@@ -2,12 +2,12 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.9.36">
+<meta name="generator" content="quarto-1.9.37">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>construction.extrude.extrude – jaxCAD</title>
+<title>parametrization.to_normalized – jaxCAD</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -74,10 +74,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-845c23b38eaddc0f92fda52bfe77a8c8.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-7f8f88aac4f3542376d5c11b86a4c14d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-1bacb4435680e45c9ebf9ff2856e7072.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-3ab3c25880d787e734ee9f73ca06a7d1.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -184,11 +184,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#jaxcad.construction.extrude.extrude" id="toc-jaxcad.construction.extrude.extrude" class="nav-link active" data-scroll-target="#jaxcad.construction.extrude.extrude">construction.extrude.extrude</a>
+  <li><a href="#jaxcad.parametrization.to_normalized" id="toc-jaxcad.parametrization.to_normalized" class="nav-link active" data-scroll-target="#jaxcad.parametrization.to_normalized">parametrization.to_normalized</a>
   <ul class="collapse">
   <li><a href="#parameters" id="toc-parameters" class="nav-link" data-scroll-target="#parameters">Parameters</a></li>
   <li><a href="#returns" id="toc-returns" class="nav-link" data-scroll-target="#returns">Returns</a></li>
-  <li><a href="#example" id="toc-example" class="nav-link" data-scroll-target="#example">Example</a></li>
   </ul></li>
   </ul>
 </nav>
@@ -199,19 +198,19 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 
 
-<section id="jaxcad.construction.extrude.extrude" class="level1">
-<h1>construction.extrude.extrude</h1>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>construction.extrude.extrude(rectangle, depth)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Extrude a rectangle to create an oriented box.</p>
-<p>The box is centered on the rectangle’s plane and extends depth/2 in each direction along the rectangle’s normal.</p>
+<section id="jaxcad.parametrization.to_normalized" class="level1">
+<h1>parametrization.to_normalized</h1>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>parametrization.to_normalized(free_params, metadata, scales)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><code>to_unconstrained</code> followed by <code>normalize</code>.</p>
+<p>Convenience wrapper for entering optimizer space from raw param values.</p>
 <section id="parameters" class="level2 doc-section doc-section-parameters">
 <h2 class="doc-section doc-section-parameters anchored" data-anchor-id="parameters">Parameters</h2>
 <table class="caption-top table">
 <colgroup>
 <col style="width: 13%">
-<col style="width: 20%">
-<col style="width: 50%">
-<col style="width: 14%">
+<col style="width: 8%">
+<col style="width: 64%">
+<col style="width: 12%">
 </colgroup>
 <thead>
 <tr class="header">
@@ -223,15 +222,21 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </thead>
 <tbody>
 <tr class="odd">
-<td>rectangle</td>
-<td>Rectangle</td>
-<td>Rectangle to extrude</td>
+<td>free_params</td>
+<td></td>
+<td><code>dict[str, Array]</code> of raw (constrained) parameter values.</td>
 <td><em>required</em></td>
 </tr>
 <tr class="even">
-<td>depth</td>
-<td>float | Scalar</td>
-<td>Extrusion depth (total, not half-depth)</td>
+<td>metadata</td>
+<td></td>
+<td><code>dict[str, Parameter]</code> from :func:<code>extract_parameters</code>.</td>
+<td><em>required</em></td>
+</tr>
+<tr class="odd">
+<td>scales</td>
+<td></td>
+<td><code>dict[str, Array]</code> from :func:<code>compute_param_scales</code>.</td>
 <td><em>required</em></td>
 </tr>
 </tbody>
@@ -240,6 +245,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="returns" class="level2 doc-section doc-section-returns">
 <h2 class="doc-section doc-section-returns anchored" data-anchor-id="returns">Returns</h2>
 <table class="caption-top table">
+<colgroup>
+<col style="width: 11%">
+<col style="width: 11%">
+<col style="width: 77%">
+</colgroup>
 <thead>
 <tr class="header">
 <th>Name</th>
@@ -250,16 +260,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <tbody>
 <tr class="odd">
 <td></td>
-<td>Box</td>
-<td>Box SDF with shared parameter references</td>
+<td></td>
+<td><code>dict[str, Array]</code> ready to pass to the optimizer.</td>
 </tr>
 </tbody>
 </table>
-</section>
-<section id="example" class="level2 doc-section doc-section-example">
-<h2 class="doc-section doc-section-example anchored" data-anchor-id="example">Example</h2>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>rect <span class="op">=</span> Rectangle(center<span class="op">=</span>[<span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">0</span>], width<span class="op">=</span><span class="fl">2.0</span>, height<span class="op">=</span><span class="fl">1.0</span>)</span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>box <span class="op">=</span> extrude(rect, depth<span class="op">=</span><span class="fl">3.0</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 
 
 </section>

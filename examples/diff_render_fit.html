@@ -1,0 +1,1272 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.37">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>Differentiable Rendering with jaxCAD’s Parameter System – jaxCAD</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-7f8f88aac4f3542376d5c11b86a4c14d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-3ab3c25880d787e734ee9f73ca06a7d1.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+</head>
+
+<body class="nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">jaxCAD</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../docs/getting-started.html"> 
+<span class="menu-text">Get Started</span></a>
+  </li>  
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-examples" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Examples</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-examples">    
+        <li>
+    <a class="dropdown-item" href="../examples/basics.html">
+ <span class="dropdown-text">Basics</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/render.html">
+ <span class="dropdown-text">Render</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/constraints.html">
+ <span class="dropdown-text">Constraints</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/optimization.html">
+ <span class="dropdown-text">Optimization</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/constrained_optimization.html">
+ <span class="dropdown-text">Constrained Optimization</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="../reference/index.html"> 
+<span class="menu-text">API Reference</span></a>
+  </li>  
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/andrinr/jaxcad"> <i class="bi bi-github" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#optimisation" id="toc-optimisation" class="nav-link active" data-scroll-target="#optimisation">Optimisation</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Differentiable Rendering with jaxCAD’s Parameter System</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>jaxCAD’s sphere-tracing renderer is fully differentiable — gradients flow through the march loop, normal computation, and shading. This notebook solves an <strong>inverse-rendering problem</strong>: given a target photograph (<code>lada.png</code>), optimise a scene of SDF primitives so its rendering minimises pixel-space MSE against the photo.</p>
+<p>The full pipeline uses jaxCAD’s parameter system end-to-end:</p>
+<ol type="1">
+<li>Build a <code>Scene</code> with geometry, per-primitive <code>Material</code>s (colours as free <code>Vector</code> params), a <code>Camera</code>, and lighting.</li>
+<li><code>extract_parameters(scene)</code> yields one <code>free_params</code> dict covering geometry, materials, camera, and lights — no manual bookkeeping.</li>
+<li><code>functionalize_render(scene)</code> compiles the scene to a pure <code>(free_params, resolution) → image</code> JAX function, differentiable via <code>jax.grad</code>.</li>
+<li>Adam optimises <code>free_params</code> to minimise pixel-space MSE against the target.</li>
+</ol>
+<p>Material colours are stored in <code>[0, 1]</code> linear space. The background colour (<code>bg_color</code>) is the exception: it lives in logit space and is sigmoid-mapped at render time so it stays unconstrained during optimisation.</p>
+<div id="b4f0f42a" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> time</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> imageio</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> jax</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> jax.numpy <span class="im">as</span> jnp</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> optax</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> PIL <span class="im">import</span> Image</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> jaxcad <span class="im">import</span> (</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>    compute_param_scales,</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>    extract_parameters,</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>    from_normalized,</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>    functionalize_render,</span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>    to_normalized,</span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> jaxcad.geometry <span class="im">import</span> Scalar, Vector</span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> jaxcad.render <span class="im">import</span> Camera, Material, Scene</span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> jaxcad.sdf <span class="im">import</span> Box, Cylinder, Plane, Rotate, RoundBox, Torus, Translate, Union</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="load_target" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># ── Target image ─────────────────────────────────────────────────────────────</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>RES <span class="op">=</span> (<span class="dv">80</span>, <span class="dv">120</span>)  <span class="co"># (height, width)</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>SKY <span class="op">=</span> (<span class="dv">140</span>, <span class="dv">152</span>, <span class="dv">168</span>)</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>img_rgba <span class="op">=</span> Image.<span class="bu">open</span>(<span class="st">"assets/lada.png"</span>).convert(<span class="st">"RGBA"</span>)</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>bg <span class="op">=</span> Image.new(<span class="st">"RGB"</span>, img_rgba.size, SKY)</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>bg.paste(img_rgba.convert(<span class="st">"RGB"</span>), mask<span class="op">=</span>img_rgba.split()[<span class="dv">3</span>])</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>target_pil <span class="op">=</span> bg.resize((RES[<span class="dv">1</span>], RES[<span class="dv">0</span>]), Image.LANCZOS)</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>target <span class="op">=</span> jnp.array(np.array(target_pil) <span class="op">/</span> <span class="fl">255.0</span>, dtype<span class="op">=</span>jnp.float32)</span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="dv">9</span>, <span class="dv">6</span>))</span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>ax.imshow(np.array(target))</span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>ax.set_title(<span class="ss">f"Target  (</span><span class="sc">{</span>RES[<span class="dv">1</span>]<span class="sc">}</span><span class="ss">×</span><span class="sc">{</span>RES[<span class="dv">0</span>]<span class="sc">}</span><span class="ss"> px)"</span>)</span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>ax.axis(<span class="st">"off"</span>)</span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="diff_render_fit_files/figure-html/cell-3-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="scene_build" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># ── Free geometry parameters ──────────────────────────────────────────────────</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Lower body (chassis + doors)</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>body_pos <span class="op">=</span> Vector([<span class="fl">0.0</span>, <span class="op">-</span><span class="fl">0.10</span>, <span class="fl">0.0</span>], free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">"body_pos"</span>)</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>body_size <span class="op">=</span> Vector([<span class="fl">1.85</span>, <span class="fl">0.42</span>, <span class="fl">0.65</span>], free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">"body_size"</span>, bounds<span class="op">=</span>(<span class="fl">0.01</span>, <span class="va">None</span>))</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Cabin — roof slab + front A-pillar + rear C-pillar, each with a free rotation angle</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>roof_pos <span class="op">=</span> Vector([<span class="op">-</span><span class="fl">0.15</span>, <span class="fl">0.90</span>, <span class="fl">0.0</span>], free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">"roof_pos"</span>)</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>roof_size <span class="op">=</span> Vector([<span class="fl">0.82</span>, <span class="fl">0.11</span>, <span class="fl">0.58</span>], free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">"roof_size"</span>, bounds<span class="op">=</span>(<span class="fl">0.01</span>, <span class="va">None</span>))</span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>pillar_f_pos <span class="op">=</span> Vector([<span class="op">-</span><span class="fl">0.65</span>, <span class="fl">0.67</span>, <span class="fl">0.0</span>], free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">"pillar_f_pos"</span>)</span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>pillar_f_size <span class="op">=</span> Vector([<span class="fl">0.13</span>, <span class="fl">0.25</span>, <span class="fl">0.55</span>], free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">"pillar_f_size"</span>, bounds<span class="op">=</span>(<span class="fl">0.01</span>, <span class="va">None</span>))</span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>pillar_f_angle <span class="op">=</span> Scalar(<span class="fl">0.25</span>, free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">"pillar_f_angle"</span>)  <span class="co"># lean (rad), around Z</span></span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>pillar_r_pos <span class="op">=</span> Vector([<span class="fl">0.42</span>, <span class="fl">0.67</span>, <span class="fl">0.0</span>], free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">"pillar_r_pos"</span>)</span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>pillar_r_size <span class="op">=</span> Vector([<span class="fl">0.13</span>, <span class="fl">0.25</span>, <span class="fl">0.55</span>], free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">"pillar_r_size"</span>, bounds<span class="op">=</span>(<span class="fl">0.01</span>, <span class="va">None</span>))</span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>pillar_r_angle <span class="op">=</span> Scalar(<span class="op">-</span><span class="fl">0.22</span>, free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">"pillar_r_angle"</span>)  <span class="co"># lean (rad), around Z</span></span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a><span class="co"># Hood — free size, position, and slope angle (nose-down = negative)</span></span>
+<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a>hood_pos <span class="op">=</span> Vector([<span class="op">-</span><span class="fl">1.47</span>, <span class="fl">0.18</span>, <span class="fl">0.0</span>], free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">"hood_pos"</span>)</span>
+<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a>hood_size <span class="op">=</span> Vector([<span class="fl">0.62</span>, <span class="fl">0.12</span>, <span class="fl">0.63</span>], free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">"hood_size"</span>, bounds<span class="op">=</span>(<span class="fl">0.01</span>, <span class="va">None</span>))</span>
+<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a>hood_angle <span class="op">=</span> Scalar(<span class="op">-</span><span class="fl">0.08</span>, free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">"hood_angle"</span>)</span>
+<span id="cb3-23"><a href="#cb3-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-24"><a href="#cb3-24" aria-hidden="true" tabindex="-1"></a><span class="co"># Trunk lid — free size, position, and slope angle</span></span>
+<span id="cb3-25"><a href="#cb3-25" aria-hidden="true" tabindex="-1"></a>trunk_pos <span class="op">=</span> Vector([<span class="fl">1.35</span>, <span class="fl">0.14</span>, <span class="fl">0.0</span>], free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">"trunk_pos"</span>)</span>
+<span id="cb3-26"><a href="#cb3-26" aria-hidden="true" tabindex="-1"></a>trunk_size <span class="op">=</span> Vector([<span class="fl">0.48</span>, <span class="fl">0.09</span>, <span class="fl">0.63</span>], free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">"trunk_size"</span>, bounds<span class="op">=</span>(<span class="fl">0.01</span>, <span class="va">None</span>))</span>
+<span id="cb3-27"><a href="#cb3-27" aria-hidden="true" tabindex="-1"></a>trunk_angle <span class="op">=</span> Scalar(<span class="fl">0.06</span>, free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">"trunk_angle"</span>)</span>
+<span id="cb3-28"><a href="#cb3-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-29"><a href="#cb3-29" aria-hidden="true" tabindex="-1"></a><span class="co"># Bumpers</span></span>
+<span id="cb3-30"><a href="#cb3-30" aria-hidden="true" tabindex="-1"></a>bumper_f_pos <span class="op">=</span> Vector([<span class="op">-</span><span class="fl">1.96</span>, <span class="op">-</span><span class="fl">0.20</span>, <span class="fl">0.0</span>], free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">"bumper_f_pos"</span>)</span>
+<span id="cb3-31"><a href="#cb3-31" aria-hidden="true" tabindex="-1"></a>bumper_r_pos <span class="op">=</span> Vector([<span class="fl">1.96</span>, <span class="op">-</span><span class="fl">0.20</span>, <span class="fl">0.0</span>], free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">"bumper_r_pos"</span>)</span>
+<span id="cb3-32"><a href="#cb3-32" aria-hidden="true" tabindex="-1"></a>bumper_size <span class="op">=</span> Vector([<span class="fl">0.04</span>, <span class="fl">0.18</span>, <span class="fl">0.58</span>], free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">"bumper_size"</span>, bounds<span class="op">=</span>(<span class="fl">0.01</span>, <span class="va">None</span>))</span>
+<span id="cb3-33"><a href="#cb3-33" aria-hidden="true" tabindex="-1"></a>bumper_radius <span class="op">=</span> Scalar(<span class="fl">0.06</span>, free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">"bumper_radius"</span>, bounds<span class="op">=</span>(<span class="fl">0.001</span>, <span class="va">None</span>))</span>
+<span id="cb3-34"><a href="#cb3-34" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-35"><a href="#cb3-35" aria-hidden="true" tabindex="-1"></a><span class="co"># Wheel positions (near-side, disc face toward +Z camera)</span></span>
+<span id="cb3-36"><a href="#cb3-36" aria-hidden="true" tabindex="-1"></a>wf_pos <span class="op">=</span> Vector([<span class="op">-</span><span class="fl">1.15</span>, <span class="op">-</span><span class="fl">0.65</span>, <span class="fl">0.52</span>], free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">"wf_pos"</span>)</span>
+<span id="cb3-37"><a href="#cb3-37" aria-hidden="true" tabindex="-1"></a>wr_pos <span class="op">=</span> Vector([<span class="fl">1.15</span>, <span class="op">-</span><span class="fl">0.65</span>, <span class="fl">0.52</span>], free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">"wr_pos"</span>)</span>
+<span id="cb3-38"><a href="#cb3-38" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-39"><a href="#cb3-39" aria-hidden="true" tabindex="-1"></a><span class="co"># Tire — Torus in XY plane (Z = wheel symmetry axis)</span></span>
+<span id="cb3-40"><a href="#cb3-40" aria-hidden="true" tabindex="-1"></a>r_tire_major <span class="op">=</span> Scalar(<span class="fl">0.34</span>, free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">"r_tire_major"</span>, bounds<span class="op">=</span>(<span class="fl">0.05</span>, <span class="va">None</span>))</span>
+<span id="cb3-41"><a href="#cb3-41" aria-hidden="true" tabindex="-1"></a>r_tire_minor <span class="op">=</span> Scalar(<span class="fl">0.08</span>, free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">"r_tire_minor"</span>, bounds<span class="op">=</span>(<span class="fl">0.01</span>, <span class="va">None</span>))</span>
+<span id="cb3-42"><a href="#cb3-42" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-43"><a href="#cb3-43" aria-hidden="true" tabindex="-1"></a><span class="co"># Rim disc (aluminium face)</span></span>
+<span id="cb3-44"><a href="#cb3-44" aria-hidden="true" tabindex="-1"></a>r_rim <span class="op">=</span> Scalar(<span class="fl">0.28</span>, free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">"r_rim"</span>, bounds<span class="op">=</span>(<span class="fl">0.02</span>, <span class="va">None</span>))</span>
+<span id="cb3-45"><a href="#cb3-45" aria-hidden="true" tabindex="-1"></a>wh_rim <span class="op">=</span> Scalar(<span class="fl">0.10</span>, free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">"wh_rim"</span>, bounds<span class="op">=</span>(<span class="fl">0.01</span>, <span class="va">None</span>))</span>
+<span id="cb3-46"><a href="#cb3-46" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-47"><a href="#cb3-47" aria-hidden="true" tabindex="-1"></a><span class="co"># Central hub boss</span></span>
+<span id="cb3-48"><a href="#cb3-48" aria-hidden="true" tabindex="-1"></a>r_hub <span class="op">=</span> Scalar(<span class="fl">0.08</span>, free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">"r_hub"</span>, bounds<span class="op">=</span>(<span class="fl">0.01</span>, <span class="va">None</span>))</span>
+<span id="cb3-49"><a href="#cb3-49" aria-hidden="true" tabindex="-1"></a>wh_hub <span class="op">=</span> Scalar(<span class="fl">0.16</span>, free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">"wh_hub"</span>, bounds<span class="op">=</span>(<span class="fl">0.01</span>, <span class="va">None</span>))</span>
+<span id="cb3-50"><a href="#cb3-50" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-51"><a href="#cb3-51" aria-hidden="true" tabindex="-1"></a><span class="co"># Materials</span></span>
+<span id="cb3-52"><a href="#cb3-52" aria-hidden="true" tabindex="-1"></a>body_mat <span class="op">=</span> Material(<span class="st">"body_mat"</span>, color<span class="op">=</span>[<span class="fl">0.50</span>, <span class="fl">0.50</span>, <span class="fl">0.50</span>], roughness<span class="op">=</span><span class="fl">0.40</span>, metallic<span class="op">=</span><span class="fl">0.12</span>, free<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb3-53"><a href="#cb3-53" aria-hidden="true" tabindex="-1"></a>roof_mat <span class="op">=</span> Material(<span class="st">"roof_mat"</span>, color<span class="op">=</span>[<span class="fl">0.50</span>, <span class="fl">0.50</span>, <span class="fl">0.50</span>], roughness<span class="op">=</span><span class="fl">0.35</span>, metallic<span class="op">=</span><span class="fl">0.08</span>, free<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb3-54"><a href="#cb3-54" aria-hidden="true" tabindex="-1"></a>pillar_mat <span class="op">=</span> Material(</span>
+<span id="cb3-55"><a href="#cb3-55" aria-hidden="true" tabindex="-1"></a>    <span class="st">"pillar_mat"</span>, color<span class="op">=</span>[<span class="fl">0.10</span>, <span class="fl">0.10</span>, <span class="fl">0.10</span>], roughness<span class="op">=</span><span class="fl">0.60</span>, metallic<span class="op">=</span><span class="fl">0.05</span>, free<span class="op">=</span><span class="va">True</span></span>
+<span id="cb3-56"><a href="#cb3-56" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb3-57"><a href="#cb3-57" aria-hidden="true" tabindex="-1"></a>hood_mat <span class="op">=</span> Material(<span class="st">"hood_mat"</span>, color<span class="op">=</span>[<span class="fl">0.50</span>, <span class="fl">0.50</span>, <span class="fl">0.50</span>], roughness<span class="op">=</span><span class="fl">0.38</span>, metallic<span class="op">=</span><span class="fl">0.12</span>, free<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb3-58"><a href="#cb3-58" aria-hidden="true" tabindex="-1"></a>tire_mat <span class="op">=</span> Material(<span class="st">"tire_mat"</span>, color<span class="op">=</span>[<span class="fl">0.08</span>, <span class="fl">0.08</span>, <span class="fl">0.08</span>], roughness<span class="op">=</span><span class="fl">0.88</span>, metallic<span class="op">=</span><span class="fl">0.00</span>, free<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb3-59"><a href="#cb3-59" aria-hidden="true" tabindex="-1"></a>rim_mat <span class="op">=</span> Material(<span class="st">"rim_mat"</span>, color<span class="op">=</span>[<span class="fl">0.75</span>, <span class="fl">0.75</span>, <span class="fl">0.80</span>], roughness<span class="op">=</span><span class="fl">0.18</span>, metallic<span class="op">=</span><span class="fl">0.92</span>, free<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb3-60"><a href="#cb3-60" aria-hidden="true" tabindex="-1"></a>bump_mat <span class="op">=</span> Material(<span class="st">"bump_mat"</span>, color<span class="op">=</span>[<span class="fl">0.72</span>, <span class="fl">0.72</span>, <span class="fl">0.72</span>], roughness<span class="op">=</span><span class="fl">0.50</span>, metallic<span class="op">=</span><span class="fl">0.25</span>, free<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb3-61"><a href="#cb3-61" aria-hidden="true" tabindex="-1"></a>ground_mat <span class="op">=</span> Material(</span>
+<span id="cb3-62"><a href="#cb3-62" aria-hidden="true" tabindex="-1"></a>    <span class="st">"ground_mat"</span>, color<span class="op">=</span>[<span class="fl">0.40</span>, <span class="fl">0.40</span>, <span class="fl">0.40</span>], roughness<span class="op">=</span><span class="fl">0.95</span>, metallic<span class="op">=</span><span class="fl">0.00</span>, free<span class="op">=</span><span class="va">True</span></span>
+<span id="cb3-63"><a href="#cb3-63" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb3-64"><a href="#cb3-64" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-65"><a href="#cb3-65" aria-hidden="true" tabindex="-1"></a><span class="co"># ── Ground plane ──────────────────────────────────────────────────────────────</span></span>
+<span id="cb3-66"><a href="#cb3-66" aria-hidden="true" tabindex="-1"></a>GROUND_Y <span class="op">=</span> <span class="op">-</span><span class="fl">1.10</span></span>
+<span id="cb3-67"><a href="#cb3-67" aria-hidden="true" tabindex="-1"></a>ground <span class="op">=</span> Plane(height<span class="op">=</span>Scalar(GROUND_Y, free<span class="op">=</span><span class="va">False</span>), material<span class="op">=</span>ground_mat)</span>
+<span id="cb3-68"><a href="#cb3-68" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-69"><a href="#cb3-69" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-70"><a href="#cb3-70" aria-hidden="true" tabindex="-1"></a><span class="co"># ── Wheel assembly: rubber torus + aluminium rim disc + hub boss ───────────────</span></span>
+<span id="cb3-71"><a href="#cb3-71" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> make_wheel(pos):</span>
+<span id="cb3-72"><a href="#cb3-72" aria-hidden="true" tabindex="-1"></a>    tire <span class="op">=</span> Translate(</span>
+<span id="cb3-73"><a href="#cb3-73" aria-hidden="true" tabindex="-1"></a>        Torus(major_radius<span class="op">=</span>r_tire_major, minor_radius<span class="op">=</span>r_tire_minor, material<span class="op">=</span>tire_mat), pos</span>
+<span id="cb3-74"><a href="#cb3-74" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb3-75"><a href="#cb3-75" aria-hidden="true" tabindex="-1"></a>    rim <span class="op">=</span> Translate(Cylinder(radius<span class="op">=</span>r_rim, height<span class="op">=</span>wh_rim, material<span class="op">=</span>rim_mat), pos)</span>
+<span id="cb3-76"><a href="#cb3-76" aria-hidden="true" tabindex="-1"></a>    hub <span class="op">=</span> Translate(Cylinder(radius<span class="op">=</span>r_hub, height<span class="op">=</span>wh_hub, material<span class="op">=</span>rim_mat), pos)</span>
+<span id="cb3-77"><a href="#cb3-77" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> Union((tire, rim, hub), smoothness<span class="op">=</span><span class="fl">0.0</span>)</span>
+<span id="cb3-78"><a href="#cb3-78" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-79"><a href="#cb3-79" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-80"><a href="#cb3-80" aria-hidden="true" tabindex="-1"></a>car <span class="op">=</span> Union(</span>
+<span id="cb3-81"><a href="#cb3-81" aria-hidden="true" tabindex="-1"></a>    (</span>
+<span id="cb3-82"><a href="#cb3-82" aria-hidden="true" tabindex="-1"></a>        <span class="co"># ── Body ─────────────────────────────────────────────────────────────</span></span>
+<span id="cb3-83"><a href="#cb3-83" aria-hidden="true" tabindex="-1"></a>        Translate(Box(size<span class="op">=</span>body_size, material<span class="op">=</span>body_mat), body_pos),</span>
+<span id="cb3-84"><a href="#cb3-84" aria-hidden="true" tabindex="-1"></a>        <span class="co"># ── Cabin: roof + A-pillar (front) + C-pillar (rear) ─────────────────</span></span>
+<span id="cb3-85"><a href="#cb3-85" aria-hidden="true" tabindex="-1"></a>        Translate(Box(size<span class="op">=</span>roof_size, material<span class="op">=</span>roof_mat), roof_pos),</span>
+<span id="cb3-86"><a href="#cb3-86" aria-hidden="true" tabindex="-1"></a>        Translate(</span>
+<span id="cb3-87"><a href="#cb3-87" aria-hidden="true" tabindex="-1"></a>            Rotate(</span>
+<span id="cb3-88"><a href="#cb3-88" aria-hidden="true" tabindex="-1"></a>                RoundBox(size<span class="op">=</span>pillar_f_size, radius<span class="op">=</span><span class="fl">0.03</span>, material<span class="op">=</span>pillar_mat), <span class="st">"z"</span>, pillar_f_angle</span>
+<span id="cb3-89"><a href="#cb3-89" aria-hidden="true" tabindex="-1"></a>            ),</span>
+<span id="cb3-90"><a href="#cb3-90" aria-hidden="true" tabindex="-1"></a>            pillar_f_pos,</span>
+<span id="cb3-91"><a href="#cb3-91" aria-hidden="true" tabindex="-1"></a>        ),</span>
+<span id="cb3-92"><a href="#cb3-92" aria-hidden="true" tabindex="-1"></a>        Translate(</span>
+<span id="cb3-93"><a href="#cb3-93" aria-hidden="true" tabindex="-1"></a>            Rotate(</span>
+<span id="cb3-94"><a href="#cb3-94" aria-hidden="true" tabindex="-1"></a>                RoundBox(size<span class="op">=</span>pillar_r_size, radius<span class="op">=</span><span class="fl">0.03</span>, material<span class="op">=</span>pillar_mat), <span class="st">"z"</span>, pillar_r_angle</span>
+<span id="cb3-95"><a href="#cb3-95" aria-hidden="true" tabindex="-1"></a>            ),</span>
+<span id="cb3-96"><a href="#cb3-96" aria-hidden="true" tabindex="-1"></a>            pillar_r_pos,</span>
+<span id="cb3-97"><a href="#cb3-97" aria-hidden="true" tabindex="-1"></a>        ),</span>
+<span id="cb3-98"><a href="#cb3-98" aria-hidden="true" tabindex="-1"></a>        <span class="co"># ── Hood (sloped) ─────────────────────────────────────────────────────</span></span>
+<span id="cb3-99"><a href="#cb3-99" aria-hidden="true" tabindex="-1"></a>        Translate(Rotate(Box(size<span class="op">=</span>hood_size, material<span class="op">=</span>hood_mat), <span class="st">"z"</span>, hood_angle), hood_pos),</span>
+<span id="cb3-100"><a href="#cb3-100" aria-hidden="true" tabindex="-1"></a>        <span class="co"># ── Trunk lid (sloped) ────────────────────────────────────────────────</span></span>
+<span id="cb3-101"><a href="#cb3-101" aria-hidden="true" tabindex="-1"></a>        Translate(Rotate(Box(size<span class="op">=</span>trunk_size, material<span class="op">=</span>hood_mat), <span class="st">"z"</span>, trunk_angle), trunk_pos),</span>
+<span id="cb3-102"><a href="#cb3-102" aria-hidden="true" tabindex="-1"></a>        <span class="co"># ── Bumpers ───────────────────────────────────────────────────────────</span></span>
+<span id="cb3-103"><a href="#cb3-103" aria-hidden="true" tabindex="-1"></a>        Translate(</span>
+<span id="cb3-104"><a href="#cb3-104" aria-hidden="true" tabindex="-1"></a>            RoundBox(size<span class="op">=</span>bumper_size, radius<span class="op">=</span>bumper_radius, material<span class="op">=</span>bump_mat), bumper_f_pos</span>
+<span id="cb3-105"><a href="#cb3-105" aria-hidden="true" tabindex="-1"></a>        ),</span>
+<span id="cb3-106"><a href="#cb3-106" aria-hidden="true" tabindex="-1"></a>        Translate(</span>
+<span id="cb3-107"><a href="#cb3-107" aria-hidden="true" tabindex="-1"></a>            RoundBox(size<span class="op">=</span>bumper_size, radius<span class="op">=</span>bumper_radius, material<span class="op">=</span>bump_mat), bumper_r_pos</span>
+<span id="cb3-108"><a href="#cb3-108" aria-hidden="true" tabindex="-1"></a>        ),</span>
+<span id="cb3-109"><a href="#cb3-109" aria-hidden="true" tabindex="-1"></a>        <span class="co"># ── Near-side wheels (tire + rim + hub) ───────────────────────────────</span></span>
+<span id="cb3-110"><a href="#cb3-110" aria-hidden="true" tabindex="-1"></a>        make_wheel(wf_pos),</span>
+<span id="cb3-111"><a href="#cb3-111" aria-hidden="true" tabindex="-1"></a>        make_wheel(wr_pos),</span>
+<span id="cb3-112"><a href="#cb3-112" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb3-113"><a href="#cb3-113" aria-hidden="true" tabindex="-1"></a>    smoothness<span class="op">=</span><span class="fl">0.05</span>,</span>
+<span id="cb3-114"><a href="#cb3-114" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb3-115"><a href="#cb3-115" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-116"><a href="#cb3-116" aria-hidden="true" tabindex="-1"></a>geometry <span class="op">=</span> Union((car, ground), smoothness<span class="op">=</span><span class="fl">0.0</span>)</span>
+<span id="cb3-117"><a href="#cb3-117" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-118"><a href="#cb3-118" aria-hidden="true" tabindex="-1"></a><span class="co"># ── Camera and scene ──────────────────────────────────────────────────────────</span></span>
+<span id="cb3-119"><a href="#cb3-119" aria-hidden="true" tabindex="-1"></a>camera <span class="op">=</span> Camera(</span>
+<span id="cb3-120"><a href="#cb3-120" aria-hidden="true" tabindex="-1"></a>    camera_pos<span class="op">=</span>Vector([<span class="fl">4.0</span>, <span class="fl">2.0</span>, <span class="fl">6.0</span>], free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">"camera_pos"</span>),</span>
+<span id="cb3-121"><a href="#cb3-121" aria-hidden="true" tabindex="-1"></a>    look_at<span class="op">=</span>Vector([<span class="fl">0.0</span>, <span class="fl">0.0</span>, <span class="fl">0.0</span>], free<span class="op">=</span><span class="va">False</span>, name<span class="op">=</span><span class="st">"look_at"</span>),</span>
+<span id="cb3-122"><a href="#cb3-122" aria-hidden="true" tabindex="-1"></a>    fov<span class="op">=</span>Scalar(<span class="fl">0.55</span>, free<span class="op">=</span><span class="va">False</span>, name<span class="op">=</span><span class="st">"fov"</span>),</span>
+<span id="cb3-123"><a href="#cb3-123" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb3-124"><a href="#cb3-124" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-125"><a href="#cb3-125" aria-hidden="true" tabindex="-1"></a>scene <span class="op">=</span> Scene(</span>
+<span id="cb3-126"><a href="#cb3-126" aria-hidden="true" tabindex="-1"></a>    geometry,</span>
+<span id="cb3-127"><a href="#cb3-127" aria-hidden="true" tabindex="-1"></a>    camera,</span>
+<span id="cb3-128"><a href="#cb3-128" aria-hidden="true" tabindex="-1"></a>    bg_color<span class="op">=</span>Vector([<span class="fl">0.5</span>, <span class="fl">0.5</span>, <span class="fl">0.5</span>], free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">"bg_color"</span>),</span>
+<span id="cb3-129"><a href="#cb3-129" aria-hidden="true" tabindex="-1"></a>    light_dirs<span class="op">=</span>[</span>
+<span id="cb3-130"><a href="#cb3-130" aria-hidden="true" tabindex="-1"></a>        Vector([<span class="fl">0.45</span>, <span class="fl">0.85</span>, <span class="fl">0.25</span>], free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">"light_dir_0"</span>),</span>
+<span id="cb3-131"><a href="#cb3-131" aria-hidden="true" tabindex="-1"></a>        Vector([<span class="op">-</span><span class="fl">0.3</span>, <span class="fl">0.5</span>, <span class="op">-</span><span class="fl">0.2</span>], free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">"light_dir_1"</span>),</span>
+<span id="cb3-132"><a href="#cb3-132" aria-hidden="true" tabindex="-1"></a>    ],</span>
+<span id="cb3-133"><a href="#cb3-133" aria-hidden="true" tabindex="-1"></a>    light_colors<span class="op">=</span>[</span>
+<span id="cb3-134"><a href="#cb3-134" aria-hidden="true" tabindex="-1"></a>        Vector([<span class="fl">0.90</span>, <span class="fl">0.90</span>, <span class="fl">0.90</span>], free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">"light_color_0"</span>, bounds<span class="op">=</span>(<span class="fl">0.0</span>, <span class="va">None</span>)),</span>
+<span id="cb3-135"><a href="#cb3-135" aria-hidden="true" tabindex="-1"></a>        Vector([<span class="fl">0.35</span>, <span class="fl">0.35</span>, <span class="fl">0.35</span>], free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">"light_color_1"</span>, bounds<span class="op">=</span>(<span class="fl">0.0</span>, <span class="va">None</span>)),</span>
+<span id="cb3-136"><a href="#cb3-136" aria-hidden="true" tabindex="-1"></a>    ],</span>
+<span id="cb3-137"><a href="#cb3-137" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb3-138"><a href="#cb3-138" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-139"><a href="#cb3-139" aria-hidden="true" tabindex="-1"></a><span class="co"># ── Extract all free parameters ───────────────────────────────────────────────</span></span>
+<span id="cb3-140"><a href="#cb3-140" aria-hidden="true" tabindex="-1"></a>free_params, fixed_params, metadata <span class="op">=</span> extract_parameters(scene)</span>
+<span id="cb3-141"><a href="#cb3-141" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-142"><a href="#cb3-142" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"free_params keys:"</span>, <span class="bu">sorted</span>(free_params.keys()))</span>
+<span id="cb3-143"><a href="#cb3-143" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(</span>
+<span id="cb3-144"><a href="#cb3-144" aria-hidden="true" tabindex="-1"></a>    <span class="ss">f"</span><span class="ch">\n</span><span class="sc">{</span><span class="bu">len</span>(free_params)<span class="sc">}</span><span class="ss"> free params, "</span></span>
+<span id="cb3-145"><a href="#cb3-145" aria-hidden="true" tabindex="-1"></a>    <span class="ss">f"</span><span class="sc">{</span><span class="bu">sum</span>(v.size <span class="cf">for</span> v <span class="kw">in</span> free_params.values())<span class="sc">}</span><span class="ss"> scalar values"</span></span>
+<span id="cb3-146"><a href="#cb3-146" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb3-147"><a href="#cb3-147" aria-hidden="true" tabindex="-1"></a>bounded <span class="op">=</span> {k: p.bounds <span class="cf">for</span> k, p <span class="kw">in</span> metadata.items() <span class="cf">if</span> p.bounds <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>}</span>
+<span id="cb3-148"><a href="#cb3-148" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">Bounded params (</span><span class="sc">{</span><span class="bu">len</span>(bounded)<span class="sc">}</span><span class="ss">): </span><span class="sc">{</span>bounded<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>free_params keys: ['bg_color', 'body_mat_color', 'body_mat_ior', 'body_mat_metallic', 'body_mat_opacity', 'body_mat_reflectivity', 'body_mat_roughness', 'body_pos', 'body_size', 'bump_mat_color', 'bump_mat_ior', 'bump_mat_metallic', 'bump_mat_opacity', 'bump_mat_reflectivity', 'bump_mat_roughness', 'bumper_f_pos', 'bumper_r_pos', 'bumper_radius', 'bumper_size', 'camera_pos', 'ground_mat_color', 'ground_mat_ior', 'ground_mat_metallic', 'ground_mat_opacity', 'ground_mat_reflectivity', 'ground_mat_roughness', 'hood_angle', 'hood_mat_color', 'hood_mat_ior', 'hood_mat_metallic', 'hood_mat_opacity', 'hood_mat_reflectivity', 'hood_mat_roughness', 'hood_pos', 'hood_size', 'light_color_0', 'light_color_1', 'light_dir_0', 'light_dir_1', 'pillar_f_angle', 'pillar_f_pos', 'pillar_f_size', 'pillar_mat_color', 'pillar_mat_ior', 'pillar_mat_metallic', 'pillar_mat_opacity', 'pillar_mat_reflectivity', 'pillar_mat_roughness', 'pillar_r_angle', 'pillar_r_pos', 'pillar_r_size', 'r_hub', 'r_rim', 'r_tire_major', 'r_tire_minor', 'rim_mat_color', 'rim_mat_ior', 'rim_mat_metallic', 'rim_mat_opacity', 'rim_mat_reflectivity', 'rim_mat_roughness', 'roof_mat_color', 'roof_mat_ior', 'roof_mat_metallic', 'roof_mat_opacity', 'roof_mat_reflectivity', 'roof_mat_roughness', 'roof_pos', 'roof_size', 'tire_mat_color', 'tire_mat_ior', 'tire_mat_metallic', 'tire_mat_opacity', 'tire_mat_reflectivity', 'tire_mat_roughness', 'trunk_angle', 'trunk_pos', 'trunk_size', 'wf_pos', 'wh_hub', 'wh_rim', 'wr_pos']
+
+82 free params, 144 scalar values
+
+Bounded params (64): {'light_color_0': (0.0, None), 'light_color_1': (0.0, None), 'body_size': (0.01, None), 'body_mat_color': (0.0, 1.0), 'body_mat_roughness': (0.0, 1.0), 'body_mat_metallic': (0.0, 1.0), 'body_mat_opacity': (0.0, 1.0), 'body_mat_ior': (1.0, 3.0), 'body_mat_reflectivity': (0.0, 1.0), 'roof_size': (0.01, None), 'roof_mat_color': (0.0, 1.0), 'roof_mat_roughness': (0.0, 1.0), 'roof_mat_metallic': (0.0, 1.0), 'roof_mat_opacity': (0.0, 1.0), 'roof_mat_ior': (1.0, 3.0), 'roof_mat_reflectivity': (0.0, 1.0), 'pillar_f_size': (0.01, None), 'pillar_mat_color': (0.0, 1.0), 'pillar_mat_roughness': (0.0, 1.0), 'pillar_mat_metallic': (0.0, 1.0), 'pillar_mat_opacity': (0.0, 1.0), 'pillar_mat_ior': (1.0, 3.0), 'pillar_mat_reflectivity': (0.0, 1.0), 'pillar_r_size': (0.01, None), 'hood_size': (0.01, None), 'hood_mat_color': (0.0, 1.0), 'hood_mat_roughness': (0.0, 1.0), 'hood_mat_metallic': (0.0, 1.0), 'hood_mat_opacity': (0.0, 1.0), 'hood_mat_ior': (1.0, 3.0), 'hood_mat_reflectivity': (0.0, 1.0), 'trunk_size': (0.01, None), 'bumper_size': (0.01, None), 'bumper_radius': (0.001, None), 'bump_mat_color': (0.0, 1.0), 'bump_mat_roughness': (0.0, 1.0), 'bump_mat_metallic': (0.0, 1.0), 'bump_mat_opacity': (0.0, 1.0), 'bump_mat_ior': (1.0, 3.0), 'bump_mat_reflectivity': (0.0, 1.0), 'r_tire_major': (0.05, None), 'r_tire_minor': (0.01, None), 'tire_mat_color': (0.0, 1.0), 'tire_mat_roughness': (0.0, 1.0), 'tire_mat_metallic': (0.0, 1.0), 'tire_mat_opacity': (0.0, 1.0), 'tire_mat_ior': (1.0, 3.0), 'tire_mat_reflectivity': (0.0, 1.0), 'r_rim': (0.02, None), 'wh_rim': (0.01, None), 'rim_mat_color': (0.0, 1.0), 'rim_mat_roughness': (0.0, 1.0), 'rim_mat_metallic': (0.0, 1.0), 'rim_mat_opacity': (0.0, 1.0), 'rim_mat_ior': (1.0, 3.0), 'rim_mat_reflectivity': (0.0, 1.0), 'r_hub': (0.01, None), 'wh_hub': (0.01, None), 'ground_mat_color': (0.0, 1.0), 'ground_mat_roughness': (0.0, 1.0), 'ground_mat_metallic': (0.0, 1.0), 'ground_mat_opacity': (0.0, 1.0), 'ground_mat_ior': (1.0, 3.0), 'ground_mat_reflectivity': (0.0, 1.0)}</code></pre>
+</div>
+</div>
+<div id="render_fn" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># ── Compile the scene to a differentiable render function ─────────────────────</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="co">#</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="co"># functionalize_render walks the geometry + material tree, builds pure JAX</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="co"># closures for the SDF and material_fn, and wires them into the sphere-tracing</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="co"># renderer. The result is a plain function that jax.grad can differentiate</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a><span class="co"># through entirely.</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>diff_render <span class="op">=</span> functionalize_render(</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>    scene,</span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>    max_steps<span class="op">=</span><span class="dv">32</span>,</span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>    shadow_steps<span class="op">=</span><span class="dv">12</span>,</span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>    shadow_hardness<span class="op">=</span><span class="fl">6.0</span>,</span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>    gamma<span class="op">=</span><span class="fl">2.2</span>,</span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>    fd_normals<span class="op">=</span><span class="va">False</span>,</span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Rendering initial scene (first run triggers XLA compilation)..."</span>)</span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>img0 <span class="op">=</span> diff_render(free_params, resolution<span class="op">=</span>RES)</span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Output shape: </span><span class="sc">{</span>img0<span class="sc">.</span>shape<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a>fig, axes <span class="op">=</span> plt.subplots(<span class="dv">1</span>, <span class="dv">2</span>, figsize<span class="op">=</span>(<span class="dv">14</span>, <span class="dv">5</span>))</span>
+<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].imshow(np.array(target))</span>
+<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].set_title(<span class="st">"Target (lada.png)"</span>)</span>
+<span id="cb5-24"><a href="#cb5-24" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].axis(<span class="st">"off"</span>)</span>
+<span id="cb5-25"><a href="#cb5-25" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">1</span>].imshow(np.array(img0))</span>
+<span id="cb5-26"><a href="#cb5-26" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">1</span>].set_title(<span class="st">"Initial render"</span>)</span>
+<span id="cb5-27"><a href="#cb5-27" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">1</span>].axis(<span class="st">"off"</span>)</span>
+<span id="cb5-28"><a href="#cb5-28" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb5-29"><a href="#cb5-29" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Rendering initial scene (first run triggers XLA compilation)...
+Output shape: (80, 120, 3)</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="diff_render_fit_files/figure-html/cell-5-output-2.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<section id="optimisation" class="level2">
+<h2 class="anchored" data-anchor-id="optimisation">Optimisation</h2>
+<p>We minimise MS-SSIM loss with AdamW and two improvements over a plain fixed-LR loop:</p>
+<ol type="1">
+<li><strong>Cosine LR decay</strong> — learning rate anneals smoothly from <code>3e-4</code> to <code>0</code> over all steps, avoiding late-stage instability.</li>
+<li><strong>Coarse-to-fine rendering</strong> — three phases at increasing resolution (40×60 → 60×90 → 80×120). Early low-res steps are cheap and escape coarse geometry minima; later high-res steps refine details. Adam momentum carries over across phases so convergence isn’t reset.</li>
+</ol>
+<div id="e710ea94" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co"># --- SSIM loss utilities ---</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> _ssim_channel(x, y, win_size<span class="op">=</span><span class="dv">3</span>, C1<span class="op">=</span><span class="fl">1e-4</span>, C2<span class="op">=</span><span class="fl">9e-4</span>):</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""SSIM between two (H, W) arrays using a uniform window."""</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>    pad <span class="op">=</span> win_size <span class="op">//</span> <span class="dv">2</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>    k <span class="op">=</span> jnp.ones((win_size, win_size)) <span class="op">/</span> win_size<span class="op">**</span><span class="dv">2</span></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> filt2d(img):</span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>        n <span class="op">=</span> img[<span class="va">None</span>, <span class="va">None</span>]  <span class="co"># (1, 1, H, W)</span></span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>        f <span class="op">=</span> k[<span class="va">None</span>, <span class="va">None</span>]  <span class="co"># (1, 1, win, win)</span></span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> jax.lax.conv_general_dilated(</span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a>            n,</span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a>            f,</span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a>            (<span class="dv">1</span>, <span class="dv">1</span>),</span>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a>            padding<span class="op">=</span>((pad, pad), (pad, pad)),</span>
+<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a>            dimension_numbers<span class="op">=</span>(<span class="st">"NCHW"</span>, <span class="st">"OIHW"</span>, <span class="st">"NCHW"</span>),</span>
+<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a>        )[<span class="dv">0</span>, <span class="dv">0</span>]</span>
+<span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a>    mu_x <span class="op">=</span> filt2d(x)</span>
+<span id="cb7-21"><a href="#cb7-21" aria-hidden="true" tabindex="-1"></a>    mu_y <span class="op">=</span> filt2d(y)</span>
+<span id="cb7-22"><a href="#cb7-22" aria-hidden="true" tabindex="-1"></a>    <span class="co"># clamp to 0 — float32 subtraction can produce tiny negatives in flat regions</span></span>
+<span id="cb7-23"><a href="#cb7-23" aria-hidden="true" tabindex="-1"></a>    s_x2 <span class="op">=</span> jnp.maximum(filt2d(x <span class="op">*</span> x) <span class="op">-</span> mu_x<span class="op">**</span><span class="dv">2</span>, <span class="fl">0.0</span>)</span>
+<span id="cb7-24"><a href="#cb7-24" aria-hidden="true" tabindex="-1"></a>    s_y2 <span class="op">=</span> jnp.maximum(filt2d(y <span class="op">*</span> y) <span class="op">-</span> mu_y<span class="op">**</span><span class="dv">2</span>, <span class="fl">0.0</span>)</span>
+<span id="cb7-25"><a href="#cb7-25" aria-hidden="true" tabindex="-1"></a>    s_xy <span class="op">=</span> filt2d(x <span class="op">*</span> y) <span class="op">-</span> mu_x <span class="op">*</span> mu_y</span>
+<span id="cb7-26"><a href="#cb7-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-27"><a href="#cb7-27" aria-hidden="true" tabindex="-1"></a>    num <span class="op">=</span> (<span class="dv">2</span> <span class="op">*</span> mu_x <span class="op">*</span> mu_y <span class="op">+</span> C1) <span class="op">*</span> (<span class="dv">2</span> <span class="op">*</span> s_xy <span class="op">+</span> C2)</span>
+<span id="cb7-28"><a href="#cb7-28" aria-hidden="true" tabindex="-1"></a>    den <span class="op">=</span> (mu_x<span class="op">**</span><span class="dv">2</span> <span class="op">+</span> mu_y<span class="op">**</span><span class="dv">2</span> <span class="op">+</span> C1) <span class="op">*</span> (s_x2 <span class="op">+</span> s_y2 <span class="op">+</span> C2)</span>
+<span id="cb7-29"><a href="#cb7-29" aria-hidden="true" tabindex="-1"></a>    <span class="co"># average numerator/denominator separately to avoid NaN from pointwise near-zero den</span></span>
+<span id="cb7-30"><a href="#cb7-30" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> jnp.<span class="bu">sum</span>(num) <span class="op">/</span> jnp.maximum(jnp.<span class="bu">sum</span>(den), <span class="fl">1e-8</span>)</span>
+<span id="cb7-31"><a href="#cb7-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-32"><a href="#cb7-32" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-33"><a href="#cb7-33" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> ms_ssim_loss(rendered, target, scales<span class="op">=</span>(<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>, <span class="dv">4</span>)):</span>
+<span id="cb7-34"><a href="#cb7-34" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Multi-scale SSIM loss (average of 1-SSIM across scales and channels)."""</span></span>
+<span id="cb7-35"><a href="#cb7-35" aria-hidden="true" tabindex="-1"></a>    <span class="co"># vmap over the channel axis — one traced graph instead of three</span></span>
+<span id="cb7-36"><a href="#cb7-36" aria-hidden="true" tabindex="-1"></a>    ssim_per_channel <span class="op">=</span> jax.vmap(_ssim_channel, in_axes<span class="op">=</span>(<span class="dv">2</span>, <span class="dv">2</span>))</span>
+<span id="cb7-37"><a href="#cb7-37" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-38"><a href="#cb7-38" aria-hidden="true" tabindex="-1"></a>    total <span class="op">=</span> <span class="fl">0.0</span></span>
+<span id="cb7-39"><a href="#cb7-39" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> s <span class="kw">in</span> scales:</span>
+<span id="cb7-40"><a href="#cb7-40" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> s <span class="op">&gt;</span> <span class="dv">1</span>:</span>
+<span id="cb7-41"><a href="#cb7-41" aria-hidden="true" tabindex="-1"></a>            H, W, _ <span class="op">=</span> rendered.shape</span>
+<span id="cb7-42"><a href="#cb7-42" aria-hidden="true" tabindex="-1"></a>            r <span class="op">=</span> jax.image.resize(rendered, (H <span class="op">//</span> s, W <span class="op">//</span> s, <span class="dv">3</span>), method<span class="op">=</span><span class="st">"linear"</span>)</span>
+<span id="cb7-43"><a href="#cb7-43" aria-hidden="true" tabindex="-1"></a>            t <span class="op">=</span> jax.image.resize(target, (H <span class="op">//</span> s, W <span class="op">//</span> s, <span class="dv">3</span>), method<span class="op">=</span><span class="st">"linear"</span>)</span>
+<span id="cb7-44"><a href="#cb7-44" aria-hidden="true" tabindex="-1"></a>        <span class="cf">else</span>:</span>
+<span id="cb7-45"><a href="#cb7-45" aria-hidden="true" tabindex="-1"></a>            r, t <span class="op">=</span> rendered, target</span>
+<span id="cb7-46"><a href="#cb7-46" aria-hidden="true" tabindex="-1"></a>        total <span class="op">+=</span> <span class="fl">1.0</span> <span class="op">-</span> jnp.mean(ssim_per_channel(r, t))</span>
+<span id="cb7-47"><a href="#cb7-47" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> total <span class="op">/</span> <span class="bu">len</span>(scales)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="l9bpbpl8t8c" class="cell" data-execution_count="6">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="co"># ── Parameter space setup ─────────────────────────────────────────────────────</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="co"># Two composable layers between raw params and the optimizer:</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="co">#</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a><span class="co">#   free_params ──► to_unconstrained ──► normalize ──► Lion optimizes here</span></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a><span class="co">#                                                            │</span></span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a><span class="co">#   free_params ◄── to_constrained  ◄── unnormalize ◄───────┘</span></span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a><span class="co">#</span></span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a><span class="co"># to_normalized / from_normalized are imported from jaxcad.parametrization.</span></span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a><span class="co"># compute_param_scales assigns scale=1.0 to fully-bounded params (sigmoid maps</span></span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a><span class="co"># them to O(1–4) already) and scale=SCENE_SCALE to lower-bounded/unbounded</span></span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a><span class="co"># params so the optimizer always works in an approximately O(1) space.</span></span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a>SCENE_SCALE <span class="op">=</span> <span class="fl">2.0</span>  <span class="co"># characteristic scene length — tune if needed</span></span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a>scales <span class="op">=</span> compute_param_scales(metadata, scene_scale<span class="op">=</span>SCENE_SCALE)</span>
+<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a><span class="co"># Sanity-check: print per-param min/max in normalized space</span></span>
+<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a>normalized_init <span class="op">=</span> to_normalized(free_params, metadata, scales)</span>
+<span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="sc">{</span><span class="st">'param'</span><span class="sc">:&lt;30}</span><span class="ss">  </span><span class="sc">{</span><span class="st">'min'</span><span class="sc">:&gt;8}</span><span class="ss">  </span><span class="sc">{</span><span class="st">'max'</span><span class="sc">:&gt;8}</span><span class="ss">"</span>)</span>
+<span id="cb8-19"><a href="#cb8-19" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> k, v <span class="kw">in</span> <span class="bu">sorted</span>(normalized_init.items()):</span>
+<span id="cb8-20"><a href="#cb8-20" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"  </span><span class="sc">{</span>k<span class="sc">:&lt;28}</span><span class="ss">  </span><span class="sc">{</span><span class="bu">float</span>(jnp.<span class="bu">min</span>(v))<span class="sc">:&gt;8.3f}</span><span class="ss">  </span><span class="sc">{</span><span class="bu">float</span>(jnp.<span class="bu">max</span>(v))<span class="sc">:&gt;8.3f}</span><span class="ss">"</span>)</span>
+<span id="cb8-21"><a href="#cb8-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-22"><a href="#cb8-22" aria-hidden="true" tabindex="-1"></a><span class="co"># Round-trip sanity check</span></span>
+<span id="cb8-23"><a href="#cb8-23" aria-hidden="true" tabindex="-1"></a>rt <span class="op">=</span> from_normalized(normalized_init, metadata, scales)</span>
+<span id="cb8-24"><a href="#cb8-24" aria-hidden="true" tabindex="-1"></a>max_err <span class="op">=</span> <span class="bu">max</span>(<span class="bu">float</span>(jnp.<span class="bu">max</span>(jnp.<span class="bu">abs</span>(rt[k] <span class="op">-</span> free_params[k]))) <span class="cf">for</span> k <span class="kw">in</span> free_params)</span>
+<span id="cb8-25"><a href="#cb8-25" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">Round-trip max error: </span><span class="sc">{</span>max_err<span class="sc">:.2e}</span><span class="ss">  (should be &lt; 1e-5)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>param                                min       max
+  bg_color                         0.250     0.250
+  body_mat_color                   0.000     0.000
+  body_mat_ior                   -13.816   -13.816
+  body_mat_metallic               -1.992    -1.992
+  body_mat_opacity                13.802    13.802
+  body_mat_reflectivity          -13.816   -13.816
+  body_mat_roughness              -0.405    -0.405
+  body_pos                        -0.050     0.000
+  body_size                       -0.340     0.834
+  bump_mat_color                   0.944     0.944
+  bump_mat_ior                   -13.816   -13.816
+  bump_mat_metallic               -1.099    -1.099
+  bump_mat_opacity                13.802    13.802
+  bump_mat_reflectivity          -13.816   -13.816
+  bump_mat_roughness               0.000     0.000
+  bumper_f_pos                    -0.980     0.000
+  bumper_r_pos                    -0.100     0.980
+  bumper_radius                   -1.400    -1.400
+  bumper_size                     -1.746    -0.132
+  camera_pos                       1.000     3.000
+  ground_mat_color                -0.405    -0.405
+  ground_mat_ior                 -13.816   -13.816
+  ground_mat_metallic            -13.816   -13.816
+  ground_mat_opacity              13.802    13.802
+  ground_mat_reflectivity        -13.816   -13.816
+  ground_mat_roughness             2.944     2.944
+  hood_angle                      -0.040    -0.040
+  hood_mat_color                   0.000     0.000
+  hood_mat_ior                   -13.816   -13.816
+  hood_mat_metallic               -1.992    -1.992
+  hood_mat_opacity                13.802    13.802
+  hood_mat_reflectivity          -13.816   -13.816
+  hood_mat_roughness              -0.490    -0.490
+  hood_pos                        -0.735     0.090
+  hood_size                       -1.076    -0.076
+  light_color_0                    0.189     0.189
+  light_color_1                   -0.435    -0.435
+  light_dir_0                      0.125     0.425
+  light_dir_1                     -0.150     0.250
+  pillar_f_angle                   0.125     0.125
+  pillar_f_pos                    -0.325     0.335
+  pillar_f_size                   -1.030    -0.167
+  pillar_mat_color                -2.197    -2.197
+  pillar_mat_ior                 -13.816   -13.816
+  pillar_mat_metallic             -2.944    -2.944
+  pillar_mat_opacity              13.802    13.802
+  pillar_mat_reflectivity        -13.816   -13.816
+  pillar_mat_roughness             0.405     0.405
+  pillar_r_angle                  -0.110    -0.110
+  pillar_r_pos                     0.000     0.335
+  pillar_r_size                   -1.030    -0.167
+  r_hub                           -1.312    -1.312
+  r_rim                           -0.607    -0.607
+  r_tire_major                    -0.545    -0.545
+  r_tire_minor                    -1.312    -1.312
+  rim_mat_color                    1.099     1.386
+  rim_mat_ior                    -13.816   -13.816
+  rim_mat_metallic                 2.442     2.442
+  rim_mat_opacity                 13.802    13.802
+  rim_mat_reflectivity           -13.816   -13.816
+  rim_mat_roughness               -1.516    -1.516
+  roof_mat_color                   0.000     0.000
+  roof_mat_ior                   -13.816   -13.816
+  roof_mat_metallic               -2.442    -2.442
+  roof_mat_opacity                13.802    13.802
+  roof_mat_reflectivity          -13.816   -13.816
+  roof_mat_roughness              -0.619    -0.619
+  roof_pos                        -0.075     0.450
+  roof_size                       -1.126     0.111
+  tire_mat_color                  -2.442    -2.442
+  tire_mat_ior                   -13.816   -13.816
+  tire_mat_metallic              -13.816   -13.816
+  tire_mat_opacity                13.802    13.802
+  tire_mat_reflectivity          -13.816   -13.816
+  tire_mat_roughness               1.992     1.992
+  trunk_angle                      0.030     0.030
+  trunk_pos                        0.000     0.675
+  trunk_size                      -1.243    -0.076
+  wf_pos                          -0.575     0.260
+  wh_hub                          -0.911    -0.911
+  wh_rim                          -1.181    -1.181
+  wr_pos                          -0.325     0.575
+
+Round-trip max error: 2.03e-06  (should be &lt; 1e-5)</code></pre>
+</div>
+</div>
+<div id="optimize" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="co"># ── Coarse-to-fine optimisation with cosine LR decay ─────────────────────────</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>phases <span class="op">=</span> [</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>    {<span class="st">"resolution"</span>: (<span class="dv">40</span>, <span class="dv">60</span>), <span class="st">"steps"</span>: <span class="dv">4000</span>, <span class="st">"max_steps"</span>: <span class="dv">16</span>, <span class="st">"shadow_steps"</span>: <span class="dv">6</span>},</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>    {<span class="st">"resolution"</span>: (<span class="dv">120</span>, <span class="dv">180</span>), <span class="st">"steps"</span>: <span class="dv">2000</span>, <span class="st">"max_steps"</span>: <span class="dv">48</span>, <span class="st">"shadow_steps"</span>: <span class="dv">16</span>},</span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>]</span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>N_STEPS <span class="op">=</span> <span class="bu">sum</span>(p[<span class="st">"steps"</span>] <span class="cf">for</span> p <span class="kw">in</span> phases)</span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Lion + normalized params — no bounds projection needed</span></span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>schedule <span class="op">=</span> optax.cosine_decay_schedule(init_value<span class="op">=</span><span class="fl">3e-4</span>, decay_steps<span class="op">=</span>N_STEPS)</span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>optimizer <span class="op">=</span> optax.lion(schedule, weight_decay<span class="op">=</span><span class="fl">1e-3</span>)</span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a><span class="co"># Work in normalized space; bounds enforced via sigmoid/softplus, scale via `scales`</span></span>
+<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a>params <span class="op">=</span> to_normalized(free_params, metadata, scales)</span>
+<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a>opt_state <span class="op">=</span> optimizer.init(params)</span>
+<span id="cb10-15"><a href="#cb10-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-16"><a href="#cb10-16" aria-hidden="true" tabindex="-1"></a>losses <span class="op">=</span> []</span>
+<span id="cb10-17"><a href="#cb10-17" aria-hidden="true" tabindex="-1"></a>grad_norms <span class="op">=</span> []</span>
+<span id="cb10-18"><a href="#cb10-18" aria-hidden="true" tabindex="-1"></a>snapshots <span class="op">=</span> {}</span>
+<span id="cb10-19"><a href="#cb10-19" aria-hidden="true" tabindex="-1"></a>step_global <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb10-20"><a href="#cb10-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-21"><a href="#cb10-21" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="sc">{</span><span class="st">'Phase'</span><span class="sc">:&lt;8}</span><span class="ss"> </span><span class="sc">{</span><span class="st">'Res'</span><span class="sc">:&gt;10}</span><span class="ss">  </span><span class="sc">{</span><span class="st">'Steps'</span><span class="sc">:&gt;6}</span><span class="ss">  </span><span class="sc">{</span><span class="st">'march'</span><span class="sc">:&gt;6}</span><span class="ss">  </span><span class="sc">{</span><span class="st">'shadow'</span><span class="sc">:&gt;7}</span><span class="ss">"</span>)</span>
+<span id="cb10-22"><a href="#cb10-22" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> p <span class="kw">in</span> phases:</span>
+<span id="cb10-23"><a href="#cb10-23" aria-hidden="true" tabindex="-1"></a>    r <span class="op">=</span> p[<span class="st">"resolution"</span>]</span>
+<span id="cb10-24"><a href="#cb10-24" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(</span>
+<span id="cb10-25"><a href="#cb10-25" aria-hidden="true" tabindex="-1"></a>        <span class="ss">f"  </span><span class="sc">{</span>phases<span class="sc">.</span>index(p)<span class="op">+</span><span class="dv">1</span><span class="sc">}</span><span class="ss">/</span><span class="sc">{</span><span class="bu">len</span>(phases)<span class="sc">}</span><span class="ss">    </span><span class="sc">{</span>r[<span class="dv">1</span>]<span class="sc">}</span><span class="ss">×</span><span class="sc">{</span>r[<span class="dv">0</span>]<span class="sc">:&gt;3}</span><span class="ss">    </span><span class="sc">{</span>p[<span class="st">'steps'</span>]<span class="sc">:&gt;5}</span><span class="ss">    </span><span class="sc">{</span>p[<span class="st">'max_steps'</span>]<span class="sc">:&gt;4}</span><span class="ss">    </span><span class="sc">{</span>p[<span class="st">'shadow_steps'</span>]<span class="sc">:&gt;5}</span><span class="ss">"</span></span>
+<span id="cb10-26"><a href="#cb10-26" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb10-27"><a href="#cb10-27" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(</span>
+<span id="cb10-28"><a href="#cb10-28" aria-hidden="true" tabindex="-1"></a>    <span class="ss">f"</span><span class="ch">\n</span><span class="ss">Total steps: </span><span class="sc">{</span>N_STEPS<span class="sc">}</span><span class="ss">   LR: cosine 3e-4 → 0 (Lion)   weight_decay=1e-3   bounds: sigmoid/softplus+scale"</span></span>
+<span id="cb10-29"><a href="#cb10-29" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb10-30"><a href="#cb10-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-31"><a href="#cb10-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-32"><a href="#cb10-32" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> make_step_fn(render_fn, res, tgt, optimizer):</span>
+<span id="cb10-33"><a href="#cb10-33" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""JIT-compile the full step: forward + backward + optimizer update + grad stats."""</span></span>
+<span id="cb10-34"><a href="#cb10-34" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-35"><a href="#cb10-35" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> loss_fn(normalized_p):</span>
+<span id="cb10-36"><a href="#cb10-36" aria-hidden="true" tabindex="-1"></a>        p <span class="op">=</span> from_normalized(normalized_p, metadata, scales)</span>
+<span id="cb10-37"><a href="#cb10-37" aria-hidden="true" tabindex="-1"></a>        rendered <span class="op">=</span> render_fn(p, resolution<span class="op">=</span>res)</span>
+<span id="cb10-38"><a href="#cb10-38" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> ms_ssim_loss(rendered, tgt)</span>
+<span id="cb10-39"><a href="#cb10-39" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-40"><a href="#cb10-40" aria-hidden="true" tabindex="-1"></a>    val_and_grad <span class="op">=</span> jax.value_and_grad(loss_fn)</span>
+<span id="cb10-41"><a href="#cb10-41" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-42"><a href="#cb10-42" aria-hidden="true" tabindex="-1"></a>    <span class="at">@jax.jit</span></span>
+<span id="cb10-43"><a href="#cb10-43" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> step(params, opt_state):</span>
+<span id="cb10-44"><a href="#cb10-44" aria-hidden="true" tabindex="-1"></a>        val, grads <span class="op">=</span> val_and_grad(params)</span>
+<span id="cb10-45"><a href="#cb10-45" aria-hidden="true" tabindex="-1"></a>        leaves <span class="op">=</span> jax.tree.leaves(grads)</span>
+<span id="cb10-46"><a href="#cb10-46" aria-hidden="true" tabindex="-1"></a>        grad_norm <span class="op">=</span> jnp.sqrt(<span class="bu">sum</span>(jnp.<span class="bu">sum</span>(g<span class="op">**</span><span class="dv">2</span>) <span class="cf">for</span> g <span class="kw">in</span> leaves))</span>
+<span id="cb10-47"><a href="#cb10-47" aria-hidden="true" tabindex="-1"></a>        grad_max <span class="op">=</span> jnp.<span class="bu">max</span>(jnp.stack([jnp.<span class="bu">max</span>(jnp.<span class="bu">abs</span>(g)) <span class="cf">for</span> g <span class="kw">in</span> leaves]))</span>
+<span id="cb10-48"><a href="#cb10-48" aria-hidden="true" tabindex="-1"></a>        grad_min <span class="op">=</span> jnp.<span class="bu">min</span>(jnp.stack([jnp.<span class="bu">min</span>(jnp.<span class="bu">abs</span>(g)) <span class="cf">for</span> g <span class="kw">in</span> leaves]))</span>
+<span id="cb10-49"><a href="#cb10-49" aria-hidden="true" tabindex="-1"></a>        has_nan <span class="op">=</span> jnp.isnan(val) <span class="op">|</span> jnp.<span class="bu">any</span>(jnp.stack([jnp.<span class="bu">any</span>(jnp.isnan(g)) <span class="cf">for</span> g <span class="kw">in</span> leaves]))</span>
+<span id="cb10-50"><a href="#cb10-50" aria-hidden="true" tabindex="-1"></a>        updates, new_opt_state <span class="op">=</span> optimizer.update(grads, opt_state, params)</span>
+<span id="cb10-51"><a href="#cb10-51" aria-hidden="true" tabindex="-1"></a>        new_params <span class="op">=</span> optax.apply_updates(params, updates)</span>
+<span id="cb10-52"><a href="#cb10-52" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> new_params, new_opt_state, val, grads, grad_norm, grad_max, grad_min, has_nan</span>
+<span id="cb10-53"><a href="#cb10-53" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-54"><a href="#cb10-54" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> step</span>
+<span id="cb10-55"><a href="#cb10-55" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-56"><a href="#cb10-56" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-57"><a href="#cb10-57" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> phase_idx, phase <span class="kw">in</span> <span class="bu">enumerate</span>(phases):</span>
+<span id="cb10-58"><a href="#cb10-58" aria-hidden="true" tabindex="-1"></a>    res <span class="op">=</span> phase[<span class="st">"resolution"</span>]</span>
+<span id="cb10-59"><a href="#cb10-59" aria-hidden="true" tabindex="-1"></a>    n_steps <span class="op">=</span> phase[<span class="st">"steps"</span>]</span>
+<span id="cb10-60"><a href="#cb10-60" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-61"><a href="#cb10-61" aria-hidden="true" tabindex="-1"></a>    render_phase <span class="op">=</span> functionalize_render(</span>
+<span id="cb10-62"><a href="#cb10-62" aria-hidden="true" tabindex="-1"></a>        scene,</span>
+<span id="cb10-63"><a href="#cb10-63" aria-hidden="true" tabindex="-1"></a>        max_steps<span class="op">=</span>phase[<span class="st">"max_steps"</span>],</span>
+<span id="cb10-64"><a href="#cb10-64" aria-hidden="true" tabindex="-1"></a>        shadow_steps<span class="op">=</span>phase[<span class="st">"shadow_steps"</span>],</span>
+<span id="cb10-65"><a href="#cb10-65" aria-hidden="true" tabindex="-1"></a>        shadow_hardness<span class="op">=</span><span class="fl">6.0</span>,</span>
+<span id="cb10-66"><a href="#cb10-66" aria-hidden="true" tabindex="-1"></a>        gamma<span class="op">=</span><span class="fl">1.0</span>,</span>
+<span id="cb10-67"><a href="#cb10-67" aria-hidden="true" tabindex="-1"></a>        fd_normals<span class="op">=</span><span class="va">False</span>,</span>
+<span id="cb10-68"><a href="#cb10-68" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb10-69"><a href="#cb10-69" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-70"><a href="#cb10-70" aria-hidden="true" tabindex="-1"></a>    target_phase <span class="op">=</span> jnp.array(</span>
+<span id="cb10-71"><a href="#cb10-71" aria-hidden="true" tabindex="-1"></a>        np.array(target_pil.resize((res[<span class="dv">1</span>], res[<span class="dv">0</span>]), Image.LANCZOS)) <span class="op">/</span> <span class="fl">255.0</span>,</span>
+<span id="cb10-72"><a href="#cb10-72" aria-hidden="true" tabindex="-1"></a>        dtype<span class="op">=</span>jnp.float32,</span>
+<span id="cb10-73"><a href="#cb10-73" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb10-74"><a href="#cb10-74" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-75"><a href="#cb10-75" aria-hidden="true" tabindex="-1"></a>    step_fn <span class="op">=</span> make_step_fn(render_phase, res, target_phase, optimizer)</span>
+<span id="cb10-76"><a href="#cb10-76" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-77"><a href="#cb10-77" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(</span>
+<span id="cb10-78"><a href="#cb10-78" aria-hidden="true" tabindex="-1"></a>        <span class="ss">f"</span><span class="ch">\n</span><span class="ss">── Phase </span><span class="sc">{</span>phase_idx <span class="op">+</span> <span class="dv">1</span><span class="sc">}</span><span class="ss">/</span><span class="sc">{</span><span class="bu">len</span>(phases)<span class="sc">}</span><span class="ss">  </span><span class="sc">{</span>res[<span class="dv">1</span>]<span class="sc">}</span><span class="ss">×</span><span class="sc">{</span>res[<span class="dv">0</span>]<span class="sc">}</span><span class="ss">  "</span></span>
+<span id="cb10-79"><a href="#cb10-79" aria-hidden="true" tabindex="-1"></a>        <span class="ss">f"march=</span><span class="sc">{</span>phase[<span class="st">'max_steps'</span>]<span class="sc">}</span><span class="ss">  shadow=</span><span class="sc">{</span>phase[<span class="st">'shadow_steps'</span>]<span class="sc">}</span><span class="ss">  </span><span class="sc">{</span>n_steps<span class="sc">}</span><span class="ss"> steps ──"</span></span>
+<span id="cb10-80"><a href="#cb10-80" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb10-81"><a href="#cb10-81" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"  (first step of each phase triggers XLA recompilation)"</span>)</span>
+<span id="cb10-82"><a href="#cb10-82" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-83"><a href="#cb10-83" aria-hidden="true" tabindex="-1"></a>    val_buf <span class="op">=</span> []</span>
+<span id="cb10-84"><a href="#cb10-84" aria-hidden="true" tabindex="-1"></a>    gn_buf <span class="op">=</span> []</span>
+<span id="cb10-85"><a href="#cb10-85" aria-hidden="true" tabindex="-1"></a>    ema_ms <span class="op">=</span> <span class="va">None</span></span>
+<span id="cb10-86"><a href="#cb10-86" aria-hidden="true" tabindex="-1"></a>    t_print <span class="op">=</span> time.perf_counter()</span>
+<span id="cb10-87"><a href="#cb10-87" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-88"><a href="#cb10-88" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> step <span class="kw">in</span> <span class="bu">range</span>(n_steps):</span>
+<span id="cb10-89"><a href="#cb10-89" aria-hidden="true" tabindex="-1"></a>        params, opt_state, val, grads, grad_norm, grad_max, grad_min, has_nan <span class="op">=</span> step_fn(</span>
+<span id="cb10-90"><a href="#cb10-90" aria-hidden="true" tabindex="-1"></a>            params, opt_state</span>
+<span id="cb10-91"><a href="#cb10-91" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb10-92"><a href="#cb10-92" aria-hidden="true" tabindex="-1"></a>        val_buf.append(val)</span>
+<span id="cb10-93"><a href="#cb10-93" aria-hidden="true" tabindex="-1"></a>        gn_buf.append(grad_norm)</span>
+<span id="cb10-94"><a href="#cb10-94" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-95"><a href="#cb10-95" aria-hidden="true" tabindex="-1"></a>        do_print <span class="op">=</span> (step_global <span class="op">%</span> <span class="dv">20</span> <span class="op">==</span> <span class="dv">0</span>) <span class="kw">or</span> (step_global <span class="op">==</span> N_STEPS <span class="op">-</span> <span class="dv">1</span>)</span>
+<span id="cb10-96"><a href="#cb10-96" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-97"><a href="#cb10-97" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> do_print:</span>
+<span id="cb10-98"><a href="#cb10-98" aria-hidden="true" tabindex="-1"></a>            val_f <span class="op">=</span> <span class="bu">float</span>(val)</span>
+<span id="cb10-99"><a href="#cb10-99" aria-hidden="true" tabindex="-1"></a>            gn_f <span class="op">=</span> <span class="bu">float</span>(grad_norm)</span>
+<span id="cb10-100"><a href="#cb10-100" aria-hidden="true" tabindex="-1"></a>            gmax_f <span class="op">=</span> <span class="bu">float</span>(grad_max)</span>
+<span id="cb10-101"><a href="#cb10-101" aria-hidden="true" tabindex="-1"></a>            gmin_f <span class="op">=</span> <span class="bu">float</span>(grad_min)</span>
+<span id="cb10-102"><a href="#cb10-102" aria-hidden="true" tabindex="-1"></a>            nan_f <span class="op">=</span> <span class="bu">bool</span>(has_nan)</span>
+<span id="cb10-103"><a href="#cb10-103" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-104"><a href="#cb10-104" aria-hidden="true" tabindex="-1"></a>            losses.extend(<span class="bu">float</span>(v) <span class="cf">for</span> v <span class="kw">in</span> val_buf)</span>
+<span id="cb10-105"><a href="#cb10-105" aria-hidden="true" tabindex="-1"></a>            grad_norms.extend(<span class="bu">float</span>(g) <span class="cf">for</span> g <span class="kw">in</span> gn_buf)</span>
+<span id="cb10-106"><a href="#cb10-106" aria-hidden="true" tabindex="-1"></a>            val_buf.clear()</span>
+<span id="cb10-107"><a href="#cb10-107" aria-hidden="true" tabindex="-1"></a>            gn_buf.clear()</span>
+<span id="cb10-108"><a href="#cb10-108" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-109"><a href="#cb10-109" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> nan_f:</span>
+<span id="cb10-110"><a href="#cb10-110" aria-hidden="true" tabindex="-1"></a>                nan_keys <span class="op">=</span> [k <span class="cf">for</span> k, v <span class="kw">in</span> grads.items() <span class="cf">if</span> <span class="bu">bool</span>(jnp.<span class="bu">any</span>(jnp.isnan(v)))]</span>
+<span id="cb10-111"><a href="#cb10-111" aria-hidden="true" tabindex="-1"></a>                <span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">  !! NaN at step </span><span class="sc">{</span>step_global<span class="sc">}</span><span class="ss">  loss=</span><span class="sc">{</span>val_f<span class="sc">}</span><span class="ss">  |grad|=</span><span class="sc">{</span>gn_f<span class="sc">:.3f}</span><span class="ss">"</span>)</span>
+<span id="cb10-112"><a href="#cb10-112" aria-hidden="true" tabindex="-1"></a>                <span class="bu">print</span>(<span class="ss">f"     NaN gradient keys: </span><span class="sc">{</span>nan_keys<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb10-113"><a href="#cb10-113" aria-hidden="true" tabindex="-1"></a>                <span class="cf">break</span></span>
+<span id="cb10-114"><a href="#cb10-114" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-115"><a href="#cb10-115" aria-hidden="true" tabindex="-1"></a>            window <span class="op">=</span> step_global <span class="op">%</span> <span class="dv">20</span> <span class="kw">or</span> <span class="dv">20</span></span>
+<span id="cb10-116"><a href="#cb10-116" aria-hidden="true" tabindex="-1"></a>            window_ms <span class="op">=</span> (time.perf_counter() <span class="op">-</span> t_print) <span class="op">*</span> <span class="dv">1000</span></span>
+<span id="cb10-117"><a href="#cb10-117" aria-hidden="true" tabindex="-1"></a>            ms_per_step <span class="op">=</span> window_ms <span class="op">/</span> <span class="bu">max</span>(window, <span class="dv">1</span>)</span>
+<span id="cb10-118"><a href="#cb10-118" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> step <span class="op">&gt;</span> <span class="dv">0</span>:</span>
+<span id="cb10-119"><a href="#cb10-119" aria-hidden="true" tabindex="-1"></a>                ema_ms <span class="op">=</span> ms_per_step <span class="cf">if</span> ema_ms <span class="kw">is</span> <span class="va">None</span> <span class="cf">else</span> <span class="fl">0.5</span> <span class="op">*</span> ema_ms <span class="op">+</span> <span class="fl">0.5</span> <span class="op">*</span> ms_per_step</span>
+<span id="cb10-120"><a href="#cb10-120" aria-hidden="true" tabindex="-1"></a>            t_print <span class="op">=</span> time.perf_counter()</span>
+<span id="cb10-121"><a href="#cb10-121" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-122"><a href="#cb10-122" aria-hidden="true" tabindex="-1"></a>            ms_str <span class="op">=</span> <span class="ss">f"</span><span class="sc">{</span>ema_ms<span class="sc">:6.1f}</span><span class="ss">"</span> <span class="cf">if</span> ema_ms <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span> <span class="cf">else</span> <span class="st">"  jit"</span></span>
+<span id="cb10-123"><a href="#cb10-123" aria-hidden="true" tabindex="-1"></a>            snapshots[step_global] <span class="op">=</span> np.array(</span>
+<span id="cb10-124"><a href="#cb10-124" aria-hidden="true" tabindex="-1"></a>                diff_render(from_normalized(params, metadata, scales), resolution<span class="op">=</span>RES)</span>
+<span id="cb10-125"><a href="#cb10-125" aria-hidden="true" tabindex="-1"></a>            )</span>
+<span id="cb10-126"><a href="#cb10-126" aria-hidden="true" tabindex="-1"></a>            <span class="bu">print</span>(</span>
+<span id="cb10-127"><a href="#cb10-127" aria-hidden="true" tabindex="-1"></a>                <span class="ss">f"  step </span><span class="sc">{</span>step_global<span class="sc">:4d}</span><span class="ss">  loss=</span><span class="sc">{</span>val_f<span class="sc">:.5f}</span><span class="ss">  "</span></span>
+<span id="cb10-128"><a href="#cb10-128" aria-hidden="true" tabindex="-1"></a>                <span class="ss">f"|grad|=</span><span class="sc">{</span>gn_f<span class="sc">:.3f}</span><span class="ss">  max=</span><span class="sc">{</span>gmax_f<span class="sc">:.3e}</span><span class="ss">  min=</span><span class="sc">{</span>gmin_f<span class="sc">:.3e}</span><span class="ss">  "</span></span>
+<span id="cb10-129"><a href="#cb10-129" aria-hidden="true" tabindex="-1"></a>                <span class="ss">f"ms/step=</span><span class="sc">{</span>ms_str<span class="sc">}</span><span class="ss">"</span></span>
+<span id="cb10-130"><a href="#cb10-130" aria-hidden="true" tabindex="-1"></a>            )</span>
+<span id="cb10-131"><a href="#cb10-131" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-132"><a href="#cb10-132" aria-hidden="true" tabindex="-1"></a>        step_global <span class="op">+=</span> <span class="dv">1</span></span>
+<span id="cb10-133"><a href="#cb10-133" aria-hidden="true" tabindex="-1"></a>    <span class="cf">else</span>:</span>
+<span id="cb10-134"><a href="#cb10-134" aria-hidden="true" tabindex="-1"></a>        <span class="cf">continue</span></span>
+<span id="cb10-135"><a href="#cb10-135" aria-hidden="true" tabindex="-1"></a>    <span class="cf">break</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="cf9e9a9c" class="cell" data-execution_count="7">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(params)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>{'bg_color': Array([nan, nan, nan], dtype=float32), 'body_mat_color': Array([nan, nan, nan], dtype=float32), 'body_mat_ior': Array(nan, dtype=float32), 'body_mat_metallic': Array(nan, dtype=float32), 'body_mat_opacity': Array(nan, dtype=float32), 'body_mat_reflectivity': Array(nan, dtype=float32), 'body_mat_roughness': Array(nan, dtype=float32), 'body_pos': Array([nan, nan, nan], dtype=float32), 'body_size': Array([nan, nan, nan], dtype=float32), 'bump_mat_color': Array([nan, nan, nan], dtype=float32), 'bump_mat_ior': Array(nan, dtype=float32), 'bump_mat_metallic': Array(nan, dtype=float32), 'bump_mat_opacity': Array(nan, dtype=float32), 'bump_mat_reflectivity': Array(nan, dtype=float32), 'bump_mat_roughness': Array(nan, dtype=float32), 'bumper_f_pos': Array([nan, nan, nan], dtype=float32), 'bumper_r_pos': Array([nan, nan, nan], dtype=float32), 'bumper_radius': Array(nan, dtype=float32), 'bumper_size': Array([nan, nan, nan], dtype=float32), 'camera_pos': Array([nan, nan, nan], dtype=float32), 'ground_mat_color': Array([nan, nan, nan], dtype=float32), 'ground_mat_ior': Array(nan, dtype=float32), 'ground_mat_metallic': Array(nan, dtype=float32), 'ground_mat_opacity': Array(nan, dtype=float32), 'ground_mat_reflectivity': Array(nan, dtype=float32), 'ground_mat_roughness': Array(nan, dtype=float32), 'hood_angle': Array(nan, dtype=float32), 'hood_mat_color': Array([nan, nan, nan], dtype=float32), 'hood_mat_ior': Array(nan, dtype=float32), 'hood_mat_metallic': Array(nan, dtype=float32), 'hood_mat_opacity': Array(nan, dtype=float32), 'hood_mat_reflectivity': Array(nan, dtype=float32), 'hood_mat_roughness': Array(nan, dtype=float32), 'hood_pos': Array([nan, nan, nan], dtype=float32), 'hood_size': Array([nan, nan, nan], dtype=float32), 'light_color_0': Array([nan, nan, nan], dtype=float32), 'light_color_1': Array([nan, nan, nan], dtype=float32), 'light_dir_0': Array([nan, nan, nan], dtype=float32), 'light_dir_1': Array([nan, nan, nan], dtype=float32), 'pillar_f_angle': Array(nan, dtype=float32), 'pillar_f_pos': Array([nan, nan, nan], dtype=float32), 'pillar_f_size': Array([nan, nan, nan], dtype=float32), 'pillar_mat_color': Array([nan, nan, nan], dtype=float32), 'pillar_mat_ior': Array(nan, dtype=float32), 'pillar_mat_metallic': Array(nan, dtype=float32), 'pillar_mat_opacity': Array(nan, dtype=float32), 'pillar_mat_reflectivity': Array(nan, dtype=float32), 'pillar_mat_roughness': Array(nan, dtype=float32), 'pillar_r_angle': Array(nan, dtype=float32), 'pillar_r_pos': Array([nan, nan, nan], dtype=float32), 'pillar_r_size': Array([nan, nan, nan], dtype=float32), 'r_hub': Array(nan, dtype=float32), 'r_rim': Array(nan, dtype=float32), 'r_tire_major': Array(nan, dtype=float32), 'r_tire_minor': Array(nan, dtype=float32), 'rim_mat_color': Array([nan, nan, nan], dtype=float32), 'rim_mat_ior': Array(nan, dtype=float32), 'rim_mat_metallic': Array(nan, dtype=float32), 'rim_mat_opacity': Array(nan, dtype=float32), 'rim_mat_reflectivity': Array(nan, dtype=float32), 'rim_mat_roughness': Array(nan, dtype=float32), 'roof_mat_color': Array([nan, nan, nan], dtype=float32), 'roof_mat_ior': Array(nan, dtype=float32), 'roof_mat_metallic': Array(nan, dtype=float32), 'roof_mat_opacity': Array(nan, dtype=float32), 'roof_mat_reflectivity': Array(nan, dtype=float32), 'roof_mat_roughness': Array(nan, dtype=float32), 'roof_pos': Array([nan, nan, nan], dtype=float32), 'roof_size': Array([nan, nan, nan], dtype=float32), 'tire_mat_color': Array([nan, nan, nan], dtype=float32), 'tire_mat_ior': Array(nan, dtype=float32), 'tire_mat_metallic': Array(nan, dtype=float32), 'tire_mat_opacity': Array(nan, dtype=float32), 'tire_mat_reflectivity': Array(nan, dtype=float32), 'tire_mat_roughness': Array(nan, dtype=float32), 'trunk_angle': Array(nan, dtype=float32), 'trunk_pos': Array([nan, nan, nan], dtype=float32), 'trunk_size': Array([nan, nan, nan], dtype=float32), 'wf_pos': Array([nan, nan, nan], dtype=float32), 'wh_hub': Array(nan, dtype=float32), 'wh_rim': Array(nan, dtype=float32), 'wr_pos': Array([nan, nan, nan], dtype=float32)}</code></pre>
+</div>
+</div>
+<div id="loss_curve" class="cell" data-execution_count="8">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>fig, (ax1, ax2) <span class="op">=</span> plt.subplots(<span class="dv">1</span>, <span class="dv">2</span>, figsize<span class="op">=</span>(<span class="dv">14</span>, <span class="dv">4</span>))</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>ax1.plot(losses, color<span class="op">=</span><span class="st">"steelblue"</span>, linewidth<span class="op">=</span><span class="fl">1.5</span>)</span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>ax1.set_xlabel(<span class="st">"Iteration"</span>)</span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>ax1.set_ylabel(<span class="st">"MS-SSIM Loss"</span>)</span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>ax1.set_title(<span class="st">"Loss"</span>)</span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>ax1.set_yscale(<span class="st">"log"</span>)</span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a>ax1.grid(<span class="va">True</span>, alpha<span class="op">=</span><span class="fl">0.35</span>)</span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a>ax2.plot(grad_norms[: <span class="bu">len</span>(losses)], color<span class="op">=</span><span class="st">"tomato"</span>, linewidth<span class="op">=</span><span class="fl">1.0</span>, alpha<span class="op">=</span><span class="fl">0.8</span>)</span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a>ax2.set_xlabel(<span class="st">"Iteration"</span>)</span>
+<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a>ax2.set_ylabel(<span class="st">"Gradient L2 norm"</span>)</span>
+<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a>ax2.set_title(<span class="st">"Gradient norm (pre-clip)"</span>)</span>
+<span id="cb13-14"><a href="#cb13-14" aria-hidden="true" tabindex="-1"></a>ax2.set_yscale(<span class="st">"log"</span>)</span>
+<span id="cb13-15"><a href="#cb13-15" aria-hidden="true" tabindex="-1"></a>ax2.axhline(<span class="fl">1.0</span>, color<span class="op">=</span><span class="st">"black"</span>, linewidth<span class="op">=</span><span class="fl">1.0</span>, linestyle<span class="op">=</span><span class="st">"--"</span>, label<span class="op">=</span><span class="st">"clip threshold"</span>)</span>
+<span id="cb13-16"><a href="#cb13-16" aria-hidden="true" tabindex="-1"></a>ax2.legend()</span>
+<span id="cb13-17"><a href="#cb13-17" aria-hidden="true" tabindex="-1"></a>ax2.grid(<span class="va">True</span>, alpha<span class="op">=</span><span class="fl">0.35</span>)</span>
+<span id="cb13-18"><a href="#cb13-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-19"><a href="#cb13-19" aria-hidden="true" tabindex="-1"></a><span class="co"># Mark phase boundaries</span></span>
+<span id="cb13-20"><a href="#cb13-20" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> boundary, label <span class="kw">in</span> <span class="bu">zip</span>(</span>
+<span id="cb13-21"><a href="#cb13-21" aria-hidden="true" tabindex="-1"></a>    [phases[<span class="dv">0</span>][<span class="st">"steps"</span>], phases[<span class="dv">0</span>][<span class="st">"steps"</span>] <span class="op">+</span> phases[<span class="dv">1</span>][<span class="st">"steps"</span>]],</span>
+<span id="cb13-22"><a href="#cb13-22" aria-hidden="true" tabindex="-1"></a>    [<span class="st">"→ 60×90"</span>, <span class="st">"→ 80×120"</span>],</span>
+<span id="cb13-23"><a href="#cb13-23" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb13-24"><a href="#cb13-24" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> ax <span class="kw">in</span> (ax1, ax2):</span>
+<span id="cb13-25"><a href="#cb13-25" aria-hidden="true" tabindex="-1"></a>        ax.axvline(boundary, color<span class="op">=</span><span class="st">"gray"</span>, linewidth<span class="op">=</span><span class="fl">1.0</span>, linestyle<span class="op">=</span><span class="st">":"</span>)</span>
+<span id="cb13-26"><a href="#cb13-26" aria-hidden="true" tabindex="-1"></a>    ax1.text(boundary <span class="op">+</span> <span class="dv">5</span>, ax1.get_ylim()[<span class="dv">0</span>], label, fontsize<span class="op">=</span><span class="dv">8</span>, color<span class="op">=</span><span class="st">"gray"</span>, va<span class="op">=</span><span class="st">"bottom"</span>)</span>
+<span id="cb13-27"><a href="#cb13-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-28"><a href="#cb13-28" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb13-29"><a href="#cb13-29" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="diff_render_fit_files/figure-html/cell-10-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<div id="final_hires" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>HIRES <span class="op">=</span> (<span class="dv">240</span>, <span class="dv">360</span>)</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>target_hires <span class="op">=</span> np.array(target_pil.resize((HIRES[<span class="dv">1</span>], HIRES[<span class="dv">0</span>]), Image.LANCZOS)) <span class="op">/</span> <span class="fl">255.0</span></span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>final_params <span class="op">=</span> from_normalized(params, metadata, scales)</span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>fig, axes <span class="op">=</span> plt.subplots(<span class="dv">1</span>, <span class="dv">3</span>, figsize<span class="op">=</span>(<span class="dv">18</span>, <span class="dv">6</span>))</span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].imshow(target_hires)</span>
+<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].set_title(<span class="st">"Target (lada.png)"</span>)</span>
+<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].axis(<span class="st">"off"</span>)</span>
+<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-12"><a href="#cb14-12" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">1</span>].imshow(np.array(diff_render(free_params, resolution<span class="op">=</span>HIRES)))</span>
+<span id="cb14-13"><a href="#cb14-13" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">1</span>].set_title(<span class="st">"Before optimisation"</span>)</span>
+<span id="cb14-14"><a href="#cb14-14" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">1</span>].axis(<span class="st">"off"</span>)</span>
+<span id="cb14-15"><a href="#cb14-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-16"><a href="#cb14-16" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">2</span>].imshow(np.array(diff_render(final_params, resolution<span class="op">=</span>HIRES)))</span>
+<span id="cb14-17"><a href="#cb14-17" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">2</span>].set_title(<span class="ss">f"After </span><span class="sc">{</span>N_STEPS<span class="sc">}</span><span class="ss"> steps"</span>)</span>
+<span id="cb14-18"><a href="#cb14-18" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">2</span>].axis(<span class="st">"off"</span>)</span>
+<span id="cb14-19"><a href="#cb14-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-20"><a href="#cb14-20" aria-hidden="true" tabindex="-1"></a>plt.suptitle(<span class="st">"Inverse rendering: fitting SDF scene to a photograph"</span>, fontsize<span class="op">=</span><span class="dv">14</span>)</span>
+<span id="cb14-21"><a href="#cb14-21" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb14-22"><a href="#cb14-22" aria-hidden="true" tabindex="-1"></a>plt.show()</span>
+<span id="cb14-23"><a href="#cb14-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-24"><a href="#cb14-24" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Initial loss: </span><span class="sc">{</span>losses[<span class="dv">0</span>]<span class="sc">:.5f}</span><span class="ss">"</span>)</span>
+<span id="cb14-25"><a href="#cb14-25" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Final loss:   </span><span class="sc">{</span>losses[<span class="op">-</span><span class="dv">1</span>]<span class="sc">:.5f}</span><span class="ss">"</span>)</span>
+<span id="cb14-26"><a href="#cb14-26" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Improvement:  </span><span class="sc">{</span>losses[<span class="dv">0</span>]<span class="op">/</span>losses[<span class="op">-</span><span class="dv">1</span>]<span class="sc">:.1f}</span><span class="ch">\u00d7</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="loj55zc65f" class="cell" data-execution_count="10">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="co"># ── Export optimisation trajectory as GIF ─────────────────────────────────────</span></span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>frames <span class="op">=</span> []</span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> step <span class="kw">in</span> <span class="bu">sorted</span>(snapshots.keys()):</span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>    frame <span class="op">=</span> (np.clip(snapshots[step], <span class="dv">0</span>, <span class="dv">1</span>) <span class="op">*</span> <span class="dv">255</span>).astype(np.uint8)</span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>    frames.append(frame)</span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a>gif_path <span class="op">=</span> <span class="st">"assets/optimization.gif"</span></span>
+<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a>imageio.mimsave(gif_path, frames, fps<span class="op">=</span><span class="dv">10</span>, loop<span class="op">=</span><span class="dv">0</span>)</span>
+<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Saved </span><span class="sc">{</span>gif_path<span class="sc">}</span><span class="ss">  (</span><span class="sc">{</span><span class="bu">len</span>(frames)<span class="sc">}</span><span class="ss"> frames, </span><span class="sc">{</span><span class="bu">len</span>(frames) <span class="op">/</span> <span class="dv">3</span><span class="sc">:.1f}</span><span class="ss">s at 3 fps)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Saved assets/optimization.gif  (301 frames, 100.3s at 3 fps)</code></pre>
+</div>
+</div>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/andrinr\.github\.io\/jaxcad\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

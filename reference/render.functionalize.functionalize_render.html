@@ -2,12 +2,12 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.9.36">
+<meta name="generator" content="quarto-1.9.37">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>construction.from_circle.from_circle – jaxCAD</title>
+<title>render.functionalize.functionalize_render – jaxCAD</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -74,10 +74,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-845c23b38eaddc0f92fda52bfe77a8c8.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-7f8f88aac4f3542376d5c11b86a4c14d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-1bacb4435680e45c9ebf9ff2856e7072.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-3ab3c25880d787e734ee9f73ca06a7d1.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -184,11 +184,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#jaxcad.construction.from_circle.from_circle" id="toc-jaxcad.construction.from_circle.from_circle" class="nav-link active" data-scroll-target="#jaxcad.construction.from_circle.from_circle">construction.from_circle.from_circle</a>
+  <li><a href="#jaxcad.render.functionalize.functionalize_render" id="toc-jaxcad.render.functionalize.functionalize_render" class="nav-link active" data-scroll-target="#jaxcad.render.functionalize.functionalize_render">render.functionalize.functionalize_render</a>
   <ul class="collapse">
   <li><a href="#parameters" id="toc-parameters" class="nav-link" data-scroll-target="#parameters">Parameters</a></li>
   <li><a href="#returns" id="toc-returns" class="nav-link" data-scroll-target="#returns">Returns</a></li>
-  <li><a href="#example" id="toc-example" class="nav-link" data-scroll-target="#example">Example</a></li>
   </ul></li>
   </ul>
 </nav>
@@ -199,19 +198,32 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 
 
-<section id="jaxcad.construction.from_circle.from_circle" class="level1">
-<h1>construction.from_circle.from_circle</h1>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>construction.from_circle.from_circle(circle, height)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Create a cylinder from a circle.</p>
-<p>The cylinder’s base is the circle, and it extends along the circle’s normal by the specified height.</p>
+<section id="jaxcad.render.functionalize.functionalize_render" class="level1">
+<h1>render.functionalize.functionalize_render</h1>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>render.functionalize.functionalize_render(</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>    scene,</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>    max_steps<span class="op">=</span><span class="dv">32</span>,</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    max_dist<span class="op">=</span><span class="fl">15.0</span>,</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>    shadow_steps<span class="op">=</span><span class="dv">12</span>,</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>    shadow_hardness<span class="op">=</span><span class="fl">6.0</span>,</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>    gamma<span class="op">=</span><span class="fl">2.2</span>,</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>    fd_normals<span class="op">=</span><span class="va">False</span>,</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>    normal_eps<span class="op">=</span><span class="fl">0.0001</span>,</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>    reflect_steps<span class="op">=</span><span class="dv">0</span>,</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Compile a <code>Scene</code> to a differentiable render function.</p>
+<p>Fixed geometry params are extracted once at call time and baked in, so the returned function only needs <code>free_params</code> — the dict that changes each optimisation step::</p>
+<pre><code>render_fn = functionalize_render(scene)
+image     = render_fn(free_params, resolution=(64, 96))</code></pre>
+<p><code>image</code> is a JAX <code>(H, W, 3)</code> float32 array fully differentiable w.r.t. <code>free_params</code> via <code>jax.grad</code>.</p>
 <section id="parameters" class="level2 doc-section doc-section-parameters">
 <h2 class="doc-section doc-section-parameters anchored" data-anchor-id="parameters">Parameters</h2>
 <table class="caption-top table">
 <colgroup>
-<col style="width: 9%">
-<col style="width: 20%">
-<col style="width: 55%">
-<col style="width: 14%">
+<col style="width: 8%">
+<col style="width: 3%">
+<col style="width: 81%">
+<col style="width: 5%">
 </colgroup>
 <thead>
 <tr class="header">
@@ -223,16 +235,52 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </thead>
 <tbody>
 <tr class="odd">
-<td>circle</td>
-<td>Circle</td>
-<td>Circle defining the cylinder’s cross-section</td>
+<td>scene</td>
+<td>Scene</td>
+<td><code>Scene</code> with geometry, camera, and lighting.</td>
 <td><em>required</em></td>
 </tr>
 <tr class="even">
-<td>height</td>
-<td>float | Scalar</td>
-<td>Cylinder height</td>
-<td><em>required</em></td>
+<td>max_steps</td>
+<td>int</td>
+<td>Sphere-tracing iterations per primary ray.</td>
+<td><code>32</code></td>
+</tr>
+<tr class="odd">
+<td>max_dist</td>
+<td>float</td>
+<td>Miss threshold distance.</td>
+<td><code>15.0</code></td>
+</tr>
+<tr class="even">
+<td>shadow_steps</td>
+<td>int</td>
+<td>Soft shadow ray iterations.</td>
+<td><code>12</code></td>
+</tr>
+<tr class="odd">
+<td>shadow_hardness</td>
+<td>float</td>
+<td>Shadow edge sharpness.</td>
+<td><code>6.0</code></td>
+</tr>
+<tr class="even">
+<td>gamma</td>
+<td>float</td>
+<td>Gamma correction exponent applied to the final image.</td>
+<td><code>2.2</code></td>
+</tr>
+<tr class="odd">
+<td>fd_normals</td>
+<td>bool</td>
+<td>Use central finite differences for surface normals instead of <code>jax.grad</code>. Set to True when calling inside <code>jax.grad(loss_fn)</code> to avoid 2nd-order AD overhead.</td>
+<td><code>False</code></td>
+</tr>
+<tr class="even">
+<td>normal_eps</td>
+<td>float</td>
+<td>Step size for finite-difference normal estimation.</td>
+<td><code>0.0001</code></td>
 </tr>
 </tbody>
 </table>
@@ -240,6 +288,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="returns" class="level2 doc-section doc-section-returns">
 <h2 class="doc-section doc-section-returns anchored" data-anchor-id="returns">Returns</h2>
 <table class="caption-top table">
+<colgroup>
+<col style="width: 10%">
+<col style="width: 12%">
+<col style="width: 77%">
+</colgroup>
 <thead>
 <tr class="header">
 <th>Name</th>
@@ -250,18 +303,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <tbody>
 <tr class="odd">
 <td></td>
-<td>Cylinder</td>
-<td>Cylinder SDF with shared parameter references</td>
+<td>Callable</td>
+<td><code>(free_params, resolution=(H, W)) -&gt; JAX image (H, W, 3)</code></td>
 </tr>
 </tbody>
 </table>
-</section>
-<section id="example" class="level2 doc-section doc-section-example">
-<h2 class="doc-section doc-section-example anchored" data-anchor-id="example">Example</h2>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>center <span class="op">=</span> Vector([<span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">0</span>], free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">'center'</span>)</span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>radius <span class="op">=</span> Scalar(<span class="fl">1.0</span>, free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">'radius'</span>)</span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>circle <span class="op">=</span> Circle(center<span class="op">=</span>center, radius<span class="op">=</span>radius)</span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>cylinder <span class="op">=</span> from_circle(circle, height<span class="op">=</span><span class="fl">5.0</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 
 
 </section>

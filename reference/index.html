@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.9.36">
+<meta name="generator" content="quarto-1.9.37">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -39,10 +39,10 @@ ul.task-list li input[type="checkbox"] {
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-845c23b38eaddc0f92fda52bfe77a8c8.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-7f8f88aac4f3542376d5c11b86a4c14d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-1bacb4435680e45c9ebf9ff2856e7072.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-3ab3c25880d787e734ee9f73ca06a7d1.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -153,9 +153,9 @@ ul.task-list li input[type="checkbox"] {
   <ul class="collapse">
   <li><a href="#parameter-extraction" id="toc-parameter-extraction" class="nav-link" data-scroll-target="#parameter-extraction">Parameter Extraction</a></li>
   <li><a href="#functionalize" id="toc-functionalize" class="nav-link" data-scroll-target="#functionalize">Functionalize</a></li>
+  <li><a href="#parametrization" id="toc-parametrization" class="nav-link" data-scroll-target="#parametrization">Parametrization</a></li>
   <li><a href="#constraints-types" id="toc-constraints-types" class="nav-link" data-scroll-target="#constraints-types">Constraints — types</a></li>
   <li><a href="#constraints-solver" id="toc-constraints-solver" class="nav-link" data-scroll-target="#constraints-solver">Constraints — solver</a></li>
-  <li><a href="#construction" id="toc-construction" class="nav-link" data-scroll-target="#construction">Construction</a></li>
   <li><a href="#geometry" id="toc-geometry" class="nav-link" data-scroll-target="#geometry">Geometry</a></li>
   <li><a href="#render" id="toc-render" class="nav-link" data-scroll-target="#render">Render</a></li>
   </ul></li>
@@ -186,8 +186,31 @@ ul.task-list li input[type="checkbox"] {
 <table class="caption-top table">
 <tbody>
 <tr class="odd">
-<td><a href="../reference/sdf.functionalize.functionalize.html#jaxcad.sdf.functionalize.functionalize">sdf.functionalize.functionalize</a></td>
+<td><a href="../reference/functionalize.functionalize.html#jaxcad.functionalize.functionalize">functionalize.functionalize</a></td>
 <td>Compile an SDF to a pure function with free and fixed parameters.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/render.functionalize.functionalize_render.html#jaxcad.render.functionalize.functionalize_render">render.functionalize.functionalize_render</a></td>
+<td>Compile a <code>Scene</code> to a differentiable render function.</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="parametrization" class="level2">
+<h2 class="anchored" data-anchor-id="parametrization">Parametrization</h2>
+<table class="caption-top table">
+<tbody>
+<tr class="odd">
+<td><a href="../reference/parametrization.to_normalized.html#jaxcad.parametrization.to_normalized">parametrization.to_normalized</a></td>
+<td><code>to_unconstrained</code> followed by <code>normalize</code>.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/parametrization.from_normalized.html#jaxcad.parametrization.from_normalized">parametrization.from_normalized</a></td>
+<td><code>unnormalize</code> followed by <code>to_constrained</code>.</td>
+</tr>
+<tr class="odd">
+<td><a href="../reference/parametrization.compute_param_scales.html#jaxcad.parametrization.compute_param_scales">parametrization.compute_param_scales</a></td>
+<td>Compute per-parameter normalization scales.</td>
 </tr>
 </tbody>
 </table>
@@ -242,29 +265,6 @@ ul.task-list li input[type="checkbox"] {
 </tbody>
 </table>
 </section>
-<section id="construction" class="level2">
-<h2 class="anchored" data-anchor-id="construction">Construction</h2>
-<table class="caption-top table">
-<tbody>
-<tr class="odd">
-<td><a href="../reference/construction.from_point.from_point.html#jaxcad.construction.from_point.from_point">construction.from_point.from_point</a></td>
-<td>Create a sphere centered at a point.</td>
-</tr>
-<tr class="even">
-<td><a href="../reference/construction.from_line.from_line.html#jaxcad.construction.from_line.from_line">construction.from_line.from_line</a></td>
-<td>Create a capsule from a line segment.</td>
-</tr>
-<tr class="odd">
-<td><a href="../reference/construction.from_circle.from_circle.html#jaxcad.construction.from_circle.from_circle">construction.from_circle.from_circle</a></td>
-<td>Create a cylinder from a circle.</td>
-</tr>
-<tr class="even">
-<td><a href="../reference/construction.extrude.extrude.html#jaxcad.construction.extrude.extrude">construction.extrude.extrude</a></td>
-<td>Extrude a rectangle to create an oriented box.</td>
-</tr>
-</tbody>
-</table>
-</section>
 <section id="geometry" class="level2">
 <h2 class="anchored" data-anchor-id="geometry">Geometry</h2>
 <table class="caption-top table">
@@ -285,11 +285,11 @@ ul.task-list li input[type="checkbox"] {
 <table class="caption-top table">
 <tbody>
 <tr class="odd">
-<td><a href="../reference/render.raymarch.raymarch.html#jaxcad.render.raymarch.raymarch">render.raymarch.raymarch</a></td>
+<td><a href="../reference/render.raymarch.render.raymarch.html#jaxcad.render.raymarch.render.raymarch">render.raymarch.render.raymarch</a></td>
 <td>Render an SDF via sphere tracing and return an RGB image array.</td>
 </tr>
 <tr class="even">
-<td><a href="../reference/render.raymarch.render_raymarched.html#jaxcad.render.raymarch.render_raymarched">render.raymarch.render_raymarched</a></td>
+<td><a href="../reference/render.raymarch.render.render_raymarched.html#jaxcad.render.raymarch.render.render_raymarched">render.raymarch.render.render_raymarched</a></td>
 <td>Render an SDF via sphere tracing and display with matplotlib.</td>
 </tr>
 <tr class="odd">

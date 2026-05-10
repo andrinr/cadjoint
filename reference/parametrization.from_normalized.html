@@ -2,12 +2,12 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.9.36">
+<meta name="generator" content="quarto-1.9.37">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>construction.from_line.from_line – jaxCAD</title>
+<title>parametrization.from_normalized – jaxCAD</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -74,10 +74,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-845c23b38eaddc0f92fda52bfe77a8c8.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-7f8f88aac4f3542376d5c11b86a4c14d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-1bacb4435680e45c9ebf9ff2856e7072.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-3ab3c25880d787e734ee9f73ca06a7d1.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -184,11 +184,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#jaxcad.construction.from_line.from_line" id="toc-jaxcad.construction.from_line.from_line" class="nav-link active" data-scroll-target="#jaxcad.construction.from_line.from_line">construction.from_line.from_line</a>
+  <li><a href="#jaxcad.parametrization.from_normalized" id="toc-jaxcad.parametrization.from_normalized" class="nav-link active" data-scroll-target="#jaxcad.parametrization.from_normalized">parametrization.from_normalized</a>
   <ul class="collapse">
   <li><a href="#parameters" id="toc-parameters" class="nav-link" data-scroll-target="#parameters">Parameters</a></li>
   <li><a href="#returns" id="toc-returns" class="nav-link" data-scroll-target="#returns">Returns</a></li>
-  <li><a href="#example" id="toc-example" class="nav-link" data-scroll-target="#example">Example</a></li>
   </ul></li>
   </ul>
 </nav>
@@ -199,19 +198,19 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 
 
-<section id="jaxcad.construction.from_line.from_line" class="level1">
-<h1>construction.from_line.from_line</h1>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>construction.from_line.from_line(line, radius)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Create a capsule from a line segment.</p>
-<p>Creates an axis-aligned capsule and applies transforms to orient it along the line and position it correctly.</p>
+<section id="jaxcad.parametrization.from_normalized" class="level1">
+<h1>parametrization.from_normalized</h1>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>parametrization.from_normalized(normalized, metadata, scales)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><code>unnormalize</code> followed by <code>to_constrained</code>.</p>
+<p>Convenience wrapper for recovering constrained param values from optimizer space, e.g.&nbsp;inside a loss function.</p>
 <section id="parameters" class="level2 doc-section doc-section-parameters">
 <h2 class="doc-section doc-section-parameters anchored" data-anchor-id="parameters">Parameters</h2>
 <table class="caption-top table">
 <colgroup>
-<col style="width: 10%">
-<col style="width: 22%">
-<col style="width: 51%">
-<col style="width: 15%">
+<col style="width: 13%">
+<col style="width: 8%">
+<col style="width: 64%">
+<col style="width: 13%">
 </colgroup>
 <thead>
 <tr class="header">
@@ -223,15 +222,21 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </thead>
 <tbody>
 <tr class="odd">
-<td>line</td>
-<td>Line</td>
-<td>Line segment defining the capsule axis</td>
+<td>normalized</td>
+<td></td>
+<td><code>dict[str, Array]</code> in normalized O(1) optimizer space.</td>
 <td><em>required</em></td>
 </tr>
 <tr class="even">
-<td>radius</td>
-<td>float | Scalar</td>
-<td>Capsule radius</td>
+<td>metadata</td>
+<td></td>
+<td><code>dict[str, Parameter]</code> from :func:<code>extract_parameters</code>.</td>
+<td><em>required</em></td>
+</tr>
+<tr class="odd">
+<td>scales</td>
+<td></td>
+<td><code>dict[str, Array]</code> from :func:<code>compute_param_scales</code>.</td>
 <td><em>required</em></td>
 </tr>
 </tbody>
@@ -241,9 +246,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h2 class="doc-section doc-section-returns anchored" data-anchor-id="returns">Returns</h2>
 <table class="caption-top table">
 <colgroup>
-<col style="width: 10%">
-<col style="width: 10%">
-<col style="width: 78%">
+<col style="width: 9%">
+<col style="width: 9%">
+<col style="width: 80%">
 </colgroup>
 <thead>
 <tr class="header">
@@ -255,18 +260,16 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <tbody>
 <tr class="odd">
 <td></td>
-<td>SDF</td>
-<td>Transformed Capsule SDF with shared parameter references</td>
+<td></td>
+<td><code>dict[str, Array]</code> of constrained parameter values, suitable for</td>
+</tr>
+<tr class="even">
+<td></td>
+<td></td>
+<td>passing directly to the render function.</td>
 </tr>
 </tbody>
 </table>
-</section>
-<section id="example" class="level2 doc-section doc-section-example">
-<h2 class="doc-section doc-section-example anchored" data-anchor-id="example">Example</h2>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>p1 <span class="op">=</span> Vector([<span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">0</span>], free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">'p1'</span>)</span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>p2 <span class="op">=</span> Vector([<span class="dv">5</span>, <span class="dv">0</span>, <span class="dv">0</span>], free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">'p2'</span>)</span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>line <span class="op">=</span> Line(start<span class="op">=</span>p1, end<span class="op">=</span>p2)</span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>capsule <span class="op">=</span> from_line(line, radius<span class="op">=</span><span class="fl">0.5</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 
 
 </section>

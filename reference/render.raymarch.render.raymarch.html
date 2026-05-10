@@ -2,12 +2,12 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.9.36">
+<meta name="generator" content="quarto-1.9.37">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>sdf.functionalize.functionalize – jaxCAD</title>
+<title>render.raymarch.render.raymarch – jaxCAD</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -74,10 +74,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-845c23b38eaddc0f92fda52bfe77a8c8.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-7f8f88aac4f3542376d5c11b86a4c14d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-1bacb4435680e45c9ebf9ff2856e7072.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-3ab3c25880d787e734ee9f73ca06a7d1.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -184,12 +184,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#jaxcad.sdf.functionalize.functionalize" id="toc-jaxcad.sdf.functionalize.functionalize" class="nav-link active" data-scroll-target="#jaxcad.sdf.functionalize.functionalize">sdf.functionalize.functionalize</a>
+  <li><a href="#jaxcad.render.raymarch.render.raymarch" id="toc-jaxcad.render.raymarch.render.raymarch" class="nav-link active" data-scroll-target="#jaxcad.render.raymarch.render.raymarch">render.raymarch.render.raymarch</a>
   <ul class="collapse">
-  <li><a href="#returns-a-curried-function-with-signature" id="toc-returns-a-curried-function-with-signature" class="nav-link" data-scroll-target="#returns-a-curried-function-with-signature">Returns a curried function with signature</a></li>
   <li><a href="#parameters" id="toc-parameters" class="nav-link" data-scroll-target="#parameters">Parameters</a></li>
   <li><a href="#returns" id="toc-returns" class="nav-link" data-scroll-target="#returns">Returns</a></li>
-  <li><a href="#example" id="toc-example" class="nav-link" data-scroll-target="#example">Example</a></li>
   </ul></li>
   </ul>
 </nav>
@@ -200,17 +198,43 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 
 
-<section id="jaxcad.sdf.functionalize.functionalize" class="level1">
-<h1>sdf.functionalize.functionalize</h1>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>sdf.functionalize.functionalize(sdf)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Compile an SDF to a pure function with free and fixed parameters.</p>
-<section id="returns-a-curried-function-with-signature" class="level2 doc-section doc-section-returns-a-curried-function-with-signature">
-<h2 class="doc-section doc-section-returns-a-curried-function-with-signature anchored" data-anchor-id="returns-a-curried-function-with-signature">Returns a curried function with signature</h2>
-<p>sdf_fn(free_params, fixed_params) -&gt; (point -&gt; distance)</p>
-</section>
+<section id="jaxcad.render.raymarch.render.raymarch" class="level1">
+<h1>render.raymarch.render.raymarch</h1>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>render.raymarch.render.raymarch(</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>    sdf,</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>    camera_pos<span class="op">=</span>jnp.array([<span class="fl">5.0</span>, <span class="fl">5.0</span>, <span class="fl">5.0</span>]),</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    look_at<span class="op">=</span>jnp.array([<span class="fl">0.0</span>, <span class="fl">0.0</span>, <span class="fl">0.0</span>]),</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>    light_dirs<span class="op">=</span>jnp.array([<span class="fl">0.5</span>, <span class="fl">1.0</span>, <span class="fl">0.3</span>]),</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>    light_colors<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>    resolution<span class="op">=</span>(<span class="dv">200</span>, <span class="dv">200</span>),</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>    fov<span class="op">=</span><span class="fl">0.6</span>,</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>    max_steps<span class="op">=</span><span class="dv">64</span>,</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>    max_dist<span class="op">=</span><span class="fl">20.0</span>,</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>    shadow_steps<span class="op">=</span><span class="dv">24</span>,</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>    shadow_hardness<span class="op">=</span><span class="fl">8.0</span>,</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>    gamma<span class="op">=</span><span class="fl">2.2</span>,</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>    ambient<span class="op">=</span><span class="fl">0.0</span>,</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>    aa_samples<span class="op">=</span><span class="dv">1</span>,</span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>    background_color<span class="op">=</span>jnp.array([<span class="fl">0.0</span>, <span class="fl">0.0</span>, <span class="fl">0.0</span>]),</span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>    refract_steps<span class="op">=</span><span class="dv">0</span>,</span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>    fd_normals<span class="op">=</span><span class="va">False</span>,</span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a>    normal_eps<span class="op">=</span><span class="fl">0.0001</span>,</span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>    reflect_steps<span class="op">=</span><span class="dv">0</span>,</span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a>    env_map<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a>    trace_mode<span class="op">=</span><span class="st">'sphere'</span>,</span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a>    bisect_steps<span class="op">=</span><span class="dv">8</span>,</span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Render an SDF via sphere tracing and return an RGB image array.</p>
+<p>Uses <code>jax.vmap</code> over pixels and <code>jax.lax.scan</code> for the inner march loop. Supports multiple colored lights, transparency, refraction, and mirror reflections.</p>
 <section id="parameters" class="level2 doc-section doc-section-parameters">
 <h2 class="doc-section doc-section-parameters anchored" data-anchor-id="parameters">Parameters</h2>
 <table class="caption-top table">
+<colgroup>
+<col style="width: 4%">
+<col style="width: 7%">
+<col style="width: 81%">
+<col style="width: 7%">
+</colgroup>
 <thead>
 <tr class="header">
 <th>Name</th>
@@ -222,9 +246,123 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <tbody>
 <tr class="odd">
 <td>sdf</td>
-<td>SDF</td>
-<td>The SDF to compile</td>
+<td>Callable[[Array], Array]</td>
+<td>Signed distance function, callable <code>(point: Array[3]) → Array[]</code>.</td>
 <td><em>required</em></td>
+</tr>
+<tr class="even">
+<td>camera_pos</td>
+<td>Array</td>
+<td>Camera position in world space.</td>
+<td><code>jnp.array([5.0, 5.0, 5.0])</code></td>
+</tr>
+<tr class="odd">
+<td>look_at</td>
+<td>Array</td>
+<td>Point the camera looks toward.</td>
+<td><code>jnp.array([0.0, 0.0, 0.0])</code></td>
+</tr>
+<tr class="even">
+<td>light_dirs</td>
+<td>Array</td>
+<td>Light direction(s) toward the light source(s). Shape <code>(3,)</code> for a single light or <code>(N, 3)</code> for N lights.</td>
+<td><code>jnp.array([0.5, 1.0, 0.3])</code></td>
+</tr>
+<tr class="odd">
+<td>light_colors</td>
+<td>Array | None</td>
+<td>RGB color(s) of the light(s), shape <code>(3,)</code> or <code>(N, 3)</code>. Defaults to white <code>[1, 1, 1]</code> for every light.</td>
+<td><code>None</code></td>
+</tr>
+<tr class="even">
+<td>resolution</td>
+<td>tuple[int, int]</td>
+<td>Output image size as (height, width).</td>
+<td><code>(200, 200)</code></td>
+</tr>
+<tr class="odd">
+<td>fov</td>
+<td>float</td>
+<td>Half-width field-of-view parameter.</td>
+<td><code>0.6</code></td>
+</tr>
+<tr class="even">
+<td>max_steps</td>
+<td>int</td>
+<td>Sphere tracing iterations per ray.</td>
+<td><code>64</code></td>
+</tr>
+<tr class="odd">
+<td>max_dist</td>
+<td>float</td>
+<td>Rays beyond this distance are treated as misses.</td>
+<td><code>20.0</code></td>
+</tr>
+<tr class="even">
+<td>shadow_steps</td>
+<td>int</td>
+<td>Iterations for the soft shadow ray.</td>
+<td><code>24</code></td>
+</tr>
+<tr class="odd">
+<td>shadow_hardness</td>
+<td>float</td>
+<td>Shadow sharpness (higher = harder edges).</td>
+<td><code>8.0</code></td>
+</tr>
+<tr class="even">
+<td>gamma</td>
+<td>float</td>
+<td>Gamma correction exponent (1.5 default, 2.2 = sRGB standard).</td>
+<td><code>2.2</code></td>
+</tr>
+<tr class="odd">
+<td>ambient</td>
+<td>float</td>
+<td>Constant ambient light added to all hit pixels (0 = fully black shadows, higher = lifted shadows).</td>
+<td><code>0.0</code></td>
+</tr>
+<tr class="even">
+<td>aa_samples</td>
+<td>int</td>
+<td>Super-sampling factor for antialiasing. 1 = no AA; 2 = 2×2 SSAA (4× rays, box-filtered); 3 = 3×3, etc.</td>
+<td><code>1</code></td>
+</tr>
+<tr class="odd">
+<td>background_color</td>
+<td>Array</td>
+<td>RGB color returned for rays that miss all geometry. Ignored when <code>env_map</code> is provided. Default is black.</td>
+<td><code>jnp.array([0.0, 0.0, 0.0])</code></td>
+</tr>
+<tr class="even">
+<td>refract_steps</td>
+<td>int</td>
+<td>Number of interior march steps for glass refraction. 0 disables refraction (legacy behaviour). Try 32–64 for glass.</td>
+<td><code>0</code></td>
+</tr>
+<tr class="odd">
+<td>fd_normals</td>
+<td>bool</td>
+<td>Use central finite differences for surface normals instead of <code>jax.grad</code>. Eliminates 2nd-order AD overhead when rendering inside <code>jax.grad(loss_fn)</code>. Default False (AD normals).</td>
+<td><code>False</code></td>
+</tr>
+<tr class="even">
+<td>normal_eps</td>
+<td>float</td>
+<td>Step size for finite-difference normal estimation.</td>
+<td><code>0.0001</code></td>
+</tr>
+<tr class="odd">
+<td>reflect_steps</td>
+<td>int</td>
+<td>Sphere-tracing iterations for mirror reflections (0 disables). Uses material <code>reflectivity</code> to blend. Try 32.</td>
+<td><code>0</code></td>
+</tr>
+<tr class="even">
+<td>env_map</td>
+<td>Array | None</td>
+<td>Optional equirectangular HDR environment map, shape <code>(H, W, 3)</code>. When set, miss rays and reflected rays that miss geometry sample this map instead of <code>background_color</code>. Load any <code>.hdr</code> or <code>.exr</code> file with <code>imageio</code> and pass through <code>jnp.asarray</code>, or generate one with :func:<code>~jaxcad.render.raymarch.env.make_gradient_sky</code>.</td>
+<td><code>None</code></td>
 </tr>
 </tbody>
 </table>
@@ -233,9 +371,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h2 class="doc-section doc-section-returns anchored" data-anchor-id="returns">Returns</h2>
 <table class="caption-top table">
 <colgroup>
-<col style="width: 5%">
-<col style="width: 5%">
-<col style="width: 89%">
+<col style="width: 9%">
+<col style="width: 14%">
+<col style="width: 75%">
 </colgroup>
 <thead>
 <tr class="header">
@@ -246,19 +384,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </thead>
 <tbody>
 <tr class="odd">
-<td>Callable</td>
-<td>Callable</td>
-<td>Curried function <code>sdf_fn(free_params, fixed_params) -&gt; (point -&gt; distance)</code> mapping parameter dicts to a callable <code>point: Array (3,) -&gt; distance: Array ()</code>.</td>
+<td></td>
+<td>np.ndarray</td>
+<td>Float32 numpy array of shape (H, W, 3) with values in [0, 1].</td>
 </tr>
 </tbody>
 </table>
-</section>
-<section id="example" class="level2 doc-section doc-section-example">
-<h2 class="doc-section doc-section-example anchored" data-anchor-id="example">Example</h2>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>radius <span class="op">=</span> Scalar(value<span class="op">=</span><span class="fl">1.0</span>, free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">'radius'</span>)</span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>sphere <span class="op">=</span> Sphere(radius<span class="op">=</span>radius)</span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>sdf_fn <span class="op">=</span> functionalize(sphere)</span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>distance <span class="op">=</span> sdf_fn({<span class="st">'sphere_0.radius'</span>: <span class="fl">2.0</span>}, {})(jnp.array([<span class="fl">0.</span>, <span class="fl">0.</span>, <span class="fl">0.</span>]))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 
 
 </section>
