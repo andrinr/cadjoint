@@ -71,6 +71,10 @@ class SDF(Fluent):
             return ClassName.sdf
     """
 
+    # Set to False on approximate SDFs (e.g. non-isometric deformations like
+    # Twist) so the renderer uses ao=1 instead of the unreliable gradient norm.
+    is_exact: bool = True
+
     params: dict[str, Parameter]
 
     def __init_subclass__(cls, **kwargs):

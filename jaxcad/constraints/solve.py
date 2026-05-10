@@ -8,14 +8,15 @@ import optax
 import optimistix as optx
 from jax import Array
 
-from jaxcad.constraints.dof import (
+from jaxcad.constraints.residual import (
     _collect_constraints,
     build_residual_fn,
     compute_param_vector,
+    pack_param_dict,
     unpack_param_vector,
 )
 from jaxcad.fluent import Fluent
-from jaxcad.geometry.parameters import Parameter, Scalar
+from jaxcad.geometry.parameters import Parameter
 
 
 def solve_constraints(
@@ -75,17 +76,8 @@ def solve_constraints(
 
     solver = optx.LevenbergMarquardt(rtol=tol, atol=tol)
     sol = optx.least_squares(residual_fn, solver, x0, max_steps=max_steps)
-    x = sol.value
 
-    # Reconstruct solved free_params as dict[name, Array]
-    result: dict[str, Array] = {}
-    offset = 0
-    for name, p in metadata.items():
-        size = p.value.size
-        val = x[offset : offset + size]
-        result[name] = val[0] if isinstance(p, Scalar) else val
-        offset += size
-    return result
+    return unpack_param_vector(sol.value, metadata)
 
 
 def project_to_manifold(
@@ -113,7 +105,7 @@ def project_to_manifold(
         return free_params
 
     flat_fn = build_residual_fn(constraints, metadata)
-    x = jnp.concatenate([jnp.atleast_1d(free_params[name]) for name in metadata])
+    x = pack_param_dict(free_params, metadata)
 
     for _ in range(steps):
         r = flat_fn(x)
@@ -142,8 +134,84 @@ def constraint_residuals(
     if not constraints:
         return jnp.array([])
     flat_fn = build_residual_fn(constraints, metadata)
-    x = jnp.concatenate([jnp.atleast_1d(free_params[name]) for name in metadata])
-    return flat_fn(x)
+    return flat_fn(pack_param_dict(free_params, metadata))
+
+
+def project_bounds(
+    free_params: dict[str, Array],
+    metadata: dict[str, Parameter],
+) -> dict[str, Array]:
+    """Clamp free_params to per-parameter bounds declared in metadata.
+
+    Reads the ``bounds`` field of each Parameter (set at construction time as
+    ``Scalar(v, bounds=(lo, hi))`` or ``Vector(v, bounds=(lo, hi))``).
+    Either bound may be ``None`` to leave that side unconstrained.
+
+    Args:
+        free_params: Current name-keyed parameter arrays.
+        metadata: Name-keyed Parameter objects carrying ``bounds`` info.
+
+    Returns:
+        A new dict with each array clipped to its declared bounds.
+        Parameters without bounds are returned unchanged.
+    """
+    result = {}
+    for k, v in free_params.items():
+        param = metadata.get(k)
+        if param is not None and param.bounds is not None:
+            lo, hi = param.bounds
+            lo = -jnp.inf if lo is None else lo
+            hi = jnp.inf if hi is None else hi
+            result[k] = jnp.clip(v, lo, hi)
+        else:
+            result[k] = v
+    return result
+
+
+def make_bounds_projection(
+    metadata: dict[str, Parameter],
+) -> optax.GradientTransformationExtraArgs:
+    """Return an optax transform that clamps params to their declared bounds.
+
+    Reads ``bounds`` from each Parameter in metadata and enforces them after
+    every gradient step.  Chain after the main optimizer:
+
+        optimizer = optax.chain(
+            optax.adamw(lr),
+            make_bounds_projection(metadata),
+        )
+
+    Args:
+        metadata: Name-keyed Parameter objects carrying ``bounds`` info.
+
+    Returns:
+        An optax.GradientTransformationExtraArgs that clamps updates.
+        Requires ``params`` to be passed to ``update``.
+    """
+    # Pre-compute which params actually have bounds to avoid repeated checks
+    bounded = {
+        k: (
+            -jnp.inf if p.bounds[0] is None else p.bounds[0],
+            jnp.inf if p.bounds[1] is None else p.bounds[1],
+        )
+        for k, p in metadata.items()
+        if p.bounds is not None
+    }
+
+    def init_fn(_params):
+        return ()
+
+    def update_fn(updates, state, params=None, **_):
+        if params is None or not bounded:
+            return updates, state
+        new_params = optax.apply_updates(params, updates)
+        projected = {
+            k: jnp.clip(v, *bounded[k]) if k in bounded else v for k, v in new_params.items()
+        }
+        corrected = jax.tree.map(lambda a, b: b - a, params, projected)
+        return corrected, state
+
+    return optax.GradientTransformationExtraArgs(init_fn, update_fn)
 
 
 def make_manifold_projection(

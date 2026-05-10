@@ -7,6 +7,7 @@ This module contains all SDF-related functionality:
 - Transforms (Translate, Rotate, Scale, Twist)
 """
 
+from jaxcad.functionalize import functionalize
 from jaxcad.sdf import measure
 from jaxcad.sdf.base import SDF
 from jaxcad.sdf.boolean import (
@@ -22,12 +23,12 @@ from jaxcad.sdf.boolean import (
     union,
     xor,
 )
-from jaxcad.sdf.functionalize import functionalize
 from jaxcad.sdf.measure import volume
 from jaxcad.sdf.primitives import (
     Box,
     Capsule,
     Cylinder,
+    Plane,
     Primitive,
     RoundBox,
     Sphere,
@@ -53,6 +54,7 @@ __all__ = [
     "Box",
     "Capsule",
     "Cylinder",
+    "Plane",
     "RoundBox",
     "Sphere",
     "Torus",

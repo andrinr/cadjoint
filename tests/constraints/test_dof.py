@@ -1,4 +1,4 @@
-"""Tests for DOF free functions (dof.py) and NullSpaceMap."""
+"""Tests for null-space free functions and NullSpaceMap."""
 
 import jax
 import jax.numpy as jnp
@@ -9,7 +9,7 @@ from jaxcad.constraints import (
     build_residual_fn,
     null_space,
 )
-from jaxcad.constraints.dof import _collect_constraints, compute_param_vector
+from jaxcad.constraints.residual import _collect_constraints, compute_param_vector
 from jaxcad.geometry.parameters import Vector
 
 

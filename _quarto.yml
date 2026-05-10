@@ -47,7 +47,13 @@ quartodoc:
         - extraction.extract_parameters
     - title: Functionalize
       contents:
-        - sdf.functionalize.functionalize
+        - functionalize.functionalize
+        - render.functionalize.functionalize_render
+    - title: Parametrization
+      contents:
+        - parametrization.to_normalized
+        - parametrization.from_normalized
+        - parametrization.compute_param_scales
     - title: Constraints — types
       contents:
         - constraints.types.base.Constraint
@@ -61,18 +67,12 @@ quartodoc:
         - constraints.solve.project_to_manifold
         - constraints.solve.constraint_residuals
         - constraints.solve.make_manifold_projection
-    - title: Construction
-      contents:
-        - construction.from_point.from_point
-        - construction.from_line.from_line
-        - construction.from_circle.from_circle
-        - construction.extrude.extrude
     - title: Geometry
       contents:
         - geometry.parameters.Vector
         - geometry.parameters.Scalar
     - title: Render
       contents:
-        - render.raymarch.raymarch
-        - render.raymarch.render_raymarched
+        - render.raymarch.render.raymarch
+        - render.raymarch.render.render_raymarched
         - render.marching_cubes.render_marching_cubes

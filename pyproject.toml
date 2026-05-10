@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "jaxcad"
 version = "0.1.0"
 description = "Fully differentiable CAD software built with JAX"
-license = { text = "AGPL-3.0-only" }
+license = { text = "Elastic-2.0" }
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [

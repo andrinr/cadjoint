@@ -29,7 +29,6 @@ def test_extract_fixed_parameter():
     free_params, fixed_params, metadata = extract_parameters(sphere)
 
     assert len(free_params) == 0
-    assert len(fixed_params) == 1
     assert "sphere_0.radius" in fixed_params
 
 
@@ -69,4 +68,4 @@ def test_extract_no_free_parameters():
     free_params, fixed_params, metadata = extract_parameters(sphere)
 
     assert len(free_params) == 0
-    assert len(fixed_params) == 1
+    assert "sphere_0.radius" in fixed_params

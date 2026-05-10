@@ -38,11 +38,11 @@ class Cylinder(Primitive):
         Returns:
             Signed distance to cylinder
         """
-        d_xy = jnp.linalg.norm(p[..., :2], axis=-1) - radius
+        d_xy = jnp.sqrt(p[..., 0] ** 2 + p[..., 1] ** 2 + 1e-20) - radius
         d_z = jnp.abs(p[..., 2]) - height
-        return jnp.sqrt(jnp.maximum(d_xy, 0.0) ** 2 + jnp.maximum(d_z, 0.0) ** 2) + jnp.minimum(
-            jnp.maximum(d_xy, d_z), 0.0
-        )
+        return jnp.sqrt(
+            jnp.maximum(d_xy, 0.0) ** 2 + jnp.maximum(d_z, 0.0) ** 2 + 1e-20
+        ) + jnp.minimum(jnp.maximum(d_xy, d_z), 0.0)
 
     def __call__(self, p: Array) -> Array:
         """Evaluate SDF at point(s) p."""

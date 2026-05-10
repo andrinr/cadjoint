@@ -1,50 +1,22 @@
-"""Free functions for constraint DOF analysis and null-space projection."""
+"""Null-space projection and DOF analysis for constrained parameter systems."""
 
 from __future__ import annotations
-
-from typing import Callable
 
 import jax
 import jax.numpy as jnp
 from jax import Array
 
+from jaxcad.constraints.residual import (
+    _collect_constraints,
+    build_residual_fn,
+    pack_param_dict,
+    unpack_param_vector,
+)
 from jaxcad.constraints.types.base import Constraint
 from jaxcad.geometry.parameters import (
     NamedParams,
     Parameter,
-    Scalar,
 )
-
-# ---------------------------------------------------------------------------
-# Private helpers
-# ---------------------------------------------------------------------------
-# Public API
-# ---------------------------------------------------------------------------
-
-
-def _collect_constraints(params: NamedParams) -> list[Constraint]:
-    """Discover all constraints attached to the given parameters (deduplicated)."""
-    seen: set = set()
-    constraints = []
-    for param in params.values():
-        for constraint in param.get_constraints():
-            if id(constraint) not in seen:
-                seen.add(id(constraint))
-                constraints.append(constraint)
-    return constraints
-
-
-def _fixed_params(constraints: list[Constraint]) -> dict[str, Array]:
-    """Collect values of non-free parameters referenced by constraints."""
-    seen: set = set()
-    result: dict[str, Array] = {}
-    for constraint in constraints:
-        for param in constraint.get_parameters():
-            if param.name not in seen:
-                seen.add(param.name)
-                if not param.free:
-                    result[param.name] = param.value
-    return result
 
 
 def _compute_null_space(jacobian: Array, n_params: int, tolerance: float = 1e-10) -> Array:
@@ -56,40 +28,6 @@ def _compute_null_space(jacobian: Array, n_params: int, tolerance: float = 1e-10
     rank = jnp.sum(s > tolerance)
     V = Vt.T
     return V[:, rank:]
-
-
-# ---------------------------------------------------------------------------
-# Public API
-# ---------------------------------------------------------------------------
-
-
-def compute_param_vector(params: NamedParams) -> Array:
-    """Build the initial flat parameter vector from an ordered params dict."""
-    return jnp.concatenate([jnp.atleast_1d(p.value) for p in params.values()])
-
-
-def unpack_param_vector(x_flat: Array, params: NamedParams) -> dict[str, Array]:
-    """Inverse of compute_param_vector: split a flat array back into named values.
-
-    Args:
-        x_flat: Flat parameter vector as returned by :func:`compute_param_vector`.
-        params: The same ordered NamedParams used to build ``x_flat``.
-
-    Returns:
-        Dict mapping parameter name to its value (scalars are 0-d arrays).
-    """
-    result: dict[str, Array] = {}
-    offset = 0
-    for name, p in params.items():
-        size = p.value.size
-        val = x_flat[offset : offset + size]
-        result[name] = val[0] if isinstance(p, Scalar) else val
-        offset += size
-    return result
-
-
-def _as_vec(v: Parameter | Array) -> Array:
-    return jnp.atleast_1d(v.value if isinstance(v, Parameter) else v)
 
 
 class NullSpaceMap:
@@ -124,9 +62,7 @@ class NullSpaceMap:
 
     def pack(self, full_dict: dict) -> Array:
         """Pack a full-space dict into a flat vector (consistent with params ordering)."""
-        return jnp.concatenate(
-            [_as_vec(full_dict[name]) for name in self._params if name in full_dict]
-        )
+        return pack_param_dict(full_dict, self._params)
 
     def unpack(self, flat: Array) -> dict[str, Array]:
         """Unpack a flat vector into a full-space dict (inverse of pack)."""
@@ -140,38 +76,6 @@ class NullSpaceMap:
     def __repr__(self) -> str:
         n, k = self._matrix.shape
         return f"NullSpaceMap(n_params={n}, n_free={k})"
-
-
-def build_residual_fn(
-    constraints: list[Constraint],
-    params: NamedParams,
-) -> Callable[[Array], Array]:
-    """Build a flat residual function over all constraints.
-
-    Each constraint's residuals are scaled by its ``weight`` attribute before
-    concatenation. Set ``constraint.weight`` at construction time to normalize
-    across types or scales.
-    """
-    fixed_by_name = _fixed_params(constraints)
-    weights: tuple[float, ...] = tuple(c.weight for c in constraints)
-    param_list = list(params.values())
-
-    def flat_fn(x_flat: Array) -> Array:
-        param_values = dict(fixed_by_name)
-        offset = 0
-        for p in param_list:
-            size = p.value.size
-            val = x_flat[offset : offset + size]
-            param_values[p.name] = val[0] if isinstance(p, Scalar) else val
-            offset += size
-        return jnp.concatenate(
-            [
-                w * jnp.atleast_1d(c.compute_residual(param_values))
-                for w, c in zip(weights, constraints)
-            ]
-        )
-
-    return flat_fn
 
 
 def all_parameters(constraints: list[Constraint]) -> list[Parameter]:
@@ -226,7 +130,7 @@ def null_space(
         ``full_dict @ N`` projects a full-space dict to reduced coords.
     """
     constraints = _collect_constraints(metadata)
-    x0 = jnp.concatenate([jnp.atleast_1d(free_params[name]) for name in metadata])
+    x0 = pack_param_dict(free_params, metadata)
     n_params = x0.shape[0]
 
     if not constraints:

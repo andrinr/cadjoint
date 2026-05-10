@@ -46,6 +46,11 @@ class Rotate(Transform):
         )
 
     @staticmethod
+    def _transform_point(p: Array, axis: Array, angle: float) -> Array:
+        R = Rotate._rotation_matrix(axis, angle)
+        return R.T @ p if p.ndim == 1 else jnp.einsum("ij,...j->...i", R.T, p)
+
+    @staticmethod
     def sdf(child_sdf, p: Array, axis: Array, angle: float) -> Array:
         """Pure function for rotation around arbitrary axis.
 

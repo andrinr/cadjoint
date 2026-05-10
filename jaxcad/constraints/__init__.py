@@ -5,8 +5,9 @@ relationships and automatically reduces degrees of freedom (DOF) during optimiza
 
 Architecture:
 - Constraints define relationships between parameters (distance, angle, etc.)
-- Free functions in dof.py compute reduced DOF space via null-space projection
-- Integration with extract_parameters() for optimization
+- residual.py builds flat residual functions and handles parameter vector pack/unpack
+- null_space.py computes reduced DOF space via null-space projection
+- solve.py drives optimization to satisfy constraints
 
 Example:
     from jaxcad.geometry import Vector, Scalar
@@ -25,18 +26,22 @@ Example:
 
 from __future__ import annotations
 
-from jaxcad.constraints.dof import (
+from jaxcad.constraints.null_space import (
     NullSpaceMap,
     all_parameters,
-    build_residual_fn,
-    compute_param_vector,
     null_space,
     total_dof_reduction,
+)
+from jaxcad.constraints.residual import (
+    build_residual_fn,
+    compute_param_vector,
     unpack_param_vector,
 )
 from jaxcad.constraints.solve import (
     constraint_residuals,
+    make_bounds_projection,
     make_manifold_projection,
+    project_bounds,
     project_to_manifold,
     solve_constraints,
 )
@@ -78,8 +83,10 @@ __all__ = [
     "null_space",
     # Solver
     "solve_constraints",
+    "project_bounds",
     "project_to_manifold",
     "constraint_residuals",
+    "make_bounds_projection",
     "make_manifold_projection",
     # Aliases
     "Distance",

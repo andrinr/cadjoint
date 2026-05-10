@@ -21,6 +21,8 @@ class Twist(Transform):
         axis: Twist axis as Array [x, y, z], Vector, or string ('x', 'y', 'z'). Defaults to 'z'.
     """
 
+    is_exact = False  # gradient magnitude is not reliable as an AO proxy
+
     def __init__(self, sdf, strength: float | Scalar, axis: str | Array | Vector = "z"):
         self.sdf = sdf
         if isinstance(axis, str):
