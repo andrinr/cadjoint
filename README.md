@@ -57,4 +57,4 @@ Inspired by [Fidget](https://www.mattkeeter.com/projects/fidget/) and [Inigo Qui
 
 ## License
 
-[Elastic License 2.0](LICENSE) — free for personal, research, and internal business use. Offering jaxcad as a hosted or managed service requires a commercial license. Contact [andrin.rehmann@simulation.science](mailto:andrin.rehmann@simulation.science) for commercial enquiries.
+[Elastic License 2.0](LICENSE) — free for personal, research, and internal business use. Offering jaxcad as a hosted or managed service requires a commercial license. Contact [andrin.rehmann@gmail.com](mailto:andrin.rehmann@gmail.com) for commercial enquiries.
