@@ -44,6 +44,10 @@ def _normal_fd(
         + k2 * sdf(pos + eps * k2)
         + k3 * sdf(pos + eps * k3)
     )
+    # The tetrahedral sum approximates ``4 * eps * grad(sdf)``. Normalizing
+    # hides that scale factor, but callers also use the magnitude as an AO
+    # proxy, so return an actual gradient estimate rather than the raw sum.
+    raw = raw / (4.0 * eps)
     return raw, jnp.sqrt(jnp.sum(raw**2) + _NORMAL_MAG_EPS)
 
 
