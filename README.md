@@ -5,7 +5,7 @@ Differentiable SDF primitives, transformations, and constraint system built with
 > [!WARNING]
 > The API is not stable. Expect breaking changes.
 
-![primitives](examples/assets/primitives.png)
+[![JAXCAD WebGPU playground with Python source beside a live rendered scene](examples/assets/webgpu_playground.png)](https://andrinr.github.io/jaxcad/docs/viewer.html)
 
 ---
 
@@ -63,6 +63,10 @@ Edit the example on the left and run it with `Ctrl+Enter` (or `Cmd+Enter`). The
 program must assign its final SDF to `scene`. The server only listens on localhost
 and compiles each edit in a timed child process, but the editor still executes
 Python on your machine—only run code you trust.
+
+The [WebGPU viewer guide](https://andrinr.github.io/jaxcad/docs/viewer.html) includes
+a live interactive scene and covers the local playground, camera controls,
+generated shader inspection, and the Jupyter widget.
 
 For offscreen OpenGL rendering, install the `glsl` extra instead.
 

@@ -6,6 +6,11 @@ title: jaxCAD
 
 jaxCAD combines parametric geometry, geometric constraints, and automatic differentiation to enable gradient-based shape optimization.
 
+[![JAXCAD WebGPU playground with Python source beside a live rendered scene](examples/assets/webgpu_playground.png)](docs/viewer.qmd)
+
+Build a scene in Python and inspect the generated WGSL in a live, interactive
+WebGPU preview. [Open the WebGPU viewer guide](docs/viewer.qmd).
+
 ## Core concepts
 
 | Layer | What it does |

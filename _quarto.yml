@@ -1,6 +1,8 @@
 project:
   type: website
   output-dir: _site
+  resources:
+    - docs/assets/**
 
 website:
   title: jaxCAD
@@ -9,6 +11,8 @@ website:
     left:
       - text: Get Started
         href: docs/getting-started.qmd
+      - text: WebGPU Viewer
+        href: docs/viewer.qmd
       - text: Examples
         menu:
           - text: Basics
@@ -21,6 +25,8 @@ website:
             href: examples/optimization.ipynb
           - text: Constrained Optimization
             href: examples/constrained_optimization.ipynb
+          - text: WebGPU Notebook
+            href: examples/webgpu_viewer.ipynb
       - text: API Reference
         href: reference/index.qmd
     right:
