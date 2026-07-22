@@ -24,13 +24,20 @@ Controls
 
 from __future__ import annotations
 
+import math
 from collections.abc import Sequence
 from typing import Callable
 
-import anywidget
-import traitlets
-
 from ..backends.wgsl.codegen import compile_sdf_to_wgsl
+
+try:
+    import anywidget
+    import traitlets
+except ImportError as exc:
+    raise ImportError(
+        "SDFViewer requires the optional viewer dependencies. "
+        "Install them with: pip install 'jaxcad[viewer]'"
+    ) from exc
 
 # ── JavaScript (ES module) ────────────────────────────────────────────────────
 
@@ -94,7 +101,7 @@ fn vs_main(@builtin(vertex_index) vid: u32) -> @builtin(position) vec4<f32> {
 @fragment
 fn fs_main(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
   let res = u.resolution.xy;
-  let uv  = (frag.xy / res - 0.5) * vec2<f32>(res.x / res.y, 1.0);
+  let uv  = (frag.xy / res - 0.5) * vec2<f32>(res.x / res.y, -1.0);
 
   let cam = u.camera_pos.xyz;
   let tgt = u.camera_target.xyz;
@@ -126,6 +133,8 @@ fn fs_main(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
 
 // ── widget entry point (must be synchronous) ──────────────────────────────────
 export function render({ model, el }) {
+  const controller = new AbortController();
+  const { signal } = controller;
   const h = model.get('height');
 
   // ── DOM setup ─────────────────────────────────────────────────────────────
@@ -151,6 +160,7 @@ export function render({ model, el }) {
 
   // ── async WebGPU initialisation ───────────────────────────────────────────
   async function init() {
+    if (signal.aborted) return;
     if (!navigator.gpu) {
       status.style.color = '#f88';
       status.textContent = '⚠ WebGPU not supported\nUse Chrome 113+ or Edge 113+';
@@ -158,13 +168,19 @@ export function render({ model, el }) {
     }
 
     const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
+    if (signal.aborted) return;
     if (!adapter) {
       status.style.color = '#f88';
       status.textContent = '⚠ No WebGPU adapter found';
       return;
     }
     const device  = await adapter.requestDevice();
+    if (signal.aborted) {
+      device.destroy();
+      return;
+    }
     const context = canvas.getContext('webgpu');
+    if (!context) throw new Error('Could not create a WebGPU canvas context');
     const format  = navigator.gpu.getPreferredCanvasFormat();
 
     function configureContext() {
@@ -180,32 +196,45 @@ export function render({ model, el }) {
 
     let pipeline  = null;
     let bindGroup = null;
+    let pipelineRevision = 0;
+    let shaderError = false;
 
     async function buildPipeline() {
+      const revision = ++pipelineRevision;
       const code = buildShader(model.get('wgsl_sdf'));
       try {
         const module = device.createShaderModule({ code });
         const info   = await module.getCompilationInfo();
         const errors = info.messages.filter(m => m.type === 'error');
         if (errors.length) {
+          if (revision !== pipelineRevision || signal.aborted) return false;
+          shaderError = true;
           status.style.color = '#f88';
           status.textContent = '⚠ Shader error:\n' + errors[0].message;
-          return;
+          return false;
         }
-        pipeline = await device.createRenderPipelineAsync({
+        const nextPipeline = await device.createRenderPipelineAsync({
           layout: 'auto',
           vertex:   { module, entryPoint: 'vs_main' },
           fragment: { module, entryPoint: 'fs_main', targets: [{ format }] },
           primitive: { topology: 'triangle-list' },
         });
-        bindGroup = device.createBindGroup({
-          layout: pipeline.getBindGroupLayout(0),
+        if (revision !== pipelineRevision || signal.aborted) return false;
+        const nextBindGroup = device.createBindGroup({
+          layout: nextPipeline.getBindGroupLayout(0),
           entries: [{ binding: 0, resource: { buffer: uniformBuf } }],
         });
+        pipeline = nextPipeline;
+        bindGroup = nextBindGroup;
+        shaderError = false;
         status.style.color = '#aaa';
+        return true;
       } catch (e) {
+        if (revision !== pipelineRevision || signal.aborted) return false;
+        shaderError = true;
         status.style.color = '#f88';
         status.textContent = '⚠ ' + e.message;
+        return false;
       }
     }
 
@@ -222,6 +251,7 @@ export function render({ model, el }) {
     }
 
     function pushUniforms() {
+      if (signal.aborted) return;
       const [px, py, pz] = camPos();
       const ld = model.get('light_dir');
       const bg = model.get('bg_color');
@@ -237,20 +267,21 @@ export function render({ model, el }) {
     // ── render loop ───────────────────────────────────────────────────────────
     let pending = false;
     function schedule() {
-      if (pending) return;
+      if (pending || signal.aborted) return;
       pending = true;
       requestAnimationFrame(frame);
     }
 
     function frame() {
       pending = false;
-      if (!pipeline) return;
+      if (!pipeline || signal.aborted) return;
       pushUniforms();
-      const [px, py, pz] = camPos();
-      status.textContent =
-        `az ${(az * 180 / Math.PI).toFixed(1)}°  ` +
-        `el ${(elev * 180 / Math.PI).toFixed(1)}°  ` +
-        `r ${dist.toFixed(2)}`;
+      if (!shaderError) {
+        status.textContent =
+          `az ${(az * 180 / Math.PI).toFixed(1)}°  ` +
+          `el ${(elev * 180 / Math.PI).toFixed(1)}°  ` +
+          `r ${dist.toFixed(2)}`;
+      }
 
       const enc  = device.createCommandEncoder();
       const pass = enc.beginRenderPass({
@@ -275,44 +306,49 @@ export function render({ model, el }) {
       lx = e.clientX; ly = e.clientY;
       canvas.style.cursor = 'grabbing';
       e.preventDefault();
-    });
-    canvas.addEventListener('contextmenu', e => e.preventDefault());
+    }, { signal });
+    canvas.addEventListener('contextmenu', e => e.preventDefault(), { signal });
 
     window.addEventListener('mousemove', e => {
       if (!dragging) return;
       const dx = e.clientX - lx, dy = e.clientY - ly;
       lx = e.clientX; ly = e.clientY;
       if (rightBtn) {
+        const pan = dx * dist * 0.002;
+        cx -= pan * Math.cos(az);
+        cz += pan * Math.sin(az);
         cy -= dy * dist * 0.002;
       } else {
         az   -= dx * 0.008;
         elev  = Math.max(-1.45, Math.min(1.45, elev + dy * 0.008));
       }
       schedule();
-    });
+    }, { signal });
     window.addEventListener('mouseup', () => {
       dragging = false; canvas.style.cursor = 'grab';
-    });
+    }, { signal });
     canvas.addEventListener('wheel', e => {
       dist = Math.max(0.1, Math.min(200, dist * (1 + e.deltaY * 0.001)));
       schedule(); e.preventDefault();
-    }, { passive: false });
+    }, { passive: false, signal });
     canvas.addEventListener('dblclick', () => {
       az = 0.6; elev = 0.4; dist = 5.0; cx = cy = cz = 0; schedule();
-    });
+    }, { signal });
 
     // ── model observers ───────────────────────────────────────────────────────
-    model.on('change:wgsl_sdf', () => {
+    const onShaderChange = () => {
       status.textContent = 'recompiling…';
-      buildPipeline().then(schedule);
-    });
-    model.on('change:light_dir change:bg_color', schedule);
+      buildPipeline().then(ok => { if (ok) schedule(); });
+    };
+    const onUniformChange = () => schedule();
+    model.on('change:wgsl_sdf', onShaderChange);
+    model.on('change:light_dir change:bg_color', onUniformChange);
 
     // ── responsive resize ─────────────────────────────────────────────────────
     const ro = new ResizeObserver(() => {
       const dpr = window.devicePixelRatio || 1;
-      const w   = Math.round(canvas.clientWidth  * dpr);
-      const h   = Math.round(canvas.clientHeight * dpr);
+      const w   = Math.max(1, Math.round(canvas.clientWidth  * dpr));
+      const h   = Math.max(1, Math.round(canvas.clientHeight * dpr));
       if (canvas.width !== w || canvas.height !== h) {
         canvas.width  = w;
         canvas.height = h;
@@ -322,14 +358,29 @@ export function render({ model, el }) {
     });
     ro.observe(canvas);
 
-    await buildPipeline();
-    schedule();
+    signal.addEventListener('abort', () => {
+      ro.disconnect();
+      model.off('change:wgsl_sdf', onShaderChange);
+      model.off('change:light_dir change:bg_color', onUniformChange);
+      device.destroy();
+    }, { once: true });
+
+    device.lost.then(info => {
+      if (signal.aborted) return;
+      status.style.color = '#f88';
+      status.textContent = '⚠ WebGPU device lost: ' + info.message;
+    });
+
+    if (await buildPipeline()) schedule();
   }
 
   init().catch(e => {
+    if (signal.aborted) return;
     status.style.color = '#f88';
     status.textContent = '⚠ ' + e.message;
   });
+
+  return () => controller.abort();
 }
 """
 
@@ -345,17 +396,35 @@ class SDFViewer(anywidget.AnyWidget):
 
     Args:
         fn: JAX-traceable SDF callable ``(p: f32[3]) -> f32[]``.
-        resolution: Canvas size as ``(width, height)``.  Default ``(512, 512)``.
+        height: Canvas height in CSS pixels. The width fills its container.
         light_dir: World-space light direction, default ``[1, 2, 3]``.
         bg_color: Background RGB in [0, 1], default ``[0.05, 0.05, 0.1]``.
     """
 
     _esm = _ESM
 
-    wgsl_sdf = traitlets.Unicode("").tag(sync=True)
-    height = traitlets.Int(400).tag(sync=True)
-    light_dir = traitlets.List([1.0, 2.0, 3.0]).tag(sync=True)
-    bg_color = traitlets.List([0.05, 0.05, 0.10]).tag(sync=True)
+    wgsl_sdf = traitlets.Unicode(default_value="").tag(sync=True)
+    height = traitlets.Int(default_value=400, min=1).tag(sync=True)
+    light_dir = traitlets.List(
+        trait=traitlets.Float(), default_value=[1.0, 2.0, 3.0], minlen=3, maxlen=3
+    ).tag(sync=True)
+    bg_color = traitlets.List(
+        trait=traitlets.Float(), default_value=[0.05, 0.05, 0.10], minlen=3, maxlen=3
+    ).tag(sync=True)
+
+    @traitlets.validate("light_dir")
+    def _validate_light_dir(self, proposal):
+        values = proposal["value"]
+        if not all(math.isfinite(value) for value in values) or not any(values):
+            raise traitlets.TraitError("light_dir must be a finite, non-zero 3D vector")
+        return values
+
+    @traitlets.validate("bg_color")
+    def _validate_bg_color(self, proposal):
+        values = proposal["value"]
+        if not all(math.isfinite(value) and 0.0 <= value <= 1.0 for value in values):
+            raise traitlets.TraitError("bg_color values must be finite and between 0 and 1")
+        return values
 
     def __init__(
         self,

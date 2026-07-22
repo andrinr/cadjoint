@@ -1444,8 +1444,6 @@ name = "jaxcad"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "anywidget", version = "0.9.21", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
-    { name = "anywidget", version = "0.11.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "imageio" },
     { name = "jax", version = "0.4.30", source = { registry = "https://pypi.org/simple" }, extra = ["cuda12"], marker = "python_full_version < '3.10'" },
     { name = "jax", version = "0.6.2", source = { registry = "https://pypi.org/simple" }, extra = ["cuda12"], marker = "python_full_version == '3.10.*'" },
@@ -1476,6 +1474,10 @@ docs = [
 glsl = [
     { name = "moderngl" },
 ]
+viewer = [
+    { name = "anywidget", version = "0.9.21", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "anywidget", version = "0.11.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -1493,12 +1495,12 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "anywidget", specifier = ">=0.9.21" },
+    { name = "anywidget", marker = "extra == 'viewer'", specifier = ">=0.9.21" },
     { name = "griffe", marker = "extra == 'docs'", specifier = "<1.0" },
     { name = "imageio", specifier = ">=2.37.2" },
     { name = "jax", extras = ["cuda12"], specifier = ">=0.4.20" },
     { name = "matplotlib", marker = "extra == 'dev'", specifier = ">=3.7.0" },
-    { name = "moderngl", marker = "extra == 'glsl'" },
+    { name = "moderngl", marker = "extra == 'glsl'", specifier = ">=5.12.0" },
     { name = "numpy", specifier = ">=1.24.0" },
     { name = "optax", specifier = ">=0.2.4" },
     { name = "optimistix", specifier = ">=0.0.10" },
@@ -1506,7 +1508,7 @@ requires-dist = [
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0.0" },
     { name = "quartodoc", marker = "extra == 'docs'", specifier = ">=0.7" },
 ]
-provides-extras = ["glsl", "dev", "docs"]
+provides-extras = ["glsl", "viewer", "dev", "docs"]
 
 [package.metadata.requires-dev]
 dev = [
