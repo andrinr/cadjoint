@@ -34,6 +34,18 @@ class GLSLRenderer:
             )
         self._ctx = moderngl.create_standalone_context()
 
+    def __enter__(self) -> GLSLRenderer:
+        return self
+
+    def __exit__(self, *_args) -> None:
+        self.close()
+
+    def close(self) -> None:
+        """Release the underlying OpenGL context."""
+        if self._ctx is not None:
+            self._ctx.release()
+            self._ctx = None
+
     def render(
         self,
         fragment_shader: str,
@@ -57,7 +69,15 @@ class GLSLRenderer:
             ``float32`` numpy array of shape ``(H, W, 3)`` in ``[0, 1]``.
         """
         h, w = resolution
+        if h <= 0 or w <= 0:
+            raise ValueError("resolution dimensions must be positive")
+        camera_pos = np.asarray(camera_pos, dtype=np.float32)
+        camera_target = np.asarray(camera_target, dtype=np.float32)
+        if camera_pos.shape != (3,) or camera_target.shape != (3,):
+            raise ValueError("camera_pos and camera_target must each have shape (3,)")
         ctx = self._ctx
+        if ctx is None:
+            raise RuntimeError("GLSLRenderer is closed")
 
         prog = ctx.program(vertex_shader=_VERT, fragment_shader=fragment_shader)
 
@@ -77,13 +97,19 @@ class GLSLRenderer:
 
         vbo = ctx.buffer(_QUAD.tobytes())
         vao = ctx.simple_vertex_array(prog, vbo, "position")
-
         tex = ctx.texture((w, h), 3, dtype="f4")
         fbo = ctx.framebuffer(color_attachments=[tex])
-        fbo.use()
-        ctx.clear(0.0, 0.0, 0.0)
-        vao.render(moderngl.TRIANGLE_STRIP)
+        try:
+            fbo.use()
+            ctx.clear(0.0, 0.0, 0.0)
+            vao.render(moderngl.TRIANGLE_STRIP)
 
-        raw = np.frombuffer(fbo.read(components=3, dtype="f4"), dtype=np.float32)
-        image = raw.reshape(h, w, 3)[::-1]  # flip Y (OpenGL origin = bottom-left)
-        return np.clip(image, 0.0, 1.0)
+            raw = np.frombuffer(fbo.read(components=3, dtype="f4"), dtype=np.float32)
+            image = raw.reshape(h, w, 3)[::-1]  # flip Y (OpenGL origin = bottom-left)
+            return np.clip(image, 0.0, 1.0)
+        finally:
+            fbo.release()
+            tex.release()
+            vao.release()
+            vbo.release()
+            prog.release()

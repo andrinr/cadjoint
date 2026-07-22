@@ -71,21 +71,18 @@ class GLSLBackend(ShaderBackend):
         Returns:
             ``float32`` numpy array ``(H, W, 3)`` in ``[0, 1]``.
         """
-        from .codegen import _RAYMARCHER
+        from .codegen import _build_fragment_shader_from_code
         from .renderer import GLSLRenderer
 
-        fragment_shader = _RAYMARCHER.format(
-            sdf_code=sdf_code,
-            max_steps=max_steps,
-            max_dist=max_dist,
-            surf_eps=surf_eps,
+        fragment_shader = _build_fragment_shader_from_code(
+            sdf_code, max_steps=max_steps, max_dist=max_dist, surf_eps=surf_eps
         )
-        renderer = GLSLRenderer()
-        return renderer.render(
-            fragment_shader,
-            camera_pos=np.asarray(camera_pos),
-            camera_target=np.asarray(camera_target),
-            resolution=resolution,
-            light_dir=light_dir,
-            bg_color=bg_color,
-        )
+        with GLSLRenderer() as renderer:
+            return renderer.render(
+                fragment_shader,
+                camera_pos=np.asarray(camera_pos),
+                camera_target=np.asarray(camera_target),
+                resolution=resolution,
+                light_dir=light_dir,
+                bg_color=bg_color,
+            )

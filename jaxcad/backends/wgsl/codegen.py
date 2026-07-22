@@ -25,5 +25,5 @@ def compile_sdf_to_wgsl(
         WGSL source for the SDF function(s) — no surrounding shader boilerplate.
     """
     if example_point is None:
-        example_point = jnp.zeros(3)
+        example_point = jnp.zeros(3, dtype=jnp.float32)
     return StableHLOToWGSL().compile(fn, example_point)

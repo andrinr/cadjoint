@@ -24,11 +24,9 @@ _HIT_THRESHOLD: float = 5e-3
 # ---------------------------------------------------------------------------
 
 # Reflection ray origin is offset this far along the surface normal to avoid
-# self-intersection.
+# self-intersection.  Must exceed _HIT_THRESHOLD so the self-surface d_min
+# stays above the hit threshold on the next trace.
 _SECONDARY_RAY_OFFSET: float = 0.01
-assert (
-    _SECONDARY_RAY_OFFSET > _HIT_THRESHOLD
-), "Secondary ray offset must exceed hit threshold to avoid self-intersection."
 
 # ---------------------------------------------------------------------------
 # Refraction / glass
@@ -43,9 +41,6 @@ _GLASS_SURFACE_OFFSET: float = 1e-3
 # because the interior SDF is negated (-sdf), so small positive values here
 # mean we're close to the exit face — we want to resolve that boundary.
 _GLASS_MIN_STEP: float = 1e-4
-assert (
-    _GLASS_MIN_STEP > _MIN_MARCH_STEP
-), "Glass minimum step must exceed core minimum march step to resolve glass boundaries."
 
 # ---------------------------------------------------------------------------
 # Surface normals

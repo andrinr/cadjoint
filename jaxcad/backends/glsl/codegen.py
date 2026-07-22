@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import Callable
 
 import jax.numpy as jnp
@@ -106,7 +107,7 @@ def compile_sdf_to_glsl(
         GLSL source for the SDF function(s) — no surrounding shader boilerplate.
     """
     if example_point is None:
-        example_point = jnp.zeros(3)
+        example_point = jnp.zeros(3, dtype=jnp.float32)
     return StableHLOToGLSL().compile(fn, example_point)
 
 
@@ -122,10 +123,35 @@ def build_fragment_shader(
     The shader includes sphere tracing, normal estimation, soft shadows,
     and Blinn-Phong lighting.  Camera and light are set via uniforms.
     """
+    _validate_fragment_options(max_steps, max_dist, surf_eps)
     sdf_code = compile_sdf_to_glsl(fn, example_point)
+    return _format_fragment_shader(sdf_code, max_steps, max_dist, surf_eps)
+
+
+def _build_fragment_shader_from_code(
+    sdf_code: str,
+    max_steps: int,
+    max_dist: float,
+    surf_eps: float,
+) -> str:
+    """Wrap an already compiled SDF in the shared ray-marching shader."""
+    _validate_fragment_options(max_steps, max_dist, surf_eps)
+    return _format_fragment_shader(sdf_code, max_steps, max_dist, surf_eps)
+
+
+def _format_fragment_shader(sdf_code: str, max_steps: int, max_dist: float, surf_eps: float) -> str:
     return _RAYMARCHER.format(
         sdf_code=sdf_code,
         max_steps=max_steps,
         max_dist=max_dist,
         surf_eps=surf_eps,
     )
+
+
+def _validate_fragment_options(max_steps: int, max_dist: float, surf_eps: float) -> None:
+    if max_steps <= 0:
+        raise ValueError("max_steps must be positive")
+    if not math.isfinite(max_dist) or max_dist <= 0:
+        raise ValueError("max_dist must be finite and positive")
+    if not math.isfinite(surf_eps) or surf_eps <= 0:
+        raise ValueError("surf_eps must be finite and positive")

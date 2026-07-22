@@ -30,8 +30,8 @@ class ShaderBackend(ABC):
     ) -> str:
         """Compile a JAX SDF function to backend shader source.
 
-        The function is traced via ``jax.make_jaxpr`` and every JAX primitive
-        is mapped to an equivalent shader expression.
+        The function is exported to StableHLO and supported operations are
+        mapped to equivalent shader expressions.
 
         Args:
             fn: Callable ``(p: f32[3]) -> f32[]`` traceable by JAX.
