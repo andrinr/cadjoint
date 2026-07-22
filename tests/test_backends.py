@@ -401,6 +401,28 @@ def test_wgsl_backend():
 # ── renderer (requires moderngl) ──────────────────────────────────────────────
 
 
+def test_glsl_renderer_validates_render_inputs_before_gpu_calls():
+    from jaxcad.backends.glsl.renderer import GLSLRenderer
+
+    renderer = GLSLRenderer.__new__(GLSLRenderer)
+    renderer._ctx = object()
+    kwargs = {
+        "fragment_shader": "",
+        "camera_pos": np.array([0.0, 0.0, 5.0]),
+        "camera_target": np.zeros(3),
+        "resolution": (32, 32),
+    }
+
+    with pytest.raises(ValueError, match="resolution"):
+        renderer.render(**(kwargs | {"resolution": (0, 32)}))
+    with pytest.raises(ValueError, match="must differ"):
+        renderer.render(**(kwargs | {"camera_target": kwargs["camera_pos"]}))
+    with pytest.raises(ValueError, match="light_dir"):
+        renderer.render(**kwargs, light_dir=np.zeros(3))
+    with pytest.raises(ValueError, match="bg_color"):
+        renderer.render(**kwargs, bg_color=np.array([0.0, 0.0, 2.0]))
+
+
 def test_glsl_renderer():
     pytest.importorskip("moderngl")
     from jaxcad.backends.glsl.renderer import GLSLRenderer

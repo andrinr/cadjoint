@@ -32,7 +32,7 @@ class GLSLRenderer:
                 "moderngl is required for GLSL rendering.\n"
                 "Install it with:  pip install jaxcad[glsl]"
             )
-        self._ctx = moderngl.create_standalone_context()
+        self._ctx = moderngl.create_standalone_context(require=430)
 
     def __enter__(self) -> GLSLRenderer:
         return self
@@ -75,6 +75,19 @@ class GLSLRenderer:
         camera_target = np.asarray(camera_target, dtype=np.float32)
         if camera_pos.shape != (3,) or camera_target.shape != (3,):
             raise ValueError("camera_pos and camera_target must each have shape (3,)")
+        if not np.isfinite(camera_pos).all() or not np.isfinite(camera_target).all():
+            raise ValueError("camera_pos and camera_target must contain only finite values")
+        if np.array_equal(camera_pos, camera_target):
+            raise ValueError("camera_pos and camera_target must differ")
+
+        ld = np.asarray(light_dir if light_dir is not None else [1.0, 2.0, 3.0], dtype=np.float32)
+        if ld.shape != (3,) or not np.isfinite(ld).all() or not np.any(ld):
+            raise ValueError("light_dir must be a finite, non-zero vector with shape (3,)")
+
+        bg = np.asarray(bg_color if bg_color is not None else np.zeros(3), dtype=np.float32)
+        if bg.shape != (3,) or not np.isfinite(bg).all() or np.any((bg < 0) | (bg > 1)):
+            raise ValueError("bg_color must have shape (3,) with finite values between 0 and 1")
+
         ctx = self._ctx
         if ctx is None:
             raise RuntimeError("GLSLRenderer is closed")
@@ -89,10 +102,8 @@ class GLSLRenderer:
         _set("uCameraPos", *[float(v) for v in camera_pos])
         _set("uCameraTarget", *[float(v) for v in camera_target])
 
-        ld = light_dir if light_dir is not None else np.array([1.0, 2.0, 3.0])
         _set("uLightDir", *[float(v) for v in ld])
 
-        bg = bg_color if bg_color is not None else np.zeros(3)
         _set("uBgColor", *[float(v) for v in bg])
 
         vbo = ctx.buffer(_QUAD.tobytes())
