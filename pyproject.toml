@@ -17,6 +17,9 @@ dependencies = [
     "optimistix>=0.0.10",
 ]
 
+[project.scripts]
+jaxcad-viewer = "jaxcad.viewer.playground:main"
+
 [project.optional-dependencies]
 glsl = ["moderngl>=5.12.0"]
 viewer = ["anywidget>=0.9.21"]
