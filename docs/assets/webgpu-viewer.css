@@ -1,0 +1,119 @@
+.jaxcad-webgpu-demo {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  margin: 1.5rem 0;
+  overflow: hidden;
+  border: 1px solid rgba(120, 130, 120, 0.28);
+  border-radius: 0.75rem;
+  background: #30352f;
+  box-shadow: 0 1rem 2.5rem rgba(22, 28, 22, 0.14);
+}
+
+.jaxcad-webgpu-demo canvas,
+.jaxcad-webgpu-demo [data-viewer-fallback] {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.jaxcad-webgpu-demo canvas {
+  cursor: grab;
+  touch-action: none;
+}
+
+.jaxcad-webgpu-demo canvas:active {
+  cursor: grabbing;
+}
+
+.jaxcad-webgpu-demo [data-viewer-fallback] {
+  display: none;
+  object-fit: cover;
+}
+
+.jaxcad-webgpu-demo.is-fallback canvas {
+  display: none;
+}
+
+.jaxcad-webgpu-demo.is-fallback [data-viewer-fallback] {
+  display: block;
+}
+
+.jaxcad-webgpu-status,
+.jaxcad-webgpu-reset,
+.jaxcad-webgpu-help {
+  position: absolute;
+  z-index: 1;
+}
+
+.jaxcad-webgpu-status {
+  top: 1rem;
+  left: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  color: #d9ddd5;
+  background: rgba(12, 15, 12, 0.76);
+  backdrop-filter: blur(0.6rem);
+  font-size: 0.76rem;
+}
+
+.jaxcad-webgpu-status::before {
+  content: "";
+  width: 0.48rem;
+  height: 0.48rem;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #92988f;
+}
+
+.jaxcad-webgpu-demo.is-live .jaxcad-webgpu-status::before {
+  background: #d9ff57;
+  box-shadow: 0 0 0.7rem #d9ff57;
+}
+
+.jaxcad-webgpu-demo.is-error .jaxcad-webgpu-status::before {
+  background: #ff8167;
+}
+
+.jaxcad-webgpu-reset {
+  top: 0.85rem;
+  right: 0.85rem;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 0.45rem;
+  color: #eef0ea;
+  background: rgba(12, 15, 12, 0.76);
+  font: 600 0.76rem/1 system-ui, sans-serif;
+  cursor: pointer;
+}
+
+.jaxcad-webgpu-reset:hover {
+  border-color: rgba(217, 255, 87, 0.72);
+}
+
+.jaxcad-webgpu-help {
+  right: 1rem;
+  bottom: 0.8rem;
+  color: rgba(238, 240, 234, 0.68);
+  font-size: 0.72rem;
+  pointer-events: none;
+}
+
+.jaxcad-webgpu-demo.is-fallback .jaxcad-webgpu-reset,
+.jaxcad-webgpu-demo.is-fallback .jaxcad-webgpu-help {
+  display: none;
+}
+
+@media (max-width: 600px) {
+  .jaxcad-webgpu-demo {
+    aspect-ratio: 4 / 3;
+  }
+
+  .jaxcad-webgpu-help {
+    display: none;
+  }
+}
