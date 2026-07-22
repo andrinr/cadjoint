@@ -22,7 +22,7 @@ class Union(BooleanOp):
     def __init__(self, *sdfs, smoothness: float = 0.1):
         if len(sdfs) == 1 and isinstance(sdfs[0], (tuple, list)):
             sdfs = tuple(sdfs[0])
-        self.sdfs = sdfs
+        self.sdfs = self._validate_children(sdfs, "Union")
         self.params = {"smoothness": smoothness}
 
     @staticmethod
@@ -48,17 +48,23 @@ class Union(BooleanOp):
         return Union.sdf(self.sdfs, p, self.params["smoothness"].value)
 
     def material_at(self, p: Array) -> dict:
+        material_fns = tuple(sdf.material_at for sdf in self.sdfs)
+        return Union.material(self.sdfs, material_fns, p, self.params["smoothness"].value)
+
+    @staticmethod
+    def material(child_sdfs, child_materials, p: Array, smoothness: float) -> dict:
+        """Pure material selection matching the union distance reduction."""
         from jaxcad.render.material import Material
 
-        k = jnp.maximum(self.params["smoothness"].value * 4.0, 1e-10)
-        result_m = self.sdfs[0].material_at(p)
-        result_d = self.sdfs[0](p)
-        for child in self.sdfs[1:]:
-            d = child(p)
-            m = child.material_at(p)
+        k = jnp.maximum(smoothness * 4.0, 1e-10)
+        result_m = child_materials[0](p)
+        result_d = child_sdfs[0](p)
+        for child_sdf, child_material in zip(child_sdfs[1:], child_materials[1:]):
+            d = child_sdf(p)
+            m = child_material(p)
             t = jnp.clip(0.5 + 0.5 * (d - result_d) / k, 0.0, 1.0)
             result_m = Material.blend(result_m, m, t)
-            result_d = smooth_min(result_d, d, self.params["smoothness"].value)
+            result_d = smooth_min(result_d, d, smoothness)
         return result_m
 
     def to_functional(self):

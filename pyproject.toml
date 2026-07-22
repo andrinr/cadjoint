@@ -1,27 +1,37 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools>=77.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "jaxcad"
 version = "0.1.0"
 description = "Fully differentiable CAD software built with JAX"
-license = { text = "Elastic-2.0" }
+license = "Elastic-2.0"
+license-files = ["LICENSE"]
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
-    "imageio>=2.37.2",
-    "jax[cuda12]>=0.4.20",
+    "jax>=0.4.20",
     "numpy>=1.24.0",
     "optax>=0.2.4",
     "optimistix>=0.0.10",
 ]
 
 [project.optional-dependencies]
+cuda12 = [
+    "jax[cuda12]>=0.4.20",
+]
+render = [
+    "imageio>=2.37.2",
+    "matplotlib>=3.7.0",
+    "scikit-image>=0.21.0",
+]
 dev = [
     "pytest>=7.0.0",
+    "ruff>=0.8.0",
     "pre-commit>=3.0.0",
     "matplotlib>=3.7.0",
+    "scikit-image>=0.21.0",
 ]
 docs = [
     "quartodoc>=0.7",

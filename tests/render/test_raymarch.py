@@ -809,3 +809,5 @@ def test_normal_fd_matches_ad_on_sphere():
     assert jnp.allclose(
         fd_normal, ad_normal, atol=1e-3
     ), f"FD normal {fd_normal} differs from AD normal {ad_normal}"
+    assert jnp.allclose(fd_raw, ad_raw, atol=1e-3)
+    assert jnp.allclose(fd_mag, jnp.linalg.norm(ad_raw), atol=1e-3)

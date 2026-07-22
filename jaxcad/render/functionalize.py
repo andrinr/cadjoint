@@ -106,7 +106,7 @@ def functionalize_render(
             shadow_hardness,
             ambient=0.0,  # ambient handled via bg fallback
             refract_steps=0,
-            use_grad_ao=True,
+            use_grad_ao=scene.geometry.is_exact,
             fd_normals=fd_normals,
             normal_eps=normal_eps,
             reflect_steps=reflect_steps,

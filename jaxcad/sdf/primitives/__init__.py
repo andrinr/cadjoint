@@ -3,6 +3,7 @@
 from jaxcad.sdf.primitives.base import Primitive
 from jaxcad.sdf.primitives.box import Box
 from jaxcad.sdf.primitives.capsule import Capsule
+from jaxcad.sdf.primitives.cone import Cone
 from jaxcad.sdf.primitives.cylinder import Cylinder
 from jaxcad.sdf.primitives.plane import Plane
 from jaxcad.sdf.primitives.round_box import RoundBox
@@ -13,6 +14,7 @@ __all__ = [
     "Primitive",
     "Box",
     "Capsule",
+    "Cone",
     "Cylinder",
     "Plane",
     "RoundBox",

@@ -31,12 +31,23 @@ class Twist(Transform):
                 "y": jnp.array([0.0, 1.0, 0.0]),
                 "z": jnp.array([0.0, 0.0, 1.0]),
             }
-            axis = axis_map.get(axis.lower(), jnp.array([0.0, 0.0, 1.0]))
+            try:
+                axis = axis_map[axis.lower()]
+            except KeyError as exc:
+                raise ValueError("Twist axis must be 'x', 'y', 'z', or a 3D vector.") from exc
+        axis_value = axis.xyz if isinstance(axis, Vector) else jnp.asarray(axis)
+        if (
+            axis_value.shape != (3,)
+            or not bool(jnp.isfinite(axis_value).all())
+            or bool(jnp.linalg.norm(axis_value) == 0)
+        ):
+            raise ValueError("Twist axis must be a finite, non-zero 3D vector.")
         self.params = {"strength": strength, "axis": axis}
 
     @staticmethod
     def _transform_point(p: Array, strength: float, axis: Array) -> Array:
         """Apply twist to a single point (1D)."""
+        axis = axis / jnp.linalg.norm(axis)
         height = jnp.dot(p, axis)
         angle = strength * height
         c, s = jnp.cos(angle), jnp.sin(angle)
@@ -78,8 +89,9 @@ class Twist(Transform):
         return Twist.sdf(self.sdf, p, self.params["strength"].value, self.params["axis"].xyz)
 
     def material_at(self, p: Array) -> dict:
-        axis = self.params["axis"].xyz / jnp.linalg.norm(self.params["axis"].xyz)
-        p_twisted = Twist._transform_point(p, self.params["strength"].value, axis)
+        p_twisted = Twist._transform_point(
+            p, self.params["strength"].value, self.params["axis"].xyz
+        )
         return self.sdf.material_at(p_twisted)
 
     def to_functional(self):

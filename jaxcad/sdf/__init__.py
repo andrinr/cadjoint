@@ -27,6 +27,7 @@ from jaxcad.sdf.measure import volume
 from jaxcad.sdf.primitives import (
     Box,
     Capsule,
+    Cone,
     Cylinder,
     Plane,
     Primitive,
@@ -53,6 +54,7 @@ __all__ = [
     "Primitive",
     "Box",
     "Capsule",
+    "Cone",
     "Cylinder",
     "Plane",
     "RoundBox",

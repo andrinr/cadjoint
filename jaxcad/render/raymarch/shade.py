@@ -43,7 +43,7 @@ def _normal_fd(
         + k1 * sdf(pos + eps * k1)
         + k2 * sdf(pos + eps * k2)
         + k3 * sdf(pos + eps * k3)
-    )
+    ) / (4.0 * eps)
     return raw, jnp.sqrt(jnp.sum(raw**2) + _NORMAL_MAG_EPS)
 
 

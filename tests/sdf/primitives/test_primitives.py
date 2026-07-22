@@ -6,6 +6,7 @@ import pytest
 from jaxcad.sdf.primitives import (
     Box,
     Capsule,
+    Cone,
     Cylinder,
     Sphere,
     Torus,
@@ -72,15 +73,24 @@ class TestCylinder:
         assert jnp.isclose(cyl(p), 0.0, atol=1e-5)
 
 
-@pytest.mark.skip(reason="Cone primitive not yet implemented in jaxcad.sdf.primitives")
 class TestCone:
     def test_apex(self):
-        """Apex should be on surface or inside"""
-        pass
+        """Apex should be on the surface."""
+        cone = Cone(radius=1.0, height=2.0)
+        assert cone(jnp.array([0.0, 0.0, 1.0])) == pytest.approx(0.0, abs=1e-6)
 
     def test_base_edge(self):
-        """Point on base edge should be reasonably close"""
-        pass
+        """The circular base edge should be on the surface."""
+        cone = Cone(radius=1.0, height=2.0)
+        assert cone(jnp.array([1.0, 0.0, -1.0])) == pytest.approx(0.0, abs=1e-6)
+
+    def test_center_is_inside(self):
+        cone = Cone(radius=1.0, height=2.0)
+        assert cone(jnp.zeros(3)) < 0.0
+
+    def test_point_below_base_is_outside(self):
+        cone = Cone(radius=1.0, height=2.0)
+        assert cone(jnp.array([0.0, 0.0, -2.0])) > 0.0
 
 
 class TestTorus:

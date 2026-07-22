@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
-from typing import Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 import jax
 import jax.numpy as jnp
-import matplotlib.pyplot as plt
 import numpy as np
 from jax import Array
+
+if TYPE_CHECKING:
+    from matplotlib.axes import Axes
+else:
+    Axes = Any
 
 from jaxcad.render.raymarch._constants import (
     _GLASS_SURFACE_OFFSET,
@@ -456,9 +460,9 @@ def render_raymarched(
     env_map: Array | None = None,
     trace_mode: TraceMode = "sphere",
     bisect_steps: int = 8,
-    ax: plt.Axes | None = None,
+    ax: Axes | None = None,
     title: str | None = None,
-) -> plt.Axes:
+) -> Axes:
     """Render an SDF via sphere tracing and display with matplotlib.
 
     Wraps :func:`raymarch` and shows the result on a ``plt.Axes``.
@@ -493,6 +497,8 @@ def render_raymarched(
         The matplotlib axes with the rendered image.
     """
     if ax is None:
+        import matplotlib.pyplot as plt
+
         _, ax = plt.subplots(figsize=(8, 8))
 
     image = raymarch(

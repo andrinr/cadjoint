@@ -119,9 +119,7 @@ def functionalize_scene(geometry) -> Callable:
     Returns:
         ``(free_params, fixed_params) -> (sdf_fn, material_fn)``
     """
-    from jaxcad.render.material import Material
     from jaxcad.sdf.boolean.base import BooleanOp
-    from jaxcad.sdf.boolean.smooth import smooth_min
     from jaxcad.sdf.primitives.base import Primitive
 
     node_counter = {"count": 0}
@@ -172,32 +170,33 @@ def functionalize_scene(geometry) -> Callable:
                     "metallic": mp.get("metallic", jnp.array(0.0)),
                     "opacity": mp.get("opacity", jnp.array(1.0)),
                     "ior": mp.get("ior", jnp.array(1.0)),
+                    "reflectivity": mp.get("reflectivity", jnp.array(0.0)),
                 }
 
             return sdf_eval, mat_eval
 
         # ── BooleanOp (Union, Intersection, …) ───────────────────────────────
         if isinstance(obj, BooleanOp):
+            pure_material = obj.__class__.material
 
             def sdf_eval(p, free, fixed, _nid=node_id, _ps=ps, _fn=pure_sdf, _ch=sdf_ch):
                 pv = _collect(_nid, _ps, free, fixed)
                 evals = tuple(lambda p_, s=s: s(p_, free, fixed) for s, _ in _ch)
                 return _fn(evals, p, **pv)
 
-            def mat_eval(p, free, fixed, _nid=node_id, _ps=ps, _ch=sdf_ch):
+            def mat_eval(
+                p,
+                free,
+                fixed,
+                _nid=node_id,
+                _ps=ps,
+                _ch=sdf_ch,
+                _fn=pure_material,
+            ):
                 pv = _collect(_nid, _ps, free, fixed)
-                smoothness = pv.get("smoothness", jnp.array(0.1))
-                k = jnp.maximum(smoothness * 4.0, 1e-10)
-
-                d0 = _ch[0][0](p, free, fixed)
-                mat0 = _ch[0][1](p, free, fixed)
-                for s_fn, m_fn in _ch[1:]:
-                    d = s_fn(p, free, fixed)
-                    m = m_fn(p, free, fixed)
-                    t = jnp.clip(0.5 + 0.5 * (d - d0) / k, 0.0, 1.0)
-                    mat0 = Material.blend(mat0, m, t)
-                    d0 = smooth_min(d0, d, smoothness)
-                return mat0
+                sdf_evals = tuple(lambda p_, s=s: s(p_, free, fixed) for s, _ in _ch)
+                mat_evals = tuple(lambda p_, m=m: m(p_, free, fixed) for _, m in _ch)
+                return _fn(sdf_evals, mat_evals, p, **pv)
 
             return sdf_eval, mat_eval
 

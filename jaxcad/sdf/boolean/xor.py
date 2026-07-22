@@ -18,7 +18,7 @@ class Xor(BooleanOp):
     def __init__(self, *sdfs):
         if len(sdfs) == 1 and isinstance(sdfs[0], (tuple, list)):
             sdfs = tuple(sdfs[0])
-        self.sdfs = sdfs
+        self.sdfs = self._validate_children(sdfs, "Xor", exact_count=2)
         self.params = {}
 
     @staticmethod
@@ -41,9 +41,15 @@ class Xor(BooleanOp):
         return Xor.sdf(self.sdfs, p)
 
     def material_at(self, p: Array) -> dict:
+        material_fns = tuple(sdf.material_at for sdf in self.sdfs)
+        return Xor.material(self.sdfs, material_fns, p)
+
+    @staticmethod
+    def material(_child_sdfs, child_materials, p: Array) -> dict:
+        """Blend both child materials at a symmetric-difference surface."""
         from jaxcad.render.material import Material
 
-        m1, m2 = self.sdfs[0].material_at(p), self.sdfs[1].material_at(p)
+        m1, m2 = child_materials[0](p), child_materials[1](p)
         return Material.blend(m1, m2, jnp.array(0.5))
 
     def to_functional(self):

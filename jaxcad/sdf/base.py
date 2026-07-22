@@ -121,6 +121,30 @@ class SDF(Fluent):
         """
         pass
 
+    def translate(self, offset) -> SDF:
+        """Return this SDF translated by ``offset``."""
+        from jaxcad.sdf.transforms import Translate
+
+        return Translate(self, offset)
+
+    def rotate(self, axis, angle) -> SDF:
+        """Return this SDF rotated around ``axis`` by ``angle`` radians."""
+        from jaxcad.sdf.transforms import Rotate
+
+        return Rotate(self, axis, angle)
+
+    def scale(self, scale) -> SDF:
+        """Return this SDF scaled uniformly or component-wise."""
+        from jaxcad.sdf.transforms import Scale
+
+        return Scale(self, scale)
+
+    def twist(self, strength, axis="z") -> SDF:
+        """Return this SDF twisted around ``axis``."""
+        from jaxcad.sdf.transforms import Twist
+
+        return Twist(self, strength, axis)
+
     def __or__(self, other: SDF) -> SDF:
         """Union operator: self | other"""
         from jaxcad.sdf.boolean import Union

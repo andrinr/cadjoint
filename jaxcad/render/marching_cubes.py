@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
-from typing import Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 import jax
 import jax.numpy as jnp
-import matplotlib.pyplot as plt
 import numpy as np
 from jax import Array
-from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+
+if TYPE_CHECKING:
+    from matplotlib.axes import Axes
+else:
+    Axes = Any
 
 
 def render_marching_cubes(
@@ -17,12 +20,12 @@ def render_marching_cubes(
     bounds: tuple[float, float, float] = (-3, -3, -3),
     size: tuple[float, float, float] = (6, 6, 6),
     resolution: int = 50,
-    ax: plt.Axes | None = None,
+    ax: Axes | None = None,
     color: str = "cyan",
     alpha: float = 0.7,
     title: str | None = None,
     figsize: tuple[float, float] = (10, 10),
-) -> plt.Axes:
+) -> Axes:
     """Render an SDF by extracting a mesh with marching cubes.
 
     Requires ``scikit-image``.
@@ -41,11 +44,14 @@ def render_marching_cubes(
     Returns:
         The matplotlib 3D axes.
     """
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+
     try:
         from skimage import measure
     except ImportError as err:
         raise ImportError(
-            "render_marching_cubes requires scikit-image. " "Install with: pip install scikit-image"
+            'render_marching_cubes requires the render extra. Install with: pip install "jaxcad[render]"'
         ) from err
 
     if ax is None:

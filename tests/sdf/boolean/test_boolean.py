@@ -1,8 +1,9 @@
 """Tests for boolean operations."""
 
 import jax.numpy as jnp
+import pytest
 
-from jaxcad.sdf.boolean import Difference, Intersection, Union
+from jaxcad.sdf.boolean import Difference, Intersection, Union, Xor
 from jaxcad.sdf.primitives import Box, Sphere
 
 
@@ -164,3 +165,19 @@ class TestSmoothness:
 
         # Smooth version should have smaller (more negative) distance
         assert smooth(p) < sharp(p)
+
+
+@pytest.mark.parametrize("operation", [Union, Intersection, Difference])
+def test_nary_boolean_requires_at_least_one_sdf(operation):
+    with pytest.raises(ValueError, match="at least 1"):
+        operation()
+
+
+def test_xor_requires_exactly_two_sdfs():
+    with pytest.raises(ValueError, match="exactly 2"):
+        Xor(Sphere(1.0), Sphere(2.0), Sphere(3.0))
+
+
+def test_boolean_rejects_non_sdf_operands():
+    with pytest.raises(TypeError, match="SDF instances"):
+        Union(Sphere(1.0), object())

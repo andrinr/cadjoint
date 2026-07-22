@@ -22,7 +22,7 @@ class Difference(BooleanOp):
     def __init__(self, *sdfs, smoothness: float = 0.1):
         if len(sdfs) == 1 and isinstance(sdfs[0], (tuple, list)):
             sdfs = tuple(sdfs[0])
-        self.sdfs = sdfs
+        self.sdfs = self._validate_children(sdfs, "Difference")
         self.params = {"smoothness": smoothness}
 
     @staticmethod
@@ -50,14 +50,30 @@ class Difference(BooleanOp):
         return Difference.sdf(self.sdfs, p, self.params["smoothness"].value)
 
     def material_at(self, p: Array) -> dict:
+        material_fns = tuple(sdf.material_at for sdf in self.sdfs)
+        return Difference.material(self.sdfs, material_fns, p, self.params["smoothness"].value)
+
+    @staticmethod
+    def material(child_sdfs, child_materials, p: Array, smoothness: float) -> dict:
+        """Pure material selection matching the difference distance reduction."""
         from jaxcad.render.material import Material
 
-        k = jnp.maximum(self.params["smoothness"].value * 4.0, 1e-10)
-        d1, d2 = self.sdfs[0](p), self.sdfs[1](p)
-        m1, m2 = self.sdfs[0].material_at(p), self.sdfs[1].material_at(p)
-        # Difference is max(d1, -d2): blend toward m2 where -d2 dominates (cut surface)
-        t = jnp.clip(0.5 + 0.5 * (d1 + d2) / k, 0.0, 1.0)
-        return Material.blend(m1, m2, t)
+        k = jnp.maximum(smoothness * 4.0, 1e-10)
+        result_m = child_materials[0](p)
+        result_d = child_sdfs[0](p)
+        for child_sdf, child_material in zip(child_sdfs[1:], child_materials[1:]):
+            d = child_sdf(p)
+            m = child_material(p)
+            # Difference is max(result_d, -d): use the cutter material where
+            # the negated child distance defines the resulting cut surface.
+            t = jnp.clip(0.5 + 0.5 * (result_d + d) / k, 0.0, 1.0)
+            result_m = Material.blend(result_m, m, t)
+            result_d = jnp.where(
+                smoothness > 0,
+                smooth_max(result_d, -d, smoothness),
+                jnp.maximum(result_d, -d),
+            )
+        return result_m
 
     def to_functional(self):
         """Return pure function for compilation."""

@@ -1205,10 +1205,9 @@ name = "jaxcad"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "imageio" },
-    { name = "jax", version = "0.4.30", source = { registry = "https://pypi.org/simple" }, extra = ["cuda12"], marker = "python_full_version < '3.10'" },
-    { name = "jax", version = "0.6.2", source = { registry = "https://pypi.org/simple" }, extra = ["cuda12"], marker = "python_full_version == '3.10.*'" },
-    { name = "jax", version = "0.8.2", source = { registry = "https://pypi.org/simple" }, extra = ["cuda12"], marker = "python_full_version >= '3.11'" },
+    { name = "jax", version = "0.4.30", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "jax", version = "0.6.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.10.*'" },
+    { name = "jax", version = "0.8.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "numpy", version = "2.0.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.10.*'" },
     { name = "numpy", version = "2.4.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
@@ -1220,6 +1219,11 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+cuda12 = [
+    { name = "jax", version = "0.4.30", source = { registry = "https://pypi.org/simple" }, extra = ["cuda12"], marker = "python_full_version < '3.10'" },
+    { name = "jax", version = "0.6.2", source = { registry = "https://pypi.org/simple" }, extra = ["cuda12"], marker = "python_full_version == '3.10.*'" },
+    { name = "jax", version = "0.8.2", source = { registry = "https://pypi.org/simple" }, extra = ["cuda12"], marker = "python_full_version >= '3.11'" },
+]
 dev = [
     { name = "matplotlib", version = "3.9.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "matplotlib", version = "3.10.8", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
@@ -1227,10 +1231,22 @@ dev = [
     { name = "pre-commit", version = "4.5.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "pytest", version = "8.4.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "pytest", version = "9.0.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
+    { name = "ruff" },
+    { name = "scikit-image", version = "0.24.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "scikit-image", version = "0.25.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.10.*'" },
+    { name = "scikit-image", version = "0.26.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
 ]
 docs = [
     { name = "griffe" },
     { name = "quartodoc" },
+]
+render = [
+    { name = "imageio" },
+    { name = "matplotlib", version = "3.9.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "matplotlib", version = "3.10.8", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
+    { name = "scikit-image", version = "0.24.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "scikit-image", version = "0.25.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.10.*'" },
+    { name = "scikit-image", version = "0.26.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
 ]
 
 [package.dev-dependencies]
@@ -1250,17 +1266,22 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "griffe", marker = "extra == 'docs'", specifier = "<1.0" },
-    { name = "imageio", specifier = ">=2.37.2" },
-    { name = "jax", extras = ["cuda12"], specifier = ">=0.4.20" },
+    { name = "imageio", marker = "extra == 'render'", specifier = ">=2.37.2" },
+    { name = "jax", specifier = ">=0.4.20" },
+    { name = "jax", extras = ["cuda12"], marker = "extra == 'cuda12'", specifier = ">=0.4.20" },
     { name = "matplotlib", marker = "extra == 'dev'", specifier = ">=3.7.0" },
+    { name = "matplotlib", marker = "extra == 'render'", specifier = ">=3.7.0" },
     { name = "numpy", specifier = ">=1.24.0" },
     { name = "optax", specifier = ">=0.2.4" },
     { name = "optimistix", specifier = ">=0.0.10" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=3.0.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0.0" },
     { name = "quartodoc", marker = "extra == 'docs'", specifier = ">=0.7" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8.0" },
+    { name = "scikit-image", marker = "extra == 'dev'", specifier = ">=0.21.0" },
+    { name = "scikit-image", marker = "extra == 'render'", specifier = ">=0.21.0" },
 ]
-provides-extras = ["dev", "docs"]
+provides-extras = ["cuda12", "render", "dev", "docs"]
 
 [package.metadata.requires-dev]
 dev = [

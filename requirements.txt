@@ -1,3 +1,4 @@
 jax>=0.4.20
-jaxlib>=0.4.20
 numpy>=1.24.0
+optax>=0.2.4
+optimistix>=0.0.10

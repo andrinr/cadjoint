@@ -35,6 +35,8 @@ Typical usage::
     # ≈ free_params
 """
 
+import math
+
 import jax
 import jax.numpy as jnp
 
@@ -56,7 +58,22 @@ __all__ = [
 
 def _softplus_inverse(y):
     """Numerically stable inverse of softplus: log(exp(y) - 1)."""
-    return jnp.where(y > 20.0, y, jnp.log(jnp.expm1(jnp.maximum(y, 1e-6))))
+    y = jnp.maximum(y, 1e-6)
+    return y + jnp.log(-jnp.expm1(-y))
+
+
+def _bounds_for(name, metadata):
+    """Return and validate the optional ``(lower, upper)`` bound pair."""
+    meta = metadata.get(name)
+    bounds = meta.bounds if meta is not None else None
+    if bounds is None:
+        return None
+    if len(bounds) != 2:
+        raise ValueError(f"Bounds for parameter '{name}' must be a (lower, upper) pair.")
+    lo, hi = bounds
+    if lo is not None and hi is not None and lo >= hi:
+        raise ValueError(f"Lower bound for parameter '{name}' must be less than its upper bound.")
+    return lo, hi
 
 
 def to_unconstrained(params, metadata):
@@ -66,6 +83,7 @@ def to_unconstrained(params, metadata):
 
     * ``[lo, hi]`` — logit:      ``u = log(v / (1 - v))`` where ``v = (param - lo) / (hi - lo)``
     * ``[lo, ∞)``  — softplus⁻¹: ``u = log(exp(param - lo) - 1)``
+    * ``(-∞, hi]`` — reflected softplus⁻¹: ``u = softplus⁻¹(hi - param)``
     * unbounded    — identity:   ``u = param``
 
     Args:
@@ -77,8 +95,7 @@ def to_unconstrained(params, metadata):
     """
     result = {}
     for k, v in params.items():
-        meta = metadata.get(k)
-        bounds = meta.bounds if meta is not None else None
+        bounds = _bounds_for(k, metadata)
         if bounds is None:
             result[k] = v
         else:
@@ -88,6 +105,8 @@ def to_unconstrained(params, metadata):
                 result[k] = jnp.log(v_norm / (1 - v_norm))  # logit
             elif lo is not None:
                 result[k] = _softplus_inverse(jnp.maximum(v - lo, 1e-6))
+            elif hi is not None:
+                result[k] = _softplus_inverse(jnp.maximum(hi - v, 1e-6))
             else:
                 result[k] = v
     return result
@@ -107,8 +126,7 @@ def to_constrained(unconstrained, metadata):
     """
     result = {}
     for k, v in unconstrained.items():
-        meta = metadata.get(k)
-        bounds = meta.bounds if meta is not None else None
+        bounds = _bounds_for(k, metadata)
         if bounds is None:
             result[k] = v
         else:
@@ -117,6 +135,8 @@ def to_constrained(unconstrained, metadata):
                 result[k] = lo + (hi - lo) * jax.nn.sigmoid(v)
             elif lo is not None:
                 result[k] = lo + jax.nn.softplus(v)
+            elif hi is not None:
+                result[k] = hi - jax.nn.softplus(v)
             else:
                 result[k] = v
     return result
@@ -138,8 +158,8 @@ def compute_param_scales(metadata, scene_scale=1.0):
 
     * ``[lo, hi]`` fully-bounded → sigmoid maps to ``(0, 1)``, logit maps
       back to ``(-∞, +∞)`` and is already O(1–4) → scale = ``1.0``
-    * ``[lo, ∞)`` lower-bounded or unbounded → values are O(``scene_scale``)
-      after the softplus⁻¹/identity → scale = ``scene_scale``
+    * singly-bounded or unbounded → values are O(``scene_scale``) after the
+      softplus⁻¹/identity → scale = ``scene_scale``
 
     Args:
         metadata: ``dict[str, Parameter]`` as returned by :func:`extract_parameters`.
@@ -150,17 +170,21 @@ def compute_param_scales(metadata, scene_scale=1.0):
     Returns:
         ``dict[str, Array]`` mapping each parameter name to its scale array.
     """
+    scene_scale = float(scene_scale)
+    if not math.isfinite(scene_scale) or scene_scale <= 0:
+        raise ValueError("scene_scale must be a positive, finite number.")
+
     scales = {}
     for k, meta in metadata.items():
-        bounds = meta.bounds
+        bounds = _bounds_for(k, metadata)
         if bounds is not None:
             lo, hi = bounds
             if lo is not None and hi is not None:
                 scales[k] = jnp.ones_like(meta.value)
             else:
-                scales[k] = jnp.full_like(meta.value, float(scene_scale))
+                scales[k] = jnp.full_like(meta.value, scene_scale)
         else:
-            scales[k] = jnp.full_like(meta.value, float(scene_scale))
+            scales[k] = jnp.full_like(meta.value, scene_scale)
     return scales
 
 

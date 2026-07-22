@@ -13,10 +13,10 @@ Differentiable SDF primitives, transformations, and constraint system built with
 
 - **SDF primitives** — sphere, box, capsule, cylinder, torus, and more
 - **Boolean ops** — union, intersection, subtraction with smooth blending
-- **Transforms** — translate, rotate, scale, mirror, repeat
+- **Transforms** — translate, rotate, scale, and twist, with fluent method chaining
 - **Raymarcher** — sphere-tracing renderer with materials, lighting, refraction, and anti-aliasing
 - **Differentiable rendering** — gradients flow through the full render pipeline via JAX
-- **Constraint system** — geometric constraints (distance, angle, coincident) with Riemannian gradient descent and Newton projection onto the constraint manifold
+- **Constraint system** — distance, angle, parallel, and perpendicular constraints with solver and manifold-projection utilities
 - **JAX-native** — every scene is a pure function; `jit`, `grad`, and `vmap` work out of the box
 
 ![primitives](examples/assets/constrained_optim.png)
@@ -28,13 +28,26 @@ Clone this repo and
 ```bash
 cd jaxcad
 uv sync
-pre-commit install
+uv run pre-commit install
+```
+
+The default install works on CPU-only systems. For NVIDIA CUDA 12 support, use:
+
+```bash
+uv sync --extra cuda12
+```
+
+Matplotlib display helpers, marching cubes, and environment-map loading use the
+optional rendering dependencies:
+
+```bash
+uv sync --extra render
 ```
 
 ## Tests
 
 ```bash
-pytest tests/
+uv run pytest tests/
 ```
 
 ## Docs

@@ -28,7 +28,17 @@ class Rotate(Transform):
                 "y": jnp.array([0.0, 1.0, 0.0]),
                 "z": jnp.array([0.0, 0.0, 1.0]),
             }
-            axis = axis_map.get(axis.lower(), jnp.array([0.0, 0.0, 1.0]))
+            try:
+                axis = axis_map[axis.lower()]
+            except KeyError as exc:
+                raise ValueError("Rotation axis must be 'x', 'y', 'z', or a 3D vector.") from exc
+        axis_value = axis.xyz if isinstance(axis, Vector) else jnp.asarray(axis)
+        if (
+            axis_value.shape != (3,)
+            or not bool(jnp.isfinite(axis_value).all())
+            or bool(jnp.linalg.norm(axis_value) == 0)
+        ):
+            raise ValueError("Rotation axis must be a finite, non-zero 3D vector.")
         self.params = {"axis": axis, "angle": angle}
 
     @staticmethod

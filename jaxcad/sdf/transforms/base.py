@@ -21,5 +21,10 @@ class Transform(SDF):
     - self.params: Dictionary of Parameter objects
     """
 
+    @property
+    def is_exact(self) -> bool:
+        """Whether this transform's child is an exact signed-distance function."""
+        return self.sdf.is_exact
+
     def children(self) -> list:
         return [self.sdf]
