@@ -17,7 +17,7 @@ Differentiable SDF primitives, transformations, and constraint system built with
 - **Raymarcher** — sphere-tracing renderer with materials, lighting, refraction, and anti-aliasing
 - **Differentiable rendering** — gradients flow through the full render pipeline via JAX
 - **Shader backends** — compile 3D SDFs through StableHLO to GLSL or WGSL
-- **Notebook viewer** — interactively inspect SDFs with WebGPU in Jupyter
+- **WebGPU viewers** — interactively inspect SDFs in a browser playground or Jupyter
 - **Constraint system** — geometric constraints (distance, angle, coincident) with Riemannian gradient descent and Newton projection onto the constraint manifold
 - **JAX-native** — every scene is a pure function; `jit`, `grad`, and `vmap` work out of the box
 
@@ -51,6 +51,18 @@ SDFViewer(sphere)
 
 See the [WebGPU viewer notebook](examples/webgpu_viewer.ipynb) for composition and
 hot-reload examples.
+
+For a split-pane Python editor and live WebGPU preview, start the local playground:
+
+```bash
+jaxcad-viewer --open
+# or: python -m jaxcad.viewer.playground --open
+```
+
+Edit the example on the left and run it with `Ctrl+Enter` (or `Cmd+Enter`). The
+program must assign its final SDF to `scene`. The server only listens on localhost
+and compiles each edit in a timed child process, but the editor still executes
+Python on your machine—only run code you trust.
 
 For offscreen OpenGL rendering, install the `glsl` extra instead.
 
