@@ -21,10 +21,8 @@ _BOUNDS: dict[str, tuple] = {
 class Material(Fluent):
     """Material properties for physically-inspired shading.
 
-    Properties are stored as Parameter objects in ``self.params`` (fixed by
-    default), consistent with how SDF primitives handle their parameters.
-    ``extract_parameters`` can therefore discover and—if marked free—optimise
-    material properties alongside geometry.
+    Properties use the same Parameter containers as SDF primitives so material
+    assignment and CSG blending share one consistent representation.
 
     Args:
         name: Material name, used to derive parameter names when ``free=True``
@@ -40,12 +38,10 @@ class Material(Fluent):
             bounds.  Already-constructed Parameter objects are left unchanged.
             Requires ``name`` when any property is still a raw value.
 
-    Example — fully free material in one line::
+    Example::
 
-        body_mat = Material("body_mat", color=[0.5, 0.5, 0.5], roughness=0.4,
-                            metallic=0.12, free=True)
-        # → free params: body_mat_color, body_mat_roughness, body_mat_metallic,
-        #                body_mat_opacity, body_mat_ior, body_mat_reflectivity
+        body_mat = Material(color=[0.5, 0.5, 0.5], roughness=0.4,
+                            metallic=0.12)
     """
 
     def __init__(

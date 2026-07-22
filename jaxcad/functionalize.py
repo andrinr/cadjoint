@@ -1,4 +1,4 @@
-"""Compile SDF trees and Scenes to differentiable JAX functions."""
+"""Compile parameterized SDF trees to pure JAX functions."""
 
 from __future__ import annotations
 
@@ -106,8 +106,9 @@ def functionalize_scene(geometry) -> Callable:
         distance = sdf(point)
         mat_dict = material_fn(point)
 
-    Both ``sdf`` and ``material_fn`` are fully differentiable w.r.t.
-    ``free_params`` via ``jax.grad``.
+    Both ``sdf`` and ``material_fn`` are pure JAX functions. This helper is for
+    geometry and material evaluation; the forward image renderer deliberately
+    has a separate, non-differentiable API.
 
     The node counter matches ``extract_parameters`` exactly (same DFS order,
     same counter increments for every Fluent node), so path-keyed fixed params
@@ -172,6 +173,7 @@ def functionalize_scene(geometry) -> Callable:
                     "metallic": mp.get("metallic", jnp.array(0.0)),
                     "opacity": mp.get("opacity", jnp.array(1.0)),
                     "ior": mp.get("ior", jnp.array(1.0)),
+                    "reflectivity": mp.get("reflectivity", jnp.array(0.0)),
                 }
 
             return sdf_eval, mat_eval

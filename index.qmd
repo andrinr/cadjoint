@@ -11,6 +11,9 @@ jaxCAD combines parametric geometry, geometric constraints, and automatic differ
 Build a scene in Python and inspect the generated WGSL in a live, interactive
 WebGPU preview. [Open the WebGPU viewer guide](docs/viewer.qmd).
 
+For still images, the [forward renderer guide](docs/rendering.qmd) covers the
+draft, balanced, and high-quality presets with real output comparisons.
+
 ## Core concepts
 
 | Layer | What it does |
@@ -20,6 +23,7 @@ WebGPU preview. [Open the WebGPU viewer guide](docs/viewer.qmd).
 | **Constraints** | Geometric relationships (`DistanceConstraint`, etc.) that reduce DOF |
 | **Extraction** | Walk an SDF tree to collect free and fixed parameters |
 | **Functionalize** | Convert a parametric scene to a pure JAX function for `jit` / `grad` / `vmap` |
+| **Rendering** | Forward-only sphere tracing with explicit performance and fidelity settings |
 
 ## Quick start
 

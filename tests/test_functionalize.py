@@ -2,8 +2,9 @@
 
 import jax.numpy as jnp
 
-from jaxcad import functionalize
+from jaxcad import extract_parameters, functionalize, functionalize_scene
 from jaxcad.geometry.parameters import Scalar, Vector
+from jaxcad.render import Material
 from jaxcad.sdf.primitives.box import Box
 from jaxcad.sdf.primitives.sphere import Sphere
 
@@ -107,3 +108,21 @@ def test_compile_consistency():
 
         # Should be very close
         assert jnp.isclose(direct_dist, compiled_dist, atol=1e-6)
+
+
+def test_functionalized_material_preserves_forward_render_properties():
+    material = Material(reflectivity=0.7, roughness=0.2, metallic=0.9)
+    sphere = Sphere(radius=1.0, material=material)
+    free, fixed, _ = extract_parameters(sphere)
+    _, material_fn = functionalize_scene(sphere)(free, fixed)
+
+    compiled = material_fn(jnp.array([1.0, 0.0, 0.0]))
+    assert set(compiled) == {
+        "color",
+        "roughness",
+        "metallic",
+        "opacity",
+        "ior",
+        "reflectivity",
+    }
+    assert jnp.isclose(compiled["reflectivity"], 0.7)

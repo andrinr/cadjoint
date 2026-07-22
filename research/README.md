@@ -4,15 +4,17 @@ Three research areas for advancing jaxCAD beyond its current state.
 
 ---
 
-## [1. GPU Rendering: GLSL / Warp / Slang](./rendering-gpu.md)
+## [1. GPU Rendering: GLSL / Warp](./rendering-gpu.md)
 
-Replacing the matplotlib-based render pipeline with real-time GPU rendering and (eventually) differentiable inverse rendering.
+Improving interactive and batch forward rendering. Differentiable inverse
+rendering is explicitly deferred; current work prioritizes runtime, fidelity,
+and maintainable renderer structure.
 
 | Approach | Use case | Effort |
 |---|---|---|
 | **GLSL + moderngl** | Interactive real-time visualization at 60fps | Low — add `to_glsl()` visitor to SDF tree |
 | **NVIDIA Warp** | Fast batch rendering with early ray termination (~5–10× speedup) | Medium — needs code generator |
-| **Slang + SlangPy** | Differentiable inverse rendering (fit parameters to images) | Medium–High — needs `.slang` emitter |
+| **Slang + SlangPy** | Deferred inverse-rendering experiment | Out of current scope |
 
 **Recommended first step**: Add `to_glsl()` to `SDF` base + subclasses, wire into `render_realtime()` via `moderngl`. Zero heavy dependencies; free parameters become GLSL uniforms (no recompilation on parameter change).
 

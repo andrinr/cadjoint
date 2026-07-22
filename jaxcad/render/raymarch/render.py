@@ -1,7 +1,8 @@
-"""Pixel-level render pipeline and public rendering API."""
+"""Forward SDF rendering pipeline and public convenience APIs."""
 
 from __future__ import annotations
 
+from functools import lru_cache, partial
 from typing import Callable
 
 import jax
@@ -12,285 +13,412 @@ from jax import Array
 
 from jaxcad.render.raymarch._constants import (
     _GLASS_SURFACE_OFFSET,
-    _HIT_THRESHOLD,
     _SECONDARY_RAY_OFFSET,
 )
 from jaxcad.render.raymarch.camera import _camera_rays
-from jaxcad.render.raymarch.shade import _compute_normal, _shade_surface
+from jaxcad.render.raymarch.shade import (
+    _ambient_occlusion,
+    _compute_normal,
+    _shade_surface,
+)
 from jaxcad.render.raymarch.trace import (
-    TraceMode,
     _fresnel_schlick,
-    _trace,
+    _sphere_trace,
     _trace_through_glass,
 )
+from jaxcad.render.scene import Scene
+from jaxcad.render.settings import RenderSettings
+
+
+def _default_material_at(_position: Array) -> dict:
+    """Return the renderer's stable fallback material."""
+    return {
+        "color": jnp.ones(3),
+        "roughness": jnp.asarray(0.5),
+        "metallic": jnp.asarray(0.0),
+        "opacity": jnp.asarray(1.0),
+        "ior": jnp.asarray(1.5),
+        "reflectivity": jnp.asarray(0.0),
+    }
+
+
+@lru_cache(maxsize=128)
+def _parameterized_scene_factory(geometry):
+    """Compile a stable geometry evaluator while keeping parameters dynamic."""
+    from jaxcad.functionalize import functionalize_scene
+
+    return functionalize_scene(geometry)
+
+
+@lru_cache(maxsize=128)
+def _callable_scene_factory(sdf):
+    """Wrap a plain SDF callable in the same factory contract."""
+    material_fn = getattr(sdf, "material_at", _default_material_at)
+
+    def factory(_free_parameters: dict, _fixed_parameters: dict):
+        return sdf, material_fn
+
+    return factory
+
+
+def _prepare_scene(sdf) -> tuple[Callable, dict, dict]:
+    """Return a cached evaluator factory and current parameter values."""
+    from jaxcad.fluent import Fluent
+
+    if isinstance(sdf, Fluent):
+        from jaxcad.extraction import extract_parameters
+
+        free_parameters, fixed_parameters, _ = extract_parameters(sdf)
+        return _parameterized_scene_factory(sdf), free_parameters, fixed_parameters
+    return _callable_scene_factory(sdf), {}, {}
 
 
 def _render_pixel(
     sdf: Callable[[Array], Array],
     material_fn: Callable[[Array], dict],
     ray_origin: Array,
-    ray_dir: Array,
-    light_dirs: Array,
+    ray_direction: Array,
+    light_directions: Array,
     light_colors: Array,
+    background_color: Array,
     max_steps: int,
-    max_dist: float,
+    max_distance: float,
+    hit_epsilon: float,
+    step_scale: float,
+    normal_epsilon: float,
     shadow_steps: int,
+    shadow_distance: float,
     shadow_hardness: float,
     ambient: float,
-    edge_width: float,
-    background_color: Array,
+    ao_steps: int,
+    ao_step_size: float,
+    ao_strength: float,
+    reflect_steps: int,
     refract_steps: int,
-    use_grad_ao: bool = True,
-    fd_normals: bool = False,
-    normal_eps: float = 1e-4,
-    reflect_steps: int = 0,
     env_fn: Callable[[Array], Array] | None = None,
-    trace_mode: TraceMode = "sphere",
-    bisect_steps: int = 8,
 ) -> Array:
-    """Trace one ray and return its shaded RGB color.
+    """Trace and shade one ray using hard surface visibility."""
 
-    Pipeline:
-      1. Sphere trace to find surface hit (closest-approach tracking).
-      2. Compute surface normal via autodiff gradient (or finite differences).
-      3. Query material at hit point.
-      4. For each light: cast soft shadow, compute Blinn-Phong diffuse + specular,
-         weight by light color and material properties, accumulate into RGB.
-      5. If reflect_steps > 0: trace reflected ray, blend by ``reflectivity``.
-      6. If refract_steps > 0: bend ray through material using Snell's law,
-         march interior, exit, shade background, blend via Fresnel + opacity.
-      7. Apply smooth edge coverage blending with background.
+    def background(direction: Array) -> Array:
+        return env_fn(direction) if env_fn is not None else background_color
 
-    Args:
-        sdf: Signed-distance function mapping a 3-D point to a scalar distance.
-        material_fn: Maps a 3-D surface point to a material property dict
-            (keys: ``color``, ``roughness``, ``metallic``, ``opacity``,
-            ``ior``, ``reflectivity``).
-        ray_origin: Ray origin in world space, shape ``(3,)``.
-        ray_dir: Unit ray direction, shape ``(3,)``.
-        light_dirs: Unit vectors toward each light source, shape ``(L, 3)``.
-        light_colors: RGB intensity of each light, shape ``(L, 3)``.
-        max_steps: Sphere-tracing iterations for the primary ray.
-        max_dist: Distance threshold beyond which a ray is considered a miss.
-        shadow_steps: Sphere-tracing iterations for shadow rays.
-        shadow_hardness: Controls shadow softness; higher values give harder edges.
-        ambient: Minimum light level applied regardless of occlusion.
-        edge_width: SDF distance threshold for smooth silhouette blending.
-        background_color: Fallback RGB color for rays that miss all geometry.
-            Ignored when ``env_fn`` is supplied.
-        refract_steps: Sphere-tracing iterations inside the medium (0 disables).
-        use_grad_ao: If ``True``, use gradient-magnitude as a cheap AO proxy.
-        fd_normals: If ``True``, compute normals via finite differences.
-        normal_eps: Step size used for finite-difference normal estimation.
-        reflect_steps: Sphere-tracing iterations for the reflected ray
-            (0 disables reflections).
-        env_fn: Optional callable ``(direction: Array[3]) -> Array[3]`` that
-            returns an environment-map RGB sample for any ray direction.
-            When provided it replaces ``background_color`` for all misses,
-            giving direction-dependent backgrounds and correct env reflections.
-
-    Returns:
-        Shaded RGB color for this pixel, shape ``(3,)``.
-    """
-
-    def _bg(d: Array) -> Array:
-        """Return environment / background color for direction d."""
-        if env_fn is not None:
-            return env_fn(d)
-        return background_color
-
-    # Primary trace
-    t_hit, d_min = _trace(sdf, ray_origin, ray_dir, max_steps, trace_mode, bisect_steps)
-    pos = ray_origin + t_hit * ray_dir
-
-    # Normal + optional gradient-magnitude AO proxy
-    normal, normal_magnitude = _compute_normal(sdf, pos, fd_normals, normal_eps)
-    ao = jnp.clip(normal_magnitude, 0.0, 1.0) if use_grad_ao else jnp.array(1.0)
-
-    # Material at hit point
-    mat = material_fn(pos)
-
-    # Surface shading (opacity/Fresnel not yet applied)
-    rgb_surface = _shade_surface(
-        sdf,
-        mat,
-        pos,
-        normal,
-        ray_dir,
-        ao,
-        light_dirs,
-        light_colors,
-        shadow_steps,
-        shadow_hardness,
-        ambient,
-    )
-
-    hit = d_min < _HIT_THRESHOLD
-
-    def _reflect() -> Array:
-        reflect_dir = ray_dir - 2.0 * jnp.dot(ray_dir, normal) * normal
-        # Offset avoids self-intersection: self-surface d_min stays ≥ _SECONDARY_RAY_OFFSET,
-        # while a real hit converges to d_min < _HIT_THRESHOLD.
-        reflect_origin = pos + _SECONDARY_RAY_OFFSET * normal
-        t_refl, d_min_refl = _trace(
-            sdf, reflect_origin, reflect_dir, reflect_steps, trace_mode, bisect_steps
-        )
-        refl_pos = reflect_origin + t_refl * reflect_dir
-        refl_hit = d_min_refl < _HIT_THRESHOLD
-        refl_norm, refl_mag = _compute_normal(sdf, refl_pos, fd_normals, normal_eps)
-        refl_ao = jnp.clip(refl_mag, 0.0, 1.0) if use_grad_ao else jnp.array(1.0)
-        refl_mat = material_fn(refl_pos)
-        rgb_reflected = jnp.where(
-            refl_hit,
-            _shade_surface(
-                sdf,
-                refl_mat,
-                refl_pos,
-                refl_norm,
-                reflect_dir,
-                refl_ao,
-                light_dirs,
-                light_colors,
-                shadow_steps,
-                shadow_hardness,
-                ambient,
-            ),
-            _bg(reflect_dir),
-        )
-        reflectivity = mat["reflectivity"]
-        return rgb_surface * (1.0 - reflectivity) + rgb_reflected * reflectivity
-
-    def _refract() -> Array:
-        opacity = mat["opacity"]
-        ior = mat["ior"]
-        cos_entry_angle = jnp.maximum(0.0, jnp.dot(-ray_dir, normal))
-        # Approximate reflection vs. refraction ratio
-        fresnel = _fresnel_schlick(cos_entry_angle, ior)
-        # Trace through glass: entry refraction → interior march → exit refraction
-        exit_pos, dir_out = _trace_through_glass(
+    def shade_hit(position: Array, direction: Array) -> tuple[Array, dict, Array]:
+        normal = _compute_normal(sdf, position, normal_epsilon)
+        occlusion = _ambient_occlusion(
             sdf,
-            pos,
-            ray_dir,
+            position,
             normal,
-            ior,
-            refract_steps,
-            fd_normals,
-            normal_eps,
-            trace_mode,
-            bisect_steps,
+            ao_steps,
+            ao_step_size,
+            ao_strength,
         )
-        # March scene behind the glass
-        bg_origin = exit_pos + _GLASS_SURFACE_OFFSET * dir_out
-        t_bg, d_min_bg = _trace(sdf, bg_origin, dir_out, refract_steps, trace_mode, bisect_steps)
-        bg_pos = bg_origin + t_bg * dir_out
-        bg_hit = d_min_bg < _HIT_THRESHOLD
-        bg_norm, bg_mag = _compute_normal(sdf, bg_pos, fd_normals, normal_eps)
-        bg_ao = jnp.clip(bg_mag, 0.0, 1.0)
-        bg_mat = material_fn(bg_pos)
-        rgb_behind = jnp.where(
-            bg_hit,
-            _shade_surface(
-                sdf,
-                bg_mat,
-                bg_pos,
-                bg_norm,
-                dir_out,
-                bg_ao,
-                light_dirs,
-                light_colors,
-                shadow_steps,
-                shadow_hardness,
-                ambient,
-            ),
-            _bg(dir_out),
-        )
-        # Tint transmitted light by glass colour
-        rgb_transmitted = rgb_behind * mat["color"]
-        # Blend:
-        #   opacity=1          → fully opaque (surface only)
-        #   opacity=0, head-on → mostly transmitted, small Fresnel highlight
-        #   opacity=0, grazing → mostly Fresnel (TIR / strong reflection)
-        return (opacity + (1.0 - opacity) * fresnel) * rgb_surface + (1.0 - fresnel) * (
-            1.0 - opacity
-        ) * rgb_transmitted
-
-    if reflect_steps > 0:
-        rgb_surface = jnp.where(hit, _reflect(), rgb_surface)
-
-    if refract_steps > 0:
-        rgb = jnp.where(hit, _refract(), _bg(ray_dir))
-    else:
-        # Opacity blends surface with background (no refraction)
-        opacity = mat["opacity"]
-        rgb = rgb_surface * opacity + _bg(ray_dir) * (1.0 - opacity)
-
-    # Smooth edge: anti-alias contour by fading to background
-    coverage = jnp.clip(1.0 - d_min / edge_width, 0.0, 1.0)
-    hit_rgb = rgb * coverage + _bg(ray_dir) * (1.0 - coverage)
-    return jnp.where(t_hit < max_dist, hit_rgb, _bg(ray_dir))
-
-
-def _render_image(
-    sdf: Callable[[Array], Array],
-    material_fn: Callable[[Array], dict],
-    camera_pos: Array,
-    rays: Array,
-    light_dirs: Array,
-    light_colors: Array,
-    background_color: Array,
-    edge_width: float,
-    max_steps: int,
-    max_dist: float,
-    shadow_steps: int,
-    shadow_hardness: float,
-    ambient: float,
-    refract_steps: int,
-    use_grad_ao: bool,
-    fd_normals: bool,
-    normal_eps: float,
-    reflect_steps: int = 0,
-    env_map: Array | None = None,
-    trace_mode: TraceMode = "sphere",
-    bisect_steps: int = 8,
-) -> Array:
-    """Core render loop: vmap ``_render_pixel`` over pre-computed camera rays.
-
-    Returns a **linear** (pre-gamma) flat array of shape ``(N, 3)`` where
-    ``N = H * W``.  Callers reshape, downsample (for AA), and apply gamma.
-    """
-    if env_map is not None:
-        from jaxcad.render.raymarch.env import _sample_env_map
-
-        def _env_fn(d: Array) -> Array:
-            return _sample_env_map(env_map, d)
-    else:
-        _env_fn = None
-
-    return jax.vmap(
-        lambda ray_dir: _render_pixel(
+        material = material_fn(position)
+        color = _shade_surface(
             sdf,
-            material_fn,
-            camera_pos,
-            ray_dir,
-            light_dirs,
+            material,
+            position,
+            normal,
+            direction,
+            occlusion,
+            light_directions,
             light_colors,
-            max_steps,
-            max_dist,
             shadow_steps,
             shadow_hardness,
             ambient,
-            edge_width,
-            background_color,
+            shadow_distance,
+            hit_epsilon,
+            step_scale,
+        )
+        return color, material, normal
+
+    primary = _sphere_trace(
+        sdf,
+        ray_origin,
+        ray_direction,
+        max_steps,
+        max_distance,
+        hit_epsilon,
+        step_scale,
+    )
+    hit_position = ray_origin + primary.distance * ray_direction
+
+    def render_surface(_unused: None) -> Array:
+        surface_color, material, normal = shade_hit(hit_position, ray_direction)
+
+        if reflect_steps > 0:
+            reflected_direction = ray_direction - 2.0 * jnp.dot(ray_direction, normal) * normal
+            reflected_origin = hit_position + _SECONDARY_RAY_OFFSET * normal
+            reflection = _sphere_trace(
+                sdf,
+                reflected_origin,
+                reflected_direction,
+                reflect_steps,
+                max_distance,
+                hit_epsilon,
+                step_scale,
+            )
+            reflected_position = reflected_origin + reflection.distance * reflected_direction
+            reflected_color = jax.lax.cond(
+                reflection.hit,
+                lambda _: shade_hit(reflected_position, reflected_direction)[0],
+                lambda _: background(reflected_direction),
+                operand=None,
+            )
+            reflectivity = material.get("reflectivity", jnp.asarray(0.0))
+            surface_color = surface_color * (1.0 - reflectivity) + reflected_color * reflectivity
+
+        opacity = material.get("opacity", jnp.asarray(1.0))
+        if refract_steps == 0:
+            return surface_color * opacity + background(ray_direction) * (1.0 - opacity)
+
+        ior = material.get("ior", jnp.asarray(1.5))
+        exit_position, exit_direction, exited = _trace_through_glass(
+            sdf,
+            hit_position,
+            ray_direction,
+            normal,
+            ior,
             refract_steps,
-            use_grad_ao,
-            fd_normals,
-            normal_eps,
+            max_distance,
+            hit_epsilon,
+            step_scale,
+            normal_epsilon,
+        )
+
+        def trace_transmission(_unused: None) -> Array:
+            transmission_origin = exit_position + _GLASS_SURFACE_OFFSET * exit_direction
+            transmission = _sphere_trace(
+                sdf,
+                transmission_origin,
+                exit_direction,
+                refract_steps,
+                max_distance,
+                hit_epsilon,
+                step_scale,
+            )
+            transmission_position = transmission_origin + transmission.distance * exit_direction
+            return jax.lax.cond(
+                transmission.hit,
+                lambda _: shade_hit(transmission_position, exit_direction)[0],
+                lambda _: background(exit_direction),
+                operand=None,
+            )
+
+        transmitted_color = jax.lax.cond(
+            exited,
+            trace_transmission,
+            lambda _: background(ray_direction),
+            operand=None,
+        )
+        transmitted_color = transmitted_color * material["color"]
+        fresnel = _fresnel_schlick(jnp.dot(-ray_direction, normal), ior)
+        surface_weight = opacity + (1.0 - opacity) * fresnel
+        return surface_color * surface_weight + transmitted_color * (1.0 - opacity) * (
+            1.0 - fresnel
+        )
+
+    return jax.lax.cond(
+        primary.hit,
+        render_surface,
+        lambda _: background(ray_direction),
+        operand=None,
+    )
+
+
+@partial(
+    jax.jit,
+    static_argnames=(
+        "scene_factory",
+        "max_steps",
+        "shadow_steps",
+        "ao_steps",
+        "reflect_steps",
+        "refract_steps",
+    ),
+)
+def _render_image(
+    scene_factory: Callable,
+    free_parameters: dict,
+    fixed_parameters: dict,
+    camera_position: Array,
+    rays: Array,
+    light_directions: Array,
+    light_colors: Array,
+    background_color: Array,
+    max_steps: int,
+    max_distance: float,
+    hit_epsilon: float,
+    step_scale: float,
+    normal_epsilon: float,
+    shadow_steps: int,
+    shadow_distance: float,
+    shadow_hardness: float,
+    ambient: float,
+    ao_steps: int,
+    ao_step_size: float,
+    ao_strength: float,
+    reflect_steps: int,
+    refract_steps: int,
+    env_map: Array | None,
+) -> Array:
+    """Render flat camera rays in linear color space.
+
+    The module-level JIT is intentionally cached across public ``raymarch``
+    calls. Repeated renders of the same scene and image shape reuse the
+    compiled program instead of rebuilding a closure on every call.
+    """
+    sdf, material_fn = scene_factory(free_parameters, fixed_parameters)
+    if env_map is not None:
+        from jaxcad.render.raymarch.env import _sample_env_map
+
+        def environment(direction: Array) -> Array:
+            return _sample_env_map(env_map, direction)
+
+    else:
+        environment = None
+
+    return jax.vmap(
+        lambda direction: _render_pixel(
+            sdf,
+            material_fn,
+            camera_position,
+            direction,
+            light_directions,
+            light_colors,
+            background_color,
+            max_steps,
+            max_distance,
+            hit_epsilon,
+            step_scale,
+            normal_epsilon,
+            shadow_steps,
+            shadow_distance,
+            shadow_hardness,
+            ambient,
+            ao_steps,
+            ao_step_size,
+            ao_strength,
             reflect_steps,
-            _env_fn,
-            trace_mode,
-            bisect_steps,
+            refract_steps,
+            environment,
         )
     )(rays)
+
+
+def _render_with_settings(
+    sdf: Callable[[Array], Array],
+    camera_position: Array,
+    camera_target: Array,
+    camera_fov: float,
+    light_directions: Array,
+    light_colors: Array | None,
+    background_color: Array,
+    environment_map: Array | None,
+    settings: RenderSettings,
+) -> np.ndarray:
+    height, width = settings.resolution
+    camera_position = jnp.asarray(camera_position, dtype=jnp.float32)
+    camera_target = jnp.asarray(camera_target, dtype=jnp.float32)
+    if camera_position.shape != (3,) or camera_target.shape != (3,):
+        raise ValueError("camera position and target must be 3D vectors")
+    if camera_fov <= 0.0:
+        raise ValueError("camera fov must be positive")
+    if np.allclose(camera_position, camera_target):
+        raise ValueError("camera position and target must be different")
+    light_directions = jnp.atleast_2d(jnp.asarray(light_directions, dtype=jnp.float32))
+    if light_directions.ndim != 2 or light_directions.shape[1] != 3:
+        raise ValueError("light_directions must have shape (3,) or (N, 3)")
+    light_norms = jnp.linalg.norm(
+        light_directions,
+        axis=1,
+        keepdims=True,
+    )
+    if bool(jnp.any(light_norms <= 1e-8)):
+        raise ValueError("light directions cannot be zero vectors")
+    light_directions = light_directions / light_norms
+    if light_colors is None:
+        light_colors = jnp.ones_like(light_directions)
+    else:
+        light_colors = jnp.atleast_2d(jnp.asarray(light_colors, dtype=jnp.float32))
+        if light_colors.shape != light_directions.shape:
+            raise ValueError("light_colors must match light_directions")
+
+    background_color = jnp.asarray(background_color, dtype=jnp.float32)
+    if background_color.shape != (3,):
+        raise ValueError("background_color must be an RGB vector")
+    if environment_map is not None:
+        environment_map = jnp.asarray(environment_map, dtype=jnp.float32)
+        if environment_map.ndim != 3 or environment_map.shape[2] != 3:
+            raise ValueError("environment_map must have shape (height, width, 3)")
+    render_resolution = (
+        height * settings.aa_samples,
+        width * settings.aa_samples,
+    )
+    rays = _camera_rays(
+        camera_position,
+        camera_target,
+        render_resolution,
+        camera_fov,
+    )
+    scene_factory, free_parameters, fixed_parameters = _prepare_scene(sdf)
+    pixels = _render_image(
+        scene_factory=scene_factory,
+        free_parameters=free_parameters,
+        fixed_parameters=fixed_parameters,
+        camera_position=camera_position,
+        rays=rays,
+        light_directions=light_directions,
+        light_colors=light_colors,
+        background_color=background_color,
+        max_steps=settings.max_steps,
+        max_distance=settings.max_distance,
+        hit_epsilon=settings.hit_epsilon,
+        step_scale=settings.step_scale,
+        normal_epsilon=settings.normal_epsilon,
+        shadow_steps=settings.shadow_steps,
+        shadow_distance=settings.shadow_distance,
+        shadow_hardness=settings.shadow_hardness,
+        ambient=settings.ambient,
+        ao_steps=settings.ao_steps,
+        ao_step_size=settings.ao_step_size,
+        ao_strength=settings.ao_strength,
+        reflect_steps=settings.reflect_steps,
+        refract_steps=settings.refract_steps,
+        env_map=environment_map,
+    )
+
+    render_height, render_width = render_resolution
+    image = pixels.reshape(render_height, render_width, 3)
+    if settings.aa_samples > 1:
+        image = image.reshape(
+            height,
+            settings.aa_samples,
+            width,
+            settings.aa_samples,
+            3,
+        ).mean(axis=(1, 3))
+
+    image = jnp.maximum(image, 0.0) ** (1.0 / settings.gamma)
+    return np.asarray(jnp.clip(image, 0.0, 1.0))
+
+
+def render_scene(
+    scene: Scene,
+    settings: RenderSettings | None = None,
+) -> np.ndarray:
+    """Render a :class:`Scene` with an explicit quality preset or settings."""
+    settings = settings or RenderSettings.balanced()
+    return _render_with_settings(
+        scene.geometry,
+        scene.camera.position,
+        scene.camera.target,
+        scene.camera.fov,
+        scene.light_directions,
+        scene.light_colors,
+        scene.background_color,
+        scene.environment_map,
+        settings,
+    )
 
 
 def raymarch(
@@ -301,226 +429,74 @@ def raymarch(
     light_colors: Array | None = None,
     resolution: tuple[int, int] = (200, 200),
     fov: float = 0.6,
-    max_steps: int = 64,
+    max_steps: int = 96,
     max_dist: float = 20.0,
-    shadow_steps: int = 24,
-    shadow_hardness: float = 8.0,
-    gamma: float = 2.2,
-    ambient: float = 0.0,
+    hit_epsilon: float = 1e-3,
+    step_scale: float = 0.9,
+    normal_eps: float = 1e-3,
+    shadow_steps: int = 32,
+    shadow_distance: float = 20.0,
+    shadow_hardness: float = 12.0,
+    ambient: float = 0.08,
+    ao_steps: int = 4,
+    ao_step_size: float = 0.08,
+    ao_strength: float = 1.0,
     aa_samples: int = 1,
+    gamma: float = 2.2,
     background_color: Array = jnp.array([0.0, 0.0, 0.0]),
-    refract_steps: int = 0,
-    fd_normals: bool = False,
-    normal_eps: float = 1e-4,
     reflect_steps: int = 0,
+    refract_steps: int = 0,
     env_map: Array | None = None,
-    trace_mode: TraceMode = "sphere",
-    bisect_steps: int = 8,
 ) -> np.ndarray:
-    """Render an SDF via sphere tracing and return an RGB image array.
+    """Render an SDF to an ``(height, width, 3)`` NumPy image.
 
-    Uses ``jax.vmap`` over pixels and ``jax.lax.scan`` for the inner march
-    loop.  Supports multiple colored lights, transparency, refraction, and
-    mirror reflections.
-
-    Args:
-        sdf: Signed distance function, callable ``(point: Array[3]) → Array[]``.
-        camera_pos: Camera position in world space.
-        look_at: Point the camera looks toward.
-        light_dirs: Light direction(s) toward the light source(s).  Shape
-            ``(3,)`` for a single light or ``(N, 3)`` for N lights.
-        light_colors: RGB color(s) of the light(s), shape ``(3,)`` or
-            ``(N, 3)``.  Defaults to white ``[1, 1, 1]`` for every light.
-        resolution: Output image size as (height, width).
-        fov: Half-width field-of-view parameter.
-        max_steps: Sphere tracing iterations per ray.
-        max_dist: Rays beyond this distance are treated as misses.
-        shadow_steps: Iterations for the soft shadow ray.
-        shadow_hardness: Shadow sharpness (higher = harder edges).
-        gamma: Gamma correction exponent (1.5 default, 2.2 = sRGB standard).
-        ambient: Constant ambient light added to all hit pixels (0 = fully
-            black shadows, higher = lifted shadows).
-        aa_samples: Super-sampling factor for antialiasing.  1 = no AA;
-            2 = 2×2 SSAA (4× rays, box-filtered); 3 = 3×3, etc.
-        background_color: RGB color returned for rays that miss all geometry.
-            Ignored when ``env_map`` is provided.  Default is black.
-        refract_steps: Number of interior march steps for glass refraction.
-            0 disables refraction (legacy behaviour).  Try 32–64 for glass.
-        fd_normals: Use central finite differences for surface normals instead
-            of ``jax.grad``.  Eliminates 2nd-order AD overhead when rendering
-            inside ``jax.grad(loss_fn)``.  Default False (AD normals).
-        normal_eps: Step size for finite-difference normal estimation.
-        reflect_steps: Sphere-tracing iterations for mirror reflections
-            (0 disables).  Uses material ``reflectivity`` to blend.  Try 32.
-        env_map: Optional equirectangular HDR environment map, shape
-            ``(H, W, 3)``.  When set, miss rays and reflected rays that miss
-            geometry sample this map instead of ``background_color``.  Load any
-            ``.hdr`` or ``.exr`` file with ``imageio`` and pass through
-            ``jnp.asarray``, or generate one with
-            :func:`~jaxcad.render.raymarch.env.make_gradient_sky`.
-
-    Returns:
-        Float32 numpy array of shape (H, W, 3) with values in [0, 1].
+    This compatibility-oriented convenience function exposes individual
+    controls. New code can group the same values with :class:`RenderSettings`
+    and call :func:`render_scene`.
     """
-    h, w = resolution
-
-    # Normalise light directions — accept (3,) for a single light
-    light_dirs = jnp.atleast_2d(jnp.asarray(light_dirs, dtype=jnp.float32))  # (N, 3)
-    light_dirs = light_dirs / jnp.linalg.norm(light_dirs, axis=1, keepdims=True)
-
-    if light_colors is None:
-        light_colors = jnp.ones_like(light_dirs)  # white for every light
-    else:
-        light_colors = jnp.atleast_2d(jnp.asarray(light_colors, dtype=jnp.float32))
-
-    background_color = jnp.asarray(background_color, dtype=jnp.float32)
-
-    # Super-sample: render at N× resolution, box-filter down after shading
-    render_res = (h * aa_samples, w * aa_samples)
-    rays = _camera_rays(camera_pos, look_at, render_res, fov)
-
-    # Edge width scaled to the super-sampled pixel footprint
-    scene_dist = float(jnp.linalg.norm(camera_pos - look_at))
-    edge_width = 2.0 * fov / min(h * aa_samples, w * aa_samples) * scene_dist
-
-    if hasattr(sdf, "material_at"):
-        material_fn = sdf.material_at
-    else:
-        from jaxcad.render.material import Material
-
-        def material_fn(_p):
-            return Material().as_dict()
-
-    # For approximate SDFs (is_exact=False, e.g. Twist) the gradient magnitude
-    # is not a reliable AO proxy — use ao=1 (unoccluded) instead.
-    use_grad_ao = getattr(sdf, "is_exact", True)
-
-    # Capture all non-array config in a closure so jit only traces array inputs.
-    pixels = jax.jit(
-        lambda r: _render_image(
-            sdf,
-            material_fn,
-            camera_pos,
-            r,
-            light_dirs,
-            light_colors,
-            background_color,
-            edge_width,
-            max_steps,
-            max_dist,
-            shadow_steps,
-            shadow_hardness,
-            ambient,
-            refract_steps,
-            use_grad_ao,
-            fd_normals,
-            normal_eps,
-            reflect_steps,
-            env_map,
-            trace_mode,
-            bisect_steps,
-        )
-    )(rays)
-
-    rh, rw = render_res
-    image = pixels.reshape(rh, rw, 3)
-
-    # Box-filter downsample in linear space before gamma correction
-    if aa_samples > 1:
-        image = image.reshape(h, aa_samples, w, aa_samples, 3).mean(axis=(1, 3))
-
-    image = jnp.clip(image ** (1.0 / gamma), 0.0, 1.0)
-    return np.array(image)
+    settings = RenderSettings(
+        resolution=resolution,
+        max_steps=max_steps,
+        max_distance=max_dist,
+        hit_epsilon=hit_epsilon,
+        step_scale=step_scale,
+        normal_epsilon=normal_eps,
+        shadow_steps=shadow_steps,
+        shadow_distance=shadow_distance,
+        shadow_hardness=shadow_hardness,
+        ambient=ambient,
+        ao_steps=ao_steps,
+        ao_step_size=ao_step_size,
+        ao_strength=ao_strength,
+        aa_samples=aa_samples,
+        gamma=gamma,
+        reflect_steps=reflect_steps,
+        refract_steps=refract_steps,
+    )
+    return _render_with_settings(
+        sdf,
+        camera_pos,
+        look_at,
+        fov,
+        light_dirs,
+        light_colors,
+        background_color,
+        env_map,
+        settings,
+    )
 
 
 def render_raymarched(
     sdf: Callable[[Array], Array],
-    camera_pos: Array = jnp.array([5.0, 5.0, 5.0]),
-    look_at: Array = jnp.array([0.0, 0.0, 0.0]),
-    light_dirs: Array = jnp.array([0.5, 1.0, 0.3]),
-    light_colors: Array | None = None,
-    resolution: tuple[int, int] = (200, 200),
-    fov: float = 0.6,
-    max_steps: int = 48,
-    max_dist: float = 20.0,
-    shadow_steps: int = 32,
-    shadow_hardness: float = 8.0,
-    gamma: float = 2.2,
-    ambient: float = 0.0,
-    aa_samples: int = 1,
-    background_color: Array = jnp.array([0.0, 0.0, 0.0]),
-    refract_steps: int = 0,
-    fd_normals: bool = False,
-    normal_eps: float = 1e-4,
-    reflect_steps: int = 0,
-    env_map: Array | None = None,
-    trace_mode: TraceMode = "sphere",
-    bisect_steps: int = 8,
+    *,
     ax: plt.Axes | None = None,
     title: str | None = None,
+    **render_options,
 ) -> plt.Axes:
-    """Render an SDF via sphere tracing and display with matplotlib.
-
-    Wraps :func:`raymarch` and shows the result on a ``plt.Axes``.
-
-    Args:
-        sdf: Signed distance function.
-        camera_pos: Camera position in world space.
-        look_at: Point the camera looks toward.
-        light_dirs: Light direction(s), shape ``(3,)`` or ``(N, 3)``.
-        light_colors: Light color(s), shape ``(3,)`` or ``(N, 3)``.
-            Defaults to white for every light.
-        resolution: Output image size as (height, width).
-        fov: Half-width field-of-view parameter.
-        max_steps: Sphere tracing iterations per ray.
-        max_dist: Miss threshold distance.
-        shadow_steps: Soft shadow ray iterations.
-        shadow_hardness: Shadow edge sharpness.
-        gamma: Gamma correction exponent.
-        ambient: Constant ambient term (0 = fully black shadows).
-        aa_samples: Super-sampling anti-aliasing factor.
-        background_color: RGB color for rays that miss all geometry.
-        refract_steps: Interior march steps for glass refraction (0 = disabled).
-        fd_normals: Use finite-difference normals (avoids 2nd-order AD overhead).
-        normal_eps: Step size for finite-difference normal estimation.
-        reflect_steps: Mirror reflection march steps (0 = disabled).
-        env_map: Equirectangular HDR environment map ``(H, W, 3)`` used for
-            miss-ray and reflection-miss coloring.
-        ax: Existing matplotlib axes; creates new figure if None.
-        title: Axes title.
-
-    Returns:
-        The matplotlib axes with the rendered image.
-    """
+    """Render an SDF with :func:`raymarch` and display it with matplotlib."""
     if ax is None:
         _, ax = plt.subplots(figsize=(8, 8))
-
-    image = raymarch(
-        sdf,
-        camera_pos=camera_pos,
-        look_at=look_at,
-        light_dirs=light_dirs,
-        light_colors=light_colors,
-        resolution=resolution,
-        fov=fov,
-        max_steps=max_steps,
-        max_dist=max_dist,
-        shadow_steps=shadow_steps,
-        shadow_hardness=shadow_hardness,
-        gamma=gamma,
-        ambient=ambient,
-        aa_samples=aa_samples,
-        background_color=background_color,
-        refract_steps=refract_steps,
-        fd_normals=fd_normals,
-        normal_eps=normal_eps,
-        reflect_steps=reflect_steps,
-        env_map=env_map,
-        trace_mode=trace_mode,
-        bisect_steps=bisect_steps,
-    )
-
-    ax.imshow(image, vmin=0, vmax=1)
+    ax.imshow(raymarch(sdf, **render_options), vmin=0, vmax=1)
     ax.axis("off")
     ax.set_title(title or "Raymarched Render", fontsize=12)
     return ax
