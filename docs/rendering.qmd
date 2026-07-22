@@ -46,9 +46,9 @@ rays are enabled only when requested.
 
 ## Quality presets
 
-- `draft`: shorter trace budgets, coarse shadows, no AO, and one sample per pixel.
+- `draft`: shorter trace budgets, direct lighting, no secondary visibility, and one sample per pixel.
 - `balanced`: more trace and shadow steps plus geometric AO.
-- `high_quality`: tighter surface precision, more visibility samples, and 2×2 SSAA.
+- `high_quality`: tighter surface precision, more visibility samples, and 3×3 SSAA.
 
 ![Draft, balanced, and high-quality forward renders](assets/rendering-quality.png)
 

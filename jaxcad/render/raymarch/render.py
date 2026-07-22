@@ -11,23 +11,20 @@ import matplotlib.pyplot as plt
 import numpy as np
 from jax import Array
 
-from jaxcad.render.raymarch._constants import (
-    _GLASS_SURFACE_OFFSET,
-    _SECONDARY_RAY_OFFSET,
-)
 from jaxcad.render.raymarch.camera import _camera_rays
 from jaxcad.render.raymarch.shade import (
     _ambient_occlusion,
     _compute_normal,
     _shade_surface,
 )
+from jaxcad.render.raymarch.surface import _offset_surface
 from jaxcad.render.raymarch.trace import (
     _fresnel_schlick,
     _sphere_trace,
     _trace_through_glass,
 )
 from jaxcad.render.scene import Scene
-from jaxcad.render.settings import RenderSettings
+from jaxcad.render.settings import RenderSettings, ToneMapping
 
 
 def _default_material_at(_position: Array) -> dict:
@@ -147,7 +144,7 @@ def _render_pixel(
 
         if reflect_steps > 0:
             reflected_direction = ray_direction - 2.0 * jnp.dot(ray_direction, normal) * normal
-            reflected_origin = hit_position + _SECONDARY_RAY_OFFSET * normal
+            reflected_origin = _offset_surface(hit_position, normal, hit_epsilon)
             reflection = _sphere_trace(
                 sdf,
                 reflected_origin,
@@ -172,7 +169,7 @@ def _render_pixel(
             return surface_color * opacity + background(ray_direction) * (1.0 - opacity)
 
         ior = material.get("ior", jnp.asarray(1.5))
-        exit_position, exit_direction, exited = _trace_through_glass(
+        exit_position, exit_direction, exit_normal, exited = _trace_through_glass(
             sdf,
             hit_position,
             ray_direction,
@@ -186,7 +183,7 @@ def _render_pixel(
         )
 
         def trace_transmission(_unused: None) -> Array:
-            transmission_origin = exit_position + _GLASS_SURFACE_OFFSET * exit_direction
+            transmission_origin = _offset_surface(exit_position, exit_normal, hit_epsilon)
             transmission = _sphere_trace(
                 sdf,
                 transmission_origin,
@@ -398,7 +395,16 @@ def _render_with_settings(
             3,
         ).mean(axis=(1, 3))
 
-    image = jnp.maximum(image, 0.0) ** (1.0 / settings.gamma)
+    image = jnp.maximum(image * settings.exposure, 0.0)
+    if settings.tone_mapping == "aces":
+        # Narkowicz ACES fit: compresses high-energy GGX highlights instead of
+        # clipping isolated pixels into white fireflies.
+        image = jnp.clip(
+            image * (2.51 * image + 0.03) / (image * (2.43 * image + 0.59) + 0.14),
+            0.0,
+            1.0,
+        )
+    image = image ** (1.0 / settings.gamma)
     return np.asarray(jnp.clip(image, 0.0, 1.0))
 
 
@@ -440,8 +446,10 @@ def raymarch(
     ambient: float = 0.08,
     ao_steps: int = 4,
     ao_step_size: float = 0.08,
-    ao_strength: float = 1.0,
+    ao_strength: float = 0.5,
     aa_samples: int = 1,
+    exposure: float = 1.0,
+    tone_mapping: ToneMapping = "aces",
     gamma: float = 2.2,
     background_color: Array = jnp.array([0.0, 0.0, 0.0]),
     reflect_steps: int = 0,
@@ -469,6 +477,8 @@ def raymarch(
         ao_step_size=ao_step_size,
         ao_strength=ao_strength,
         aa_samples=aa_samples,
+        exposure=exposure,
+        tone_mapping=tone_mapping,
         gamma=gamma,
         reflect_steps=reflect_steps,
         refract_steps=refract_steps,

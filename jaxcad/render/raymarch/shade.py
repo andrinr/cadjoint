@@ -11,10 +11,10 @@ from jax import Array
 from jaxcad.render.raymarch._constants import (
     _MIN_MARCH_STEP,
     _NORMAL_ZERO_THRESHOLD,
-    _SECONDARY_RAY_OFFSET,
     _SHADOW_T_START,
 )
 from jaxcad.render.raymarch.camera import _normalize
+from jaxcad.render.raymarch.surface import _offset_surface
 
 _PI = jnp.pi
 
@@ -24,21 +24,16 @@ def _normal_fd(
     position: Array,
     epsilon: float = 1e-3,
 ) -> Array:
-    """Estimate an SDF normal with four tetrahedral samples.
+    """Estimate an SDF normal with symmetric central differences.
 
-    This forward-only estimator is cheaper than six-sample central differences
-    and does not construct an autodiff graph for every visible pixel.
+    Six samples cost slightly more than a tetrahedral estimate, but avoid its
+    directional bias and produce substantially more stable specular highlights
+    on edges and small curved surfaces.
     """
-    directions = jnp.array(
-        [
-            [1.0, -1.0, -1.0],
-            [-1.0, -1.0, 1.0],
-            [-1.0, 1.0, -1.0],
-            [1.0, 1.0, 1.0],
-        ]
-    )
-    samples = jax.vmap(lambda offset: sdf(position + epsilon * offset))(directions)
-    return jnp.sum(directions * samples[:, None], axis=0)
+    offsets = jnp.eye(3, dtype=position.dtype) * epsilon
+    positive = jax.vmap(lambda offset: sdf(position + offset))(offsets)
+    negative = jax.vmap(lambda offset: sdf(position - offset))(offsets)
+    return positive - negative
 
 
 def _compute_normal(
@@ -83,7 +78,7 @@ def _cast_shadow(
     step_scale: float = 0.9,
 ) -> Array:
     """Return an early-exit soft-shadow visibility factor in ``[0, 1]``."""
-    origin = position + normal * _SECONDARY_RAY_OFFSET
+    origin = _offset_surface(position, normal, hit_epsilon)
     initial = (
         jnp.asarray(_SHADOW_T_START),
         jnp.asarray(1.0),

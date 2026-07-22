@@ -8,10 +8,8 @@ import jax
 import jax.numpy as jnp
 from jax import Array
 
-from jaxcad.render.raymarch._constants import (
-    _GLASS_SURFACE_OFFSET,
-    _MIN_MARCH_STEP,
-)
+from jaxcad.render.raymarch._constants import _MIN_MARCH_STEP
+from jaxcad.render.raymarch.surface import _offset_surface
 
 
 class TraceResult(NamedTuple):
@@ -103,12 +101,12 @@ def _trace_through_glass(
     hit_epsilon: float,
     step_scale: float,
     normal_epsilon: float,
-) -> tuple[Array, Array, Array]:
+) -> tuple[Array, Array, Array, Array]:
     """Trace a ray from a glass entry surface to its exit surface."""
     from jaxcad.render.raymarch.shade import _compute_normal
 
     inside_direction = _refract(ray_direction, entry_normal, 1.0 / ior)
-    inside_origin = entry_position + _GLASS_SURFACE_OFFSET * inside_direction
+    inside_origin = _offset_surface(entry_position, -entry_normal, hit_epsilon)
     exit_trace = _sphere_trace(
         lambda point: -sdf(point),
         inside_origin,
@@ -121,4 +119,4 @@ def _trace_through_glass(
     exit_position = inside_origin + exit_trace.distance * inside_direction
     exit_normal = _compute_normal(sdf, exit_position, normal_epsilon)
     outside_direction = _refract(inside_direction, -exit_normal, ior)
-    return exit_position, outside_direction, exit_trace.hit
+    return exit_position, outside_direction, exit_normal, exit_trace.hit

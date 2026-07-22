@@ -13,8 +13,11 @@ from jaxcad.render.raymarch import (
     _render_pixel,
     _shade_surface,
     _sphere_trace,
+    _trace_through_glass,
     raymarch,
 )
+from jaxcad.render.raymarch.env import _sample_env_map
+from jaxcad.render.raymarch.surface import _offset_surface
 from jaxcad.sdf.primitives import Sphere
 
 
@@ -111,6 +114,19 @@ def test_sphere_trace_respects_step_budget():
 def test_finite_difference_normal_matches_sphere_normal():
     normal = _compute_normal(_sphere_sdf(), jnp.array([1.0, 0.0, 0.0]))
     np.testing.assert_allclose(normal, [1.0, 0.0, 0.0], atol=2e-3)
+
+
+def test_environment_map_sampling_is_bilinear():
+    env_map = jnp.array(
+        [
+            [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]],
+            [[0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
+        ]
+    )
+
+    color = _sample_env_map(env_map, jnp.array([0.0, 0.0, 1.0]))
+
+    np.testing.assert_allclose(color, env_map.mean(axis=(0, 1)), atol=1e-6)
 
 
 def test_ambient_occlusion_is_open_above_plane():
@@ -253,6 +269,7 @@ def test_raymarch_background_color_on_miss():
         resolution=(8, 8),
         max_steps=8,
         background_color=background,
+        tone_mapping="none",
         gamma=gamma,
     )
     expected = np.asarray(background) ** (1.0 / gamma)
@@ -306,3 +323,33 @@ def test_refraction_produces_finite_image():
         refract_steps=32,
     )
     assert np.isfinite(image).all()
+
+
+def test_grazing_glass_exit_does_not_immediately_rehit_surface():
+    sdf = _sphere_sdf()
+    ray_origin = jnp.array([0.0, 0.0, 5.0])
+    ray_direction = _normalize(jnp.array([0.95, 0.0, 0.0]) - ray_origin)
+    entry_trace = _sphere_trace(sdf, ray_origin, ray_direction, max_steps=128)
+    entry_position = ray_origin + entry_trace.distance * ray_direction
+    entry_normal = _compute_normal(sdf, entry_position)
+
+    exit_position, exit_direction, exit_normal, exited = _trace_through_glass(
+        sdf,
+        entry_position,
+        ray_direction,
+        entry_normal,
+        jnp.asarray(1.5),
+        128,
+        20.0,
+        1e-3,
+        0.9,
+        1e-3,
+    )
+    transmission_origin = _offset_surface(exit_position, exit_normal, 1e-3)
+    transmission = _sphere_trace(sdf, transmission_origin, exit_direction, max_steps=128)
+
+    assert bool(entry_trace.hit)
+    assert bool(exited)
+    assert float(sdf(transmission_origin)) > 1e-3
+    assert float(jnp.dot(exit_direction, exit_normal)) > 0.0
+    assert not bool(transmission.hit)

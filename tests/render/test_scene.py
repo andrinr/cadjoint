@@ -31,6 +31,8 @@ def test_quality_presets_increase_work_and_fidelity():
         ("step_scale", 1.1),
         ("aa_samples", 0),
         ("gamma", 0.0),
+        ("exposure", 0.0),
+        ("tone_mapping", "invalid"),
         ("ambient", -0.1),
         ("shadow_hardness", 0.0),
     ],
@@ -93,6 +95,8 @@ def test_render_scene_matches_low_level_raymarch():
         ao_strength=settings.ao_strength,
         aa_samples=settings.aa_samples,
         gamma=settings.gamma,
+        exposure=settings.exposure,
+        tone_mapping=settings.tone_mapping,
     )
     np.testing.assert_allclose(structured, direct, atol=1e-6)
 

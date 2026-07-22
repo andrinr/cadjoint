@@ -38,14 +38,22 @@ def build_scene(*, glass: bool) -> Scene:
         ior=1.5,
     )
     ground = Material(color=[0.18, 0.21, 0.26], roughness=0.82)
+    ground_height = -0.92
+    contact_clearance = 0.005
     geometry = Union(
-        Translate(Sphere(0.82, material=red), jnp.array([-1.45, -0.12, 0.0])),
+        Translate(
+            Sphere(0.82, material=red),
+            jnp.array([-1.45, ground_height + 0.82 + contact_clearance, 0.0]),
+        ),
         Translate(
             RoundBox([0.68, 0.68, 0.68], 0.16, material=gold),
-            jnp.array([0.0, -0.22, 0.0]),
+            jnp.array([0.0, ground_height + 0.68 + 0.16 + contact_clearance, 0.0]),
         ),
-        Translate(Sphere(0.78, material=blue), jnp.array([1.4, -0.16, 0.0])),
-        Plane(-0.92, material=ground),
+        Translate(
+            Sphere(0.78, material=blue),
+            jnp.array([1.4, ground_height + 0.78 + contact_clearance, 0.0]),
+        ),
+        Plane(ground_height, material=ground),
         smoothness=0.0,
     )
     return Scene(
@@ -81,7 +89,7 @@ def save_comparison(path: Path, images: list, labels: list[str], columns: int) -
     figure.tight_layout(pad=1.4)
     figure.savefig(
         path,
-        dpi=150,
+        dpi=100,
         facecolor=figure.get_facecolor(),
         bbox_inches="tight",
     )
@@ -91,15 +99,15 @@ def save_comparison(path: Path, images: list, labels: list[str], columns: int) -
 def main() -> None:
     output = Path(__file__).parents[1] / "docs" / "assets"
     output.mkdir(parents=True, exist_ok=True)
-    resolution = (220, 320)
+    resolution = (300, 440)
 
     modes_scene = build_scene(glass=True)
-    balanced = replace(RenderSettings.balanced(resolution), aa_samples=2)
+    high_quality = RenderSettings.high_quality(resolution)
     mode_settings = [
-        replace(balanced, shadow_steps=0, ao_steps=0, ambient=0.1),
-        replace(balanced, ao_steps=0),
-        balanced,
-        replace(balanced, reflect_steps=64, refract_steps=64),
+        replace(high_quality, shadow_steps=0, ao_steps=0, ambient=0.1),
+        replace(high_quality, ao_steps=0),
+        high_quality,
+        replace(high_quality, reflect_steps=64, refract_steps=64),
     ]
     mode_images = [render_scene(modes_scene, settings) for settings in mode_settings]
     save_comparison(
@@ -119,7 +127,7 @@ def main() -> None:
     save_comparison(
         output / "rendering-quality.png",
         quality_images,
-        ["Draft", "Balanced", "High quality (2x2 SSAA)"],
+        ["Draft", "Balanced", "High quality (3x3 SSAA)"],
         columns=3,
     )
 

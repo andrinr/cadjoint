@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Literal
+
+ToneMapping = Literal["aces", "none"]
 
 
 @dataclass(frozen=True)
@@ -26,8 +29,10 @@ class RenderSettings:
     ambient: float = 0.08
     ao_steps: int = 4
     ao_step_size: float = 0.08
-    ao_strength: float = 1.0
+    ao_strength: float = 0.5
     aa_samples: int = 1
+    exposure: float = 1.0
+    tone_mapping: ToneMapping = "aces"
     gamma: float = 2.2
     reflect_steps: int = 0
     refract_steps: int = 0
@@ -54,6 +59,10 @@ class RenderSettings:
             raise ValueError("ambient and ao_strength cannot be negative")
         if self.aa_samples < 1:
             raise ValueError("aa_samples must be at least 1")
+        if self.exposure <= 0.0:
+            raise ValueError("exposure must be positive")
+        if self.tone_mapping not in {"aces", "none"}:
+            raise ValueError("tone_mapping must be 'aces' or 'none'")
         if self.gamma <= 0.0:
             raise ValueError("gamma must be positive")
         if self.reflect_steps < 0 or self.refract_steps < 0:
@@ -61,12 +70,12 @@ class RenderSettings:
 
     @classmethod
     def draft(cls, resolution: tuple[int, int] = (200, 200)) -> RenderSettings:
-        """Fast interactive preview with direct light and coarse shadows."""
+        """Fast interactive preview with direct light and no secondary visibility."""
         return cls(
             resolution=resolution,
-            max_steps=48,
-            hit_epsilon=2e-3,
-            shadow_steps=12,
+            max_steps=72,
+            hit_epsilon=1.5e-3,
+            shadow_steps=0,
             ambient=0.1,
             ao_steps=0,
         )
@@ -78,7 +87,7 @@ class RenderSettings:
 
     @classmethod
     def high_quality(cls, resolution: tuple[int, int] = (400, 400)) -> RenderSettings:
-        """Higher precision, denser visibility sampling, and 2x2 SSAA."""
+        """Higher precision, denser visibility sampling, and 3x3 SSAA."""
         return cls(
             resolution=resolution,
             max_steps=160,
@@ -88,5 +97,5 @@ class RenderSettings:
             shadow_steps=64,
             shadow_hardness=16.0,
             ao_steps=6,
-            aa_samples=2,
+            aa_samples=3,
         )
