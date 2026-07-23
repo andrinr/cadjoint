@@ -1,6 +1,13 @@
 # jaxCAD Research: Improvement Directions
 
-Three research areas for advancing jaxCAD beyond its current state.
+Research areas for advancing jaxCAD beyond its current state.
+
+## [WebGPU SDF path tracing](./path-tracing.md)
+
+Progressive global illumination in the browser using the same generated WGSL
+distance and material functions as the deterministic viewer. The first mode
+uses GGX/Lambertian BSDF sampling, glass transport, directional-light
+next-event estimation, Russian roulette, and ping-pong HDR accumulation.
 
 ---
 
