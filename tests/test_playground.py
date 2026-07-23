@@ -79,7 +79,11 @@ fn material_optics(p: vec3<f32>) -> vec4<f32> {
 
     assert scene_code in shader
     assert "fn trace_path(" in shader
+    assert "fn refine_sign_crossing(" in shader
+    assert "fn signs_differ(" in shader
     assert "fn sample_opaque_bsdf(" in shader
+    assert "MAX_SHADOW_SAMPLES" in shader
+    assert "configured_shadow_samples" in shader
     assert "previous_accumulation: texture_2d<f32>" in shader
     assert "@fragment\nfn fs_path_trace(" in shader
     assert "fn fs_present(" in WGSL_PRESENT_TEMPLATE

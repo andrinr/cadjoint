@@ -7,10 +7,11 @@ _SCENE_MARKER = "__JAXCAD_SCENE_CODE__"
 WGSL_PATH_TRACER_TEMPLATE = r"""__JAXCAD_SCENE_CODE__
 
 const PI: f32 = 3.141592653589793;
-const HIT_EPSILON: f32 = 0.001;
+const HIT_EPSILON: f32 = 0.0005;
 const MAX_DISTANCE: f32 = 100.0;
-const MAX_TRACE_STEPS: u32 = 128u;
+const MAX_TRACE_STEPS: u32 = 160u;
 const MAX_PATH_BOUNCES: u32 = 8u;
+const MAX_SHADOW_SAMPLES: u32 = 4u;
 
 struct Uniforms {
   resolution   : vec4<f32>,
@@ -50,39 +51,84 @@ fn random_f32(state: ptr<function, u32>) -> f32 {
   return f32(*state) * (1.0 / 4294967296.0);
 }
 
-fn trace_scene(origin: vec3<f32>, direction: vec3<f32>) -> TraceHit {
-  var distance = 0.01;
-  for (var step = 0u; step < MAX_TRACE_STEPS; step += 1u) {
-    let surface_distance = sdf(origin + direction * distance);
-    let hit_epsilon = max(HIT_EPSILON, distance * 0.00002);
-    if (abs(surface_distance) < hit_epsilon) {
-      return TraceHit(distance, true);
+fn signs_differ(a: f32, b: f32) -> bool {
+  return (a < 0.0 && b >= 0.0) || (a > 0.0 && b <= 0.0);
+}
+
+fn refine_sign_crossing(
+  origin: vec3<f32>,
+  direction: vec3<f32>,
+  near_distance: f32,
+  far_distance: f32,
+  near_surface_distance: f32,
+) -> f32 {
+  var near = near_distance;
+  var far = far_distance;
+  var near_sdf = near_surface_distance;
+  for (var refinement = 0u; refinement < 7u; refinement += 1u) {
+    let middle = 0.5 * (near + far);
+    let middle_sdf = sdf(origin + direction * middle);
+    let same_side = (near_sdf < 0.0) == (middle_sdf < 0.0);
+    if (same_side) {
+      near = middle;
+      near_sdf = middle_sdf;
+    } else {
+      far = middle;
     }
-    distance += max(abs(surface_distance) * 0.9, hit_epsilon * 0.5);
-    if (distance >= MAX_DISTANCE) {
+  }
+  return 0.5 * (near + far);
+}
+
+fn trace_scene(origin: vec3<f32>, direction: vec3<f32>) -> TraceHit {
+  var distance = 0.0;
+  var surface_distance = sdf(origin);
+  for (var step = 0u; step < MAX_TRACE_STEPS; step += 1u) {
+    let advance = max(abs(surface_distance) * 0.9, HIT_EPSILON * 0.5);
+    let next_distance = distance + advance;
+    if (next_distance >= MAX_DISTANCE) {
       break;
     }
+    let next_surface_distance = sdf(origin + direction * next_distance);
+    if (signs_differ(surface_distance, next_surface_distance)) {
+      let refined_distance = refine_sign_crossing(
+        origin,
+        direction,
+        distance,
+        next_distance,
+        surface_distance,
+      );
+      return TraceHit(refined_distance, true);
+    }
+    distance = next_distance;
+    surface_distance = next_surface_distance;
   }
   return TraceHit(MAX_DISTANCE, false);
 }
 
 fn visible_to_directional_light(origin: vec3<f32>, direction: vec3<f32>) -> f32 {
-  var distance = HIT_EPSILON * 4.0;
-  for (var step = 0u; step < 48u; step += 1u) {
-    let surface_distance = sdf(origin + direction * distance);
-    if (surface_distance < HIT_EPSILON) {
-      return 0.0;
-    }
-    distance += max(surface_distance * 0.9, HIT_EPSILON * 0.5);
-    if (distance >= 30.0) {
+  var distance = 0.0;
+  var surface_distance = sdf(origin);
+  if (surface_distance <= 0.0) {
+    return 0.0;
+  }
+  for (var step = 0u; step < 96u; step += 1u) {
+    let advance = max(surface_distance * 0.9, HIT_EPSILON * 0.5);
+    let next_distance = distance + advance;
+    if (next_distance >= 50.0) {
       break;
     }
+    let next_surface_distance = sdf(origin + direction * next_distance);
+    if (next_surface_distance <= 0.0) {
+      return 0.0;
+    }
+    distance = next_distance;
+    surface_distance = next_surface_distance;
   }
   return 1.0;
 }
 
 fn sdf_normal(position: vec3<f32>) -> vec3<f32> {
-  let e = 0.001;
+  let e = 0.00075;
   return safe_normalize(vec3<f32>(
     sdf(position + vec3<f32>( e, 0.0, 0.0)) -
       sdf(position + vec3<f32>(-e, 0.0, 0.0)),
@@ -291,6 +337,11 @@ fn trace_path(
   var throughput = vec3<f32>(1.0);
   var eta_scale = 1.0;
   let configured_bounces = min(u32(u.path_settings.y), MAX_PATH_BOUNCES);
+  let configured_shadow_samples = clamp(
+    u32(u.path_settings.z),
+    1u,
+    MAX_SHADOW_SAMPLES,
+  );
 
   for (var bounce = 0u; bounce < MAX_PATH_BOUNCES; bounce += 1u) {
     if (bounce >= configured_bounces) {
@@ -317,32 +368,45 @@ fn trace_path(
     let ior = max(optics.z, 1.0001);
     let reflectivity = clamp(optics.w, 0.0, 1.0);
 
-    let light_direction = sample_sun_direction(
-      safe_normalize(u.light_dir.xyz),
-      vec2<f32>(random_f32(random_state), random_f32(random_state)),
-    );
-    let normal_dot_light = max(dot(normal, light_direction), 0.0);
     if (
       opacity > 0.0 &&
-      reflectivity < 1.0 &&
-      normal_dot_light > 0.0
+      reflectivity < 1.0
     ) {
-      let visibility = visible_to_directional_light(
-        position + normal * (HIT_EPSILON * 4.0),
-        light_direction,
-      );
-      let direct_bsdf = evaluate_opaque_bsdf(
-        base_color,
-        roughness,
-        metallic,
-        normal,
-        outgoing,
-        light_direction,
-      );
       let light_radiance =
         vec3<f32>(1.0, 0.92, 0.82) * max(u.light_dir.w, 0.0);
+      var direct_lighting = vec3<f32>(0.0);
+      for (
+        var shadow_sample = 0u;
+        shadow_sample < MAX_SHADOW_SAMPLES;
+        shadow_sample += 1u
+      ) {
+        if (shadow_sample >= configured_shadow_samples) {
+          break;
+        }
+        let light_direction = sample_sun_direction(
+          safe_normalize(u.light_dir.xyz),
+          vec2<f32>(random_f32(random_state), random_f32(random_state)),
+        );
+        let normal_dot_light = max(dot(normal, light_direction), 0.0);
+        if (normal_dot_light > 0.0) {
+          let visibility = visible_to_directional_light(
+            position + normal * (HIT_EPSILON * 6.0),
+            light_direction,
+          );
+          let direct_bsdf = evaluate_opaque_bsdf(
+            base_color,
+            roughness,
+            metallic,
+            normal,
+            outgoing,
+            light_direction,
+          );
+          direct_lighting +=
+            direct_bsdf * light_radiance * normal_dot_light * visibility;
+        }
+      }
       radiance += throughput * opacity * (1.0 - reflectivity) *
-        direct_bsdf * light_radiance * normal_dot_light * visibility;
+        direct_lighting / f32(configured_shadow_samples);
     }
 
     let transparent_event = random_f32(random_state) >= opacity;
@@ -391,7 +455,7 @@ fn trace_path(
 
     direction = safe_normalize(direction);
     let offset_sign = select(-1.0, 1.0, dot(direction, normal) >= 0.0);
-    origin = position + normal * (HIT_EPSILON * 4.0 * offset_sign);
+    origin = position + normal * (HIT_EPSILON * 6.0 * offset_sign);
 
     if (bounce >= 2u) {
       let roulette_throughput = throughput * eta_scale;

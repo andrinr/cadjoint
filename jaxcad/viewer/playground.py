@@ -196,7 +196,7 @@ _PAGE = r"""<!doctype html>
         <span class="hint">Run with Ctrl / ⌘ + Enter</span>
         <button id="wgsl-button" type="button" disabled>WGSL</button>
         <button id="path-button" type="button" disabled>Path trace</button>
-        <select id="quality-select" aria-label="Path-tracing quality">
+        <select id="quality-select" aria-label="Rendering quality">
           <option value="draft">Draft</option>
           <option value="high" selected>High</option>
           <option value="ultra">Ultra</option>
@@ -252,17 +252,21 @@ _PAGE = r"""<!doctype html>
     let shaderRevision = 0;
     let latestShaders = null;
     let webgpuError = "";
+    let rendererLabel = "WebGPU";
     let yaw = 0.75, pitch = 0.32, distance = 4.2;
     let dragging = false, lastX = 0, lastY = 0;
     const QUALITY_PRESETS = {
       draft: {
-        label: "Draft", pixelBudget: 320_000, maxRatio: 1, bounces: 3, samples: 128,
+        label: "Draft", pixelBudget: 320_000, maxRatio: 1,
+        bounces: 3, shadowSamples: 1, samples: 128,
       },
       high: {
-        label: "High", pixelBudget: 900_000, maxRatio: 1.25, bounces: 6, samples: 512,
+        label: "High", pixelBudget: 900_000, maxRatio: 1.25,
+        bounces: 6, shadowSamples: 2, samples: 512,
       },
       ultra: {
-        label: "Ultra", pixelBudget: 1_600_000, maxRatio: 2, bounces: 8, samples: 1024,
+        label: "Ultra", pixelBudget: 1_600_000, maxRatio: 2,
+        bounces: 8, shadowSamples: 4, samples: 1024,
       },
     };
 
@@ -313,6 +317,21 @@ _PAGE = r"""<!doctype html>
       }
     }
 
+    async function identifyAdapter(adapter) {
+      try {
+        const info = adapter.info ||
+          (adapter.requestAdapterInfo ? await adapter.requestAdapterInfo() : null);
+        if (!info) return "WebGPU";
+        const identity = info.description ||
+          [info.vendor, info.architecture].filter(
+            (part) => part && part.toLowerCase() !== "unknown",
+          ).join(" ");
+        return identity ? `WebGPU · ${identity}` : "WebGPU";
+      } catch {
+        return "WebGPU";
+      }
+    }
+
     async function initWebGPU() {
       if (!window.isSecureContext) {
         webgpuError = "WebGPU requires a secure context. Open this viewer on localhost or over HTTPS.";
@@ -337,6 +356,7 @@ _PAGE = r"""<!doctype html>
         showError(webgpuError);
         return;
       }
+      rendererLabel = await identifyAdapter(adapter);
       device = await withTimeout(adapter.requestDevice(), 8_000, "WebGPU device request");
       context = canvas.getContext("webgpu");
       if (!context) {
@@ -443,7 +463,7 @@ _PAGE = r"""<!doctype html>
       });
       clearError();
       destroyAccumulationTextures();
-      setStatus("ready", "Preview ready · preparing path tracer…");
+      setStatus("ready", `Preview ready · ${rendererLabel} · preparing path tracer…`);
       scheduleRender();
 
       const [pathModule, presentModule] = await Promise.all([
@@ -478,7 +498,7 @@ _PAGE = r"""<!doctype html>
       pathReady = true;
       destroyAccumulationTextures();
       pathButton.disabled = false;
-      setStatus("ready", "Live · WebGPU");
+      setStatus("ready", `Live · ${rendererLabel}`);
       invalidateRender();
     }
 
@@ -520,9 +540,8 @@ _PAGE = r"""<!doctype html>
       const cssWidth = Math.max(1, canvas.clientWidth);
       const cssHeight = Math.max(1, canvas.clientHeight);
       const quality = selectedQuality();
-      const maxRatio = pathTracing ? quality.maxRatio : 1.5;
-      const requestedRatio = Math.min(devicePixelRatio || 1, maxRatio);
-      const pixelBudget = pathTracing ? quality.pixelBudget : 1_200_000;
+      const requestedRatio = Math.min(devicePixelRatio || 1, quality.maxRatio);
+      const pixelBudget = quality.pixelBudget;
       const budgetRatio = Math.sqrt(pixelBudget / (cssWidth * cssHeight));
       const ratio = Math.min(requestedRatio, budgetRatio);
       const width = Math.max(1, Math.floor(cssWidth * ratio));
@@ -565,7 +584,7 @@ _PAGE = r"""<!doctype html>
         0, 0, 0, 0,
         0.55, 0.8, 0.35, 3,
         0.035, 0.045, 0.035, 1,
-        sampleCount, selectedQuality().bounces, 1, 0,
+        sampleCount, selectedQuality().bounces, selectedQuality().shadowSamples, 0,
       ]);
       device.queue.writeBuffer(uniformBuffer, 0, values);
       const encoder = device.createCommandEncoder();
@@ -616,16 +635,19 @@ _PAGE = r"""<!doctype html>
       if (renderPath) {
         sampleCount += 1;
         const quality = selectedQuality();
-        setStatus("ready", `${quality.label} path trace · ${sampleCount} spp`);
+        setStatus(
+          "ready",
+          `${quality.label} path trace · ${rendererLabel} · ${sampleCount} spp`,
+        );
         if (sampleCount < quality.samples) scheduleRender();
       } else {
         setStatus(
           "ready",
           pathTracing && !pathReady
-            ? "Preview · preparing path tracer…"
+            ? `${selectedQuality().label} preview · ${rendererLabel} · preparing path tracer…`
             : pathTracing
-              ? "Moving · WebGPU preview"
-              : "Live · WebGPU preview",
+              ? `Moving · ${selectedQuality().label} preview · ${rendererLabel}`
+              : `${selectedQuality().label} preview · ${rendererLabel}`,
         );
       }
     }

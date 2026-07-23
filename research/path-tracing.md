@@ -25,6 +25,10 @@ hand-written WGSL transport runtime around those generated functions.
 - Jarzynski and Olano's
   [GPU hash evaluation](https://jcgt.org/published/0009/03/02/) supports using a
   compact PCG hash for independent per-pixel sample streams.
+- Inigo Quilez's
+  [binary-search SDF intersections](https://iquilezles.org/articles/binarysearchsdf/)
+  motivates bracketing sign changes and refining them rather than accepting a
+  small positive distance as a surface hit.
 - The [WebGPU specification](https://gpuweb.github.io/gpuweb/) requires
   compatible texture usages within a render pass. Progressive accumulation
   therefore uses distinct read and write textures and swaps them each frame.
@@ -34,7 +38,9 @@ hand-written WGSL transport runtime around those generated functions.
 Each animation frame traces one jittered camera path per pixel and folds it into
 a running linear-HDR average:
 
-1. Sphere-trace the generated `sdf(point)` to the next surface.
+1. Sphere-trace the generated `sdf(point)` until its sign changes, then refine
+   the bracket with seven binary-search steps. Near misses remain misses even
+   when they pass within the surface epsilon.
 2. Read `material_base(point)` and `material_optics(point)`.
 3. Add next-event lighting from a sampled finite sun when the material has a
    non-delta opaque component.
@@ -48,6 +54,8 @@ a running linear-HDR average:
 Two `rgba16float` textures ping-pong between sampled input and render
 attachment. A separate presentation pass applies ACES tone mapping and gamma.
 Accumulation resets after camera, viewport, scene, or rendering-mode changes.
+Quality presets scale resolution, bounce depth, total accumulation, and the
+number of finite-sun visibility samples per surface hit.
 
 ## Deliberate boundaries
 

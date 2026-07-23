@@ -79,7 +79,7 @@ scene, camera, viewport, or rendering mode changes.
 | Zoom | Scroll in the preview |
 | Restore the example | **Reset** |
 | Toggle progressive global illumination | **Path trace** / **Preview** |
-| Choose resolution, bounce, and sample budget | **Draft** / **High** / **Ultra** |
+| Choose rendering quality | **Draft** / **High** / **Ultra** |
 | Inspect the complete generated shader | **WGSL** |
 
 ### Compilation path
@@ -105,14 +105,23 @@ frame and averages samples in linear HDR. It supports:
 - explicit mirror reflectivity and Schlick-Fresnel glass reflection/refraction;
 - finite-sun next-event estimation with progressively resolved soft shadows;
 - multi-bounce environment lighting and Russian-roulette termination;
+- sign-crossing intersection tests with binary refinement, avoiding false
+  silhouette and shadow hits on rays that merely pass close to a surface;
 - ACES tone mapping in a separate presentation pass.
+
+The quality selector changes framebuffer resolution in both preview and path
+mode. In path mode it additionally changes bounce depth, sun-visibility samples,
+and the accumulation limit. The status pill always identifies WebGPU as the
+active backend and includes adapter details when the browser exposes them; the
+viewer has no silent WebGL fallback.
 
 Two half-float textures alternate between sampled input and render attachment.
 WebGPU does not allow one texture to be sampled and rendered into in the same
 pass, so this ping-pong design is required rather than incidental. The playground
 offers three quality budgets. **High** is the default at roughly 900,000 pixels,
-six bounces, and 512 samples per pixel; **Draft** favors interaction, while
-**Ultra** opts into a 1.6-million-pixel, eight-bounce, 1,024-sample budget.
+six bounces, two sun-visibility samples per hit, and 512 samples per pixel;
+**Draft** favors interaction, while **Ultra** opts into a 1.6-million-pixel,
+eight-bounce, four-visibility-sample, 1,024-sample budget.
 
 The finite sun is sampled only through next-event estimation and is not part of
 the environment radiance seen by BSDF paths, so the current strategies do not
