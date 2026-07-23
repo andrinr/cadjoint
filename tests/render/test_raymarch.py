@@ -307,6 +307,38 @@ def test_reflection_uses_background_on_secondary_miss():
     np.testing.assert_allclose(pixel, background, atol=0.02)
 
 
+def test_glass_fresnel_uses_traced_reflection():
+    def directional_environment(direction):
+        return jnp.where(
+            direction[2] > 0.0,
+            jnp.array([1.0, 0.0, 0.0]),
+            jnp.array([0.0, 0.0, 1.0]),
+        )
+
+    pixel = _render_pixel(
+        _sphere_sdf(),
+        lambda _point: _default_material(
+            color=jnp.ones(3),
+            opacity=jnp.asarray(0.0),
+            ior=jnp.asarray(1.5),
+        ),
+        jnp.array([0.0, 0.0, 5.0]),
+        jnp.array([0.0, 0.0, -1.0]),
+        jnp.array([[0.0, 0.0, -1.0]]),
+        jnp.ones((1, 3)),
+        jnp.zeros(3),
+        **_pixel_options(
+            reflect_steps=32,
+            refract_steps=32,
+            shadow_steps=0,
+            ambient=0.0,
+        ),
+        env_fn=directional_environment,
+    )
+
+    np.testing.assert_allclose(pixel, [0.04, 0.0, 0.96], atol=0.01)
+
+
 def test_refraction_produces_finite_image():
     glass = Sphere(
         radius=1.0,

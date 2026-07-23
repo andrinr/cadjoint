@@ -31,15 +31,21 @@ def build_scene(*, glass: bool) -> Scene:
         metallic=0.8,
         reflectivity=0.35,
     )
-    blue = Material(
-        color=[0.72, 0.9, 1.0] if glass else [0.035, 0.18, 0.72],
+    sphere_material = Material(
+        color=[0.96, 0.98, 1.0] if glass else [0.035, 0.18, 0.72],
         roughness=0.08 if glass else 0.28,
-        opacity=0.06 if glass else 1.0,
+        opacity=0.03 if glass else 1.0,
         ior=1.5,
     )
     ground = Material(color=[0.1, 0.12, 0.16], roughness=0.72)
     ground_height = -0.92
     contact_clearance = 0.002
+    sphere_radius = 0.58 if glass else 0.78
+    sphere_position = (
+        jnp.array([-0.25, 0.5, 1.24])
+        if glass
+        else jnp.array([1.4, ground_height + sphere_radius + contact_clearance, 0.0])
+    )
     geometry = Union(
         Translate(
             Sphere(0.82, material=red),
@@ -50,8 +56,8 @@ def build_scene(*, glass: bool) -> Scene:
             jnp.array([0.0, ground_height + 0.62 + 0.23 + contact_clearance, 0.0]),
         ),
         Translate(
-            Sphere(0.78, material=blue),
-            jnp.array([1.4, ground_height + 0.78 + contact_clearance, 0.0]),
+            Sphere(sphere_radius, material=sphere_material),
+            sphere_position,
         ),
         Plane(ground_height, material=ground),
         smoothness=0.0,

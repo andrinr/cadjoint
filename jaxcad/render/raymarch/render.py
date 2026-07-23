@@ -134,6 +134,7 @@ def _render_pixel(
 
     def render_surface(_unused: None) -> Array:
         shaded_color = surface_color
+        reflected_color = surface_color
 
         if reflect_steps > 0:
             reflected_direction = ray_direction - 2.0 * jnp.dot(ray_direction, normal) * normal
@@ -202,8 +203,8 @@ def _render_pixel(
         )
         transmitted_color = transmitted_color * material["color"]
         fresnel = _fresnel_schlick(jnp.dot(-ray_direction, normal), ior)
-        surface_weight = opacity + (1.0 - opacity) * fresnel
-        return shaded_color * surface_weight + transmitted_color * (1.0 - opacity) * (1.0 - fresnel)
+        dielectric_color = reflected_color * fresnel + transmitted_color * (1.0 - fresnel)
+        return shaded_color * opacity + dielectric_color * (1.0 - opacity)
 
     def render_silhouette(_unused: None) -> Array:
         opacity = material.get("opacity", jnp.asarray(1.0))
