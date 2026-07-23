@@ -4,6 +4,19 @@
 > prioritizes runtime, fidelity, and clean abstractions. The inverse-rendering
 > and Slang sections below are retained as historical research, not planned work.
 
+## Forward-rendering references
+
+- [Soft shadows in raymarched SDFs](https://iquilezles.org/articles/rmshadows/)
+  derives the `distance / travel` penumbra estimate and the two-sample closest
+  approach used by the active forward renderer.
+- [Binary search for SDF ray tracing](https://iquilezles.org/articles/binarysearchsdf/)
+  is useful as a traversal reference, but its own evaluation found substantially
+  more SDF evaluations than conventional sphere tracing. Keep early-exit sphere
+  tracing as the default unless a scene-specific benchmark shows otherwise.
+- [Smooth minimum](https://iquilezles.org/articles/smin/) documents normalized
+  blend kernels, bounds inflation, and matching material blend factors. Use it
+  as the reference for a focused CSG/material-blending pass.
+
 ## Current state
 
 `jaxcad/render.py` has two paths:

@@ -26,11 +26,9 @@ class RenderSettings:
     shadow_steps: int = 32
     shadow_distance: float = 20.0
     shadow_hardness: float = 12.0
-    ambient: float = 0.08
-    ao_steps: int = 4
-    ao_step_size: float = 0.08
-    ao_strength: float = 0.5
+    ambient: float = 0.12
     aa_samples: int = 1
+    silhouette_smoothing: float = 0.75
     exposure: float = 1.0
     tone_mapping: ToneMapping = "aces"
     gamma: float = 2.2
@@ -49,16 +47,18 @@ class RenderSettings:
             raise ValueError("surface epsilons must be positive")
         if not 0.0 < self.step_scale <= 1.0:
             raise ValueError("step_scale must be in (0, 1]")
-        if self.shadow_steps < 0 or self.ao_steps < 0:
-            raise ValueError("shadow_steps and ao_steps cannot be negative")
-        if self.shadow_distance <= 0.0 or self.ao_step_size <= 0.0:
-            raise ValueError("shadow_distance and ao_step_size must be positive")
+        if self.shadow_steps < 0:
+            raise ValueError("shadow_steps cannot be negative")
+        if self.shadow_distance <= 0.0:
+            raise ValueError("shadow_distance must be positive")
         if self.shadow_hardness <= 0.0:
             raise ValueError("shadow_hardness must be positive")
-        if self.ambient < 0.0 or self.ao_strength < 0.0:
-            raise ValueError("ambient and ao_strength cannot be negative")
+        if self.ambient < 0.0:
+            raise ValueError("ambient cannot be negative")
         if self.aa_samples < 1:
             raise ValueError("aa_samples must be at least 1")
+        if self.silhouette_smoothing < 0.0:
+            raise ValueError("silhouette_smoothing cannot be negative")
         if self.exposure <= 0.0:
             raise ValueError("exposure must be positive")
         if self.tone_mapping not in {"aces", "none"}:
@@ -76,14 +76,13 @@ class RenderSettings:
             max_steps=72,
             hit_epsilon=1.5e-3,
             shadow_steps=0,
-            ambient=0.1,
-            ao_steps=0,
+            ambient=0.14,
         )
 
     @classmethod
     def balanced(cls, resolution: tuple[int, int] = (200, 200)) -> RenderSettings:
-        """Balanced default for notebooks, tests, and documentation."""
-        return cls(resolution=resolution)
+        """Balanced default with soft shadows and 2x2 supersampling."""
+        return cls(resolution=resolution, aa_samples=2)
 
     @classmethod
     def high_quality(cls, resolution: tuple[int, int] = (400, 400)) -> RenderSettings:
@@ -95,7 +94,6 @@ class RenderSettings:
             step_scale=0.8,
             normal_epsilon=5e-4,
             shadow_steps=64,
-            shadow_hardness=16.0,
-            ao_steps=6,
+            shadow_hardness=24.0,
             aa_samples=3,
         )

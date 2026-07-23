@@ -2,7 +2,8 @@
 
 Two backends:
 - :func:`render_scene` / :func:`raymarch` — early-exit sphere tracing with
-  finite-difference normals, geometric AO, soft shadows, and GGX shading.
+  reconstructed silhouettes, finite-difference normals, soft shadows, and GGX
+  shading.
 - :func:`render_marching_cubes` — mesh extraction via marching cubes (requires
   scikit-image).
 """

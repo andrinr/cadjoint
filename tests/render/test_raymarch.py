@@ -5,7 +5,6 @@ import numpy as np
 
 from jaxcad.render.material import Material
 from jaxcad.render.raymarch import (
-    _ambient_occlusion,
     _camera_rays,
     _cast_shadow,
     _compute_normal,
@@ -42,9 +41,7 @@ def _pixel_options(**overrides):
         "shadow_distance": 20.0,
         "shadow_hardness": 12.0,
         "ambient": 0.08,
-        "ao_steps": 2,
-        "ao_step_size": 0.08,
-        "ao_strength": 1.0,
+        "edge_width": 0.0,
         "reflect_steps": 0,
         "refract_steps": 0,
     }
@@ -111,6 +108,19 @@ def test_sphere_trace_respects_step_budget():
     assert int(result.steps) == 2
 
 
+def test_sphere_trace_preserves_closest_approach_on_miss():
+    result = _sphere_trace(
+        _sphere_sdf(),
+        jnp.array([1.05, 0.0, 5.0]),
+        jnp.array([0.0, 0.0, -1.0]),
+        max_steps=128,
+    )
+
+    assert not bool(result.hit)
+    assert float(result.closest_surface_distance) < 0.06
+    assert float(result.closest_distance) < float(result.distance)
+
+
 def test_finite_difference_normal_matches_sphere_normal():
     normal = _compute_normal(_sphere_sdf(), jnp.array([1.0, 0.0, 0.0]))
     np.testing.assert_allclose(normal, [1.0, 0.0, 0.0], atol=2e-3)
@@ -127,36 +137,6 @@ def test_environment_map_sampling_is_bilinear():
     color = _sample_env_map(env_map, jnp.array([0.0, 0.0, 1.0]))
 
     np.testing.assert_allclose(color, env_map.mean(axis=(0, 1)), atol=1e-6)
-
-
-def test_ambient_occlusion_is_open_above_plane():
-    def plane(point):
-        return point[1]
-
-    ao = _ambient_occlusion(
-        plane,
-        jnp.zeros(3),
-        jnp.array([0.0, 1.0, 0.0]),
-        steps=5,
-        step_size=0.1,
-        strength=1.0,
-    )
-    assert jnp.isclose(ao, 1.0)
-
-
-def test_ambient_occlusion_darkens_blocked_samples():
-    def blocked(_point):
-        return jnp.asarray(0.0)
-
-    ao = _ambient_occlusion(
-        blocked,
-        jnp.zeros(3),
-        jnp.array([0.0, 1.0, 0.0]),
-        steps=5,
-        step_size=0.1,
-        strength=1.0,
-    )
-    assert float(ao) < 0.5
 
 
 def test_cast_shadow_exits_on_occluder():
@@ -187,7 +167,6 @@ def test_backlit_surface_without_ambient_is_black():
         jnp.array([0.0, 1.0, 0.0]),
         jnp.array([0.0, 1.0, 0.0]),
         jnp.array([0.0, 0.0, -1.0]),
-        jnp.asarray(1.0),
         jnp.array([[0.0, -1.0, 0.0]]),
         jnp.ones((1, 3)),
         shadow_steps=0,
@@ -203,7 +182,6 @@ def test_ggx_metallic_highlight_is_tinted_by_base_color():
         "position": jnp.array([1.0, 0.0, 0.0]),
         "normal": jnp.array([1.0, 0.0, 0.0]),
         "ray_direction": jnp.array([-1.0, 0.0, 0.0]),
-        "ambient_occlusion": jnp.asarray(1.0),
         "light_directions": jnp.array([[1.0, 0.0, 0.0]]),
         "light_colors": jnp.ones((1, 3)),
         "shadow_steps": 0,
@@ -245,6 +223,27 @@ def test_render_pixel_uses_hard_visibility_for_miss():
     np.testing.assert_array_equal(pixel, background)
 
 
+def test_render_pixel_smooths_near_silhouette_miss():
+    background = jnp.array([0.02, 0.03, 0.05])
+    ray_direction = _normalize(jnp.array([1.05, 0.0, 0.0]) - jnp.array([0.0, 0.0, 5.0]))
+    common = {
+        "sdf": _sphere_sdf(),
+        "material_fn": lambda _point: _default_material(color=jnp.array([0.8, 0.2, 0.1])),
+        "ray_origin": jnp.array([0.0, 0.0, 5.0]),
+        "ray_direction": ray_direction,
+        "light_directions": jnp.array([[0.0, 0.0, 1.0]]),
+        "light_colors": jnp.ones((1, 3)),
+        "background_color": background,
+        **_pixel_options(shadow_steps=0, ambient=0.2),
+    }
+
+    hard = _render_pixel(**common)
+    smooth = _render_pixel(**(common | {"edge_width": 0.1}))
+
+    np.testing.assert_array_equal(hard, background)
+    assert not np.allclose(smooth, background)
+
+
 def test_raymarch_lit_side_is_brighter_than_dark_side():
     image = raymarch(
         _sphere_sdf(),
@@ -254,7 +253,6 @@ def test_raymarch_lit_side_is_brighter_than_dark_side():
         resolution=(32, 32),
         max_steps=64,
         shadow_steps=0,
-        ao_steps=0,
         ambient=0.0,
     )
     middle = image.shape[0] // 2
@@ -278,14 +276,14 @@ def test_raymarch_background_color_on_miss():
 
 def test_single_light_vector_and_matrix_match():
     light = jnp.array([0.5, 1.0, 0.3])
-    options = {"resolution": (16, 16), "max_steps": 32, "shadow_steps": 8, "ao_steps": 0}
+    options = {"resolution": (16, 16), "max_steps": 32, "shadow_steps": 8}
     vector_image = raymarch(_sphere_sdf(), light_dirs=light, **options)
     matrix_image = raymarch(_sphere_sdf(), light_dirs=light[None], **options)
     np.testing.assert_allclose(vector_image, matrix_image, atol=1e-5)
 
 
 def test_primitive_material_changes_render():
-    options = {"resolution": (20, 20), "max_steps": 32, "shadow_steps": 8, "ao_steps": 0}
+    options = {"resolution": (20, 20), "max_steps": 32, "shadow_steps": 8}
     plain = raymarch(_sphere_sdf(), **options)
     green = raymarch(
         Sphere(radius=1.0, material=Material(color=[0.2, 0.8, 0.2])),
@@ -304,7 +302,7 @@ def test_reflection_uses_background_on_secondary_miss():
         jnp.array([[0.0, 1.0, 0.0]]),
         jnp.ones((1, 3)),
         background,
-        **_pixel_options(reflect_steps=32, shadow_steps=0, ao_steps=0),
+        **_pixel_options(reflect_steps=32, shadow_steps=0),
     )
     np.testing.assert_allclose(pixel, background, atol=0.02)
 
@@ -319,7 +317,6 @@ def test_refraction_produces_finite_image():
         resolution=(16, 16),
         max_steps=48,
         shadow_steps=8,
-        ao_steps=0,
         refract_steps=32,
     )
     assert np.isfinite(image).all()

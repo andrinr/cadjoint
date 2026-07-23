@@ -47,25 +47,6 @@ def _compute_normal(
     return raw_normal / jnp.maximum(magnitude, _NORMAL_ZERO_THRESHOLD)
 
 
-def _ambient_occlusion(
-    sdf: Callable[[Array], Array],
-    position: Array,
-    normal: Array,
-    steps: int,
-    step_size: float,
-    strength: float,
-) -> Array:
-    """Sample geometric ambient occlusion along the surface normal."""
-    if steps == 0:
-        return jnp.asarray(1.0)
-
-    offsets = step_size * jnp.arange(1, steps + 1, dtype=position.dtype)
-    distances = jax.vmap(lambda offset: sdf(position + normal * offset))(offsets)
-    weights = 0.5 ** jnp.arange(steps, dtype=position.dtype)
-    occlusion = jnp.sum(jnp.maximum(offsets - distances, 0.0) * weights)
-    return jnp.clip(1.0 - strength * occlusion / step_size, 0.0, 1.0)
-
-
 def _cast_shadow(
     sdf: Callable[[Array], Array],
     position: Array,
@@ -87,27 +68,51 @@ def _cast_shadow(
     )
 
     def keep_marching(state: tuple[Array, Array, Array, Array]) -> Array:
-        distance, visibility, surface_distance, count = state
-        return (
-            (count < steps)
-            & (distance < max_distance)
-            & (visibility > 0.0)
-            & (surface_distance > hit_epsilon)
-        )
+        distance, visibility, _, count = state
+        return (count < steps) & (distance < max_distance) & (visibility > 0.0)
 
     def march(state: tuple[Array, Array, Array, Array]):
-        distance, visibility, _, count = state
+        distance, visibility, previous_surface_distance, count = state
         surface_distance = sdf(origin + light_direction * distance)
         finite_distance = jnp.where(jnp.isfinite(surface_distance), surface_distance, max_distance)
+        intersection = finite_distance <= hit_epsilon
+
+        # Estimate the closest surface-to-ray distance between this sample and
+        # the previous one. This avoids the step-shaped light leaks produced by
+        # evaluating h / t only at march positions, especially around corners.
+        has_previous_sample = jnp.isfinite(previous_surface_distance)
+        y = jnp.where(
+            has_previous_sample,
+            finite_distance**2 / jnp.maximum(2.0 * previous_surface_distance, 1e-8),
+            0.0,
+        )
+        valid_closest_estimate = (
+            has_previous_sample
+            & (previous_surface_distance > 0.0)
+            & (finite_distance > 0.0)
+            & (y < finite_distance)
+        )
+        closest_distance = jnp.where(
+            valid_closest_estimate,
+            jnp.sqrt(jnp.maximum(finite_distance**2 - y**2, 0.0)),
+            jnp.abs(finite_distance),
+        )
+        distance_along_ray = jnp.where(valid_closest_estimate, distance - y, distance)
+        distance_along_ray = jnp.maximum(distance_along_ray, _MIN_MARCH_STEP)
+        penumbra = jnp.clip(
+            hardness * closest_distance / distance_along_ray,
+            0.0,
+            1.0,
+        )
         next_visibility = jnp.minimum(
             visibility,
-            jnp.clip(hardness * finite_distance / distance, 0.0, 1.0),
+            jnp.where(intersection, 0.0, penumbra),
         )
         advance = jnp.maximum(jnp.abs(finite_distance) * step_scale, _MIN_MARCH_STEP)
         return distance + advance, next_visibility, finite_distance, count + 1
 
-    _, visibility, surface_distance, _ = jax.lax.while_loop(keep_marching, march, initial)
-    return jnp.where(surface_distance <= hit_epsilon, 0.0, visibility)
+    _, visibility, _, _ = jax.lax.while_loop(keep_marching, march, initial)
+    return visibility
 
 
 def _ggx_light(
@@ -158,12 +163,12 @@ def _shade_surface(
     position: Array,
     normal: Array,
     ray_direction: Array,
-    ambient_occlusion: Array,
     light_directions: Array,
     light_colors: Array,
     shadow_steps: int,
     shadow_hardness: float,
     ambient: float,
+    ambient_color: Array = jnp.ones(3),
     shadow_distance: float = 20.0,
     hit_epsilon: float = 1e-3,
     step_scale: float = 0.9,
@@ -200,4 +205,4 @@ def _shade_surface(
         )
 
     direct = jax.vmap(shade_light)(light_directions, light_colors).sum(axis=0)
-    return direct + base_color * ambient * ambient_occlusion
+    return direct + base_color * ambient * ambient_color

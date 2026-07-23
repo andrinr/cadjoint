@@ -3,8 +3,8 @@ title: Forward Renderer
 ---
 
 jaxCAD's image renderer is designed for predictable forward rendering. It uses
-early-exit sphere tracing, hard surface visibility, finite-difference normals,
-Cook–Torrance GGX materials, soft shadows, geometric ambient occlusion, and
+early-exit sphere tracing, screen-space silhouette reconstruction,
+finite-difference normals, Cook–Torrance GGX materials, soft shadows, and
 optional reflection and refraction rays.
 
 Geometry and constraints remain JAX-native and differentiable. Rendered pixels
@@ -36,18 +36,24 @@ mirror = replace(RenderSettings.balanced(), reflect_steps=64)
 The low-level `raymarch(sdf, ...)` function remains available for compact
 notebook calls.
 
+Each primary trace retains its closest approach to the scene. Rays that narrowly
+miss a surface receive screen-space coverage across
+`RenderSettings.silhouette_smoothing` pixels, which removes hard hit/miss
+outlines without restoring differentiable visibility or fixed-step tracing. Set
+the value to `0` when exact binary coverage is required.
+
 ## Rendering modes
 
 All panels below are produced by the forward renderer. Soft shadows stop as
-soon as they find an occluder; AO samples actual scene geometry; and secondary
-rays are enabled only when requested.
+soon as they find an occluder, and reflection and refraction rays are enabled
+only when requested.
 
-![Direct lighting, soft shadows, geometric AO, and reflection/refraction modes](assets/rendering-modes.png)
+![Direct lighting, soft shadows, metal reflections, and glass refraction](assets/rendering-modes.png)
 
 ## Quality presets
 
 - `draft`: shorter trace budgets, direct lighting, no secondary visibility, and one sample per pixel.
-- `balanced`: more trace and shadow steps plus geometric AO.
+- `balanced`: more trace and shadow steps with reconstructed silhouettes and 2×2 SSAA.
 - `high_quality`: tighter surface precision, more visibility samples, and 3×3 SSAA.
 
 ![Draft, balanced, and high-quality forward renders](assets/rendering-quality.png)

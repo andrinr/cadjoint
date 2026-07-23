@@ -14,7 +14,7 @@ Differentiable SDF primitives, transformations, and constraint system built with
 - **SDF primitives** — sphere, box, capsule, cylinder, torus, and more
 - **Boolean ops** — union, intersection, subtraction with smooth blending
 - **Transforms** — translate, rotate, scale, mirror, repeat
-- **Forward raymarcher** — early-exit sphere tracing, hard visibility, GGX materials, soft shadows, geometric AO, reflections, refraction, and anti-aliasing
+- **Forward raymarcher** — early-exit sphere tracing, reconstructed silhouettes, GGX materials, soft shadows, reflections, refraction, and anti-aliasing
 - **Shader backends** — compile 3D SDFs through StableHLO to GLSL or WGSL
 - **WebGPU viewers** — interactively inspect SDFs in a browser playground or Jupyter
 - **Constraint system** — geometric constraints (distance, angle, coincident) with Riemannian gradient descent and Newton projection onto the constraint manifold

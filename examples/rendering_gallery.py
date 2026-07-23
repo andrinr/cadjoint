@@ -18,36 +18,36 @@ from jaxcad.render import (
     render_scene,
 )
 from jaxcad.sdf.boolean import Union
-from jaxcad.sdf.primitives import Plane, RoundBox, Sphere
-from jaxcad.sdf.transforms import Translate
+from jaxcad.sdf.primitives import Plane, Sphere, Torus
+from jaxcad.sdf.transforms import Rotate, Translate
 
 
 def build_scene(*, glass: bool) -> Scene:
     """Build one small material-and-visibility showcase."""
-    red = Material(color=[0.8, 0.08, 0.04], roughness=0.55)
+    red = Material(color=[0.78, 0.06, 0.025], roughness=0.42)
     gold = Material(
-        color=[0.95, 0.55, 0.08],
-        roughness=0.18,
-        metallic=0.9,
-        reflectivity=0.45,
+        color=[1.0, 0.58, 0.08],
+        roughness=0.28,
+        metallic=0.8,
+        reflectivity=0.35,
     )
     blue = Material(
-        color=[0.45, 0.75, 1.0] if glass else [0.08, 0.3, 0.85],
-        roughness=0.12 if glass else 0.35,
-        opacity=0.12 if glass else 1.0,
+        color=[0.72, 0.9, 1.0] if glass else [0.035, 0.18, 0.72],
+        roughness=0.08 if glass else 0.28,
+        opacity=0.06 if glass else 1.0,
         ior=1.5,
     )
-    ground = Material(color=[0.18, 0.21, 0.26], roughness=0.82)
+    ground = Material(color=[0.1, 0.12, 0.16], roughness=0.72)
     ground_height = -0.92
-    contact_clearance = 0.005
+    contact_clearance = 0.002
     geometry = Union(
         Translate(
             Sphere(0.82, material=red),
             jnp.array([-1.45, ground_height + 0.82 + contact_clearance, 0.0]),
         ),
         Translate(
-            RoundBox([0.68, 0.68, 0.68], 0.16, material=gold),
-            jnp.array([0.0, ground_height + 0.68 + 0.16 + contact_clearance, 0.0]),
+            Rotate(Torus(0.62, 0.23, material=gold), axis="y", angle=0.45),
+            jnp.array([0.0, ground_height + 0.62 + 0.23 + contact_clearance, 0.0]),
         ),
         Translate(
             Sphere(0.78, material=blue),
@@ -59,17 +59,17 @@ def build_scene(*, glass: bool) -> Scene:
     return Scene(
         geometry,
         camera=Camera(
-            position=(4.8, 2.7, 7.6),
-            target=(0.0, -0.18, 0.0),
-            fov=0.56,
+            position=(4.4, 3.5, 7.5),
+            target=(0.0, -0.35, 0.0),
+            fov=0.38,
         ),
-        light_directions=((0.55, 1.0, 0.45), (-0.55, 0.35, -0.25)),
-        light_colors=((1.15, 0.96, 0.78), (0.24, 0.36, 0.7)),
-        background_color=(0.06, 0.09, 0.16),
+        light_directions=((0.35, 1.0, 0.55), (-0.65, 0.45, -0.2), (0.15, 0.2, 1.0)),
+        light_colors=((1.5, 1.35, 1.15), (0.22, 0.3, 0.5), (0.2, 0.23, 0.3)),
+        background_color=(0.025, 0.04, 0.08),
         environment_map=make_gradient_sky(
-            sky_color=(0.08, 0.2, 0.52),
-            horizon_color=(0.85, 0.58, 0.32),
-            ground_color=(0.05, 0.04, 0.04),
+            sky_color=(0.7, 0.76, 0.88),
+            horizon_color=(0.18, 0.27, 0.44),
+            ground_color=(0.16, 0.18, 0.24),
         ),
     )
 
@@ -85,7 +85,7 @@ def save_comparison(path: Path, images: list, labels: list[str], columns: int) -
         axis.axis("off")
     for axis in axes[len(images) :]:
         axis.axis("off")
-    figure.patch.set_facecolor("#10141d")
+    figure.patch.set_facecolor("#0b0f18")
     figure.tight_layout(pad=1.4)
     figure.savefig(
         path,
@@ -101,27 +101,35 @@ def main() -> None:
     output.mkdir(parents=True, exist_ok=True)
     resolution = (300, 440)
 
-    modes_scene = build_scene(glass=True)
-    high_quality = RenderSettings.high_quality(resolution)
+    solid_scene = build_scene(glass=False)
+    glass_scene = build_scene(glass=True)
+    high_quality = replace(
+        RenderSettings.high_quality(resolution),
+        ambient=0.2,
+        exposure=1.15,
+    )
+    mode_scenes = [solid_scene, solid_scene, solid_scene, glass_scene]
     mode_settings = [
-        replace(high_quality, shadow_steps=0, ao_steps=0, ambient=0.1),
-        replace(high_quality, ao_steps=0),
+        replace(high_quality, shadow_steps=0),
         high_quality,
+        replace(high_quality, reflect_steps=64),
         replace(high_quality, reflect_steps=64, refract_steps=64),
     ]
-    mode_images = [render_scene(modes_scene, settings) for settings in mode_settings]
+    mode_images = [
+        render_scene(scene, settings) for scene, settings in zip(mode_scenes, mode_settings)
+    ]
     save_comparison(
         output / "rendering-modes.png",
         mode_images,
-        ["Direct lighting", "Soft shadows", "Shadows + AO", "Reflection + refraction"],
+        ["Direct lighting", "Soft shadows", "Metal reflections", "Glass refraction"],
         columns=2,
     )
 
-    quality_scene = build_scene(glass=False)
+    quality_scene = solid_scene
     quality_settings = [
-        RenderSettings.draft(resolution),
-        RenderSettings.balanced(resolution),
-        RenderSettings.high_quality(resolution),
+        replace(RenderSettings.draft(resolution), ambient=0.2, exposure=1.15),
+        replace(RenderSettings.balanced(resolution), ambient=0.2, exposure=1.15),
+        high_quality,
     ]
     quality_images = [render_scene(quality_scene, settings) for settings in quality_settings]
     save_comparison(

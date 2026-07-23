@@ -17,11 +17,16 @@ class TraceResult(NamedTuple):
 
     ``distance`` is the travelled distance along the ray. ``hit`` is a hard
     visibility result, and ``steps`` reports the amount of work performed.
+    ``closest_distance`` and ``closest_surface_distance`` preserve the nearest
+    approach for screen-space silhouette reconstruction on rays that narrowly
+    miss a surface.
     """
 
     distance: Array
     hit: Array
     steps: Array
+    closest_distance: Array
+    closest_surface_distance: Array
 
 
 def _sphere_trace(
@@ -42,14 +47,21 @@ def _sphere_trace(
     """
 
     initial_distance = sdf(origin)
+    initial_abs_distance = jnp.where(
+        jnp.isfinite(initial_distance),
+        jnp.abs(initial_distance),
+        jnp.asarray(jnp.inf),
+    )
     initial = (
         jnp.asarray(0.0),
         initial_distance,
+        jnp.asarray(0.0),
+        initial_abs_distance,
         jnp.asarray(0, dtype=jnp.int32),
     )
 
-    def keep_marching(state: tuple[Array, Array, Array]) -> Array:
-        distance, surface_distance, steps = state
+    def keep_marching(state: tuple[Array, Array, Array, Array, Array]) -> Array:
+        distance, surface_distance, _, _, steps = state
         return (
             (steps < max_steps)
             & (distance < max_distance)
@@ -57,20 +69,42 @@ def _sphere_trace(
             & (jnp.abs(surface_distance) > hit_epsilon)
         )
 
-    def march(state: tuple[Array, Array, Array]) -> tuple[Array, Array, Array]:
-        distance, surface_distance, steps = state
+    def march(
+        state: tuple[Array, Array, Array, Array, Array],
+    ) -> tuple[Array, Array, Array, Array, Array]:
+        distance, surface_distance, closest_distance, closest_surface_distance, steps = state
         advance = jnp.maximum(jnp.abs(surface_distance) * step_scale, _MIN_MARCH_STEP)
         next_distance = jnp.minimum(distance + advance, max_distance)
         next_surface_distance = sdf(origin + next_distance * direction)
-        return next_distance, next_surface_distance, steps + 1
+        next_abs_distance = jnp.where(
+            jnp.isfinite(next_surface_distance),
+            jnp.abs(next_surface_distance),
+            jnp.asarray(jnp.inf),
+        )
+        closer = next_abs_distance < closest_surface_distance
+        return (
+            next_distance,
+            next_surface_distance,
+            jnp.where(closer, next_distance, closest_distance),
+            jnp.minimum(next_abs_distance, closest_surface_distance),
+            steps + 1,
+        )
 
-    distance, surface_distance, steps = jax.lax.while_loop(keep_marching, march, initial)
+    distance, surface_distance, closest_distance, closest_surface_distance, steps = (
+        jax.lax.while_loop(keep_marching, march, initial)
+    )
     hit = (
         jnp.isfinite(surface_distance)
         & (jnp.abs(surface_distance) <= hit_epsilon)
         & (distance < max_distance)
     )
-    return TraceResult(distance, hit, steps)
+    return TraceResult(
+        distance,
+        hit,
+        steps,
+        closest_distance,
+        closest_surface_distance,
+    )
 
 
 def _refract(direction: Array, normal: Array, eta: Array) -> Array:

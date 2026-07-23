@@ -13,7 +13,6 @@ from jax import Array
 
 from jaxcad.render.raymarch.camera import _camera_rays
 from jaxcad.render.raymarch.shade import (
-    _ambient_occlusion,
     _compute_normal,
     _shade_surface,
 )
@@ -87,41 +86,32 @@ def _render_pixel(
     shadow_distance: float,
     shadow_hardness: float,
     ambient: float,
-    ao_steps: int,
-    ao_step_size: float,
-    ao_strength: float,
+    edge_width: float,
     reflect_steps: int,
     refract_steps: int,
     env_fn: Callable[[Array], Array] | None = None,
 ) -> Array:
-    """Trace and shade one ray using hard surface visibility."""
+    """Trace and shade one ray with reconstructed silhouette coverage."""
 
     def background(direction: Array) -> Array:
         return env_fn(direction) if env_fn is not None else background_color
 
     def shade_hit(position: Array, direction: Array) -> tuple[Array, dict, Array]:
         normal = _compute_normal(sdf, position, normal_epsilon)
-        occlusion = _ambient_occlusion(
-            sdf,
-            position,
-            normal,
-            ao_steps,
-            ao_step_size,
-            ao_strength,
-        )
         material = material_fn(position)
+        ambient_color = background(normal) if env_fn is not None else jnp.ones(3)
         color = _shade_surface(
             sdf,
             material,
             position,
             normal,
             direction,
-            occlusion,
             light_directions,
             light_colors,
             shadow_steps,
             shadow_hardness,
             ambient,
+            ambient_color,
             shadow_distance,
             hit_epsilon,
             step_scale,
@@ -138,13 +128,16 @@ def _render_pixel(
         step_scale,
     )
     hit_position = ray_origin + primary.distance * ray_direction
+    closest_position = ray_origin + primary.closest_distance * ray_direction
+    sample_position = jnp.where(primary.hit, hit_position, closest_position)
+    surface_color, material, normal = shade_hit(sample_position, ray_direction)
 
     def render_surface(_unused: None) -> Array:
-        surface_color, material, normal = shade_hit(hit_position, ray_direction)
+        shaded_color = surface_color
 
         if reflect_steps > 0:
             reflected_direction = ray_direction - 2.0 * jnp.dot(ray_direction, normal) * normal
-            reflected_origin = _offset_surface(hit_position, normal, hit_epsilon)
+            reflected_origin = _offset_surface(sample_position, normal, hit_epsilon)
             reflection = _sphere_trace(
                 sdf,
                 reflected_origin,
@@ -162,16 +155,16 @@ def _render_pixel(
                 operand=None,
             )
             reflectivity = material.get("reflectivity", jnp.asarray(0.0))
-            surface_color = surface_color * (1.0 - reflectivity) + reflected_color * reflectivity
+            shaded_color = shaded_color * (1.0 - reflectivity) + reflected_color * reflectivity
 
         opacity = material.get("opacity", jnp.asarray(1.0))
         if refract_steps == 0:
-            return surface_color * opacity + background(ray_direction) * (1.0 - opacity)
+            return shaded_color * opacity + background(ray_direction) * (1.0 - opacity)
 
         ior = material.get("ior", jnp.asarray(1.5))
         exit_position, exit_direction, exit_normal, exited = _trace_through_glass(
             sdf,
-            hit_position,
+            sample_position,
             ray_direction,
             normal,
             ior,
@@ -210,16 +203,28 @@ def _render_pixel(
         transmitted_color = transmitted_color * material["color"]
         fresnel = _fresnel_schlick(jnp.dot(-ray_direction, normal), ior)
         surface_weight = opacity + (1.0 - opacity) * fresnel
-        return surface_color * surface_weight + transmitted_color * (1.0 - opacity) * (
-            1.0 - fresnel
-        )
+        return shaded_color * surface_weight + transmitted_color * (1.0 - opacity) * (1.0 - fresnel)
 
-    return jax.lax.cond(
+    def render_silhouette(_unused: None) -> Array:
+        opacity = material.get("opacity", jnp.asarray(1.0))
+        return surface_color * opacity + background(ray_direction) * (1.0 - opacity)
+
+    safe_edge_width = jnp.maximum(edge_width, 1e-8)
+    edge_proximity = jnp.clip(
+        1.0 - primary.closest_surface_distance / safe_edge_width,
+        0.0,
+        1.0,
+    )
+    smooth_proximity = edge_proximity**2 * (3.0 - 2.0 * edge_proximity)
+    miss_coverage = jnp.where(edge_width > 0.0, 0.5 * smooth_proximity, 0.0)
+    coverage = jnp.where(primary.hit, 1.0, miss_coverage)
+    surface_sample = jax.lax.cond(
         primary.hit,
         render_surface,
-        lambda _: background(ray_direction),
+        render_silhouette,
         operand=None,
     )
+    return surface_sample * coverage + background(ray_direction) * (1.0 - coverage)
 
 
 @partial(
@@ -228,7 +233,6 @@ def _render_pixel(
         "scene_factory",
         "max_steps",
         "shadow_steps",
-        "ao_steps",
         "reflect_steps",
         "refract_steps",
     ),
@@ -251,9 +255,7 @@ def _render_image(
     shadow_distance: float,
     shadow_hardness: float,
     ambient: float,
-    ao_steps: int,
-    ao_step_size: float,
-    ao_strength: float,
+    edge_width: float,
     reflect_steps: int,
     refract_steps: int,
     env_map: Array | None,
@@ -292,9 +294,7 @@ def _render_image(
             shadow_distance,
             shadow_hardness,
             ambient,
-            ao_steps,
-            ao_step_size,
-            ao_strength,
+            edge_width,
             reflect_steps,
             refract_steps,
             environment,
@@ -351,6 +351,10 @@ def _render_with_settings(
         height * settings.aa_samples,
         width * settings.aa_samples,
     )
+    scene_distance = float(np.linalg.norm(np.asarray(camera_position - camera_target)))
+    edge_width = (
+        settings.silhouette_smoothing * 2.0 * camera_fov * scene_distance / min(render_resolution)
+    )
     rays = _camera_rays(
         camera_position,
         camera_target,
@@ -376,9 +380,7 @@ def _render_with_settings(
         shadow_distance=settings.shadow_distance,
         shadow_hardness=settings.shadow_hardness,
         ambient=settings.ambient,
-        ao_steps=settings.ao_steps,
-        ao_step_size=settings.ao_step_size,
-        ao_strength=settings.ao_strength,
+        edge_width=edge_width,
         reflect_steps=settings.reflect_steps,
         refract_steps=settings.refract_steps,
         env_map=environment_map,
@@ -443,11 +445,9 @@ def raymarch(
     shadow_steps: int = 32,
     shadow_distance: float = 20.0,
     shadow_hardness: float = 12.0,
-    ambient: float = 0.08,
-    ao_steps: int = 4,
-    ao_step_size: float = 0.08,
-    ao_strength: float = 0.5,
+    ambient: float = 0.12,
     aa_samples: int = 1,
+    silhouette_smoothing: float = 0.75,
     exposure: float = 1.0,
     tone_mapping: ToneMapping = "aces",
     gamma: float = 2.2,
@@ -473,10 +473,8 @@ def raymarch(
         shadow_distance=shadow_distance,
         shadow_hardness=shadow_hardness,
         ambient=ambient,
-        ao_steps=ao_steps,
-        ao_step_size=ao_step_size,
-        ao_strength=ao_strength,
         aa_samples=aa_samples,
+        silhouette_smoothing=silhouette_smoothing,
         exposure=exposure,
         tone_mapping=tone_mapping,
         gamma=gamma,

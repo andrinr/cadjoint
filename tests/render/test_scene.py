@@ -18,8 +18,7 @@ def test_quality_presets_increase_work_and_fidelity():
     assert draft.resolution == balanced.resolution == high.resolution
     assert draft.max_steps < balanced.max_steps < high.max_steps
     assert draft.shadow_steps < balanced.shadow_steps < high.shadow_steps
-    assert draft.ao_steps < balanced.ao_steps < high.ao_steps
-    assert draft.aa_samples < high.aa_samples
+    assert draft.aa_samples < balanced.aa_samples < high.aa_samples
     assert draft.hit_epsilon > balanced.hit_epsilon > high.hit_epsilon
 
 
@@ -30,6 +29,7 @@ def test_quality_presets_increase_work_and_fidelity():
         ("max_steps", 0),
         ("step_scale", 1.1),
         ("aa_samples", 0),
+        ("silhouette_smoothing", -0.1),
         ("gamma", 0.0),
         ("exposure", 0.0),
         ("tone_mapping", "invalid"),
@@ -90,10 +90,8 @@ def test_render_scene_matches_low_level_raymarch():
         shadow_distance=settings.shadow_distance,
         shadow_hardness=settings.shadow_hardness,
         ambient=settings.ambient,
-        ao_steps=settings.ao_steps,
-        ao_step_size=settings.ao_step_size,
-        ao_strength=settings.ao_strength,
         aa_samples=settings.aa_samples,
+        silhouette_smoothing=settings.silhouette_smoothing,
         gamma=settings.gamma,
         exposure=settings.exposure,
         tone_mapping=settings.tone_mapping,

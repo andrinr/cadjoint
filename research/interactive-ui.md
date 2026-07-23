@@ -178,6 +178,13 @@ def parameter_sliders(sdf):
 
 Pair with **three.js `DragControls`** for genuine 3D drag handles on free `Vector` parameters.
 
+When rasterized three.js helpers or meshes are layered over the SDF shader,
+write the raymarched intersection into the shared depth buffer instead of
+manually ordering passes. [Compositing raymarched and polygonal
+geometry](https://iquilezles.org/articles/raypolys/) derives the required
+eye-space to clip-space depth mapping and is the implementation reference for
+that viewer work.
+
 ### Architecture
 
 ```

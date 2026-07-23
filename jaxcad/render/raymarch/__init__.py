@@ -15,7 +15,6 @@ from jaxcad.render.raymarch.render import (
     render_scene,
 )
 from jaxcad.render.raymarch.shade import (
-    _ambient_occlusion,
     _cast_shadow,
     _compute_normal,
     _normal_fd,
@@ -42,7 +41,6 @@ __all__ = [
     "_render_pixel",
     "_sphere_trace",
     "_cast_shadow",
-    "_ambient_occlusion",
     "_normal_fd",
     "_compute_normal",
     "_normalize",
