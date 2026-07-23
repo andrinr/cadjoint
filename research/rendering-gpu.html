@@ -131,6 +131,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span class="menu-text">Get Started</span></a>
   </li>  
   <li class="nav-item">
+    <a class="nav-link" href="../docs/rendering.html"> 
+<span class="menu-text">Rendering</span></a>
+  </li>  
+  <li class="nav-item">
     <a class="nav-link" href="../docs/viewer.html"> 
 <span class="menu-text">WebGPU Viewer</span></a>
   </li>  
@@ -194,6 +198,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <ul>
   <li><a href="#gpu-rendering-glsl-nvidia-warp-slang" id="toc-gpu-rendering-glsl-nvidia-warp-slang" class="nav-link active" data-scroll-target="#gpu-rendering-glsl-nvidia-warp-slang">GPU Rendering: GLSL / NVIDIA Warp / Slang</a>
   <ul class="collapse">
+  <li><a href="#forward-rendering-references" id="toc-forward-rendering-references" class="nav-link" data-scroll-target="#forward-rendering-references">Forward-rendering references</a></li>
   <li><a href="#current-state" id="toc-current-state" class="nav-link" data-scroll-target="#current-state">Current state</a></li>
   <li><a href="#approach-1-jax-tree-glsl-most-practical" id="toc-approach-1-jax-tree-glsl-most-practical" class="nav-link" data-scroll-target="#approach-1-jax-tree-glsl-most-practical">Approach 1: JAX tree → GLSL (most practical)</a>
   <ul class="collapse">
@@ -240,8 +245,16 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="gpu-rendering-glsl-nvidia-warp-slang" class="level1">
 <h1>GPU Rendering: GLSL / NVIDIA Warp / Slang</h1>
 <blockquote class="blockquote">
-<p>Research into replacing jaxCAD’s matplotlib-based rendering pipeline with real-time GPU rendering and differentiable inverse rendering.</p>
+<p>Archived exploration. The active renderer roadmap is forward-only and prioritizes runtime, fidelity, and clean abstractions. The inverse-rendering and Slang sections below are retained as historical research, not planned work.</p>
 </blockquote>
+<section id="forward-rendering-references" class="level2">
+<h2 class="anchored" data-anchor-id="forward-rendering-references">Forward-rendering references</h2>
+<ul>
+<li><a href="https://iquilezles.org/articles/rmshadows/">Soft shadows in raymarched SDFs</a> derives the <code>distance / travel</code> penumbra estimate and the two-sample closest approach used by the active forward renderer.</li>
+<li><a href="https://iquilezles.org/articles/binarysearchsdf/">Binary search for SDF ray tracing</a> is useful as a traversal reference, but its own evaluation found substantially more SDF evaluations than conventional sphere tracing. Keep early-exit sphere tracing as the default unless a scene-specific benchmark shows otherwise.</li>
+<li><a href="https://iquilezles.org/articles/smin/">Smooth minimum</a> documents normalized blend kernels, bounds inflation, and matching material blend factors. Use it as the reference for a focused CSG/material-blending pass.</li>
+</ul>
+</section>
 <section id="current-state" class="level2">
 <h2 class="anchored" data-anchor-id="current-state">Current state</h2>
 <p><code>jaxcad/render.py</code> has two paths:</p>
@@ -711,7 +724,7 @@ float sceneSDF(float3 p, float radius, float3 translate, float smoothness) {
 <ol type="1">
 <li><p><strong>GLSL + moderngl</strong> — Add <code>to_glsl()</code> to <code>SDF</code> base class and each subclass. Wire into <code>render_realtime()</code> in <code>render.py</code>. Gives interactive visualization immediately.</p></li>
 <li><p><strong>Warp</strong> — When high-resolution batch rendering or performance is needed. Write a Warp code generator mirroring the GLSL one. Bridge back to JAX via DLPack + <code>custom_vjp</code>.</p></li>
-<li><p><strong>Slang</strong> — When inverse rendering (fitting SDF parameters to target images) becomes a goal. Reuse the GLSL/Warp visitor pattern to emit <code>.slang</code> files.</p></li>
+<li><p><strong>Slang</strong> — Deferred. Revisit only if inverse rendering becomes an explicit project goal.</p></li>
 </ol>
 <hr>
 </section>

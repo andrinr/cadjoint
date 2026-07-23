@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>constraints.types.base.constraint – jaxCAD</title>
+<title>render.settings.rendersettings – jaxCAD</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -196,14 +196,13 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#jaxcad.constraints.types.base.Constraint" id="toc-jaxcad.constraints.types.base.Constraint" class="nav-link active" data-scroll-target="#jaxcad.constraints.types.base.Constraint">constraints.types.base.Constraint</a>
+  <li><a href="#jaxcad.render.settings.RenderSettings" id="toc-jaxcad.render.settings.RenderSettings" class="nav-link active" data-scroll-target="#jaxcad.render.settings.RenderSettings">render.settings.RenderSettings</a>
   <ul class="collapse">
-  <li><a href="#attributes" id="toc-attributes" class="nav-link" data-scroll-target="#attributes">Attributes</a></li>
   <li><a href="#methods" id="toc-methods" class="nav-link" data-scroll-target="#methods">Methods</a>
   <ul class="collapse">
-  <li><a href="#jaxcad.constraints.types.base.Constraint.compute_residual" id="toc-jaxcad.constraints.types.base.Constraint.compute_residual" class="nav-link" data-scroll-target="#jaxcad.constraints.types.base.Constraint.compute_residual">compute_residual</a></li>
-  <li><a href="#jaxcad.constraints.types.base.Constraint.dof_reduction" id="toc-jaxcad.constraints.types.base.Constraint.dof_reduction" class="nav-link" data-scroll-target="#jaxcad.constraints.types.base.Constraint.dof_reduction">dof_reduction</a></li>
-  <li><a href="#jaxcad.constraints.types.base.Constraint.get_parameters" id="toc-jaxcad.constraints.types.base.Constraint.get_parameters" class="nav-link" data-scroll-target="#jaxcad.constraints.types.base.Constraint.get_parameters">get_parameters</a></li>
+  <li><a href="#jaxcad.render.settings.RenderSettings.balanced" id="toc-jaxcad.render.settings.RenderSettings.balanced" class="nav-link" data-scroll-target="#jaxcad.render.settings.RenderSettings.balanced">balanced</a></li>
+  <li><a href="#jaxcad.render.settings.RenderSettings.draft" id="toc-jaxcad.render.settings.RenderSettings.draft" class="nav-link" data-scroll-target="#jaxcad.render.settings.RenderSettings.draft">draft</a></li>
+  <li><a href="#jaxcad.render.settings.RenderSettings.high_quality" id="toc-jaxcad.render.settings.RenderSettings.high_quality" class="nav-link" data-scroll-target="#jaxcad.render.settings.RenderSettings.high_quality">high_quality</a></li>
   </ul></li>
   </ul></li>
   </ul>
@@ -215,36 +214,29 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 
 
-<section id="jaxcad.constraints.types.base.Constraint" class="level1">
-<h1>constraints.types.base.Constraint</h1>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>constraints.types.base.Constraint(weight<span class="op">=</span><span class="fl">1.0</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Base class for geometric constraints.</p>
-<p>Constraints are represented as residual equations c(x) = 0. The Jacobian ∂c/∂x is computed via AD over the flat residual function in dof.py, not per-constraint.</p>
-<p>Subclasses must implement: - compute_residual(): Returns constraint violation c(x) - dof_reduction(): Number of DOF this constraint removes - get_parameters(): List of parameters involved in this constraint</p>
-<section id="attributes" class="level2 doc-section doc-section-attributes">
-<h2 class="doc-section doc-section-attributes anchored" data-anchor-id="attributes">Attributes</h2>
-<table class="caption-top table">
-<colgroup>
-<col style="width: 3%">
-<col style="width: 3%">
-<col style="width: 93%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>Name</th>
-<th>Type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>weight</td>
-<td>float</td>
-<td>Scalar applied to this constraint’s residuals in penalty-based optimization. Use to normalize across types or scales — e.g.&nbsp;<code>weight=1/distance</code> makes a DistanceConstraint residual dimensionless. Defaults to 1.0.</td>
-</tr>
-</tbody>
-</table>
-</section>
+<section id="jaxcad.render.settings.RenderSettings" class="level1">
+<h1>render.settings.RenderSettings</h1>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>render.settings.RenderSettings(</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>    resolution<span class="op">=</span>(<span class="dv">200</span>, <span class="dv">200</span>),</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>    max_steps<span class="op">=</span><span class="dv">96</span>,</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    max_distance<span class="op">=</span><span class="fl">20.0</span>,</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>    hit_epsilon<span class="op">=</span><span class="fl">0.001</span>,</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>    step_scale<span class="op">=</span><span class="fl">0.9</span>,</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>    normal_epsilon<span class="op">=</span><span class="fl">0.001</span>,</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>    shadow_steps<span class="op">=</span><span class="dv">32</span>,</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>    shadow_distance<span class="op">=</span><span class="fl">20.0</span>,</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>    shadow_hardness<span class="op">=</span><span class="fl">12.0</span>,</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>    ambient<span class="op">=</span><span class="fl">0.12</span>,</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>    aa_samples<span class="op">=</span><span class="dv">1</span>,</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>    silhouette_smoothing<span class="op">=</span><span class="fl">0.75</span>,</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>    exposure<span class="op">=</span><span class="fl">1.0</span>,</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>    tone_mapping<span class="op">=</span><span class="st">'aces'</span>,</span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>    gamma<span class="op">=</span><span class="fl">2.2</span>,</span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>    reflect_steps<span class="op">=</span><span class="dv">0</span>,</span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>    refract_steps<span class="op">=</span><span class="dv">0</span>,</span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Quality and performance controls for the forward renderer.</p>
+<p>Use :meth:<code>draft</code>, :meth:<code>balanced</code>, or :meth:<code>high_quality</code> as clear starting points, then override individual fields with :func:<code>dataclasses.replace</code> when a scene needs different trade-offs.</p>
 <section id="methods" class="level2">
 <h2 class="anchored" data-anchor-id="methods">Methods</h2>
 <table class="caption-top table">
@@ -256,134 +248,35 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </thead>
 <tbody>
 <tr class="odd">
-<td><a href="#jaxcad.constraints.types.base.Constraint.compute_residual">compute_residual</a></td>
-<td>Compute constraint residual c(x).</td>
+<td><a href="#jaxcad.render.settings.RenderSettings.balanced">balanced</a></td>
+<td>Balanced default with soft shadows and 2x2 supersampling.</td>
 </tr>
 <tr class="even">
-<td><a href="#jaxcad.constraints.types.base.Constraint.dof_reduction">dof_reduction</a></td>
-<td>Number of degrees of freedom this constraint removes.</td>
+<td><a href="#jaxcad.render.settings.RenderSettings.draft">draft</a></td>
+<td>Fast interactive preview with direct light and no secondary visibility.</td>
 </tr>
 <tr class="odd">
-<td><a href="#jaxcad.constraints.types.base.Constraint.get_parameters">get_parameters</a></td>
-<td>Get list of parameters involved in this constraint.</td>
+<td><a href="#jaxcad.render.settings.RenderSettings.high_quality">high_quality</a></td>
+<td>Higher precision, denser visibility sampling, and 3x3 SSAA.</td>
 </tr>
 </tbody>
 </table>
-<section id="jaxcad.constraints.types.base.Constraint.compute_residual" class="level3">
-<h3 class="anchored" data-anchor-id="jaxcad.constraints.types.base.Constraint.compute_residual">compute_residual</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>constraints.types.base.Constraint.compute_residual(param_values)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Compute constraint residual c(x).</p>
-<section id="parameters" class="level4 doc-section doc-section-parameters">
-<h4 class="doc-section doc-section-parameters anchored" data-anchor-id="parameters">Parameters</h4>
-<table class="caption-top table">
-<colgroup>
-<col style="width: 13%">
-<col style="width: 18%">
-<col style="width: 56%">
-<col style="width: 11%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>Name</th>
-<th>Type</th>
-<th>Description</th>
-<th>Default</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>param_values</td>
-<td>dict[str, Array]</td>
-<td>Dictionary mapping parameter names to their current values</td>
-<td><em>required</em></td>
-</tr>
-</tbody>
-</table>
+<section id="jaxcad.render.settings.RenderSettings.balanced" class="level3">
+<h3 class="anchored" data-anchor-id="jaxcad.render.settings.RenderSettings.balanced">balanced</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>render.settings.RenderSettings.balanced(resolution<span class="op">=</span>(<span class="dv">200</span>, <span class="dv">200</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Balanced default with soft shadows and 2x2 supersampling.</p>
 </section>
-<section id="returns" class="level4 doc-section doc-section-returns">
-<h4 class="doc-section doc-section-returns anchored" data-anchor-id="returns">Returns</h4>
-<table class="caption-top table">
-<colgroup>
-<col style="width: 8%">
-<col style="width: 8%">
-<col style="width: 82%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>Name</th>
-<th>Type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td></td>
-<td>Array</td>
-<td>Constraint residual (scalar or array). Zero means constraint is satisfied.</td>
-</tr>
-</tbody>
-</table>
+<section id="jaxcad.render.settings.RenderSettings.draft" class="level3">
+<h3 class="anchored" data-anchor-id="jaxcad.render.settings.RenderSettings.draft">draft</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>render.settings.RenderSettings.draft(resolution<span class="op">=</span>(<span class="dv">200</span>, <span class="dv">200</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Fast interactive preview with direct light and no secondary visibility.</p>
 </section>
-</section>
-<section id="jaxcad.constraints.types.base.Constraint.dof_reduction" class="level3">
-<h3 class="anchored" data-anchor-id="jaxcad.constraints.types.base.Constraint.dof_reduction">dof_reduction</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>constraints.types.base.Constraint.dof_reduction()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Number of degrees of freedom this constraint removes.</p>
-<section id="returns-1" class="level4 doc-section doc-section-returns">
-<h4 class="doc-section doc-section-returns anchored" data-anchor-id="returns-1">Returns</h4>
-<table class="caption-top table">
-<colgroup>
-<col style="width: 10%">
-<col style="width: 10%">
-<col style="width: 78%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>Name</th>
-<th>Type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td></td>
-<td>int</td>
-<td>Number of independent constraint equations (typically 1)</td>
-</tr>
-</tbody>
-</table>
-</section>
-</section>
-<section id="jaxcad.constraints.types.base.Constraint.get_parameters" class="level3">
-<h3 class="anchored" data-anchor-id="jaxcad.constraints.types.base.Constraint.get_parameters">get_parameters</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>constraints.types.base.Constraint.get_parameters()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Get list of parameters involved in this constraint.</p>
-<section id="returns-2" class="level4 doc-section doc-section-returns">
-<h4 class="doc-section doc-section-returns anchored" data-anchor-id="returns-2">Returns</h4>
-<table class="caption-top table">
-<colgroup>
-<col style="width: 9%">
-<col style="width: 22%">
-<col style="width: 68%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>Name</th>
-<th>Type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td></td>
-<td>list[Parameter]</td>
-<td>List of Parameter objects that this constraint depends on</td>
-</tr>
-</tbody>
-</table>
+<section id="jaxcad.render.settings.RenderSettings.high_quality" class="level3">
+<h3 class="anchored" data-anchor-id="jaxcad.render.settings.RenderSettings.high_quality">high_quality</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>render.settings.RenderSettings.high_quality(resolution<span class="op">=</span>(<span class="dv">400</span>, <span class="dv">400</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Higher precision, denser visibility sampling, and 3x3 SSAA.</p>
 
 
-</section>
 </section>
 </section>
 </section>

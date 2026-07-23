@@ -96,6 +96,10 @@ ul.task-list li input[type="checkbox"] {
 <span class="menu-text">Get Started</span></a>
   </li>  
   <li class="nav-item">
+    <a class="nav-link" href="../docs/rendering.html"> 
+<span class="menu-text">Rendering</span></a>
+  </li>  
+  <li class="nav-item">
     <a class="nav-link" href="../docs/viewer.html"> 
 <span class="menu-text">WebGPU Viewer</span></a>
   </li>  
@@ -197,10 +201,6 @@ ul.task-list li input[type="checkbox"] {
 <td><a href="../reference/functionalize.functionalize.html#jaxcad.functionalize.functionalize">functionalize.functionalize</a></td>
 <td>Compile an SDF to a pure function with free and fixed parameters.</td>
 </tr>
-<tr class="even">
-<td><a href="../reference/render.functionalize.functionalize_render.html#jaxcad.render.functionalize.functionalize_render">render.functionalize.functionalize_render</a></td>
-<td>Compile a <code>Scene</code> to a differentiable render function.</td>
-</tr>
 </tbody>
 </table>
 </section>
@@ -293,12 +293,28 @@ ul.task-list li input[type="checkbox"] {
 <table class="caption-top table">
 <tbody>
 <tr class="odd">
+<td><a href="../reference/render.scene.Camera.html#jaxcad.render.scene.Camera">render.scene.Camera</a></td>
+<td>Perspective camera used by :func:<code>jaxcad.render.render_scene</code>.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/render.scene.Scene.html#jaxcad.render.scene.Scene">render.scene.Scene</a></td>
+<td>Geometry, camera, lighting, and background for one forward render.</td>
+</tr>
+<tr class="odd">
+<td><a href="../reference/render.settings.RenderSettings.html#jaxcad.render.settings.RenderSettings">render.settings.RenderSettings</a></td>
+<td>Quality and performance controls for the forward renderer.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/render.raymarch.render.render_scene.html#jaxcad.render.raymarch.render.render_scene">render.raymarch.render.render_scene</a></td>
+<td>Render a :class:<code>Scene</code> with an explicit quality preset or settings.</td>
+</tr>
+<tr class="odd">
 <td><a href="../reference/render.raymarch.render.raymarch.html#jaxcad.render.raymarch.render.raymarch">render.raymarch.render.raymarch</a></td>
-<td>Render an SDF via sphere tracing and return an RGB image array.</td>
+<td>Render an SDF to an <code>(height, width, 3)</code> NumPy image.</td>
 </tr>
 <tr class="even">
 <td><a href="../reference/render.raymarch.render.render_raymarched.html#jaxcad.render.raymarch.render.render_raymarched">render.raymarch.render.render_raymarched</a></td>
-<td>Render an SDF via sphere tracing and display with matplotlib.</td>
+<td>Render an SDF with :func:<code>raymarch</code> and display it with matplotlib.</td>
 </tr>
 <tr class="odd">
 <td><a href="../reference/render.marching_cubes.render_marching_cubes.html#jaxcad.render.marching_cubes.render_marching_cubes">render.marching_cubes.render_marching_cubes</a></td>

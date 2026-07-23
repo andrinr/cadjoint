@@ -131,6 +131,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span class="menu-text">Get Started</span></a>
   </li>  
   <li class="nav-item">
+    <a class="nav-link" href="./docs/rendering.html"> 
+<span class="menu-text">Rendering</span></a>
+  </li>  
+  <li class="nav-item">
     <a class="nav-link" href="./docs/viewer.html"> 
 <span class="menu-text">WebGPU Viewer</span></a>
   </li>  
@@ -228,6 +232,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </figure>
 </div>
 <p>Build a scene in Python and inspect the generated WGSL in a live, interactive WebGPU preview. <a href="./docs/viewer.html">Open the WebGPU viewer guide</a>.</p>
+<p>For still images, the <a href="./docs/rendering.html">forward renderer guide</a> covers the draft, balanced, and high-quality presets with real output comparisons.</p>
 <section id="core-concepts" class="level2">
 <h2 class="anchored" data-anchor-id="core-concepts">Core concepts</h2>
 <table class="caption-top table">
@@ -261,6 +266,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <tr class="odd">
 <td><strong>Functionalize</strong></td>
 <td>Convert a parametric scene to a pure JAX function for <code>jit</code> / <code>grad</code> / <code>vmap</code></td>
+</tr>
+<tr class="even">
+<td><strong>Rendering</strong></td>
+<td>Forward-only sphere tracing with explicit performance and fidelity settings</td>
 </tr>
 </tbody>
 </table>

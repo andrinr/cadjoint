@@ -131,6 +131,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span class="menu-text">Get Started</span></a>
   </li>  
   <li class="nav-item">
+    <a class="nav-link" href="../docs/rendering.html"> 
+<span class="menu-text">Rendering</span></a>
+  </li>  
+  <li class="nav-item">
     <a class="nav-link" href="../docs/viewer.html"> 
 <span class="menu-text">WebGPU Viewer</span></a>
   </li>  
@@ -427,6 +431,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h3 class="anchored" data-anchor-id="what-it-is-2">What it is</h3>
 <p><a href="https://anywidget.dev">anywidget</a> (<code>pip install anywidget</code>) lets you write custom Jupyter widgets as an ES module + Python class. Synced state via traitlets. Works in JupyterLab 4, VS Code, and Marimo.</p>
 <p>Pair with <strong>three.js <code>DragControls</code></strong> for genuine 3D drag handles on free <code>Vector</code> parameters.</p>
+<p>When rasterized three.js helpers or meshes are layered over the SDF shader, write the raymarched intersection into the shared depth buffer instead of manually ordering passes. <a href="https://iquilezles.org/articles/raypolys/">Compositing raymarched and polygonal geometry</a> derives the required eye-space to clip-space depth mapping and is the implementation reference for that viewer work.</p>
 </section>
 <section id="architecture" class="level3">
 <h3 class="anchored" data-anchor-id="architecture">Architecture</h3>

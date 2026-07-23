@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>render.functionalize.functionalize_render – jaxCAD</title>
+<title>Forward Renderer – jaxCAD</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -131,6 +131,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span class="menu-text">Get Started</span></a>
   </li>  
   <li class="nav-item">
+    <a class="nav-link active" href="../docs/rendering.html" aria-current="page"> 
+<span class="menu-text">Rendering</span></a>
+  </li>  
+  <li class="nav-item">
     <a class="nav-link" href="../docs/viewer.html"> 
 <span class="menu-text">WebGPU Viewer</span></a>
   </li>  
@@ -192,133 +196,83 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#jaxcad.render.functionalize.functionalize_render" id="toc-jaxcad.render.functionalize.functionalize_render" class="nav-link active" data-scroll-target="#jaxcad.render.functionalize.functionalize_render">render.functionalize.functionalize_render</a>
-  <ul class="collapse">
-  <li><a href="#parameters" id="toc-parameters" class="nav-link" data-scroll-target="#parameters">Parameters</a></li>
-  <li><a href="#returns" id="toc-returns" class="nav-link" data-scroll-target="#returns">Returns</a></li>
-  </ul></li>
+  <li><a href="#scene-and-quality-settings" id="toc-scene-and-quality-settings" class="nav-link active" data-scroll-target="#scene-and-quality-settings">Scene and quality settings</a></li>
+  <li><a href="#rendering-modes" id="toc-rendering-modes" class="nav-link" data-scroll-target="#rendering-modes">Rendering modes</a></li>
+  <li><a href="#quality-presets" id="toc-quality-presets" class="nav-link" data-scroll-target="#quality-presets">Quality presets</a></li>
   </ul>
 </nav>
     </div>
 <!-- main -->
-<main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"></header>
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Forward Renderer</h1>
+</div>
 
 
 
+<div class="quarto-title-meta">
 
-<section id="jaxcad.render.functionalize.functionalize_render" class="level1">
-<h1>render.functionalize.functionalize_render</h1>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>render.functionalize.functionalize_render(</span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>    scene,</span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>    max_steps<span class="op">=</span><span class="dv">32</span>,</span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    max_dist<span class="op">=</span><span class="fl">15.0</span>,</span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>    shadow_steps<span class="op">=</span><span class="dv">12</span>,</span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>    shadow_hardness<span class="op">=</span><span class="fl">6.0</span>,</span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>    gamma<span class="op">=</span><span class="fl">2.2</span>,</span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>    fd_normals<span class="op">=</span><span class="va">False</span>,</span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>    normal_eps<span class="op">=</span><span class="fl">0.0001</span>,</span>
-<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>    reflect_steps<span class="op">=</span><span class="dv">0</span>,</span>
-<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Compile a <code>Scene</code> to a differentiable render function.</p>
-<p>Fixed geometry params are extracted once at call time and baked in, so the returned function only needs <code>free_params</code> — the dict that changes each optimisation step::</p>
-<pre><code>render_fn = functionalize_render(scene)
-image     = render_fn(free_params, resolution=(64, 96))</code></pre>
-<p><code>image</code> is a JAX <code>(H, W, 3)</code> float32 array fully differentiable w.r.t. <code>free_params</code> via <code>jax.grad</code>.</p>
-<section id="parameters" class="level2 doc-section doc-section-parameters">
-<h2 class="doc-section doc-section-parameters anchored" data-anchor-id="parameters">Parameters</h2>
-<table class="caption-top table">
-<colgroup>
-<col style="width: 8%">
-<col style="width: 3%">
-<col style="width: 81%">
-<col style="width: 5%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>Name</th>
-<th>Type</th>
-<th>Description</th>
-<th>Default</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>scene</td>
-<td>Scene</td>
-<td><code>Scene</code> with geometry, camera, and lighting.</td>
-<td><em>required</em></td>
-</tr>
-<tr class="even">
-<td>max_steps</td>
-<td>int</td>
-<td>Sphere-tracing iterations per primary ray.</td>
-<td><code>32</code></td>
-</tr>
-<tr class="odd">
-<td>max_dist</td>
-<td>float</td>
-<td>Miss threshold distance.</td>
-<td><code>15.0</code></td>
-</tr>
-<tr class="even">
-<td>shadow_steps</td>
-<td>int</td>
-<td>Soft shadow ray iterations.</td>
-<td><code>12</code></td>
-</tr>
-<tr class="odd">
-<td>shadow_hardness</td>
-<td>float</td>
-<td>Shadow edge sharpness.</td>
-<td><code>6.0</code></td>
-</tr>
-<tr class="even">
-<td>gamma</td>
-<td>float</td>
-<td>Gamma correction exponent applied to the final image.</td>
-<td><code>2.2</code></td>
-</tr>
-<tr class="odd">
-<td>fd_normals</td>
-<td>bool</td>
-<td>Use central finite differences for surface normals instead of <code>jax.grad</code>. Set to True when calling inside <code>jax.grad(loss_fn)</code> to avoid 2nd-order AD overhead.</td>
-<td><code>False</code></td>
-</tr>
-<tr class="even">
-<td>normal_eps</td>
-<td>float</td>
-<td>Step size for finite-difference normal estimation.</td>
-<td><code>0.0001</code></td>
-</tr>
-</tbody>
-</table>
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>jaxCAD’s image renderer is designed for predictable forward rendering. It uses early-exit sphere tracing, screen-space silhouette reconstruction, finite-difference normals, Cook–Torrance GGX materials, soft shadows, and optional reflection and refraction rays.</p>
+<p>Geometry and constraints remain JAX-native and differentiable. Rendered pixels are intentionally not an inverse-rendering or optimization API.</p>
+<section id="scene-and-quality-settings" class="level2">
+<h2 class="anchored" data-anchor-id="scene-and-quality-settings">Scene and quality settings</h2>
+<p>Use <code>Scene</code> for camera, lights, and environment data and <code>RenderSettings</code> for the performance/fidelity trade-off:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> dataclasses <span class="im">import</span> replace</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> jaxcad.render <span class="im">import</span> Camera, RenderSettings, Scene, render_scene</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> jaxcad.sdf.primitives <span class="im">import</span> Sphere</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>scene <span class="op">=</span> Scene(</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>    Sphere(<span class="fl">1.0</span>),</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>    camera<span class="op">=</span>Camera(position<span class="op">=</span>(<span class="dv">0</span>, <span class="fl">1.5</span>, <span class="dv">5</span>), target<span class="op">=</span>(<span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">0</span>)),</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>preview <span class="op">=</span> render_scene(scene, RenderSettings.draft((<span class="dv">240</span>, <span class="dv">320</span>)))</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>final <span class="op">=</span> render_scene(scene, RenderSettings.high_quality((<span class="dv">480</span>, <span class="dv">640</span>)))</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="co"># Presets are immutable; override only what a scene needs.</span></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>mirror <span class="op">=</span> replace(RenderSettings.balanced(), reflect_steps<span class="op">=</span><span class="dv">64</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The low-level <code>raymarch(sdf, ...)</code> function remains available for compact notebook calls.</p>
+<p>Each primary trace retains its closest approach to the scene. Rays that narrowly miss a surface receive screen-space coverage across <code>RenderSettings.silhouette_smoothing</code> pixels, which removes hard hit/miss outlines without restoring differentiable visibility or fixed-step tracing. Set the value to <code>0</code> when exact binary coverage is required.</p>
 </section>
-<section id="returns" class="level2 doc-section doc-section-returns">
-<h2 class="doc-section doc-section-returns anchored" data-anchor-id="returns">Returns</h2>
-<table class="caption-top table">
-<colgroup>
-<col style="width: 10%">
-<col style="width: 12%">
-<col style="width: 77%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>Name</th>
-<th>Type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td></td>
-<td>Callable</td>
-<td><code>(free_params, resolution=(H, W)) -&gt; JAX image (H, W, 3)</code></td>
-</tr>
-</tbody>
-</table>
-
-
+<section id="rendering-modes" class="level2">
+<h2 class="anchored" data-anchor-id="rendering-modes">Rendering modes</h2>
+<p>All panels below are produced by the forward renderer. Soft shadows stop as soon as they find an occluder, and reflection and refraction rays are enabled only when requested.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="assets/rendering-modes.png" class="img-fluid figure-img"></p>
+<figcaption>Direct lighting, soft shadows, metal reflections, and glass refraction</figcaption>
+</figure>
+</div>
 </section>
+<section id="quality-presets" class="level2">
+<h2 class="anchored" data-anchor-id="quality-presets">Quality presets</h2>
+<ul>
+<li><code>draft</code>: shorter trace budgets, direct lighting, no secondary visibility, and one sample per pixel.</li>
+<li><code>balanced</code>: more trace and shadow steps with reconstructed silhouettes and 2×2 SSAA.</li>
+<li><code>high_quality</code>: tighter surface precision, more visibility samples, and 3×3 SSAA.</li>
+</ul>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="assets/rendering-quality.png" class="img-fluid figure-img"></p>
+<figcaption>Draft, balanced, and high-quality forward renders</figcaption>
+</figure>
+</div>
+<p>The presets are starting points rather than hidden modes. Every field is public, validated, and can be changed with <code>dataclasses.replace</code>.</p>
+
+
 </section>
 
 </main> <!-- /main -->

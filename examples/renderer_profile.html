@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>Renderer Profiling – jaxCAD</title>
+<title>Forward renderer profile – jaxCAD</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -131,6 +131,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span class="menu-text">Get Started</span></a>
   </li>  
   <li class="nav-item">
+    <a class="nav-link" href="../docs/rendering.html"> 
+<span class="menu-text">Rendering</span></a>
+  </li>  
+  <li class="nav-item">
     <a class="nav-link" href="../docs/viewer.html"> 
 <span class="menu-text">WebGPU Viewer</span></a>
   </li>  
@@ -192,18 +196,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#image-resolution" id="toc-image-resolution" class="nav-link active" data-scroll-target="#image-resolution">1. Image Resolution</a></li>
-  <li><a href="#ray-march-steps-max_steps" id="toc-ray-march-steps-max_steps" class="nav-link" data-scroll-target="#ray-march-steps-max_steps">2. Ray-march Steps (<code>max_steps</code>)</a></li>
-  <li><a href="#shadow-steps-shadow_steps" id="toc-shadow-steps-shadow_steps" class="nav-link" data-scroll-target="#shadow-steps-shadow_steps">3. Shadow Steps (<code>shadow_steps</code>)</a></li>
-  <li><a href="#scene-complexity-number-of-primitives" id="toc-scene-complexity-number-of-primitives" class="nav-link" data-scroll-target="#scene-complexity-number-of-primitives">4. Scene Complexity (number of primitives)</a></li>
-  <li><a href="#summary" id="toc-summary" class="nav-link" data-scroll-target="#summary">Summary</a></li>
-  <li><a href="#fd_normals-finite-difference-vs-analytic-normals" id="toc-fd_normals-finite-difference-vs-analytic-normals" class="nav-link" data-scroll-target="#fd_normals-finite-difference-vs-analytic-normals">5. <code>fd_normals</code> — Finite-difference vs Analytic Normals</a>
-  <ul class="collapse">
-  <li><a href="#a.-basic-comparison" id="toc-a.-basic-comparison" class="nav-link" data-scroll-target="#a.-basic-comparison">5a. Basic comparison</a></li>
-  <li><a href="#b.-speedup-vs-max_steps-and-n_primitives" id="toc-b.-speedup-vs-max_steps-and-n_primitives" class="nav-link" data-scroll-target="#b.-speedup-vs-max_steps-and-n_primitives">5b. Speedup vs <code>max_steps</code> and <code>n_primitives</code></a></li>
-  <li><a href="#c.-visual-quality" id="toc-c.-visual-quality" class="nav-link" data-scroll-target="#c.-visual-quality">5c. Visual quality</a></li>
-  </ul></li>
-  <li><a href="#perfetto-trace" id="toc-perfetto-trace" class="nav-link" data-scroll-target="#perfetto-trace">6. Perfetto Trace</a></li>
+  <li><a href="#early-termination" id="toc-early-termination" class="nav-link active" data-scroll-target="#early-termination">Early termination</a></li>
+  <li><a href="#compile-once-render-repeatedly" id="toc-compile-once-render-repeatedly" class="nav-link" data-scroll-target="#compile-once-render-repeatedly">Compile once, render repeatedly</a></li>
+  <li><a href="#preset-cost-and-output" id="toc-preset-cost-and-output" class="nav-link" data-scroll-target="#preset-cost-and-output">Preset cost and output</a></li>
   </ul>
 </nav>
     </div>
@@ -212,7 +207,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
-<h1 class="title">Renderer Profiling</h1>
+<h1 class="title">Forward renderer profile</h1>
 </div>
 
 
@@ -229,624 +224,101 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </header>
 
 
-<p>Sweeps key rendering parameters and measures wall-clock time per frame. Each measurement warms up the JIT cache, then averages over several runs. Both <strong>forward</strong> (render) and <strong>backward</strong> (gradient) passes are timed.</p>
-<blockquote class="blockquote">
-<p>Note: <code>aa_samples</code> is a <code>raymarch</code>-only parameter and is not available in the differentiable <code>functionalize_render</code> path, so it is not profiled here.</p>
-</blockquote>
-<p>Sweeps covered: 1. <strong>Image resolution</strong> — pixels × pixels 2. <strong><code>max_steps</code></strong> — ray-march iterations 3. <strong><code>shadow_steps</code></strong> — shadow-ray iterations 4. <strong>Scene complexity</strong> — number of SDF primitives</p>
-<div id="imports" class="cell" data-execution_count="14">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> time</span>
+<p>This notebook measures the renderer users run in notebooks and documentation: early-exit sphere tracing, finite-difference normals, visibility sampling, and cached JIT programs. It deliberately does not benchmark image gradients because rendered pixels are no longer an optimization interface.</p>
+<div id="acae54e37e7d407bbb7b55eff062a284" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> time <span class="im">import</span> perf_counter</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> jax</span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> jax.numpy <span class="im">as</span> jnp</span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> jaxcad <span class="im">import</span> functionalize_render</span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> jaxcad.extraction <span class="im">import</span> extract_parameters</span>
-<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> jaxcad.geometry <span class="im">import</span> Scalar, Vector</span>
-<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> jaxcad.render <span class="im">import</span> Camera, Material, Scene</span>
-<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> jaxcad.sdf <span class="im">import</span> Box, Sphere, Translate, Union</span>
-<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"JAX devices: </span><span class="sc">{</span>jax<span class="sc">.</span>devices()<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>JAX devices: [CudaDevice(id=0)]</code></pre>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> jax.numpy <span class="im">as</span> jnp</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> jaxcad.render <span class="im">import</span> Camera, Material, RenderSettings, Scene, render_scene</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> jaxcad.render.raymarch <span class="im">import</span> _sphere_trace</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> jaxcad.sdf.boolean <span class="im">import</span> Union</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> jaxcad.sdf.primitives <span class="im">import</span> Plane, Sphere</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> jaxcad.sdf.transforms <span class="im">import</span> Translate</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
+<div id="9a63283cbaf04dbcab1f6479b197f3a8" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>geometry <span class="op">=</span> Union(</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    Translate(</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>        Sphere(<span class="fl">0.9</span>, material<span class="op">=</span>Material(color<span class="op">=</span>[<span class="fl">0.8</span>, <span class="fl">0.1</span>, <span class="fl">0.05</span>], roughness<span class="op">=</span><span class="fl">0.5</span>)), [<span class="op">-</span><span class="fl">1.0</span>, <span class="fl">0.0</span>, <span class="fl">0.0</span>]</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>    Translate(</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>        Sphere(<span class="fl">0.9</span>, material<span class="op">=</span>Material(color<span class="op">=</span>[<span class="fl">0.9</span>, <span class="fl">0.55</span>, <span class="fl">0.08</span>], roughness<span class="op">=</span><span class="fl">0.18</span>, metallic<span class="op">=</span><span class="fl">0.9</span>)),</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>        [<span class="fl">1.0</span>, <span class="fl">0.0</span>, <span class="fl">0.0</span>],</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>    Plane(<span class="op">-</span><span class="fl">0.9</span>, material<span class="op">=</span>Material(color<span class="op">=</span>[<span class="fl">0.2</span>, <span class="fl">0.23</span>, <span class="fl">0.28</span>], roughness<span class="op">=</span><span class="fl">0.8</span>)),</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>    smoothness<span class="op">=</span><span class="fl">0.0</span>,</span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>scene <span class="op">=</span> Scene(</span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>    geometry,</span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>    camera<span class="op">=</span>Camera(position<span class="op">=</span>(<span class="fl">4.5</span>, <span class="fl">2.8</span>, <span class="fl">7.0</span>), target<span class="op">=</span>(<span class="fl">0.0</span>, <span class="op">-</span><span class="fl">0.1</span>, <span class="fl">0.0</span>)),</span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>    light_directions<span class="op">=</span>((<span class="fl">0.6</span>, <span class="fl">1.0</span>, <span class="fl">0.4</span>), (<span class="op">-</span><span class="fl">0.5</span>, <span class="fl">0.4</span>, <span class="op">-</span><span class="fl">0.2</span>)),</span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>    light_colors<span class="op">=</span>((<span class="fl">1.0</span>, <span class="fl">0.9</span>, <span class="fl">0.75</span>), (<span class="fl">0.25</span>, <span class="fl">0.35</span>, <span class="fl">0.6</span>)),</span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
-<div id="scene" class="cell" data-execution_count="15">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># ── Reference scene ───────────────────────────────────────────────────────────</span></span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="co"># 8-primitive scene used as the baseline across all sweeps.</span></span>
+<section id="early-termination" class="level2">
+<h2 class="anchored" data-anchor-id="early-termination">Early termination</h2>
+<p>A direct sphere hit should consume only a small fraction of the available step budget. Misses also stop at <code>max_distance</code> rather than evaluating the SDF for every configured step.</p>
+<div id="72eea5119410473aa328ad9291626812" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> sphere_sdf(point):</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> jnp.linalg.norm(point) <span class="op">-</span> <span class="fl">1.0</span></span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> build_scene(n_primitives: <span class="bu">int</span> <span class="op">=</span> <span class="dv">8</span>) <span class="op">-&gt;</span> Scene:</span>
-<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Build a Union of n_primitives spheres/boxes arranged in a ring."""</span></span>
-<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>    <span class="im">import</span> math</span>
-<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>    mats <span class="op">=</span> [</span>
-<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>        Material(color<span class="op">=</span>[<span class="fl">0.8</span>, <span class="fl">0.2</span>, <span class="fl">0.2</span>], roughness<span class="op">=</span><span class="fl">0.4</span>),</span>
-<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>        Material(color<span class="op">=</span>[<span class="fl">0.2</span>, <span class="fl">0.6</span>, <span class="fl">0.9</span>], roughness<span class="op">=</span><span class="fl">0.3</span>),</span>
-<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>        Material(color<span class="op">=</span>[<span class="fl">0.2</span>, <span class="fl">0.8</span>, <span class="fl">0.3</span>], roughness<span class="op">=</span><span class="fl">0.6</span>),</span>
-<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>        Material(color<span class="op">=</span>[<span class="fl">0.9</span>, <span class="fl">0.7</span>, <span class="fl">0.1</span>], roughness<span class="op">=</span><span class="fl">0.2</span>),</span>
-<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>    ]</span>
-<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>    parts <span class="op">=</span> []</span>
-<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(n_primitives):</span>
-<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>        angle <span class="op">=</span> <span class="dv">2</span> <span class="op">*</span> math.pi <span class="op">*</span> i <span class="op">/</span> n_primitives</span>
-<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a>        r <span class="op">=</span> <span class="fl">1.4</span></span>
-<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a>        pos <span class="op">=</span> Vector([r <span class="op">*</span> math.cos(angle), <span class="fl">0.0</span>, r <span class="op">*</span> math.sin(angle)], free<span class="op">=</span><span class="va">False</span>)</span>
-<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a>        mat <span class="op">=</span> mats[i <span class="op">%</span> <span class="bu">len</span>(mats)]</span>
-<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> i <span class="op">%</span> <span class="dv">2</span> <span class="op">==</span> <span class="dv">0</span>:</span>
-<span id="cb3-23"><a href="#cb3-23" aria-hidden="true" tabindex="-1"></a>            parts.append(Translate(Sphere(radius<span class="op">=</span><span class="fl">0.55</span>, material<span class="op">=</span>mat), pos))</span>
-<span id="cb3-24"><a href="#cb3-24" aria-hidden="true" tabindex="-1"></a>        <span class="cf">else</span>:</span>
-<span id="cb3-25"><a href="#cb3-25" aria-hidden="true" tabindex="-1"></a>            parts.append(Translate(Box(size<span class="op">=</span>[<span class="fl">0.7</span>, <span class="fl">0.7</span>, <span class="fl">0.7</span>], material<span class="op">=</span>mat), pos))</span>
-<span id="cb3-26"><a href="#cb3-26" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-27"><a href="#cb3-27" aria-hidden="true" tabindex="-1"></a>    geometry <span class="op">=</span> Union(<span class="bu">tuple</span>(parts), smoothness<span class="op">=</span><span class="fl">0.1</span>)</span>
-<span id="cb3-28"><a href="#cb3-28" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-29"><a href="#cb3-29" aria-hidden="true" tabindex="-1"></a>    camera <span class="op">=</span> Camera(</span>
-<span id="cb3-30"><a href="#cb3-30" aria-hidden="true" tabindex="-1"></a>        camera_pos<span class="op">=</span>Vector([<span class="fl">0.0</span>, <span class="fl">3.5</span>, <span class="fl">6.0</span>], free<span class="op">=</span><span class="va">False</span>),</span>
-<span id="cb3-31"><a href="#cb3-31" aria-hidden="true" tabindex="-1"></a>        look_at<span class="op">=</span>Vector([<span class="fl">0.0</span>, <span class="fl">0.0</span>, <span class="fl">0.0</span>], free<span class="op">=</span><span class="va">False</span>),</span>
-<span id="cb3-32"><a href="#cb3-32" aria-hidden="true" tabindex="-1"></a>        fov<span class="op">=</span>Scalar(<span class="fl">0.55</span>, free<span class="op">=</span><span class="va">False</span>),</span>
-<span id="cb3-33"><a href="#cb3-33" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb3-34"><a href="#cb3-34" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> Scene(</span>
-<span id="cb3-35"><a href="#cb3-35" aria-hidden="true" tabindex="-1"></a>        geometry,</span>
-<span id="cb3-36"><a href="#cb3-36" aria-hidden="true" tabindex="-1"></a>        camera,</span>
-<span id="cb3-37"><a href="#cb3-37" aria-hidden="true" tabindex="-1"></a>        bg_color<span class="op">=</span>Vector([<span class="fl">0.08</span>, <span class="fl">0.10</span>, <span class="fl">0.18</span>], free<span class="op">=</span><span class="va">False</span>),</span>
-<span id="cb3-38"><a href="#cb3-38" aria-hidden="true" tabindex="-1"></a>        light_dirs<span class="op">=</span>[</span>
-<span id="cb3-39"><a href="#cb3-39" aria-hidden="true" tabindex="-1"></a>            Vector([<span class="fl">1.0</span>, <span class="fl">2.0</span>, <span class="fl">1.5</span>], free<span class="op">=</span><span class="va">False</span>),</span>
-<span id="cb3-40"><a href="#cb3-40" aria-hidden="true" tabindex="-1"></a>            Vector([<span class="op">-</span><span class="fl">1.0</span>, <span class="fl">0.5</span>, <span class="op">-</span><span class="fl">0.8</span>], free<span class="op">=</span><span class="va">False</span>),</span>
-<span id="cb3-41"><a href="#cb3-41" aria-hidden="true" tabindex="-1"></a>        ],</span>
-<span id="cb3-42"><a href="#cb3-42" aria-hidden="true" tabindex="-1"></a>        light_colors<span class="op">=</span>[</span>
-<span id="cb3-43"><a href="#cb3-43" aria-hidden="true" tabindex="-1"></a>            Vector([<span class="fl">1.0</span>, <span class="fl">0.92</span>, <span class="fl">0.75</span>], free<span class="op">=</span><span class="va">False</span>),</span>
-<span id="cb3-44"><a href="#cb3-44" aria-hidden="true" tabindex="-1"></a>            Vector([<span class="fl">0.25</span>, <span class="fl">0.35</span>, <span class="fl">0.65</span>], free<span class="op">=</span><span class="va">False</span>),</span>
-<span id="cb3-45"><a href="#cb3-45" aria-hidden="true" tabindex="-1"></a>        ],</span>
-<span id="cb3-46"><a href="#cb3-46" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb3-47"><a href="#cb3-47" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-48"><a href="#cb3-48" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-49"><a href="#cb3-49" aria-hidden="true" tabindex="-1"></a>REF_SCENE <span class="op">=</span> build_scene(<span class="dv">8</span>)</span>
-<span id="cb3-50"><a href="#cb3-50" aria-hidden="true" tabindex="-1"></a>REF_PARAMS, _, _ <span class="op">=</span> extract_parameters(REF_SCENE)</span>
-<span id="cb3-51"><a href="#cb3-51" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Reference scene: </span><span class="sc">{</span><span class="bu">len</span>(REF_PARAMS)<span class="sc">}</span><span class="ss"> free params"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>Reference scene: 0 free params</code></pre>
-</div>
-</div>
-<div id="bench_util" class="cell" data-execution_count="16">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># ── Timing utility ────────────────────────────────────────────────────────────</span></span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> bench(fn, warmup: <span class="bu">int</span> <span class="op">=</span> <span class="dv">1</span>, repeat: <span class="bu">int</span> <span class="op">=</span> <span class="dv">5</span>):</span>
-<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Time a zero-argument callable.</span></span>
-<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a><span class="co">    The first call is timed to capture JIT compile + first-run overhead.</span></span>
-<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a><span class="co">    Then `repeat` steady-state calls are measured.</span></span>
-<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a><span class="co">    Returns:</span></span>
-<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a><span class="co">        (mean_ms, std_ms, jit_ms)</span></span>
-<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a><span class="co">        mean_ms — average steady-state call time</span></span>
-<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a><span class="co">        std_ms  — standard deviation</span></span>
-<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a><span class="co">        jit_ms  — estimated JIT compile overhead (first_call − mean_steady)</span></span>
-<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
-<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Timed first call: XLA compilation + first execution</span></span>
-<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a>    t0 <span class="op">=</span> time.perf_counter()</span>
-<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>    jax.block_until_ready(fn())</span>
-<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a>    first_ms <span class="op">=</span> (time.perf_counter() <span class="op">-</span> t0) <span class="op">*</span> <span class="fl">1e3</span></span>
-<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Extra warmup passes (warmup=1 usually sufficient for JAX/XLA)</span></span>
-<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> _ <span class="kw">in</span> <span class="bu">range</span>(warmup <span class="op">-</span> <span class="dv">1</span>):</span>
-<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a>        jax.block_until_ready(fn())</span>
-<span id="cb5-24"><a href="#cb5-24" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-25"><a href="#cb5-25" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Steady-state timing</span></span>
-<span id="cb5-26"><a href="#cb5-26" aria-hidden="true" tabindex="-1"></a>    times <span class="op">=</span> []</span>
-<span id="cb5-27"><a href="#cb5-27" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> _ <span class="kw">in</span> <span class="bu">range</span>(repeat):</span>
-<span id="cb5-28"><a href="#cb5-28" aria-hidden="true" tabindex="-1"></a>        t0 <span class="op">=</span> time.perf_counter()</span>
-<span id="cb5-29"><a href="#cb5-29" aria-hidden="true" tabindex="-1"></a>        jax.block_until_ready(fn())</span>
-<span id="cb5-30"><a href="#cb5-30" aria-hidden="true" tabindex="-1"></a>        times.append((time.perf_counter() <span class="op">-</span> t0) <span class="op">*</span> <span class="fl">1e3</span>)</span>
-<span id="cb5-31"><a href="#cb5-31" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-32"><a href="#cb5-32" aria-hidden="true" tabindex="-1"></a>    mean_ms <span class="op">=</span> <span class="bu">float</span>(np.mean(times))</span>
-<span id="cb5-33"><a href="#cb5-33" aria-hidden="true" tabindex="-1"></a>    std_ms <span class="op">=</span> <span class="bu">float</span>(np.std(times))</span>
-<span id="cb5-34"><a href="#cb5-34" aria-hidden="true" tabindex="-1"></a>    jit_ms <span class="op">=</span> <span class="bu">max</span>(first_ms <span class="op">-</span> mean_ms, <span class="fl">0.0</span>)</span>
-<span id="cb5-35"><a href="#cb5-35" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> mean_ms, std_ms, jit_ms</span>
-<span id="cb5-36"><a href="#cb5-36" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-37"><a href="#cb5-37" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-38"><a href="#cb5-38" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> make_render_fns(scene, params, resolution, <span class="op">**</span>kwargs):</span>
-<span id="cb5-39"><a href="#cb5-39" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Compile and return (fwd_fn, grad_fn) ready for bench().</span></span>
-<span id="cb5-40"><a href="#cb5-40" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-41"><a href="#cb5-41" aria-hidden="true" tabindex="-1"></a><span class="co">    fwd_fn  — renders the scene: () → image</span></span>
-<span id="cb5-42"><a href="#cb5-42" aria-hidden="true" tabindex="-1"></a><span class="co">    grad_fn — computes value + gradients w.r.t. params: () → (loss, grads)</span></span>
-<span id="cb5-43"><a href="#cb5-43" aria-hidden="true" tabindex="-1"></a><span class="co">              loss = mean pixel value (proxy scalar for profiling)</span></span>
-<span id="cb5-44"><a href="#cb5-44" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
-<span id="cb5-45"><a href="#cb5-45" aria-hidden="true" tabindex="-1"></a>    render <span class="op">=</span> functionalize_render(scene, <span class="op">**</span>kwargs)</span>
-<span id="cb5-46"><a href="#cb5-46" aria-hidden="true" tabindex="-1"></a>    fwd <span class="op">=</span> jax.jit(<span class="kw">lambda</span>: render(params, resolution<span class="op">=</span>resolution))</span>
-<span id="cb5-47"><a href="#cb5-47" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-48"><a href="#cb5-48" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> loss_fn(p):</span>
-<span id="cb5-49"><a href="#cb5-49" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> jnp.mean(render(p, resolution<span class="op">=</span>resolution))</span>
-<span id="cb5-50"><a href="#cb5-50" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-51"><a href="#cb5-51" aria-hidden="true" tabindex="-1"></a>    grad <span class="op">=</span> jax.jit(<span class="kw">lambda</span>: jax.value_and_grad(loss_fn)(params))</span>
-<span id="cb5-52"><a href="#cb5-52" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> fwd, grad</span>
-<span id="cb5-53"><a href="#cb5-53" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-54"><a href="#cb5-54" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-55"><a href="#cb5-55" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> grouped_bar_chart(</span>
-<span id="cb5-56"><a href="#cb5-56" aria-hidden="true" tabindex="-1"></a>    ax, labels, fwd_means, fwd_stds, grad_means, grad_stds, xlabel, ylabel<span class="op">=</span><span class="st">"ms / call"</span>, title<span class="op">=</span><span class="st">""</span></span>
-<span id="cb5-57"><a href="#cb5-57" aria-hidden="true" tabindex="-1"></a>):</span>
-<span id="cb5-58"><a href="#cb5-58" aria-hidden="true" tabindex="-1"></a>    xs <span class="op">=</span> np.arange(<span class="bu">len</span>(labels))</span>
-<span id="cb5-59"><a href="#cb5-59" aria-hidden="true" tabindex="-1"></a>    w <span class="op">=</span> <span class="fl">0.38</span></span>
-<span id="cb5-60"><a href="#cb5-60" aria-hidden="true" tabindex="-1"></a>    ax.bar(</span>
-<span id="cb5-61"><a href="#cb5-61" aria-hidden="true" tabindex="-1"></a>        xs <span class="op">-</span> w <span class="op">/</span> <span class="dv">2</span>,</span>
-<span id="cb5-62"><a href="#cb5-62" aria-hidden="true" tabindex="-1"></a>        fwd_means,</span>
-<span id="cb5-63"><a href="#cb5-63" aria-hidden="true" tabindex="-1"></a>        yerr<span class="op">=</span>fwd_stds,</span>
-<span id="cb5-64"><a href="#cb5-64" aria-hidden="true" tabindex="-1"></a>        width<span class="op">=</span>w,</span>
-<span id="cb5-65"><a href="#cb5-65" aria-hidden="true" tabindex="-1"></a>        capsize<span class="op">=</span><span class="dv">3</span>,</span>
-<span id="cb5-66"><a href="#cb5-66" aria-hidden="true" tabindex="-1"></a>        color<span class="op">=</span><span class="st">"steelblue"</span>,</span>
-<span id="cb5-67"><a href="#cb5-67" aria-hidden="true" tabindex="-1"></a>        alpha<span class="op">=</span><span class="fl">0.85</span>,</span>
-<span id="cb5-68"><a href="#cb5-68" aria-hidden="true" tabindex="-1"></a>        label<span class="op">=</span><span class="st">"forward"</span>,</span>
-<span id="cb5-69"><a href="#cb5-69" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb5-70"><a href="#cb5-70" aria-hidden="true" tabindex="-1"></a>    ax.bar(</span>
-<span id="cb5-71"><a href="#cb5-71" aria-hidden="true" tabindex="-1"></a>        xs <span class="op">+</span> w <span class="op">/</span> <span class="dv">2</span>,</span>
-<span id="cb5-72"><a href="#cb5-72" aria-hidden="true" tabindex="-1"></a>        grad_means,</span>
-<span id="cb5-73"><a href="#cb5-73" aria-hidden="true" tabindex="-1"></a>        yerr<span class="op">=</span>grad_stds,</span>
-<span id="cb5-74"><a href="#cb5-74" aria-hidden="true" tabindex="-1"></a>        width<span class="op">=</span>w,</span>
-<span id="cb5-75"><a href="#cb5-75" aria-hidden="true" tabindex="-1"></a>        capsize<span class="op">=</span><span class="dv">3</span>,</span>
-<span id="cb5-76"><a href="#cb5-76" aria-hidden="true" tabindex="-1"></a>        color<span class="op">=</span><span class="st">"tomato"</span>,</span>
-<span id="cb5-77"><a href="#cb5-77" aria-hidden="true" tabindex="-1"></a>        alpha<span class="op">=</span><span class="fl">0.85</span>,</span>
-<span id="cb5-78"><a href="#cb5-78" aria-hidden="true" tabindex="-1"></a>        label<span class="op">=</span><span class="st">"grad"</span>,</span>
-<span id="cb5-79"><a href="#cb5-79" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb5-80"><a href="#cb5-80" aria-hidden="true" tabindex="-1"></a>    ax.set_xticks(xs)</span>
-<span id="cb5-81"><a href="#cb5-81" aria-hidden="true" tabindex="-1"></a>    ax.set_xticklabels(labels, fontsize<span class="op">=</span><span class="dv">9</span>)</span>
-<span id="cb5-82"><a href="#cb5-82" aria-hidden="true" tabindex="-1"></a>    ax.set_xlabel(xlabel)</span>
-<span id="cb5-83"><a href="#cb5-83" aria-hidden="true" tabindex="-1"></a>    ax.set_ylabel(ylabel)</span>
-<span id="cb5-84"><a href="#cb5-84" aria-hidden="true" tabindex="-1"></a>    ax.set_title(title)</span>
-<span id="cb5-85"><a href="#cb5-85" aria-hidden="true" tabindex="-1"></a>    ax.legend(fontsize<span class="op">=</span><span class="dv">8</span>)</span>
-<span id="cb5-86"><a href="#cb5-86" aria-hidden="true" tabindex="-1"></a>    ax.grid(axis<span class="op">=</span><span class="st">"y"</span>, alpha<span class="op">=</span><span class="fl">0.35</span>)</span>
-<span id="cb5-87"><a href="#cb5-87" aria-hidden="true" tabindex="-1"></a>    top <span class="op">=</span> <span class="bu">max</span>(<span class="bu">max</span>(fwd_means), <span class="bu">max</span>(grad_means))</span>
-<span id="cb5-88"><a href="#cb5-88" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> x, m <span class="kw">in</span> <span class="bu">zip</span>(xs <span class="op">-</span> w <span class="op">/</span> <span class="dv">2</span>, fwd_means):</span>
-<span id="cb5-89"><a href="#cb5-89" aria-hidden="true" tabindex="-1"></a>        ax.text(x, m <span class="op">+</span> top <span class="op">*</span> <span class="fl">0.01</span>, <span class="ss">f"</span><span class="sc">{</span>m<span class="sc">:.1f}</span><span class="ss">"</span>, ha<span class="op">=</span><span class="st">"center"</span>, fontsize<span class="op">=</span><span class="dv">7</span>, color<span class="op">=</span><span class="st">"steelblue"</span>)</span>
-<span id="cb5-90"><a href="#cb5-90" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> x, m <span class="kw">in</span> <span class="bu">zip</span>(xs <span class="op">+</span> w <span class="op">/</span> <span class="dv">2</span>, grad_means):</span>
-<span id="cb5-91"><a href="#cb5-91" aria-hidden="true" tabindex="-1"></a>        ax.text(x, m <span class="op">+</span> top <span class="op">*</span> <span class="fl">0.01</span>, <span class="ss">f"</span><span class="sc">{</span>m<span class="sc">:.1f}</span><span class="ss">"</span>, ha<span class="op">=</span><span class="st">"center"</span>, fontsize<span class="op">=</span><span class="dv">7</span>, color<span class="op">=</span><span class="st">"tomato"</span>)</span>
-<span id="cb5-92"><a href="#cb5-92" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-93"><a href="#cb5-93" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-94"><a href="#cb5-94" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> jit_bar_chart(ax, labels, fwd_jit, grad_jit, xlabel, title<span class="op">=</span><span class="st">"JIT compile time"</span>):</span>
-<span id="cb5-95"><a href="#cb5-95" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Bar chart of estimated JIT compile overhead (first_call − steady_state)."""</span></span>
-<span id="cb5-96"><a href="#cb5-96" aria-hidden="true" tabindex="-1"></a>    xs <span class="op">=</span> np.arange(<span class="bu">len</span>(labels))</span>
-<span id="cb5-97"><a href="#cb5-97" aria-hidden="true" tabindex="-1"></a>    w <span class="op">=</span> <span class="fl">0.38</span></span>
-<span id="cb5-98"><a href="#cb5-98" aria-hidden="true" tabindex="-1"></a>    ax.bar(xs <span class="op">-</span> w <span class="op">/</span> <span class="dv">2</span>, fwd_jit, width<span class="op">=</span>w, color<span class="op">=</span><span class="st">"steelblue"</span>, alpha<span class="op">=</span><span class="fl">0.55</span>, label<span class="op">=</span><span class="st">"fwd JIT"</span>)</span>
-<span id="cb5-99"><a href="#cb5-99" aria-hidden="true" tabindex="-1"></a>    ax.bar(xs <span class="op">+</span> w <span class="op">/</span> <span class="dv">2</span>, grad_jit, width<span class="op">=</span>w, color<span class="op">=</span><span class="st">"tomato"</span>, alpha<span class="op">=</span><span class="fl">0.55</span>, label<span class="op">=</span><span class="st">"grad JIT"</span>)</span>
-<span id="cb5-100"><a href="#cb5-100" aria-hidden="true" tabindex="-1"></a>    ax.set_xticks(xs)</span>
-<span id="cb5-101"><a href="#cb5-101" aria-hidden="true" tabindex="-1"></a>    ax.set_xticklabels(labels, fontsize<span class="op">=</span><span class="dv">9</span>)</span>
-<span id="cb5-102"><a href="#cb5-102" aria-hidden="true" tabindex="-1"></a>    ax.set_xlabel(xlabel)</span>
-<span id="cb5-103"><a href="#cb5-103" aria-hidden="true" tabindex="-1"></a>    ax.set_ylabel(<span class="st">"ms"</span>)</span>
-<span id="cb5-104"><a href="#cb5-104" aria-hidden="true" tabindex="-1"></a>    ax.set_title(title)</span>
-<span id="cb5-105"><a href="#cb5-105" aria-hidden="true" tabindex="-1"></a>    ax.legend(fontsize<span class="op">=</span><span class="dv">8</span>)</span>
-<span id="cb5-106"><a href="#cb5-106" aria-hidden="true" tabindex="-1"></a>    ax.grid(axis<span class="op">=</span><span class="st">"y"</span>, alpha<span class="op">=</span><span class="fl">0.35</span>)</span>
-<span id="cb5-107"><a href="#cb5-107" aria-hidden="true" tabindex="-1"></a>    top <span class="op">=</span> <span class="bu">max</span>(<span class="bu">max</span>(fwd_jit, default<span class="op">=</span><span class="dv">0</span>), <span class="bu">max</span>(grad_jit, default<span class="op">=</span><span class="dv">0</span>), <span class="dv">1</span>)</span>
-<span id="cb5-108"><a href="#cb5-108" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> x, m <span class="kw">in</span> <span class="bu">zip</span>(xs <span class="op">-</span> w <span class="op">/</span> <span class="dv">2</span>, fwd_jit):</span>
-<span id="cb5-109"><a href="#cb5-109" aria-hidden="true" tabindex="-1"></a>        ax.text(x, m <span class="op">+</span> top <span class="op">*</span> <span class="fl">0.01</span>, <span class="ss">f"</span><span class="sc">{</span>m<span class="sc">:.0f}</span><span class="ss">"</span>, ha<span class="op">=</span><span class="st">"center"</span>, fontsize<span class="op">=</span><span class="dv">7</span>, color<span class="op">=</span><span class="st">"steelblue"</span>)</span>
-<span id="cb5-110"><a href="#cb5-110" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> x, m <span class="kw">in</span> <span class="bu">zip</span>(xs <span class="op">+</span> w <span class="op">/</span> <span class="dv">2</span>, grad_jit):</span>
-<span id="cb5-111"><a href="#cb5-111" aria-hidden="true" tabindex="-1"></a>        ax.text(x, m <span class="op">+</span> top <span class="op">*</span> <span class="fl">0.01</span>, <span class="ss">f"</span><span class="sc">{</span>m<span class="sc">:.0f}</span><span class="ss">"</span>, ha<span class="op">=</span><span class="st">"center"</span>, fontsize<span class="op">=</span><span class="dv">7</span>, color<span class="op">=</span><span class="st">"tomato"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-</div>
-<section id="image-resolution" class="level2">
-<h2 class="anchored" data-anchor-id="image-resolution">1. Image Resolution</h2>
-<p>Resolution doubles each step: 32 → 64 → 128 → 256 → 512.<br>
-Each new resolution triggers a JIT retrace (output shape changes), so warmup is per-resolution.</p>
-<div id="sweep_resolution" class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>RESOLUTIONS <span class="op">=</span> [<span class="dv">32</span>, <span class="dv">64</span>, <span class="dv">128</span>, <span class="dv">256</span>, <span class="dv">512</span>]RENDER_KWARGS <span class="op">=</span> {<span class="st">"max_steps"</span>: <span class="dv">32</span>, <span class="st">"shadow_steps"</span>: <span class="dv">12</span>, <span class="st">"shadow_hardness"</span>: <span class="fl">6.0</span>, <span class="st">"gamma"</span>: <span class="fl">2.2</span>}res_fwd_means, res_fwd_stds, res_fwd_jit <span class="op">=</span> [], [], []res_grad_means, res_grad_stds, res_grad_jit <span class="op">=</span> [], [], []<span class="cf">for</span> px <span class="kw">in</span> RESOLUTIONS:    fwd, grad <span class="op">=</span> make_render_fns(REF_SCENE, REF_PARAMS, (px, px), <span class="op">**</span>RENDER_KWARGS)    mf, sf, jf <span class="op">=</span> bench(fwd)    mg, sg, jg <span class="op">=</span> bench(grad)    res_fwd_means.append(mf)    res_fwd_stds.append(sf)    res_fwd_jit.append(jf)    res_grad_means.append(mg)    res_grad_stds.append(sg)    res_grad_jit.append(jg)    <span class="bu">print</span>(        <span class="ss">f"  </span><span class="sc">{</span>px<span class="sc">:4d}</span><span class="ss">×</span><span class="sc">{</span>px<span class="sc">:&lt;4d}</span><span class="ss">  fwd=</span><span class="sc">{</span>mf<span class="sc">:7.1f}</span><span class="ss">±</span><span class="sc">{</span>sf<span class="sc">:.1f}</span><span class="ss"> ms (JIT </span><span class="sc">{</span>jf<span class="sc">:.0f}</span><span class="ss">)   grad=</span><span class="sc">{</span>mg<span class="sc">:7.1f}</span><span class="ss">±</span><span class="sc">{</span>sg<span class="sc">:.1f}</span><span class="ss"> ms (JIT </span><span class="sc">{</span>jg<span class="sc">:.0f}</span><span class="ss">)"</span>    )fig, axes <span class="op">=</span> plt.subplots(<span class="dv">1</span>, <span class="dv">3</span>, figsize<span class="op">=</span>(<span class="dv">20</span>, <span class="dv">4</span>))grouped_bar_chart(    axes[<span class="dv">0</span>],    [<span class="ss">f"</span><span class="sc">{</span>p<span class="sc">}</span><span class="ss">×</span><span class="sc">{</span>p<span class="sc">}</span><span class="ss">"</span> <span class="cf">for</span> p <span class="kw">in</span> RESOLUTIONS],    res_fwd_means,    res_fwd_stds,    res_grad_means,    res_grad_stds,    xlabel<span class="op">=</span><span class="st">"Resolution"</span>,    title<span class="op">=</span><span class="st">"Render time vs resolution"</span>,)axes[<span class="dv">1</span>].errorbar(    RESOLUTIONS,    res_fwd_means,    yerr<span class="op">=</span>res_fwd_stds,    fmt<span class="op">=</span><span class="st">"o-"</span>,    capsize<span class="op">=</span><span class="dv">4</span>,    color<span class="op">=</span><span class="st">"steelblue"</span>,    label<span class="op">=</span><span class="st">"forward"</span>,)axes[<span class="dv">1</span>].errorbar(    RESOLUTIONS,    res_grad_means,    yerr<span class="op">=</span>res_grad_stds,    fmt<span class="op">=</span><span class="st">"s-"</span>,    capsize<span class="op">=</span><span class="dv">4</span>,    color<span class="op">=</span><span class="st">"tomato"</span>,    label<span class="op">=</span><span class="st">"grad"</span>,)ref <span class="op">=</span> res_fwd_means[<span class="dv">0</span>] <span class="op">*</span> (np.array(RESOLUTIONS) <span class="op">/</span> RESOLUTIONS[<span class="dv">0</span>]) <span class="op">**</span> <span class="dv">2</span><span class="er">axes</span>[<span class="dv">1</span>].plot(RESOLUTIONS, ref, <span class="st">"k--"</span>, alpha<span class="op">=</span><span class="fl">0.4</span>, label<span class="op">=</span><span class="st">"O(N²)"</span>)axes[<span class="dv">1</span>].set_xscale(<span class="st">"log"</span>, base<span class="op">=</span><span class="dv">2</span>)axes[<span class="dv">1</span>].set_yscale(<span class="st">"log"</span>)axes[<span class="dv">1</span>].set_xlabel(<span class="st">"Resolution (px)"</span>)axes[<span class="dv">1</span>].set_ylabel(<span class="st">"ms / call"</span>)axes[<span class="dv">1</span>].set_title(<span class="st">"Log-log scaling"</span>)axes[<span class="dv">1</span>].legend()axes[<span class="dv">1</span>].grid(<span class="va">True</span>, alpha<span class="op">=</span><span class="fl">0.35</span>)jit_bar_chart(    axes[<span class="dv">2</span>],    [<span class="ss">f"</span><span class="sc">{</span>p<span class="sc">}</span><span class="ss">×</span><span class="sc">{</span>p<span class="sc">}</span><span class="ss">"</span> <span class="cf">for</span> p <span class="kw">in</span> RESOLUTIONS],    res_fwd_jit,    res_grad_jit,    xlabel<span class="op">=</span><span class="st">"Resolution"</span>,    title<span class="op">=</span><span class="st">"JIT compile time vs resolution"</span>,)plt.tight_layout()plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>hit <span class="op">=</span> _sphere_trace(</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>    sphere_sdf, jnp.array([<span class="fl">0.0</span>, <span class="fl">0.0</span>, <span class="fl">5.0</span>]), jnp.array([<span class="fl">0.0</span>, <span class="fl">0.0</span>, <span class="op">-</span><span class="fl">1.0</span>]), max_steps<span class="op">=</span><span class="dv">96</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>miss <span class="op">=</span> _sphere_trace(</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>    sphere_sdf, jnp.array([<span class="fl">0.0</span>, <span class="fl">5.0</span>, <span class="fl">0.0</span>]), jnp.array([<span class="fl">0.0</span>, <span class="fl">0.0</span>, <span class="fl">1.0</span>]), max_steps<span class="op">=</span><span class="dv">96</span></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"hit: distance=</span><span class="sc">{</span><span class="bu">float</span>(hit.distance)<span class="sc">:.3f}</span><span class="ss">, steps=</span><span class="sc">{</span><span class="bu">int</span>(hit.steps)<span class="sc">}</span><span class="ss">, hit=</span><span class="sc">{</span><span class="bu">bool</span>(hit.hit)<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"miss: distance=</span><span class="sc">{</span><span class="bu">float</span>(miss.distance)<span class="sc">:.3f}</span><span class="ss">, steps=</span><span class="sc">{</span><span class="bu">int</span>(miss.steps)<span class="sc">}</span><span class="ss">, hit=</span><span class="sc">{</span><span class="bu">bool</span>(miss.hit)<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </section>
-<section id="ray-march-steps-max_steps" class="level2">
-<h2 class="anchored" data-anchor-id="ray-march-steps-max_steps">2. Ray-march Steps (<code>max_steps</code>)</h2>
-<p>Each extra step is one SDF evaluation per pixel. Expect roughly linear scaling.</p>
-<div id="sweep_max_steps" class="cell" data-execution_count="5">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>MAX_STEPS_VALS <span class="op">=</span> [<span class="dv">4</span>, <span class="dv">8</span>, <span class="dv">16</span>, <span class="dv">32</span>, <span class="dv">64</span>, <span class="dv">128</span>]</span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>REF_RES <span class="op">=</span> (<span class="dv">128</span>, <span class="dv">128</span>)</span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>ms_fwd_means, ms_fwd_stds, ms_fwd_jit <span class="op">=</span> [], [], []</span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>ms_grad_means, ms_grad_stds, ms_grad_jit <span class="op">=</span> [], [], []</span>
-<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> steps <span class="kw">in</span> MAX_STEPS_VALS:</span>
-<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>    fwd, grad <span class="op">=</span> make_render_fns(</span>
-<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>        REF_SCENE,</span>
-<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>        REF_PARAMS,</span>
-<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>        REF_RES,</span>
-<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>        max_steps<span class="op">=</span>steps,</span>
-<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a>        shadow_steps<span class="op">=</span><span class="dv">12</span>,</span>
-<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a>        shadow_hardness<span class="op">=</span><span class="fl">6.0</span>,</span>
-<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a>        gamma<span class="op">=</span><span class="fl">2.2</span>,</span>
-<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a>    mf, sf, jf <span class="op">=</span> bench(fwd)</span>
-<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a>    mg, sg, jg <span class="op">=</span> bench(grad)</span>
-<span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a>    ms_fwd_means.append(mf)</span>
-<span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a>    ms_fwd_stds.append(sf)</span>
-<span id="cb7-21"><a href="#cb7-21" aria-hidden="true" tabindex="-1"></a>    ms_fwd_jit.append(jf)</span>
-<span id="cb7-22"><a href="#cb7-22" aria-hidden="true" tabindex="-1"></a>    ms_grad_means.append(mg)</span>
-<span id="cb7-23"><a href="#cb7-23" aria-hidden="true" tabindex="-1"></a>    ms_grad_stds.append(sg)</span>
-<span id="cb7-24"><a href="#cb7-24" aria-hidden="true" tabindex="-1"></a>    ms_grad_jit.append(jg)</span>
-<span id="cb7-25"><a href="#cb7-25" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(</span>
-<span id="cb7-26"><a href="#cb7-26" aria-hidden="true" tabindex="-1"></a>        <span class="ss">f"  max_steps=</span><span class="sc">{</span>steps<span class="sc">:4d}</span><span class="ss">  fwd=</span><span class="sc">{</span>mf<span class="sc">:7.1f}</span><span class="ss">±</span><span class="sc">{</span>sf<span class="sc">:.1f}</span><span class="ss"> ms (JIT </span><span class="sc">{</span>jf<span class="sc">:.0f}</span><span class="ss">)   grad=</span><span class="sc">{</span>mg<span class="sc">:7.1f}</span><span class="ss">±</span><span class="sc">{</span>sg<span class="sc">:.1f}</span><span class="ss"> ms (JIT </span><span class="sc">{</span>jg<span class="sc">:.0f}</span><span class="ss">)"</span></span>
-<span id="cb7-27"><a href="#cb7-27" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb7-28"><a href="#cb7-28" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-29"><a href="#cb7-29" aria-hidden="true" tabindex="-1"></a>fig, axes <span class="op">=</span> plt.subplots(<span class="dv">1</span>, <span class="dv">2</span>, figsize<span class="op">=</span>(<span class="dv">14</span>, <span class="dv">4</span>))</span>
-<span id="cb7-30"><a href="#cb7-30" aria-hidden="true" tabindex="-1"></a>grouped_bar_chart(</span>
-<span id="cb7-31"><a href="#cb7-31" aria-hidden="true" tabindex="-1"></a>    axes[<span class="dv">0</span>],</span>
-<span id="cb7-32"><a href="#cb7-32" aria-hidden="true" tabindex="-1"></a>    [<span class="bu">str</span>(s) <span class="cf">for</span> s <span class="kw">in</span> MAX_STEPS_VALS],</span>
-<span id="cb7-33"><a href="#cb7-33" aria-hidden="true" tabindex="-1"></a>    ms_fwd_means,</span>
-<span id="cb7-34"><a href="#cb7-34" aria-hidden="true" tabindex="-1"></a>    ms_fwd_stds,</span>
-<span id="cb7-35"><a href="#cb7-35" aria-hidden="true" tabindex="-1"></a>    ms_grad_means,</span>
-<span id="cb7-36"><a href="#cb7-36" aria-hidden="true" tabindex="-1"></a>    ms_grad_stds,</span>
-<span id="cb7-37"><a href="#cb7-37" aria-hidden="true" tabindex="-1"></a>    xlabel<span class="op">=</span><span class="st">"max_steps"</span>,</span>
-<span id="cb7-38"><a href="#cb7-38" aria-hidden="true" tabindex="-1"></a>    title<span class="op">=</span><span class="ss">f"Render time vs max_steps  (</span><span class="sc">{</span>REF_RES[<span class="dv">0</span>]<span class="sc">}</span><span class="ss">×</span><span class="sc">{</span>REF_RES[<span class="dv">1</span>]<span class="sc">}</span><span class="ss">)"</span>,</span>
-<span id="cb7-39"><a href="#cb7-39" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb7-40"><a href="#cb7-40" aria-hidden="true" tabindex="-1"></a>jit_bar_chart(</span>
-<span id="cb7-41"><a href="#cb7-41" aria-hidden="true" tabindex="-1"></a>    axes[<span class="dv">1</span>],</span>
-<span id="cb7-42"><a href="#cb7-42" aria-hidden="true" tabindex="-1"></a>    [<span class="bu">str</span>(s) <span class="cf">for</span> s <span class="kw">in</span> MAX_STEPS_VALS],</span>
-<span id="cb7-43"><a href="#cb7-43" aria-hidden="true" tabindex="-1"></a>    ms_fwd_jit,</span>
-<span id="cb7-44"><a href="#cb7-44" aria-hidden="true" tabindex="-1"></a>    ms_grad_jit,</span>
-<span id="cb7-45"><a href="#cb7-45" aria-hidden="true" tabindex="-1"></a>    xlabel<span class="op">=</span><span class="st">"max_steps"</span>,</span>
-<span id="cb7-46"><a href="#cb7-46" aria-hidden="true" tabindex="-1"></a>    title<span class="op">=</span><span class="ss">f"JIT compile time vs max_steps  (</span><span class="sc">{</span>REF_RES[<span class="dv">0</span>]<span class="sc">}</span><span class="ss">×</span><span class="sc">{</span>REF_RES[<span class="dv">1</span>]<span class="sc">}</span><span class="ss">)"</span>,</span>
-<span id="cb7-47"><a href="#cb7-47" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb7-48"><a href="#cb7-48" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
-<span id="cb7-49"><a href="#cb7-49" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>  max_steps=   4  fwd=    4.2±0.6 ms (JIT 3492)   grad=    3.8±0.2 ms (JIT 3643)
-  max_steps=   8  fwd=    3.2±0.4 ms (JIT 3525)   grad=    4.1±0.8 ms (JIT 3902)
-  max_steps=  16  fwd=    4.7±0.4 ms (JIT 3638)   grad=    4.3±0.4 ms (JIT 3670)
-  max_steps=  32  fwd=    9.4±2.2 ms (JIT 3593)   grad=    6.4±0.4 ms (JIT 3714)
-  max_steps=  64  fwd=    8.2±0.9 ms (JIT 3713)   grad=    9.6±0.7 ms (JIT 3777)
-  max_steps= 128  fwd=   18.4±1.4 ms (JIT 3803)   grad=   17.7±5.3 ms (JIT 3534)</code></pre>
-</div>
-<div class="cell-output cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="renderer_profile_files/figure-html/cell-6-output-2.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
+<section id="compile-once-render-repeatedly" class="level2">
+<h2 class="anchored" data-anchor-id="compile-once-render-repeatedly">Compile once, render repeatedly</h2>
+<p>The first call includes JAX compilation. Later calls with the same scene, image shape, and static feature set reuse the module-level compiled renderer.</p>
+<div id="10185d26023b46108eb7d9f57d49d2b3" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>settings <span class="op">=</span> RenderSettings.balanced((<span class="dv">128</span>, <span class="dv">160</span>))</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>start <span class="op">=</span> perf_counter()</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>render_scene(scene, settings)</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>compile_and_render_ms <span class="op">=</span> (perf_counter() <span class="op">-</span> start) <span class="op">*</span> <span class="fl">1e3</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>samples <span class="op">=</span> []</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> _ <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">10</span>):</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>    start <span class="op">=</span> perf_counter()</span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>    render_scene(scene, settings)</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>    samples.append((perf_counter() <span class="op">-</span> start) <span class="op">*</span> <span class="fl">1e3</span>)</span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"first call: </span><span class="sc">{</span>compile_and_render_ms<span class="sc">:.1f}</span><span class="ss"> ms"</span>)</span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"cached median: </span><span class="sc">{</span>np<span class="sc">.</span>median(samples)<span class="sc">:.2f}</span><span class="ss"> ms"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </section>
-<section id="shadow-steps-shadow_steps" class="level2">
-<h2 class="anchored" data-anchor-id="shadow-steps-shadow_steps">3. Shadow Steps (<code>shadow_steps</code>)</h2>
-<p>Soft shadows cast one shadow ray per lit pixel. <code>shadow_steps=0</code> disables shadows entirely.</p>
-<div id="sweep_shadow_steps" class="cell" data-execution_count="6">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>SHADOW_STEPS_VALS <span class="op">=</span> [<span class="dv">0</span>, <span class="dv">4</span>, <span class="dv">8</span>, <span class="dv">16</span>, <span class="dv">32</span>, <span class="dv">64</span>]</span>
-<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>sh_fwd_means, sh_fwd_stds, sh_fwd_jit <span class="op">=</span> [], [], []</span>
-<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>sh_grad_means, sh_grad_stds, sh_grad_jit <span class="op">=</span> [], [], []</span>
-<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> steps <span class="kw">in</span> SHADOW_STEPS_VALS:</span>
-<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>    fwd, grad <span class="op">=</span> make_render_fns(</span>
-<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>        REF_SCENE,</span>
-<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>        REF_PARAMS,</span>
-<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>        REF_RES,</span>
-<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>        max_steps<span class="op">=</span><span class="dv">32</span>,</span>
-<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>        shadow_steps<span class="op">=</span>steps,</span>
-<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>        shadow_hardness<span class="op">=</span><span class="fl">6.0</span>,</span>
-<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a>        gamma<span class="op">=</span><span class="fl">2.2</span>,</span>
-<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a>    mf, sf, jf <span class="op">=</span> bench(fwd)</span>
-<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a>    mg, sg, jg <span class="op">=</span> bench(grad)</span>
-<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a>    sh_fwd_means.append(mf)</span>
-<span id="cb9-19"><a href="#cb9-19" aria-hidden="true" tabindex="-1"></a>    sh_fwd_stds.append(sf)</span>
-<span id="cb9-20"><a href="#cb9-20" aria-hidden="true" tabindex="-1"></a>    sh_fwd_jit.append(jf)</span>
-<span id="cb9-21"><a href="#cb9-21" aria-hidden="true" tabindex="-1"></a>    sh_grad_means.append(mg)</span>
-<span id="cb9-22"><a href="#cb9-22" aria-hidden="true" tabindex="-1"></a>    sh_grad_stds.append(sg)</span>
-<span id="cb9-23"><a href="#cb9-23" aria-hidden="true" tabindex="-1"></a>    sh_grad_jit.append(jg)</span>
-<span id="cb9-24"><a href="#cb9-24" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(</span>
-<span id="cb9-25"><a href="#cb9-25" aria-hidden="true" tabindex="-1"></a>        <span class="ss">f"  shadow_steps=</span><span class="sc">{</span>steps<span class="sc">:4d}</span><span class="ss">  fwd=</span><span class="sc">{</span>mf<span class="sc">:7.1f}</span><span class="ss">±</span><span class="sc">{</span>sf<span class="sc">:.1f}</span><span class="ss"> ms (JIT </span><span class="sc">{</span>jf<span class="sc">:.0f}</span><span class="ss">)   grad=</span><span class="sc">{</span>mg<span class="sc">:7.1f}</span><span class="ss">±</span><span class="sc">{</span>sg<span class="sc">:.1f}</span><span class="ss"> ms (JIT </span><span class="sc">{</span>jg<span class="sc">:.0f}</span><span class="ss">)"</span></span>
-<span id="cb9-26"><a href="#cb9-26" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb9-27"><a href="#cb9-27" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb9-28"><a href="#cb9-28" aria-hidden="true" tabindex="-1"></a>fig, axes <span class="op">=</span> plt.subplots(<span class="dv">1</span>, <span class="dv">2</span>, figsize<span class="op">=</span>(<span class="dv">14</span>, <span class="dv">4</span>))</span>
-<span id="cb9-29"><a href="#cb9-29" aria-hidden="true" tabindex="-1"></a>grouped_bar_chart(</span>
-<span id="cb9-30"><a href="#cb9-30" aria-hidden="true" tabindex="-1"></a>    axes[<span class="dv">0</span>],</span>
-<span id="cb9-31"><a href="#cb9-31" aria-hidden="true" tabindex="-1"></a>    [<span class="bu">str</span>(s) <span class="cf">for</span> s <span class="kw">in</span> SHADOW_STEPS_VALS],</span>
-<span id="cb9-32"><a href="#cb9-32" aria-hidden="true" tabindex="-1"></a>    sh_fwd_means,</span>
-<span id="cb9-33"><a href="#cb9-33" aria-hidden="true" tabindex="-1"></a>    sh_fwd_stds,</span>
-<span id="cb9-34"><a href="#cb9-34" aria-hidden="true" tabindex="-1"></a>    sh_grad_means,</span>
-<span id="cb9-35"><a href="#cb9-35" aria-hidden="true" tabindex="-1"></a>    sh_grad_stds,</span>
-<span id="cb9-36"><a href="#cb9-36" aria-hidden="true" tabindex="-1"></a>    xlabel<span class="op">=</span><span class="st">"shadow_steps"</span>,</span>
-<span id="cb9-37"><a href="#cb9-37" aria-hidden="true" tabindex="-1"></a>    title<span class="op">=</span><span class="ss">f"Render time vs shadow_steps  (</span><span class="sc">{</span>REF_RES[<span class="dv">0</span>]<span class="sc">}</span><span class="ss">×</span><span class="sc">{</span>REF_RES[<span class="dv">1</span>]<span class="sc">}</span><span class="ss">)"</span>,</span>
-<span id="cb9-38"><a href="#cb9-38" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb9-39"><a href="#cb9-39" aria-hidden="true" tabindex="-1"></a>jit_bar_chart(</span>
-<span id="cb9-40"><a href="#cb9-40" aria-hidden="true" tabindex="-1"></a>    axes[<span class="dv">1</span>],</span>
-<span id="cb9-41"><a href="#cb9-41" aria-hidden="true" tabindex="-1"></a>    [<span class="bu">str</span>(s) <span class="cf">for</span> s <span class="kw">in</span> SHADOW_STEPS_VALS],</span>
-<span id="cb9-42"><a href="#cb9-42" aria-hidden="true" tabindex="-1"></a>    sh_fwd_jit,</span>
-<span id="cb9-43"><a href="#cb9-43" aria-hidden="true" tabindex="-1"></a>    sh_grad_jit,</span>
-<span id="cb9-44"><a href="#cb9-44" aria-hidden="true" tabindex="-1"></a>    xlabel<span class="op">=</span><span class="st">"shadow_steps"</span>,</span>
-<span id="cb9-45"><a href="#cb9-45" aria-hidden="true" tabindex="-1"></a>    title<span class="op">=</span><span class="ss">f"JIT compile time vs shadow_steps  (</span><span class="sc">{</span>REF_RES[<span class="dv">0</span>]<span class="sc">}</span><span class="ss">×</span><span class="sc">{</span>REF_RES[<span class="dv">1</span>]<span class="sc">}</span><span class="ss">)"</span>,</span>
-<span id="cb9-46"><a href="#cb9-46" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb9-47"><a href="#cb9-47" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
-<span id="cb9-48"><a href="#cb9-48" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>  shadow_steps=   0  fwd=    4.0±0.4 ms (JIT 4267)   grad=    1.9±0.2 ms (JIT 3419)
-  shadow_steps=   4  fwd=    9.1±1.8 ms (JIT 3646)   grad=    8.8±1.4 ms (JIT 3933)
-  shadow_steps=   8  fwd=   11.6±1.7 ms (JIT 3773)   grad=    6.7±3.9 ms (JIT 3711)
-  shadow_steps=  16  fwd=   11.7±1.8 ms (JIT 3508)   grad=   11.3±1.6 ms (JIT 3803)
-  shadow_steps=  32  fwd=   12.9±2.4 ms (JIT 3641)   grad=   10.9±2.6 ms (JIT 3622)
-  shadow_steps=  64  fwd=   14.5±1.2 ms (JIT 3532)   grad=   18.8±5.9 ms (JIT 3545)</code></pre>
-</div>
-<div class="cell-output cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="renderer_profile_files/figure-html/cell-7-output-2.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-</section>
-<section id="scene-complexity-number-of-primitives" class="level2">
-<h2 class="anchored" data-anchor-id="scene-complexity-number-of-primitives">4. Scene Complexity (number of primitives)</h2>
-<p>Each primitive adds one SDF evaluation to the Union. The cost depends on whether XLA fuses or unrolls the loop — this sweep makes that visible.</p>
-<div id="sweep_complexity" class="cell" data-execution_count="7">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>N_PRIMS <span class="op">=</span> [<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">4</span>, <span class="dv">8</span>, <span class="dv">16</span>, <span class="dv">32</span>]</span>
-<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>cx_fwd_means, cx_fwd_stds, cx_fwd_jit <span class="op">=</span> [], [], []</span>
-<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>cx_grad_means, cx_grad_stds, cx_grad_jit <span class="op">=</span> [], [], []</span>
-<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> n <span class="kw">in</span> N_PRIMS:</span>
-<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>    scene_n <span class="op">=</span> build_scene(n)</span>
-<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>    params_n, _, _ <span class="op">=</span> extract_parameters(scene_n)</span>
-<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a>    fwd, grad <span class="op">=</span> make_render_fns(</span>
-<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a>        scene_n, params_n, REF_RES, max_steps<span class="op">=</span><span class="dv">32</span>, shadow_steps<span class="op">=</span><span class="dv">12</span>, shadow_hardness<span class="op">=</span><span class="fl">6.0</span>, gamma<span class="op">=</span><span class="fl">2.2</span></span>
-<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a>    mf, sf, jf <span class="op">=</span> bench(fwd)</span>
-<span id="cb11-13"><a href="#cb11-13" aria-hidden="true" tabindex="-1"></a>    mg, sg, jg <span class="op">=</span> bench(grad)</span>
-<span id="cb11-14"><a href="#cb11-14" aria-hidden="true" tabindex="-1"></a>    cx_fwd_means.append(mf)</span>
-<span id="cb11-15"><a href="#cb11-15" aria-hidden="true" tabindex="-1"></a>    cx_fwd_stds.append(sf)</span>
-<span id="cb11-16"><a href="#cb11-16" aria-hidden="true" tabindex="-1"></a>    cx_fwd_jit.append(jf)</span>
-<span id="cb11-17"><a href="#cb11-17" aria-hidden="true" tabindex="-1"></a>    cx_grad_means.append(mg)</span>
-<span id="cb11-18"><a href="#cb11-18" aria-hidden="true" tabindex="-1"></a>    cx_grad_stds.append(sg)</span>
-<span id="cb11-19"><a href="#cb11-19" aria-hidden="true" tabindex="-1"></a>    cx_grad_jit.append(jg)</span>
-<span id="cb11-20"><a href="#cb11-20" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(</span>
-<span id="cb11-21"><a href="#cb11-21" aria-hidden="true" tabindex="-1"></a>        <span class="ss">f"  n_primitives=</span><span class="sc">{</span>n<span class="sc">:3d}</span><span class="ss">  fwd=</span><span class="sc">{</span>mf<span class="sc">:7.1f}</span><span class="ss">±</span><span class="sc">{</span>sf<span class="sc">:.1f}</span><span class="ss"> ms (JIT </span><span class="sc">{</span>jf<span class="sc">:.0f}</span><span class="ss">)   grad=</span><span class="sc">{</span>mg<span class="sc">:7.1f}</span><span class="ss">±</span><span class="sc">{</span>sg<span class="sc">:.1f}</span><span class="ss"> ms (JIT </span><span class="sc">{</span>jg<span class="sc">:.0f}</span><span class="ss">)"</span></span>
-<span id="cb11-22"><a href="#cb11-22" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb11-23"><a href="#cb11-23" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb11-24"><a href="#cb11-24" aria-hidden="true" tabindex="-1"></a>fig, axes <span class="op">=</span> plt.subplots(<span class="dv">1</span>, <span class="dv">2</span>, figsize<span class="op">=</span>(<span class="dv">14</span>, <span class="dv">4</span>))</span>
-<span id="cb11-25"><a href="#cb11-25" aria-hidden="true" tabindex="-1"></a>grouped_bar_chart(</span>
-<span id="cb11-26"><a href="#cb11-26" aria-hidden="true" tabindex="-1"></a>    axes[<span class="dv">0</span>],</span>
-<span id="cb11-27"><a href="#cb11-27" aria-hidden="true" tabindex="-1"></a>    [<span class="bu">str</span>(n) <span class="cf">for</span> n <span class="kw">in</span> N_PRIMS],</span>
-<span id="cb11-28"><a href="#cb11-28" aria-hidden="true" tabindex="-1"></a>    cx_fwd_means,</span>
-<span id="cb11-29"><a href="#cb11-29" aria-hidden="true" tabindex="-1"></a>    cx_fwd_stds,</span>
-<span id="cb11-30"><a href="#cb11-30" aria-hidden="true" tabindex="-1"></a>    cx_grad_means,</span>
-<span id="cb11-31"><a href="#cb11-31" aria-hidden="true" tabindex="-1"></a>    cx_grad_stds,</span>
-<span id="cb11-32"><a href="#cb11-32" aria-hidden="true" tabindex="-1"></a>    xlabel<span class="op">=</span><span class="st">"Number of primitives"</span>,</span>
-<span id="cb11-33"><a href="#cb11-33" aria-hidden="true" tabindex="-1"></a>    title<span class="op">=</span><span class="ss">f"Render time vs scene complexity  (</span><span class="sc">{</span>REF_RES[<span class="dv">0</span>]<span class="sc">}</span><span class="ss">×</span><span class="sc">{</span>REF_RES[<span class="dv">1</span>]<span class="sc">}</span><span class="ss">)"</span>,</span>
-<span id="cb11-34"><a href="#cb11-34" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb11-35"><a href="#cb11-35" aria-hidden="true" tabindex="-1"></a>jit_bar_chart(</span>
-<span id="cb11-36"><a href="#cb11-36" aria-hidden="true" tabindex="-1"></a>    axes[<span class="dv">1</span>],</span>
-<span id="cb11-37"><a href="#cb11-37" aria-hidden="true" tabindex="-1"></a>    [<span class="bu">str</span>(n) <span class="cf">for</span> n <span class="kw">in</span> N_PRIMS],</span>
-<span id="cb11-38"><a href="#cb11-38" aria-hidden="true" tabindex="-1"></a>    cx_fwd_jit,</span>
-<span id="cb11-39"><a href="#cb11-39" aria-hidden="true" tabindex="-1"></a>    cx_grad_jit,</span>
-<span id="cb11-40"><a href="#cb11-40" aria-hidden="true" tabindex="-1"></a>    xlabel<span class="op">=</span><span class="st">"Number of primitives"</span>,</span>
-<span id="cb11-41"><a href="#cb11-41" aria-hidden="true" tabindex="-1"></a>    title<span class="op">=</span><span class="ss">f"JIT compile time vs n_primitives  (</span><span class="sc">{</span>REF_RES[<span class="dv">0</span>]<span class="sc">}</span><span class="ss">×</span><span class="sc">{</span>REF_RES[<span class="dv">1</span>]<span class="sc">}</span><span class="ss">)"</span>,</span>
-<span id="cb11-42"><a href="#cb11-42" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb11-43"><a href="#cb11-43" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
-<span id="cb11-44"><a href="#cb11-44" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>  n_primitives=  1  fwd=    5.7±2.3 ms (JIT 771)   grad=    5.8±1.0 ms (JIT 654)
-  n_primitives=  2  fwd=    5.8±0.6 ms (JIT 1487)   grad=    7.6±2.4 ms (JIT 1097)
-  n_primitives=  4  fwd=    5.6±0.9 ms (JIT 2345)   grad=    9.6±1.2 ms (JIT 1706)
-  n_primitives=  8  fwd=    8.9±1.0 ms (JIT 3921)   grad=   13.6±1.8 ms (JIT 3843)
-  n_primitives= 16  fwd=    9.2±0.9 ms (JIT 15876)   grad=    9.8±1.9 ms (JIT 13922)
-  n_primitives= 32  fwd=    9.1±1.8 ms (JIT 47728)   grad=    9.8±2.0 ms (JIT 45656)</code></pre>
-</div>
-<div class="cell-output cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="renderer_profile_files/figure-html/cell-8-output-2.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-</section>
-<section id="summary" class="level2">
-<h2 class="anchored" data-anchor-id="summary">Summary</h2>
-<p>Normalised cost relative to the cheapest setting in each sweep.</p>
-</section>
-<section id="fd_normals-finite-difference-vs-analytic-normals" class="level2">
-<h2 class="anchored" data-anchor-id="fd_normals-finite-difference-vs-analytic-normals">5. <code>fd_normals</code> — Finite-difference vs Analytic Normals</h2>
-<p><code>fd_normals=False</code> (default) computes surface normals via <code>jax.grad(sdf)(point)</code>. Inside <code>jax.grad(loss)</code> this triggers <strong>2nd-order AD</strong>, which is expensive and produces NaN at hard-min boundaries (<code>smoothness=0</code>).</p>
-<p><code>fd_normals=True</code> replaces normal computation with central finite differences (6 extra SDF evaluations per pixel). Cheaper in the backward pass, NaN-free with any Union smoothness, and visually indistinguishable at the default <code>eps=1e-4</code>.</p>
-<section id="a.-basic-comparison" class="level3">
-<h3 class="anchored" data-anchor-id="a.-basic-comparison">5a. Basic comparison</h3>
-<div id="cofymgsht8c" class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>FD_CONFIGS <span class="op">=</span> [    (<span class="st">"analytic</span><span class="ch">\n</span><span class="st">(fd_normals=False)"</span>, {<span class="st">"fd_normals"</span>: <span class="va">False</span>}),    (<span class="st">"finite-diff</span><span class="ch">\n</span><span class="st">(fd_normals=True)"</span>, {<span class="st">"fd_normals"</span>: <span class="va">True</span>}),]fd_fwd_means, fd_fwd_stds, fd_fwd_jit <span class="op">=</span> [], [], []fd_grad_means, fd_grad_stds, fd_grad_jit <span class="op">=</span> [], [], []<span class="cf">for</span> label, kwargs <span class="kw">in</span> FD_CONFIGS:    fwd, grad <span class="op">=</span> make_render_fns(        REF_SCENE,        REF_PARAMS,        REF_RES,        max_steps<span class="op">=</span><span class="dv">32</span>,        shadow_steps<span class="op">=</span><span class="dv">12</span>,        shadow_hardness<span class="op">=</span><span class="fl">6.0</span>,        gamma<span class="op">=</span><span class="fl">2.2</span>,        <span class="op">**</span>kwargs,    )    mf, sf, jf <span class="op">=</span> bench(fwd)    mg, sg, jg <span class="op">=</span> bench(grad)    fd_fwd_means.append(mf)    fd_fwd_stds.append(sf)    fd_fwd_jit.append(jf)    fd_grad_means.append(mg)    fd_grad_stds.append(sg)    fd_grad_jit.append(jg)    <span class="bu">print</span>(        <span class="ss">f"  </span><span class="sc">{</span>label<span class="sc">.</span>replace(<span class="bu">chr</span>(<span class="dv">10</span>), <span class="st">' '</span>)<span class="sc">:&lt;40}</span><span class="ss">  fwd=</span><span class="sc">{</span>mf<span class="sc">:7.1f}</span><span class="ss">±</span><span class="sc">{</span>sf<span class="sc">:.1f}</span><span class="ss"> ms (JIT </span><span class="sc">{</span>jf<span class="sc">:.0f}</span><span class="ss">)   grad=</span><span class="sc">{</span>mg<span class="sc">:7.1f}</span><span class="ss">±</span><span class="sc">{</span>sg<span class="sc">:.1f}</span><span class="ss"> ms (JIT </span><span class="sc">{</span>jg<span class="sc">:.0f}</span><span class="ss">)"</span>    )<span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">  steady-state grad speedup (fd vs analytic): </span><span class="sc">{</span>fd_grad_means[<span class="dv">0</span>] <span class="op">/</span> fd_grad_means[<span class="dv">1</span>]<span class="sc">:.2f}</span><span class="ss">×"</span>)<span class="bu">print</span>(    <span class="ss">f"  JIT speedup (fd vs analytic):  fwd </span><span class="sc">{</span>fd_fwd_jit[<span class="dv">0</span>] <span class="op">/</span> <span class="bu">max</span>(fd_fwd_jit[<span class="dv">1</span>], <span class="dv">1</span>)<span class="sc">:.1f}</span><span class="ss">×   grad </span><span class="sc">{</span>fd_grad_jit[<span class="dv">0</span>] <span class="op">/</span> <span class="bu">max</span>(fd_grad_jit[<span class="dv">1</span>], <span class="dv">1</span>)<span class="sc">:.1f}</span><span class="ss">×"</span>)fig, axes <span class="op">=</span> plt.subplots(<span class="dv">1</span>, <span class="dv">2</span>, figsize<span class="op">=</span>(<span class="dv">12</span>, <span class="dv">4</span>))grouped_bar_chart(    axes[<span class="dv">0</span>],    [lbl.split(<span class="st">"</span><span class="ch">\n</span><span class="st">"</span>)[<span class="dv">0</span>] <span class="cf">for</span> lbl, _ <span class="kw">in</span> FD_CONFIGS],    fd_fwd_means,    fd_fwd_stds,    fd_grad_means,    fd_grad_stds,    xlabel<span class="op">=</span><span class="st">"Normal mode"</span>,    title<span class="op">=</span><span class="ss">f"Steady-state time  (</span><span class="sc">{</span>REF_RES[<span class="dv">0</span>]<span class="sc">}</span><span class="ss">×</span><span class="sc">{</span>REF_RES[<span class="dv">1</span>]<span class="sc">}</span><span class="ss">)"</span>,)jit_bar_chart(    axes[<span class="dv">1</span>],    [lbl.split(<span class="st">"</span><span class="ch">\n</span><span class="st">"</span>)[<span class="dv">0</span>] <span class="cf">for</span> lbl, _ <span class="kw">in</span> FD_CONFIGS],    fd_fwd_jit,    fd_grad_jit,    xlabel<span class="op">=</span><span class="st">"Normal mode"</span>,    title<span class="op">=</span><span class="ss">f"JIT compile time  (</span><span class="sc">{</span>REF_RES[<span class="dv">0</span>]<span class="sc">}</span><span class="ss">×</span><span class="sc">{</span>REF_RES[<span class="dv">1</span>]<span class="sc">}</span><span class="ss">)"</span>,)plt.tight_layout()plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-</div>
-</section>
-<section id="b.-speedup-vs-max_steps-and-n_primitives" class="level3">
-<h3 class="anchored" data-anchor-id="b.-speedup-vs-max_steps-and-n_primitives">5b. Speedup vs <code>max_steps</code> and <code>n_primitives</code></h3>
-<p>With <code>fd_normals=False</code>, computing surface normals inside <code>jax.grad(loss)</code> requires <strong>2nd-order autodiff</strong> — differentiating through <code>jax.grad(sdf)(pos)</code>. The cost scales with the scan depth (<code>max_steps</code>) and the SDF tree size (<code>n_primitives</code>).</p>
-<p>With <code>fd_normals=True</code> the normal is 6 FD SDF evaluations — constant per pixel, independent of scene depth. The <strong>speedup therefore grows</strong> with complexity.</p>
-</section>
-<section id="c.-visual-quality" class="level3">
-<h3 class="anchored" data-anchor-id="c.-visual-quality">5c. Visual quality</h3>
-<p><code>fd_normals=True</code> is visually indistinguishable from analytic normals at the default <code>eps=1e-4</code> (≈ 0.1 mm at unit-scale scenes). The difference image below quantifies the per-pixel error.</p>
-<div id="n65w583649r" class="cell" data-execution_count="9">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="co"># How fd_normals speedup scales with max_steps and scene complexity.</span></span>
-<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a><span class="co"># Analytic normals require 2nd-order AD through the scan loop and SDF tree,</span></span>
-<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a><span class="co"># so cost grows with both. FD normals are 6 SDF evals per pixel — fixed.</span></span>
-<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>FD_STEPS_SWEEP <span class="op">=</span> [<span class="dv">8</span>, <span class="dv">16</span>, <span class="dv">32</span>, <span class="dv">64</span>, <span class="dv">128</span>]</span>
-<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>FD_PRIM_SWEEP <span class="op">=</span> [<span class="dv">2</span>, <span class="dv">4</span>, <span class="dv">8</span>, <span class="dv">16</span>, <span class="dv">32</span>]</span>
-<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"max_steps sweep (grad only):"</span>)</span>
-<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a>fd_ad_by_steps, fd_fd_by_steps <span class="op">=</span> [], []</span>
-<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> steps <span class="kw">in</span> FD_STEPS_SWEEP:</span>
-<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a>    _, grad_ad <span class="op">=</span> make_render_fns(</span>
-<span id="cb14-12"><a href="#cb14-12" aria-hidden="true" tabindex="-1"></a>        REF_SCENE,</span>
-<span id="cb14-13"><a href="#cb14-13" aria-hidden="true" tabindex="-1"></a>        REF_PARAMS,</span>
-<span id="cb14-14"><a href="#cb14-14" aria-hidden="true" tabindex="-1"></a>        (<span class="dv">128</span>, <span class="dv">128</span>),</span>
-<span id="cb14-15"><a href="#cb14-15" aria-hidden="true" tabindex="-1"></a>        max_steps<span class="op">=</span>steps,</span>
-<span id="cb14-16"><a href="#cb14-16" aria-hidden="true" tabindex="-1"></a>        shadow_steps<span class="op">=</span><span class="dv">12</span>,</span>
-<span id="cb14-17"><a href="#cb14-17" aria-hidden="true" tabindex="-1"></a>        shadow_hardness<span class="op">=</span><span class="fl">6.0</span>,</span>
-<span id="cb14-18"><a href="#cb14-18" aria-hidden="true" tabindex="-1"></a>        gamma<span class="op">=</span><span class="fl">2.2</span>,</span>
-<span id="cb14-19"><a href="#cb14-19" aria-hidden="true" tabindex="-1"></a>        fd_normals<span class="op">=</span><span class="va">False</span>,</span>
-<span id="cb14-20"><a href="#cb14-20" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb14-21"><a href="#cb14-21" aria-hidden="true" tabindex="-1"></a>    _, grad_fd <span class="op">=</span> make_render_fns(</span>
-<span id="cb14-22"><a href="#cb14-22" aria-hidden="true" tabindex="-1"></a>        REF_SCENE,</span>
-<span id="cb14-23"><a href="#cb14-23" aria-hidden="true" tabindex="-1"></a>        REF_PARAMS,</span>
-<span id="cb14-24"><a href="#cb14-24" aria-hidden="true" tabindex="-1"></a>        (<span class="dv">128</span>, <span class="dv">128</span>),</span>
-<span id="cb14-25"><a href="#cb14-25" aria-hidden="true" tabindex="-1"></a>        max_steps<span class="op">=</span>steps,</span>
-<span id="cb14-26"><a href="#cb14-26" aria-hidden="true" tabindex="-1"></a>        shadow_steps<span class="op">=</span><span class="dv">12</span>,</span>
-<span id="cb14-27"><a href="#cb14-27" aria-hidden="true" tabindex="-1"></a>        shadow_hardness<span class="op">=</span><span class="fl">6.0</span>,</span>
-<span id="cb14-28"><a href="#cb14-28" aria-hidden="true" tabindex="-1"></a>        gamma<span class="op">=</span><span class="fl">2.2</span>,</span>
-<span id="cb14-29"><a href="#cb14-29" aria-hidden="true" tabindex="-1"></a>        fd_normals<span class="op">=</span><span class="va">True</span>,</span>
-<span id="cb14-30"><a href="#cb14-30" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb14-31"><a href="#cb14-31" aria-hidden="true" tabindex="-1"></a>    mad, _, _ <span class="op">=</span> bench(grad_ad)</span>
-<span id="cb14-32"><a href="#cb14-32" aria-hidden="true" tabindex="-1"></a>    mfd, _, _ <span class="op">=</span> bench(grad_fd)</span>
-<span id="cb14-33"><a href="#cb14-33" aria-hidden="true" tabindex="-1"></a>    fd_ad_by_steps.append(mad)</span>
-<span id="cb14-34"><a href="#cb14-34" aria-hidden="true" tabindex="-1"></a>    fd_fd_by_steps.append(mfd)</span>
-<span id="cb14-35"><a href="#cb14-35" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"  steps=</span><span class="sc">{</span>steps<span class="sc">:4d}</span><span class="ss">  analytic=</span><span class="sc">{</span>mad<span class="sc">:7.1f}</span><span class="ss"> ms   fd=</span><span class="sc">{</span>mfd<span class="sc">:7.1f}</span><span class="ss"> ms  speedup=</span><span class="sc">{</span>mad<span class="op">/</span>mfd<span class="sc">:.2f}</span><span class="ss">×"</span>)</span>
-<span id="cb14-36"><a href="#cb14-36" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-37"><a href="#cb14-37" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"</span><span class="ch">\n</span><span class="st">n_primitives sweep (grad only):"</span>)</span>
-<span id="cb14-38"><a href="#cb14-38" aria-hidden="true" tabindex="-1"></a>fd_ad_by_prims, fd_fd_by_prims <span class="op">=</span> [], []</span>
-<span id="cb14-39"><a href="#cb14-39" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> n <span class="kw">in</span> FD_PRIM_SWEEP:</span>
-<span id="cb14-40"><a href="#cb14-40" aria-hidden="true" tabindex="-1"></a>    scene_n <span class="op">=</span> build_scene(n)</span>
-<span id="cb14-41"><a href="#cb14-41" aria-hidden="true" tabindex="-1"></a>    params_n, _, _ <span class="op">=</span> extract_parameters(scene_n)</span>
-<span id="cb14-42"><a href="#cb14-42" aria-hidden="true" tabindex="-1"></a>    _, grad_ad <span class="op">=</span> make_render_fns(</span>
-<span id="cb14-43"><a href="#cb14-43" aria-hidden="true" tabindex="-1"></a>        scene_n,</span>
-<span id="cb14-44"><a href="#cb14-44" aria-hidden="true" tabindex="-1"></a>        params_n,</span>
-<span id="cb14-45"><a href="#cb14-45" aria-hidden="true" tabindex="-1"></a>        (<span class="dv">128</span>, <span class="dv">128</span>),</span>
-<span id="cb14-46"><a href="#cb14-46" aria-hidden="true" tabindex="-1"></a>        max_steps<span class="op">=</span><span class="dv">32</span>,</span>
-<span id="cb14-47"><a href="#cb14-47" aria-hidden="true" tabindex="-1"></a>        shadow_steps<span class="op">=</span><span class="dv">12</span>,</span>
-<span id="cb14-48"><a href="#cb14-48" aria-hidden="true" tabindex="-1"></a>        shadow_hardness<span class="op">=</span><span class="fl">6.0</span>,</span>
-<span id="cb14-49"><a href="#cb14-49" aria-hidden="true" tabindex="-1"></a>        gamma<span class="op">=</span><span class="fl">2.2</span>,</span>
-<span id="cb14-50"><a href="#cb14-50" aria-hidden="true" tabindex="-1"></a>        fd_normals<span class="op">=</span><span class="va">False</span>,</span>
-<span id="cb14-51"><a href="#cb14-51" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb14-52"><a href="#cb14-52" aria-hidden="true" tabindex="-1"></a>    _, grad_fd <span class="op">=</span> make_render_fns(</span>
-<span id="cb14-53"><a href="#cb14-53" aria-hidden="true" tabindex="-1"></a>        scene_n,</span>
-<span id="cb14-54"><a href="#cb14-54" aria-hidden="true" tabindex="-1"></a>        params_n,</span>
-<span id="cb14-55"><a href="#cb14-55" aria-hidden="true" tabindex="-1"></a>        (<span class="dv">128</span>, <span class="dv">128</span>),</span>
-<span id="cb14-56"><a href="#cb14-56" aria-hidden="true" tabindex="-1"></a>        max_steps<span class="op">=</span><span class="dv">32</span>,</span>
-<span id="cb14-57"><a href="#cb14-57" aria-hidden="true" tabindex="-1"></a>        shadow_steps<span class="op">=</span><span class="dv">12</span>,</span>
-<span id="cb14-58"><a href="#cb14-58" aria-hidden="true" tabindex="-1"></a>        shadow_hardness<span class="op">=</span><span class="fl">6.0</span>,</span>
-<span id="cb14-59"><a href="#cb14-59" aria-hidden="true" tabindex="-1"></a>        gamma<span class="op">=</span><span class="fl">2.2</span>,</span>
-<span id="cb14-60"><a href="#cb14-60" aria-hidden="true" tabindex="-1"></a>        fd_normals<span class="op">=</span><span class="va">True</span>,</span>
-<span id="cb14-61"><a href="#cb14-61" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb14-62"><a href="#cb14-62" aria-hidden="true" tabindex="-1"></a>    mad, _, _ <span class="op">=</span> bench(grad_ad)</span>
-<span id="cb14-63"><a href="#cb14-63" aria-hidden="true" tabindex="-1"></a>    mfd, _, _ <span class="op">=</span> bench(grad_fd)</span>
-<span id="cb14-64"><a href="#cb14-64" aria-hidden="true" tabindex="-1"></a>    fd_ad_by_prims.append(mad)</span>
-<span id="cb14-65"><a href="#cb14-65" aria-hidden="true" tabindex="-1"></a>    fd_fd_by_prims.append(mfd)</span>
-<span id="cb14-66"><a href="#cb14-66" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"  n=</span><span class="sc">{</span>n<span class="sc">:3d}</span><span class="ss">  analytic=</span><span class="sc">{</span>mad<span class="sc">:7.1f}</span><span class="ss"> ms   fd=</span><span class="sc">{</span>mfd<span class="sc">:7.1f}</span><span class="ss"> ms  speedup=</span><span class="sc">{</span>mad<span class="op">/</span>mfd<span class="sc">:.2f}</span><span class="ss">×"</span>)</span>
-<span id="cb14-67"><a href="#cb14-67" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-68"><a href="#cb14-68" aria-hidden="true" tabindex="-1"></a>fig, axes <span class="op">=</span> plt.subplots(<span class="dv">1</span>, <span class="dv">2</span>, figsize<span class="op">=</span>(<span class="dv">14</span>, <span class="dv">5</span>))</span>
-<span id="cb14-69"><a href="#cb14-69" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> ax, xs, ad, fd, xlabel <span class="kw">in</span> [</span>
-<span id="cb14-70"><a href="#cb14-70" aria-hidden="true" tabindex="-1"></a>    (axes[<span class="dv">0</span>], FD_STEPS_SWEEP, fd_ad_by_steps, fd_fd_by_steps, <span class="st">"max_steps"</span>),</span>
-<span id="cb14-71"><a href="#cb14-71" aria-hidden="true" tabindex="-1"></a>    (axes[<span class="dv">1</span>], FD_PRIM_SWEEP, fd_ad_by_prims, fd_fd_by_prims, <span class="st">"n_primitives"</span>),</span>
-<span id="cb14-72"><a href="#cb14-72" aria-hidden="true" tabindex="-1"></a>]:</span>
-<span id="cb14-73"><a href="#cb14-73" aria-hidden="true" tabindex="-1"></a>    ax.plot(xs, ad, <span class="st">"o-"</span>, color<span class="op">=</span><span class="st">"steelblue"</span>, label<span class="op">=</span><span class="st">"analytic (fd_normals=False)"</span>, zorder<span class="op">=</span><span class="dv">3</span>)</span>
-<span id="cb14-74"><a href="#cb14-74" aria-hidden="true" tabindex="-1"></a>    ax.plot(xs, fd, <span class="st">"s-"</span>, color<span class="op">=</span><span class="st">"tomato"</span>, label<span class="op">=</span><span class="st">"FD (fd_normals=True)"</span>, zorder<span class="op">=</span><span class="dv">3</span>)</span>
-<span id="cb14-75"><a href="#cb14-75" aria-hidden="true" tabindex="-1"></a>    ax2 <span class="op">=</span> ax.twinx()</span>
-<span id="cb14-76"><a href="#cb14-76" aria-hidden="true" tabindex="-1"></a>    speedups <span class="op">=</span> [a <span class="op">/</span> <span class="bu">max</span>(b, <span class="fl">0.1</span>) <span class="cf">for</span> a, b <span class="kw">in</span> <span class="bu">zip</span>(ad, fd)]</span>
-<span id="cb14-77"><a href="#cb14-77" aria-hidden="true" tabindex="-1"></a>    ax2.plot(xs, speedups, <span class="st">"k--"</span>, alpha<span class="op">=</span><span class="fl">0.5</span>, label<span class="op">=</span><span class="st">"speedup ×"</span>)</span>
-<span id="cb14-78"><a href="#cb14-78" aria-hidden="true" tabindex="-1"></a>    ax2.set_ylabel(<span class="st">"speedup (×)"</span>, color<span class="op">=</span><span class="st">"gray"</span>, fontsize<span class="op">=</span><span class="dv">9</span>)</span>
-<span id="cb14-79"><a href="#cb14-79" aria-hidden="true" tabindex="-1"></a>    ax2.tick_params(axis<span class="op">=</span><span class="st">"y"</span>, labelcolor<span class="op">=</span><span class="st">"gray"</span>)</span>
-<span id="cb14-80"><a href="#cb14-80" aria-hidden="true" tabindex="-1"></a>    ax2.legend(loc<span class="op">=</span><span class="st">"lower right"</span>, fontsize<span class="op">=</span><span class="dv">8</span>)</span>
-<span id="cb14-81"><a href="#cb14-81" aria-hidden="true" tabindex="-1"></a>    ax.set_xlabel(xlabel)</span>
-<span id="cb14-82"><a href="#cb14-82" aria-hidden="true" tabindex="-1"></a>    ax.set_ylabel(<span class="st">"grad ms / call"</span>)</span>
-<span id="cb14-83"><a href="#cb14-83" aria-hidden="true" tabindex="-1"></a>    ax.set_title(<span class="ss">f"Grad time vs </span><span class="sc">{</span>xlabel<span class="sc">}</span><span class="ss">  (128×128)"</span>)</span>
-<span id="cb14-84"><a href="#cb14-84" aria-hidden="true" tabindex="-1"></a>    ax.legend(loc<span class="op">=</span><span class="st">"upper left"</span>, fontsize<span class="op">=</span><span class="dv">8</span>)</span>
-<span id="cb14-85"><a href="#cb14-85" aria-hidden="true" tabindex="-1"></a>    ax.grid(alpha<span class="op">=</span><span class="fl">0.35</span>)</span>
-<span id="cb14-86"><a href="#cb14-86" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-87"><a href="#cb14-87" aria-hidden="true" tabindex="-1"></a>plt.suptitle(<span class="st">"fd_normals=True grad speedup vs complexity"</span>, fontsize<span class="op">=</span><span class="dv">12</span>)</span>
-<span id="cb14-88"><a href="#cb14-88" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
-<span id="cb14-89"><a href="#cb14-89" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>max_steps sweep (grad only):
-  steps=   8  analytic=    4.9 ms   fd=    5.3 ms  speedup=0.92×
-  steps=  16  analytic=    6.8 ms   fd=    6.4 ms  speedup=1.06×
-  steps=  32  analytic=    9.5 ms   fd=   11.7 ms  speedup=0.81×
-  steps=  64  analytic=   13.7 ms   fd=   12.4 ms  speedup=1.10×
-  steps= 128  analytic=   23.5 ms   fd=   25.2 ms  speedup=0.93×
-
-n_primitives sweep (grad only):
-  n=  2  analytic=    9.2 ms   fd=    8.1 ms  speedup=1.14×
-  n=  4  analytic=   17.4 ms   fd=   19.5 ms  speedup=0.89×
-  n=  8  analytic=    8.9 ms   fd=   10.1 ms  speedup=0.88×
-  n= 16  analytic=   10.0 ms   fd=   11.6 ms  speedup=0.87×
-  n= 32  analytic=    2.3 ms   fd=   32.4 ms  speedup=0.07×</code></pre>
-</div>
-<div class="cell-output cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="renderer_profile_files/figure-html/cell-10-output-2.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-</div>
-<div id="76kvgxgmkg9" class="cell" data-execution_count="10">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Visual quality: analytic vs fd normals — should look identical at eps=1e-4.</span></span>
-<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>render_ad <span class="op">=</span> functionalize_render(</span>
-<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>    REF_SCENE, max_steps<span class="op">=</span><span class="dv">48</span>, shadow_steps<span class="op">=</span><span class="dv">16</span>, shadow_hardness<span class="op">=</span><span class="fl">6.0</span>, gamma<span class="op">=</span><span class="fl">2.2</span>, fd_normals<span class="op">=</span><span class="va">False</span></span>
-<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>render_fd <span class="op">=</span> functionalize_render(</span>
-<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a>    REF_SCENE, max_steps<span class="op">=</span><span class="dv">48</span>, shadow_steps<span class="op">=</span><span class="dv">16</span>, shadow_hardness<span class="op">=</span><span class="fl">6.0</span>, gamma<span class="op">=</span><span class="fl">2.2</span>, fd_normals<span class="op">=</span><span class="va">True</span></span>
-<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a>img_ad <span class="op">=</span> jax.jit(<span class="kw">lambda</span>: render_ad(REF_PARAMS, resolution<span class="op">=</span>(<span class="dv">256</span>, <span class="dv">256</span>)))()</span>
-<span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a>img_fd <span class="op">=</span> jax.jit(<span class="kw">lambda</span>: render_fd(REF_PARAMS, resolution<span class="op">=</span>(<span class="dv">256</span>, <span class="dv">256</span>)))()</span>
-<span id="cb16-11"><a href="#cb16-11" aria-hidden="true" tabindex="-1"></a>diff <span class="op">=</span> jnp.<span class="bu">abs</span>(img_ad <span class="op">-</span> img_fd)</span>
-<span id="cb16-12"><a href="#cb16-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-13"><a href="#cb16-13" aria-hidden="true" tabindex="-1"></a>fig, axes <span class="op">=</span> plt.subplots(<span class="dv">1</span>, <span class="dv">3</span>, figsize<span class="op">=</span>(<span class="dv">18</span>, <span class="dv">5</span>))</span>
-<span id="cb16-14"><a href="#cb16-14" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].imshow(np.array(img_ad), vmin<span class="op">=</span><span class="dv">0</span>, vmax<span class="op">=</span><span class="dv">1</span>)</span>
-<span id="cb16-15"><a href="#cb16-15" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].set_title(<span class="st">"fd_normals=False  (analytic)"</span>)</span>
-<span id="cb16-16"><a href="#cb16-16" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].axis(<span class="st">"off"</span>)</span>
-<span id="cb16-17"><a href="#cb16-17" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">1</span>].imshow(np.array(img_fd), vmin<span class="op">=</span><span class="dv">0</span>, vmax<span class="op">=</span><span class="dv">1</span>)</span>
-<span id="cb16-18"><a href="#cb16-18" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">1</span>].set_title(<span class="st">"fd_normals=True  (FD, eps=1e-4)"</span>)</span>
-<span id="cb16-19"><a href="#cb16-19" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">1</span>].axis(<span class="st">"off"</span>)</span>
-<span id="cb16-20"><a href="#cb16-20" aria-hidden="true" tabindex="-1"></a>im <span class="op">=</span> axes[<span class="dv">2</span>].imshow(np.array(diff).mean(axis<span class="op">=-</span><span class="dv">1</span>), cmap<span class="op">=</span><span class="st">"hot"</span>, vmin<span class="op">=</span><span class="dv">0</span>)</span>
-<span id="cb16-21"><a href="#cb16-21" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">2</span>].set_title(<span class="ss">f"|analytic − FD|  (mean RGB)</span><span class="ch">\n</span><span class="ss">max=</span><span class="sc">{</span><span class="bu">float</span>(diff.<span class="bu">max</span>())<span class="sc">:.4f}</span><span class="ss">"</span>)</span>
-<span id="cb16-22"><a href="#cb16-22" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">2</span>].axis(<span class="st">"off"</span>)</span>
-<span id="cb16-23"><a href="#cb16-23" aria-hidden="true" tabindex="-1"></a>plt.colorbar(im, ax<span class="op">=</span>axes[<span class="dv">2</span>], fraction<span class="op">=</span><span class="fl">0.046</span>, pad<span class="op">=</span><span class="fl">0.04</span>)</span>
-<span id="cb16-24"><a href="#cb16-24" aria-hidden="true" tabindex="-1"></a>plt.suptitle(<span class="st">"Visual quality: analytic vs finite-difference normals"</span>, fontsize<span class="op">=</span><span class="dv">12</span>)</span>
-<span id="cb16-25"><a href="#cb16-25" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
-<span id="cb16-26"><a href="#cb16-26" aria-hidden="true" tabindex="-1"></a>plt.show()</span>
-<span id="cb16-27"><a href="#cb16-27" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Max pixel difference: </span><span class="sc">{</span><span class="bu">float</span>(diff.<span class="bu">max</span>())<span class="sc">:.5f}</span><span class="ss">   Mean: </span><span class="sc">{</span><span class="bu">float</span>(diff.mean())<span class="sc">:.6f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="cell-output cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="renderer_profile_files/figure-html/cell-11-output-1.png" class="img-fluid figure-img"></p>
-</figure>
-</div>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>Max pixel difference: 0.42681   Mean: 0.022764</code></pre>
-</div>
-</div>
-<hr>
-</section>
-</section>
-<section id="perfetto-trace" class="level2">
-<h2 class="anchored" data-anchor-id="perfetto-trace">6. Perfetto Trace</h2>
-<p><code>jax.profiler.trace()</code> writes a Perfetto-compatible protobuf trace to disk. Load it at <strong>https://ui.perfetto.dev</strong> to see individual XLA ops, kernel launch latencies, and memory transfers broken down by name.</p>
-<p>The cells below capture three traces:</p>
-<table class="caption-top table">
-<colgroup>
-<col style="width: 30%">
-<col style="width: 70%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>File</th>
-<th>What it shows</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td><code>trace_ref/</code></td>
-<td>Reference render (128×128, 32 steps) — baseline breakdown</td>
-</tr>
-<tr class="even">
-<td><code>trace_hires/</code></td>
-<td>High-res render (512×512) — how kernel shapes change</td>
-</tr>
-<tr class="odd">
-<td><code>trace_steps/</code></td>
-<td>Many march steps (128) — how the step loop unrolls</td>
-</tr>
-</tbody>
-</table>
-<p><code>jax.named_call</code> wraps sub-expressions with human-readable names that appear as spans in the Perfetto timeline.</p>
-<div id="7442q9fwin6" class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> osTRACE_ROOT <span class="op">=</span> <span class="st">"/tmp/jaxcad_profile"</span>def capture_trace(name: <span class="bu">str</span>, fn, n_iter: <span class="bu">int</span> <span class="op">=</span> <span class="dv">5</span>):    <span class="st">"""Warm up fn, then capture a Perfetto trace for n_iter calls."""</span>    trace_dir <span class="op">=</span> os.path.join(TRACE_ROOT, name)    <span class="cf">for</span> _ <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">3</span>):        jax.block_until_ready(fn())    <span class="cf">with</span> jax.profiler.trace(trace_dir):        <span class="cf">for</span> _ <span class="kw">in</span> <span class="bu">range</span>(n_iter):            jax.block_until_ready(fn())    <span class="bu">print</span>(<span class="ss">f"  ✓ </span><span class="sc">{</span>name<span class="sc">:&lt;28}</span><span class="ss">  →  </span><span class="sc">{</span>trace_dir<span class="sc">}</span><span class="ss">"</span>)    <span class="cf">return</span> trace_dirprint(<span class="st">"Capturing Perfetto traces (fwd + grad per config)..."</span>)<span class="bu">print</span>(<span class="ss">f"Output root: </span><span class="sc">{</span>TRACE_ROOT<span class="sc">}</span><span class="ch">\n</span><span class="ss">"</span>)configs <span class="op">=</span> [    (<span class="st">"ref_fwd"</span>, {<span class="st">"resolution"</span>: (<span class="dv">128</span>, <span class="dv">128</span>), <span class="st">"max_steps"</span>: <span class="dv">32</span>, <span class="st">"shadow_steps"</span>: <span class="dv">12</span>}, <span class="st">"fwd"</span>),    (<span class="st">"ref_grad"</span>, {<span class="st">"resolution"</span>: (<span class="dv">128</span>, <span class="dv">128</span>), <span class="st">"max_steps"</span>: <span class="dv">32</span>, <span class="st">"shadow_steps"</span>: <span class="dv">12</span>}, <span class="st">"grad"</span>),    (<span class="st">"hires_fwd"</span>, {<span class="st">"resolution"</span>: (<span class="dv">512</span>, <span class="dv">512</span>), <span class="st">"max_steps"</span>: <span class="dv">32</span>, <span class="st">"shadow_steps"</span>: <span class="dv">12</span>}, <span class="st">"fwd"</span>),    (<span class="st">"hires_grad"</span>, {<span class="st">"resolution"</span>: (<span class="dv">512</span>, <span class="dv">512</span>), <span class="st">"max_steps"</span>: <span class="dv">32</span>, <span class="st">"shadow_steps"</span>: <span class="dv">12</span>}, <span class="st">"grad"</span>),    (<span class="st">"steps_fwd"</span>, {<span class="st">"resolution"</span>: (<span class="dv">128</span>, <span class="dv">128</span>), <span class="st">"max_steps"</span>: <span class="dv">128</span>, <span class="st">"shadow_steps"</span>: <span class="dv">12</span>}, <span class="st">"fwd"</span>),    (<span class="st">"steps_grad"</span>, {<span class="st">"resolution"</span>: (<span class="dv">128</span>, <span class="dv">128</span>), <span class="st">"max_steps"</span>: <span class="dv">128</span>, <span class="st">"shadow_steps"</span>: <span class="dv">12</span>}, <span class="st">"grad"</span>),]trace_paths <span class="op">=</span> {}<span class="cf">for</span> name, cfg, mode <span class="kw">in</span> configs:    res <span class="op">=</span> cfg.pop(<span class="st">"resolution"</span>)    fwd, grad <span class="op">=</span> make_render_fns(REF_SCENE, REF_PARAMS, res, shadow_hardness<span class="op">=</span><span class="fl">6.0</span>, gamma<span class="op">=</span><span class="fl">2.2</span>, <span class="op">**</span>cfg)    fn <span class="op">=</span> fwd <span class="cf">if</span> mode <span class="op">==</span> <span class="st">"fwd"</span> <span class="cf">else</span> grad    trace_paths[name] <span class="op">=</span> capture_trace(name, fn)<span class="bu">print</span>(<span class="st">"</span><span class="ch">\n</span><span class="st">Open each trace at https://ui.perfetto.dev  (File → Open trace file)"</span>)<span class="bu">print</span>(<span class="st">"Compare *_fwd vs *_grad to see the backward-pass overhead per config."</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-</div>
-<div id="summary" class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>sweeps <span class="op">=</span> [    (        [<span class="ss">f"</span><span class="sc">{</span>p<span class="sc">}</span><span class="ss">×</span><span class="sc">{</span>p<span class="sc">}</span><span class="ss">"</span> <span class="cf">for</span> p <span class="kw">in</span> RESOLUTIONS],        res_fwd_means,        res_fwd_stds,        res_grad_means,        res_grad_stds,        res_fwd_jit,        res_grad_jit,        <span class="st">"Resolution"</span>,    ),    (        [<span class="bu">str</span>(s) <span class="cf">for</span> s <span class="kw">in</span> MAX_STEPS_VALS],        ms_fwd_means,        ms_fwd_stds,        ms_grad_means,        ms_grad_stds,        ms_fwd_jit,        ms_grad_jit,        <span class="st">"max_steps"</span>,    ),    (        [<span class="bu">str</span>(s) <span class="cf">for</span> s <span class="kw">in</span> SHADOW_STEPS_VALS],        sh_fwd_means,        sh_fwd_stds,        sh_grad_means,        sh_grad_stds,        sh_fwd_jit,        sh_grad_jit,        <span class="st">"shadow_steps"</span>,    ),    (        [<span class="bu">str</span>(n) <span class="cf">for</span> n <span class="kw">in</span> N_PRIMS],        cx_fwd_means,        cx_fwd_stds,        cx_grad_means,        cx_grad_stds,        cx_fwd_jit,        cx_grad_jit,        <span class="st">"n_primitives"</span>,    ),    (        [<span class="st">"analytic"</span>, <span class="st">"fd"</span>],        fd_fwd_means,        fd_fwd_stds,        fd_grad_means,        fd_grad_stds,        fd_fwd_jit,        fd_grad_jit,        <span class="st">"fd_normals"</span>,    ),]<span class="co"># ── Normalised steady-state cost ──────────────────────────────────────────────fig, axes = plt.subplots(1, 5, figsize=(22, 4))for ax, (labels, fm, fs, gm, gs, _fj, _gj, xlabel) in zip(axes, sweeps):    norm = fm[0] if fm[0] &gt; 0 else 1.0    grouped_bar_chart(        ax,        labels,        [m / norm for m in fm],        [s / norm for s in fs],        [m / norm for m in gm],        [s / norm for s in gs],        xlabel=xlabel,        ylabel="relative cost",        title=xlabel,    )plt.suptitle("Normalised cost per sweep  (blue=forward, red=grad)", fontsize=13, y=1.02)plt.tight_layout()plt.show()# ── JIT compile time ──────────────────────────────────────────────────────────fig2, axes2 = plt.subplots(1, 5, figsize=(22, 4))for ax, (labels, _fm, _fs, _gm, _gs, fj, gj, xlabel) in zip(axes2, sweeps):    jit_bar_chart(ax, labels, fj, gj, xlabel=xlabel, title=f"JIT: {xlabel}")plt.suptitle("JIT compile time per sweep  (blue=forward, red=grad)", fontsize=13, y=1.02)plt.tight_layout()plt.show()# ── Table ─────────────────────────────────────────────────────────────────────print(    f"{'Sweep':&lt;16} {'fwd min':&gt;8} {'fwd max':&gt;8} {'fwd range':&gt;10}  "    f"{'grad min':&gt;9} {'grad max':&gt;9} {'grad range':&gt;11}  {'grad/fwd':&gt;9}  "    f"{'jit_fwd':&gt;9} {'jit_grad':&gt;10}")print("-" * 112)for _labels, fm, _fs, gm, _gs, fj, gj, xlabel in sweeps:    ratio = np.mean(gm) / np.mean(fm)    print(        f"{xlabel:&lt;16} {min(fm):&gt;8.1f} {max(fm):&gt;8.1f} {max(fm)/min(fm):&gt;9.1f}×  "        f"{min(gm):&gt;9.1f} {max(gm):&gt;9.1f} {max(gm)/min(gm):&gt;10.1f}×  {ratio:&gt;8.1f}×  "        f"{np.mean(fj):&gt;9.0f} {np.mean(gj):&gt;10.0f}"    )</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<section id="preset-cost-and-output" class="level2">
+<h2 class="anchored" data-anchor-id="preset-cost-and-output">Preset cost and output</h2>
+<p>Each preset makes its work explicit. <code>draft</code> uses direct lighting with a shorter trace budget, <code>balanced</code> enables soft shadows and 2×2 supersampling, and <code>high_quality</code> adds tighter precision and 3×3 supersampling. Each distinct static preset compiles once.</p>
+<div id="7623eae2785240b9bd12b16a66d81610" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>presets <span class="op">=</span> {</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>    <span class="st">"Draft"</span>: RenderSettings.draft((<span class="dv">128</span>, <span class="dv">160</span>)),</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>    <span class="st">"Balanced"</span>: RenderSettings.balanced((<span class="dv">128</span>, <span class="dv">160</span>)),</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>    <span class="st">"High quality"</span>: RenderSettings.high_quality((<span class="dv">128</span>, <span class="dv">160</span>)),</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>images, steady_ms <span class="op">=</span> {}, {}</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> name, preset <span class="kw">in</span> presets.items():</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>    images[name] <span class="op">=</span> render_scene(scene, preset)  <span class="co"># compile/warm up</span></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>    timings <span class="op">=</span> []</span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> _ <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">5</span>):</span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>        start <span class="op">=</span> perf_counter()</span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>        images[name] <span class="op">=</span> render_scene(scene, preset)</span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>        timings.append((perf_counter() <span class="op">-</span> start) <span class="op">*</span> <span class="fl">1e3</span>)</span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>    steady_ms[name] <span class="op">=</span> np.median(timings)</span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>fig, axes <span class="op">=</span> plt.subplots(<span class="dv">1</span>, <span class="dv">3</span>, figsize<span class="op">=</span>(<span class="dv">12</span>, <span class="dv">4</span>))</span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> axis, (name, image) <span class="kw">in</span> <span class="bu">zip</span>(axes, images.items()):</span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>    axis.imshow(image)</span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a>    axis.set_title(<span class="ss">f"</span><span class="sc">{</span>name<span class="sc">}</span><span class="ch">\n</span><span class="sc">{</span>steady_ms[name]<span class="sc">:.1f}</span><span class="ss"> ms cached"</span>)</span>
+<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a>    axis.axis(<span class="st">"off"</span>)</span>
+<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 
 
