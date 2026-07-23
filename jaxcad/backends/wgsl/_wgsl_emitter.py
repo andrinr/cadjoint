@@ -74,6 +74,12 @@ def wgsl_literal(val, shape, dtype) -> str:
                 return "-3.402823e38"
             if np.isnan(fv):
                 raise ValueError("NaN constants cannot be represented portably in WGSL")
+            if fv != 0.0 and abs(fv) <= 0.5e-6:
+                return np.format_float_scientific(
+                    np.float32(fv),
+                    unique=True,
+                    trim="-",
+                )
             return f"{fv:.6f}"
         if base == "i32":
             return str(int(v))
