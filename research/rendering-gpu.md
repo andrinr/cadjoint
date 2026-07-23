@@ -1,6 +1,21 @@
 # GPU Rendering: GLSL / NVIDIA Warp / Slang
 
-> Research into replacing jaxCAD's matplotlib-based rendering pipeline with real-time GPU rendering and differentiable inverse rendering.
+> Archived exploration. The active renderer roadmap is forward-only and
+> prioritizes runtime, fidelity, and clean abstractions. The inverse-rendering
+> and Slang sections below are retained as historical research, not planned work.
+
+## Forward-rendering references
+
+- [Soft shadows in raymarched SDFs](https://iquilezles.org/articles/rmshadows/)
+  derives the `distance / travel` penumbra estimate and the two-sample closest
+  approach used by the active forward renderer.
+- [Binary search for SDF ray tracing](https://iquilezles.org/articles/binarysearchsdf/)
+  is useful as a traversal reference, but its own evaluation found substantially
+  more SDF evaluations than conventional sphere tracing. Keep early-exit sphere
+  tracing as the default unless a scene-specific benchmark shows otherwise.
+- [Smooth minimum](https://iquilezles.org/articles/smin/) documents normalized
+  blend kernels, bounds inflation, and matching material blend factors. Use it
+  as the reference for a focused CSG/material-blending pass.
 
 ## Current state
 
@@ -378,7 +393,7 @@ jaxCAD already defaults to smooth min (`smoothness=0.1`) — the correct choice 
 
 2. **Warp** — When high-resolution batch rendering or performance is needed. Write a Warp code generator mirroring the GLSL one. Bridge back to JAX via DLPack + `custom_vjp`.
 
-3. **Slang** — When inverse rendering (fitting SDF parameters to target images) becomes a goal. Reuse the GLSL/Warp visitor pattern to emit `.slang` files.
+3. **Slang** — Deferred. Revisit only if inverse rendering becomes an explicit project goal.
 
 ---
 

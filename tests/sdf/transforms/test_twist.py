@@ -1,18 +1,17 @@
 """Diagnostic tests for the Twist deformation.
 
 These tests verify the properties needed for correct sphere-tracing and shading:
-  1. Gradient magnitude at surface points  (drives the `ao` proxy in the renderer)
+  1. Finite-difference normals at surface points
   2. Conservative property                 (SDF must not overestimate distances)
   3. Normal direction correctness          (gradient direction points outward)
   4. Rendering brightness parity          (twist should not significantly darken/brighten)
 """
 
-import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from jaxcad.render.raymarch import _sphere_trace, raymarch
+from jaxcad.render.raymarch import _compute_normal, _sphere_trace, raymarch
 from jaxcad.sdf.primitives import Box
 from jaxcad.sdf.transforms import Twist
 
@@ -30,23 +29,19 @@ def _surface_points(sdf, origins, directions, steps=128):
     """Run sphere tracing from origins and return hit positions where sdf ≈ 0."""
     hits = []
     for o, d in zip(origins, directions):
-        t, d_min = _sphere_trace(sdf, o, d, steps)
-        if float(d_min) < 0.02:
-            hits.append(o + t * d)
+        result = _sphere_trace(sdf, o, d, max_steps=steps)
+        if bool(result.hit):
+            hits.append(o + result.distance * d)
     return hits
 
 
 # ---------------------------------------------------------------------------
-# 1. Gradient magnitude at surface
+# 1. Forward-renderer normals at the surface
 # ---------------------------------------------------------------------------
 
 
-def test_twist_gradient_magnitude_at_surface():
-    """At surface points the gradient magnitude determines the `ao` proxy.
-
-    For correct rendering we need ||grad|| to not differ wildly from 1.
-    Record exact values so failures are informative.
-    """
+def test_twist_finite_difference_normals_are_unit_length():
+    """The forward renderer should produce finite unit normals on a twist."""
     sdf = _make_twisted_box(strength=1.0)
 
     # Cast rays inward from 6 axis-aligned directions to find surface points
@@ -63,19 +58,13 @@ def test_twist_gradient_magnitude_at_surface():
     hits = _surface_points(sdf, origins, directions)
     assert len(hits) > 0, "No surface hits found — sphere tracing may be broken"
 
-    grad_norms = []
+    normal_norms = []
     for pos in hits:
-        g = jax.grad(sdf)(pos)
-        grad_norms.append(float(jnp.linalg.norm(g)))
+        normal = _compute_normal(sdf, pos)
+        assert jnp.all(jnp.isfinite(normal))
+        normal_norms.append(float(jnp.linalg.norm(normal)))
 
-    min_norm = min(grad_norms)
-    max_norm = max(grad_norms)
-    print(f"\nGradient norms at surface: min={min_norm:.4f}  max={max_norm:.4f}")
-
-    # For a valid SDF the gradient norm equals 1. For an approximate SDF it should
-    # stay within a reasonable band so the `ao` proxy is not wildly off.
-    assert max_norm <= 2.5, f"Gradient norm too large ({max_norm:.3f}) — ao will be inflated"
-    assert min_norm >= 0.4, f"Gradient norm too small ({min_norm:.3f}) — ao will darken scene"
+    np.testing.assert_allclose(normal_norms, 1.0, atol=1e-4)
 
 
 # ---------------------------------------------------------------------------
@@ -143,8 +132,7 @@ def test_twist_normals_point_outward():
 
     step = 0.05
     for pos in hits:
-        g = jax.grad(sdf)(pos)
-        normal = g / jnp.linalg.norm(g)
+        normal = _compute_normal(sdf, pos)
         d_inward = float(sdf(pos - step * normal))
         d_outward = float(sdf(pos + step * normal))
         assert d_outward > d_inward, (
@@ -211,11 +199,9 @@ def test_twist_sphere_trace_converges():
     ]
 
     for origin, direction in rays:
-        t, d_min = _sphere_trace(sdf, origin, direction, steps=128)
-        pos = origin + t * direction
+        result = _sphere_trace(sdf, origin, direction, max_steps=128)
+        pos = origin + result.distance * direction
         sdf_at_hit = float(sdf(pos))
-        print(f"  d_min={float(d_min):.5f}  sdf@hit={sdf_at_hit:.5f}")
-        assert d_min < 0.05, (
-            f"Sphere trace failed to converge (d_min={float(d_min):.4f}). "
-            "Twist SDF may be non-conservative, causing overstepping."
-        )
+        print(f"  hit={bool(result.hit)}  steps={int(result.steps)}  sdf@hit={sdf_at_hit:.5f}")
+        assert result.hit, "Twist SDF may be non-conservative, causing overstepping."
+        assert abs(sdf_at_hit) <= 1e-3

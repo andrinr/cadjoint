@@ -26,10 +26,24 @@ def _sample_env_map(env_map: Array, direction: Array) -> Array:
     u = (theta / (2.0 * jnp.pi) + 0.5) % 1.0  # [0, 1]
     v = 0.5 - phi / jnp.pi  # [0, 1]  (top = sky)
 
-    H, W = env_map.shape[0], env_map.shape[1]
-    ix = jnp.clip(jnp.floor(u * W).astype(jnp.int32), 0, W - 1)
-    iy = jnp.clip(jnp.floor(v * H).astype(jnp.int32), 0, H - 1)
-    return env_map[iy, ix]
+    height, width = env_map.shape[0], env_map.shape[1]
+    # Address texel centres and interpolate instead of snapping to the nearest
+    # environment row/column. Nearest sampling becomes conspicuous banding when
+    # a curved glass or mirror surface magnifies the map.
+    x = u * width - 0.5
+    y = v * height - 0.5
+    x0_unwrapped = jnp.floor(x).astype(jnp.int32)
+    y0_unclamped = jnp.floor(y).astype(jnp.int32)
+    x0 = jnp.mod(x0_unwrapped, width)
+    x1 = jnp.mod(x0_unwrapped + 1, width)
+    y0 = jnp.clip(y0_unclamped, 0, height - 1)
+    y1 = jnp.clip(y0_unclamped + 1, 0, height - 1)
+    tx = x - jnp.floor(x)
+    ty = y - jnp.floor(y)
+
+    top = env_map[y0, x0] * (1.0 - tx) + env_map[y0, x1] * tx
+    bottom = env_map[y1, x0] * (1.0 - tx) + env_map[y1, x1] * tx
+    return top * (1.0 - ty) + bottom * ty
 
 
 def make_gradient_sky(

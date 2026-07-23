@@ -14,8 +14,7 @@ Differentiable SDF primitives, transformations, and constraint system built with
 - **SDF primitives** — sphere, box, capsule, cylinder, torus, and more
 - **Boolean ops** — union, intersection, subtraction with smooth blending
 - **Transforms** — translate, rotate, scale, mirror, repeat
-- **Raymarcher** — sphere-tracing renderer with materials, lighting, refraction, and anti-aliasing
-- **Differentiable rendering** — gradients flow through the full render pipeline via JAX
+- **Forward raymarcher** — early-exit sphere tracing, reconstructed silhouettes, GGX materials, soft shadows, reflections, refraction, and anti-aliasing
 - **Shader backends** — compile 3D SDFs through StableHLO to GLSL or WGSL
 - **WebGPU viewers** — interactively inspect SDFs in a browser playground or Jupyter
 - **Constraint system** — geometric constraints (distance, angle, coincident) with Riemannian gradient descent and Newton projection onto the constraint manifold
@@ -69,6 +68,25 @@ a live interactive scene and covers the local playground, camera controls,
 generated shader inspection, and the Jupyter widget.
 
 For offscreen OpenGL rendering, install the `glsl` extra instead.
+
+## Forward rendering
+
+The image renderer groups scene data and quality controls explicitly:
+
+```python
+from jaxcad.render import Camera, RenderSettings, Scene, render_scene
+from jaxcad.sdf.primitives import Sphere
+
+scene = Scene(
+    Sphere(1.0),
+    camera=Camera(position=(0, 1.5, 5), target=(0, 0, 0)),
+)
+image = render_scene(scene, RenderSettings.balanced((240, 320)))
+```
+
+Use `RenderSettings.draft()`, `.balanced()`, or `.high_quality()` to choose an
+explicit performance/fidelity trade-off. See the [forward renderer guide](https://andrinr.github.io/jaxcad/docs/rendering.html)
+for mode and quality comparisons.
 
 ## Development install
 

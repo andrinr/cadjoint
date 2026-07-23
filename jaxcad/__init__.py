@@ -12,7 +12,6 @@ from jaxcad.parametrization import (
     to_unconstrained,
     unnormalize,
 )
-from jaxcad.render.functionalize import functionalize_render
 from jaxcad.render.material import Material
 from jaxcad.sdf import SDF, boolean, primitives, transforms
 
@@ -25,7 +24,6 @@ __all__ = [
     "extract_parameters",
     "functionalize",
     "functionalize_scene",
-    "functionalize_render",
     "solve_constraints",
     "to_unconstrained",
     "to_constrained",

@@ -11,6 +11,8 @@ website:
     left:
       - text: Get Started
         href: docs/getting-started.qmd
+      - text: Rendering
+        href: docs/rendering.qmd
       - text: WebGPU Viewer
         href: docs/viewer.qmd
       - text: Examples
@@ -54,7 +56,6 @@ quartodoc:
     - title: Functionalize
       contents:
         - functionalize.functionalize
-        - render.functionalize.functionalize_render
     - title: Parametrization
       contents:
         - parametrization.to_normalized
@@ -79,6 +80,10 @@ quartodoc:
         - geometry.parameters.Scalar
     - title: Render
       contents:
+        - render.scene.Camera
+        - render.scene.Scene
+        - render.settings.RenderSettings
+        - render.raymarch.render.render_scene
         - render.raymarch.render.raymarch
         - render.raymarch.render.render_raymarched
         - render.marching_cubes.render_marching_cubes

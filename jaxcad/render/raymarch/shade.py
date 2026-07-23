@@ -1,4 +1,4 @@
-"""Surface normals, lighting, and Blinn-Phong shading."""
+"""Finite-difference normals, visibility, and physically based shading."""
 
 from __future__ import annotations
 
@@ -9,201 +9,200 @@ import jax.numpy as jnp
 from jax import Array
 
 from jaxcad.render.raymarch._constants import (
-    _AO_WEIGHT,
-    _DIFFUSE_WEIGHT,
     _MIN_MARCH_STEP,
-    _NORMAL_MAG_EPS,
     _NORMAL_ZERO_THRESHOLD,
-    _ROUGHNESS_EPS,
-    _SECONDARY_RAY_OFFSET,
     _SHADOW_T_START,
-    _SPECULAR_WEIGHT,
 )
 from jaxcad.render.raymarch.camera import _normalize
+from jaxcad.render.raymarch.surface import _offset_surface
+
+_PI = jnp.pi
 
 
 def _normal_fd(
     sdf: Callable[[Array], Array],
-    pos: Array,
-    eps: float = 1e-4,
-) -> tuple[Array, Array]:
-    """Tetrahedral finite-difference surface normal (IQ trick).
+    position: Array,
+    epsilon: float = 1e-3,
+) -> Array:
+    """Estimate an SDF normal with symmetric central differences.
 
-    Uses 4 SDF evaluations instead of the 6 required by central differences.
-    Avoids nested backward-mode AD when called inside jax.grad(loss).
-    Reference: https://iquilezles.org/articles/normalsSDF/
+    Six samples cost slightly more than a tetrahedral estimate, but avoid its
+    directional bias and produce substantially more stable specular highlights
+    on edges and small curved surfaces.
     """
-    # Tetrahedral sample directions
-    k0 = jnp.array([1.0, -1.0, -1.0])
-    k1 = jnp.array([-1.0, -1.0, 1.0])
-    k2 = jnp.array([-1.0, 1.0, -1.0])
-    k3 = jnp.array([1.0, 1.0, 1.0])
-    raw = (
-        k0 * sdf(pos + eps * k0)
-        + k1 * sdf(pos + eps * k1)
-        + k2 * sdf(pos + eps * k2)
-        + k3 * sdf(pos + eps * k3)
-    )
-    # The tetrahedral sum approximates ``4 * eps * grad(sdf)``. Normalizing
-    # hides that scale factor, but callers also use the magnitude as an AO
-    # proxy, so return an actual gradient estimate rather than the raw sum.
-    raw = raw / (4.0 * eps)
-    return raw, jnp.sqrt(jnp.sum(raw**2) + _NORMAL_MAG_EPS)
+    offsets = jnp.eye(3, dtype=position.dtype) * epsilon
+    positive = jax.vmap(lambda offset: sdf(position + offset))(offsets)
+    negative = jax.vmap(lambda offset: sdf(position - offset))(offsets)
+    return positive - negative
 
 
 def _compute_normal(
     sdf: Callable[[Array], Array],
-    pos: Array,
-    fd_normals: bool,
-    eps: float,
-) -> tuple[Array, Array]:
-    """Return ``(unit_normal, raw_magnitude)`` at *pos*.
-
-    Args:
-        sdf: Signed-distance function.
-        pos: Surface point, shape ``(3,)``.
-        fd_normals: Use finite differences instead of autodiff.
-        eps: Step size for finite-difference estimation.
-
-    Returns:
-        ``(unit_normal, raw_mag)`` where ``unit_normal`` is the normalized
-        outward surface normal and ``raw_mag`` is the gradient magnitude
-        (useful as an AO proxy or for Eikonal-deviation checks).
-    """
-    if fd_normals:
-        raw, mag = _normal_fd(sdf, pos, eps)
-    else:
-        raw = jax.grad(sdf)(pos)
-        # sqrt(sum+eps) avoids the 0/||0|| NaN gradient of linalg.norm at zero.
-        mag = jnp.sqrt(jnp.sum(raw**2) + _NORMAL_MAG_EPS)
-    return raw / jnp.where(mag > _NORMAL_ZERO_THRESHOLD, mag, 1.0), mag
+    position: Array,
+    epsilon: float = 1e-3,
+) -> Array:
+    """Return a unit surface normal estimated with finite differences."""
+    raw_normal = _normal_fd(sdf, position, epsilon)
+    magnitude = jnp.linalg.norm(raw_normal)
+    return raw_normal / jnp.maximum(magnitude, _NORMAL_ZERO_THRESHOLD)
 
 
 def _cast_shadow(
     sdf: Callable[[Array], Array],
-    pos: Array,
+    position: Array,
     normal: Array,
-    light_dir: Array,
+    light_direction: Array,
     steps: int,
     hardness: float,
+    max_distance: float = 20.0,
+    hit_epsilon: float = 1e-3,
+    step_scale: float = 0.9,
 ) -> Array:
-    """Soft shadow via secondary sphere tracing toward the light.
-
-    Uses the Inigo Quilez penumbra technique: the minimum ratio of SDF value
-    to ray distance approximates how much light is blocked.
-
-    The shadow ray origin is offset along the surface normal to avoid
-    self-intersection with the surface the ray was cast from.
-
-    Args:
-        sdf: Signed distance function, callable (3,) → scalar.
-        pos: Surface point to shadow-test, shape (3,).
-        normal: Outward surface normal at pos, shape (3,).
-        light_dir: Unit vector toward the light source, shape (3,).
-        steps: Number of shadow-ray march steps.
-        hardness: Controls shadow sharpness; higher values give harder edges.
-
-    Returns:
-        Shadow factor in [0, 1]: 0 = fully shadowed, 1 = fully lit.
-    """
-    # Offset along the normal so the shadow ray starts clearly outside the surface
-    origin = pos + normal * _SECONDARY_RAY_OFFSET
-
-    def f(carry, _):
-        t, shadow = carry
-        h = sdf(origin + light_dir * t)
-        # Clamp step to positive to prevent the ray going backwards inside geometry
-        return (t + jnp.maximum(h, _MIN_MARCH_STEP), jnp.clip(hardness * h / t, 0.0, shadow)), None
-
-    (_, shadow), _ = jax.lax.scan(
-        f, (jnp.array(_SHADOW_T_START), jnp.array(1.0)), None, length=steps
+    """Return an early-exit soft-shadow visibility factor in ``[0, 1]``."""
+    origin = _offset_surface(position, normal, hit_epsilon)
+    initial = (
+        jnp.asarray(_SHADOW_T_START),
+        jnp.asarray(1.0),
+        jnp.asarray(jnp.inf),
+        jnp.asarray(0, dtype=jnp.int32),
     )
-    return shadow
+
+    def keep_marching(state: tuple[Array, Array, Array, Array]) -> Array:
+        distance, visibility, _, count = state
+        return (count < steps) & (distance < max_distance) & (visibility > 0.0)
+
+    def march(state: tuple[Array, Array, Array, Array]):
+        distance, visibility, previous_surface_distance, count = state
+        surface_distance = sdf(origin + light_direction * distance)
+        finite_distance = jnp.where(jnp.isfinite(surface_distance), surface_distance, max_distance)
+        intersection = finite_distance <= hit_epsilon
+
+        # Estimate the closest surface-to-ray distance between this sample and
+        # the previous one. This avoids the step-shaped light leaks produced by
+        # evaluating h / t only at march positions, especially around corners.
+        has_previous_sample = jnp.isfinite(previous_surface_distance)
+        y = jnp.where(
+            has_previous_sample,
+            finite_distance**2 / jnp.maximum(2.0 * previous_surface_distance, 1e-8),
+            0.0,
+        )
+        valid_closest_estimate = (
+            has_previous_sample
+            & (previous_surface_distance > 0.0)
+            & (finite_distance > 0.0)
+            & (y < finite_distance)
+        )
+        closest_distance = jnp.where(
+            valid_closest_estimate,
+            jnp.sqrt(jnp.maximum(finite_distance**2 - y**2, 0.0)),
+            jnp.abs(finite_distance),
+        )
+        distance_along_ray = jnp.where(valid_closest_estimate, distance - y, distance)
+        distance_along_ray = jnp.maximum(distance_along_ray, _MIN_MARCH_STEP)
+        penumbra = jnp.clip(
+            hardness * closest_distance / distance_along_ray,
+            0.0,
+            1.0,
+        )
+        next_visibility = jnp.minimum(
+            visibility,
+            jnp.where(intersection, 0.0, penumbra),
+        )
+        advance = jnp.maximum(jnp.abs(finite_distance) * step_scale, _MIN_MARCH_STEP)
+        return distance + advance, next_visibility, finite_distance, count + 1
+
+    _, visibility, _, _ = jax.lax.while_loop(keep_marching, march, initial)
+    return visibility
 
 
-def _shade_one_light(
-    ldir: Array,
-    lcolor: Array,
-    sdf: Callable,
-    pos: Array,
+def _ggx_light(
+    light_direction: Array,
+    light_color: Array,
     normal: Array,
-    ray_dir: Array,
-    ao: Array,
+    view_direction: Array,
     base_color: Array,
-    specular_color: Array,
-    shininess: Array,
-    shadow_steps: int,
-    shadow_hardness: float,
+    roughness: Array,
+    metallic: Array,
+    visibility: Array,
 ) -> Array:
-    if shadow_steps == 0:
-        shadow = 1.0
-    else:
-        shadow = _cast_shadow(sdf, pos, normal, ldir, shadow_steps, shadow_hardness)
+    """Evaluate one Cook-Torrance GGX directional light."""
+    half_vector = _normalize(view_direction + light_direction)
+    n_dot_l = jnp.clip(jnp.dot(normal, light_direction), 0.0, 1.0)
+    n_dot_v = jnp.clip(jnp.dot(normal, view_direction), 0.0, 1.0)
+    n_dot_h = jnp.clip(jnp.dot(normal, half_vector), 0.0, 1.0)
+    v_dot_h = jnp.clip(jnp.dot(view_direction, half_vector), 0.0, 1.0)
 
-    diffuse = jnp.clip(jnp.dot(normal, ldir), 0.0, 1.0) * shadow
-    halfway = _normalize(ldir - ray_dir)
-    # Safe power: gradient of 0^s = 0^s*log(0) = NaN; replace base=0 with 1 so
-    # the gradient stays finite, then mask the result to 0 via jnp.where.
-    spec_cos = jnp.clip(jnp.dot(halfway, normal), 0.0, 1.0)
-    safe_cos = jnp.where(spec_cos > 0, spec_cos, jnp.ones_like(spec_cos))
-    specular = jnp.where(spec_cos > 0, safe_cos**shininess, 0.0) * shadow
-    return lcolor * (
-        base_color * (_AO_WEIGHT * ao + _DIFFUSE_WEIGHT * diffuse)
-        + specular_color * _SPECULAR_WEIGHT * specular
+    perceptual_roughness = jnp.clip(roughness, 0.04, 1.0)
+    alpha = perceptual_roughness**2
+    alpha_squared = alpha**2
+    distribution_denominator = n_dot_h**2 * (alpha_squared - 1.0) + 1.0
+    distribution = alpha_squared / jnp.maximum(
+        _PI * distribution_denominator**2,
+        1e-6,
     )
+
+    geometry_k = (perceptual_roughness + 1.0) ** 2 / 8.0
+
+    def geometry_schlick(n_dot_direction: Array) -> Array:
+        return n_dot_direction / jnp.maximum(
+            n_dot_direction * (1.0 - geometry_k) + geometry_k,
+            1e-6,
+        )
+
+    geometry = geometry_schlick(n_dot_l) * geometry_schlick(n_dot_v)
+    f0 = 0.04 * (1.0 - metallic) + base_color * metallic
+    fresnel = f0 + (1.0 - f0) * (1.0 - v_dot_h) ** 5
+    specular = distribution * geometry * fresnel / jnp.maximum(4.0 * n_dot_v * n_dot_l, 1e-6)
+    diffuse = (1.0 - fresnel) * (1.0 - metallic) * base_color / _PI
+    return light_color * (diffuse + specular) * n_dot_l * visibility
 
 
 def _shade_surface(
-    sdf: Callable,
-    mat: dict,
-    pos: Array,
+    sdf: Callable[[Array], Array],
+    material: dict,
+    position: Array,
     normal: Array,
-    ray_dir: Array,
-    ao: Array,
-    light_dirs: Array,
+    ray_direction: Array,
+    light_directions: Array,
     light_colors: Array,
     shadow_steps: int,
     shadow_hardness: float,
     ambient: float,
+    ambient_color: Array = jnp.ones(3),
+    shadow_distance: float = 20.0,
+    hit_epsilon: float = 1e-3,
+    step_scale: float = 0.9,
 ) -> Array:
-    """Blinn-Phong shading for a surface hit point.
+    """Shade a surface using Cook-Torrance GGX and directional lights."""
+    base_color = material["color"]
+    roughness = material["roughness"]
+    metallic = material["metallic"]
+    view_direction = -ray_direction
 
-    Args:
-        sdf: Signed distance function used for soft shadow rays.
-        mat: Material dict with keys "color" (RGB Array), "roughness"
-            (scalar in [0, 1]), and "metallic" (scalar in [0, 1]).
-        pos: Surface hit position in world space, shape (3,).
-        normal: Outward unit surface normal at pos, shape (3,).
-        ray_dir: Incident ray direction (pointing toward surface), shape (3,).
-        ao: Ambient occlusion factor in [0, 1]; 1.0 = fully lit.
-        light_dirs: Unit vectors toward each light source, shape (N, 3).
-        light_colors: RGB color/intensity of each light, shape (N, 3).
-        shadow_steps: Number of ray march steps for soft shadow evaluation.
-        shadow_hardness: Controls shadow sharpness; higher = harder shadows.
-        ambient: Scalar ambient light intensity added as base_color * ambient.
-
-    Returns:
-        RGB color array of shape (3,), unweighted by opacity or Fresnel.
-    """
-    base_color = mat["color"]
-    roughness = mat["roughness"]
-    metallic = mat["metallic"]
-    shininess = jnp.maximum(2.0 / (roughness**2 + _ROUGHNESS_EPS) - 2.0, 1.0)
-    specular_color = jnp.ones(3) * (1.0 - metallic) + base_color * metallic
-    per_light = jax.vmap(
-        lambda ld, lc: _shade_one_light(
-            ld,
-            lc,
-            sdf,
-            pos,
+    def shade_light(light_direction: Array, light_color: Array) -> Array:
+        visibility = jnp.asarray(1.0)
+        if shadow_steps > 0:
+            visibility = _cast_shadow(
+                sdf,
+                position,
+                normal,
+                light_direction,
+                shadow_steps,
+                shadow_hardness,
+                shadow_distance,
+                hit_epsilon,
+                step_scale,
+            )
+        return _ggx_light(
+            light_direction,
+            light_color,
             normal,
-            ray_dir,
-            ao,
+            view_direction,
             base_color,
-            specular_color,
-            shininess,
-            shadow_steps,
-            shadow_hardness,
+            roughness,
+            metallic,
+            visibility,
         )
-    )(light_dirs, light_colors)
-    return per_light.sum(0) + base_color * ambient
+
+    direct = jax.vmap(shade_light)(light_directions, light_colors).sum(axis=0)
+    return direct + base_color * ambient * ambient_color
