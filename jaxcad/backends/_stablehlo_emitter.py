@@ -36,24 +36,40 @@ def _strip_locs(text: str) -> str:
     return text
 
 
-def _validate_sdf_export(exported) -> None:
-    """Ensure generated source has the signature required by the renderers."""
+def _validate_point_shader_export(
+    exported,
+    *,
+    shader_description: str,
+    output_shape: tuple[int, ...],
+    output_description: str,
+) -> None:
+    """Validate a point-query shader export before source generation."""
     if len(exported.in_avals) != 1:
-        raise ValueError("An SDF shader must accept exactly one point argument")
+        raise ValueError(f"{shader_description} must accept exactly one point argument")
     point = exported.in_avals[0]
     if tuple(point.shape) != (3,) or np.dtype(point.dtype) != np.float32:
         raise ValueError(
-            "An SDF shader must accept one float32 point with shape (3,), "
+            f"{shader_description} must accept one float32 point with shape (3,), "
             f"got {point.dtype}{tuple(point.shape)}"
         )
     if len(exported.out_avals) != 1:
-        raise ValueError("An SDF shader must return exactly one distance value")
-    distance = exported.out_avals[0]
-    if tuple(distance.shape) != () or np.dtype(distance.dtype) != np.float32:
+        raise ValueError(f"{shader_description} must return exactly one value")
+    output = exported.out_avals[0]
+    if tuple(output.shape) != output_shape or np.dtype(output.dtype) != np.float32:
         raise ValueError(
-            "An SDF shader must return one scalar float32 distance, "
-            f"got {distance.dtype}{tuple(distance.shape)}"
+            f"{shader_description} must return one {output_description}, "
+            f"got {output.dtype}{tuple(output.shape)}"
         )
+
+
+def _validate_sdf_export(exported) -> None:
+    """Ensure generated source has the signature required by SDF renderers."""
+    _validate_point_shader_export(
+        exported,
+        shader_description="An SDF shader",
+        output_shape=(),
+        output_description="scalar float32 distance",
+    )
 
 
 # ── op dispatch tables ────────────────────────────────────────────────────────

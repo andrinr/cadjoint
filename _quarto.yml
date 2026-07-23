@@ -56,6 +56,11 @@ quartodoc:
     - title: Functionalize
       contents:
         - functionalize.functionalize
+        - functionalize.functionalize_scene
+    - title: Shader compilation
+      contents:
+        - backends.wgsl.codegen.compile_sdf_to_wgsl
+        - backends.wgsl.codegen.compile_scene_to_wgsl
     - title: Parametrization
       contents:
         - parametrization.to_normalized

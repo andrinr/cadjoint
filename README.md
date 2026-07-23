@@ -29,12 +29,18 @@ Compile an SDF to a standalone shader function:
 
 ```python
 from jaxcad.backends import GLSLBackend, WGSLBackend
+from jaxcad.backends.wgsl import compile_scene_to_wgsl
 from jaxcad.sdf.primitives import Sphere
 
 sphere = Sphere(radius=1.0)
 glsl = GLSLBackend().compile_sdf(sphere)
 wgsl = WGSLBackend().compile_sdf(sphere)
+wgsl_scene = compile_scene_to_wgsl(sphere)
 ```
+
+`compile_scene_to_wgsl` emits `sdf`, `material_base` (RGB + roughness), and
+`material_optics` (metallic + opacity + IOR + reflectivity) from the same scene
+snapshot, ready to embed in a WebGPU renderer.
 
 The Jupyter viewer is an optional dependency:
 
