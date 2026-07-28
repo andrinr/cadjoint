@@ -14,6 +14,11 @@ from jaxcad.viewer._pathtracer import (
     WGSL_PRESENT_TEMPLATE,
     build_path_tracer_shader,
 )
+from jaxcad.viewer._source_map import (
+    PLAYGROUND_FILENAME,
+    build_construction_payload,
+    capture_profiles,
+)
 from jaxcad.viewer._webgpu import build_viewer_shader
 
 
@@ -24,12 +29,14 @@ def _compile_source(source: str) -> dict[str, Any]:
     }
     captured = io.StringIO()
     with contextlib.redirect_stdout(captured), contextlib.redirect_stderr(captured):
-        exec(compile(source, "<jaxcad-playground>", "exec"), namespace, namespace)
+        with capture_profiles(PLAYGROUND_FILENAME) as profiles:
+            exec(compile(source, PLAYGROUND_FILENAME, "exec"), namespace, namespace)
         if "scene" not in namespace:
             raise ValueError("Your program must assign the SDF to a variable named `scene`.")
         scene_code = compile_scene_to_wgsl(namespace["scene"])
         preview_shader = build_viewer_shader(scene_code)
         path_shader = build_path_tracer_shader(scene_code)
+        construction = build_construction_payload(profiles, source)
 
     return {
         "ok": True,
@@ -39,6 +46,7 @@ def _compile_source(source: str) -> dict[str, Any]:
         "preview_shader": preview_shader,
         "path_shader": path_shader,
         "present_shader": WGSL_PRESENT_TEMPLATE,
+        "construction": construction,
         "output": captured.getvalue()[-8_000:],
     }
 

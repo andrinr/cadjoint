@@ -18,6 +18,10 @@ Differentiable SDF primitives, transformations, and constraint system built with
 - **Shader backends** — compile 3D SDFs through StableHLO to GLSL or WGSL
 - **WebGPU viewers** — interactively inspect SDFs or progressively path-trace
   materials in the browser playground
+- **Sketch construction** — 2D profiles on work planes, extruded or revolved into
+  solids that share their parameters, so constraints and gradients act on both
+- **Editable in the browser** — sketches render as depth-tested overlays you can
+  click, drag, and extend; every edit rewrites the Python source that produced it
 - **Constraint system** — geometric constraints (distance, angle, coincident) with Riemannian gradient descent and Newton projection onto the constraint manifold
 - **JAX-native** — every scene is a pure function; `jit`, `grad`, and `vmap` work out of the box
 
@@ -92,6 +96,44 @@ multi-bounce lighting, GGX reflections, and glass transport; camera and scene
 changes reset accumulation automatically. The server only listens on localhost
 and compiles each edit in a timed child process, but the editor still executes
 Python on your machine—only run code you trust.
+
+### Editing sketches in the viewer
+
+Sketches from the construction layer (see the
+[sketch notebook](examples/sketch_construction.ipynb)) are drawn over the
+rendered solid as depth-tested wireframes — an edge behind the model is hidden
+by it — and they can be edited directly:
+
+| Action | Result |
+| --- | --- |
+| Click a vertex handle | Selects it and highlights the exact literal in the code |
+| Drag a handle | Rewrites that vertex's coordinates and rebuilds the solid |
+| **Add vertex**, then click an edge | Inserts a vertex at that point in the code |
+| Select a handle, press Delete | Removes that vertex |
+| Drag empty space / Shift-drag / scroll | Orbit / pan / zoom |
+
+Every edit is applied to the Python source, which stays the single source of
+truth — there is no hidden scene state to drift out of sync. Sketches whose
+vertices are not plain literals (built in a loop, or from a variable) still
+render, but are read-only in the viewer.
+
+### Developing the playground UI
+
+The UI is a Solid + TypeScript app in `frontend/`, built into
+`jaxcad/viewer/static` and committed, so installing jaxcad needs no Node
+toolchain. To work on it:
+
+```bash
+cd frontend
+npm install
+npm run dev        # Vite on :5173, proxying the API to the Python server
+npm run build      # refresh jaxcad/viewer/static (commit the result)
+npm test           # projection and picking unit tests
+npm run e2e        # Playwright, drives the real server end to end
+```
+
+Run `uv run jaxcad-viewer` alongside `npm run dev` so the dev server has an API
+to proxy to.
 
 ## Shader compilation and live viewer
 

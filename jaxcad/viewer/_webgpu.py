@@ -27,6 +27,13 @@ struct Uniforms {
 };
 @group(0) @binding(0) var<uniform> u: Uniforms;
 
+// Only referenced by fs_main_depth, so pipelines built from vs_main/fs_main
+// (the notebook widget) never see this binding in their derived layout.
+struct ViewUniforms {
+  view_proj : mat4x4<f32>,
+};
+@group(0) @binding(2) var<uniform> view: ViewUniforms;
+
 fn safe_normalize(v: vec3<f32>) -> vec3<f32> {
   return v * inverseSqrt(max(dot(v, v), 1e-12));
 }
@@ -161,10 +168,15 @@ fn vs_main(@builtin(vertex_index) vid: u32) -> @builtin(position) vec4<f32> {
   return vec4<f32>(pos[vid], 0.0, 1.0);
 }
 
-@fragment
-fn fs_main(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
+struct TraceResult {
+  color    : vec3<f32>,
+  position : vec3<f32>,
+  hit      : bool,
+};
+
+fn trace_pixel(frag_xy: vec2<f32>) -> TraceResult {
   let res = u.resolution.xy;
-  let uv = (frag.xy / res - 0.5) * vec2<f32>(res.x / res.y, -1.0);
+  let uv = (frag_xy / res - 0.5) * vec2<f32>(res.x / res.y, -1.0);
   let camera = u.camera_pos.xyz;
   let camera_target = u.camera_target.xyz;
   let forward = safe_normalize(camera_target - camera);
@@ -174,19 +186,48 @@ fn fs_main(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
     forward + 1.5 * (uv.x * right + uv.y * up),
   );
   let distance = trace(camera, ray_direction);
-  var color = environment_radiance(ray_direction);
 
-  if (distance >= 0.0) {
+  var result: TraceResult;
+  result.color = environment_radiance(ray_direction);
+  result.position = camera;
+  result.hit = distance >= 0.0;
+
+  if (result.hit) {
     let position = camera + ray_direction * distance;
     let normal = sdf_normal(position);
-    color = shade_material(position, normal, ray_direction);
+    result.color = shade_material(position, normal, ray_direction);
+    result.position = position;
   }
+  return result;
+}
 
-  let display_color = pow(
-    aces_tone_map(color),
-    vec3<f32>(1.0 / 2.2),
-  );
-  return vec4<f32>(display_color, 1.0);
+fn display_color(color: vec3<f32>) -> vec4<f32> {
+  return vec4<f32>(pow(aces_tone_map(color), vec3<f32>(1.0 / 2.2)), 1.0);
+}
+
+@fragment
+fn fs_main(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
+  return display_color(trace_pixel(frag.xy).color);
+}
+
+struct DepthFragment {
+  @location(0) color            : vec4<f32>,
+  @builtin(frag_depth) depth    : f32,
+};
+
+// Same image as fs_main, plus scene depth so construction-tree overlays can be
+// depth-tested against the rendered solid instead of floating on top of it.
+@fragment
+fn fs_main_depth(@builtin(position) frag: vec4<f32>) -> DepthFragment {
+  let result = trace_pixel(frag.xy);
+  var fragment: DepthFragment;
+  fragment.color = display_color(result.color);
+  fragment.depth = 1.0;
+  if (result.hit) {
+    let clip = view.view_proj * vec4<f32>(result.position, 1.0);
+    fragment.depth = clamp(clip.z / max(clip.w, 1e-6), 0.0, 1.0);
+  }
+  return fragment;
 }
 """
 

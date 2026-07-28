@@ -1,0 +1,32 @@
+{
+  "name": "jaxcad-playground",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Browser CAD frontend for the JAXCAD playground server",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "e2e": "playwright test"
+  },
+  "dependencies": {
+    "@codemirror/commands": "^6.7.1",
+    "@codemirror/lang-python": "^6.1.6",
+    "@codemirror/language": "^6.10.8",
+    "@codemirror/state": "^6.5.0",
+    "@codemirror/view": "^6.36.1",
+    "solid-js": "^1.9.3"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.1",
+    "@types/node": "^26.1.2",
+    "@webgpu/types": "^0.1.52",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.7",
+    "vite-plugin-solid": "^2.11.0",
+    "vitest": "^2.1.8"
+  }
+}
