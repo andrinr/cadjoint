@@ -1,4 +1,4 @@
-"""Extrude a rectangle to create an oriented box."""
+"""Extrude a 2D profile (or legacy rectangle) into a solid SDF."""
 
 from __future__ import annotations
 
@@ -6,14 +6,64 @@ from typing import TYPE_CHECKING
 
 import jax.numpy as jnp
 
+from jaxcad.construction.sketch import PolygonProfile, SketchPlane
 from jaxcad.geometry.parameters import Scalar, Vector, as_parameter
 from jaxcad.geometry.primitives import Rectangle
 
 if TYPE_CHECKING:
+    from jaxcad.sdf.base import SDF
     from jaxcad.sdf.primitives.box import Box
 
 
-def extrude(rectangle: Rectangle, depth: float | Scalar) -> Box:
+def _place_on_plane(sdf: SDF, plane: SketchPlane) -> SDF:
+    """Wrap a local-frame SDF with transforms placing it on a sketch plane.
+
+    Rotation (orientation snapshot) then translation. The translation shares
+    the plane's ``origin`` Parameter, so plane position stays differentiable
+    and constraint-driven; orientation is captured at generation time.
+    """
+    from jaxcad.sdf.transforms import Rotate, Translate
+
+    if plane.is_identity():
+        return sdf
+    axis, angle = plane.axis_angle()
+    placed = sdf if angle == 0.0 else Rotate(sdf, axis=axis, angle=angle)
+    return Translate(placed, offset=plane.origin)
+
+
+def extrude(profile: PolygonProfile | Rectangle, depth: float | Scalar, material=None):
+    """Extrude a 2D profile into a solid.
+
+    For a :class:`PolygonProfile`, generates an
+    :class:`~jaxcad.sdf.primitives.polygon.ExtrudedPolygon` that shares the
+    profile's vertex parameters and is placed on the profile's sketch plane.
+    The solid spans ``±depth/2`` around the plane.
+
+    The legacy ``Rectangle → Box`` path is kept for backward compatibility.
+
+    Args:
+        profile: PolygonProfile (or legacy Rectangle) to extrude.
+        depth: Total extrusion depth.
+        material: Optional render material (PolygonProfile path only).
+
+    Returns:
+        SDF solid sharing parameter references with the construction tree.
+
+    Example:
+        ```python
+        profile = PolygonProfile([[0, 0], [2, 0], [2, 1], [0, 1]])
+        solid = extrude(profile, depth=0.5)
+        ```
+    """
+    if isinstance(profile, PolygonProfile):
+        from jaxcad.sdf.primitives.polygon import ExtrudedPolygon
+
+        base = ExtrudedPolygon(profile.vertices, depth=depth, material=material)
+        return _place_on_plane(base, profile.plane)
+    return _extrude_rectangle(profile, depth)
+
+
+def _extrude_rectangle(rectangle: Rectangle, depth: float | Scalar) -> Box:
     """Extrude a rectangle to create an oriented box.
 
     The box is centered on the rectangle's plane and extends depth/2 in each

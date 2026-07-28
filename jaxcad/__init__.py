@@ -1,7 +1,7 @@
 """jaxCAD: Differentiable CAD with SDFs and CSG."""
 
 from jaxcad.constraints.solve import solve_constraints
-from jaxcad.extraction import extract_parameters
+from jaxcad.extraction import apply_parameters, extract_parameters
 from jaxcad.functionalize import functionalize, functionalize_scene
 from jaxcad.parametrization import (
     compute_param_scales,
@@ -22,6 +22,7 @@ __all__ = [
     "boolean",
     "transforms",
     "extract_parameters",
+    "apply_parameters",
     "functionalize",
     "functionalize_scene",
     "solve_constraints",

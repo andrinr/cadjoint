@@ -5,6 +5,7 @@ from jaxcad.sdf.primitives.box import Box
 from jaxcad.sdf.primitives.capsule import Capsule
 from jaxcad.sdf.primitives.cylinder import Cylinder
 from jaxcad.sdf.primitives.plane import Plane
+from jaxcad.sdf.primitives.polygon import ExtrudedPolygon, RevolvedPolygon, polygon_sdf_2d
 from jaxcad.sdf.primitives.round_box import RoundBox
 from jaxcad.sdf.primitives.sphere import Sphere
 from jaxcad.sdf.primitives.torus import Torus
@@ -14,8 +15,11 @@ __all__ = [
     "Box",
     "Capsule",
     "Cylinder",
+    "ExtrudedPolygon",
     "Plane",
+    "RevolvedPolygon",
     "RoundBox",
     "Sphere",
     "Torus",
+    "polygon_sdf_2d",
 ]

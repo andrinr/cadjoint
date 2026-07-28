@@ -52,3 +52,52 @@ def extract_parameters(root: Fluent) -> tuple[dict, dict, dict]:
 
     walk(root)
     return free_params, fixed_params, metadata
+
+
+def apply_parameters(root: Fluent, free_params: dict) -> None:
+    """Write solved/optimized values back into a tree's free parameters.
+
+    The inverse of :func:`extract_parameters` for the free set: walks the same
+    tree and assigns ``free_params[name]`` to each free Parameter's ``value``.
+    Because generated solids share Parameter objects with their construction
+    tree, applying to either tree updates both.
+
+    Args:
+        root: The Fluent tree (construction node or SDF) to update.
+        free_params: Name-keyed values, as returned by ``solve_constraints``,
+            ``extract_parameters``, or an optimization loop.
+
+    Raises:
+        ValueError: If a name in ``free_params`` matches no free parameter in
+            the tree, or a value's shape does not match the parameter's.
+
+    Example:
+        ```python
+        solved = solve_constraints(profile)
+        apply_parameters(profile, solved)  # sketch, overlay, and solid update
+        ```
+    """
+    import jax.numpy as jnp
+
+    applied = set()
+
+    def walk(obj: Fluent) -> None:
+        if hasattr(obj, "params"):
+            for param in obj.params.values():
+                if param.free and param.name in free_params:
+                    value = jnp.asarray(free_params[param.name], dtype=jnp.float32)
+                    if value.shape != param.value.shape:
+                        raise ValueError(
+                            f"Value for '{param.name}' has shape {value.shape}, "
+                            f"expected {param.value.shape}."
+                        )
+                    param.value = value
+                    applied.add(param.name)
+        for child in obj.children():
+            walk(child)
+
+    walk(root)
+
+    unknown = set(free_params) - applied
+    if unknown:
+        raise ValueError(f"No free parameter found for: {sorted(unknown)}")
