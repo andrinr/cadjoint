@@ -16,7 +16,8 @@ Differentiable SDF primitives, transformations, and constraint system built with
 - **Transforms** — translate, rotate, scale, mirror, repeat
 - **Forward raymarcher** — early-exit sphere tracing, reconstructed silhouettes, GGX materials, soft shadows, reflections, refraction, and anti-aliasing
 - **Shader backends** — compile 3D SDFs through StableHLO to GLSL or WGSL
-- **WebGPU viewers** — interactively inspect SDFs in a browser playground or Jupyter
+- **WebGPU viewers** — interactively inspect SDFs or progressively path-trace
+  materials in the browser playground
 - **Constraint system** — geometric constraints (distance, angle, coincident) with Riemannian gradient descent and Newton projection onto the constraint manifold
 - **JAX-native** — every scene is a pure function; `jit`, `grad`, and `vmap` work out of the box
 
@@ -65,7 +66,9 @@ jaxcad-viewer --open
 ```
 
 Edit the example on the left and run it with `Ctrl+Enter` (or `Cmd+Enter`). The
-program must assign its final SDF to `scene`. The server only listens on localhost
+program must assign its final SDF to `scene`. Use **Path trace** for progressive
+multi-bounce lighting, GGX reflections, and glass transport; camera and scene
+changes reset accumulation automatically. The server only listens on localhost
 and compiles each edit in a timed child process, but the editor still executes
 Python on your machine—only run code you trust.
 
