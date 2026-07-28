@@ -5,6 +5,7 @@ headless test runs usually lack. ``wgpu`` (wgpu-native/naga) compiles the same
 WGSL a browser would, so syntax and type errors fail here instead.
 """
 
+import struct
 from pathlib import Path
 
 import pytest
@@ -81,10 +82,13 @@ def test_invalid_wgsl_is_actually_rejected(device):
 # renderer.ts builds them.
 
 COLOR_FORMAT = "bgra8unorm"
+# The preview pass is drawn first and owns both colour and depth. It must not
+# depth-test: a ray miss writes depth 1.0, which "less" rejects against the 1.0
+# clear, discarding the whole background.
 DEPTH_STATE = {
     "format": "depth32float",
     "depth_write_enabled": True,
-    "depth_compare": "less",
+    "depth_compare": "always",
 }
 
 
@@ -396,6 +400,115 @@ def test_preview_and_overlay_draw_in_one_pass(device, scene_code):
     render_pass.draw(6, 4)
     render_pass.end()
     device.queue.submit([encoder.finish()])
+
+
+def test_preview_pass_actually_shades_pixels(device, scene_code):
+    """Render the preview and read it back — a black frame is a failure.
+
+    Pipeline construction succeeds even when every fragment is later discarded,
+    so this checks the image itself: both the environment background and the
+    lit surface have to survive the depth configuration.
+    """
+    width = height = 64
+    color = device.create_texture(
+        size=(width, height, 1),
+        format="rgba8unorm",
+        usage=wgpu.TextureUsage.RENDER_ATTACHMENT | wgpu.TextureUsage.COPY_SRC,
+    )
+    depth = device.create_texture(
+        size=(width, height, 1),
+        format="depth32float",
+        usage=wgpu.TextureUsage.RENDER_ATTACHMENT,
+    )
+
+    module = device.create_shader_module(code=build_viewer_shader(scene_code))
+    bind_group_layout, pipeline_layout = shared_layout(device, [0, 2])
+    pipeline = device.create_render_pipeline(
+        layout=pipeline_layout,
+        vertex={"module": module, "entry_point": "vs_main"},
+        fragment={
+            "module": module,
+            "entry_point": "fs_main_depth",
+            "targets": [{"format": "rgba8unorm"}],
+        },
+        primitive={"topology": "triangle-list"},
+        depth_stencil=DEPTH_STATE,
+    )
+
+    # resolution | camera_pos | camera_target | light_dir+intensity | bg | path
+    scene_uniforms = struct.pack(
+        "24f",
+        width,
+        height,
+        0,
+        0,
+        3.0,
+        2.0,
+        4.0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0.55,
+        0.8,
+        0.35,
+        3.0,
+        0.035,
+        0.045,
+        0.035,
+        1.0,
+        0,
+        0,
+        0,
+        0,
+    )
+    scene_buffer = device.create_buffer_with_data(
+        data=scene_uniforms, usage=wgpu.BufferUsage.UNIFORM
+    )
+    view_buffer = device.create_buffer_with_data(
+        data=struct.pack("16f", *([0.0] * 16)), usage=wgpu.BufferUsage.UNIFORM
+    )
+    bind_group = device.create_bind_group(
+        layout=bind_group_layout,
+        entries=[
+            {"binding": 0, "resource": {"buffer": scene_buffer, "offset": 0, "size": 96}},
+            {"binding": 2, "resource": {"buffer": view_buffer, "offset": 0, "size": 64}},
+        ],
+    )
+
+    encoder = device.create_command_encoder()
+    render_pass = encoder.begin_render_pass(
+        color_attachments=[
+            {
+                "view": color.create_view(),
+                "clear_value": (0, 0, 0, 1),
+                "load_op": "clear",
+                "store_op": "store",
+            }
+        ],
+        depth_stencil_attachment={
+            "view": depth.create_view(),
+            "depth_clear_value": 1.0,
+            "depth_load_op": "clear",
+            "depth_store_op": "store",
+        },
+    )
+    render_pass.set_pipeline(pipeline)
+    render_pass.set_bind_group(0, bind_group)
+    render_pass.draw(3)
+    render_pass.end()
+    device.queue.submit([encoder.finish()])
+
+    pixels = device.queue.read_texture(
+        {"texture": color},
+        {"offset": 0, "bytes_per_row": width * 4, "rows_per_image": height},
+        (width, height, 1),
+    )
+    values = list(bytes(pixels))
+    lit = sum(1 for value in values[::4] if value > 8)
+    assert lit > width * height * 0.5, "preview rendered an almost entirely black frame"
+    assert len(set(values[::4])) > 4, "preview rendered a flat image with no shading"
 
 
 def test_present_pipeline_can_share_the_overlay_depth_attachment(device):

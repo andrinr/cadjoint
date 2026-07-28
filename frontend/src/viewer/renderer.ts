@@ -376,7 +376,10 @@ export class Renderer {
         targets: [{ format: this.format, writeMask }],
       },
       primitive: { topology: "triangle-list" },
-      depthStencil: { format: DEPTH_FORMAT, depthWriteEnabled: true, depthCompare: "less" },
+      // "always": this fullscreen pass establishes both colour and depth, and a
+      // ray miss writes depth 1.0 — which "less" would reject against the 1.0
+      // clear, discarding every background fragment.
+      depthStencil: { format: DEPTH_FORMAT, depthWriteEnabled: true, depthCompare: "always" },
     });
 
     const [colorPipeline, depthOnlyPipeline] = await Promise.all([
