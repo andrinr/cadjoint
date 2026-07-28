@@ -9,7 +9,7 @@ import jax
 import jax.numpy as jnp
 import pytest
 
-from jaxcad import extract_parameters, functionalize
+from jaxcad import apply_parameters, extract_parameters, functionalize
 from jaxcad.constraints import DistanceConstraint, FixedConstraint
 from jaxcad.constraints.solve import project_to_manifold, solve_constraints
 from jaxcad.construction import PolygonProfile, SketchPlane, extrude, revolve
@@ -236,3 +236,39 @@ class TestConstrainedOptimization:
         assert jnp.allclose(params["opt_v0"], jnp.array([0.0, 0.0]), atol=1e-3)
         edge = float(jnp.linalg.norm(params["opt_v1"] - params["opt_v0"]))
         assert edge == pytest.approx(2.0, abs=1e-3)
+
+
+# ── apply_parameters: writing values back into the shared tree ────────────────
+
+
+class TestApplyParameters:
+    def test_apply_updates_construction_and_solid(self):
+        profile = PolygonProfile([[0.1, -0.1], [1.9, 0.2], [1.0, 1.5]], name="ap")
+        v0, v1, v2 = profile.vertices
+        FixedConstraint(v0, [0.0, 0.0])
+        FixedConstraint(v1, [2.0, 0.0])
+        DistanceConstraint(v0, v2, 2.0)
+        DistanceConstraint(v1, v2, 2.0)
+        solid = extrude(profile, depth=1.0)
+
+        solved = solve_constraints(profile)
+        apply_parameters(profile, solved)
+
+        # construction tree updated
+        assert jnp.allclose(profile.vertices[2].value, jnp.array([1.0, jnp.sqrt(3.0)]), atol=1e-4)
+        # the solid shares the parameters, so direct evaluation sees the solve
+        centroid = jnp.array([1.0, float(jnp.sqrt(3.0)) / 3.0, 0.0])
+        assert float(solid(centroid)) < 0
+        # applying via the solid works identically (same walk, shared params)
+        apply_parameters(solid, solved)
+        assert jnp.allclose(profile.vertices[2].value, jnp.array([1.0, jnp.sqrt(3.0)]), atol=1e-4)
+
+    def test_unknown_name_raises(self):
+        profile = PolygonProfile(SQUARE, name="apu")
+        with pytest.raises(ValueError, match="No free parameter"):
+            apply_parameters(profile, {"nope": jnp.zeros(2)})
+
+    def test_shape_mismatch_raises(self):
+        profile = PolygonProfile(SQUARE, name="aps")
+        with pytest.raises(ValueError, match="shape"):
+            apply_parameters(profile, {"aps_v0": jnp.zeros(3)})
