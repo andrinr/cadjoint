@@ -162,7 +162,7 @@ existing widget after changing a scene without recreating its output cell:
 viewer.update_scene(new_scene)
 ```
 
-See the [WebGPU viewer notebook](../examples/webgpu_viewer.ipynb) for a complete
+See the [rendering notebook](../examples/rendering.ipynb) for a complete
 composition and hot-reload example.
 
 ## Troubleshooting

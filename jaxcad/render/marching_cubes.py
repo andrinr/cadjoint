@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
-from typing import Callable
+from typing import TYPE_CHECKING, Callable
 
 import jax
 import jax.numpy as jnp
-import matplotlib.pyplot as plt
 import numpy as np
 from jax import Array
-from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+
+from jaxcad.render._plotting import require_matplotlib
+
+if TYPE_CHECKING:
+    import matplotlib.pyplot as plt
 
 
 def render_marching_cubes(
@@ -25,7 +28,7 @@ def render_marching_cubes(
 ) -> plt.Axes:
     """Render an SDF by extracting a mesh with marching cubes.
 
-    Requires ``scikit-image``.
+    Requires ``scikit-image`` and ``matplotlib``.
 
     Args:
         sdf: Signed distance function, callable ``(point: Array[3]) → Array[]``.
@@ -45,8 +48,11 @@ def render_marching_cubes(
         from skimage import measure
     except ImportError as err:
         raise ImportError(
-            "render_marching_cubes requires scikit-image. " "Install with: pip install scikit-image"
+            "render_marching_cubes requires scikit-image. Install with: pip install scikit-image"
         ) from err
+
+    plt = require_matplotlib()
+    from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
     if ax is None:
         fig = plt.figure(figsize=figsize)

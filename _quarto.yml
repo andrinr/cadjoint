@@ -19,16 +19,14 @@ website:
         menu:
           - text: Basics
             href: examples/basics.ipynb
-          - text: Render
-            href: examples/render.ipynb
+          - text: Rendering
+            href: examples/rendering.ipynb
           - text: Constraints
             href: examples/constraints.ipynb
           - text: Optimization
             href: examples/optimization.ipynb
           - text: Constrained Optimization
             href: examples/constrained_optimization.ipynb
-          - text: WebGPU Notebook
-            href: examples/webgpu_viewer.ipynb
       - text: API Reference
         href: reference/index.qmd
     right:

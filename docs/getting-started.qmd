@@ -179,7 +179,7 @@ image = raymarch(
 
 ## Next steps
 
-- [Rendering notebook](../examples/render.ipynb) - full gallery of rendering features including glass refraction
+- [Rendering notebook](../examples/rendering.ipynb) - forward renderer, quality presets, and the interactive WebGPU viewer
 - [Optimization](../examples/optimization.ipynb) - differentiating through geometry parameters
 - [Constraints](../examples/constraints.ipynb) - solving fully-determined constraint systems
 - [Constrained Optimization](../examples/constrained_optimization.ipynb) - the full workflow with trajectory visualization

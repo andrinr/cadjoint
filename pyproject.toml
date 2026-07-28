@@ -11,7 +11,7 @@ readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
     "imageio>=2.37.2",
-    "jax[cuda12]>=0.4.20",
+    "jax>=0.4.20",
     "numpy>=1.24.0",
     "optax>=0.2.4",
     "optimistix>=0.0.10",
@@ -21,6 +21,9 @@ dependencies = [
 jaxcad-viewer = "jaxcad.viewer.playground:main"
 
 [project.optional-dependencies]
+# CPU JAX is the default so the package installs on macOS and CPU-only Linux.
+# Install this extra on a Linux box with an NVIDIA GPU (no macOS wheels exist).
+cuda = ["jax[cuda12]>=0.4.20"]
 glsl = ["moderngl>=5.12.0"]
 viewer = ["anywidget>=0.9.21"]
 dev = [

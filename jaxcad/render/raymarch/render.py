@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 from functools import lru_cache, partial
-from typing import Callable
+from typing import TYPE_CHECKING, Callable
 
 import jax
 import jax.numpy as jnp
-import matplotlib.pyplot as plt
 import numpy as np
 from jax import Array
 
+from jaxcad.render._plotting import require_matplotlib
 from jaxcad.render.raymarch.camera import _camera_rays
 from jaxcad.render.raymarch.shade import (
     _compute_normal,
@@ -24,6 +24,9 @@ from jaxcad.render.raymarch.trace import (
 )
 from jaxcad.render.scene import Scene
 from jaxcad.render.settings import RenderSettings, ToneMapping
+
+if TYPE_CHECKING:
+    import matplotlib.pyplot as plt
 
 
 def _default_material_at(_position: Array) -> dict:
@@ -502,7 +505,11 @@ def render_raymarched(
     title: str | None = None,
     **render_options,
 ) -> plt.Axes:
-    """Render an SDF with :func:`raymarch` and display it with matplotlib."""
+    """Render an SDF with :func:`raymarch` and display it with matplotlib.
+
+    Requires ``matplotlib``.
+    """
+    plt = require_matplotlib()
     if ax is None:
         _, ax = plt.subplots(figsize=(8, 8))
     ax.imshow(raymarch(sdf, **render_options), vmin=0, vmax=1)
