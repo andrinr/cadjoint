@@ -21,6 +21,8 @@ website:
             href: examples/basics.ipynb
           - text: Rendering
             href: examples/rendering.ipynb
+          - text: Sketch Construction
+            href: examples/sketch_construction.ipynb
           - text: Constraints
             href: examples/constraints.ipynb
           - text: Optimization
