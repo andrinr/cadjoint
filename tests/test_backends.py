@@ -130,6 +130,13 @@ def test_matrix_literals_use_shader_column_order():
     assert wgsl_literal(value, (2, 3), np.float32) == f"mat3x2<f32>({values})"
 
 
+def test_wgsl_literals_preserve_small_nonzero_values():
+    from jaxcad.backends.wgsl._wgsl_emitter import wgsl_literal
+
+    assert wgsl_literal(np.float32(1e-10), (), np.float32) == "1e-10"
+    assert wgsl_literal(np.float32(5e-7), (), np.float32) == "5e-07"
+
+
 # ── 3. Scalar arithmetic ──────────────────────────────────────────────────────
 
 

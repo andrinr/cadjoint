@@ -12,9 +12,11 @@ Key differences from GLSL:
 
 from __future__ import annotations
 
+import re
+
 import numpy as np
 
-from .._stablehlo_emitter import _strip_locs, _validate_sdf_export
+from .._stablehlo_emitter import _strip_locs, _validate_point_shader_export
 from .._type_utils import _shader_shape, parse_mlir_tensor_type
 
 # ── WGSL type mapping ─────────────────────────────────────────────────────────
@@ -72,6 +74,12 @@ def wgsl_literal(val, shape, dtype) -> str:
                 return "-3.402823e38"
             if np.isnan(fv):
                 raise ValueError("NaN constants cannot be represented portably in WGSL")
+            if fv != 0.0 and abs(fv) <= 0.5e-6:
+                return np.format_float_scientific(
+                    np.float32(fv),
+                    unique=True,
+                    trim="-",
+                )
             return f"{fv:.6f}"
         if base == "i32":
             return str(int(v))
@@ -131,12 +139,20 @@ _COMPARE: dict[str, str] = {
     "NE": "!=",
 }
 
+_WGSL_IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+
+
+def _validate_entry_point(entry_point: str) -> None:
+    if _WGSL_IDENTIFIER.fullmatch(entry_point) is None:
+        raise ValueError(f"WGSL entry point must be a valid identifier, got {entry_point!r}")
+
 
 # ── per-function emitter ──────────────────────────────────────────────────────
 
 
 class _WGSLFuncEmitter:
-    def __init__(self) -> None:
+    def __init__(self, symbol_names: dict[str, str]) -> None:
+        self._symbol_names = symbol_names
         self._names: dict = {}
         self._counter = 0
         self._lines: list[str] = []
@@ -152,7 +168,7 @@ class _WGSLFuncEmitter:
         except KeyError as exc:
             raise RuntimeError(f"StableHLO value {val} was used before it was emitted") from exc
 
-    def emit(self, func_op, fn_name: str) -> str:
+    def emit(self, func_op, fn_name: str, *, point_entry: bool = False) -> str:
         self._names = {}
         self._counter = 0
         self._lines = []
@@ -162,9 +178,14 @@ class _WGSLFuncEmitter:
         # ── arguments ─────────────────────────────────────────────────────────
         params = []
         for i, arg in enumerate(blk.arguments):
-            name = "p" if (i == 0 and fn_name == "sdf") else f"_arg{i}"
+            name = "p" if (i == 0 and point_entry) else f"_arg{i}"
             self._names[arg] = name
             params.append(f"{name}: {mlir_type_to_wgsl(str(arg.type))}")
+        # JAX may remove an unused point from the lowered main function when,
+        # for example, a scene has one constant material. Keep the public
+        # point-query contract stable even though the generated body ignores it.
+        if point_entry and not params:
+            params.append("p: vec3<f32>")
 
         # ── ops ───────────────────────────────────────────────────────────────
         ret_name, ret_type = "MISSING", "f32"
@@ -239,7 +260,11 @@ class _WGSLFuncEmitter:
 
         if name == "func.call":
             callee = mlir_ir.FlatSymbolRefAttr(op.attributes["callee"]).value
-            return f"{callee}({', '.join(a)})"
+            try:
+                emitted_callee = self._symbol_names[callee]
+            except KeyError as exc:
+                raise RuntimeError(f"StableHLO calls unknown function '{callee}'") from exc
+            return f"{emitted_callee}({', '.join(a)})"
 
         if name in ("stablehlo.broadcast_in_dim", "stablehlo.reshape"):
             in_t = mlir_type_to_wgsl(str(op.operands[0].type))
@@ -406,26 +431,57 @@ class _WGSLFuncEmitter:
 class StableHLOToWGSL:
     """Compiles JAX functions to WGSL via StableHLO."""
 
-    def compile(self, fn, *example_args) -> str:
+    def compile(
+        self,
+        fn,
+        *example_args,
+        entry_point: str = "sdf",
+        output_shape: tuple[int, ...] = (),
+        output_description: str = "scalar float32 distance",
+    ) -> str:
         import jax
         from jax.export import export
 
+        _validate_entry_point(entry_point)
         exported = export(jax.jit(fn))(*example_args)
-        _validate_sdf_export(exported)
-        return self.convert(exported.mlir_module())
+        _validate_point_shader_export(
+            exported,
+            shader_description=(
+                "An SDF shader"
+                if entry_point == "sdf" and output_shape == ()
+                else f"The {entry_point!r} shader"
+            ),
+            output_shape=output_shape,
+            output_description=output_description,
+        )
+        return self.convert(exported.mlir_module(), entry_point=entry_point)
 
-    def convert(self, mlir_text: str) -> str:
+    def convert(self, mlir_text: str, *, entry_point: str = "sdf") -> str:
         from jax._src.interpreters.mlir import make_ir_context
         from jaxlib.mlir import ir
+
+        _validate_entry_point(entry_point)
 
         clean = _strip_locs(mlir_text)
         with make_ir_context():
             module = ir.Module.parse(clean)
             funcs = list(module.body.operations)
+            symbol_names = {
+                func_op.name.value: (
+                    entry_point
+                    if func_op.name.value == "main"
+                    else f"{entry_point}__{func_op.name.value}"
+                )
+                for func_op in funcs
+            }
             parts: list[str] = []
             for func_op in reversed(funcs):
-                fn_name = func_op.name.value
-                if fn_name == "main":
-                    fn_name = "sdf"
-                parts.append(_WGSLFuncEmitter().emit(func_op, fn_name))
+                original_name = func_op.name.value
+                parts.append(
+                    _WGSLFuncEmitter(symbol_names).emit(
+                        func_op,
+                        symbol_names[original_name],
+                        point_entry=original_name == "main",
+                    )
+                )
         return "\n\n".join(parts)

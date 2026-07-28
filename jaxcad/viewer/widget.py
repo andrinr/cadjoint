@@ -29,8 +29,9 @@ import math
 from collections.abc import Sequence
 from typing import Callable
 
-from ..backends.wgsl.codegen import compile_sdf_to_wgsl
-from ._webgpu import WGSL_VIEWER_TEMPLATE
+from ..backends.wgsl.codegen import compile_scene_to_wgsl, compile_sdf_to_wgsl
+from ..fluent import Fluent
+from ._webgpu import WGSL_VIEWER_TEMPLATE, ensure_material_wgsl
 
 try:
     import anywidget
@@ -309,6 +310,13 @@ _ESM = _ESM.replace("__JAXCAD_SHADER_TEMPLATE__", json.dumps(WGSL_VIEWER_TEMPLAT
 # ── Python widget ─────────────────────────────────────────────────────────────
 
 
+def _compile_viewer_wgsl(fn: Callable) -> str:
+    """Compile complete JAXCAD scenes while retaining plain-callable support."""
+    if isinstance(fn, Fluent):
+        return compile_scene_to_wgsl(fn)
+    return ensure_material_wgsl(compile_sdf_to_wgsl(fn))
+
+
 class SDFViewer(anywidget.AnyWidget):
     """Interactive WebGPU SDF viewer for Jupyter notebooks.
 
@@ -357,7 +365,7 @@ class SDFViewer(anywidget.AnyWidget):
         **kwargs,
     ) -> None:
         super().__init__(
-            wgsl_sdf=compile_sdf_to_wgsl(fn),
+            wgsl_sdf=_compile_viewer_wgsl(fn),
             height=height,
             light_dir=list(light_dir),
             bg_color=list(bg_color),
@@ -366,4 +374,4 @@ class SDFViewer(anywidget.AnyWidget):
 
     def update_scene(self, fn: Callable) -> None:
         """Recompile and hot-reload the scene without recreating the widget."""
-        self.wgsl_sdf = compile_sdf_to_wgsl(fn)
+        self.wgsl_sdf = _compile_viewer_wgsl(fn)
