@@ -2,21 +2,24 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.9.38">
+<meta name="generator" content="quarto-1.10.18">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="description" content="Edit JAXCAD scenes in Python and preview their generated WGSL live in WebGPU.">
+<meta name="description" content="Edit JAXCAD scenes in Python and render their generated WGSL live in WebGPU.">
 
 <title>WebGPU Viewer – jaxCAD</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
 */
-code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
-div.columns{display: flex; gap: min(4vw, 1.5em);}
-div.column{flex: auto; overflow-x: auto;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
 div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
 ul.task-list{list-style: none;}
 ul.task-list li input[type="checkbox"] {
@@ -75,10 +78,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-c77c9138bec0b7f87654b70582999a87.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-d94f0129d652a5a8036266edffbc062c.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -201,6 +204,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <ul class="collapse">
   <li><a href="#controls" id="toc-controls" class="nav-link" data-scroll-target="#controls">Controls</a></li>
   <li><a href="#compilation-path" id="toc-compilation-path" class="nav-link" data-scroll-target="#compilation-path">Compilation path</a></li>
+  <li><a href="#path-tracing-mode" id="toc-path-tracing-mode" class="nav-link" data-scroll-target="#path-tracing-mode">Path-tracing mode</a></li>
   </ul></li>
   <li><a href="#jupyter-widget" id="toc-jupyter-widget" class="nav-link" data-scroll-target="#jupyter-widget">Jupyter widget</a></li>
   <li><a href="#troubleshooting" id="toc-troubleshooting" class="nav-link" data-scroll-target="#troubleshooting">Troubleshooting</a></li>
@@ -217,7 +221,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 <div>
   <div class="description">
-    Edit JAXCAD scenes in Python and preview their generated WGSL live in WebGPU.
+    Edit JAXCAD scenes in Python and render their generated WGSL live in WebGPU.
   </div>
 </div>
 
@@ -235,6 +239,19 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 
 <p>JAXCAD provides two interactive WebGPU workflows: a standalone browser playground for editing complete Python scenes and a compact widget for Jupyter notebooks.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>WebGPU requires localhost or HTTPS and a browser/platform combination with an available GPU adapter. The viewer reports adapter, device, context, shader, and device-loss failures directly over the canvas. Mozilla currently enables WebGPU by default on Windows and Apple-silicon macOS; Linux support remains <a href="https://developer.mozilla.org/en-US/docs/Mozilla/Firefox/Experimental_features">Nightly-only</a>.</p>
+</div>
+</div>
 <p><link rel="stylesheet" href="assets/webgpu-viewer.css"></p>
 <div class="jaxcad-webgpu-demo" data-jaxcad-webgpu-viewer="">
 <canvas data-viewer-canvas="" aria-label="Interactive WebGPU rendering of the JAXCAD orbital example">
@@ -257,24 +274,27 @@ Drag to orbit · Scroll to zoom
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run jaxcad-viewer <span class="at">--open</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>The module entry point works as well, and accepts a custom port:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> <span class="at">-m</span> jaxcad.viewer.playground <span class="at">--open</span> <span class="at">--port</span> 9000</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>The playground opens with a complete example. Edit the Python on the left and press <strong>Run scene</strong> or <code>Ctrl+Enter</code> (<code>Cmd+Enter</code> on macOS) to update the preview. The final SDF must be assigned to a variable named <code>scene</code>:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> jax.numpy <span class="im">as</span> jnp</span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> jaxcad.sdf.boolean <span class="im">import</span> Difference, Union</span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> jaxcad.sdf.primitives <span class="im">import</span> Box, Sphere, Torus</span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> jaxcad.sdf.transforms <span class="im">import</span> Rotate, Translate</span>
-<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>ring <span class="op">=</span> Rotate(Torus(major_radius<span class="op">=</span><span class="fl">0.95</span>, minor_radius<span class="op">=</span><span class="fl">0.18</span>), <span class="st">"x"</span>, jnp.pi <span class="op">/</span> <span class="fl">2.5</span>)</span>
-<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>core <span class="op">=</span> Sphere(radius<span class="op">=</span><span class="fl">0.62</span>)</span>
-<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>notch <span class="op">=</span> Rotate(Box(size<span class="op">=</span>[<span class="fl">0.30</span>, <span class="fl">1.5</span>, <span class="fl">0.30</span>]), <span class="st">"z"</span>, jnp.pi <span class="op">/</span> <span class="dv">4</span>)</span>
-<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>moon <span class="op">=</span> Translate(Sphere(radius<span class="op">=</span><span class="fl">0.28</span>), [<span class="fl">1.18</span>, <span class="fl">0.22</span>, <span class="fl">0.08</span>])</span>
-<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>body <span class="op">=</span> Difference(Union(core, ring, smoothness<span class="op">=</span><span class="fl">0.10</span>), notch, smoothness<span class="op">=</span><span class="fl">0.04</span>)</span>
-<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>scene <span class="op">=</span> Union(body, moon, smoothness<span class="op">=</span><span class="fl">0.06</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>The viewer recompiles only when requested and redraws only after a scene, camera, or viewport change.</p>
+<p>The playground opens with a complete material example. Edit the Python on the left and press <strong>Run scene</strong> or <code>Ctrl+Enter</code> (<code>Cmd+Enter</code> on macOS) to update the preview. The final SDF must be assigned to a variable named <code>scene</code>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> jaxcad.render <span class="im">import</span> Material</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> jaxcad.sdf.boolean <span class="im">import</span> Union</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> jaxcad.sdf.primitives <span class="im">import</span> Plane, Sphere</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> jaxcad.sdf.transforms <span class="im">import</span> Translate</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>red <span class="op">=</span> Material(color<span class="op">=</span>[<span class="fl">0.8</span>, <span class="fl">0.035</span>, <span class="fl">0.015</span>], roughness<span class="op">=</span><span class="fl">0.42</span>)</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>glass <span class="op">=</span> Material(color<span class="op">=</span>[<span class="fl">0.94</span>, <span class="fl">0.98</span>, <span class="fl">1.0</span>], opacity<span class="op">=</span><span class="fl">0.0</span>, ior<span class="op">=</span><span class="fl">1.5</span>)</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>scene <span class="op">=</span> Union(</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>    Translate(Sphere(<span class="fl">0.72</span>, material<span class="op">=</span>red), [<span class="op">-</span><span class="fl">0.8</span>, <span class="op">-</span><span class="fl">0.38</span>, <span class="fl">0.0</span>]),</span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>    Translate(Sphere(<span class="fl">0.58</span>, material<span class="op">=</span>glass), [<span class="fl">0.8</span>, <span class="op">-</span><span class="fl">0.5</span>, <span class="fl">0.15</span>]),</span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>    Plane(<span class="op">-</span><span class="fl">1.1</span>, material<span class="op">=</span>Material(color<span class="op">=</span>[<span class="fl">0.1</span>, <span class="fl">0.12</span>, <span class="fl">0.16</span>])),</span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The deterministic preview redraws only after a scene, camera, or viewport change. Select <strong>Path trace</strong> to progressively accumulate indirect lighting, material reflections, and glass transport. Accumulation resets automatically when the scene, camera, viewport, or rendering mode changes.</p>
 <section id="controls" class="level3">
 <h3 class="anchored" data-anchor-id="controls">Controls</h3>
 <table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
 <thead>
 <tr class="header">
 <th>Action</th>
@@ -299,6 +319,14 @@ Drag to orbit · Scroll to zoom
 <td><strong>Reset</strong></td>
 </tr>
 <tr class="odd">
+<td>Toggle progressive global illumination</td>
+<td><strong>Path trace</strong> / <strong>Preview</strong></td>
+</tr>
+<tr class="even">
+<td>Choose rendering quality</td>
+<td><strong>Draft</strong> / <strong>High</strong> / <strong>Ultra</strong></td>
+</tr>
+<tr class="odd">
 <td>Inspect the complete generated shader</td>
 <td><strong>WGSL</strong></td>
 </tr>
@@ -310,11 +338,26 @@ Drag to orbit · Scroll to zoom
 <p>Each update follows the same path used by the shader backend:</p>
 <ol type="1">
 <li>The local server evaluates the Python and reads <code>scene</code>.</li>
-<li>JAX traces the SDF and lowers it to StableHLO.</li>
-<li>JAXCAD translates StableHLO to a WGSL <code>sdf</code> function.</li>
-<li>The browser builds a WebGPU pipeline and ray-marches the SDF.</li>
+<li>JAX traces distance and material evaluation and lowers both to StableHLO.</li>
+<li>JAXCAD emits WGSL <code>sdf</code>, <code>material_base</code>, and <code>material_optics</code> functions.</li>
+<li>The browser embeds those functions in either the preview or path-tracing transport runtime and builds the WebGPU pipelines.</li>
 </ol>
 <p>Compilation runs in a separate child process with a timeout, so a failed edit does not take down the viewer server. Python tracebacks and WebGPU shader errors appear under the editor.</p>
+</section>
+<section id="path-tracing-mode" class="level3">
+<h3 class="anchored" data-anchor-id="path-tracing-mode">Path-tracing mode</h3>
+<p>The path tracer launches one jittered camera sample per pixel per animation frame and averages samples in linear HDR. It supports:</p>
+<ul>
+<li>cosine-weighted diffuse and importance-sampled GGX reflection;</li>
+<li>explicit mirror reflectivity and Schlick-Fresnel glass reflection/refraction;</li>
+<li>finite-sun next-event estimation with progressively resolved soft shadows;</li>
+<li>multi-bounce environment lighting and Russian-roulette termination;</li>
+<li>sign-crossing intersection tests with binary refinement, avoiding false silhouette and shadow hits on rays that merely pass close to a surface;</li>
+<li>ACES tone mapping in a separate presentation pass.</li>
+</ul>
+<p>The quality selector changes framebuffer resolution in both preview and path mode. In path mode it additionally changes bounce depth, sun-visibility samples, and the accumulation limit. The status pill always identifies WebGPU as the active backend and includes adapter details when the browser exposes them; the viewer has no silent WebGL fallback.</p>
+<p>Two half-float textures alternate between sampled input and render attachment. WebGPU does not allow one texture to be sampled and rendered into in the same pass, so this ping-pong design is required rather than incidental. The playground offers three quality budgets. <strong>High</strong> is the default at roughly 900,000 pixels, six bounces, two sun-visibility samples per hit, and 512 samples per pixel; <strong>Draft</strong> favors interaction, while <strong>Ultra</strong> opts into a 1.6-million-pixel, eight-bounce, four-visibility-sample, 1,024-sample budget.</p>
+<p>The finite sun is sampled only through next-event estimation and is not part of the environment radiance seen by BSDF paths, so the current strategies do not overlap. Multiple importance sampling becomes useful when emissive area lights or an importance-sampled environment map are added. The research and scope decisions are recorded in <a href="https://github.com/andrinr/jaxcad/blob/main/research/path-tracing.md"><code>research/path-tracing.md</code></a>.</p>
 <div class="callout callout-style-default callout-warning callout-titled">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">

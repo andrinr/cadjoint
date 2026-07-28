@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>constraints.types.perpendicular.perpendicularconstraint – jaxCAD</title>
+<title>backends.wgsl.codegen.compile_sdf_to_wgsl – jaxCAD</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -199,16 +199,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#jaxcad.constraints.types.perpendicular.PerpendicularConstraint" id="toc-jaxcad.constraints.types.perpendicular.PerpendicularConstraint" class="nav-link active" data-scroll-target="#jaxcad.constraints.types.perpendicular.PerpendicularConstraint">constraints.types.perpendicular.PerpendicularConstraint</a>
+  <li><a href="#jaxcad.backends.wgsl.codegen.compile_sdf_to_wgsl" id="toc-jaxcad.backends.wgsl.codegen.compile_sdf_to_wgsl" class="nav-link active" data-scroll-target="#jaxcad.backends.wgsl.codegen.compile_sdf_to_wgsl">backends.wgsl.codegen.compile_sdf_to_wgsl</a>
   <ul class="collapse">
   <li><a href="#parameters" id="toc-parameters" class="nav-link" data-scroll-target="#parameters">Parameters</a></li>
-  <li><a href="#example" id="toc-example" class="nav-link" data-scroll-target="#example">Example</a></li>
-  <li><a href="#methods" id="toc-methods" class="nav-link" data-scroll-target="#methods">Methods</a>
-  <ul class="collapse">
-  <li><a href="#jaxcad.constraints.types.perpendicular.PerpendicularConstraint.compute_residual" id="toc-jaxcad.constraints.types.perpendicular.PerpendicularConstraint.compute_residual" class="nav-link" data-scroll-target="#jaxcad.constraints.types.perpendicular.PerpendicularConstraint.compute_residual">compute_residual</a></li>
-  <li><a href="#jaxcad.constraints.types.perpendicular.PerpendicularConstraint.dof_reduction" id="toc-jaxcad.constraints.types.perpendicular.PerpendicularConstraint.dof_reduction" class="nav-link" data-scroll-target="#jaxcad.constraints.types.perpendicular.PerpendicularConstraint.dof_reduction">dof_reduction</a></li>
-  <li><a href="#jaxcad.constraints.types.perpendicular.PerpendicularConstraint.get_parameters" id="toc-jaxcad.constraints.types.perpendicular.PerpendicularConstraint.get_parameters" class="nav-link" data-scroll-target="#jaxcad.constraints.types.perpendicular.PerpendicularConstraint.get_parameters">get_parameters</a></li>
-  </ul></li>
+  <li><a href="#returns" id="toc-returns" class="nav-link" data-scroll-target="#returns">Returns</a></li>
   </ul></li>
   </ul>
 </nav>
@@ -219,25 +213,19 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 
 
-<section id="jaxcad.constraints.types.perpendicular.PerpendicularConstraint" class="level1">
-<h1>constraints.types.perpendicular.PerpendicularConstraint</h1>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>constraints.types.perpendicular.PerpendicularConstraint(</span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>    vector1,</span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>    vector2,</span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    <span class="op">*</span>,</span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>    weight<span class="op">=</span><span class="fl">1.0</span>,</span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Constraint that forces two vectors to be perpendicular.</p>
-<p>This is equivalent to AngleConstraint with angle=π/2.</p>
-<p>Reduces DOF by 1 (one scalar equation: dot product = 0).</p>
+<section id="jaxcad.backends.wgsl.codegen.compile_sdf_to_wgsl" class="level1">
+<h1>backends.wgsl.codegen.compile_sdf_to_wgsl</h1>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>backends.wgsl.codegen.compile_sdf_to_wgsl(fn, example_point<span class="op">=</span><span class="va">None</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Compile a JAX SDF function to a WGSL function string.</p>
+<p>The emitted entry-point is always named <code>sdf</code>.</p>
 <section id="parameters" class="level2 doc-section doc-section-parameters">
 <h2 class="doc-section doc-section-parameters anchored" data-anchor-id="parameters">Parameters</h2>
 <table class="caption-top table">
 <colgroup>
-<col style="width: 12%">
-<col style="width: 10%">
-<col style="width: 60%">
-<col style="width: 16%">
+<col style="width: 14%">
+<col style="width: 20%">
+<col style="width: 53%">
+<col style="width: 11%">
 </colgroup>
 <thead>
 <tr class="header">
@@ -249,91 +237,27 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </thead>
 <tbody>
 <tr class="odd">
-<td>vector1</td>
-<td>Vector</td>
-<td>First direction vector (Vector parameter)</td>
+<td>fn</td>
+<td>Callable</td>
+<td>Callable <code>(p: f32[3]) -&gt; f32[]</code> traceable by JAX.</td>
 <td><em>required</em></td>
 </tr>
 <tr class="even">
-<td>vector2</td>
-<td>Vector</td>
-<td>Second direction vector (Vector parameter)</td>
-<td><em>required</em></td>
+<td>example_point</td>
+<td>jnp.ndarray | None</td>
+<td>Example input for shape inference. Defaults to zeros.</td>
+<td><code>None</code></td>
 </tr>
 </tbody>
 </table>
 </section>
-<section id="example" class="level2 doc-section doc-section-example">
-<h2 class="doc-section doc-section-example anchored" data-anchor-id="example">Example</h2>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>v1 <span class="op">=</span> Vector([<span class="dv">1</span>, <span class="dv">0</span>, <span class="dv">0</span>], free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">'v1'</span>)</span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>v2 <span class="op">=</span> Vector([<span class="dv">0</span>, <span class="dv">1</span>, <span class="dv">0</span>], free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">'v2'</span>)</span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>constraint <span class="op">=</span> PerpendicularConstraint(v1, v2)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-</section>
-<section id="methods" class="level2">
-<h2 class="anchored" data-anchor-id="methods">Methods</h2>
-<table class="caption-top table">
-<thead>
-<tr class="header">
-<th>Name</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td><a href="#jaxcad.constraints.types.perpendicular.PerpendicularConstraint.compute_residual">compute_residual</a></td>
-<td>Compute perpendicular constraint residual: v1 · v2.</td>
-</tr>
-<tr class="even">
-<td><a href="#jaxcad.constraints.types.perpendicular.PerpendicularConstraint.dof_reduction">dof_reduction</a></td>
-<td>Perpendicular constraint adds 1 scalar equation.</td>
-</tr>
-<tr class="odd">
-<td><a href="#jaxcad.constraints.types.perpendicular.PerpendicularConstraint.get_parameters">get_parameters</a></td>
-<td>Return both vectors involved in the perpendicular constraint.</td>
-</tr>
-</tbody>
-</table>
-<section id="jaxcad.constraints.types.perpendicular.PerpendicularConstraint.compute_residual" class="level3">
-<h3 class="anchored" data-anchor-id="jaxcad.constraints.types.perpendicular.PerpendicularConstraint.compute_residual">compute_residual</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>constraints.types.perpendicular.PerpendicularConstraint.compute_residual(</span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>    param_values,</span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Compute perpendicular constraint residual: v1 · v2.</p>
-<p>Two vectors are perpendicular iff their dot product is zero.</p>
-<section id="parameters-1" class="level4 doc-section doc-section-parameters">
-<h4 class="doc-section doc-section-parameters anchored" data-anchor-id="parameters-1">Parameters</h4>
+<section id="returns" class="level2 doc-section doc-section-returns">
+<h2 class="doc-section doc-section-returns anchored" data-anchor-id="returns">Returns</h2>
 <table class="caption-top table">
 <colgroup>
-<col style="width: 16%">
-<col style="width: 22%">
-<col style="width: 47%">
-<col style="width: 13%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>Name</th>
-<th>Type</th>
-<th>Description</th>
-<th>Default</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>param_values</td>
-<td>dict[str, Array]</td>
-<td>Dict with keys matching parameter names</td>
-<td><em>required</em></td>
-</tr>
-</tbody>
-</table>
-</section>
-<section id="returns" class="level4 doc-section doc-section-returns">
-<h4 class="doc-section doc-section-returns anchored" data-anchor-id="returns">Returns</h4>
-<table class="caption-top table">
-<colgroup>
-<col style="width: 10%">
-<col style="width: 10%">
-<col style="width: 78%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 82%">
 </colgroup>
 <thead>
 <tr class="header">
@@ -345,25 +269,13 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <tbody>
 <tr class="odd">
 <td></td>
-<td>Array</td>
-<td>Scalar residual (dot product, should be 0 when satisfied)</td>
+<td>str</td>
+<td>WGSL source for the SDF function(s) — no surrounding shader boilerplate.</td>
 </tr>
 </tbody>
 </table>
-</section>
-</section>
-<section id="jaxcad.constraints.types.perpendicular.PerpendicularConstraint.dof_reduction" class="level3">
-<h3 class="anchored" data-anchor-id="jaxcad.constraints.types.perpendicular.PerpendicularConstraint.dof_reduction">dof_reduction</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>constraints.types.perpendicular.PerpendicularConstraint.dof_reduction()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Perpendicular constraint adds 1 scalar equation.</p>
-</section>
-<section id="jaxcad.constraints.types.perpendicular.PerpendicularConstraint.get_parameters" class="level3">
-<h3 class="anchored" data-anchor-id="jaxcad.constraints.types.perpendicular.PerpendicularConstraint.get_parameters">get_parameters</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>constraints.types.perpendicular.PerpendicularConstraint.get_parameters()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Return both vectors involved in the perpendicular constraint.</p>
 
 
-</section>
 </section>
 </section>
 
