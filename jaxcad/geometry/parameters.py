@@ -166,12 +166,45 @@ class Vector(Parameter):
         return self.value
 
 
+@dataclass
+class Vector2(Parameter):
+    """2D vector parameter (sketch points, planar offsets, profile vertices).
+
+    Sketch entities live in plane coordinates, so their points carry 2 DOF —
+    using ``Vector2`` instead of a z-padded :class:`Vector` keeps constraint
+    DOF counting honest.
+
+    Example:
+        ```python
+        vertex = Vector2(value=[1.0, 0.5], free=True, name='v0')
+        ```
+    """
+
+    def __post_init__(self):
+        super().__post_init__()
+        if self.value.shape != (2,):
+            raise ValueError(f"Vector2 must be 2D, got shape {self.value.shape}")
+        if not jnp.issubdtype(self.value.dtype, jnp.floating):
+            self.value = self.value.astype(jnp.float32)
+
+    def norm(self) -> float:
+        """Compute Euclidean norm."""
+        return jnp.linalg.norm(self.value)
+
+    @property
+    def xy(self) -> Array:
+        """Alias for .value (2D coordinates)."""
+        return self.value
+
+
 # Register as JAX pytrees
 jax.tree_util.register_pytree_node(Parameter, Parameter.tree_flatten, Parameter.tree_unflatten)
 
 jax.tree_util.register_pytree_node(Scalar, Scalar.tree_flatten, Scalar.tree_unflatten)
 
 jax.tree_util.register_pytree_node(Vector, Vector.tree_flatten, Vector.tree_unflatten)
+
+jax.tree_util.register_pytree_node(Vector2, Vector2.tree_flatten, Vector2.tree_unflatten)
 
 
 @overload
@@ -223,10 +256,14 @@ def as_parameter(
     elif arr.shape == (3,):
         return Vector(value=arr, free=False, name=name)
 
+    # Vector2 (2D array — sketch/plane coordinates)
+    elif arr.shape == (2,):
+        return Vector2(value=arr, free=False, name=name)
+
     else:
         raise ValueError(
             f"Cannot auto-convert value with shape {arr.shape} to Parameter. "
-            f"Use Scalar for scalars or Vector for 3D vectors."
+            f"Use Scalar for scalars, Vector for 3D vectors, or Vector2 for 2D vectors."
         )
 
 

@@ -1,12 +1,20 @@
-"""Construction layer: Bridge from geometry primitives to SDF primitives.
+"""Construction layer: a second tree of editable CAD scaffolding.
 
-This module provides functions to construct SDF primitives from geometric entities.
-It acts as the bridge between the parametric geometry layer and the SDF layer.
+The construction tree holds sketch planes and parameter-bearing 2D profiles —
+the objects a user edits. Generator functions turn them into SDF solids that
+share the *same* Parameter objects, so sketch constraints and gradients act
+directly on the generated geometry. The construction tree itself is rendered
+as a wireframe overlay on top of SDF renders (``jaxcad.render.overlay``).
 
-Construction functions preserve parameter references, so constraints on geometry
-automatically affect the resulting SDFs.
+Construction tree:
+- SketchPlane(origin, normal) — work plane / coordinate frame
+- PolygonProfile(vertices, plane) — closed 2D profile with Vector2 parameters
 
-Functions:
+Generators (construction → SDF):
+- extrude(profile, depth) → ExtrudedPolygon placed on the profile's plane
+- revolve(profile, offset) → RevolvedPolygon placed on the profile's plane
+
+Legacy helpers:
 - extrude(rectangle, depth) → Box
 - from_line(line, radius) → Capsule
 - from_circle(circle, height) → Cylinder
@@ -19,9 +27,14 @@ from jaxcad.construction.extrude import extrude
 from jaxcad.construction.from_circle import from_circle
 from jaxcad.construction.from_line import from_line
 from jaxcad.construction.from_point import from_point
+from jaxcad.construction.revolve import revolve
+from jaxcad.construction.sketch import PolygonProfile, SketchPlane
 
 __all__ = [
+    "SketchPlane",
+    "PolygonProfile",
     "extrude",
+    "revolve",
     "from_line",
     "from_circle",
     "from_point",

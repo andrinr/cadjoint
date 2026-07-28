@@ -50,17 +50,19 @@ from jaxcad.constraints.types.angle import AngleConstraint
 # Import all constraint types
 from jaxcad.constraints.types.base import Constraint
 from jaxcad.constraints.types.distance import DistanceConstraint
+from jaxcad.constraints.types.fixed import FixedConstraint
 from jaxcad.constraints.types.parallel import ParallelConstraint
 from jaxcad.constraints.types.perpendicular import PerpendicularConstraint
 
 # Re-export parameter types for convenience
-from jaxcad.geometry.parameters import Parameter, Scalar, Vector
+from jaxcad.geometry.parameters import Parameter, Scalar, Vector, Vector2
 
 # Convenience aliases (for backward compatibility with planned API)
 Distance = DistanceConstraint
 Angle = AngleConstraint
 Parallel = ParallelConstraint
 Perpendicular = PerpendicularConstraint
+Fixed = FixedConstraint
 
 # Type alias for Point (just a Vector)
 Point = Vector
@@ -73,6 +75,7 @@ __all__ = [
     "AngleConstraint",
     "ParallelConstraint",
     "PerpendicularConstraint",
+    "FixedConstraint",
     # DOF free functions
     "NullSpaceMap",
     "all_parameters",
@@ -93,9 +96,11 @@ __all__ = [
     "Angle",
     "Parallel",
     "Perpendicular",
+    "Fixed",
     # Re-exports
     "Parameter",
     "Scalar",
     "Vector",
+    "Vector2",
     "Point",
 ]

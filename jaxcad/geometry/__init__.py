@@ -15,6 +15,7 @@ from jaxcad.geometry.parameters import (
     PathParams,
     Scalar,
     Vector,
+    Vector2,
     as_parameter,
     deduplicate_params,
 )
@@ -31,6 +32,7 @@ __all__ = [
     "Parameter",
     "Scalar",
     "Vector",
+    "Vector2",
     "as_parameter",
     "PathParams",
     "NamedParams",

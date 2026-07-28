@@ -11,6 +11,7 @@ Two backends:
 from jaxcad.functionalize import functionalize_scene
 from jaxcad.render.marching_cubes import render_marching_cubes
 from jaxcad.render.material import Material
+from jaxcad.render.overlay import draw_plane, draw_profile, project_points
 from jaxcad.render.raymarch import (
     make_gradient_sky,
     raymarch,
@@ -31,4 +32,7 @@ __all__ = [
     "RenderSettings",
     "functionalize_scene",
     "make_gradient_sky",
+    "project_points",
+    "draw_profile",
+    "draw_plane",
 ]
