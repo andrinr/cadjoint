@@ -36,13 +36,7 @@ function square(id: string, editable = true): ConstructionProfile {
 
 /** Where a profile vertex lands on screen. */
 function screenOf(profile: ConstructionProfile, index: number) {
-  return projectPoint(
-    profile.vertices[index].world,
-    VIEW.position,
-    VIEW.target,
-    VIEW.width,
-    VIEW.height,
-  );
+  return projectPoint(profile.vertices[index].world, VIEW);
 }
 
 describe("pickVertex", () => {

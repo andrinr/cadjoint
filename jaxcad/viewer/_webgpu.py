@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from jaxcad.viewer._camera_wgsl import inject_camera
+
 _SDF_MARKER = "__JAXCAD_SDF_CODE__"
 
 DEFAULT_MATERIAL_WGSL = r"""
@@ -14,18 +16,33 @@ fn material_optics(_p: vec3<f32>) -> vec4<f32> {
 }
 """
 
-WGSL_VIEWER_TEMPLATE = r"""__JAXCAD_SDF_CODE__
+_VIEWER_TEMPLATE = r"""__JAXCAD_SDF_CODE__
 
 const PI: f32 = 3.141592653589793;
 
+// display.x  projection: 0 perspective, 1 orthographic
+// display.y  orthographic viewport height in world units
+// display.z  DISPLAY_* flag bits, packed as a float
+// display.w  x-ray strength, 0 disables
 struct Uniforms {
   resolution   : vec4<f32>,
   camera_pos   : vec4<f32>,
   camera_target: vec4<f32>,
   light_dir    : vec4<f32>,
   bg_color     : vec4<f32>,
+  path_settings: vec4<f32>,
+  display      : vec4<f32>,
 };
 @group(0) @binding(0) var<uniform> u: Uniforms;
+
+const DISPLAY_SHADOWS: u32 = 1u;
+const DISPLAY_REFLECTIONS: u32 = 2u;
+const DISPLAY_FLAT: u32 = 4u;
+const DISPLAY_HIDE_SOLID: u32 = 8u;
+
+fn display_flag(flag: u32) -> bool {
+  return (u32(max(u.display.z, 0.0)) & flag) != 0u;
+}
 
 // Only referenced by fs_main_depth, so pipelines built from vs_main/fs_main
 // (the notebook widget) never see this binding in their derived layout.
@@ -34,9 +51,7 @@ struct ViewUniforms {
 };
 @group(0) @binding(2) var<uniform> view: ViewUniforms;
 
-fn safe_normalize(v: vec3<f32>) -> vec3<f32> {
-  return v * inverseSqrt(max(dot(v, v), 1e-12));
-}
+__JAXCAD_CAMERA__
 
 fn sdf_normal(p: vec3<f32>) -> vec3<f32> {
   let e = 0.001;
@@ -120,10 +135,16 @@ fn shade_material(
     max(4.0 * normal_dot_view * normal_dot_light, 1e-6);
   let diffuse =
     (vec3<f32>(1.0) - fresnel) * (1.0 - metallic) * base_color / PI;
-  let visibility = soft_shadow(
-    position + normal * 0.004,
-    light_direction,
-    16.0,
+  if (display_flag(DISPLAY_FLAT)) {
+    // Flat shading: albedo with a touch of wrap lighting so form still reads,
+    // and no specular, shadows, or environment contribution.
+    return base_color * (0.55 + 0.45 * normal_dot_light);
+  }
+
+  let visibility = select(
+    1.0,
+    soft_shadow(position + normal * 0.004, light_direction, 16.0),
+    display_flag(DISPLAY_SHADOWS),
   );
   let light_radiance =
     vec3<f32>(1.0, 0.92, 0.82) * max(u.light_dir.w, 1.0);
@@ -131,7 +152,8 @@ fn shade_material(
     (diffuse + specular) * light_radiance * normal_dot_light * visibility;
   let ambient = base_color * environment_radiance(normal) * 0.18;
   let reflected = environment_radiance(reflect(ray_direction, normal));
-  let opaque = mix(direct + ambient, reflected, reflectivity);
+  let mirror = select(0.0, reflectivity, display_flag(DISPLAY_REFLECTIONS));
+  let opaque = mix(direct + ambient, reflected, mirror);
   let glass_fresnel = fresnel_schlick(
     max(dot(view_direction, normal), 0.0),
     vec3<f32>(0.04),
@@ -172,31 +194,48 @@ struct TraceResult {
   color    : vec3<f32>,
   position : vec3<f32>,
   hit      : bool,
+  occludes : bool,
 };
 
 fn trace_pixel(frag_xy: vec2<f32>) -> TraceResult {
   let res = u.resolution.xy;
   let uv = (frag_xy / res - 0.5) * vec2<f32>(res.x / res.y, -1.0);
-  let camera = u.camera_pos.xyz;
-  let camera_target = u.camera_target.xyz;
-  let forward = safe_normalize(camera_target - camera);
-  let right = safe_normalize(cross(forward, vec3<f32>(0.0, 1.0, 0.0)));
-  let up = cross(right, forward);
-  let ray_direction = safe_normalize(
-    forward + 1.5 * (uv.x * right + uv.y * up),
+  let ray = primary_ray(
+    uv,
+    u.camera_pos.xyz,
+    u.camera_target.xyz,
+    u.display.x,
+    u.display.y,
   );
-  let distance = trace(camera, ray_direction);
+  let hide_solid = display_flag(DISPLAY_HIDE_SOLID);
+  let distance = select(trace(ray.origin, ray.direction), -1.0, hide_solid);
 
   var result: TraceResult;
-  result.color = environment_radiance(ray_direction);
-  result.position = camera;
+  result.color = environment_radiance(ray.direction);
+  result.position = ray.origin;
   result.hit = distance >= 0.0;
+  result.occludes = result.hit;
 
   if (result.hit) {
-    let position = camera + ray_direction * distance;
+    let position = ray.origin + ray.direction * distance;
     let normal = sdf_normal(position);
-    result.color = shade_material(position, normal, ray_direction);
+    result.color = shade_material(position, normal, ray.direction);
     result.position = position;
+
+    let xray = clamp(u.display.w, 0.0, 1.0);
+    if (xray > 0.0) {
+      // Fade faces that point at the viewer and keep grazing angles solid, so
+      // silhouettes and creases stay legible while interiors turn translucent.
+      let facing = 1.0 - abs(dot(normal, ray.direction));
+      let alpha = mix(0.12, 0.95, facing * facing);
+      result.color = mix(
+        environment_radiance(ray.direction),
+        result.color,
+        mix(1.0, alpha, xray),
+      );
+      // Construction geometry must stay visible through an x-rayed solid.
+      result.occludes = false;
+    }
   }
   return result;
 }
@@ -223,13 +262,15 @@ fn fs_main_depth(@builtin(position) frag: vec4<f32>) -> DepthFragment {
   var fragment: DepthFragment;
   fragment.color = display_color(result.color);
   fragment.depth = 1.0;
-  if (result.hit) {
+  if (result.occludes) {
     let clip = view.view_proj * vec4<f32>(result.position, 1.0);
     fragment.depth = clamp(clip.z / max(clip.w, 1e-6), 0.0, 1.0);
   }
   return fragment;
 }
 """
+
+WGSL_VIEWER_TEMPLATE = inject_camera(_VIEWER_TEMPLATE)
 
 
 def ensure_material_wgsl(scene_code: str) -> str:

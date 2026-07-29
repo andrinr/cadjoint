@@ -75,12 +75,13 @@ export function ViewerPane(props: ViewerPaneProps) {
     const profile = profileById(profileId);
     if (!profile) return null;
     const view = pickView();
-    const ray = rayFromPixel(x, y, view.position, view.target, view.width, view.height);
+    const ray = rayFromPixel(x, y, view);
     const hit = intersectPlane(ray, profile.plane.origin, profile.plane.normal);
     if (!hit) return null;
     return worldToPlane(hit, profile.plane.origin, profile.plane.u, profile.plane.v);
   };
 
+  /** Insert one vertex where the user clicked; the tool stays active. */
   const handleAddVertex = async (x: number, y: number) => {
     const view = pickView();
     const editable = profiles().filter((profile) => profile.editable);
@@ -110,14 +111,13 @@ export function ViewerPane(props: ViewerPaneProps) {
         : nearestInsertIndex(target, x, y, view);
     await props.onPatch("insert_vertex", target.line, index, xy);
     setSelection({ profileId: target.id, vertexIndex: Math.min(index, target.vertices.length) });
-    setTool("select");
   };
 
   const onPointerDown = (event: PointerEvent) => {
     canvas.setPointerCapture(event.pointerId);
     const [x, y] = toPixels(event);
 
-    if (tool() === "add" && event.button === 0) {
+    if (tool() === "polygon" && event.button === 0) {
       void handleAddVertex(x, y);
       return;
     }
@@ -157,7 +157,7 @@ export function ViewerPane(props: ViewerPaneProps) {
       if (next?.profileId !== current?.profileId || next?.vertexIndex !== current?.vertexIndex) {
         setHover(next);
       }
-      canvas.style.cursor = hit ? "pointer" : tool() === "add" ? "crosshair" : "grab";
+      canvas.style.cursor = hit ? "pointer" : tool() === "polygon" ? "crosshair" : "grab";
       return;
     }
 
@@ -308,8 +308,8 @@ export function ViewerPane(props: ViewerPaneProps) {
         </div>
       )}
       <p class="viewer-hint">
-        {tool() === "add"
-          ? "Click a sketch edge to insert a vertex · Esc to cancel"
+        {tool() === "polygon"
+          ? "Polygon: click sketch edges to add vertices · Esc to finish"
           : "Drag handles to edit · Drag empty space to orbit · Shift/right-drag to pan"}
       </p>
     </section>

@@ -103,15 +103,20 @@ export function render({ model, el }) {
     const context = canvas.getContext('webgpu');
     if (!context) throw new Error('Could not create a WebGPU canvas context');
     const format  = navigator.gpu.getPreferredCanvasFormat();
+    // DISPLAY_SHADOWS | DISPLAY_REFLECTIONS from _webgpu.py — the notebook
+    // viewer always renders fully shaded.
+    const SHADING_FLAGS = 1 | 2;
 
     function configureContext() {
       context.configure({ device, format, alphaMode: 'opaque' });
     }
     configureContext();
 
-    // Uniform buffer: 5 × vec4<f32> = 80 bytes
+    // Uniform buffer: 7 × vec4<f32> = 112 bytes, matching the Uniforms struct
+    // in _webgpu.py. The widget does not expose the path-trace or display
+    // fields, but the buffer must still cover them.
     const uniformBuf = device.createBuffer({
-      size: 80,
+      size: 112,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
@@ -182,6 +187,8 @@ export function render({ model, el }) {
         cx, cy, cz, 0,
         ld[0], ld[1], ld[2], 0,
         bg[0], bg[1], bg[2], 0,
+        0, 0, 0, 0,                       // path_settings (unused here)
+        0, 0, SHADING_FLAGS, 0,           // perspective, shadows + reflections
       ]));
     }
 

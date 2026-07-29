@@ -113,6 +113,62 @@ button.primary {
   border-left: 1px solid var(--line);
 }
 
+.view-controls {
+  display: flex;
+  gap: 6px;
+  padding-left: 8px;
+  border-left: 1px solid var(--line);
+}
+
+.display-options {
+  position: relative;
+}
+
+.display-options .popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 230px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+
+.display-options .option {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 7px 8px;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.display-options .option:hover {
+  background: #191c19;
+}
+
+.display-options .option input {
+  margin-top: 2px;
+  accent-color: var(--lime);
+}
+
+.display-options .option span {
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+}
+
+.display-options .option small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
 .selection-chip {
   padding: 3px 9px;
   border: 1px solid rgba(217, 255, 87, 0.5);

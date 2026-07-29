@@ -106,13 +106,13 @@ def test_preview_depth_pipeline_matches_the_renderer(device, scene_code):
         depth_stencil=DEPTH_STATE,
     )
     layout = pipeline.get_bind_group_layout(0)
-    scene_uniforms = device.create_buffer(size=96, usage=wgpu.BufferUsage.UNIFORM)
+    scene_uniforms = device.create_buffer(size=112, usage=wgpu.BufferUsage.UNIFORM)
     view_uniforms = device.create_buffer(size=64, usage=wgpu.BufferUsage.UNIFORM)
     # Depth needs both the scene uniforms and the view-projection matrix.
     device.create_bind_group(
         layout=layout,
         entries=[
-            {"binding": 0, "resource": {"buffer": scene_uniforms, "offset": 0, "size": 96}},
+            {"binding": 0, "resource": {"buffer": scene_uniforms, "offset": 0, "size": 112}},
             {"binding": 2, "resource": {"buffer": view_uniforms, "offset": 0, "size": 64}},
         ],
     )
@@ -135,10 +135,10 @@ def test_widget_entry_point_does_not_require_the_view_binding(device, scene_code
         },
         primitive={"topology": "triangle-list"},
     )
-    uniforms = device.create_buffer(size=80, usage=wgpu.BufferUsage.UNIFORM)
+    uniforms = device.create_buffer(size=112, usage=wgpu.BufferUsage.UNIFORM)
     device.create_bind_group(
         layout=pipeline.get_bind_group_layout(0),
-        entries=[{"binding": 0, "resource": {"buffer": uniforms, "offset": 0, "size": 80}}],
+        entries=[{"binding": 0, "resource": {"buffer": uniforms, "offset": 0, "size": 112}}],
     )
 
 
@@ -278,9 +278,9 @@ def test_preview_and_overlay_draw_in_one_pass(device, scene_code):
             {
                 "binding": 0,
                 "resource": {
-                    "buffer": device.create_buffer(size=96, usage=wgpu.BufferUsage.UNIFORM),
+                    "buffer": device.create_buffer(size=112, usage=wgpu.BufferUsage.UNIFORM),
                     "offset": 0,
-                    "size": 96,
+                    "size": 112,
                 },
             },
             {
@@ -402,25 +402,26 @@ def test_preview_and_overlay_draw_in_one_pass(device, scene_code):
     device.queue.submit([encoder.finish()])
 
 
-def test_preview_pass_actually_shades_pixels(device, scene_code):
-    """Render the preview and read it back — a black frame is a failure.
+# Display uniform: projection, ortho height, flag bits, x-ray strength.
+SHADOWS = 1
+REFLECTIONS = 2
+FLAT = 4
+HIDE_SOLID = 8
+PERSPECTIVE = (0.0, 0.0, float(SHADOWS | REFLECTIONS), 0.0)
 
-    Pipeline construction succeeds even when every fragment is later discarded,
-    so this checks the image itself: both the environment background and the
-    lit surface have to survive the depth configuration.
-    """
-    width = height = 64
+
+def render_preview(device, scene_code, display=PERSPECTIVE, size=64, camera=(3.0, 2.0, 4.0)):
+    """Render one preview frame and return its red channel, one byte per pixel."""
     color = device.create_texture(
-        size=(width, height, 1),
+        size=(size, size, 1),
         format="rgba8unorm",
         usage=wgpu.TextureUsage.RENDER_ATTACHMENT | wgpu.TextureUsage.COPY_SRC,
     )
     depth = device.create_texture(
-        size=(width, height, 1),
+        size=(size, size, 1),
         format="depth32float",
         usage=wgpu.TextureUsage.RENDER_ATTACHMENT,
     )
-
     module = device.create_shader_module(code=build_viewer_shader(scene_code))
     bind_group_layout, pipeline_layout = shared_layout(device, [0, 2])
     pipeline = device.create_render_pipeline(
@@ -435,36 +436,37 @@ def test_preview_pass_actually_shades_pixels(device, scene_code):
         depth_stencil=DEPTH_STATE,
     )
 
-    # resolution | camera_pos | camera_target | light_dir+intensity | bg | path
-    scene_uniforms = struct.pack(
-        "24f",
-        width,
-        height,
-        0,
-        0,
-        3.0,
-        2.0,
-        4.0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0.55,
-        0.8,
-        0.35,
-        3.0,
-        0.035,
-        0.045,
-        0.035,
-        1.0,
-        0,
-        0,
-        0,
-        0,
-    )
+    # resolution | camera_pos | camera_target | light+intensity | bg | path | display
     scene_buffer = device.create_buffer_with_data(
-        data=scene_uniforms, usage=wgpu.BufferUsage.UNIFORM
+        data=struct.pack(
+            "28f",
+            size,
+            size,
+            0,
+            0,
+            camera[0],
+            camera[1],
+            camera[2],
+            0,
+            0,
+            0,
+            0,
+            0,
+            0.55,
+            0.8,
+            0.35,
+            3.0,
+            0.035,
+            0.045,
+            0.035,
+            1.0,
+            0,
+            0,
+            0,
+            0,
+            *display,
+        ),
+        usage=wgpu.BufferUsage.UNIFORM,
     )
     view_buffer = device.create_buffer_with_data(
         data=struct.pack("16f", *([0.0] * 16)), usage=wgpu.BufferUsage.UNIFORM
@@ -472,7 +474,7 @@ def test_preview_pass_actually_shades_pixels(device, scene_code):
     bind_group = device.create_bind_group(
         layout=bind_group_layout,
         entries=[
-            {"binding": 0, "resource": {"buffer": scene_buffer, "offset": 0, "size": 96}},
+            {"binding": 0, "resource": {"buffer": scene_buffer, "offset": 0, "size": 112}},
             {"binding": 2, "resource": {"buffer": view_buffer, "offset": 0, "size": 64}},
         ],
     )
@@ -502,13 +504,76 @@ def test_preview_pass_actually_shades_pixels(device, scene_code):
 
     pixels = device.queue.read_texture(
         {"texture": color},
-        {"offset": 0, "bytes_per_row": width * 4, "rows_per_image": height},
-        (width, height, 1),
+        {"offset": 0, "bytes_per_row": size * 4, "rows_per_image": size},
+        (size, size, 1),
     )
-    values = list(bytes(pixels))
-    lit = sum(1 for value in values[::4] if value > 8)
-    assert lit > width * height * 0.5, "preview rendered an almost entirely black frame"
-    assert len(set(values[::4])) > 4, "preview rendered a flat image with no shading"
+    return list(bytes(pixels))[::4]
+
+
+def assert_rendered(channel, size=64, label="frame"):
+    """A rendered frame must be neither black nor a flat fill."""
+    lit = sum(1 for value in channel if value > 8)
+    assert lit > size * size * 0.5, f"{label} rendered an almost entirely black image"
+    assert len(set(channel)) > 4, f"{label} rendered a flat image with no shading"
+
+
+def test_preview_pass_actually_shades_pixels(device, scene_code):
+    """Render the preview and read it back — a black frame is a failure.
+
+    Pipeline construction succeeds even when every fragment is later discarded,
+    so this checks the image itself: both the environment background and the
+    lit surface have to survive the depth configuration.
+    """
+    assert_rendered(render_preview(device, scene_code), label="perspective preview")
+
+
+def test_orthographic_projection_renders(device, scene_code):
+    """The orthographic branch of primary_ray must produce an image too."""
+    ortho = (1.0, 6.0, float(SHADOWS | REFLECTIONS), 0.0)
+    channel = render_preview(device, scene_code, display=ortho)
+    assert_rendered(channel, label="orthographic preview")
+    # Parallel rays frame the scene differently from a perspective camera.
+    assert channel != render_preview(device, scene_code)
+
+
+@pytest.mark.parametrize(
+    ("label", "camera"),
+    [("top", (0.0, 6.0, 0.0)), ("bottom", (0.0, -6.0, 0.0))],
+)
+def test_pole_views_do_not_degenerate(device, scene_code, label, camera):
+    """Looking straight down or up is where cross(forward, +Y) collapses.
+
+    Without the reference-vector fallback in camera_basis the frame is NaN and
+    the frame comes out blank, so this renders from directly overhead.
+    """
+    channel = render_preview(
+        device,
+        scene_code,
+        display=(1.0, 6.0, float(SHADOWS | REFLECTIONS), 0.0),
+        camera=camera,
+    )
+    assert_rendered(channel, label=f"{label} view")
+
+
+@pytest.mark.parametrize(
+    ("label", "display"),
+    [
+        ("flat shading", (0.0, 0.0, float(FLAT), 0.0)),
+        ("no shadows", (0.0, 0.0, float(REFLECTIONS), 0.0)),
+        ("x-ray", (0.0, 0.0, float(SHADOWS | REFLECTIONS), 1.0)),
+    ],
+)
+def test_display_modes_render(device, scene_code, label, display):
+    assert_rendered(render_preview(device, scene_code, display=display), label=label)
+
+
+def test_hide_solid_leaves_only_the_environment(device, scene_code):
+    """The hide-solid flag skips tracing, so only the background remains."""
+    hidden = render_preview(device, scene_code, display=(0.0, 0.0, float(HIDE_SOLID), 0.0))
+    shaded = render_preview(device, scene_code)
+    assert hidden != shaded
+    # A pure environment gradient has far fewer distinct values than a shaded solid.
+    assert len(set(hidden)) < len(set(shaded))
 
 
 def test_present_pipeline_can_share_the_overlay_depth_attachment(device):

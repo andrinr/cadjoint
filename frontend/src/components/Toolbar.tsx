@@ -2,9 +2,17 @@
 
 import { For, Show } from "solid-js";
 import { busy, dirty, selection, setTool, status, tool } from "../state";
-import { QUALITY_PRESETS } from "../viewer/renderer";
+import { DisplayOptions } from "./DisplayOptions";
+import { ViewControls } from "./ViewControls";
+import type { Projection } from "../viewer/math";
+import { QUALITY_PRESETS, type DisplaySettings } from "../viewer/renderer";
 
 export interface ToolbarProps {
+  display: DisplaySettings;
+  viewPreset: string;
+  onDisplayChange: (patch: Partial<DisplaySettings>) => void;
+  onViewPreset: (key: string) => void;
+  onProjection: (projection: Projection) => void;
   onRun: () => void;
   onReset: () => void;
   onToggleTrace: () => void;
@@ -35,14 +43,22 @@ export function Toolbar(props: ToolbarProps) {
         </button>
         <button
           type="button"
-          class={tool() === "add" ? "active" : ""}
-          onClick={() => setTool("add")}
-          title="Click a sketch edge to insert a vertex"
-          data-testid="tool-add"
+          class={tool() === "polygon" ? "active" : ""}
+          onClick={() => setTool(tool() === "polygon" ? "select" : "polygon")}
+          title="Polygon: click sketch edges to add vertices (Esc to finish)"
+          data-testid="tool-polygon"
         >
-          Add vertex
+          Polygon
         </button>
       </div>
+
+      <ViewControls
+        active={props.viewPreset}
+        projection={props.display.projection}
+        onPreset={props.onViewPreset}
+        onProjection={props.onProjection}
+      />
+      <DisplayOptions display={props.display} onChange={props.onDisplayChange} />
 
       <div class="spacer" />
 

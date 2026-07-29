@@ -147,10 +147,10 @@ const NUMBER = String.raw`-?[\d.]+(?:e[-+]?\d+)?`;
 const vertexLiteralCount = async (page: Page) =>
   ((await editorText(page)).match(new RegExp(`\\[${NUMBER}, ${NUMBER}\\]`, "g")) ?? []).length;
 
-test("add-vertex mode inserts a vertex into the source", async ({ page }) => {
+test("the polygon tool inserts a vertex and stays active", async ({ page }) => {
   const before = await vertexLiteralCount(page);
 
-  await page.getByTestId("tool-add").click();
+  await page.getByTestId("tool-polygon").click();
   const metrics = await canvasMetrics(page);
   // Midpoint of the sketch's bottom edge.
   const point = projectToCss([0, -0.7, 0], metrics);
@@ -158,9 +158,50 @@ test("add-vertex mode inserts a vertex into the source", async ({ page }) => {
 
   // The patch and its recompile are async; poll rather than racing them.
   await expect.poll(() => vertexLiteralCount(page), { timeout: 45_000 }).toBe(before + 1);
-  // The tool returns to select so the next click does not add another vertex.
-  await expect(page.getByTestId("tool-select")).toHaveClass(/active/);
+  // Unlike the old one-shot button, the tool keeps going for the next click.
+  await expect(page.getByTestId("tool-polygon")).toHaveClass(/active/);
   await waitForCompile(page);
+
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("tool-select")).toHaveClass(/active/);
+});
+
+test("standard views switch the projection to orthographic", async ({ page }) => {
+  await expect(page.getByTestId("projection-toggle")).toHaveText("Persp");
+
+  await page.getByTestId("view-preset").selectOption("front");
+  await expect(page.getByTestId("projection-toggle")).toHaveText("Ortho");
+
+  // Iso returns to a perspective camera.
+  await page.getByTestId("view-preset").selectOption("iso");
+  await expect(page.getByTestId("projection-toggle")).toHaveText("Persp");
+});
+
+test("the projection toggle works on its own", async ({ page }) => {
+  await page.getByTestId("projection-toggle").click();
+  await expect(page.getByTestId("projection-toggle")).toHaveText("Ortho");
+  await page.getByTestId("projection-toggle").click();
+  await expect(page.getByTestId("projection-toggle")).toHaveText("Persp");
+});
+
+test("display options toggle without disturbing the sketch", async ({ page }) => {
+  const before = await editorText(page);
+
+  await page.getByTestId("display-options").click();
+  await page.getByTestId("toggle-xray").check();
+  await expect(page.getByTestId("toggle-xray")).toBeChecked();
+  await page.getByTestId("toggle-shadows").uncheck();
+  await page.getByTestId("toggle-flatShading").check();
+  await page.keyboard.press("Escape");
+
+  // Display settings are viewer state, never edits to the program.
+  expect(await editorText(page)).toBe(before);
+
+  // Selection still works with the new display settings applied.
+  const metrics = await canvasMetrics(page);
+  const point = projectToCss(FIRST_VERTEX, metrics);
+  await page.mouse.click(metrics.left + point.x, metrics.top + point.y);
+  await expect(page.getByTestId("selection-chip")).toHaveText("vertex 0");
 });
 
 test("editing the code updates the sketch the viewer reports", async ({ page }) => {
