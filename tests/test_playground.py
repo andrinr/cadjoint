@@ -259,3 +259,13 @@ def test_unknown_host_header_is_rejected():
         with pytest.raises(HTTPError) as error:
             urlopen(request)
         assert error.value.code == 403
+
+
+def test_patch_rejects_an_operation_this_server_does_not_know():
+    # A browser running newer assets than the server used to get a confusing
+    # complaint about a missing `line` instead of the real problem.
+    result = patch_source({"source": "x = 1", "op": "teleport", "line": 1, "index": 0})
+
+    assert result["ok"] is False
+    assert "does not support the patch operation" in result["error"]
+    assert "restart" in result["error"]

@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
-from jaxcad.viewer._patch import PatchError, apply_operation
+from jaxcad.viewer._patch import OPERATIONS, PatchError, apply_operation
 
 DEFAULT_PORT = 8765
 MAX_SOURCE_BYTES = 100_000
@@ -162,6 +162,18 @@ def patch_source(request: dict[str, Any]) -> dict[str, Any]:
         return {"ok": False, "error": f"Source is larger than the {MAX_SOURCE_BYTES:,}-byte limit."}
     if not isinstance(operation, str):
         return {"ok": False, "error": "The patch request must contain a string `op` field."}
+    if operation not in OPERATIONS:
+        # Reject up front: otherwise an operation this server does not know
+        # falls through to the vertex-edit checks and complains about a missing
+        # `line`, which points nowhere near the real problem — usually a browser
+        # running newer assets than the server process.
+        return {
+            "ok": False,
+            "error": (
+                f"This server does not support the patch operation {operation!r}. "
+                "If you updated jaxcad, restart the playground server."
+            ),
+        }
 
     def numbers(value, count: int | None = None) -> list[float] | None:
         """Validate a list of plain numbers, optionally of a fixed length."""
