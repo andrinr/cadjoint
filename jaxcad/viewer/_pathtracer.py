@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from jaxcad.viewer._camera_wgsl import inject_camera
+
 _SCENE_MARKER = "__JAXCAD_SCENE_CODE__"
 
-WGSL_PATH_TRACER_TEMPLATE = r"""__JAXCAD_SCENE_CODE__
+_PATH_TRACER_TEMPLATE = r"""__JAXCAD_SCENE_CODE__
 
 const PI: f32 = 3.141592653589793;
 const HIT_EPSILON: f32 = 0.0005;
@@ -20,6 +22,7 @@ struct Uniforms {
   light_dir    : vec4<f32>,
   bg_color     : vec4<f32>,
   path_settings: vec4<f32>,
+  display      : vec4<f32>,
 };
 
 struct TraceHit {
@@ -36,9 +39,7 @@ struct BsdfSample {
 @group(0) @binding(0) var<uniform> u: Uniforms;
 @group(0) @binding(1) var previous_accumulation: texture_2d<f32>;
 
-fn safe_normalize(v: vec3<f32>) -> vec3<f32> {
-  return v * inverseSqrt(max(dot(v, v), 1e-12));
-}
+__JAXCAD_CAMERA__
 
 fn pcg_hash(input: u32) -> u32 {
   let state = input * 747796405u + 2891336453u;
@@ -506,13 +507,15 @@ fn fs_path_trace(
   let resolution = u.resolution.xy;
   let uv = ((fragment.xy + jitter) / resolution - 0.5) *
     vec2<f32>(resolution.x / resolution.y, -1.0);
-  let camera = u.camera_pos.xyz;
-  let forward = safe_normalize(u.camera_target.xyz - camera);
-  let right = safe_normalize(cross(forward, vec3<f32>(0.0, 1.0, 0.0)));
-  let up = cross(right, forward);
-  let ray_direction = safe_normalize(
-    forward + 1.5 * (uv.x * right + uv.y * up),
+  let ray = primary_ray(
+    uv,
+    u.camera_pos.xyz,
+    u.camera_target.xyz,
+    u.display.x,
+    u.display.y,
   );
+  let camera = ray.origin;
+  let ray_direction = ray.direction;
   let sample_radiance = trace_path(camera, ray_direction, &random_state);
 
   let previous = textureLoad(previous_accumulation, pixel, 0).xyz;
@@ -561,6 +564,9 @@ fn fs_present(@builtin(position) fragment: vec4<f32>) -> @location(0) vec4<f32> 
   return vec4<f32>(display_color, 1.0);
 }
 """
+
+
+WGSL_PATH_TRACER_TEMPLATE = inject_camera(_PATH_TRACER_TEMPLATE)
 
 
 def build_path_tracer_shader(scene_code: str) -> str:

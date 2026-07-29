@@ -68,4 +68,4 @@ export interface Selection {
   vertexIndex: number;
 }
 
-export type ToolMode = "select" | "add";
+export type ToolMode = "select" | "polygon";

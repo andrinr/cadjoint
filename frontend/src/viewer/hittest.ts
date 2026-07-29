@@ -6,14 +6,10 @@
  */
 
 import type { ConstructionProfile } from "../types";
-import { projectPoint, type Vec3 } from "./math";
+import { projectPoint, type View } from "./math";
 
-export interface PickView {
-  position: Vec3;
-  target: Vec3;
-  width: number;
-  height: number;
-}
+/** Picking uses the same view descriptor as projection and ray casting. */
+export type PickView = View;
 
 export interface VertexHit {
   profileId: string;
@@ -63,13 +59,7 @@ export function pickVertex(
   for (const profile of profiles) {
     if (editableOnly && !profile.editable) continue;
     for (let index = 0; index < profile.vertices.length; index++) {
-      const projected = projectPoint(
-        profile.vertices[index].world,
-        view.position,
-        view.target,
-        view.width,
-        view.height,
-      );
+      const projected = projectPoint(profile.vertices[index].world, view);
       if (!projected.visible) continue;
       const distance = Math.hypot(projected.x - x, projected.y - y);
       if (distance <= radius && (best === null || distance < best.distance)) {
@@ -99,7 +89,7 @@ export function pickEdge(
     if (!profile.editable) continue;
     const count = profile.vertices.length;
     const screen = profile.vertices.map((vertex) =>
-      projectPoint(vertex.world, view.position, view.target, view.width, view.height),
+      projectPoint(vertex.world, view),
     );
     for (let index = 0; index < count; index++) {
       const start = screen[index];
@@ -129,13 +119,7 @@ export function nearestInsertIndex(
   let bestIndex = profile.vertices.length;
   let bestDistance = Infinity;
   for (let index = 0; index < profile.vertices.length; index++) {
-    const projected = projectPoint(
-      profile.vertices[index].world,
-      view.position,
-      view.target,
-      view.width,
-      view.height,
-    );
+    const projected = projectPoint(profile.vertices[index].world, view);
     if (!projected.visible) continue;
     const distance = Math.hypot(projected.x - x, projected.y - y);
     if (distance < bestDistance) {

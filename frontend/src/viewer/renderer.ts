@@ -13,9 +13,12 @@
 import type { ConstructionProfile, Selection } from "../types";
 import {
   cameraPosition,
+  orthoHeightFor,
   viewProjection,
   type CameraState,
+  type Projection,
   type Vec3,
+  type View,
 } from "./math";
 // Kept as a standalone .wgsl file so the shader has one source of truth that
 // both the bundler and the Python shader-validation test read.
@@ -73,6 +76,46 @@ const HANDLE_RADIUS_PX = 6.5;
 
 const EDGE_STRIDE = 40;
 const HANDLE_STRIDE = 32;
+
+/** Display flag bits, matching the DISPLAY_* constants in _webgpu.py. */
+export const DISPLAY = {
+  shadows: 1,
+  reflections: 2,
+  flat: 4,
+  hideSolid: 8,
+} as const;
+
+export interface DisplaySettings {
+  projection: Projection;
+  shadows: boolean;
+  reflections: boolean;
+  flatShading: boolean;
+  hideSolid: boolean;
+  /** 0 disables x-ray; 1 is fully translucent. */
+  xray: number;
+  showSketches: boolean;
+}
+
+export const DEFAULT_DISPLAY: DisplaySettings = {
+  projection: "perspective",
+  shadows: true,
+  reflections: true,
+  flatShading: false,
+  hideSolid: false,
+  xray: 0,
+  showSketches: true,
+};
+
+/** Orbit angles for the standard views, in radians. */
+export const VIEW_PRESETS: Record<string, { yaw: number; pitch: number }> = {
+  iso: { yaw: 0.75, pitch: 0.32 },
+  front: { yaw: 0, pitch: 0 },
+  back: { yaw: Math.PI, pitch: 0 },
+  right: { yaw: Math.PI / 2, pitch: 0 },
+  left: { yaw: -Math.PI / 2, pitch: 0 },
+  top: { yaw: 0, pitch: Math.PI / 2 },
+  bottom: { yaw: 0, pitch: -Math.PI / 2 },
+};
 
 type Rgba = readonly [number, number, number, number];
 
@@ -141,6 +184,7 @@ export class Renderer {
   private initError = "";
 
   camera: CameraState = { yaw: 0.75, pitch: 0.32, distance: 4.6, target: [0, 0, 0] };
+  display: DisplaySettings = { ...DEFAULT_DISPLAY };
   quality: QualityPreset = QUALITY_PRESETS.high;
   pathTracing = false;
   pathReady = false;
@@ -171,6 +215,40 @@ export class Renderer {
 
   get cameraPosition(): Vec3 {
     return cameraPosition(this.camera);
+  }
+
+  /** The view descriptor picking and overlay projection must agree on. */
+  get view(): View {
+    return {
+      position: cameraPosition(this.camera),
+      target: this.camera.target,
+      width: this.viewport.width,
+      height: this.viewport.height,
+      projection: this.display.projection,
+      orthoHeight: orthoHeightFor(this.camera.distance),
+    };
+  }
+
+  /** Point the camera along a standard axis; presets switch to orthographic. */
+  applyViewPreset(name: string): void {
+    const preset = VIEW_PRESETS[name];
+    if (!preset) return;
+    this.camera = { ...this.camera, yaw: preset.yaw, pitch: preset.pitch };
+    this.display = {
+      ...this.display,
+      projection: name === "iso" ? "perspective" : "orthographic",
+    };
+    this.invalidate();
+  }
+
+  private displayFlags(): number {
+    const { shadows, reflections, flatShading, hideSolid } = this.display;
+    return (
+      (shadows ? DISPLAY.shadows : 0) |
+      (reflections ? DISPLAY.reflections : 0) |
+      (flatShading ? DISPLAY.flat : 0) |
+      (hideSolid ? DISPLAY.hideSolid : 0)
+    );
   }
 
   async init(canvas: HTMLCanvasElement): Promise<void> {
@@ -204,7 +282,7 @@ export class Renderer {
       this.format = navigator.gpu.getPreferredCanvasFormat();
       this.context.configure({ device: this.device, format: this.format, alphaMode: "opaque" });
 
-      this.uniformBuffer = this.createUniform(96);
+      this.uniformBuffer = this.createUniform(112);  // 7 x vec4, see Uniforms in _webgpu.py
       this.viewBuffer = this.createUniform(64);
       this.overlayBuffer = this.createUniform(112);
       this.buildOverlayPipelines();
@@ -636,11 +714,14 @@ export class Renderer {
       0.55, 0.8, 0.35, 3,
       BACKGROUND.r, BACKGROUND.g, BACKGROUND.b, 1,
       this.sampleCount, this.quality.bounces, this.quality.shadowSamples, 0,
+      this.display.projection === "orthographic" ? 1 : 0,
+      orthoHeightFor(this.camera.distance),
+      this.displayFlags(),
+      this.display.xray,
     ]);
     device.queue.writeBuffer(this.uniformBuffer, 0, scene);
 
-    const aspect = this.canvas.width / this.canvas.height;
-    const matrix = viewProjection(position, this.camera.target, aspect);
+    const matrix = viewProjection(this.view);
     device.queue.writeBuffer(this.viewBuffer, 0, matrix);
 
     const overlay = new Float32Array(28);
@@ -655,7 +736,7 @@ export class Renderer {
   }
 
   private drawOverlay(pass: GPURenderPassEncoder): void {
-    if (!this.overlayBindGroup) return;
+    if (!this.overlayBindGroup || !this.display.showSketches) return;
     if (this.edgeCount && this.edgeBuffer && this.edgePipeline) {
       pass.setPipeline(this.edgePipeline);
       pass.setBindGroup(0, this.overlayBindGroup);
@@ -717,7 +798,7 @@ export class Renderer {
       presentPass.draw(3);
       // Re-run the cheap preview purely for depth so overlays interleave with
       // the path-traced image, which carries no depth of its own.
-      if (this.edgeCount && this.previewDepthPipeline) {
+      if (this.edgeCount && this.display.showSketches && this.previewDepthPipeline) {
         presentPass.setPipeline(this.previewDepthPipeline);
         presentPass.setBindGroup(0, this.previewBindGroup);
         presentPass.draw(3);

@@ -25,7 +25,13 @@ import {
   setViewerError,
   source,
 } from "./state";
-import { QUALITY_PRESETS, Renderer } from "./viewer/renderer";
+import type { Projection } from "./viewer/math";
+import {
+  DEFAULT_DISPLAY,
+  QUALITY_PRESETS,
+  Renderer,
+  type DisplaySettings,
+} from "./viewer/renderer";
 
 export function App() {
   const [pathTracing, setPathTracing] = createSignal(false);
@@ -33,11 +39,27 @@ export function App() {
   const [wgsl, setWgsl] = createSignal<{ preview: string; path: string } | null>(null);
   const [showWgsl, setShowWgsl] = createSignal(false);
   const [example, setExample] = createSignal("");
+  const [display, setDisplay] = createSignal<DisplaySettings>({ ...DEFAULT_DISPLAY });
+  const [viewPreset, setViewPreset] = createSignal("iso");
 
   const renderer = new Renderer({
     onStatus: (kind, text) => setStatus({ kind, text }),
     onError: (message) => setViewerError(message),
   });
+
+  /** Push display settings to the renderer and redraw. */
+  const applyDisplay = (patch: Partial<DisplaySettings>) => {
+    const next = { ...display(), ...patch };
+    setDisplay(next);
+    renderer.display = next;
+    renderer.invalidate();
+  };
+
+  const applyPreset = (key: string) => {
+    setViewPreset(key);
+    renderer.applyViewPreset(key);
+    setDisplay({ ...renderer.display });
+  };
 
   /** Character span of the selected vertex's literal, for the editor. */
   const highlight = createMemo(() => {
@@ -135,6 +157,11 @@ export function App() {
   return (
     <div class="app">
       <Toolbar
+        display={display()}
+        viewPreset={viewPreset()}
+        onDisplayChange={applyDisplay}
+        onViewPreset={applyPreset}
+        onProjection={(projection: Projection) => applyDisplay({ projection })}
         onRun={() => void run()}
         onReset={() => {
           setSource(example());
