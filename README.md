@@ -20,8 +20,11 @@ Differentiable SDF primitives, transformations, and constraint system built with
   materials in the browser playground
 - **Sketch construction** — 2D profiles on work planes, extruded or revolved into
   solids that share their parameters, so constraints and gradients act on both
-- **Editable in the browser** — sketches render as depth-tested overlays you can
-  click, drag, and extend; every edit rewrites the Python source that produced it
+- **Construction primitives** — boxes, spheres, and cylinders with editable
+  placement, mirroring the SDF primitives they generate
+- **Editable in the browser** — construction geometry renders as depth-tested
+  overlays you can click, drag, place, and transform with a gizmo; every edit
+  rewrites the Python source that produced it
 - **Constraint system** — geometric constraints (distance, angle, coincident) with Riemannian gradient descent and Newton projection onto the constraint manifold
 - **JAX-native** — every scene is a pure function; `jit`, `grad`, and `vmap` work out of the box
 
@@ -97,25 +100,45 @@ changes reset accumulation automatically. The server only listens on localhost
 and compiles each edit in a timed child process, but the editor still executes
 Python on your machine—only run code you trust.
 
-### Editing sketches in the viewer
+### Modelling in the viewer
 
-Sketches from the construction layer (see the
-[sketch notebook](examples/sketch_construction.ipynb)) are drawn over the
-rendered solid as depth-tested wireframes — an edge behind the model is hidden
-by it — and they can be edited directly:
+Construction geometry — sketch profiles and primitives — is drawn over the
+rendered solid as a depth-tested wireframe (an edge behind the model is hidden
+by it) and can be edited directly:
 
 | Action | Result |
 | --- | --- |
 | Click a vertex handle | Selects it and highlights the exact literal in the code |
 | Drag a handle | Rewrites that vertex's coordinates and rebuilds the solid |
-| **Add vertex**, then click an edge | Inserts a vertex at that point in the code |
+| **Polygon**, then click edges | Inserts a vertex per click until Esc |
 | Select a handle, press Delete | Removes that vertex |
+| **Box** / **Sphere** / **Cylinder**, then click | Writes a `Solid.*` call and adds it to the scene |
+| Click a solid's outline | Selects it and shows the move/rotate gizmo |
+| Drag a gizmo arrow or ring | Rewrites `position=` or `rotation=` on that solid |
 | Drag empty space / Shift-drag / scroll | Orbit / pan / zoom |
 
 Every edit is applied to the Python source, which stays the single source of
-truth — there is no hidden scene state to drift out of sync. Sketches whose
-vertices are not plain literals (built in a loop, or from a variable) still
-render, but are read-only in the viewer.
+truth — there is no hidden scene state to drift out of sync. Geometry whose
+literals cannot be rewritten (built in a loop, or from a variable) still
+renders, but is read-only in the viewer.
+
+Solids created this way come from the construction layer, so they are ordinary
+parametric geometry as well as viewer objects:
+
+```python
+from jaxcad.construction import Solid
+from jaxcad.sdf.boolean import Union
+
+scene = Union(
+    Solid.box(size=[1, 1, 0.5], position=[0, 0, 0], rotation=[0, 0, 0.4]),
+    Solid.sphere(radius=0.6, position=[1.5, 0, 0]),
+)
+```
+
+`size`, `position`, and `rotation` become named free parameters shared with the
+SDF the factory returns, so constraints and `jax.grad` reach them exactly as
+they do for sketch vertices. `size` is half-extents and `rotation` is intrinsic
+X, Y, Z angles in radians, matching the underlying primitives.
 
 ### Developing the playground UI
 

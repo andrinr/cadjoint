@@ -56,15 +56,14 @@ CONTENT_SECURITY_POLICY = (
     "form-action 'none'"
 )
 
-EXAMPLE_SOURCE = """from jaxcad.construction import PolygonProfile, SketchPlane, extrude
+EXAMPLE_SOURCE = """from jaxcad.construction import PolygonProfile, SketchPlane, Solid, extrude
 from jaxcad.render import Material
 from jaxcad.sdf.boolean import Union
-from jaxcad.sdf.primitives import Plane, Sphere
-from jaxcad.sdf.transforms import Translate
+from jaxcad.sdf.primitives import Plane
 
 # Sketch a profile on a work plane, then extrude it. Click a vertex handle in
-# the viewer to find it here; drag it, or use "Add vertex", and this code is
-# rewritten to match.
+# the viewer to find it here; drag it, or use the Polygon tool, and this code
+# is rewritten to match.
 profile = PolygonProfile(
     [[-1.1, -0.7], [1.1, -0.7], [1.1, 0.3], [0.0, 1.0], [-1.1, 0.3]],
     plane=SketchPlane(origin=[0.0, 0.0, 0.0], normal=[0.0, 0.0, 1.0]),
@@ -76,12 +75,18 @@ body = extrude(
     material=Material(color=[0.85, 0.45, 0.12], roughness=0.35),
 )
 
+# Primitives keep an editable placement. Click the outline to select one, then
+# drag the gizmo to move or turn it.
+ball = Solid.sphere(
+    radius=0.45,
+    position=[1.95, -0.25, 0.0],
+    material=Material(color=[0.1, 0.3, 0.8], roughness=0.22),
+    name="ball",
+)
+
 scene = Union(
     body,
-    Translate(
-        Sphere(0.45, material=Material(color=[0.1, 0.3, 0.8], roughness=0.22)),
-        [1.95, -0.25, 0.0],
-    ),
+    ball,
     Plane(-1.25, material=Material(color=[0.12, 0.14, 0.18], roughness=0.8)),
     smoothness=0.0,
 )
@@ -158,23 +163,78 @@ def patch_source(request: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(operation, str):
         return {"ok": False, "error": "The patch request must contain a string `op` field."}
 
+    def numbers(value, count: int | None = None) -> list[float] | None:
+        """Validate a list of plain numbers, optionally of a fixed length."""
+        if not isinstance(value, (list, tuple)):
+            return None
+        if count is not None and len(value) != count:
+            return None
+        if not all(isinstance(item, (int, float)) and not isinstance(item, bool) for item in value):
+            return None
+        return [float(item) for item in value]
+
     arguments: dict[str, Any] = {}
+
+    if operation == "add_primitive":
+        kind = request.get("kind")
+        if not isinstance(kind, str):
+            return {"ok": False, "error": "The patch request needs a string `kind`."}
+        position = numbers(request.get("position"), 3)
+        if position is None:
+            return {"ok": False, "error": "The patch request needs `position` as three numbers."}
+        raw = request.get("dimensions")
+        if not isinstance(raw, dict):
+            return {"ok": False, "error": "The patch request needs a `dimensions` object."}
+        dimensions: dict[str, Any] = {}
+        for key, value in raw.items():
+            if isinstance(value, (int, float)) and not isinstance(value, bool):
+                dimensions[key] = float(value)
+                continue
+            vector = numbers(value)
+            if vector is None:
+                return {"ok": False, "error": f"Dimension `{key}` must be a number or numbers."}
+            dimensions[key] = vector
+        arguments = {"kind": kind, "position": position, "dimensions": dimensions}
+        try:
+            return {"ok": True, "source": apply_operation(source, operation, **arguments)}
+        except PatchError as error:
+            return {"ok": False, "error": str(error)}
+
+    if operation == "set_value":
+        for key in ("name", "argument"):
+            value = request.get(key)
+            if not isinstance(value, str):
+                return {"ok": False, "error": f"The patch request needs a string `{key}`."}
+            arguments[key] = value
+        line = request.get("line")
+        if not isinstance(line, int) or isinstance(line, bool):
+            return {"ok": False, "error": "The patch request needs an integer `line`."}
+        arguments["line"] = line
+        raw_value = request.get("value")
+        scalar = (
+            float(raw_value)
+            if isinstance(raw_value, (int, float)) and not isinstance(raw_value, bool)
+            else None
+        )
+        vector = numbers(raw_value)
+        if scalar is None and vector is None:
+            return {"ok": False, "error": "The patch request needs `value` as a number or numbers."}
+        arguments["value"] = scalar if scalar is not None else vector
+        try:
+            return {"ok": True, "source": apply_operation(source, operation, **arguments)}
+        except PatchError as error:
+            return {"ok": False, "error": str(error)}
+
     for key in ("line", "index"):
         value = request.get(key)
         if not isinstance(value, int) or isinstance(value, bool):
             return {"ok": False, "error": f"The patch request needs an integer `{key}`."}
         arguments[key] = value
     if operation in {"set_vertex", "insert_vertex"}:
-        xy = request.get("xy")
-        if (
-            not isinstance(xy, (list, tuple))
-            or len(xy) != 2
-            or not all(
-                isinstance(value, (int, float)) and not isinstance(value, bool) for value in xy
-            )
-        ):
+        xy = numbers(request.get("xy"), 2)
+        if xy is None:
             return {"ok": False, "error": "The patch request needs `xy` as two numbers."}
-        arguments["xy"] = (float(xy[0]), float(xy[1]))
+        arguments["xy"] = (xy[0], xy[1])
 
     try:
         return {"ok": True, "source": apply_operation(source, operation, **arguments)}

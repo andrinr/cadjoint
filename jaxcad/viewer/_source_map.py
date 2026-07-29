@@ -64,15 +64,82 @@ def _node_span(source: str, offsets: list[int], node: ast.AST) -> Span | None:
     return absolute(node.lineno, node.col_offset), absolute(node.end_lineno, node.end_col_offset)
 
 
-def _is_profile_call(node: ast.AST) -> bool:
+def _called_name(node: ast.AST) -> str | None:
+    """Name of the function a Call node invokes, bare or attribute-qualified."""
     if not isinstance(node, ast.Call):
-        return False
+        return None
     func = node.func
     if isinstance(func, ast.Name):
-        return func.id == "PolygonProfile"
+        return func.id
     if isinstance(func, ast.Attribute):
-        return func.attr == "PolygonProfile"
-    return False
+        return func.attr
+    return None
+
+
+def _is_profile_call(node: ast.AST) -> bool:
+    return _called_name(node) == "PolygonProfile"
+
+
+@dataclass(frozen=True)
+class CallSite:
+    """Character spans of a construction call's arguments."""
+
+    line: int
+    name: str
+    arguments: dict[str, Span]
+    """Offset just past the last argument, where a new keyword can be added."""
+    arguments_end: int
+
+
+def locate_call(source: str, line: int, names: set[str]) -> CallSite | None:
+    """Locate a construction call at *line* and map its arguments to spans.
+
+    Args:
+        source: The full program text.
+        line: 1-based line captured when the object was constructed.
+        names: Acceptable function names, e.g. ``{"box", "sphere"}``.
+
+    Returns:
+        A :class:`CallSite` with one span per keyword argument, or None when the
+        call is ambiguous, absent, or unparseable.
+    """
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return None
+
+    calls = [node for node in ast.walk(tree) if _called_name(node) in names]
+    matches = [node for node in calls if node.lineno == line]
+    if not matches:
+        matches = [
+            node for node in calls if node.lineno <= line <= (node.end_lineno or node.lineno)
+        ]
+    if len(matches) != 1:
+        return None
+
+    call = matches[0]
+    offsets = _line_offsets(source)
+    arguments: dict[str, Span] = {}
+    end = None
+    for keyword in call.keywords:
+        span = _node_span(source, offsets, keyword.value)
+        if span is None:
+            continue
+        end = max(end or 0, span[1])
+        if keyword.arg is not None:
+            arguments[keyword.arg] = span
+    for argument in call.args:
+        span = _node_span(source, offsets, argument)
+        if span is not None:
+            end = max(end or 0, span[1])
+    if end is None:
+        return None
+    return CallSite(
+        line=line,
+        name=_called_name(call) or "",
+        arguments=arguments,
+        arguments_end=end,
+    )
 
 
 def _vertices_argument(call: ast.Call) -> ast.AST | None:
@@ -152,89 +219,141 @@ def _caller_line(filename: str) -> int | None:
 
 @contextmanager
 def capture_profiles(filename: str = PLAYGROUND_FILENAME):
-    """Record every PolygonProfile constructed inside the block, with its line.
+    """Record every construction object built inside the block, with its line.
 
-    Wraps ``PolygonProfile.__init__`` for the duration so profiles are captured
-    wherever they are built — including ones passed straight into ``extrude()``
-    that never get bound to a variable.
+    Wraps the construction classes' initialisers for the duration, so objects
+    are captured wherever they are built — including ones passed straight into
+    ``extrude()`` or ``Union()`` that never get bound to a variable.
 
     Yields:
-        A list of ``(profile, line)`` pairs in construction order. ``line`` is
+        A list of ``(object, line)`` pairs in construction order. ``line`` is
         None when construction did not originate from *filename*.
     """
     from jaxcad.construction.sketch import PolygonProfile
+    from jaxcad.construction.solid import ConstructionPrimitive
 
     captured: list[tuple[object, int | None]] = []
-    original_init = PolygonProfile.__init__
+    originals = {cls: cls.__init__ for cls in (PolygonProfile, ConstructionPrimitive)}
 
-    def patched_init(self, *args, **kwargs):
-        original_init(self, *args, **kwargs)
-        captured.append((self, _caller_line(filename)))
+    def wrap(cls, original):
+        def patched_init(self, *args, **kwargs):
+            original(self, *args, **kwargs)
+            captured.append((self, _caller_line(filename)))
 
-    PolygonProfile.__init__ = patched_init
+        cls.__init__ = patched_init
+
+    for cls, original in originals.items():
+        wrap(cls, original)
     try:
         yield captured
     finally:
-        PolygonProfile.__init__ = original_init
+        for cls, original in originals.items():
+            cls.__init__ = original
 
 
 def build_construction_payload(
     captured: list[tuple[object, int | None]],
     source: str,
 ) -> list[dict]:
-    """Serialize captured profiles into the viewer's construction payload.
+    """Serialize captured construction objects into the viewer's payload.
 
     Args:
-        captured: ``(profile, line)`` pairs from :func:`capture_profiles`.
-        source: The program text the profiles were built from.
+        captured: ``(object, line)`` pairs from :func:`capture_profiles`.
+        source: The program text the objects were built from.
 
     Returns:
-        One dict per profile: plane frame, vertex positions in both sketch and
-        world coordinates, and the source span of each vertex literal (null when
-        that vertex is not safely editable).
+        One dict per object. Every entry carries a world-space ``edges``
+        wireframe so the viewer can draw any shape without knowing its topology;
+        sketch profiles add their plane and per-vertex handles, primitives add
+        their placement and the spans that make it editable.
     """
-    # One call site can build several profiles (a loop or comprehension). Their
+    from jaxcad.construction.solid import DIMENSIONS
+
+    # One call site can build several objects (a loop or comprehension). Their
     # literals are indistinguishable in the text, so none of them is editable.
     line_counts = Counter(line for _, line in captured if line is not None)
     shared_lines = {line for line, count in line_counts.items() if count > 1}
 
     payload = []
-    for index, (profile, line) in enumerate(captured):
-        call = (
-            locate_profile_call(source, line)
-            if line is not None and line not in shared_lines
-            else None
-        )
-        spans: list[Span | None]
-        if call is not None and len(call.element_spans) == len(profile.vertices):
-            spans = list(call.element_spans)
+    for index, (obj, line) in enumerate(captured):
+        traceable = line is not None and line not in shared_lines
+        if hasattr(obj, "kind") and obj.kind in DIMENSIONS:
+            payload.append(_primitive_entry(obj, index, line, source, traceable))
         else:
-            spans = [None] * len(profile.vertices)
-
-        u, v, normal = profile.plane.frame()
-        world = profile.world_vertices()
-        payload.append(
-            {
-                "id": f"profile_{index}",
-                "name": profile.name,
-                "line": line,
-                "editable": call is not None and spans[0] is not None,
-                "plane": {
-                    "origin": [float(x) for x in profile.plane.origin.xyz],
-                    "u": [float(x) for x in u],
-                    "v": [float(x) for x in v],
-                    "normal": [float(x) for x in normal],
-                },
-                "vertices": [
-                    {
-                        "name": vertex.name,
-                        "free": bool(vertex.free),
-                        "uv": [float(x) for x in vertex.value],
-                        "world": [float(x) for x in world[i]],
-                        "span": list(spans[i]) if spans[i] is not None else None,
-                    }
-                    for i, vertex in enumerate(profile.vertices)
-                ],
-            }
-        )
+            payload.append(_profile_entry(obj, index, line, source, traceable))
     return payload
+
+
+def _profile_entry(profile, index: int, line: int | None, source: str, traceable: bool) -> dict:
+    """Payload for a sketch profile: plane, closed edge loop, vertex handles."""
+    call = locate_profile_call(source, line) if traceable else None
+    spans: list[Span | None]
+    if call is not None and len(call.element_spans) == len(profile.vertices):
+        spans = list(call.element_spans)
+    else:
+        spans = [None] * len(profile.vertices)
+
+    u, v, normal = profile.plane.frame()
+    world = [[float(x) for x in point] for point in profile.world_vertices()]
+    count = len(world)
+    return {
+        "id": f"profile_{index}",
+        "kind": "profile",
+        "name": profile.name,
+        "line": line,
+        "editable": call is not None and spans[0] is not None,
+        "edges": [[world[i], world[(i + 1) % count]] for i in range(count)],
+        "plane": {
+            "origin": [float(x) for x in profile.plane.origin.xyz],
+            "u": [float(x) for x in u],
+            "v": [float(x) for x in v],
+            "normal": [float(x) for x in normal],
+        },
+        "vertices": [
+            {
+                "name": vertex.name,
+                "free": bool(vertex.free),
+                "uv": [float(x) for x in vertex.value],
+                "world": world[i],
+                "span": list(spans[i]) if spans[i] is not None else None,
+            }
+            for i, vertex in enumerate(profile.vertices)
+        ],
+        "transform": None,
+        "spans": {},
+    }
+
+
+def _primitive_entry(primitive, index: int, line: int | None, source: str, traceable: bool) -> dict:
+    """Payload for a construction primitive: outline plus editable placement."""
+    from jaxcad.construction.solid import DIMENSIONS
+
+    call = locate_call(source, line, {primitive.kind}) if traceable else None
+    arguments = call.arguments if call is not None else {}
+    # Placement is only editable when both literals are present to rewrite.
+    editable = "position" in arguments
+
+    dimensions = {
+        key: (
+            [float(x) for x in primitive.params[key].xyz]
+            if key == "size"
+            else float(primitive.params[key].value)
+        )
+        for key in DIMENSIONS[primitive.kind]
+    }
+    return {
+        "id": f"{primitive.kind}_{index}",
+        "kind": primitive.kind,
+        "name": primitive.name,
+        "line": line,
+        "editable": editable,
+        "edges": primitive.world_edges(),
+        "plane": None,
+        "vertices": [],
+        "transform": {
+            "position": [float(x) for x in primitive.position.xyz],
+            "rotation": list(primitive.rotation_values()),
+            "dimensions": dimensions,
+        },
+        "spans": {name: list(span) for name, span in arguments.items()},
+    }

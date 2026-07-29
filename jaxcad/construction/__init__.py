@@ -29,10 +29,13 @@ from jaxcad.construction.from_line import from_line
 from jaxcad.construction.from_point import from_point
 from jaxcad.construction.revolve import revolve
 from jaxcad.construction.sketch import PolygonProfile, SketchPlane
+from jaxcad.construction.solid import ConstructionPrimitive, Solid
 
 __all__ = [
     "SketchPlane",
     "PolygonProfile",
+    "ConstructionPrimitive",
+    "Solid",
     "extrude",
     "revolve",
     "from_line",

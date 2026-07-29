@@ -5,20 +5,20 @@
  * the selection and insertion rules can be unit tested without a browser.
  */
 
-import type { ConstructionProfile } from "../types";
+import type { ConstructionNode } from "../types";
 import { projectPoint, type View } from "./math";
 
 /** Picking uses the same view descriptor as projection and ray casting. */
 export type PickView = View;
 
 export interface VertexHit {
-  profileId: string;
+  nodeId: string;
   vertexIndex: number;
   distance: number;
 }
 
 export interface EdgeHit {
-  profileId: string;
+  nodeId: string;
   /** Index the new vertex should take, i.e. after the edge's start vertex. */
   insertIndex: number;
   distance: number;
@@ -48,7 +48,7 @@ function pointSegmentDistance(
  * when `editableOnly` is set, since non-editable sketches cannot be modified.
  */
 export function pickVertex(
-  profiles: readonly ConstructionProfile[],
+  profiles: readonly ConstructionNode[],
   x: number,
   y: number,
   view: PickView,
@@ -63,7 +63,7 @@ export function pickVertex(
       if (!projected.visible) continue;
       const distance = Math.hypot(projected.x - x, projected.y - y);
       if (distance <= radius && (best === null || distance < best.distance)) {
-        best = { profileId: profile.id, vertexIndex: index, distance };
+        best = { nodeId: profile.id, vertexIndex: index, distance };
       }
     }
   }
@@ -78,7 +78,7 @@ export function pickVertex(
  * first yields an append (`insertIndex === vertices.length`).
  */
 export function pickEdge(
-  profiles: readonly ConstructionProfile[],
+  profiles: readonly ConstructionNode[],
   x: number,
   y: number,
   view: PickView,
@@ -97,7 +97,42 @@ export function pickEdge(
       if (!start.visible || !end.visible) continue;
       const distance = pointSegmentDistance(x, y, start.x, start.y, end.x, end.y);
       if (distance <= radius && (best === null || distance < best.distance)) {
-        best = { profileId: profile.id, insertIndex: index + 1, distance };
+        best = { nodeId: profile.id, insertIndex: index + 1, distance };
+      }
+    }
+  }
+  return best;
+}
+
+export interface NodeHit {
+  nodeId: string;
+  distance: number;
+}
+
+/**
+ * Nearest construction wireframe to a pixel.
+ *
+ * Selecting a primitive means clicking its outline, since a primitive has no
+ * vertex handles of its own. Sketch profiles are excluded: their vertices are
+ * the interactive part, and picking the whole loop would fight with that.
+ */
+export function pickNode(
+  nodes: readonly ConstructionNode[],
+  x: number,
+  y: number,
+  view: PickView,
+  radius = 8,
+): NodeHit | null {
+  let best: NodeHit | null = null;
+  for (const node of nodes) {
+    if (node.kind === "profile" || !node.editable) continue;
+    for (const [start, end] of node.edges) {
+      const a = projectPoint(start, view);
+      const b = projectPoint(end, view);
+      if (!a.visible || !b.visible) continue;
+      const distance = pointSegmentDistance(x, y, a.x, a.y, b.x, b.y);
+      if (distance <= radius && (best === null || distance < best.distance)) {
+        best = { nodeId: node.id, distance };
       }
     }
   }
@@ -111,7 +146,7 @@ export function pickEdge(
  * which keeps the winding sensible for clicks inside or outside the profile.
  */
 export function nearestInsertIndex(
-  profile: ConstructionProfile,
+  profile: ConstructionNode,
   x: number,
   y: number,
   view: PickView,

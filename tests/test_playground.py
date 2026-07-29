@@ -102,13 +102,14 @@ def test_path_tracer_builder_rejects_reserved_marker():
         build_path_tracer_shader("// __JAXCAD_SCENE_CODE__")
 
 
-def test_example_scene_reports_its_sketch_for_the_viewer():
+def test_example_scene_reports_its_construction_for_the_viewer():
     result = compile_source(EXAMPLE_SOURCE)
 
     assert result["ok"] is True
-    profiles = result["construction"]
-    assert len(profiles) == 1
-    profile = profiles[0]
+    nodes = {node["kind"]: node for node in result["construction"]}
+    assert set(nodes) == {"profile", "sphere"}
+
+    profile = nodes["profile"]
     assert profile["editable"] is True
     assert profile["name"] == "house"
     assert len(profile["vertices"]) == 5
@@ -116,6 +117,15 @@ def test_example_scene_reports_its_sketch_for_the_viewer():
     for vertex in profile["vertices"]:
         start, end = vertex["span"]
         assert EXAMPLE_SOURCE[start:end].startswith("[")
+
+    ball = nodes["sphere"]
+    assert ball["editable"] is True
+    assert ball["transform"]["position"] == pytest.approx([1.95, -0.25, 0.0], abs=1e-6)
+    # A wireframe the viewer can draw without knowing the shape's topology.
+    assert len(ball["edges"]) > 0
+    start, end = ball["spans"]["position"]
+    assert EXAMPLE_SOURCE[start:end] == "[1.95, -0.25, 0.0]"
+
     assert "fn fs_main_depth(" in result["preview_shader"]
 
 

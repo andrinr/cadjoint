@@ -1,7 +1,17 @@
 /** Top bar: run controls, tool modes, quality, and the generated-WGSL view. */
 
 import { For, Show } from "solid-js";
-import { busy, dirty, selection, setTool, status, tool } from "../state";
+import {
+  busy,
+  dirty,
+  gizmoMode,
+  nodeById,
+  selection,
+  setGizmoMode,
+  setTool,
+  status,
+  tool,
+} from "../state";
 import { DisplayOptions } from "./DisplayOptions";
 import { ViewControls } from "./ViewControls";
 import type { Projection } from "../viewer/math";
@@ -50,7 +60,37 @@ export function Toolbar(props: ToolbarProps) {
         >
           Polygon
         </button>
+        <For each={["box", "sphere", "cylinder"] as const}>
+          {(kind) => (
+            <button
+              type="button"
+              class={tool() === kind ? "active" : ""}
+              onClick={() => setTool(tool() === kind ? "select" : kind)}
+              title={`Place a ${kind} where you click`}
+              data-testid={`tool-${kind}`}
+            >
+              {kind[0].toUpperCase() + kind.slice(1)}
+            </button>
+          )}
+        </For>
       </div>
+
+      <Show when={selection() && selection()!.vertexIndex === null}>
+        <div class="tool-group" role="group" aria-label="Gizmo mode">
+          <For each={["translate", "rotate"] as const}>
+            {(mode) => (
+              <button
+                type="button"
+                class={gizmoMode() === mode ? "active" : ""}
+                onClick={() => setGizmoMode(mode)}
+                data-testid={`gizmo-${mode}`}
+              >
+                {mode === "translate" ? "Move" : "Rotate"}
+              </button>
+            )}
+          </For>
+        </div>
+      </Show>
 
       <ViewControls
         active={props.viewPreset}
@@ -64,7 +104,9 @@ export function Toolbar(props: ToolbarProps) {
 
       <Show when={selection()}>
         <span class="selection-chip" data-testid="selection-chip">
-          vertex {selection()!.vertexIndex}
+          {selection()!.vertexIndex === null
+            ? (nodeById(selection()!.nodeId)?.name ?? "solid")
+            : `vertex ${selection()!.vertexIndex}`}
         </span>
       </Show>
 

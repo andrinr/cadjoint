@@ -14,7 +14,12 @@ from __future__ import annotations
 
 import ast
 
-from jaxcad.viewer._source_map import locate_profile_call
+from jaxcad.viewer._source_map import (
+    _line_offsets,
+    _node_span,
+    locate_call,
+    locate_profile_call,
+)
 
 
 class PatchError(ValueError):
@@ -152,10 +157,156 @@ def delete_vertex(source: str, line: int, index: int) -> str:
     return _validate(source[:start] + source[end:])
 
 
+def _format_value(value) -> str:
+    """Format a scalar or vector literal."""
+    if isinstance(value, (int, float)):
+        return _format_coordinate(value)
+    return "[" + ", ".join(_format_coordinate(component) for component in value) + "]"
+
+
+def set_value(source: str, line: int, name: str, argument: str, value) -> str:
+    """Rewrite one keyword argument of a construction call.
+
+    Used for primitive placement — ``position``, ``rotation``, ``size``,
+    ``radius`` — where the whole argument is replaced rather than one element.
+
+    Args:
+        source: The program text.
+        line: 1-based line of the construction call.
+        name: The called function's name, e.g. ``box``.
+        argument: Keyword to rewrite.
+        value: A number, or a sequence of numbers for a vector argument.
+
+    Returns:
+        The patched source.
+
+    Raises:
+        PatchError: If the call or that keyword cannot be located.
+    """
+    call = locate_call(source, line, {name})
+    if call is None:
+        raise PatchError(f"No editable {name}() call found at line {line}.")
+    span = call.arguments.get(argument)
+    if span is None:
+        # The keyword is simply absent — a solid written without `rotation=`
+        # should still be rotatable, so add it rather than refusing.
+        insert = call.arguments_end
+        return _validate(source[:insert] + f", {argument}={_format_value(value)}" + source[insert:])
+    start, end = span
+    return _validate(source[:start] + _format_value(value) + source[end:])
+
+
+def _module_names(tree: ast.Module) -> set[str]:
+    """Every name bound at module level, for choosing a fresh variable."""
+    names: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store):
+            names.add(node.id)
+        elif isinstance(node, ast.alias):
+            names.add(node.asname or node.name.split(".")[0])
+    return names
+
+
+def _scene_assignment(tree: ast.Module) -> ast.Assign | None:
+    """The module-level ``scene = ...`` statement, if there is one."""
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and any(
+            isinstance(target, ast.Name) and target.id == "scene" for target in node.targets
+        ):
+            return node
+    return None
+
+
+def _ensure_import(source: str, tree: ast.Module, module: str, symbol: str) -> str:
+    """Add ``from module import symbol`` when the symbol is not already bound."""
+    if symbol in _module_names(tree):
+        return source
+    offsets = _line_offsets(source)
+    imports = [node for node in tree.body if isinstance(node, (ast.Import, ast.ImportFrom))]
+    insert_line = (imports[-1].end_lineno if imports else 0) or 0
+    offset = offsets[insert_line] if insert_line < len(offsets) else len(source)
+    return source[:offset] + f"from {module} import {symbol}\n" + source[offset:]
+
+
+def add_primitive(
+    source: str, kind: str, position, dimensions: dict, name: str | None = None
+) -> str:
+    """Insert a new construction primitive and add it to the scene.
+
+    Writes a ``Solid.<kind>(...)`` statement above the ``scene`` assignment and
+    includes the new variable in the scene expression, wrapping it in a
+    ``Union`` when it is not one already.
+
+    Args:
+        source: The program text.
+        kind: ``box``, ``sphere``, or ``cylinder``.
+        position: World position for the new solid.
+        dimensions: Kind-specific arguments, e.g. ``{"radius": 0.5}``.
+        name: Optional variable name; one is generated when omitted.
+
+    Returns:
+        The patched source.
+
+    Raises:
+        PatchError: If the program has no ``scene`` assignment to extend.
+    """
+    try:
+        tree = ast.parse(source)
+    except SyntaxError as error:
+        raise PatchError(f"Source is not valid Python: {error}") from error
+
+    assignment = _scene_assignment(tree)
+    if assignment is None:
+        raise PatchError("Add a `scene = ...` assignment before placing solids from the viewer.")
+
+    taken = _module_names(tree)
+    variable = name
+    if variable is None:
+        index = 1
+        while f"{kind}{index}" in taken:
+            index += 1
+        variable = f"{kind}{index}"
+
+    arguments = ", ".join(f"{key}={_format_value(value)}" for key, value in dimensions.items())
+    statement = (
+        f"{variable} = Solid.{kind}({arguments}, position={_format_value(position)}, "
+        f'name="{variable}")\n'
+    )
+
+    offsets = _line_offsets(source)
+    value = assignment.value
+    patched = source
+
+    # Extend the scene expression first: inserting the statement above it would
+    # otherwise shift every span the AST reported.
+    if isinstance(value, ast.Call) and getattr(value.func, "id", "") == "Union":
+        anchor = value.args[-1] if value.args else None
+        if anchor is None:
+            raise PatchError("The scene Union has no operands to extend.")
+        _, end = _node_span(patched, offsets, anchor)
+        patched = patched[:end] + f", {variable}" + patched[end:]
+    else:
+        start, end = _node_span(patched, offsets, value)
+        patched = patched[:start] + f"Union({patched[start:end]}, {variable})" + patched[end:]
+        patched = _ensure_import(patched, ast.parse(patched), "jaxcad.sdf.boolean", "Union")
+
+    # Re-parse: the scene edit moved everything after it.
+    tree = ast.parse(patched)
+    assignment = _scene_assignment(tree)
+    offsets = _line_offsets(patched)
+    insert_at = offsets[assignment.lineno - 1]
+    patched = patched[:insert_at] + statement + patched[insert_at:]
+
+    patched = _ensure_import(patched, ast.parse(patched), "jaxcad.construction", "Solid")
+    return _validate(patched)
+
+
 OPERATIONS = {
     "set_vertex": set_vertex,
     "insert_vertex": insert_vertex,
     "delete_vertex": delete_vertex,
+    "set_value": set_value,
+    "add_primitive": add_primitive,
 }
 
 

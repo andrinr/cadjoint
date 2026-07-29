@@ -6,21 +6,23 @@
  *   new shaders + construction tree → viewer redraws.
  */
 
-import { createMemo, createSignal, onMount, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, onMount, Show } from "solid-js";
 import * as api from "./api";
 import { EditorPane } from "./components/EditorPane";
 import { Toolbar } from "./components/Toolbar";
 import { ViewerPane } from "./components/ViewerPane";
 import {
   busy,
-  profileById,
+  gizmoMode,
+  nodeById,
   selection,
   setBusy,
   setConsoleText,
   setDirty,
-  setProfiles,
+  setNodes,
   setSelection,
   setSource,
+  reportViewerError,
   setStatus,
   setViewerError,
   source,
@@ -44,7 +46,7 @@ export function App() {
 
   const renderer = new Renderer({
     onStatus: (kind, text) => setStatus({ kind, text }),
-    onError: (message) => setViewerError(message),
+    onError: (message) => reportViewerError(message),
   });
 
   /** Push display settings to the renderer and redraw. */
@@ -62,10 +64,23 @@ export function App() {
   };
 
   /** Character span of the selected vertex's literal, for the editor. */
+  // The renderer needs the gizmo mode to know which handles to draw.
+  createEffect(() => {
+    renderer.gizmoMode = gizmoMode();
+    renderer.invalidate();
+  });
+
   const highlight = createMemo(() => {
     const active = selection();
     if (!active) return null;
-    const span = profileById(active.profileId)?.vertices[active.vertexIndex]?.span;
+    const node = nodeById(active.nodeId);
+    if (!node) return null;
+    if (active.vertexIndex === null) {
+      // A whole primitive highlights its position literal instead.
+      const span = node.spans.position;
+      return span ? { from: span[0], to: span[1] } : null;
+    }
+    const span = node.vertices[active.vertexIndex]?.span;
     return span ? { from: span[0], to: span[1] } : null;
   });
 
@@ -90,12 +105,15 @@ export function App() {
       }
       setDirty(false);
       setConsoleText(result.output ?? "");
-      setProfiles(result.construction ?? []);
+      setNodes(result.construction ?? []);
       // Drop a selection that no longer exists in the rebuilt sketch.
       const active = selection();
       if (active) {
-        const profile = (result.construction ?? []).find((item) => item.id === active.profileId);
-        if (!profile || active.vertexIndex >= profile.vertices.length) setSelection(null);
+        const node = (result.construction ?? []).find((item) => item.id === active.nodeId);
+        const stale =
+          !node ||
+          (active.vertexIndex !== null && active.vertexIndex >= node.vertices.length);
+        if (stale) setSelection(null);
       }
       setWgsl({ preview: result.preview_shader, path: result.path_shader });
       setViewerError("");
@@ -119,15 +137,10 @@ export function App() {
     }
   };
 
-  /** Apply one viewer edit to the program text, then rebuild. */
-  const patch = async (
-    op: "set_vertex" | "insert_vertex" | "delete_vertex",
-    line: number,
-    index: number,
-    xy?: [number, number],
-  ) => {
+  /** Send one edit to the server, adopt the patched source, then rebuild. */
+  const applyPatch = async (body: Record<string, unknown>) => {
     try {
-      const result = await api.patch(source(), op, line, index, xy);
+      const result = await api.patch({ source: source(), ...body });
       if (!result.ok || !result.source) {
         setStatus({ kind: "error", text: result.error ?? "Edit failed" });
         return;
@@ -141,6 +154,22 @@ export function App() {
       });
     }
   };
+
+  const patch = (
+    op: "set_vertex" | "insert_vertex" | "delete_vertex",
+    line: number,
+    index: number,
+    xy?: [number, number],
+  ) => applyPatch({ op, line, index, xy });
+
+  const setValue = (line: number, name: string, argument: string, value: number[]) =>
+    applyPatch({ op: "set_value", line, name, argument, value });
+
+  const addPrimitive = (
+    kind: string,
+    position: [number, number, number],
+    dimensions: Record<string, number | number[]>,
+  ) => applyPatch({ op: "add_primitive", kind, position, dimensions });
 
   onMount(async () => {
     try {
@@ -187,7 +216,12 @@ export function App() {
 
       <main class="panes">
         <EditorPane highlight={highlight()} onRun={() => void run()} />
-        <ViewerPane renderer={renderer} onPatch={patch} />
+        <ViewerPane
+          renderer={renderer}
+          onPatch={patch}
+          onSetValue={setValue}
+          onAddPrimitive={addPrimitive}
+        />
       </main>
 
       <Show when={showWgsl() && wgsl()}>

@@ -227,3 +227,83 @@ test("editing the code updates the sketch the viewer reports", async ({ page }) 
   await expect(page.getByTestId("selection-chip")).toHaveText("vertex 0");
   await expect(page.locator(".cm-vertex-highlight")).toHaveText("[-2.2, -0.9]");
 });
+
+/** Where the gizmo's X arrow tip lands for a primitive at `origin`. */
+function gizmoTip(origin: Vec3, axis: 0 | 1 | 2, canvas: Parameters<typeof projectToCss>[1]) {
+  const position = cameraPosition();
+  const size = Math.max(0.15, 0.18 * Math.hypot(...sub(origin, position)));
+  const unit: Vec3 = [0, 0, 0];
+  unit[axis] = size * 0.6;
+  return projectToCss([origin[0] + unit[0], origin[1] + unit[1], origin[2] + unit[2]], canvas);
+}
+
+test("placing a primitive writes a Solid call into the source", async ({ page }) => {
+  expect(await editorText(page)).not.toContain("Solid.sphere");
+
+  await page.getByTestId("tool-sphere").click();
+  const metrics = await canvasMetrics(page);
+  // Somewhere on the world XY plane, clear of the existing sketch.
+  const point = projectToCss([2.4, 1.4, 0], metrics);
+  await page.mouse.click(metrics.left + point.x, metrics.top + point.y);
+
+  await expect
+    .poll(async () => (await editorText(page)).includes("Solid.sphere"), { timeout: 45_000 })
+    .toBe(true);
+  const text = await editorText(page);
+  expect(text).toContain("from jaxcad.construction import Solid");
+  // Named once where it is built and again in the scene, so it is not an
+  // orphan statement the renderer would never see.
+  expect(text.match(/sphere1/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
+  await waitForCompile(page);
+  await expect(page.getByTestId("status")).not.toContainText("failed");
+
+  // The tool reverts to select so the next click does not place another.
+  await expect(page.getByTestId("tool-select")).toHaveClass(/active/);
+});
+
+test("a placed primitive can be selected and moved along an axis", async ({ page }) => {
+  await page.getByTestId("tool-box").click();
+  const metrics = await canvasMetrics(page);
+  // Kept near the middle of the view so the gizmo arrows stay on the canvas.
+  const drop = projectToCss([1.6, 0, 0], metrics);
+  await page.mouse.click(metrics.left + drop.x, metrics.top + drop.y);
+  await expect
+    .poll(async () => (await editorText(page)).includes("Solid.box"), { timeout: 45_000 })
+    .toBe(true);
+  await waitForCompile(page);
+
+  // Read back where it actually landed, then click its wireframe to select it.
+  const placed = (await editorText(page)).match(/Solid\.box\([^)]*position=\[([^\]]+)\]/);
+  expect(placed).not.toBeNull();
+  const origin = placed![1].split(",").map(Number) as Vec3;
+
+  // Re-read the canvas: the panes resize as the program grows, and projecting
+  // with stale metrics aims at the wrong pixel.
+  const afterPlacing = await canvasMetrics(page);
+  // Midpoint of a top edge: clear of the sketch's own vertex handles, which
+  // would otherwise win the pick.
+  const edge = projectToCss([origin[0], origin[1] + 0.5, origin[2] + 0.5], afterPlacing);
+  await page.mouse.click(afterPlacing.left + edge.x, afterPlacing.top + edge.y);
+  await expect(page.getByTestId("selection-chip")).toBeVisible();
+  // A whole-object selection offers the move/rotate gizmo.
+  await expect(page.getByTestId("gizmo-translate")).toBeVisible();
+
+  // Drag the Y arrow upward; the vertical axis stays comfortably in frame.
+  const view = await canvasMetrics(page);
+  const from = gizmoTip(origin, 1, view);
+  const to = projectToCss([origin[0], origin[1] + 1.0, origin[2]], view);
+  await page.mouse.move(view.left + from.x, view.top + from.y);
+  await page.mouse.down();
+  await page.mouse.move(view.left + to.x, view.top + to.y, { steps: 12 });
+  await page.mouse.up();
+
+  await expect
+    .poll(
+      async () => {
+        const match = (await editorText(page)).match(/Solid\.box\([^)]*position=\[([^\]]+)\]/);
+        return match ? Number(match[1].split(",")[1]) : origin[1];
+      },
+      { timeout: 45_000 },
+    )
+    .toBeGreaterThan(origin[1] + 0.2);
+});

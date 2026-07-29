@@ -10,7 +10,8 @@
  * the overlay pipelines, and pan support added.
  */
 
-import type { ConstructionProfile, Selection } from "../types";
+import type { ConstructionNode, GizmoMode, Selection } from "../types";
+import { AXIS_COLORS, gizmoEdges, gizmoScale, type AxisIndex } from "./gizmo";
 import {
   cameraPosition,
   orthoHeightFor,
@@ -126,6 +127,7 @@ const COLORS: Record<string, Rgba> = {
   handleSelected: [0.98, 0.99, 0.94, 1.0],
   handleHover: [1.0, 0.72, 0.4, 1.0],
   handleLocked: [0.62, 0.64, 0.6, 0.9],
+  edgeSelected: [1.0, 0.95, 0.6, 1.0],
 };
 
 export interface RendererCallbacks {
@@ -190,7 +192,9 @@ export class Renderer {
   pathReady = false;
   interacting = false;
 
-  private profiles: readonly ConstructionProfile[] = [];
+  private profiles: readonly ConstructionNode[] = [];
+  gizmoMode: GizmoMode = "translate";
+  gizmoAxis: AxisIndex | null = null;
   private selection: Selection | null = null;
   private hover: Selection | null = null;
 
@@ -520,7 +524,7 @@ export class Renderer {
 
   /** Replace the construction geometry drawn on top of the scene. */
   setConstruction(
-    profiles: readonly ConstructionProfile[],
+    profiles: readonly ConstructionNode[],
     selection: Selection | null,
     hover: Selection | null,
   ): void {
@@ -536,27 +540,48 @@ export class Renderer {
     const edges: number[] = [];
     const handles: number[] = [];
 
-    for (const profile of this.profiles) {
-      const count = profile.vertices.length;
-      const edgeColor = profile.editable ? COLORS.edge : COLORS.edgeLocked;
-      for (let index = 0; index < count; index++) {
-        const start = profile.vertices[index].world;
-        const end = profile.vertices[(index + 1) % count].world;
+    for (const node of this.profiles) {
+      // The payload ships a ready-made wireframe, so boxes, spheres, and
+      // sketches all draw through one path.
+      const color = node.editable ? COLORS.edge : COLORS.edgeLocked;
+      const selected = this.selection?.nodeId === node.id;
+      const edgeColor = selected ? COLORS.edgeSelected : color;
+      for (const [start, end] of node.edges) {
         edges.push(start[0], start[1], start[2], end[0], end[1], end[2], ...edgeColor);
       }
-      for (let index = 0; index < count; index++) {
-        const selected =
-          this.selection?.profileId === profile.id && this.selection.vertexIndex === index;
-        const hovered = this.hover?.profileId === profile.id && this.hover.vertexIndex === index;
-        const color = !profile.editable
+      for (let index = 0; index < node.vertices.length; index++) {
+        const isSelected =
+          this.selection?.nodeId === node.id && this.selection.vertexIndex === index;
+        const hovered = this.hover?.nodeId === node.id && this.hover.vertexIndex === index;
+        const handleColor = !node.editable
           ? COLORS.handleLocked
-          : selected
+          : isSelected
             ? COLORS.handleSelected
             : hovered
               ? COLORS.handleHover
               : COLORS.handle;
-        const position = profile.vertices[index].world;
-        handles.push(position[0], position[1], position[2], ...color, selected || hovered ? 1 : 0);
+        const position = node.vertices[index].world;
+        handles.push(
+          position[0],
+          position[1],
+          position[2],
+          ...handleColor,
+          isSelected || hovered ? 1 : 0,
+        );
+      }
+    }
+
+    // The gizmo rides on the same instance buffer, in axis colours.
+    const target = this.gizmoTarget();
+    if (target) {
+      const size = gizmoScale(this.view, target.origin);
+      for (const group of gizmoEdges(target.origin, size, this.gizmoMode)) {
+        const base = AXIS_COLORS[group.axis];
+        const active = this.gizmoAxis === group.axis;
+        const color: Rgba = active ? [1, 1, 0.75, 1] : [base[0], base[1], base[2], 0.95];
+        for (const [start, end] of group.edges) {
+          edges.push(start[0], start[1], start[2], end[0], end[1], end[2], ...color);
+        }
       }
     }
 
@@ -578,6 +603,15 @@ export class Renderer {
       this.handleCapacity,
       "overlay handles",
     );
+  }
+
+  /** The selected primitive the gizmo should attach to, if any. */
+  gizmoTarget(): { node: ConstructionNode; origin: Vec3 } | null {
+    const active = this.selection;
+    if (!active || active.vertexIndex !== null) return null;
+    const node = this.profiles.find((candidate) => candidate.id === active.nodeId);
+    if (!node?.transform || !node.editable) return null;
+    return { node, origin: node.transform.position as Vec3 };
   }
 
   private writeInstances(
