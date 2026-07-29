@@ -113,19 +113,22 @@ export interface NodeHit {
  * Nearest construction wireframe to a pixel.
  *
  * Selecting a primitive means clicking its outline, since a primitive has no
- * vertex handles of its own. Sketch profiles are excluded: their vertices are
- * the interactive part, and picking the whole loop would fight with that.
+ * vertex handles of its own. Sketch profiles only join in when `includeProfiles`
+ * is set — in vertex mode their handles are the interactive part, and picking
+ * the whole loop would fight with that.
  */
 export function pickNode(
   nodes: readonly ConstructionNode[],
   x: number,
   y: number,
   view: PickView,
-  radius = 8,
+  radius = 10,
+  includeProfiles = false,
 ): NodeHit | null {
   let best: NodeHit | null = null;
   for (const node of nodes) {
-    if (node.kind === "profile" || !node.editable) continue;
+    if (!node.editable) continue;
+    if (node.kind === "profile" && !includeProfiles) continue;
     for (const [start, end] of node.edges) {
       const a = projectPoint(start, view);
       const b = projectPoint(end, view);

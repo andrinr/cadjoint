@@ -9,11 +9,15 @@
 import { createEffect, createMemo, createSignal, onMount, Show } from "solid-js";
 import * as api from "./api";
 import { EditorPane } from "./components/EditorPane";
+import { ToolRail } from "./components/ToolRail";
 import { Toolbar } from "./components/Toolbar";
+import { ViewCube } from "./components/ViewCube";
 import { ViewerPane } from "./components/ViewerPane";
 import {
   busy,
+  cameraAngles,
   gizmoMode,
+  setCameraAngles,
   nodeById,
   selection,
   setBusy,
@@ -27,7 +31,6 @@ import {
   setViewerError,
   source,
 } from "./state";
-import type { Projection } from "./viewer/math";
 import {
   DEFAULT_DISPLAY,
   QUALITY_PRESETS,
@@ -61,6 +64,7 @@ export function App() {
     setViewPreset(key);
     renderer.applyViewPreset(key);
     setDisplay({ ...renderer.display });
+    setCameraAngles({ yaw: renderer.camera.yaw, pitch: renderer.camera.pitch });
   };
 
   /** Character span of the selected vertex's literal, for the editor. */
@@ -187,10 +191,7 @@ export function App() {
     <div class="app">
       <Toolbar
         display={display()}
-        viewPreset={viewPreset()}
         onDisplayChange={applyDisplay}
-        onViewPreset={applyPreset}
-        onProjection={(projection: Projection) => applyDisplay({ projection })}
         onRun={() => void run()}
         onReset={() => {
           setSource(example());
@@ -221,6 +222,19 @@ export function App() {
           onPatch={patch}
           onSetValue={setValue}
           onAddPrimitive={addPrimitive}
+          overlay={
+            <>
+              <ToolRail />
+              <ViewCube
+                yaw={cameraAngles().yaw}
+                pitch={cameraAngles().pitch}
+                projection={display().projection}
+                active={viewPreset()}
+                onPreset={applyPreset}
+                onProjection={(projection) => applyDisplay({ projection })}
+              />
+            </>
+          }
         />
       </main>
 

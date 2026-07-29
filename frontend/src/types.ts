@@ -93,3 +93,6 @@ export type ToolMode = "select" | "polygon" | "box" | "sphere" | "cylinder";
 
 /** How a gizmo drag transforms the selected primitive. */
 export type GizmoMode = "translate" | "rotate";
+
+/** What a click in the viewport picks. */
+export type SelectionMode = "object" | "vertex";

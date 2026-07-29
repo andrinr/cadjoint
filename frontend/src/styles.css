@@ -113,58 +113,275 @@ button.primary {
   border-left: 1px solid var(--line);
 }
 
-.view-controls {
+/* Viewport overlays ---------------------------------------------------- */
+
+.tool-rail {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: rgba(14, 17, 15, 0.86);
+  backdrop-filter: blur(8px);
+}
+
+.tool-rail button {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+}
+
+.tool-rail button:hover:not(:disabled) {
+  border-color: var(--line);
+  color: var(--ink);
+  background: #1b1f1b;
+}
+
+.tool-rail button.active {
+  border-color: var(--lime);
+  background: #202616;
+  color: var(--lime);
+}
+
+.tool-rail button:disabled {
+  opacity: 0.3;
+}
+
+.tool-rail hr {
+  width: 22px;
+  height: 1px;
+  margin: 3px 0;
+  border: 0;
+  background: var(--line);
+}
+
+.rail-hint {
+  color: var(--lime);
+  font: 600 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* ViewCube ------------------------------------------------------------- */
+
+.view-cube {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.cube-stage {
+  width: 96px;
+  height: 96px;
+  display: grid;
+  place-items: center;
+  perspective: 340px;
+}
+
+.cube {
+  position: relative;
+  width: 60px;
+  height: 60px;
+  transform-style: preserve-3d;
+  transition: transform 120ms linear;
+}
+
+.cube-face {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  width: 60px;
+  height: 60px;
+  padding: 0;
+  border: 1px solid rgba(217, 255, 87, 0.35);
+  border-radius: 4px;
+  background: rgba(23, 28, 23, 0.82);
+  color: var(--muted);
+  font: 600 8px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.08em;
+  /* Only faces turned toward the viewer are drawn, so a click always lands on
+     the face you can actually see. */
+  backface-visibility: hidden;
+}
+
+.cube-face:hover {
+  background: rgba(217, 255, 87, 0.22);
+  color: var(--ink);
+}
+
+.cube-face.active {
+  border-color: var(--lime);
+  color: var(--lime);
+}
+
+.cube-actions {
   display: flex;
   gap: 6px;
-  padding-left: 8px;
-  border-left: 1px solid var(--line);
 }
+
+.cube-actions button {
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 6px;
+  background: rgba(14, 17, 15, 0.86);
+  font: 600 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.06em;
+}
+
+.view-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 118px;
+  margin: 0;
+  padding: 5px;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5);
+}
+
+.view-menu button {
+  width: 100%;
+  height: 26px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 12px;
+  text-align: left;
+}
+
+.view-menu button:hover {
+  background: #1b1f1b;
+}
+
+.view-menu button.active {
+  color: var(--lime);
+}
+
+/* Render settings panel ------------------------------------------------ */
 
 .display-options {
   position: relative;
 }
 
+button.icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  padding: 0;
+}
+
+button.primary svg {
+  margin-right: 6px;
+}
+
 .display-options .popover {
   position: absolute;
   top: calc(100% + 8px);
-  left: 0;
+  right: 0;
   z-index: 20;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  min-width: 230px;
-  padding: 8px;
+  gap: 14px;
+  width: 264px;
+  padding: 14px;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 12px;
   background: var(--panel);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
 }
 
-.display-options .option {
+.display-options section {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.display-options h4 {
+  margin: 0;
+  color: var(--muted);
+  font: 600 10px/1 system-ui;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.segmented {
+  display: flex;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #0e110f;
+}
+
+.segmented button {
+  flex: 1;
+  height: 26px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.segmented button:hover {
+  color: var(--ink);
+}
+
+.segmented button.active {
+  background: #222a1b;
+  color: var(--lime);
+}
+
+.switch {
   display: flex;
   align-items: flex-start;
   gap: 9px;
-  padding: 7px 8px;
+  padding: 5px 4px;
   border-radius: 7px;
   cursor: pointer;
 }
 
-.display-options .option:hover {
+.switch:hover {
   background: #191c19;
 }
 
-.display-options .option input {
+.switch input {
   margin-top: 2px;
   accent-color: var(--lime);
 }
 
-.display-options .option span {
+.switch span {
   display: flex;
   flex-direction: column;
   font-size: 13px;
 }
 
-.display-options .option small {
+.switch small {
   color: var(--muted);
   font-size: 11px;
 }
@@ -280,6 +497,7 @@ button.primary {
   position: absolute;
   right: 14px;
   bottom: 12px;
+  z-index: 5;
   margin: 0;
   color: var(--muted);
   font-size: 11px;
@@ -288,9 +506,10 @@ button.primary {
 
 .viewer-error {
   position: absolute;
-  top: 14px;
+  bottom: 40px;
   right: 14px;
-  left: 14px;
+  left: 62px;
+  z-index: 12;
   padding: 12px 14px;
   border: 1px solid var(--coral);
   border-radius: 10px;
@@ -316,6 +535,9 @@ button.primary {
 .dialog {
   display: flex;
   flex-direction: column;
+  /* Without min-height the flex item takes its content's full height, and a
+     shader thousands of lines long pushes the whole dialog off screen. */
+  min-height: 0;
   width: min(880px, calc(100% - 48px));
   height: min(680px, calc(100% - 48px));
   border: 1px solid #3a3e38;
@@ -334,6 +556,7 @@ button.primary {
 
 .dialog pre {
   flex: 1;
+  min-height: 0;
   margin: 0;
   padding: 14px 18px;
   overflow: auto;

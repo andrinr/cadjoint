@@ -84,11 +84,15 @@ export const DISPLAY = {
   reflections: 2,
   flat: 4,
   hideSolid: 8,
+  hardShadows: 16,
 } as const;
+
+/** Off, one crisp occlusion ray, or a penumbra. */
+export type ShadowMode = "off" | "hard" | "soft";
 
 export interface DisplaySettings {
   projection: Projection;
-  shadows: boolean;
+  shadows: ShadowMode;
   reflections: boolean;
   flatShading: boolean;
   hideSolid: boolean;
@@ -99,9 +103,11 @@ export interface DisplaySettings {
 
 export const DEFAULT_DISPLAY: DisplaySettings = {
   projection: "perspective",
-  shadows: true,
+  // Flat shading with crisp shadows reads like a working drawing, which is
+  // what you want while modelling; full shading is a click away.
+  shadows: "hard",
   reflections: true,
-  flatShading: false,
+  flatShading: true,
   hideSolid: false,
   xray: 0,
   showSketches: true,
@@ -248,7 +254,8 @@ export class Renderer {
   private displayFlags(): number {
     const { shadows, reflections, flatShading, hideSolid } = this.display;
     return (
-      (shadows ? DISPLAY.shadows : 0) |
+      (shadows === "off" ? 0 : DISPLAY.shadows) |
+      (shadows === "hard" ? DISPLAY.hardShadows : 0) |
       (reflections ? DISPLAY.reflections : 0) |
       (flatShading ? DISPLAY.flat : 0) |
       (hideSolid ? DISPLAY.hideSolid : 0)

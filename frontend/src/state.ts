@@ -8,7 +8,13 @@
  */
 
 import { createSignal } from "solid-js";
-import type { ConstructionNode, GizmoMode, Selection, ToolMode } from "./types";
+import type {
+  ConstructionNode,
+  GizmoMode,
+  Selection,
+  SelectionMode,
+  ToolMode,
+} from "./types";
 import { placeEdges } from "./viewer/gizmo";
 
 export const [source, setSource] = createSignal("");
@@ -57,6 +63,10 @@ export interface GizmoDrag {
 export const [drag, setDrag] = createSignal<DragState | null>(null);
 export const [gizmoDrag, setGizmoDrag] = createSignal<GizmoDrag | null>(null);
 export const [gizmoMode, setGizmoMode] = createSignal<GizmoMode>("translate");
+export const [selectionMode, setSelectionMode] = createSignal<SelectionMode>("object");
+
+/** Camera angles mirrored into a signal so the ViewCube can track them. */
+export const [cameraAngles, setCameraAngles] = createSignal({ yaw: 0.75, pitch: 0.32 });
 
 /** Find a construction node by id. */
 export function nodeById(id: string): ConstructionNode | undefined {

@@ -107,7 +107,9 @@ def test_example_scene_reports_its_construction_for_the_viewer():
 
     assert result["ok"] is True
     nodes = {node["kind"]: node for node in result["construction"]}
-    assert set(nodes) == {"profile", "sphere"}
+    # A sketch plus a glass sphere and a metal cylinder, so the starter scene
+    # shows transparency and reflection as well as construction geometry.
+    assert set(nodes) == {"profile", "sphere", "cylinder"}
 
     profile = nodes["profile"]
     assert profile["editable"] is True
@@ -118,13 +120,17 @@ def test_example_scene_reports_its_construction_for_the_viewer():
         start, end = vertex["span"]
         assert EXAMPLE_SOURCE[start:end].startswith("[")
 
-    ball = nodes["sphere"]
-    assert ball["editable"] is True
-    assert ball["transform"]["position"] == pytest.approx([1.95, -0.25, 0.0], abs=1e-6)
+    glass = nodes["sphere"]
+    assert glass["editable"] is True
+    assert glass["transform"]["position"] == pytest.approx([1.95, -0.3, 0.35], abs=1e-6)
     # A wireframe the viewer can draw without knowing the shape's topology.
-    assert len(ball["edges"]) > 0
-    start, end = ball["spans"]["position"]
-    assert EXAMPLE_SOURCE[start:end] == "[1.95, -0.25, 0.0]"
+    assert len(glass["edges"]) > 0
+    start, end = glass["spans"]["position"]
+    assert EXAMPLE_SOURCE[start:end] == "[1.95, -0.3, 0.35]"
+
+    metal = nodes["cylinder"]
+    assert metal["transform"]["rotation"] == pytest.approx([1.5708, 0.0, 0.0], abs=1e-5)
+    assert "rotation" in metal["spans"]
 
     assert "fn fs_main_depth(" in result["preview_shader"]
 

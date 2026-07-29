@@ -77,16 +77,29 @@ body = extrude(
 
 # Primitives keep an editable placement. Click the outline to select one, then
 # drag the gizmo to move or turn it.
-ball = Solid.sphere(
-    radius=0.45,
-    position=[1.95, -0.25, 0.0],
-    material=Material(color=[0.1, 0.3, 0.8], roughness=0.22),
-    name="ball",
+glass = Solid.sphere(
+    radius=0.5,
+    position=[1.95, -0.3, 0.35],
+    material=Material(
+        color=[0.72, 0.86, 1.0], roughness=0.04, opacity=0.18, ior=1.45
+    ),
+    name="glass",
+)
+metal = Solid.cylinder(
+    radius=0.36,
+    height=0.55,
+    position=[-1.9, -0.65, 0.0],
+    rotation=[1.5708, 0.0, 0.0],
+    material=Material(
+        color=[0.95, 0.78, 0.35], roughness=0.12, metallic=1.0, reflectivity=0.55
+    ),
+    name="metal",
 )
 
 scene = Union(
     body,
-    ball,
+    glass,
+    metal,
     Plane(-1.25, material=Material(color=[0.12, 0.14, 0.18], roughness=0.8)),
     smoothness=0.0,
 )

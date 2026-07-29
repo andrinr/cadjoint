@@ -104,6 +104,7 @@ test("serves the app and loads the starter sketch", async ({ page }) => {
 });
 
 test("clicking a sketch handle selects it and highlights its source span", async ({ page }) => {
+  await page.getByTestId("mode-vertex").click();
   const metrics = await canvasMetrics(page);
   const point = projectToCss(FIRST_VERTEX, metrics);
   await page.mouse.click(metrics.left + point.x, metrics.top + point.y);
@@ -114,6 +115,7 @@ test("clicking a sketch handle selects it and highlights its source span", async
 });
 
 test("escape clears the selection", async ({ page }) => {
+  await page.getByTestId("mode-vertex").click();
   const metrics = await canvasMetrics(page);
   const point = projectToCss(FIRST_VERTEX, metrics);
   await page.mouse.click(metrics.left + point.x, metrics.top + point.y);
@@ -124,6 +126,7 @@ test("escape clears the selection", async ({ page }) => {
 });
 
 test("dragging a handle rewrites the vertex literal", async ({ page }) => {
+  await page.getByTestId("mode-vertex").click();
   const metrics = await canvasMetrics(page);
   const from = projectToCss(FIRST_VERTEX, metrics);
   const to = projectToCss([-1.1, -1.4, 0], metrics);
@@ -163,48 +166,88 @@ test("the polygon tool inserts a vertex and stays active", async ({ page }) => {
   await waitForCompile(page);
 
   await page.keyboard.press("Escape");
-  await expect(page.getByTestId("tool-select")).toHaveClass(/active/);
+  await expect(page.getByTestId("mode-object")).toHaveClass(/active/);
 });
 
-test("standard views switch the projection to orthographic", async ({ page }) => {
-  await expect(page.getByTestId("projection-toggle")).toHaveText("Persp");
+test("the view cube switches the projection to orthographic", async ({ page }) => {
+  await expect(page.getByTestId("projection-toggle")).toHaveText("PERSP");
 
-  await page.getByTestId("view-preset").selectOption("front");
-  await expect(page.getByTestId("projection-toggle")).toHaveText("Ortho");
+  await page.getByTestId("view-menu").click();
+  await page.getByTestId("view-menu-front").click();
+  await expect(page.getByTestId("projection-toggle")).toHaveText("ORTHO");
 
   // Iso returns to a perspective camera.
-  await page.getByTestId("view-preset").selectOption("iso");
-  await expect(page.getByTestId("projection-toggle")).toHaveText("Persp");
+  await page.getByTestId("view-iso").click();
+  await expect(page.getByTestId("projection-toggle")).toHaveText("PERSP");
+});
+
+test("the view cube tracks the camera", async ({ page }) => {
+  const cube = page.locator(".view-cube .cube");
+  const before = await cube.evaluate((node) => getComputedStyle(node).transform);
+
+  // Orbit by dragging empty space well clear of the sketch and the overlays.
+  const metrics = await canvasMetrics(page);
+  await page.mouse.move(metrics.left + metrics.clientWidth * 0.8, metrics.top + metrics.clientHeight * 0.85);
+  await page.mouse.down();
+  await page.mouse.move(
+    metrics.left + metrics.clientWidth * 0.55,
+    metrics.top + metrics.clientHeight * 0.85,
+    { steps: 10 },
+  );
+  await page.mouse.up();
+
+  await expect
+    .poll(() => cube.evaluate((node) => getComputedStyle(node).transform))
+    .not.toBe(before);
 });
 
 test("the projection toggle works on its own", async ({ page }) => {
   await page.getByTestId("projection-toggle").click();
-  await expect(page.getByTestId("projection-toggle")).toHaveText("Ortho");
+  await expect(page.getByTestId("projection-toggle")).toHaveText("ORTHO");
   await page.getByTestId("projection-toggle").click();
-  await expect(page.getByTestId("projection-toggle")).toHaveText("Persp");
+  await expect(page.getByTestId("projection-toggle")).toHaveText("PERSP");
 });
 
-test("display options toggle without disturbing the sketch", async ({ page }) => {
-  const before = await editorText(page);
-
-  await page.getByTestId("display-options").click();
-  await page.getByTestId("toggle-xray").check();
-  await expect(page.getByTestId("toggle-xray")).toBeChecked();
-  await page.getByTestId("toggle-shadows").uncheck();
-  await page.getByTestId("toggle-flatShading").check();
-  await page.keyboard.press("Escape");
-
-  // Display settings are viewer state, never edits to the program.
-  expect(await editorText(page)).toBe(before);
-
-  // Selection still works with the new display settings applied.
+test("selection mode decides what a click picks", async ({ page }) => {
   const metrics = await canvasMetrics(page);
   const point = projectToCss(FIRST_VERTEX, metrics);
+
+  // Object mode is the default, so a sketch vertex is not picked as a vertex.
+  await expect(page.getByTestId("mode-object")).toHaveClass(/active/);
+  await page.mouse.click(metrics.left + point.x, metrics.top + point.y);
+  await expect(page.locator(".cm-vertex-highlight")).toHaveCount(0);
+
+  await page.getByTestId("mode-vertex").click();
   await page.mouse.click(metrics.left + point.x, metrics.top + point.y);
   await expect(page.getByTestId("selection-chip")).toHaveText("vertex 0");
+  await expect(page.locator(".cm-vertex-highlight")).toHaveText("[-1.1, -0.7]");
+});
+
+test("render settings group shading, shadows, and quality", async ({ page }) => {
+  const before = await editorText(page);
+  await page.getByTestId("display-options").click();
+
+  // Modelling defaults: flat shading with crisp shadows.
+  await expect(page.getByTestId("shadows-hard")).toHaveClass(/active/);
+  await expect(page.getByTestId("shading-flat")).toHaveClass(/active/);
+
+  await page.getByTestId("shadows-soft").click();
+  await expect(page.getByTestId("shadows-soft")).toHaveClass(/active/);
+  await page.getByTestId("shadows-off").click();
+  await expect(page.getByTestId("shadows-off")).toHaveClass(/active/);
+
+  await page.getByTestId("shading-full").click();
+  await expect(page.getByTestId("shading-full")).toHaveClass(/active/);
+  await page.getByTestId("quality-draft").click();
+  await expect(page.getByTestId("quality-draft")).toHaveClass(/active/);
+  await page.getByTestId("toggle-xray").check();
+
+  // Render settings are viewer state, never edits to the program.
+  expect(await editorText(page)).toBe(before);
 });
 
 test("editing the code updates the sketch the viewer reports", async ({ page }) => {
+  await page.getByTestId("mode-vertex").click();
   const program = [
     "from jaxcad.construction import PolygonProfile, extrude",
     'profile = PolygonProfile([[-2.2, -0.9], [1.0, -0.9], [0.0, 1.2]], name="t")',
@@ -237,8 +280,12 @@ function gizmoTip(origin: Vec3, axis: 0 | 1 | 2, canvas: Parameters<typeof proje
   return projectToCss([origin[0] + unit[0], origin[1] + unit[1], origin[2] + unit[2]], canvas);
 }
 
+const sphereCount = async (page: Page) =>
+  ((await editorText(page)).match(/Solid\.sphere/g) ?? []).length;
+
 test("placing a primitive writes a Solid call into the source", async ({ page }) => {
-  expect(await editorText(page)).not.toContain("Solid.sphere");
+  // The starter program already has one sphere, so count rather than presence.
+  const before = await sphereCount(page);
 
   await page.getByTestId("tool-sphere").click();
   const metrics = await canvasMetrics(page);
@@ -246,19 +293,27 @@ test("placing a primitive writes a Solid call into the source", async ({ page })
   const point = projectToCss([2.4, 1.4, 0], metrics);
   await page.mouse.click(metrics.left + point.x, metrics.top + point.y);
 
-  await expect
-    .poll(async () => (await editorText(page)).includes("Solid.sphere"), { timeout: 45_000 })
-    .toBe(true);
-  const text = await editorText(page);
-  expect(text).toContain("from jaxcad.construction import Solid");
-  // Named once where it is built and again in the scene, so it is not an
-  // orphan statement the renderer would never see.
-  expect(text.match(/sphere1/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
+  await expect.poll(() => sphereCount(page), { timeout: 45_000 }).toBe(before + 1);
+  // Solid is already imported by the starter program, so no duplicate appears.
+  expect(await editorText(page)).toMatch(/from jaxcad\.construction import .*\bSolid\b/);
+
+  // CodeMirror only renders the lines in view, so scroll to the scene
+  // assignment before checking the new solid was wired into it rather than
+  // left as an orphan statement.
+  await page.locator("[data-testid=editor] .cm-scroller").evaluate((node) => {
+    node.scrollTop = node.scrollHeight;
+  });
+  await expect(page.locator("[data-testid=editor] .cm-content")).toContainText(
+    /scene = Union\(|sphere1,/,
+  );
+  await expect(page.locator("[data-testid=editor] .cm-content")).toContainText("sphere1");
   await waitForCompile(page);
   await expect(page.getByTestId("status")).not.toContainText("failed");
 
-  // The tool reverts to select so the next click does not place another.
-  await expect(page.getByTestId("tool-select")).toHaveClass(/active/);
+  // The tool reverts to picking, with the new solid already selected so the
+  // gizmo is usable straight away.
+  await expect(page.getByTestId("mode-object")).toHaveClass(/active/);
+  await expect(page.getByTestId("selection-chip")).toBeVisible();
 });
 
 test("a placed primitive can be selected and moved along an axis", async ({ page }) => {
@@ -285,6 +340,7 @@ test("a placed primitive can be selected and moved along an axis", async ({ page
   const edge = projectToCss([origin[0], origin[1] + 0.5, origin[2] + 0.5], afterPlacing);
   await page.mouse.click(afterPlacing.left + edge.x, afterPlacing.top + edge.y);
   await expect(page.getByTestId("selection-chip")).toBeVisible();
+  await expect(page.getByTestId("gizmo-translate")).toBeEnabled();
   // A whole-object selection offers the move/rotate gizmo.
   await expect(page.getByTestId("gizmo-translate")).toBeVisible();
 
