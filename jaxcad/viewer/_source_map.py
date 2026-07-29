@@ -284,6 +284,51 @@ def build_construction_payload(
     return payload
 
 
+def _plane_transform(source: str, line: int, origin) -> dict | None:
+    """Locate the ``SketchPlane(...)`` that positions a profile, if it is literal.
+
+    A sketch's placement lives on its plane rather than the profile, so moving
+    the sketch means rewriting the plane's ``origin``. Planes passed in as a
+    variable cannot be rewritten, and the sketch is simply not movable then.
+    """
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return None
+
+    for node in ast.walk(tree):
+        if _called_name(node) != "SketchPlane":
+            continue
+        spans_line = node.lineno <= line <= (node.end_lineno or node.lineno)
+        # Also accept a plane built on its own line inside the profile call.
+        nested_in_profile = any(
+            other.lineno <= line <= (other.end_lineno or other.lineno)
+            for other in ast.walk(tree)
+            if _is_profile_call(other) and _contains(other, node)
+        )
+        if not spans_line and not nested_in_profile:
+            continue
+        plane_call = locate_call(source, node.lineno, {"SketchPlane"})
+        if plane_call is None or "origin" not in plane_call.arguments:
+            return None
+        return {
+            "position": [float(x) for x in origin],
+            "rotation": [0.0, 0.0, 0.0],
+            "dimensions": {},
+            "line": node.lineno,
+            "call": "SketchPlane",
+            "positionArgument": "origin",
+            # Turning a sketch means reorienting its plane's normal, which is
+            # not an angle triple, so rotation stays a code-only edit.
+            "canRotate": False,
+        }
+    return None
+
+
+def _contains(outer: ast.AST, inner: ast.AST) -> bool:
+    return any(node is inner for node in ast.walk(outer))
+
+
 def _profile_entry(profile, index: int, line: int | None, source: str, traceable: bool) -> dict:
     """Payload for a sketch profile: plane, closed edge loop, vertex handles."""
     call = locate_profile_call(source, line) if traceable else None
@@ -319,7 +364,9 @@ def _profile_entry(profile, index: int, line: int | None, source: str, traceable
             }
             for i, vertex in enumerate(profile.vertices)
         ],
-        "transform": None,
+        "transform": (
+            _plane_transform(source, line, profile.plane.origin.xyz) if traceable else None
+        ),
         "spans": {},
     }
 
@@ -354,6 +401,12 @@ def _primitive_entry(primitive, index: int, line: int | None, source: str, trace
             "position": [float(x) for x in primitive.position.xyz],
             "rotation": list(primitive.rotation_values()),
             "dimensions": dimensions,
-        },
+            "line": line,
+            "call": primitive.kind,
+            "positionArgument": "position",
+            "canRotate": True,
+        }
+        if editable
+        else None,
         "spans": {name: list(span) for name, span in arguments.items()},
     }

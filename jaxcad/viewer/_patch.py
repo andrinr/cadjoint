@@ -15,6 +15,7 @@ from __future__ import annotations
 import ast
 
 from jaxcad.viewer._source_map import (
+    _called_name,
     _line_offsets,
     _node_span,
     locate_call,
@@ -301,12 +302,140 @@ def add_primitive(
     return _validate(patched)
 
 
+CONSTRUCTION_CALLS = {"PolygonProfile", "box", "sphere", "cylinder"}
+
+
+def _statement_containing(tree: ast.Module, node: ast.AST) -> ast.stmt | None:
+    """The module-level statement whose subtree holds *node*."""
+    for statement in tree.body:
+        if any(candidate is node for candidate in ast.walk(statement)):
+            return statement
+    return None
+
+
+def _name_references(tree: ast.Module, name: str, exclude: ast.AST) -> list[ast.Name]:
+    """Every load of *name* outside the statement that defines it."""
+    return [
+        node
+        for statement in tree.body
+        if statement is not exclude
+        for node in ast.walk(statement)
+        if isinstance(node, ast.Name) and node.id == name and isinstance(node.ctx, ast.Load)
+    ]
+
+
+def delete_object(source: str, line: int) -> str:
+    """Remove a construction object and its use in the scene.
+
+    Deletes the statement that builds it and drops it from the scene
+    expression. Refuses when the value is used somewhere else, since removing
+    it would leave the program referring to a name that no longer exists.
+
+    Args:
+        source: The program text.
+        line: 1-based line of the construction call to remove.
+
+    Returns:
+        The patched source.
+
+    Raises:
+        PatchError: If the object cannot be located or is still in use.
+    """
+    try:
+        tree = ast.parse(source)
+    except SyntaxError as error:
+        raise PatchError(f"Source is not valid Python: {error}") from error
+
+    calls = [
+        node
+        for node in ast.walk(tree)
+        if _called_name(node) in CONSTRUCTION_CALLS
+        and node.lineno <= line <= (node.end_lineno or node.lineno)
+    ]
+    if len(calls) != 1:
+        raise PatchError(f"No single construction call found at line {line}.")
+    call = calls[0]
+
+    statement = _statement_containing(tree, call)
+    if statement is None:
+        raise PatchError("Could not find the statement that builds this object.")
+
+    offsets = _line_offsets(source)
+    scene = _scene_assignment(tree)
+    edits: list[tuple[int, int]] = []
+
+    # A solid written straight into the scene has no statement of its own to
+    # remove — only its operand — so the scene assignment never takes the
+    # named-variable path, which would delete the whole scene.
+    if (
+        statement is not scene
+        and isinstance(statement, ast.Assign)
+        and len(statement.targets) == 1
+        and isinstance(statement.targets[0], ast.Name)
+    ):
+        variable = statement.targets[0].id
+        uses = _name_references(tree, variable, statement)
+        # Only a direct operand of the scene's Union can be dropped safely.
+        # Anywhere else — an argument to extrude(), say — removing it would
+        # silently change what the program builds.
+        operands = _union_operands(scene)
+        if any(not any(operand is node for operand in operands) for node in uses):
+            raise PatchError(
+                f"`{variable}` is used elsewhere in the program, so it cannot be deleted "
+                "from the viewer. Remove those uses first."
+            )
+        for node in uses:
+            edits.append(_argument_span(source, offsets, node))
+        # Whole statement, including its line ending.
+        start = offsets[statement.lineno - 1]
+        end = offsets[min(statement.end_lineno or statement.lineno, len(offsets) - 1)]
+        edits.append((start, end))
+    else:
+        # Built inline inside the scene expression: drop just that argument.
+        if not any(operand is call for operand in _union_operands(scene)):
+            raise PatchError(
+                "This object is not a direct operand of the scene Union, so it cannot be "
+                "deleted from the viewer."
+            )
+        edits.append(_argument_span(source, offsets, call))
+
+    patched = source
+    for start, end in sorted(edits, reverse=True):
+        patched = patched[:start] + patched[end:]
+    return _validate(patched)
+
+
+def _contains_node(outer: ast.AST, inner: ast.AST) -> bool:
+    return any(node is inner for node in ast.walk(outer))
+
+
+def _union_operands(scene: ast.Assign | None) -> list[ast.AST]:
+    """Positional arguments of a ``scene = Union(...)`` assignment."""
+    if scene is None or not isinstance(scene.value, ast.Call):
+        return []
+    if getattr(scene.value.func, "id", "") != "Union":
+        return []
+    return list(scene.value.args)
+
+
+def _argument_span(source: str, offsets, node) -> tuple[int, int]:
+    """Span of one call argument, including the comma that follows it."""
+    span = _node_span(source, offsets, node)
+    if span is None:  # pragma: no cover - defensive
+        raise PatchError("Could not locate the argument to remove.")
+    start, end = span
+    while end < len(source) and source[end] in ", ":
+        end += 1
+    return start, end
+
+
 OPERATIONS = {
     "set_vertex": set_vertex,
     "insert_vertex": insert_vertex,
     "delete_vertex": delete_vertex,
     "set_value": set_value,
     "add_primitive": add_primitive,
+    "delete_object": delete_object,
 }
 
 

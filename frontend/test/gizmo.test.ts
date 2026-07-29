@@ -61,6 +61,10 @@ describe("placeEdges", () => {
     position: [1, 0, 0],
     rotation: [0, 0, 0],
     dimensions: { size: [1, 1, 1] },
+    line: 3,
+    call: "box",
+    positionArgument: "position",
+    canRotate: true,
   };
   const edges = [
     [

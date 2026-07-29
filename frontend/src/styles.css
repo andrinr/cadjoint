@@ -158,6 +158,12 @@ button.primary {
   opacity: 0.3;
 }
 
+.tool-rail button.danger:hover:not(:disabled) {
+  border-color: var(--coral);
+  color: var(--coral);
+  background: #24140f;
+}
+
 .tool-rail hr {
   width: 22px;
   height: 1px;
@@ -192,6 +198,12 @@ button.primary {
   display: grid;
   place-items: center;
   perspective: 340px;
+  cursor: grab;
+  touch-action: none;
+}
+
+.cube-stage:active {
+  cursor: grabbing;
 }
 
 .cube {
@@ -237,8 +249,11 @@ button.primary {
 }
 
 .cube-actions button {
-  height: 22px;
-  padding: 0 8px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 26px;
+  padding: 0;
   border-radius: 6px;
   background: rgba(14, 17, 15, 0.86);
   font: 600 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace;

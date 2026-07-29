@@ -169,6 +169,8 @@ export function App() {
   const setValue = (line: number, name: string, argument: string, value: number[]) =>
     applyPatch({ op: "set_value", line, name, argument, value });
 
+  const deleteObject = (line: number) => applyPatch({ op: "delete_object", line });
+
   const addPrimitive = (
     kind: string,
     position: [number, number, number],
@@ -222,9 +224,22 @@ export function App() {
           onPatch={patch}
           onSetValue={setValue}
           onAddPrimitive={addPrimitive}
+          onDeleteObject={deleteObject}
           overlay={
             <>
-              <ToolRail />
+              <ToolRail
+                onDelete={() => {
+                  const active = selection();
+                  const node = active && nodeById(active.nodeId);
+                  if (!node?.editable || node.line === null) return;
+                  if (active!.vertexIndex !== null) {
+                    void patch("delete_vertex", node.line, active!.vertexIndex);
+                  } else {
+                    void deleteObject(node.line);
+                  }
+                  setSelection(null);
+                }}
+              />
               <ViewCube
                 yaw={cameraAngles().yaw}
                 pitch={cameraAngles().pitch}
@@ -232,6 +247,11 @@ export function App() {
                 active={viewPreset()}
                 onPreset={applyPreset}
                 onProjection={(projection) => applyDisplay({ projection })}
+                onOrbit={(yaw, pitch) => {
+                  renderer.camera = { ...renderer.camera, yaw, pitch };
+                  setCameraAngles({ yaw, pitch });
+                  renderer.invalidate();
+                }}
               />
             </>
           }

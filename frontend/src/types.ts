@@ -31,6 +31,14 @@ export interface ConstructionTransform {
   /** Intrinsic X, Y, Z angles in radians. */
   rotation: [number, number, number];
   dimensions: Record<string, number | number[]>;
+  /** Line of the call that owns the placement — a plane, for a sketch. */
+  line: number;
+  /** That call's name, e.g. `box` or `SketchPlane`. */
+  call: string;
+  /** Keyword holding the position: `position`, or `origin` for a plane. */
+  positionArgument: string;
+  /** False for sketches, whose orientation is a normal rather than angles. */
+  canRotate: boolean;
 }
 
 /**
@@ -74,7 +82,8 @@ export type PatchOperation =
   | "insert_vertex"
   | "delete_vertex"
   | "set_value"
-  | "add_primitive";
+  | "add_primitive"
+  | "delete_object";
 
 export interface PatchResponse {
   ok: boolean;

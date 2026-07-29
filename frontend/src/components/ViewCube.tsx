@@ -10,8 +10,9 @@
  *   its +X ("Right") face to the front.
  */
 
-import { For, Show, createSignal, onCleanup } from "solid-js";
+import { For } from "solid-js";
 import type { Projection } from "../viewer/math";
+import { IsoIcon, OrthographicIcon, PerspectiveIcon } from "./icons";
 
 interface Face {
   key: string;
@@ -33,6 +34,11 @@ const FACES: Face[] = [
 
 const degrees = (radians: number) => (radians * 180) / Math.PI;
 
+const ORBIT_SPEED = 0.011;
+const PITCH_LIMIT = 1.45;
+/** Pointer travel, in pixels, below which the gesture counts as a click. */
+const CLICK_SLOP = 4;
+
 export interface ViewCubeProps {
   yaw: number;
   pitch: number;
@@ -40,24 +46,68 @@ export interface ViewCubeProps {
   active: string;
   onPreset: (key: string) => void;
   onProjection: (projection: Projection) => void;
+  /** Drag the cube to orbit, as in other 3D viewports. */
+  onOrbit: (yaw: number, pitch: number) => void;
 }
 
 export function ViewCube(props: ViewCubeProps) {
-  const [menuOpen, setMenuOpen] = createSignal(false);
-  const closeOnOutside = (event: MouseEvent) => {
-    if (!(event.target as HTMLElement).closest(".view-cube")) setMenuOpen(false);
-  };
-  document.addEventListener("click", closeOnOutside);
-  onCleanup(() => document.removeEventListener("click", closeOnOutside));
+  let dragging = false;
+  let travelled = 0;
+  let lastX = 0;
+  let lastY = 0;
 
+  const onPointerDown = (event: PointerEvent) => {
+    dragging = true;
+    travelled = 0;
+    lastX = event.clientX;
+    lastY = event.clientY;
+  };
+
+  const onPointerMove = (event: PointerEvent) => {
+    if (!dragging) return;
+    const dx = event.clientX - lastX;
+    const dy = event.clientY - lastY;
+    travelled += Math.abs(dx) + Math.abs(dy);
+    lastX = event.clientX;
+    lastY = event.clientY;
+    // Capture only once this is really a drag: capturing on pointerdown would
+    // retarget the click and a face would never receive it.
+    if (travelled > CLICK_SLOP) {
+      const element = event.currentTarget as HTMLElement;
+      if (!element.hasPointerCapture(event.pointerId)) {
+        element.setPointerCapture(event.pointerId);
+      }
+    }
+    props.onOrbit(
+      props.yaw - dx * ORBIT_SPEED,
+      Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, props.pitch + dy * ORBIT_SPEED)),
+    );
+  };
+
+  const onPointerUp = (event: PointerEvent) => {
+    dragging = false;
+    const element = event.currentTarget as HTMLElement;
+    if (element.hasPointerCapture(event.pointerId)) {
+      element.releasePointerCapture(event.pointerId);
+    }
+  };
+
+  /** A face click only snaps the view when the pointer barely moved. */
   const choose = (key: string) => {
+    if (travelled > CLICK_SLOP) return;
     props.onPreset(key);
-    setMenuOpen(false);
   };
 
   return (
     <div class="view-cube" data-testid="view-cube">
-      <div class="cube-stage">
+      <div
+        class="cube-stage"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        title="Drag to orbit, click a face to snap"
+      >
         <div
           class="cube"
           style={{
@@ -87,19 +137,10 @@ export function ViewCube(props: ViewCubeProps) {
           class={props.active === "iso" ? "active" : ""}
           onClick={() => props.onPreset("iso")}
           title="Isometric view"
+          aria-label="Isometric view"
           data-testid="view-iso"
         >
-          ISO
-        </button>
-        <button
-          type="button"
-          class={menuOpen() ? "active" : ""}
-          onClick={() => setMenuOpen(!menuOpen())}
-          title="Standard views"
-          aria-label="Standard views"
-          data-testid="view-menu"
-        >
-          VIEWS
+          <IsoIcon />
         </button>
         <button
           type="button"
@@ -114,30 +155,13 @@ export function ViewCube(props: ViewCubeProps) {
               ? "Orthographic — click for perspective"
               : "Perspective — click for orthographic"
           }
+          aria-label="Toggle projection"
           data-testid="projection-toggle"
         >
-          {props.projection === "orthographic" ? "ORTHO" : "PERSP"}
+          {props.projection === "orthographic" ? <OrthographicIcon /> : <PerspectiveIcon />}
         </button>
       </div>
 
-      <Show when={menuOpen()}>
-        <ul class="view-menu" role="menu">
-          <For each={FACES}>
-            {(face) => (
-              <li>
-                <button
-                  type="button"
-                  class={props.active === face.key ? "active" : ""}
-                  onClick={() => choose(face.key)}
-                  data-testid={`view-menu-${face.key}`}
-                >
-                  {face.label[0] + face.label.slice(1).toLowerCase()}
-                </button>
-              </li>
-            )}
-          </For>
-        </ul>
-      </Show>
     </div>
   );
 }

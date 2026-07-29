@@ -169,16 +169,37 @@ test("the polygon tool inserts a vertex and stays active", async ({ page }) => {
   await expect(page.getByTestId("mode-object")).toHaveClass(/active/);
 });
 
-test("the view cube switches the projection to orthographic", async ({ page }) => {
-  await expect(page.getByTestId("projection-toggle")).toHaveText("PERSP");
+/** The projection toggle shows one icon per mode. */
+const projectionMode = async (page: Page) =>
+  page.getByTestId("projection-toggle").getAttribute("title");
 
-  await page.getByTestId("view-menu").click();
-  await page.getByTestId("view-menu-front").click();
-  await expect(page.getByTestId("projection-toggle")).toHaveText("ORTHO");
+test("the view cube snaps to a face and switches projection", async ({ page }) => {
+  expect(await projectionMode(page)).toContain("Perspective");
+
+  await page.getByTestId("view-front").click({ force: true });
+  expect(await projectionMode(page)).toContain("Orthographic");
 
   // Iso returns to a perspective camera.
   await page.getByTestId("view-iso").click();
-  await expect(page.getByTestId("projection-toggle")).toHaveText("PERSP");
+  expect(await projectionMode(page)).toContain("Perspective");
+});
+
+test("dragging the view cube orbits the camera", async ({ page }) => {
+  const cube = page.locator(".view-cube .cube");
+  const before = await cube.evaluate((node) => getComputedStyle(node).transform);
+
+  const stage = await page.locator(".cube-stage").boundingBox();
+  const centre = { x: stage!.x + stage!.width / 2, y: stage!.y + stage!.height / 2 };
+  await page.mouse.move(centre.x, centre.y);
+  await page.mouse.down();
+  await page.mouse.move(centre.x - 40, centre.y + 10, { steps: 8 });
+  await page.mouse.up();
+
+  await expect
+    .poll(() => cube.evaluate((node) => getComputedStyle(node).transform))
+    .not.toBe(before);
+  // A drag must not be mistaken for a face click, which would snap to a view.
+  expect(await projectionMode(page)).toContain("Perspective");
 });
 
 test("the view cube tracks the camera", async ({ page }) => {
@@ -203,9 +224,24 @@ test("the view cube tracks the camera", async ({ page }) => {
 
 test("the projection toggle works on its own", async ({ page }) => {
   await page.getByTestId("projection-toggle").click();
-  await expect(page.getByTestId("projection-toggle")).toHaveText("ORTHO");
+  expect(await projectionMode(page)).toContain("Orthographic");
   await page.getByTestId("projection-toggle").click();
-  await expect(page.getByTestId("projection-toggle")).toHaveText("PERSP");
+  expect(await projectionMode(page)).toContain("Perspective");
+});
+
+test("a solid can be deleted from the viewer", async ({ page }) => {
+  const metrics = await canvasMetrics(page);
+  // The starter scene's glass sphere sits at (1.95, -0.3, 0.35).
+  const outline = projectToCss([1.95, -0.3, 0.85], metrics);
+  await page.mouse.click(metrics.left + outline.x, metrics.top + outline.y);
+  await expect(page.getByTestId("selection-chip")).toHaveText("glass");
+
+  await page.getByTestId("delete-selection").click();
+  await expect
+    .poll(async () => (await editorText(page)).includes("glass"), { timeout: 45_000 })
+    .toBe(false);
+  await waitForCompile(page);
+  await expect(page.getByTestId("status")).not.toContainText("failed");
 });
 
 test("selection mode decides what a click picks", async ({ page }) => {
@@ -362,4 +398,47 @@ test("a placed primitive can be selected and moved along an axis", async ({ page
       { timeout: 45_000 },
     )
     .toBeGreaterThan(origin[1] + 0.2);
+});
+
+test("a sketch can be moved by its plane", async ({ page }) => {
+  // Selecting the sketch as an object targets its plane, which is where a
+  // profile's placement actually lives.
+  const metrics = await canvasMetrics(page);
+  const edge = projectToCss([0, -0.7, 0], metrics);
+  await page.mouse.click(metrics.left + edge.x, metrics.top + edge.y);
+  await expect(page.getByTestId("selection-chip")).toHaveText("house");
+  await expect(page.getByTestId("gizmo-translate")).toBeEnabled();
+
+  // Drag the Y arrow upward.
+  const view = await canvasMetrics(page);
+  const from = gizmoTip([0, 0, 0], 1, view);
+  const to = projectToCss([0, 1.0, 0], view);
+  await page.mouse.move(view.left + from.x, view.top + from.y);
+  await page.mouse.down();
+  await page.mouse.move(view.left + to.x, view.top + to.y, { steps: 12 });
+  await page.mouse.up();
+
+  // The plane's origin is what gets rewritten, not the vertices.
+  await expect
+    .poll(
+      async () => {
+        const match = (await editorText(page)).match(/SketchPlane\(origin=\[([^\]]+)\]/);
+        return match ? Number(match[1].split(",")[1]) : 0;
+      },
+      { timeout: 45_000 },
+    )
+    .toBeGreaterThan(0.2);
+  expect(await editorText(page)).toContain("[-1.1, -0.7]");
+});
+
+test("hovering an object highlights it before the click", async ({ page }) => {
+  const metrics = await canvasMetrics(page);
+  const away = { x: metrics.clientWidth * 0.5, y: metrics.clientHeight * 0.08 };
+  await page.mouse.move(metrics.left + away.x, metrics.top + away.y);
+  await expect(page.locator("[data-testid=viewer-canvas]")).toHaveCSS("cursor", "default");
+
+  // Moving onto the sketch outline shows it is pickable.
+  const edge = projectToCss([0, -0.7, 0], metrics);
+  await page.mouse.move(metrics.left + edge.x, metrics.top + edge.y);
+  await expect(page.locator("[data-testid=viewer-canvas]")).toHaveCSS("cursor", "pointer");
 });

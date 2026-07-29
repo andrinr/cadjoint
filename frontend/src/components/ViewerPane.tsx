@@ -75,6 +75,8 @@ export interface ViewerPaneProps {
     position: [number, number, number],
     dimensions: Record<string, number | number[]>,
   ) => Promise<void>;
+  /** Remove a whole construction object from the program. */
+  onDeleteObject: (line: number) => Promise<void>;
 }
 
 type Gesture =
@@ -97,6 +99,8 @@ type Gesture =
 export function ViewerPane(props: ViewerPaneProps) {
   let canvas!: HTMLCanvasElement;
   let gesture: Gesture = { kind: "none" };
+  /** Held space turns any drag into a pan, as other 3D viewports do. */
+  let panHeld = false;
 
   const renderer = props.renderer;
 
@@ -188,6 +192,10 @@ export function ViewerPane(props: ViewerPaneProps) {
    * selects, and the default arrow means "nothing here" — dragging there orbits.
    */
   const updateHover = (x: number, y: number) => {
+    if (panHeld) {
+      canvas.style.cursor = "move";
+      return;
+    }
     if (tool() !== "select") {
       canvas.style.cursor = "crosshair";
       setHover(null);
@@ -214,6 +222,7 @@ export function ViewerPane(props: ViewerPaneProps) {
         canvas.style.cursor = "grab";
         return;
       }
+
     }
 
     if (selectionMode() === "vertex") {
@@ -227,8 +236,13 @@ export function ViewerPane(props: ViewerPaneProps) {
       return;
     }
 
-    setHover(null);
-    canvas.style.cursor = pickNode(displayProfiles(), x, y, view, 10, true) ? "pointer" : "default";
+    const node = pickNode(displayProfiles(), x, y, view, 10, true);
+    const next = node ? { nodeId: node.nodeId, vertexIndex: null } : null;
+    const current = hover();
+    if (next?.nodeId !== current?.nodeId || next?.vertexIndex !== current?.vertexIndex) {
+      setHover(next);
+    }
+    canvas.style.cursor = node ? "pointer" : "default";
   };
 
   const onPointerDown = (event: PointerEvent) => {
@@ -250,7 +264,8 @@ export function ViewerPane(props: ViewerPaneProps) {
     if (event.button === 0 && target) {
       const view = pickView();
       const size = gizmoScale(view, target.origin);
-      const axis = pickGizmoAxis(target.origin, size, gizmoMode(), x, y, view);
+      const mode = target.node.transform?.canRotate ? gizmoMode() : "translate";
+      const axis = pickGizmoAxis(target.origin, size, mode, x, y, view);
       if (axis !== null) {
         const transform = target.node.transform!;
         const ray = rayFromPixel(x, y, view);
@@ -263,7 +278,7 @@ export function ViewerPane(props: ViewerPaneProps) {
             kind: "gizmo",
             nodeId: target.node.id,
             axis,
-            mode: gizmoMode(),
+            mode,
             start,
             position: [...transform.position] as [number, number, number],
             rotation: [...transform.rotation] as [number, number, number],
@@ -307,7 +322,7 @@ export function ViewerPane(props: ViewerPaneProps) {
       setSelection(null);
     }
     gesture =
-      event.button === 2 || event.shiftKey
+      event.button === 2 || event.shiftKey || panHeld
         ? { kind: "pan", x: event.clientX, y: event.clientY }
         : { kind: "orbit", x: event.clientX, y: event.clientY };
     renderer.interacting = true;
@@ -408,10 +423,15 @@ export function ViewerPane(props: ViewerPaneProps) {
       const node = nodeById(finished.nodeId);
       setGizmoDrag(null);
       renderer.gizmoAxis = null;
-      if (finished.moved && active && node?.line != null) {
-        const argument = finished.mode === "translate" ? "position" : "rotation";
-        const value = finished.mode === "translate" ? active.position : active.rotation;
-        await props.onSetValue(node.line, node.kind, argument, value);
+      const placement = node?.transform;
+      if (finished.moved && active && placement) {
+        const translating = finished.mode === "translate";
+        await props.onSetValue(
+          placement.line,
+          placement.call,
+          translating ? placement.positionArgument : "rotation",
+          translating ? active.position : active.rotation,
+        );
       }
       return;
     }
@@ -479,19 +499,36 @@ export function ViewerPane(props: ViewerPaneProps) {
       const active = selection();
       if ((event.key === "Delete" || event.key === "Backspace") && active) {
         if (typing) return;
-        const profile = nodeById(active.nodeId);
-        if (profile?.editable && profile.line !== null && active.vertexIndex !== null) {
+        const node = nodeById(active.nodeId);
+        if (node?.editable && node.line !== null) {
           event.preventDefault();
-          void props.onPatch("delete_vertex", profile.line, active.vertexIndex);
+          if (active.vertexIndex !== null) {
+            void props.onPatch("delete_vertex", node.line, active.vertexIndex);
+          } else {
+            void props.onDeleteObject(node.line);
+          }
           setSelection(null);
         }
       }
     };
+    const onPanKey = (event: KeyboardEvent) => {
+      if (event.code !== "Space") return;
+      const target = document.activeElement;
+      if (target && (target.tagName === "TEXTAREA" || target.closest(".cm-editor"))) return;
+      // Stop the page scrolling or a focused button firing.
+      event.preventDefault();
+      panHeld = event.type === "keydown";
+      canvas.style.cursor = panHeld ? "move" : "default";
+    };
     window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keydown", onPanKey);
+    window.addEventListener("keyup", onPanKey);
 
     onCleanup(() => {
       observer.disconnect();
       window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keydown", onPanKey);
+      window.removeEventListener("keyup", onPanKey);
       renderer.destroy();
     });
   });
@@ -532,7 +569,7 @@ export function ViewerPane(props: ViewerPaneProps) {
           ? "Polygon: click sketch edges to add vertices · Esc to finish"
           : tool() !== "select"
             ? `Click to place a ${tool()} · Esc to cancel`
-            : "Drag handles or the gizmo · Drag empty space to orbit · Shift/right-drag to pan"}
+            : "Drag handles or the gizmo · Drag to orbit · Space, Shift or right-drag to pan · Del removes"}
       </p>
     </section>
   );

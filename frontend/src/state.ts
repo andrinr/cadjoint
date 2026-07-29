@@ -126,9 +126,16 @@ function withPlacement(
   rotation: [number, number, number],
 ): ConstructionNode {
   if (!node.transform) return node;
+  const move = (point: [number, number, number]): [number, number, number] => [
+    point[0] + (position[0] - node.transform!.position[0]),
+    point[1] + (position[1] - node.transform!.position[1]),
+    point[2] + (position[2] - node.transform!.position[2]),
+  ];
   return {
     ...node,
     edges: placeEdges(node.edges, node.transform, position, rotation),
+    // A sketch's handles ride along with its plane.
+    vertices: node.vertices.map((vertex) => ({ ...vertex, world: move(vertex.world) })),
     transform: { ...node.transform, position, rotation },
   };
 }

@@ -26,6 +26,7 @@ import {
   PolygonIcon,
   RotateIcon,
   SphereIcon,
+  TrashIcon,
   VertexSelectIcon,
 } from "./icons";
 
@@ -46,7 +47,11 @@ const TRANSFORMS: { key: GizmoMode; label: string; hint: string; icon: Component
   { key: "rotate", label: "Rotate", hint: "Rotate about an axis  (R)", icon: RotateIcon },
 ];
 
-export function ToolRail() {
+export interface ToolRailProps {
+  onDelete: () => void;
+}
+
+export function ToolRail(props: ToolRailProps) {
   /** A whole object is selected, so the transform gizmo applies. */
   const transformable = () => selection() !== null && selection()!.vertexIndex === null;
 
@@ -106,6 +111,20 @@ export function ToolRail() {
           </button>
         )}
       </For>
+
+      <hr />
+
+      <button
+        type="button"
+        class="danger"
+        disabled={selection() === null}
+        onClick={props.onDelete}
+        title="Delete the selection  (Del)"
+        aria-label="Delete"
+        data-testid="delete-selection"
+      >
+        <TrashIcon />
+      </button>
 
       <Show when={transformable()}>
         <span class="rail-hint" data-testid="rail-hint">

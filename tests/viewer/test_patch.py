@@ -237,3 +237,60 @@ class TestAddPrimitive:
 
         with pytest.raises(PatchError, match="scene = "):
             add_primitive("x = 1\n", "sphere", [0, 0, 0], {"radius": 0.5})
+
+
+class TestDeleteObject:
+    def test_removes_a_solid_and_its_use_in_the_scene(self):
+        from jaxcad.viewer._patch import delete_object
+
+        source = (
+            "from jaxcad.construction import Solid\n"
+            "from jaxcad.sdf.boolean import Union\n"
+            'ball = Solid.sphere(radius=0.5, position=[0, 0, 0], name="ball")\n'
+            'block = Solid.box(size=[1, 1, 1], position=[2, 0, 0], name="block")\n'
+            "scene = Union(ball, block)\n"
+        )
+        patched = delete_object(source, 3)
+
+        assert "ball" not in patched
+        assert "Solid.box" in patched
+        assert ast.parse(patched)  # still valid Python
+        scene = [line for line in patched.splitlines() if line.startswith("scene")][0]
+        assert scene == "scene = Union(block)"
+
+    def test_refuses_when_the_value_is_used_elsewhere(self):
+        from jaxcad.viewer._patch import delete_object
+
+        source = (
+            "from jaxcad.construction import PolygonProfile, extrude\n"
+            "profile = PolygonProfile([[0, 0], [1, 0], [0, 1]], name='p')\n"
+            "scene = extrude(profile, depth=0.5)\n"
+        )
+        with pytest.raises(PatchError, match="used elsewhere"):
+            delete_object(source, 2)
+
+    def test_removes_an_inline_solid_from_the_scene(self):
+        from jaxcad.viewer._patch import delete_object
+
+        source = (
+            "from jaxcad.construction import Solid\n"
+            "from jaxcad.sdf.boolean import Union\n"
+            "scene = Union(\n"
+            "    Solid.sphere(radius=1.0),\n"
+            "    Solid.box(size=[1, 1, 1]),\n"
+            ")\n"
+        )
+        patched = delete_object(source, 4)
+        assert patched.count("Solid.") == 1
+        assert "Solid.box" in patched
+
+    def test_refuses_two_objects_built_on_one_line(self):
+        from jaxcad.viewer._patch import delete_object
+
+        source = (
+            "from jaxcad.construction import Solid\n"
+            "from jaxcad.sdf.boolean import Union\n"
+            "scene = Union(Solid.sphere(radius=1.0), Solid.box(size=[1, 1, 1]))\n"
+        )
+        with pytest.raises(PatchError, match="No single construction call"):
+            delete_object(source, 3)

@@ -250,6 +250,15 @@ def patch_source(request: dict[str, Any]) -> dict[str, Any]:
         except PatchError as error:
             return {"ok": False, "error": str(error)}
 
+    if operation == "delete_object":
+        line = request.get("line")
+        if not isinstance(line, int) or isinstance(line, bool):
+            return {"ok": False, "error": "The patch request needs an integer `line`."}
+        try:
+            return {"ok": True, "source": apply_operation(source, operation, line=line)}
+        except PatchError as error:
+            return {"ok": False, "error": str(error)}
+
     for key in ("line", "index"):
         value = request.get(key)
         if not isinstance(value, int) or isinstance(value, bool):

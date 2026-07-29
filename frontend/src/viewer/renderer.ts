@@ -134,6 +134,7 @@ const COLORS: Record<string, Rgba> = {
   handleHover: [1.0, 0.72, 0.4, 1.0],
   handleLocked: [0.62, 0.64, 0.6, 0.9],
   edgeSelected: [1.0, 0.95, 0.6, 1.0],
+  edgeHover: [0.95, 1.0, 0.72, 1.0],
 };
 
 export interface RendererCallbacks {
@@ -550,9 +551,16 @@ export class Renderer {
     for (const node of this.profiles) {
       // The payload ships a ready-made wireframe, so boxes, spheres, and
       // sketches all draw through one path.
-      const color = node.editable ? COLORS.edge : COLORS.edgeLocked;
       const selected = this.selection?.nodeId === node.id;
-      const edgeColor = selected ? COLORS.edgeSelected : color;
+      // Whole-object hover previews the pick before it is committed.
+      const hovered = this.hover?.nodeId === node.id && this.hover.vertexIndex === null;
+      const edgeColor = selected
+        ? COLORS.edgeSelected
+        : hovered
+          ? COLORS.edgeHover
+          : node.editable
+            ? COLORS.edge
+            : COLORS.edgeLocked;
       for (const [start, end] of node.edges) {
         edges.push(start[0], start[1], start[2], end[0], end[1], end[2], ...edgeColor);
       }

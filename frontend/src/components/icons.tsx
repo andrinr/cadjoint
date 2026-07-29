@@ -150,3 +150,42 @@ export function VertexSelectIcon(props: IconProps) {
     </svg>
   );
 }
+
+export function TrashIcon(props: IconProps) {
+  return (
+    <svg {...base(props.size ?? 18)}>
+      <path d="M4 6.5h16M9.5 6.5V4.5h5v2M6.5 6.5l1 13h9l1-13" />
+      <path d="M10.5 10v6M13.5 10v6" />
+    </svg>
+  );
+}
+
+/** Converging lines: a perspective frustum. */
+export function PerspectiveIcon(props: IconProps) {
+  return (
+    <svg {...base(props.size ?? 16)}>
+      <path d="M4 4.5l16 3.2v8.6L4 19.5z" />
+      <path d="M4 4.5v15M20 7.7v8.6" />
+    </svg>
+  );
+}
+
+/** Parallel lines: an orthographic box. */
+export function OrthographicIcon(props: IconProps) {
+  return (
+    <svg {...base(props.size ?? 16)}>
+      <rect x="4" y="5" width="16" height="14" rx="1" />
+      <path d="M4 9h16M8 5v14" />
+    </svg>
+  );
+}
+
+/** A corner-on cube: the isometric home view. */
+export function IsoIcon(props: IconProps) {
+  return (
+    <svg {...base(props.size ?? 16)}>
+      <path d="M12 3l8 4.6v8.8L12 21l-8-4.6V7.6z" />
+      <path d="M4 7.6l8 4.6 8-4.6M12 12.2V21" />
+    </svg>
+  );
+}
