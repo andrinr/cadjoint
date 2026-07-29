@@ -19,6 +19,35 @@ from jaxcad.geometry.parameters import Scalar, Vector2
 from jaxcad.sdf.primitives.base import Primitive
 
 
+def _polygon_distance(p: Array, vertices: list[Array]) -> Array:
+    """Polygon distance over a Python list of ``(2,)`` vertices.
+
+    Keeping the vertices in a list rather than one ``(N, 2)`` array matters for
+    shader compilation: every traced value stays a 2-vector, so the StableHLO →
+    WGSL backend only ever sees ``vec2`` math instead of multi-dimensional
+    slices it cannot lower.
+    """
+    num = len(vertices)
+    d = jnp.sum((p - vertices[0]) ** 2, axis=-1)
+    s = jnp.ones(p.shape[:-1])
+    for i in range(num):
+        j = (i + num - 1) % num
+        e = vertices[j] - vertices[i]
+        w = p - vertices[i]
+        t = jnp.clip(jnp.sum(w * e, axis=-1) / jnp.sum(e * e), 0.0, 1.0)
+        b = w - e * t[..., None]
+        d = jnp.minimum(d, jnp.sum(b * b, axis=-1))
+        # Even-odd crossing test; flips sign once per boundary crossing. Written
+        # as pairwise equality (rather than negating each term) to stay within
+        # the operations the shader backends implement.
+        c1 = p[..., 1] >= vertices[i][1]
+        c2 = p[..., 1] < vertices[j][1]
+        c3 = e[0] * w[..., 1] > e[1] * w[..., 0]
+        flip = (c1 == c2) & (c2 == c3)
+        s = jnp.where(flip, -s, s)
+    return s * jnp.sqrt(d + 1e-20)
+
+
 def polygon_sdf_2d(p: Array, vertices: Array) -> Array:
     """Exact signed distance from 2D point(s) to a simple polygon.
 
@@ -29,29 +58,12 @@ def polygon_sdf_2d(p: Array, vertices: Array) -> Array:
     Returns:
         Signed distance, shape (...). Negative inside.
     """
-    num = vertices.shape[0]
-    d = jnp.sum((p - vertices[0]) ** 2, axis=-1)
-    s = jnp.ones(p.shape[:-1])
-    for i in range(num):
-        j = (i + num - 1) % num
-        e = vertices[j] - vertices[i]
-        w = p - vertices[i]
-        t = jnp.clip(jnp.sum(w * e, axis=-1) / jnp.sum(e * e), 0.0, 1.0)
-        b = w - e * t[..., None]
-        d = jnp.minimum(d, jnp.sum(b * b, axis=-1))
-        # Even-odd crossing test; flips sign once per boundary crossing.
-        c1 = p[..., 1] >= vertices[i, 1]
-        c2 = p[..., 1] < vertices[j, 1]
-        c3 = e[0] * w[..., 1] > e[1] * w[..., 0]
-        flip = (c1 & c2 & c3) | (~c1 & ~c2 & ~c3)
-        s = jnp.where(flip, -s, s)
-    return s * jnp.sqrt(d + 1e-20)
+    return _polygon_distance(p, [vertices[i] for i in range(vertices.shape[0])])
 
 
-def _stack_vertices(vertices: dict[str, Array]) -> Array:
-    """Stack v0..v{N-1} keyword params into an (N, 2) array in index order."""
-    ordered = sorted(vertices, key=lambda name: int(name[1:]))
-    return jnp.stack([vertices[name] for name in ordered])
+def _ordered_vertices(vertices: dict[str, Array]) -> list[Array]:
+    """Order v0..v{N-1} keyword params by index, without stacking them."""
+    return [vertices[name] for name in sorted(vertices, key=lambda name: int(name[1:]))]
 
 
 class ExtrudedPolygon(Primitive):
@@ -94,8 +106,8 @@ class ExtrudedPolygon(Primitive):
         Returns:
             Signed distance, shape (...).
         """
-        verts = _stack_vertices(vertices)
-        d2 = polygon_sdf_2d(p[..., :2], verts)
+        verts = _ordered_vertices(vertices)
+        d2 = _polygon_distance(p[..., :2], verts)
         dz = jnp.abs(p[..., 2]) - depth / 2.0
         w = jnp.stack([d2, dz], axis=-1)
         outside = jnp.sqrt(jnp.sum(jnp.maximum(w, 0.0) ** 2, axis=-1) + 1e-20)
@@ -150,10 +162,10 @@ class RevolvedPolygon(Primitive):
         Returns:
             Signed distance, shape (...).
         """
-        verts = _stack_vertices(vertices)
+        verts = _ordered_vertices(vertices)
         radial = jnp.sqrt(p[..., 0] ** 2 + p[..., 2] ** 2 + 1e-20) - offset
         q = jnp.stack([radial, p[..., 1]], axis=-1)
-        return polygon_sdf_2d(q, verts)
+        return _polygon_distance(q, verts)
 
     def __call__(self, p: Array) -> Array:
         values = {k: v.value for k, v in self.params.items() if k != "offset"}

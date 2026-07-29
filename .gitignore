@@ -32,3 +32,10 @@ _site/
 /.quarto/
 /reference/
 **/*.quarto_ipynb
+
+# Frontend (playground UI source; built output in jaxcad/viewer/static is committed)
+node_modules/
+test-results/
+frontend/test-results/
+frontend/playwright-report/
+frontend/.vite/
