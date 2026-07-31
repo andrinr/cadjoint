@@ -10,6 +10,7 @@ import {
   pickGizmoAxis,
   placeEdges,
   rotationMatrix,
+  scaleDimensions,
 } from "../src/viewer/gizmo";
 import { projectPoint, type Vec3, type View } from "../src/viewer/math";
 
@@ -90,6 +91,45 @@ describe("placeEdges", () => {
     const placed = placeEdges(edges, transform, [1, 0, 0], [0, 0, Math.PI / 2]);
     expect(placed[0][0][0]).toBeCloseTo(1, 6);
     expect(placed[0][0][1]).toBeCloseTo(1, 6);
+  });
+
+  it("resizes local geometry while preserving its placement", () => {
+    const placed = placeEdges(
+      edges,
+      transform,
+      [1, 0, 0],
+      [0, 0, 0],
+      { size: [2, 1, 1] },
+    );
+    expect(placed[0][0][0]).toBeCloseTo(3, 6);
+    expect(placed[0][1][1]).toBeCloseTo(1, 6);
+  });
+});
+
+describe("scaleDimensions", () => {
+  it("scales one box axis", () => {
+    expect(scaleDimensions("box", { size: [1, 2, 3] }, 1, 1.5)).toEqual({
+      size: [1, 3, 3],
+    });
+  });
+
+  it("scales spheres uniformly from any handle", () => {
+    expect(scaleDimensions("sphere", { radius: 2 }, 0, 0.5)).toEqual({ radius: 1 });
+  });
+
+  it("uses radial and height dimensions for cylinders", () => {
+    expect(scaleDimensions("cylinder", { radius: 2, height: 3 }, 0, 1.5)).toEqual({
+      radius: 3,
+      height: 3,
+    });
+    expect(scaleDimensions("cylinder", { radius: 2, height: 3 }, 2, 2)).toEqual({
+      radius: 2,
+      height: 6,
+    });
+  });
+
+  it("never mirrors through zero", () => {
+    expect(scaleDimensions("sphere", { radius: 2 }, 0, -4)).toEqual({ radius: 0.1 });
   });
 });
 

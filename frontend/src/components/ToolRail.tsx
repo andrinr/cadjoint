@@ -10,9 +10,11 @@ import { Dynamic } from "solid-js/web";
 import { For, Show, type Component } from "solid-js";
 import {
   gizmoMode,
+  nodeById,
   selection,
   selectionMode,
   setGizmoMode,
+  setSelection,
   setSelectionMode,
   setTool,
   tool,
@@ -23,8 +25,10 @@ import {
   CylinderIcon,
   MoveIcon,
   ObjectSelectIcon,
+  PointAddIcon,
   PolygonIcon,
   RotateIcon,
+  ScaleIcon,
   SphereIcon,
   TrashIcon,
   VertexSelectIcon,
@@ -36,7 +40,8 @@ const MODES: { key: SelectionMode; label: string; hint: string; icon: Component 
 ];
 
 const CREATE: { key: ToolMode; label: string; hint: string; icon: Component }[] = [
-  { key: "polygon", label: "Polygon", hint: "Add sketch vertices  (P)", icon: PolygonIcon },
+  { key: "sketch", label: "Sketch", hint: "Place a new 2D sketch", icon: PolygonIcon },
+  { key: "polygon", label: "Point", hint: "Add a point to a sketch  (P)", icon: PointAddIcon },
   { key: "box", label: "Box", hint: "Place a box  (B)", icon: BoxIcon },
   { key: "sphere", label: "Sphere", hint: "Place a sphere  (S)", icon: SphereIcon },
   { key: "cylinder", label: "Cylinder", hint: "Place a cylinder  (C)", icon: CylinderIcon },
@@ -45,6 +50,7 @@ const CREATE: { key: ToolMode; label: string; hint: string; icon: Component }[] 
 const TRANSFORMS: { key: GizmoMode; label: string; hint: string; icon: Component }[] = [
   { key: "translate", label: "Move", hint: "Move along an axis  (G)", icon: MoveIcon },
   { key: "rotate", label: "Rotate", hint: "Rotate about an axis  (R)", icon: RotateIcon },
+  { key: "scale", label: "Scale", hint: "Scale along an axis", icon: ScaleIcon },
 ];
 
 export interface ToolRailProps {
@@ -54,6 +60,15 @@ export interface ToolRailProps {
 export function ToolRail(props: ToolRailProps) {
   /** A whole object is selected, so the transform gizmo applies. */
   const transformable = () => selection() !== null && selection()!.vertexIndex === null;
+  const supports = (mode: GizmoMode) => {
+    if (!transformable()) return false;
+    const node = nodeById(selection()!.nodeId);
+    if (!node?.transform) return false;
+    if (mode === "rotate") return node.transform.canRotate;
+    if (mode === "scale") return node.kind !== "profile";
+    return true;
+  };
+  const activeTransform = () => (supports(gizmoMode()) ? gizmoMode() : "translate");
 
   return (
     <nav class="tool-rail" aria-label="Tools">
@@ -65,6 +80,13 @@ export function ToolRail(props: ToolRailProps) {
             onClick={() => {
               setTool("select");
               setSelectionMode(mode.key);
+              const active = selection();
+              if (mode.key === "object" && active && active.vertexIndex !== null) {
+                setSelection({ nodeId: active.nodeId, vertexIndex: null });
+                if (nodeById(active.nodeId)?.kind === "profile") {
+                  setGizmoMode("translate");
+                }
+              }
             }}
             title={mode.hint}
             aria-label={mode.label}
@@ -98,11 +120,15 @@ export function ToolRail(props: ToolRailProps) {
         {(entry) => (
           <button
             type="button"
-            class={transformable() && gizmoMode() === entry.key ? "active" : ""}
-            disabled={!transformable()}
+            class={supports(entry.key) && gizmoMode() === entry.key ? "active" : ""}
+            disabled={!supports(entry.key)}
             onClick={() => setGizmoMode(entry.key)}
             title={
-              transformable() ? entry.hint : `${entry.label} — select an object first`
+              supports(entry.key)
+                ? entry.hint
+                : entry.key === "scale" && transformable()
+                  ? "Scale — select a solid primitive"
+                  : `${entry.label} — select a compatible object first`
             }
             aria-label={entry.label}
             data-testid={`gizmo-${entry.key}`}
@@ -128,7 +154,11 @@ export function ToolRail(props: ToolRailProps) {
 
       <Show when={transformable()}>
         <span class="rail-hint" data-testid="rail-hint">
-          {gizmoMode() === "translate" ? "move" : "turn"}
+          {activeTransform() === "translate"
+            ? "move"
+            : activeTransform() === "rotate"
+              ? "turn"
+              : "size"}
         </span>
       </Show>
     </nav>

@@ -1,16 +1,15 @@
 /**
  * Translate/rotate gizmo geometry and drag math.
  *
- * The gizmo is drawn with the same overlay edge pipeline as construction
- * wireframes — three axis arrows for translation, three rings for rotation —
- * and all of its interaction is solved on the CPU here, so it can be unit
- * tested without a GPU.
+ * Translation axes are rendered as filled screen-space arrows and rotation
+ * axes as rings. Their interaction geometry and drag math live on the CPU
+ * here, so both remain unit-testable without a GPU.
  *
  * Axis order is X, Y, Z throughout, matching the rotation angles the Python
  * side applies intrinsically in that order.
  */
 
-import type { ConstructionTransform } from "../types";
+import type { ConstructionKind, ConstructionTransform, GizmoMode } from "../types";
 import {
   add,
   cross,
@@ -32,11 +31,11 @@ export const AXES: Vec3[] = [
   [0, 0, 1],
 ];
 
-/** Axis colours: X red, Y green, Z blue, brightened when active. */
+/** Crisp, slightly softened CAD axis colours: X red, Y green, Z blue. */
 export const AXIS_COLORS: [number, number, number][] = [
-  [1.0, 0.35, 0.35],
-  [0.45, 0.95, 0.45],
-  [0.42, 0.62, 1.0],
+  [0.96, 0.28, 0.32],
+  [0.3, 0.8, 0.4],
+  [0.28, 0.52, 0.98],
 ];
 
 const RING_SEGMENTS = 40;
@@ -80,16 +79,76 @@ export function placeEdges(
   transform: ConstructionTransform,
   position: Vec3,
   rotation: readonly number[],
+  dimensions: Record<string, number | number[]> = transform.dimensions,
 ): [number, number, number][][] {
   const original = rotationMatrix(transform.rotation);
   const next = rotationMatrix(rotation);
   const origin = transform.position as Vec3;
+  const ratios = dimensionRatios(transform.dimensions, dimensions);
 
   const move = (point: readonly number[]): [number, number, number] => {
     const local = applyInverse(original, subtract(point as Vec3, origin));
-    return add(applyMatrix(next, local), position) as [number, number, number];
+    const resized: Vec3 = [
+      local[0] * ratios[0],
+      local[1] * ratios[1],
+      local[2] * ratios[2],
+    ];
+    return add(applyMatrix(next, resized), position) as [number, number, number];
   };
   return edges.map((edge) => [move(edge[0]), move(edge[1])]);
+}
+
+function safeRatio(next: number, original: number): number {
+  return Math.abs(original) < 1e-9 ? 1 : next / original;
+}
+
+/** Per-local-axis size ratio between two primitive dimension records. */
+function dimensionRatios(
+  original: Record<string, number | number[]>,
+  next: Record<string, number | number[]>,
+): Vec3 {
+  if (Array.isArray(original.size) && Array.isArray(next.size)) {
+    return [
+      safeRatio(next.size[0], original.size[0]),
+      safeRatio(next.size[1], original.size[1]),
+      safeRatio(next.size[2], original.size[2]),
+    ];
+  }
+  if (typeof original.radius === "number" && typeof next.radius === "number") {
+    const radial = safeRatio(next.radius, original.radius);
+    if (typeof original.height === "number" && typeof next.height === "number") {
+      return [radial, radial, safeRatio(next.height, original.height)];
+    }
+    return [radial, radial, radial];
+  }
+  return [1, 1, 1];
+}
+
+/** Return primitive dimensions after scaling one supported axis. */
+export function scaleDimensions(
+  kind: ConstructionKind,
+  dimensions: Record<string, number | number[]>,
+  axis: AxisIndex,
+  factor: number,
+): Record<string, number | number[]> {
+  const next = Object.fromEntries(
+    Object.entries(dimensions).map(([key, value]) => [
+      key,
+      Array.isArray(value) ? [...value] : value,
+    ]),
+  );
+  const safeFactor = Math.max(0.05, factor);
+  if (kind === "box" && Array.isArray(next.size)) {
+    next.size[axis] *= safeFactor;
+  } else if (kind === "sphere" && typeof next.radius === "number") {
+    next.radius *= safeFactor;
+  } else if (kind === "cylinder") {
+    const argument = axis === 2 ? "height" : "radius";
+    if (typeof next[argument] === "number") {
+      next[argument] *= safeFactor;
+    }
+  }
+  return next;
 }
 
 /** World-space size of the gizmo, so it stays usable at any zoom. */
@@ -103,7 +162,7 @@ function planeBasis(axis: Vec3): [Vec3, Vec3] {
   return [u, cross(axis, u)];
 }
 
-/** Arrow shaft plus head for one translate axis. */
+/** Picking geometry for one translate arrow; rendering uses its first edge as the axis span. */
 export function translateAxisEdges(origin: Vec3, axis: Vec3, size: number): Edge[] {
   const tip = add(origin, scale(axis, size));
   const [u, v] = planeBasis(axis);
@@ -136,14 +195,14 @@ export function rotateAxisEdges(origin: Vec3, axis: Vec3, size: number): Edge[] 
 export function gizmoEdges(
   origin: Vec3,
   size: number,
-  mode: "translate" | "rotate",
+  mode: GizmoMode,
 ): { axis: AxisIndex; edges: Edge[] }[] {
   return AXES.map((axis, index) => ({
     axis: index as AxisIndex,
     edges:
-      mode === "translate"
-        ? translateAxisEdges(origin, axis, size)
-        : rotateAxisEdges(origin, axis, size),
+      mode === "rotate"
+        ? rotateAxisEdges(origin, axis, size)
+        : translateAxisEdges(origin, axis, size),
   }));
 }
 
@@ -166,7 +225,7 @@ function segmentDistance(px: number, py: number, a: Vec3, b: Vec3, view: View): 
 export function pickGizmoAxis(
   origin: Vec3,
   size: number,
-  mode: "translate" | "rotate",
+  mode: GizmoMode,
   x: number,
   y: number,
   view: View,

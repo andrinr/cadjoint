@@ -14,6 +14,12 @@ const MAX_DISTANCE: f32 = 100.0;
 const MAX_TRACE_STEPS: u32 = 160u;
 const MAX_PATH_BOUNCES: u32 = 8u;
 const MAX_SHADOW_SAMPLES: u32 = 4u;
+const DISPLAY_SHADOWS: u32 = 1u;
+const DISPLAY_REFLECTIONS: u32 = 2u;
+const DISPLAY_FLAT: u32 = 4u;
+const DISPLAY_HIDE_SOLID: u32 = 8u;
+const DISPLAY_HARD_SHADOWS: u32 = 16u;
+const HARD_SHADOW_FLOOR: f32 = 0.45;
 
 struct Uniforms {
   resolution   : vec4<f32>,
@@ -40,6 +46,10 @@ struct BsdfSample {
 @group(0) @binding(1) var previous_accumulation: texture_2d<f32>;
 
 __JAXCAD_CAMERA__
+
+fn display_flag(flag: u32) -> bool {
+  return (u32(max(u.display.z, 0.0)) & flag) != 0u;
+}
 
 fn pcg_hash(input: u32) -> u32 {
   let state = input * 747796405u + 2891336453u;
@@ -338,11 +348,16 @@ fn trace_path(
   var throughput = vec3<f32>(1.0);
   var eta_scale = 1.0;
   let configured_bounces = min(u32(u.path_settings.y), MAX_PATH_BOUNCES);
-  let configured_shadow_samples = clamp(
+  var configured_shadow_samples = clamp(
     u32(u.path_settings.z),
     1u,
     MAX_SHADOW_SAMPLES,
   );
+  let shadows_enabled = display_flag(DISPLAY_SHADOWS);
+  let hard_shadows = display_flag(DISPLAY_HARD_SHADOWS);
+  if (!shadows_enabled || hard_shadows) {
+    configured_shadow_samples = 1u;
+  }
 
   for (var bounce = 0u; bounce < MAX_PATH_BOUNCES; bounce += 1u) {
     if (bounce >= configured_bounces) {
@@ -365,9 +380,34 @@ fn trace_path(
     let base_color = clamp(base.xyz, vec3<f32>(0.0), vec3<f32>(1.0));
     let roughness = clamp(base.w, 0.04, 1.0);
     let metallic = clamp(optics.x, 0.0, 1.0);
-    let opacity = clamp(optics.y, 0.0, 1.0);
+    let xray = clamp(u.display.w, 0.0, 1.0);
+    let facing = 1.0 - abs(dot(normal, direction));
+    let xray_alpha = mix(1.0, mix(0.12, 0.95, facing * facing), xray);
+    let opacity = clamp(optics.y, 0.0, 1.0) * xray_alpha;
     let ior = max(optics.z, 1.0001);
-    let reflectivity = clamp(optics.w, 0.0, 1.0);
+    let reflectivity = select(
+      0.0,
+      clamp(optics.w, 0.0, 1.0),
+      display_flag(DISPLAY_REFLECTIONS),
+    );
+
+    if (display_flag(DISPLAY_FLAT)) {
+      let light_direction = safe_normalize(u.light_dir.xyz);
+      let normal_dot_light = max(dot(normal, light_direction), 0.0);
+      var visibility = 1.0;
+      if (shadows_enabled) {
+        visibility = visible_to_directional_light(
+          position + normal * (HIT_EPSILON * 6.0),
+          light_direction,
+        );
+        if (hard_shadows) {
+          visibility = mix(HARD_SHADOW_FLOOR, 1.0, visibility);
+        }
+      }
+      let flat_color =
+        base_color * mix(0.35, 1.0, normal_dot_light * visibility);
+      return mix(environment_radiance(direction), flat_color, opacity);
+    }
 
     if (
       opacity > 0.0 &&
@@ -384,16 +424,25 @@ fn trace_path(
         if (shadow_sample >= configured_shadow_samples) {
           break;
         }
-        let light_direction = sample_sun_direction(
-          safe_normalize(u.light_dir.xyz),
-          vec2<f32>(random_f32(random_state), random_f32(random_state)),
-        );
+        var light_direction = safe_normalize(u.light_dir.xyz);
+        if (shadows_enabled && !hard_shadows) {
+          light_direction = sample_sun_direction(
+            light_direction,
+            vec2<f32>(random_f32(random_state), random_f32(random_state)),
+          );
+        }
         let normal_dot_light = max(dot(normal, light_direction), 0.0);
         if (normal_dot_light > 0.0) {
-          let visibility = visible_to_directional_light(
-            position + normal * (HIT_EPSILON * 6.0),
-            light_direction,
-          );
+          var visibility = 1.0;
+          if (shadows_enabled) {
+            visibility = visible_to_directional_light(
+              position + normal * (HIT_EPSILON * 6.0),
+              light_direction,
+            );
+            if (hard_shadows) {
+              visibility = mix(HARD_SHADOW_FLOOR, 1.0, visibility);
+            }
+          }
           let direct_bsdf = evaluate_opaque_bsdf(
             base_color,
             roughness,
@@ -516,7 +565,10 @@ fn fs_path_trace(
   );
   let camera = ray.origin;
   let ray_direction = ray.direction;
-  let sample_radiance = trace_path(camera, ray_direction, &random_state);
+  var sample_radiance = environment_radiance(ray_direction);
+  if (!display_flag(DISPLAY_HIDE_SOLID)) {
+    sample_radiance = trace_path(camera, ray_direction, &random_state);
+  }
 
   let previous = textureLoad(previous_accumulation, pixel, 0).xyz;
   let sample_count = f32(sample_index);

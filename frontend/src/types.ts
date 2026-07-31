@@ -23,6 +23,62 @@ export interface ConstructionPlane {
   normal: [number, number, number];
 }
 
+export interface ConstructionConstraint {
+  kind: "fixed" | "distance";
+  vertices: number[];
+  value: number | number[];
+}
+
+/** A constraint relating whole construction objects rather than sketch points. */
+export interface ConstructionRelation {
+  kind: "fixed" | "distance";
+  nodes: string[];
+  value: number | number[];
+}
+
+export type ConstraintSolverMethod = "newton" | "adam" | "sgd";
+
+/** Diagnostics captured from one source-level satisfy_constraints call. */
+export interface ConstraintSolverRun {
+  node: string | null;
+  method: ConstraintSolverMethod;
+  iterations: number;
+  losses: number[];
+}
+
+/** A source-computed proof that gradients traverse the active CAD pipeline. */
+export interface DifferentiabilityDemo {
+  pipeline: string;
+  metric: string;
+  value: number;
+  parameter_count: number;
+  sensitivities: {
+    parameter: string;
+    value: number;
+  }[];
+}
+
+export interface ConstructionOperator {
+  kind: "extrude" | "revolve";
+  line: number;
+}
+
+/** A named Python Material definition shown in the material browser. */
+export interface MaterialDefinition {
+  id: string;
+  /** Stable Python variable used when assigning the material to an object. */
+  name: string;
+  line: number;
+  editable: boolean;
+  color: [number, number, number];
+  roughness: number;
+  metallic: number;
+  opacity: number;
+  ior: number;
+  reflectivity: number;
+  spans: Record<string, [number, number]>;
+}
+
 export type ConstructionKind = "profile" | "box" | "sphere" | "cylinder";
 
 /** Placement and size of a construction primitive. */
@@ -64,6 +120,12 @@ export interface ConstructionNode {
   transform: ConstructionTransform | null;
   /** Source spans of the primitive's keyword arguments. */
   spans: Record<string, [number, number]>;
+  /** Constraints attached to sketch vertices. */
+  constraints: ConstructionConstraint[];
+  /** Construction-history operations consuming this sketch. */
+  operators: ConstructionOperator[];
+  /** Named material assigned to this primitive or the profile's extrusion. */
+  material: string | null;
 }
 
 export interface CompileResponse {
@@ -74,6 +136,10 @@ export interface CompileResponse {
   path_shader: string;
   present_shader: string;
   construction: ConstructionNode[];
+  relations: ConstructionRelation[];
+  solver_runs: ConstraintSolverRun[];
+  materials: MaterialDefinition[];
+  differentiability: DifferentiabilityDemo | null;
   output: string;
 }
 
@@ -83,6 +149,12 @@ export type PatchOperation =
   | "delete_vertex"
   | "set_value"
   | "add_primitive"
+  | "add_material"
+  | "assign_material"
+  | "add_sketch"
+  | "add_extrusion"
+  | "add_constraint"
+  | "solve_sketch"
   | "delete_object";
 
 export interface PatchResponse {
@@ -98,10 +170,17 @@ export interface Selection {
   vertexIndex: number | null;
 }
 
-export type ToolMode = "select" | "polygon" | "box" | "sphere" | "cylinder";
+export type ToolMode =
+  | "select"
+  | "sketch"
+  | "polygon"
+  | "distance"
+  | "box"
+  | "sphere"
+  | "cylinder";
 
-/** How a gizmo drag transforms the selected primitive. */
-export type GizmoMode = "translate" | "rotate";
+/** How a gizmo drag transforms the selected construction object. */
+export type GizmoMode = "translate" | "rotate" | "scale";
 
 /** What a click in the viewport picks. */
 export type SelectionMode = "object" | "vertex";

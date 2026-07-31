@@ -5,7 +5,7 @@ Differentiable SDF primitives, transformations, and constraint system built with
 > [!WARNING]
 > The API is not stable. Expect breaking changes.
 
-[![JAXCAD WebGPU playground with Python source beside a live rendered scene](examples/assets/webgpu_playground.png)](https://andrinr.github.io/jaxcad/docs/viewer.html)
+[![JAXCAD WebGPU playground with Python source beside a live rendered scene](examples/assets/viewer.png)](https://andrinr.github.io/jaxcad/docs/viewer.html)
 
 ---
 

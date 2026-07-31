@@ -3,8 +3,9 @@
  *
  * Draws the compiled SDF scene (raymarched preview or progressive path trace)
  * and the construction-tree overlay on top of it. The preview pass writes
- * `frag_depth` from the ray hit position, so overlay edges and handles are
- * depth-tested against the solid rather than floating over it.
+ * `frag_depth` from the ray hit position, so construction edges and handles
+ * are depth-tested against the solid. Transform controls use a separate
+ * always-visible pass so the selected object cannot hide its own gizmo.
  *
  * Ported from the previous inline playground script, with the depth attachment,
  * the overlay pipelines, and pan support added.
@@ -70,13 +71,14 @@ export const QUALITY_PRESETS: Record<string, QualityPreset> = {
 const DEPTH_FORMAT: GPUTextureFormat = "depth32float";
 const BACKGROUND: GPUColorDict = { r: 0.035, g: 0.045, b: 0.035, a: 1 };
 
-/** Fraction of the distance to the camera that overlays are pulled forward. */
+/** Fraction of the distance to the camera that construction overlays are pulled forward. */
 const DEPTH_NUDGE = 0.004;
 const LINE_WIDTH_PX = 2.4;
 const HANDLE_RADIUS_PX = 6.5;
 
 const EDGE_STRIDE = 40;
 const HANDLE_STRIDE = 32;
+const GIZMO_STRIDE = 44;
 
 /** Display flag bits, matching the DISPLAY_* constants in _webgpu.py. */
 export const DISPLAY = {
@@ -99,18 +101,26 @@ export interface DisplaySettings {
   /** 0 disables x-ray; 1 is fully translucent. */
   xray: number;
   showSketches: boolean;
+  showConstraints: boolean;
+  showFixedConstraints: boolean;
+  showDistanceConstraints: boolean;
+  showConstraintValues: boolean;
 }
 
 export const DEFAULT_DISPLAY: DisplaySettings = {
-  projection: "perspective",
+  projection: "orthographic",
   // Flat shading with crisp shadows reads like a working drawing, which is
   // what you want while modelling; full shading is a click away.
   shadows: "hard",
   reflections: true,
   flatShading: true,
   hideSolid: false,
-  xray: 0,
+  xray: 1,
   showSketches: true,
+  showConstraints: true,
+  showFixedConstraints: true,
+  showDistanceConstraints: true,
+  showConstraintValues: true,
 };
 
 /** Orbit angles for the standard views, in radians. */
@@ -170,6 +180,9 @@ export class Renderer {
   private presentPipeline: GPURenderPipeline | null = null;
   private edgePipeline: GPURenderPipeline | null = null;
   private handlePipeline: GPURenderPipeline | null = null;
+  private gizmoEdgePipeline: GPURenderPipeline | null = null;
+  private gizmoArrowPipeline: GPURenderPipeline | null = null;
+  private gizmoScalePipeline: GPURenderPipeline | null = null;
   private overlayBindGroup: GPUBindGroup | null = null;
 
   private depthTexture: GPUTexture | null = null;
@@ -187,6 +200,10 @@ export class Renderer {
   private handleCapacity = 0;
   private edgeCount = 0;
   private handleCount = 0;
+  private gizmoBuffer: GPUBuffer | null = null;
+  private gizmoCapacity = 0;
+  private gizmoCount = 0;
+  private visibleGizmoMode: GizmoMode = "translate";
 
   private shaderRevision = 0;
   private framePending = false;
@@ -200,8 +217,8 @@ export class Renderer {
   interacting = false;
 
   private profiles: readonly ConstructionNode[] = [];
-  gizmoMode: GizmoMode = "translate";
-  gizmoAxis: AxisIndex | null = null;
+  private _gizmoMode: GizmoMode = "translate";
+  private _gizmoAxis: AxisIndex | null = null;
   private selection: Selection | null = null;
   private hover: Selection | null = null;
 
@@ -217,6 +234,35 @@ export class Renderer {
 
   get currentSampleCount(): number {
     return this.sampleCount;
+  }
+
+  get gizmoMode(): GizmoMode {
+    return this._gizmoMode;
+  }
+
+  set gizmoMode(mode: GizmoMode) {
+    if (mode === this._gizmoMode) return;
+    this._gizmoMode = mode;
+    this.uploadOverlay();
+    this.invalidate();
+  }
+
+  get gizmoAxis(): AxisIndex | null {
+    return this._gizmoAxis;
+  }
+
+  set gizmoAxis(axis: AxisIndex | null) {
+    if (axis === this._gizmoAxis) return;
+    this._gizmoAxis = axis;
+    this.uploadOverlay();
+    this.scheduleRender();
+  }
+
+  /** Requested mode, reduced to the transforms a selected node supports. */
+  gizmoModeFor(node: ConstructionNode): GizmoMode {
+    if (this.gizmoMode === "rotate" && !node.transform?.canRotate) return "translate";
+    if (this.gizmoMode === "scale" && node.kind === "profile") return "translate";
+    return this.gizmoMode;
   }
 
   /** Framebuffer size, used by hit testing to match projected pixels. */
@@ -434,6 +480,91 @@ export class Renderer {
       depthStencil,
     });
 
+    const alwaysVisibleDepth: GPUDepthStencilState = {
+      format: DEPTH_FORMAT,
+      depthWriteEnabled: false,
+      depthCompare: "always",
+    };
+
+    this.gizmoEdgePipeline = device.createRenderPipeline({
+      label: "Always-visible rotation gizmo",
+      layout: pipelineLayout,
+      vertex: {
+        module,
+        entryPoint: "vs_edge",
+        buffers: [
+          {
+            arrayStride: GIZMO_STRIDE,
+            stepMode: "instance",
+            attributes: [
+              { shaderLocation: 0, offset: 0, format: "float32x3" },
+              { shaderLocation: 1, offset: 12, format: "float32x3" },
+              { shaderLocation: 2, offset: 24, format: "float32x4" },
+            ],
+          },
+        ],
+      },
+      fragment: { module, entryPoint: "fs_edge", targets: [{ format: this.format, blend }] },
+      primitive: { topology: "triangle-list" },
+      depthStencil: alwaysVisibleDepth,
+    });
+
+    this.gizmoArrowPipeline = device.createRenderPipeline({
+      label: "Always-visible translation gizmo",
+      layout: pipelineLayout,
+      vertex: {
+        module,
+        entryPoint: "vs_gizmo_arrow",
+        buffers: [
+          {
+            arrayStride: GIZMO_STRIDE,
+            stepMode: "instance",
+            attributes: [
+              { shaderLocation: 0, offset: 0, format: "float32x3" },
+              { shaderLocation: 1, offset: 12, format: "float32x3" },
+              { shaderLocation: 2, offset: 24, format: "float32x4" },
+              { shaderLocation: 3, offset: 40, format: "float32" },
+            ],
+          },
+        ],
+      },
+      fragment: {
+        module,
+        entryPoint: "fs_gizmo_arrow",
+        targets: [{ format: this.format, blend }],
+      },
+      primitive: { topology: "triangle-list" },
+      depthStencil: alwaysVisibleDepth,
+    });
+
+    this.gizmoScalePipeline = device.createRenderPipeline({
+      label: "Always-visible scale gizmo",
+      layout: pipelineLayout,
+      vertex: {
+        module,
+        entryPoint: "vs_gizmo_scale",
+        buffers: [
+          {
+            arrayStride: GIZMO_STRIDE,
+            stepMode: "instance",
+            attributes: [
+              { shaderLocation: 0, offset: 0, format: "float32x3" },
+              { shaderLocation: 1, offset: 12, format: "float32x3" },
+              { shaderLocation: 2, offset: 24, format: "float32x4" },
+              { shaderLocation: 3, offset: 40, format: "float32" },
+            ],
+          },
+        ],
+      },
+      fragment: {
+        module,
+        entryPoint: "fs_gizmo_arrow",
+        targets: [{ format: this.format, blend }],
+      },
+      primitive: { topology: "triangle-list" },
+      depthStencil: alwaysVisibleDepth,
+    });
+
     this.overlayBindGroup = device.createBindGroup({
       layout: bindGroupLayout,
       entries: [{ binding: 0, resource: { buffer: this.overlayBuffer } }],
@@ -547,6 +678,7 @@ export class Renderer {
     if (!this.device) return;
     const edges: number[] = [];
     const handles: number[] = [];
+    const gizmo: number[] = [];
 
     for (const node of this.profiles) {
       // The payload ships a ready-made wireframe, so boxes, spheres, and
@@ -586,22 +718,43 @@ export class Renderer {
       }
     }
 
-    // The gizmo rides on the same instance buffer, in axis colours.
+    // Transform controls have their own buffer and pass. Translation only
+    // needs one instance per axis; rotation keeps its segmented rings.
     const target = this.gizmoTarget();
     if (target) {
       const size = gizmoScale(this.view, target.origin);
-      for (const group of gizmoEdges(target.origin, size, this.gizmoMode)) {
+      this.visibleGizmoMode = this.gizmoModeFor(target.node);
+      for (const group of gizmoEdges(target.origin, size, this.visibleGizmoMode)) {
         const base = AXIS_COLORS[group.axis];
         const active = this.gizmoAxis === group.axis;
-        const color: Rgba = active ? [1, 1, 0.75, 1] : [base[0], base[1], base[2], 0.95];
-        for (const [start, end] of group.edges) {
-          edges.push(start[0], start[1], start[2], end[0], end[1], end[2], ...color);
+        const color: Rgba = active
+          ? [
+              base[0] + (1 - base[0]) * 0.38,
+              base[1] + (1 - base[1]) * 0.38,
+              base[2] + (1 - base[2]) * 0.38,
+              1,
+            ]
+          : [base[0], base[1], base[2], 0.98];
+        const visibleEdges =
+          this.visibleGizmoMode === "rotate" ? group.edges : group.edges.slice(0, 1);
+        for (const [start, end] of visibleEdges) {
+          gizmo.push(
+            start[0],
+            start[1],
+            start[2],
+            end[0],
+            end[1],
+            end[2],
+            ...color,
+            active ? 1 : 0,
+          );
         }
       }
     }
 
     this.edgeCount = edges.length / (EDGE_STRIDE / 4);
     this.handleCount = handles.length / (HANDLE_STRIDE / 4);
+    this.gizmoCount = gizmo.length / (GIZMO_STRIDE / 4);
     this.edgeBuffer = this.writeInstances(
       this.edgeBuffer,
       new Float32Array(edges),
@@ -618,6 +771,14 @@ export class Renderer {
       this.handleCapacity,
       "overlay handles",
     );
+    this.gizmoBuffer = this.writeInstances(
+      this.gizmoBuffer,
+      new Float32Array(gizmo),
+      GIZMO_STRIDE,
+      (capacity) => (this.gizmoCapacity = capacity),
+      this.gizmoCapacity,
+      "transform gizmo",
+    );
   }
 
   /** The selected primitive the gizmo should attach to, if any. */
@@ -626,6 +787,23 @@ export class Renderer {
     if (!active || active.vertexIndex !== null) return null;
     const node = this.profiles.find((candidate) => candidate.id === active.nodeId);
     if (!node?.transform || !node.editable) return null;
+    if (node.kind === "profile" && node.vertices.length > 0) {
+      const sum = node.vertices.reduce<Vec3>(
+        (center, vertex) => [
+          center[0] + vertex.world[0],
+          center[1] + vertex.world[1],
+          center[2] + vertex.world[2],
+        ] as Vec3,
+        [0, 0, 0],
+      );
+      const count = node.vertices.length;
+      return {
+        node,
+        // The plane origin can sit far outside an offset polygon. Keep the
+        // translation arrows on the selected geometry where they are visible.
+        origin: [sum[0] / count, sum[1] / count, sum[2] / count],
+      };
+    }
     return { node, origin: node.transform.position as Vec3 };
   }
 
@@ -785,18 +963,44 @@ export class Renderer {
   }
 
   private drawOverlay(pass: GPURenderPassEncoder): void {
-    if (!this.overlayBindGroup || !this.display.showSketches) return;
-    if (this.edgeCount && this.edgeBuffer && this.edgePipeline) {
+    if (!this.overlayBindGroup) return;
+    if (this.display.showSketches && this.edgeCount && this.edgeBuffer && this.edgePipeline) {
       pass.setPipeline(this.edgePipeline);
       pass.setBindGroup(0, this.overlayBindGroup);
       pass.setVertexBuffer(0, this.edgeBuffer);
       pass.draw(6, this.edgeCount);
     }
-    if (this.handleCount && this.handleBuffer && this.handlePipeline) {
+    if (
+      this.display.showSketches &&
+      this.handleCount &&
+      this.handleBuffer &&
+      this.handlePipeline
+    ) {
       pass.setPipeline(this.handlePipeline);
       pass.setBindGroup(0, this.overlayBindGroup);
       pass.setVertexBuffer(0, this.handleBuffer);
       pass.draw(6, this.handleCount);
+    }
+    if (this.gizmoCount && this.gizmoBuffer) {
+      const pipeline =
+        this.visibleGizmoMode === "translate"
+          ? this.gizmoArrowPipeline
+          : this.visibleGizmoMode === "scale"
+            ? this.gizmoScalePipeline
+            : this.gizmoEdgePipeline;
+      if (pipeline) {
+        pass.setPipeline(pipeline);
+        pass.setBindGroup(0, this.overlayBindGroup);
+        pass.setVertexBuffer(0, this.gizmoBuffer);
+        pass.draw(
+          this.visibleGizmoMode === "translate"
+            ? 9
+            : this.visibleGizmoMode === "scale"
+              ? 12
+              : 6,
+          this.gizmoCount,
+        );
+      }
     }
   }
 
@@ -896,6 +1100,7 @@ export class Renderer {
     this.depthTexture?.destroy();
     this.edgeBuffer?.destroy();
     this.handleBuffer?.destroy();
+    this.gizmoBuffer?.destroy();
     this.device?.destroy();
   }
 }

@@ -1,17 +1,23 @@
-/** Top bar: run controls, tool modes, quality, and the generated-WGSL view. */
+/** Top bar: source controls and the compact entry point to render presets. */
 
 import { Show } from "solid-js";
 import { busy, dirty, nodeById, selection, status } from "../state";
 import { DisplayOptions } from "./DisplayOptions";
-import { CodeIcon, PlayIcon, ResetIcon, TraceIcon } from "./icons";
+import { CodeIcon, PlayIcon, ResetIcon } from "./icons";
 import type { DisplaySettings } from "../viewer/renderer";
+import type { RenderPreset, RenderPresetId } from "../renderPresets";
 
 export interface ToolbarProps {
   display: DisplaySettings;
+  renderPresets: RenderPreset[];
+  selectedRenderPreset: RenderPresetId;
   onDisplayChange: (patch: Partial<DisplaySettings>) => void;
+  onRenderPresetActivate: (id: RenderPresetId) => void;
+  onRenderPresetSave: (id: RenderPresetId) => void;
+  onRenderPresetReset: (id: RenderPresetId) => void;
+  onPathTracingChange: (enabled: boolean) => void;
   onRun: () => void;
   onReset: () => void;
-  onToggleTrace: () => void;
   onQualityChange: (key: string) => void;
   onShowWgsl: () => void;
   pathTracing: boolean;
@@ -44,9 +50,16 @@ export function Toolbar(props: ToolbarProps) {
 
       <DisplayOptions
         display={props.display}
+        presets={props.renderPresets}
+        selectedPreset={props.selectedRenderPreset}
         quality={props.quality}
         onChange={props.onDisplayChange}
         onQualityChange={props.onQualityChange}
+        onPresetActivate={props.onRenderPresetActivate}
+        onPresetSave={props.onRenderPresetSave}
+        onPresetReset={props.onRenderPresetReset}
+        pathTracing={props.pathTracing}
+        onPathTracingChange={props.onPathTracingChange}
       />
       <button
         type="button"
@@ -57,15 +70,6 @@ export function Toolbar(props: ToolbarProps) {
         aria-label="Generated WGSL"
       >
         <CodeIcon />
-      </button>
-      <button
-        type="button"
-        class={`icon ${props.pathTracing ? "active" : ""}`}
-        onClick={props.onToggleTrace}
-        title={props.pathTracing ? "Back to preview" : "Progressive path trace"}
-        aria-label="Path trace"
-      >
-        <TraceIcon />
       </button>
       <button
         type="button"

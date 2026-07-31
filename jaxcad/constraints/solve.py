@@ -1,6 +1,9 @@
-"""Constraint solving via optimistix."""
+"""Constraint solving via Optimistix, Newton projection, and Optax."""
 
-from typing import Any
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
+from typing import Any, Literal
 
 import jax
 import jax.numpy as jnp
@@ -17,6 +20,64 @@ from jaxcad.constraints.residual import (
 )
 from jaxcad.fluent import Fluent
 from jaxcad.geometry.parameters import Parameter
+
+ConstraintSolveMethod = Literal["newton", "adam", "sgd"]
+_CAPTURED_SOLVES: ContextVar[list[dict[str, Any]] | None] = ContextVar(
+    "jaxcad_captured_constraint_solves",
+    default=None,
+)
+
+
+@contextmanager
+def capture_constraint_solves() -> Iterator[list[dict[str, Any]]]:
+    """Capture diagnostics from ``satisfy_constraints`` calls in this context."""
+    reports: list[dict[str, Any]] = []
+    token = _CAPTURED_SOLVES.set(reports)
+    try:
+        yield reports
+    finally:
+        _CAPTURED_SOLVES.reset(token)
+
+
+def _loss(flat_fn, values: Array) -> Array:
+    residual = flat_fn(values)
+    return jnp.mean(jnp.square(residual))
+
+
+def _newton_projection(flat_fn, values: Array, steps: int) -> tuple[Array, list[float]]:
+    """Minimum-norm Newton corrections plus their residual loss history."""
+    x = values
+    losses = [float(_loss(flat_fn, x))]
+    for _ in range(steps):
+        residual = flat_fn(x)
+        jacobian = jax.jacobian(flat_fn)(x)
+        delta = jacobian.T @ jnp.linalg.solve(
+            jacobian @ jacobian.T,
+            residual,
+        )
+        x = x - delta
+        losses.append(float(_loss(flat_fn, x)))
+    return x, losses
+
+
+def _gradient_projection(
+    flat_fn,
+    values: Array,
+    steps: int,
+    method: Literal["adam", "sgd"],
+) -> tuple[Array, list[float]]:
+    """Minimize squared constraint residuals with an Optax optimizer."""
+    optimizer = optax.adam(0.05) if method == "adam" else optax.sgd(0.15)
+    state = optimizer.init(values)
+    x = values
+    losses = [float(_loss(flat_fn, x))]
+    loss_and_grad = jax.value_and_grad(lambda current: _loss(flat_fn, current))
+    for _ in range(steps):
+        _, gradient = loss_and_grad(x)
+        updates, state = optimizer.update(gradient, state, x)
+        x = optax.apply_updates(x, updates)
+        losses.append(float(_loss(flat_fn, x)))
+    return x, losses
 
 
 def solve_constraints(
@@ -107,13 +168,68 @@ def project_to_manifold(
     flat_fn = build_residual_fn(constraints, metadata)
     x = pack_param_dict(free_params, metadata)
 
-    for _ in range(steps):
-        r = flat_fn(x)
-        J = jax.jacobian(flat_fn)(x)
-        delta = J.T @ jnp.linalg.solve(J @ J.T, r)
-        x = x - delta
+    x, _ = _newton_projection(flat_fn, x, steps)
 
     return unpack_param_vector(x, metadata)
+
+
+def satisfy_constraints(
+    root: Fluent,
+    *,
+    steps: int = 8,
+    method: ConstraintSolveMethod = "newton",
+) -> dict[str, Array]:
+    """Project a construction/SDF tree onto its attached constraints in place.
+
+    Unlike :func:`solve_constraints`, this is also useful for under-constrained
+    sketches: unconstrained degrees of freedom stay near their current values
+    while the selected method satisfies the relationships that do exist.
+
+    The returned mapping is also applied to ``root`` so construction overlays
+    and generated solids sharing those Parameter objects update together.
+
+    Args:
+        root: Construction or SDF tree whose attached constraints are solved.
+        steps: Number of optimizer updates.
+        method: ``"newton"`` for minimum-norm manifold projection, or
+            ``"adam"``/``"sgd"`` for Optax residual minimization.
+
+    Returns:
+        The solved free-parameter mapping, after applying it to ``root``.
+    """
+    from jaxcad.extraction import apply_parameters, extract_parameters
+
+    if not isinstance(steps, int) or isinstance(steps, bool) or steps < 1:
+        raise ValueError("steps must be a positive integer")
+    if method not in {"newton", "adam", "sgd"}:
+        raise ValueError("method must be one of: newton, adam, sgd")
+
+    free, _, metadata = extract_parameters(root)
+    constraints = _collect_constraints(metadata)
+    if constraints:
+        flat_fn = build_residual_fn(constraints, metadata)
+        initial = pack_param_dict(free, metadata)
+        if method == "newton":
+            values, losses = _newton_projection(flat_fn, initial, steps)
+        else:
+            values, losses = _gradient_projection(flat_fn, initial, steps, method)
+        solved = unpack_param_vector(values, metadata)
+    else:
+        solved = free
+        losses = [0.0]
+    apply_parameters(root, solved)
+
+    reports = _CAPTURED_SOLVES.get()
+    if reports is not None:
+        reports.append(
+            {
+                "target_id": id(root),
+                "method": method,
+                "iterations": steps,
+                "losses": losses,
+            }
+        )
+    return solved
 
 
 def constraint_residuals(
