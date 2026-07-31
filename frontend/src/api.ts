@@ -46,13 +46,14 @@ export async function compile(source: string): Promise<CompileResponse> {
   return post<CompileResponse>("/compile", { source });
 }
 
-/** Rewrite a sketch vertex literal in the program text. */
+/**
+ * Apply one edit to the program text.
+ *
+ * Operations differ in shape — a vertex edit needs an index, a placement edit
+ * needs an argument name — so the body is passed through as given.
+ */
 export async function patch(
-  source: string,
-  op: PatchOperation,
-  line: number,
-  index: number,
-  xy?: [number, number],
+  body: { source: string; op?: PatchOperation | string } & Record<string, unknown>,
 ): Promise<PatchResponse> {
-  return post<PatchResponse>("/patch", { source, op, line, index, xy });
+  return post<PatchResponse>("/patch", body);
 }

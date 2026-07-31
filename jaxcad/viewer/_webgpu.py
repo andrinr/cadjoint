@@ -39,6 +39,11 @@ const DISPLAY_SHADOWS: u32 = 1u;
 const DISPLAY_REFLECTIONS: u32 = 2u;
 const DISPLAY_FLAT: u32 = 4u;
 const DISPLAY_HIDE_SOLID: u32 = 8u;
+const DISPLAY_HARD_SHADOWS: u32 = 16u;
+
+// Hard shadows stay lifted rather than black: a single occlusion test has no
+// penumbra to soften the edge, and fully dark cores hide the geometry inside.
+const HARD_SHADOW_FLOOR: f32 = 0.45;
 
 fn display_flag(flag: u32) -> bool {
   return (u32(max(u.display.z, 0.0)) & flag) != 0u;
@@ -71,6 +76,19 @@ fn trace(ro: vec3<f32>, rd: vec3<f32>) -> f32 {
     t += max(abs(d) * 0.9, 0.0005);
   }
   return -1.0;
+}
+
+// One occlusion ray, no penumbra: cheaper than soft_shadow and gives the crisp
+// edge a drafting view wants.
+fn hard_shadow(ro: vec3<f32>, rd: vec3<f32>) -> f32 {
+  var t = 0.02;
+  for (var i = 0; i < 48; i++) {
+    let h = sdf(ro + rd * t);
+    if (h < 0.001) { return 0.0; }
+    t += max(h, 0.002);
+    if (t > 30.0) { break; }
+  }
+  return 1.0;
 }
 
 fn soft_shadow(ro: vec3<f32>, rd: vec3<f32>, k: f32) -> f32 {
@@ -135,17 +153,22 @@ fn shade_material(
     max(4.0 * normal_dot_view * normal_dot_light, 1e-6);
   let diffuse =
     (vec3<f32>(1.0) - fresnel) * (1.0 - metallic) * base_color / PI;
-  if (display_flag(DISPLAY_FLAT)) {
-    // Flat shading: albedo with a touch of wrap lighting so form still reads,
-    // and no specular, shadows, or environment contribution.
-    return base_color * (0.55 + 0.45 * normal_dot_light);
+  let shadow_origin = position + normal * 0.004;
+  var visibility = 1.0;
+  if (display_flag(DISPLAY_SHADOWS)) {
+    if (display_flag(DISPLAY_HARD_SHADOWS)) {
+      visibility = mix(HARD_SHADOW_FLOOR, 1.0, hard_shadow(shadow_origin, light_direction));
+    } else {
+      visibility = soft_shadow(shadow_origin, light_direction, 16.0);
+    }
   }
 
-  let visibility = select(
-    1.0,
-    soft_shadow(position + normal * 0.004, light_direction, 16.0),
-    display_flag(DISPLAY_SHADOWS),
-  );
+  if (display_flag(DISPLAY_FLAT)) {
+    // Flat shading: albedo lit only by incidence and shadowing — no specular
+    // and no environment. The ambient floor keeps unlit faces readable while
+    // still letting a shadow register.
+    return base_color * mix(0.35, 1.0, normal_dot_light * visibility);
+  }
   let light_radiance =
     vec3<f32>(1.0, 0.92, 0.82) * max(u.light_dir.w, 1.0);
   let direct =

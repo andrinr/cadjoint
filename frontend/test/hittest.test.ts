@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ConstructionProfile } from "../src/types";
+import type { ConstructionNode } from "../src/types";
 import { nearestInsertIndex, pickEdge, pickVertex, type PickView } from "../src/viewer/hittest";
 import { projectPoint, type Vec3 } from "../src/viewer/math";
 
@@ -11,31 +11,39 @@ const VIEW: PickView = {
 };
 
 /** A unit square sketch on the world XY plane. */
-function square(id: string, editable = true): ConstructionProfile {
+function square(id: string, editable = true): ConstructionNode {
   const corners: [number, number][] = [
     [-1, -1],
     [1, -1],
     [1, 1],
     [-1, 1],
   ];
+  const vertices = corners.map(([x, y]) => ({
+    name: `${id}_v`,
+    free: true,
+    uv: [x, y] as [number, number],
+    world: [x, y, 0] as [number, number, number],
+    span: [0, 8] as [number, number],
+  }));
   return {
     id,
+    kind: "profile",
     name: id,
     line: 3,
     editable,
+    edges: vertices.map((vertex, index) => [
+      vertex.world,
+      vertices[(index + 1) % vertices.length].world,
+    ]),
     plane: { origin: [0, 0, 0], u: [1, 0, 0], v: [0, 1, 0], normal: [0, 0, 1] },
-    vertices: corners.map(([x, y]) => ({
-      name: `${id}_v`,
-      free: true,
-      uv: [x, y],
-      world: [x, y, 0],
-      span: [0, 8],
-    })),
+    vertices,
+    transform: null,
+    spans: {},
   };
 }
 
 /** Where a profile vertex lands on screen. */
-function screenOf(profile: ConstructionProfile, index: number) {
+function screenOf(profile: ConstructionNode, index: number) {
   return projectPoint(profile.vertices[index].world, VIEW);
 }
 
@@ -48,7 +56,7 @@ describe("pickVertex", () => {
       const hit = pickVertex([profile], point.x, point.y, VIEW);
       expect(hit).not.toBeNull();
       expect(hit!.vertexIndex).toBe(index);
-      expect(hit!.profileId).toBe("p0");
+      expect(hit!.nodeId).toBe("p0");
     }
   });
 
@@ -125,7 +133,7 @@ describe("nearestInsertIndex", () => {
   });
 
   it("appends when no vertex is visible", () => {
-    const hidden: ConstructionProfile = {
+    const hidden: ConstructionNode = {
       ...profile,
       vertices: profile.vertices.map((vertex) => ({
         ...vertex,

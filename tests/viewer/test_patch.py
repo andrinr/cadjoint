@@ -147,3 +147,150 @@ class TestRoundTrip:
         # Spans stay usable for the next edit.
         start, end = payload[0]["vertices"][1]["span"]
         assert patched[start:end] == "[0.75, -0.25]"
+
+
+PRIMITIVES = """from jaxcad.construction import Solid
+from jaxcad.sdf.boolean import Union
+
+block = Solid.box(size=[0.5, 0.5, 0.5], position=[1.0, 0.0, 0.0], name="block")
+scene = Union(block)
+"""
+
+
+def call_arguments(source: str, line: int, name: str) -> dict:
+    """Read back a call's keyword arguments as Python values."""
+    tree = ast.parse(source)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call) and getattr(node.func, "attr", "") == name:
+            if node.lineno <= line <= (node.end_lineno or node.lineno):
+                return {kw.arg: ast.literal_eval(kw.value) for kw in node.keywords}
+    raise AssertionError(f"no {name}() call at line {line}")
+
+
+class TestSetValue:
+    def test_rewrites_an_existing_keyword(self):
+        from jaxcad.viewer._patch import set_value
+
+        patched = set_value(PRIMITIVES, 4, "box", "position", [1.5, 0.25, -0.5])
+        assert call_arguments(patched, 4, "box")["position"] == [1.5, 0.25, -0.5]
+
+    def test_adds_a_keyword_that_is_not_there_yet(self):
+        from jaxcad.viewer._patch import set_value
+
+        # A solid written without `rotation=` must still be rotatable.
+        patched = set_value(PRIMITIVES, 4, "box", "rotation", [0, 0.5, 0])
+        assert call_arguments(patched, 4, "box")["rotation"] == [0, 0.5, 0]
+        # ...and rotating again updates rather than duplicating it.
+        again = set_value(patched, 4, "box", "rotation", [0, 1.0, 0])
+        assert again.count("rotation=") == 1
+        assert call_arguments(again, 4, "box")["rotation"] == [0, 1.0, 0]
+
+    def test_accepts_scalar_arguments(self):
+        from jaxcad.viewer._patch import set_value
+
+        source = "from jaxcad.construction import Solid\nball = Solid.sphere(radius=0.5, position=[0, 0, 0])\n"
+        patched = set_value(source, 2, "sphere", "radius", 1.25)
+        assert call_arguments(patched, 2, "sphere")["radius"] == 1.25
+
+    def test_rejects_an_unknown_call(self):
+        from jaxcad.viewer._patch import set_value
+
+        with pytest.raises(PatchError, match="No editable"):
+            set_value(PRIMITIVES, 1, "box", "position", [0, 0, 0])
+
+
+class TestAddPrimitive:
+    def test_extends_an_existing_union(self):
+        from jaxcad.viewer._patch import add_primitive
+
+        patched = add_primitive(PRIMITIVES, "sphere", [0.0, 1.0, 0.0], {"radius": 0.4})
+        assert "sphere1 = Solid.sphere(radius=0.4, position=[0, 1, 0]" in patched
+        assert "scene = Union(block, sphere1)" in patched
+
+    def test_wraps_a_scene_that_is_not_a_union(self):
+        from jaxcad.viewer._patch import add_primitive
+
+        source = (
+            "from jaxcad.construction import Solid\n"
+            'scene = Solid.box(size=[1, 1, 1], position=[0, 0, 0], name="b")\n'
+        )
+        patched = add_primitive(source, "cylinder", [2.0, 0, 0], {"radius": 0.3, "height": 0.8})
+        assert "from jaxcad.sdf.boolean import Union" in patched
+        assert patched.rstrip().endswith("cylinder1)")
+
+    def test_generates_names_that_do_not_collide(self):
+        from jaxcad.viewer._patch import add_primitive
+
+        once = add_primitive(PRIMITIVES, "sphere", [0, 0, 0], {"radius": 0.4})
+        twice = add_primitive(once, "sphere", [1, 0, 0], {"radius": 0.4})
+        assert "sphere1 =" in twice and "sphere2 =" in twice
+
+    def test_adds_the_Solid_import_when_missing(self):
+        from jaxcad.viewer._patch import add_primitive
+
+        source = "from jaxcad.sdf.primitives import Sphere\nscene = Sphere(1.0)\n"
+        patched = add_primitive(source, "box", [0, 0, 0], {"size": [0.5, 0.5, 0.5]})
+        assert "from jaxcad.construction import Solid" in patched
+
+    def test_requires_a_scene_assignment(self):
+        from jaxcad.viewer._patch import add_primitive
+
+        with pytest.raises(PatchError, match="scene = "):
+            add_primitive("x = 1\n", "sphere", [0, 0, 0], {"radius": 0.5})
+
+
+class TestDeleteObject:
+    def test_removes_a_solid_and_its_use_in_the_scene(self):
+        from jaxcad.viewer._patch import delete_object
+
+        source = (
+            "from jaxcad.construction import Solid\n"
+            "from jaxcad.sdf.boolean import Union\n"
+            'ball = Solid.sphere(radius=0.5, position=[0, 0, 0], name="ball")\n'
+            'block = Solid.box(size=[1, 1, 1], position=[2, 0, 0], name="block")\n'
+            "scene = Union(ball, block)\n"
+        )
+        patched = delete_object(source, 3)
+
+        assert "ball" not in patched
+        assert "Solid.box" in patched
+        assert ast.parse(patched)  # still valid Python
+        scene = [line for line in patched.splitlines() if line.startswith("scene")][0]
+        assert scene == "scene = Union(block)"
+
+    def test_refuses_when_the_value_is_used_elsewhere(self):
+        from jaxcad.viewer._patch import delete_object
+
+        source = (
+            "from jaxcad.construction import PolygonProfile, extrude\n"
+            "profile = PolygonProfile([[0, 0], [1, 0], [0, 1]], name='p')\n"
+            "scene = extrude(profile, depth=0.5)\n"
+        )
+        with pytest.raises(PatchError, match="used elsewhere"):
+            delete_object(source, 2)
+
+    def test_removes_an_inline_solid_from_the_scene(self):
+        from jaxcad.viewer._patch import delete_object
+
+        source = (
+            "from jaxcad.construction import Solid\n"
+            "from jaxcad.sdf.boolean import Union\n"
+            "scene = Union(\n"
+            "    Solid.sphere(radius=1.0),\n"
+            "    Solid.box(size=[1, 1, 1]),\n"
+            ")\n"
+        )
+        patched = delete_object(source, 4)
+        assert patched.count("Solid.") == 1
+        assert "Solid.box" in patched
+
+    def test_refuses_two_objects_built_on_one_line(self):
+        from jaxcad.viewer._patch import delete_object
+
+        source = (
+            "from jaxcad.construction import Solid\n"
+            "from jaxcad.sdf.boolean import Union\n"
+            "scene = Union(Solid.sphere(radius=1.0), Solid.box(size=[1, 1, 1]))\n"
+        )
+        with pytest.raises(PatchError, match="No single construction call"):
+            delete_object(source, 3)

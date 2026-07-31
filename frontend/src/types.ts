@@ -23,16 +23,47 @@ export interface ConstructionPlane {
   normal: [number, number, number];
 }
 
-/** One `PolygonProfile` from the executed program. */
-export interface ConstructionProfile {
+export type ConstructionKind = "profile" | "box" | "sphere" | "cylinder";
+
+/** Placement and size of a construction primitive. */
+export interface ConstructionTransform {
+  position: [number, number, number];
+  /** Intrinsic X, Y, Z angles in radians. */
+  rotation: [number, number, number];
+  dimensions: Record<string, number | number[]>;
+  /** Line of the call that owns the placement — a plane, for a sketch. */
+  line: number;
+  /** That call's name, e.g. `box` or `SketchPlane`. */
+  call: string;
+  /** Keyword holding the position: `position`, or `origin` for a plane. */
+  positionArgument: string;
+  /** False for sketches, whose orientation is a normal rather than angles. */
+  canRotate: boolean;
+}
+
+/**
+ * One construction object from the executed program.
+ *
+ * `edges` is a ready-made world-space wireframe, so the viewer draws sketches,
+ * boxes, and spheres through one path without knowing their topology.
+ */
+export interface ConstructionNode {
   id: string;
+  kind: ConstructionKind;
   name: string | null;
-  /** 1-based line of the `PolygonProfile(...)` call, null if unknown. */
+  /** 1-based line of the constructor call, null if unknown. */
   line: number | null;
-  /** False for sketches built in a loop or from variables. */
+  /** False when the literals cannot be safely rewritten. */
   editable: boolean;
-  plane: ConstructionPlane;
+  edges: [number, number, number][][];
+  /** Sketch profiles only. */
+  plane: ConstructionPlane | null;
+  /** Sketch profiles only; primitives carry no per-vertex handles. */
   vertices: ConstructionVertex[];
+  /** Primitives only. */
+  transform: ConstructionTransform | null;
+  /** Source spans of the primitive's keyword arguments. */
+  spans: Record<string, [number, number]>;
 }
 
 export interface CompileResponse {
@@ -42,19 +73,17 @@ export interface CompileResponse {
   preview_shader: string;
   path_shader: string;
   present_shader: string;
-  construction: ConstructionProfile[];
+  construction: ConstructionNode[];
   output: string;
 }
 
-export type PatchOperation = "set_vertex" | "insert_vertex" | "delete_vertex";
-
-export interface PatchRequest {
-  source: string;
-  op: PatchOperation;
-  line: number;
-  index: number;
-  xy?: [number, number];
-}
+export type PatchOperation =
+  | "set_vertex"
+  | "insert_vertex"
+  | "delete_vertex"
+  | "set_value"
+  | "add_primitive"
+  | "delete_object";
 
 export interface PatchResponse {
   ok: boolean;
@@ -62,10 +91,17 @@ export interface PatchResponse {
   error?: string;
 }
 
-/** Which sketch vertex the user has selected, if any. */
+/** What the user has selected: a whole object, or one of its vertices. */
 export interface Selection {
-  profileId: string;
-  vertexIndex: number;
+  nodeId: string;
+  /** Null when the selection is the object itself, as for a primitive. */
+  vertexIndex: number | null;
 }
 
-export type ToolMode = "select" | "polygon";
+export type ToolMode = "select" | "polygon" | "box" | "sphere" | "cylinder";
+
+/** How a gizmo drag transforms the selected primitive. */
+export type GizmoMode = "translate" | "rotate";
+
+/** What a click in the viewport picks. */
+export type SelectionMode = "object" | "vertex";

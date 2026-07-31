@@ -135,10 +135,9 @@ def test_twist_normals_point_outward():
         normal = _compute_normal(sdf, pos)
         d_inward = float(sdf(pos - step * normal))
         d_outward = float(sdf(pos + step * normal))
-        assert d_outward > d_inward, (
-            f"Normal points inward at {pos}: "
-            f"sdf(+step)={d_outward:.4f}  sdf(-step)={d_inward:.4f}"
-        )
+        assert (
+            d_outward > d_inward
+        ), f"Normal points inward at {pos}: sdf(+step)={d_outward:.4f}  sdf(-step)={d_inward:.4f}"
 
 
 # ---------------------------------------------------------------------------

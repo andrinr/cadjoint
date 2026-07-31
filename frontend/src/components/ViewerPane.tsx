@@ -7,25 +7,49 @@
  * source through `/patch`, never to a private scene graph.
  */
 
-import { createEffect, onCleanup, onMount } from "solid-js";
+import { createEffect, onCleanup, onMount, type JSX } from "solid-js";
 import {
   displayProfiles,
   drag,
+  gizmoDrag,
+  gizmoMode,
+  selectionMode,
+  setCameraAngles,
+  setGizmoDrag,
+  setGizmoMode,
   hover,
-  profileById,
+  nodeById,
+  nodes,
   profiles,
   selection,
   setDrag,
   setHover,
+  dismissViewerError,
   setSelection,
+  setSelectionMode,
   setStatus,
   setTool,
-  setViewerError,
   tool,
   viewerError,
 } from "../state";
-import { intersectPlane, rayFromPixel, worldToPlane } from "../viewer/math";
-import { nearestInsertIndex, pickEdge, pickVertex, type PickView } from "../viewer/hittest";
+import { add, intersectPlane, rayFromPixel, scale, worldToPlane, type Vec3 } from "../viewer/math";
+import {
+  nearestInsertIndex,
+  pickEdge,
+  pickNode,
+  pickVertex,
+  type PickView,
+} from "../viewer/hittest";
+import {
+  AXES,
+  angleAroundAxis,
+  angleDelta,
+  closestPointOnAxis,
+  gizmoScale,
+  pickGizmoAxis,
+  type AxisIndex,
+} from "../viewer/gizmo";
+import type { GizmoMode } from "../types";
 import { Renderer } from "../viewer/renderer";
 
 const PITCH_LIMIT = 1.45;
@@ -34,6 +58,8 @@ const PAN_SPEED = 0.0022;
 
 export interface ViewerPaneProps {
   renderer: Renderer;
+  /** Overlays rendered on top of the canvas (tool rail, ViewCube). */
+  overlay?: JSX.Element;
   /** Apply a patch operation to the source and recompile. */
   onPatch: (
     op: "set_vertex" | "insert_vertex" | "delete_vertex",
@@ -41,17 +67,40 @@ export interface ViewerPaneProps {
     index: number,
     xy?: [number, number],
   ) => Promise<void>;
+  /** Rewrite a primitive's placement keyword. */
+  onSetValue: (line: number, name: string, argument: string, value: number[]) => Promise<void>;
+  /** Insert a new solid into the program. */
+  onAddPrimitive: (
+    kind: string,
+    position: [number, number, number],
+    dimensions: Record<string, number | number[]>,
+  ) => Promise<void>;
+  /** Remove a whole construction object from the program. */
+  onDeleteObject: (line: number) => Promise<void>;
 }
 
 type Gesture =
   | { kind: "none" }
   | { kind: "orbit"; x: number; y: number }
   | { kind: "pan"; x: number; y: number }
-  | { kind: "drag"; profileId: string; vertexIndex: number; moved: boolean };
+  | { kind: "drag"; nodeId: string; vertexIndex: number; moved: boolean }
+  | {
+      kind: "gizmo";
+      nodeId: string;
+      axis: AxisIndex;
+      mode: GizmoMode;
+      /** Drag origin: axis parameter for translate, angle for rotate. */
+      start: number;
+      position: [number, number, number];
+      rotation: [number, number, number];
+      moved: boolean;
+    };
 
 export function ViewerPane(props: ViewerPaneProps) {
   let canvas!: HTMLCanvasElement;
   let gesture: Gesture = { kind: "none" };
+  /** Held space turns any drag into a pan, as other 3D viewports do. */
+  let panHeld = false;
 
   const renderer = props.renderer;
 
@@ -71,14 +120,37 @@ export function ViewerPane(props: ViewerPaneProps) {
   });
 
   /** Sketch-plane coordinates under the pointer for a given profile. */
-  const planePointAt = (profileId: string, x: number, y: number): [number, number] | null => {
-    const profile = profileById(profileId);
-    if (!profile) return null;
+  const planePointAt = (nodeId: string, x: number, y: number): [number, number] | null => {
+    const profile = nodeById(nodeId);
+    if (!profile?.plane) return null;
+    const { origin, normal, u, v } = profile.plane;
+    const hit = intersectPlane(rayFromPixel(x, y, pickView()), origin, normal);
+    return hit ? worldToPlane(hit, origin, u, v) : null;
+  };
+
+  /** Drop a new primitive where the pointer meets the ground plane. */
+  const handlePlacePrimitive = async (kind: "box" | "sphere" | "cylinder", x: number, y: number) => {
     const view = pickView();
     const ray = rayFromPixel(x, y, view);
-    const hit = intersectPlane(ray, profile.plane.origin, profile.plane.normal);
-    if (!hit) return null;
-    return worldToPlane(hit, profile.plane.origin, profile.plane.u, profile.plane.v);
+    // Place on the world XY plane, falling back to a point in front of the
+    // camera when the view is edge-on to it.
+    const hit =
+      intersectPlane(ray, [0, 0, 0], [0, 0, 1]) ??
+      add(ray.origin, scale(ray.direction, Math.max(1, renderer.camera.distance)));
+    const position: [number, number, number] = [hit[0], hit[1], hit[2]];
+    const dimensions: Record<string, number | number[]> =
+      kind === "box"
+        ? { size: [0.5, 0.5, 0.5] }
+        : kind === "sphere"
+          ? { radius: 0.5 }
+          : { radius: 0.4, height: 0.5 };
+    await props.onAddPrimitive(kind, position, dimensions);
+    setTool("select");
+    setSelectionMode("object");
+    // Select what was just placed so the gizmo is ready without a second click.
+    const placed = nodes().filter((node) => node.kind === kind);
+    const newest = placed[placed.length - 1];
+    if (newest) setSelection({ nodeId: newest.id, vertexIndex: null });
   };
 
   /** Insert one vertex where the user clicked; the tool stays active. */
@@ -93,8 +165,8 @@ export function ViewerPane(props: ViewerPaneProps) {
     // (or the selected one) and insert next to its nearest vertex.
     const edge = pickEdge(profiles(), x, y, view);
     const target =
-      (edge && profileById(edge.profileId)) ??
-      (selection() && profileById(selection()!.profileId)) ??
+      (edge && nodeById(edge.nodeId)) ??
+      (selection() && nodeById(selection()!.nodeId)) ??
       editable[0];
     if (!target.editable) {
       setStatus({ kind: "error", text: "That sketch is not editable from the viewer." });
@@ -106,30 +178,129 @@ export function ViewerPane(props: ViewerPaneProps) {
       return;
     }
     const index =
-      edge && edge.profileId === target.id
+      edge && edge.nodeId === target.id
         ? edge.insertIndex
         : nearestInsertIndex(target, x, y, view);
     await props.onPatch("insert_vertex", target.line, index, xy);
-    setSelection({ profileId: target.id, vertexIndex: Math.min(index, target.vertices.length) });
+    setSelection({ nodeId: target.id, vertexIndex: Math.min(index, target.vertices.length) });
+  };
+
+  /**
+   * Reflect what the pointer can act on right now.
+   *
+   * Cursor vocabulary: crosshair places, grab drags a handle or gizmo, pointer
+   * selects, and the default arrow means "nothing here" — dragging there orbits.
+   */
+  const updateHover = (x: number, y: number) => {
+    if (panHeld) {
+      canvas.style.cursor = "move";
+      return;
+    }
+    if (tool() !== "select") {
+      canvas.style.cursor = "crosshair";
+      setHover(null);
+      renderer.gizmoAxis = null;
+      return;
+    }
+    const view = pickView();
+
+    const target = renderer.gizmoTarget();
+    if (target) {
+      const axis = pickGizmoAxis(
+        target.origin,
+        gizmoScale(view, target.origin),
+        gizmoMode(),
+        x,
+        y,
+        view,
+      );
+      if (axis !== renderer.gizmoAxis) {
+        renderer.gizmoAxis = axis;
+        renderer.setConstruction(displayProfiles(), selection(), hover());
+      }
+      if (axis !== null) {
+        canvas.style.cursor = "grab";
+        return;
+      }
+
+    }
+
+    if (selectionMode() === "vertex") {
+      const hit = pickVertex(displayProfiles(), x, y, view);
+      const next = hit ? { nodeId: hit.nodeId, vertexIndex: hit.vertexIndex } : null;
+      const current = hover();
+      if (next?.nodeId !== current?.nodeId || next?.vertexIndex !== current?.vertexIndex) {
+        setHover(next);
+      }
+      canvas.style.cursor = hit ? "grab" : "default";
+      return;
+    }
+
+    const node = pickNode(displayProfiles(), x, y, view, 10, true);
+    const next = node ? { nodeId: node.nodeId, vertexIndex: null } : null;
+    const current = hover();
+    if (next?.nodeId !== current?.nodeId || next?.vertexIndex !== current?.vertexIndex) {
+      setHover(next);
+    }
+    canvas.style.cursor = node ? "pointer" : "default";
   };
 
   const onPointerDown = (event: PointerEvent) => {
     canvas.setPointerCapture(event.pointerId);
     const [x, y] = toPixels(event);
 
+    if (event.button === 0 && tool() !== "select" && tool() !== "polygon") {
+      void handlePlacePrimitive(tool() as "box" | "sphere" | "cylinder", x, y);
+      return;
+    }
+
     if (tool() === "polygon" && event.button === 0) {
       void handleAddVertex(x, y);
       return;
     }
 
-    const hit = event.button === 0 ? pickVertex(displayProfiles(), x, y, pickView()) : null;
+    // The gizmo sits on top of everything it can move, so it gets first refusal.
+    const target = renderer.gizmoTarget();
+    if (event.button === 0 && target) {
+      const view = pickView();
+      const size = gizmoScale(view, target.origin);
+      const mode = target.node.transform?.canRotate ? gizmoMode() : "translate";
+      const axis = pickGizmoAxis(target.origin, size, mode, x, y, view);
+      if (axis !== null) {
+        const transform = target.node.transform!;
+        const ray = rayFromPixel(x, y, view);
+        const start =
+          gizmoMode() === "translate"
+            ? closestPointOnAxis(ray, target.origin, AXES[axis])
+            : angleAroundAxis(ray, target.origin, AXES[axis]);
+        if (start !== null) {
+          gesture = {
+            kind: "gizmo",
+            nodeId: target.node.id,
+            axis,
+            mode,
+            start,
+            position: [...transform.position] as [number, number, number],
+            rotation: [...transform.rotation] as [number, number, number],
+            moved: false,
+          };
+          renderer.gizmoAxis = axis;
+          return;
+        }
+      }
+    }
+
+    const hit =
+      event.button === 0 && selectionMode() === "vertex"
+        ? pickVertex(displayProfiles(), x, y, pickView())
+        : null;
     if (hit) {
-      const profile = profileById(hit.profileId);
-      setSelection({ profileId: hit.profileId, vertexIndex: hit.vertexIndex });
+      const profile = nodeById(hit.nodeId);
+      setSelection({ nodeId: hit.nodeId, vertexIndex: hit.vertexIndex });
       if (profile?.editable) {
         gesture = {
           kind: "drag",
-          profileId: hit.profileId,
+          nodeId: hit.nodeId,
           vertexIndex: hit.vertexIndex,
           moved: false,
         };
@@ -139,9 +310,19 @@ export function ViewerPane(props: ViewerPaneProps) {
       return;
     }
 
-    if (event.button === 0) setSelection(null);
+    if (event.button === 0 && selectionMode() === "object") {
+      const node = pickNode(displayProfiles(), x, y, pickView(), 10, true);
+      if (node) {
+        setSelection({ nodeId: node.nodeId, vertexIndex: null });
+        gesture = { kind: "none" };
+        return;
+      }
+      setSelection(null);
+    } else if (event.button === 0) {
+      setSelection(null);
+    }
     gesture =
-      event.button === 2 || event.shiftKey
+      event.button === 2 || event.shiftKey || panHeld
         ? { kind: "pan", x: event.clientX, y: event.clientY }
         : { kind: "orbit", x: event.clientX, y: event.clientY };
     renderer.interacting = true;
@@ -151,25 +332,44 @@ export function ViewerPane(props: ViewerPaneProps) {
     const [x, y] = toPixels(event);
 
     if (gesture.kind === "none") {
-      const hit = pickVertex(displayProfiles(), x, y, pickView());
-      const next = hit ? { profileId: hit.profileId, vertexIndex: hit.vertexIndex } : null;
-      const current = hover();
-      if (next?.profileId !== current?.profileId || next?.vertexIndex !== current?.vertexIndex) {
-        setHover(next);
+      updateHover(x, y);
+      return;
+    }
+
+    if (gesture.kind === "gizmo") {
+      canvas.style.cursor = "grabbing";
+      const view = pickView();
+      const ray = rayFromPixel(x, y, view);
+      const origin = gesture.position as Vec3;
+      const axis = AXES[gesture.axis];
+      if (gesture.mode === "translate") {
+        const now = closestPointOnAxis(ray, origin, axis);
+        const delta = now - gesture.start;
+        const position = add(origin, scale(axis, delta)) as [number, number, number];
+        gesture.moved = true;
+        setGizmoDrag({ ...gesture, position, rotation: gesture.rotation });
+      } else {
+        const now = angleAroundAxis(ray, origin, axis);
+        if (now === null) return;
+        const rotation = [...gesture.rotation] as [number, number, number];
+        rotation[gesture.axis] += angleDelta(gesture.start, now);
+        gesture.moved = true;
+        setGizmoDrag({ ...gesture, position: gesture.position, rotation });
       }
-      canvas.style.cursor = hit ? "pointer" : tool() === "polygon" ? "crosshair" : "grab";
       return;
     }
 
     if (gesture.kind === "drag") {
-      const xy = planePointAt(gesture.profileId, x, y);
+      canvas.style.cursor = "grabbing";
+      const xy = planePointAt(gesture.nodeId, x, y);
       if (!xy) return;
       gesture.moved = true;
-      setDrag({ profileId: gesture.profileId, vertexIndex: gesture.vertexIndex, xy });
+      setDrag({ nodeId: gesture.nodeId, vertexIndex: gesture.vertexIndex, xy });
       return;
     }
 
     if (gesture.kind === "orbit") {
+      canvas.style.cursor = "grabbing";
       renderer.camera = {
         ...renderer.camera,
         yaw: renderer.camera.yaw - (event.clientX - gesture.x) * ORBIT_SPEED,
@@ -180,10 +380,12 @@ export function ViewerPane(props: ViewerPaneProps) {
       };
       gesture.x = event.clientX;
       gesture.y = event.clientY;
+      setCameraAngles({ yaw: renderer.camera.yaw, pitch: renderer.camera.pitch });
       renderer.invalidate();
       return;
     }
 
+    canvas.style.cursor = "move";
     // Pan: shift the orbit target within the camera's screen plane.
     const dx = (event.clientX - gesture.x) * PAN_SPEED * renderer.camera.distance;
     const dy = (event.clientY - gesture.y) * PAN_SPEED * renderer.camera.distance;
@@ -214,10 +416,29 @@ export function ViewerPane(props: ViewerPaneProps) {
     const finished = gesture;
     gesture = { kind: "none" };
     renderer.interacting = false;
+    canvas.style.cursor = "default";
+
+    if (finished.kind === "gizmo") {
+      const active = gizmoDrag();
+      const node = nodeById(finished.nodeId);
+      setGizmoDrag(null);
+      renderer.gizmoAxis = null;
+      const placement = node?.transform;
+      if (finished.moved && active && placement) {
+        const translating = finished.mode === "translate";
+        await props.onSetValue(
+          placement.line,
+          placement.call,
+          translating ? placement.positionArgument : "rotation",
+          translating ? active.position : active.rotation,
+        );
+      }
+      return;
+    }
 
     if (finished.kind === "drag") {
       const active = drag();
-      const profile = profileById(finished.profileId);
+      const profile = nodeById(finished.nodeId);
       setDrag(null);
       if (finished.moved && active && profile?.line != null) {
         await props.onPatch("set_vertex", profile.line, finished.vertexIndex, active.xy);
@@ -252,27 +473,62 @@ export function ViewerPane(props: ViewerPaneProps) {
     observer.observe(canvas);
 
     const onKeyDown = (event: KeyboardEvent) => {
+      const target = document.activeElement;
+      const typing = target && (target.tagName === "TEXTAREA" || target.closest(".cm-editor"));
       if (event.key === "Escape") {
         setSelection(null);
         setTool("select");
       }
+      if (!typing && !event.metaKey && !event.ctrlKey && !event.altKey) {
+        const shortcuts: Record<string, () => void> = {
+          "1": () => (setTool("select"), setSelectionMode("object")),
+          "2": () => (setTool("select"), setSelectionMode("vertex")),
+          p: () => setTool("polygon"),
+          b: () => setTool("box"),
+          s: () => setTool("sphere"),
+          c: () => setTool("cylinder"),
+          g: () => setGizmoMode("translate"),
+          r: () => setGizmoMode("rotate"),
+        };
+        const action = shortcuts[event.key.toLowerCase()];
+        if (action) {
+          event.preventDefault();
+          action();
+        }
+      }
       const active = selection();
       if ((event.key === "Delete" || event.key === "Backspace") && active) {
-        const target = document.activeElement;
-        if (target && (target.tagName === "TEXTAREA" || target.closest(".cm-editor"))) return;
-        const profile = profileById(active.profileId);
-        if (profile?.editable && profile.line !== null) {
+        if (typing) return;
+        const node = nodeById(active.nodeId);
+        if (node?.editable && node.line !== null) {
           event.preventDefault();
-          void props.onPatch("delete_vertex", profile.line, active.vertexIndex);
+          if (active.vertexIndex !== null) {
+            void props.onPatch("delete_vertex", node.line, active.vertexIndex);
+          } else {
+            void props.onDeleteObject(node.line);
+          }
           setSelection(null);
         }
       }
     };
+    const onPanKey = (event: KeyboardEvent) => {
+      if (event.code !== "Space") return;
+      const target = document.activeElement;
+      if (target && (target.tagName === "TEXTAREA" || target.closest(".cm-editor"))) return;
+      // Stop the page scrolling or a focused button firing.
+      event.preventDefault();
+      panHeld = event.type === "keydown";
+      canvas.style.cursor = panHeld ? "move" : "default";
+    };
     window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keydown", onPanKey);
+    window.addEventListener("keyup", onPanKey);
 
     onCleanup(() => {
       observer.disconnect();
       window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keydown", onPanKey);
+      window.removeEventListener("keyup", onPanKey);
       renderer.destroy();
     });
   });
@@ -284,6 +540,7 @@ export function ViewerPane(props: ViewerPaneProps) {
 
   return (
     <section class="pane viewer-pane">
+      {props.overlay}
       <canvas
         ref={canvas}
         class="viewer-canvas"
@@ -302,7 +559,7 @@ export function ViewerPane(props: ViewerPaneProps) {
       {viewerError() && (
         <div class="viewer-error">
           <p>{viewerError()}</p>
-          <button type="button" onClick={() => setViewerError("")}>
+          <button type="button" onClick={dismissViewerError}>
             Dismiss
           </button>
         </div>
@@ -310,7 +567,9 @@ export function ViewerPane(props: ViewerPaneProps) {
       <p class="viewer-hint">
         {tool() === "polygon"
           ? "Polygon: click sketch edges to add vertices · Esc to finish"
-          : "Drag handles to edit · Drag empty space to orbit · Shift/right-drag to pan"}
+          : tool() !== "select"
+            ? `Click to place a ${tool()} · Esc to cancel`
+            : "Drag handles or the gizmo · Drag to orbit · Space, Shift or right-drag to pan · Del removes"}
       </p>
     </section>
   );

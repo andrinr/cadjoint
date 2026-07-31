@@ -1,18 +1,14 @@
 /** Top bar: run controls, tool modes, quality, and the generated-WGSL view. */
 
-import { For, Show } from "solid-js";
-import { busy, dirty, selection, setTool, status, tool } from "../state";
+import { Show } from "solid-js";
+import { busy, dirty, nodeById, selection, status } from "../state";
 import { DisplayOptions } from "./DisplayOptions";
-import { ViewControls } from "./ViewControls";
-import type { Projection } from "../viewer/math";
-import { QUALITY_PRESETS, type DisplaySettings } from "../viewer/renderer";
+import { CodeIcon, PlayIcon, ResetIcon, TraceIcon } from "./icons";
+import type { DisplaySettings } from "../viewer/renderer";
 
 export interface ToolbarProps {
   display: DisplaySettings;
-  viewPreset: string;
   onDisplayChange: (patch: Partial<DisplaySettings>) => void;
-  onViewPreset: (key: string) => void;
-  onProjection: (projection: Projection) => void;
   onRun: () => void;
   onReset: () => void;
   onToggleTrace: () => void;
@@ -31,40 +27,13 @@ export function Toolbar(props: ToolbarProps) {
         <span>JAXCAD</span>
       </div>
 
-      <div class="tool-group" role="group" aria-label="Sketch tools">
-        <button
-          type="button"
-          class={tool() === "select" ? "active" : ""}
-          onClick={() => setTool("select")}
-          title="Select and drag sketch vertices"
-          data-testid="tool-select"
-        >
-          Select
-        </button>
-        <button
-          type="button"
-          class={tool() === "polygon" ? "active" : ""}
-          onClick={() => setTool(tool() === "polygon" ? "select" : "polygon")}
-          title="Polygon: click sketch edges to add vertices (Esc to finish)"
-          data-testid="tool-polygon"
-        >
-          Polygon
-        </button>
-      </div>
-
-      <ViewControls
-        active={props.viewPreset}
-        projection={props.display.projection}
-        onPreset={props.onViewPreset}
-        onProjection={props.onProjection}
-      />
-      <DisplayOptions display={props.display} onChange={props.onDisplayChange} />
-
       <div class="spacer" />
 
       <Show when={selection()}>
         <span class="selection-chip" data-testid="selection-chip">
-          vertex {selection()!.vertexIndex}
+          {selection()!.vertexIndex === null
+            ? (nodeById(selection()!.nodeId)?.name ?? "solid")
+            : `vertex ${selection()!.vertexIndex}`}
         </span>
       </Show>
 
@@ -73,27 +42,39 @@ export function Toolbar(props: ToolbarProps) {
         {status().text}
       </span>
 
-      <button type="button" onClick={props.onShowWgsl} disabled={!props.wgslReady}>
-        WGSL
-      </button>
-      <select
-        value={props.quality}
-        onChange={(event) => props.onQualityChange(event.currentTarget.value)}
-        aria-label="Render quality"
-      >
-        <For each={Object.entries(QUALITY_PRESETS)}>
-          {([key, preset]) => <option value={key}>{preset.label}</option>}
-        </For>
-      </select>
+      <DisplayOptions
+        display={props.display}
+        quality={props.quality}
+        onChange={props.onDisplayChange}
+        onQualityChange={props.onQualityChange}
+      />
       <button
         type="button"
-        class={props.pathTracing ? "active" : ""}
-        onClick={props.onToggleTrace}
+        class="icon"
+        onClick={props.onShowWgsl}
+        disabled={!props.wgslReady}
+        title="Show the generated WGSL"
+        aria-label="Generated WGSL"
       >
-        {props.pathTracing ? "Preview" : "Path trace"}
+        <CodeIcon />
       </button>
-      <button type="button" onClick={props.onReset}>
-        Reset
+      <button
+        type="button"
+        class={`icon ${props.pathTracing ? "active" : ""}`}
+        onClick={props.onToggleTrace}
+        title={props.pathTracing ? "Back to preview" : "Progressive path trace"}
+        aria-label="Path trace"
+      >
+        <TraceIcon />
+      </button>
+      <button
+        type="button"
+        class="icon"
+        onClick={props.onReset}
+        title="Reset to the starter program"
+        aria-label="Reset"
+      >
+        <ResetIcon />
       </button>
       <button
         type="button"
@@ -102,6 +83,7 @@ export function Toolbar(props: ToolbarProps) {
         disabled={busy()}
         data-testid="run"
       >
+        <PlayIcon />
         {busy() ? "Compiling…" : dirty() ? "Run •" : "Run"}
       </button>
     </header>

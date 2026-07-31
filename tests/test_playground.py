@@ -102,13 +102,16 @@ def test_path_tracer_builder_rejects_reserved_marker():
         build_path_tracer_shader("// __JAXCAD_SCENE_CODE__")
 
 
-def test_example_scene_reports_its_sketch_for_the_viewer():
+def test_example_scene_reports_its_construction_for_the_viewer():
     result = compile_source(EXAMPLE_SOURCE)
 
     assert result["ok"] is True
-    profiles = result["construction"]
-    assert len(profiles) == 1
-    profile = profiles[0]
+    nodes = {node["kind"]: node for node in result["construction"]}
+    # A sketch plus a glass sphere and a metal cylinder, so the starter scene
+    # shows transparency and reflection as well as construction geometry.
+    assert set(nodes) == {"profile", "sphere", "cylinder"}
+
+    profile = nodes["profile"]
     assert profile["editable"] is True
     assert profile["name"] == "house"
     assert len(profile["vertices"]) == 5
@@ -116,6 +119,19 @@ def test_example_scene_reports_its_sketch_for_the_viewer():
     for vertex in profile["vertices"]:
         start, end = vertex["span"]
         assert EXAMPLE_SOURCE[start:end].startswith("[")
+
+    glass = nodes["sphere"]
+    assert glass["editable"] is True
+    assert glass["transform"]["position"] == pytest.approx([1.95, -0.3, 0.35], abs=1e-6)
+    # A wireframe the viewer can draw without knowing the shape's topology.
+    assert len(glass["edges"]) > 0
+    start, end = glass["spans"]["position"]
+    assert EXAMPLE_SOURCE[start:end] == "[1.95, -0.3, 0.35]"
+
+    metal = nodes["cylinder"]
+    assert metal["transform"]["rotation"] == pytest.approx([1.5708, 0.0, 0.0], abs=1e-5)
+    assert "rotation" in metal["spans"]
+
     assert "fn fs_main_depth(" in result["preview_shader"]
 
 
@@ -249,3 +265,13 @@ def test_unknown_host_header_is_rejected():
         with pytest.raises(HTTPError) as error:
             urlopen(request)
         assert error.value.code == 403
+
+
+def test_patch_rejects_an_operation_this_server_does_not_know():
+    # A browser running newer assets than the server used to get a confusing
+    # complaint about a missing `line` instead of the real problem.
+    result = patch_source({"source": "x = 1", "op": "teleport", "line": 1, "index": 0})
+
+    assert result["ok"] is False
+    assert "does not support the patch operation" in result["error"]
+    assert "restart" in result["error"]

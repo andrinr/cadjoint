@@ -8,6 +8,8 @@
 
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
 import { python } from "@codemirror/lang-python";
+import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
+import { tags } from "@lezer/highlight";
 import { EditorState, StateEffect, StateField, type Extension } from "@codemirror/state";
 import {
   Decoration,
@@ -39,6 +41,27 @@ const highlightField = StateField.define<DecorationSet>({
   },
   provide: (field) => EditorView.decorations.from(field),
 });
+
+/**
+ * Syntax colours for the editor.
+ *
+ * CodeMirror ships no highlighting unless a style is installed — the language
+ * package only supplies the parser — so this defines one on the app's palette
+ * rather than pulling in the default light-leaning theme.
+ */
+const highlightStyle = HighlightStyle.define([
+  { tag: tags.comment, color: "#6d746a", fontStyle: "italic" },
+  { tag: tags.keyword, color: "#d9ff57" },
+  { tag: [tags.controlKeyword, tags.moduleKeyword], color: "#c7f04a" },
+  { tag: [tags.string, tags.special(tags.string)], color: "#ffb37a" },
+  { tag: [tags.number, tags.bool, tags.null], color: "#8fd8ff" },
+  { tag: [tags.className, tags.typeName, tags.namespace], color: "#ff8167" },
+  { tag: tags.function(tags.variableName), color: "#e7e6df" },
+  { tag: tags.definition(tags.variableName), color: "#f2efe6" },
+  { tag: tags.propertyName, color: "#cfe8a0" },
+  { tag: [tags.operator, tags.punctuation, tags.separator], color: "#9aa294" },
+  { tag: tags.self, color: "#ff8167", fontStyle: "italic" },
+]);
 
 const theme = EditorView.theme(
   {
@@ -73,6 +96,7 @@ export function EditorPane(props: EditorPaneProps) {
       lineNumbers(),
       history(),
       python(),
+      syntaxHighlighting(highlightStyle),
       highlightField,
       theme,
       keymap.of([
