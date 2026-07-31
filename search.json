@@ -718,7 +718,7 @@
     "href": "examples/constraints.html#solve",
     "title": "Constraint Solving in jaxCAD",
     "section": "Solve",
-    "text": "Solve\nsolve_constraints runs Levenberg-Marquardt (via optimistix) starting from the wrong initial guess (0.5, 0.5, 0) and converges to the true position (2, 1, 0).\n\nfree_params, fixed_params, metadata = extract_parameters(scene)\nsolved_params = solve_constraints(scene, max_steps=10)\n\nprint(\"Initial p: \", p.value)\nprint(\"Solved p:  \", solved_params[\"p\"])\n\nInitial p:  [0.5 0.5 0. ]\nSolved p:   [1.9999999 0.9999999 0.       ]"
+    "text": "Solve\nsolve_constraints runs Levenberg-Marquardt (via optimistix) starting from the wrong initial guess (0.5, 0.5, 0) and converges to the true position (2, 1, 0).\n\nfree_params, fixed_params, metadata = extract_parameters(scene)\nsolved_params = solve_constraints(scene, max_steps=10)\n\nprint(\"Initial p: \", p.value)\nprint(\"Solved p:  \", solved_params[\"p\"])\n\nInitial p:  [0.5 0.5 0. ]\nSolved p:   [1.9999999 1.        0.       ]"
   },
   {
     "objectID": "examples/constraints.html#render-at-the-solved-position",
