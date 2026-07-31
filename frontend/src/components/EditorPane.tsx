@@ -18,8 +18,14 @@ import {
   lineNumbers,
   type DecorationSet,
 } from "@codemirror/view";
-import { createEffect, onCleanup, onMount } from "solid-js";
-import { consoleText, setDirty, setSource, source } from "../state";
+import { For, Show, createEffect, createSignal, onCleanup, onMount } from "solid-js";
+import {
+  consoleText,
+  differentiabilityDemo,
+  setDirty,
+  setSource,
+  source,
+} from "../state";
 
 /** Highlight the character span of the selected sketch vertex. */
 const setHighlight = StateEffect.define<{ from: number; to: number } | null>();
@@ -90,6 +96,11 @@ export interface EditorPaneProps {
 export function EditorPane(props: EditorPaneProps) {
   let host!: HTMLDivElement;
   let view: EditorView | undefined;
+  const [autodiffOpen, setAutodiffOpen] = createSignal(false);
+  const formatValue = (value: number) =>
+    Math.abs(value) < 0.001 && value !== 0
+      ? value.toExponential(2)
+      : value.toFixed(3);
 
   onMount(() => {
     const extensions: Extension[] = [
@@ -157,7 +168,57 @@ export function EditorPane(props: EditorPaneProps) {
     <section class="pane editor-pane">
       <header class="pane-head">
         <span class="pane-title">scene.py</span>
-        <span class="pane-hint">Ctrl/⌘ + Enter to run</span>
+        <div class="editor-head-actions">
+          <Show when={differentiabilityDemo()}>
+            {(demo) => (
+              <div class="autodiff-wrap">
+                <button
+                  type="button"
+                  class="autodiff-toggle"
+                  onClick={() => setAutodiffOpen(!autodiffOpen())}
+                  aria-expanded={autodiffOpen()}
+                  title="Open the live JAX autodiff result"
+                  data-testid="autodiff-toggle"
+                >
+                  <i>∂</i>
+                  <span>AD live</span>
+                  <small>{demo().parameter_count}</small>
+                </button>
+                <Show when={autodiffOpen()}>
+                  <aside class="autodiff-panel" data-testid="autodiff-panel">
+                    <div class="autodiff-title">
+                      <span>
+                        <small>Reverse-mode proof</small>
+                        Live JAX gradient
+                      </span>
+                      <b>∂</b>
+                    </div>
+                    <p>{demo().pipeline}</p>
+                    <div class="autodiff-metric">
+                      <span>{demo().metric}</span>
+                      <b>{formatValue(demo().value)}</b>
+                    </div>
+                    <ul>
+                      <For each={demo().sensitivities}>
+                        {(sensitivity) => (
+                          <li>
+                            <code>∂ metric / ∂ {sensitivity.parameter}</code>
+                            <b>{formatValue(sensitivity.value)}</b>
+                          </li>
+                        )}
+                      </For>
+                    </ul>
+                    <footer>
+                      {demo().parameter_count} differentiable parameters in this
+                      construction
+                    </footer>
+                  </aside>
+                </Show>
+              </div>
+            )}
+          </Show>
+          <span class="pane-hint">Ctrl/⌘ + Enter to run</span>
+        </div>
       </header>
       <div class="editor-host" ref={host} data-testid="editor" />
       {consoleText() && <pre class="console">{consoleText()}</pre>}

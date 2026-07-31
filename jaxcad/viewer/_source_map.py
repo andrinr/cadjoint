@@ -31,11 +31,19 @@ Span = tuple[int, int]
 
 @dataclass(frozen=True)
 class ProfileCall:
-    """Character spans of a ``PolygonProfile(...)`` call's vertex literals."""
+    """Character spans of a ``PolygonProfile(...)`` call's vertices.
+
+    ``element_spans`` point at the editable coordinate payloads, which may
+    resolve through names into ``Vector2(value=[...])`` assignments.
+    ``list_element_spans`` always point at the elements of the profile's
+    vertex list itself.  Keeping both prevents structural edits from being
+    inserted into a parameter constructor.
+    """
 
     line: int
     vertices_span: Span
     element_spans: list[Span]
+    list_element_spans: list[Span]
 
 
 def _line_offsets(source: str) -> list[int]:
@@ -80,6 +88,106 @@ def _is_profile_call(node: ast.AST) -> bool:
     return _called_name(node) == "PolygonProfile"
 
 
+_PARAMETER_CALLS = {"Parameter", "Scalar", "Vector", "Vector2"}
+_ARRAY_CALLS = {"array", "asarray"}
+
+
+def _assignment_value(tree: ast.Module, name: str, before_line: int) -> ast.AST | None:
+    """Value of one unambiguous module-level assignment visible at a use site.
+
+    Following names is intentionally conservative: rebinding, tuple unpacking,
+    loop targets, and function-local values are rejected rather than risking a
+    source edit at the wrong definition.
+    """
+    values: list[ast.AST] = []
+    for statement in tree.body:
+        if statement.lineno >= before_line:
+            continue
+        if (
+            isinstance(statement, ast.Assign)
+            and len(statement.targets) == 1
+            and isinstance(statement.targets[0], ast.Name)
+            and statement.targets[0].id == name
+        ) or (
+            isinstance(statement, ast.AnnAssign)
+            and isinstance(statement.target, ast.Name)
+            and statement.target.id == name
+            and statement.value is not None
+        ):
+            values.append(statement.value)
+    return values[0] if len(values) == 1 else None
+
+
+def _call_value_argument(call: ast.Call) -> ast.AST | None:
+    """The numeric payload of a Parameter/array wrapper call."""
+    for keyword in call.keywords:
+        if keyword.arg == "value":
+            return keyword.value
+    return call.args[0] if call.args else None
+
+
+def _editable_value_node(
+    node: ast.AST,
+    tree: ast.Module,
+    seen: set[str] | None = None,
+) -> ast.AST | None:
+    """Resolve a numeric value through named parameters to its source literal."""
+    seen = set() if seen is None else seen
+    if _is_number(node):
+        return node
+    if isinstance(node, (ast.List, ast.Tuple)) and all(_is_number(item) for item in node.elts):
+        return node
+    if isinstance(node, ast.Name):
+        if node.id in seen:
+            return None
+        value = _assignment_value(tree, node.id, node.lineno)
+        return _editable_value_node(value, tree, seen | {node.id}) if value is not None else None
+    if isinstance(node, ast.Call) and _called_name(node) in _PARAMETER_CALLS | _ARRAY_CALLS:
+        value = _call_value_argument(node)
+        return _editable_value_node(value, tree, seen) if value is not None else None
+    return None
+
+
+def _resolved_container(
+    node: ast.AST,
+    tree: ast.Module,
+    seen: set[str] | None = None,
+) -> ast.List | ast.Tuple | None:
+    """Resolve a named vertex collection to its literal list or tuple."""
+    seen = set() if seen is None else seen
+    if isinstance(node, (ast.List, ast.Tuple)):
+        return node
+    if isinstance(node, ast.Name):
+        if node.id in seen:
+            return None
+        value = _assignment_value(tree, node.id, node.lineno)
+        return _resolved_container(value, tree, seen | {node.id}) if value is not None else None
+    if isinstance(node, ast.Call) and _called_name(node) in _ARRAY_CALLS:
+        value = _call_value_argument(node)
+        return _resolved_container(value, tree, seen) if value is not None else None
+    return None
+
+
+def _resolved_call(
+    node: ast.AST,
+    tree: ast.Module,
+    expected: str,
+    seen: set[str] | None = None,
+) -> ast.Call | None:
+    """Resolve a named construction object to the call that creates it."""
+    seen = set() if seen is None else seen
+    if isinstance(node, ast.Call):
+        return node if _called_name(node) == expected else None
+    if isinstance(node, ast.Name):
+        if node.id in seen:
+            return None
+        value = _assignment_value(tree, node.id, node.lineno)
+        return (
+            _resolved_call(value, tree, expected, seen | {node.id}) if value is not None else None
+        )
+    return None
+
+
 @dataclass(frozen=True)
 class CallSite:
     """Character spans of a construction call's arguments."""
@@ -122,11 +230,13 @@ def locate_call(source: str, line: int, names: set[str]) -> CallSite | None:
     arguments: dict[str, Span] = {}
     end = None
     for keyword in call.keywords:
-        span = _node_span(source, offsets, keyword.value)
-        if span is None:
+        raw_span = _node_span(source, offsets, keyword.value)
+        if raw_span is None:
             continue
-        end = max(end or 0, span[1])
-        if keyword.arg is not None:
+        end = max(end or 0, raw_span[1])
+        editable = _editable_value_node(keyword.value, tree)
+        span = _node_span(source, offsets, editable) if editable is not None else None
+        if keyword.arg is not None and span is not None:
             arguments[keyword.arg] = span
     for argument in call.args:
         span = _node_span(source, offsets, argument)
@@ -175,8 +285,8 @@ def locate_profile_call(source: str, line: int) -> ProfileCall | None:
     if len(exact) != 1:
         return None
 
-    vertices = _vertices_argument(exact[0])
-    if not isinstance(vertices, (ast.List, ast.Tuple)):
+    vertices = _resolved_container(_vertices_argument(exact[0]), tree)
+    if vertices is None:
         return None
 
     offsets = _line_offsets(source)
@@ -185,17 +295,28 @@ def locate_profile_call(source: str, line: int) -> ProfileCall | None:
         return None
 
     element_spans: list[Span] = []
+    list_element_spans: list[Span] = []
     for element in vertices.elts:
-        if not isinstance(element, (ast.List, ast.Tuple)) or len(element.elts) != 2:
+        list_span = _node_span(source, offsets, element)
+        if list_span is None:
             return None
-        if not all(_is_number(coordinate) for coordinate in element.elts):
+        list_element_spans.append(list_span)
+        editable = _editable_value_node(element, tree)
+        if not isinstance(editable, (ast.List, ast.Tuple)) or len(editable.elts) != 2:
             return None
-        span = _node_span(source, offsets, element)
+        if not all(_is_number(coordinate) for coordinate in editable.elts):
+            return None
+        span = _node_span(source, offsets, editable)
         if span is None:
             return None
         element_spans.append(span)
 
-    return ProfileCall(line=line, vertices_span=vertices_span, element_spans=element_spans)
+    return ProfileCall(
+        line=line,
+        vertices_span=vertices_span,
+        element_spans=element_spans,
+        list_element_spans=list_element_spans,
+    )
 
 
 def _is_number(node: ast.AST) -> bool:
@@ -284,49 +405,304 @@ def build_construction_payload(
     return payload
 
 
-def _plane_transform(source: str, line: int, origin) -> dict | None:
-    """Locate the ``SketchPlane(...)`` that positions a profile, if it is literal.
+def build_construction_relations(
+    captured: list[tuple[object, int | None]],
+) -> list[dict]:
+    """Serialize constraints relating whole construction-object positions."""
+    from jaxcad.construction.solid import DIMENSIONS
 
-    A sketch's placement lives on its plane rather than the profile, so moving
-    the sketch means rewriting the plane's ``origin``. Planes passed in as a
-    variable cannot be rewritten, and the sketch is simply not movable then.
+    position_nodes: dict[int, str] = {}
+    position_params: dict[int, object] = {}
+    for index, (obj, _) in enumerate(captured):
+        if hasattr(obj, "kind") and obj.kind in DIMENSIONS:
+            position_nodes[id(obj.position)] = f"{obj.kind}_{index}"
+            position_params[id(obj.position)] = obj.position
+
+    seen: set[int] = set()
+    relations: list[dict] = []
+    for parameter in position_params.values():
+        for constraint in parameter.get_constraints():
+            if id(constraint) in seen:
+                continue
+            seen.add(id(constraint))
+            name = constraint.__class__.__name__
+            if name == "FixedConstraint":
+                node_id = position_nodes.get(id(constraint.param))
+                if node_id is not None:
+                    relations.append(
+                        {
+                            "kind": "fixed",
+                            "nodes": [node_id],
+                            "value": [float(value) for value in constraint.target.reshape(-1)],
+                        }
+                    )
+            elif name == "DistanceConstraint":
+                node_ids = [
+                    position_nodes.get(id(constraint.param1)),
+                    position_nodes.get(id(constraint.param2)),
+                ]
+                if all(node_id is not None for node_id in node_ids):
+                    relations.append(
+                        {
+                            "kind": "distance",
+                            "nodes": node_ids,
+                            "value": float(constraint.distance.value),
+                        }
+                    )
+    return relations
+
+
+def build_material_payload(namespace: dict, source: str) -> list[dict]:
+    """Serialize named ``Material`` definitions for the visual material browser.
+
+    Only direct module-level assignments such as ``brass = Material(...)`` are
+    exposed. This gives every browser card a stable Python identifier that can
+    be written into another construction call when the user drops the material
+    onto an object.
     """
+    from jaxcad.render.material import Material
+
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return []
+
+    result: list[dict] = []
+    for statement in tree.body:
+        if not (
+            isinstance(statement, ast.Assign)
+            and len(statement.targets) == 1
+            and isinstance(statement.targets[0], ast.Name)
+            and isinstance(statement.value, ast.Call)
+            and _called_name(statement.value) == "Material"
+        ):
+            continue
+        variable = statement.targets[0].id
+        material = namespace.get(variable)
+        if not isinstance(material, Material):
+            continue
+        call = locate_call(source, statement.value.lineno, {"Material"})
+        params = material.params
+        result.append(
+            {
+                "id": f"material_{len(result)}",
+                "name": variable,
+                "line": statement.value.lineno,
+                "editable": call is not None,
+                "color": [float(value) for value in params["color"].value],
+                "roughness": float(params["roughness"].value),
+                "metallic": float(params["metallic"].value),
+                "opacity": float(params["opacity"].value),
+                "ior": float(params["ior"].value),
+                "reflectivity": float(params["reflectivity"].value),
+                "spans": (
+                    {name: list(span) for name, span in call.arguments.items()}
+                    if call is not None
+                    else {}
+                ),
+            }
+        )
+    return result
+
+
+def _material_name_from_call(call: ast.Call) -> str | None:
+    """Return the named material passed to a construction call, if any."""
+    value = next(
+        (keyword.value for keyword in call.keywords if keyword.arg == "material"),
+        None,
+    )
+    return value.id if isinstance(value, ast.Name) else None
+
+
+def _primitive_material(source: str, line: int, kind: str) -> str | None:
+    """Named material referenced by a primitive call at *line*."""
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return None
+    calls = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and _called_name(node) == kind
+        and node.lineno <= line <= (node.end_lineno or node.lineno)
+    ]
+    return _material_name_from_call(calls[0]) if len(calls) == 1 else None
+
+
+def _profile_material(source: str, line: int) -> str | None:
+    """Named material on the generator consuming a profile at *line*."""
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return None
+    profiles = [
+        node
+        for node in ast.walk(tree)
+        if _is_profile_call(node) and node.lineno <= line <= (node.end_lineno or node.lineno)
+    ]
+    if len(profiles) != 1:
+        return None
+    statement = next(
+        (
+            item
+            for item in tree.body
+            if isinstance(item, ast.Assign) and _contains(item, profiles[0])
+        ),
+        None,
+    )
+    if not (
+        isinstance(statement, ast.Assign)
+        and len(statement.targets) == 1
+        and isinstance(statement.targets[0], ast.Name)
+    ):
+        return None
+    variable = statement.targets[0].id
+    generators = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and _called_name(node) in {"extrude", "revolve"}
+        and node.args
+        and isinstance(node.args[0], ast.Name)
+        and node.args[0].id == variable
+    ]
+    return _material_name_from_call(generators[0]) if len(generators) == 1 else None
+
+
+def _plane_transform(source: str, line: int, origin) -> dict | None:
+    """Locate the plane owning a profile, including named and default planes."""
     try:
         tree = ast.parse(source)
     except SyntaxError:
         return None
 
-    for node in ast.walk(tree):
-        if _called_name(node) != "SketchPlane":
-            continue
-        spans_line = node.lineno <= line <= (node.end_lineno or node.lineno)
-        # Also accept a plane built on its own line inside the profile call.
-        nested_in_profile = any(
-            other.lineno <= line <= (other.end_lineno or other.lineno)
-            for other in ast.walk(tree)
-            if _is_profile_call(other) and _contains(other, node)
-        )
-        if not spans_line and not nested_in_profile:
-            continue
-        plane_call = locate_call(source, node.lineno, {"SketchPlane"})
-        if plane_call is None or "origin" not in plane_call.arguments:
-            return None
+    profiles = [
+        node
+        for node in ast.walk(tree)
+        if _is_profile_call(node) and node.lineno <= line <= (node.end_lineno or node.lineno)
+    ]
+    if len(profiles) != 1:
+        return None
+    profile = profiles[0]
+    plane_argument = next(
+        (keyword.value for keyword in profile.keywords if keyword.arg == "plane"),
+        profile.args[1] if len(profile.args) > 1 else None,
+    )
+    plane = (
+        _resolved_call(plane_argument, tree, "SketchPlane") if plane_argument is not None else None
+    )
+
+    if plane is not None:
         return {
             "position": [float(x) for x in origin],
             "rotation": [0.0, 0.0, 0.0],
             "dimensions": {},
-            "line": node.lineno,
+            "line": plane.lineno,
             "call": "SketchPlane",
             "positionArgument": "origin",
-            # Turning a sketch means reorienting its plane's normal, which is
-            # not an angle triple, so rotation stays a code-only edit.
             "canRotate": False,
         }
-    return None
+
+    if plane_argument is not None:
+        # An arbitrary expression produced the plane and cannot be rewritten
+        # without changing the program's meaning.
+        return None
+
+    # PolygonProfile() creates an identity plane by default. Moving it can be
+    # represented safely by adding an explicit SketchPlane keyword.
+    return {
+        "position": [float(x) for x in origin],
+        "rotation": [0.0, 0.0, 0.0],
+        "dimensions": {},
+        "line": profile.lineno,
+        "call": "PolygonProfile",
+        "positionArgument": "planeOrigin",
+        "canRotate": False,
+    }
 
 
 def _contains(outer: ast.AST, inner: ast.AST) -> bool:
     return any(node is inner for node in ast.walk(outer))
+
+
+def _profile_constraints(profile) -> list[dict]:
+    """Serialize constraints attached to a profile's vertex parameters."""
+    vertex_indices = {id(vertex): index for index, vertex in enumerate(profile.vertices)}
+    seen: set[int] = set()
+    result: list[dict] = []
+    for vertex in profile.vertices:
+        for constraint in vertex.get_constraints():
+            if id(constraint) in seen:
+                continue
+            seen.add(id(constraint))
+            name = constraint.__class__.__name__
+            if name == "FixedConstraint":
+                index = vertex_indices.get(id(constraint.param))
+                if index is not None:
+                    result.append(
+                        {
+                            "kind": "fixed",
+                            "vertices": [index],
+                            "value": [float(x) for x in constraint.target.reshape(-1)],
+                        }
+                    )
+            elif name == "DistanceConstraint":
+                indices = [
+                    vertex_indices.get(id(constraint.param1)),
+                    vertex_indices.get(id(constraint.param2)),
+                ]
+                if all(index is not None for index in indices):
+                    result.append(
+                        {
+                            "kind": "distance",
+                            "vertices": indices,
+                            "value": float(constraint.distance.value),
+                        }
+                    )
+    return result
+
+
+def _profile_operators(source: str, line: int) -> list[dict]:
+    """Operators in source that consume the named profile."""
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return []
+    calls = [
+        node
+        for node in ast.walk(tree)
+        if _is_profile_call(node) and node.lineno <= line <= (node.end_lineno or node.lineno)
+    ]
+    if len(calls) != 1:
+        return []
+    statement = next(
+        (
+            item
+            for item in tree.body
+            if isinstance(item, ast.Assign) and any(node is calls[0] for node in ast.walk(item))
+        ),
+        None,
+    )
+    if not (
+        isinstance(statement, ast.Assign)
+        and len(statement.targets) == 1
+        and isinstance(statement.targets[0], ast.Name)
+    ):
+        return []
+    variable = statement.targets[0].id
+    result = []
+    for node in ast.walk(tree):
+        if not (
+            isinstance(node, ast.Call)
+            and _called_name(node) in {"extrude", "revolve"}
+            and node.args
+            and isinstance(node.args[0], ast.Name)
+            and node.args[0].id == variable
+        ):
+            continue
+        result.append({"kind": _called_name(node), "line": node.lineno})
+    return result
 
 
 def _profile_entry(profile, index: int, line: int | None, source: str, traceable: bool) -> dict:
@@ -368,6 +744,9 @@ def _profile_entry(profile, index: int, line: int | None, source: str, traceable
             _plane_transform(source, line, profile.plane.origin.xyz) if traceable else None
         ),
         "spans": {},
+        "constraints": _profile_constraints(profile),
+        "operators": _profile_operators(source, line) if traceable else [],
+        "material": _profile_material(source, line) if traceable else None,
     }
 
 
@@ -377,8 +756,9 @@ def _primitive_entry(primitive, index: int, line: int | None, source: str, trace
 
     call = locate_call(source, line, {primitive.kind}) if traceable else None
     arguments = call.arguments if call is not None else {}
-    # Placement is only editable when both literals are present to rewrite.
-    editable = "position" in arguments
+    # Missing placement keywords can be added, and parameter-backed values have
+    # already been resolved to their defining literals by locate_call().
+    editable = call is not None
 
     dimensions = {
         key: (
@@ -409,4 +789,7 @@ def _primitive_entry(primitive, index: int, line: int | None, source: str, trace
         if editable
         else None,
         "spans": {name: list(span) for name, span in arguments.items()},
+        "constraints": [],
+        "operators": [],
+        "material": (_primitive_material(source, line, primitive.kind) if traceable else None),
     }

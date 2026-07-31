@@ -39,6 +39,9 @@ function square(id: string, editable = true): ConstructionNode {
     vertices,
     transform: null,
     spans: {},
+    constraints: [],
+    operators: [],
+    material: null,
   };
 }
 

@@ -40,6 +40,17 @@ export function PolygonIcon(props: IconProps) {
   );
 }
 
+export function PointAddIcon(props: IconProps) {
+  return (
+    <svg {...base(props.size ?? 18)}>
+      <path d="M4 17L9 6l9 6" />
+      <circle cx="4" cy="17" r="1.7" fill="currentColor" />
+      <circle cx="9" cy="6" r="1.7" fill="currentColor" />
+      <path d="M17.5 15v6M14.5 18h6" />
+    </svg>
+  );
+}
+
 export function BoxIcon(props: IconProps) {
   return (
     <svg {...base(props.size ?? 18)}>
@@ -84,6 +95,16 @@ export function RotateIcon(props: IconProps) {
     <svg {...base(props.size ?? 18)}>
       <path d="M20 12a8 8 0 1 1-2.6-5.9" />
       <path d="M20 3.5V8h-4.5" />
+    </svg>
+  );
+}
+
+export function ScaleIcon(props: IconProps) {
+  return (
+    <svg {...base(props.size ?? 18)}>
+      <path d="M5 19L19 5M10 5h9v9" />
+      <rect x="3.5" y="15.5" width="5" height="5" rx="0.8" />
+      <rect x="15.5" y="3.5" width="5" height="5" rx="0.8" />
     </svg>
   );
 }

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import json
 import threading
 from contextlib import contextmanager
@@ -22,6 +23,18 @@ from jaxcad.viewer.playground import (
 )
 
 
+def call_line(source: str, name: str) -> int:
+    """Line of the first bare or attribute-qualified call in a test program."""
+    calls = [
+        node
+        for node in ast.walk(ast.parse(source))
+        if isinstance(node, ast.Call)
+        and (getattr(node.func, "id", None) == name or getattr(node.func, "attr", None) == name)
+    ]
+    assert calls
+    return min(calls, key=lambda call: call.lineno).lineno
+
+
 def test_example_scene_compiles_to_complete_webgpu_shader():
     result = compile_source(EXAMPLE_SOURCE)
 
@@ -40,6 +53,27 @@ def test_compile_source_reports_missing_scene():
 
     assert result["ok"] is False
     assert "variable named `scene`" in result["error"]
+
+
+def test_compile_source_reports_profile_solver_loss_history():
+    source = (
+        "from jaxcad.construction import PolygonProfile, extrude\n"
+        "from jaxcad.constraints import DistanceConstraint, satisfy_constraints\n"
+        "profile = PolygonProfile([[0, 0], [2, 0], [0, 1]], name='solved')\n"
+        "DistanceConstraint(profile.vertices[0], profile.vertices[1], 1.0)\n"
+        "satisfy_constraints(profile, method='newton', steps=2)\n"
+        "scene = extrude(profile, depth=0.5)\n"
+    )
+
+    result = compile_source(source)
+
+    assert result["ok"] is True
+    run = result["solver_runs"][0]
+    assert run["node"] == "profile_0"
+    assert run["method"] == "newton"
+    assert run["iterations"] == 2
+    assert len(run["losses"]) == 3
+    assert run["losses"][-1] < run["losses"][0]
 
 
 def test_compile_source_enforces_timeout():
@@ -92,6 +126,10 @@ fn material_optics(p: vec3<f32>) -> vec4<f32> {
     assert "fn sample_opaque_bsdf(" in shader
     assert "MAX_SHADOW_SAMPLES" in shader
     assert "configured_shadow_samples" in shader
+    assert "display_flag(DISPLAY_HIDE_SOLID)" in shader
+    assert "display_flag(DISPLAY_FLAT)" in shader
+    assert "display_flag(DISPLAY_REFLECTIONS)" in shader
+    assert "let xray = clamp(u.display.w" in shader
     assert "previous_accumulation: texture_2d<f32>" in shader
     assert "@fragment\nfn fs_path_trace(" in shader
     assert "fn fs_present(" in WGSL_PRESENT_TEMPLATE
@@ -106,12 +144,13 @@ def test_example_scene_reports_its_construction_for_the_viewer():
     result = compile_source(EXAMPLE_SOURCE)
 
     assert result["ok"] is True
-    nodes = {node["kind"]: node for node in result["construction"]}
-    # A sketch plus a glass sphere and a metal cylinder, so the starter scene
-    # shows transparency and reflection as well as construction geometry.
-    assert set(nodes) == {"profile", "sphere", "cylinder"}
+    profiles = {node["name"]: node for node in result["construction"] if node["kind"] == "profile"}
+    nodes = {node["kind"]: node for node in result["construction"] if node["kind"] != "profile"}
+    # Extrude and revolve sketches sit alongside two editable primitives.
+    assert set(profiles) == {"house", "revolve section"}
+    assert set(nodes) == {"sphere", "cylinder"}
 
-    profile = nodes["profile"]
+    profile = profiles["house"]
     assert profile["editable"] is True
     assert profile["name"] == "house"
     assert len(profile["vertices"]) == 5
@@ -119,18 +158,83 @@ def test_example_scene_reports_its_construction_for_the_viewer():
     for vertex in profile["vertices"]:
         start, end = vertex["span"]
         assert EXAMPLE_SOURCE[start:end].startswith("[")
+    assert [item["kind"] for item in profile["constraints"]] == [
+        "fixed",
+        "distance",
+        "distance",
+    ]
+    assert profile["material"] == "clay"
+
+    revolve_profile = profiles["revolve section"]
+    assert revolve_profile["operators"] == [
+        {"kind": "revolve", "line": call_line(EXAMPLE_SOURCE, "revolve")}
+    ]
+    assert revolve_profile["material"] == "polished_copper"
+    assert revolve_profile["transform"]["position"] == pytest.approx([0.0, 1.65, 0.15], abs=1e-6)
 
     glass = nodes["sphere"]
     assert glass["editable"] is True
-    assert glass["transform"]["position"] == pytest.approx([1.95, -0.3, 0.35], abs=1e-6)
+    metal_position = nodes["cylinder"]["transform"]["position"]
+    distance = (
+        sum((glass["transform"]["position"][axis] - metal_position[axis]) ** 2 for axis in range(3))
+        ** 0.5
+    )
+    assert distance == pytest.approx(3.8, abs=1e-5)
+    assert glass["transform"]["position"] != pytest.approx([2.2, -0.3, 0.35], abs=1e-3)
+    assert glass["material"] == "glass_material"
     # A wireframe the viewer can draw without knowing the shape's topology.
     assert len(glass["edges"]) > 0
     start, end = glass["spans"]["position"]
-    assert EXAMPLE_SOURCE[start:end] == "[1.95, -0.3, 0.35]"
+    assert EXAMPLE_SOURCE[start:end] == "[2.2, -0.3, 0.35]"
 
     metal = nodes["cylinder"]
     assert metal["transform"]["rotation"] == pytest.approx([1.5708, 0.0, 0.0], abs=1e-5)
     assert "rotation" in metal["spans"]
+    assert metal["material"] == "brass"
+
+    materials = {material["name"]: material for material in result["materials"]}
+    assert set(materials) == {
+        "clay",
+        "glass_material",
+        "brass",
+        "polished_copper",
+        "ground",
+    }
+    assert materials["brass"]["metallic"] == pytest.approx(1.0)
+    assert materials["glass_material"]["opacity"] == pytest.approx(0.18)
+    assert materials["polished_copper"]["metallic"] == pytest.approx(0.92)
+
+    assert result["solver_runs"] == [
+        {
+            "node": None,
+            "method": "newton",
+            "iterations": 2,
+            "losses": pytest.approx([0.0135935191, 0.0, 0.0], abs=1e-6),
+        }
+    ]
+
+    autodiff = result["differentiability"]
+    assert autodiff["pipeline"] == "Profile -> Extrude -> SDF"
+    assert autodiff["metric"] == "two-probe clearance"
+    assert autodiff["parameter_count"] == 6
+    assert autodiff["value"] == pytest.approx(0.85)
+    assert autodiff["sensitivities"] == [
+        {"parameter": "eave_right.x", "value": pytest.approx(-0.7)},
+        {"parameter": "body_depth", "value": pytest.approx(-0.5)},
+    ]
+
+    assert result["relations"] == [
+        {
+            "kind": "distance",
+            "nodes": ["cylinder_2", "sphere_1"],
+            "value": pytest.approx(3.8),
+        },
+        {
+            "kind": "fixed",
+            "nodes": ["cylinder_2"],
+            "value": pytest.approx([-1.9, -0.65, 0.0]),
+        },
+    ]
 
     assert "fn fs_main_depth(" in result["preview_shader"]
 
@@ -140,16 +244,45 @@ def test_patch_source_round_trips_through_compile():
         {
             "source": EXAMPLE_SOURCE,
             "op": "set_vertex",
-            "line": 10,
-            "index": 0,
-            "xy": [-1.4, -0.9],
+            "line": call_line(EXAMPLE_SOURCE, "PolygonProfile"),
+            "index": 3,
+            "xy": [-0.2, 1.25],
         }
     )
     assert edited["ok"] is True
 
     result = compile_source(edited["source"])
     assert result["ok"] is True
-    assert result["construction"][0]["vertices"][0]["uv"] == pytest.approx([-1.4, -0.9], abs=1e-6)
+    assert result["construction"][0]["vertices"][3]["uv"] == pytest.approx([-0.2, 1.25], abs=1e-6)
+
+
+def test_material_patches_create_and_assign_source_definitions():
+    created = patch_source(
+        {
+            "source": EXAMPLE_SOURCE,
+            "op": "add_material",
+            "color": [0.2, 0.4, 0.8],
+            "roughness": 0.25,
+        }
+    )
+    assert created["ok"] is True
+    assert "material1 = Material(" in created["source"]
+
+    assigned = patch_source(
+        {
+            "source": created["source"],
+            "op": "assign_material",
+            "line": call_line(created["source"], "sphere"),
+            "material": "material1",
+        }
+    )
+    assert assigned["ok"] is True
+    assert "material=material1" in assigned["source"]
+
+    result = compile_source(assigned["source"])
+    assert result["ok"] is True
+    sphere = next(node for node in result["construction"] if node["kind"] == "sphere")
+    assert sphere["material"] == "material1"
 
 
 @pytest.mark.parametrize(
@@ -223,7 +356,7 @@ def test_patch_endpoint_edits_the_program_text():
                 {
                     "source": EXAMPLE_SOURCE,
                     "op": "insert_vertex",
-                    "line": 10,
+                    "line": call_line(EXAMPLE_SOURCE, "PolygonProfile"),
                     "index": 5,
                     "xy": [0.4, 0.8],
                 },
@@ -234,6 +367,21 @@ def test_patch_endpoint_edits_the_program_text():
 
     assert result["ok"] is True
     assert "[0.4, 0.8]" in result["source"]
+
+
+def test_solver_patch_endpoint_forwards_optimizer_controls():
+    result = patch_source(
+        {
+            "source": EXAMPLE_SOURCE,
+            "op": "solve_sketch",
+            "line": call_line(EXAMPLE_SOURCE, "PolygonProfile"),
+            "method": "adam",
+            "iterations": 24,
+        }
+    )
+
+    assert result["ok"] is True
+    assert "satisfy_constraints(profile, method='adam', steps=24)" in result["source"]
 
 
 def test_patch_endpoint_reports_failures_without_crashing():

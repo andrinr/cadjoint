@@ -10,7 +10,11 @@
 import { createSignal } from "solid-js";
 import type {
   ConstructionNode,
+  ConstructionRelation,
+  ConstraintSolverRun,
+  DifferentiabilityDemo,
   GizmoMode,
+  MaterialDefinition,
   Selection,
   SelectionMode,
   ToolMode,
@@ -19,6 +23,11 @@ import { placeEdges } from "./viewer/gizmo";
 
 export const [source, setSource] = createSignal("");
 export const [nodes, setNodes] = createSignal<ConstructionNode[]>([]);
+export const [relations, setRelations] = createSignal<ConstructionRelation[]>([]);
+export const [solverRuns, setSolverRuns] = createSignal<ConstraintSolverRun[]>([]);
+export const [differentiabilityDemo, setDifferentiabilityDemo] =
+  createSignal<DifferentiabilityDemo | null>(null);
+export const [materials, setMaterials] = createSignal<MaterialDefinition[]>([]);
 export const [selection, setSelection] = createSignal<Selection | null>(null);
 export const [hover, setHover] = createSignal<Selection | null>(null);
 export const [tool, setTool] = createSignal<ToolMode>("select");
@@ -58,6 +67,7 @@ export interface GizmoDrag {
   axis: 0 | 1 | 2;
   position: [number, number, number];
   rotation: [number, number, number];
+  dimensions: Record<string, number | number[]>;
 }
 
 export const [drag, setDrag] = createSignal<DragState | null>(null);
@@ -92,7 +102,7 @@ export function displayProfiles(): ConstructionNode[] {
   if (gizmo) {
     return all.map((node) =>
       node.id === gizmo.nodeId && node.transform
-        ? withPlacement(node, gizmo.position, gizmo.rotation)
+        ? withPlacement(node, gizmo.position, gizmo.rotation, gizmo.dimensions)
         : node,
     );
   }
@@ -124,6 +134,7 @@ function withPlacement(
   node: ConstructionNode,
   position: [number, number, number],
   rotation: [number, number, number],
+  dimensions: Record<string, number | number[]>,
 ): ConstructionNode {
   if (!node.transform) return node;
   const move = (point: [number, number, number]): [number, number, number] => [
@@ -133,9 +144,9 @@ function withPlacement(
   ];
   return {
     ...node,
-    edges: placeEdges(node.edges, node.transform, position, rotation),
+    edges: placeEdges(node.edges, node.transform, position, rotation, dimensions),
     // A sketch's handles ride along with its plane.
     vertices: node.vertices.map((vertex) => ({ ...vertex, world: move(vertex.world) })),
-    transform: { ...node.transform, position, rotation },
+    transform: { ...node.transform, position, rotation, dimensions },
   };
 }

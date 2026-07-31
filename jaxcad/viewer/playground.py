@@ -56,53 +56,136 @@ CONTENT_SECURITY_POLICY = (
     "form-action 'none'"
 )
 
-EXAMPLE_SOURCE = """from jaxcad.construction import PolygonProfile, SketchPlane, Solid, extrude
+EXAMPLE_SOURCE = """import jax
+import jax.numpy as jnp
+
+from jaxcad import extract_parameters, functionalize
+from jaxcad.construction import PolygonProfile, SketchPlane, Solid, extrude, revolve
+from jaxcad.constraints import DistanceConstraint, FixedConstraint, satisfy_constraints
+from jaxcad.geometry import Scalar, Vector, Vector2
 from jaxcad.render import Material
 from jaxcad.sdf.boolean import Union
 from jaxcad.sdf.primitives import Plane
 
-# Sketch a profile on a work plane, then extrude it. Click a vertex handle in
-# the viewer to find it here; drag it, or use the Polygon tool, and this code
-# is rewritten to match.
+# Named dimensions and points remain editable from either the code or viewport.
+wall_width = Scalar(2.2, name="wall_width")
+wall_height = Scalar(1.0, name="wall_height")
+base_left = Vector2(value=[-1.1, -0.7], free=True, name="base_left")
+base_right = Vector2(value=[1.1, -0.7], free=True, name="base_right")
+eave_right = Vector2(value=[1.1, 0.3], free=True, name="eave_right")
+roof_peak = Vector2(value=[0.0, 1.0], free=True, name="roof_peak")
+eave_left = Vector2(value=[-1.1, 0.3], free=True, name="eave_left")
+
 profile = PolygonProfile(
-    [[-1.1, -0.7], [1.1, -0.7], [1.1, 0.3], [0.0, 1.0], [-1.1, 0.3]],
+    [base_left, base_right, eave_right, roof_peak, eave_left],
     plane=SketchPlane(origin=[0.0, 0.0, 0.0], normal=[0.0, 0.0, 1.0]),
     name="house",
 )
-body = extrude(
-    profile,
-    depth=0.9,
-    material=Material(color=[0.85, 0.45, 0.12], roughness=0.35),
-)
 
-# Primitives keep an editable placement. Click the outline to select one, then
-# drag the gizmo to move or turn it.
+# These constraints own part of the sketch shape. Move a point, then use
+# Satisfy in the sketch panel to project it back onto this system.
+FixedConstraint(base_left, [-1.1, -0.7])
+DistanceConstraint(base_left, base_right, wall_width)
+DistanceConstraint(base_right, eave_right, wall_height)
+
+# Named materials appear in the material browser and can be dragged onto solids.
+clay = Material(name="clay", color=[0.85, 0.45, 0.12], roughness=0.35)
+glass_material = Material(
+    name="glass_material",
+    color=[0.72, 0.86, 1.0],
+    roughness=0.04,
+    opacity=0.18,
+    ior=1.45,
+)
+brass = Material(
+    name="brass",
+    color=[0.95, 0.78, 0.35],
+    roughness=0.12,
+    metallic=1.0,
+    reflectivity=0.55,
+)
+polished_copper = Material(
+    name="polished_copper",
+    color=[0.9, 0.38, 0.16],
+    roughness=0.18,
+    metallic=0.92,
+    reflectivity=0.48,
+)
+ground = Material(name="ground", color=[0.12, 0.14, 0.18], roughness=0.8)
+
+# Object positions can also be parameters. The initial glass position is a
+# seed; the distance constraint below drives it to `fixture_spacing`.
+glass_position = Vector([2.2, -0.3, 0.35], free=True, name="glass_position")
+metal_position = Vector([-1.9, -0.65, 0.0], free=True, name="metal_position")
+fixture_spacing = Scalar(3.8, name="fixture_spacing")
+body_depth = Scalar(0.9, free=True, name="body_depth")
+
+body = extrude(profile, depth=body_depth, material=clay)
 glass = Solid.sphere(
     radius=0.5,
-    position=[1.95, -0.3, 0.35],
-    material=Material(
-        color=[0.72, 0.86, 1.0], roughness=0.04, opacity=0.18, ior=1.45
-    ),
+    position=glass_position,
+    material=glass_material,
     name="glass",
 )
 metal = Solid.cylinder(
     radius=0.36,
     height=0.55,
-    position=[-1.9, -0.65, 0.0],
+    position=metal_position,
     rotation=[1.5708, 0.0, 0.0],
-    material=Material(
-        color=[0.95, 0.78, 0.35], roughness=0.12, metallic=1.0, reflectivity=0.55
-    ),
+    material=brass,
     name="metal",
 )
+
+FixedConstraint(metal_position, [-1.9, -0.65, 0.0])
+DistanceConstraint(metal_position, glass_position, fixture_spacing)
+
+# A second parameter-backed sketch demonstrates the revolve operator. Its
+# X coordinate is radius from the local Y axis; revolving the small section
+# produces the copper ring while preserving editable source points.
+ring_inner_low = Vector2(value=[0.62, -0.16], free=True, name="ring_inner_low")
+ring_outer_low = Vector2(value=[0.9, -0.16], free=True, name="ring_outer_low")
+ring_outer_high = Vector2(value=[0.9, 0.16], free=True, name="ring_outer_high")
+ring_inner_high = Vector2(value=[0.62, 0.16], free=True, name="ring_inner_high")
+ring_profile = PolygonProfile(
+    [ring_inner_low, ring_outer_low, ring_outer_high, ring_inner_high],
+    plane=SketchPlane(origin=[0.0, 1.65, 0.15], normal=[0.0, 0.0, 1.0]),
+    name="revolve section",
+)
+ring = revolve(ring_profile, material=polished_copper)
 
 scene = Union(
     body,
     glass,
     metal,
-    Plane(-1.25, material=Material(color=[0.12, 0.14, 0.18], roughness=0.8)),
+    ring,
+    Plane(-1.25, material=ground),
     smoothness=0.0,
 )
+satisfy_constraints(scene, steps=2)
+
+# This is a real reverse-mode derivative through sketch points -> extrusion ->
+# final SDF evaluation. Change the profile or depth and rerun: both
+# sensitivities update in the compact AD panel above the code.
+body_parameters, body_fixed, _ = extract_parameters(body)
+body_sdf = functionalize(body)
+
+def clearance_metric(parameters):
+    sdf = body_sdf(parameters, body_fixed)
+    side_clearance = sdf(jnp.array([1.6, 0.0, 0.0]))
+    top_clearance = sdf(jnp.array([0.0, 0.0, 0.8]))
+    return side_clearance + top_clearance
+
+clearance, clearance_gradient = jax.value_and_grad(clearance_metric)(body_parameters)
+differentiability_demo = {
+    "pipeline": "Profile -> Extrude -> SDF",
+    "metric": "two-probe clearance",
+    "value": float(clearance),
+    "parameter_count": len(body_parameters),
+    "sensitivities": [
+        {"parameter": "eave_right.x", "value": float(clearance_gradient["eave_right"][0])},
+        {"parameter": "body_depth", "value": float(clearance_gradient["body_depth"])},
+    ],
+}
 """
 
 MISSING_BUILD_PAGE = """<!doctype html>
@@ -200,6 +283,15 @@ def patch_source(request: dict[str, Any]) -> dict[str, Any]:
 
     arguments: dict[str, Any] = {}
 
+    if operation == "add_sketch":
+        origin = numbers(request.get("origin"), 3)
+        if origin is None:
+            return {"ok": False, "error": "The patch request needs `origin` as three numbers."}
+        try:
+            return {"ok": True, "source": apply_operation(source, operation, origin=origin)}
+        except PatchError as error:
+            return {"ok": False, "error": str(error)}
+
     if operation == "add_primitive":
         kind = request.get("kind")
         if not isinstance(kind, str):
@@ -222,6 +314,155 @@ def patch_source(request: dict[str, Any]) -> dict[str, Any]:
         arguments = {"kind": kind, "position": position, "dimensions": dimensions}
         try:
             return {"ok": True, "source": apply_operation(source, operation, **arguments)}
+        except PatchError as error:
+            return {"ok": False, "error": str(error)}
+
+    if operation == "add_material":
+        color = numbers(request.get("color"), 3)
+        if color is None or any(value < 0.0 or value > 1.0 for value in color):
+            return {
+                "ok": False,
+                "error": "The patch request needs `color` as three numbers from 0 to 1.",
+            }
+        properties: dict[str, float] = {}
+        ranges = {
+            "roughness": (0.0, 1.0, 0.4),
+            "metallic": (0.0, 1.0, 0.0),
+            "opacity": (0.0, 1.0, 1.0),
+            "ior": (1.0, 3.0, 1.45),
+            "reflectivity": (0.0, 1.0, 0.0),
+        }
+        for key, (low, high, default) in ranges.items():
+            raw = request.get(key, default)
+            if (
+                not isinstance(raw, (int, float))
+                or isinstance(raw, bool)
+                or not low <= float(raw) <= high
+            ):
+                return {
+                    "ok": False,
+                    "error": f"The patch request needs `{key}` from {low:g} to {high:g}.",
+                }
+            properties[key] = float(raw)
+        try:
+            return {
+                "ok": True,
+                "source": apply_operation(
+                    source,
+                    operation,
+                    color=color,
+                    **properties,
+                ),
+            }
+        except PatchError as error:
+            return {"ok": False, "error": str(error)}
+
+    if operation == "assign_material":
+        line = request.get("line")
+        material = request.get("material")
+        if not isinstance(line, int) or isinstance(line, bool):
+            return {"ok": False, "error": "The patch request needs an integer `line`."}
+        if not isinstance(material, str) or not material.isidentifier():
+            return {
+                "ok": False,
+                "error": "The patch request needs `material` as a Python identifier.",
+            }
+        try:
+            return {
+                "ok": True,
+                "source": apply_operation(
+                    source,
+                    operation,
+                    line=line,
+                    material=material,
+                ),
+            }
+        except PatchError as error:
+            return {"ok": False, "error": str(error)}
+
+    if operation == "add_extrusion":
+        line = request.get("line")
+        depth = request.get("depth", 0.5)
+        if not isinstance(line, int) or isinstance(line, bool):
+            return {"ok": False, "error": "The patch request needs an integer `line`."}
+        if not isinstance(depth, (int, float)) or isinstance(depth, bool):
+            return {"ok": False, "error": "The patch request needs a numeric `depth`."}
+        try:
+            return {
+                "ok": True,
+                "source": apply_operation(source, operation, line=line, depth=float(depth)),
+            }
+        except PatchError as error:
+            return {"ok": False, "error": str(error)}
+
+    if operation == "add_constraint":
+        line = request.get("line")
+        kind = request.get("kind")
+        indices = request.get("indices")
+        if not isinstance(line, int) or isinstance(line, bool):
+            return {"ok": False, "error": "The patch request needs an integer `line`."}
+        if kind not in {"fixed", "distance"}:
+            return {"ok": False, "error": "Constraint `kind` must be `fixed` or `distance`."}
+        if not (
+            isinstance(indices, list)
+            and all(isinstance(index, int) and not isinstance(index, bool) for index in indices)
+        ):
+            return {"ok": False, "error": "The patch request needs integer `indices`."}
+        raw_value = request.get("value")
+        scalar = (
+            float(raw_value)
+            if isinstance(raw_value, (int, float)) and not isinstance(raw_value, bool)
+            else None
+        )
+        vector = numbers(raw_value)
+        if scalar is None and vector is None:
+            return {"ok": False, "error": "The constraint needs a numeric `value`."}
+        try:
+            return {
+                "ok": True,
+                "source": apply_operation(
+                    source,
+                    operation,
+                    line=line,
+                    kind=kind,
+                    indices=indices,
+                    value=scalar if scalar is not None else vector,
+                ),
+            }
+        except PatchError as error:
+            return {"ok": False, "error": str(error)}
+
+    if operation == "solve_sketch":
+        line = request.get("line")
+        if not isinstance(line, int) or isinstance(line, bool):
+            return {"ok": False, "error": "The patch request needs an integer `line`."}
+        method = request.get("method", "newton")
+        iterations = request.get("iterations", 8)
+        if method not in {"newton", "adam", "sgd"}:
+            return {
+                "ok": False,
+                "error": "Solver `method` must be `newton`, `adam`, or `sgd`.",
+            }
+        if (
+            not isinstance(iterations, int)
+            or isinstance(iterations, bool)
+            or not 1 <= iterations <= 512
+        ):
+            return {
+                "ok": False,
+                "error": "Solver `iterations` must be an integer from 1 to 512.",
+            }
+        try:
+            return {
+                "ok": True,
+                "source": apply_operation(
+                    source,
+                    operation,
+                    line=line,
+                    method=method,
+                    iterations=iterations,
+                ),
+            }
         except PatchError as error:
             return {"ok": False, "error": str(error)}
 

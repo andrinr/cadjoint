@@ -43,6 +43,7 @@ from jaxcad.constraints.solve import (
     make_manifold_projection,
     project_bounds,
     project_to_manifold,
+    satisfy_constraints,
     solve_constraints,
 )
 from jaxcad.constraints.types.angle import AngleConstraint
@@ -88,6 +89,7 @@ __all__ = [
     "solve_constraints",
     "project_bounds",
     "project_to_manifold",
+    "satisfy_constraints",
     "constraint_residuals",
     "make_bounds_projection",
     "make_manifold_projection",

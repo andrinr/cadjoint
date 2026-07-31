@@ -1,9 +1,14 @@
 """Tests for mapping construction objects back to their source text."""
 
+import pytest
+
 from jaxcad.viewer._source_map import (
     PLAYGROUND_FILENAME,
     build_construction_payload,
+    build_construction_relations,
+    build_material_payload,
     capture_profiles,
+    locate_call,
     locate_profile_call,
 )
 
@@ -80,9 +85,34 @@ class TestLocateProfileCall:
         start, end = call.element_spans[0]
         assert source[start:end] == "[-1.5, -0.25]"
 
-    def test_rejects_vertices_from_a_variable(self):
+    def test_follows_vertices_to_a_named_list(self):
         source = "points = [[0, 0], [1, 0], [0, 1]]\np = PolygonProfile(points)\n"
-        assert locate_profile_call(source, 2) is None
+        call = locate_profile_call(source, 2)
+        assert call is not None
+        start, end = call.element_spans[1]
+        assert source[start:end] == "[1, 0]"
+
+    def test_follows_vector2_parameters_to_their_values(self):
+        source = (
+            "from jaxcad.geometry import Vector2\n"
+            "v0 = Vector2(value=[0, 0], free=True, name='v0')\n"
+            "v1 = Vector2([1, 0], free=True, name='v1')\n"
+            "v2 = Vector2([0, 1], free=True, name='v2')\n"
+            "points = [v0, v1, v2]\n"
+            "p = PolygonProfile(points)\n"
+        )
+        call = locate_profile_call(source, 6)
+        assert call is not None
+        assert [source[start:end] for start, end in call.element_spans] == [
+            "[0, 0]",
+            "[1, 0]",
+            "[0, 1]",
+        ]
+        assert [source[start:end] for start, end in call.list_element_spans] == [
+            "v0",
+            "v1",
+            "v2",
+        ]
 
     def test_rejects_computed_coordinates(self):
         source = "p = PolygonProfile([[0, 0], [w, 0], [0, 1]])\n"
@@ -140,7 +170,7 @@ class TestConstructionPayload:
         assert all(profile["editable"] is False for profile in payload)
         assert all(vertex["span"] is None for profile in payload for vertex in profile["vertices"])
 
-    def test_variable_vertices_render_but_are_not_editable(self):
+    def test_variable_vertices_remain_editable_at_their_definition(self):
         source = (
             "from jaxcad.construction import PolygonProfile, extrude\n"
             "points = [[0, 0], [1, 0], [0, 1]]\n"
@@ -149,5 +179,97 @@ class TestConstructionPayload:
         captured, _ = run(source)
         payload = build_construction_payload(captured, source)
         assert len(payload) == 1
-        assert payload[0]["editable"] is False
+        assert payload[0]["editable"] is True
         assert len(payload[0]["vertices"]) == 3
+
+    def test_default_plane_is_movable_by_adding_an_explicit_plane(self):
+        captured, _ = run(SIMPLE)
+        profile = build_construction_payload(captured, SIMPLE)[0]
+        assert profile["transform"]["call"] == "PolygonProfile"
+        assert profile["transform"]["positionArgument"] == "planeOrigin"
+
+    def test_named_plane_parameter_maps_to_its_origin_definition(self):
+        source = (
+            "from jaxcad.construction import PolygonProfile, SketchPlane, extrude\n"
+            "from jaxcad.geometry import Vector\n"
+            "origin = Vector(value=[1, 2, 3], free=True, name='origin')\n"
+            "plane = SketchPlane(origin=origin)\n"
+            "profile = PolygonProfile([[0, 0], [1, 0], [0, 1]], plane=plane)\n"
+            "scene = extrude(profile, depth=0.5)\n"
+        )
+        captured, _ = run(source)
+        profile = build_construction_payload(captured, source)[0]
+        assert profile["transform"]["call"] == "SketchPlane"
+        start, end = locate_call(source, 4, {"SketchPlane"}).arguments["origin"]
+        assert source[start:end] == "[1, 2, 3]"
+
+    def test_reports_constraints_and_extrusion_history(self):
+        source = (
+            "from jaxcad.construction import PolygonProfile, extrude\n"
+            "from jaxcad.constraints import DistanceConstraint, FixedConstraint\n"
+            "profile = PolygonProfile([[0, 0], [1, 0], [0, 1]])\n"
+            "FixedConstraint(profile.vertices[0], [0, 0])\n"
+            "DistanceConstraint(profile.vertices[0], profile.vertices[1], 1.0)\n"
+            "scene = extrude(profile, depth=0.5)\n"
+        )
+        captured, _ = run(source)
+        profile = build_construction_payload(captured, source)[0]
+        assert [item["kind"] for item in profile["constraints"]] == ["fixed", "distance"]
+        assert profile["operators"] == [{"kind": "extrude", "line": 6}]
+
+    def test_reports_revolve_history_and_material(self):
+        source = (
+            "from jaxcad.construction import PolygonProfile, revolve\n"
+            "from jaxcad.render import Material\n"
+            "copper = Material(color=[0.9, 0.4, 0.2], metallic=0.9)\n"
+            "section = PolygonProfile([[0.7, -0.2], [1, -0.2], [1, 0.2], [0.7, 0.2]])\n"
+            "scene = revolve(section, material=copper)\n"
+        )
+        captured, _ = run(source)
+        profile = build_construction_payload(captured, source)[0]
+
+        assert profile["operators"] == [{"kind": "revolve", "line": 5}]
+        assert profile["material"] == "copper"
+
+    def test_reports_named_materials_and_object_assignments(self):
+        source = (
+            "from jaxcad.construction import Solid\n"
+            "from jaxcad.render import Material\n"
+            "paint = Material(color=[0.2, 0.4, 0.8], roughness=0.3)\n"
+            "scene = Solid.sphere(radius=0.5, material=paint, name='ball')\n"
+        )
+        captured, namespace = run(source)
+        node = build_construction_payload(captured, source)[0]
+        library = build_material_payload(namespace, source)
+
+        assert node["material"] == "paint"
+        assert len(library) == 1
+        assert library[0]["name"] == "paint"
+        assert library[0]["color"] == pytest.approx([0.2, 0.4, 0.8])
+        start, end = library[0]["spans"]["color"]
+        assert source[start:end] == "[0.2, 0.4, 0.8]"
+
+    def test_reports_constraints_between_primitive_positions(self):
+        source = (
+            "from jaxcad.construction import Solid\n"
+            "from jaxcad.constraints import DistanceConstraint, FixedConstraint\n"
+            "from jaxcad.geometry import Vector\n"
+            "from jaxcad.sdf.boolean import Union\n"
+            "left_pos = Vector([-1, 0, 0], free=True, name='left_pos')\n"
+            "right_pos = Vector([1, 0, 0], free=True, name='right_pos')\n"
+            "left = Solid.sphere(radius=0.5, position=left_pos)\n"
+            "right = Solid.sphere(radius=0.5, position=right_pos)\n"
+            "FixedConstraint(left_pos, [-1, 0, 0])\n"
+            "DistanceConstraint(left_pos, right_pos, 2.0)\n"
+            "scene = Union(left, right)\n"
+        )
+        captured, _ = run(source)
+
+        assert build_construction_relations(captured) == [
+            {"kind": "fixed", "nodes": ["sphere_0"], "value": [-1.0, 0.0, 0.0]},
+            {
+                "kind": "distance",
+                "nodes": ["sphere_0", "sphere_1"],
+                "value": 2.0,
+            },
+        ]

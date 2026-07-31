@@ -84,6 +84,167 @@ fn fs_edge(input: EdgeVertex) -> @location(0) vec4<f32> {
   return vec4<f32>(input.color.rgb, input.color.a * coverage);
 }
 
+// Translation axes get their own screen-space shape instead of being assembled
+// from wireframe segments. The result is a compact filled arrow whose weight is
+// stable at every zoom level.
+struct GizmoVertex {
+  @builtin(position) position : vec4<f32>,
+  @location(0) color          : vec4<f32>,
+  @location(1) side           : f32,
+  @location(2) barycentric    : vec3<f32>,
+  @location(3) head           : f32,
+};
+
+@vertex
+fn vs_gizmo_arrow(
+  @builtin(vertex_index) vertex_index : u32,
+  @location(0) start    : vec3<f32>,
+  @location(1) end      : vec3<f32>,
+  @location(2) color    : vec4<f32>,
+  @location(3) emphasis : f32,
+) -> GizmoVertex {
+  let clip_start = project(start);
+  let clip_end = project(end);
+  let half_size = half_viewport();
+  let screen_start = clip_start.xy / clip_start.w * half_size;
+  let screen_end = clip_end.xy / clip_end.w * half_size;
+
+  var direction = screen_end - screen_start;
+  let span = max(length(direction), 1e-4);
+  direction = select(vec2<f32>(1.0, 0.0), direction / span, span > 1e-4);
+  let normal = vec2<f32>(-direction.y, direction.x);
+
+  let head_length = min(14.0 + emphasis * 2.0, span * 0.42);
+  let head_width = 6.5 + emphasis * 1.5;
+  let shaft_width = 2.35 + emphasis * 0.65;
+  let start_gap = min(5.0, span * 0.12);
+  let head_base = screen_end - direction * head_length;
+  let shaft_start = screen_start + direction * start_gap;
+  // A tiny overlap prevents a hairline seam between the shaft and head.
+  let shaft_end = head_base + direction;
+
+  var point: vec2<f32>;
+  var along = 0.0;
+  var side = 0.0;
+  var barycentric = vec3<f32>(-1.0);
+  var head = 0.0;
+
+  if (vertex_index < 6u) {
+    var corners = array<vec2<f32>, 6>(
+      vec2<f32>(0.0, -1.0), vec2<f32>(1.0, -1.0), vec2<f32>(1.0, 1.0),
+      vec2<f32>(0.0, -1.0), vec2<f32>(1.0, 1.0), vec2<f32>(0.0, 1.0),
+    );
+    let corner = corners[vertex_index];
+    point = mix(shaft_start, shaft_end, corner.x) + normal * shaft_width * corner.y;
+    along = (start_gap + corner.x * max(span - start_gap - head_length + 1.0, 0.0)) / span;
+    side = corner.y;
+  } else {
+    let head_vertex = vertex_index - 6u;
+    var points = array<vec2<f32>, 3>(
+      screen_end,
+      head_base + normal * head_width,
+      head_base - normal * head_width,
+    );
+    var barycentrics = array<vec3<f32>, 3>(
+      vec3<f32>(1.0, 0.0, 0.0),
+      vec3<f32>(0.0, 1.0, 0.0),
+      vec3<f32>(0.0, 0.0, 1.0),
+    );
+    point = points[head_vertex];
+    along = select(1.0 - head_length / span, 1.0, head_vertex == 0u);
+    barycentric = barycentrics[head_vertex];
+    head = 1.0;
+  }
+
+  let clip = mix(clip_start, clip_end, clamp(along, 0.0, 1.0));
+  var out: GizmoVertex;
+  out.position = vec4<f32>(point / half_size * clip.w, clip.z, clip.w);
+  out.color = color;
+  out.side = side;
+  out.barycentric = barycentric;
+  out.head = head;
+  return out;
+}
+
+@vertex
+fn vs_gizmo_scale(
+  @builtin(vertex_index) vertex_index : u32,
+  @location(0) start    : vec3<f32>,
+  @location(1) end      : vec3<f32>,
+  @location(2) color    : vec4<f32>,
+  @location(3) emphasis : f32,
+) -> GizmoVertex {
+  let clip_start = project(start);
+  let clip_end = project(end);
+  let half_size = half_viewport();
+  let screen_start = clip_start.xy / clip_start.w * half_size;
+  let screen_end = clip_end.xy / clip_end.w * half_size;
+
+  var direction = screen_end - screen_start;
+  let span = max(length(direction), 1e-4);
+  direction = select(vec2<f32>(1.0, 0.0), direction / span, span > 1e-4);
+  let normal = vec2<f32>(-direction.y, direction.x);
+  let block_radius = 5.2 + emphasis;
+  let shaft_width = 2.2 + emphasis * 0.65;
+  let start_gap = min(5.0, span * 0.12);
+  let shaft_start = screen_start + direction * start_gap;
+  let shaft_end = screen_end - direction * (block_radius - 0.8);
+
+  var point: vec2<f32>;
+  var along = 0.0;
+  var side = 0.0;
+  var local = vec2<f32>(-1.0);
+  var head = 0.0;
+
+  if (vertex_index < 6u) {
+    var corners = array<vec2<f32>, 6>(
+      vec2<f32>(0.0, -1.0), vec2<f32>(1.0, -1.0), vec2<f32>(1.0, 1.0),
+      vec2<f32>(0.0, -1.0), vec2<f32>(1.0, 1.0), vec2<f32>(0.0, 1.0),
+    );
+    let corner = corners[vertex_index];
+    point = mix(shaft_start, shaft_end, corner.x) + normal * shaft_width * corner.y;
+    along = (start_gap + corner.x * max(span - start_gap - block_radius + 0.8, 0.0)) / span;
+    side = corner.y;
+  } else {
+    let block_vertex = vertex_index - 6u;
+    var corners = array<vec2<f32>, 6>(
+      vec2<f32>(-1.0, -1.0), vec2<f32>(1.0, -1.0), vec2<f32>(1.0, 1.0),
+      vec2<f32>(-1.0, -1.0), vec2<f32>(1.0, 1.0), vec2<f32>(-1.0, 1.0),
+    );
+    local = corners[block_vertex];
+    point = screen_end + (direction * local.x + normal * local.y) * block_radius;
+    along = 1.0;
+    head = 2.0;
+  }
+
+  let clip = mix(clip_start, clip_end, clamp(along, 0.0, 1.0));
+  var out: GizmoVertex;
+  out.position = vec4<f32>(point / half_size * clip.w, clip.z, clip.w);
+  out.color = color;
+  out.side = side;
+  out.barycentric = vec3<f32>(local, 0.0);
+  out.head = head;
+  return out;
+}
+
+@fragment
+fn fs_gizmo_arrow(input: GizmoVertex) -> @location(0) vec4<f32> {
+  var border = smoothstep(0.62, 0.86, abs(input.side));
+  var coverage = smoothstep(1.0, 0.82, abs(input.side));
+  if (input.head > 1.5) {
+    let edge = max(abs(input.barycentric.x), abs(input.barycentric.y));
+    border = smoothstep(0.64, 0.86, edge);
+    coverage = smoothstep(1.0, 0.88, edge);
+  } else if (input.head > 0.5) {
+    let nearest_edge = min(input.barycentric.x, min(input.barycentric.y, input.barycentric.z));
+    border = 1.0 - smoothstep(0.055, 0.14, nearest_edge);
+    coverage = 1.0;
+  }
+  let outline = vec3<f32>(0.025, 0.035, 0.03);
+  let shaded = mix(input.color.rgb, outline, border * 0.82);
+  return vec4<f32>(shaded, input.color.a * coverage);
+}
+
 struct HandleVertex {
   @builtin(position) position : vec4<f32>,
   @location(0) local          : vec2<f32>,

@@ -62,12 +62,17 @@ def test_overlay_shader_compiles(device):
 
 
 def test_sketch_scene_shader_compiles(device):
-    """The polygon primitives added for sketches must survive shader lowering."""
-    from jaxcad.construction import PolygonProfile, extrude
+    """Extruded and revolved sketch polygons must survive shader lowering."""
+    from jaxcad.construction import PolygonProfile, extrude, revolve
 
     profile = PolygonProfile([[0.0, 0.0], [2.0, 0.0], [1.5, 1.2], [0.2, 1.0]], name="p")
-    code = compile_scene_to_wgsl(extrude(profile, depth=0.8))
+    section = PolygonProfile(
+        [[0.7, -0.2], [1.0, -0.2], [1.0, 0.2], [0.7, 0.2]],
+        name="section",
+    )
+    code = compile_scene_to_wgsl(Union(extrude(profile, depth=0.8), revolve(section)))
     compile_wgsl(device, build_viewer_shader(code), "sketch preview")
+    compile_wgsl(device, build_path_tracer_shader(code), "sketch path tracer")
 
 
 def test_invalid_wgsl_is_actually_rejected(device):
