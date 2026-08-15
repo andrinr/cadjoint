@@ -185,6 +185,10 @@ def classify_feature_cells(
     edge_ids = jnp.asarray(np.maximum(incidence.edge_ids, 0))
     mask = jnp.asarray((incidence.edge_ids >= 0).astype(np.float32))
     gathered = normals[edge_ids]
+    # A degenerate sample (zero unit normal from a dead field subgradient)
+    # must not drag the cell mean toward zero — that inflates the centered
+    # spread and misclassifies smooth cells as creases.
+    mask = mask * (jnp.sum(gathered**2, axis=-1) > 0.25)
     counts = jnp.maximum(jnp.sum(mask, axis=1), 1.0)
     means = jnp.sum(gathered * mask[..., None], axis=1) / counts[:, None]
     centered = (gathered - means[:, None, :]) * mask[..., None]
@@ -213,6 +217,91 @@ def classify_feature_cells(
         corner_measure=corner_measure,
         classes=classes,
     )
+
+
+# Half of the 26-neighborhood: one representative per unordered offset pair.
+_HALF_NEIGHBORHOOD = np.array(
+    [
+        offset
+        for offset in ((dx, dy, dz) for dx in (-1, 0, 1) for dy in (-1, 0, 1) for dz in (-1, 0, 1))
+        if offset > (0, 0, 0)
+    ],
+    dtype=np.int64,
+)
+
+
+def feature_cell_links(
+    feature_mask: np.ndarray,
+    incidence: CellIncidence,
+    grid: GridSpec,
+    *,
+    junction_mask: np.ndarray | None = None,
+) -> np.ndarray:
+    """Link feature cells that are lattice neighbors (diagonals included).
+
+    A feature curve — a crease, a corner fan, a CSG seam — crosses cells
+    diagonally as often as it crosses them face-to-face, so consecutive
+    feature cells along the curve are generally *not* connected by a mesh
+    edge; drawing the sharp mesh edges instead produces a staircase around
+    the true curve.  Because feature-aware vertex placement puts every
+    feature cell's vertex exactly on the curve, connecting neighboring
+    feature vertices directly yields chords of the true curve.
+
+    Args:
+        feature_mask: Boolean mask over incidence rows selecting feature
+            cells (creases, corners, seams).
+        incidence: Cell-to-edge mapping whose rows the mask indexes.
+        grid: The sampling grid (for lattice strides).
+        junction_mask: Optional boolean mask over incidence rows marking
+            junction cells (corners).  A link between two cells that share a
+            junction neighbor is a shortcut across the junction — the true
+            feature path runs through it — and is dropped.
+
+    Returns:
+        Unordered incidence-row pairs shaped ``(link_count, 2)``; each pair
+        of cells is within Chebyshev distance 1 of the other.
+    """
+    mask = np.asarray(feature_mask, dtype=bool)
+    if mask.shape != (incidence.count,):
+        raise ValueError(
+            f"feature_mask must have shape ({incidence.count},); received {mask.shape}."
+        )
+    rows = np.flatnonzero(mask)
+    if rows.size == 0:
+        return np.empty((0, 2), dtype=np.int32)
+    cells = incidence.cells[rows].astype(np.int64)
+    strides = np.array(
+        [(grid.cells[1] + 2) * (grid.cells[2] + 2), grid.cells[2] + 2, 1], dtype=np.int64
+    )
+    keys = (cells + 1) @ strides  # shift by one so negative neighbors stay unique
+    order = np.argsort(keys)
+    sorted_keys = keys[order]
+    links = []
+    for offset in _HALF_NEIGHBORHOOD:
+        neighbor_keys = (cells + 1 + offset) @ strides
+        found = np.searchsorted(sorted_keys, neighbor_keys)
+        found = np.clip(found, 0, sorted_keys.size - 1)
+        hit = sorted_keys[found] == neighbor_keys
+        links.append(np.stack([rows[hit], rows[order[found[hit]]]], axis=1))
+    if not links:
+        return np.empty((0, 2), dtype=np.int32)
+    pairs = np.concatenate(links).astype(np.int32).reshape((-1, 2))
+    if junction_mask is None or pairs.shape[0] == 0:
+        return pairs
+
+    junctions = np.asarray(junction_mask, dtype=bool)
+    adjacency: dict[int, set[int]] = {}
+    for a, b in pairs:
+        adjacency.setdefault(int(a), set()).add(int(b))
+        adjacency.setdefault(int(b), set()).add(int(a))
+    keep = np.ones(pairs.shape[0], dtype=bool)
+    for row, (a, b) in enumerate(pairs):
+        if junctions[a] or junctions[b]:
+            continue
+        common = adjacency[int(a)] & adjacency[int(b)]
+        if any(junctions[cell] for cell in common):
+            keep[row] = False
+    return pairs[keep]
 
 
 def active_branches(

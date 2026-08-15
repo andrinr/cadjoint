@@ -44,6 +44,7 @@ from jaxcad.meshing.features import (
     cell_edge_incidence,
     classify_feature_cells,
     detect_branch_changes,
+    feature_cell_links,
 )
 
 __all__ = [
@@ -70,4 +71,5 @@ __all__ = [
     "classify_feature_cells",
     "active_branches",
     "detect_branch_changes",
+    "feature_cell_links",
 ]

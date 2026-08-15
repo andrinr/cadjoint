@@ -312,3 +312,62 @@ class TestValidation:
 
         with pytest.raises(ValueError, match="mode"):
             active_branches([sdf, other], jnp.zeros((2, 3)), mode="sum")
+
+
+class TestFeatureCellLinks:
+    def test_box_feature_chains_connect_corners(self):
+        from jaxcad.meshing.features import feature_cell_links
+
+        grid = GridSpec.from_bounds((-0.75,) * 3, (1.5,) * 3, 15)
+        sdf = lambda p: Box.sdf(p, jnp.array([0.5, 0.5, 0.5]))  # noqa: E731
+        edges, hermite = detect_edges(sdf, grid)
+        incidence = cell_edge_incidence(edges, grid)
+        features = classify_feature_cells(hermite, incidence)
+        mask = features.classes != FACE
+        links = feature_cell_links(mask, incidence, grid)
+
+        assert links.shape[1] == 2
+        assert links.shape[0] > 0
+        # Links only connect feature cells, and each pair is a lattice
+        # neighbor (Chebyshev distance 1).
+        assert bool(np.all(mask[links.reshape(-1)]))
+        gaps = np.abs(incidence.cells[links[:, 0]] - incidence.cells[links[:, 1]])
+        assert int(gaps.max()) == 1
+        # Every corner cell participates in the chain graph.
+        corner_rows = np.flatnonzero(features.classes == CORNER)
+        linked = set(links.reshape(-1).tolist())
+        assert all(int(row) in linked for row in corner_rows)
+
+    def test_empty_mask_yields_no_links(self):
+        from jaxcad.meshing.features import feature_cell_links
+
+        grid = GridSpec.from_bounds((-1.3,) * 3, (2.6,) * 3, 13)
+        edges, _hermite = detect_edges(lambda p: jnp.linalg.norm(p) - 1.0, grid)
+        incidence = cell_edge_incidence(edges, grid)
+        links = feature_cell_links(np.zeros(incidence.count, dtype=bool), incidence, grid)
+        assert links.shape == (0, 2)
+
+    def test_junction_mask_drops_corner_shortcuts(self):
+        from jaxcad.meshing.features import feature_cell_links
+
+        grid = GridSpec.from_bounds((-0.75,) * 3, (1.5,) * 3, 15)
+        sdf = lambda p: Box.sdf(p, jnp.array([0.5, 0.5, 0.5]))  # noqa: E731
+        edges, hermite = detect_edges(sdf, grid)
+        incidence = cell_edge_incidence(edges, grid)
+        features = classify_feature_cells(hermite, incidence)
+        mask = features.classes != FACE
+        junctions = features.classes == CORNER
+        links = feature_cell_links(mask, incidence, grid, junction_mask=junctions)
+
+        adjacency: dict[int, set[int]] = {}
+        for a, b in links:
+            adjacency.setdefault(int(a), set()).add(int(b))
+            adjacency.setdefault(int(b), set()).add(int(a))
+        # No remaining link may shortcut around a corner cell...
+        for a, b in links:
+            if junctions[a] or junctions[b]:
+                continue
+            assert not any(junctions[c] for c in adjacency[int(a)] & adjacency[int(b)])
+        # ...while every corner stays connected to its chains.
+        for row in np.flatnonzero(junctions):
+            assert int(row) in adjacency
