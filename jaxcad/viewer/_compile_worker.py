@@ -284,12 +284,21 @@ def _mesh_edge_payload(scene: Any) -> dict[str, Any] | None:
             directions = vertices[links[:, 1]] - vertices[links[:, 0]]
             lengths = np.maximum(np.linalg.norm(directions, axis=1), 1e-12)
             keep = np.ones(links.shape[0], dtype=bool)
+            confirmed = np.zeros(links.shape[0], dtype=bool)
             for column in (0, 1):
                 rows = links[:, column]
                 tangent = tangents[rows]
                 defined = np.isfinite(tangent).all(axis=1) & ~junctions[rows]
                 alignment = np.abs(np.einsum("li,li->l", directions, tangent)) / lengths
                 keep &= ~defined | (alignment > 0.75)
+                confirmed |= defined & (alignment > 0.75)
+            # Sub-resolution strips classify whole rows of cells as corners
+            # or leave tangents undefined, bypassing the alignment test; a
+            # link no endpoint positively confirmed must stay within one
+            # cell, so rail-to-rail diagonals (~1.4 cells) cannot weave an
+            # X-band through the exemptions while diagonal chords of real
+            # curves — whose endpoints do confirm — keep their full reach.
+            keep &= confirmed | (lengths <= 1.2 * max(grid.spacing))
             links = links[keep]
 
         def segments(pairs: np.ndarray) -> list[list[list[float]]]:
