@@ -178,6 +178,7 @@ export class Renderer {
   private uniformBuffer!: GPUBuffer;
   private viewBuffer!: GPUBuffer;
   private overlayBuffer!: GPUBuffer;
+  private meshOverlayBuffer!: GPUBuffer;
 
   private previewPipeline: GPURenderPipeline | null = null;
   private previewDepthPipeline: GPURenderPipeline | null = null;
@@ -190,6 +191,7 @@ export class Renderer {
   private gizmoArrowPipeline: GPURenderPipeline | null = null;
   private gizmoScalePipeline: GPURenderPipeline | null = null;
   private overlayBindGroup: GPUBindGroup | null = null;
+  private meshOverlayBindGroup: GPUBindGroup | null = null;
 
   private depthTexture: GPUTexture | null = null;
   private accumulation: GPUTexture[] = [];
@@ -354,6 +356,7 @@ export class Renderer {
       this.uniformBuffer = this.createUniform(112);  // 7 x vec4, see Uniforms in _webgpu.py
       this.viewBuffer = this.createUniform(64);
       this.overlayBuffer = this.createUniform(112);
+      this.meshOverlayBuffer = this.createUniform(112);
       this.buildOverlayPipelines();
 
       this.device.addEventListener("uncapturederror", (event) => {
@@ -579,6 +582,10 @@ export class Renderer {
     this.overlayBindGroup = device.createBindGroup({
       layout: bindGroupLayout,
       entries: [{ binding: 0, resource: { buffer: this.overlayBuffer } }],
+    });
+    this.meshOverlayBindGroup = device.createBindGroup({
+      layout: bindGroupLayout,
+      entries: [{ binding: 0, resource: { buffer: this.meshOverlayBuffer } }],
     });
   }
 
@@ -1009,18 +1016,30 @@ export class Renderer {
     );
     overlay.set([DEPTH_NUDGE, 0, 0, 0], 24);
     device.queue.writeBuffer(this.overlayBuffer, 0, overlay);
+
+    // Mesh edges sit exactly on the surface creases the construction
+    // wireframe also traces; a smaller nudge keeps them consistently behind
+    // coincident construction lines instead of z-fighting into dashes.
+    overlay.set([DEPTH_NUDGE * 0.4, 0, 0, 0], 24);
+    device.queue.writeBuffer(this.meshOverlayBuffer, 0, overlay);
   }
 
   private drawOverlay(pass: GPURenderPassEncoder): void {
     if (!this.overlayBindGroup) return;
     const wantMeshWire = this.display.showMeshWireframe && this.meshWireCount > 0;
     const wantMeshSharp = this.display.showMeshEdges && this.meshSharpCount > 0;
-    if ((wantMeshWire || wantMeshSharp) && this.meshEdgeBuffer && this.edgePipeline) {
+    if (
+      (wantMeshWire || wantMeshSharp) &&
+      this.meshEdgeBuffer &&
+      this.edgePipeline &&
+      this.meshOverlayBindGroup
+    ) {
       pass.setPipeline(this.edgePipeline);
-      pass.setBindGroup(0, this.overlayBindGroup);
+      pass.setBindGroup(0, this.meshOverlayBindGroup);
       pass.setVertexBuffer(0, this.meshEdgeBuffer);
       if (wantMeshWire) pass.draw(6, this.meshWireCount, 0, 0);
       if (wantMeshSharp) pass.draw(6, this.meshSharpCount, 0, this.meshWireCount);
+      pass.setBindGroup(0, this.overlayBindGroup);
     }
     if (this.display.showSketches && this.edgeCount && this.edgeBuffer && this.edgePipeline) {
       pass.setPipeline(this.edgePipeline);
