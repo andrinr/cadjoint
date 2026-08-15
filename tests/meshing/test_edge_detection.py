@@ -330,3 +330,34 @@ class TestValidation:
             sample_grid(lambda p: p, grid)  # vector output, not one scalar per point
         with pytest.raises(ValueError):
             sample_grid(lambda p: p[0] / 0.0, grid)  # non-finite values
+
+
+class TestGradientFallback:
+    def test_polygon_walls_yield_valid_normals(self):
+        # Regression: piecewise-linear walls let the secant land bit-exactly
+        # on the surface, where polygon SDFs used to have a dead subgradient
+        # (epsilon-smoothed sqrt at zero).  Degenerate root gradients now
+        # fall back to a nudged evaluation on the same smooth branch.
+        from jaxcad.sdf.primitives.polygon import ExtrudedPolygon
+
+        profile = [
+            jnp.array([-1.1, -0.7]),
+            jnp.array([1.1, -0.7]),
+            jnp.array([1.1, 0.3]),
+            jnp.array([0.0, 1.0]),
+            jnp.array([-1.1, 0.3]),
+        ]
+
+        def sdf(p):
+            return ExtrudedPolygon.sdf(
+                p, jnp.float32(1.0), **{f"v{i}": v for i, v in enumerate(profile)}
+            )
+
+        grid = GridSpec.from_bounds((-1.45, -1.05, -0.85), (2.9, 2.4, 1.7), (29, 24, 17))
+        edges, hermite = detect_edges(sdf, grid)
+        assert edges.count > 0
+        unit = np.asarray(hermite.unit_normals())
+        degenerate = np.sum(unit**2, axis=1) < 0.25
+        # Every sample carries a usable normal; allow a tiny residue for
+        # roots landing exactly on profile corners.
+        assert degenerate.mean() < 0.005

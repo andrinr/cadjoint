@@ -332,7 +332,18 @@ def edge_hermite_data(
         t = jnp.where(improved, proposed, t0)
 
     points = at(t)
-    return HermiteData(points=points, gradients=gradient(points), t=t, values=field(points))
+    gradients = gradient(points)
+    # A root can land bit-exactly on a surface plane whose SDF has a dead
+    # subgradient there (epsilon-smoothed norms, |x| at 0, polygon
+    # boundaries): the secant is exact on piecewise-linear walls, so this is
+    # common, not exotic.  Re-evaluate degenerate gradients a fraction of an
+    # edge toward the inside endpoint — the same smooth branch, off the
+    # measure-zero point.
+    inward = jnp.where(jnp.asarray(edges.start_inside, dtype=bool), -1e-3, 1e-3)
+    fallback = gradient(at(jax.lax.stop_gradient(t) + inward))
+    degenerate = jnp.sum(jax.lax.stop_gradient(gradients) ** 2, axis=-1) < 1e-12
+    gradients = jnp.where(degenerate[:, None], fallback, gradients)
+    return HermiteData(points=points, gradients=gradients, t=t, values=field(points))
 
 
 def detect_edges(

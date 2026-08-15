@@ -45,7 +45,14 @@ def _polygon_distance(p: Array, vertices: list[Array]) -> Array:
         c3 = e[0] * w[..., 1] > e[1] * w[..., 0]
         flip = (c1 == c2) & (c2 == c3)
         s = jnp.where(flip, -s, s)
-    return s * jnp.sqrt(d + 1e-20)
+    # Double-where sqrt guard: an epsilon inside the sqrt would zero the
+    # derivative for points on (or within ~1e-9 of) the boundary — exactly
+    # where surface sampling evaluates.  The guarded branch keeps the exact
+    # gradient b/|b| of the active segment; truly on-boundary points fall to
+    # the constant branch and are masked out downstream.
+    positive = d > 1e-18
+    safe = jnp.where(positive, d, 1.0)
+    return s * jnp.where(positive, jnp.sqrt(safe), 0.0)
 
 
 def polygon_sdf_2d(p: Array, vertices: Array) -> Array:
@@ -109,10 +116,14 @@ class ExtrudedPolygon(Primitive):
         verts = _ordered_vertices(vertices)
         d2 = _polygon_distance(p[..., :2], verts)
         dz = jnp.abs(p[..., 2]) - depth / 2.0
-        w = jnp.stack([d2, dz], axis=-1)
-        outside = jnp.sqrt(jnp.sum(jnp.maximum(w, 0.0) ** 2, axis=-1) + 1e-20)
-        inside = jnp.minimum(jnp.maximum(w[..., 0], w[..., 1]), 0.0)
-        return inside + outside
+        # Branch on inside/outside like Box.sdf so points exactly on a side
+        # wall or cap receive a valid one-sided subgradient instead of the
+        # exact zero an epsilon-smoothed outside norm produces there.
+        max_d = jnp.maximum(d2, dz)
+        squared = jnp.maximum(d2, 0.0) ** 2 + jnp.maximum(dz, 0.0) ** 2
+        on_or_inside = max_d <= 0.0
+        safe = jnp.where(on_or_inside, 1.0, squared)
+        return jnp.where(on_or_inside, max_d, jnp.sqrt(safe))
 
     def __call__(self, p: Array) -> Array:
         values = {k: v.value for k, v in self.params.items() if k != "depth"}
