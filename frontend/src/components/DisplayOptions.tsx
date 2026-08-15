@@ -25,7 +25,8 @@ const SHADOWS: { value: ShadowMode; label: string; hint: string }[] = [
 const SWITCHES: { key: keyof DisplaySettings; label: string; hint: string }[] = [
   { key: "reflections", label: "Reflections", hint: "Environment reflections" },
   { key: "hideSolid", label: "Hide solid", hint: "Construction geometry only" },
-  { key: "showMeshEdges", label: "Mesh edges", hint: "Dual-contour wireframe; sharp creases pop" },
+  { key: "showMeshEdges", label: "Feature edges", hint: "Sharp creases, corners, and CSG seams" },
+  { key: "showMeshWireframe", label: "Mesh wireframe", hint: "Full dual-contour quad wireframe" },
 ];
 
 export interface DisplayOptionsProps {

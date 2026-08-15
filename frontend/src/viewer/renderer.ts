@@ -102,6 +102,7 @@ export interface DisplaySettings {
   xray: number;
   showSketches: boolean;
   showMeshEdges: boolean;
+  showMeshWireframe: boolean;
   showConstraints: boolean;
   showFixedConstraints: boolean;
   showDistanceConstraints: boolean;
@@ -119,6 +120,7 @@ export const DEFAULT_DISPLAY: DisplaySettings = {
   xray: 1,
   showSketches: true,
   showMeshEdges: false,
+  showMeshWireframe: false,
   showConstraints: true,
   showFixedConstraints: true,
   showDistanceConstraints: true,
@@ -147,7 +149,7 @@ const COLORS: Record<string, Rgba> = {
   handleLocked: [0.62, 0.64, 0.6, 0.9],
   edgeSelected: [1.0, 0.95, 0.6, 1.0],
   edgeHover: [0.95, 1.0, 0.72, 1.0],
-  meshWire: [0.5, 0.56, 0.62, 0.45],
+  meshWire: [0.5, 0.56, 0.62, 0.22],
   meshSharp: [0.35, 0.85, 1.0, 0.95],
 };
 
@@ -210,7 +212,8 @@ export class Renderer {
   private visibleGizmoMode: GizmoMode = "translate";
   private meshEdgeBuffer: GPUBuffer | null = null;
   private meshEdgeCapacity = 0;
-  private meshEdgeCount = 0;
+  private meshWireCount = 0;
+  private meshSharpCount = 0;
   private meshEdges: MeshEdgePayload | null = null;
 
   private shaderRevision = 0;
@@ -767,8 +770,9 @@ export class Renderer {
       }
     }
 
-    // The extracted mesh wireframe shares the sketch edge pipeline; sharp
-    // edges (creases, corners, CSG seams) draw brighter than the wire.
+    // The extracted mesh edges share the sketch edge pipeline in one buffer:
+    // wire first, sharp second, so the two display switches can draw either
+    // instance range independently.
     const meshSegments: number[] = [];
     if (this.meshEdges) {
       for (const [start, end] of this.meshEdges.wire) {
@@ -790,7 +794,8 @@ export class Renderer {
     this.edgeCount = edges.length / (EDGE_STRIDE / 4);
     this.handleCount = handles.length / (HANDLE_STRIDE / 4);
     this.gizmoCount = gizmo.length / (GIZMO_STRIDE / 4);
-    this.meshEdgeCount = meshSegments.length / (EDGE_STRIDE / 4);
+    this.meshWireCount = this.meshEdges?.wire.length ?? 0;
+    this.meshSharpCount = this.meshEdges?.sharp.length ?? 0;
     this.meshEdgeBuffer = this.writeInstances(
       this.meshEdgeBuffer,
       new Float32Array(meshSegments),
@@ -1008,16 +1013,14 @@ export class Renderer {
 
   private drawOverlay(pass: GPURenderPassEncoder): void {
     if (!this.overlayBindGroup) return;
-    if (
-      this.display.showMeshEdges &&
-      this.meshEdgeCount &&
-      this.meshEdgeBuffer &&
-      this.edgePipeline
-    ) {
+    const wantMeshWire = this.display.showMeshWireframe && this.meshWireCount > 0;
+    const wantMeshSharp = this.display.showMeshEdges && this.meshSharpCount > 0;
+    if ((wantMeshWire || wantMeshSharp) && this.meshEdgeBuffer && this.edgePipeline) {
       pass.setPipeline(this.edgePipeline);
       pass.setBindGroup(0, this.overlayBindGroup);
       pass.setVertexBuffer(0, this.meshEdgeBuffer);
-      pass.draw(6, this.meshEdgeCount);
+      if (wantMeshWire) pass.draw(6, this.meshWireCount, 0, 0);
+      if (wantMeshSharp) pass.draw(6, this.meshSharpCount, 0, this.meshWireCount);
     }
     if (this.display.showSketches && this.edgeCount && this.edgeBuffer && this.edgePipeline) {
       pass.setPipeline(this.edgePipeline);

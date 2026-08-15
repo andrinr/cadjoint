@@ -77,11 +77,20 @@ benchmarks before the next stage starts.
    self-intersection checks remain open.
 5. **Adaptivity.** Conservative cell pruning (Lipschitz bounds), octree with
    2:1 balancing, manifold-preserving clustering.
-6. **Viewer integration (started).** The compile payload now carries the
-   dual-contour mesh's edges split into `wire` and `sharp` (dihedral above
-   30°), and the playground has a "Mesh edges" display switch drawing them
-   through the existing overlay edge pipeline. Surface handles and drag
-   solve come later.
+6. **Viewer integration (started).** The compile payload carries the
+   dual-contour mesh's quad edges (no triangulation diagonals) split into
+   `wire` and `sharp`. Sharp combines two signals: quad-normal dihedral
+   above 45° — chosen above the faceting angle of the smallest curved
+   feature resolution 48 can carry, below real CAD creases at 55–90° — and
+   exact structural CSG seams, marking edges whose endpoints are owned by
+   different world-frame `min`/`max` operands. The playground draws them
+   through the overlay edge pipeline behind two switches: "Feature edges"
+   (the technical-drawing look) and "Mesh wireframe" (debugging).
+   Primitives are themselves min/max compositions internally (a box is a
+   max over axis distances, an extrude is max(profile, axial)), so the next
+   step replaces the dihedral heuristic with exact per-primitive patch
+   fields; that needs local-frame plumbing through transforms. Surface
+   handles and drag solve come later.
 
 ## Benchmark policy
 

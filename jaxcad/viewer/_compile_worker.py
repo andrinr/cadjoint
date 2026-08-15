@@ -68,18 +68,47 @@ def _differentiability_payload(namespace: dict[str, Any]) -> dict[str, Any] | No
         return None
 
 
-# Mesh-edge view settings.  The grid matches the raymarcher's view volume;
-# the resolution keeps the JSON payload and extraction time modest.  A quad
-# diagonal always has dihedral 0, so the sharpness threshold only needs to
-# separate creases from smooth-surface faceting at this cell size.
+# Mesh-edge view settings.  The grid matches the raymarcher's view volume.
+# The sharpness threshold must sit above the faceting angle of the smallest
+# curved feature the resolution can carry (about 2*asin(spacing / 2r)), or
+# ordinary curvature misreads as creases; resolution 48 keeps even a
+# 0.18-radius tube's faceting near 41 degrees, under the 45-degree
+# threshold, while real CAD creases (rims, ridges, eaves) sit at 55-90
+# degrees.  The structural CSG-seam check below has no such tuning: it is
+# exact.
 _MESH_EDGE_BOUNDS = (-3.0, -3.0, -3.0)
 _MESH_EDGE_SIZE = (6.0, 6.0, 6.0)
-_MESH_EDGE_RESOLUTION = 24
-_SHARP_DIHEDRAL_DEGREES = 30.0
+_MESH_EDGE_RESOLUTION = 48
+_SHARP_DIHEDRAL_DEGREES = 45.0
+
+
+def _world_frame_leaves(node: Any) -> list[Any]:
+    """Maximal world-frame subtrees below the scene's Boolean structure.
+
+    Hard CSG is built from ``min``/``max``, so the exact seam between two
+    operands is where surface ownership switches between them — no angular
+    threshold involved.  Descend only through Boolean nodes: their children
+    share the parent's coordinate frame and stay callable in world space,
+    while anything else (a transformed subtree) becomes one opaque leaf.
+    """
+    from jaxcad.sdf.boolean.base import BooleanOp
+
+    if isinstance(node, BooleanOp):
+        leaves: list[Any] = []
+        for child in node.children():
+            leaves.extend(_world_frame_leaves(child))
+        return leaves
+    return [node]
 
 
 def _mesh_edge_payload(scene: Any) -> dict[str, Any] | None:
     """Extract the dual-contour mesh and split its edges into wire and sharp.
+
+    Only native quad edges are reported — triangulation diagonals double the
+    visual density without carrying any surface information.  An edge is
+    sharp when the dihedral between its two triangles exceeds the threshold
+    OR when its endpoints belong to different CSG operands (exact ``min``/
+    ``max`` seam detection, independent of any angle).
 
     Optional viewer data: any failure prints a note (captured into the
     compile output) and returns ``None`` rather than failing the compile.
@@ -93,27 +122,32 @@ def _mesh_edge_payload(scene: Any) -> dict[str, Any] | None:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")  # an open mesh is fine for edge display
             mesh = extract_mesh(lambda p: jnp.asarray(scene(p)), grid)
-        faces = mesh.faces
-        if faces.shape[0] == 0:
+        quads = mesh.quads
+        if quads.shape[0] == 0:
             return None
         vertices = np.asarray(mesh.vertices, dtype=np.float64)
 
-        corners = vertices[faces]
-        normals = np.cross(corners[:, 1] - corners[:, 0], corners[:, 2] - corners[:, 0])
+        # Per-quad normals via the diagonal cross product: smoother than
+        # triangle normals, whose arbitrary diagonal split inflates the
+        # apparent dihedral on curved surfaces.
+        corners = vertices[quads]
+        normals = np.cross(corners[:, 2] - corners[:, 0], corners[:, 3] - corners[:, 1])
         lengths = np.linalg.norm(normals, axis=1)
         normals = normals / np.maximum(lengths, 1e-30)[:, None]
 
-        directed = np.concatenate([faces[:, [0, 1]], faces[:, [1, 2]], faces[:, [2, 0]]])
-        triangle_ids = np.tile(np.arange(faces.shape[0]), 3)
+        directed = np.concatenate(
+            [quads[:, [0, 1]], quads[:, [1, 2]], quads[:, [2, 3]], quads[:, [3, 0]]]
+        )
+        quad_ids = np.tile(np.arange(quads.shape[0]), 4)
         undirected, inverse = np.unique(np.sort(directed, axis=1), axis=0, return_inverse=True)
-        # Up to two triangles meet at each undirected edge of a manifold mesh.
+        # Up to two quads meet at each undirected edge of a manifold mesh.
         first = np.full(undirected.shape[0], -1, dtype=np.int64)
         second = np.full(undirected.shape[0], -1, dtype=np.int64)
-        for edge_row, triangle in zip(inverse, triangle_ids):
+        for edge_row, quad in zip(inverse, quad_ids):
             if first[edge_row] < 0:
-                first[edge_row] = triangle
+                first[edge_row] = quad
             elif second[edge_row] < 0:
-                second[edge_row] = triangle
+                second[edge_row] = quad
         interior = second >= 0
         cosine = np.einsum(
             "ij,ij->i",
@@ -123,10 +157,32 @@ def _mesh_edge_payload(scene: Any) -> dict[str, Any] | None:
         threshold = math.cos(math.radians(_SHARP_DIHEDRAL_DEGREES))
         sharp_mask = interior & (cosine < threshold)
 
+        # Exact structural seams: each vertex is owned by the CSG operand
+        # whose field magnitude vanishes there; an edge crossing owners is a
+        # seam even when the dihedral is shallow.
+        leaves = _world_frame_leaves(scene)
+        if len(leaves) >= 2:
+            import jax
+
+            points = jnp.asarray(vertices, dtype=jnp.float32)
+            magnitudes = np.stack(
+                [
+                    np.abs(
+                        np.asarray(
+                            jax.vmap(lambda p, field=leaf: jnp.asarray(field(p)))(points),
+                            dtype=np.float64,
+                        )
+                    )
+                    for leaf in leaves
+                ]
+            )
+            owners = np.argmin(magnitudes, axis=0)
+            sharp_mask |= owners[undirected[:, 0]] != owners[undirected[:, 1]]
+
         def segments(mask: np.ndarray) -> list[list[list[float]]]:
             pairs = vertices[undirected[mask]]
             return [
-                [[round(float(value), 4) for value in point] for point in pair] for pair in pairs
+                [[round(float(value), 3) for value in point] for point in pair] for pair in pairs
             ]
 
         return {

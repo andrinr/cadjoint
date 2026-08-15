@@ -100,6 +100,7 @@ function isDisplaySettings(value: unknown): value is DisplaySettings {
     Number.isFinite(display.xray) &&
     typeof display.showSketches === "boolean" &&
     typeof display.showMeshEdges === "boolean" &&
+    typeof display.showMeshWireframe === "boolean" &&
     typeof display.showConstraints === "boolean" &&
     typeof display.showFixedConstraints === "boolean" &&
     typeof display.showDistanceConstraints === "boolean" &&
