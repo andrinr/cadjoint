@@ -131,12 +131,18 @@ def run(resolutions, repeats):
             grid = GridSpec.from_bounds(bounds, size, resolution)
             extract_mesh(sdf, grid)  # warm up jit caches
             duration, mesh = best_time(lambda g=grid, s=sdf: extract_mesh(s, g), repeats)
+            # All benchmark fields are exact SDFs (Lipschitz 1), so octree
+            # pruning is exact here; it returns the identical mesh.
+            sparse_duration, _ = best_time(
+                lambda g=grid, s=sdf: extract_mesh(s, g, lipschitz=1.0), repeats
+            )
             vertices = np.asarray(mesh.vertices, dtype=np.float64)
             row = {
                 "shape": name,
                 "resolution": resolution,
                 "triangles": int(mesh.faces.shape[0]),
                 "extract_ms": duration * 1e3,
+                "sparse_ms": sparse_duration * 1e3,
                 "watertight": watertight(mesh.faces),
                 "volume_rel_err": abs(signed_volume(vertices, mesh.faces) - exact_volume)
                 / exact_volume,
@@ -159,14 +165,14 @@ def run(resolutions, repeats):
 def print_markdown(rows):
     print("## Dual contouring quality and timing\n")
     print(
-        "| shape | res | tris | extract (ms) | watertight | volume rel err "
+        "| shape | res | tris | extract (ms) | sparse (ms) | watertight | volume rel err "
         "| min angle p5 (deg) | corner err | MC corner err | MC (ms) | grad (ms) |"
     )
-    print("|---|---:|---:|---:|---|---:|---:|---:|---:|---:|---:|")
+    print("|---|---:|---:|---:|---:|---|---:|---:|---:|---:|---:|---:|")
     for row in rows:
         print(
             f"| {row['shape']} | {row['resolution']} | {row['triangles']} "
-            f"| {row['extract_ms']:.1f} | {row['watertight']} "
+            f"| {row['extract_ms']:.1f} | {row['sparse_ms']:.1f} | {row['watertight']} "
             f"| {row['volume_rel_err']:.2e} | {row['min_angle_p5_deg']:.1f} "
             f"| {row.get('corner_err', float('nan')):.2e} "
             f"| {row.get('mc_corner_err', float('nan')):.2e} "

@@ -138,6 +138,55 @@ def qef_vertices(
     return vertices, averaged
 
 
+def sharp_qef_vertices(
+    hermite: HermiteData,
+    incidence: CellIncidence,
+    grid: GridSpec,
+    *,
+    rcond: float = 5e-2,
+) -> np.ndarray:
+    """Place vertices with a rank-revealing QEF that lands exactly on features.
+
+    The truncated pseudo-inverse keeps only the constraint directions the
+    cell's Hermite planes actually determine: planar cells project the mass
+    point onto their face, crease cells land on the crease line, and corner
+    cells reproduce the corner — with none of the mass-point bias the
+    Tikhonov solve trades for smooth gradients.  On a uniform grid that
+    bias differs per cell (it depends on how the grid slices the surface),
+    which is exactly the wiggle visible along feature curves.
+
+    Concrete forward placement only: singular-value truncation has no
+    usable derivative, so optimization losses should keep differentiating
+    :func:`qef_vertices`.  The two solutions differ by the regularization
+    bias, of order ``regularization × cell size``.
+    """
+    if not 0 < rcond < 1:
+        raise ValueError("rcond must be between 0 and 1.")
+
+    edge_ids = np.maximum(incidence.edge_ids, 0)
+    mask = (incidence.edge_ids >= 0).astype(np.float64)
+    normals = np.asarray(hermite.unit_normals(), dtype=np.float64)[edge_ids] * mask[..., None]
+    points = np.asarray(hermite.points, dtype=np.float64)[edge_ids]
+    counts = np.maximum(mask.sum(axis=1), 1.0)
+    mass_point = (points * mask[..., None]).sum(axis=1) / counts[:, None]
+
+    offsets = np.einsum("cei,cei->ce", normals, points - mass_point[:, None, :])
+    u, singular, vt = np.linalg.svd(normals, full_matrices=False)
+    leading = np.maximum(singular[:, :1], 1e-30)
+    inverse = np.where(singular > rcond * leading, 1.0 / np.maximum(singular, 1e-30), 0.0)
+    solution = np.einsum(
+        "cji,cj->ci",
+        vt,
+        inverse * np.einsum("cej,ce->cj", u, offsets),
+    )
+    vertices = mass_point + solution
+
+    cell_min = np.asarray(grid.origin, dtype=np.float64) + incidence.cells * np.asarray(
+        grid.spacing, dtype=np.float64
+    )
+    return np.clip(vertices, cell_min, cell_min + np.asarray(grid.spacing, dtype=np.float64))
+
+
 # Neighbor cells around an axis-``a`` edge, as (du, dv) lattice offsets to
 # subtract on the two other axes ``u = (a+1) % 3`` and ``v = (a+2) % 3``.
 # The order walks counterclockwise in the (u, v) plane seen from +a, so a
@@ -221,21 +270,32 @@ def extract_mesh(
     bisection_iterations: int = 16,
     newton_steps: int = 1,
     regularization: float = 1e-3,
+    sharp: bool = True,
+    lipschitz: float | None = None,
 ) -> Mesh:
     """Extract a feature-preserving dual-contour mesh from an implicit field.
 
     Convenience composition of the pipeline stages with concrete inputs:
     sample, detect crossing edges, refine Hermite data, place QEF vertices,
-    and build oriented dual faces.  For parameter gradients, freeze the
-    detected edges/incidence and differentiate through
-    :func:`edge_hermite_data` + :func:`qef_vertices` as shown in the module
-    docstring.
+    and build oriented dual faces.  With ``sharp=True`` (the default) the
+    forward vertices come from :func:`sharp_qef_vertices`, which lands
+    exactly on creases and corners; ``sharp=False`` keeps the Tikhonov
+    placement everywhere.  Passing ``lipschitz`` switches detection to
+    octree pruning (:mod:`jaxcad.meshing.adaptive`): identical output,
+    surface-proportional cost, safe only when the value genuinely bounds
+    the field's gradient.  For parameter gradients, freeze the detected
+    edges/incidence and differentiate through :func:`edge_hermite_data` +
+    :func:`qef_vertices` as shown in the module docstring.
 
     Warns when the surface crosses the grid boundary; the returned mesh is
     open there.
     """
-    values = sample_grid(sdf, grid)
-    edges = find_crossing_edges(values, level=level)
+    if lipschitz is None:
+        edges = find_crossing_edges(sample_grid(sdf, grid), level=level)
+    else:
+        from jaxcad.meshing.adaptive import sparse_crossing_edges
+
+        edges = sparse_crossing_edges(sdf, grid, level=level, lipschitz=lipschitz)
     incidence = cell_edge_incidence(edges, grid)
     if edges.count == 0:
         empty = np.empty((0, 3), dtype=np.float32)
@@ -255,6 +315,8 @@ def extract_mesh(
         newton_steps=newton_steps,
     )
     vertices, normals = qef_vertices(hermite, incidence, grid, regularization=regularization)
+    if sharp:
+        vertices = jnp.asarray(sharp_qef_vertices(hermite, incidence, grid), dtype=vertices.dtype)
     quads, faces, skipped_boundary = dual_faces(edges, incidence, grid, np.asarray(vertices))
     if skipped_boundary:
         warnings.warn(

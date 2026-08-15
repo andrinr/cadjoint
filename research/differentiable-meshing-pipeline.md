@@ -61,22 +61,39 @@ benchmarks before the next stage starts.
    min/max branch changes. Measures are differentiable; labels are frozen
    like the edge set.
 3. **Mesh generation from Hermite data (done).**
-   `jaxcad.meshing.dual_contouring`: one vertex per active cell from a
+   `jaxcad.meshing.dual_contouring`: one vertex per active cell, with two
+   placements sharing one contract. The differentiable path is a
    Tikhonov-regularized QEF — batched linear algebra with no
    SVD/eigendecomposition in the gradient path, so planar cells cannot NaN
-   it — plus deterministic dual connectivity wound by the frozen
-   `start_inside` orientation. Measured: sphere and box meshes are
-   watertight and manifold (Euler 2, every edge shared by two triangles),
-   box corners land within 8e-5 at resolution 32 versus 3e-2 for marching
-   cubes on the same volume, and the corner vertex's Jacobian with respect
-   to the box half-extents is the identity to 0.2% — full tangential
-   motion, which a normal-only backward pass structurally cannot produce.
+   it. The concrete forward path (`sharp_qef_vertices`, default in
+   `extract_mesh`) solves the unregularized QEF with a rank-revealing
+   pseudo-inverse: planar cells project onto their face, crease cells land
+   exactly on the crease, corners land exactly on the corner (box corner
+   error 0.0; cylinder rim vertices sit on the cap plane to the last bit).
+   The uniform-grid wiggle along feature curves was precisely the per-cell
+   Tikhonov bias, which varies with how the grid slices the surface.
+   Connectivity is deterministic, wound by the frozen `start_inside`
+   orientation. Measured: sphere/box/CSG-union meshes are watertight
+   manifolds (Euler 2), and the corner vertex's Jacobian with respect to
+   the box half-extents is the identity to 0.2% — full tangential motion,
+   which a normal-only backward pass structurally cannot produce.
 4. **Mesh quality diagnostics and benchmarks (partial).** Watertightness,
    Euler characteristic, signed volume, corner error, and triangle minimum
    angles are tested and benchmarked; Hausdorff sampling and
    self-intersection checks remain open.
-5. **Adaptivity.** Conservative cell pruning (Lipschitz bounds), octree with
-   2:1 balancing, manifold-preserving clustering.
+5. **Adaptivity (partial).** `jaxcad.meshing.adaptive` descends an octree
+   over the cell lattice, discarding blocks where
+   `|f(center) - level| > half_diagonal × L`, then evaluates only the
+   surviving cells' corners. The octree adapts the *search*, not the mesh:
+   leaves stay at uniform depth, so the edge set is bit-identical to dense
+   detection (tested as exact equality) and every downstream stage works
+   unchanged. Evaluations drop to 6–15% of the dense lattice at
+   resolutions 64–96; wall-clock at viewer scales is dominated by the
+   per-call JAX trace/compile of the scene, so the viewer keeps the dense
+   default (a wrong user-supplied Lipschitz bound would punch holes),
+   while `extract_mesh(..., lipschitz=...)` is the path for high-res
+   export and controlled fields. Multi-size leaf cells — 2:1 balancing,
+   transition stitching, manifold-preserving clustering — remain open.
 6. **Viewer integration (started).** The compile payload carries the
    dual-contour mesh's quad edges (no triangulation diagonals) split into
    `wire` and `sharp`. Sharp combines two signals: quad-normal dihedral

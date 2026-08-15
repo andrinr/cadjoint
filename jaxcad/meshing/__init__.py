@@ -17,11 +17,13 @@ extraction; all continuous quantities carry exact JAX derivatives with
 respect to design parameters.
 """
 
+from jaxcad.meshing.adaptive import sparse_crossing_edges, surface_cells
 from jaxcad.meshing.dual_contouring import (
     Mesh,
     dual_faces,
     extract_mesh,
     qef_vertices,
+    sharp_qef_vertices,
 )
 from jaxcad.meshing.edge_detection import (
     CrossingEdges,
@@ -47,8 +49,11 @@ from jaxcad.meshing.features import (
 __all__ = [
     "Mesh",
     "qef_vertices",
+    "sharp_qef_vertices",
     "dual_faces",
     "extract_mesh",
+    "surface_cells",
+    "sparse_crossing_edges",
     "GridSpec",
     "CrossingEdges",
     "HermiteData",
