@@ -30,6 +30,7 @@ import jax.numpy as jnp
 import numpy as np
 from jax import Array
 
+from jaxcad.meshing._lattice import _flatten, _strides, _unflatten
 from jaxcad.meshing.edge_detection import CrossingEdges, GridSpec
 from jaxcad.meshing.features import _CELL_EDGE_OFFSETS
 
@@ -168,21 +169,13 @@ def sparse_crossing_edges(
 
     origin = np.asarray(grid.origin, dtype=np.float64)
     spacing = np.asarray(grid.spacing, dtype=np.float64)
-    lattice = np.asarray(grid.lattice_shape, dtype=np.int64)
-    strides = np.array([lattice[1] * lattice[2], lattice[2], 1], dtype=np.int64)
+    strides = _strides(grid.lattice_shape)
 
     corners = (candidates[:, None, :].astype(np.int64) + _CORNER_OFFSETS[None, :, :]).reshape(
         (-1, 3)
     )
-    corner_keys = np.unique(corners @ strides)
-    corner_index = np.stack(
-        [
-            corner_keys // strides[0],
-            (corner_keys % strides[0]) // strides[1],
-            corner_keys % strides[1],
-        ],
-        axis=1,
-    )
+    corner_keys = np.unique(_flatten(corners, strides))
+    corner_index = _unflatten(corner_keys, strides)
     # The same float64 expression as lattice_points(), so evaluation happens
     # at bit-identical coordinates to a dense sample.
     positions = origin + corner_index.astype(np.float64) * spacing
@@ -201,7 +194,7 @@ def sparse_crossing_edges(
     for axis in range(3):
         offsets = np.asarray(_CELL_EDGE_OFFSETS[axis], dtype=np.int64)
         starts = (candidates[:, None, :].astype(np.int64) + offsets[None, :, :]).reshape((-1, 3))
-        start_keys = np.unique(starts @ strides)
+        start_keys = np.unique(_flatten(starts, strides))
         step = strides[axis]
         start_values = value_at(start_keys)
         end_values = value_at(start_keys + step)
@@ -209,10 +202,7 @@ def sparse_crossing_edges(
         end_inside = (end_values - level) < 0
         crossing = start_inside != end_inside
         keys = start_keys[crossing]
-        index = np.stack(
-            [keys // strides[0], (keys % strides[0]) // strides[1], keys % strides[1]],
-            axis=1,
-        )
+        index = _unflatten(keys, strides)
         axis_labels.append(np.full((keys.shape[0],), axis, dtype=np.int8))
         axis_indices.append(index.astype(np.int32))
         axis_orientation.append(start_inside[crossing])

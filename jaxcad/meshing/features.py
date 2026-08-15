@@ -35,6 +35,7 @@ import jax.numpy as jnp
 import numpy as np
 from jax import Array
 
+from jaxcad.meshing._lattice import _flatten, _strides, _unflatten
 from jaxcad.meshing.edge_detection import CrossingEdges, GridSpec, HermiteData
 
 FACE = 0
@@ -95,6 +96,34 @@ class FeatureCells(NamedTuple):
     classes: np.ndarray
 
 
+def _gather_incident(incidence: CellIncidence, normals):
+    """Gather per-edge unit normals into each cell's padded slot table.
+
+    Returns ``(gathered, mask)``: the normals in every cell's twelve edge
+    slots, and a mask keeping only real slots (the table pads with ``-1``)
+    that hold a non-degenerate normal.  A degenerate sample (zero unit
+    normal from a dead field subgradient) must not drag cell statistics
+    toward zero — that inflates the centered spread and misclassifies
+    smooth cells as creases.
+
+    Only operations shared by JAX and NumPy arrays are used, so JAX inputs
+    stay traceable and NumPy inputs stay concrete.
+    """
+    gathered = normals[np.maximum(incidence.edge_ids, 0)]
+    mask = ((gathered**2).sum(axis=-1) > 0.25) & (incidence.edge_ids >= 0)
+    return gathered, mask
+
+
+def _masked_mean(gathered, mask):
+    """Mean over each cell's masked slots; empty cells divide by one.
+
+    Returns ``(mean, counts)``; the clamped counts are reused by callers
+    as normalizers.  Same JAX/NumPy duality as :func:`_gather_incident`.
+    """
+    counts = mask.sum(axis=1).clip(1)
+    return (gathered * mask[..., None]).sum(axis=1) / counts[:, None], counts
+
+
 def cell_edge_incidence(edges: CrossingEdges, grid: GridSpec) -> CellIncidence:
     """Group crossing edges by the grid cells they border.
 
@@ -127,11 +156,8 @@ def cell_edge_incidence(edges: CrossingEdges, grid: GridSpec) -> CellIncidence:
     cells = cells[in_bounds]
     edge_ids = edge_ids[in_bounds]
 
-    strides = np.asarray(
-        [grid.cells[1] * grid.cells[2], grid.cells[2], 1],
-        dtype=np.int64,
-    )
-    flat = cells.astype(np.int64) @ strides
+    strides = _strides(grid.cells)
+    flat = _flatten(cells, strides)
     unique_flat, inverse = np.unique(flat, return_inverse=True)
     order = np.argsort(inverse, kind="stable")
     sorted_inverse = inverse[order]
@@ -141,14 +167,7 @@ def cell_edge_incidence(edges: CrossingEdges, grid: GridSpec) -> CellIncidence:
 
     table = np.full((unique_flat.shape[0], 12), -1, dtype=np.int32)
     table[sorted_inverse, positions] = edge_ids[order]
-    unique_cells = np.stack(
-        [
-            unique_flat // strides[0],
-            (unique_flat % strides[0]) // strides[1],
-            unique_flat % strides[1],
-        ],
-        axis=1,
-    ).astype(np.int32)
+    unique_cells = _unflatten(unique_flat, strides).astype(np.int32)
     return CellIncidence(cells=unique_cells, edge_ids=table, counts=counts.astype(np.int32))
 
 
@@ -181,16 +200,8 @@ def classify_feature_cells(
     if not 0 < corner_threshold < 1:
         raise ValueError("corner_threshold must be between 0 and 1.")
 
-    normals = hermite.unit_normals()
-    edge_ids = jnp.asarray(np.maximum(incidence.edge_ids, 0))
-    mask = jnp.asarray((incidence.edge_ids >= 0).astype(np.float32))
-    gathered = normals[edge_ids]
-    # A degenerate sample (zero unit normal from a dead field subgradient)
-    # must not drag the cell mean toward zero — that inflates the centered
-    # spread and misclassifies smooth cells as creases.
-    mask = mask * (jnp.sum(gathered**2, axis=-1) > 0.25)
-    counts = jnp.maximum(jnp.sum(mask, axis=1), 1.0)
-    means = jnp.sum(gathered * mask[..., None], axis=1) / counts[:, None]
+    gathered, mask = _gather_incident(incidence, hermite.unit_normals())
+    means, counts = _masked_mean(gathered, mask)
     centered = (gathered - means[:, None, :]) * mask[..., None]
     covariance = jnp.einsum("cei,cej->cij", centered, centered) / counts[:, None, None]
     eigenvalues = jnp.linalg.eigvalsh(covariance)[..., ::-1]
@@ -270,15 +281,14 @@ def feature_cell_links(
     if rows.size == 0:
         return np.empty((0, 2), dtype=np.int32)
     cells = incidence.cells[rows].astype(np.int64)
-    strides = np.array(
-        [(grid.cells[1] + 2) * (grid.cells[2] + 2), grid.cells[2] + 2, 1], dtype=np.int64
-    )
-    keys = (cells + 1) @ strides  # shift by one so negative neighbors stay unique
+    padded = (grid.cells[0] + 2, grid.cells[1] + 2, grid.cells[2] + 2)
+    strides = _strides(padded)
+    keys = _flatten(cells + 1, strides)  # shift by one so negative neighbors stay unique
     order = np.argsort(keys)
     sorted_keys = keys[order]
     links = []
     for offset in _HALF_NEIGHBORHOOD:
-        neighbor_keys = (cells + 1 + offset) @ strides
+        neighbor_keys = _flatten(cells + 1 + offset, strides)
         found = np.searchsorted(sorted_keys, neighbor_keys)
         found = np.clip(found, 0, sorted_keys.size - 1)
         hit = sorted_keys[found] == neighbor_keys

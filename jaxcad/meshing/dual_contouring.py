@@ -45,11 +45,17 @@ from jaxcad.meshing.edge_detection import (
     CrossingEdges,
     GridSpec,
     HermiteData,
+    _safe_normalize,
     edge_hermite_data,
     find_crossing_edges,
     sample_grid,
 )
-from jaxcad.meshing.features import CellIncidence, cell_edge_incidence
+from jaxcad.meshing.features import (
+    CellIncidence,
+    _gather_incident,
+    _masked_mean,
+    cell_edge_incidence,
+)
 
 
 class Mesh(NamedTuple):
@@ -72,6 +78,19 @@ class Mesh(NamedTuple):
     quads: np.ndarray
     normals: Array
     cells: np.ndarray
+
+
+def _averaged_normals(hermite: HermiteData, incidence: CellIncidence) -> Array:
+    """Masked mean of each cell's incident unit normals, safely normalized.
+
+    A cell whose normals cancel (opposed thin-sheet subgradients) falls
+    back to its first sample's normal so downstream orientation and
+    shading stay finite.
+    """
+    gathered, mask = _gather_incident(incidence, hermite.unit_normals())
+    normals = gathered * mask[..., None]
+    mean_normal, _ = _masked_mean(normals, incidence.edge_ids >= 0)
+    return _safe_normalize(mean_normal, normals[:, 0, :], epsilon=1e-6)
 
 
 def qef_vertices(
@@ -110,12 +129,15 @@ def qef_vertices(
     if not regularization > 0:
         raise ValueError("regularization must be positive.")
 
-    ids = jnp.asarray(np.maximum(incidence.edge_ids, 0))
-    mask = jnp.asarray((incidence.edge_ids >= 0).astype(np.float32))
-    normals = hermite.unit_normals()[ids] * mask[..., None]
-    points = hermite.points[ids]
-    counts = jnp.maximum(jnp.sum(mask, axis=1), 1.0)
-    mass_point = jnp.sum(points * mask[..., None], axis=1) / counts[:, None]
+    gathered, mask = _gather_incident(incidence, hermite.unit_normals())
+    normals = gathered * mask[..., None]
+    # The statistics mask stays slot validity alone: a degenerate normal is
+    # zero and drops out of the sums by itself, but its Hermite point is a
+    # real surface sample that must keep its weight in the mass point (and
+    # its slot must keep counting toward the damping scale).
+    valid = incidence.edge_ids >= 0
+    points = hermite.points[np.maximum(incidence.edge_ids, 0)]
+    mass_point, counts = _masked_mean(points, valid)
 
     system = jnp.einsum("cei,cej->cij", normals, normals)
     plane_offsets = jnp.einsum("cei,cei->ce", normals, points - mass_point[:, None, :])
@@ -130,12 +152,7 @@ def qef_vertices(
     )
     vertices = jnp.clip(vertices, cell_min, cell_min + jnp.asarray(grid.spacing))
 
-    mean_normal = jnp.sum(normals, axis=1) / counts[:, None]
-    squared = jnp.sum(mean_normal**2, axis=-1, keepdims=True)
-    valid = squared > 1e-12
-    safe = jnp.where(valid, squared, 1.0)
-    averaged = jnp.where(valid, mean_normal / jnp.sqrt(safe), normals[:, 0, :])
-    return vertices, averaged
+    return vertices, _averaged_normals(hermite, incidence)
 
 
 def sharp_qef_vertices(
@@ -163,12 +180,14 @@ def sharp_qef_vertices(
     if not 0 < rcond < 1:
         raise ValueError("rcond must be between 0 and 1.")
 
-    edge_ids = np.maximum(incidence.edge_ids, 0)
-    mask = (incidence.edge_ids >= 0).astype(np.float64)
-    normals = np.asarray(hermite.unit_normals(), dtype=np.float64)[edge_ids] * mask[..., None]
-    points = np.asarray(hermite.points, dtype=np.float64)[edge_ids]
-    counts = np.maximum(mask.sum(axis=1), 1.0)
-    mass_point = (points * mask[..., None]).sum(axis=1) / counts[:, None]
+    unit = np.asarray(hermite.unit_normals(), dtype=np.float64)
+    gathered, mask = _gather_incident(incidence, unit)
+    normals = gathered * mask[..., None]
+    # As in qef_vertices: mass-point statistics weigh every real slot, not
+    # only the ones holding a non-degenerate normal.
+    valid = incidence.edge_ids >= 0
+    points = np.asarray(hermite.points, dtype=np.float64)[np.maximum(incidence.edge_ids, 0)]
+    mass_point, _ = _masked_mean(points, valid)
 
     offsets = np.einsum("cei,cei->ce", normals, points - mass_point[:, None, :])
     u, singular, vt = np.linalg.svd(normals, full_matrices=False)
@@ -222,43 +241,43 @@ def dual_faces(
     vertex_rows[tuple(incidence.cells.T)] = np.arange(incidence.count, dtype=np.int32)
     positions = np.asarray(vertices, dtype=np.float64)
 
-    quads: list[tuple[int, int, int, int]] = []
-    skipped_boundary = 0
-    axis_array = np.asarray(edges.axis)
-    index_array = np.asarray(edges.index)
+    axis_array = np.asarray(edges.axis, dtype=np.int64)
+    index_array = np.asarray(edges.index, dtype=np.int64)
     inside_array = np.asarray(edges.start_inside)
-    for edge_id in range(edges.count):
-        axis = int(axis_array[edge_id])
-        u = (axis + 1) % 3
-        v = (axis + 2) % 3
-        index = index_array[edge_id]
-        if not (0 < index[u] < grid.cells[u] and 0 < index[v] < grid.cells[v]):
-            skipped_boundary += 1
-            continue
-        rows = []
-        for du, dv in _QUAD_NEIGHBOR_OFFSETS:
-            cell = index.copy()
-            cell[u] -= du
-            cell[v] -= dv
-            rows.append(int(vertex_rows[tuple(cell)]))
-        if min(rows) < 0:
-            # Cannot happen for a well-formed incidence (each neighbor owns
-            # this crossing edge), but never emit an invalid quad.
-            continue
-        if not inside_array[edge_id]:
-            rows.reverse()
-        quads.append(tuple(rows))
 
-    quad_array = np.asarray(quads, dtype=np.int32).reshape((-1, 4))
-    triangles: list[tuple[int, int, int]] = []
-    for a, b, c, d in quad_array:
-        diagonal_ac = np.sum((positions[a] - positions[c]) ** 2)
-        diagonal_bd = np.sum((positions[b] - positions[d]) ** 2)
-        if diagonal_ac <= diagonal_bd:
-            triangles.extend(((a, b, c), (a, c, d)))
-        else:
-            triangles.extend(((a, b, d), (b, c, d)))
-    triangle_array = np.asarray(triangles, dtype=np.int32).reshape((-1, 3))
+    edge_rows = np.arange(edges.count)
+    u = (axis_array + 1) % 3
+    v = (axis_array + 2) % 3
+    cell_counts = np.asarray(grid.cells, dtype=np.int64)
+    index_u = index_array[edge_rows, u]
+    index_v = index_array[edge_rows, v]
+    interior = (
+        (index_u > 0) & (index_u < cell_counts[u]) & (index_v > 0) & (index_v < cell_counts[v])
+    )
+    skipped_boundary = int(np.count_nonzero(~interior))
+
+    selected = edge_rows[interior]
+    offsets = np.asarray(_QUAD_NEIGHBOR_OFFSETS, dtype=np.int64)
+    cells = np.repeat(index_array[selected][:, None, :], 4, axis=1)
+    quad_slot = np.arange(4)[None, :]
+    edge_slot = np.arange(selected.size)[:, None]
+    cells[edge_slot, quad_slot, u[selected][:, None]] -= offsets[:, 0][None, :]
+    cells[edge_slot, quad_slot, v[selected][:, None]] -= offsets[:, 1][None, :]
+    rows = vertex_rows[cells[..., 0], cells[..., 1], cells[..., 2]]
+    # A missing neighbor cannot happen for a well-formed incidence (each
+    # neighbor owns this crossing edge), but never emit an invalid quad.
+    complete = rows.min(axis=1) >= 0
+    quad_array = rows[complete]
+    flipped = ~inside_array[selected][complete]
+    quad_array[flipped] = quad_array[flipped][:, ::-1]
+
+    a, b, c, d = quad_array.T
+    diagonal_ac = np.sum((positions[a] - positions[c]) ** 2, axis=-1)
+    diagonal_bd = np.sum((positions[b] - positions[d]) ** 2, axis=-1)
+    shorter_ac = (diagonal_ac <= diagonal_bd)[:, None]
+    first = np.where(shorter_ac, np.stack([a, b, c], axis=1), np.stack([a, b, d], axis=1))
+    second = np.where(shorter_ac, np.stack([a, c, d], axis=1), np.stack([b, c, d], axis=1))
+    triangle_array = np.stack([first, second], axis=1).reshape((-1, 3)).astype(np.int32)
     return quad_array, triangle_array, skipped_boundary
 
 
@@ -290,6 +309,8 @@ def extract_mesh(
     Warns when the surface crosses the grid boundary; the returned mesh is
     open there.
     """
+    if not regularization > 0:
+        raise ValueError("regularization must be positive.")
     if lipschitz is None:
         edges = find_crossing_edges(sample_grid(sdf, grid), level=level)
     else:
@@ -314,9 +335,13 @@ def extract_mesh(
         bisection_iterations=bisection_iterations,
         newton_steps=newton_steps,
     )
-    vertices, normals = qef_vertices(hermite, incidence, grid, regularization=regularization)
     if sharp:
-        vertices = jnp.asarray(sharp_qef_vertices(hermite, incidence, grid), dtype=vertices.dtype)
+        # The Tikhonov solve would only be thrown away here; compute the
+        # averaged normals it shares with the smooth path directly.
+        normals = _averaged_normals(hermite, incidence)
+        vertices = jnp.asarray(sharp_qef_vertices(hermite, incidence, grid), dtype=normals.dtype)
+    else:
+        vertices, normals = qef_vertices(hermite, incidence, grid, regularization=regularization)
     quads, faces, skipped_boundary = dual_faces(edges, incidence, grid, np.asarray(vertices))
     if skipped_boundary:
         warnings.warn(

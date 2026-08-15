@@ -34,6 +34,20 @@ import numpy as np
 from jax import Array
 
 
+def _safe_normalize(vectors: Array, fallback, *, epsilon: float) -> Array:
+    """Normalize the rows of ``vectors``; degenerate rows take ``fallback``.
+
+    Rows with squared length at most ``epsilon**2`` are replaced by the
+    broadcast ``fallback`` instead of being divided.  The double-``where``
+    keeps the degenerate branch constant, so in reverse mode a zero row
+    cannot NaN the gradients of healthy rows.
+    """
+    squared = jnp.sum(vectors**2, axis=-1, keepdims=True)
+    valid = squared > epsilon**2
+    safe = jnp.where(valid, squared, 1.0)
+    return jnp.where(valid, vectors / jnp.sqrt(safe), fallback)
+
+
 class GridSpec(NamedTuple):
     """Regular sampling grid described by static Python values.
 
@@ -140,10 +154,7 @@ class HermiteData(NamedTuple):
         Safe in reverse mode too: the zero branch is constant, so a
         degenerate row cannot NaN the gradients of healthy rows.
         """
-        squared = jnp.sum(self.gradients**2, axis=-1, keepdims=True)
-        valid = squared > epsilon**2
-        safe = jnp.where(valid, squared, 1.0)
-        return jnp.where(valid, self.gradients / jnp.sqrt(safe), 0.0)
+        return _safe_normalize(self.gradients, 0.0, epsilon=epsilon)
 
 
 def sample_grid(sdf: Callable[[Array], Array], grid: GridSpec) -> np.ndarray:

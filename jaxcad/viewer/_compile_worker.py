@@ -252,6 +252,46 @@ def _mesh_edge_payload(scene: Any) -> dict[str, Any] | None:
         ]
         links = np.concatenate(link_groups) if link_groups else np.empty((0, 2), dtype=np.int32)
 
+        # Two parallel creases of one thin face share an operand, so identity
+        # grouping cannot separate them; rail-to-rail cross-links would weave
+        # an X-band between them.  A genuine chord runs along its curve: the
+        # local tangent is the least-varying direction of the cell's incident
+        # normals (they fan across a crease, stay constant along it), and a
+        # link must align with the tangent at both non-junction endpoints.
+        # The threshold must be well above 1/2: a diagonal hop to a rail up
+        # to two cells away still has slightly more than half its length
+        # along the rail (alignment h / sqrt(h² + s²) ≈ 0.5 for rail
+        # separation s ≈ 1.7 h), while genuine chords sit on the curve
+        # itself and align above 0.9 even where the curve bends.
+        if links.shape[0]:
+            feature_rows = np.flatnonzero(np.any(groups, axis=0))
+            unit = np.asarray(hermite.unit_normals(), dtype=np.float64)
+            gathered = unit[np.maximum(incidence.edge_ids[feature_rows], 0)]
+            valid = (incidence.edge_ids[feature_rows] >= 0) & (np.sum(gathered**2, axis=-1) > 0.25)
+            counts = np.maximum(valid.sum(axis=1), 1)
+            mean = (gathered * valid[..., None]).sum(axis=1) / counts[:, None]
+            centered = (gathered - mean[:, None, :]) * valid[..., None]
+            covariance = np.einsum("cei,cej->cij", centered, centered)
+            _, eigenvectors = np.linalg.eigh(covariance)
+            # The centered covariance of a straight crease is rank one, so
+            # its nullspace is a plane; the tangent is instead perpendicular
+            # to both the mean normal and the principal spread direction.
+            raw = np.cross(mean, eigenvectors[:, :, 2])
+            norms = np.linalg.norm(raw, axis=1, keepdims=True)
+            tangents = np.full((incidence.count, 3), np.nan)
+            tangents[feature_rows] = np.where(norms > 1e-6, raw / np.maximum(norms, 1e-12), np.nan)
+
+            directions = vertices[links[:, 1]] - vertices[links[:, 0]]
+            lengths = np.maximum(np.linalg.norm(directions, axis=1), 1e-12)
+            keep = np.ones(links.shape[0], dtype=bool)
+            for column in (0, 1):
+                rows = links[:, column]
+                tangent = tangents[rows]
+                defined = np.isfinite(tangent).all(axis=1) & ~junctions[rows]
+                alignment = np.abs(np.einsum("li,li->l", directions, tangent)) / lengths
+                keep &= ~defined | (alignment > 0.75)
+            links = links[keep]
+
         def segments(pairs: np.ndarray) -> list[list[list[float]]]:
             return [
                 [[round(float(value), 3) for value in point] for point in pair] for pair in pairs

@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
+import numpy as np
 import pytest
 
 from jaxcad.viewer._pathtracer import (
@@ -63,6 +64,30 @@ def test_example_scene_reports_mesh_edges_for_the_viewer():
                 assert len(point) == 3
                 assert all(isinstance(value, float) for value in point)
                 assert all(-3.0 <= value <= 3.0 for value in point)
+
+
+def test_thin_slab_sharp_edges_stay_on_their_own_rim():
+    # A slab thinner than two grid cells puts its top and bottom crease
+    # rails in vertically adjacent cells, so neighbor linking offers
+    # diagonal rail-to-rail links; the tangent-alignment filter must drop
+    # them.  Only the four short true corner edges of the box may remain
+    # near-vertical, so the cross-rail fraction stays tiny.
+    source = (
+        "from jaxcad.geometry import Vector\n"
+        "from jaxcad.sdf.primitives import Box\n"
+        "\n"
+        "scene = Box(size=Vector([0.9, 0.9, 0.08]))\n"
+    )
+
+    result = compile_source(source)
+
+    assert result["ok"] is True
+    sharp = np.asarray(result["mesh_edges"]["sharp"], dtype=float)
+    assert sharp.shape[0] > 0
+    directions = sharp[:, 1] - sharp[:, 0]
+    lengths = np.maximum(np.linalg.norm(directions, axis=1), 1e-9)
+    cross_rail = np.abs(directions[:, 2]) / lengths > 0.7
+    assert cross_rail.mean() < 0.05
 
 
 def test_compile_source_reports_missing_scene():
