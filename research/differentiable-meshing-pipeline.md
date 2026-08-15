@@ -94,20 +94,26 @@ benchmarks before the next stage starts.
    while `extract_mesh(..., lipschitz=...)` is the path for high-res
    export and controlled fields. Multi-size leaf cells — 2:1 balancing,
    transition stitching, manifold-preserving clustering — remain open.
-6. **Viewer integration (started).** The compile payload carries the
-   dual-contour mesh's quad edges (no triangulation diagonals) split into
-   `wire` and `sharp`. Sharp combines two signals: quad-normal dihedral
-   above 45° — chosen above the faceting angle of the smallest curved
-   feature resolution 48 can carry, below real CAD creases at 55–90° — and
-   exact structural CSG seams, marking edges whose endpoints are owned by
-   different world-frame `min`/`max` operands. The playground draws them
-   through the overlay edge pipeline behind two switches: "Feature edges"
-   (the technical-drawing look) and "Mesh wireframe" (debugging).
-   Primitives are themselves min/max compositions internally (a box is a
-   max over axis distances, an extrude is max(profile, axial)), so the next
-   step replaces the dihedral heuristic with exact per-primitive patch
-   fields; that needs local-frame plumbing through transforms. Surface
-   handles and drag solve come later.
+6. **Viewer integration (working).** The compile payload carries a `wire`
+   layer (the mesh's native quad edges) and a `sharp` layer that is *not*
+   mesh edges: feature curves cross grid cells diagonally, so mesh edges
+   trace a staircase around them. Instead, feature cells — normal-spread
+   creases/corners plus exact `min`/`max` CSG seam cells — are linked to
+   their lattice neighbors (`feature_cell_links`), and since feature-aware
+   placement puts their vertices exactly on the feature curve, the links
+   are chords of the true curve. Three rules keep the chains honest: cells
+   are grouped by feature identity (owning operand for creases, operand
+   pair for seams) so nearby distinct curves never cross-link into
+   X-lattices; links that shortcut around a corner cell are dropped; and
+   seam vertices are Newton-projected onto the exact intersection curve
+   `f_a = f_b = 0` of their two owning operands, with a transversality
+   guard for tangent/coincident surfaces. Two display switches ("Feature
+   edges", "Mesh wireframe") draw the layers with a reduced depth nudge so
+   coincident construction lines win. Primitives are themselves min/max
+   compositions internally (a box is a max over axis distances, an extrude
+   is max(profile, axial)), so per-primitive patch fields can replace the
+   spread heuristic for known trees next; that needs local-frame plumbing
+   through transforms. Surface handles and drag solve come later.
 
 ## Benchmark policy
 

@@ -356,5 +356,5 @@ def detect_branch_changes(
         raise ValueError(f"branches must be one-dimensional; received shape {branch_array.shape}.")
     valid = incidence.edge_ids >= 0
     gathered = branch_array[np.maximum(incidence.edge_ids, 0)]
-    first = gathered[np.arange(incidence.count), 0]
+    first = gathered[:, 0]
     return np.any(valid & (gathered != first[:, None]), axis=1)

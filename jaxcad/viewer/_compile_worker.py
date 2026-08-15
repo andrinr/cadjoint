@@ -95,27 +95,47 @@ def _world_frame_leaves(node: Any) -> list[Any]:
     return [node]
 
 
-def _project_to_seam(field_a: Any, field_b: Any, points: np.ndarray) -> np.ndarray:
-    """Newton-project points onto the intersection curve of two zero sets."""
+def _project_to_seam(fields: list[Any], points: np.ndarray, max_step: float) -> np.ndarray:
+    """Newton-project points onto the common zero set of two or more fields.
+
+    Two fields define a seam curve, three a corner point (triple junction).
+    Points whose gradients are rank-deficient (tangent or coincident
+    surfaces — the system is singular and there is no transversal
+    intersection to project onto) are returned unchanged.
+    """
     import jax
     import jax.numpy as jnp
 
-    value_a = jax.vmap(jax.value_and_grad(lambda p: jnp.asarray(field_a(p))))
-    value_b = jax.vmap(jax.value_and_grad(lambda p: jnp.asarray(field_b(p))))
-    x = jnp.asarray(points, dtype=jnp.float32)
-    for _ in range(4):
-        fa, ga = value_a(x)
-        fb, gb = value_b(x)
-        jacobian = jnp.stack([ga, gb], axis=1)
+    evaluators = [
+        jax.vmap(jax.value_and_grad(lambda p, f=field: jnp.asarray(f(p)))) for field in fields
+    ]
+    count = len(fields)
+    start = jnp.asarray(points, dtype=jnp.float32)
+
+    def system(x):
+        values, gradients = zip(*(evaluate(x) for evaluate in evaluators))
+        jacobian = jnp.stack(gradients, axis=1)
         gram = jnp.einsum("sij,skj->sik", jacobian, jacobian)
-        gram = gram + 1e-9 * jnp.eye(2, dtype=gram.dtype)
-        residual = jnp.stack([fa, fb], axis=-1)
+        return jnp.stack(values, axis=-1), jacobian, gram
+
+    _, _, gram0 = system(start)
+    eigenvalues = jnp.linalg.eigvalsh(gram0)
+    trace = jnp.trace(gram0, axis1=-2, axis2=-1)
+    transversal = eigenvalues[..., 0] > 1e-2 * trace / count
+
+    x = start
+    for _ in range(4):
+        residual, jacobian, gram = system(x)
+        # Regularize at a float32-meaningful scale; smaller epsilons
+        # underflow against unit-gradient Gram entries.
+        trace = jnp.trace(gram, axis1=-2, axis2=-1)
+        gram = gram + (1e-4 * trace + 1e-12)[..., None, None] * jnp.eye(count, dtype=gram.dtype)
         multipliers = jnp.linalg.solve(gram, residual[..., None])[..., 0]
         step = jnp.einsum("sij,si->sj", jacobian, multipliers)
-        # Coincident surfaces make the system singular; never step far.
         length = jnp.linalg.norm(step, axis=-1, keepdims=True)
-        step = step * jnp.minimum(1.0, 0.2 / jnp.maximum(length, 1e-9))
+        step = step * jnp.minimum(1.0, max_step / jnp.maximum(length, 1e-9))
         x = x - step
+    x = jnp.where(transversal[:, None], x, start)
     return np.asarray(x, dtype=np.float64)
 
 
@@ -161,14 +181,22 @@ def _mesh_edge_payload(scene: Any) -> dict[str, Any] | None:
         hermite = edge_hermite_data(sdf, grid, edges)
         vertices = sharp_qef_vertices(hermite, incidence, grid)
         quads, _triangles, _skipped = dual_faces(edges, incidence, grid, vertices)
+        quad_edge_list = np.concatenate(
+            [quads[:, [0, 1]], quads[:, [1, 2]], quads[:, [2, 3]], quads[:, [3, 0]]]
+        )
 
         features = classify_feature_cells(hermite, incidence)
-        feature_mask = features.classes != FACE
+        geometric_mask = features.classes != FACE
+        junctions = features.classes == CORNER
 
-        # Exact structural seams: each vertex is owned by the CSG operand
-        # whose field magnitude vanishes there; cells adjacent to an
-        # ownership change straddle a seam even when the crease is shallow.
+        # Feature curves must never cross-link: two distinct curves (a crease
+        # and a nearby seam, or seams of different operand pairs) can run
+        # within one cell of each other, and linking across them weaves an
+        # X-lattice between the curves.  Cells are therefore grouped by
+        # feature identity — the owning CSG operand for geometric creases,
+        # the operand pair for seams — and linked only within their group.
         leaves = _world_frame_leaves(scene)
+        groups: list[np.ndarray] = []
         if len(leaves) >= 2 and quads.shape[0] > 0:
             points = jnp.asarray(vertices, dtype=jnp.float32)
             magnitudes = np.stack(
@@ -183,46 +211,53 @@ def _mesh_edge_payload(scene: Any) -> dict[str, Any] | None:
                 ]
             )
             owners = np.argmin(magnitudes, axis=0)
-            quad_edges = np.concatenate(
-                [quads[:, [0, 1]], quads[:, [1, 2]], quads[:, [2, 3]], quads[:, [3, 0]]]
-            )
-            mismatched = quad_edges[owners[quad_edges[:, 0]] != owners[quad_edges[:, 1]]]
+            mismatched = quad_edge_list[
+                owners[quad_edge_list[:, 0]] != owners[quad_edge_list[:, 1]]
+            ]
             seam_rows = np.unique(mismatched)
-            feature_mask[seam_rows] = True
-            # Project seam vertices onto the exact intersection curve
-            # (f_a = f_b = 0 of the two nearest operands): min/max structure
-            # makes the seam a solvable system, not a mesh approximation.
+            structural = np.zeros_like(geometric_mask)
+            structural[seam_rows] = True
+            geometric_only = geometric_mask & ~structural
+            for owner in np.unique(owners[geometric_only]):
+                groups.append(geometric_only & (owners == owner))
+            # Seam vertices are Newton-projected onto the exact common zero
+            # set of every operand meeting there — a curve for two, a triple
+            # point for three: min/max structure makes seams a solvable
+            # system, not a mesh approximation.  Grouping by the full
+            # operand set projects each vertex exactly once.
             if seam_rows.size:
-                nearest = np.argsort(magnitudes[:, seam_rows], axis=0)
-                for a, b in {
-                    (int(min(pa, pb)), int(max(pa, pb))) for pa, pb in zip(nearest[0], nearest[1])
-                }:
-                    selected = seam_rows[(nearest[0] == a) & (nearest[1] == b)]
-                    selected = np.concatenate(
-                        [selected, seam_rows[(nearest[0] == b) & (nearest[1] == a)]]
+                incident: dict[int, set[int]] = {}
+                for u, v in mismatched:
+                    for row in (int(u), int(v)):
+                        incident.setdefault(row, set()).update((int(owners[u]), int(owners[v])))
+                by_operands: dict[frozenset[int], list[int]] = {}
+                for row, operand_set in incident.items():
+                    by_operands.setdefault(frozenset(operand_set), []).append(row)
+                max_step = 2.0 * max(_MESH_EDGE_SIZE) / _MESH_EDGE_RESOLUTION  # ~2 cells
+                for operand_set, rows in by_operands.items():
+                    selected = np.asarray(sorted(rows), dtype=np.int64)
+                    vertices[selected] = _project_to_seam(
+                        [leaves[index] for index in sorted(operand_set)],
+                        vertices[selected],
+                        max_step,
                     )
-                    if selected.size == 0:
-                        continue
-                    vertices[selected] = _project_to_seam(leaves[a], leaves[b], vertices[selected])
+                    group_mask = np.zeros_like(geometric_mask)
+                    group_mask[selected] = True
+                    groups.append(group_mask)
+        else:
+            groups.append(geometric_mask)
 
-        links = feature_cell_links(
-            feature_mask, incidence, grid, junction_mask=features.classes == CORNER
-        )
+        link_groups = [
+            feature_cell_links(group, incidence, grid, junction_mask=junctions) for group in groups
+        ]
+        links = np.concatenate(link_groups) if link_groups else np.empty((0, 2), dtype=np.int32)
 
         def segments(pairs: np.ndarray) -> list[list[list[float]]]:
             return [
                 [[round(float(value), 3) for value in point] for point in pair] for pair in pairs
             ]
 
-        wire_edges = np.unique(
-            np.sort(
-                np.concatenate(
-                    [quads[:, [0, 1]], quads[:, [1, 2]], quads[:, [2, 3]], quads[:, [3, 0]]]
-                ),
-                axis=1,
-            ),
-            axis=0,
-        )
+        wire_edges = np.unique(np.sort(quad_edge_list, axis=1), axis=0)
         return {
             "wire": segments(vertices[wire_edges]),
             "sharp": segments(vertices[links]),

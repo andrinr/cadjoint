@@ -9,12 +9,16 @@ Built bottom-up in tested stages:
    from ``min``/``max`` branch changes.
 3. :mod:`jaxcad.meshing.dual_contouring` — mesh generation: differentiable
    QEF vertex placement over the Hermite data and oriented dual
-   connectivity.
+   connectivity, with exact sharp-feature placement for the forward mesh.
+4. :mod:`jaxcad.meshing.adaptive` — octree-pruned surface-cell discovery:
+   identical output to dense detection at surface-proportional cost.
+5. :mod:`jaxcad.meshing.export` — planar-patch merging into sparse polygon
+   meshes and OBJ/STL/STEP serialization.
 
-Later stages add quality diagnostics and adaptivity.  Discrete choices
-(edge sets, incidence, connectivity, class labels) are frozen per
-extraction; all continuous quantities carry exact JAX derivatives with
-respect to design parameters.
+Remaining stages add mesh diagnostics and multi-size octree leaves.
+Discrete choices (edge sets, incidence, connectivity, class labels) are
+frozen per extraction; all continuous quantities carry exact JAX
+derivatives with respect to design parameters.
 """
 
 from jaxcad.meshing.adaptive import sparse_crossing_edges, surface_cells
@@ -34,6 +38,7 @@ from jaxcad.meshing.edge_detection import (
     find_crossing_edges,
     sample_grid,
 )
+from jaxcad.meshing.export import merge_planar_faces, save_obj, save_step, save_stl
 from jaxcad.meshing.features import (
     CORNER,
     CREASE,
@@ -55,6 +60,10 @@ __all__ = [
     "extract_mesh",
     "surface_cells",
     "sparse_crossing_edges",
+    "merge_planar_faces",
+    "save_obj",
+    "save_stl",
+    "save_step",
     "GridSpec",
     "CrossingEdges",
     "HermiteData",
