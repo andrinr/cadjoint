@@ -38,10 +38,22 @@ class Box(Primitive):
 
         Returns:
             Signed distance to box
+
+        Note:
+            Branches on inside/outside instead of smoothing the outside norm
+            with an epsilon: points exactly on a face then differentiate
+            through the inside branch and receive a valid one-sided
+            subgradient.  An epsilon-regularized ``sqrt`` has an exact
+            stationary point on the face plane, which silently zeroes
+            parameter gradients for on-surface samples.
         """
         q = jnp.abs(p) - size
-        d = jnp.maximum(q, 0.0)
-        return jnp.sqrt(jnp.sum(d * d, axis=-1) + 1e-20) + jnp.minimum(jnp.max(q, axis=-1), 0.0)
+        max_q = jnp.max(q, axis=-1)
+        clamped = jnp.maximum(q, 0.0)
+        squared = jnp.sum(clamped * clamped, axis=-1)
+        on_or_inside = max_q <= 0.0
+        safe = jnp.where(on_or_inside, 1.0, squared)
+        return jnp.where(on_or_inside, max_q, jnp.sqrt(safe))
 
     def __call__(self, p: Array) -> Array:
         """Evaluate SDF at point(s) p."""

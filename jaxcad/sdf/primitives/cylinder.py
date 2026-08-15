@@ -37,12 +37,21 @@ class Cylinder(Primitive):
 
         Returns:
             Signed distance to cylinder
+
+        Note:
+            Branches on inside/outside like :meth:`Box.sdf` so points exactly
+            on the side or cap surfaces receive a valid one-sided subgradient
+            instead of the exact zero an epsilon-smoothed outside norm
+            produces there.  The radial epsilon stays: its degenerate point
+            is the axis, which is interior, never on the surface.
         """
         d_xy = jnp.sqrt(p[..., 0] ** 2 + p[..., 1] ** 2 + 1e-20) - radius
         d_z = jnp.abs(p[..., 2]) - height
-        return jnp.sqrt(
-            jnp.maximum(d_xy, 0.0) ** 2 + jnp.maximum(d_z, 0.0) ** 2 + 1e-20
-        ) + jnp.minimum(jnp.maximum(d_xy, d_z), 0.0)
+        max_d = jnp.maximum(d_xy, d_z)
+        squared = jnp.maximum(d_xy, 0.0) ** 2 + jnp.maximum(d_z, 0.0) ** 2
+        on_or_inside = max_d <= 0.0
+        safe = jnp.where(on_or_inside, 1.0, squared)
+        return jnp.where(on_or_inside, max_d, jnp.sqrt(safe))
 
     def __call__(self, p: Array) -> Array:
         """Evaluate SDF at point(s) p."""
