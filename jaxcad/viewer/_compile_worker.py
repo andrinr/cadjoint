@@ -71,14 +71,16 @@ def _differentiability_payload(namespace: dict[str, Any]) -> dict[str, Any] | No
 # Mesh-edge view settings.  The grid matches the raymarcher's view volume.
 # The sharpness threshold must sit above the faceting angle of the smallest
 # curved feature the resolution can carry (about 2*asin(spacing / 2r)), or
-# ordinary curvature misreads as creases; resolution 48 keeps even a
-# 0.18-radius tube's faceting near 41 degrees, under the 45-degree
-# threshold, while real CAD creases (rims, ridges, eaves) sit at 55-90
-# degrees.  The structural CSG-seam check below has no such tuning: it is
-# exact.
+# ordinary curvature misreads as creases; resolution 64 keeps even a
+# 0.12-radius tube's faceting near 46 degrees, at the 45-degree threshold's
+# edge, and everything larger well below it, while real CAD creases (rims,
+# ridges, eaves) sit at 55-90 degrees.  The structural CSG-seam check below
+# has no such tuning: it is exact.  Detection stays dense rather than
+# Lipschitz-pruned: user-written fields can exceed any assumed gradient
+# bound, and a hole in the viewer is worse than the ~100 ms this costs.
 _MESH_EDGE_BOUNDS = (-3.0, -3.0, -3.0)
 _MESH_EDGE_SIZE = (6.0, 6.0, 6.0)
-_MESH_EDGE_RESOLUTION = 48
+_MESH_EDGE_RESOLUTION = 64
 _SHARP_DIHEDRAL_DEGREES = 45.0
 
 
