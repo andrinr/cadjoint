@@ -11,3 +11,10 @@ scikit-image is installed, `skimage.measure.marching_cubes` on the same volumes 
 for context. Run with:
 
     python benchmarks/edge_detection_bench.py --resolutions 16 32 64 [--repeats 3] [--json out.json]
+
+`dual_contouring_bench.py` covers stage 3 (`jaxcad.meshing.dual_contouring`): extraction
+wall time, watertightness, signed-volume error, 5th-percentile triangle minimum angle,
+sharp-corner placement error against scikit-image marching cubes on the same volume, and
+the wall time of one reverse-mode mesh-loss gradient. Run with:
+
+    python benchmarks/dual_contouring_bench.py --resolutions 16 32 64 [--repeats 3] [--json out.json]

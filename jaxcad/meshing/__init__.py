@@ -7,13 +7,22 @@ Built bottom-up in tested stages:
 2. :mod:`jaxcad.meshing.features` — sharp-feature classification (face,
    crease, corner cells) from Hermite data, plus exact CSG seam detection
    from ``min``/``max`` branch changes.
+3. :mod:`jaxcad.meshing.dual_contouring` — mesh generation: differentiable
+   QEF vertex placement over the Hermite data and oriented dual
+   connectivity.
 
-Later stages add mesh generation from the Hermite data, quality diagnostics,
-and adaptivity.  Discrete choices (edge sets, incidence, class labels) are
-frozen per extraction; all continuous quantities carry exact JAX derivatives
-with respect to design parameters.
+Later stages add quality diagnostics and adaptivity.  Discrete choices
+(edge sets, incidence, connectivity, class labels) are frozen per
+extraction; all continuous quantities carry exact JAX derivatives with
+respect to design parameters.
 """
 
+from jaxcad.meshing.dual_contouring import (
+    Mesh,
+    dual_faces,
+    extract_mesh,
+    qef_vertices,
+)
 from jaxcad.meshing.edge_detection import (
     CrossingEdges,
     GridSpec,
@@ -36,6 +45,10 @@ from jaxcad.meshing.features import (
 )
 
 __all__ = [
+    "Mesh",
+    "qef_vertices",
+    "dual_faces",
+    "extract_mesh",
     "GridSpec",
     "CrossingEdges",
     "HermiteData",

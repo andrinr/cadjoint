@@ -60,18 +60,28 @@ benchmarks before the next stage starts.
    of half the normal fan angle), plus exact hard-CSG seam cells from
    min/max branch changes. Measures are differentiable; labels are frozen
    like the edge set.
-3. **Mesh generation from Hermite data (next).** One QEF-placed vertex per
-   active cell, dual quads around crossing edges, feature-aware placement
-   using the stage-2 classification, orientation and triangulation. The QEF
-   solve is differentiable linear algebra on stage-1 outputs, so vertex
-   positions inherit exact parameter gradients by construction.
-4. **Mesh quality diagnostics and benchmarks.** Watertightness, manifold
-   edge incidence, component/Euler signature, Hausdorff/SDF error, triangle
-   aspect histograms; sharp-feature placement error against analytic corners.
+3. **Mesh generation from Hermite data (done).**
+   `jaxcad.meshing.dual_contouring`: one vertex per active cell from a
+   Tikhonov-regularized QEF — batched linear algebra with no
+   SVD/eigendecomposition in the gradient path, so planar cells cannot NaN
+   it — plus deterministic dual connectivity wound by the frozen
+   `start_inside` orientation. Measured: sphere and box meshes are
+   watertight and manifold (Euler 2, every edge shared by two triangles),
+   box corners land within 8e-5 at resolution 32 versus 3e-2 for marching
+   cubes on the same volume, and the corner vertex's Jacobian with respect
+   to the box half-extents is the identity to 0.2% — full tangential
+   motion, which a normal-only backward pass structurally cannot produce.
+4. **Mesh quality diagnostics and benchmarks (partial).** Watertightness,
+   Euler characteristic, signed volume, corner error, and triangle minimum
+   angles are tested and benchmarked; Hausdorff sampling and
+   self-intersection checks remain open.
 5. **Adaptivity.** Conservative cell pruning (Lipschitz bounds), octree with
    2:1 balancing, manifold-preserving clustering.
-6. **Viewer integration.** Meshes in the compile payload, surface handles,
-   drag solve — after the pipeline itself is trustworthy.
+6. **Viewer integration (started).** The compile payload now carries the
+   dual-contour mesh's edges split into `wire` and `sharp` (dihedral above
+   30°), and the playground has a "Mesh edges" display switch drawing them
+   through the existing overlay edge pipeline. Surface handles and drag
+   solve come later.
 
 ## Benchmark policy
 
