@@ -33,6 +33,7 @@ import {
   setDifferentiabilityDemo,
   setDirty,
   setMaterials,
+  setMeshEdges,
   setNodes,
   setRelations,
   setSolverRuns,
@@ -197,6 +198,7 @@ export function App() {
       setSolverRuns(result.solver_runs ?? []);
       setDifferentiabilityDemo(result.differentiability ?? null);
       setMaterials(result.materials ?? []);
+      setMeshEdges(result.mesh_edges ?? null);
       // Drop a selection that no longer exists in the rebuilt sketch.
       const active = selection();
       if (active) {

@@ -20,6 +20,7 @@ import {
 import { MATERIAL_DRAG_TYPE } from "./MaterialPanel";
 import {
   displayProfiles,
+  meshEdges,
   drag,
   gizmoDrag,
   cameraAngles,
@@ -884,6 +885,10 @@ export function ViewerPane(props: ViewerPaneProps) {
   // Keep the GPU overlay buffers in step with the construction tree.
   createEffect(() => {
     renderer.setConstruction(displayProfiles(), selection(), hover());
+  });
+
+  createEffect(() => {
+    renderer.setMeshEdges(meshEdges());
   });
 
   createEffect(() => {

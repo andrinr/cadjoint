@@ -15,6 +15,7 @@ import type {
   DifferentiabilityDemo,
   GizmoMode,
   MaterialDefinition,
+  MeshEdgePayload,
   Selection,
   SelectionMode,
   ToolMode,
@@ -28,6 +29,7 @@ export const [solverRuns, setSolverRuns] = createSignal<ConstraintSolverRun[]>([
 export const [differentiabilityDemo, setDifferentiabilityDemo] =
   createSignal<DifferentiabilityDemo | null>(null);
 export const [materials, setMaterials] = createSignal<MaterialDefinition[]>([]);
+export const [meshEdges, setMeshEdges] = createSignal<MeshEdgePayload | null>(null);
 export const [selection, setSelection] = createSignal<Selection | null>(null);
 export const [hover, setHover] = createSignal<Selection | null>(null);
 export const [tool, setTool] = createSignal<ToolMode>("select");

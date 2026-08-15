@@ -48,6 +48,23 @@ def test_example_scene_compiles_to_complete_webgpu_shader():
     assert "fn fs_present(" in result["present_shader"]
 
 
+def test_example_scene_reports_mesh_edges_for_the_viewer():
+    result = compile_source(EXAMPLE_SOURCE)
+
+    assert result["ok"] is True
+    mesh_edges = result["mesh_edges"]
+    assert mesh_edges is not None
+    assert mesh_edges["resolution"] >= 8
+    for group in ("wire", "sharp"):
+        assert len(mesh_edges[group]) > 0
+        for segment in mesh_edges[group][:16]:
+            assert len(segment) == 2
+            for point in segment:
+                assert len(point) == 3
+                assert all(isinstance(value, float) for value in point)
+                assert all(-3.0 <= value <= 3.0 for value in point)
+
+
 def test_compile_source_reports_missing_scene():
     result = compile_source("answer = 42")
 

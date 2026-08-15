@@ -128,6 +128,18 @@ export interface ConstructionNode {
   material: string | null;
 }
 
+/**
+ * World-space line segments of the extracted dual-contour mesh.
+ *
+ * `sharp` edges sit across a significant dihedral angle (creases, corners,
+ * CSG seams); `wire` is the rest of the wireframe.
+ */
+export interface MeshEdgePayload {
+  wire: [number, number, number][][];
+  sharp: [number, number, number][][];
+  resolution: number;
+}
+
 export interface CompileResponse {
   ok: boolean;
   error?: string;
@@ -140,6 +152,7 @@ export interface CompileResponse {
   solver_runs: ConstraintSolverRun[];
   materials: MaterialDefinition[];
   differentiability: DifferentiabilityDemo | null;
+  mesh_edges: MeshEdgePayload | null;
   output: string;
 }
 

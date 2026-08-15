@@ -11,7 +11,7 @@
  * the overlay pipelines, and pan support added.
  */
 
-import type { ConstructionNode, GizmoMode, Selection } from "../types";
+import type { ConstructionNode, GizmoMode, MeshEdgePayload, Selection } from "../types";
 import { AXIS_COLORS, gizmoEdges, gizmoScale, type AxisIndex } from "./gizmo";
 import {
   cameraPosition,
@@ -101,6 +101,7 @@ export interface DisplaySettings {
   /** 0 disables x-ray; 1 is fully translucent. */
   xray: number;
   showSketches: boolean;
+  showMeshEdges: boolean;
   showConstraints: boolean;
   showFixedConstraints: boolean;
   showDistanceConstraints: boolean;
@@ -117,6 +118,7 @@ export const DEFAULT_DISPLAY: DisplaySettings = {
   hideSolid: false,
   xray: 1,
   showSketches: true,
+  showMeshEdges: false,
   showConstraints: true,
   showFixedConstraints: true,
   showDistanceConstraints: true,
@@ -145,6 +147,8 @@ const COLORS: Record<string, Rgba> = {
   handleLocked: [0.62, 0.64, 0.6, 0.9],
   edgeSelected: [1.0, 0.95, 0.6, 1.0],
   edgeHover: [0.95, 1.0, 0.72, 1.0],
+  meshWire: [0.5, 0.56, 0.62, 0.45],
+  meshSharp: [0.35, 0.85, 1.0, 0.95],
 };
 
 export interface RendererCallbacks {
@@ -204,6 +208,10 @@ export class Renderer {
   private gizmoCapacity = 0;
   private gizmoCount = 0;
   private visibleGizmoMode: GizmoMode = "translate";
+  private meshEdgeBuffer: GPUBuffer | null = null;
+  private meshEdgeCapacity = 0;
+  private meshEdgeCount = 0;
+  private meshEdges: MeshEdgePayload | null = null;
 
   private shaderRevision = 0;
   private framePending = false;
@@ -674,6 +682,13 @@ export class Renderer {
     this.scheduleRender();
   }
 
+  /** Replace the dual-contour mesh edges gated by the mesh-edges display flag. */
+  setMeshEdges(payload: MeshEdgePayload | null): void {
+    this.meshEdges = payload;
+    this.uploadOverlay();
+    this.scheduleRender();
+  }
+
   private uploadOverlay(): void {
     if (!this.device) return;
     const edges: number[] = [];
@@ -752,9 +767,38 @@ export class Renderer {
       }
     }
 
+    // The extracted mesh wireframe shares the sketch edge pipeline; sharp
+    // edges (creases, corners, CSG seams) draw brighter than the wire.
+    const meshSegments: number[] = [];
+    if (this.meshEdges) {
+      for (const [start, end] of this.meshEdges.wire) {
+        meshSegments.push(start[0], start[1], start[2], end[0], end[1], end[2], ...COLORS.meshWire);
+      }
+      for (const [start, end] of this.meshEdges.sharp) {
+        meshSegments.push(
+          start[0],
+          start[1],
+          start[2],
+          end[0],
+          end[1],
+          end[2],
+          ...COLORS.meshSharp,
+        );
+      }
+    }
+
     this.edgeCount = edges.length / (EDGE_STRIDE / 4);
     this.handleCount = handles.length / (HANDLE_STRIDE / 4);
     this.gizmoCount = gizmo.length / (GIZMO_STRIDE / 4);
+    this.meshEdgeCount = meshSegments.length / (EDGE_STRIDE / 4);
+    this.meshEdgeBuffer = this.writeInstances(
+      this.meshEdgeBuffer,
+      new Float32Array(meshSegments),
+      EDGE_STRIDE,
+      (capacity) => (this.meshEdgeCapacity = capacity),
+      this.meshEdgeCapacity,
+      "mesh edges",
+    );
     this.edgeBuffer = this.writeInstances(
       this.edgeBuffer,
       new Float32Array(edges),
@@ -964,6 +1008,17 @@ export class Renderer {
 
   private drawOverlay(pass: GPURenderPassEncoder): void {
     if (!this.overlayBindGroup) return;
+    if (
+      this.display.showMeshEdges &&
+      this.meshEdgeCount &&
+      this.meshEdgeBuffer &&
+      this.edgePipeline
+    ) {
+      pass.setPipeline(this.edgePipeline);
+      pass.setBindGroup(0, this.overlayBindGroup);
+      pass.setVertexBuffer(0, this.meshEdgeBuffer);
+      pass.draw(6, this.meshEdgeCount);
+    }
     if (this.display.showSketches && this.edgeCount && this.edgeBuffer && this.edgePipeline) {
       pass.setPipeline(this.edgePipeline);
       pass.setBindGroup(0, this.overlayBindGroup);
