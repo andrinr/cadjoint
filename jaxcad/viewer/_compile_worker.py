@@ -346,6 +346,55 @@ def _mesh_edge_payload(scene: Any) -> dict[str, Any] | None:
             keep &= ~(suppressed[links[:, 0]] | suppressed[links[:, 1]])
             links = links[keep]
 
+            # Chain tracing: a curve visits each cell once, so every vertex
+            # keeps at most one link per tangent side — the best-aligned,
+            # then shortest — and a link survives only when both endpoints
+            # keep it.  Degree <= 2 makes X-lattices structurally impossible
+            # regardless of how thin a double rail gets; junction (corner)
+            # cells are exempt, since several chains legitimately meet there.
+            if links.shape[0]:
+                directions = vertices[links[:, 1]] - vertices[links[:, 0]]
+                lengths = np.maximum(np.linalg.norm(directions, axis=1), 1e-12)
+                best: dict[tuple[int, int], int] = {}
+                slot_quality: dict[tuple[int, int], tuple[float, float]] = {}
+                for index in range(links.shape[0]):
+                    for column in (0, 1):
+                        row = int(links[index, column])
+                        if junctions[row]:
+                            continue
+                        outward = directions[index] * (1.0 if column == 0 else -1.0)
+                        tangent = tangents[row]
+                        if np.isfinite(tangent).all():
+                            side = 0 if float(outward @ tangent) >= 0.0 else 1
+                            quality = (
+                                -abs(float(outward @ tangent)) / float(lengths[index]),
+                                float(lengths[index]),
+                            )
+                        else:
+                            # No tangent: two shortest links keep a chain alive.
+                            side = index % 2
+                            quality = (0.0, float(lengths[index]))
+                        key = (row, side)
+                        if key not in slot_quality or quality < slot_quality[key]:
+                            slot_quality[key] = quality
+                            best[key] = index
+                winners = set(best.values())
+                chain_keep = np.zeros(links.shape[0], dtype=bool)
+                for index in range(links.shape[0]):
+                    approvals = 0
+                    for column in (0, 1):
+                        row = int(links[index, column])
+                        if junctions[row]:
+                            approvals += 1
+                            continue
+                        if index in winners and any(
+                            best.get((row, side)) == index for side in (0, 1)
+                        ):
+                            approvals += 1
+                    if approvals == 2:
+                        chain_keep[index] = True
+                links = links[chain_keep]
+
         def segments(pairs: np.ndarray) -> list[list[list[float]]]:
             return [
                 [[round(float(value), 3) for value in point] for point in pair] for pair in pairs
