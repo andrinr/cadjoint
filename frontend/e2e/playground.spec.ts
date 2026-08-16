@@ -104,6 +104,21 @@ test.beforeEach(async ({ page }) => {
   if (await dismiss.isVisible().catch(() => false)) await dismiss.click();
 });
 
+/**
+ * Click a rail tool that lives inside a grouped flyout.
+ *
+ * The rail's clusters expand on click of their parent icon; children keep
+ * their stable testids (`tool-box`, `gizmo-scale`, …) but are only visible
+ * while the flyout is open.
+ */
+async function railTool(page: Page, group: string, testid: string) {
+  const child = page.getByTestId(testid);
+  for (let attempt = 0; attempt < 2 && !(await child.isVisible()); attempt++) {
+    await page.getByTestId(`tool-group-${group}`).click();
+  }
+  await child.click();
+}
+
 test("serves the app and loads the starter sketch", async ({ page }) => {
   await expect(page).toHaveTitle(/JAXCAD/);
   expect(await editorText(page)).toContain("PolygonProfile(");
@@ -248,7 +263,7 @@ const vertexLiteralCount = async (page: Page) =>
 test("the polygon tool inserts a vertex and stays active", async ({ page }) => {
   const before = await vertexLiteralCount(page);
 
-  await page.getByTestId("tool-polygon").click();
+  await railTool(page, "create", "tool-polygon");
   const metrics = await canvasMetrics(page);
   // Midpoint of the sketch's bottom edge.
   const point = projectToCss([0, -0.7, 0], metrics);
@@ -522,7 +537,7 @@ test("placing a primitive writes a Solid call into the source", async ({ page })
   // The starter program already has one sphere, so count rather than presence.
   const before = await sphereCount(page);
 
-  await page.getByTestId("tool-sphere").click();
+  await railTool(page, "create", "tool-sphere");
   const metrics = await canvasMetrics(page);
   // Somewhere on the world XY plane, clear of the existing sketch.
   const point = projectToCss([2.4, 1.4, 0], metrics);
@@ -598,7 +613,7 @@ test("the material browser creates, edits, and drag-assigns materials", async ({
 });
 
 test("a placed primitive can be selected and moved along an axis", async ({ page }) => {
-  await page.getByTestId("tool-box").click();
+  await railTool(page, "create", "tool-box");
   const metrics = await canvasMetrics(page);
   // Kept near the middle of the view so the gizmo arrows stay on the canvas.
   const drop = projectToCss([1.6, 0, 0], metrics);
@@ -622,8 +637,8 @@ test("a placed primitive can be selected and moved along an axis", async ({ page
   await page.mouse.click(afterPlacing.left + edge.x, afterPlacing.top + edge.y);
   await expect(page.getByTestId("selection-chip")).toBeVisible();
   await expect(page.getByTestId("gizmo-translate")).toBeEnabled();
-  // A whole-object selection offers the move/rotate gizmo.
-  await expect(page.getByTestId("gizmo-translate")).toBeVisible();
+  // A whole-object selection offers the transform cluster on the rail.
+  await expect(page.getByTestId("tool-group-transform")).toBeVisible();
 
   // Drag the Y arrow upward; the vertical axis stays comfortably in frame.
   const view = await canvasMetrics(page);
@@ -721,13 +736,13 @@ test("a default polygon can move without losing parameter-backed points", async 
 });
 
 test("a primitive can be scaled along an axis", async ({ page }) => {
-  await page.getByTestId("tool-box").click();
+  await railTool(page, "create", "tool-box");
   let metrics = await canvasMetrics(page);
   const drop = projectToCss([1.5, 0.6, 0], metrics);
   await page.mouse.click(metrics.left + drop.x, metrics.top + drop.y);
   await waitForCompile(page);
   await expect(page.getByTestId("gizmo-scale")).toBeEnabled();
-  await page.getByTestId("gizmo-scale").click();
+  await railTool(page, "transform", "gizmo-scale");
 
   const placed = (await editorText(page)).match(
     /Solid\.box\(size=\[([^\]]+)\][^)]*position=\[([^\]]+)\]/,
@@ -755,7 +770,7 @@ test("a primitive can be scaled along an axis", async ({ page }) => {
 });
 
 test("sketch constraints and extrusion are represented in UI and code", async ({ page }) => {
-  await page.getByTestId("tool-sketch").click();
+  await railTool(page, "create", "tool-sketch");
   let metrics = await canvasMetrics(page);
   const origin: Vec3 = [1.0, 1.4, 0];
   const drop = projectToCss(origin, metrics);
@@ -924,7 +939,7 @@ test("relational constraint chips render for API-added kinds", async ({ page }) 
 });
 
 test("a standalone sketch can be revolved from the panel", async ({ page }) => {
-  await page.getByTestId("tool-sketch").click();
+  await railTool(page, "create", "tool-sketch");
   const metrics = await canvasMetrics(page);
   const drop = projectToCss([1.0, 1.4, 0], metrics);
   await page.mouse.click(metrics.left + drop.x, metrics.top + drop.y);
@@ -969,6 +984,33 @@ test("path tracing yields to interactive dragging and resumes afterwards", async
   await waitForCompile(page);
   await page.getByTestId("display-options").click();
   await expect(page.getByTestId("toggle-path-tracing")).toBeChecked();
+});
+
+test("editing modes scope the tool rail and Escape returns to model", async ({ page }) => {
+  // Model mode is the default: the create cluster is offered, no simulate slot.
+  await expect(page.getByTestId("editmode-model")).toHaveClass(/active/);
+  await expect(page.getByTestId("hint-mode")).toHaveText("model");
+  await expect(page.getByTestId("tool-group-create")).toBeVisible();
+  await expect(page.getByTestId("mode-simulate")).toHaveCount(0);
+
+  // Simulate mode swaps the tool clusters for the simulation slot.
+  await page.getByTestId("editmode-simulate").click();
+  await expect(page.getByTestId("mode-simulate")).toBeVisible();
+  await expect(page.getByTestId("hint-mode")).toHaveText("simulate");
+  await expect(page.getByTestId("tool-group-create")).toHaveCount(0);
+
+  // Escape backs out to model mode.
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("editmode-model")).toHaveClass(/active/);
+  await expect(page.getByTestId("mode-simulate")).toHaveCount(0);
+
+  // Selecting a sketch auto-enters sketch mode, where constraint tools live.
+  const metrics = await canvasMetrics(page);
+  const edge = projectToCss([0, -0.7, 0], metrics);
+  await page.mouse.click(metrics.left + edge.x, metrics.top + edge.y);
+  await expect(page.getByTestId("selection-chip")).toHaveText("house");
+  await expect(page.getByTestId("editmode-sketch")).toHaveClass(/active/);
+  await expect(page.getByTestId("tool-group-annotate")).toBeVisible();
 });
 
 test("hovering an object highlights it before the click", async ({ page }) => {

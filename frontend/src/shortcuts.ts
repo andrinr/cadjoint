@@ -15,7 +15,8 @@ export type ViewerToolAction =
   | "tool-sphere"
   | "tool-cylinder"
   | "gizmo-translate"
-  | "gizmo-rotate";
+  | "gizmo-rotate"
+  | "cycle-mode";
 
 export const VIEWER_TOOL_KEYS: Record<string, ViewerToolAction> = {
   "1": "select-object",
@@ -26,6 +27,7 @@ export const VIEWER_TOOL_KEYS: Record<string, ViewerToolAction> = {
   c: "tool-cylinder",
   g: "gizmo-translate",
   r: "gizmo-rotate",
+  m: "cycle-mode",
 };
 
 export interface ShortcutItem {
@@ -39,6 +41,14 @@ export interface ShortcutGroup {
 }
 
 export const SHORTCUT_GROUPS: ShortcutGroup[] = [
+  {
+    title: "Modes",
+    items: [
+      { keys: "M", action: "Cycle Model → Sketch → Simulate" },
+      { keys: "Shift + M", action: "Cycle modes backwards" },
+      { keys: "Esc", action: "Return to Model mode" },
+    ],
+  },
   {
     title: "Tools",
     items: [

@@ -259,6 +259,43 @@ class TestSetValue:
         assert "SketchPlane(origin=[2, 3, 4])" in patched
         assert "from jaxcad.construction import" in patched and "SketchPlane" in patched
 
+    def test_makes_a_default_profile_plane_explicit_when_reoriented(self):
+        from jaxcad.viewer._patch import set_value
+
+        source = (
+            "from jaxcad.construction import PolygonProfile\n"
+            "profile = PolygonProfile([[0, 0], [1, 0], [0, 1]])\n"
+        )
+        patched = set_value(source, 2, "PolygonProfile", "planeNormal", [0, 1, 0])
+        assert "SketchPlane(normal=[0, 1, 0])" in patched
+        assert "from jaxcad.construction import" in patched and "SketchPlane" in patched
+
+    def test_adds_a_normal_to_an_existing_sketch_plane(self):
+        from jaxcad.viewer._patch import set_value
+
+        source = (
+            "from jaxcad.construction import PolygonProfile, SketchPlane\n"
+            "profile = PolygonProfile([[0, 0], [1, 0], [0, 1]], "
+            "plane=SketchPlane(origin=[1, 2, 3]), name='s')\n"
+        )
+        patched = set_value(source, 2, "PolygonProfile", "planeNormal", [0, 0.5, 0.5])
+        assert "SketchPlane(origin=[1, 2, 3], normal=[0, 0.5, 0.5])" in patched
+        # The profile gains no second `plane=` keyword.
+        assert patched.count("plane=") == 1
+
+    def test_rewrites_an_existing_sketch_plane_normal_in_place(self):
+        from jaxcad.viewer._patch import set_value
+
+        source = (
+            "from jaxcad.construction import PolygonProfile, SketchPlane\n"
+            "profile = PolygonProfile([[0, 0], [1, 0], [0, 1]], "
+            "plane=SketchPlane(origin=[1, 2, 3], normal=[0, 0, 1]), name='s')\n"
+        )
+        patched = set_value(source, 2, "PolygonProfile", "planeNormal", [1, 0, 0])
+        assert "normal=[1, 0, 0]" in patched
+        assert "normal=[0, 0, 1]" not in patched
+        assert "origin=[1, 2, 3]" in patched
+
 
 class TestAddPrimitive:
     def test_extends_an_existing_union(self):

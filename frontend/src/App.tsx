@@ -12,6 +12,7 @@ import { EditorPane } from "./components/EditorPane";
 import { MaterialPanel } from "./components/MaterialPanel";
 import { MenuBar } from "./components/MenuBar";
 import { ObjectTree } from "./components/ObjectTree";
+import { SimulatePanel } from "./components/SimulatePanel";
 import { SketchPanel } from "./components/SketchPanel";
 import { ToolRail } from "./components/ToolRail";
 import { Toolbar } from "./components/Toolbar";
@@ -28,7 +29,9 @@ import {
   busy,
   cameraAngles,
   dirty,
+  editingMode,
   gizmoMode,
+  reactToSelectionForMode,
   meshEdges,
   panels,
   setCameraAngles,
@@ -240,6 +243,13 @@ export function App() {
     renderer.invalidate();
   });
 
+  // Selecting a sketch profile auto-enters sketch mode (cancelable — the
+  // rule itself lives in editingMode.ts and remembers manual exits).
+  createEffect(() => {
+    selection();
+    reactToSelectionForMode();
+  });
+
   const highlight = createMemo(() => {
     const active = selection();
     if (!active) return null;
@@ -408,6 +418,23 @@ export function App() {
 
   const addRevolution = (line: number) =>
     applyPatch({ op: "add_revolution", line, offset: 0 });
+
+  /** Extrude the selected sketch — shared by the rail and the sketch panel. */
+  const extrudeSelection = () => {
+    const active = selection();
+    const node = active && nodeById(active.nodeId);
+    if (node?.kind === "profile" && node.line !== null) {
+      void addExtrusion(node.line);
+    }
+  };
+
+  const revolveSelection = () => {
+    const active = selection();
+    const node = active && nodeById(active.nodeId);
+    if (node?.kind === "profile" && node.line !== null) {
+      void addRevolution(node.line);
+    }
+  };
 
   const addLoft = (lineA: number, lineB: number) =>
     applyPatch({ op: "add_loft", line_a: lineA, line_b: lineB, height: 1.0 });
@@ -608,8 +635,10 @@ export function App() {
                   }
                   setSelection(null);
                 }}
+                onExtrude={extrudeSelection}
+                onRevolve={revolveSelection}
               />
-              <Show when={panels().sketch}>
+              <Show when={panels().sketch && editingMode() !== "simulate"}>
                 <SketchPanel
                   onFix={() => {
                     const active = selection();
@@ -637,20 +666,8 @@ export function App() {
                       void solveSketch(node.line, method, iterations);
                     }
                   }}
-                  onExtrude={() => {
-                    const active = selection();
-                    const node = active && nodeById(active.nodeId);
-                    if (node?.kind === "profile" && node.line !== null) {
-                      void addExtrusion(node.line);
-                    }
-                  }}
-                  onRevolve={() => {
-                    const active = selection();
-                    const node = active && nodeById(active.nodeId);
-                    if (node?.kind === "profile" && node.line !== null) {
-                      void addRevolution(node.line);
-                    }
-                  }}
+                  onExtrude={extrudeSelection}
+                  onRevolve={revolveSelection}
                   onDeleteConstraint={(line, index) =>
                     void deleteConstraint(line, index)
                   }
@@ -670,6 +687,15 @@ export function App() {
                       setValue(line, "Material", argument, value)
                     }
                   />
+                </Show>
+                {/* Simulate-mode slot: shown by the mode system (switcher, M
+                    cycling, Escape returns to model); the panel internals
+                    belong to the FEM feature, which may expand/collapse and
+                    drive the renderer freely inside it. */}
+                <Show when={editingMode() === "simulate"}>
+                  <div class="mode-simulate-slot" data-testid="mode-simulate">
+                    <SimulatePanel renderer={renderer} />
+                  </div>
                 </Show>
               </div>
               <ViewCube

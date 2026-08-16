@@ -22,6 +22,7 @@ from jaxcad.viewer._pathtracer import (  # noqa: E402
 from jaxcad.viewer._webgpu import build_viewer_shader  # noqa: E402
 
 OVERLAY_WGSL = Path(__file__).resolve().parents[2] / "frontend/src/viewer/overlay.wgsl"
+SIMULATION_WGSL = Path(__file__).resolve().parents[2] / "frontend/src/viewer/simulation.wgsl"
 
 
 @pytest.fixture(scope="module")
@@ -73,6 +74,11 @@ def test_sketch_scene_shader_compiles(device):
     code = compile_scene_to_wgsl(Union(extrude(profile, depth=0.8), revolve(section)))
     compile_wgsl(device, build_viewer_shader(code), "sketch preview")
     compile_wgsl(device, build_path_tracer_shader(code), "sketch path tracer")
+
+
+@pytest.mark.skipif(not SIMULATION_WGSL.is_file(), reason="frontend sources not present")
+def test_simulation_shader_compiles(device):
+    compile_wgsl(device, SIMULATION_WGSL.read_text(), "simulation")
 
 
 def test_invalid_wgsl_is_actually_rejected(device):
@@ -147,14 +153,27 @@ def test_widget_entry_point_does_not_require_the_view_binding(device, scene_code
     )
 
 
+OVERLAY_BLEND = {
+    "color": {
+        "src_factor": "src-alpha",
+        "dst_factor": "one-minus-src-alpha",
+        "operation": "add",
+    },
+    "alpha": {"src_factor": "one", "dst_factor": "one-minus-src-alpha", "operation": "add"},
+}
+
+
 @pytest.mark.skipif(not OVERLAY_WGSL.is_file(), reason="frontend sources not present")
 @pytest.mark.parametrize(
-    ("entry_vertex", "entry_fragment", "stride", "attributes"),
+    ("shader", "entry_vertex", "entry_fragment", "stride", "step_mode", "blend", "attributes"),
     [
         (
+            "overlay.wgsl",
             "vs_edge",
             "fs_edge",
             40,
+            "instance",
+            OVERLAY_BLEND,
             [
                 {"shader_location": 0, "offset": 0, "format": "float32x3"},
                 {"shader_location": 1, "offset": 12, "format": "float32x3"},
@@ -162,50 +181,53 @@ def test_widget_entry_point_does_not_require_the_view_binding(device, scene_code
             ],
         ),
         (
+            "overlay.wgsl",
             "vs_handle",
             "fs_handle",
             32,
+            "instance",
+            OVERLAY_BLEND,
             [
                 {"shader_location": 0, "offset": 0, "format": "float32x3"},
                 {"shader_location": 1, "offset": 12, "format": "float32x4"},
                 {"shader_location": 2, "offset": 28, "format": "float32"},
             ],
         ),
+        # The simulation surface: interleaved position + scalar per vertex,
+        # drawn indexed and opaque (no blend).
+        (
+            "simulation.wgsl",
+            "vs_sim",
+            "fs_sim",
+            16,
+            "vertex",
+            None,
+            [
+                {"shader_location": 0, "offset": 0, "format": "float32x3"},
+                {"shader_location": 1, "offset": 12, "format": "float32"},
+            ],
+        ),
     ],
 )
 def test_overlay_pipelines_match_the_renderer(
-    device, entry_vertex, entry_fragment, stride, attributes
+    device, shader, entry_vertex, entry_fragment, stride, step_mode, blend, attributes
 ):
-    module = device.create_shader_module(code=OVERLAY_WGSL.read_text())
+    path = OVERLAY_WGSL.parent / shader
+    module = device.create_shader_module(code=path.read_text())
+    target = {"format": COLOR_FORMAT}
+    if blend is not None:
+        target["blend"] = blend
     pipeline = device.create_render_pipeline(
         layout="auto",
         vertex={
             "module": module,
             "entry_point": entry_vertex,
-            "buffers": [
-                {"array_stride": stride, "step_mode": "instance", "attributes": attributes}
-            ],
+            "buffers": [{"array_stride": stride, "step_mode": step_mode, "attributes": attributes}],
         },
         fragment={
             "module": module,
             "entry_point": entry_fragment,
-            "targets": [
-                {
-                    "format": COLOR_FORMAT,
-                    "blend": {
-                        "color": {
-                            "src_factor": "src-alpha",
-                            "dst_factor": "one-minus-src-alpha",
-                            "operation": "add",
-                        },
-                        "alpha": {
-                            "src_factor": "one",
-                            "dst_factor": "one-minus-src-alpha",
-                            "operation": "add",
-                        },
-                    },
-                }
-            ],
+            "targets": [target],
         },
         primitive={"topology": "triangle-list"},
         depth_stencil={

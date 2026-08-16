@@ -8,6 +8,8 @@ Serves the built frontend (``jaxcad/viewer/static``) and a small JSON API:
 - ``POST /patch``        rewrite sketch vertex literals in the user's source
 - ``POST /api/mesh``     run the source again and return only the dual-contour
                          mesh edges (requested lazily by the viewer)
+- ``POST /api/simulate`` mesh the scene into hexahedra and run a thermal or
+                         elastic FEM solve (or just probe the face groups)
 - ``GET  /api/scenes``   list saved scene files in ``./scenes``
 - ``POST /api/scenes/load``  read one saved scene file
 - ``POST /api/scenes/save``  write one scene file into ``./scenes``
@@ -209,7 +211,9 @@ npm run build</pre>
 """
 
 
-def _run_worker(source: str, mode: str, timeout: float) -> dict[str, Any]:
+def _run_worker(
+    source: str, mode: str, timeout: float, extra: dict[str, Any] | None = None
+) -> dict[str, Any]:
     """Run one compile-worker request in a disposable child process."""
     if not isinstance(source, str):
         return {"ok": False, "error": "Source must be a string."}
@@ -222,7 +226,7 @@ def _run_worker(source: str, mode: str, timeout: float) -> dict[str, Any]:
     try:
         completed = subprocess.run(
             [sys.executable, "-m", "jaxcad.viewer._compile_worker"],
-            input=json.dumps({"source": source, "mode": mode}),
+            input=json.dumps({**(extra or {}), "source": source, "mode": mode}),
             capture_output=True,
             check=False,
             text=True,
@@ -259,6 +263,92 @@ def mesh_source(source: str, timeout: float = COMPILE_TIMEOUT_SECONDS) -> dict[s
     through this path only while a mesh overlay is actually turned on.
     """
     return _run_worker(source, "mesh", timeout)
+
+
+# FEM solves cover meshing plus a PETSc-assembled solve, which can far exceed
+# the ordinary compile budget.
+SIMULATE_TIMEOUT_SECONDS = 180
+SIMULATE_KINDS = ("probe", "thermal", "elastic")
+SIMULATE_BC_TYPES = ("dirichlet", "traction")
+SIMULATE_MATERIAL_KEYS = ("conductivity", "source", "youngs", "poisson")
+MIN_SIMULATE_RESOLUTION = 4
+MAX_SIMULATE_RESOLUTION = 64
+
+
+def _validate_simulate_bc(bc: Any) -> str | None:
+    """Return an error message for one boundary-condition entry, or None."""
+    if not isinstance(bc, dict):
+        return "Each boundary condition must be an object."
+    spec = bc.get("group")
+    if isinstance(spec, dict):
+        if spec.get("axis") not in {"x", "y", "z"} or spec.get("side") not in {"+", "-"}:
+            return "A predicate spec needs `axis` of x/y/z and `side` of +/-."
+    elif not (isinstance(spec, str) and len(spec) == 2 and spec[0] in "+-" and spec[1] in "xyz"):
+        return "Each boundary condition needs `group` as an id like `+x` or a predicate spec."
+    if bc.get("type") not in SIMULATE_BC_TYPES:
+        return "Boundary condition `type` must be `dirichlet` or `traction`."
+    value = bc.get("value", 0.0)
+    if bc["type"] == "traction":
+        if not (
+            isinstance(value, (list, tuple))
+            and len(value) == 3
+            and all(isinstance(item, (int, float)) and not isinstance(item, bool) for item in value)
+        ):
+            return "A traction boundary condition needs `value` as three numbers."
+    elif not isinstance(value, (int, float)) or isinstance(value, bool):
+        return "A dirichlet boundary condition needs a numeric `value`."
+    return None
+
+
+def simulate_source(
+    request: dict[str, Any], timeout: float = SIMULATE_TIMEOUT_SECONDS
+) -> dict[str, Any]:
+    """Validate a simulation request and run it in a disposable child process.
+
+    ``kind="probe"`` only meshes the scene, returning the boundary surface and
+    its face-group catalog for the BC UI; ``"thermal"``/``"elastic"`` also
+    solve.  The worker reports a missing jax-fem extra as
+    ``error_kind="fem_unavailable"``, which the HTTP layer maps to 501.
+    """
+    kind = request.get("kind", "probe")
+    if kind not in SIMULATE_KINDS:
+        allowed = ", ".join(SIMULATE_KINDS)
+        return {"ok": False, "error": f"Simulation `kind` must be one of: {allowed}."}
+    resolution = request.get("resolution", 20)
+    if (
+        not isinstance(resolution, int)
+        or isinstance(resolution, bool)
+        or not MIN_SIMULATE_RESOLUTION <= resolution <= MAX_SIMULATE_RESOLUTION
+    ):
+        return {
+            "ok": False,
+            "error": (
+                f"Simulation `resolution` must be an integer from "
+                f"{MIN_SIMULATE_RESOLUTION} to {MAX_SIMULATE_RESOLUTION}."
+            ),
+        }
+    bcs = request.get("bcs", [])
+    if not isinstance(bcs, list):
+        return {"ok": False, "error": "Simulation `bcs` must be a list."}
+    for bc in bcs:
+        error = _validate_simulate_bc(bc)
+        if error is not None:
+            return {"ok": False, "error": error}
+    material = request.get("material", {})
+    if not isinstance(material, dict):
+        return {"ok": False, "error": "Simulation `material` must be an object."}
+    for key, value in material.items():
+        if key not in SIMULATE_MATERIAL_KEYS:
+            allowed = ", ".join(SIMULATE_MATERIAL_KEYS)
+            return {"ok": False, "error": f"Material key `{key}` is not one of: {allowed}."}
+        if not isinstance(value, (int, float)) or isinstance(value, bool):
+            return {"ok": False, "error": f"Material `{key}` must be a number."}
+    return _run_worker(
+        request.get("source"),
+        "simulate",
+        timeout,
+        extra={"kind": kind, "resolution": resolution, "bcs": bcs, "material": material},
+    )
 
 
 # Saved scenes live in one directory under the server's working directory.
@@ -669,6 +759,16 @@ def patch_source(request: dict[str, Any]) -> dict[str, Any]:
         vector = numbers(raw_value)
         if scalar is None and vector is None:
             return {"ok": False, "error": "The patch request needs `value` as a number or numbers."}
+        if arguments["argument"] in {"planeOrigin", "planeNormal"}:
+            if vector is None or len(vector) != 3:
+                return {
+                    "ok": False,
+                    "error": "A sketch-plane edit needs `value` as three numbers.",
+                }
+            if arguments["argument"] == "planeNormal" and not any(
+                abs(component) > 1e-9 for component in vector
+            ):
+                return {"ok": False, "error": "A sketch-plane normal must not be zero."}
         arguments["value"] = scalar if scalar is not None else vector
         try:
             return {"ok": True, "source": apply_operation(source, operation, **arguments)}
@@ -841,6 +941,7 @@ def make_handler(token: str):
             handlers = {
                 "/compile": lambda payload: compile_source(payload.get("source")),
                 "/api/mesh": lambda payload: mesh_source(payload.get("source")),
+                "/api/simulate": simulate_source,
                 "/patch": patch_source,
                 "/api/scenes/load": load_scene,
                 "/api/scenes/save": save_scene,
@@ -856,7 +957,14 @@ def make_handler(token: str):
                 return
 
             result = handler(payload)
-            status = HTTPStatus.OK if result.get("ok") else HTTPStatus.UNPROCESSABLE_ENTITY
+            if result.get("ok"):
+                status = HTTPStatus.OK
+            elif result.get("error_kind") == "fem_unavailable":
+                # A missing optional solver extra is "not implemented here",
+                # not a bad request; the UI shows it as an install hint.
+                status = HTTPStatus.NOT_IMPLEMENTED
+            else:
+                status = HTTPStatus.UNPROCESSABLE_ENTITY
             self._send_json(status, result)
 
         def log_message(self, format: str, *args: Any) -> None:

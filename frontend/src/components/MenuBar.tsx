@@ -12,14 +12,17 @@ import { sanitizeSceneName } from "../scenes";
 import { SHORTCUT_GROUPS } from "../shortcuts";
 import {
   dirty,
+  editingMode,
   panels,
   sceneName,
+  setEditingMode,
   setPanelVisible,
   setSceneName,
   setStatus,
   source,
   type PanelVisibility,
 } from "../state";
+import { EDITING_MODES } from "../editingMode";
 
 export interface MenuBarProps {
   canUndo: boolean;
@@ -270,6 +273,30 @@ export function MenuBar(props: MenuBarProps) {
           {menuTitle("window", "Window")}
           <Show when={openMenu() === "window"}>
             <div class="menu-dropdown" role="menu">
+              <For each={EDITING_MODES}>
+                {(mode) => (
+                  <button
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={editingMode() === mode}
+                    onClick={() => {
+                      setEditingMode(mode);
+                      setOpenMenu(null);
+                    }}
+                    onKeyDown={onMenuKeyDown}
+                    data-testid={`menu-window-mode-${mode}`}
+                  >
+                    <i class="menu-check">{editingMode() === mode ? "•" : ""}</i>
+                    <span>
+                      {mode.charAt(0).toUpperCase() + mode.slice(1)} mode
+                    </span>
+                    <Show when={mode === "model"}>
+                      <small>Esc</small>
+                    </Show>
+                  </button>
+                )}
+              </For>
+              <hr />
               <For each={PANEL_ITEMS}>
                 {(panel) => (
                   <button

@@ -11,7 +11,19 @@
  * the overlay pipelines, and pan support added.
  */
 
-import type { ConstructionNode, GizmoMode, MeshEdgePayload, Selection } from "../types";
+import {
+  DEFAULT_SLICE,
+  meshBounds,
+  slicePlane,
+  type SliceState,
+} from "../simulation";
+import type {
+  ConstructionNode,
+  GizmoMode,
+  MeshEdgePayload,
+  Selection,
+  SimulationMeshPayload,
+} from "../types";
 import { AXIS_COLORS, gizmoEdges, gizmoScale, type AxisIndex } from "./gizmo";
 import {
   cameraPosition,
@@ -25,6 +37,7 @@ import {
 // Kept as a standalone .wgsl file so the shader has one source of truth that
 // both the bundler and the Python shader-validation test read.
 import OVERLAY_WGSL from "./overlay.wgsl?raw";
+import SIMULATION_WGSL from "./simulation.wgsl?raw";
 
 export interface Shaders {
   preview: string;
@@ -218,6 +231,24 @@ export class Renderer {
   private meshSharpCount = 0;
   private meshEdges: MeshEdgePayload | null = null;
 
+  // FEM simulation surface: an indexed triangle mesh with a scalar per
+  // vertex, drawn instead of the raymarched solid while simulation display
+  // is on. Two bind groups share one pipeline: the base pass and the
+  // hover-highlight pass differ only in the tint uniform.
+  private simPipeline: GPURenderPipeline | null = null;
+  private simBindGroup: GPUBindGroup | null = null;
+  private simHighlightBindGroup: GPUBindGroup | null = null;
+  private simUniformBuffer: GPUBuffer | null = null;
+  private simHighlightUniformBuffer: GPUBuffer | null = null;
+  private simVertexBuffer: GPUBuffer | null = null;
+  private simIndexBuffer: GPUBuffer | null = null;
+  private simIndexCount = 0;
+  private simRange: [number, number] = [0, 0];
+  private simBounds = { min: [0, 0, 0], max: [0, 0, 0] };
+  private simHighlight: { start: number; count: number } | null = null;
+  private simClip: SliceState = { ...DEFAULT_SLICE };
+  private _simulationActive = false;
+
   private shaderRevision = 0;
   private framePending = false;
   private initError = "";
@@ -318,7 +349,10 @@ export class Renderer {
       (shadows === "hard" ? DISPLAY.hardShadows : 0) |
       (reflections ? DISPLAY.reflections : 0) |
       (flatShading ? DISPLAY.flat : 0) |
-      (hideSolid ? DISPLAY.hideSolid : 0)
+      // While the simulation surface is shown the raymarched solid is hidden:
+      // the preview pass still supplies the environment background and clears
+      // depth to 1, and the FEM mesh depth-tests into that frame.
+      (hideSolid || this._simulationActive ? DISPLAY.hideSolid : 0)
     );
   }
 
@@ -358,6 +392,7 @@ export class Renderer {
       this.overlayBuffer = this.createUniform(112);
       this.meshOverlayBuffer = this.createUniform(112);
       this.buildOverlayPipelines();
+      this.buildSimulationPipeline();
 
       this.device.addEventListener("uncapturederror", (event) => {
         const message = (event as GPUUncapturedErrorEvent).error?.message ?? "WebGPU error";
@@ -587,6 +622,117 @@ export class Renderer {
       layout: bindGroupLayout,
       entries: [{ binding: 0, resource: { buffer: this.meshOverlayBuffer } }],
     });
+  }
+
+  /**
+   * The indexed triangle-mesh pipeline for FEM results.
+   *
+   * Follows the overlay pattern: an explicit layout (never `layout: "auto"`)
+   * so the base and highlight passes can bind different uniform buffers to
+   * one pipeline. Vertices interleave a position with the nodal scalar; the
+   * fragment stage ramps the scalar and applies the clip plane.
+   */
+  private buildSimulationPipeline(): void {
+    const device = this.device!;
+    const module = device.createShaderModule({ code: SIMULATION_WGSL, label: "Simulation WGSL" });
+    const { bindGroupLayout, pipelineLayout } = this.sharedLayout("Simulation bindings", [0]);
+
+    this.simPipeline = device.createRenderPipeline({
+      label: "Simulation surface",
+      layout: pipelineLayout,
+      vertex: {
+        module,
+        entryPoint: "vs_sim",
+        buffers: [
+          {
+            arrayStride: 16,
+            stepMode: "vertex",
+            attributes: [
+              { shaderLocation: 0, offset: 0, format: "float32x3" },
+              { shaderLocation: 1, offset: 12, format: "float32" },
+            ],
+          },
+        ],
+      },
+      fragment: { module, entryPoint: "fs_sim", targets: [{ format: this.format }] },
+      primitive: { topology: "triangle-list" },
+      depthStencil: {
+        format: DEPTH_FORMAT,
+        depthWriteEnabled: true,
+        depthCompare: "less-equal",
+      },
+    });
+
+    this.simUniformBuffer = this.createUniform(96);
+    this.simHighlightUniformBuffer = this.createUniform(96);
+    this.simBindGroup = device.createBindGroup({
+      layout: bindGroupLayout,
+      entries: [{ binding: 0, resource: { buffer: this.simUniformBuffer } }],
+    });
+    this.simHighlightBindGroup = device.createBindGroup({
+      layout: bindGroupLayout,
+      entries: [{ binding: 0, resource: { buffer: this.simHighlightUniformBuffer } }],
+    });
+  }
+
+  /** Whether the FEM surface replaces the raymarched solid. */
+  get simulationActive(): boolean {
+    return this._simulationActive;
+  }
+
+  set simulationActive(active: boolean) {
+    if (active === this._simulationActive) return;
+    this._simulationActive = active;
+    this.invalidate();
+  }
+
+  /** Replace the FEM surface mesh (null clears it). */
+  setSimulationMesh(payload: SimulationMeshPayload | null): void {
+    this.simIndexCount = 0;
+    this.simHighlight = null;
+    if (!payload || !this.device || payload.indices.length === 0) {
+      this.invalidate();
+      return;
+    }
+    const vertexCount = payload.vertex_count;
+    const interleaved = new Float32Array(vertexCount * 4);
+    for (let index = 0; index < vertexCount; index++) {
+      interleaved[index * 4] = payload.positions[index * 3];
+      interleaved[index * 4 + 1] = payload.positions[index * 3 + 1];
+      interleaved[index * 4 + 2] = payload.positions[index * 3 + 2];
+      interleaved[index * 4 + 3] = payload.scalars[index];
+    }
+    const indices = new Uint32Array(payload.indices);
+    this.simVertexBuffer?.destroy();
+    this.simVertexBuffer = this.device.createBuffer({
+      label: "simulation vertices",
+      size: interleaved.byteLength,
+      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+    });
+    this.device.queue.writeBuffer(this.simVertexBuffer, 0, interleaved);
+    this.simIndexBuffer?.destroy();
+    this.simIndexBuffer = this.device.createBuffer({
+      label: "simulation indices",
+      size: indices.byteLength,
+      usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
+    });
+    this.device.queue.writeBuffer(this.simIndexBuffer, 0, indices);
+    this.simIndexCount = indices.length;
+    this.simRange = payload.range;
+    this.simBounds = meshBounds(payload.positions);
+    this.invalidate();
+  }
+
+  /** Tint one face group's triangle range on hover (null clears it). */
+  setSimulationHighlight(range: { start: number; count: number } | null): void {
+    this.simHighlight = range;
+    this.scheduleRender();
+  }
+
+  /** Move the ParaView-style clip plane of the simulation surface. */
+  setSimulationClip(clip: SliceState): void {
+    this.simClip = { ...clip };
+    this.scheduleRender();
   }
 
   /**
@@ -1022,6 +1168,45 @@ export class Renderer {
     // coincident construction lines instead of z-fighting into dashes.
     overlay.set([DEPTH_NUDGE * 0.4, 0, 0, 0], 24);
     device.queue.writeBuffer(this.meshOverlayBuffer, 0, overlay);
+
+    if (this._simulationActive && this.simUniformBuffer && this.simHighlightUniformBuffer) {
+      const { normal, offset } = slicePlane(this.simClip, this.simBounds);
+      const [low, high] = this.simRange;
+      const span = high - low;
+      const inverseRange = span > 1e-12 ? 1 / span : 0;
+      const sim = new Float32Array(24);
+      sim.set(matrix, 0);
+      sim.set([normal[0], normal[1], normal[2], offset], 16);
+      sim.set([low, inverseRange, 0, this.simClip.enabled ? 1 : 0], 20);
+      device.queue.writeBuffer(this.simUniformBuffer, 0, sim);
+      // The highlight pass re-draws a face group's range with a warm tint.
+      sim.set([low, inverseRange, 0.55, this.simClip.enabled ? 1 : 0], 20);
+      device.queue.writeBuffer(this.simHighlightUniformBuffer, 0, sim);
+    }
+  }
+
+  /** Draw the FEM surface (and its hovered face group) into the pass. */
+  private drawSimulation(pass: GPURenderPassEncoder): void {
+    if (
+      !this._simulationActive ||
+      !this.simPipeline ||
+      !this.simBindGroup ||
+      !this.simVertexBuffer ||
+      !this.simIndexBuffer ||
+      this.simIndexCount === 0
+    ) {
+      return;
+    }
+    pass.setPipeline(this.simPipeline);
+    pass.setBindGroup(0, this.simBindGroup);
+    pass.setVertexBuffer(0, this.simVertexBuffer);
+    pass.setIndexBuffer(this.simIndexBuffer, "uint32");
+    pass.drawIndexed(this.simIndexCount);
+    const highlight = this.simHighlight;
+    if (highlight && this.simHighlightBindGroup) {
+      pass.setBindGroup(0, this.simHighlightBindGroup);
+      pass.drawIndexed(highlight.count, 1, highlight.start);
+    }
   }
 
   private drawOverlay(pass: GPURenderPassEncoder): void {
@@ -1097,7 +1282,9 @@ export class Renderer {
       depthLoadOp: "clear",
       depthStoreOp: "store",
     };
-    const tracing = this.pathTracing && this.pathReady && !this.interacting;
+    // The path tracer draws the SDF scene, which simulation display replaces.
+    const tracing =
+      this.pathTracing && this.pathReady && !this.interacting && !this._simulationActive;
 
     if (tracing) {
       this.ensureAccumulation();
@@ -1146,6 +1333,7 @@ export class Renderer {
       previewPass.setPipeline(this.previewPipeline);
       previewPass.setBindGroup(0, this.previewBindGroup);
       previewPass.draw(3);
+      this.drawSimulation(previewPass);
       this.drawOverlay(previewPass);
       previewPass.end();
     }
@@ -1178,6 +1366,8 @@ export class Renderer {
     this.edgeBuffer?.destroy();
     this.handleBuffer?.destroy();
     this.gizmoBuffer?.destroy();
+    this.simVertexBuffer?.destroy();
+    this.simIndexBuffer?.destroy();
     this.device?.destroy();
   }
 }

@@ -245,5 +245,63 @@ export type ToolMode =
 /** How a gizmo drag transforms the selected construction object. */
 export type GizmoMode = "translate" | "rotate" | "scale";
 
+/** One boundary face group of the simulation hex mesh — a BC target. */
+export interface SimulationFaceGroup {
+  /** Gradient-axis id such as `+x` or `-z`. */
+  id: string;
+  axis: "x" | "y" | "z";
+  side: "+" | "-";
+  center: [number, number, number];
+  area: number;
+  faces: number;
+  /** This group's triangle range in the payload's index buffer. */
+  start: number;
+  count: number;
+}
+
+/** Indexed boundary-surface triangles with one scalar per vertex. */
+export interface SimulationMeshPayload {
+  /** Flat xyz positions, three floats per vertex. */
+  positions: number[];
+  /** One scalar per vertex (temperature, von Mises, or zero for a probe). */
+  scalars: number[];
+  /** Flat triangle list into the compacted vertex array. */
+  indices: number[];
+  groups: SimulationFaceGroup[];
+  /** Min and max of the scalar field. */
+  range: [number, number];
+  vertex_count: number;
+}
+
+/** `probe` only meshes and returns the face-group catalog; the rest solve. */
+export type SimulationKind = "probe" | "thermal" | "elastic";
+
+/** One boundary condition, targeting a face group by id. */
+export interface SimulationBc {
+  group: string;
+  type: "dirichlet" | "traction";
+  value: number | [number, number, number];
+}
+
+export interface SimulateRequest {
+  source: string;
+  kind: SimulationKind;
+  resolution: number;
+  bcs: SimulationBc[];
+  material: Record<string, number>;
+}
+
+export interface SimulateResponse {
+  ok: boolean;
+  kind?: SimulationKind;
+  /** Which nodal field `mesh.scalars` carries; null for a probe. */
+  field?: "temperature" | "von_mises" | null;
+  mesh?: SimulationMeshPayload;
+  error?: string;
+  /** `fem_unavailable` when the jax-fem extra is not installed (HTTP 501). */
+  error_kind?: string;
+  output?: string;
+}
+
 /** What a click in the viewport picks. */
 export type SelectionMode = "object" | "vertex";

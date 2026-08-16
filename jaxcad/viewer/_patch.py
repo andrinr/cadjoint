@@ -193,11 +193,24 @@ def set_value(source: str, line: int, name: str, argument: str, value) -> str:
     call = locate_call(source, line, {name})
     if call is None:
         raise PatchError(f"No editable {name}() call found at line {line}.")
-    if name == "PolygonProfile" and argument == "planeOrigin":
+    if name == "PolygonProfile" and argument in {"planeOrigin", "planeNormal"}:
+        keyword = "origin" if argument == "planeOrigin" else "normal"
+        plane = locate_call(source, line, {"SketchPlane"})
+        if plane is not None:
+            # The profile already carries a plane: rewrite that keyword in
+            # place, or append it to the SketchPlane call when absent.
+            span = plane.arguments.get(keyword)
+            if span is None:
+                insert = plane.arguments_end
+                return _validate(
+                    source[:insert] + f", {keyword}={_format_value(value)}" + source[insert:]
+                )
+            start, end = span
+            return _validate(source[:start] + _format_value(value) + source[end:])
         insert = call.arguments_end
         patched = _validate(
             source[:insert]
-            + f", plane=SketchPlane(origin={_format_value(value)})"
+            + f", plane=SketchPlane({keyword}={_format_value(value)})"
             + source[insert:]
         )
         return _ensure_import(

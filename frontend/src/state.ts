@@ -22,6 +22,14 @@ import type {
 } from "./types";
 import { placeEdges } from "./viewer/gizmo";
 import type { PendingLoft } from "./loft";
+import {
+  autoEnterSketchMode,
+  cycleEditingMode,
+  loadEditingMode,
+  persistEditingMode,
+  type EditingMode,
+} from "./editingMode";
+import { DEFAULT_SKETCH_PLANE, type SketchPlaneChoice } from "./sketchPlanes";
 
 export const [source, setSource] = createSignal("");
 export const [nodes, setNodes] = createSignal<ConstructionNode[]>([]);
@@ -120,6 +128,49 @@ export interface GizmoDrag {
   rotation: [number, number, number];
   dimensions: Record<string, number | number[]>;
 }
+
+/** Top-level editing mode: what family of tools the rail offers. */
+const [editingModeSignal, setEditingModeSignal] = createSignal<EditingMode>(loadEditingMode());
+export const editingMode = editingModeSignal;
+
+/** Sketch profile that last auto-entered sketch mode, for cancelability. */
+let lastAutoSketchId: string | null = null;
+
+export function setEditingMode(mode: EditingMode): void {
+  setEditingModeSignal(mode);
+  persistEditingMode(mode);
+  if (mode !== "sketch") {
+    // A manual exit must not bounce back while the same sketch is selected.
+    const active = selection();
+    lastAutoSketchId = active ? active.nodeId : null;
+  }
+}
+
+/** Keyboard cycling between the editing modes. */
+export function cycleMode(step: 1 | -1 = 1): void {
+  setEditingMode(cycleEditingMode(editingMode(), step));
+}
+
+/**
+ * Feed a selection change into the sketch-mode auto-entry rule.
+ *
+ * Called from an effect in App: selecting a sketch profile enters sketch
+ * mode once; Escape or the mode switcher can leave again without fighting it.
+ */
+export function reactToSelectionForMode(): void {
+  const active = selection();
+  const node = active ? nodeById(active.nodeId) : null;
+  const next = autoEnterSketchMode(editingMode(), node, lastAutoSketchId);
+  lastAutoSketchId = next.lastAutoNodeId;
+  if (next.mode !== editingMode()) {
+    setEditingModeSignal(next.mode);
+    persistEditingMode(next.mode);
+  }
+}
+
+/** Plane the next placed sketch lands on (quick pick or a solid's face). */
+export const [sketchPlane, setSketchPlane] =
+  createSignal<SketchPlaneChoice>(DEFAULT_SKETCH_PLANE);
 
 export const [drag, setDrag] = createSignal<DragState | null>(null);
 export const [gizmoDrag, setGizmoDrag] = createSignal<GizmoDrag | null>(null);

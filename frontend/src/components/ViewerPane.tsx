@@ -25,8 +25,12 @@ import {
   gizmoDrag,
   cameraAngles,
   busy,
+  cycleMode,
+  editingMode,
+  setEditingMode,
   selectionMode,
   setCameraAngles,
+  sketchPlane,
   setGizmoDrag,
   setGizmoMode,
   hover,
@@ -76,6 +80,11 @@ import {
 import type { ConstraintKind, GizmoMode } from "../types";
 import { VIEWER_TOOL_KEYS, type ViewerToolAction } from "../shortcuts";
 import { loftPickError } from "../loft";
+import {
+  pickSurfacePoint,
+  quickPlaneEmission,
+  type SketchPlaneEmission,
+} from "../sketchPlanes";
 import {
   CONSTRAINT_TOOL_NAMES,
   edgeVertexIndices,
@@ -368,18 +377,39 @@ export function ViewerPane(props: ViewerPaneProps) {
     if (newest) setSelection({ nodeId: newest.id, vertexIndex: null });
   };
 
-  /** Place a new identity-oriented sketch where the pointer meets world XY. */
+  /**
+   * Place a new sketch on the chosen plane.
+   *
+   * Quick picks intersect the pointer ray with a world plane; "on face"
+   * ray-casts the solids under the cursor and adopts the surface point and
+   * its normal. A non-default normal is written with a second patch
+   * (`set_value planeNormal`) once the sketch exists in the source.
+   */
   const handlePlaceSketch = async (x: number, y: number) => {
     const view = pickView();
     const ray = rayFromPixel(x, y, view);
-    const hit =
-      intersectPlane(ray, [0, 0, 0], [0, 0, 1]) ??
-      add(ray.origin, scale(ray.direction, Math.max(1, renderer.camera.distance)));
-    await props.onAddSketch([hit[0], hit[1], hit[2]]);
+    const choice = sketchPlane();
+    let emission: SketchPlaneEmission;
+    if (choice === "face") {
+      const hit = pickSurfacePoint(nodes(), ray);
+      if (!hit) {
+        setStatus({ kind: "error", text: "On face: click a solid's surface." });
+        return;
+      }
+      emission = { origin: hit.point, normal: hit.normal };
+    } else {
+      emission = quickPlaneEmission(choice, ray, renderer.camera.distance);
+    }
+    await props.onAddSketch(emission.origin);
+    let sketches = profiles();
+    let newest = sketches[sketches.length - 1];
+    if (emission.normal && newest?.line != null) {
+      await props.onSetValue(newest.line, "PolygonProfile", "planeNormal", emission.normal);
+      sketches = profiles();
+      newest = sketches[sketches.length - 1];
+    }
     setTool("select");
     setSelectionMode("object");
-    const sketches = profiles();
-    const newest = sketches[sketches.length - 1];
     if (newest) setSelection({ nodeId: newest.id, vertexIndex: null });
   };
 
@@ -944,18 +974,23 @@ export function ViewerPane(props: ViewerPaneProps) {
         setPendingLoft(null);
         setSelection(null);
         setTool("select");
+        // Escape backs all the way out to the default editing mode.
+        setEditingMode("model");
       }
       if (!typing && !event.metaKey && !event.ctrlKey && !event.altKey) {
         // Key→action table shared with the Help dialog (src/shortcuts.ts).
+        // Placement shortcuts for solid primitives imply model mode, so the
+        // keys keep working from any mode without leaving a hidden tool armed.
         const actions: Record<ViewerToolAction, () => void> = {
           "select-object": () => (setTool("select"), setSelectionMode("object")),
           "select-vertex": () => (setTool("select"), setSelectionMode("vertex")),
           "tool-polygon": () => setTool("polygon"),
-          "tool-box": () => setTool("box"),
-          "tool-sphere": () => setTool("sphere"),
-          "tool-cylinder": () => setTool("cylinder"),
+          "tool-box": () => (setEditingMode("model"), setTool("box")),
+          "tool-sphere": () => (setEditingMode("model"), setTool("sphere")),
+          "tool-cylinder": () => (setEditingMode("model"), setTool("cylinder")),
           "gizmo-translate": () => setGizmoMode("translate"),
           "gizmo-rotate": () => setGizmoMode("rotate"),
+          "cycle-mode": () => cycleMode(event.shiftKey ? -1 : 1),
         };
         const action = VIEWER_TOOL_KEYS[event.key.toLowerCase()];
         if (action) {
@@ -1153,9 +1188,19 @@ export function ViewerPane(props: ViewerPaneProps) {
           </button>
         </div>
       )}
-      <p class="viewer-hint">
-        {pendingLoft()
+      <p class="viewer-hint" data-testid="viewer-hint">
+        <b class="hint-mode" data-testid="hint-mode">
+          {editingMode()}
+        </b>
+        {" · "}
+        {editingMode() === "simulate"
+          ? "Simulation setup · M cycles modes · Esc returns to model"
+          : pendingLoft()
           ? "Loft: click the second sketch in the viewport · Esc to cancel"
+          : tool() === "sketch"
+          ? sketchPlane() === "face"
+            ? "Sketch: click a solid's face to place it there · Esc to cancel"
+            : `Sketch: click to place on the ${sketchPlane().toUpperCase()} plane · Esc to cancel`
           : tool() === "polygon"
           ? "Point: click sketch edges to add vertices · Esc to finish"
           : isVertexConstraintTool(tool())

@@ -14,6 +14,8 @@ import type {
   SceneLoadResponse,
   SceneSaveResponse,
   SessionResponse,
+  SimulateRequest,
+  SimulateResponse,
 } from "./types";
 
 let token = "";
@@ -70,6 +72,16 @@ export async function patch(
  */
 export async function mesh(source: string): Promise<MeshResponse> {
   return post<MeshResponse>("/api/mesh", { source });
+}
+
+/**
+ * Mesh the scene into hexahedra and run (or just probe) a FEM simulation.
+ *
+ * Errors come back in the body — including `error_kind: "fem_unavailable"`
+ * when the optional jax-fem extra is missing — so callers can render them.
+ */
+export async function simulate(body: SimulateRequest): Promise<SimulateResponse> {
+  return post<SimulateResponse>("/api/simulate", body);
 }
 
 /** List saved scene files in the server's `scenes` workspace. */
