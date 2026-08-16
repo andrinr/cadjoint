@@ -44,7 +44,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
   {
     title: "Modes",
     items: [
-      { keys: "M", action: "Cycle Model → Sketch → Simulate" },
+      { keys: "M", action: "Cycle Model → Sketch → Simulate → Render" },
       { keys: "Shift + M", action: "Cycle modes backwards" },
       { keys: "Esc", action: "Return to Model mode" },
     ],

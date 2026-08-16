@@ -1,27 +1,22 @@
-/** Top bar: source controls and the compact entry point to render presets. */
+/** Top bar: brand, the mode switcher, source controls, and status. */
 
 import { Show } from "solid-js";
-import { busy, dirty, nodeById, selection, status } from "../state";
-import { DisplayOptions } from "./DisplayOptions";
-import { CodeIcon, PlayIcon, ResetIcon } from "./icons";
-import type { DisplaySettings } from "../viewer/renderer";
-import type { RenderPreset, RenderPresetId } from "../renderPresets";
+import {
+  busy,
+  dirty,
+  editingMode,
+  nodeById,
+  selection,
+  setEditingMode,
+  status,
+} from "../state";
+import { ModeSwitcher } from "./ModeSwitcher";
+import { CodeIcon, DisplayIcon, PlayIcon, ResetIcon } from "./icons";
 
 export interface ToolbarProps {
-  display: DisplaySettings;
-  renderPresets: RenderPreset[];
-  selectedRenderPreset: RenderPresetId;
-  onDisplayChange: (patch: Partial<DisplaySettings>) => void;
-  onRenderPresetActivate: (id: RenderPresetId) => void;
-  onRenderPresetSave: (id: RenderPresetId) => void;
-  onRenderPresetReset: (id: RenderPresetId) => void;
-  onPathTracingChange: (enabled: boolean) => void;
   onRun: () => void;
   onReset: () => void;
-  onQualityChange: (key: string) => void;
   onShowWgsl: () => void;
-  pathTracing: boolean;
-  quality: string;
   wgslReady: boolean;
 }
 
@@ -32,6 +27,8 @@ export function Toolbar(props: ToolbarProps) {
         <span class="mark">jx</span>
         <span>JAXCAD</span>
       </div>
+
+      <ModeSwitcher />
 
       <div class="spacer" />
 
@@ -48,19 +45,21 @@ export function Toolbar(props: ToolbarProps) {
         {status().text}
       </span>
 
-      <DisplayOptions
-        display={props.display}
-        presets={props.renderPresets}
-        selectedPreset={props.selectedRenderPreset}
-        quality={props.quality}
-        onChange={props.onDisplayChange}
-        onQualityChange={props.onQualityChange}
-        onPresetActivate={props.onRenderPresetActivate}
-        onPresetSave={props.onRenderPresetSave}
-        onPresetReset={props.onRenderPresetReset}
-        pathTracing={props.pathTracing}
-        onPathTracingChange={props.onPathTracingChange}
-      />
+      {/* The old render-settings popover became Render mode; the eye is now a
+          shortcut into it (and back out), so muscle memory keeps working. */}
+      <button
+        type="button"
+        class={`icon ${editingMode() === "render" ? "active" : ""}`}
+        onClick={() =>
+          setEditingMode(editingMode() === "render" ? "model" : "render")
+        }
+        title="Render settings — opens Render mode"
+        aria-label="Render settings"
+        aria-pressed={editingMode() === "render"}
+        data-testid="display-options"
+      >
+        <DisplayIcon />
+      </button>
       <button
         type="button"
         class="icon"

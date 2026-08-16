@@ -245,6 +245,16 @@ export function SimulateModeIcon(props: IconProps) {
   );
 }
 
+/** Camera aperture blades: the render mode. */
+export function RenderModeIcon(props: IconProps) {
+  return (
+    <svg {...base(props.size ?? 18)}>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M14 8.6l4.9 8.5M10 8.6h8.3M8.1 12l4.9-8.5M10 15.4L5.2 7M14 15.4H5.7M15.9 12L11 20.5" />
+    </svg>
+  );
+}
+
 /** Profile pushed upward: extrude. */
 export function ExtrudeIcon(props: IconProps) {
   return (

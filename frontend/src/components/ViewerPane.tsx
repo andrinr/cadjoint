@@ -974,7 +974,7 @@ export function ViewerPane(props: ViewerPaneProps) {
         // themselves in the capture phase); only a bare viewport Escape backs
         // the editing state out.
         const overlayOpen = document.querySelector(
-          ".dialog-backdrop, .menu-dropdown, .display-options .popover, .tool-group.open",
+          ".dialog-backdrop, .menu-dropdown, .tool-group.open",
         );
         if (!overlayOpen) {
           setPendingConstraint(null);
@@ -1203,6 +1203,8 @@ export function ViewerPane(props: ViewerPaneProps) {
         {" · "}
         {editingMode() === "simulate"
           ? "Simulation setup · M cycles modes · Esc returns to model"
+          : editingMode() === "render"
+          ? "Render setup · presets & quality in the Render panel · M cycles modes · Esc returns to model"
           : pendingLoft()
           ? "Loft: click the second sketch in the viewport · Esc to cancel"
           : tool() === "sketch"

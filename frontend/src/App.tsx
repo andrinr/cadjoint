@@ -12,6 +12,7 @@ import { EditorPane } from "./components/EditorPane";
 import { MaterialPanel } from "./components/MaterialPanel";
 import { MenuBar } from "./components/MenuBar";
 import { ObjectTree } from "./components/ObjectTree";
+import { RenderPanel } from "./components/RenderPanel";
 import { SimulatePanel } from "./components/SimulatePanel";
 import { SketchPanel } from "./components/SketchPanel";
 import { ToolRail } from "./components/ToolRail";
@@ -550,7 +551,9 @@ export function App() {
   });
 
   return (
-    <div class="app">
+    // data-mode drives the per-mode accent variables in the stylesheet, so
+    // the switcher, rail, dock, hint bar, and viewport border stay in step.
+    <div class="app" data-mode={editingMode()}>
       <MenuBar
         canUndo={canUndo()}
         canRedo={canRedo()}
@@ -560,24 +563,13 @@ export function App() {
         onAdoptScene={adoptScene}
       />
       <Toolbar
-        display={display()}
-        renderPresets={renderPresets()}
-        selectedRenderPreset={selectedRenderPreset()}
-        onDisplayChange={applyDisplay}
-        onRenderPresetActivate={activateRenderPreset}
-        onRenderPresetSave={saveRenderPreset}
-        onRenderPresetReset={resetRenderPreset}
-        onPathTracingChange={applyPathTracing}
         onRun={() => void run()}
         onReset={() => {
           setSource(example());
           setSelection(null);
           void run();
         }}
-        onQualityChange={applyQuality}
         onShowWgsl={() => setShowWgsl(true)}
-        pathTracing={pathTracing()}
-        quality={quality()}
         wgslReady={wgsl() !== null}
       />
 
@@ -648,14 +640,21 @@ export function App() {
                 onExtrude={extrudeSelection}
                 onRevolve={revolveSelection}
               />
-              {/* Right-side dock: Objects tree, then the contextual sketch
-                  properties, then materials, then the simulate slot. One
-                  column; sections share the height and scroll internally. */}
+              {/* Right-side dock, scoped by editing mode: Model shows Objects
+                  + Materials, Sketch shows Objects + Sketch properties,
+                  Simulate and Render each own the column with their panel.
+                  One column; sections share the height and scroll
+                  internally. */}
               <div class="dock">
-                <Show when={panels().objectTree}>
+                <Show
+                  when={
+                    (editingMode() === "model" || editingMode() === "sketch") &&
+                    panels().objectTree
+                  }
+                >
                   <ObjectTree />
                 </Show>
-                <Show when={panels().sketch && editingMode() !== "simulate"}>
+                <Show when={editingMode() === "sketch" && panels().sketch}>
                   <SketchPanel
                     onFix={() => {
                       const active = selection();
@@ -693,7 +692,7 @@ export function App() {
                     }
                   />
                 </Show>
-                <Show when={panels().materials}>
+                <Show when={editingMode() === "model" && panels().materials}>
                   <MaterialPanel
                     onCreate={addMaterial}
                     onSetValue={(line, argument, value) =>
@@ -709,6 +708,23 @@ export function App() {
                   <div class="mode-simulate-slot" data-testid="mode-simulate">
                     <SimulatePanel renderer={renderer} />
                   </div>
+                </Show>
+                {/* Render mode owns the dock with the full render settings —
+                    the panel the eye-icon popover grew into. */}
+                <Show when={editingMode() === "render"}>
+                  <RenderPanel
+                    display={display()}
+                    presets={renderPresets()}
+                    selectedPreset={selectedRenderPreset()}
+                    pathTracing={pathTracing()}
+                    quality={quality()}
+                    onChange={applyDisplay}
+                    onQualityChange={applyQuality}
+                    onPresetActivate={activateRenderPreset}
+                    onPresetSave={saveRenderPreset}
+                    onPresetReset={resetRenderPreset}
+                    onPathTracingChange={applyPathTracing}
+                  />
                 </Show>
               </div>
               <ViewCube

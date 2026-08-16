@@ -11,6 +11,29 @@
   color-scheme: dark;
 }
 
+/* Per-mode accent, threaded through the mode switcher, tool rail, dock
+   section headers, hint bar, and the viewport border. Keep the values in
+   sync with MODE_ACCENTS in src/editingMode.ts. */
+.app[data-mode="model"] {
+  --mode-accent: #d9ff57;
+  --mode-accent-rgb: 217, 255, 87;
+}
+
+.app[data-mode="sketch"] {
+  --mode-accent: #7fd6f5;
+  --mode-accent-rgb: 127, 214, 245;
+}
+
+.app[data-mode="simulate"] {
+  --mode-accent: #ffb25c;
+  --mode-accent-rgb: 255, 178, 92;
+}
+
+.app[data-mode="render"] {
+  --mode-accent: #d8a6ff;
+  --mode-accent-rgb: 216, 166, 255;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -188,6 +211,67 @@ body {
   flex: 1;
 }
 
+/* Mode switcher: a prominent segmented control next to the brand, the way
+   Blender and Fusion place their workspace picker. Each segment lights in
+   its own mode accent when active. */
+.mode-switcher {
+  display: flex;
+  gap: 2px;
+  margin-left: 8px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #0a0c0b;
+}
+
+.mode-switcher button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+}
+
+.mode-switcher button svg {
+  width: 15px;
+  height: 15px;
+}
+
+.mode-switcher button:hover:not(.active) {
+  border-color: transparent;
+  background: #171a17;
+  color: var(--ink);
+}
+
+.mode-switcher button[data-mode="model"] {
+  --seg-rgb: 217, 255, 87;
+}
+
+.mode-switcher button[data-mode="sketch"] {
+  --seg-rgb: 127, 214, 245;
+}
+
+.mode-switcher button[data-mode="simulate"] {
+  --seg-rgb: 255, 178, 92;
+}
+
+.mode-switcher button[data-mode="render"] {
+  --seg-rgb: 216, 166, 255;
+}
+
+.mode-switcher button.active {
+  border-color: rgba(var(--seg-rgb), 0.6);
+  background: rgba(var(--seg-rgb), 0.12);
+  color: rgb(var(--seg-rgb));
+}
+
 button,
 select {
   height: 30px;
@@ -267,9 +351,9 @@ button.primary {
 }
 
 .tool-rail button.active {
-  border-color: var(--lime);
-  background: #202616;
-  color: var(--lime);
+  border-color: var(--mode-accent, var(--lime));
+  background: rgba(var(--mode-accent-rgb, 217, 255, 87), 0.12);
+  color: var(--mode-accent, var(--lime));
 }
 
 .tool-rail button:disabled {
@@ -291,26 +375,10 @@ button.primary {
 }
 
 .rail-hint {
-  color: var(--lime);
+  color: var(--mode-accent, var(--lime));
   font: 600 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-}
-
-/* Editing-mode switcher at the top of the rail. */
-.mode-switch {
-  display: flex;
-  gap: 2px;
-  padding: 2px;
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  background: rgba(255, 255, 255, 0.03);
-}
-
-.tool-rail .mode-switch button {
-  width: 26px;
-  height: 26px;
-  border-radius: 7px;
 }
 
 /* Grouped tool clusters: the parent shows the last-used child and expands
@@ -334,7 +402,7 @@ button.primary {
 }
 
 .tool-group-parent.active .tool-group-caret {
-  border-bottom-color: var(--lime);
+  border-bottom-color: var(--mode-accent, var(--lime));
 }
 
 .tool-flyout {
@@ -654,7 +722,12 @@ button.primary {
   min-height: 150px;
 }
 
-/* Collapsed sections: one shared launcher look (icon · label · count). */
+.dock .render-panel {
+  min-height: 160px;
+}
+
+/* Collapsed sections: one shared launcher look (icon · label · count).
+   The accent top border is the dock's share of the mode identity. */
 .object-tree-launch,
 .material-launch,
 .sim-launch {
@@ -665,6 +738,7 @@ button.primary {
   height: 36px;
   padding: 0 12px 0 10px;
   border: 1px solid var(--line);
+  border-top: 2px solid rgba(var(--mode-accent-rgb, 217, 255, 87), 0.42);
   border-radius: 11px;
   background: rgba(14, 17, 15, 0.9);
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.3);
@@ -691,17 +765,31 @@ button.primary {
   text-align: center;
 }
 
-/* Expanded sections: one shared panel shell. */
+/* Expanded sections: one shared panel shell with the mode-accent header
+   strip along the top edge. */
 .object-tree-panel,
 .material-panel,
 .sim-panel,
-.sketch-panel {
+.sketch-panel,
+.render-panel {
   width: 100%;
   border: 1px solid var(--line);
+  border-top: 2px solid rgba(var(--mode-accent-rgb, 217, 255, 87), 0.42);
   border-radius: 13px;
   background: rgba(14, 17, 15, 0.91);
   box-shadow: 0 16px 42px rgba(0, 0, 0, 0.35);
   backdrop-filter: blur(12px);
+}
+
+/* Section header kickers pick up the accent too, so an open dock reads as
+   part of the active mode at a glance. */
+.object-tree-panel > header small,
+.sketch-panel header small,
+.material-panel-title small,
+.sim-panel header small,
+.render-panel header small {
+  color: rgba(var(--mode-accent-rgb, 217, 255, 87), 0.85);
+  opacity: 1;
 }
 
 /* Object tree ----------------------------------------------------------- */
@@ -773,12 +861,12 @@ button.primary {
 }
 
 .object-tree-row.active {
-  background: rgba(217, 255, 87, 0.08);
-  outline: 1px solid rgba(217, 255, 87, 0.4);
+  background: rgba(var(--mode-accent-rgb, 217, 255, 87), 0.08);
+  outline: 1px solid rgba(var(--mode-accent-rgb, 217, 255, 87), 0.4);
 }
 
 .object-tree-row:focus-visible {
-  outline: 1px solid var(--lime);
+  outline: 1px solid var(--mode-accent, var(--lime));
 }
 
 .object-tree-row.operator {
@@ -1224,11 +1312,7 @@ button.primary {
   color: var(--lime);
 }
 
-/* Render settings panel ------------------------------------------------ */
-
-.display-options {
-  position: relative;
-}
+/* Render settings panel (a dock section, owned by Render mode) ---------- */
 
 button.icon {
   display: grid;
@@ -1237,38 +1321,63 @@ button.icon {
   padding: 0;
 }
 
+/* The eye is active exactly while Render mode is, so it glows in that
+   mode's accent rather than the default lime. */
+.toolbar button.icon.active {
+  border-color: rgba(var(--mode-accent-rgb, 217, 255, 87), 0.6);
+  background: rgba(var(--mode-accent-rgb, 217, 255, 87), 0.12);
+  color: var(--mode-accent, var(--lime));
+}
+
 button.primary svg {
   margin-right: 6px;
 }
 
-.display-options .popover {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  z-index: 20;
+.render-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.render-panel > header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px 8px;
+}
+
+.render-panel > header > span {
+  display: flex;
+  flex-direction: column;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.05;
+}
+
+.render-panel > header small {
+  margin-top: 3px;
+  font: 600 8px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.render-settings {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  width: 300px;
-  /* The popover's top edge sits ~92px below the viewport top (menu bar +
-     toolbar + gap); subtract that and a bottom margin so the panel always
-     stays fully on-screen and scrolls internally instead. */
-  max-height: calc(100vh - 104px);
-  padding: 14px;
+  min-height: 0;
+  padding: 0 12px 12px;
   overflow: auto;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--panel);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
 }
 
-.display-options section {
+.render-settings section {
   display: flex;
   flex-direction: column;
   gap: 7px;
 }
 
-.display-options h4 {
+.render-settings h4 {
   margin: 0;
   color: var(--muted);
   font: 600 10px/1 system-ui;
@@ -1315,8 +1424,8 @@ button.primary svg {
 }
 
 .render-preset-card.active {
-  border-color: rgba(217, 255, 87, 0.72);
-  background: rgba(217, 255, 87, 0.055);
+  border-color: rgba(var(--mode-accent-rgb, 217, 255, 87), 0.72);
+  background: rgba(var(--mode-accent-rgb, 217, 255, 87), 0.055);
 }
 
 .render-preset-card.active::after {
@@ -1326,8 +1435,8 @@ button.primary svg {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--lime);
-  box-shadow: 0 0 8px rgba(217, 255, 87, 0.72);
+  background: var(--mode-accent, var(--lime));
+  box-shadow: 0 0 8px rgba(var(--mode-accent-rgb, 217, 255, 87), 0.72);
   content: "";
 }
 
@@ -1437,7 +1546,7 @@ button.primary svg {
 }
 
 .render-customize > i {
-  color: var(--lime);
+  color: var(--mode-accent, var(--lime));
   font: normal 16px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
@@ -1492,8 +1601,8 @@ button.primary svg {
 }
 
 .segmented button.active {
-  background: #222a1b;
-  color: var(--lime);
+  background: rgba(var(--mode-accent-rgb, 217, 255, 87), 0.14);
+  color: var(--mode-accent, var(--lime));
 }
 
 .switch {
@@ -1511,7 +1620,7 @@ button.primary svg {
 
 .switch input {
   margin-top: 2px;
-  accent-color: var(--lime);
+  accent-color: var(--mode-accent, var(--lime));
 }
 
 .switch span {
@@ -1854,6 +1963,19 @@ button.primary svg {
   background: #090b0a;
 }
 
+/* Subtle mode cue on the viewport itself: a thin tinted border with a
+   slightly stronger strip along the top edge. Non-interactive; sits above
+   the canvas but under every overlay. */
+.viewer-pane::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  border: 1px solid rgba(var(--mode-accent-rgb, 217, 255, 87), 0.16);
+  border-top: 2px solid rgba(var(--mode-accent-rgb, 217, 255, 87), 0.5);
+  pointer-events: none;
+}
+
 .viewer-canvas {
   flex: 1;
   width: 100%;
@@ -1975,9 +2097,13 @@ button.primary svg {
   pointer-events: none;
 }
 
-/* Active editing mode, leading the hint bar. */
+/* Active editing mode, leading the hint bar: an accent-tinted pill. */
 .viewer-hint .hint-mode {
-  color: var(--lime);
+  padding: 2px 7px;
+  border: 1px solid rgba(var(--mode-accent-rgb, 217, 255, 87), 0.45);
+  border-radius: 999px;
+  background: rgba(var(--mode-accent-rgb, 217, 255, 87), 0.1);
+  color: var(--mode-accent, var(--lime));
   font: 600 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
   letter-spacing: 0.08em;
   text-transform: uppercase;

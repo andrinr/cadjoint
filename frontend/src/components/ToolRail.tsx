@@ -1,12 +1,13 @@
 /**
- * Vertical tool rail: mode switcher on top, grouped tool clusters below.
+ * Vertical tool rail: grouped tool clusters, scoped by the editing mode.
  *
- * The switcher scopes the rail to an editing mode (model / sketch /
- * simulate), the way Blender's mode dropdown scopes its tool set. Tools sit
- * in expandable clusters: a parent icon shows the group's last-used child
- * and expands — on hover dwell or click — into a horizontal flyout of the
- * children, like Photoshop's nested tools. Flyouts close on selection,
- * Escape, or a mouse-leave delay; the last-used choice persists.
+ * The mode switcher itself lives in the toolbar (`ModeSwitcher`); the rail
+ * only shows the clusters the active mode offers, and disappears entirely in
+ * tool-less modes (Simulate, Render). Tools sit in expandable clusters: a
+ * parent icon shows the group's last-used child and expands — on hover dwell
+ * or click — into a horizontal flyout of the children, like Photoshop's
+ * nested tools. Flyouts close on selection, Escape, or a mouse-leave delay;
+ * the last-used choice persists.
  *
  * The open/close rules live in `../flyout`, the mode filtering in
  * `../editingMode` — both pure and unit tested.
@@ -22,7 +23,6 @@ import {
   pendingLoft,
   selection,
   selectionMode,
-  setEditingMode,
   setGizmoMode,
   setPendingLoft,
   setSelection,
@@ -35,7 +35,7 @@ import {
 import {
   createToolVisibleInMode,
   groupVisibleInMode,
-  type EditingMode,
+  railGroupsForMode,
 } from "../editingMode";
 import { FlyoutController, loadLastUsed, persistLastUsed } from "../flyout";
 import { SKETCH_PLANE_CHOICES } from "../sketchPlanes";
@@ -49,7 +49,6 @@ import {
   ExtrudeIcon,
   HorizontalIcon,
   LoftIcon,
-  ModelModeIcon,
   MoveIcon,
   ObjectSelectIcon,
   ParallelIcon,
@@ -59,19 +58,11 @@ import {
   RevolveIcon,
   RotateIcon,
   ScaleIcon,
-  SimulateModeIcon,
-  SketchModeIcon,
   SphereIcon,
   TrashIcon,
   VertexSelectIcon,
   VerticalIcon,
 } from "./icons";
-
-const EDIT_MODES: { key: EditingMode; label: string; hint: string; icon: Component }[] = [
-  { key: "model", label: "Model", hint: "Model mode — solids and transforms  (M cycles)", icon: ModelModeIcon },
-  { key: "sketch", label: "Sketch", hint: "Sketch mode — 2D profiles and constraints  (M cycles)", icon: SketchModeIcon },
-  { key: "simulate", label: "Simulate", hint: "Simulate mode — FEM setup  (M cycles)", icon: SimulateModeIcon },
-];
 
 const SELECT_MODES: { key: SelectionMode; label: string; hint: string; icon: Component }[] = [
   { key: "object", label: "Object", hint: "Select whole objects  (1)", icon: ObjectSelectIcon },
@@ -204,7 +195,7 @@ export function ToolRail(props: ToolRailProps) {
     const active = tool();
     if (active === "select") return;
     const available =
-      mode !== "simulate" &&
+      railGroupsForMode(mode).length > 0 &&
       (CREATE.some((entry) => entry.key === active)
         ? createToolVisibleInMode(active, mode)
         : mode === "sketch");
@@ -293,27 +284,11 @@ export function ToolRail(props: ToolRailProps) {
   };
 
   return (
+    // Tool-less modes (Simulate, Render) hide the rail entirely — their dock
+    // panel is the whole workspace, and an empty rail would read as broken.
+    <Show when={railGroupsForMode(editingMode()).length > 0}>
     <nav class="tool-rail" aria-label="Tools">
-      <div class="mode-switch" role="group" aria-label="Editing mode">
-        <For each={EDIT_MODES}>
-          {(mode) => (
-            <button
-              type="button"
-              classList={{ active: editingMode() === mode.key }}
-              onClick={() => setEditingMode(mode.key)}
-              title={mode.hint}
-              aria-label={`${mode.label} mode`}
-              aria-pressed={editingMode() === mode.key}
-              data-testid={`editmode-${mode.key}`}
-            >
-              <Dynamic component={mode.icon} />
-            </button>
-          )}
-        </For>
-      </div>
-
       <Show when={groupVisibleInMode("select", editingMode())}>
-        <hr />
         <For each={SELECT_MODES}>
           {(mode) => (
             <button
@@ -419,7 +394,7 @@ export function ToolRail(props: ToolRailProps) {
         </div>
       </Show>
 
-      <Show when={transformable() && editingMode() !== "simulate"}>
+      <Show when={transformable()}>
         <span class="rail-hint" data-testid="rail-hint">
           {activeTransform() === "translate"
             ? "move"
@@ -429,5 +404,6 @@ export function ToolRail(props: ToolRailProps) {
         </span>
       </Show>
     </nav>
+    </Show>
   );
 }

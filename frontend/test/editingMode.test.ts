@@ -28,14 +28,16 @@ const boxNode = (id: string): ConstructionNode =>
   ({ id, kind: "box" }) as ConstructionNode;
 
 describe("editing mode cycling", () => {
-  it("cycles forward through model, sketch, simulate and wraps", () => {
+  it("cycles forward through model, sketch, simulate, render and wraps", () => {
     expect(cycleEditingMode("model")).toBe("sketch");
     expect(cycleEditingMode("sketch")).toBe("simulate");
-    expect(cycleEditingMode("simulate")).toBe("model");
+    expect(cycleEditingMode("simulate")).toBe("render");
+    expect(cycleEditingMode("render")).toBe("model");
   });
 
   it("cycles backwards and wraps the other way", () => {
-    expect(cycleEditingMode("model", -1)).toBe("simulate");
+    expect(cycleEditingMode("model", -1)).toBe("render");
+    expect(cycleEditingMode("render", -1)).toBe("simulate");
     expect(cycleEditingMode("simulate", -1)).toBe("sketch");
   });
 
@@ -67,9 +69,11 @@ describe("mode filtering of tool groups", () => {
     expect(groups).toContain("select");
   });
 
-  it("simulate mode hides every tool group", () => {
+  it("simulate and render modes hide every tool group", () => {
     expect(railGroupsForMode("simulate")).toEqual([]);
     expect(groupVisibleInMode("delete", "simulate")).toBe(false);
+    expect(railGroupsForMode("render")).toEqual([]);
+    expect(groupVisibleInMode("select", "render")).toBe(false);
   });
 
   it("filters create tools per mode: solids are model-only", () => {
@@ -107,9 +111,11 @@ describe("sketch-mode auto-entry", () => {
     expect(next.lastAutoNodeId).toBeNull();
   });
 
-  it("never hijacks simulate mode", () => {
-    const next = autoEnterSketchMode("simulate", profileNode("s1"), null);
-    expect(next.mode).toBe("simulate");
+  it("never hijacks simulate or render mode", () => {
+    const simulate = autoEnterSketchMode("simulate", profileNode("s1"), null);
+    expect(simulate.mode).toBe("simulate");
+    const render = autoEnterSketchMode("render", profileNode("s1"), null);
+    expect(render.mode).toBe("render");
   });
 });
 
@@ -118,6 +124,8 @@ describe("editing mode persistence", () => {
     const storage = memoryStorage();
     persistEditingMode("sketch", storage);
     expect(loadEditingMode(storage)).toBe("sketch");
+    persistEditingMode("render", storage);
+    expect(loadEditingMode(storage)).toBe("render");
   });
 
   it("falls back to model for unknown or missing values", () => {

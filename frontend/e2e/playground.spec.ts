@@ -418,15 +418,20 @@ test("render presets activate, edit, and persist without bloating the closed UI"
   page,
 }) => {
   const before = await editorText(page);
+  // Outside Render mode the settings cost nothing: no panel, no cards.
+  await expect(page.getByTestId("render-panel")).toHaveCount(0);
   await expect(page.locator(".render-preset-card")).toHaveCount(0);
+  // The eye icon is the shortcut into Render mode, where the panel lives.
   await page.getByTestId("display-options").click();
+  await expect(page.getByTestId("editmode-render")).toHaveClass(/active/);
 
+  await expect(page.getByTestId("render-panel")).toBeVisible();
   await expect(page.locator(".render-preset-card")).toHaveCount(3);
   await expect(page.getByTestId("render-preset-editor")).toHaveCount(0);
   await expect(page.getByTestId("render-preset-xray")).toHaveClass(/active/);
-  const compactPanel = await page.locator(".display-options .popover").boundingBox();
+  const compactPanel = await page.getByTestId("render-panel").boundingBox();
   expect(compactPanel!.width).toBeLessThanOrEqual(310);
-  expect(compactPanel!.height).toBeLessThan(260);
+  expect(compactPanel!.height).toBeLessThan(300);
 
   await page.getByTestId("render-preset-studio").click();
   await expect(page.getByTestId("render-preset-studio")).toHaveClass(/active/);
@@ -453,7 +458,9 @@ test("render presets activate, edit, and persist without bloating the closed UI"
   await waitForCompile(page);
   const dismiss = page.getByRole("button", { name: "Dismiss" });
   if (await dismiss.isVisible().catch(() => false)) await dismiss.click();
-  await page.getByTestId("display-options").click();
+  // Render mode itself persists across the reload, panel and all.
+  await expect(page.getByTestId("editmode-render")).toHaveClass(/active/);
+  await expect(page.getByTestId("render-panel")).toBeVisible();
   await expect(page.getByTestId("render-preset-studio")).toHaveClass(/active/);
   await page.getByTestId("render-customize").click();
   await expect(page.getByTestId("shadows-off")).toHaveClass(/active/);
@@ -473,16 +480,15 @@ test("render presets activate, edit, and persist without bloating the closed UI"
 
 test("the source-code pane stays above floating panels", async ({ page }) => {
   await page.getByTestId("display-options").click();
-  const popover = page.locator(".display-options .popover");
-  await expect(popover).toBeVisible();
+  await expect(page.getByTestId("render-panel")).toBeVisible();
 
   const editorZ = await page
     .locator(".editor-pane")
     .evaluate((node) => Number.parseInt(getComputedStyle(node).zIndex, 10));
-  const popoverZ = await popover.evaluate((node) =>
-    Number.parseInt(getComputedStyle(node).zIndex, 10),
-  );
-  expect(editorZ).toBeGreaterThan(popoverZ);
+  const dockZ = await page
+    .locator(".dock")
+    .evaluate((node) => Number.parseInt(getComputedStyle(node).zIndex, 10));
+  expect(editorZ).toBeGreaterThan(dockZ);
 });
 
 test("editing the code updates the sketch the viewer reports", async ({ page }) => {
@@ -985,7 +991,9 @@ test("path tracing yields to interactive dragging and resumes afterwards", async
     })
     .toBe(true);
   await waitForCompile(page);
+  // Re-entering Render mode mounts a fresh panel with Customize collapsed.
   await page.getByTestId("display-options").click();
+  await page.getByTestId("render-customize").click();
   await expect(page.getByTestId("toggle-path-tracing")).toBeChecked();
 });
 
@@ -1006,6 +1014,15 @@ test("editing modes scope the tool rail and Escape returns to model", async ({ p
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("editmode-model")).toHaveClass(/active/);
   await expect(page.getByTestId("mode-simulate")).toHaveCount(0);
+
+  // Render mode owns the dock with the render settings panel; Escape leaves.
+  await page.getByTestId("editmode-render").click();
+  await expect(page.getByTestId("render-panel")).toBeVisible();
+  await expect(page.getByTestId("hint-mode")).toHaveText("render");
+  await expect(page.getByTestId("tool-group-create")).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("editmode-model")).toHaveClass(/active/);
+  await expect(page.getByTestId("render-panel")).toHaveCount(0);
 
   // Selecting a sketch auto-enters sketch mode, where constraint tools live.
   const metrics = await canvasMetrics(page);

@@ -8,10 +8,22 @@
 
 import type { ConstructionNode } from "./types";
 
-export type EditingMode = "model" | "sketch" | "simulate";
+export type EditingMode = "model" | "sketch" | "simulate" | "render";
 
 /** Switcher order, also the keyboard cycling order. */
-export const EDITING_MODES: EditingMode[] = ["model", "sketch", "simulate"];
+export const EDITING_MODES: EditingMode[] = ["model", "sketch", "simulate", "render"];
+
+/**
+ * Per-mode identity: label plus the accent color threaded through the mode
+ * switcher, tool rail, dock headers, hint bar, and viewport border. The CSS
+ * mirrors these values via `.app[data-mode=…]`; keep the two in sync.
+ */
+export const MODE_ACCENTS: Record<EditingMode, string> = {
+  model: "#d9ff57",
+  sketch: "#7fd6f5",
+  simulate: "#ffb25c",
+  render: "#d8a6ff",
+};
 
 /** The next mode when cycling with the keyboard (wraps around). */
 export function cycleEditingMode(mode: EditingMode, step: 1 | -1 = 1): EditingMode {
@@ -33,6 +45,7 @@ const GROUPS_BY_MODE: Record<EditingMode, RailGroupId[]> = {
   model: ["select", "create", "transform", "delete"],
   sketch: ["select", "create", "modify", "transform", "annotate", "delete"],
   simulate: [],
+  render: [],
 };
 
 /** The clusters the rail shows in `mode`, in display order. */
@@ -65,14 +78,14 @@ export function createToolVisibleInMode(tool: string, mode: EditingMode): boolea
  * Predictable and cancelable: only a *newly* selected sketch profile enters
  * sketch mode (`lastAutoNodeId` remembers the previous auto-entry, so leaving
  * sketch mode manually while the same sketch stays selected is respected),
- * and simulate mode is never hijacked by a selection.
+ * and simulate/render mode is never hijacked by a selection.
  */
 export function autoEnterSketchMode(
   mode: EditingMode,
   node: ConstructionNode | null | undefined,
   lastAutoNodeId: string | null,
 ): { mode: EditingMode; lastAutoNodeId: string | null } {
-  if (mode === "simulate") return { mode, lastAutoNodeId };
+  if (mode === "simulate" || mode === "render") return { mode, lastAutoNodeId };
   if (!node || node.kind !== "profile") {
     // Leaving the sketch (or selecting a solid) re-arms auto-entry.
     return { mode, lastAutoNodeId: null };
@@ -101,7 +114,7 @@ function defaultStorage(): StringStorage | undefined {
 export function loadEditingMode(storage: StringStorage | undefined = defaultStorage()): EditingMode {
   try {
     const raw = storage?.getItem(EDITING_MODE_STORAGE_KEY);
-    return raw === "sketch" || raw === "simulate" ? raw : "model";
+    return raw === "sketch" || raw === "simulate" || raw === "render" ? raw : "model";
   } catch {
     return "model";
   }
