@@ -10,15 +10,14 @@ import pytest
 from jaxcad.fem import (
     Dirichlet,
     ElasticStudy,
-    FaceSelector,
     Fixed,
     GridSpec,
     HeatFlux,
+    Nodes,
     ThermalStudy,
     Traction,
     capture_studies,
     sdf_to_hex_mesh,
-    select_faces,
 )
 from jaxcad.geometry.parameters import Vector
 from jaxcad.sdf.primitives import Box
@@ -42,8 +41,8 @@ def _thermal_study(**overrides):
         "resolution": _RESOLUTION,
         "conductivity": 2.0,
         "bcs": [
-            Dirichlet(FaceSelector.side("-x"), 1.0),
-            Dirichlet(FaceSelector.side("+x"), 0.0),
+            Dirichlet(Nodes.side("-x"), 1.0),
+            Dirichlet(Nodes.side("+x"), 0.0),
         ],
         "bounds": _BOUNDS,
         "size": _SIZE,
@@ -59,8 +58,8 @@ def _elastic_study(**overrides):
         "youngs": 1000.0,
         "poisson": 0.3,
         "bcs": [
-            Fixed(FaceSelector.side("-x")),
-            Traction(FaceSelector.side("+x"), (0.0, 0.0, -1.0)),
+            Fixed(Nodes.side("-x")),
+            Traction(Nodes.side("+x"), (0.0, 0.0, -1.0)),
         ],
         "bounds": _BOUNDS,
         "size": _SIZE,
@@ -70,17 +69,19 @@ def _elastic_study(**overrides):
 
 
 class TestValidation:
-    def test_bad_side_name(self):
-        with pytest.raises(ValueError, match="side must be one of"):
-            FaceSelector.side("+w")
+    def test_bc_requires_a_node_selection(self):
+        with pytest.raises(ValueError, match="node selection"):
+            Dirichlet(lambda center: center[0] > 0.99, 1.0)
+        with pytest.raises(ValueError, match="node selection"):
+            Fixed("-x")
+        with pytest.raises(ValueError, match="node selection"):
+            Traction(None, (0.0, 0.0, -1.0))
+        with pytest.raises(ValueError, match="node selection"):
+            HeatFlux([1, 2, 3], 0.5)
 
-    def test_box_selector_needs_center_and_extent(self):
-        with pytest.raises(ValueError, match="center and extent"):
-            FaceSelector(kind="box")
-
-    def test_predicate_selector_needs_callable(self):
-        with pytest.raises(ValueError, match="callable"):
-            FaceSelector(kind="predicate", predicate=None)
+    def test_traction_vector_shape(self):
+        with pytest.raises(ValueError, match="vector"):
+            Traction(Nodes.side("+x"), (0.0, 1.0))
 
     def test_empty_name(self):
         with pytest.raises(ValueError, match="non-empty name"):
@@ -100,9 +101,9 @@ class TestValidation:
 
     def test_wrong_bc_type_for_study(self):
         with pytest.raises(ValueError, match="accepts boundary conditions"):
-            _thermal_study(bcs=[Fixed(FaceSelector.side("-x"))])
+            _thermal_study(bcs=[Fixed(Nodes.side("-x"))])
         with pytest.raises(ValueError, match="accepts boundary conditions"):
-            _elastic_study(bcs=[Dirichlet(FaceSelector.side("-x"), 1.0)])
+            _elastic_study(bcs=[Dirichlet(Nodes.side("-x"), 1.0)])
 
     def test_thermal_solve_requires_a_dirichlet(self):
         study = _thermal_study(bcs=[])
@@ -110,20 +111,31 @@ class TestValidation:
             study.solve(_bar())
 
     def test_elastic_solve_requires_a_fixed(self):
-        study = _elastic_study(bcs=[Traction(FaceSelector.side("+x"), (0.0, 0.0, -1.0))])
+        study = _elastic_study(bcs=[Traction(Nodes.side("+x"), (0.0, 0.0, -1.0))])
         with pytest.raises(ValueError, match="at least one Fixed"):
             study.solve(_bar())
 
-    def test_heat_flux_declared_but_not_solvable(self):
+    def test_unmatched_selection_fails_before_solving(self):
         study = _thermal_study(
             bcs=[
-                Dirichlet(FaceSelector.side("-x"), 1.0),
-                HeatFlux(FaceSelector.side("+x"), 0.5),
+                Dirichlet(Nodes.side("-x"), 1.0),
+                Dirichlet(Nodes.sphere([50.0, 0.0, 0.0], 0.1), 0.0),
             ]
         )
-        assert study.describe()["bcs"][1]["type"] == "heat_flux"
-        with pytest.raises(NotImplementedError, match="HeatFlux"):
-            study.solve(_bar())
+        with pytest.raises(ValueError, match="matched no boundary nodes"):
+            study.solve(_bar(), mesh=_bar_mesh())
+
+    def test_faceless_flux_selection_fails_before_solving(self):
+        # A single corner node spans no complete boundary quad, so an
+        # area-integrated BC cannot act on it.
+        study = _thermal_study(
+            bcs=[
+                Dirichlet(Nodes.side("-x"), 1.0),
+                HeatFlux(Nodes.sphere([1.0, 0.15, 0.15], 0.01), 0.5),
+            ]
+        )
+        with pytest.raises(ValueError, match="spans no complete boundary face"):
+            study.solve(_bar(), mesh=_bar_mesh())
 
 
 class TestDescribe:
@@ -139,7 +151,7 @@ class TestDescribe:
         assert payload["material"] == {"conductivity": 2.0}
         assert payload["bcs"][0] == {
             "type": "dirichlet",
-            "selector": {"kind": "side", "side": "-x"},
+            "nodes": {"kind": "side", "side": "-x", "tol": None},
             "value": 1.0,
         }
 
@@ -148,58 +160,36 @@ class TestDescribe:
         assert json.loads(json.dumps(payload)) == payload
         assert payload["kind"] == "elastic"
         assert payload["material"] == {"youngs": 1000.0, "poisson": 0.3}
+        assert payload["bcs"][0] == {
+            "type": "fixed",
+            "nodes": {"kind": "side", "side": "-x", "tol": None},
+        }
         assert payload["bcs"][1]["vector"] == [0.0, 0.0, -1.0]
 
-    def test_box_and_predicate_selectors_describe(self):
-        box = FaceSelector.box((1.0, 0.0, 0.0), (0.02, 0.4, 0.4))
-        assert box.describe() == {
-            "kind": "box",
-            "center": [1.0, 0.0, 0.0],
-            "extent": [0.02, 0.4, 0.4],
+    def test_heat_flux_describe(self):
+        bc = HeatFlux(Nodes.side("+x"), 0.5)
+        assert bc.describe() == {
+            "type": "heat_flux",
+            "nodes": {"kind": "side", "side": "+x", "tol": None},
+            "flux": 0.5,
         }
 
-        def loaded_face(center):
-            return center[0] > 0.99
-
-        described = FaceSelector.where(loaded_face).describe()
-        assert described == {"kind": "predicate", "callable": "loaded_face"}
-        assert json.loads(json.dumps(described)) == described
-
-
-class TestSelectors:
-    def test_side_selector_matches_manual_predicate(self):
-        mesh = _bar_mesh()
-        by_side = FaceSelector.side("+x").resolve(mesh)
-        by_hand = select_faces(mesh, lambda center: center[0] > 0.99)
-        assert {tuple(row) for row in by_side.nodes} == {tuple(row) for row in by_hand.nodes}
-
-    def test_box_selector_matches_side_group(self):
-        mesh = _bar_mesh()
-        by_box = FaceSelector.box((1.0, 0.0, 0.0), (0.02, 0.4, 0.4)).resolve(mesh)
-        by_side = FaceSelector.side("+x").resolve(mesh)
-        assert {tuple(row) for row in by_box.nodes} == {tuple(row) for row in by_side.nodes}
-
-    def test_predicate_selector_passthrough(self):
-        mesh = _bar_mesh()
-        selector = FaceSelector.where(lambda center, normal: normal[0] > 0.9)
-        group = selector.resolve(mesh)
-        assert np.allclose(group.normals[:, 0], 1.0)
-
-    def test_unmatched_selector_raises(self):
-        mesh = _bar_mesh()
-        with pytest.raises(ValueError, match="matched no boundary faces"):
-            FaceSelector.box((50.0, 0.0, 0.0), (0.1, 0.1, 0.1)).resolve(mesh)
+    def test_composed_selection_describes_through_the_bc(self):
+        clamp = Fixed(Nodes.sphere([0.0, 0.0, 0.0], 0.5) | Nodes.box([0, 0, 0], [1, 1, 1]))
+        payload = clamp.describe()
+        assert payload["nodes"]["kind"] == "or"
+        assert json.loads(json.dumps(payload)) == payload
 
 
 class TestCapture:
     def test_capture_collects_exec_declared_studies(self):
         source = "\n".join(
             [
-                "from jaxcad.fem import Dirichlet, ElasticStudy, FaceSelector, Fixed, ThermalStudy",
+                "from jaxcad.fem import Dirichlet, ElasticStudy, Fixed, Nodes, ThermalStudy",
                 "ThermalStudy(name='captured-thermal', resolution=8, conductivity=1.0,",
-                "             bcs=[Dirichlet(FaceSelector.side('-x'), 1.0)])",
+                "             bcs=[Dirichlet(Nodes.side('-x'), 1.0)])",
                 "ElasticStudy(name='captured-elastic', resolution=8, youngs=10.0, poisson=0.2,",
-                "             bcs=[Fixed(FaceSelector.side('-x'))])",
+                "             bcs=[Fixed(Nodes.side('-x'))])",
             ]
         )
         with capture_studies() as studies:
@@ -243,6 +233,20 @@ class TestSolve:
         euler = -force * 2.0**3 / (3.0 * 1000.0 * inertia)
         assert tip_uz < 0.0
         assert 0.7 < tip_uz / euler < 1.3
+
+    def test_heat_flux_study_solves_on_the_direct_backend(self):
+        pytest.importorskip("jax_fem")
+        # -k T'' = 0 with T(-1) = 0 and k T'(1) = q: T(x) = (q/k)(x + 1).
+        study = _thermal_study(
+            bcs=[
+                Dirichlet(Nodes.side("-x"), 0.0),
+                HeatFlux(Nodes.side("+x"), 1.0),
+            ]
+        )
+        result = study.solve(_bar())
+        temperature = np.asarray(result.temperature)
+        expected = (result.mesh.points[:, 0] + 1.0) * (1.0 / 2.0)
+        assert np.abs(temperature - expected).max() < 1e-6
 
     def test_solve_accepts_pre_extracted_mesh(self):
         pytest.importorskip("jax_fem")

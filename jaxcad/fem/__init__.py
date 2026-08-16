@@ -13,21 +13,27 @@ from jaxcad.fem.hexmesh import (
     GridSpec,
     HexMesh,
     corner_tet_volumes,
+    faces_from_nodes,
     project_points,
     recompute_points,
     sdf_to_hex_mesh,
     select_faces,
 )
+from jaxcad.fem.selection import Nodes, NodeSelection, selection_from_description
 
 __all__ = [
     "FaceGroup",
     "GridSpec",
     "HexMesh",
+    "NodeSelection",
+    "Nodes",
     "corner_tet_volumes",
+    "faces_from_nodes",
     "project_points",
     "recompute_points",
     "sdf_to_hex_mesh",
     "select_faces",
+    "selection_from_description",
 ]
 
 # Declarative study layer (code-first simulation, capture registry for the
@@ -35,7 +41,6 @@ __all__ = [
 from jaxcad.fem.study import (  # noqa: E402
     Dirichlet,
     ElasticStudy,
-    FaceSelector,
     Fixed,
     HeatFlux,
     ThermalStudy,
@@ -46,7 +51,6 @@ from jaxcad.fem.study import (  # noqa: E402
 __all__ += [
     "Dirichlet",
     "ElasticStudy",
-    "FaceSelector",
     "Fixed",
     "HeatFlux",
     "ThermalStudy",

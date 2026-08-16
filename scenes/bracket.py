@@ -14,6 +14,7 @@ Named design parameters (drive the FEM optimization in
 
 from jaxcad.constraints import DistanceConstraint, FixedConstraint, satisfy_constraints
 from jaxcad.construction import PolygonProfile, SketchPlane, Solid, extrude
+from jaxcad.fem import ElasticStudy, Fixed, Nodes, Traction
 from jaxcad.geometry import Scalar, Vector, Vector2
 from jaxcad.render import Material
 from jaxcad.sdf.boolean import Difference, Union
@@ -82,3 +83,24 @@ hole_right = Solid.cylinder(radius=0.16, height=0.4, position=bolt_right, name="
 body = Union(plate, web, rib, smoothness=0.05)
 scene = Difference(body, hole_left, hole_right, smoothness=0.02)
 satisfy_constraints(scene, steps=2)
+
+# ── simulation study: bolt regions clamped, prying load on the web tip ───────
+# Node selections are programmatic: a ball around each bolt hole is fixed,
+# and the traction acts on the boundary faces spanned by the outer (-y) web
+# wall above z = 1.0 (mirrors examples/fem_bracket_optimization.py).
+pry_study = ElasticStudy(
+    name="bracket-pry",
+    resolution=(24, 17, 13),
+    youngs=1000.0,
+    poisson=0.3,
+    bcs=[
+        Fixed(Nodes.sphere([-0.7, 0.35, 0.1], 0.33) | Nodes.sphere([0.7, 0.35, 0.1], 0.33)),
+        Traction(
+            Nodes.halfspace([0.0, -0.7, 0.0], [0.0, -1.0, 0.0])
+            & Nodes.halfspace([0.0, 0.0, 1.0], [0.0, 0.0, 1.0]),
+            (0.0, -2.0, 0.0),
+        ),
+    ],
+    bounds=(-1.3, -0.95, -0.06),
+    size=(2.6, 1.9, 1.42),
+)

@@ -1,10 +1,18 @@
 """Thermal and structural simulation on SDF-extracted hex meshes.
 
 Public entry points :func:`thermal_solve` and :func:`elastic_solve` resolve
-face predicates against the mesh's boundary quads, hand array-level BCs to
-a pluggable solver backend (:mod:`jaxcad.fem.backends`; direct in-process
+boundary patches — :class:`~jaxcad.fem.selection.NodeSelection` values or
+legacy face predicates — against the mesh, hand array-level BCs to a
+pluggable solver backend (:mod:`jaxcad.fem.backends`; direct in-process
 jax-fem by default), and return small result objects with VTK export for
 ParaView.
+
+Patch semantics: a ``NodeSelection`` used for a node-valued condition
+(prescribed temperature, clamp) applies to its selected node set directly;
+used for an area-integrated condition (traction, heat flux) it spans the
+boundary faces all four of whose corners are selected
+(:func:`~jaxcad.fem.hexmesh.faces_from_nodes`).  A callable patch is the
+legacy face-predicate form resolved via :func:`~jaxcad.fem.select_faces`.
 
 Requires the ``fem`` extra (jax-fem) for the default backend; add the
 ``tesseract`` extra for ``backend="tesseract"``.
@@ -24,11 +32,14 @@ from typing import Any, Callable
 import numpy as np
 
 from jaxcad.fem.backends import ElasticBCs, SolverBackend, ThermalBCs, get_backend
-from jaxcad.fem.hexmesh import HexMesh, select_faces
+from jaxcad.fem.hexmesh import HexMesh, faces_from_nodes, select_faces
+from jaxcad.fem.selection import NodeSelection
 
 __all__ = ["ElasticResult", "ThermalResult", "elastic_solve", "thermal_solve"]
 
 Predicate = Callable[..., Any]
+#: A boundary patch: a node selection or a legacy face predicate.
+Patch = NodeSelection | Predicate
 
 # Trilinear corner signs of the VTK hex in reference coordinates [-1, 1]^3;
 # dN_i/dxi at the element center is _CORNER_SIGNS[i] / 8.
@@ -53,6 +64,36 @@ def _patch_nodes(mesh: HexMesh, predicate: Predicate) -> np.ndarray:
     if group.nodes.size == 0:
         raise ValueError("Boundary-condition predicate selected no boundary faces.")
     return np.unique(group.nodes).astype(np.int32)
+
+
+def _node_patch(mesh: HexMesh, patch: Patch) -> np.ndarray:
+    """Node indices for a node-valued condition (Dirichlet / clamp).
+
+    A :class:`NodeSelection` applies to its selected node set directly; a
+    legacy predicate resolves to the unique nodes of its matching faces.
+    """
+    if isinstance(patch, NodeSelection):
+        return patch.resolve(mesh)
+    return _patch_nodes(mesh, patch)
+
+
+def _face_patch(mesh: HexMesh, patch: Patch) -> np.ndarray:
+    """Node indices spanning an area-integrated condition (traction / flux).
+
+    A :class:`NodeSelection` spans the boundary faces whose four corners
+    are all selected; the returned set is the union of those corners so a
+    backend applies the load to exactly the spanned faces.
+    """
+    if isinstance(patch, NodeSelection):
+        group = faces_from_nodes(mesh, patch.resolve(mesh))
+        if group.nodes.size == 0:
+            raise ValueError(
+                f"Selection {patch.describe()} spans no complete boundary face; "
+                "area-integrated conditions need all four corners of at least one "
+                "boundary quad selected."
+            )
+        return np.unique(group.nodes).astype(np.int32)
+    return _patch_nodes(mesh, patch)
 
 
 def _export_vtk(path: str, mesh: HexMesh, point_data: dict, cell_data: dict) -> None:
@@ -144,7 +185,8 @@ def thermal_solve(
     mesh: HexMesh,
     *,
     conductivity: float,
-    dirichlet: list[tuple[Predicate, float]],
+    dirichlet: list[tuple[Patch, float]],
+    neumann: list[tuple[Patch, float]] | None = None,
     source: float = 0.0,
     backend: str | SolverBackend | None = None,
     points: Any = None,
@@ -154,12 +196,16 @@ def thermal_solve(
     Args:
         mesh: Hex mesh from :func:`jaxcad.fem.sdf_to_hex_mesh`.
         conductivity: Thermal conductivity ``k`` (constant).
-        dirichlet: ``(predicate, temperature)`` pairs; each predicate picks a
-            boundary patch via :func:`jaxcad.fem.select_faces` — called with
-            the face center, or ``(center, normal)`` if it takes two
-            arguments.  With the default direct backend a temperature may be
-            a traced JAX scalar: the solve is then differentiable w.r.t. the
-            prescribed value (lifted formulation).
+        dirichlet: ``(patch, temperature)`` pairs; each patch is a
+            :class:`~jaxcad.fem.Nodes` selection (applied to its node set
+            directly) or a legacy face predicate for
+            :func:`jaxcad.fem.select_faces`.  With the default direct
+            backend a temperature may be a traced JAX scalar: the solve is
+            then differentiable w.r.t. the prescribed value (lifted
+            formulation).
+        neumann: ``(patch, flux)`` pairs prescribing a heat inflow per area
+            (positive heats the body) on the boundary faces spanned by the
+            patch.  Direct backend only for now.
         source: Volumetric heat source ``q``.
         backend: Backend name (``"jaxfem"`` default, ``"tesseract"``) or a
             :class:`~jaxcad.fem.backends.SolverBackend` instance.
@@ -172,10 +218,12 @@ def thermal_solve(
         adjoint VJP w.r.t. ``points``, ``conductivity``, and ``source``.
     """
     bcs = ThermalBCs(
-        dirichlet_nodes=[_patch_nodes(mesh, predicate) for predicate, _ in dirichlet],
+        dirichlet_nodes=[_node_patch(mesh, patch) for patch, _ in dirichlet],
         dirichlet_values=[
             float(value) if isinstance(value, (int, float)) else value for _, value in dirichlet
         ],
+        flux_nodes=[_face_patch(mesh, patch) for patch, _ in (neumann or [])],
+        flux_values=[float(value) for _, value in (neumann or [])],
     )
     solver = get_backend(backend)
     solve_points = mesh.points if points is None else points
@@ -195,8 +243,8 @@ def elastic_solve(
     *,
     youngs: float,
     poisson: float,
-    dirichlet: list[Predicate],
-    tractions: list[tuple[Predicate, Any]],
+    dirichlet: list[Patch],
+    tractions: list[tuple[Patch, Any]],
     backend: str | SolverBackend | None = None,
     points: Any = None,
 ) -> ElasticResult:
@@ -206,10 +254,11 @@ def elastic_solve(
         mesh: Hex mesh from :func:`jaxcad.fem.sdf_to_hex_mesh`.
         youngs: Young's modulus.
         poisson: Poisson ratio.
-        dirichlet: Predicates picking fully-clamped boundary patches
-            (all displacement components fixed to zero).
-        tractions: ``(predicate, vector)`` pairs applying a constant traction
-            (force per area) on the selected boundary patch.
+        dirichlet: Patches picking fully-clamped node sets (all displacement
+            components fixed to zero) — :class:`~jaxcad.fem.Nodes`
+            selections applied directly, or legacy face predicates.
+        tractions: ``(patch, vector)`` pairs applying a constant traction
+            (force per area) on the boundary faces spanned by the patch.
         backend: Backend name or instance (see :func:`thermal_solve`).
         points: Optional traced override of ``mesh.points`` (same shape) for
             differentiable frozen-topology solves.
@@ -219,8 +268,8 @@ def elastic_solve(
         adjoint VJP w.r.t. ``points``.
     """
     bcs = ElasticBCs(
-        fixed_nodes=[_patch_nodes(mesh, predicate) for predicate in dirichlet],
-        traction_nodes=[_patch_nodes(mesh, predicate) for predicate, _ in tractions],
+        fixed_nodes=[_node_patch(mesh, patch) for patch in dirichlet],
+        traction_nodes=[_face_patch(mesh, patch) for patch, _ in tractions],
         traction_vectors=[np.asarray(vector, dtype=np.float64) for _, vector in tractions],
     )
     solver = get_backend(backend)

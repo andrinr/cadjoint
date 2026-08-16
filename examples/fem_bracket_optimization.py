@@ -37,6 +37,7 @@ import jax.numpy as jnp
 import numpy as np
 
 from jaxcad.fem.hexmesh import GridSpec, HexMesh, recompute_points, sdf_to_hex_mesh
+from jaxcad.fem.selection import Nodes
 from jaxcad.fem.simulate import elastic_solve
 from jaxcad.sdf.boolean.smooth import smooth_min
 from jaxcad.sdf.primitives.box import Box
@@ -142,20 +143,17 @@ def build_mesh() -> HexMesh:
     return sdf_to_hex_mesh(nominal, build_grid())
 
 
-def bolt_region(center) -> bool:
-    """Boundary faces on or around either bolt hole (clamped)."""
-    xy = np.asarray(center[:2])
-    return any(np.hypot(*(xy - np.asarray(b))) < 0.30 for b in _BOLT_XY)
+# Clamped nodes: a ball around each bolt hole (through the plate thickness).
+BOLT_CLAMP = Nodes.sphere([-0.7, 0.35, 0.1], 0.33) | Nodes.sphere([0.7, 0.35, 0.1], 0.33)
 
-
-def web_tip(center, normal) -> bool:
-    """Outer (-y) side faces near the top edge of the web (loaded).
-
-    Restricting the patch to the outward-facing side wall keeps the loaded
-    area — and with it the total applied force — independent of the web
-    thickness the optimizer is changing.
-    """
-    return center[2] > 1.05 and center[1] < -0.4 and normal[1] < -0.5
+# Loaded nodes: the outer (-y) wall of the web above z = 1.0.  Restricting
+# the patch to the outward-facing side wall keeps the loaded area — and with
+# it the total applied force — independent of the web thickness the
+# optimizer is changing (the traction acts on faces whose four corners are
+# all selected, so inner-wall and top faces never qualify).
+WEB_TIP_LOAD = Nodes.halfspace([0.0, -0.7, 0.0], [0.0, -1.0, 0.0]) & Nodes.halfspace(
+    [0.0, 0.0, 1.0], [0.0, 0.0, 1.0]
+)
 
 
 def make_objective(mesh: HexMesh):
@@ -186,8 +184,8 @@ def make_objective(mesh: HexMesh):
             mesh,
             youngs=_YOUNGS,
             poisson=_POISSON,
-            dirichlet=[bolt_region],
-            tractions=[(web_tip, list(_TRACTION))],
+            dirichlet=[BOLT_CLAMP],
+            tractions=[(WEB_TIP_LOAD, list(_TRACTION))],
             points=points,
         )
         compliance = jnp.sum(result.displacement**2)
@@ -248,8 +246,8 @@ def run_optimization(steps: int = 4, learning_rates=_LEARNING_RATES, export_vtk:
                 candidate_mesh,
                 youngs=_YOUNGS,
                 poisson=_POISSON,
-                dirichlet=[bolt_region],
-                tractions=[(web_tip, list(_TRACTION))],
+                dirichlet=[BOLT_CLAMP],
+                tractions=[(WEB_TIP_LOAD, list(_TRACTION))],
             )
             path = f"fem_bracket_{name}.vtu"
             result.vtk_export(path)

@@ -17,6 +17,8 @@ differences. This note records what runs today, the honest limits, and the follo
 | Tesseract plugin ABI (local, no Docker) | working, gradients bit-identical to direct | `jaxcad/fem/tesseracts/thermal_jaxfem/` |
 | Elastic solve packaged as a tesseract | working, gradients bit-identical to direct | `jaxcad/fem/tesseracts/elastic_jaxfem/` |
 | Differentiable Dirichlet *values* (thermal, direct backend) | working via lifted solve, FD-validated | `JaxFemBackend.thermal` + `tests/fem/test_dirichlet_gradient.py` |
+| Programmatic node selection (`Nodes` + boolean algebra) | working, serializable | `jaxcad/fem/selection.py` |
+| Heat-flux (Neumann) BCs on the direct backend | working, analytic-validated | `JaxFemBackend.thermal` surface maps |
 
 ### Versions
 
@@ -107,22 +109,61 @@ end-ring cells distort slightly (~3% local error on the misaligned thermal bar �
 tested and tolerated explicitly). Cells use VTK/meshio HEX8 ordering, which
 jax-fem consumes directly (it reorders to basix internally).
 
-## BC selection design
+## BC selection design: programmatic node selections
 
-Now: **predicates over boundary faces**. `sdf_to_hex_mesh` tags every boundary
-quad with center + outward normal and groups by dominant SDF-gradient axis
-(`"+x"`, `"-z"`, ...). `select_faces(mesh, predicate)` takes
-`predicate(center)` or `predicate(center, normal)`; `thermal_solve`/`elastic_solve`
-accept `(predicate, value)` pairs and resolve them to node index sets — which
-cross any backend boundary as plain arrays. Inside jax-fem the sets become
-2-arg location functions (`isin(index, set)`), avoiding coordinate matching.
-Caveat: jax-fem applies a surface load to a face when *all* its vertices are in
-the set, so a non-target face entirely inside a patch's vertex set would also be
-selected (harmless for planar patches; keep patches face-aligned).
+**Now: first-class vertex selection** (`jaxcad/fem/selection.py`), replacing the
+earlier `FaceSelector` face-group orientation ("the current face groups are not
+so good to work with" — the face-group ids depended on the mesher's
+gradient-axis tagging, which is opaque for anything non-box-like and useless
+for sub-patches).
 
-Later: **visual face picking in the viewer**. The boundary groups are exactly the
-planar patches the viewer's hit-testing already understands; a picked patch
-serializes to the same node-index-set ABI, so the solver layer needs no change.
+- `Nodes` is the factory namespace: `Nodes.box(min_corner, max_corner)`,
+  `Nodes.sphere(center, radius)`, `Nodes.halfspace(point, normal)` (selects
+  `dot(x - point, normal) >= 0`), `Nodes.side("+x", tol=None)` (axis-extreme
+  plane; default tol resolves per mesh to half the smallest cell spacing), and
+  `Nodes.predicate(fn)` as the code-only escape hatch (`fn` is vectorized:
+  `(N, 3)` positions in, `(N,)` boolean mask out).
+- Selections compose with **boolean algebra**: `&`, `|`, `~`.
+- **Boundary restriction is implicit**: selections always resolve to boundary
+  (surface) nodes, because boundary conditions only ever act on the surface.
+  `~selection` therefore means "the rest of the surface", never the mesh
+  interior.
+- Evaluation is lazy: `selection.mask(mesh)` / `selection.resolve(mesh)` run
+  against a concrete `HexMesh`, so one selection works across resolutions and
+  remeshes.
+- **Serialization contract**: `describe()` emits `{"kind": ..., numeric
+  params}` with plain floats/lists; `selection_from_description(payload)`
+  round-trips everything except predicates (`{"kind": "predicate", "name":
+  fn_name}`, flagged via `selection.serializable == False`). Combinators
+  describe as `{"kind": "and"|"or", "operands": [...]}` and `{"kind": "not",
+  "operand": ...}`. Constructor signatures are deliberately literal-friendly
+  (floats and 3-lists) so the viewer's next wave can write selections into
+  scene source as patch operations (`Nodes.box([0, 0, 0], [1, 1, 1])`).
+
+**BC semantics** (`jaxcad/fem/study.py`, `simulate.py`):
+
+- Node-valued conditions — `Dirichlet(nodes, value)`, `Fixed(nodes)` — apply
+  to the selected node set directly.
+- Area-integrated conditions — `HeatFlux(nodes, flux)`, `Traction(nodes,
+  vector)` — act on the boundary faces **spanned** by the selection: a quad
+  carries the load iff all four of its corners are selected
+  (`hexmesh.faces_from_nodes`). This matches jax-fem's own face-selection
+  rule, so the spanned-face set and the solver's applied set coincide by
+  construction; a selection spanning no complete face is an error raised
+  before solving.
+- Node sets still cross the backend boundary as plain int arrays (the
+  Tesseract ABI is unchanged); inside jax-fem they become 2-arg location
+  functions (`isin(index, set)`).
+
+**Legacy face path**: the mesher's gradient-axis face groups
+(`HexMesh.boundary_faces`), `select_faces(mesh, predicate)` and predicate
+patches in `thermal_solve`/`elastic_solve` all still work — the viewer's
+`/api/simulate` preview path is built on the group catalog and stays
+untouched. New code and studies use node selections exclusively.
+
+Later: **visual picking in the viewer** writes `Nodes.*` expressions into the
+scene program via patch ops; a picked patch serializes through `describe()`
+and lands in source as literal constructor calls.
 
 ## Plugin architecture (why Tesseract)
 
@@ -182,13 +223,16 @@ missing piece is a trust-region rule for when to re-freeze topology.
 
 ## Test inventory
 
-`tests/fem/`: 44 tests, all passing with the extras installed; solver-dependent
-files `pytest.importorskip` on `jax_fem` / `tesseract_core` / `tesseract_jax`, so
-the suite skips (not fails) without them. `test_hexmesh.py` (11, mesher only),
-`test_simulate.py` (10), `test_tesseract_backend.py` (5, incl. elastic parity +
-bit-identical gradients + a generous overhead-timing bound),
-`test_dirichlet_gradient.py` (3, lifted Dirichlet values vs FD),
-`test_end_to_end.py` (2), plus the bracket demo and render-payload files.
+`tests/fem/`: solver-dependent files `pytest.importorskip` on `jax_fem` /
+`tesseract_core` / `tesseract_jax`, so the suite skips (not fails) without
+them. `test_hexmesh.py` (mesher only), `test_selection.py` (node-selection
+layer: primitives, algebra, describe round-trip, `faces_from_nodes` — no
+solver), `test_simulate.py` (incl. selection-vs-predicate parity and the
+analytic heat-flux profile), `test_study.py`, `test_tesseract_backend.py`
+(elastic parity + bit-identical gradients + a generous overhead-timing
+bound), `test_dirichlet_gradient.py` (lifted Dirichlet values vs FD, through
+node selections), `test_end_to_end.py`, plus the bracket demo and
+render-payload files.
 
 ## Bracket demo: a realistic part through the whole chain
 
@@ -233,23 +277,47 @@ makes studies declarative and first-class:
   `sdf_to_hex_mesh` + the existing solvers and returns the usual result
   objects, so optimizers consume studies with no extra plumbing (a frozen
   mesh can be passed in for the frozen-topology gradient loop).
-- `FaceSelector` makes boundary selection serializable: `side("+x")`
-  (dominant-gradient-axis groups the mesher already computes),
-  `box(center, extent)` (face-center containment), and `where(predicate)` as
-  the code-only escape hatch. Side/box selectors round-trip through JSON;
-  selectors resolve against `HexMesh.boundary_faces`/`select_faces` and are
-  proven equivalent to hand-written predicates in tests.
+- Boundary conditions consume `Nodes` selections (see the selection section
+  above): `Dirichlet(nodes, value)`, `HeatFlux(nodes, flux)`,
+  `Fixed(nodes)`, `Traction(nodes, vector)`. Non-selection arguments are
+  rejected at construction with a pointer to the `Nodes` factory.
 - `.describe()` emits the JSON-ready payload the viewer needs (name, kind,
-  resolution, domain, material, serialized BCs) — `json.dumps`-able,
-  asserted in tests.
+  resolution, domain, material, serialized BCs, each BC embedding its
+  selection's description) — `json.dumps`-able, asserted in tests.
 - `capture_studies()` mirrors `capture_constraint_solves` in
   `jaxcad/constraints/solve.py` (ContextVar + context manager): constructing
   a study inside the context registers it, so the compile worker can exec a
   user program and collect its declared studies in order. Verified against
   exec'd source, including nested-context isolation.
-- `HeatFlux` is declarable and serializable now but raises
-  `NotImplementedError` at solve time until the thermal backend grows a
-  Neumann term — the schema leads, the solver follows.
+- `HeatFlux` **solves on the direct backend now**: with faces derivable from
+  node selections, the flux enters jax-fem's weak form as a surface
+  integral (`get_surface_maps` returning `-q`, so `k grad(T) . n = q`;
+  positive flux heats the body). It composes with the lifted Dirichlet
+  formulation unchanged (the surface term does not involve the lift).
+  Validated against the analytic linear profile `T(x) = (q/k)(x + 1)` on
+  the bar to 1e-6. The thermal tesseract schema does not carry fluxes yet;
+  `TesseractBackend.thermal` raises `NotImplementedError` for them.
+- `scenes/bracket.py` now declares a `bracket-pry` `ElasticStudy` in the
+  scene program itself (bolt-ball clamps, spanned-face traction on the
+  outer web wall), mirroring the optimization example's selections.
+
+## Precision hygiene: x64 is scoped to the solve
+
+jax-fem requires float64 and `jax_fem.solver` even flips `jax_enable_x64` at
+module import. Flipping it globally poisons every float32 computation later
+in the same process — the concrete symptom was
+`tests/meshing/test_adaptive.py::test_identical_crossing_edges[union]`
+failing when it ran after `tests/viewer/test_simulate.py` (the viewer's
+forward solves flipped x64 via the old `_require_jax_fem`, and the sparse
+octree pruning's dense-vs-sparse equivalence is x64-sensitive for the union
+case). Fix: every backend call now wraps itself in `_x64_scope()`
+(`backends.py`), enabling x64 for its own duration and restoring the
+caller's setting afterwards — which also undoes the import-time flip, since
+`jax_fem.solver` is first imported inside the scope. Forward-only callers
+(the viewer preview) are therefore leak-free. Callers that differentiate
+*through* a solve run the backward pass after the scope has exited and must
+enable x64 process-wide themselves — `tests/fem/conftest.py` does it as a
+package fixture and the optimization example does it at import.
 
 Next wave (viewer side, not in this change): the Simulate panel becomes a
 patch layer — `add_study` / `add_study_bc` patch ops edit the study

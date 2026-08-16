@@ -27,6 +27,7 @@ __all__ = [
     "GridSpec",
     "HexMesh",
     "corner_tet_volumes",
+    "faces_from_nodes",
     "project_points",
     "recompute_points",
     "sdf_to_hex_mesh",
@@ -275,6 +276,28 @@ def select_faces(mesh: HexMesh, predicate: Callable[..., Any]) -> FaceGroup:
         )
     else:
         mask = np.array([bool(predicate(c)) for c in faces.centers], dtype=bool)
+    return FaceGroup(
+        nodes=faces.nodes[mask], centers=faces.centers[mask], normals=faces.normals[mask]
+    )
+
+
+def faces_from_nodes(mesh: HexMesh, nodes: Any) -> FaceGroup:
+    """Boundary faces spanned by a node set (all four corners selected).
+
+    The bridge from node selections to area-integrated boundary conditions
+    (tractions, heat fluxes): a boundary quad carries the load exactly when
+    every one of its corner nodes belongs to ``nodes``.
+
+    Args:
+        mesh: The hex mesh.
+        nodes: Node indices (any integer array-like).
+
+    Returns:
+        A :class:`FaceGroup` of the spanned faces (possibly empty).
+    """
+    indices = np.asarray(nodes).reshape(-1)
+    faces = mesh.all_boundary_faces()
+    mask = np.isin(faces.nodes, indices).all(axis=1)
     return FaceGroup(
         nodes=faces.nodes[mask], centers=faces.centers[mask], normals=faces.normals[mask]
     )

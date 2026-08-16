@@ -8,6 +8,14 @@ scripts and optimizers via :meth:`solve`.  Constructing a study inside a
 worker can collect the studies a user program declares — mirroring
 ``capture_constraint_solves`` in :mod:`jaxcad.constraints.solve`.
 
+Boundary conditions take a :class:`~jaxcad.fem.selection.NodeSelection`
+built from the :class:`~jaxcad.fem.selection.Nodes` factory — programmatic
+vertex selection composed with ``&``/``|``/``~``.  Node-valued conditions
+(:class:`Dirichlet`, :class:`Fixed`) apply to the selected node set
+directly; area-integrated conditions (:class:`HeatFlux`, :class:`Traction`)
+act on the boundary faces spanned by the selection (all four corners
+selected — :func:`~jaxcad.fem.hexmesh.faces_from_nodes`).
+
 Example::
 
     study = ThermalStudy(
@@ -15,8 +23,8 @@ Example::
         resolution=(22, 5, 5),
         conductivity=2.0,
         bcs=[
-            Dirichlet(FaceSelector.side("-x"), 1.0),
-            Dirichlet(FaceSelector.side("+x"), 0.0),
+            Dirichlet(Nodes.side("-x"), 1.0),
+            Dirichlet(Nodes.side("+x"), 0.0),
         ],
     )
     result = study.solve(scene_sdf)
@@ -32,12 +40,12 @@ from typing import Any, Callable
 
 import numpy as np
 
-from jaxcad.fem.hexmesh import FaceGroup, GridSpec, HexMesh, sdf_to_hex_mesh, select_faces
+from jaxcad.fem.hexmesh import GridSpec, HexMesh, faces_from_nodes, sdf_to_hex_mesh
+from jaxcad.fem.selection import NodeSelection
 
 __all__ = [
     "Dirichlet",
     "ElasticStudy",
-    "FaceSelector",
     "Fixed",
     "HeatFlux",
     "ThermalStudy",
@@ -48,7 +56,6 @@ __all__ = [
 # Same domain convention as the viewer's simulate path (compile worker).
 _DEFAULT_BOUNDS = (-3.0, -3.0, -3.0)
 _DEFAULT_SIZE = (6.0, 6.0, 6.0)
-_SIDES = ("+x", "-x", "+y", "-y", "+z", "-z")
 
 _CAPTURED_STUDIES: ContextVar[list[Any] | None] = ContextVar(
     "jaxcad_captured_studies",
@@ -85,148 +92,85 @@ def _triplet(value: Any, label: str) -> tuple[float, float, float]:
     return (float(array[0]), float(array[1]), float(array[2]))
 
 
-@dataclass(frozen=True)
-class FaceSelector:
-    """Serializable selector of boundary-face patches.
-
-    Build via the classmethods: :meth:`side` (dominant-gradient-axis group,
-    e.g. ``"+x"``), :meth:`box` (face centers inside an axis-aligned
-    region), or :meth:`where` (arbitrary predicate — the escape hatch;
-    everything else round-trips through JSON, predicates do not).
-    """
-
-    kind: str
-    side_name: str | None = None
-    center: tuple[float, float, float] | None = None
-    extent: tuple[float, float, float] | None = None
-    predicate: Callable[..., Any] | None = None
-
-    def __post_init__(self):
-        if self.kind == "side":
-            if self.side_name not in _SIDES:
-                raise ValueError(f"side must be one of {_SIDES}, got {self.side_name!r}.")
-        elif self.kind == "box":
-            if self.center is None or self.extent is None:
-                raise ValueError("box selector needs center and extent.")
-        elif self.kind == "predicate":
-            if not callable(self.predicate):
-                raise ValueError("predicate selector needs a callable.")
-        else:
-            raise ValueError(f"Unknown selector kind {self.kind!r}.")
-
-    @classmethod
-    def side(cls, name: str) -> FaceSelector:
-        """All boundary faces whose dominant SDF-gradient axis is ``name``."""
-        return cls(kind="side", side_name=name)
-
-    @classmethod
-    def box(cls, center: Any, extent: Any) -> FaceSelector:
-        """Boundary faces whose centers lie in the axis-aligned box.
-
-        Args:
-            center: Box center.
-            extent: Full box widths per axis.
-        """
-        return cls(kind="box", center=_triplet(center, "center"), extent=_triplet(extent, "extent"))
-
-    @classmethod
-    def where(cls, predicate: Callable[..., Any]) -> FaceSelector:
-        """Escape hatch: ``predicate(center)`` or ``predicate(center, normal)``."""
-        return cls(kind="predicate", predicate=predicate)
-
-    def describe(self) -> dict[str, Any]:
-        """JSON-ready description (predicates are named but not serialized)."""
-        if self.kind == "side":
-            return {"kind": "side", "side": self.side_name}
-        if self.kind == "box":
-            return {"kind": "box", "center": list(self.center), "extent": list(self.extent)}
-        name = getattr(self.predicate, "__name__", "<lambda>")
-        return {"kind": "predicate", "callable": name}
-
-    def resolve(self, mesh: HexMesh) -> FaceGroup:
-        """The matching boundary faces of ``mesh``.
-
-        Raises:
-            ValueError: If no boundary face matches.
-        """
-        group = select_faces(mesh, self.to_predicate(mesh))
-        if group.nodes.size == 0:
-            raise ValueError(f"Selector {self.describe()} matched no boundary faces.")
-        return group
-
-    def to_predicate(self, mesh: HexMesh) -> Callable[..., Any]:
-        """A ``select_faces`` predicate equivalent to this selector.
-
-        Side selectors are membership tests against the mesh's precomputed
-        gradient-axis group (exact float match — ``select_faces`` iterates
-        the very same center rows), so they compose with the existing
-        predicate-based ``thermal_solve``/``elastic_solve`` API unchanged.
-        """
-        if self.kind == "side":
-            group = mesh.boundary_faces.get(self.side_name)
-            centers = frozenset(map(tuple, group.centers)) if group is not None else frozenset()
-            return lambda center: tuple(center) in centers
-        if self.kind == "box":
-            center = np.asarray(self.center)
-            half = np.asarray(self.extent) / 2.0
-            return lambda point: bool(np.all(np.abs(np.asarray(point) - center) <= half))
-        return self.predicate
+def _expect_selection(nodes: Any, bc_kind: str) -> NodeSelection:
+    if not isinstance(nodes, NodeSelection):
+        raise ValueError(
+            f"{bc_kind} takes a node selection, got {type(nodes).__name__}. "
+            "Build one via Nodes.box/sphere/halfspace/side/predicate "
+            "(from jaxcad.fem import Nodes)."
+        )
+    return nodes
 
 
 @dataclass(frozen=True)
 class Dirichlet:
-    """Prescribed temperature on a boundary patch."""
+    """Prescribed temperature on a set of boundary nodes.
 
-    selector: FaceSelector
+    Applies to the selected node set directly.  With the default direct
+    backend ``value`` may be a traced JAX scalar, making the solve
+    differentiable w.r.t. the prescribed value.
+    """
+
+    nodes: NodeSelection
     value: float
+
+    def __post_init__(self):
+        _expect_selection(self.nodes, "Dirichlet")
 
     def describe(self) -> dict[str, Any]:
         """JSON-ready description."""
-        return {"type": "dirichlet", "selector": self.selector.describe(), "value": self.value}
+        return {"type": "dirichlet", "nodes": self.nodes.describe(), "value": self.value}
 
 
 @dataclass(frozen=True)
 class HeatFlux:
-    """Prescribed heat flux on a boundary patch.
+    """Prescribed heat inflow per area on the faces spanned by a selection.
 
-    Declarable and serializable today; solving raises until the thermal
-    backend grows Neumann support (see research/fem-integration.md).
+    Positive flux heats the body.  Solvable on the direct backend (Neumann
+    surface integral); the tesseract schema does not carry fluxes yet.
     """
 
-    selector: FaceSelector
-    value: float
+    nodes: NodeSelection
+    flux: float
+
+    def __post_init__(self):
+        _expect_selection(self.nodes, "HeatFlux")
 
     def describe(self) -> dict[str, Any]:
         """JSON-ready description."""
-        return {"type": "heat_flux", "selector": self.selector.describe(), "value": self.value}
+        return {"type": "heat_flux", "nodes": self.nodes.describe(), "flux": float(self.flux)}
 
 
 @dataclass(frozen=True)
 class Fixed:
-    """Fully clamped boundary patch (all displacement components zero)."""
+    """Fully clamped node set (all displacement components zero)."""
 
-    selector: FaceSelector
+    nodes: NodeSelection
+
+    def __post_init__(self):
+        _expect_selection(self.nodes, "Fixed")
 
     def describe(self) -> dict[str, Any]:
         """JSON-ready description."""
-        return {"type": "fixed", "selector": self.selector.describe()}
+        return {"type": "fixed", "nodes": self.nodes.describe()}
 
 
 @dataclass(frozen=True)
 class Traction:
-    """Constant traction (force per area) on a boundary patch."""
+    """Constant traction (force per area) on the faces spanned by a selection."""
 
-    selector: FaceSelector
+    nodes: NodeSelection
     vector: tuple[float, float, float]
 
     def __post_init__(self):
+        _expect_selection(self.nodes, "Traction")
         object.__setattr__(self, "vector", _triplet(self.vector, "vector"))
 
     def describe(self) -> dict[str, Any]:
         """JSON-ready description."""
         return {
             "type": "traction",
-            "selector": self.selector.describe(),
+            "nodes": self.nodes.describe(),
             "vector": list(self.vector),
         }
 
@@ -260,6 +204,18 @@ def _as_sdf(sdf_or_callable: Any) -> Callable[[Any], Any]:
     if not callable(sdf_or_callable):
         raise TypeError("solve() expects an SDF object or a callable field.")
     return sdf_or_callable
+
+
+def _check_resolvable(bcs: list[Any], mesh: HexMesh) -> None:
+    """Raise a selection-specific error before handing BCs to the solver."""
+    for bc in bcs:
+        indices = bc.nodes.resolve(mesh)
+        if isinstance(bc, (HeatFlux, Traction)) and faces_from_nodes(mesh, indices).nodes.size == 0:
+            raise ValueError(
+                f"{type(bc).__name__} selection {bc.nodes.describe()} spans no complete "
+                "boundary face; area-integrated conditions need all four corners of at "
+                "least one boundary quad selected."
+            )
 
 
 @dataclass
@@ -320,24 +276,19 @@ class ThermalStudy:
         """
         from jaxcad.fem.simulate import thermal_solve
 
-        if any(isinstance(bc, HeatFlux) for bc in self.bcs):
-            raise NotImplementedError(
-                "HeatFlux boundary conditions are declarable but not solvable yet: "
-                "the thermal backend has no Neumann term. Use Dirichlet + source, "
-                "or wait for the flux-enabled backend."
-            )
         dirichlet = [bc for bc in self.bcs if isinstance(bc, Dirichlet)]
+        fluxes = [bc for bc in self.bcs if isinstance(bc, HeatFlux)]
         if not dirichlet:
             raise ValueError("A thermal study needs at least one Dirichlet BC to solve.")
         field_fn = _as_sdf(sdf)
         if mesh is None:
             mesh = sdf_to_hex_mesh(field_fn, _study_grid(self))
-        for bc in dirichlet:
-            bc.selector.resolve(mesh)  # selector-specific error before solving
+        _check_resolvable(self.bcs, mesh)
         return thermal_solve(
             mesh,
             conductivity=float(self.conductivity),
-            dirichlet=[(bc.selector.to_predicate(mesh), bc.value) for bc in dirichlet],
+            dirichlet=[(bc.nodes, bc.value) for bc in dirichlet],
+            neumann=[(bc.nodes, bc.flux) for bc in fluxes],
             source=float(self.source),
             backend=backend,
         )
@@ -409,13 +360,12 @@ class ElasticStudy:
         field_fn = _as_sdf(sdf)
         if mesh is None:
             mesh = sdf_to_hex_mesh(field_fn, _study_grid(self))
-        for bc in self.bcs:
-            bc.selector.resolve(mesh)  # selector-specific error before solving
+        _check_resolvable(self.bcs, mesh)
         return elastic_solve(
             mesh,
             youngs=float(self.youngs),
             poisson=float(self.poisson),
-            dirichlet=[bc.selector.to_predicate(mesh) for bc in fixed],
-            tractions=[(bc.selector.to_predicate(mesh), bc.vector) for bc in tractions],
+            dirichlet=[bc.nodes for bc in fixed],
+            tractions=[(bc.nodes, bc.vector) for bc in tractions],
             backend=backend,
         )

@@ -10,6 +10,7 @@ import pytest
 pytest.importorskip("jax_fem")
 
 from jaxcad.fem.hexmesh import GridSpec, sdf_to_hex_mesh
+from jaxcad.fem.selection import Nodes
 from jaxcad.fem.simulate import elastic_solve, thermal_solve
 from jaxcad.geometry.parameters import Vector
 from jaxcad.sdf.primitives import Box
@@ -138,6 +139,84 @@ class TestElastic:
         read_back = meshio.read(str(path))
         assert "displacement" in read_back.point_data
         assert "von_mises" in read_back.cell_data
+
+
+class TestNodeSelectionPatches:
+    def test_thermal_selection_matches_predicate_solution(self, bar_mesh):
+        result = thermal_solve(
+            bar_mesh,
+            conductivity=2.0,
+            dirichlet=[(Nodes.side("-x"), 1.0), (Nodes.side("+x"), 0.0)],
+        )
+        expected = (1.0 - bar_mesh.points[:, 0]) / _LENGTH
+        assert np.abs(np.asarray(result.temperature) - expected).max() < 1e-6
+
+    def test_elastic_selection_matches_predicate_solution(self, bar_mesh):
+        by_selection = elastic_solve(
+            bar_mesh,
+            youngs=1000.0,
+            poisson=0.3,
+            dirichlet=[Nodes.side("-x")],
+            tractions=[(Nodes.side("+x"), [0.0, 0.0, -1.0])],
+        )
+        by_predicate = elastic_solve(
+            bar_mesh,
+            youngs=1000.0,
+            poisson=0.3,
+            dirichlet=[_hot_end],
+            tractions=[(_cold_end, [0.0, 0.0, -1.0])],
+        )
+        np.testing.assert_allclose(
+            np.asarray(by_selection.displacement),
+            np.asarray(by_predicate.displacement),
+            atol=1e-10,
+        )
+
+    def test_empty_selection_raises(self, bar_mesh):
+        with pytest.raises(ValueError, match="matched no boundary nodes"):
+            thermal_solve(
+                bar_mesh,
+                conductivity=1.0,
+                dirichlet=[(Nodes.sphere([50.0, 0.0, 0.0], 0.1), 1.0)],
+            )
+
+    def test_faceless_selection_raises_for_traction(self, bar_mesh):
+        # The corner node alone matches, but no boundary quad has all four
+        # of its corners inside the selection.
+        corner_only = Nodes.sphere([1.0, 0.15, 0.15], 0.01)
+        with pytest.raises(ValueError, match="spans no complete boundary face"):
+            elastic_solve(
+                bar_mesh,
+                youngs=1000.0,
+                poisson=0.3,
+                dirichlet=[Nodes.side("-x")],
+                tractions=[(corner_only, [0.0, 0.0, -1.0])],
+            )
+
+
+class TestHeatFlux:
+    def test_end_flux_gives_the_linear_profile(self, bar_mesh):
+        # -k T'' = 0 with T(-1) = 0 and k T'(1) = q: T(x) = (q/k)(x + 1).
+        result = thermal_solve(
+            bar_mesh,
+            conductivity=2.0,
+            dirichlet=[(Nodes.side("-x"), 0.0)],
+            neumann=[(Nodes.side("+x"), 1.0)],
+        )
+        temperature = np.asarray(result.temperature)
+        expected = (bar_mesh.points[:, 0] + 1.0) * (1.0 / 2.0)
+        assert np.abs(temperature - expected).max() < 1e-6
+
+    def test_negative_flux_cools_the_body(self, bar_mesh):
+        result = thermal_solve(
+            bar_mesh,
+            conductivity=1.0,
+            dirichlet=[(Nodes.side("-x"), 0.0)],
+            neumann=[(Nodes.side("+x"), -1.0)],
+        )
+        temperature = np.asarray(result.temperature)
+        tip = np.isclose(bar_mesh.points[:, 0], 1.0)
+        assert temperature[tip].max() < 0.0
 
 
 class TestBackendResolution:

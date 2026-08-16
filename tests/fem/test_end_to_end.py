@@ -23,19 +23,15 @@ import jax
 import jax.numpy as jnp
 
 from jaxcad.fem.hexmesh import GridSpec, recompute_points, sdf_to_hex_mesh
+from jaxcad.fem.selection import Nodes
 from jaxcad.fem.simulate import elastic_solve
 from jaxcad.geometry.parameters import Vector
 from jaxcad.sdf.primitives import Box
 
 _NOMINAL_HALF_HEIGHT = 0.15
 
-
-def _fixed_end(center):
-    return center[0] < -0.999
-
-
-def _loaded_end(center):
-    return center[0] > 0.999
+_FIXED_END = Nodes.side("-x")
+_LOADED_END = Nodes.side("+x")
 
 
 class TestEndToEndGradient:
@@ -56,8 +52,8 @@ class TestEndToEndGradient:
                 mesh,
                 youngs=1000.0,
                 poisson=0.3,
-                dirichlet=[_fixed_end],
-                tractions=[(_loaded_end, [0.0, 0.0, -1.0])],
+                dirichlet=[_FIXED_END],
+                tractions=[(_LOADED_END, [0.0, 0.0, -1.0])],
                 points=points,
             )
             return jnp.sum(result.displacement**2)
@@ -95,8 +91,8 @@ class TestEndToEndGradient:
                 mesh,
                 youngs=1000.0,
                 poisson=0.3,
-                dirichlet=[_fixed_end],
-                tractions=[(_loaded_end, [0.0, 0.0, -1.0])],
+                dirichlet=[_FIXED_END],
+                tractions=[(_LOADED_END, [0.0, 0.0, -1.0])],
                 points=points,
             )
             return float(jnp.sum(result.displacement**2))

@@ -21,17 +21,13 @@ import jax
 import jax.numpy as jnp
 
 from jaxcad.fem.hexmesh import GridSpec, sdf_to_hex_mesh
+from jaxcad.fem.selection import Nodes
 from jaxcad.fem.simulate import thermal_solve
 from jaxcad.geometry.parameters import Vector
 from jaxcad.sdf.primitives import Box
 
-
-def _hot_end(center):
-    return center[0] < -0.999
-
-
-def _cold_end(center):
-    return center[0] > 0.999
+_HOT_END = Nodes.side("-x")
+_COLD_END = Nodes.side("+x")
 
 
 @pytest.fixture(scope="module")
@@ -47,7 +43,7 @@ class TestDirichletValueGradient:
         result = thermal_solve(
             bar_mesh,
             conductivity=2.0,
-            dirichlet=[(_hot_end, jnp.asarray(1.0)), (_cold_end, 0.0)],
+            dirichlet=[(_HOT_END, jnp.asarray(1.0)), (_COLD_END, 0.0)],
         )
         temperature = np.asarray(result.temperature)
         expected = (1.0 - bar_mesh.points[:, 0]) / 2.0
@@ -60,7 +56,7 @@ class TestDirichletValueGradient:
             result = thermal_solve(
                 bar_mesh,
                 conductivity=2.0,
-                dirichlet=[(_hot_end, hot_value), (_cold_end, 0.0)],
+                dirichlet=[(_HOT_END, hot_value), (_COLD_END, 0.0)],
             )
             return jnp.sum(result.temperature**2)
 
@@ -80,7 +76,7 @@ class TestDirichletValueGradient:
             result = thermal_solve(
                 bar_mesh,
                 conductivity=2.0,
-                dirichlet=[(_hot_end, hot), (_cold_end, cold)],
+                dirichlet=[(_HOT_END, hot), (_COLD_END, cold)],
             )
             # Mean temperature: linear in both values, nonzero sensitivities.
             return jnp.mean(result.temperature)

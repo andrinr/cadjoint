@@ -21,6 +21,7 @@ import jax
 import jax.numpy as jnp
 
 from jaxcad.fem.hexmesh import GridSpec, sdf_to_hex_mesh
+from jaxcad.fem.selection import Nodes
 from jaxcad.fem.simulate import thermal_solve
 from jaxcad.geometry.parameters import Vector
 from jaxcad.sdf.primitives import Box
@@ -50,6 +51,16 @@ class TestTesseractThermal:
         tesseract = thermal_solve(bar_mesh, conductivity=2.0, dirichlet=_BC, backend="tesseract")
         difference = np.abs(np.asarray(tesseract.temperature) - np.asarray(direct.temperature))
         assert difference.max() < 1e-9
+
+    def test_heat_flux_is_rejected_by_the_schema(self, bar_mesh):
+        with pytest.raises(NotImplementedError, match="tesseract schema"):
+            thermal_solve(
+                bar_mesh,
+                conductivity=2.0,
+                dirichlet=[(Nodes.side("-x"), 0.0)],
+                neumann=[(Nodes.side("+x"), 1.0)],
+                backend="tesseract",
+            )
 
     def test_gradient_through_tesseract_boundary(self, bar_mesh):
         points = jnp.asarray(bar_mesh.points, dtype=jnp.float64)
