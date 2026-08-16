@@ -525,6 +525,16 @@ export function App() {
     };
     window.addEventListener("keydown", onKeyDown);
     onCleanup(() => window.removeEventListener("keydown", onKeyDown));
+
+    // Escape closes the WGSL dialog. Capture phase, so the viewer's global
+    // Escape (clear selection, reset mode) does not also fire underneath.
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || !showWgsl()) return;
+      event.stopPropagation();
+      setShowWgsl(false);
+    };
+    document.addEventListener("keydown", onEscape, true);
+    onCleanup(() => document.removeEventListener("keydown", onEscape, true));
   });
 
   onMount(async () => {
@@ -638,47 +648,50 @@ export function App() {
                 onExtrude={extrudeSelection}
                 onRevolve={revolveSelection}
               />
-              <Show when={panels().sketch && editingMode() !== "simulate"}>
-                <SketchPanel
-                  onFix={() => {
-                    const active = selection();
-                    const node = active && nodeById(active.nodeId);
-                    if (
-                      !node ||
-                      node.kind !== "profile" ||
-                      node.line === null ||
-                      active!.vertexIndex === null
-                    ) {
-                      return;
-                    }
-                    const vertex = node.vertices[active!.vertexIndex];
-                    void addConstraint(
-                      node.line,
-                      "fixed",
-                      [active!.vertexIndex],
-                      vertex.uv,
-                    );
-                  }}
-                  onSolve={(method, iterations) => {
-                    const active = selection();
-                    const node = active && nodeById(active.nodeId);
-                    if (node?.kind === "profile" && node.line !== null) {
-                      void solveSketch(node.line, method, iterations);
-                    }
-                  }}
-                  onExtrude={extrudeSelection}
-                  onRevolve={revolveSelection}
-                  onDeleteConstraint={(line, index) =>
-                    void deleteConstraint(line, index)
-                  }
-                  onSetConstraintValue={(line, index, value) =>
-                    void setConstraintValue(line, index, value)
-                  }
-                />
-              </Show>
-              <div class="side-stack">
+              {/* Right-side dock: Objects tree, then the contextual sketch
+                  properties, then materials, then the simulate slot. One
+                  column; sections share the height and scroll internally. */}
+              <div class="dock">
                 <Show when={panels().objectTree}>
                   <ObjectTree />
+                </Show>
+                <Show when={panels().sketch && editingMode() !== "simulate"}>
+                  <SketchPanel
+                    onFix={() => {
+                      const active = selection();
+                      const node = active && nodeById(active.nodeId);
+                      if (
+                        !node ||
+                        node.kind !== "profile" ||
+                        node.line === null ||
+                        active!.vertexIndex === null
+                      ) {
+                        return;
+                      }
+                      const vertex = node.vertices[active!.vertexIndex];
+                      void addConstraint(
+                        node.line,
+                        "fixed",
+                        [active!.vertexIndex],
+                        vertex.uv,
+                      );
+                    }}
+                    onSolve={(method, iterations) => {
+                      const active = selection();
+                      const node = active && nodeById(active.nodeId);
+                      if (node?.kind === "profile" && node.line !== null) {
+                        void solveSketch(node.line, method, iterations);
+                      }
+                    }}
+                    onExtrude={extrudeSelection}
+                    onRevolve={revolveSelection}
+                    onDeleteConstraint={(line, index) =>
+                      void deleteConstraint(line, index)
+                    }
+                    onSetConstraintValue={(line, index, value) =>
+                      void setConstraintValue(line, index, value)
+                    }
+                  />
                 </Show>
                 <Show when={panels().materials}>
                   <MaterialPanel

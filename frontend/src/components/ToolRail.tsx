@@ -212,11 +212,16 @@ export function ToolRail(props: ToolRailProps) {
   });
 
   onMount(() => {
+    // Capture phase: when a flyout is open, Escape closes only the flyout.
+    // Without consuming the event, the viewer's global Escape would also
+    // clear the selection and drop the user back to model mode.
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") flyouts.dismiss();
+      if (event.key !== "Escape" || openGroup() === null) return;
+      event.stopPropagation();
+      flyouts.dismiss();
     };
-    window.addEventListener("keydown", onKeyDown);
-    onCleanup(() => window.removeEventListener("keydown", onKeyDown));
+    document.addEventListener("keydown", onKeyDown, true);
+    onCleanup(() => document.removeEventListener("keydown", onKeyDown, true));
   });
 
   /** One expandable cluster: parent shows the last-used child. */

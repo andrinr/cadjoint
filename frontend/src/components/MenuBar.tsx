@@ -61,6 +61,24 @@ export function MenuBar(props: MenuBarProps) {
   document.addEventListener("click", closeOnOutside);
   onCleanup(() => document.removeEventListener("click", closeOnOutside));
 
+  // Escape closes an open dialog (or a menu opened without keyboard focus).
+  // Capture phase, so the viewer's global Escape handling (clear selection,
+  // reset editing mode) does not also fire behind the dialog.
+  const closeOnEscape = (event: KeyboardEvent) => {
+    if (event.key !== "Escape") return;
+    if (dialog() !== null) {
+      event.stopPropagation();
+      setDialog(null);
+    } else if (openMenu() !== null) {
+      event.stopPropagation();
+      // Keep the keyboard flow: focus returns to the menu's title button.
+      document.querySelector<HTMLElement>(".menu-title.active")?.focus();
+      setOpenMenu(null);
+    }
+  };
+  document.addEventListener("keydown", closeOnEscape, true);
+  onCleanup(() => document.removeEventListener("keydown", closeOnEscape, true));
+
   const toggleMenu = (id: MenuId) => setOpenMenu(openMenu() === id ? null : id);
   /** An open menubar behaves like hover navigation between its menus. */
   const glideTo = (id: MenuId) => {

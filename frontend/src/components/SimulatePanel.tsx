@@ -47,6 +47,8 @@ export function SimulatePanel(props: SimulatePanelProps) {
     poisson: 0.3,
   });
   const [running, setRunning] = createSignal(false);
+  /** What the in-flight request is doing, for accurate button feedback. */
+  const [phase, setPhase] = createSignal<"mesh" | "solve">("mesh");
   const [error, setError] = createSignal("");
   const [unavailable, setUnavailable] = createSignal(false);
   const [result, setResult] = createSignal<{ field: string; range: [number, number] } | null>(
@@ -63,6 +65,7 @@ export function SimulatePanel(props: SimulatePanelProps) {
   /** Mesh the scene and load its face-group catalog (no solve). */
   const probe = async () => {
     setRunning(true);
+    setPhase("mesh");
     setError("");
     setResult(null);
     try {
@@ -95,6 +98,7 @@ export function SimulatePanel(props: SimulatePanelProps) {
 
   const run = async () => {
     setRunning(true);
+    setPhase("solve");
     setError("");
     try {
       const response = await api.simulate({
@@ -390,7 +394,7 @@ export function SimulatePanel(props: SimulatePanelProps) {
           }
           data-testid="simulate-run"
         >
-          {running() ? "Solving…" : "Run"}
+          {running() ? (phase() === "mesh" ? "Meshing…" : "Solving…") : "Run"}
         </button>
 
         <Show when={result()}>

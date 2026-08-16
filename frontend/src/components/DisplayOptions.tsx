@@ -58,6 +58,16 @@ export function DisplayOptions(props: DisplayOptionsProps) {
   document.addEventListener("click", closeOnOutside);
   onCleanup(() => document.removeEventListener("click", closeOnOutside));
 
+  // Escape closes the popover without also clearing the viewer selection —
+  // capture phase runs before the viewer's window-level Escape handler.
+  const closeOnEscape = (event: KeyboardEvent) => {
+    if (event.key !== "Escape" || !open()) return;
+    event.stopPropagation();
+    setOpen(false);
+  };
+  document.addEventListener("keydown", closeOnEscape, true);
+  onCleanup(() => document.removeEventListener("keydown", closeOnEscape, true));
+
   return (
     <div class="display-options">
       <button

@@ -970,12 +970,20 @@ export function ViewerPane(props: ViewerPaneProps) {
       const target = document.activeElement;
       const typing = target && (target.tagName === "TEXTAREA" || target.closest(".cm-editor"));
       if (event.key === "Escape") {
-        setPendingConstraint(null);
-        setPendingLoft(null);
-        setSelection(null);
-        setTool("select");
-        // Escape backs all the way out to the default editing mode.
-        setEditingMode("model");
+        // Overlays own their Escape (dialogs, menus, popovers, flyouts close
+        // themselves in the capture phase); only a bare viewport Escape backs
+        // the editing state out.
+        const overlayOpen = document.querySelector(
+          ".dialog-backdrop, .menu-dropdown, .display-options .popover, .tool-group.open",
+        );
+        if (!overlayOpen) {
+          setPendingConstraint(null);
+          setPendingLoft(null);
+          setSelection(null);
+          setTool("select");
+          // Escape backs all the way out to the default editing mode.
+          setEditingMode("model");
+        }
       }
       if (!typing && !event.metaKey && !event.ctrlKey && !event.altKey) {
         // Key→action table shared with the Help dialog (src/shortcuts.ts).

@@ -391,20 +391,11 @@ button.primary {
   letter-spacing: 0.05em;
 }
 
-/* Sketch history ------------------------------------------------------- */
+/* Sketch history (a dock section; the shell comes from the dock rules). */
 
 .sketch-panel {
-  position: absolute;
-  left: 62px;
-  bottom: 14px;
-  z-index: 9;
-  width: min(340px, calc(100% - 150px));
   padding: 11px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: rgba(14, 17, 15, 0.9);
-  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(10px);
+  overflow: auto;
 }
 
 .sketch-panel header {
@@ -614,9 +605,13 @@ button.primary {
   vector-effect: non-scaling-stroke;
 }
 
-/* Right-side panel stack (object tree above materials) ----------------- */
+/* Right-side dock: one column of collapsible sections ------------------ */
 
-.side-stack {
+/* Object tree, sketch properties, materials, and simulate share this
+   column. Sections shrink together (flex 0 1 auto + min-height 0) and
+   scroll internally, so the dock never overlaps the ViewCube above it or
+   the hint bar below, and never runs off-screen. */
+.dock {
   position: absolute;
   top: 158px;
   right: 14px;
@@ -624,33 +619,58 @@ button.primary {
   z-index: 9;
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: stretch;
   gap: 8px;
+  width: 292px;
   pointer-events: none;
 }
 
-.side-stack > * {
+.dock > * {
   flex: 0 1 auto;
   min-height: 0;
   pointer-events: auto;
 }
 
-.side-stack > button {
+.dock > button {
   flex: 0 0 auto;
 }
 
-/* Object tree ----------------------------------------------------------- */
+/* Keep every open section usable while the dock squeezes them: each holds a
+   small minimum (header plus a couple of rows) and scrolls internally. The
+   minimums sum well below the dock height at 800px-tall viewports. */
+.dock .object-tree-panel {
+  min-height: 104px;
+}
 
-.object-tree-launch {
+.dock .sketch-panel {
+  min-height: 118px;
+}
+
+.dock .material-panel {
+  min-height: 126px;
+}
+
+.dock .sim-panel {
+  min-height: 150px;
+}
+
+/* Collapsed sections: one shared launcher look (icon · label · count). */
+.object-tree-launch,
+.material-launch,
+.sim-launch {
   display: flex;
   align-items: center;
-  gap: 8px;
-  height: 38px;
-  padding: 0 10px 0 8px;
-  border-radius: 10px;
+  gap: 9px;
+  width: 100%;
+  height: 36px;
+  padding: 0 12px 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
   background: rgba(14, 17, 15, 0.9);
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.3);
   backdrop-filter: blur(10px);
+  font-weight: 600;
+  text-align: left;
 }
 
 .object-tree-launch svg {
@@ -659,25 +679,37 @@ button.primary {
   color: var(--muted);
 }
 
-.object-tree-launch b {
+.object-tree-launch b,
+.material-launch b {
   min-width: 18px;
+  margin-left: auto;
   padding: 3px 5px;
   border-radius: 999px;
   background: rgba(217, 255, 87, 0.1);
   color: var(--lime);
   font: 600 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  text-align: center;
 }
 
-.object-tree-panel {
-  display: flex;
-  flex-direction: column;
-  width: 252px;
-  overflow: hidden;
+/* Expanded sections: one shared panel shell. */
+.object-tree-panel,
+.material-panel,
+.sim-panel,
+.sketch-panel {
+  width: 100%;
   border: 1px solid var(--line);
   border-radius: 13px;
   background: rgba(14, 17, 15, 0.91);
   box-shadow: 0 16px 42px rgba(0, 0, 0, 0.35);
   backdrop-filter: blur(12px);
+}
+
+/* Object tree ----------------------------------------------------------- */
+
+.object-tree-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .object-tree-panel > header {
@@ -832,36 +864,9 @@ button.primary {
 
 /* Material browser ----------------------------------------------------- */
 
-.material-launch {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 38px;
-  padding: 0 10px 0 8px;
-  border-radius: 10px;
-  background: rgba(14, 17, 15, 0.9);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(10px);
-}
-
-.material-launch b {
-  min-width: 18px;
-  padding: 3px 5px;
-  border-radius: 999px;
-  background: rgba(217, 255, 87, 0.1);
-  color: var(--lime);
-  font: 600 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
-}
-
 .material-panel {
-  width: 282px;
   max-height: 100%;
   overflow: auto;
-  border: 1px solid var(--line);
-  border-radius: 13px;
-  background: rgba(14, 17, 15, 0.91);
-  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(12px);
 }
 
 .material-panel > header {
@@ -1245,7 +1250,10 @@ button.primary svg {
   flex-direction: column;
   gap: 14px;
   width: 300px;
-  max-height: calc(100vh - 72px);
+  /* The popover's top edge sits ~92px below the viewport top (menu bar +
+     toolbar + gap); subtract that and a bottom margin so the panel always
+     stays fully on-screen and scrolls internally instead. */
+  max-height: calc(100vh - 104px);
   padding: 14px;
   overflow: auto;
   border: 1px solid var(--line);
@@ -2156,48 +2164,21 @@ button.primary svg {
   white-space: nowrap;
 }
 
-/* ── FEM simulate mode ─────────────────────────────────────────────────── */
-
-.mode-simulate-slot {
-  position: absolute;
-  left: 62px;
-  top: 14px;
-  bottom: 46px;
-  z-index: 9;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  pointer-events: none;
-}
-.mode-simulate-slot > * {
-  pointer-events: auto;
-}
-
-.sim-launch {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 38px;
-  padding: 0 12px;
-  border-radius: 10px;
-  background: rgba(14, 17, 15, 0.9);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(10px);
-}
+/* ── FEM simulate mode (a dock section) ────────────────────────────────── */
 
 .sim-panel {
-  width: 302px;
   max-height: 100%;
   overflow: auto;
   display: flex;
   flex-direction: column;
   gap: 9px;
   padding: 11px;
-  border: 1px solid var(--line);
-  border-radius: 13px;
-  background: rgba(14, 17, 15, 0.91);
-  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(12px);
+}
+
+/* When the dock shrinks the section, the panel scrolls — its rows must not
+   be flex-crushed to zero height (the face-group list used to vanish). */
+.sim-panel > * {
+  flex: 0 0 auto;
 }
 .sim-panel header {
   display: flex;

@@ -772,7 +772,10 @@ test("a primitive can be scaled along an axis", async ({ page }) => {
 test("sketch constraints and extrusion are represented in UI and code", async ({ page }) => {
   await railTool(page, "create", "tool-sketch");
   let metrics = await canvasMetrics(page);
-  const origin: Vec3 = [1.0, 1.4, 0];
+  // Placed left of center: the right side of the viewport hosts the dock
+  // (object tree / sketch / materials), and the vertex clicks below must land
+  // on the canvas, not on the dock's panels.
+  const origin: Vec3 = [0.0, 1.6, 0];
   const drop = projectToCss(origin, metrics);
   await page.mouse.click(metrics.left + drop.x, metrics.top + drop.y);
   await waitForCompile(page);
