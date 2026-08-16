@@ -7,8 +7,12 @@
 
 import type {
   CompileResponse,
+  MeshResponse,
   PatchOperation,
   PatchResponse,
+  SceneListResponse,
+  SceneLoadResponse,
+  SceneSaveResponse,
   SessionResponse,
 } from "./types";
 
@@ -56,4 +60,33 @@ export async function patch(
   body: { source: string; op?: PatchOperation | string } & Record<string, unknown>,
 ): Promise<PatchResponse> {
   return post<PatchResponse>("/patch", body);
+}
+
+/**
+ * Extract the dual-contour mesh edges for the current program.
+ *
+ * Split out of `/compile` because it dominates the compile round-trip; the
+ * viewer only asks while a mesh overlay is actually displayed.
+ */
+export async function mesh(source: string): Promise<MeshResponse> {
+  return post<MeshResponse>("/api/mesh", { source });
+}
+
+/** List saved scene files in the server's `scenes` workspace. */
+export async function listScenes(): Promise<SceneListResponse> {
+  const response = await fetch("/api/scenes");
+  return readJson<SceneListResponse>(response);
+}
+
+/** Read one saved scene file. */
+export async function loadScene(name: string): Promise<SceneLoadResponse> {
+  return post<SceneLoadResponse>("/api/scenes/load", { name });
+}
+
+/** Write one scene file into the server's `scenes` workspace. */
+export async function saveScene(
+  name: string,
+  source: string,
+): Promise<SceneSaveResponse> {
+  return post<SceneSaveResponse>("/api/scenes/save", { name, source });
 }

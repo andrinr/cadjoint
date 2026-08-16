@@ -15,7 +15,9 @@ import {
 import {
   busy,
   nodeById,
+  pendingLoft,
   selection,
+  setPendingLoft,
   setSelectionMode,
   setTool,
   solverRuns,
@@ -286,6 +288,29 @@ export function SketchPanel(props: SketchPanelProps) {
               data-testid="sketch-revolve"
             >
               Revolve
+            </button>
+            <button
+              type="button"
+              class={pendingLoft()?.nodeId === node().id ? "active" : ""}
+              disabled={busy() || hasOperator() || node().line === null}
+              onClick={() => {
+                if (pendingLoft()?.nodeId === node().id) {
+                  setPendingLoft(null);
+                  return;
+                }
+                const line = node().line;
+                if (line === null) return;
+                setSelectionMode("object");
+                setPendingLoft({ nodeId: node().id, line });
+              }}
+              title={
+                hasOperator()
+                  ? "This sketch already drives an operation"
+                  : "Loft to a second sketch with the same vertex count"
+              }
+              data-testid="sketch-loft"
+            >
+              Loft
             </button>
           </div>
 

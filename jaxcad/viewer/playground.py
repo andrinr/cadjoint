@@ -6,16 +6,23 @@ Serves the built frontend (``jaxcad/viewer/static``) and a small JSON API:
 - ``POST /compile``      run the user's Python in a disposable child process
                          and return WGSL shaders plus the construction tree
 - ``POST /patch``        rewrite sketch vertex literals in the user's source
+- ``POST /api/mesh``     run the source again and return only the dual-contour
+                         mesh edges (requested lazily by the viewer)
+- ``GET  /api/scenes``   list saved scene files in ``./scenes``
+- ``POST /api/scenes/load``  read one saved scene file
+- ``POST /api/scenes/save``  write one scene file into ``./scenes``
 
-Everything is loopback-only and token-gated. ``/compile`` executes the editor's
-Python on this machine — only run code you trust. ``/patch`` is pure text
-surgery and never executes anything.
+Everything is loopback-only and token-gated. ``/compile`` and ``/api/mesh``
+execute the editor's Python on this machine — only run code you trust.
+``/patch`` is pure text surgery and never executes anything. Scene files are
+confined to the ``scenes`` directory under the server's working directory.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import re
 import secrets
 import subprocess
 import sys
@@ -202,8 +209,8 @@ npm run build</pre>
 """
 
 
-def compile_source(source: str, timeout: float = COMPILE_TIMEOUT_SECONDS) -> dict[str, Any]:
-    """Compile playground source in a disposable child process."""
+def _run_worker(source: str, mode: str, timeout: float) -> dict[str, Any]:
+    """Run one compile-worker request in a disposable child process."""
     if not isinstance(source, str):
         return {"ok": False, "error": "Source must be a string."}
     if len(source.encode("utf-8", errors="replace")) > MAX_SOURCE_BYTES:
@@ -215,7 +222,7 @@ def compile_source(source: str, timeout: float = COMPILE_TIMEOUT_SECONDS) -> dic
     try:
         completed = subprocess.run(
             [sys.executable, "-m", "jaxcad.viewer._compile_worker"],
-            input=json.dumps({"source": source}),
+            input=json.dumps({"source": source, "mode": mode}),
             capture_output=True,
             check=False,
             text=True,
@@ -238,6 +245,110 @@ def compile_source(source: str, timeout: float = COMPILE_TIMEOUT_SECONDS) -> dic
     if not isinstance(result, dict):
         return {"ok": False, "error": "Invalid compiler response."}
     return result
+
+
+def compile_source(source: str, timeout: float = COMPILE_TIMEOUT_SECONDS) -> dict[str, Any]:
+    """Compile playground source in a disposable child process."""
+    return _run_worker(source, "compile", timeout)
+
+
+def mesh_source(source: str, timeout: float = COMPILE_TIMEOUT_SECONDS) -> dict[str, Any]:
+    """Extract only the dual-contour mesh edges, in a disposable child process.
+
+    Mesh extraction dominates a full compile, so the viewer requests it lazily
+    through this path only while a mesh overlay is actually turned on.
+    """
+    return _run_worker(source, "mesh", timeout)
+
+
+# Saved scenes live in one directory under the server's working directory.
+# Requests supply bare ``*.py`` names only; anything resembling a path is
+# rejected before it touches the filesystem.
+SCENES_DIRNAME = "scenes"
+MAX_SCENE_NAME_LENGTH = 128
+_SCENE_STEM = re.compile(r"[A-Za-z0-9_-][A-Za-z0-9._ -]*")
+
+
+def scenes_root() -> Path:
+    """Directory holding saved scene files (created lazily on first save)."""
+    return Path.cwd() / SCENES_DIRNAME
+
+
+def sanitize_scene_name(name: Any) -> str | None:
+    """Validate a scene file name, or return None if it is unacceptable.
+
+    Accepts bare file names such as ``bracket.py``. Path separators, traversal
+    (``../evil.py``), hidden files, and non-``.py`` suffixes are all refused.
+    """
+    if not isinstance(name, str) or not name.endswith(".py"):
+        return None
+    if len(name) > MAX_SCENE_NAME_LENGTH:
+        return None
+    if "/" in name or "\\" in name or "\x00" in name:
+        return None
+    stem = name[: -len(".py")]
+    if not _SCENE_STEM.fullmatch(stem):
+        return None
+    return name
+
+
+def _scene_path(name: str) -> Path | None:
+    """Resolve a sanitized name inside the scenes directory, or None."""
+    candidate = (scenes_root() / name).resolve()
+    try:
+        candidate.relative_to(scenes_root().resolve())
+    except ValueError:
+        return None
+    return candidate
+
+
+def list_scenes() -> dict[str, Any]:
+    """List saved scene files as bare names, newest directory state wins."""
+    root = scenes_root()
+    if not root.is_dir():
+        return {"ok": True, "files": []}
+    names = sorted(
+        path.name for path in root.glob("*.py") if path.is_file() and sanitize_scene_name(path.name)
+    )
+    return {"ok": True, "files": names}
+
+
+def load_scene(request: dict[str, Any]) -> dict[str, Any]:
+    """Read one saved scene file: ``{"name"}`` → ``{"source"}``."""
+    name = sanitize_scene_name(request.get("name"))
+    if name is None:
+        return {"ok": False, "error": "Scene `name` must be a bare `*.py` file name."}
+    path = _scene_path(name)
+    if path is None or not path.is_file():
+        return {"ok": False, "error": f"No saved scene named {name!r}."}
+    if path.stat().st_size > MAX_SOURCE_BYTES:
+        return {"ok": False, "error": f"{name!r} is larger than the source limit."}
+    try:
+        source = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return {"ok": False, "error": f"Could not read {name!r}."}
+    return {"ok": True, "name": name, "source": source}
+
+
+def save_scene(request: dict[str, Any]) -> dict[str, Any]:
+    """Write one scene file: ``{"name", "source"}`` → ``{"name"}``."""
+    name = sanitize_scene_name(request.get("name"))
+    if name is None:
+        return {"ok": False, "error": "Scene `name` must be a bare `*.py` file name."}
+    source = request.get("source")
+    if not isinstance(source, str):
+        return {"ok": False, "error": "The save request must contain a string `source` field."}
+    if len(source.encode("utf-8", errors="replace")) > MAX_SOURCE_BYTES:
+        return {"ok": False, "error": f"Source is larger than the {MAX_SOURCE_BYTES:,}-byte limit."}
+    path = _scene_path(name)
+    if path is None:
+        return {"ok": False, "error": "Scene `name` must stay inside the scenes directory."}
+    try:
+        scenes_root().mkdir(parents=True, exist_ok=True)
+        path.write_text(source, encoding="utf-8")
+    except OSError as error:
+        return {"ok": False, "error": f"Could not save {name!r}: {error}."}
+    return {"ok": True, "name": name}
 
 
 def patch_source(request: dict[str, Any]) -> dict[str, Any]:
@@ -485,6 +596,26 @@ def patch_source(request: dict[str, Any]) -> dict[str, Any]:
         except PatchError as error:
             return {"ok": False, "error": str(error)}
 
+    if operation == "add_loft":
+        line_a = request.get("line_a")
+        line_b = request.get("line_b")
+        height = request.get("height", 1.0)
+        if not all(
+            isinstance(value, int) and not isinstance(value, bool) for value in (line_a, line_b)
+        ):
+            return {"ok": False, "error": "The patch request needs integer `line_a` and `line_b`."}
+        if not isinstance(height, (int, float)) or isinstance(height, bool):
+            return {"ok": False, "error": "The patch request needs a numeric `height`."}
+        try:
+            return {
+                "ok": True,
+                "source": apply_operation(
+                    source, operation, line_a=line_a, line_b=line_b, height=float(height)
+                ),
+            }
+        except PatchError as error:
+            return {"ok": False, "error": str(error)}
+
     if operation == "solve_sketch":
         line = request.get("line")
         if not isinstance(line, int) or isinstance(line, bool):
@@ -675,6 +806,10 @@ def make_handler(token: str):
                 )
                 return
 
+            if path == "/api/scenes":
+                self._send_json(HTTPStatus.OK, list_scenes())
+                return
+
             target = resolve_static(path)
             if target is None:
                 if path == "/":
@@ -703,7 +838,15 @@ def make_handler(token: str):
             if not self._host_allowed():
                 return
             path = urlsplit(self.path).path
-            if path not in {"/compile", "/patch"}:
+            handlers = {
+                "/compile": lambda payload: compile_source(payload.get("source")),
+                "/api/mesh": lambda payload: mesh_source(payload.get("source")),
+                "/patch": patch_source,
+                "/api/scenes/load": load_scene,
+                "/api/scenes/save": save_scene,
+            }
+            handler = handlers.get(path)
+            if handler is None:
                 self._reject(HTTPStatus.NOT_FOUND, "Not found.")
                 return
             if not self._token_valid():
@@ -712,10 +855,7 @@ def make_handler(token: str):
             if payload is None:
                 return
 
-            if path == "/compile":
-                result = compile_source(payload.get("source"))
-            else:
-                result = patch_source(payload)
+            result = handler(payload)
             status = HTTPStatus.OK if result.get("ok") else HTTPStatus.UNPROCESSABLE_ENTITY
             self._send_json(status, result)
 

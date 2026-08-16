@@ -237,11 +237,38 @@ def _scene_assignment(tree: ast.Module) -> ast.Assign | None:
     return None
 
 
-def _ensure_import(source: str, tree: ast.Module, module: str, symbol: str) -> str:
-    """Add ``from module import symbol`` when the symbol is not already bound."""
+def _ensure_import(
+    source: str,
+    tree: ast.Module,
+    module: str,
+    symbol: str,
+    *,
+    prefer_offset: int | None = None,
+) -> str:
+    """Add ``from module import symbol`` when the symbol is not already bound.
+
+    An existing single-line ``from module import ...`` is extended in place
+    rather than adding a new line: line-addressed patch operations identify
+    their targets by line number, so imports must not shift the file.  When
+    no such line exists and ``prefer_offset`` is given, the new import is
+    inserted there (module-level imports are legal anywhere) so callers can
+    keep everything above their target line untouched.
+    """
     if symbol in _module_names(tree):
         return source
     offsets = _line_offsets(source)
+    for node in tree.body:
+        if (
+            isinstance(node, ast.ImportFrom)
+            and node.module == module
+            and node.level == 0
+            and node.lineno == node.end_lineno
+            and not any(alias.asname for alias in node.names)
+        ):
+            _, end = _node_span(source, offsets, node)
+            return source[:end] + f", {symbol}" + source[end:]
+    if prefer_offset is not None:
+        return source[:prefer_offset] + f"from {module} import {symbol}\n" + source[prefer_offset:]
     imports = [node for node in tree.body if isinstance(node, (ast.Import, ast.ImportFrom))]
     insert_line = (imports[-1].end_lineno if imports else 0) or 0
     offset = offsets[insert_line] if insert_line < len(offsets) else len(source)
@@ -599,9 +626,19 @@ def add_constraint(
             "`vertical`, `coincident`), or four (`parallel`, `perpendicular`)."
         )
 
-    insert = _after_statement(source, statement)
+    # Append after the profile's LAST existing constraint statement so source
+    # order equals creation order — the serialized payload indices the viewer
+    # chips address are statement ordinals, and prepending would reverse them.
+    existing = locate_constraint_statements(source, line)
+    anchor = existing[-1].statement if existing else statement
+    insert = _after_statement(source, anchor)
     patched = source[:insert] + constraint + source[insert:]
-    patched = _ensure_import(patched, ast.parse(patched), "jaxcad.constraints", symbol)
+    # Keep everything above the profile untouched: a first-time constraint
+    # import lands next to the constraint statement, so repeated
+    # line-addressed calls stay valid without recompiling in between.
+    patched = _ensure_import(
+        patched, ast.parse(patched), "jaxcad.constraints", symbol, prefer_offset=insert
+    )
     return _validate(patched)
 
 
@@ -653,7 +690,18 @@ def set_constraint_value(source: str, line: int, index: int, value) -> str:
         raise PatchError("The constraint value is not an editable literal.")
     offsets = _line_offsets(source)
     start, end = _node_span(source, offsets, literal)
-    return _validate(source[:start] + _format_value(value) + source[end:])
+
+    def exact(component) -> str:
+        # Typed-in values must round-trip exactly; the %.4g compaction is for
+        # drag-generated coordinates, not numbers the user chose.
+        return repr(float(component))
+
+    formatted = (
+        exact(value)
+        if isinstance(value, (int, float))
+        else "[" + ", ".join(exact(component) for component in value) + "]"
+    )
+    return _validate(source[:start] + formatted + source[end:])
 
 
 def add_revolution(source: str, line: int, offset: float = 0.0) -> str:
@@ -802,13 +850,28 @@ def solve_sketch(
     statements = list(tree.body)
     index = statements.index(profile_statement)
     anchor = profile_statement
-    constraint_names = {"FixedConstraint", "DistanceConstraint"}
+    constraint_names = {
+        "FixedConstraint",
+        "DistanceConstraint",
+        "HorizontalConstraint",
+        "VerticalConstraint",
+        "CoincidentConstraint",
+        "EqualLengthConstraint",
+        "PointOnLineConstraint",
+        "ParallelEdgesConstraint",
+        "PerpendicularEdgesConstraint",
+    }
     for candidate in statements[index + 1 :]:
         if (
             isinstance(candidate, ast.Expr)
             and isinstance(candidate.value, ast.Call)
             and _called_name(candidate.value) in constraint_names
         ):
+            anchor = candidate
+            continue
+        if isinstance(candidate, (ast.Import, ast.ImportFrom)):
+            # Constraint imports are placed beside their statements; they are
+            # part of the block the solve step must follow.
             anchor = candidate
             continue
         break

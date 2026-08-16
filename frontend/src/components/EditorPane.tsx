@@ -22,6 +22,7 @@ import { For, Show, createEffect, createSignal, onCleanup, onMount } from "solid
 import {
   consoleText,
   differentiabilityDemo,
+  sceneName,
   setDirty,
   setSource,
   source,
@@ -91,6 +92,8 @@ export interface EditorPaneProps {
   /** Character span to highlight, or null to clear. */
   highlight: { from: number; to: number } | null;
   onRun: () => void;
+  /** Collapse the pane to its slim rail (same state as Window → Editor). */
+  onCollapse?: () => void;
 }
 
 export function EditorPane(props: EditorPaneProps) {
@@ -167,7 +170,7 @@ export function EditorPane(props: EditorPaneProps) {
   return (
     <section class="pane editor-pane">
       <header class="pane-head">
-        <span class="pane-title">scene.py</span>
+        <span class="pane-title">{sceneName() ?? "scene.py"}</span>
         <div class="editor-head-actions">
           <Show when={differentiabilityDemo()}>
             {(demo) => (
@@ -218,6 +221,18 @@ export function EditorPane(props: EditorPaneProps) {
             )}
           </Show>
           <span class="pane-hint">Ctrl/⌘ + Enter to run</span>
+          {props.onCollapse && (
+            <button
+              type="button"
+              class="editor-collapse"
+              onClick={() => props.onCollapse?.()}
+              title="Collapse the editor"
+              aria-label="Collapse the editor"
+              data-testid="editor-collapse"
+            >
+              ⟨
+            </button>
+          )}
         </div>
       </header>
       <div class="editor-host" ref={host} data-testid="editor" />

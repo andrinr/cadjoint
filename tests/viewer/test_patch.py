@@ -257,7 +257,7 @@ class TestSetValue:
         )
         patched = set_value(source, 2, "PolygonProfile", "planeOrigin", [2, 3, 4])
         assert "SketchPlane(origin=[2, 3, 4])" in patched
-        assert "from jaxcad.construction import SketchPlane" in patched
+        assert "from jaxcad.construction import" in patched and "SketchPlane" in patched
 
 
 class TestAddPrimitive:
@@ -378,8 +378,10 @@ class TestSketchHistoryOperations:
             "scene = extrude(profile, depth=0.5)\n"
         )
         patched = add_constraint(source, 2, "fixed", [0], [0, 0])
-        patched = add_constraint(patched, 3, "distance", [0, 1], 1.0)
-        patched = solve_sketch(patched, 4)
+        # Imports land beside the constraint statements, so the profile's
+        # line number is stable across repeated patches.
+        patched = add_constraint(patched, 2, "distance", [0, 1], 1.0)
+        patched = solve_sketch(patched, 2)
         assert "FixedConstraint(profile.vertices[0], [0, 0])" in patched
         assert "DistanceConstraint(profile.vertices[0], profile.vertices[1], 1)" in patched
         assert "satisfy_constraints(profile, method='newton', steps=8)" in patched
@@ -535,8 +537,10 @@ class TestConstraintEditing:
         grown = apply_operation(
             EXAMPLE_SOURCE, "add_constraint", line=line, kind="horizontal", indices=[0, 1]
         )
+        # Creation order appends: the new constraint sits after the starter's
+        # three bare-name statements, at index 3.
         shrunk = apply_operation(
-            grown, "delete_constraint", line=self._profile_line(grown), index=0
+            grown, "delete_constraint", line=self._profile_line(grown), index=3
         )
         assert "HorizontalConstraint(profile.vertices" not in shrunk
 
@@ -565,7 +569,7 @@ class TestConstraintEditing:
         )
         with pytest.raises(PatchError, match="editable value"):
             apply_operation(
-                grown, "set_constraint_value", line=self._profile_line(grown), index=0, value=1.0
+                grown, "set_constraint_value", line=self._profile_line(grown), index=3, value=1.0
             )
 
 
@@ -623,7 +627,7 @@ class TestAddLoft:
         )
         assert "sketch1_body = loft(sketch1, sketch2, height=1.5)" in patched
         assert ", sketch1_body" in patched
-        assert "from jaxcad.construction import loft" in patched
+        assert "from jaxcad.construction import" in patched and "loft" in patched
         assert patched.index("sketch1_body =") < patched.index("scene =")
         result = compile_source(patched)
         assert result["ok"], result.get("error")

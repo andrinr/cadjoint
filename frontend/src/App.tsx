@@ -6,15 +6,18 @@
  *   new shaders + construction tree → viewer redraws.
  */
 
-import { createEffect, createMemo, createSignal, onMount, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, onCleanup, onMount, Show } from "solid-js";
 import * as api from "./api";
 import { EditorPane } from "./components/EditorPane";
 import { MaterialPanel } from "./components/MaterialPanel";
+import { MenuBar } from "./components/MenuBar";
+import { ObjectTree } from "./components/ObjectTree";
 import { SketchPanel } from "./components/SketchPanel";
 import { ToolRail } from "./components/ToolRail";
 import { Toolbar } from "./components/Toolbar";
 import { ViewCube } from "./components/ViewCube";
 import { ViewerPane } from "./components/ViewerPane";
+import { SourceHistory } from "./history";
 import {
   DEFAULT_RENDER_PRESETS,
   loadRenderPresetState,
@@ -24,7 +27,10 @@ import {
 import {
   busy,
   cameraAngles,
+  dirty,
   gizmoMode,
+  meshEdges,
+  panels,
   setCameraAngles,
   nodeById,
   selection,
@@ -35,7 +41,9 @@ import {
   setMaterials,
   setMeshEdges,
   setNodes,
+  setPanelVisible,
   setRelations,
+  setSceneName,
   setSolverRuns,
   setSelection,
   setSource,
@@ -71,6 +79,80 @@ export function App() {
   const [selectedRenderPreset, setSelectedRenderPreset] =
     createSignal<RenderPresetId>(initialPresetState.activeId);
   const [viewPreset, setViewPreset] = createSignal("iso");
+
+  // Undo/redo across source edits. Snapshots are committed on every run and
+  // every viewer patch (both funnel through run()); typing inside the editor
+  // keeps CodeMirror's native history until the next run commits it here.
+  const history = new SourceHistory();
+  const [historyVersion, setHistoryVersion] = createSignal(0);
+  const commitHistory = (text: string) => {
+    history.commit(text);
+    setHistoryVersion((version) => version + 1);
+  };
+  const canUndo = createMemo(() => (historyVersion(), history.canUndo()));
+  const canRedo = createMemo(() => (historyVersion(), history.canRedo()));
+
+  // Editor/viewport splitter. Null means "the stylesheet default" until the
+  // user drags; the value persists like the other layout preferences.
+  const EDITOR_WIDTH_KEY = "jaxcad.editorWidth.v1";
+  const EDITOR_MIN = 280;
+  const VIEWER_MIN = 360;
+  const storedWidth = Number(localStorage.getItem(EDITOR_WIDTH_KEY));
+  const [editorWidth, setEditorWidth] = createSignal<number | null>(
+    Number.isFinite(storedWidth) && storedWidth >= EDITOR_MIN ? storedWidth : null,
+  );
+  const [resizing, setResizing] = createSignal(false);
+  let panesElement: HTMLElement | undefined;
+
+  const persistEditorWidth = (width: number | null) => {
+    setEditorWidth(width);
+    try {
+      if (width === null) localStorage.removeItem(EDITOR_WIDTH_KEY);
+      else localStorage.setItem(EDITOR_WIDTH_KEY, String(Math.round(width)));
+    } catch {
+      // Layout persistence is best-effort only.
+    }
+  };
+
+  const paneColumns = () => {
+    if (!panels().editor) return "44px 0px 1fr";
+    const width = editorWidth();
+    const editor =
+      width === null
+        ? "minmax(320px, 42%)"
+        : `min(${Math.round(width)}px, calc(100% - ${VIEWER_MIN + 6}px))`;
+    return `${editor} 6px 1fr`;
+  };
+
+  const onSplitterDown = (event: PointerEvent) => {
+    if (!panels().editor || !panesElement) return;
+    const splitter = event.currentTarget as HTMLElement;
+    splitter.setPointerCapture(event.pointerId);
+    setResizing(true);
+    const bounds = panesElement.getBoundingClientRect();
+    const move = (moveEvent: PointerEvent) => {
+      const width = Math.min(
+        Math.max(moveEvent.clientX - bounds.left, EDITOR_MIN),
+        bounds.width - VIEWER_MIN - 6,
+      );
+      setEditorWidth(width);
+    };
+    const up = () => {
+      splitter.removeEventListener("pointermove", move);
+      splitter.removeEventListener("pointerup", up);
+      splitter.removeEventListener("pointercancel", up);
+      setResizing(false);
+      persistEditorWidth(editorWidth());
+    };
+    splitter.addEventListener("pointermove", move);
+    splitter.addEventListener("pointerup", up);
+    splitter.addEventListener("pointercancel", up);
+  };
+
+  // The mesh-edge overlay is fetched lazily: /compile no longer computes it,
+  // and this cache requests it only while a mesh display mode is on.
+  const [compiledSource, setCompiledSource] = createSignal<string | null>(null);
+  let meshRequestFor: string | null = null;
 
   const renderer = new Renderer({
     onStatus: (kind, text) => setStatus({ kind, text }),
@@ -184,8 +266,10 @@ export function App() {
     setBusy(true);
     setStatus({ kind: "", text: "JAX compiling…" });
     setConsoleText("");
+    const text = source();
+    commitHistory(text);
     try {
-      const result = await api.compile(source());
+      const result = await api.compile(text);
       if (!result.ok) {
         setStatus({ kind: "error", text: "Compile failed" });
         setConsoleText(result.error ?? "Unknown compile error.");
@@ -199,7 +283,10 @@ export function App() {
       setSolverRuns(result.solver_runs ?? []);
       setDifferentiabilityDemo(result.differentiability ?? null);
       setMaterials(result.materials ?? []);
-      setMeshEdges(result.mesh_edges ?? null);
+      // Mesh edges are no longer part of the compile payload; clear the stale
+      // overlay and let the lazy /api/mesh effect refill it when wanted.
+      setMeshEdges(null);
+      setCompiledSource(text);
       // Drop a selection that no longer exists in the rebuilt sketch.
       const active = selection();
       if (active) {
@@ -322,11 +409,96 @@ export function App() {
   const addRevolution = (line: number) =>
     applyPatch({ op: "add_revolution", line, offset: 0 });
 
+  const addLoft = (lineA: number, lineB: number) =>
+    applyPatch({ op: "add_loft", line_a: lineA, line_b: lineB, height: 1.0 });
+
   const solveSketch = (
     line: number,
     method: "newton" | "adam" | "sgd",
     iterations: number,
   ) => applyPatch({ op: "solve_sketch", line, method, iterations });
+
+  /**
+   * Fetch mesh edges lazily: only while a mesh overlay is displayed, only for
+   * the compiled program, and only once per compile (a "no mesh available"
+   * answer is cached too, so the effect cannot loop on it).
+   */
+  createEffect(() => {
+    const wanted = display().showMeshEdges || display().showMeshWireframe;
+    const compiled = compiledSource();
+    if (!wanted || compiled === null || meshEdges() !== null) return;
+    if (meshRequestFor === compiled) return;
+    meshRequestFor = compiled;
+    void api
+      .mesh(compiled)
+      .then((result) => {
+        // A newer compile owns the cache now; drop the stale answer.
+        if (compiledSource() !== compiled) return;
+        if (result.ok) setMeshEdges(result.mesh_edges ?? null);
+      })
+      .catch(() => {
+        // Missing mesh edges only dim an optional overlay; stay quiet.
+      });
+  });
+
+  const undo = () => {
+    // Capture typed-but-unrun edits first so redo can return to them.
+    commitHistory(source());
+    const previous = history.undo();
+    setHistoryVersion((version) => version + 1);
+    if (previous === null) return;
+    setSource(previous);
+    setSelection(null);
+    void run();
+  };
+
+  const redo = () => {
+    const next = history.redo();
+    setHistoryVersion((version) => version + 1);
+    if (next === null) return;
+    setSource(next);
+    setSelection(null);
+    void run();
+  };
+
+  /** Reset to the starter example, asking before unsaved work is lost. */
+  const newScene = () => {
+    if (dirty() && !window.confirm("Discard unsaved changes to the current scene?")) {
+      return;
+    }
+    setSceneName(null);
+    setSource(example());
+    setSelection(null);
+    void run();
+  };
+
+  /** Adopt a scene file loaded through File → Open. */
+  const adoptScene = (name: string, text: string) => {
+    setSceneName(name);
+    setSource(text);
+    setSelection(null);
+    void run();
+  };
+
+  onMount(() => {
+    // Undo/redo shortcuts, kept away from the editor: while typing there,
+    // CodeMirror's own history owns Ctrl/Cmd+Z. The menu items always work.
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "z") return;
+      const target = document.activeElement;
+      const typing =
+        target &&
+        (target.tagName === "TEXTAREA" ||
+          target.tagName === "INPUT" ||
+          target.closest(".cm-editor"));
+      if (typing) return;
+      event.preventDefault();
+      if (event.shiftKey) redo();
+      else undo();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    onCleanup(() => window.removeEventListener("keydown", onKeyDown));
+  });
 
   onMount(async () => {
     try {
@@ -342,6 +514,14 @@ export function App() {
 
   return (
     <div class="app">
+      <MenuBar
+        canUndo={canUndo()}
+        canRedo={canRedo()}
+        onUndo={undo}
+        onRedo={redo}
+        onNew={newScene}
+        onAdoptScene={adoptScene}
+      />
       <Toolbar
         display={display()}
         renderPresets={renderPresets()}
@@ -364,8 +544,45 @@ export function App() {
         wgslReady={wgsl() !== null}
       />
 
-      <main class="panes">
-        <EditorPane highlight={highlight()} onRun={() => void run()} />
+      <main
+        class="panes"
+        classList={{ resizing: resizing(), "editor-collapsed": !panels().editor }}
+        style={{ "grid-template-columns": paneColumns() }}
+        ref={panesElement}
+      >
+        <Show
+          when={panels().editor}
+          fallback={
+            <div class="editor-rail">
+              <button
+                type="button"
+                title="Expand the editor"
+                aria-label="Expand the editor"
+                onClick={() => setPanelVisible("editor", true)}
+                data-testid="editor-expand"
+              >
+                ⟩
+              </button>
+              <span class="editor-rail-label">scene.py</span>
+            </div>
+          }
+        >
+          <EditorPane
+            highlight={highlight()}
+            onRun={() => void run()}
+            onCollapse={() => setPanelVisible("editor", false)}
+          />
+        </Show>
+        <div
+          class="pane-splitter"
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize the editor pane"
+          title="Drag to resize · double-click to reset"
+          onPointerDown={onSplitterDown}
+          onDblClick={() => persistEditorWidth(null)}
+          data-testid="pane-splitter"
+        />
         <ViewerPane
           renderer={renderer}
           display={display()}
@@ -374,6 +591,7 @@ export function App() {
           onAddPrimitive={addPrimitive}
           onAddSketch={addSketch}
           onAddConstraint={addConstraint}
+          onAddLoft={addLoft}
           onDeleteObject={deleteObject}
           onAssignMaterial={assignMaterial}
           overlay={
@@ -391,60 +609,69 @@ export function App() {
                   setSelection(null);
                 }}
               />
-              <SketchPanel
-                onFix={() => {
-                  const active = selection();
-                  const node = active && nodeById(active.nodeId);
-                  if (
-                    !node ||
-                    node.kind !== "profile" ||
-                    node.line === null ||
-                    active!.vertexIndex === null
-                  ) {
-                    return;
+              <Show when={panels().sketch}>
+                <SketchPanel
+                  onFix={() => {
+                    const active = selection();
+                    const node = active && nodeById(active.nodeId);
+                    if (
+                      !node ||
+                      node.kind !== "profile" ||
+                      node.line === null ||
+                      active!.vertexIndex === null
+                    ) {
+                      return;
+                    }
+                    const vertex = node.vertices[active!.vertexIndex];
+                    void addConstraint(
+                      node.line,
+                      "fixed",
+                      [active!.vertexIndex],
+                      vertex.uv,
+                    );
+                  }}
+                  onSolve={(method, iterations) => {
+                    const active = selection();
+                    const node = active && nodeById(active.nodeId);
+                    if (node?.kind === "profile" && node.line !== null) {
+                      void solveSketch(node.line, method, iterations);
+                    }
+                  }}
+                  onExtrude={() => {
+                    const active = selection();
+                    const node = active && nodeById(active.nodeId);
+                    if (node?.kind === "profile" && node.line !== null) {
+                      void addExtrusion(node.line);
+                    }
+                  }}
+                  onRevolve={() => {
+                    const active = selection();
+                    const node = active && nodeById(active.nodeId);
+                    if (node?.kind === "profile" && node.line !== null) {
+                      void addRevolution(node.line);
+                    }
+                  }}
+                  onDeleteConstraint={(line, index) =>
+                    void deleteConstraint(line, index)
                   }
-                  const vertex = node.vertices[active!.vertexIndex];
-                  void addConstraint(
-                    node.line,
-                    "fixed",
-                    [active!.vertexIndex],
-                    vertex.uv,
-                  );
-                }}
-                onSolve={(method, iterations) => {
-                  const active = selection();
-                  const node = active && nodeById(active.nodeId);
-                  if (node?.kind === "profile" && node.line !== null) {
-                    void solveSketch(node.line, method, iterations);
+                  onSetConstraintValue={(line, index, value) =>
+                    void setConstraintValue(line, index, value)
                   }
-                }}
-                onExtrude={() => {
-                  const active = selection();
-                  const node = active && nodeById(active.nodeId);
-                  if (node?.kind === "profile" && node.line !== null) {
-                    void addExtrusion(node.line);
-                  }
-                }}
-                onRevolve={() => {
-                  const active = selection();
-                  const node = active && nodeById(active.nodeId);
-                  if (node?.kind === "profile" && node.line !== null) {
-                    void addRevolution(node.line);
-                  }
-                }}
-                onDeleteConstraint={(line, index) =>
-                  void deleteConstraint(line, index)
-                }
-                onSetConstraintValue={(line, index, value) =>
-                  void setConstraintValue(line, index, value)
-                }
-              />
-              <MaterialPanel
-                onCreate={addMaterial}
-                onSetValue={(line, argument, value) =>
-                  setValue(line, "Material", argument, value)
-                }
-              />
+                />
+              </Show>
+              <div class="side-stack">
+                <Show when={panels().objectTree}>
+                  <ObjectTree />
+                </Show>
+                <Show when={panels().materials}>
+                  <MaterialPanel
+                    onCreate={addMaterial}
+                    onSetValue={(line, argument, value) =>
+                      setValue(line, "Material", argument, value)
+                    }
+                  />
+                </Show>
+              </div>
               <ViewCube
                 yaw={cameraAngles().yaw}
                 pitch={cameraAngles().pitch}

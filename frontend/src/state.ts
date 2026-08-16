@@ -21,6 +21,7 @@ import type {
   ToolMode,
 } from "./types";
 import { placeEdges } from "./viewer/gizmo";
+import type { PendingLoft } from "./loft";
 
 export const [source, setSource] = createSignal("");
 export const [nodes, setNodes] = createSignal<ConstructionNode[]>([]);
@@ -33,6 +34,8 @@ export const [meshEdges, setMeshEdges] = createSignal<MeshEdgePayload | null>(nu
 export const [selection, setSelection] = createSignal<Selection | null>(null);
 export const [hover, setHover] = createSignal<Selection | null>(null);
 export const [tool, setTool] = createSignal<ToolMode>("select");
+/** Armed first sketch of a two-click loft; the viewport picks the second. */
+export const [pendingLoft, setPendingLoft] = createSignal<PendingLoft | null>(null);
 export const [status, setStatus] = createSignal({ kind: "", text: "Starting…" });
 export const [viewerError, setViewerError] = createSignal("");
 const [dismissedError, setDismissedError] = createSignal("");
@@ -54,6 +57,52 @@ export function dismissViewerError(): void {
 export const [consoleText, setConsoleText] = createSignal("");
 export const [busy, setBusy] = createSignal(false);
 export const [dirty, setDirty] = createSignal(false);
+/** Saved scene file name, or null for an unsaved buffer. */
+export const [sceneName, setSceneName] = createSignal<string | null>(null);
+
+/** Which shell panels are shown, toggled from the Window menu. */
+export interface PanelVisibility {
+  editor: boolean;
+  objectTree: boolean;
+  materials: boolean;
+  sketch: boolean;
+}
+
+export const DEFAULT_PANELS: PanelVisibility = {
+  editor: true,
+  objectTree: true,
+  materials: true,
+  sketch: true,
+};
+
+const PANELS_STORAGE_KEY = "jaxcad.panels.v1";
+
+function loadPanels(): PanelVisibility {
+  try {
+    const raw = localStorage.getItem(PANELS_STORAGE_KEY);
+    if (!raw) return { ...DEFAULT_PANELS };
+    const parsed = JSON.parse(raw) as Partial<Record<keyof PanelVisibility, unknown>>;
+    const next = { ...DEFAULT_PANELS };
+    for (const key of Object.keys(next) as (keyof PanelVisibility)[]) {
+      if (typeof parsed[key] === "boolean") next[key] = parsed[key] as boolean;
+    }
+    return next;
+  } catch {
+    return { ...DEFAULT_PANELS };
+  }
+}
+
+export const [panels, setPanels] = createSignal<PanelVisibility>(loadPanels());
+
+export function setPanelVisible(key: keyof PanelVisibility, visible: boolean): void {
+  const next = { ...panels(), [key]: visible };
+  setPanels(next);
+  try {
+    localStorage.setItem(PANELS_STORAGE_KEY, JSON.stringify(next));
+  } catch {
+    // Persistence is a convenience; private-mode storage failures are fine.
+  }
+}
 
 /** Vertex being dragged, with its live sketch-plane position. */
 export interface DragState {

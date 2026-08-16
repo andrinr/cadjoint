@@ -162,22 +162,25 @@ def _mesh_edge_payload(scene: Any) -> dict[str, Any] | None:
             CORNER,
             FACE,
             GridSpec,
-            cell_edge_incidence,
             classify_feature_cells,
             dual_faces,
             edge_hermite_data,
             feature_cell_links,
             find_crossing_edges,
+            manifold_cell_incidence,
             sample_grid,
             sharp_qef_vertices,
         )
 
         grid = GridSpec.from_bounds(_MESH_EDGE_BOUNDS, _MESH_EDGE_SIZE, _MESH_EDGE_RESOLUTION)
         sdf = lambda p: jnp.asarray(scene(p))  # noqa: E731
-        edges = find_crossing_edges(sample_grid(sdf, grid))
+        values = sample_grid(sdf, grid)
+        edges = find_crossing_edges(values)
         if edges.count == 0:
             return None
-        incidence = cell_edge_incidence(edges, grid)
+        # Manifold incidence: one row per inside-corner component, so cells
+        # crossed by two surface sheets keep the sheets on separate vertices.
+        incidence = manifold_cell_incidence(edges, grid, values < 0.0)
         hermite = edge_hermite_data(sdf, grid, edges)
         vertices = sharp_qef_vertices(hermite, incidence, grid)
         quads, _triangles, _skipped = dual_faces(edges, incidence, grid, vertices)
@@ -317,6 +320,36 @@ def _mesh_edge_payload(scene: Any) -> dict[str, Any] | None:
         return None
 
 
+def _execute_scene(source: str) -> dict[str, Any]:
+    """Run playground source and return its namespace (the scene lives inside)."""
+    namespace: dict[str, Any] = {
+        "__builtins__": __builtins__,
+        "__name__": "__jaxcad_playground__",
+    }
+    exec(compile(source, PLAYGROUND_FILENAME, "exec"), namespace, namespace)
+    if "scene" not in namespace:
+        raise ValueError("Your program must assign the SDF to a variable named `scene`.")
+    return namespace
+
+
+def _mesh_source(source: str) -> dict[str, Any]:
+    """Extract only the dual-contour mesh edges for the viewer.
+
+    The mesh view is optional and expensive (it re-runs dual contouring on a
+    dense grid), so the playground requests it lazily through ``/api/mesh``
+    instead of paying for it on every compile.
+    """
+    captured = io.StringIO()
+    with contextlib.redirect_stdout(captured), contextlib.redirect_stderr(captured):
+        namespace = _execute_scene(source)
+        mesh_edges = _mesh_edge_payload(namespace["scene"])
+    return {
+        "ok": True,
+        "mesh_edges": mesh_edges,
+        "output": captured.getvalue()[-8_000:],
+    }
+
+
 def _compile_source(source: str) -> dict[str, Any]:
     namespace: dict[str, Any] = {
         "__builtins__": __builtins__,
@@ -338,7 +371,6 @@ def _compile_source(source: str) -> dict[str, Any]:
         relations = build_construction_relations(profiles)
         materials = build_material_payload(namespace, source)
         differentiability = _differentiability_payload(namespace)
-        mesh_edges = _mesh_edge_payload(namespace["scene"])
         node_ids = {
             id(obj): (f"{obj.kind}_{index}" if hasattr(obj, "kind") else f"profile_{index}")
             for index, (obj, _) in enumerate(profiles)
@@ -365,7 +397,9 @@ def _compile_source(source: str) -> dict[str, Any]:
         "relations": relations,
         "materials": materials,
         "differentiability": differentiability,
-        "mesh_edges": mesh_edges,
+        # The mesh-edge view is requested lazily via `mode: "mesh"` — computing
+        # it here used to dominate the compile round-trip.
+        "mesh_edges": None,
         "solver_runs": solver_runs,
         "output": captured.getvalue()[-8_000:],
     }
@@ -377,7 +411,13 @@ def main() -> None:
         source = request.get("source")
         if not isinstance(source, str):
             raise TypeError("The compile request must contain a string `source` field.")
-        result = _compile_source(source)
+        mode = request.get("mode", "compile")
+        if mode == "mesh":
+            result = _mesh_source(source)
+        elif mode == "compile":
+            result = _compile_source(source)
+        else:
+            raise ValueError(f"Unknown compile worker mode: {mode!r}.")
     except Exception:
         result = {"ok": False, "error": traceback.format_exc()}
     json.dump(result, sys.stdout)

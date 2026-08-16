@@ -32,11 +32,13 @@ import {
   hover,
   nodeById,
   nodes,
+  pendingLoft,
   profiles,
   relations,
   selection,
   setDrag,
   setHover,
+  setPendingLoft,
   dismissViewerError,
   setSelection,
   setSelectionMode,
@@ -72,6 +74,8 @@ import {
   type AxisIndex,
 } from "../viewer/gizmo";
 import type { ConstraintKind, GizmoMode } from "../types";
+import { VIEWER_TOOL_KEYS, type ViewerToolAction } from "../shortcuts";
+import { loftPickError } from "../loft";
 import {
   CONSTRAINT_TOOL_NAMES,
   edgeVertexIndices,
@@ -121,6 +125,8 @@ export interface ViewerPaneProps {
     indices: number[],
     value?: number | number[],
   ) => Promise<void>;
+  /** Loft two named sketches, identified by their source lines. */
+  onAddLoft: (lineA: number, lineB: number) => Promise<void>;
   /** Remove a whole construction object from the program. */
   onDeleteObject: (line: number) => Promise<void>;
   /** Assign a named Python material to the object under a drop. */
@@ -464,6 +470,22 @@ export function ViewerPane(props: ViewerPaneProps) {
     setSelection({ nodeId: hit.nodeId, vertexIndex: null });
   };
 
+  /** Complete a pending loft with the sketch under the pointer. */
+  const handleLoftPick = async (x: number, y: number) => {
+    const pending = pendingLoft();
+    if (!pending) return;
+    const hit = pickNode(displayProfiles(), x, y, pickView(), 10, true);
+    const node = hit && nodeById(hit.nodeId);
+    const error = loftPickError(pending, node);
+    if (error) {
+      setStatus({ kind: "error", text: error });
+      return;
+    }
+    setPendingLoft(null);
+    setSelection({ nodeId: node!.id, vertexIndex: null });
+    await props.onAddLoft(pending.line, node!.line!);
+  };
+
   /** Insert one vertex where the user clicked; the tool stays active. */
   const handleAddVertex = async (x: number, y: number) => {
     const view = pickView();
@@ -577,6 +599,12 @@ export function ViewerPane(props: ViewerPaneProps) {
 
     if (tool() === "sketch" && event.button === 0) {
       void handlePlaceSketch(x, y);
+      return;
+    }
+
+    // A pending loft claims the next object pick, like the constraint flows.
+    if (pendingLoft() && event.button === 0) {
+      void handleLoftPick(x, y);
       return;
     }
 
@@ -913,24 +941,26 @@ export function ViewerPane(props: ViewerPaneProps) {
       const typing = target && (target.tagName === "TEXTAREA" || target.closest(".cm-editor"));
       if (event.key === "Escape") {
         setPendingConstraint(null);
+        setPendingLoft(null);
         setSelection(null);
         setTool("select");
       }
       if (!typing && !event.metaKey && !event.ctrlKey && !event.altKey) {
-        const shortcuts: Record<string, () => void> = {
-          "1": () => (setTool("select"), setSelectionMode("object")),
-          "2": () => (setTool("select"), setSelectionMode("vertex")),
-          p: () => setTool("polygon"),
-          b: () => setTool("box"),
-          s: () => setTool("sphere"),
-          c: () => setTool("cylinder"),
-          g: () => setGizmoMode("translate"),
-          r: () => setGizmoMode("rotate"),
+        // Key→action table shared with the Help dialog (src/shortcuts.ts).
+        const actions: Record<ViewerToolAction, () => void> = {
+          "select-object": () => (setTool("select"), setSelectionMode("object")),
+          "select-vertex": () => (setTool("select"), setSelectionMode("vertex")),
+          "tool-polygon": () => setTool("polygon"),
+          "tool-box": () => setTool("box"),
+          "tool-sphere": () => setTool("sphere"),
+          "tool-cylinder": () => setTool("cylinder"),
+          "gizmo-translate": () => setGizmoMode("translate"),
+          "gizmo-rotate": () => setGizmoMode("rotate"),
         };
-        const action = shortcuts[event.key.toLowerCase()];
+        const action = VIEWER_TOOL_KEYS[event.key.toLowerCase()];
         if (action) {
           event.preventDefault();
-          action();
+          actions[action]();
         }
       }
       const active = selection();
@@ -1124,7 +1154,9 @@ export function ViewerPane(props: ViewerPaneProps) {
         </div>
       )}
       <p class="viewer-hint">
-        {tool() === "polygon"
+        {pendingLoft()
+          ? "Loft: click the second sketch in the viewport · Esc to cancel"
+          : tool() === "polygon"
           ? "Point: click sketch edges to add vertices · Esc to finish"
           : isVertexConstraintTool(tool())
             ? pendingConstraint()

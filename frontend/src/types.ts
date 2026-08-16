@@ -74,7 +74,7 @@ export interface DifferentiabilityDemo {
 }
 
 export interface ConstructionOperator {
-  kind: "extrude" | "revolve";
+  kind: "extrude" | "revolve" | "loft";
   line: number;
 }
 
@@ -182,6 +182,7 @@ export type PatchOperation =
   | "add_sketch"
   | "add_extrusion"
   | "add_revolution"
+  | "add_loft"
   | "add_constraint"
   | "delete_constraint"
   | "set_constraint_value"
@@ -191,6 +192,32 @@ export type PatchOperation =
 export interface PatchResponse {
   ok: boolean;
   source?: string;
+  error?: string;
+}
+
+/** Lazy mesh-edge extraction, requested only while a mesh overlay is on. */
+export interface MeshResponse {
+  ok: boolean;
+  mesh_edges?: MeshEdgePayload | null;
+  error?: string;
+}
+
+export interface SceneListResponse {
+  ok: boolean;
+  files?: string[];
+  error?: string;
+}
+
+export interface SceneLoadResponse {
+  ok: boolean;
+  name?: string;
+  source?: string;
+  error?: string;
+}
+
+export interface SceneSaveResponse {
+  ok: boolean;
+  name?: string;
   error?: string;
 }
 

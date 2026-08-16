@@ -19,8 +19,13 @@ from jaxcad.viewer.playground import (
     EXAMPLE_SOURCE,
     compile_source,
     create_server,
+    list_scenes,
+    load_scene,
+    mesh_source,
     patch_source,
     resolve_static,
+    sanitize_scene_name,
+    save_scene,
 )
 
 
@@ -49,8 +54,17 @@ def test_example_scene_compiles_to_complete_webgpu_shader():
     assert "fn fs_present(" in result["present_shader"]
 
 
-def test_example_scene_reports_mesh_edges_for_the_viewer():
+def test_compile_no_longer_pays_for_mesh_edges():
+    # Mesh extraction used to dominate the compile round-trip; it now runs
+    # only through the lazy `/api/mesh` request.
     result = compile_source(EXAMPLE_SOURCE)
+
+    assert result["ok"] is True
+    assert result["mesh_edges"] is None
+
+
+def test_mesh_endpoint_reports_mesh_edges_for_the_viewer():
+    result = mesh_source(EXAMPLE_SOURCE)
 
     assert result["ok"] is True
     mesh_edges = result["mesh_edges"]
@@ -79,7 +93,7 @@ def test_thin_slab_sharp_edges_stay_on_their_own_rim():
         "scene = Box(size=Vector([0.9, 0.9, 0.08]))\n"
     )
 
-    result = compile_source(source)
+    result = mesh_source(source)
 
     assert result["ok"] is True
     sharp = np.asarray(result["mesh_edges"]["sharp"], dtype=float)
@@ -379,7 +393,9 @@ def test_session_endpoint_hands_out_a_token_and_the_example():
     assert session["example"] == EXAMPLE_SOURCE
 
 
-@pytest.mark.parametrize("path", ["/compile", "/patch"])
+@pytest.mark.parametrize(
+    "path", ["/compile", "/patch", "/api/mesh", "/api/scenes/load", "/api/scenes/save"]
+)
 def test_write_endpoints_require_the_session_token(path):
     with running_server() as base:
         with pytest.raises(HTTPError) as error:
@@ -455,6 +471,91 @@ def test_unknown_host_header_is_rejected():
         with pytest.raises(HTTPError) as error:
             urlopen(request)
         assert error.value.code == 403
+
+
+def test_scene_files_round_trip_in_the_workspace(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+
+    # The directory is created lazily, so listing before any save is empty.
+    assert list_scenes() == {"ok": True, "files": []}
+
+    saved = save_scene({"name": "bracket.py", "source": "scene = None\n"})
+    assert saved == {"ok": True, "name": "bracket.py"}
+    assert (tmp_path / "scenes" / "bracket.py").read_text() == "scene = None\n"
+    assert list_scenes() == {"ok": True, "files": ["bracket.py"]}
+
+    loaded = load_scene({"name": "bracket.py"})
+    assert loaded["ok"] is True
+    assert loaded["source"] == "scene = None\n"
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "../evil.py",
+        "..\\evil.py",
+        "/etc/passwd.py",
+        "nested/evil.py",
+        ".hidden.py",
+        "..py",
+        "evil.txt",
+        "",
+        7,
+        None,
+    ],
+)
+def test_scene_requests_reject_bad_names(tmp_path, monkeypatch, name):
+    monkeypatch.chdir(tmp_path)
+
+    assert sanitize_scene_name(name) is None
+    assert save_scene({"name": name, "source": "scene = None\n"})["ok"] is False
+    assert load_scene({"name": name})["ok"] is False
+    # Nothing may leak outside the workspace, and the lazy directory itself
+    # is only created by a valid save.
+    assert not (tmp_path / "scenes").exists()
+    assert not (tmp_path / "evil.py").exists()
+
+
+def test_scene_load_reports_a_missing_file(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+
+    result = load_scene({"name": "missing.py"})
+    assert result["ok"] is False
+    assert "missing.py" in result["error"]
+
+
+def test_scene_save_rejects_oversized_source(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+
+    result = save_scene({"name": "big.py", "source": "x" * 200_000})
+    assert result["ok"] is False
+    assert "limit" in result["error"]
+
+
+def test_scene_endpoints_round_trip_over_http(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    with running_server() as base:
+        with urlopen(f"{base}/api/session") as response:
+            token = json.loads(response.read())["token"]
+
+        with urlopen(
+            post(base, "/api/scenes/save", {"name": "part.py", "source": "scene = None\n"}, token)
+        ) as response:
+            assert json.loads(response.read()) == {"ok": True, "name": "part.py"}
+
+        with urlopen(f"{base}/api/scenes") as response:
+            assert json.loads(response.read()) == {"ok": True, "files": ["part.py"]}
+
+        with urlopen(post(base, "/api/scenes/load", {"name": "part.py"}, token)) as response:
+            loaded = json.loads(response.read())
+        assert loaded["ok"] is True
+        assert loaded["source"] == "scene = None\n"
+
+        # Path traversal is refused with a client error, not a write.
+        with pytest.raises(HTTPError) as error:
+            urlopen(post(base, "/api/scenes/save", {"name": "../evil.py", "source": "x"}, token))
+        assert 400 <= error.value.code < 500
+    assert not (tmp_path / "evil.py").exists()
 
 
 def test_patch_rejects_an_operation_this_server_does_not_know():

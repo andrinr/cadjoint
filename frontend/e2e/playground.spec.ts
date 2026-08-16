@@ -849,7 +849,7 @@ test("sketch constraints and extrusion are represented in UI and code", async ({
   // Chips delete their constraint by serialized index.
   await page.getByTestId("constraint-delete-0").click();
   await expect
-    .poll(async () => (await editorText(page)).includes("FixedConstraint("), {
+    .poll(async () => (await editorText(page)).includes("FixedConstraint(sketch1"), {
       timeout: 45_000,
     })
     .toBe(false);
