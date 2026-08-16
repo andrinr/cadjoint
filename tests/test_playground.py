@@ -566,3 +566,140 @@ def test_patch_rejects_an_operation_this_server_does_not_know():
     assert result["ok"] is False
     assert "does not support the patch operation" in result["error"]
     assert "restart" in result["error"]
+
+
+# ── Simulation studies as first-class code citizens ─────────────────────────
+
+STUDY_SOURCE = """from jaxcad.fem import Dirichlet, Nodes, ThermalStudy
+from jaxcad.geometry import Vector
+from jaxcad.sdf.primitives import Box
+
+scene = Box(Vector([0.8, 0.5, 0.5], free=True, name="size"))
+heat = ThermalStudy(
+    name="bar-conduction",
+    resolution=10,
+    conductivity=2.0,
+    bcs=[Dirichlet(Nodes.side("-x"), value=1.0), Dirichlet(Nodes.side("+x"), value=0.0)],
+)
+"""
+
+
+def test_compile_reports_declared_studies_for_the_viewer():
+    result = compile_source(STUDY_SOURCE)
+
+    assert result["ok"] is True
+    studies = result["studies"]
+    assert len(studies) == 1
+    study = studies[0]
+    assert study["name"] == "bar-conduction"
+    assert study["kind"] == "thermal"
+    assert study["index"] == 0
+    assert study["editable"] is True
+    assert study["line"] == call_line(STUDY_SOURCE, "ThermalStudy")
+    assert study["resolution"] == 10
+    assert study["material"] == {"conductivity": 2.0}
+    start, end = study["span"]
+    assert STUDY_SOURCE[start:end].startswith("ThermalStudy(")
+    assert [bc["type"] for bc in study["bcs"]] == ["dirichlet", "dirichlet"]
+    for bc in study["bcs"]:
+        assert bc["serializable"] is True
+        assert bc["nodes"]["kind"] == "side"
+        start, end = bc["span"]
+        assert STUDY_SOURCE[start:end].startswith("Dirichlet(")
+
+
+def test_compile_reports_a_scene_without_studies_as_an_empty_list():
+    result = compile_source("from jaxcad.sdf.primitives import Sphere\nscene = Sphere(1.0)\n")
+
+    assert result["ok"] is True
+    assert result["studies"] == []
+
+
+def test_study_patches_round_trip_through_compile():
+    added = patch_source(
+        {
+            "source": STUDY_SOURCE,
+            "op": "add_study_bc",
+            "study": "bar-conduction",
+            "bc_type": "dirichlet",
+            "selection": {
+                "kind": "box",
+                "min_corner": [0.0, 0.0, 0.0],
+                "max_corner": [1.0, 1.0, 1.0],
+            },
+            "value": 300.0,
+        }
+    )
+    assert added["ok"] is True
+    assert "Dirichlet(Nodes.box([0.0, 0.0, 0.0], [1.0, 1.0, 1.0]), value=300.0)" in added["source"]
+
+    result = compile_source(added["source"])
+    assert result["ok"] is True
+    bcs = result["studies"][0]["bcs"]
+    assert len(bcs) == 3
+    assert bcs[2]["nodes"] == {
+        "kind": "box",
+        "min_corner": [0.0, 0.0, 0.0],
+        "max_corner": [1.0, 1.0, 1.0],
+    }
+    assert bcs[2]["value"] == 300.0
+
+
+@pytest.mark.parametrize(
+    ("request_body", "message"),
+    [
+        ({"op": "add_study", "kind": "modal"}, "thermal"),
+        ({"op": "add_study", "kind": "thermal", "name": "  "}, "non-empty"),
+        ({"op": "delete_study"}, "`study`"),
+        ({"op": "delete_study", "study": -1}, "`study`"),
+        ({"op": "delete_study_bc", "study": 0, "bc": "first"}, "`bc`"),
+        ({"op": "add_study_bc", "study": 0, "bc_type": "neumann"}, "bc_type"),
+        (
+            {"op": "add_study_bc", "study": 0, "bc_type": "dirichlet", "selection": "box"},
+            "description object",
+        ),
+        (
+            {
+                "op": "add_study_bc",
+                "study": 0,
+                "bc_type": "dirichlet",
+                "selection": {"kind": "side", "side": "-x"},
+                "value": "hot",
+            },
+            "numeric `value`",
+        ),
+        (
+            {
+                "op": "add_study_bc",
+                "study": 0,
+                "bc_type": "traction",
+                "selection": {"kind": "side", "side": "-x"},
+                "value": 1.0,
+            },
+            "three numbers",
+        ),
+        ({"op": "set_study_value", "study": 0, "value": 1.0}, "exactly one"),
+        (
+            {"op": "set_study_value", "study": 0, "bc": 0, "argument": "source", "value": 1.0},
+            "exactly one",
+        ),
+        ({"op": "set_study_value", "study": 0, "bc": 0, "value": "hot"}, "`value`"),
+    ],
+)
+def test_patch_source_validates_study_requests(request_body, message):
+    result = patch_source({"source": STUDY_SOURCE, **request_body})
+
+    assert result["ok"] is False
+    assert message in result["error"]
+
+
+def test_simulate_study_requires_a_declared_study_name():
+    from jaxcad.viewer.playground import simulate_source
+
+    result = simulate_source({"source": STUDY_SOURCE, "kind": "study"})
+    assert result["ok"] is False
+    assert "name" in result["error"]
+
+    result = simulate_source({"source": STUDY_SOURCE, "kind": "study", "name": "   "})
+    assert result["ok"] is False
+    assert "name" in result["error"]

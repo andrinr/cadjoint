@@ -9,7 +9,9 @@ Serves the built frontend (``jaxcad/viewer/static``) and a small JSON API:
 - ``POST /api/mesh``     run the source again and return only the dual-contour
                          mesh edges (requested lazily by the viewer)
 - ``POST /api/simulate`` mesh the scene into hexahedra and run a thermal or
-                         elastic FEM solve (or just probe the face groups)
+                         elastic FEM solve (or just probe the face groups);
+                         ``kind="study"`` runs a study the program declares
+                         (``jaxcad.fem.study``) picked by ``name``
 - ``GET  /api/scenes``   list saved scene files in ``./scenes``
 - ``POST /api/scenes/load``  read one saved scene file
 - ``POST /api/scenes/save``  write one scene file into ``./scenes``
@@ -268,7 +270,7 @@ def mesh_source(source: str, timeout: float = COMPILE_TIMEOUT_SECONDS) -> dict[s
 # FEM solves cover meshing plus a PETSc-assembled solve, which can far exceed
 # the ordinary compile budget.
 SIMULATE_TIMEOUT_SECONDS = 180
-SIMULATE_KINDS = ("probe", "thermal", "elastic")
+SIMULATE_KINDS = ("probe", "thermal", "elastic", "study")
 SIMULATE_BC_TYPES = ("dirichlet", "traction")
 SIMULATE_MATERIAL_KEYS = ("conductivity", "source", "youngs", "poisson")
 MIN_SIMULATE_RESOLUTION = 4
@@ -307,13 +309,30 @@ def simulate_source(
 
     ``kind="probe"`` only meshes the scene, returning the boundary surface and
     its face-group catalog for the BC UI; ``"thermal"``/``"elastic"`` also
-    solve.  The worker reports a missing jax-fem extra as
+    solve, as an ad-hoc preview from request-supplied BCs.  ``kind="study"``
+    instead runs a study the scene program itself declares (a first-class
+    :mod:`jaxcad.fem.study` object), picked by ``name`` — resolution,
+    material, and boundary conditions all come from the declaration.  The
+    worker reports a missing jax-fem extra as
     ``error_kind="fem_unavailable"``, which the HTTP layer maps to 501.
     """
     kind = request.get("kind", "probe")
     if kind not in SIMULATE_KINDS:
         allowed = ", ".join(SIMULATE_KINDS)
         return {"ok": False, "error": f"Simulation `kind` must be one of: {allowed}."}
+    if kind == "study":
+        name = request.get("name")
+        if not isinstance(name, str) or not name.strip():
+            return {
+                "ok": False,
+                "error": "A study simulation needs `name`: the declared study to run.",
+            }
+        return _run_worker(
+            request.get("source"),
+            "simulate",
+            timeout,
+            extra={"kind": kind, "name": name},
+        )
     resolution = request.get("resolution", 20)
     if (
         not isinstance(resolution, int)
@@ -781,6 +800,108 @@ def patch_source(request: dict[str, Any]) -> dict[str, Any]:
             return {"ok": False, "error": "The patch request needs an integer `line`."}
         try:
             return {"ok": True, "source": apply_operation(source, operation, line=line)}
+        except PatchError as error:
+            return {"ok": False, "error": str(error)}
+
+    if operation == "add_study":
+        kind = request.get("kind")
+        if kind not in {"thermal", "elastic"}:
+            return {"ok": False, "error": "Study `kind` must be `thermal` or `elastic`."}
+        name = request.get("name")
+        if name is not None and (not isinstance(name, str) or not name.strip()):
+            return {"ok": False, "error": "Study `name` must be a non-empty string."}
+        try:
+            return {"ok": True, "source": apply_operation(source, operation, kind=kind, name=name)}
+        except PatchError as error:
+            return {"ok": False, "error": str(error)}
+
+    if operation in {"delete_study", "add_study_bc", "delete_study_bc", "set_study_value"}:
+        study = request.get("study")
+        if not (
+            (isinstance(study, int) and not isinstance(study, bool) and study >= 0)
+            or (isinstance(study, str) and study.strip())
+        ):
+            return {
+                "ok": False,
+                "error": "The patch request needs `study` as a name or a non-negative index.",
+            }
+        arguments = {"study": study}
+
+        if operation == "add_study_bc":
+            bc_type = request.get("bc_type")
+            if bc_type not in {"dirichlet", "heat_flux", "fixed", "traction"}:
+                return {
+                    "ok": False,
+                    "error": ("`bc_type` must be one of: dirichlet, heat_flux, fixed, traction."),
+                }
+            selection = request.get("selection")
+            if not isinstance(selection, dict):
+                return {
+                    "ok": False,
+                    "error": "The patch request needs `selection` as a description object.",
+                }
+            arguments.update(bc_type=bc_type, selection=selection)
+            raw_value = request.get("value")
+            if bc_type == "fixed":
+                if raw_value is not None:
+                    return {"ok": False, "error": "A `fixed` boundary condition takes no value."}
+            elif bc_type == "traction":
+                vector = numbers(raw_value, 3)
+                if vector is None:
+                    return {
+                        "ok": False,
+                        "error": "A `traction` boundary condition needs `value` as three numbers.",
+                    }
+                arguments["value"] = vector
+            else:
+                if not isinstance(raw_value, (int, float)) or isinstance(raw_value, bool):
+                    return {
+                        "ok": False,
+                        "error": f"A `{bc_type}` boundary condition needs a numeric `value`.",
+                    }
+                arguments["value"] = float(raw_value)
+
+        if operation == "delete_study_bc":
+            bc = request.get("bc")
+            if not isinstance(bc, int) or isinstance(bc, bool) or bc < 0:
+                return {"ok": False, "error": "The patch request needs a non-negative `bc` index."}
+            arguments["bc"] = bc
+
+        if operation == "set_study_value":
+            bc = request.get("bc")
+            argument = request.get("argument")
+            if (bc is None) == (argument is None):
+                return {
+                    "ok": False,
+                    "error": "The patch request needs exactly one of `bc` or `argument`.",
+                }
+            if bc is not None:
+                if not isinstance(bc, int) or isinstance(bc, bool) or bc < 0:
+                    return {
+                        "ok": False,
+                        "error": "The patch request needs a non-negative `bc` index.",
+                    }
+                arguments["bc"] = bc
+            else:
+                if not isinstance(argument, str):
+                    return {"ok": False, "error": "The patch request needs a string `argument`."}
+                arguments["argument"] = argument
+            raw_value = request.get("value")
+            scalar = (
+                float(raw_value)
+                if isinstance(raw_value, (int, float)) and not isinstance(raw_value, bool)
+                else None
+            )
+            vector = numbers(raw_value)
+            if scalar is None and vector is None:
+                return {
+                    "ok": False,
+                    "error": "The patch request needs `value` as a number or numbers.",
+                }
+            arguments["value"] = scalar if scalar is not None else vector
+
+        try:
+            return {"ok": True, "source": apply_operation(source, operation, **arguments)}
         except PatchError as error:
             return {"ok": False, "error": str(error)}
 

@@ -24,6 +24,7 @@ from jaxcad.viewer._source_map import (
     build_construction_relations,
     build_material_payload,
     capture_profiles,
+    locate_study_statements,
 )
 from jaxcad.viewer._webgpu import build_viewer_shader
 
@@ -569,6 +570,51 @@ def _mesh_edge_payload(scene: Any) -> dict[str, Any] | None:
         return None
 
 
+def _study_entries(studies: list[Any], source: str) -> list[dict[str, Any]]:
+    """Serialize declared studies for the viewer, with their source locations.
+
+    Mirrors how constraints flow into the payload: each entry is the study's
+    ``describe()`` dict plus a stable ``index``, the statement's ``line`` and
+    the constructor call's character ``span``, an ``editable`` flag, and a
+    per-BC ``serializable`` flag (false only for predicate selections) with
+    the BC argument's character ``span``.
+
+    Studies are matched to source statements positionally: top-level
+    declarations execute in source order, so the alignment holds exactly when
+    the counts and kinds agree.  Anything else (studies built in loops, from
+    helper functions) still renders but is marked non-editable.
+    """
+    statements = locate_study_statements(source) or []
+    aligned = len(statements) == len(studies) and all(
+        statement.kind == study.describe()["kind"] for statement, study in zip(statements, studies)
+    )
+    entries: list[dict[str, Any]] = []
+    for index, study in enumerate(studies):
+        described = study.describe()
+        statement = statements[index] if aligned else None
+        bc_spans: tuple[Any, ...] = ()
+        if statement is not None and len(statement.bc_spans) == len(study.bcs):
+            bc_spans = statement.bc_spans
+        entries.append(
+            {
+                **described,
+                "index": index,
+                "line": statement.statement.lineno if statement is not None else None,
+                "span": list(statement.call_span) if statement is not None else None,
+                "editable": statement is not None,
+                "bcs": [
+                    {
+                        **bc.describe(),
+                        "serializable": bc.nodes.serializable,
+                        "span": list(bc_spans[position]) if bc_spans else None,
+                    }
+                    for position, bc in enumerate(study.bcs)
+                ],
+            }
+        )
+    return entries
+
+
 def _execute_scene(source: str) -> dict[str, Any]:
     """Run playground source and return its namespace (the scene lives inside)."""
     namespace: dict[str, Any] = {
@@ -719,12 +765,66 @@ def _simulate_scene(scene: Any, request: dict[str, Any]) -> dict[str, Any]:
     return {"ok": True, "kind": kind, "field": field, "mesh": boundary_render_payload(mesh, scalar)}
 
 
+def _simulate_study(scene: Any, studies: list[Any], request: dict[str, Any]) -> dict[str, Any]:
+    """Solve one study the scene program declared, by name.
+
+    The study is the source of truth: meshing volume, resolution, material,
+    and boundary conditions all come from its declaration — the request only
+    picks which one to run.  Non-serializable (predicate) selections solve
+    fine here since the declared objects are used directly.
+    """
+    import jax.numpy as jnp
+
+    from jaxcad.fem.render_payload import boundary_render_payload, cell_to_node_scalar
+
+    name = request.get("name")
+    matches = [study for study in studies if study.name == name]
+    if not matches:
+        declared = ", ".join(repr(study.name) for study in studies) or "none"
+        raise ValueError(f"The program declares no study named {name!r} (declared: {declared}).")
+    if len(matches) > 1:
+        raise ValueError(f"The program declares more than one study named {name!r}.")
+    study = matches[0]
+
+    try:
+        import jax_fem  # noqa: F401
+    except ImportError:
+        return {"ok": False, "error_kind": "fem_unavailable", "error": _FEM_UNAVAILABLE_MESSAGE}
+
+    sdf = lambda p: jnp.asarray(scene(p))  # noqa: E731
+    result = study.solve(sdf)
+    described = study.describe()
+    if described["kind"] == "thermal":
+        scalar = np.asarray(result.temperature, dtype=np.float64)
+        field = "temperature"
+    else:
+        scalar = cell_to_node_scalar(result.mesh, result.von_mises())
+        field = "von_mises"
+    described["bcs"] = [
+        {**bc.describe(), "serializable": bc.nodes.serializable} for bc in study.bcs
+    ]
+    return {
+        "ok": True,
+        "kind": "study",
+        "study": described,
+        "field": field,
+        "mesh": boundary_render_payload(result.mesh, scalar),
+    }
+
+
 def _simulate_source(request: dict[str, Any]) -> dict[str, Any]:
     """Run the FEM simulation mode: exec scene -> hex mesh -> solve -> payload."""
     captured = io.StringIO()
     with contextlib.redirect_stdout(captured), contextlib.redirect_stderr(captured):
-        namespace = _execute_scene(request["source"])
-        result = _simulate_scene(namespace["scene"], request)
+        if request.get("kind") == "study":
+            from jaxcad.fem.study import capture_studies
+
+            with capture_studies() as studies:
+                namespace = _execute_scene(request["source"])
+            result = _simulate_study(namespace["scene"], studies, request)
+        else:
+            namespace = _execute_scene(request["source"])
+            result = _simulate_scene(namespace["scene"], request)
     result["output"] = captured.getvalue()[-8_000:]
     return result
 
@@ -734,11 +834,14 @@ def _compile_source(source: str) -> dict[str, Any]:
         "__builtins__": __builtins__,
         "__name__": "__jaxcad_playground__",
     }
+    from jaxcad.fem.study import capture_studies
+
     captured = io.StringIO()
     with contextlib.redirect_stdout(captured), contextlib.redirect_stderr(captured):
         with (
             capture_constraint_solves() as solver_reports,
             capture_profiles(PLAYGROUND_FILENAME) as profiles,
+            capture_studies() as studies,
         ):
             exec(compile(source, PLAYGROUND_FILENAME, "exec"), namespace, namespace)
         if "scene" not in namespace:
@@ -749,6 +852,9 @@ def _compile_source(source: str) -> dict[str, Any]:
         construction = build_construction_payload(profiles, source)
         relations = build_construction_relations(profiles)
         materials = build_material_payload(namespace, source)
+        # Declaration only: studies are serialized from their describe()
+        # payloads — no meshing or solving happens at compile time.
+        studies_payload = _study_entries(studies, source)
         differentiability = _differentiability_payload(namespace)
         node_ids = {
             id(obj): (f"{obj.kind}_{index}" if hasattr(obj, "kind") else f"profile_{index}")
@@ -775,6 +881,7 @@ def _compile_source(source: str) -> dict[str, Any]:
         "construction": construction,
         "relations": relations,
         "materials": materials,
+        "studies": studies_payload,
         "differentiability": differentiability,
         # The mesh-edge view is requested lazily via `mode: "mesh"` — computing
         # it here used to dominate the compile round-trip.

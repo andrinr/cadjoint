@@ -777,6 +777,116 @@ def locate_constraint_statements(source: str, line: int) -> list[ConstraintState
     return statements
 
 
+STUDY_CALL_KINDS = {"ThermalStudy": "thermal", "ElasticStudy": "elastic"}
+"""Study constructor names mapped to their viewer payload ``kind``."""
+
+
+@dataclass(frozen=True)
+class StudyStatement:
+    """One top-level study constructor statement, in source order.
+
+    Statement order equals construction order for top-level declarations, so
+    the position doubles as a stable index: the compile payload and the study
+    patch operations agree on which statement an index refers to.  ``bcs`` is
+    the resolved literal boundary-condition list (None when the argument is
+    absent or not a literal container), and ``bc_spans`` are the character
+    spans of its elements so single conditions can be edited or deleted.
+    """
+
+    index: int
+    kind: str
+    name: str | None
+    variable: str | None
+    statement: ast.stmt
+    call: ast.Call
+    call_span: Span
+    bcs: ast.List | ast.Tuple | None
+    bcs_span: Span | None
+    bc_spans: tuple[Span, ...]
+
+
+def locate_study_statements(source: str) -> list[StudyStatement] | None:
+    """Top-level ``ThermalStudy``/``ElasticStudy`` constructors, in source order.
+
+    Mirrors :func:`locate_constraint_statements`: only unambiguous top-level
+    statements (an assignment or a bare expression containing exactly one
+    study constructor) are located.  Studies built in loops or functions are
+    not — the compile payload detects the count mismatch against the captured
+    studies and marks every entry non-editable.
+
+    Args:
+        source: The full program text.
+
+    Returns:
+        The study statements in source order, or None when the source cannot
+        be parsed.
+    """
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return None
+    offsets = _line_offsets(source)
+    statements: list[StudyStatement] = []
+    for item in tree.body:
+        if not isinstance(item, (ast.Assign, ast.AnnAssign, ast.Expr)):
+            continue
+        calls = [node for node in ast.walk(item) if _called_name(node) in STUDY_CALL_KINDS]
+        if len(calls) != 1:
+            continue
+        call = calls[0]
+        call_span = _node_span(source, offsets, call)
+        if call_span is None:
+            continue
+        name = next(
+            (
+                keyword.value.value
+                for keyword in call.keywords
+                if keyword.arg == "name"
+                and isinstance(keyword.value, ast.Constant)
+                and isinstance(keyword.value.value, str)
+            ),
+            None,
+        )
+        variable = None
+        if (
+            isinstance(item, ast.Assign)
+            and len(item.targets) == 1
+            and isinstance(item.targets[0], ast.Name)
+        ):
+            variable = item.targets[0].id
+        elif isinstance(item, ast.AnnAssign) and isinstance(item.target, ast.Name):
+            variable = item.target.id
+        bcs_argument = next(
+            (keyword.value for keyword in call.keywords if keyword.arg == "bcs"),
+            None,
+        )
+        bcs = _resolved_container(bcs_argument, tree) if bcs_argument is not None else None
+        bcs_span = _node_span(source, offsets, bcs) if bcs is not None else None
+        bc_spans: list[Span] = []
+        for element in bcs.elts if bcs is not None else []:
+            span = _node_span(source, offsets, element)
+            if span is None:  # pragma: no cover - constructors always carry spans
+                bcs = bcs_span = None
+                bc_spans = []
+                break
+            bc_spans.append(span)
+        statements.append(
+            StudyStatement(
+                index=len(statements),
+                kind=STUDY_CALL_KINDS[_called_name(call) or ""],
+                name=name,
+                variable=variable,
+                statement=item,
+                call=call,
+                call_span=call_span,
+                bcs=bcs,
+                bcs_span=bcs_span,
+                bc_spans=tuple(bc_spans),
+            )
+        )
+    return statements
+
+
 def _runtime_constraint_entry(constraint, vertex_indices: dict[int, int]) -> dict | None:
     """Serialize one runtime constraint whose parameters are profile vertices."""
     kind = CONSTRAINT_CLASS_KINDS.get(constraint.__class__.__name__)

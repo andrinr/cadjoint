@@ -73,6 +73,12 @@ class TestSimulateValidation:
         result = simulate_source({"kind": "probe"})
         assert result["ok"] is False
 
+    def test_study_kind_requires_a_name(self):
+        for name in (None, "", "   ", 7):
+            result = simulate_source({"source": BOX_SOURCE, "kind": "study", "name": name})
+            assert result["ok"] is False, name
+            assert "name" in result["error"]
+
 
 # ── Worker-level behavior (in-process, no subprocess) ───────────────────────
 
@@ -277,3 +283,110 @@ class TestSolves:
             _compile_worker._simulate_scene(
                 _box_scene(), {"kind": "thermal", "resolution": 8, "bcs": []}
             )
+
+
+# ── Declared studies run by name (code-parity path) ─────────────────────────
+
+
+def _bar_study():
+    from jaxcad.fem import Dirichlet, Nodes, ThermalStudy
+
+    return ThermalStudy(
+        name="bar",
+        resolution=10,
+        conductivity=1.0,
+        bcs=[
+            Dirichlet(Nodes.side("-x"), 0.0),
+            Dirichlet(Nodes.side("+x"), 100.0),
+        ],
+    )
+
+
+class TestStudySimulate:
+    def test_unknown_study_name_lists_the_declared_ones(self):
+        with pytest.raises(ValueError, match="'bar'"):
+            _compile_worker._simulate_study(
+                _box_scene(), [_bar_study()], {"kind": "study", "name": "nope"}
+            )
+
+    def test_duplicate_study_names_are_ambiguous(self):
+        with pytest.raises(ValueError, match="more than one"):
+            _compile_worker._simulate_study(
+                _box_scene(), [_bar_study(), _bar_study()], {"kind": "study", "name": "bar"}
+            )
+
+    def test_fem_unavailable_is_a_typed_error(self, monkeypatch):
+        import builtins
+
+        real_import = builtins.__import__
+
+        def no_jax_fem(name, *args, **kwargs):
+            if name == "jax_fem" or name.startswith("jax_fem."):
+                raise ImportError("No module named 'jax_fem'")
+            return real_import(name, *args, **kwargs)
+
+        study = _bar_study()
+        monkeypatch.setattr(builtins, "__import__", no_jax_fem)
+        result = _compile_worker._simulate_study(
+            _box_scene(), [study], {"kind": "study", "name": "bar"}
+        )
+        assert result["ok"] is False
+        assert result["error_kind"] == "fem_unavailable"
+
+    def test_thermal_study_solves_with_its_declared_settings(self):
+        pytest.importorskip("jax_fem", reason="study solve needs the fem extra")
+        result = _compile_worker._simulate_study(
+            _box_scene(), [_bar_study()], {"kind": "study", "name": "bar"}
+        )
+        assert result["ok"] is True
+        assert result["kind"] == "study"
+        assert result["field"] == "temperature"
+        low, high = result["mesh"]["range"]
+        assert low == pytest.approx(0.0, abs=1e-3)
+        assert high == pytest.approx(100.0, abs=1e-3)
+        # The declaration itself rides along, with per-BC serializability.
+        assert result["study"]["name"] == "bar"
+        assert [bc["serializable"] for bc in result["study"]["bcs"]] == [True, True]
+
+    def test_elastic_study_reports_von_mises(self):
+        pytest.importorskip("jax_fem", reason="study solve needs the fem extra")
+        from jaxcad.fem import ElasticStudy, Fixed, Nodes, Traction
+
+        study = ElasticStudy(
+            name="cantilever",
+            resolution=8,
+            youngs=200.0,
+            poisson=0.3,
+            bcs=[
+                Fixed(Nodes.side("-x")),
+                Traction(Nodes.side("+x"), (0.0, 0.0, -1.0)),
+            ],
+        )
+        result = _compile_worker._simulate_study(
+            _box_scene(), [study], {"kind": "study", "name": "cantilever"}
+        )
+        assert result["ok"] is True
+        assert result["field"] == "von_mises"
+        low, high = result["mesh"]["range"]
+        assert high > low >= 0.0
+
+    def test_worker_simulate_source_dispatches_studies(self):
+        pytest.importorskip("jax_fem", reason="study solve needs the fem extra")
+        source = "\n".join(
+            [
+                "from jaxcad.fem import Dirichlet, Nodes, ThermalStudy",
+                "from jaxcad.geometry import Vector",
+                "from jaxcad.sdf.primitives import Box",
+                "",
+                'scene = Box(Vector([0.8, 0.5, 0.5], free=True, name="size"))',
+                "heat = ThermalStudy(name='bar', resolution=8, conductivity=1.0,",
+                "                    bcs=[Dirichlet(Nodes.side('-x'), 0.0),",
+                "                         Dirichlet(Nodes.side('+x'), 1.0)])",
+            ]
+        )
+        result = _compile_worker._simulate_source(
+            {"source": source, "kind": "study", "name": "bar"}
+        )
+        assert result["ok"] is True
+        assert result["field"] == "temperature"
+        assert "output" in result

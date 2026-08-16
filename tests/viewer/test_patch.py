@@ -724,3 +724,415 @@ class TestAddLoft:
                 line_a=_sketch_line(patched, "sketch1"),
                 line_b=_sketch_line(patched, "sketch2"),
             )
+
+
+STUDIES = """from jaxcad.construction import Solid
+from jaxcad.fem import Dirichlet, Nodes, ThermalStudy
+from jaxcad.sdf.boolean import Union
+
+block = Solid.box(size=[0.5, 0.5, 0.5], position=[1.0, 0.0, 0.0], name="block")
+scene = Union(block)
+heat = ThermalStudy(
+    name="bar-conduction",
+    resolution=12,
+    conductivity=2.0,
+    bcs=[Dirichlet(Nodes.side("-x"), value=1.0), Dirichlet(Nodes.side("+x"), value=0.0)],
+)
+"""
+
+BOX_SELECTION = {"kind": "box", "min_corner": [0.0, 0.0, 0.0], "max_corner": [1.0, 1.0, 1.0]}
+
+
+class TestAddStudy:
+    def test_appends_a_thermal_study_after_the_scene(self):
+        from jaxcad.viewer._patch import add_study
+
+        patched = add_study(PRIMITIVES, "thermal")
+        assert (
+            "study1 = ThermalStudy(name='study1', resolution=20, conductivity=1.0, bcs=[])"
+            in patched
+        )
+        assert "from jaxcad.fem import ThermalStudy" in patched
+        assert patched.index("scene =") < patched.index("study1 =")
+        assert ast.parse(patched)
+
+    def test_appends_an_elastic_study_after_the_last_study(self):
+        from jaxcad.viewer._patch import add_study
+
+        patched = add_study(STUDIES, "elastic", name="cantilever")
+        assert (
+            "study1 = ElasticStudy(name='cantilever', resolution=20, "
+            "youngs=200.0, poisson=0.3, bcs=[])" in patched
+        )
+        assert patched.index("heat = ") < patched.index("study1 =")
+        # The existing jaxcad.fem import is extended in place, so every
+        # original line keeps its number and only the new study line is added.
+        assert "from jaxcad.fem import Dirichlet, Nodes, ThermalStudy, ElasticStudy" in patched
+        assert patched.count("from jaxcad.fem import") == 1
+        assert len(patched.splitlines()) == len(STUDIES.splitlines()) + 1
+
+    def test_keeps_lines_above_the_insertion_untouched(self):
+        from jaxcad.viewer._patch import add_study
+
+        original = PRIMITIVES.splitlines()
+        patched = add_study(PRIMITIVES, "thermal").splitlines()
+        # A first-time import lands beside the study statement, below
+        # everything else, so line-addressed operations stay valid.
+        assert patched[: len(original)] == original
+
+    def test_generates_names_that_do_not_collide(self):
+        once = apply_operation(PRIMITIVES, "add_study", kind="thermal", name=None)
+        twice = apply_operation(once, "add_study", kind="elastic", name=None)
+        assert "study1 = ThermalStudy(" in twice
+        assert "study2 = ElasticStudy(" in twice
+
+    def test_rejects_a_duplicate_name(self):
+        with pytest.raises(PatchError, match="already exists"):
+            apply_operation(STUDIES, "add_study", kind="thermal", name="bar-conduction")
+
+    def test_rejects_an_unknown_kind(self):
+        with pytest.raises(PatchError, match="thermal"):
+            apply_operation(PRIMITIVES, "add_study", kind="modal", name=None)
+
+    def test_requires_a_scene_assignment(self):
+        with pytest.raises(PatchError, match="scene = "):
+            apply_operation("x = 1\n", "add_study", kind="thermal", name=None)
+
+    def test_added_study_round_trips_through_exec(self):
+        from jaxcad.fem import capture_studies
+
+        patched = apply_operation(PRIMITIVES, "add_study", kind="thermal", name=None)
+        patched = apply_operation(
+            patched,
+            "add_study_bc",
+            study="study1",
+            bc_type="dirichlet",
+            selection=BOX_SELECTION,
+            value=300.0,
+        )
+        with capture_studies() as studies:
+            exec(compile(patched, "<test>", "exec"), {})
+        assert [study.name for study in studies] == ["study1"]
+        assert studies[0].describe()["bcs"][0]["value"] == 300.0
+
+
+class TestDeleteStudy:
+    def test_removes_a_named_study_statement(self):
+        patched = apply_operation(STUDIES, "delete_study", study="bar-conduction")
+        assert "ThermalStudy" not in patched.replace(
+            "from jaxcad.fem import Dirichlet, Nodes, ThermalStudy", ""
+        )
+        assert "scene = Union(block)" in patched
+        assert ast.parse(patched)
+
+    def test_resolves_a_study_by_index(self):
+        patched = apply_operation(STUDIES, "delete_study", study=0)
+        assert "heat = " not in patched
+
+    def test_refuses_when_the_study_is_used_elsewhere(self):
+        source = STUDIES + "result = heat.solve(scene)\n"
+        with pytest.raises(PatchError, match="used elsewhere"):
+            apply_operation(source, "delete_study", study="heat")
+
+    def test_rejects_an_unknown_reference(self):
+        with pytest.raises(PatchError, match="No single study"):
+            apply_operation(STUDIES, "delete_study", study="nope")
+        with pytest.raises(PatchError, match="out of range"):
+            apply_operation(STUDIES, "delete_study", study=4)
+
+
+class TestStudyBc:
+    def test_appends_the_literal_bc_source(self):
+        patched = apply_operation(
+            STUDIES,
+            "add_study_bc",
+            study="bar-conduction",
+            bc_type="dirichlet",
+            selection=BOX_SELECTION,
+            value=300.0,
+        )
+        assert "Dirichlet(Nodes.box([0.0, 0.0, 0.0], [1.0, 1.0, 1.0]), value=300.0)" in patched
+        # Appended after the existing conditions, inside the same list.
+        assert patched.index('Nodes.side("+x")') < patched.index("Nodes.box(")
+        assert ast.parse(patched)
+
+    def test_fills_an_empty_bcs_list(self):
+        grown = apply_operation(PRIMITIVES, "add_study", kind="elastic", name=None)
+        patched = apply_operation(
+            grown,
+            "add_study_bc",
+            study="study1",
+            bc_type="fixed",
+            selection={"kind": "side", "side": "-x"},
+        )
+        assert "bcs=[Fixed(Nodes.side('-x'))]" in patched
+
+    def test_adds_a_missing_bcs_keyword(self):
+        source = (
+            "from jaxcad.fem import ThermalStudy\n"
+            "scene = None\n"
+            "study = ThermalStudy(name='t', resolution=8, conductivity=1.0)\n"
+        )
+        patched = apply_operation(
+            source,
+            "add_study_bc",
+            study="t",
+            bc_type="heat_flux",
+            selection={"kind": "sphere", "center": [0.0, 0.0, 1.0], "radius": 0.5},
+            value=2.5,
+        )
+        assert "bcs=[HeatFlux(Nodes.sphere([0.0, 0.0, 1.0], 0.5), flux=2.5)]" in patched
+        assert ast.parse(patched)
+
+    def test_creates_imports_beside_the_study_and_extends_them_in_place(self):
+        source = (
+            "from jaxcad.fem import ThermalStudy\n"
+            "scene = None\n"
+            "study = ThermalStudy(name='t', resolution=8, conductivity=1.0, bcs=[])\n"
+        )
+        once = apply_operation(
+            source,
+            "add_study_bc",
+            study="t",
+            bc_type="dirichlet",
+            selection=BOX_SELECTION,
+            value=1.0,
+        )
+        assert "from jaxcad.fem import ThermalStudy, Dirichlet, Nodes" in once
+        # A second condition reuses the import line: no line drift.
+        twice = apply_operation(
+            once,
+            "add_study_bc",
+            study="t",
+            bc_type="dirichlet",
+            selection={"kind": "side", "side": "+x"},
+            value=0.0,
+        )
+        assert twice.count("from jaxcad.fem import") == 1
+        assert len(twice.splitlines()) == len(once.splitlines())
+
+    def test_renders_composed_selections(self):
+        patched = apply_operation(
+            STUDIES,
+            "add_study_bc",
+            study="bar-conduction",
+            bc_type="dirichlet",
+            selection={
+                "kind": "and",
+                "operands": [
+                    {"kind": "side", "side": "+x", "tol": 0.25},
+                    {
+                        "kind": "not",
+                        "operand": {
+                            "kind": "halfspace",
+                            "point": [0.0, 0.0, 0.0],
+                            "normal": [0.0, 0.0, -1.0],
+                        },
+                    },
+                ],
+            },
+            value=5.0,
+        )
+        assert (
+            "(Nodes.side('+x', tol=0.25) & "
+            "~Nodes.halfspace([0.0, 0.0, 0.0], [0.0, 0.0, -1.0]))" in patched
+        )
+        assert ast.parse(patched)
+
+    def test_rejects_a_predicate_selection_description(self):
+        with pytest.raises(PatchError, match="serializable"):
+            apply_operation(
+                STUDIES,
+                "add_study_bc",
+                study="bar-conduction",
+                bc_type="dirichlet",
+                selection={"kind": "predicate", "name": "hot_end"},
+                value=1.0,
+            )
+
+    def test_rejects_a_kind_incompatible_bc_type(self):
+        with pytest.raises(PatchError, match="thermal study accepts"):
+            apply_operation(
+                STUDIES,
+                "add_study_bc",
+                study="bar-conduction",
+                bc_type="traction",
+                selection=BOX_SELECTION,
+                value=[0.0, 0.0, -1.0],
+            )
+
+    def test_rejects_bad_values(self):
+        with pytest.raises(PatchError, match="numeric `value`"):
+            apply_operation(
+                STUDIES,
+                "add_study_bc",
+                study="bar-conduction",
+                bc_type="dirichlet",
+                selection=BOX_SELECTION,
+                value=[1.0, 2.0],
+            )
+        elastic = apply_operation(PRIMITIVES, "add_study", kind="elastic", name=None)
+        with pytest.raises(PatchError, match="three numbers"):
+            apply_operation(
+                elastic,
+                "add_study_bc",
+                study="study1",
+                bc_type="traction",
+                selection=BOX_SELECTION,
+                value=1.0,
+            )
+        with pytest.raises(PatchError, match="takes no value"):
+            apply_operation(
+                elastic,
+                "add_study_bc",
+                study="study1",
+                bc_type="fixed",
+                selection=BOX_SELECTION,
+                value=1.0,
+            )
+
+    def test_delete_removes_one_condition_and_its_separator(self):
+        patched = apply_operation(STUDIES, "delete_study_bc", study="bar-conduction", bc=0)
+        assert 'Nodes.side("-x")' not in patched
+        assert 'Dirichlet(Nodes.side("+x"), value=0.0)' in patched
+        assert ast.parse(patched)
+
+    def test_delete_of_the_last_condition_leaves_an_empty_list(self):
+        patched = apply_operation(STUDIES, "delete_study_bc", study="bar-conduction", bc=1)
+        patched = apply_operation(patched, "delete_study_bc", study="bar-conduction", bc=0)
+        assert "Dirichlet" not in patched.replace(
+            "from jaxcad.fem import Dirichlet, Nodes, ThermalStudy", ""
+        )
+        assert "bcs=[" in patched
+        assert ast.parse(patched)
+
+    def test_delete_rejects_out_of_range(self):
+        with pytest.raises(PatchError, match="out of range"):
+            apply_operation(STUDIES, "delete_study_bc", study="bar-conduction", bc=5)
+
+    def test_predicate_conditions_reject_edits(self):
+        source = (
+            "from jaxcad.fem import Dirichlet, Nodes, ThermalStudy\n"
+            "def hot_end(points):\n"
+            "    return points[:, 0] > 0.9\n"
+            "scene = None\n"
+            "study = ThermalStudy(name='t', resolution=8, conductivity=1.0,\n"
+            "                     bcs=[Dirichlet(Nodes.predicate(hot_end), value=1.0)])\n"
+        )
+        with pytest.raises(PatchError, match="predicate"):
+            apply_operation(source, "delete_study_bc", study="t", bc=0)
+        with pytest.raises(PatchError, match="predicate"):
+            apply_operation(source, "set_study_value", study="t", bc=0, value=2.0)
+
+
+class TestSetStudyValue:
+    def test_rewrites_a_bc_value_with_exact_repr(self):
+        patched = apply_operation(
+            STUDIES, "set_study_value", study="bar-conduction", bc=0, value=273.15
+        )
+        assert 'Dirichlet(Nodes.side("-x"), value=273.15)' in patched
+
+    def test_rewrites_a_positional_bc_value(self):
+        source = (
+            "from jaxcad.fem import Dirichlet, Nodes, ThermalStudy\n"
+            "scene = None\n"
+            "study = ThermalStudy(name='t', resolution=8, conductivity=1.0,\n"
+            "                     bcs=[Dirichlet(Nodes.side('-x'), 1.0)])\n"
+        )
+        patched = apply_operation(source, "set_study_value", study="t", bc=0, value=250.0)
+        assert "Dirichlet(Nodes.side('-x'), 250.0)" in patched
+
+    def test_rewrites_a_traction_vector(self):
+        elastic = apply_operation(PRIMITIVES, "add_study", kind="elastic", name=None)
+        elastic = apply_operation(
+            elastic,
+            "add_study_bc",
+            study="study1",
+            bc_type="traction",
+            selection={"kind": "side", "side": "+x"},
+            value=[0.0, 0.0, -1.0],
+        )
+        patched = apply_operation(
+            elastic, "set_study_value", study="study1", bc=0, value=[0.0, 0.5, -2.0]
+        )
+        assert "vector=[0.0, 0.5, -2.0]" in patched
+
+    def test_rejects_editing_a_fixed_bc(self):
+        elastic = apply_operation(PRIMITIVES, "add_study", kind="elastic", name=None)
+        elastic = apply_operation(
+            elastic,
+            "add_study_bc",
+            study="study1",
+            bc_type="fixed",
+            selection={"kind": "side", "side": "-x"},
+        )
+        with pytest.raises(PatchError, match="no value to edit"):
+            apply_operation(elastic, "set_study_value", study="study1", bc=0, value=1.0)
+
+    def test_rewrites_a_study_keyword_in_place(self):
+        patched = apply_operation(
+            STUDIES, "set_study_value", study="bar-conduction", argument="conductivity", value=3.5
+        )
+        assert "conductivity=3.5" in patched
+        assert "conductivity=2.0" not in patched
+
+    def test_resolution_stays_integral(self):
+        patched = apply_operation(
+            STUDIES, "set_study_value", study="bar-conduction", argument="resolution", value=24
+        )
+        assert "resolution=24" in patched
+        patched = apply_operation(
+            STUDIES,
+            "set_study_value",
+            study="bar-conduction",
+            argument="resolution",
+            value=[10.0, 4.0, 4.0],
+        )
+        assert "resolution=[10, 4, 4]" in patched
+        with pytest.raises(PatchError, match="whole numbers"):
+            apply_operation(
+                STUDIES,
+                "set_study_value",
+                study="bar-conduction",
+                argument="resolution",
+                value=10.5,
+            )
+
+    def test_adds_a_missing_keyword(self):
+        patched = apply_operation(
+            STUDIES, "set_study_value", study="bar-conduction", argument="source", value=0.5
+        )
+        assert "source=0.5" in patched
+        assert ast.parse(patched)
+
+    def test_follows_named_scalar_indirection(self):
+        source = (
+            "from jaxcad.fem import ThermalStudy\n"
+            "scene = None\n"
+            "k = 2.0\n"
+            "study = ThermalStudy(name='t', resolution=8, conductivity=k, bcs=[])\n"
+        )
+        patched = apply_operation(
+            source, "set_study_value", study="t", argument="conductivity", value=4.0
+        )
+        assert "k = 4.0" in patched
+        assert "conductivity=k" in patched
+
+    def test_rejects_arguments_of_the_other_kind(self):
+        with pytest.raises(PatchError, match="thermal study's editable arguments"):
+            apply_operation(
+                STUDIES, "set_study_value", study="bar-conduction", argument="youngs", value=1.0
+            )
+
+    def test_rejects_both_or_neither_target(self):
+        with pytest.raises(PatchError, match="exactly one"):
+            apply_operation(
+                STUDIES,
+                "set_study_value",
+                study="bar-conduction",
+                bc=0,
+                argument="conductivity",
+                value=1.0,
+            )
+        with pytest.raises(PatchError, match="exactly one"):
+            apply_operation(STUDIES, "set_study_value", study="bar-conduction", value=1.0)
