@@ -200,6 +200,7 @@ def _mesh_edge_payload(scene: Any) -> dict[str, Any] | None:
         # the operand pair for seams — and linked only within their group.
         leaves = _world_frame_leaves(scene)
         groups: list[np.ndarray] = []
+        seam_groups: list[tuple[np.ndarray, tuple[int, int]]] = []
         if len(leaves) >= 2 and quads.shape[0] > 0:
             points = jnp.asarray(vertices, dtype=jnp.float32)
             magnitudes = np.stack(
@@ -247,6 +248,8 @@ def _mesh_edge_payload(scene: Any) -> dict[str, Any] | None:
                     group_mask = np.zeros_like(geometric_mask)
                     group_mask[selected] = True
                     groups.append(group_mask)
+                    if len(operand_set) == 2:
+                        seam_groups.append((selected, tuple(sorted(operand_set))))
         else:
             groups.append(geometric_mask)
 
@@ -283,6 +286,35 @@ def _mesh_edge_payload(scene: Any) -> dict[str, Any] | None:
             norms = np.linalg.norm(raw, axis=1, keepdims=True)
             tangents = np.full((incidence.count, 3), np.nan)
             tangents[feature_rows] = np.where(norms > 1e-6, raw / np.maximum(norms, 1e-12), np.nan)
+
+            # Seam cells get the EXACT tangent cross(grad_a, grad_b) instead
+            # of the covariance estimate, which degrades where two seam
+            # curves of the same operand pair converge (near-tangent
+            # contact).  Tiny cross products mean tangential contact — no
+            # reliable direction, so leave those undefined (short links
+            # only).  Seam cells also lose the junction exemption: a seam
+            # is a curve, not a corner fan.
+            for seam_rows, (index_a, index_b) in seam_groups:
+                points = jnp.asarray(vertices[seam_rows], dtype=jnp.float32)
+                grad_a = np.asarray(
+                    jax.vmap(jax.grad(lambda p, f=leaves[index_a]: jnp.asarray(f(p))))(points),
+                    dtype=np.float64,
+                )
+                grad_b = np.asarray(
+                    jax.vmap(jax.grad(lambda p, f=leaves[index_b]: jnp.asarray(f(p))))(points),
+                    dtype=np.float64,
+                )
+                cross = np.cross(grad_a, grad_b)
+                cross_norms = np.linalg.norm(cross, axis=1, keepdims=True)
+                scale = np.linalg.norm(grad_a, axis=1, keepdims=True) * np.linalg.norm(
+                    grad_b, axis=1, keepdims=True
+                )
+                reliable = cross_norms > 0.1 * np.maximum(scale, 1e-12)
+                tangents[seam_rows] = np.where(
+                    reliable, cross / np.maximum(cross_norms, 1e-12), np.nan
+                )
+                junctions = junctions.copy()
+                junctions[seam_rows] = False
 
             directions = vertices[links[:, 1]] - vertices[links[:, 0]]
             lengths = np.maximum(np.linalg.norm(directions, axis=1), 1e-12)
