@@ -593,3 +593,93 @@ class TestAddRevolution:
         )
         with pytest.raises(PatchError, match="already has"):
             apply_operation(EXAMPLE_SOURCE, "add_revolution", line=line, offset=0.0)
+
+
+def _sketch_line(source: str, variable: str) -> int:
+    return next(
+        number + 1
+        for number, text in enumerate(source.splitlines())
+        if text.startswith(f"{variable} =")
+    )
+
+
+class TestAddLoft:
+    def _two_sketches(self) -> str:
+        from jaxcad.viewer.playground import EXAMPLE_SOURCE
+
+        grown = apply_operation(EXAMPLE_SOURCE, "add_sketch", origin=[0.5, 0.5, 0.0])
+        return apply_operation(grown, "add_sketch", origin=[0.5, 0.5, 1.0])
+
+    def test_lofts_two_fresh_sketches(self):
+        from jaxcad.viewer.playground import compile_source
+
+        source = self._two_sketches()
+        patched = apply_operation(
+            source,
+            "add_loft",
+            line_a=_sketch_line(source, "sketch1"),
+            line_b=_sketch_line(source, "sketch2"),
+            height=1.5,
+        )
+        assert "sketch1_body = loft(sketch1, sketch2, height=1.5)" in patched
+        assert ", sketch1_body" in patched
+        assert "from jaxcad.construction import loft" in patched
+        assert patched.index("sketch1_body =") < patched.index("scene =")
+        result = compile_source(patched)
+        assert result["ok"], result.get("error")
+
+    def test_refuses_unequal_vertex_counts(self):
+        source = self._two_sketches()
+        source = apply_operation(
+            source,
+            "insert_vertex",
+            line=_sketch_line(source, "sketch2"),
+            index=1,
+            xy=[0.0, -0.8],
+        )
+        with pytest.raises(PatchError, match="equal vertex counts"):
+            apply_operation(
+                source,
+                "add_loft",
+                line_a=_sketch_line(source, "sketch1"),
+                line_b=_sketch_line(source, "sketch2"),
+            )
+
+    def test_refuses_the_same_sketch_twice(self):
+        source = self._two_sketches()
+        line = _sketch_line(source, "sketch1")
+        with pytest.raises(PatchError, match="two different sketches"):
+            apply_operation(source, "add_loft", line_a=line, line_b=line)
+
+    def test_refuses_a_sketch_with_an_operator(self):
+        from jaxcad.viewer.playground import EXAMPLE_SOURCE
+
+        grown = apply_operation(EXAMPLE_SOURCE, "add_sketch", origin=[0.5, 0.5, 0.0])
+        extruded_line = next(
+            number + 1
+            for number, text in enumerate(grown.splitlines())
+            if "PolygonProfile(" in text and not text.startswith("sketch1 =")
+        )
+        with pytest.raises(PatchError, match="already has an operator"):
+            apply_operation(
+                grown,
+                "add_loft",
+                line_a=extruded_line,
+                line_b=_sketch_line(grown, "sketch1"),
+            )
+
+    def test_lofted_sketches_cannot_be_lofted_again(self):
+        source = self._two_sketches()
+        patched = apply_operation(
+            source,
+            "add_loft",
+            line_a=_sketch_line(source, "sketch1"),
+            line_b=_sketch_line(source, "sketch2"),
+        )
+        with pytest.raises(PatchError, match="already has an operator"):
+            apply_operation(
+                patched,
+                "add_loft",
+                line_a=_sketch_line(patched, "sketch1"),
+                line_b=_sketch_line(patched, "sketch2"),
+            )

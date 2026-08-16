@@ -186,6 +186,74 @@ def step_ids(text):
     return defined, referenced
 
 
+def parse_step_entities(text: str) -> dict[int, str]:
+    """Parse a STEP data section into ``{entity id: body}``, one per line.
+
+    Asserts that every entity id is defined exactly once.  Test helper only;
+    it understands exactly the single-line ``#n = BODY;`` records that
+    :func:`~jaxcad.meshing.export.save_step` writes.
+    """
+    data = text.split("DATA;", 1)[1].split("ENDSEC;", 1)[0]
+    entities: dict[int, str] = {}
+    for match in re.finditer(r"^#(\d+)\s*=\s*(.+);\s*$", data, re.MULTILINE):
+        entity_id = int(match.group(1))
+        assert entity_id not in entities, f"entity #{entity_id} defined twice"
+        entities[entity_id] = match.group(2).strip()
+    return entities
+
+
+def step_references(body: str) -> list[int]:
+    return [int(number) for number in re.findall(r"#(\d+)", body)]
+
+
+def check_step_graph(mesh: Mesh, text: str) -> None:
+    """Validate the structural entity graph of a save_step output."""
+    entities = parse_step_entities(text)
+
+    # Every reference resolves to a defined entity.
+    for entity_id, body in entities.items():
+        for reference in step_references(body):
+            assert reference in entities, f"#{entity_id} references undefined #{reference}"
+
+    def of_type(name: str) -> dict[int, str]:
+        return {i: body for i, body in entities.items() if body.startswith(name + "(")}
+
+    # Exactly one shell, referencing only ADVANCED_FACE entities — all of them.
+    shells = of_type("CLOSED_SHELL")
+    assert len(shells) == 1
+    (shell_id,) = shells
+    shell_faces = step_references(shells[shell_id])
+    faces = of_type("ADVANCED_FACE")
+    assert sorted(shell_faces) == sorted(faces)
+    assert len(shell_faces) == len(set(shell_faces))
+
+    # Exactly one solid, referencing the shell.
+    breps = of_type("MANIFOLD_SOLID_BREP")
+    assert len(breps) == 1
+    assert step_references(next(iter(breps.values()))) == [shell_id]
+
+    # Every EDGE_CURVE runs between two VERTEX_POINT entities.
+    vertex_points = of_type("VERTEX_POINT")
+    edge_curves = of_type("EDGE_CURVE")
+    for body in edge_curves.values():
+        start, end = step_references(body)[:2]
+        assert start in vertex_points
+        assert end in vertex_points
+
+    # Entity counts match the merged polygon mesh the writer serializes.
+    polygons, triangles = merge_planar_faces(mesh)
+    loops = [list(loop) for loop in polygons]
+    loops.extend([int(a), int(b), int(c)] for a, b, c in triangles)
+    used_vertices = {index for loop in loops for index in loop}
+    undirected_edges = {
+        (a, b) if a < b else (b, a) for loop in loops for a, b in zip(loop, loop[1:] + loop[:1])
+    }
+    assert len(faces) == len(loops)
+    assert len(vertex_points) == len(used_vertices)
+    assert len(edge_curves) == len(undirected_edges)
+    assert len(of_type("ORIENTED_EDGE")) == sum(len(loop) for loop in loops)
+
+
 class TestSaveStep:
     def test_box_structure(self, box_mesh, tmp_path):
         path = tmp_path / "box.step"
@@ -232,3 +300,13 @@ class TestSaveStep:
         save_step(box_mesh, first)
         save_step(box_mesh, second)
         assert first.read_bytes() == second.read_bytes()
+
+    def test_box_structural_graph(self, box_mesh, tmp_path):
+        path = tmp_path / "box_graph.step"
+        save_step(box_mesh, path)
+        check_step_graph(box_mesh, path.read_text())
+
+    def test_sphere_structural_graph(self, coarse_sphere_mesh, tmp_path):
+        path = tmp_path / "sphere_graph.step"
+        save_step(coarse_sphere_mesh, path)
+        check_step_graph(coarse_sphere_mesh, path.read_text())

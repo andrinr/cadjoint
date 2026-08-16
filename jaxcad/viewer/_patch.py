@@ -19,6 +19,8 @@ from jaxcad.viewer._source_map import (
     _editable_value_node,
     _line_offsets,
     _node_span,
+    _resolved_container,
+    _vertices_argument,
     locate_call,
     locate_constraint_statements,
     locate_profile_call,
@@ -687,6 +689,73 @@ def add_revolution(source: str, line: int, offset: float = 0.0) -> str:
     return _validate(patched)
 
 
+def add_loft(source: str, line_a: int, line_b: int, height: float = 1.0) -> str:
+    """Loft between two named sketches and add the generated solid to ``scene``.
+
+    Both lines must resolve to distinct named ``PolygonProfile`` sketches with
+    equal vertex counts, and neither may already feed an operator.
+
+    Args:
+        source: The program text.
+        line_a: 1-based line of the first (base) sketch's profile call.
+        line_b: 1-based line of the second sketch's profile call.
+        height: Total loft height along the base profile's plane normal.
+
+    Returns:
+        The patched source.
+
+    Raises:
+        PatchError: If either sketch cannot be resolved, the sketches are the
+            same, the vertex counts differ, or an operator already exists.
+    """
+    tree, call_a, _, profile_a = _profile_binding(source, line_a)
+    tree_b, call_b, _, profile_b = _profile_binding(source, line_b)
+    if profile_a == profile_b:
+        raise PatchError("Loft needs two different sketches.")
+
+    for profile in (profile_a, profile_b):
+        already = [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and _called_name(node) in {"extrude", "revolve", "loft"}
+            and any(
+                isinstance(argument, ast.Name) and argument.id == profile for argument in node.args
+            )
+        ]
+        if already:
+            raise PatchError(f"`{profile}` already has an operator.")
+
+    counts: dict[str, int] = {}
+    for profile, call, owner in ((profile_a, call_a, tree), (profile_b, call_b, tree_b)):
+        container = _resolved_container(_vertices_argument(call), owner)
+        if container is None:
+            raise PatchError(f"Could not count the vertices of `{profile}`.")
+        counts[profile] = len(container.elts)
+    if counts[profile_a] != counts[profile_b]:
+        raise PatchError(
+            f"Loft needs equal vertex counts; `{profile_a}` has {counts[profile_a]} and "
+            f"`{profile_b}` has {counts[profile_b]}."
+        )
+
+    taken = _module_names(tree)
+    body = f"{profile_a}_body"
+    suffix = 2
+    while body in taken:
+        body = f"{profile_a}_body{suffix}"
+        suffix += 1
+
+    patched = _extend_scene_with(source, body)
+    tree = ast.parse(patched)
+    assignment = _scene_assignment(tree)
+    offsets = _line_offsets(patched)
+    insert = offsets[assignment.lineno - 1]
+    statement = f"{body} = loft({profile_a}, {profile_b}, height={_format_coordinate(height)})\n"
+    patched = patched[:insert] + statement + patched[insert:]
+    patched = _ensure_import(patched, ast.parse(patched), "jaxcad.construction", "loft")
+    return _validate(patched)
+
+
 def solve_sketch(
     source: str,
     line: int,
@@ -951,6 +1020,7 @@ OPERATIONS = {
     "add_sketch": add_sketch,
     "add_extrusion": add_extrusion,
     "add_revolution": add_revolution,
+    "add_loft": add_loft,
     "add_constraint": add_constraint,
     "delete_constraint": delete_constraint,
     "set_constraint_value": set_constraint_value,

@@ -14,14 +14,23 @@ Built bottom-up in tested stages:
    identical output to dense detection at surface-proportional cost.
 5. :mod:`jaxcad.meshing.export` — planar-patch merging into sparse polygon
    meshes and OBJ/STL/STEP serialization.
+6. :mod:`jaxcad.meshing.diagnostics` — post-extraction mesh checks: sampled
+   surface deviation and self-intersection tests, triangle-quality
+   statistics, watertightness, and Euler characteristic.
 
-Remaining stages add mesh diagnostics and multi-size octree leaves.
+Remaining stages add multi-size octree leaves.
 Discrete choices (edge sets, incidence, connectivity, class labels) are
 frozen per extraction; all continuous quantities carry exact JAX
 derivatives with respect to design parameters.
 """
 
 from jaxcad.meshing.adaptive import sparse_crossing_edges, surface_cells
+from jaxcad.meshing.diagnostics import (
+    mesh_report,
+    self_intersections,
+    surface_deviation,
+    triangle_quality,
+)
 from jaxcad.meshing.dual_contouring import (
     Mesh,
     dual_faces,
@@ -50,6 +59,7 @@ from jaxcad.meshing.features import (
     classify_feature_cells,
     detect_branch_changes,
     feature_cell_links,
+    manifold_cell_incidence,
 )
 
 __all__ = [
@@ -64,6 +74,10 @@ __all__ = [
     "save_obj",
     "save_stl",
     "save_step",
+    "surface_deviation",
+    "self_intersections",
+    "triangle_quality",
+    "mesh_report",
     "GridSpec",
     "CrossingEdges",
     "HermiteData",
@@ -77,6 +91,7 @@ __all__ = [
     "CREASE",
     "CORNER",
     "cell_edge_incidence",
+    "manifold_cell_incidence",
     "classify_feature_cells",
     "active_branches",
     "detect_branch_changes",

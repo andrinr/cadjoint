@@ -1,8 +1,12 @@
 """Mesh generation from Hermite edge data: differentiable dual contouring.
 
-Third stage of the meshing pipeline.  One vertex is placed in every active
-cell by minimizing a regularized quadratic error against the cell's Hermite
-tangent planes, and cells are connected by a quad around every crossing edge.
+Third stage of the meshing pipeline.  One vertex is placed per incidence row
+— per connected component of inside corners of every active cell, following
+Manifold Dual Contouring — by minimizing a regularized quadratic error
+against the row's Hermite tangent planes, and rows are connected by a quad
+around every crossing edge.  Cells crossed by a single surface sheet have
+one row; cells crossed by two sheets get one vertex per sheet, which keeps
+the mesh manifold where uniform dual contouring would fuse the sheets.
 
 The split established by the earlier stages carries through unchanged:
 
@@ -22,8 +26,9 @@ The split established by the earlier stages carries through unchanged:
 An optimization loop re-extracts per step and differentiates through
 :func:`qef_vertices` with frozen edges/incidence::
 
-    edges = find_crossing_edges(sample_grid(compiled(free, fixed), grid))
-    incidence = cell_edge_incidence(edges, grid)
+    values = sample_grid(compiled(free, fixed), grid)
+    edges = find_crossing_edges(values)
+    incidence = manifold_cell_incidence(edges, grid, values < 0.0)
 
     def loss(candidate_free):
         hermite = edge_hermite_data(compiled(candidate_free, fixed), grid, edges)
@@ -41,6 +46,7 @@ import jax.numpy as jnp
 import numpy as np
 from jax import Array
 
+from jaxcad.meshing._lattice import _flatten, _strides
 from jaxcad.meshing.edge_detection import (
     CrossingEdges,
     GridSpec,
@@ -54,7 +60,7 @@ from jaxcad.meshing.features import (
     CellIncidence,
     _gather_incident,
     _masked_mean,
-    cell_edge_incidence,
+    manifold_cell_incidence,
 )
 
 
@@ -62,15 +68,17 @@ class Mesh(NamedTuple):
     """Dual-contour surface mesh.
 
     Attributes:
-        vertices: One vertex per active cell, shaped ``(cell_count, 3)``.
-            JAX values; differentiable with respect to design parameters.
+        vertices: One vertex per incidence row (per inside-corner component
+            of each active cell), shaped ``(cell_count, 3)``.  JAX values;
+            differentiable with respect to design parameters.
         faces: Triangle indices into ``vertices``, shaped ``(tri_count, 3)``,
             counterclockwise seen from outside.  Concrete and frozen.
         quads: Source quads before triangulation, shaped ``(quad_count, 4)``.
         normals: Per-vertex normals (masked mean of incident Hermite unit
             normals), shaped ``(cell_count, 3)``.  JAX values.
         cells: Lattice cell index of each vertex row, shaped
-            ``(cell_count, 3)``.  Concrete.
+            ``(cell_count, 3)``.  Concrete; a cell crossed by two surface
+            sheets appears once per sheet.
     """
 
     vertices: Array
@@ -175,7 +183,11 @@ def sharp_qef_vertices(
     Concrete forward placement only: singular-value truncation has no
     usable derivative, so optimization losses should keep differentiating
     :func:`qef_vertices`.  The two solutions differ by the regularization
-    bias, of order ``regularization × cell size``.
+    bias, of order ``regularization × cell size``.  Vertices always stay in
+    their cell: candidate solutions at every truncation rank are clamped to
+    the cell and the one with the smallest QEF error wins, so a marginal
+    singular direction that flings the full-rank minimizer outside cannot
+    park the vertex off the surface.
     """
     if not 0 < rcond < 1:
         raise ValueError("rcond must be between 0 and 1.")
@@ -193,17 +205,40 @@ def sharp_qef_vertices(
     u, singular, vt = np.linalg.svd(normals, full_matrices=False)
     leading = np.maximum(singular[:, :1], 1e-30)
     inverse = np.where(singular > rcond * leading, 1.0 / np.maximum(singular, 1e-30), 0.0)
-    solution = np.einsum(
-        "cji,cj->ci",
-        vt,
-        inverse * np.einsum("cej,ce->cj", u, offsets),
-    )
-    vertices = mass_point + solution
 
-    cell_min = np.asarray(grid.origin, dtype=np.float64) + incidence.cells * np.asarray(
-        grid.spacing, dtype=np.float64
-    )
-    return np.clip(vertices, cell_min, cell_min + np.asarray(grid.spacing, dtype=np.float64))
+    spacing = np.asarray(grid.spacing, dtype=np.float64)
+    cell_min = np.asarray(grid.origin, dtype=np.float64) + incidence.cells * spacing
+    cell_max = cell_min + spacing
+
+    # A nearly degenerate direction that survives ``rcond`` can still throw
+    # the minimizer far outside the cell — a crease grazing a lattice plane
+    # leaves its third singular value at about ``rcond`` of the leading one —
+    # and clamping such a vertex parks it off the surface.  As in Ju et al.'s
+    # original solver, the truncation escalates: each cell compares the
+    # clamped solutions at every rank limit and keeps the one whose actual
+    # QEF error is smallest (ties prefer the higher rank, so cells whose
+    # full-rank solution already fits keep their previous placement).
+    vertices = None
+    best_error = None
+    for rank in (3, 2, 1):
+        limited = np.where(np.arange(3)[None, :] < rank, inverse, 0.0)
+        candidate = mass_point + np.einsum(
+            "cji,cj->ci",
+            vt,
+            limited * np.einsum("cej,ce->cj", u, offsets),
+        )
+        candidate = np.clip(candidate, cell_min, cell_max)
+        residuals = np.einsum("cei,ci->ce", normals, candidate) - np.einsum(
+            "cei,cei->ce", normals, points
+        )
+        error = np.einsum("ce,ce->c", residuals, residuals)
+        if vertices is None:
+            vertices, best_error = candidate, error
+        else:
+            better = error < best_error
+            vertices = np.where(better[:, None], candidate, vertices)
+            best_error = np.where(better, error, best_error)
+    return vertices
 
 
 # Neighbor cells around an axis-``a`` edge, as (du, dv) lattice offsets to
@@ -227,6 +262,13 @@ def dual_faces(
     shorter diagonal.  Edges on the grid boundary lack one of their four
     cells and are skipped.
 
+    Each quad corner is the incidence row of the adjacent cell *whose edge
+    list contains the crossing edge*: the lookup is keyed by (cell, edge),
+    not by cell alone, so multi-row cells from
+    :func:`jaxcad.meshing.features.manifold_cell_incidence` route each
+    surface sheet to its own vertex, and single-row incidence behaves as
+    before.
+
     Args:
         edges: Crossing edges from :func:`find_crossing_edges`.
         incidence: Cell-to-edge mapping for the same edge set.
@@ -237,8 +279,19 @@ def dual_faces(
     Returns:
         ``(quads, triangles, skipped_boundary_edges)``.
     """
-    vertex_rows = np.full(grid.cells, -1, dtype=np.int32)
-    vertex_rows[tuple(incidence.cells.T)] = np.arange(incidence.count, dtype=np.int32)
+    # Sorted (cell, edge) -> incidence row table.  Within one cell every
+    # crossing edge belongs to exactly one row (one inside-corner
+    # component), so the keys are unique.
+    strides = _strides(grid.cells)
+    slot_valid = incidence.edge_ids >= 0
+    edge_stride = np.int64(max(edges.count, 1))
+    pair_keys = (_flatten(incidence.cells, strides)[:, None] * edge_stride) + incidence.edge_ids
+    slot_rows = np.broadcast_to(
+        np.arange(incidence.count, dtype=np.int32)[:, None], incidence.edge_ids.shape
+    )
+    order = np.argsort(pair_keys[slot_valid])
+    sorted_keys = pair_keys[slot_valid][order]
+    sorted_rows = slot_rows[slot_valid][order]
     positions = np.asarray(vertices, dtype=np.float64)
 
     axis_array = np.asarray(edges.axis, dtype=np.int64)
@@ -263,9 +316,16 @@ def dual_faces(
     edge_slot = np.arange(selected.size)[:, None]
     cells[edge_slot, quad_slot, u[selected][:, None]] -= offsets[:, 0][None, :]
     cells[edge_slot, quad_slot, v[selected][:, None]] -= offsets[:, 1][None, :]
-    rows = vertex_rows[cells[..., 0], cells[..., 1], cells[..., 2]]
+    queries = _flatten(cells.reshape((-1, 3)), strides).reshape(cells.shape[:2])
+    queries = queries * edge_stride + selected[:, None]
+    if sorted_keys.size:
+        found = np.clip(np.searchsorted(sorted_keys, queries), 0, sorted_keys.size - 1)
+        rows = np.where(sorted_keys[found] == queries, sorted_rows[found], np.int32(-1))
+    else:
+        rows = np.full(queries.shape, -1, dtype=np.int32)
     # A missing neighbor cannot happen for a well-formed incidence (each
-    # neighbor owns this crossing edge), but never emit an invalid quad.
+    # neighbor owns this crossing edge in exactly one of its rows), but
+    # never emit an invalid quad.
     complete = rows.min(axis=1) >= 0
     quad_array = rows[complete]
     flipped = ~inside_array[selected][complete]
@@ -312,12 +372,16 @@ def extract_mesh(
     if not regularization > 0:
         raise ValueError("regularization must be positive.")
     if lipschitz is None:
-        edges = find_crossing_edges(sample_grid(sdf, grid), level=level)
+        values = sample_grid(sdf, grid)
+        edges = find_crossing_edges(values, level=level)
+        inside = (values - level) < 0
     else:
         from jaxcad.meshing.adaptive import sparse_crossing_edges
 
-        edges = sparse_crossing_edges(sdf, grid, level=level, lipschitz=lipschitz)
-    incidence = cell_edge_incidence(edges, grid)
+        edges, inside = sparse_crossing_edges(
+            sdf, grid, level=level, lipschitz=lipschitz, return_inside=True
+        )
+    incidence = manifold_cell_incidence(edges, grid, inside)
     if edges.count == 0:
         empty = np.empty((0, 3), dtype=np.float32)
         return Mesh(

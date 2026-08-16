@@ -12,6 +12,8 @@ Reports, per shape and resolution:
   cubes on the same volume when available (the number dual contouring
   exists for);
 - signed-volume error against the analytic solid volume;
+- sampled surface deviation (max |field| over area-uniform mesh samples) and
+  sampled self-intersection count from :func:`jaxcad.meshing.mesh_report`;
 - 5th-percentile triangle minimum angle (degrees);
 - wall time of one reverse-mode gradient of a mesh loss w.r.t. a design
   parameter.
@@ -27,6 +29,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
+from jaxcad.meshing.diagnostics import mesh_report
 from jaxcad.meshing.dual_contouring import extract_mesh, qef_vertices
 from jaxcad.meshing.edge_detection import (
     GridSpec,
@@ -137,6 +140,7 @@ def run(resolutions, repeats):
                 lambda g=grid, s=sdf: extract_mesh(s, g, lipschitz=1.0), repeats
             )
             vertices = np.asarray(mesh.vertices, dtype=np.float64)
+            report = mesh_report(sdf, mesh)  # outside the timed region
             row = {
                 "shape": name,
                 "resolution": resolution,
@@ -146,6 +150,8 @@ def run(resolutions, repeats):
                 "watertight": watertight(mesh.faces),
                 "volume_rel_err": abs(signed_volume(vertices, mesh.faces) - exact_volume)
                 / exact_volume,
+                "deviation_max": report["surface_deviation"]["max_abs"],
+                "self_intersections": report["self_intersections"]["count"],
                 "min_angle_p5_deg": minimum_angle_p5(vertices, mesh.faces),
             }
             if name == "box":
@@ -166,14 +172,16 @@ def print_markdown(rows):
     print("## Dual contouring quality and timing\n")
     print(
         "| shape | res | tris | extract (ms) | sparse (ms) | watertight | volume rel err "
-        "| min angle p5 (deg) | corner err | MC corner err | MC (ms) | grad (ms) |"
+        "| dev max | self-isect | min angle p5 (deg) | corner err | MC corner err "
+        "| MC (ms) | grad (ms) |"
     )
-    print("|---|---:|---:|---:|---:|---|---:|---:|---:|---:|---:|---:|")
+    print("|---|---:|---:|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|")
     for row in rows:
         print(
             f"| {row['shape']} | {row['resolution']} | {row['triangles']} "
             f"| {row['extract_ms']:.1f} | {row['sparse_ms']:.1f} | {row['watertight']} "
-            f"| {row['volume_rel_err']:.2e} | {row['min_angle_p5_deg']:.1f} "
+            f"| {row['volume_rel_err']:.2e} | {row['deviation_max']:.2e} "
+            f"| {row['self_intersections']} | {row['min_angle_p5_deg']:.1f} "
             f"| {row.get('corner_err', float('nan')):.2e} "
             f"| {row.get('mc_corner_err', float('nan')):.2e} "
             f"| {row.get('mc_ms', float('nan')):.1f} "

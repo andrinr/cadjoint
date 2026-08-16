@@ -52,6 +52,17 @@ _CELL_EDGE_OFFSETS = (
     ((0, 0, 0), (1, 0, 0), (0, 1, 0), (1, 1, 0)),
 )
 
+# The eight corners of a cell in bit order: corner id ``4 dx + 2 dy + dz``.
+_CELL_CORNER_OFFSETS = np.array(
+    [[dx, dy, dz] for dx in (0, 1) for dy in (0, 1) for dz in (0, 1)],
+    dtype=np.int64,
+)
+
+# The twelve cell edges as corner-id pairs: corners differing in one bit.
+_CORNER_EDGE_PAIRS = tuple(
+    (corner, corner | bit) for corner in range(8) for bit in (4, 2, 1) if not corner & bit
+)
+
 
 class CellIncidence(NamedTuple):
     """Mapping from active cells to the crossing edges on their boundary.
@@ -169,6 +180,124 @@ def cell_edge_incidence(edges: CrossingEdges, grid: GridSpec) -> CellIncidence:
     table[sorted_inverse, positions] = edge_ids[order]
     unique_cells = _unflatten(unique_flat, strides).astype(np.int32)
     return CellIncidence(cells=unique_cells, edge_ids=table, counts=counts.astype(np.int32))
+
+
+def manifold_cell_incidence(
+    edges: CrossingEdges,
+    grid: GridSpec,
+    inside: np.ndarray,
+) -> CellIncidence:
+    """Group crossing edges by cell *and* by inside-corner component.
+
+    Uniform dual contouring places one vertex per active cell, which cannot
+    represent two surface sheets crossing the same cell: their quads share
+    the vertex and mesh edges end up bordered by four triangles.  Following
+    Manifold Dual Contouring, this variant splits every active cell into the
+    connected components of its *inside* corners under the cell's edge
+    adjacency (corners connected along the twelve cell edges) and emits one
+    incidence row per component.  Each crossing edge joins the component of
+    its inside endpoint, so a cell crossed by two sheets contributes two
+    rows — two QEF vertices — and the quads of the two sheets stay disjoint.
+    Cells crossed by a single sheet produce exactly the rows (and slot
+    order) of :func:`cell_edge_incidence`.
+
+    Args:
+        edges: Crossing edges from
+            :func:`jaxcad.meshing.edge_detection.find_crossing_edges`.
+        grid: The sampling grid the edges were detected on.
+        inside: Boolean lattice shaped like :attr:`GridSpec.lattice_shape`;
+            ``True`` where ``value - level < 0``, matching the
+            ``start_inside`` convention of the edge set.  Only the corners
+            of active cells are consulted.
+
+    Returns:
+        Incidence rows keyed by (cell, component); ``cells`` rows may repeat
+        the same lattice cell.
+    """
+    inside_lattice = np.asarray(inside, dtype=bool)
+    if inside_lattice.shape != grid.lattice_shape:
+        raise ValueError(
+            f"inside must be shaped {grid.lattice_shape}; received {inside_lattice.shape}."
+        )
+    if edges.count == 0:
+        return CellIncidence(
+            cells=np.empty((0, 3), dtype=np.int32),
+            edge_ids=np.empty((0, 12), dtype=np.int32),
+            counts=np.empty((0,), dtype=np.int32),
+        )
+
+    # Candidate (cell, edge, inside-corner) triples, in the same order as
+    # cell_edge_incidence so single-component cells reproduce its rows.
+    axis_units = np.eye(3, dtype=np.int32)
+    candidate_cells = []
+    candidate_edges = []
+    candidate_corners = []
+    for axis in range(3):
+        selected = np.flatnonzero(edges.axis == axis)
+        if selected.size == 0:
+            continue
+        offsets = np.asarray(_CELL_EDGE_OFFSETS[axis], dtype=np.int32)
+        starts = edges.index[selected].astype(np.int32)
+        cells = starts[:, None, :] - offsets[None, :, :]
+        inward = np.where(edges.start_inside[selected, None], 0, axis_units[axis][None, :])
+        corner = starts[:, None, :] + inward[:, None, :] - cells  # components in {0, 1}
+        candidate_cells.append(cells.reshape((-1, 3)))
+        candidate_edges.append(np.repeat(selected.astype(np.int32), offsets.shape[0]))
+        candidate_corners.append(
+            (corner[..., 0] * 4 + corner[..., 1] * 2 + corner[..., 2]).reshape((-1,))
+        )
+
+    cells = np.concatenate(candidate_cells)
+    edge_ids = np.concatenate(candidate_edges)
+    corners = np.concatenate(candidate_corners)
+    in_bounds = np.all((cells >= 0) & (cells < np.asarray(grid.cells, dtype=np.int32)), axis=1)
+    cells = cells[in_bounds]
+    edge_ids = edge_ids[in_bounds]
+    corners = corners[in_bounds]
+
+    strides = _strides(grid.cells)
+    flat = _flatten(cells, strides)
+    unique_flat, inverse = np.unique(flat, return_inverse=True)
+    unique_cells = _unflatten(unique_flat, strides)
+
+    # Connected components of each active cell's inside corners: label every
+    # inside corner with its own id and propagate the minimum across the
+    # twelve corner-pair edges (both endpoints inside) to a fixed point.
+    corner_lattice = unique_cells[:, None, :] + _CELL_CORNER_OFFSETS[None, :, :]
+    corner_inside = inside_lattice[
+        corner_lattice[..., 0], corner_lattice[..., 1], corner_lattice[..., 2]
+    ]
+    labels = np.where(corner_inside, np.arange(8, dtype=np.int8)[None, :], np.int8(8))
+    while True:
+        previous = labels.copy()
+        for a, b in _CORNER_EDGE_PAIRS:
+            both = corner_inside[:, a] & corner_inside[:, b]
+            merged = np.minimum(labels[:, a], labels[:, b])
+            labels[:, a] = np.where(both, merged, labels[:, a])
+            labels[:, b] = np.where(both, merged, labels[:, b])
+        if np.array_equal(previous, labels):
+            break
+
+    components = labels[inverse, corners]
+    if np.any(components == 8):
+        raise ValueError(
+            "inside is inconsistent with the edge set: a crossing edge's inside "
+            "endpoint is not marked inside."
+        )
+
+    # Group candidates by (cell, component); rows sort by cell then component.
+    group_keys = inverse.astype(np.int64) * 8 + components
+    unique_groups, group_inverse = np.unique(group_keys, return_inverse=True)
+    order = np.argsort(group_inverse, kind="stable")
+    sorted_inverse = group_inverse[order]
+    counts = np.bincount(sorted_inverse, minlength=unique_groups.shape[0])
+    row_starts = np.concatenate([[0], np.cumsum(counts)[:-1]])
+    positions = np.arange(sorted_inverse.shape[0]) - row_starts[sorted_inverse]
+
+    table = np.full((unique_groups.shape[0], 12), -1, dtype=np.int32)
+    table[sorted_inverse, positions] = edge_ids[order]
+    row_cells = unique_cells[unique_groups // 8].astype(np.int32)
+    return CellIncidence(cells=row_cells, edge_ids=table, counts=counts.astype(np.int32))
 
 
 def classify_feature_cells(

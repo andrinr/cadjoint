@@ -562,10 +562,11 @@ def _profile_material(source: str, line: int) -> str | None:
         node
         for node in ast.walk(tree)
         if isinstance(node, ast.Call)
-        and _called_name(node) in {"extrude", "revolve"}
-        and node.args
-        and isinstance(node.args[0], ast.Name)
-        and node.args[0].id == variable
+        and _called_name(node) in {"extrude", "revolve", "loft"}
+        and any(
+            isinstance(argument, ast.Name) and argument.id == variable
+            for argument in (node.args if _called_name(node) == "loft" else node.args[:1])
+        )
     ]
     return _material_name_from_call(generators[0]) if len(generators) == 1 else None
 
@@ -899,15 +900,16 @@ def _profile_operators(source: str, line: int) -> list[dict]:
     variable = statement.targets[0].id
     result = []
     for node in ast.walk(tree):
-        if not (
-            isinstance(node, ast.Call)
-            and _called_name(node) in {"extrude", "revolve"}
-            and node.args
-            and isinstance(node.args[0], ast.Name)
-            and node.args[0].id == variable
+        name = _called_name(node)
+        if not (isinstance(node, ast.Call) and name in {"extrude", "revolve", "loft"}):
+            continue
+        # A loft consumes two profiles, so its chip appears on both sketches.
+        references = node.args if name == "loft" else node.args[:1]
+        if not any(
+            isinstance(argument, ast.Name) and argument.id == variable for argument in references
         ):
             continue
-        result.append({"kind": _called_name(node), "line": node.lineno})
+        result.append({"kind": name, "line": node.lineno})
     return result
 
 

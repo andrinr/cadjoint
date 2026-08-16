@@ -135,7 +135,8 @@ def sparse_crossing_edges(
     level: float = 0.0,
     lipschitz: float = 1.0,
     stats: dict | None = None,
-) -> CrossingEdges:
+    return_inside: bool = False,
+) -> CrossingEdges | tuple[CrossingEdges, np.ndarray]:
     """Detect crossing edges without sampling the full lattice.
 
     Octree pruning finds the candidate cells, then only their corner
@@ -152,6 +153,17 @@ def sparse_crossing_edges(
             docstring.
         stats: Optional dict that receives ``evaluations`` (total field
             evaluations, pruning plus corners) and ``candidate_cells``.
+        return_inside: Also return a boolean inside lattice shaped like
+            :attr:`GridSpec.lattice_shape`, filled from the corner values
+            already evaluated here (``value - level < 0``; unevaluated
+            vertices read ``False``).  Every active cell is a pruning
+            candidate, so all corners consulted by
+            :func:`jaxcad.meshing.features.manifold_cell_incidence` carry
+            evaluated values, matching a dense sample exactly.
+
+    Returns:
+        The crossing edge set, or ``(edges, inside)`` when
+        ``return_inside`` is true.
     """
     # One evaluator for pruning and corners: tracing/compiling the field is
     # the dominant cost for real scenes, and must be paid exactly once.
@@ -161,11 +173,14 @@ def sparse_crossing_edges(
         stats["candidate_cells"] = int(candidates.shape[0])
     if candidates.shape[0] == 0:
         empty_index = np.empty((0, 3), dtype=np.int32)
-        return CrossingEdges(
+        empty = CrossingEdges(
             axis=np.empty((0,), dtype=np.int8),
             index=empty_index,
             start_inside=np.empty((0,), dtype=bool),
         )
+        if return_inside:
+            return empty, np.zeros(grid.lattice_shape, dtype=bool)
+        return empty
 
     origin = np.asarray(grid.origin, dtype=np.float64)
     spacing = np.asarray(grid.spacing, dtype=np.float64)
@@ -207,8 +222,13 @@ def sparse_crossing_edges(
         axis_indices.append(index.astype(np.int32))
         axis_orientation.append(start_inside[crossing])
 
-    return CrossingEdges(
+    edges = CrossingEdges(
         axis=np.concatenate(axis_labels),
         index=np.concatenate(axis_indices).reshape((-1, 3)),
         start_inside=np.concatenate(axis_orientation),
     )
+    if return_inside:
+        inside = np.zeros(grid.lattice_shape, dtype=bool)
+        inside.reshape((-1,))[corner_keys] = (corner_values - level) < 0
+        return edges, inside
+    return edges

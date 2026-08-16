@@ -252,24 +252,20 @@ class TestScene:
         np.testing.assert_array_equal(np.asarray(first.vertices), np.asarray(second.vertices))
 
 
-# SUSPECTED MODULE BUG (kept as a strict xfail so the defect stays visible):
-# when a CSG crease runs nearly tangent to a lattice plane (here the seam
-# circles of the three-sphere union graze z = 0.568), dual_faces emits edges
-# shared by FOUR triangles (nonmanifold) and the affected cell vertices sit
-# ~0.033 off the surface, because one QEF vertex per cell cannot represent
-# the two surface sheets crossing the same cell face.  Independent of
-# ``sharp``; appears/disappears with grid alignment (30,28,20 fails while
-# 30,28,22 and 28,26,19 are clean).  Needs manifold dual contouring or cell
-# disambiguation in jaxcad.meshing.dual_contouring.
-@pytest.mark.xfail(
-    strict=True,
-    reason="dual_faces yields nonmanifold edges when a crease grazes a lattice plane",
-)
-def test_grazing_crease_stays_manifold_known_bug():
+# Regression test for the manifold-DC cell split: when a CSG crease runs
+# nearly tangent to a lattice plane (here the seam circles of the
+# three-sphere union graze z = 0.568), two surface sheets cross the same
+# cell.  Uniform DC's single vertex per cell fused them into edges shared by
+# FOUR triangles with vertices ~0.033 off the surface; the per-component
+# rows of manifold_cell_incidence give each sheet its own QEF vertex, so the
+# mesh stays manifold and the vertices stay on the surface.
+def test_grazing_crease_stays_manifold():
     grid = GridSpec.from_bounds((-0.94, -0.93, -0.92), (2.77, 2.66, 1.86), (30, 28, 20))
     mesh = extract_mesh(three_sphere_union, grid)
     counts = undirected_edge_counts(mesh.faces)
     np.testing.assert_array_equal(np.unique(counts), [2])
+    residuals = np.abs(np.asarray(jax.vmap(three_sphere_union)(mesh.vertices)))
+    assert residuals.max() < 2e-2
 
 
 @pytest.mark.parametrize("scene", SPARSE_SCENES, ids=[s.name for s in SPARSE_SCENES])
