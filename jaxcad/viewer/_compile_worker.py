@@ -286,6 +286,7 @@ def _mesh_edge_payload(scene: Any) -> dict[str, Any] | None:
             norms = np.linalg.norm(raw, axis=1, keepdims=True)
             tangents = np.full((incidence.count, 3), np.nan)
             tangents[feature_rows] = np.where(norms > 1e-6, raw / np.maximum(norms, 1e-12), np.nan)
+            suppressed = np.zeros(incidence.count, dtype=bool)
 
             # Seam cells get the EXACT tangent cross(grad_a, grad_b) instead
             # of the covariance estimate, which degrades where two seam
@@ -315,6 +316,11 @@ def _mesh_edge_payload(scene: Any) -> dict[str, Any] | None:
                 )
                 junctions = junctions.copy()
                 junctions[seam_rows] = False
+                # Tangential contact has no seam CURVE at all — the operands
+                # touch over a region.  Unlike sub-resolution creases (where
+                # short rungs honestly show a thin band), drawing anything
+                # there is noise: suppress these cells' links completely.
+                suppressed[seam_rows[~reliable[:, 0]]] = True
 
             directions = vertices[links[:, 1]] - vertices[links[:, 0]]
             lengths = np.maximum(np.linalg.norm(directions, axis=1), 1e-12)
@@ -334,6 +340,7 @@ def _mesh_edge_payload(scene: Any) -> dict[str, Any] | None:
             # X-band through the exemptions while diagonal chords of real
             # curves — whose endpoints do confirm — keep their full reach.
             keep &= confirmed | (lengths <= 1.2 * max(grid.spacing))
+            keep &= ~(suppressed[links[:, 0]] | suppressed[links[:, 1]])
             links = links[keep]
 
         def segments(pairs: np.ndarray) -> list[list[list[float]]]:
@@ -380,6 +387,136 @@ def _mesh_source(source: str) -> dict[str, Any]:
         "mesh_edges": mesh_edges,
         "output": captured.getvalue()[-8_000:],
     }
+
+
+# Simulation meshing volume: matches the raymarcher's view volume so what the
+# user sees is what gets meshed.  Resolution is a per-request choice.
+_SIMULATE_BOUNDS = (-3.0, -3.0, -3.0)
+_SIMULATE_SIZE = (6.0, 6.0, 6.0)
+_FEM_UNAVAILABLE_MESSAGE = (
+    "FEM simulation needs the 'fem' extra (jax-fem). Install it with: pip install jaxcad[fem]"
+)
+
+
+def _membership_predicate(centers: np.ndarray) -> Any:
+    """A single-argument face predicate matching centroids of one group.
+
+    Kept unary via a closure (not a defaulted lambda argument):
+    ``select_faces`` inspects the predicate's arity, and a second parameter —
+    even a defaulted one — would make it pass the face normal into it.
+    """
+    members = {tuple(np.round(center, 9)) for center in centers}
+
+    def predicate(center: np.ndarray) -> bool:
+        return tuple(np.round(center, 9)) in members
+
+    return predicate
+
+
+def _resolve_bc_groups(mesh: Any, bcs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Attach a face predicate to each boundary condition, by face-group id.
+
+    A condition names its patch either as a group id (``"+x"``) or as a
+    predicate spec ``{"axis": "x", "side": "+"}``; both resolve to one of the
+    gradient-axis groups the mesher tagged.  The returned predicate matches a
+    boundary face by centroid membership in that group.
+    """
+    resolved = []
+    for bc in bcs:
+        spec = bc.get("group")
+        group_id = f"{spec.get('side')}{spec.get('axis')}" if isinstance(spec, dict) else str(spec)
+        group = mesh.boundary_faces.get(group_id)
+        if group is None:
+            available = ", ".join(sorted(mesh.boundary_faces))
+            raise ValueError(
+                f"Boundary condition targets face group {group_id!r}, "
+                f"but this mesh only has: {available}."
+            )
+        resolved.append(
+            {**bc, "group_id": group_id, "predicate": _membership_predicate(group.centers)}
+        )
+    return resolved
+
+
+def _simulate_scene(scene: Any, request: dict[str, Any]) -> dict[str, Any]:
+    """Mesh the scene and, unless probing, solve the requested FEM problem."""
+    import jax.numpy as jnp
+
+    from jaxcad.fem.hexmesh import GridSpec, sdf_to_hex_mesh
+    from jaxcad.fem.render_payload import (
+        boundary_render_payload,
+        cell_to_node_scalar,
+    )
+
+    kind = request.get("kind", "probe")
+    resolution = int(request.get("resolution", 20))
+    material = request.get("material") or {}
+    sdf = lambda p: jnp.asarray(scene(p))  # noqa: E731
+
+    grid = GridSpec.from_bounds(_SIMULATE_BOUNDS, _SIMULATE_SIZE, resolution)
+    mesh = sdf_to_hex_mesh(sdf, grid)
+
+    if kind == "probe":
+        # Meshing only: the catalog and geometry the BC UI is built from.
+        payload = boundary_render_payload(mesh, np.zeros(mesh.num_points))
+        return {"ok": True, "kind": kind, "field": None, "mesh": payload}
+
+    try:
+        import jax_fem  # noqa: F401
+    except ImportError:
+        return {"ok": False, "error_kind": "fem_unavailable", "error": _FEM_UNAVAILABLE_MESSAGE}
+
+    from jaxcad.fem.simulate import elastic_solve, thermal_solve
+
+    bcs = _resolve_bc_groups(mesh, request.get("bcs") or [])
+    if kind == "thermal":
+        dirichlet = [
+            (bc["predicate"], float(bc.get("value", 0.0)))
+            for bc in bcs
+            if bc.get("type") == "dirichlet"
+        ]
+        if not dirichlet:
+            raise ValueError("A thermal solve needs at least one fixed-temperature face group.")
+        result = thermal_solve(
+            mesh,
+            conductivity=float(material.get("conductivity", 1.0)),
+            source=float(material.get("source", 0.0)),
+            dirichlet=dirichlet,
+        )
+        scalar = np.asarray(result.temperature, dtype=np.float64)
+        field = "temperature"
+    elif kind == "elastic":
+        fixed = [bc["predicate"] for bc in bcs if bc.get("type") == "dirichlet"]
+        tractions = [
+            (bc["predicate"], np.asarray(bc.get("value"), dtype=np.float64))
+            for bc in bcs
+            if bc.get("type") == "traction"
+        ]
+        if not fixed:
+            raise ValueError("An elastic solve needs at least one fixed-support face group.")
+        result = elastic_solve(
+            mesh,
+            youngs=float(material.get("youngs", 200.0)),
+            poisson=float(material.get("poisson", 0.3)),
+            dirichlet=fixed,
+            tractions=tractions,
+        )
+        scalar = cell_to_node_scalar(mesh, result.von_mises())
+        field = "von_mises"
+    else:
+        raise ValueError(f"Unknown simulation kind: {kind!r}.")
+
+    return {"ok": True, "kind": kind, "field": field, "mesh": boundary_render_payload(mesh, scalar)}
+
+
+def _simulate_source(request: dict[str, Any]) -> dict[str, Any]:
+    """Run the FEM simulation mode: exec scene -> hex mesh -> solve -> payload."""
+    captured = io.StringIO()
+    with contextlib.redirect_stdout(captured), contextlib.redirect_stderr(captured):
+        namespace = _execute_scene(request["source"])
+        result = _simulate_scene(namespace["scene"], request)
+    result["output"] = captured.getvalue()[-8_000:]
+    return result
 
 
 def _compile_source(source: str) -> dict[str, Any]:
@@ -446,6 +583,8 @@ def main() -> None:
         mode = request.get("mode", "compile")
         if mode == "mesh":
             result = _mesh_source(source)
+        elif mode == "simulate":
+            result = _simulate_source(request)
         elif mode == "compile":
             result = _compile_source(source)
         else:
