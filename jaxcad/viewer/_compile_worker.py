@@ -331,8 +331,11 @@ def _mesh_edge_payload(scene: Any) -> dict[str, Any] | None:
                 tangent = tangents[rows]
                 defined = np.isfinite(tangent).all(axis=1) & ~junctions[rows]
                 alignment = np.abs(np.einsum("li,li->l", directions, tangent)) / lengths
-                keep &= ~defined | (alignment > 0.75)
-                confirmed |= defined & (alignment > 0.75)
+                # Genuine on-curve chords align above ~0.98 even where the
+                # curve turns sharply per cell; rail-to-rail diagonals on
+                # shallow double seams reach ~0.8, so the cut sits at 0.9.
+                keep &= ~defined | (alignment > 0.9)
+                confirmed |= defined & (alignment > 0.9)
             # Sub-resolution strips classify whole rows of cells as corners
             # or leave tangents undefined, bypassing the alignment test; a
             # link no endpoint positively confirmed must stay within one
