@@ -29,3 +29,27 @@ __all__ = [
     "sdf_to_hex_mesh",
     "select_faces",
 ]
+
+# Declarative study layer (code-first simulation, capture registry for the
+# compile worker).  Appended additively; no solver import happens here.
+from jaxcad.fem.study import (  # noqa: E402
+    Dirichlet,
+    ElasticStudy,
+    FaceSelector,
+    Fixed,
+    HeatFlux,
+    ThermalStudy,
+    Traction,
+    capture_studies,
+)
+
+__all__ += [
+    "Dirichlet",
+    "ElasticStudy",
+    "FaceSelector",
+    "Fixed",
+    "HeatFlux",
+    "ThermalStudy",
+    "Traction",
+    "capture_studies",
+]

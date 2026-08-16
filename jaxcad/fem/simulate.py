@@ -157,7 +157,9 @@ def thermal_solve(
         dirichlet: ``(predicate, temperature)`` pairs; each predicate picks a
             boundary patch via :func:`jaxcad.fem.select_faces` — called with
             the face center, or ``(center, normal)`` if it takes two
-            arguments.
+            arguments.  With the default direct backend a temperature may be
+            a traced JAX scalar: the solve is then differentiable w.r.t. the
+            prescribed value (lifted formulation).
         source: Volumetric heat source ``q``.
         backend: Backend name (``"jaxfem"`` default, ``"tesseract"``) or a
             :class:`~jaxcad.fem.backends.SolverBackend` instance.
@@ -171,7 +173,9 @@ def thermal_solve(
     """
     bcs = ThermalBCs(
         dirichlet_nodes=[_patch_nodes(mesh, predicate) for predicate, _ in dirichlet],
-        dirichlet_values=[float(value) for _, value in dirichlet],
+        dirichlet_values=[
+            float(value) if isinstance(value, (int, float)) else value for _, value in dirichlet
+        ],
     )
     solver = get_backend(backend)
     solve_points = mesh.points if points is None else points

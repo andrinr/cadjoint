@@ -20,9 +20,12 @@ Differentiability contract: ``thermal``/``elastic`` accept possibly-traced
 ``points`` and return JAX arrays whose VJP w.r.t. ``points`` (and scalar
 material parameters where noted) is defined — via jax-fem's adjoint
 (``ad_wrapper``) for the direct backend, via the tesseract's
-``vector_jacobian_product`` endpoint for tesseract backends.  Forward
-solves are not jax-traceable end-to-end (PETSc assembly), so none of these
-calls may sit under ``jax.jit``.
+``vector_jacobian_product`` endpoint for tesseract backends.  The direct
+thermal solve is additionally differentiable w.r.t. the prescribed
+Dirichlet *values* (lifted formulation; see
+:meth:`JaxFemBackend.thermal`).  Forward solves are not jax-traceable
+end-to-end (PETSc assembly), so none of these calls may sit under
+``jax.jit``.
 """
 
 from __future__ import annotations
@@ -49,11 +52,13 @@ class ThermalBCs:
 
     Attributes:
         dirichlet_nodes: One int array of node indices per prescribed patch.
-        dirichlet_values: Prescribed temperature per patch.
+        dirichlet_values: Prescribed temperature per patch — plain floats or
+            (for the direct backend) traced JAX scalars, in which case the
+            solve is differentiable w.r.t. the prescribed values.
     """
 
     dirichlet_nodes: list[np.ndarray] = field(default_factory=list)
-    dirichlet_values: list[float] = field(default_factory=list)
+    dirichlet_values: list[Any] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -157,7 +162,18 @@ class JaxFemBackend:
     name = "jaxfem"
 
     def thermal(self, points, cells, bcs, *, conductivity, source, base_points=None):
-        """See :meth:`SolverBackend.thermal`."""
+        """See :meth:`SolverBackend.thermal`.
+
+        Dirichlet values are differentiable: jax-fem bakes prescribed values
+        into the DOF elimination at problem construction (outside the
+        adjoint's parameter path), so the solve is lifted — ``T = u0 + g``
+        with ``g`` the nodal field interpolating the prescribed boundary
+        values and ``u0`` solved under *homogeneous* Dirichlet conditions
+        with the extra flux ``k grad(g)`` in the weak form.  ``g`` enters
+        through ``set_params`` (as an internal variable via its quad-point
+        gradient), so ``d(objective)/d(dirichlet value)`` flows through the
+        adjoint.
+        """
         _require_jax_fem()
         import jax.numpy as jnp
         from jax_fem.generate_mesh import Mesh
@@ -166,13 +182,14 @@ class JaxFemBackend:
 
         class _Thermal(Problem):
             def get_tensor_map(self):
-                def tensor_map(u_grad, kappa, _source):
-                    return kappa * u_grad
+                def tensor_map(u_grad, kappa, _source, lift_grad):
+                    # u_grad: (vec=1, dim); lift_grad: (dim,) broadcasts in.
+                    return kappa * (u_grad + lift_grad)
 
                 return tensor_map
 
             def get_mass_map(self):
-                def mass_map(u, _x, _kappa, source_value):
+                def mass_map(u, _x, _kappa, source_value, _lift_grad):
                     # Weak form: residual += integral(v * mass_map); the
                     # source q enters as -q so that -div(k grad T) = q.
                     return -source_value * jnp.ones_like(u)
@@ -180,26 +197,36 @@ class JaxFemBackend:
                 return mass_map
 
             def set_params(self, params):
-                params_points, kappa, source_value = params
+                params_points, kappa, source_value, lift_nodal = params
                 self.initialize_geometric_quantities([params_points])
-                shape = (self.fes[0].num_cells, self.fes[0].num_quads)
+                fe = self.fes[0]
+                shape = (fe.num_cells, fe.num_quads)
+                # grad(g) at the quad points from the (possibly traced)
+                # nodal lift: (C, 8) x (C, Q, 8, dim) -> (C, Q, dim).
+                lift_grad = jnp.einsum("cn,cqnd->cqd", lift_nodal[fe.cells], fe.shape_grads)
                 self.internal_vars = [
                     kappa * jnp.ones(shape),
                     source_value * jnp.ones(shape),
+                    lift_grad,
                 ]
 
         if base_points is None:
             base_points = points
-        mesh = Mesh(np.asarray(base_points, dtype=np.float64), np.asarray(cells), ele_type="HEX8")
+        base_points = np.asarray(base_points, dtype=np.float64)
+        mesh = Mesh(base_points, np.asarray(cells), ele_type="HEX8")
         dirichlet = [
             [_membership_location(nodes) for nodes in bcs.dirichlet_nodes],
             [0] * len(bcs.dirichlet_nodes),
-            [(lambda _point, value=value: value) for value in bcs.dirichlet_values],
+            [(lambda _point: 0.0) for _ in bcs.dirichlet_nodes],
         ]
         problem = _Thermal(mesh=mesh, vec=1, dim=3, ele_type="HEX8", dirichlet_bc_info=dirichlet)
         forward = ad_wrapper(problem)
-        solution = forward((jnp.asarray(points), conductivity, source))
-        return solution[0][:, 0]
+
+        lift = jnp.zeros(base_points.shape[0], dtype=jnp.float64)
+        for nodes, value in zip(bcs.dirichlet_nodes, bcs.dirichlet_values):
+            lift = lift.at[jnp.asarray(np.asarray(nodes, dtype=np.int32))].set(value)
+        solution = forward((jnp.asarray(points), conductivity, source, lift))
+        return solution[0][:, 0] + lift
 
     def elastic(self, points, cells, bcs, *, youngs, poisson, base_points=None):
         """See :meth:`SolverBackend.elastic`."""
@@ -253,28 +280,45 @@ class JaxFemBackend:
 
 
 class TesseractBackend:
-    """Backend routing through a Tesseract (interop ABI reference).
+    """Backend routing through Tesseracts (interop ABI reference).
 
-    Executes the packaged jax-fem thermal tesseract locally (no Docker) via
-    ``Tesseract.from_tesseract_api`` and composes it into JAX autodiff with
-    ``tesseract_jax.apply_tesseract``, which dispatches to the tesseract's
-    ``vector_jacobian_product`` endpoint under ``jax.grad``.  Third-party
-    solvers plug in the same way: point ``api_path`` at their
-    ``tesseract_api.py`` (or adapt this class to a served/containerized
-    tesseract via ``Tesseract.from_image``).
+    Executes the packaged jax-fem thermal and elastic tesseracts locally
+    (no Docker) via ``Tesseract.from_tesseract_api`` and composes them into
+    JAX autodiff with ``tesseract_jax.apply_tesseract``, which dispatches to
+    the tesseract's ``vector_jacobian_product`` endpoint under ``jax.grad``.
+    Third-party solvers plug in the same way: point ``api_path`` /
+    ``elastic_api_path`` at their ``tesseract_api.py`` (or adapt this class
+    to a served/containerized tesseract via ``Tesseract.from_image``).
     """
 
     name = "tesseract"
 
-    def __init__(self, api_path: str | Path | None = None):
+    def __init__(
+        self,
+        api_path: str | Path | None = None,
+        *,
+        elastic_api_path: str | Path | None = None,
+    ):
         try:
-            from tesseract_core import Tesseract
+            from tesseract_core import Tesseract  # noqa: F401
         except ImportError as error:
             raise ImportError(_TESSERACT_EXTRA_MESSAGE) from error
-        _require_jax_fem()  # the packaged reference tesseract runs jax-fem in-process
+        _require_jax_fem()  # the packaged reference tesseracts run jax-fem in-process
+        tesseracts_dir = Path(__file__).parent / "tesseracts"
         if api_path is None:
-            api_path = Path(__file__).parent / "tesseracts" / "thermal_jaxfem" / "tesseract_api.py"
-        self._tesseract = Tesseract.from_tesseract_api(str(api_path))
+            api_path = tesseracts_dir / "thermal_jaxfem" / "tesseract_api.py"
+        if elastic_api_path is None:
+            elastic_api_path = tesseracts_dir / "elastic_jaxfem" / "tesseract_api.py"
+        self._api_paths = {"thermal": Path(api_path), "elastic": Path(elastic_api_path)}
+        self._tesseracts: dict[str, Any] = {}
+
+    def _tesseract_for(self, kind: str):
+        """Load the tesseract for ``kind`` lazily (kept warm per instance)."""
+        if kind not in self._tesseracts:
+            from tesseract_core import Tesseract
+
+            self._tesseracts[kind] = Tesseract.from_tesseract_api(str(self._api_paths[kind]))
+        return self._tesseracts[kind]
 
     def thermal(self, points, cells, bcs, *, conductivity, source, base_points=None):
         """See :meth:`SolverBackend.thermal`.
@@ -298,7 +342,7 @@ class TesseractBackend:
             nodes = np.zeros(0, dtype=np.int32)
             values = np.zeros(0, dtype=np.float64)
         outputs = apply_tesseract(
-            self._tesseract,
+            self._tesseract_for("thermal"),
             {
                 "points": jnp.asarray(points, dtype=jnp.float64),
                 "cells": np.asarray(cells, dtype=np.int32),
@@ -311,11 +355,49 @@ class TesseractBackend:
         return outputs["temperature"]
 
     def elastic(self, points, cells, bcs, *, youngs, poisson, base_points=None):
-        """Not packaged as a tesseract yet; use the direct backend."""
-        raise NotImplementedError(
-            "No elastic reference tesseract is packaged yet; use backend='jaxfem' "
-            "or ship a tesseract_api.py implementing the elastic ABI."
+        """See :meth:`SolverBackend.elastic`.
+
+        ``base_points`` is unused: the tesseract runtime hands its endpoints
+        concrete arrays, so construction-time concreteness is guaranteed.
+        Clamped patches cross the boundary as one union node set (all
+        components pinned to zero, so patch identity is irrelevant);
+        traction patches keep their identity via prefix offsets.
+        """
+        del base_points
+        import jax.numpy as jnp
+        from tesseract_jax import apply_tesseract
+
+        if bcs.fixed_nodes:
+            fixed = np.unique(
+                np.concatenate([np.asarray(n, dtype=np.int32) for n in bcs.fixed_nodes])
+            ).astype(np.int32)
+        else:
+            fixed = np.zeros(0, dtype=np.int32)
+        if bcs.traction_nodes:
+            traction_nodes = np.concatenate(
+                [np.asarray(n, dtype=np.int32) for n in bcs.traction_nodes]
+            )
+            traction_vectors = np.asarray(bcs.traction_vectors, dtype=np.float64)
+        else:
+            traction_nodes = np.zeros(0, dtype=np.int32)
+            traction_vectors = np.zeros((0, 3), dtype=np.float64)
+        offsets = np.concatenate(
+            [[0], np.cumsum([len(n) for n in bcs.traction_nodes], dtype=np.int64)]
+        ).astype(np.int32)
+        outputs = apply_tesseract(
+            self._tesseract_for("elastic"),
+            {
+                "points": jnp.asarray(points, dtype=jnp.float64),
+                "cells": np.asarray(cells, dtype=np.int32),
+                "fixed_nodes": fixed,
+                "traction_nodes": traction_nodes,
+                "traction_offsets": offsets,
+                "traction_vectors": traction_vectors,
+                "youngs": np.asarray(youngs, dtype=np.float64),
+                "poisson": np.asarray(poisson, dtype=np.float64),
+            },
         )
+        return outputs["displacement"]
 
 
 _REGISTRY: dict[str, Callable[[], SolverBackend]] = {

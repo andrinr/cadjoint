@@ -15,6 +15,8 @@ differences. This note records what runs today, the honest limits, and the follo
 | Adjoint gradients w.r.t. node coordinates | working, FD-validated | `jaxcad/fem/backends.py` |
 | End-to-end design gradient | working, FD-validated to ~1e-4 off kinks | `tests/fem/test_end_to_end.py` |
 | Tesseract plugin ABI (local, no Docker) | working, gradients bit-identical to direct | `jaxcad/fem/tesseracts/thermal_jaxfem/` |
+| Elastic solve packaged as a tesseract | working, gradients bit-identical to direct | `jaxcad/fem/tesseracts/elastic_jaxfem/` |
+| Differentiable Dirichlet *values* (thermal, direct backend) | working via lifted solve, FD-validated | `JaxFemBackend.thermal` + `tests/fem/test_dirichlet_gradient.py` |
 
 ### Versions
 
@@ -48,8 +50,23 @@ backward solves the adjoint system (`implicit_vjp`: one transposed linear solve 
   `Problem.initialize_geometric_quantities(fes_points=...)` recomputes all shape
   data through `jax.numpy`, so **nodal coordinates are a valid parameter**:
   coordinate gradients validated against FD (0.05% on a Poisson bar node).
-- Dirichlet *values* are baked into DOF elimination at problem construction —
-  not differentiable through this path (documented in the tesseract schema).
+- Dirichlet *values* are baked into DOF elimination at problem construction
+  (`fe.vals_list`, outside `set_params`' parameter path — verified in
+  `jax_fem/solver.py`: `implicit_vjp`'s `constraint_fn` only re-runs
+  `set_params`, while `apply_bc_vec` reads the frozen `vals_list`), so they
+  are **not** differentiable through jax-fem directly. The direct thermal
+  backend therefore uses the standard **lift**: solve `T = u0 + g` with
+  homogeneous Dirichlet conditions on `u0`, where `g` is the nodal field
+  interpolating the prescribed boundary values (nonzero only at the
+  Dirichlet nodes — any discrete lift with the right boundary trace is
+  exact). The extra weak-form flux `k grad(g)` enters as an internal
+  variable (`g`'s quad-point gradient from `fes[0].shape_grads`, itself
+  recomputed differentiably), so `d(objective)/d(dirichlet value)` flows
+  through the adjoint. FD-validated on the thermal bar (hot-end temperature
+  as the design variable; observed agreement ~1e-8 relative, asserted at
+  rtol 5e-2 in `tests/fem/test_dirichlet_gradient.py`). Elastic clamps are
+  identically zero, so no elastic lift is needed yet; the tesseract thermal
+  schema still treats Dirichlet values as static inputs.
 
 ### The end-to-end chain (frozen-topology doctrine)
 
@@ -132,9 +149,15 @@ Direct in-process jax-fem is the **default backend and performance baseline**
   schema and endpoints — its `vector_jacobian_product` can wrap any adjoint
   (hand-derived, FEniCS, code-generated) — and plugs in via
   `TesseractBackend(api_path=...)` or `register_backend`.
-- Not yet packaged: an elastic tesseract (direct backend only; `NotImplementedError`
-  points there). Dirichlet values and material fields per-cell are natural schema
-  extensions.
+- `jaxcad/fem/tesseracts/elastic_jaxfem/tesseract_api.py`: the elastic solve
+  packaged the same way. Variable patch counts cross the fixed-rank schema as
+  a union `fixed_nodes` set (clamps are all-zero, patch identity irrelevant)
+  plus `traction_nodes`/`traction_offsets` (prefix offsets) with one traction
+  vector per patch. Differentiable input: `points` only, matching the direct
+  backend (materials and tractions are baked into weak-form closures).
+  `TesseractBackend` loads both tesseracts lazily and routes by kind;
+  gradients agree with the direct path to < 1e-9 in the tests. Differentiable
+  material fields per-cell remain natural schema extensions.
 
 ## Visualization
 
@@ -159,10 +182,13 @@ missing piece is a trust-region rule for when to re-freeze topology.
 
 ## Test inventory
 
-`tests/fem/`: 26 tests, all passing with the extras installed; solver-dependent
+`tests/fem/`: 44 tests, all passing with the extras installed; solver-dependent
 files `pytest.importorskip` on `jax_fem` / `tesseract_core` / `tesseract_jax`, so
 the suite skips (not fails) without them. `test_hexmesh.py` (11, mesher only),
-`test_simulate.py` (10), `test_tesseract_backend.py` (3), `test_end_to_end.py` (2).
+`test_simulate.py` (10), `test_tesseract_backend.py` (5, incl. elastic parity +
+bit-identical gradients + a generous overhead-timing bound),
+`test_dirichlet_gradient.py` (3, lifted Dirichlet values vs FD),
+`test_end_to_end.py` (2), plus the bracket demo and render-payload files.
 
 ## Bracket demo: a realistic part through the whole chain
 
@@ -195,3 +221,44 @@ compliance sensitivity to web thickness is discretization-dominated (fully
 integrated HEX8 locks in bending), so quantitative sizing of thin walls needs
 either finer through-thickness resolution or an incompatible-modes element.
 The gradient machinery itself is exact for the discrete model either way.
+
+## Code parity: studies are scene-program citizens
+
+Simulation follows the same doctrine as sketches and constraints: **code is the
+source of truth, visual features are a layer on top**. `jaxcad/fem/study.py`
+makes studies declarative and first-class:
+
+- `ThermalStudy` / `ElasticStudy` are plain validated dataclasses declared
+  directly in user programs and scripts. `.solve(sdf)` runs
+  `sdf_to_hex_mesh` + the existing solvers and returns the usual result
+  objects, so optimizers consume studies with no extra plumbing (a frozen
+  mesh can be passed in for the frozen-topology gradient loop).
+- `FaceSelector` makes boundary selection serializable: `side("+x")`
+  (dominant-gradient-axis groups the mesher already computes),
+  `box(center, extent)` (face-center containment), and `where(predicate)` as
+  the code-only escape hatch. Side/box selectors round-trip through JSON;
+  selectors resolve against `HexMesh.boundary_faces`/`select_faces` and are
+  proven equivalent to hand-written predicates in tests.
+- `.describe()` emits the JSON-ready payload the viewer needs (name, kind,
+  resolution, domain, material, serialized BCs) — `json.dumps`-able,
+  asserted in tests.
+- `capture_studies()` mirrors `capture_constraint_solves` in
+  `jaxcad/constraints/solve.py` (ContextVar + context manager): constructing
+  a study inside the context registers it, so the compile worker can exec a
+  user program and collect its declared studies in order. Verified against
+  exec'd source, including nested-context isolation.
+- `HeatFlux` is declarable and serializable now but raises
+  `NotImplementedError` at solve time until the thermal backend grows a
+  Neumann term — the schema leads, the solver follows.
+
+Next wave (viewer side, not in this change): the Simulate panel becomes a
+patch layer — `add_study` / `add_study_bc` patch ops edit the study
+declarations in the program text, and the worker ships `describe()` payloads
+to the frontend. `/api/simulate`'s ad-hoc BC payload then survives only as a
+preview path for not-yet-committed panel state; committed studies always
+live in code. Study defaults reuse the worker's simulate-domain convention
+(bounds `(-3,-3,-3)`, size `(6,6,6)`), overridable per study.
+
+Study tests: `test_study.py` (24) — construction/validation, JSON round-trip,
+selector-vs-predicate equivalence, exec capture, and bar-scene solves
+reproducing the direct thermal/elastic results through the study path.
