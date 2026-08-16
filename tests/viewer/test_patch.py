@@ -485,3 +485,111 @@ class TestDeleteObject:
         )
         with pytest.raises(PatchError, match="No single construction call"):
             delete_object(source, 3)
+
+
+class TestConstraintEditing:
+    """delete_constraint / set_constraint_value / relational add_constraint."""
+
+    def _profile_line(self, source: str) -> int:
+        return next(
+            number + 1
+            for number, text in enumerate(source.splitlines())
+            if "PolygonProfile(" in text
+        )
+
+    def test_relational_kinds_emit_their_classes(self):
+        from jaxcad.viewer.playground import EXAMPLE_SOURCE
+
+        line = self._profile_line(EXAMPLE_SOURCE)
+        cases = {
+            "horizontal": ("HorizontalConstraint", [0, 1]),
+            "vertical": ("VerticalConstraint", [0, 1]),
+            "coincident": ("CoincidentConstraint", [0, 1]),
+            "parallel": ("ParallelEdgesConstraint", [0, 1, 2, 3]),
+            "perpendicular": ("PerpendicularEdgesConstraint", [0, 1, 2, 3]),
+        }
+        for kind, (symbol, indices) in cases.items():
+            patched = apply_operation(
+                EXAMPLE_SOURCE, "add_constraint", line=line, kind=kind, indices=indices
+            )
+            assert f"{symbol}(profile.vertices[0]" in patched
+            assert "from jaxcad.constraints import" in patched or symbol in patched
+
+    def test_delete_constraint_removes_bare_name_statement(self):
+        from jaxcad.viewer.playground import EXAMPLE_SOURCE
+
+        line = self._profile_line(EXAMPLE_SOURCE)
+        patched = apply_operation(EXAMPLE_SOURCE, "delete_constraint", line=line, index=0)
+        assert "FixedConstraint(base_left" not in patched
+        # Only that statement changed: removing its line reproduces the rest.
+        removed = [
+            text for text in EXAMPLE_SOURCE.splitlines() if "FixedConstraint(base_left" in text
+        ]
+        assert len(removed) == 1
+        assert patched == EXAMPLE_SOURCE.replace(removed[0] + "\n", "")
+
+    def test_delete_constraint_removes_subscript_statement(self):
+        from jaxcad.viewer.playground import EXAMPLE_SOURCE
+
+        line = self._profile_line(EXAMPLE_SOURCE)
+        grown = apply_operation(
+            EXAMPLE_SOURCE, "add_constraint", line=line, kind="horizontal", indices=[0, 1]
+        )
+        shrunk = apply_operation(
+            grown, "delete_constraint", line=self._profile_line(grown), index=0
+        )
+        assert "HorizontalConstraint(profile.vertices" not in shrunk
+
+    def test_delete_constraint_rejects_out_of_range(self):
+        from jaxcad.viewer.playground import EXAMPLE_SOURCE
+
+        line = self._profile_line(EXAMPLE_SOURCE)
+        with pytest.raises(PatchError, match="out of range"):
+            apply_operation(EXAMPLE_SOURCE, "delete_constraint", line=line, index=99)
+
+    def test_set_constraint_value_follows_scalar_indirection(self):
+        from jaxcad.viewer.playground import EXAMPLE_SOURCE
+
+        line = self._profile_line(EXAMPLE_SOURCE)
+        patched = apply_operation(
+            EXAMPLE_SOURCE, "set_constraint_value", line=line, index=1, value=2.5
+        )
+        assert "Scalar(2.5" in patched
+
+    def test_set_constraint_value_rejects_relational(self):
+        from jaxcad.viewer.playground import EXAMPLE_SOURCE
+
+        line = self._profile_line(EXAMPLE_SOURCE)
+        grown = apply_operation(
+            EXAMPLE_SOURCE, "add_constraint", line=line, kind="coincident", indices=[0, 1]
+        )
+        with pytest.raises(PatchError, match="editable value"):
+            apply_operation(
+                grown, "set_constraint_value", line=self._profile_line(grown), index=0, value=1.0
+            )
+
+
+class TestAddRevolution:
+    def test_revolves_a_fresh_sketch(self):
+        from jaxcad.viewer.playground import EXAMPLE_SOURCE
+
+        grown = apply_operation(EXAMPLE_SOURCE, "add_sketch", origin=[0.5, 0.5, 0.0])
+        sketch_line = next(
+            number + 1
+            for number, text in enumerate(grown.splitlines())
+            if text.startswith("sketch1 =")
+        )
+        patched = apply_operation(grown, "add_revolution", line=sketch_line, offset=0.3)
+        assert "sketch1_body = revolve(sketch1, offset=0.3)" in patched
+        assert ", sketch1_body" in patched
+
+    def test_refuses_a_second_operator(self):
+        from jaxcad.viewer.playground import EXAMPLE_SOURCE
+
+        line = next(
+            number + 1
+            for number, text in enumerate(EXAMPLE_SOURCE.splitlines())
+            if "PolygonProfile(" in text
+        )
+        with pytest.raises(PatchError, match="already has"):
+            apply_operation(EXAMPLE_SOURCE, "add_revolution", line=line, offset=0.0)

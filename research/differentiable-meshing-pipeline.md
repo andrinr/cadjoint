@@ -127,3 +127,26 @@ Every stage tracks four dimensions from day one, in `benchmarks/`:
   triangle quality.
 - **Performance** — wall-clock and scaling vs resolution as a runnable
   script; timing lives in benchmarks, not in CI-gating tests.
+
+## CAD-system increment (2026-08-16)
+
+Constraints, sketch editing, and construction operators, built against one
+shared contract:
+
+- **Constraints**: horizontal, vertical, coincident, equal-length, and
+  point-on-line join the existing fixed/distance/angle/parallel/
+  perpendicular set — all plain differentiable residuals through the same
+  Levenberg–Marquardt (`solve_constraints`, exact-DOF) and projection
+  (`satisfy_constraints`, under-constrained-tolerant) paths.
+- **Sketch editing**: the viewer payload now carries every constraint kind
+  with a stable per-profile `index`; new patch operations
+  `delete_constraint`, `set_constraint_value`, and `add_revolution` extend
+  the source-surgery layer, and the sketch panel gains removable constraint
+  chips, click-to-edit distance values, vertex-pair and edge-pair constraint
+  tools, and a Revolve operator button.
+- **Construction**: `loft(profile_a, profile_b, height)` interpolates two
+  equal-count vertex loops along the sketch normal (per-slice-exact polygon
+  distance, documented as a bound in 3D); `extrude` gains `draft` and
+  `twist` (twist documented non-1-Lipschitz); `jaxcad.sdf.operations` adds
+  shell, offset, mirror, and linear/polar patterns. Everything traces to
+  WGSL for the viewer and differentiates with respect to profile vertices.

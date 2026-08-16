@@ -71,7 +71,15 @@ import {
   scaleDimensions,
   type AxisIndex,
 } from "../viewer/gizmo";
-import type { GizmoMode } from "../types";
+import type { ConstraintKind, GizmoMode } from "../types";
+import {
+  CONSTRAINT_TOOL_NAMES,
+  edgeVertexIndices,
+  isEdgeConstraintTool,
+  isVertexConstraintTool,
+  type EdgeConstraintTool,
+  type VertexConstraintTool,
+} from "../constraints";
 import { Renderer, type DisplaySettings } from "../viewer/renderer";
 
 const PITCH_LIMIT = 1.45;
@@ -109,9 +117,9 @@ export interface ViewerPaneProps {
   /** Attach a source-level constraint to sketch vertices. */
   onAddConstraint: (
     line: number,
-    kind: "fixed" | "distance",
+    kind: ConstraintKind,
     indices: number[],
-    value: number | number[],
+    value?: number | number[],
   ) => Promise<void>;
   /** Remove a whole construction object from the program. */
   onDeleteObject: (line: number) => Promise<void>;
@@ -141,10 +149,19 @@ type Gesture =
       moved: boolean;
     };
 
+/** First pick of a two-click constraint flow, keyed by the active tool. */
+type PendingConstraint =
+  | { kind: VertexConstraintTool; first: { nodeId: string; vertexIndex: number } }
+  | {
+      kind: EdgeConstraintTool;
+      first: { nodeId: string; start: number; end: number };
+    };
+
 export function ViewerPane(props: ViewerPaneProps) {
   let canvas!: HTMLCanvasElement;
   let gesture: Gesture = { kind: "none" };
-  let distanceStart: { nodeId: string; vertexIndex: number } | null = null;
+  const [pendingConstraint, setPendingConstraint] =
+    createSignal<PendingConstraint | null>(null);
   /** Held space turns any drag into a pan, as other 3D viewports do. */
   let panHeld = false;
   const [materialDropActive, setMaterialDropActive] = createSignal(false);
@@ -262,6 +279,9 @@ export function ViewerPane(props: ViewerPaneProps) {
           continue;
         }
 
+        // Only distance constraints draw a dimension; relational kinds
+        // (horizontal, parallel, …) are shown as panel chips instead.
+        if (constraint.kind !== "distance") continue;
         const first = profile.vertices[constraint.vertices[0]];
         const second = profile.vertices[constraint.vertices[1]];
         if (!first || !second || typeof constraint.value !== "number") continue;
@@ -357,11 +377,21 @@ export function ViewerPane(props: ViewerPaneProps) {
     if (newest) setSelection({ nodeId: newest.id, vertexIndex: null });
   };
 
-  /** Pick two points and preserve their current sketch-plane distance. */
-  const handleDistanceConstraint = async (x: number, y: number) => {
+  /**
+   * Pick two points for a vertex-pair constraint.
+   *
+   * A distance constraint records the current sketch-plane distance as its
+   * target; the relational kinds carry no value.
+   */
+  const handleVertexConstraint = async (
+    kind: VertexConstraintTool,
+    x: number,
+    y: number,
+  ) => {
+    const name = CONSTRAINT_TOOL_NAMES[kind];
     const hit = pickVertex(displayProfiles(), x, y, pickView());
     if (!hit) {
-      setStatus({ kind: "error", text: "Distance: click a sketch point." });
+      setStatus({ kind: "error", text: `${name}: click a sketch point.` });
       return;
     }
     const profile = nodeById(hit.nodeId);
@@ -369,24 +399,69 @@ export function ViewerPane(props: ViewerPaneProps) {
       setStatus({ kind: "error", text: "That sketch cannot be edited from source." });
       return;
     }
-    if (!distanceStart) {
-      distanceStart = { nodeId: hit.nodeId, vertexIndex: hit.vertexIndex };
+    const pending = pendingConstraint();
+    if (pending?.kind !== kind) {
+      setPendingConstraint({
+        kind,
+        first: { nodeId: hit.nodeId, vertexIndex: hit.vertexIndex },
+      });
       setSelection({ nodeId: hit.nodeId, vertexIndex: hit.vertexIndex });
-      setStatus({ kind: "", text: "Distance: choose the second point" });
+      setStatus({ kind: "", text: `${name}: choose the second point` });
       return;
     }
-    if (distanceStart.nodeId !== hit.nodeId || distanceStart.vertexIndex === hit.vertexIndex) {
+    const start = pending.first as { nodeId: string; vertexIndex: number };
+    if (start.nodeId !== hit.nodeId || start.vertexIndex === hit.vertexIndex) {
       setStatus({ kind: "error", text: "Choose a different point in the same sketch." });
       return;
     }
-    const first = profile.vertices[distanceStart.vertexIndex].uv;
-    const second = profile.vertices[hit.vertexIndex].uv;
-    const distance = Math.hypot(second[0] - first[0], second[1] - first[1]);
-    const indices = [distanceStart.vertexIndex, hit.vertexIndex];
-    distanceStart = null;
-    await props.onAddConstraint(profile.line, "distance", indices, distance);
+    const indices = [start.vertexIndex, hit.vertexIndex];
+    let value: number | undefined;
+    if (kind === "distance") {
+      const first = profile.vertices[start.vertexIndex].uv;
+      const second = profile.vertices[hit.vertexIndex].uv;
+      value = Math.hypot(second[0] - first[0], second[1] - first[1]);
+    }
+    setPendingConstraint(null);
+    await props.onAddConstraint(profile.line, kind, indices, value);
     setTool("select");
     setSelection({ nodeId: hit.nodeId, vertexIndex: hit.vertexIndex });
+  };
+
+  /** Pick two edges for an edge-pair constraint (parallel/perpendicular). */
+  const handleEdgeConstraint = async (
+    kind: EdgeConstraintTool,
+    x: number,
+    y: number,
+  ) => {
+    const name = CONSTRAINT_TOOL_NAMES[kind];
+    const hit = pickEdge(displayProfiles(), x, y, pickView());
+    if (!hit) {
+      setStatus({ kind: "error", text: `${name}: click a sketch edge.` });
+      return;
+    }
+    const profile = nodeById(hit.nodeId);
+    if (!profile?.editable || profile.line === null) {
+      setStatus({ kind: "error", text: "That sketch cannot be edited from source." });
+      return;
+    }
+    const [start, end] = edgeVertexIndices(hit.insertIndex, profile.vertices.length);
+    const pending = pendingConstraint();
+    if (pending?.kind !== kind) {
+      setPendingConstraint({ kind, first: { nodeId: hit.nodeId, start, end } });
+      setSelection({ nodeId: hit.nodeId, vertexIndex: null });
+      setStatus({ kind: "", text: `${name}: choose the second edge` });
+      return;
+    }
+    const firstEdge = pending.first as { nodeId: string; start: number; end: number };
+    if (firstEdge.nodeId !== hit.nodeId || firstEdge.start === start) {
+      setStatus({ kind: "error", text: "Choose a different edge in the same sketch." });
+      return;
+    }
+    const indices = [firstEdge.start, firstEdge.end, start, end];
+    setPendingConstraint(null);
+    await props.onAddConstraint(profile.line, kind, indices);
+    setTool("select");
+    setSelection({ nodeId: hit.nodeId, vertexIndex: null });
   };
 
   /** Insert one vertex where the user clicked; the tool stays active. */
@@ -432,10 +507,17 @@ export function ViewerPane(props: ViewerPaneProps) {
       canvas.style.cursor = "move";
       return;
     }
-    if (tool() === "distance") {
+    if (isVertexConstraintTool(tool())) {
       const hit = pickVertex(displayProfiles(), x, y, pickView());
       const next = hit ? { nodeId: hit.nodeId, vertexIndex: hit.vertexIndex } : null;
       setHover(next);
+      canvas.style.cursor = hit ? "crosshair" : "default";
+      renderer.gizmoAxis = null;
+      return;
+    }
+    if (isEdgeConstraintTool(tool())) {
+      const hit = pickEdge(displayProfiles(), x, y, pickView());
+      setHover(null);
       canvas.style.cursor = hit ? "crosshair" : "default";
       renderer.gizmoAxis = null;
       return;
@@ -498,8 +580,14 @@ export function ViewerPane(props: ViewerPaneProps) {
       return;
     }
 
-    if (tool() === "distance" && event.button === 0) {
-      void handleDistanceConstraint(x, y);
+    const activeTool = tool();
+    if (isVertexConstraintTool(activeTool) && event.button === 0) {
+      void handleVertexConstraint(activeTool, x, y);
+      return;
+    }
+
+    if (isEdgeConstraintTool(activeTool) && event.button === 0) {
+      void handleEdgeConstraint(activeTool, x, y);
       return;
     }
 
@@ -824,7 +912,7 @@ export function ViewerPane(props: ViewerPaneProps) {
       const target = document.activeElement;
       const typing = target && (target.tagName === "TEXTAREA" || target.closest(".cm-editor"));
       if (event.key === "Escape") {
-        distanceStart = null;
+        setPendingConstraint(null);
         setSelection(null);
         setTool("select");
       }
@@ -898,16 +986,29 @@ export function ViewerPane(props: ViewerPaneProps) {
   });
 
   createEffect(() => {
-    if (tool() !== "distance") {
-      distanceStart = null;
+    const activeTool = tool();
+    if (!isVertexConstraintTool(activeTool) && !isEdgeConstraintTool(activeTool)) {
+      setPendingConstraint(null);
       return;
     }
+    // A first pick made with another constraint tool does not carry over.
+    if (pendingConstraint() && pendingConstraint()!.kind !== activeTool) {
+      setPendingConstraint(null);
+    }
+    if (!isVertexConstraintTool(activeTool)) return;
+    // Activating a vertex-pair tool with a point selected uses it as the start.
     const active = selection();
-    if (!distanceStart && active?.vertexIndex != null) {
+    if (!pendingConstraint() && active?.vertexIndex != null) {
       const node = nodeById(active.nodeId);
       if (node?.kind === "profile") {
-        distanceStart = { nodeId: active.nodeId, vertexIndex: active.vertexIndex };
-        setStatus({ kind: "", text: "Distance: choose the second point" });
+        setPendingConstraint({
+          kind: activeTool,
+          first: { nodeId: active.nodeId, vertexIndex: active.vertexIndex },
+        });
+        setStatus({
+          kind: "",
+          text: `${CONSTRAINT_TOOL_NAMES[activeTool]}: choose the second point`,
+        });
       }
     }
   });
@@ -1025,10 +1126,14 @@ export function ViewerPane(props: ViewerPaneProps) {
       <p class="viewer-hint">
         {tool() === "polygon"
           ? "Point: click sketch edges to add vertices · Esc to finish"
-          : tool() === "distance"
-            ? distanceStart
-              ? "Distance: choose a second point in the same sketch"
-              : "Distance: choose the first sketch point"
+          : isVertexConstraintTool(tool())
+            ? pendingConstraint()
+              ? `${CONSTRAINT_TOOL_NAMES[tool() as VertexConstraintTool]}: choose a second point in the same sketch`
+              : `${CONSTRAINT_TOOL_NAMES[tool() as VertexConstraintTool]}: choose the first sketch point`
+          : isEdgeConstraintTool(tool())
+            ? pendingConstraint()
+              ? `${CONSTRAINT_TOOL_NAMES[tool() as EdgeConstraintTool]}: choose a second edge in the same sketch`
+              : `${CONSTRAINT_TOOL_NAMES[tool() as EdgeConstraintTool]}: choose the first sketch edge`
           : tool() !== "select"
             ? `Click to place a ${tool()} · Esc to cancel`
             : "Drag handles or the gizmo · Drag to orbit · Space, Shift or right-drag to pan · Del removes"}

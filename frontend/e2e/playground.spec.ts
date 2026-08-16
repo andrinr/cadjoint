@@ -783,6 +783,18 @@ test("sketch constraints and extrusion are represented in UI and code", async ({
     })
     .toBe(true);
   await expect(page.getByTestId("sketch-panel")).toContainText("distance · P1–P2");
+  await waitForCompile(page);
+
+  // A relational constraint uses the same two-click flow: select the first
+  // point, arm the tool (which adopts the selection), then pick the second.
+  metrics = await canvasMetrics(page);
+  await page.mouse.click(metrics.left + first.x, metrics.top + first.y);
+  await page.getByTestId("constraint-horizontal").click();
+  await page.mouse.click(metrics.left + second.x, metrics.top + second.y);
+  await expect(page.getByTestId("sketch-panel")).toContainText("horiz · P1–P2", {
+    timeout: 45_000,
+  });
+  await waitForCompile(page);
 
   await expect(page.getByTestId("solver-panel")).toHaveCount(0);
   await page.getByTestId("solver-toggle").click();
@@ -823,6 +835,113 @@ test("sketch constraints and extrusion are represented in UI and code", async ({
   expect(text).toContain("satisfy_constraints(sketch1, method='adam', steps=24)");
   expect(text).toContain("_body = extrude(");
   await expect(page.getByTestId("sketch-extrude")).toBeDisabled();
+  // An operator now exists, so the sketch cannot also be revolved.
+  await expect(page.getByTestId("sketch-revolve")).toBeDisabled();
+
+  // The distance chip (serialized index 1: fix, distance, horizontal) edits
+  // its numeric target in place.
+  await page.getByTestId("constraint-label-1").click();
+  await page.getByTestId("constraint-value-1").fill("1.2345");
+  await page.getByTestId("constraint-value-1").press("Enter");
+  await expect.poll(() => editorText(page), { timeout: 45_000 }).toContain("1.2345");
+  await waitForCompile(page);
+
+  // Chips delete their constraint by serialized index.
+  await page.getByTestId("constraint-delete-0").click();
+  await expect
+    .poll(async () => (await editorText(page)).includes("FixedConstraint("), {
+      timeout: 45_000,
+    })
+    .toBe(false);
+  await waitForCompile(page);
+  await expect(page.getByTestId("status")).not.toContainText("failed");
+});
+
+test("relational constraint chips render for API-added kinds", async ({ page }) => {
+  const program = [
+    "from jaxcad.construction import PolygonProfile, extrude",
+    'profile = PolygonProfile([[-1.0, -0.8], [1.0, -0.8], [1.0, 0.8], [-1.0, 0.8]], name="quad")',
+    "scene = extrude(profile, depth=0.4)",
+    "",
+  ].join("\n");
+  // Drive /patch directly — the same API the app uses — to cover the kinds the
+  // starter program never adds, then load the accumulated source into the app.
+  const patched = await page.evaluate(async (source) => {
+    const session = (await (await fetch("/api/session")).json()) as { token: string };
+    let text = source;
+    const operations = [
+      { op: "add_constraint", line: 2, kind: "horizontal", indices: [0, 1] },
+      { op: "add_constraint", line: 2, kind: "vertical", indices: [1, 2] },
+      { op: "add_constraint", line: 2, kind: "coincident", indices: [0, 3] },
+      { op: "add_constraint", line: 2, kind: "parallel", indices: [0, 1, 2, 3] },
+      { op: "add_constraint", line: 2, kind: "perpendicular", indices: [0, 1, 1, 2] },
+    ];
+    for (const operation of operations) {
+      const response = await fetch("/patch", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Jaxcad-Token": session.token,
+        },
+        body: JSON.stringify({ source: text, ...operation }),
+      });
+      const result = (await response.json()) as {
+        ok: boolean;
+        source?: string;
+        error?: string;
+      };
+      if (!result.ok || !result.source) {
+        return { error: result.error ?? "patch failed" };
+      }
+      text = result.source;
+    }
+    return { source: text };
+  }, program);
+  expect(patched.error).toBeUndefined();
+
+  const editor = page.locator("[data-testid=editor] .cm-content");
+  await editor.click();
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.insertText(patched.source!);
+  await page.getByTestId("run").click();
+  await waitForCompile(page);
+
+  await page.getByTestId("mode-vertex").click();
+  const metrics = await canvasMetrics(page);
+  const point = projectToCss([-1.0, -0.8, 0], metrics);
+  await page.mouse.click(metrics.left + point.x, metrics.top + point.y);
+  const panel = page.getByTestId("sketch-panel");
+  await expect(panel).toBeVisible();
+  await expect(panel).toContainText("horiz · P1–P2");
+  await expect(panel).toContainText("vert · P2–P3");
+  await expect(panel).toContainText("coinc · P1–P4");
+  await expect(panel).toContainText("∥ · P1P2–P3P4");
+  await expect(panel).toContainText("⊥ · P1P2–P2P3");
+  // Every chip carries a delete affordance keyed by serialized index.
+  await expect(page.getByTestId("constraint-delete-0")).toBeVisible();
+  // This sketch already drives an extrusion, so Revolve is unavailable.
+  await expect(page.getByTestId("sketch-revolve")).toBeDisabled();
+});
+
+test("a standalone sketch can be revolved from the panel", async ({ page }) => {
+  await page.getByTestId("tool-sketch").click();
+  const metrics = await canvasMetrics(page);
+  const drop = projectToCss([1.0, 1.4, 0], metrics);
+  await page.mouse.click(metrics.left + drop.x, metrics.top + drop.y);
+  await waitForCompile(page);
+  await expect(page.getByTestId("sketch-panel")).toBeVisible();
+
+  await expect(page.getByTestId("sketch-revolve")).toBeEnabled();
+  await page.getByTestId("sketch-revolve").click();
+  await expect
+    .poll(async () => (await editorText(page)).includes("_body = revolve("), {
+      timeout: 45_000,
+    })
+    .toBe(true);
+  await waitForCompile(page);
+  await expect(page.getByTestId("status")).not.toContainText("failed");
+  await expect(page.getByTestId("sketch-revolve")).toBeDisabled();
+  await expect(page.getByTestId("sketch-panel")).toContainText("revolve");
 });
 
 test("path tracing yields to interactive dragging and resumes afterwards", async ({ page }) => {

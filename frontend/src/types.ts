@@ -23,10 +23,25 @@ export interface ConstructionPlane {
   normal: [number, number, number];
 }
 
+export type ConstraintKind =
+  | "fixed"
+  | "distance"
+  | "horizontal"
+  | "vertical"
+  | "coincident"
+  | "parallel"
+  | "perpendicular";
+
 export interface ConstructionConstraint {
-  kind: "fixed" | "distance";
+  kind: ConstraintKind;
   vertices: number[];
-  value: number | number[];
+  /** Target for fixed/distance constraints; null for purely relational kinds. */
+  value: number | number[] | null;
+  /**
+   * Position in the profile's serialized constraint list — the stable identity
+   * used to delete or edit this constraint at the source level.
+   */
+  index?: number;
 }
 
 /** A constraint relating whole construction objects rather than sketch points. */
@@ -166,7 +181,10 @@ export type PatchOperation =
   | "assign_material"
   | "add_sketch"
   | "add_extrusion"
+  | "add_revolution"
   | "add_constraint"
+  | "delete_constraint"
+  | "set_constraint_value"
   | "solve_sketch"
   | "delete_object";
 
@@ -188,6 +206,11 @@ export type ToolMode =
   | "sketch"
   | "polygon"
   | "distance"
+  | "horizontal"
+  | "vertical"
+  | "coincident"
+  | "parallel"
+  | "perpendicular"
   | "box"
   | "sphere"
   | "cylinder";

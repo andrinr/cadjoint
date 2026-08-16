@@ -16,9 +16,11 @@ import ast
 
 from jaxcad.viewer._source_map import (
     _called_name,
+    _editable_value_node,
     _line_offsets,
     _node_span,
     locate_call,
+    locate_constraint_statements,
     locate_profile_call,
 )
 
@@ -547,30 +549,141 @@ def add_extrusion(source: str, line: int, depth: float = 0.5) -> str:
     return _validate(patched)
 
 
+_RELATIONAL_CONSTRAINT_SYMBOLS = {
+    "horizontal": "HorizontalConstraint",
+    "vertical": "VerticalConstraint",
+    "coincident": "CoincidentConstraint",
+    "parallel": "ParallelEdgesConstraint",
+    "perpendicular": "PerpendicularEdgesConstraint",
+}
+
+
 def add_constraint(
     source: str,
     line: int,
     kind: str,
     indices: list[int],
-    value,
+    value=None,
 ) -> str:
-    """Attach a fixed or distance constraint to sketch vertices."""
+    """Attach a constraint statement to sketch vertices.
+
+    ``fixed`` and ``distance`` carry a numeric ``value``; the relational kinds
+    (``horizontal``, ``vertical``, ``coincident`` on two vertices, ``parallel``
+    and ``perpendicular`` on two edges given as four vertices) take none.
+    """
     _, _, statement, profile = _profile_binding(source, line)
+
+    def vertex(index: int) -> str:
+        return f"{profile}.vertices[{index}]"
+
     if kind == "fixed" and len(indices) == 1:
-        constraint = f"FixedConstraint({profile}.vertices[{indices[0]}], {_format_value(value)})\n"
+        constraint = f"FixedConstraint({vertex(indices[0])}, {_format_value(value)})\n"
         symbol = "FixedConstraint"
     elif kind == "distance" and len(indices) == 2:
         constraint = (
-            f"DistanceConstraint({profile}.vertices[{indices[0]}], "
-            f"{profile}.vertices[{indices[1]}], {_format_value(value)})\n"
+            f"DistanceConstraint({vertex(indices[0])}, {vertex(indices[1])}, "
+            f"{_format_value(value)})\n"
         )
         symbol = "DistanceConstraint"
+    elif kind in {"horizontal", "vertical", "coincident"} and len(indices) == 2:
+        symbol = _RELATIONAL_CONSTRAINT_SYMBOLS[kind]
+        constraint = f"{symbol}({vertex(indices[0])}, {vertex(indices[1])})\n"
+    elif kind in {"parallel", "perpendicular"} and len(indices) == 4:
+        symbol = _RELATIONAL_CONSTRAINT_SYMBOLS[kind]
+        constraint = f"{symbol}({', '.join(vertex(index) for index in indices)})\n"
     else:
-        raise PatchError("Constraints must be `fixed` with one vertex or `distance` with two.")
+        raise PatchError(
+            "Constraints take one vertex (`fixed`), two (`distance`, `horizontal`, "
+            "`vertical`, `coincident`), or four (`parallel`, `perpendicular`)."
+        )
 
     insert = _after_statement(source, statement)
     patched = source[:insert] + constraint + source[insert:]
     patched = _ensure_import(patched, ast.parse(patched), "jaxcad.constraints", symbol)
+    return _validate(patched)
+
+
+def _located_constraint(source: str, line: int, index: int):
+    """The profile's ``index``-th constraint statement, payload-order."""
+    statements = locate_constraint_statements(source, line)
+    if statements is None:
+        raise PatchError("Name the sketch before editing constraints from the viewer.")
+    if not isinstance(index, int) or isinstance(index, bool) or not 0 <= index < len(statements):
+        raise PatchError(
+            f"Constraint index {index} is out of range; the sketch has {len(statements)}."
+        )
+    return statements[index]
+
+
+def delete_constraint(source: str, line: int, index: int) -> str:
+    """Remove one constraint statement, identified by its payload index.
+
+    The index is the ordinal :func:`locate_constraint_statements` assigns —
+    the same ordering the viewer payload carries — so a chip's ``index``
+    deletes exactly the statement it displays.
+    """
+    located = _located_constraint(source, line, index)
+    offsets = _line_offsets(source)
+    start = offsets[located.statement.lineno - 1]
+    end = offsets[min(located.statement.end_lineno or located.statement.lineno, len(offsets) - 1)]
+    return _validate(source[:start] + source[end:])
+
+
+def set_constraint_value(source: str, line: int, index: int, value) -> str:
+    """Rewrite the numeric target of a fixed or distance constraint.
+
+    Follows named-parameter indirection: when the target is a name bound to
+    ``Scalar(value=...)`` (the starter program's ``wall_width`` pattern), the
+    Scalar's literal is rewritten so every use of the name stays consistent.
+    """
+    located = _located_constraint(source, line, index)
+    if located.kind == "distance":
+        target = located.call.args[2] if len(located.call.args) > 2 else None
+    elif located.kind == "fixed":
+        target = located.call.args[1] if len(located.call.args) > 1 else None
+    else:
+        raise PatchError("Only `fixed` and `distance` constraints carry an editable value.")
+    if target is None:
+        raise PatchError("The constraint statement has no value argument to rewrite.")
+    tree = ast.parse(source)
+    literal = _editable_value_node(target, tree)
+    if literal is None:
+        raise PatchError("The constraint value is not an editable literal.")
+    offsets = _line_offsets(source)
+    start, end = _node_span(source, offsets, literal)
+    return _validate(source[:start] + _format_value(value) + source[end:])
+
+
+def add_revolution(source: str, line: int, offset: float = 0.0) -> str:
+    """Revolve a named sketch and add the generated solid to ``scene``."""
+    tree, _, _, profile = _profile_binding(source, line)
+    already = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and _called_name(node) in {"extrude", "revolve"}
+        and node.args
+        and isinstance(node.args[0], ast.Name)
+        and node.args[0].id == profile
+    ]
+    if already:
+        raise PatchError(f"`{profile}` already has an extrusion or revolution.")
+
+    taken = _module_names(tree)
+    body = f"{profile}_body"
+    suffix = 2
+    while body in taken:
+        body = f"{profile}_body{suffix}"
+        suffix += 1
+
+    patched = _extend_scene_with(source, body)
+    tree = ast.parse(patched)
+    assignment = _scene_assignment(tree)
+    offsets = _line_offsets(patched)
+    insert = offsets[assignment.lineno - 1]
+    statement = f"{body} = revolve({profile}, offset={_format_coordinate(offset)})\n"
+    patched = patched[:insert] + statement + patched[insert:]
+    patched = _ensure_import(patched, ast.parse(patched), "jaxcad.construction", "revolve")
     return _validate(patched)
 
 
@@ -744,6 +857,13 @@ def delete_object(source: str, line: int) -> str:
             "AngleConstraint",
             "ParallelConstraint",
             "PerpendicularConstraint",
+            "HorizontalConstraint",
+            "VerticalConstraint",
+            "CoincidentConstraint",
+            "EqualLengthConstraint",
+            "PointOnLineConstraint",
+            "ParallelEdgesConstraint",
+            "PerpendicularEdgesConstraint",
         }
         for parameter in parameter_names:
             shared = any(
@@ -830,7 +950,10 @@ OPERATIONS = {
     "assign_material": assign_material,
     "add_sketch": add_sketch,
     "add_extrusion": add_extrusion,
+    "add_revolution": add_revolution,
     "add_constraint": add_constraint,
+    "delete_constraint": delete_constraint,
+    "set_constraint_value": set_constraint_value,
     "solve_sketch": solve_sketch,
     "delete_object": delete_object,
 }

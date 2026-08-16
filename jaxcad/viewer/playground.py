@@ -399,24 +399,38 @@ def patch_source(request: dict[str, Any]) -> dict[str, Any]:
         line = request.get("line")
         kind = request.get("kind")
         indices = request.get("indices")
+        valued_kinds = {"fixed": 1, "distance": 2}
+        relational_kinds = {
+            "horizontal": 2,
+            "vertical": 2,
+            "coincident": 2,
+            "parallel": 4,
+            "perpendicular": 4,
+        }
         if not isinstance(line, int) or isinstance(line, bool):
             return {"ok": False, "error": "The patch request needs an integer `line`."}
-        if kind not in {"fixed", "distance"}:
-            return {"ok": False, "error": "Constraint `kind` must be `fixed` or `distance`."}
+        if kind not in valued_kinds and kind not in relational_kinds:
+            allowed = ", ".join(sorted({**valued_kinds, **relational_kinds}))
+            return {"ok": False, "error": f"Constraint `kind` must be one of: {allowed}."}
+        arity = valued_kinds.get(kind) or relational_kinds[kind]
         if not (
             isinstance(indices, list)
+            and len(indices) == arity
             and all(isinstance(index, int) and not isinstance(index, bool) for index in indices)
         ):
-            return {"ok": False, "error": "The patch request needs integer `indices`."}
-        raw_value = request.get("value")
-        scalar = (
-            float(raw_value)
-            if isinstance(raw_value, (int, float)) and not isinstance(raw_value, bool)
-            else None
-        )
-        vector = numbers(raw_value)
-        if scalar is None and vector is None:
-            return {"ok": False, "error": "The constraint needs a numeric `value`."}
+            return {"ok": False, "error": f"`{kind}` takes exactly {arity} integer `indices`."}
+        value = None
+        if kind in valued_kinds:
+            raw_value = request.get("value")
+            scalar = (
+                float(raw_value)
+                if isinstance(raw_value, (int, float)) and not isinstance(raw_value, bool)
+                else None
+            )
+            vector = numbers(raw_value)
+            if scalar is None and vector is None:
+                return {"ok": False, "error": "The constraint needs a numeric `value`."}
+            value = scalar if scalar is not None else vector
         try:
             return {
                 "ok": True,
@@ -426,8 +440,47 @@ def patch_source(request: dict[str, Any]) -> dict[str, Any]:
                     line=line,
                     kind=kind,
                     indices=indices,
-                    value=scalar if scalar is not None else vector,
+                    value=value,
                 ),
+            }
+        except PatchError as error:
+            return {"ok": False, "error": str(error)}
+
+    if operation in {"delete_constraint", "set_constraint_value"}:
+        line = request.get("line")
+        index = request.get("index")
+        if not isinstance(line, int) or isinstance(line, bool):
+            return {"ok": False, "error": "The patch request needs an integer `line`."}
+        if not isinstance(index, int) or isinstance(index, bool) or index < 0:
+            return {"ok": False, "error": "The patch request needs a non-negative `index`."}
+        arguments = {"line": line, "index": index}
+        if operation == "set_constraint_value":
+            raw_value = request.get("value")
+            scalar = (
+                float(raw_value)
+                if isinstance(raw_value, (int, float)) and not isinstance(raw_value, bool)
+                else None
+            )
+            vector = numbers(raw_value)
+            if scalar is None and vector is None:
+                return {"ok": False, "error": "The constraint needs a numeric `value`."}
+            arguments["value"] = scalar if scalar is not None else vector
+        try:
+            return {"ok": True, "source": apply_operation(source, operation, **arguments)}
+        except PatchError as error:
+            return {"ok": False, "error": str(error)}
+
+    if operation == "add_revolution":
+        line = request.get("line")
+        offset = request.get("offset", 0.0)
+        if not isinstance(line, int) or isinstance(line, bool):
+            return {"ok": False, "error": "The patch request needs an integer `line`."}
+        if not isinstance(offset, (int, float)) or isinstance(offset, bool):
+            return {"ok": False, "error": "The patch request needs a numeric `offset`."}
+        try:
+            return {
+                "ok": True,
+                "source": apply_operation(source, operation, line=line, offset=float(offset)),
             }
         except PatchError as error:
             return {"ok": False, "error": str(error)}

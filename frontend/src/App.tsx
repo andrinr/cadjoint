@@ -44,6 +44,7 @@ import {
   setViewerError,
   source,
 } from "./state";
+import type { ConstraintKind } from "./types";
 import {
   QUALITY_PRESETS,
   Renderer,
@@ -304,13 +305,22 @@ export function App() {
 
   const addConstraint = (
     line: number,
-    kind: "fixed" | "distance",
+    kind: ConstraintKind,
     indices: number[],
-    value: number | number[],
+    value?: number | number[],
   ) => applyPatch({ op: "add_constraint", line, kind, indices, value });
+
+  const deleteConstraint = (line: number, index: number) =>
+    applyPatch({ op: "delete_constraint", line, index });
+
+  const setConstraintValue = (line: number, index: number, value: number) =>
+    applyPatch({ op: "set_constraint_value", line, index, value });
 
   const addExtrusion = (line: number) =>
     applyPatch({ op: "add_extrusion", line, depth: 0.5 });
+
+  const addRevolution = (line: number) =>
+    applyPatch({ op: "add_revolution", line, offset: 0 });
 
   const solveSketch = (
     line: number,
@@ -415,6 +425,19 @@ export function App() {
                     void addExtrusion(node.line);
                   }
                 }}
+                onRevolve={() => {
+                  const active = selection();
+                  const node = active && nodeById(active.nodeId);
+                  if (node?.kind === "profile" && node.line !== null) {
+                    void addRevolution(node.line);
+                  }
+                }}
+                onDeleteConstraint={(line, index) =>
+                  void deleteConstraint(line, index)
+                }
+                onSetConstraintValue={(line, index, value) =>
+                  void setConstraintValue(line, index, value)
+                }
               />
               <MaterialPanel
                 onCreate={addMaterial}
