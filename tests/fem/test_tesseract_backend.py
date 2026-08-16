@@ -25,8 +25,6 @@ from jaxcad.fem.simulate import thermal_solve
 from jaxcad.geometry.parameters import Vector
 from jaxcad.sdf.primitives import Box
 
-jax.config.update("jax_enable_x64", True)
-
 
 def _hot(center):
     return center[0] < -0.999

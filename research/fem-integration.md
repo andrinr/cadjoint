@@ -163,3 +163,35 @@ missing piece is a trust-region rule for when to re-freeze topology.
 files `pytest.importorskip` on `jax_fem` / `tesseract_core` / `tesseract_jax`, so
 the suite skips (not fails) without them. `test_hexmesh.py` (11, mesher only),
 `test_simulate.py` (10), `test_tesseract_backend.py` (3), `test_end_to_end.py` (2).
+
+## Bracket demo: a realistic part through the whole chain
+
+`scenes/bracket.py` is a playground scene of an L-bracket built from the
+construction API: a base plate and a tapered vertical web extruded from
+parameter-backed `PolygonProfile` sketches (`plate_thickness`,
+`web_thickness` as named Scalars), a triangular gusset rib whose tip is tied
+to a `rib_height` dimension by a `DistanceConstraint`, and two bolt holes
+subtracted at constraint-pinned positions (`FixedConstraint` +
+`DistanceConstraint` on the spacing). The scene compiles in the playground
+and its SDF meshes watertight with Euler characteristic -2 — genus 2, i.e.
+exactly the two bolt holes.
+
+`examples/fem_bracket_optimization.py` mirrors the same geometry as a pure
+parameterized SDF and runs the frozen-topology chain end to end: HEX8 mesh at
+the nominal design, bolt regions clamped, a prying traction on the web tip's
+outer face (chosen normal-restricted so the applied force does not scale with
+the thickness being optimized), objective = total squared displacement + a
+smoothed-volume mass penalty, and a few diagonally preconditioned gradient
+steps on (web thickness, rib height) via `recompute_points` + the solver
+adjoint. At the demo resolution the descent is monotone (~1% objective drop
+in 4 steps, ~30 s total): the optimizer thins the slightly oversized web to
+save mass while growing the gusset for stiffness. `tests/fem/test_bracket_demo.py`
+guards all of it — scene compile, watertightness, one-step descent, and
+adjoint-vs-FD agreement at the nominal (both parameters, rtol 5e-2; observed
+agreement is ~1e-5, the tolerance is headroom).
+
+Caveat worth carrying forward: with the web only one element thick, the raw
+compliance sensitivity to web thickness is discretization-dominated (fully
+integrated HEX8 locks in bending), so quantitative sizing of thin walls needs
+either finer through-thickness resolution or an incompatible-modes element.
+The gradient machinery itself is exact for the discrete model either way.

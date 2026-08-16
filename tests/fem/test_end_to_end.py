@@ -27,8 +27,6 @@ from jaxcad.fem.simulate import elastic_solve
 from jaxcad.geometry.parameters import Vector
 from jaxcad.sdf.primitives import Box
 
-jax.config.update("jax_enable_x64", True)
-
 _NOMINAL_HALF_HEIGHT = 0.15
 
 
