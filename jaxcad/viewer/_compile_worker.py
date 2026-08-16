@@ -192,6 +192,48 @@ def _mesh_edge_payload(scene: Any) -> dict[str, Any] | None:
         geometric_mask = features.classes != FACE
         junctions = features.classes == CORNER
 
+        # On-surface subgradient verification.  Root refinement converges
+        # every crossing onto the surface to float32 precision, and several
+        # fields (the polygon among them) have degenerate subgradients
+        # exactly on their boundary: the recorded gradient can come out
+        # zero or exactly negated.  A cell whose crossings hit that locus
+        # classifies as a maximally sharp crease in the middle of a flat
+        # face and sheds orphan tick links.  True normals live a hair off
+        # the surface, so re-evaluate the gradient at +-h/4 along each
+        # incident edge and demote feature cells whose verified normal
+        # spread is face-like.  Genuine creases keep their fan: each
+        # crossing edge pierces one smooth facet, and different edges
+        # pierce different facets.
+        feature_rows = np.flatnonzero(geometric_mask)
+        if feature_rows.size:
+            cell_edges = incidence.edge_ids[feature_rows]
+            used = np.unique(cell_edges[cell_edges >= 0])
+            axes = np.asarray(edges.axis)[used]
+            offsets = (0.25 * np.asarray(grid.spacing, dtype=np.float64)[axes])[:, None] * np.eye(
+                3
+            )[axes]
+            base = np.asarray(hermite.points, dtype=np.float64)[used]
+            probes = jnp.asarray(np.concatenate([base - offsets, base + offsets]), jnp.float32)
+            gradients = np.asarray(jax.vmap(jax.grad(sdf))(probes), dtype=np.float64)
+            scale = np.linalg.norm(gradients, axis=1, keepdims=True)
+            probe_normals = np.where(scale > 1e-9, gradients / np.maximum(scale, 1e-12), 0.0)
+            lookup = np.zeros(int(used.max()) + 1, dtype=np.int64)
+            lookup[used] = np.arange(used.size)
+            slots = lookup[np.maximum(cell_edges, 0)]
+            samples = np.concatenate(
+                [probe_normals[slots], probe_normals[slots + used.size]], axis=1
+            )
+            sample_valid = np.concatenate([cell_edges >= 0] * 2, axis=1) & (
+                np.linalg.norm(samples, axis=-1) > 0.5
+            )
+            sample_counts = np.maximum(sample_valid.sum(axis=1), 1)
+            sample_mean = (samples * sample_valid[..., None]).sum(axis=1) / sample_counts[:, None]
+            centered = (samples - sample_mean[:, None, :]) * sample_valid[..., None]
+            spread = np.einsum("cei,cej->cij", centered, centered) / sample_counts[:, None, None]
+            singular = np.sqrt(np.clip(np.linalg.eigvalsh(spread), 0.0, None))[:, ::-1]
+            geometric_mask[feature_rows[singular[:, 0] <= 0.25]] = False
+            junctions[feature_rows[singular[:, 1] <= 0.25]] = False
+
         # Feature curves must never cross-link: two distinct curves (a crease
         # and a nearby seam, or seams of different operand pairs) can run
         # within one cell of each other, and linking across them weaves an
@@ -220,15 +262,24 @@ def _mesh_edge_payload(scene: Any) -> dict[str, Any] | None:
             ]
             seam_rows = np.unique(mismatched)
             structural = np.zeros_like(geometric_mask)
-            structural[seam_rows] = True
-            geometric_only = geometric_mask & ~structural
-            for owner in np.unique(owners[geometric_only]):
-                groups.append(geometric_only & (owners == owner))
             # Seam vertices are Newton-projected onto the exact common zero
             # set of every operand meeting there — a curve for two, a triple
             # point for three: min/max structure makes seams a solvable
             # system, not a mesh approximation.  Grouping by the full
             # operand set projects each vertex exactly once.
+            #
+            # Ownership flips alone are not proof of a seam: they also fire
+            # along the near-miss band between DISJOINT surfaces (staggered
+            # thin slabs, a ring hovering just above a roof), where there is
+            # no intersection curve at all.  The operand fields are signed
+            # distances, so the projection doubles as the test — a genuine
+            # seam vertex converges onto every operand's zero set (residual
+            # far below a tenth of a cell), while a near-miss row's residual
+            # stays at half the surface gap or worse, even when a
+            # sub-resolution gap merged both sheets into one dual vertex
+            # sitting between them.  Rows that fail keep their original
+            # vertex and return to their owner's geometric group instead of
+            # being dragged onto a phantom curve and suppressed as seams.
             if seam_rows.size:
                 incident: dict[int, set[int]] = {}
                 for u, v in mismatched:
@@ -240,21 +291,48 @@ def _mesh_edge_payload(scene: Any) -> dict[str, Any] | None:
                 max_step = 2.0 * max(_MESH_EDGE_SIZE) / _MESH_EDGE_RESOLUTION  # ~2 cells
                 for operand_set, rows in by_operands.items():
                     selected = np.asarray(sorted(rows), dtype=np.int64)
-                    vertices[selected] = _project_to_seam(
-                        [leaves[index] for index in sorted(operand_set)],
-                        vertices[selected],
-                        max_step,
+                    fields = [leaves[index] for index in sorted(operand_set)]
+                    projected = _project_to_seam(fields, vertices[selected], max_step)
+                    residual = np.max(
+                        np.stack(
+                            [
+                                np.abs(
+                                    np.asarray(
+                                        jax.vmap(lambda p, f=field: jnp.asarray(f(p)))(
+                                            jnp.asarray(projected, dtype=jnp.float32)
+                                        ),
+                                        dtype=np.float64,
+                                    )
+                                )
+                                for field in fields
+                            ]
+                        ),
+                        axis=0,
                     )
+                    genuine = residual < 0.1 * max(grid.spacing)
+                    selected = selected[genuine]
+                    if selected.size == 0:
+                        continue
+                    vertices[selected] = projected[genuine]
+                    structural[selected] = True
                     group_mask = np.zeros_like(geometric_mask)
                     group_mask[selected] = True
                     groups.append(group_mask)
                     if len(operand_set) == 2:
                         seam_groups.append((selected, tuple(sorted(operand_set))))
+            geometric_only = geometric_mask & ~structural
+            for owner in np.unique(owners[geometric_only]):
+                groups.append(geometric_only & (owners == owner))
         else:
             groups.append(geometric_mask)
 
         link_groups = [
-            feature_cell_links(group, incidence, grid, junction_mask=junctions) for group in groups
+            # The junction-shortcut pruning normally done by
+            # ``junction_mask`` happens below instead, where tangents are
+            # available to tell a genuine corner shortcut from a straight
+            # rail that merely passes beside someone else's corner.
+            feature_cell_links(group, incidence, grid)
+            for group in groups
         ]
         links = np.concatenate(link_groups) if link_groups else np.empty((0, 2), dtype=np.int32)
 
@@ -322,6 +400,42 @@ def _mesh_edge_payload(scene: Any) -> dict[str, Any] | None:
                 # there is noise: suppress these cells' links completely.
                 suppressed[seam_rows[~reliable[:, 0]]] = True
 
+            # Junction shortcuts: a link between two non-junction cells
+            # that share a junction neighbor usually cuts a corner — the
+            # true feature path runs through the junction, and the direct
+            # chord would double-draw it.  A shared junction neighbor is
+            # not proof, though: where another feature complex's corner
+            # sits one cell beside a straight rail (a slab rim passing
+            # under a second solid's corner), the rail's own links must
+            # survive.  Drop the direct link only when the detour through
+            # the junction is actually drawable — each replacement leg
+            # aligned with the tangent at its non-junction end.  (An
+            # undefined tangent cannot veto, matching the unconditional
+            # drop this replaces.)
+            adjacency: dict[int, set[int]] = {}
+            for a, b in links:
+                adjacency.setdefault(int(a), set()).add(int(b))
+                adjacency.setdefault(int(b), set()).add(int(a))
+
+            def drawable(row: int, junction_row: int) -> bool:
+                tangent = tangents[row]
+                if not np.isfinite(tangent).all():
+                    return True
+                chord = vertices[junction_row] - vertices[row]
+                length = float(np.linalg.norm(chord))
+                return length < 1e-9 or abs(float(chord @ tangent)) / length > 0.9
+
+            shortcut_keep = np.ones(links.shape[0], dtype=bool)
+            for index, (a, b) in enumerate(links):
+                a, b = int(a), int(b)
+                if junctions[a] or junctions[b]:
+                    continue
+                for common in adjacency[a] & adjacency[b]:
+                    if junctions[common] and drawable(a, common) and drawable(b, common):
+                        shortcut_keep[index] = False
+                        break
+            links = links[shortcut_keep]
+
             directions = vertices[links[:, 1]] - vertices[links[:, 0]]
             lengths = np.maximum(np.linalg.norm(directions, axis=1), 1e-12)
             keep = np.ones(links.shape[0], dtype=bool)
@@ -346,54 +460,98 @@ def _mesh_edge_payload(scene: Any) -> dict[str, Any] | None:
             keep &= ~(suppressed[links[:, 0]] | suppressed[links[:, 1]])
             links = links[keep]
 
-            # Chain tracing: a curve visits each cell once, so every vertex
-            # keeps at most one link per tangent side — the best-aligned,
-            # then shortest — and a link survives only when both endpoints
-            # keep it.  Degree <= 2 makes X-lattices structurally impossible
-            # regardless of how thin a double rail gets; junction (corner)
-            # cells are exempt, since several chains legitimately meet there.
+            # Chain building: a curve visits each cell once, so every
+            # non-junction vertex accepts at most one link per tangent side
+            # (two links total where its tangent is undefined); junction
+            # (corner) cells are exempt, since several chains legitimately
+            # meet there.  Links are considered best-first — shortest,
+            # discounted by endpoint alignment — and accepted only while
+            # every non-junction endpoint has a free slot.  Greedy
+            # acceptance keeps degree <= 2, so X-lattices stay structurally
+            # impossible however thin a double rail gets, and it cannot dash
+            # real edges the way independent per-slot competition with
+            # mutual veto could: on a straight chain the direct link and its
+            # cell-skipping chord tie at alignment 1.0, float noise then
+            # picked slot winners the endpoints disagreed on, and BOTH links
+            # died.  Here a link is only ever rejected because an accepted
+            # link already continues the same chain through that slot.
             if links.shape[0]:
                 directions = vertices[links[:, 1]] - vertices[links[:, 0]]
                 lengths = np.maximum(np.linalg.norm(directions, axis=1), 1e-12)
-                best: dict[tuple[int, int], int] = {}
-                slot_quality: dict[tuple[int, int], tuple[float, float]] = {}
-                for index in range(links.shape[0]):
+                cost = lengths.copy()
+                for column in (0, 1):
+                    rows = links[:, column]
+                    tangent = np.nan_to_num(tangents[rows])
+                    defined = np.isfinite(tangents[rows]).all(axis=1) & ~junctions[rows]
+                    cosine = np.abs(np.einsum("li,li->l", directions, tangent)) / lengths
+                    cost = np.where(defined, cost * (2.0 - cosine), cost)
+                taken: set[tuple[int, int]] = set()
+                budget: dict[int, int] = {}
+                chain_keep = np.zeros(links.shape[0], dtype=bool)
+                for index in np.argsort(cost, kind="stable"):
+                    directional: list[tuple[int, int]] = []
+                    loose: list[int] = []
                     for column in (0, 1):
                         row = int(links[index, column])
                         if junctions[row]:
                             continue
-                        outward = directions[index] * (1.0 if column == 0 else -1.0)
                         tangent = tangents[row]
                         if np.isfinite(tangent).all():
-                            side = 0 if float(outward @ tangent) >= 0.0 else 1
-                            quality = (
-                                -abs(float(outward @ tangent)) / float(lengths[index]),
-                                float(lengths[index]),
-                            )
+                            outward = directions[index] * (1.0 if column == 0 else -1.0)
+                            directional.append((row, 0 if float(outward @ tangent) >= 0.0 else 1))
                         else:
-                            # No tangent: two shortest links keep a chain alive.
-                            side = index % 2
-                            quality = (0.0, float(lengths[index]))
-                        key = (row, side)
-                        if key not in slot_quality or quality < slot_quality[key]:
-                            slot_quality[key] = quality
-                            best[key] = index
-                winners = set(best.values())
-                chain_keep = np.zeros(links.shape[0], dtype=bool)
-                for index in range(links.shape[0]):
-                    approvals = 0
-                    for column in (0, 1):
-                        row = int(links[index, column])
-                        if junctions[row]:
-                            approvals += 1
-                            continue
-                        if index in winners and any(
-                            best.get((row, side)) == index for side in (0, 1)
-                        ):
-                            approvals += 1
-                    if approvals == 2:
-                        chain_keep[index] = True
+                            loose.append(row)
+                    if any(key in taken for key in directional) or any(
+                        budget.get(row, 0) >= 2 for row in loose
+                    ):
+                        continue
+                    chain_keep[index] = True
+                    taken.update(directional)
+                    for row in loose:
+                        budget[row] = budget.get(row, 0) + 1
                 links = links[chain_keep]
+
+            # Debris pruning: a component of the link graph that is open (it
+            # has a vertex of degree one) yet spans under about three cells
+            # is an orphan fragment, not a curve — real chains are long,
+            # closed, or anchored in a larger junction network, and honest
+            # sub-resolution bands are long strips of short rungs.  Such
+            # fragments survive the per-link tests near tangential contact,
+            # where a handful of borderline cells sits between the
+            # suppressed zone and clean geometry, and render as ticks.
+            if links.shape[0]:
+                parent = np.arange(incidence.count, dtype=np.int64)
+
+                def find(row: int) -> int:
+                    while parent[row] != row:
+                        parent[row] = parent[parent[row]]
+                        row = int(parent[row])
+                    return row
+
+                lengths = np.linalg.norm(vertices[links[:, 1]] - vertices[links[:, 0]], axis=1)
+                for a, b in links:
+                    root_a, root_b = find(int(a)), find(int(b))
+                    if root_a != root_b:
+                        parent[root_a] = root_b
+                degree = np.bincount(links.ravel(), minlength=incidence.count)
+                component_length: dict[int, float] = {}
+                component_open: set[int] = set()
+                for (a, _b), length in zip(links, lengths):
+                    root = find(int(a))
+                    component_length[root] = component_length.get(root, 0.0) + float(length)
+                for row in np.unique(links.ravel()):
+                    if degree[row] == 1:
+                        component_open.add(find(int(row)))
+                limit = 3.25 * max(grid.spacing)
+                keep_component = np.array(
+                    [
+                        find(int(a)) not in component_open
+                        or component_length[find(int(a))] >= limit
+                        for a, _b in links
+                    ],
+                    dtype=bool,
+                )
+                links = links[keep_component]
 
         def segments(pairs: np.ndarray) -> list[list[list[float]]]:
             return [
