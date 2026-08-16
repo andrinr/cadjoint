@@ -73,6 +73,22 @@ def _ordered_vertices(vertices: dict[str, Array]) -> list[Array]:
     return [vertices[name] for name in sorted(vertices, key=lambda name: int(name[1:]))]
 
 
+def _statically_zero(value) -> bool:
+    """True when ``value`` is a concrete number equal to zero.
+
+    Used to skip draft/twist math entirely when the parameter is a known
+    zero, keeping the default extrusion bit-identical to the plain form.
+    Traced values (which cannot be concretized) report False so the full
+    expression is emitted for them.
+    """
+    import jax
+
+    try:
+        return float(value) == 0.0
+    except (TypeError, ValueError, jax.errors.ConcretizationTypeError):
+        return False
+
+
 class ExtrudedPolygon(Primitive):
     """Solid formed by extruding a polygon profile along the local Z axis.
 
@@ -86,9 +102,31 @@ class ExtrudedPolygon(Primitive):
             keep acting on the generated solid.
         depth: Total extrusion depth (Scalar parameter or float).
         material: Optional render material.
+        draft: Draft angle in degrees. Positive values taper the walls inward
+            as z increases: the profile is exact at ``z = -depth/2`` and the
+            2D distance is offset by ``tan(draft)·(z + depth/2)`` above it.
+            A non-zero draft makes the field a bound (gradient norm up to
+            ``sec(draft)``), not an exact SDF.
+        twist: Total twist in degrees over the full depth, applied by rotating
+            the query's XY coordinates by an angle proportional to z (zero at
+            mid-depth, ``±twist/2`` at the caps). A non-zero twist makes the
+            field non-1-Lipschitz — distances can be overestimated, so
+            sphere-tracing style consumers must shorten their steps.
+
+    Both ``draft`` and ``twist`` default to 0.0 and are only added to
+    ``params`` when non-zero (or given as Parameters), so plain extrusions
+    keep their exact parameter layout and bit-identical field values.
     """
 
-    def __init__(self, vertices: list[Vector2], depth: float | Scalar, material=None):
+    def __init__(
+        self,
+        vertices: list[Vector2],
+        depth: float | Scalar,
+        material=None,
+        draft: float | Scalar = 0.0,
+        twist: float | Scalar = 0.0,
+    ):
+        from jaxcad.geometry.parameters import Parameter
         from jaxcad.render.material import Material
 
         if len(vertices) < 3:
@@ -97,25 +135,52 @@ class ExtrudedPolygon(Primitive):
         self.num_vertices = len(vertices)
         self.params = {f"v{i}": v for i, v in enumerate(vertices)}
         self.params["depth"] = depth
+        if isinstance(draft, Parameter) or not _statically_zero(draft):
+            self.params["draft"] = draft
+            # Drafted distances have gradient norm up to sec(draft) > 1.
+            self.is_exact = False
+        if isinstance(twist, Parameter) or not _statically_zero(twist):
+            self.params["twist"] = twist
+            # Twisted distances are not 1-Lipschitz; flag for renderers.
+            self.is_exact = False
 
     def material_at(self, _p):
         return self.material.as_dict()
 
     @staticmethod
-    def sdf(p: Array, depth: Array, **vertices: Array) -> Array:
+    def sdf(p: Array, depth: Array, draft: Array = 0.0, twist: Array = 0.0, **vertices: Array):
         """Pure SDF: exact extrusion of the exact polygon distance.
+
+        With the default ``draft=0``/``twist=0`` this is bit-identical to the
+        plain extrusion — the extra terms are skipped for concrete zeros.
 
         Args:
             p: Query point(s), shape (..., 3). Profile plane is local XY.
             depth: Total extrusion depth.
+            draft: Draft angle in degrees; offsets the 2D distance by
+                ``tan(draft)·(z + depth/2)`` so walls taper inward with +z.
+            twist: Total twist in degrees over the full depth; rotates the
+                query XY by ``twist·z/depth`` (non-1-Lipschitz when non-zero).
             **vertices: v0..v{N-1} profile vertices, each shape (2,).
 
         Returns:
             Signed distance, shape (...).
         """
         verts = _ordered_vertices(vertices)
-        d2 = _polygon_distance(p[..., :2], verts)
-        dz = jnp.abs(p[..., 2]) - depth / 2.0
+        xy = p[..., :2]
+        z = p[..., 2]
+        if not _statically_zero(twist):
+            theta = jnp.deg2rad(twist) * z / depth
+            c, s = jnp.cos(theta), jnp.sin(theta)
+            xy = jnp.stack(
+                [xy[..., 0] * c + xy[..., 1] * s, xy[..., 1] * c - xy[..., 0] * s],
+                axis=-1,
+            )
+        d2 = _polygon_distance(xy, verts)
+        if not _statically_zero(draft):
+            slope = jnp.sin(jnp.deg2rad(draft)) / jnp.cos(jnp.deg2rad(draft))
+            d2 = d2 + slope * (z + depth / 2.0)
+        dz = jnp.abs(z) - depth / 2.0
         # Branch on inside/outside like Box.sdf so points exactly on a side
         # wall or cap receive a valid one-sided subgradient instead of the
         # exact zero an epsilon-smoothed outside norm produces there.

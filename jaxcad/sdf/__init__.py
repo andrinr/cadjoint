@@ -5,6 +5,7 @@ This module contains all SDF-related functionality:
 - Primitives (Sphere, Box, Cylinder, etc.)
 - Boolean operations (Union, Intersection, Difference)
 - Transforms (Translate, Rotate, Scale, Twist)
+- Field operations (Shell, Offset, Mirror, LinearPattern, PolarPattern)
 """
 
 from jaxcad.functionalize import functionalize
@@ -24,6 +25,18 @@ from jaxcad.sdf.boolean import (
     xor,
 )
 from jaxcad.sdf.measure import volume
+from jaxcad.sdf.operations import (
+    LinearPattern,
+    Mirror,
+    Offset,
+    PolarPattern,
+    Shell,
+    linear_pattern,
+    mirror,
+    offset,
+    polar_pattern,
+    shell,
+)
 from jaxcad.sdf.primitives import (
     Box,
     Capsule,
@@ -75,4 +88,15 @@ __all__ = [
     "Rotate",
     "Scale",
     "Twist",
+    # Field operations
+    "Shell",
+    "Offset",
+    "Mirror",
+    "LinearPattern",
+    "PolarPattern",
+    "shell",
+    "offset",
+    "mirror",
+    "linear_pattern",
+    "polar_pattern",
 ]

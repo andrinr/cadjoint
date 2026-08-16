@@ -13,6 +13,7 @@ Construction tree:
 Generators (construction → SDF):
 - extrude(profile, depth) → ExtrudedPolygon placed on the profile's plane
 - revolve(profile, offset) → RevolvedPolygon placed on the profile's plane
+- loft(profile_a, profile_b, height) → LoftedPolygon placed on profile_a's plane
 
 Legacy helpers:
 - extrude(rectangle, depth) → Box
@@ -27,6 +28,7 @@ from jaxcad.construction.extrude import extrude
 from jaxcad.construction.from_circle import from_circle
 from jaxcad.construction.from_line import from_line
 from jaxcad.construction.from_point import from_point
+from jaxcad.construction.loft import loft
 from jaxcad.construction.revolve import revolve
 from jaxcad.construction.sketch import PolygonProfile, SketchPlane
 from jaxcad.construction.solid import ConstructionPrimitive, Solid
@@ -38,6 +40,7 @@ __all__ = [
     "Solid",
     "extrude",
     "revolve",
+    "loft",
     "from_line",
     "from_circle",
     "from_point",

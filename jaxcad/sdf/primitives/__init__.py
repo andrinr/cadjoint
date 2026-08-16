@@ -4,6 +4,7 @@ from jaxcad.sdf.primitives.base import Primitive
 from jaxcad.sdf.primitives.box import Box
 from jaxcad.sdf.primitives.capsule import Capsule
 from jaxcad.sdf.primitives.cylinder import Cylinder
+from jaxcad.sdf.primitives.loft import LoftedPolygon
 from jaxcad.sdf.primitives.plane import Plane
 from jaxcad.sdf.primitives.polygon import ExtrudedPolygon, RevolvedPolygon, polygon_sdf_2d
 from jaxcad.sdf.primitives.round_box import RoundBox
@@ -16,6 +17,7 @@ __all__ = [
     "Capsule",
     "Cylinder",
     "ExtrudedPolygon",
+    "LoftedPolygon",
     "Plane",
     "RevolvedPolygon",
     "RoundBox",

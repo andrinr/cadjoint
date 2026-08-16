@@ -31,7 +31,13 @@ def _place_on_plane(sdf: SDF, plane: SketchPlane) -> SDF:
     return Translate(placed, offset=plane.origin)
 
 
-def extrude(profile: PolygonProfile | Rectangle, depth: float | Scalar, material=None):
+def extrude(
+    profile: PolygonProfile | Rectangle,
+    depth: float | Scalar,
+    material=None,
+    draft: float | Scalar = 0.0,
+    twist: float | Scalar = 0.0,
+):
     """Extrude a 2D profile into a solid.
 
     For a :class:`PolygonProfile`, generates an
@@ -45,6 +51,11 @@ def extrude(profile: PolygonProfile | Rectangle, depth: float | Scalar, material
         profile: PolygonProfile (or legacy Rectangle) to extrude.
         depth: Total extrusion depth.
         material: Optional render material (PolygonProfile path only).
+        draft: Draft angle in degrees (PolygonProfile only). Positive values
+            taper the walls inward as local z increases; the profile is exact
+            at the bottom cap.
+        twist: Total twist in degrees over the full depth (PolygonProfile
+            only). Non-zero twist makes the field non-1-Lipschitz.
 
     Returns:
         SDF solid sharing parameter references with the construction tree.
@@ -58,8 +69,13 @@ def extrude(profile: PolygonProfile | Rectangle, depth: float | Scalar, material
     if isinstance(profile, PolygonProfile):
         from jaxcad.sdf.primitives.polygon import ExtrudedPolygon
 
-        base = ExtrudedPolygon(profile.vertices, depth=depth, material=material)
+        base = ExtrudedPolygon(
+            profile.vertices, depth=depth, material=material, draft=draft, twist=twist
+        )
         return _place_on_plane(base, profile.plane)
+    for value in (draft, twist):
+        if isinstance(value, Scalar) or float(value) != 0.0:
+            raise ValueError("draft/twist are only supported for PolygonProfile extrusions")
     return _extrude_rectangle(profile, depth)
 
 

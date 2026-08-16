@@ -13,7 +13,7 @@ from jaxcad.parametrization import (
     unnormalize,
 )
 from jaxcad.render.material import Material
-from jaxcad.sdf import SDF, boolean, primitives, transforms
+from jaxcad.sdf import SDF, boolean, operations, primitives, transforms
 
 __all__ = [
     "SDF",
@@ -21,6 +21,7 @@ __all__ = [
     "primitives",
     "boolean",
     "transforms",
+    "operations",
     "extract_parameters",
     "apply_parameters",
     "functionalize",
