@@ -16,6 +16,14 @@ Run directly (requires the ``fem`` extra)::
 
     python examples/fem_bracket_optimization.py
 
+With ``--backend calculix`` the compliance term instead runs through the
+CalculiX tesseract (requires the ``tesseract`` extra and a ``ccx`` binary
+— see :mod:`jaxcad.fem.calculix`): the objective becomes classical
+compliance (``f . u``, twice the strain energy) plus the same mass term,
+and its gradient flows through ccx's native ``*SENSITIVITY`` adjoint
+instead of jax-fem's — a 1990s Fortran Abaqus clone one ``jax.grad``
+away from the design parameters.
+
 Writes ``fem_bracket_before.vtu`` / ``fem_bracket_after.vtu`` for ParaView.
 """
 # Guarded jax-fem import must precede the jaxcad.fem imports.
@@ -156,12 +164,15 @@ WEB_TIP_LOAD = Nodes.halfspace([0.0, -0.7, 0.0], [0.0, -1.0, 0.0]) & Nodes.halfs
 )
 
 
-def make_objective(mesh: HexMesh):
+def make_objective(mesh: HexMesh, backend: str | None = None):
     """Objective ``theta = (web_thickness, rib_height) -> compliance + mass``.
 
-    Compliance is the total squared displacement under the prying load; mass
-    is a smoothed volume integral of the inside indicator on the (fixed)
-    lattice of cell centers, so both terms are differentiable in ``theta``.
+    With the default backend, compliance is the total squared displacement
+    under the prying load (jax-fem adjoint); with ``backend="calculix"``
+    it is the classical compliance ``f . u`` (twice the strain energy,
+    ccx ``*SENSITIVITY`` adjoint).  Mass is a smoothed volume integral of
+    the inside indicator on the (fixed) lattice of cell centers, so both
+    terms are differentiable in ``theta``.
     """
     grid = build_grid()
     nx, ny, nz = grid.cells
@@ -173,6 +184,12 @@ def make_objective(mesh: HexMesh):
     cell_volume = float(np.prod(spacing))
     sharpness = 0.5 * float(np.min(spacing))
 
+    ccx_backend = None
+    if backend == "calculix":
+        from jaxcad.fem.calculix import CalculixBackend
+
+        ccx_backend = CalculixBackend()
+
     def objective(theta):
         web_thickness, rib_height = theta[0], theta[1]
 
@@ -180,22 +197,40 @@ def make_objective(mesh: HexMesh):
             return bracket_sdf(p, web_thickness, rib_height)
 
         points = recompute_points(sdf, mesh)
-        result = elastic_solve(
-            mesh,
-            youngs=_YOUNGS,
-            poisson=_POISSON,
-            dirichlet=[BOLT_CLAMP],
-            tractions=[(WEB_TIP_LOAD, list(_TRACTION))],
-            points=points,
-        )
-        compliance = jnp.sum(result.displacement**2)
+        if ccx_backend is not None:
+            from jaxcad.fem.calculix import strain_energy_solve
+
+            compliance = 2.0 * strain_energy_solve(
+                mesh,
+                youngs=_YOUNGS,
+                poisson=_POISSON,
+                dirichlet=[BOLT_CLAMP],
+                tractions=[(WEB_TIP_LOAD, list(_TRACTION))],
+                points=points,
+                backend=ccx_backend,
+            )
+        else:
+            result = elastic_solve(
+                mesh,
+                youngs=_YOUNGS,
+                poisson=_POISSON,
+                dirichlet=[BOLT_CLAMP],
+                tractions=[(WEB_TIP_LOAD, list(_TRACTION))],
+                points=points,
+            )
+            compliance = jnp.sum(result.displacement**2)
         mass = cell_volume * jnp.sum(jax.nn.sigmoid(-sdf(centers) / sharpness))
         return compliance + _MASS_WEIGHT * mass
 
     return objective
 
 
-def run_optimization(steps: int = 4, learning_rates=_LEARNING_RATES, export_vtk: bool = False):
+def run_optimization(
+    steps: int = 4,
+    learning_rates=_LEARNING_RATES,
+    export_vtk: bool = False,
+    backend: str | None = None,
+):
     """Gradient descent on (web thickness, rib height) with frozen topology.
 
     Args:
@@ -203,6 +238,8 @@ def run_optimization(steps: int = 4, learning_rates=_LEARNING_RATES, export_vtk:
         learning_rates: Per-parameter step sizes; small so node motion stays
             well inside the frozen mesh's snap clamp.
         export_vtk: Write before/after VTK files for ParaView.
+        backend: ``None`` (jax-fem, squared-displacement compliance) or
+            ``"calculix"`` (ccx adjoint, classical ``f . u`` compliance).
 
     Returns:
         ``(history, theta)`` — a list of ``(objective, web_thickness,
@@ -210,7 +247,7 @@ def run_optimization(steps: int = 4, learning_rates=_LEARNING_RATES, export_vtk:
     """
     mesh = build_mesh()
     print(f"mesh: {mesh.num_cells} hexes, {mesh.num_points} nodes")
-    objective = make_objective(mesh)
+    objective = make_objective(mesh, backend=backend)
     value_and_grad = jax.value_and_grad(objective)
     rates = jnp.asarray(learning_rates, dtype=jnp.float64)
 
@@ -257,4 +294,19 @@ def run_optimization(steps: int = 4, learning_rates=_LEARNING_RATES, export_vtk:
 
 
 if __name__ == "__main__":
-    run_optimization(export_vtk=True)
+    import argparse
+
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument(
+        "--backend",
+        choices=("jaxfem", "calculix"),
+        default="jaxfem",
+        help="solver/adjoint for the compliance term (calculix needs a ccx binary)",
+    )
+    parser.add_argument("--steps", type=int, default=4, help="gradient-descent iterations")
+    arguments = parser.parse_args()
+    run_optimization(
+        steps=arguments.steps,
+        export_vtk=True,
+        backend=None if arguments.backend == "jaxfem" else arguments.backend,
+    )

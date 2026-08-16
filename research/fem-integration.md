@@ -330,3 +330,141 @@ live in code. Study defaults reuse the worker's simulate-domain convention
 Study tests: `test_study.py` (24) — construction/validation, JSON round-trip,
 selector-vs-predicate equivalence, exec capture, and bar-scene solves
 reproducing the direct thermal/elastic results through the study path.
+
+## CalculiX: a Fortran solver with a native adjoint behind the Tesseract ABI
+
+Status: **working end to end** (2026-08-16). Same mesh, same BCs, same
+`jax.grad` call — but the elastic solve and its shape adjoint run in a
+CalculiX 2.23 subprocess (`ccx`, Fortran 77/90 + C, GPL-2 held at the
+process boundary: decks in, result files out, no linking).
+
+### Getting the binary (what actually worked)
+
+No Homebrew formula exists (`brew search calculix` is empty) and no conda
+manager was installed, so: standalone micromamba + conda-forge, which ships
+a native arm64 `ccx` 2.23 for macOS:
+
+```sh
+curl -Ls -o micromamba.tar.bz2 https://micro.mamba.pm/api/micromamba/osx-arm64/latest
+tar -xjf micromamba.tar.bz2 bin/micromamba
+./bin/micromamba create -y -p ./ccx-env -c conda-forge calculix
+./ccx-env/bin/ccx -v   # "This is Version 2.23"
+```
+
+`jaxcad.fem.calculix.find_ccx` resolves the binary via `JAXCAD_CCX` / `CCX`
+env vars or `PATH`; every live test skips cleanly when none is found.
+
+### Integration shape
+
+- `jaxcad/fem/calculix.py` — deck writer (`write_elastic_deck`: C3D8 from
+  HexMesh, corner order is byte-identical to VTK so cells serialize 1:1;
+  `*NSET`+`*BOUNDARY` clamps; tractions as `*CLOAD` **consistent nodal
+  forces** from 2x2 Gauss on the bilinear boundary quads, exactly matching
+  jax-fem's surface integration), `.dat`/`.frd` parsers, the sensitivity
+  correction (below), a `CalculixBackend`, and `strain_energy_solve` for
+  study-style patch arguments.
+- `jaxcad/fem/tesseracts/elastic_calculix/tesseract_api.py` — mirrors the
+  `elastic_jaxfem` schema, adds a `strain_energy` output; `apply` = write
+  deck, run `ccx`, parse; `vector_jacobian_product` = the `*SENSITIVITY`
+  adjoint run + normal-projection chain rule.
+- `backend="calculix"` is registered in `jaxcad/fem/backends.py` (lazy
+  import), so `elastic_solve(..., backend="calculix")` and
+  `ElasticStudy.solve(..., backend="calculix")` run forward through ccx;
+  `examples/fem_bracket_optimization.py --backend calculix` runs the whole
+  design-parameter gradient loop through the ccx adjoint.
+
+### The ccx 2.23 STRAINENERGY sensitivity misses a term (found, fixed, FD-proven)
+
+The `*SENSITIVITY` step (design response STRAINENERGY, `*DESIGN VARIABLES,
+TYPE=COORDINATE`) writes per-design-node normal-projected sensitivities to
+the `.frd` as `DFDN` (raw) and `DFDNFIL` (mass-matrix-smoothed — solve of
+`M s = g` over the design surface, per `filterbackwardmain.c`; a *field*,
+not the discrete gradient). Validating raw `DFDN` against central FD of
+`E = f·u/2` showed the MASS response is **exact** (matches the analytic
+volume derivative to 6 digits) but STRAINENERGY was off by a
+*non-constant* factor (1.4–2.0x across nodes, 4.5x on a degenerate
+single-element cube) — so neither raw nor rescaled values are usable as-is.
+
+Reading the 2.23 sources pinned it: `objective_shapeener_dx.f` computes the
+frozen-displacement partial by accumulating only the stress-times-
+strain-increment `sigma . d(eps)` over the perturbed volume and never adds
+the Jacobian-variation term `w * d(detJ)` of the energy integrand. The true
+fixed-load shape derivative is therefore
+
+```
+dE/ds_i = DFDN_i + sum_{e∋i} sum_q w_q detJ_q (grad N_i(q) . n_i)
+```
+
+with `w` the strain-energy density of the (unperturbed) solution and `n_i`
+the outward node normal ccx itself writes to the `NORM` frd block. The
+correction is pure post-processing (`energy_volume_gradient`, closed form
+`d(detJ)/dx_ia = detJ * dN_i/dx_a`) computed from ccx's own displacement
+output — no extra solver runs. The identity was confirmed to 6 significant
+digits on the cube and to rel. 2e-4 per node (faces, edges) against central
+FD with ccx forward solves on a 4x2x2 bar.
+
+### Numbers (bar mesh from the existing tests: 180 cells / 336 nodes)
+
+- **Forward parity** ccx vs jax-fem, identical discrete system (fully
+  integrated trilinear HEX8 both sides): max deviation **1.5e-7 relative**
+  to the peak displacement. The floor is ccx's 6-significant-digit text
+  output, not the discretizations — C3D8 and jax-fem's HEX8 are the same
+  element.
+- **Adjoint vs FD** (corrected sensitivities, ccx forward solves for FD):
+  agreement to **rel. 2e-4** at every checked design node.
+- **Three gradient paths on one mesh** (ccx `*SENSITIVITY` adjoint vs
+  jax-fem `ad_wrapper` adjoint vs FD, strain energy objective, 228 design
+  nodes): max deviation **4.5e-5 of the gradient scale**; per-node relative
+  error ≤ 3.2e-3 on entries above 1% of scale — again set by the 5–6 digit
+  `.frd`/`.dat` text precision plus DFDN/correction cancellation.
+
+### VJP coverage (honest contract)
+
+Differentiability through the ccx tesseract is **objective-valued**:
+
+- Supported: cotangents on the `strain_energy` output (compliance = 2E for
+  fixed loads), w.r.t. `points`. `jax.grad` of the bracket objective
+  (compliance + smoothed mass) flows through `recompute_points` into the
+  SDF design parameters — demonstrated by the example's `--backend
+  calculix` flag (objective decreases, gradients finite and stable).
+- Rejected with `NotImplementedError`: nonzero cotangents on the raw
+  `displacement` field — ccx exposes adjoints for its built-in design
+  responses only, not for arbitrary functionals. Displacement-valued
+  objectives (e.g. the default example's `sum(u^2)`) stay on the jax-fem
+  backends. (ccx's ALL-DISP response could add the `sqrt(sum u^2)`
+  functional later; not wired up.)
+- Geometry contract: the gradient is nonzero only at boundary (design)
+  nodes and only along ccx's outward node normals — tangential and
+  interior components are zero. That is exact in the continuum limit
+  (in-surface/interior mesh motion does not change the shape) and is
+  precisely the component the Newton-snapped mesher consumes, but it is
+  not the full discrete `dE/d(points)`. At traction-loaded nodes the VJP
+  holds the consistent nodal loads fixed (neglects the load-area
+  derivative); the gradient-path comparison therefore masks clamped and
+  loaded patches.
+
+### Caveats
+
+- ccx prints results with 5–6 significant digits (`.dat` `%13.6E`, `.frd`
+  `%12.5E`); everything downstream inherits that floor. Fine for
+  optimization, unsuitable for tight bitwise cross-checks.
+- Each objective evaluation is a fresh ccx process (~50 ms small meshes,
+  plus one extra factorization for the sensitivity solve); the deck writer
+  is O(mesh) Python string work. Wrong default for inner loops — the
+  in-process jax-fem backend stays the default; `backend="calculix"` is
+  the interop/demo path.
+- Thermal is not wired (ccx does heat transfer; out of scope here —
+  `CalculixBackend.thermal` raises with a pointer to the jax-fem
+  backends).
+- The DFDN correction is validated against ccx **2.23** behavior. If a
+  future ccx fixes `objective_shapeener_dx.f`, the FD-backed live tests
+  (`tests/fem/test_calculix.py::TestLiveAdjoint`) will catch the double
+  count immediately.
+
+Tests: `tests/fem/test_calculix.py` (20) — deck-writer golden file,
+parser fixtures (`.dat` displacements/stresses, `.frd` DISP/NORM/SENENER
+with run-together fixed columns), correction-term FD identity (no binary
+needed), and live: cube-vs-theory, forward parity, von Mises parity,
+sensitivity-vs-FD, three-path gradient agreement, tesseract roundtrip +
+displacement-cotangent rejection. All live tests skip without a binary;
+full `tests/fem` = 123 green with one.

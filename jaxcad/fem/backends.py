@@ -469,9 +469,17 @@ class TesseractBackend:
             return outputs["displacement"]
 
 
+def _calculix_backend() -> SolverBackend:
+    """Factory for the CalculiX backend (lazy import keeps ccx optional)."""
+    from jaxcad.fem.calculix import CalculixBackend
+
+    return CalculixBackend()
+
+
 _REGISTRY: dict[str, Callable[[], SolverBackend]] = {
     "jaxfem": JaxFemBackend,
     "tesseract": TesseractBackend,
+    "calculix": _calculix_backend,
 }
 
 
