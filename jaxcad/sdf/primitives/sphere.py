@@ -77,3 +77,8 @@ class Sphere(Primitive):
             Pure function: Sphere.sdf(p, radius) -> sdf_value
         """
         return Sphere.sdf
+
+    def patch_fields(self):
+        """Single smooth patch: the sphere surface has no feature edges."""
+        radius = self.params["radius"].value
+        return [lambda p: Sphere.sdf(p, radius)]

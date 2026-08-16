@@ -49,3 +49,8 @@ class Plane(Primitive):
 
     def to_functional(self):
         return Plane.sdf
+
+    def patch_fields(self):
+        """Single smooth patch: an infinite plane has no feature edges."""
+        height = self.params["height"].value
+        return [lambda p: Plane.sdf(p, height)]

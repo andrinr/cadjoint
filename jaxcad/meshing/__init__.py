@@ -17,8 +17,15 @@ Built bottom-up in tested stages:
 6. :mod:`jaxcad.meshing.diagnostics` — post-extraction mesh checks: sampled
    surface deviation and self-intersection tests, triangle-quality
    statistics, watertightness, and Euler characteristic.
+7. :mod:`jaxcad.meshing.patch_fields` — per-primitive smooth patch fields
+   and ``(leaf, patch)`` surface signatures: exact feature edges as the
+   loci where ``argmin |field|`` ownership switches.
+8. :mod:`jaxcad.meshing.simplify` — post-extraction, topology-safe mesh
+   simplification: error-bounded, feature-preserving half-edge collapses
+   that merge coplanar and gently curved regions (multi-size leaves after
+   the fact).
 
-Remaining stages add multi-size octree leaves.
+Remaining stages add multi-size octree leaves inside the extractor.
 Discrete choices (edge sets, incidence, connectivity, class labels) are
 frozen per extraction; all continuous quantities carry exact JAX
 derivatives with respect to design parameters.
@@ -61,6 +68,15 @@ from jaxcad.meshing.features import (
     feature_cell_links,
     manifold_cell_incidence,
 )
+from jaxcad.meshing.patch_fields import (
+    ScenePatchFields,
+    exact_feature_mask,
+    patch_signatures,
+    scene_patch_fields,
+    signature_function,
+    world_frame_leaves,
+)
+from jaxcad.meshing.simplify import simplify_mesh
 
 __all__ = [
     "Mesh",
@@ -96,4 +112,11 @@ __all__ = [
     "active_branches",
     "detect_branch_changes",
     "feature_cell_links",
+    "ScenePatchFields",
+    "world_frame_leaves",
+    "scene_patch_fields",
+    "signature_function",
+    "patch_signatures",
+    "exact_feature_mask",
+    "simplify_mesh",
 ]

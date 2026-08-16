@@ -73,6 +73,52 @@ def _ordered_vertices(vertices: dict[str, Array]) -> list[Array]:
     return [vertices[name] for name in sorted(vertices, key=lambda name: int(name[1:]))]
 
 
+def _profile_vertex_values(params: dict) -> list[Array]:
+    """Concrete v0..v{N-1} vertex values from a primitive's params dict."""
+    names = sorted(
+        (name for name in params if name.startswith("v") and name[1:].isdigit()),
+        key=lambda name: int(name[1:]),
+    )
+    return [params[name].value for name in names]
+
+
+def _edge_half_plane_fields(verts: list[Array]):
+    """Outward half-plane distance fields, one per profile edge.
+
+    Edge ``k`` runs from vertex ``k`` to vertex ``(k+1) % N``; its field is
+    the signed distance to the edge's supporting line, positive on the
+    polygon's outside for either input winding.  On a convex profile the 2D
+    polygon distance is exactly ``max_k`` of these fields; in general each
+    field still agrees with the exact distance on its own edge's patch, so
+    ``argmin |f_k|`` identifies the owning edge there.
+
+    Returns:
+        List of callables mapping profile points shaped ``(..., 2)`` to
+        signed distances shaped ``(...)``.
+    """
+    num = len(verts)
+    # Shoelace winding: positive area means counterclockwise vertices, whose
+    # outward edge normal is the edge direction rotated by -90 degrees.
+    area = 0.0
+    for i in range(num):
+        a, b = verts[i], verts[(i + 1) % num]
+        area += float(a[0] * b[1] - b[0] * a[1])
+    orient = 1.0 if area >= 0.0 else -1.0
+
+    fields = []
+    for i in range(num):
+        a, b = verts[i], verts[(i + 1) % num]
+        direction = b - a
+        length = jnp.sqrt(jnp.sum(direction**2) + 1e-20)
+        normal = orient * jnp.stack([direction[1], -direction[0]]) / length
+
+        def field(q: Array, a=a, normal=normal) -> Array:
+            return jnp.sum((q - a) * normal, axis=-1)
+
+        fields.append(field)
+    return fields
+
+
 def _statically_zero(value) -> bool:
     """True when ``value`` is a concrete number equal to zero.
 
@@ -197,6 +243,26 @@ class ExtrudedPolygon(Primitive):
     def to_functional(self):
         return ExtrudedPolygon.sdf
 
+    def patch_fields(self):
+        """Per-edge wall half-planes plus the two caps.
+
+        Order: patch ``k`` (for ``k < N``) is the wall extruded from profile
+        edge ``(v_k, v_{k+1})``; patch ``N`` is the bottom cap
+        (``z = -depth/2``), patch ``N+1`` the top cap.  Drafted or twisted
+        extrusions have curved/tapered walls that are no longer half-planes,
+        so they report ``None``.
+        """
+        if "draft" in self.params or "twist" in self.params:
+            return None
+        depth = self.params["depth"].value
+        edge_fields = _edge_half_plane_fields(_profile_vertex_values(self.params))
+        walls = [(lambda p, f=field: f(p[..., :2])) for field in edge_fields]
+        caps = [
+            lambda p: -p[..., 2] - depth / 2.0,
+            lambda p: p[..., 2] - depth / 2.0,
+        ]
+        return walls + caps
+
 
 class RevolvedPolygon(Primitive):
     """Solid of revolution: a polygon profile revolved around the local Y axis.
@@ -249,3 +315,21 @@ class RevolvedPolygon(Primitive):
 
     def to_functional(self):
         return RevolvedPolygon.sdf
+
+    def patch_fields(self):
+        """One field per profile edge, in revolved (radial, height) coords.
+
+        Patch ``k`` is the surface swept by profile edge ``(v_k, v_{k+1})``:
+        the edge's outward half-plane distance evaluated at
+        ``q = (sqrt(x² + z²) - offset, y)``, exactly as :meth:`sdf` maps
+        queries into profile coordinates.  The profile is closed, so there
+        are no separate cap fields.
+        """
+        offset = self.params["offset"].value
+        edge_fields = _edge_half_plane_fields(_profile_vertex_values(self.params))
+
+        def revolved(p: Array) -> Array:
+            radial = jnp.sqrt(p[..., 0] ** 2 + p[..., 2] ** 2 + 1e-20) - offset
+            return jnp.stack([radial, p[..., 1]], axis=-1)
+
+        return [(lambda p, f=field: f(revolved(p))) for field in edge_fields]

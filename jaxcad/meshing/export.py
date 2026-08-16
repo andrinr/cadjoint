@@ -321,6 +321,13 @@ def _step_point(point: np.ndarray) -> str:
     return "(" + ",".join(_step_real(float(value)) for value in point) + ")"
 
 
+# Distance below which two points are the same point per the exported file's
+# own UNCERTAINTY_MEASURE_WITH_UNIT declaration (entity #12 below).  Edges
+# shorter than this are degenerate: OCCT cannot build a LINE from a
+# zero-magnitude VECTOR and drops the whole containing wire, splitting the
+# shell.  ``save_step`` welds such edge endpoints together instead.
+_STEP_DISTANCE_ACCURACY = 1e-7
+
 _STEP_HEADER = """ISO-10303-21;
 HEADER;
 FILE_DESCRIPTION(('jaxcad faceted mesh export'),'2;1');
@@ -351,6 +358,55 @@ _STEP_BOILERPLATE = (
 )
 
 
+def _weld_degenerate_edges(
+    vertices: np.ndarray,
+    loops: list[list[int]],
+    tolerance: float = _STEP_DISTANCE_ACCURACY,
+) -> list[list[int]]:
+    """Collapse loop edges shorter than ``tolerance`` onto one endpoint.
+
+    Sharp dual-contour placement can land two adjacent cells' vertices on the
+    same feature-curve point, giving distinct indices with coincident
+    coordinates.  The endpoints of every such degenerate edge are merged
+    (union-find, lowest index wins), consecutive duplicates are removed from
+    each loop, and loops left with fewer than three vertices are dropped.
+
+    Args:
+        vertices: Vertex positions ``(n, 3)``.
+        loops: Ordered vertex-index loops (polygons and triangles alike).
+        tolerance: Maximum length of an edge to weld away.
+
+    Returns:
+        Fresh loop lists with welded indices; the input loops are untouched.
+    """
+    parent: dict[int, int] = {}
+
+    def find(index: int) -> int:
+        root = index
+        while parent.get(root, root) != root:
+            root = parent[root]
+        while parent.get(index, index) != index:
+            parent[index], index = root, parent[index]
+        return root
+
+    for loop in loops:
+        for a, b in zip(loop, loop[1:] + loop[:1]):
+            if a != b and float(np.linalg.norm(vertices[b] - vertices[a])) <= tolerance:
+                ra, rb = find(a), find(b)
+                if ra != rb:
+                    parent[max(ra, rb)] = min(ra, rb)
+    if not parent:
+        return [list(loop) for loop in loops]
+
+    welded: list[list[int]] = []
+    for loop in loops:
+        mapped = [find(index) for index in loop]
+        collapsed = [v for i, v in enumerate(mapped) if v != mapped[i - 1]]
+        if len(collapsed) >= 3:
+            welded.append(collapsed)
+    return welded
+
+
 def save_step(mesh: Mesh, path: str | Path) -> None:
     """Write a minimal faceted STEP AP214 boundary representation.
 
@@ -361,8 +417,14 @@ def save_step(mesh: Mesh, path: str | Path) -> None:
     product and unit boilerplate.  Every referenced entity id is defined and
     the output is deterministic for a given mesh.
 
-    This is best-effort: the file is structurally valid STEP intended for
-    CAD import, but it has not yet been validated against a CAD kernel.
+    Degenerate loop edges (endpoints closer than the file's declared
+    distance accuracy, which sharp feature placement can produce) are welded
+    away first — OCCT rejects zero-length ``LINE`` geometry and would split
+    the shell.  Output is validated against the OCCT kernel in
+    ``tests/meshing/test_step_kernel.py``: files read back as a single valid
+    closed ``MANIFOLD_SOLID_BREP`` with matching face counts and volume.
+    Units are metres (one mesh unit = 1 m); readers defaulting to
+    millimetres scale coordinates by 1000 on import.
 
     Args:
         mesh: A dual-contour :class:`~jaxcad.meshing.dual_contouring.Mesh`;
@@ -378,6 +440,9 @@ def save_step(mesh: Mesh, path: str | Path) -> None:
     loops.extend([int(a), int(b), int(c)] for a, b, c in triangles)
     if not loops:
         raise ValueError("Cannot export an empty mesh to STEP.")
+    loops = _weld_degenerate_edges(vertices, loops)
+    if not loops:
+        raise ValueError("Every face of the mesh is degenerate at STEP accuracy.")
 
     entities: list[str] = list(_STEP_BOILERPLATE)
 

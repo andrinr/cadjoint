@@ -60,3 +60,18 @@ class Cylinder(Primitive):
     def to_functional(self):
         """Return pure function for compilation."""
         return Cylinder.sdf
+
+    def patch_fields(self):
+        """Side surface plus the two caps, from the sdf's max composition.
+
+        :meth:`sdf` is (inside) ``max(d_xy, |p_z| - height)``; the axial term
+        splits into the two cap half-spaces.  Order: ``[side, +z cap,
+        -z cap]``.
+        """
+        radius = self.params["radius"].value
+        height = self.params["height"].value
+        return [
+            lambda p: jnp.sqrt(p[..., 0] ** 2 + p[..., 1] ** 2 + 1e-20) - radius,
+            lambda p: p[..., 2] - height,
+            lambda p: -p[..., 2] - height,
+        ]

@@ -151,6 +151,28 @@ class SDF(Fluent):
 
         return Xor((self, other))
 
+    def patch_fields(self) -> list[Callable[[Array], Array]] | None:
+        """Return this node's smooth patch fields in its own frame, if known.
+
+        A patch field decomposition expresses the node's surface as pieces of
+        the zero sets of smooth scalar fields ``f_i`` — the node's SDF is
+        internally a ``min``/``max`` composition over them (Box: six face
+        half-space distances; Cylinder: side plus two caps).  A surface point
+        ``p`` belongs to patch ``argmin_i |f_i(p)|``, and the node's exact
+        feature edges are exactly where that ownership switches.
+
+        Transforms forward the protocol by mapping the query point into the
+        child frame exactly as their ``sdf`` does.  Nodes without an exact
+        decomposition return ``None`` (the default), which consumers treat
+        gracefully as "one opaque patch".
+
+        Returns:
+            List of callables ``f_i(p)`` accepting points shaped ``(..., 3)``
+            in this node's frame and returning values shaped ``(...)``, or
+            ``None`` when no exact decomposition is available.
+        """
+        return None
+
     def material_at(self, _p: Array) -> dict:
         """Return material properties at point p.
 

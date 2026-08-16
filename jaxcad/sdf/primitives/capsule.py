@@ -51,3 +51,9 @@ class Capsule(Primitive):
     def to_functional(self):
         """Return pure function for compilation."""
         return Capsule.sdf
+
+    def patch_fields(self):
+        """Single smooth patch: the capsule surface is C1 (no feature edges)."""
+        radius = self.params["radius"].value
+        height = self.params["height"].value
+        return [lambda p: Capsule.sdf(p, radius, height)]

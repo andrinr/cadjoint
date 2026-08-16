@@ -49,6 +49,20 @@ class Translate(Transform):
     def material_at(self, p: Array) -> dict:
         return self.sdf.material_at(Translate._transform_point(p, self.params["offset"].xyz))
 
+    def patch_fields(self):
+        """Forward the child's patch fields through the inverse translation.
+
+        Query points map into the child frame exactly as :meth:`sdf` does
+        (``p - offset``), so patch ids and feature edges stay exact.
+        """
+        child_fields = self.sdf.patch_fields()
+        if child_fields is None:
+            return None
+        offset = self.params["offset"].xyz
+        return [
+            (lambda p, f=field: f(Translate._transform_point(p, offset))) for field in child_fields
+        ]
+
     def to_functional(self):
         """Return pure function for compilation."""
         return Translate.sdf

@@ -75,6 +75,23 @@ class Rotate(Transform):
         R = Rotate._rotation_matrix(self.params["axis"].xyz, self.params["angle"].value)
         return self.sdf.material_at(R.T @ p)
 
+    def patch_fields(self):
+        """Forward the child's patch fields through the inverse rotation.
+
+        Query points map into the child frame exactly as :meth:`sdf` does
+        (``R.T @ p``); rotation is an isometry, so field values — and with
+        them patch ownership and feature edges — stay exact.
+        """
+        child_fields = self.sdf.patch_fields()
+        if child_fields is None:
+            return None
+        axis = self.params["axis"].xyz
+        angle = self.params["angle"].value
+        return [
+            (lambda p, f=field: f(Rotate._transform_point(p, axis, angle)))
+            for field in child_fields
+        ]
+
     def to_functional(self):
         """Return pure function for compilation."""
         return Rotate.sdf

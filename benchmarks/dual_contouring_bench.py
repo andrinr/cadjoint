@@ -15,6 +15,8 @@ Reports, per shape and resolution:
 - sampled surface deviation (max |field| over area-uniform mesh samples) and
   sampled self-intersection count from :func:`jaxcad.meshing.mesh_report`;
 - 5th-percentile triangle minimum angle (degrees);
+- triangle count and wall time of error-bounded simplification
+  (:func:`jaxcad.meshing.simplify.simplify_mesh` at a quarter cell size);
 - wall time of one reverse-mode gradient of a mesh loss w.r.t. a design
   parameter.
 """
@@ -38,6 +40,7 @@ from jaxcad.meshing.edge_detection import (
     sample_grid,
 )
 from jaxcad.meshing.features import cell_edge_incidence
+from jaxcad.meshing.simplify import simplify_mesh
 from jaxcad.sdf.primitives import Box
 
 BOX_SIZE = np.array([0.4, 0.5, 0.6])
@@ -141,6 +144,12 @@ def run(resolutions, repeats):
             )
             vertices = np.asarray(mesh.vertices, dtype=np.float64)
             report = mesh_report(sdf, mesh)  # outside the timed region
+            # Error-bounded simplification at a quarter cell; timed once
+            # (deterministic host-side pass loop, no jit cache to warm).
+            simplify_error = 0.25 * float(np.max(grid.spacing))
+            simplify_start = time.perf_counter()
+            simplified = simplify_mesh(mesh, sdf, error=simplify_error)
+            simplify_duration = time.perf_counter() - simplify_start
             row = {
                 "shape": name,
                 "resolution": resolution,
@@ -153,6 +162,8 @@ def run(resolutions, repeats):
                 "deviation_max": report["surface_deviation"]["max_abs"],
                 "self_intersections": report["self_intersections"]["count"],
                 "min_angle_p5_deg": minimum_angle_p5(vertices, mesh.faces),
+                "simplified_tris": int(simplified.faces.shape[0]),
+                "simplify_ms": simplify_duration * 1e3,
             }
             if name == "box":
                 row["corner_err"] = corner_error(vertices)
@@ -172,16 +183,17 @@ def print_markdown(rows):
     print("## Dual contouring quality and timing\n")
     print(
         "| shape | res | tris | extract (ms) | sparse (ms) | watertight | volume rel err "
-        "| dev max | self-isect | min angle p5 (deg) | corner err | MC corner err "
-        "| MC (ms) | grad (ms) |"
+        "| dev max | self-isect | min angle p5 (deg) | simplified tris (ms) | corner err "
+        "| MC corner err | MC (ms) | grad (ms) |"
     )
-    print("|---|---:|---:|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|")
+    print("|---|---:|---:|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|")
     for row in rows:
         print(
             f"| {row['shape']} | {row['resolution']} | {row['triangles']} "
             f"| {row['extract_ms']:.1f} | {row['sparse_ms']:.1f} | {row['watertight']} "
             f"| {row['volume_rel_err']:.2e} | {row['deviation_max']:.2e} "
             f"| {row['self_intersections']} | {row['min_angle_p5_deg']:.1f} "
+            f"| {row['simplified_tris']} ({row['simplify_ms']:.1f}) "
             f"| {row.get('corner_err', float('nan')):.2e} "
             f"| {row.get('mc_corner_err', float('nan')):.2e} "
             f"| {row.get('mc_ms', float('nan')):.1f} "

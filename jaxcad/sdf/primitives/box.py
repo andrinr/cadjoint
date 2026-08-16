@@ -62,3 +62,20 @@ class Box(Primitive):
     def to_functional(self):
         """Return pure function for compilation."""
         return Box.sdf
+
+    def patch_fields(self):
+        """Six face half-space distances, derived from the sdf structure.
+
+        :meth:`sdf` is (inside) ``max_a(|p_a| - size_a)``, and each term
+        splits as ``|p_a| - size_a = max(p_a - size_a, -p_a - size_a)`` — so
+        the box is the max composition of six half-space distances, one per
+        face.  Order: ``[+x, -x, +y, -y, +z, -z]`` (index ``2*axis + side``
+        with side 0 for the positive face).
+        """
+        size = self.params["size"].xyz
+
+        def face(axis: int, sign: float):
+            bound = size[axis]
+            return lambda p: sign * p[..., axis] - bound
+
+        return [face(axis, sign) for axis in range(3) for sign in (1.0, -1.0)]

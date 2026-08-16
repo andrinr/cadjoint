@@ -150,3 +150,38 @@ shared contract:
   `twist` (twist documented non-1-Lipschitz); `jaxcad.sdf.operations` adds
   shell, offset, mirror, and linear/polar patterns. Everything traces to
   WGSL for the viewer and differentiates with respect to profile vertices.
+
+## STEP validation against a real CAD kernel (2026-08-16)
+
+`save_step` was "best-effort, not yet validated"; it is now validated
+against OCCT. `cadquery-ocp` 7.9.3.1.1 (the first candidate tried)
+installed cleanly on this macOS arm64 / CPython 3.14 venv via uv, imported,
+and read a trivial hand-written AP214 file, so build123d and pythonocc-core
+were never needed. It lives behind a dev-only `stepcheck` extra with
+`python_version >= '3.10' and python_version < '3.15'` markers (the wheel
+range), and `tests/meshing/test_step_kernel.py` importorskips `OCP`.
+
+Round-trip results (read → `TransferRoots` → `BRepCheck_Analyzer` →
+`BRepGProp` volume), per exported mesh:
+
+- **Box and sphere passed unmodified**: one `BRepCheck`-valid closed
+  `SOLID`, face counts exactly matching `merge_planar_faces` (6 for the
+  box), kernel volume equal to the mesh's signed volume.
+- **One real bug, found only by the union mesh**: sharp QEF placement can
+  land two *adjacent* cells' vertices on the same crease point (observed
+  distance ~3e-17), so the exported loops contained zero-length edges. OCCT
+  cannot build a `LINE` from a zero-magnitude `VECTOR`
+  (`Make Geom_Curve (3D) failed` → `wire not done`), silently dropped the
+  four affected faces' wires, and demoted the `MANIFOLD_SOLID_BREP` to a
+  compound of five open shells with garbage volume. Fix in `export.py`:
+  `_weld_degenerate_edges` union-finds the endpoints of any loop edge
+  shorter than the file's own declared `UNCERTAINTY` (1e-7), collapses
+  consecutive duplicates, and drops loops left with fewer than three
+  vertices. The union now reads back as one valid closed solid; the four
+  dropped faces are exactly the triangles that collapsed at the two welds,
+  and volume agrees to well under 1%.
+- **Units**: the file declares `SI_UNIT($,.METRE.)`; OCCT defaults to a
+  millimetre working unit, scaling volumes by `1000**3` on import. Not a
+  file bug — the tests set `xstep.cascade.unit` to `M` (Interface statics
+  initialize only after a reader is constructed) and compare volumes
+  directly; `save_step`'s docstring now documents the metre convention.
