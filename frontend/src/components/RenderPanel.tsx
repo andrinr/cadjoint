@@ -237,6 +237,14 @@ export function RenderPanel(props: RenderPanelProps) {
             <section>
               <h4>Annotations</h4>
               <ToggleSwitch
+                checked={props.display.showGraticule}
+                onChange={(showGraticule) => props.onChange({ showGraticule })}
+                testId="toggle-graticule"
+              >
+                Graticule
+                <small>Scale grid, gain readout, and title block</small>
+              </ToggleSwitch>
+              <ToggleSwitch
                 checked={props.display.showSketches}
                 onChange={(showSketches) => props.onChange({ showSketches })}
                 testId="toggle-showSketches"

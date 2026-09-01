@@ -87,6 +87,15 @@
   --viewport-sketch-rgb: 24, 112, 125;
   --viewport-simulate-rgb: 143, 90, 22;
 
+  /* ── colour: graticule ─────────────────────────────────────────────── */
+  /* The instrument faceplate the scene is drawn over. Structure, never text,
+     so these sit below the 3:1 a meaningful mark owes — 1.8 / 2.2 / 2.6 : 1
+     on paper, weakest to strongest. The shader reads them through tokens.ts;
+     they are declared here so the token layer stays one list. */
+  --graticule-line: #adadb3;
+  --graticule-axis: #9c9ca2;
+  --graticule-frame: #8f8f95;
+
   /* Accent alpha ladder. An accent appears at exactly six strengths, and
      each step means something: a wash is a surface barely touched, a tint is
      an active control's fill, a veil is a decorative hairline, an edge is an
@@ -2340,6 +2349,109 @@ button.icon {
   outline-offset: -7px;
 }
 
+/* The gain readout: what one graticule division is worth, and where the
+   camera is standing. Top-left, never moves — it is the instrument's own
+   label, so it owns the corner and the transient compile chip stacks under
+   it. No plate: it sits where the tool rail already holds the field back. */
+.graticule-gain {
+  position: absolute;
+  top: var(--space-5);
+  left: 62px;
+  z-index: 5;
+  display: flex;
+  /* Every cell is given the same line box, so centring them also lands their
+     baselines within a pixel of each other — the two things a mixed-size row
+     usually has to choose between. */
+  align-items: center;
+  gap: var(--space-2);
+  pointer-events: none;
+}
+
+.graticule-gain > span {
+  color: var(--viewport-ink-2);
+  font: var(--type-kicker);
+  line-height: var(--text-sm);
+  letter-spacing: var(--tracking-caps);
+}
+
+.graticule-gain > span:not(:first-child) {
+  margin-left: var(--space-5);
+}
+
+.graticule-gain b {
+  color: var(--viewport-ink);
+  font: var(--weight-medium) var(--text-sm) / var(--leading-flat) var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.graticule-gain i {
+  color: var(--viewport-ink-2);
+  font: var(--type-mono);
+  font-style: normal;
+  line-height: var(--text-sm);
+}
+
+/* The title block, ASME Y14.100's lower-right corner: five rows of what is on
+   screen, an em dash wherever the app cannot fill a field. Opaque paper, so a
+   part passing behind it never shows through the type; below the dock in
+   stacking order, because a panel someone opened outranks a caption. */
+.title-block {
+  position: absolute;
+  /* Inside the drawing frame, not on it: the corner brackets reach 36px in
+     from each edge, and a title block belongs within the border it labels. */
+  right: 40px;
+  bottom: 40px;
+  z-index: 5;
+  display: grid;
+  grid-template-columns: 62px 136px;
+  margin: 0;
+  border: 1px solid var(--graticule-frame);
+  background: var(--surface-viewport);
+  pointer-events: none;
+}
+
+.title-block dt,
+.title-block dd {
+  margin: 0;
+  padding: var(--space-1) var(--space-3);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Same two cells as the gain readout, on the same 12px line box: two labels
+   of one instrument should not be two type variants. */
+.title-block dt {
+  border-right: 1px solid var(--graticule-frame);
+  color: var(--viewport-ink-2);
+  font: var(--type-kicker);
+  line-height: var(--text-sm);
+  letter-spacing: var(--tracking-caps);
+}
+
+.title-block dd {
+  color: var(--viewport-ink);
+  font: var(--type-mono);
+  line-height: var(--text-sm);
+}
+
+.title-block dt:nth-of-type(n + 2),
+.title-block dd:nth-of-type(n + 2) {
+  border-top: 1px solid var(--graticule-frame);
+}
+
+/* The hint bar is left alone: the title block sits 40px up from the bottom
+   edge, so the two never share a line, and narrowing the hint to "clear" it
+   only truncated a sentence that already fits. */
+
+/* The dock keeps its full height. Shortening it to clear the title block was
+   tried and measured: the panels are already over-full at the height they
+   have (`scroll-content-hidden` fires on three of them today), so taking
+   100px away buried more controls and squeezed two panels into overlapping
+   hit boxes. A caption occasionally hidden behind a panel the user opened is
+   the cheaper failure, which is why the block sits below the dock in the
+   stacking order rather than pushing it around. */
+
 .viewer-compile-indicator {
   position: absolute;
   top: var(--space-5);
@@ -2372,6 +2484,12 @@ button.icon {
   border-top-color: var(--mode-accent, var(--accent-model));
   border-radius: 50%;
   animation: viewer-spin 650ms linear infinite;
+}
+
+/* The gain readout owns the top-left corner, so the compile chip stacks under
+   it rather than replacing it for the duration of a compile. */
+.viewer-pane.has-graticule .viewer-compile-indicator {
+  top: calc(var(--space-5) + 24px);
 }
 
 @keyframes viewer-spin {

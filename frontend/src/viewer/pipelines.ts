@@ -21,6 +21,7 @@ import {
 } from "./overlayGeometry";
 // Kept as standalone .wgsl files so the shaders have one source of truth that
 // both the bundler and the Python shader-validation test read.
+import GRATICULE_WGSL from "./graticule.wgsl?raw";
 import OVERLAY_WGSL from "./overlay.wgsl?raw";
 import SIMULATION_WGSL from "./simulation.wgsl?raw";
 
@@ -233,6 +234,77 @@ export function createOverlayPipelines(
     meshOverlayBindGroup: device.createBindGroup({
       layout: bindGroupLayout,
       entries: [{ binding: 0, resource: { buffer: meshOverlayBuffer } }],
+    }),
+  };
+}
+
+/** Bytes of the graticule uniform: six vec4s, see `Graticule` in the WGSL. */
+export const GRATICULE_UNIFORM_SIZE = 96;
+
+export interface GraticulePipeline {
+  graticulePipeline: GPURenderPipeline;
+  graticuleBindGroup: GPUBindGroup;
+}
+
+/**
+ * The faceplate pass: one fullscreen triangle at the far plane.
+ *
+ * `depthCompare: "less-equal"` with a vertex at z = 1 is what puts the
+ * graticule *behind* everything: the preview pass writes exactly 1.0 on a ray
+ * miss, so the test passes on background and fails against every nearer
+ * fragment the scene, the FEM surface or the depth prepass has written. Depth
+ * is not written back, so the overlays that follow are unaffected.
+ */
+export function createGraticulePipeline(
+  device: GPUDevice,
+  format: GPUTextureFormat,
+  uniformBuffer: GPUBuffer,
+): GraticulePipeline {
+  const module = device.createShaderModule({
+    code: GRATICULE_WGSL,
+    label: "Graticule WGSL",
+  });
+  const { bindGroupLayout, pipelineLayout } = sharedLayout(
+    device,
+    "Graticule bindings",
+    [0],
+  );
+  return {
+    graticulePipeline: device.createRenderPipeline({
+      label: "Viewport graticule",
+      layout: pipelineLayout,
+      vertex: { module, entryPoint: "vs_graticule" },
+      fragment: {
+        module,
+        entryPoint: "fs_graticule",
+        targets: [
+          {
+            format,
+            blend: {
+              color: {
+                srcFactor: "src-alpha",
+                dstFactor: "one-minus-src-alpha",
+                operation: "add",
+              },
+              alpha: {
+                srcFactor: "one",
+                dstFactor: "one-minus-src-alpha",
+                operation: "add",
+              },
+            },
+          },
+        ],
+      },
+      primitive: { topology: "triangle-list" },
+      depthStencil: {
+        format: DEPTH_FORMAT,
+        depthWriteEnabled: false,
+        depthCompare: "less-equal",
+      },
+    }),
+    graticuleBindGroup: device.createBindGroup({
+      layout: bindGroupLayout,
+      entries: [{ binding: 0, resource: { buffer: uniformBuffer } }],
     }),
   };
 }

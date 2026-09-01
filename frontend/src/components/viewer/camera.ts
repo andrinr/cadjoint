@@ -8,7 +8,8 @@
  * range) has one home, and the pane is left holding only the event plumbing.
  */
 
-import type { CameraState, Vec3 } from "../../viewer/math";
+import { orthoHeightFor, type CameraState, type Vec3 } from "../../viewer/math";
+import { distanceForGain, gainFor, stepDetent } from "../../viewer/graticule";
 
 /** Pitch clamp, radians: stops the orbit tumbling over the poles. */
 export const PITCH_LIMIT = 1.45;
@@ -58,10 +59,44 @@ export function panCamera(
   };
 }
 
+/** Closest and furthest the orbit camera may sit from its target. */
+export const MIN_DISTANCE = 0.4;
+export const MAX_DISTANCE = 60;
+
+const clampDistance = (distance: number): number =>
+  Math.max(MIN_DISTANCE, Math.min(MAX_DISTANCE, distance));
+
 /** Wheel zoom: exponential in the wheel delta, clamped to a usable range. */
 export function zoomCamera(camera: CameraState, wheelDelta: number): CameraState {
   return {
     ...camera,
-    distance: Math.max(0.4, Math.min(60, camera.distance * Math.exp(wheelDelta * 0.001))),
+    distance: clampDistance(camera.distance * Math.exp(wheelDelta * 0.001)),
   };
+}
+
+/**
+ * Wheel zoom that lands on the graticule's 1-2-5 gain ladder.
+ *
+ * One notch is one rung, so a division is always worth an exact, stateable
+ * number of millimetres and the readout drops its `>` prefix. Held behind a
+ * modifier because quantized zoom is unusual in CAD (§16.3): free zoom stays
+ * the default, and the prefix keeps the readout honest either way.
+ *
+ * The snap is instantaneous rather than the 160 ms glide §16.3 sketches. A
+ * glide would pass the gain through every value between two rungs, and §16.3's
+ * own rule is that the readout "changes *at* the detent crossing, never
+ * between" — the only ways to honour both are to hold a second, pinned copy
+ * of the gain for the duration, or to not move through the intermediate
+ * values at all. The second is cheaper, is what `prefers-reduced-motion` would
+ * force anyway, and preserves the graticule's zero-per-frame cost.
+ */
+export function detentZoomCamera(camera: CameraState, wheelDelta: number): CameraState {
+  if (wheelDelta === 0) return camera;
+  const gain = gainFor(orthoHeightFor(camera.distance));
+  const stepped = stepDetent(gain, wheelDelta > 0 ? 1 : -1);
+  const distance = distanceForGain(stepped);
+  // Refuse a half-step at the ends of the range: a detent that lands off the
+  // ladder because it was clamped would show the `>` it exists to remove.
+  if (distance < MIN_DISTANCE || distance > MAX_DISTANCE) return camera;
+  return { ...camera, distance };
 }

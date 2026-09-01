@@ -76,6 +76,8 @@ export interface DisplaySettings {
   hideSolid: boolean;
   /** 0 disables x-ray; 1 is fully translucent. */
   xray: number;
+  /** The instrument faceplate behind the scene, its gain readout, title block. */
+  showGraticule: boolean;
   showSketches: boolean;
   showMeshEdges: boolean;
   showMeshWireframe: boolean;
@@ -94,6 +96,10 @@ export const DEFAULT_DISPLAY: DisplaySettings = {
   flatShading: true,
   hideSolid: false,
   xray: 1,
+  // On by default: the viewport had no spatial scale on it at all, and a
+  // drafting ground is what tells you how big the part you are looking at is.
+  // The Studio preset turns it off — a presentation render is not a drawing.
+  showGraticule: true,
   showSketches: true,
   showMeshEdges: false,
   showMeshWireframe: false,

@@ -59,11 +59,15 @@ import {
 } from "./overlayGeometry";
 import {
   DEPTH_FORMAT,
+  GRATICULE_UNIFORM_SIZE,
   compileModule,
+  createGraticulePipeline,
   createOverlayPipelines,
   createSimulationPipelines,
   sharedLayout,
 } from "./pipelines";
+import { DIVISIONS } from "./graticule";
+import { CHROME, hexToRgb } from "../tokens";
 
 export {
   DEFAULT_DISPLAY,
@@ -114,6 +118,31 @@ const DEPTH_NUDGE = 0.004;
 const LINE_WIDTH_PX = 2.4;
 const HANDLE_RADIUS_PX = 6.5;
 
+/**
+ * The graticule's metrics, in CSS pixels (the renderer scales them into
+ * framebuffer pixels, which are fewer than CSS pixels under the quality
+ * budget's resolution cap).
+ *
+ * The tick arms and the 26px bracket are §16.3's numbers; the hairline is 1px
+ * because this is furniture and a 2px grid on paper reads as a table.
+ */
+const GRATICULE = {
+  lineWidth: 1,
+  /** 475A: the centre axes carry five subdivisions per division, nothing else. */
+  subdivisions: 5,
+  tickArm: 4,
+  fifthTickArm: 7,
+  bracketArm: 26,
+  bracketWeight: 2,
+  bracketInset: 10,
+  /**
+   * Outermost horizontal division line drawn. With eight divisions the ±4
+   * boundaries land on the viewport's top and bottom edges, where they would
+   * be half-clipped hairlines; the corner brackets state the frame instead.
+   */
+  interiorLimit: 3,
+} as const;
+
 export interface RendererCallbacks {
   onStatus?: (kind: string, text: string) => void;
   onError?: (message: string) => void;
@@ -140,6 +169,7 @@ export class Renderer {
   private viewBuffer!: GPUBuffer;
   private overlayBuffer!: GPUBuffer;
   private meshOverlayBuffer!: GPUBuffer;
+  private graticuleBuffer!: GPUBuffer;
 
   private previewPipeline: GPURenderPipeline | null = null;
   private previewDepthPipeline: GPURenderPipeline | null = null;
@@ -153,6 +183,8 @@ export class Renderer {
   private gizmoScalePipeline: GPURenderPipeline | null = null;
   private overlayBindGroup: GPUBindGroup | null = null;
   private meshOverlayBindGroup: GPUBindGroup | null = null;
+  private graticulePipeline: GPURenderPipeline | null = null;
+  private graticuleBindGroup: GPUBindGroup | null = null;
 
   private depthTexture: GPUTexture | null = null;
   private accumulation: GPUTexture[] = [];
@@ -344,6 +376,7 @@ export class Renderer {
       this.viewBuffer = this.createUniform(64);
       this.overlayBuffer = this.createUniform(112);
       this.meshOverlayBuffer = this.createUniform(112);
+      this.graticuleBuffer = this.createUniform(GRATICULE_UNIFORM_SIZE);
       this.buildPipelines();
 
       this.device.addEventListener("uncapturederror", (event) => {
@@ -398,6 +431,10 @@ export class Renderer {
     this.gizmoScalePipeline = overlay.gizmoScalePipeline;
     this.overlayBindGroup = overlay.overlayBindGroup;
     this.meshOverlayBindGroup = overlay.meshOverlayBindGroup;
+
+    const graticule = createGraticulePipeline(device, this.format, this.graticuleBuffer);
+    this.graticulePipeline = graticule.graticulePipeline;
+    this.graticuleBindGroup = graticule.graticuleBindGroup;
 
     const simulation = createSimulationPipelines(device, this.format, (size) =>
       this.createUniform(size),
@@ -897,6 +934,8 @@ export class Renderer {
     overlay.set([DEPTH_NUDGE * 0.4, 0, 0, 0], 24);
     device.queue.writeBuffer(this.meshOverlayBuffer, 0, overlay);
 
+    if (this.display.showGraticule) this.writeGraticuleUniforms();
+
     if (this._simulationActive && this.simUniformBuffer && this.simHighlightUniformBuffer) {
       const { normal, offset } = slicePlane(this.simClip, this.simBounds);
       const [low, high] = this.simRange;
@@ -917,6 +956,57 @@ export class Renderer {
       sim.set([low, inverseRange, 0.55, this.simClip.enabled ? 1 : 0], 20);
       device.queue.writeBuffer(this.simHighlightUniformBuffer, 0, sim);
     }
+  }
+
+  /**
+   * The faceplate's metrics, in framebuffer pixels.
+   *
+   * Two pixel systems meet here: the graticule is specified in CSS pixels
+   * (§16.3's 26px bracket is 26 CSS px) while the shader works in framebuffer
+   * pixels, and the quality budget's resolution cap makes the framebuffer
+   * *smaller* than the CSS box at large viewports. Every length is therefore
+   * scaled by the same ratio the framebuffer was, which is also what keeps the
+   * division square: it is derived from the framebuffer height alone.
+   */
+  private writeGraticuleUniforms(): void {
+    const scale = this.canvas.width / Math.max(this.canvas.clientWidth, 1);
+    const px = (css: number) => css * scale;
+    const tone = (name: "graticule-line" | "graticule-axis" | "graticule-frame") =>
+      hexToRgb(CHROME[name]);
+    const [lineR, lineG, lineB] = tone("graticule-line");
+    const [axisR, axisG, axisB] = tone("graticule-axis");
+    const [frameR, frameG, frameB] = tone("graticule-frame");
+    this.device!.queue.writeBuffer(
+      this.graticuleBuffer,
+      0,
+      new Float32Array([
+        this.canvas.width,
+        this.canvas.height,
+        this.canvas.height / DIVISIONS,
+        Math.max(1, px(GRATICULE.lineWidth)),
+        lineR, lineG, lineB, 1,
+        axisR, axisG, axisB, 1,
+        frameR, frameG, frameB, 1,
+        GRATICULE.subdivisions,
+        px(GRATICULE.tickArm),
+        px(GRATICULE.fifthTickArm),
+        px(GRATICULE.bracketArm),
+        Math.max(1, px(GRATICULE.bracketWeight)),
+        px(GRATICULE.bracketInset),
+        GRATICULE.interiorLimit,
+        0,
+      ]),
+    );
+  }
+
+  /** Draw the graticule between the scene's depth and the overlays. */
+  private drawGraticule(pass: GPURenderPassEncoder): void {
+    if (!this.display.showGraticule || !this.graticulePipeline || !this.graticuleBindGroup) {
+      return;
+    }
+    pass.setPipeline(this.graticulePipeline);
+    pass.setBindGroup(0, this.graticuleBindGroup);
+    pass.draw(3);
   }
 
   /** Draw the FEM surface (and its hovered face group) into the pass. */
@@ -1060,12 +1150,17 @@ export class Renderer {
       presentPass.setBindGroup(0, this.presentBindGroups[writeIndex]);
       presentPass.draw(3);
       // Re-run the cheap preview purely for depth so overlays interleave with
-      // the path-traced image, which carries no depth of its own.
-      if (this.edgeCount && this.display.showSketches && this.previewDepthPipeline) {
+      // the path-traced image, which carries no depth of its own. The
+      // graticule needs it for the same reason — without a depth buffer it
+      // would paint over the part instead of behind it.
+      const wantDepth =
+        (this.edgeCount && this.display.showSketches) || this.display.showGraticule;
+      if (wantDepth && this.previewDepthPipeline) {
         presentPass.setPipeline(this.previewDepthPipeline);
         presentPass.setBindGroup(0, this.previewBindGroup);
         presentPass.draw(3);
       }
+      this.drawGraticule(presentPass);
       this.drawOverlay(presentPass);
       presentPass.end();
       this.readIndex = writeIndex;
@@ -1080,6 +1175,10 @@ export class Renderer {
       previewPass.setBindGroup(0, this.previewBindGroup);
       previewPass.draw(3);
       this.drawSimulation(previewPass);
+      // After every pass that writes depth, before every pass that does not:
+      // the faceplate is occluded by the part and the FEM surface, and the
+      // construction overlays are drawn on top of it.
+      this.drawGraticule(previewPass);
       this.drawOverlay(previewPass);
       previewPass.end();
     }

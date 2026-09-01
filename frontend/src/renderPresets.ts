@@ -51,6 +51,7 @@ export const DEFAULT_RENDER_PRESETS: RenderPreset[] = [
       reflections: true,
       flatShading: false,
       xray: 0,
+      showGraticule: false,
       showSketches: false,
       showConstraints: false,
     },
@@ -98,6 +99,7 @@ function isDisplaySettings(value: unknown): value is DisplaySettings {
     typeof display.hideSolid === "boolean" &&
     typeof display.xray === "number" &&
     Number.isFinite(display.xray) &&
+    typeof display.showGraticule === "boolean" &&
     typeof display.showSketches === "boolean" &&
     typeof display.showMeshEdges === "boolean" &&
     typeof display.showMeshWireframe === "boolean" &&

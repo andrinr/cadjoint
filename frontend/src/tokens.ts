@@ -98,6 +98,19 @@ export const CHROME = {
   "viewport-model": "#5b6d15",
   "viewport-sketch": "#18707d",
   "viewport-simulate": "#8f5a16",
+
+  // ── graticule ───────────────────────────────────────────────────────────
+  // The instrument faceplate drawn *under* the scene: eight square divisions,
+  // minor ticks on the two centre axes, four corner brackets. Furniture, not
+  // data, so these deliberately sit far below the 3:1 a meaningful mark owes
+  // — they are measured against paper in `test/graticule.test.ts` and held
+  // inside a 1.6–2.8:1 band. Above that the grid competes with the field;
+  // below it, it is invisible. Ordered weakest to strongest, which is §16.3's
+  // order (`#1e1d22` / `#332f38` / `#413e47` on the ground it was written
+  // for); on paper the polarity inverts and the tones darken instead.
+  "graticule-line": "#adadb3",
+  "graticule-axis": "#9c9ca2",
+  "graticule-frame": "#8f8f95",
 } as const;
 
 export type ChromeToken = keyof typeof CHROME;
@@ -110,6 +123,20 @@ export const VIEWPORT_TONES: ChromeToken[] = [
   "viewport-model",
   "viewport-sketch",
   "viewport-simulate",
+];
+
+/**
+ * Graticule furniture drawn on paper.
+ *
+ * Absent from VIEWPORT_TONES on purpose: these are structure, never text, and
+ * a hairline pushed to AA would turn the viewport into squared paper that
+ * competes with the part. `test/graticule.test.ts` holds them to a band
+ * instead of a floor.
+ */
+export const GRATICULE_TONES: ChromeToken[] = [
+  "graticule-line",
+  "graticule-axis",
+  "graticule-frame",
 ];
 
 /** Editing modes, in switcher and keyboard-cycling order. */

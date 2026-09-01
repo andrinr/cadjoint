@@ -48,9 +48,10 @@ import {
   isEdgeConstraintTool,
   isVertexConstraintTool,
 } from "../constraints";
-import { orbitCamera, panCamera, zoomCamera } from "./viewer/camera";
+import { detentZoomCamera, orbitCamera, panCamera, zoomCamera } from "./viewer/camera";
 import { buildConstraintOverlay } from "./viewer/constraintMarks";
 import { ConstraintOverlay } from "./viewer/ConstraintOverlay";
+import { Graticule } from "./viewer/Graticule";
 import { createGizmoDrag } from "./viewer/gizmoDrag";
 import { createSimInteraction } from "./viewer/simInteraction";
 import { createViewerKeyboard } from "./viewer/keyboard";
@@ -110,6 +111,20 @@ export function ViewerPane(props: ViewerPaneProps) {
   });
   const gizmo = createGizmoDrag({ renderer, pickView, props });
   const sim = createSimInteraction({ canvas: () => canvas, renderer, pickView });
+
+  /**
+   * The camera as the graticule's labels see it.
+   *
+   * `overlayRevision` is bumped by every gesture that moves the camera, which
+   * is exactly the set of events that can change the gain — so the readout is
+   * driven by the same signal that reprojects the DOM annotations, and cannot
+   * drift from what the shader drew.
+   */
+  const graticuleCamera = createMemo(() => {
+    overlayRevision();
+    const { distance, yaw, pitch } = renderer.camera;
+    return { distance, yaw, pitch, projection: props.display.projection };
+  });
 
   const constraintOverlay = createMemo(() => {
     overlayRevision();
@@ -404,9 +419,14 @@ export function ViewerPane(props: ViewerPaneProps) {
     if (finished.kind !== "none") renderer.invalidate();
   };
 
+  // Free zoom is the default; Alt holds the graticule's 1-2-5 detent, so one
+  // division is an exact number of millimetres and the gain readout drops its
+  // uncalibrated `>` prefix.
   const onWheel = (event: WheelEvent) => {
     event.preventDefault();
-    renderer.camera = zoomCamera(renderer.camera, event.deltaY);
+    renderer.camera = event.altKey
+      ? detentZoomCamera(renderer.camera, event.deltaY)
+      : zoomCamera(renderer.camera, event.deltaY);
     refreshOverlays();
     renderer.invalidate();
   };
@@ -511,7 +531,11 @@ export function ViewerPane(props: ViewerPaneProps) {
   });
 
   return (
-    <section class="pane viewer-pane" aria-busy={busy()}>
+    <section
+      class="pane viewer-pane"
+      classList={{ "has-graticule": props.display.showGraticule }}
+      aria-busy={busy()}
+    >
       {props.overlay}
       <canvas
         ref={canvas}
@@ -549,6 +573,7 @@ export function ViewerPane(props: ViewerPaneProps) {
         showValues={props.display.showConstraintValues}
         geometry={constraintOverlay()}
       />
+      <Graticule show={props.display.showGraticule} camera={graticuleCamera()} />
       <ViewerOverlays pickRect={pickRect()} />
       <ViewerHint pendingConstraint={pendingConstraint()} />
     </section>
