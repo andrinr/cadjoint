@@ -1,6 +1,7 @@
-# jaxCAD
+# cadjoint
 
-Differentiable SDF primitives, transformations, and constraint system built with JAX.
+Differentiable code-first CAD: sketches, constraints, SDF geometry, meshing, and
+FEM simulation composed into one function JAX can differentiate end to end.
 
 > [!WARNING]
 > The API is not stable. Expect breaking changes.
@@ -60,14 +61,16 @@ the `cuda` extra.
 Optional extras — repeat the flag, one `--extra` per name:
 
 ```bash
-uv sync --extra viewer --extra glsl --extra docs
+uv sync --extra viewer --extra fem --extra docs
 ```
 
 | Extra | Pulls in |
 | --- | --- |
 | `cuda` | GPU JAX (Linux + NVIDIA only) |
 | `viewer` | Jupyter widget (`anywidget`) |
-| `glsl` | Offscreen OpenGL rendering (`moderngl`) |
+| `fem` | jax-fem finite-element stack (basix, meshio, petsc4py) |
+| `tesseract` | tesseract-core + tesseract-jax solver plugin runtime |
+| `stepcheck` | OCCT kernel validation of STEP exports (dev) |
 | `docs` | Quarto API reference (`quartodoc`) |
 
 Avoid `--all-extras` on macOS — it includes `cuda`, which has no macOS wheels.
@@ -163,13 +166,11 @@ to proxy to.
 Compile an SDF to a standalone shader function:
 
 ```python
-from cadjoint.backends import GLSLBackend, WGSLBackend
-from cadjoint.backends.wgsl import compile_scene_to_wgsl
+from cadjoint.backends import compile_sdf_to_wgsl, compile_scene_to_wgsl
 from cadjoint.sdf.primitives import Sphere
 
 sphere = Sphere(radius=1.0)
-glsl = GLSLBackend().compile_sdf(sphere)
-wgsl = WGSLBackend().compile_sdf(sphere)
+wgsl = compile_sdf_to_wgsl(sphere)
 wgsl_scene = compile_scene_to_wgsl(sphere)
 ```
 
@@ -250,6 +251,76 @@ table, and writes convergence CSV + figure and before/after VTK files to
 `examples/output/`:
 
 ![Convergence of the bracket optimization](examples/output/fem_bracket_convergence.png)
+
+## Tesseracts: one differentiable function across four AD strategies
+
+Real engineering pipelines die at tool boundaries — a Fortran solver here, a
+Rust kernel there, a mesher nobody can differentiate — and the gradients die
+with them. cadjoint crosses those boundaries with
+[Tesseract](https://github.com/pasteurlabs/tesseract-core): every non-JAX
+component is packaged as a Tesseract exposing typed `apply` and
+`vector_jacobian_product` endpoints, and
+[tesseract-jax](https://github.com/pasteurlabs/tesseract-jax) lifts each one
+into a JAX primitive. The result is a single function from CAD parameters to
+engineering objective that `jax.grad` differentiates end to end, even though
+no two stages agree on how to compute a derivative.
+
+### The Tesseracts in this repo
+
+| Tesseract | Wraps | Boundary crossed | How its VJP works |
+| --- | --- | --- | --- |
+| `cadjoint/fem/tesseracts/thermal_jaxfem` | jax-fem Poisson solve | AD strategy: JAX cannot trace the solver (PETSc assembly) | Implicit adjoint — one transposed linear solve per cotangent |
+| `cadjoint/fem/tesseracts/elastic_jaxfem` | jax-fem linear elasticity + von Mises | same | same; gradients bit-identical to the in-process path |
+| `cadjoint/fem/tesseracts/elastic_calculix` | **CalculiX 2.23, Fortran**, over a subprocess (text decks in, result files out) | Language, licence (GPL-2 isolated), and AD strategy | The solver's native `*SENSITIVITY` discrete adjoint, plus a correction we derived for a missing Jacobian-variation term in ccx 2.23 — validated to 2e-4 of finite differences |
+| `native/tesseract_api.py` | **Rust** dual-contouring kernels (batched QEF solves, rayon-parallel, 90–107× faster than the reference) | Language and memory model (cdylib over ctypes) | Hand-derived linear-solve VJP, matches JAX autodiff to ~4e-14 |
+| `cadjoint/fem/tesseracts/mesher` *(experimental, in validation)* | The **whole black-box mesher** — dual-contoured surface into a tetrahedral volume mesher whose internals nobody differentiates | The boundary everyone gives up on: a discrete, non-differentiable meshing algorithm | **Surface-interpolation VJP**: a boundary vertex lies on the zero set of the trilinearly interpolated SDF samples, so the implicit function theorem gives `∂v/∂fᵢ = −wᵢ(v)·∇f/|∇f|²` — the interpolation weights at the frozen vertex locations *are* the VJP rows. Any mesher becomes differentiable without touching its internals; only the Hadamard-meaningful normal motion is carried |
+
+### The composition
+
+```
+CAD parameters θ  ──►  constraints ──► SDF        (JAX autodiff)
+        │                              │
+        │                              ▼
+        │                    lattice SDF samples   (JAX autodiff)
+        │                              │
+        │                              ▼
+        │              ┌─ mesher Tesseract ──────┐ (frozen topology;
+        │              │  DC surface → tet/hex   │  interpolation VJP)
+        │              └───────────┬─────────────┘
+        │                          ▼
+        │              ┌─ solver Tesseract ──────┐ (jax-fem adjoint, or
+        │              │  thermal / elastic FEM  │  CalculiX Fortran adjoint)
+        │              └───────────┬─────────────┘
+        │                          ▼
+        └──────────  ∂J/∂θ  ◄──  objective J      (JAX autodiff)
+```
+
+`examples/fem_bracket_optimization.py` runs this loop for real: optax Adam over
+named CAD parameters, objective down 73% in 30 steps, adjoint checked against
+finite differences at every boundary (2e-5 … 3e-7 per parameter), and
+`--backend calculix` swaps a 1990s Fortran code into the same `jax.grad` call
+without changing a line of the objective.
+
+### Why Tesseract is load-bearing here
+
+- **CalculiX cannot be traced, linked, or relicensed** — it is GPL-2 Fortran
+  speaking input decks. The Tesseract boundary is what lets its native adjoint
+  compose with JAX autodiff while staying a subprocess.
+- **The mesher VJP is a contract, not a computation** — the surface-
+  interpolation map is defined at the Tesseract boundary from the *inputs and
+  outputs alone*, which is what makes swapping TetGen, fTetWild, or gmsh
+  behind it a zero-cost experiment.
+- **Solvers are plugins.** `SolverBackend` routes `backend="jaxfem" | "tesseract"
+  | "calculix"` through one ABI; the survey in
+  `research/simulator-ecosystem.md` ranks 31 further candidates (jwave,
+  JAX-Fluids, MJX, …) that drop into the same slot.
+- **It stays fast.** Tesseracts here run in-process via
+  `Tesseract.from_tesseract_api` — no Docker, ~0.14 s per apply/VJP roundtrip —
+  with containerization available when a component needs isolation.
+
+Design notes: `research/fem-integration.md` (solver ABI, adjoint mechanics,
+the ccx sensitivity correction), `research/native-mesher.md` (Rust core and
+its VJP), `research/tet-vs-hex.md` (the mesher-Tesseract validation matrix).
 
 ## Tests
 
