@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>constraints – jaxCAD</title>
+<title>constraints – cadjoint</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -25,41 +25,6 @@ ul.task-list li input[type="checkbox"] {
   width: 0.8em;
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
-}
-/* CSS for syntax highlighting */
-html { -webkit-text-size-adjust: 100%; }
-pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
-pre > code.sourceCode > span:empty { height: 1.2em; }
-.sourceCode { overflow: visible; }
-code.sourceCode > span { color: inherit; text-decoration: inherit; }
-div.sourceCode { margin: 1em 0; }
-pre.sourceCode { margin: 0; }
-@media screen {
-div.sourceCode { overflow: auto; }
-}
-@media print {
-pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
-}
-pre.numberSource code
-  { counter-reset: source-line 0; }
-pre.numberSource code > span
-  { position: relative; left: -4em; counter-increment: source-line; }
-pre.numberSource code > span > a:first-child::before
-  { content: counter(source-line);
-    position: relative; left: -1em; text-align: right; vertical-align: baseline;
-    border: none; display: inline-block;
-    -webkit-touch-callout: none; -webkit-user-select: none;
-    -khtml-user-select: none; -moz-user-select: none;
-    -ms-user-select: none; user-select: none;
-    padding: 0 4px; width: 4em;
-  }
-pre.numberSource { margin-left: 3em;  padding-left: 4px; }
-div.sourceCode
-  {   }
-@media screen {
-pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
 }
 </style>
 
@@ -80,7 +45,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <link href="../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-d94f0129d652a5a8036266edffbc062c.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-f83c246346592b24d02aa84ae3974412.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -120,7 +85,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
       <div class="navbar-container container-fluid">
       <div class="navbar-brand-container mx-auto">
     <a class="navbar-brand" href="../index.html">
-    <span class="navbar-title">jaxCAD</span>
+    <span class="navbar-title">cadjoint</span>
     </a>
   </div>
             <div id="quarto-search" class="" title="Search"></div>
@@ -179,7 +144,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </ul>
             <ul class="navbar-nav navbar-nav-scroll ms-auto">
   <li class="nav-item compact">
-    <a class="nav-link" href="https://github.com/andrinr/jaxcad"> <i class="bi bi-github" role="img">
+    <a class="nav-link" href="https://github.com/andrinr/cadjoint"> <i class="bi bi-github" role="img">
 </i> 
 <span class="menu-text"></span></a>
   </li>  
@@ -199,48 +164,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#improved-constraint-system" id="toc-improved-constraint-system" class="nav-link active" data-scroll-target="#improved-constraint-system">Improved Constraint System</a>
+  <li><a href="#constraint-system-final-state-and-remaining-vocabulary" id="toc-constraint-system-final-state-and-remaining-vocabulary" class="nav-link active" data-scroll-target="#constraint-system-final-state-and-remaining-vocabulary">Constraint system: final state and remaining vocabulary</a>
   <ul class="collapse">
-  <li><a href="#current-system" id="toc-current-system" class="nav-link" data-scroll-target="#current-system">Current system</a></li>
-  <li><a href="#part-1-richer-constraint-types" id="toc-part-1-richer-constraint-types" class="nav-link" data-scroll-target="#part-1-richer-constraint-types">Part 1: Richer constraint types</a>
-  <ul class="collapse">
-  <li><a href="#the-full-vocabulary-professional-cad-standard" id="toc-the-full-vocabulary-professional-cad-standard" class="nav-link" data-scroll-target="#the-full-vocabulary-professional-cad-standard">The full vocabulary (professional CAD standard)</a></li>
-  <li><a href="#priority-ordering-for-jaxcad" id="toc-priority-ordering-for-jaxcad" class="nav-link" data-scroll-target="#priority-ordering-for-jaxcad">Priority ordering for jaxCAD</a></li>
-  <li><a href="#numerical-improvements-to-existing-constraints" id="toc-numerical-improvements-to-existing-constraints" class="nav-link" data-scroll-target="#numerical-improvements-to-existing-constraints">Numerical improvements to existing constraints</a></li>
-  </ul></li>
-  <li><a href="#part-2-better-solvers" id="toc-part-2-better-solvers" class="nav-link" data-scroll-target="#part-2-better-solvers">Part 2: Better solvers</a>
-  <ul class="collapse">
-  <li><a href="#why-the-current-newton-raphson-fails" id="toc-why-the-current-newton-raphson-fails" class="nav-link" data-scroll-target="#why-the-current-newton-raphson-fails">Why the current Newton-Raphson fails</a></li>
-  <li><a href="#drop-in-replacement-optimistix.levenbergmarquardt" id="toc-drop-in-replacement-optimistix.levenbergmarquardt" class="nav-link" data-scroll-target="#drop-in-replacement-optimistix.levenbergmarquardt">Drop-in replacement: <code>optimistix.LevenbergMarquardt</code></a></li>
-  <li><a href="#jit-compatibility" id="toc-jit-compatibility" class="nav-link" data-scroll-target="#jit-compatibility">JIT compatibility</a></li>
-  <li><a href="#bounds-handling" id="toc-bounds-handling" class="nav-link" data-scroll-target="#bounds-handling">Bounds handling</a></li>
-  <li><a href="#robust-initialization" id="toc-robust-initialization" class="nav-link" data-scroll-target="#robust-initialization">Robust initialization</a></li>
-  <li><a href="#scipy-fallback-non-jit" id="toc-scipy-fallback-non-jit" class="nav-link" data-scroll-target="#scipy-fallback-non-jit">scipy fallback (non-JIT)</a></li>
-  </ul></li>
-  <li><a href="#part-3-underover-constrained-handling" id="toc-part-3-underover-constrained-handling" class="nav-link" data-scroll-target="#part-3-underover-constrained-handling">Part 3: Under/over-constrained handling</a>
-  <ul class="collapse">
-  <li><a href="#current-behavior" id="toc-current-behavior" class="nav-link" data-scroll-target="#current-behavior">Current behavior</a></li>
-  <li><a href="#better-api-constraintsolution-result-object" id="toc-better-api-constraintsolution-result-object" class="nav-link" data-scroll-target="#better-api-constraintsolution-result-object">Better API: <code>ConstraintSolution</code> result object</a></li>
-  <li><a href="#under-constrained-solve-anyway" id="toc-under-constrained-solve-anyway" class="nav-link" data-scroll-target="#under-constrained-solve-anyway">Under-constrained: solve anyway</a></li>
-  <li><a href="#over-constrained-solve-and-report-conflicts" id="toc-over-constrained-solve-and-report-conflicts" class="nav-link" data-scroll-target="#over-constrained-solve-and-report-conflicts">Over-constrained: solve and report conflicts</a></li>
-  <li><a href="#conflict-detection-via-jacobian-rank" id="toc-conflict-detection-via-jacobian-rank" class="nav-link" data-scroll-target="#conflict-detection-via-jacobian-rank">Conflict detection via Jacobian rank</a></li>
-  <li><a href="#connected-component-decomposition" id="toc-connected-component-decomposition" class="nav-link" data-scroll-target="#connected-component-decomposition">Connected-component decomposition</a></li>
-  <li><a href="#backward-compatible-api" id="toc-backward-compatible-api" class="nav-link" data-scroll-target="#backward-compatible-api">Backward-compatible API</a></li>
-  </ul></li>
-  <li><a href="#part-4-2d-sketch-constraints" id="toc-part-4-2d-sketch-constraints" class="nav-link" data-scroll-target="#part-4-2d-sketch-constraints">Part 4: 2D sketch constraints</a>
-  <ul class="collapse">
-  <li><a href="#architecture-question-3d-vectors-in-a-2d-sketch" id="toc-architecture-question-3d-vectors-in-a-2d-sketch" class="nav-link" data-scroll-target="#architecture-question-3d-vectors-in-a-2d-sketch">Architecture question: 3D vectors in a 2D sketch</a></li>
-  <li><a href="#most-important-2d-constraints-for-jaxcads-geometry" id="toc-most-important-2d-constraints-for-jaxcads-geometry" class="nav-link" data-scroll-target="#most-important-2d-constraints-for-jaxcads-geometry">Most important 2D constraints for jaxCAD’s geometry</a></li>
-  <li><a href="#how-professional-2d-sketch-solvers-work" id="toc-how-professional-2d-sketch-solvers-work" class="nav-link" data-scroll-target="#how-professional-2d-sketch-solvers-work">How professional 2D sketch solvers work</a></li>
-  <li><a href="#python-solvespace-as-a-referencefallback" id="toc-python-solvespace-as-a-referencefallback" class="nav-link" data-scroll-target="#python-solvespace-as-a-referencefallback">python-solvespace as a reference/fallback</a></li>
-  </ul></li>
-  <li><a href="#summary-recommended-changes" id="toc-summary-recommended-changes" class="nav-link" data-scroll-target="#summary-recommended-changes">Summary: recommended changes</a>
-  <ul class="collapse">
-  <li><a href="#priority-0-highest-impact" id="toc-priority-0-highest-impact" class="nav-link" data-scroll-target="#priority-0-highest-impact">Priority 0 (highest impact)</a></li>
-  <li><a href="#priority-1" id="toc-priority-1" class="nav-link" data-scroll-target="#priority-1">Priority 1</a></li>
-  <li><a href="#priority-2" id="toc-priority-2" class="nav-link" data-scroll-target="#priority-2">Priority 2</a></li>
-  </ul></li>
-  <li><a href="#key-references" id="toc-key-references" class="nav-link" data-scroll-target="#key-references">Key references</a></li>
+  <li><a href="#what-shipped-see-cadjointconstraints-testsconstraints" id="toc-what-shipped-see-cadjointconstraints-testsconstraints" class="nav-link" data-scroll-target="#what-shipped-see-cadjointconstraints-testsconstraints">What shipped (see <code>cadjoint/constraints/</code>, <code>tests/constraints/</code>)</a></li>
+  <li><a href="#remaining-constraint-vocabulary-not-yet-implemented" id="toc-remaining-constraint-vocabulary-not-yet-implemented" class="nav-link" data-scroll-target="#remaining-constraint-vocabulary-not-yet-implemented">Remaining constraint vocabulary (not yet implemented)</a></li>
+  <li><a href="#references" id="toc-references" class="nav-link" data-scroll-target="#references">References</a></li>
   </ul></li>
   </ul>
 </nav>
@@ -251,56 +179,21 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 
 
-<section id="improved-constraint-system" class="level1">
-<h1>Improved Constraint System</h1>
+<section id="constraint-system-final-state-and-remaining-vocabulary" class="level1">
+<h1>Constraint system: final state and remaining vocabulary</h1>
 <blockquote class="blockquote">
-<p>Research into richer constraint types, better solvers, and improved under/over-constrained handling for jaxCAD.</p>
+<p>Compact note. This file was the pre-implementation research for the constraint system; everything it recommended has shipped. Full build history in git/PR #19.</p>
 </blockquote>
-<section id="current-system" class="level2">
-<h2 class="anchored" data-anchor-id="current-system">Current system</h2>
-<table class="caption-top table">
-<colgroup>
-<col style="width: 33%">
-<col style="width: 33%">
-<col style="width: 33%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>Component</th>
-<th>What it does</th>
-<th>Key limitation</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td><code>newton_raphson</code></td>
-<td>Python <code>for</code> loop + <code>jax.jacobian</code> + <code>lstsq</code></td>
-<td>Not JIT-compiled; no step-size control; diverges from bad initial guess</td>
-</tr>
-<tr class="even">
-<td><code>solve_constraints</code></td>
-<td>Wraps NR with DOF check</td>
-<td>Hard-raises <code>ValueError</code> for any non-exact system</td>
-</tr>
-<tr class="odd">
-<td>Constraint types</td>
-<td>Distance, Angle, Parallel, Perpendicular</td>
-<td>Missing: Coincident, Fixed, Horizontal, Vertical, Tangent, etc.</td>
-</tr>
-<tr class="even">
-<td>DOF check</td>
-<td><code>total_dof == constraint_dof</code> required</td>
-<td>No per-parameter DOF reporting; no conflict identification</td>
-</tr>
-</tbody>
-</table>
-<p><strong>Installed libraries</strong> (<code>uv</code> environment): - <code>optimistix 0.1.0</code> — Levenberg-Marquardt, Gauss-Newton, Dogleg, Newton+bounds - <code>lineax 0.1.0</code> — JAX linear solvers (QR, LU, SVD, CG) - <code>equinox 0.13.6</code> — JAX pytree utilities, <code>filter_jit</code> - <code>scipy 1.17.0</code> — <code>least_squares(method='lm')</code> fallback</p>
-<hr>
+<section id="what-shipped-see-cadjointconstraints-testsconstraints" class="level2">
+<h2 class="anchored" data-anchor-id="what-shipped-see-cadjointconstraints-testsconstraints">What shipped (see <code>cadjoint/constraints/</code>, <code>tests/constraints/</code>)</h2>
+<ul>
+<li><strong>Solver</strong>: <code>solve_constraints</code> runs <code>optimistix.LevenbergMarquardt</code> (implicit-adjoint differentiable through the solve); <code>satisfy_constraints</code> handles under-constrained projection; <code>project_to_manifold</code>, <code>make_manifold_projection</code>, and <code>make_bounds_projection</code> compose with optax.</li>
+<li><strong>Constraint types</strong> (<code>cadjoint/constraints/types/</code>): distance, angle, parallel/perpendicular (vector- and edge-based), fixed, coincident, horizontal, vertical, equal-length, point-on-line — all plain differentiable residuals through one residual/solve path.</li>
+<li><strong>Numerical forms</strong>: the singularity fixes recommended here (squared distance form, cosine angle form) are in the shipped residuals.</li>
+</ul>
 </section>
-<section id="part-1-richer-constraint-types" class="level2">
-<h2 class="anchored" data-anchor-id="part-1-richer-constraint-types">Part 1: Richer constraint types</h2>
-<section id="the-full-vocabulary-professional-cad-standard" class="level3">
-<h3 class="anchored" data-anchor-id="the-full-vocabulary-professional-cad-standard">The full vocabulary (professional CAD standard)</h3>
+<section id="remaining-constraint-vocabulary-not-yet-implemented" class="level2">
+<h2 class="anchored" data-anchor-id="remaining-constraint-vocabulary-not-yet-implemented">Remaining constraint vocabulary (not yet implemented)</h2>
 <table class="caption-top table">
 <colgroup>
 <col style="width: 33%">
@@ -316,447 +209,56 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </thead>
 <tbody>
 <tr class="odd">
-<td><strong>Coincident</strong> (p1 == p2)</td>
-<td>2–3</td>
-<td><code>p1 - p2 = 0</code></td>
-</tr>
-<tr class="even">
-<td><strong>Fixed</strong> (pin to coordinate)</td>
-<td>2–3</td>
-<td><code>p - p_fixed = 0</code></td>
-</tr>
-<tr class="odd">
-<td><strong>Horizontal</strong> (line)</td>
-<td>1</td>
-<td><code>end.y - start.y = 0</code></td>
-</tr>
-<tr class="even">
-<td><strong>Vertical</strong> (line)</td>
-<td>1</td>
-<td><code>end.x - start.x = 0</code></td>
-</tr>
-<tr class="odd">
-<td><strong>Collinear</strong> (3 points)</td>
+<td>Collinear (3 points)</td>
 <td>1</td>
 <td><code>(p2-p1) × (p3-p1) = 0</code> (scalar in 2D)</td>
 </tr>
 <tr class="even">
-<td><strong>Midpoint</strong></td>
+<td>Midpoint</td>
 <td>2</td>
 <td><code>p_mid - (p1+p2)/2 = 0</code></td>
 </tr>
 <tr class="odd">
-<td><strong>Equal length</strong></td>
+<td>Tangent (circle-line)</td>
 <td>1</td>
-<td><code>‖p2-p1‖ - ‖p4-p3‖ = 0</code></td>
+<td><code>dist(center, line)² - r² = 0</code> (squared form)</td>
 </tr>
 <tr class="even">
-<td><strong>Tangent</strong> (circle-line)</td>
-<td>1</td>
-<td><code>dist(center, line) - radius = 0</code></td>
-</tr>
-<tr class="odd">
-<td><strong>Tangent</strong> (circle-circle)</td>
+<td>Tangent (circle-circle)</td>
 <td>1</td>
 <td><code>‖c1-c2‖ - (r1±r2) = 0</code></td>
 </tr>
-<tr class="even">
-<td><strong>Concentric</strong></td>
+<tr class="odd">
+<td>Concentric</td>
 <td>2</td>
 <td><code>c1 - c2 = 0</code></td>
 </tr>
-<tr class="odd">
-<td><strong>Symmetric</strong></td>
-<td>2</td>
-<td>midpoint on axis + (p2-p1) ⊥ axis</td>
-</tr>
 <tr class="even">
-<td><strong>Equal radius</strong></td>
+<td>Symmetric</td>
+<td>2</td>
+<td>midpoint on axis + <code>(p2-p1) ⊥ axis</code></td>
+</tr>
+<tr class="odd">
+<td>Equal radius</td>
 <td>1</td>
 <td><code>r1 - r2 = 0</code></td>
 </tr>
-<tr class="odd">
-<td><strong>Point on line</strong></td>
-<td>1</td>
-<td><code>(p - start) × direction = 0</code></td>
-</tr>
 <tr class="even">
-<td><strong>Point on circle</strong></td>
+<td>Point on circle</td>
 <td>1</td>
 <td><code>‖p - center‖ - r = 0</code></td>
 </tr>
 <tr class="odd">
-<td><strong>Coplanar</strong> (3D)</td>
+<td>Coplanar (3D)</td>
 <td>1</td>
 <td><code>(p - origin) · normal = 0</code></td>
 </tr>
 </tbody>
 </table>
-<p>Reference implementation: <a href="https://github.com/solvespace/solvespace/blob/master/src/system.cpp">SolveSpace <code>src/system.cpp</code></a></p>
+<p>Also still open: per-constraint conflict identification (report which residuals stay large in an over-constrained system) and connected-component decomposition of the constraint graph.</p>
 </section>
-<section id="priority-ordering-for-jaxcad" class="level3">
-<h3 class="anchored" data-anchor-id="priority-ordering-for-jaxcad">Priority ordering for jaxCAD</h3>
-<p><strong>Tier 1 — Needed for any useful sketch:</strong></p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co"># CoincidentConstraint: p1 == p2 (connect line endpoints)</span></span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> CoincidentConstraint(Constraint):</span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> compute_residual(<span class="va">self</span>, pv):</span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> pv[<span class="va">self</span>.p1.name] <span class="op">-</span> pv[<span class="va">self</span>.p2.name]   <span class="co"># shape (3,), 3 DOF</span></span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> dof_reduction(<span class="va">self</span>): <span class="cf">return</span> <span class="dv">3</span></span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="co"># FixedConstraint: pin a point to a known location (eliminates rigid-body DOF)</span></span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> FixedConstraint(Constraint):</span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> compute_residual(<span class="va">self</span>, pv):</span>
-<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> pv[<span class="va">self</span>.point.name] <span class="op">-</span> <span class="va">self</span>.target       <span class="co"># shape (3,)</span></span>
-<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> dof_reduction(<span class="va">self</span>): <span class="cf">return</span> <span class="dv">3</span></span>
-<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="co"># HorizontalConstraint</span></span>
-<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> HorizontalConstraint(Constraint):</span>
-<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> compute_residual(<span class="va">self</span>, pv):</span>
-<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> pv[<span class="va">self</span>.line.end.name][<span class="dv">1</span>] <span class="op">-</span> pv[<span class="va">self</span>.line.start.name][<span class="dv">1</span>]  <span class="co"># scalar</span></span>
-<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> dof_reduction(<span class="va">self</span>): <span class="cf">return</span> <span class="dv">1</span></span>
-<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a><span class="co"># VerticalConstraint</span></span>
-<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> VerticalConstraint(Constraint):</span>
-<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> compute_residual(<span class="va">self</span>, pv):</span>
-<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> pv[<span class="va">self</span>.line.end.name][<span class="dv">0</span>] <span class="op">-</span> pv[<span class="va">self</span>.line.start.name][<span class="dv">0</span>]  <span class="co"># scalar</span></span>
-<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> dof_reduction(<span class="va">self</span>): <span class="cf">return</span> <span class="dv">1</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p><strong>Tier 2 — High value for 2D sketch:</strong></p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># PointOnLineConstraint: scalar cross product = 0</span></span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> PointOnLineConstraint(Constraint):</span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> compute_residual(<span class="va">self</span>, pv):</span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>        a <span class="op">=</span> pv[<span class="va">self</span>.line.end.name] <span class="op">-</span> pv[<span class="va">self</span>.line.start.name]</span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>        b <span class="op">=</span> pv[<span class="va">self</span>.point.name]    <span class="op">-</span> pv[<span class="va">self</span>.line.start.name]</span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> a[<span class="dv">0</span>]<span class="op">*</span>b[<span class="dv">1</span>] <span class="op">-</span> a[<span class="dv">1</span>]<span class="op">*</span>b[<span class="dv">0</span>]   <span class="co"># 2D cross product z-component</span></span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> dof_reduction(<span class="va">self</span>): <span class="cf">return</span> <span class="dv">1</span></span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="co"># TangentConstraint(circle, line): dist(center, line) = radius</span></span>
-<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> TangentConstraint(Constraint):</span>
-<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> compute_residual(<span class="va">self</span>, pv):</span>
-<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>        c  <span class="op">=</span> pv[<span class="va">self</span>.circle.center.name][:<span class="dv">2</span>]</span>
-<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>        r  <span class="op">=</span> pv[<span class="va">self</span>.circle.radius.name]</span>
-<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>        p1 <span class="op">=</span> pv[<span class="va">self</span>.line.start.name][:<span class="dv">2</span>]</span>
-<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>        p2 <span class="op">=</span> pv[<span class="va">self</span>.line.end.name][:<span class="dv">2</span>]</span>
-<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>        d <span class="op">=</span> p2 <span class="op">-</span> p1</span>
-<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>        cross <span class="op">=</span> d[<span class="dv">0</span>]<span class="op">*</span>(p1[<span class="dv">1</span>]<span class="op">-</span>c[<span class="dv">1</span>]) <span class="op">-</span> d[<span class="dv">1</span>]<span class="op">*</span>(p1[<span class="dv">0</span>]<span class="op">-</span>c[<span class="dv">0</span>])</span>
-<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> cross<span class="op">**</span><span class="dv">2</span> <span class="op">/</span> jnp.dot(d,d) <span class="op">-</span> r<span class="op">**</span><span class="dv">2</span>   <span class="co"># squared to avoid sqrt singularity</span></span>
-<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> dof_reduction(<span class="va">self</span>): <span class="cf">return</span> <span class="dv">1</span></span>
-<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a><span class="co"># EqualLengthConstraint</span></span>
-<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> EqualLengthConstraint(Constraint):</span>
-<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> compute_residual(<span class="va">self</span>, pv):</span>
-<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a>        l1 <span class="op">=</span> jnp.linalg.norm(pv[<span class="va">self</span>.line1.end.name] <span class="op">-</span> pv[<span class="va">self</span>.line1.start.name])</span>
-<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a>        l2 <span class="op">=</span> jnp.linalg.norm(pv[<span class="va">self</span>.line2.end.name] <span class="op">-</span> pv[<span class="va">self</span>.line2.start.name])</span>
-<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> l1 <span class="op">-</span> l2</span>
-<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> dof_reduction(<span class="va">self</span>): <span class="cf">return</span> <span class="dv">1</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p><strong>Tier 3 — Advanced:</strong> - <code>SymmetricConstraint</code>, <code>CollinearConstraint</code>, <code>EqualRadiusConstraint</code>, <code>CoplanarConstraint</code> (3D)</p>
-</section>
-<section id="numerical-improvements-to-existing-constraints" class="level3">
-<h3 class="anchored" data-anchor-id="numerical-improvements-to-existing-constraints">Numerical improvements to existing constraints</h3>
-<p><strong><code>DistanceConstraint</code></strong> — current <code>‖p1-p2‖ - d</code> has a Jacobian singularity when <code>p1 == p2</code>. Fix:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Squared form: no sqrt, no singularity at d &gt; 0</span></span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="cf">return</span> jnp.dot(p1<span class="op">-</span>p2, p1<span class="op">-</span>p2) <span class="op">-</span> d<span class="op">**</span><span class="dv">2</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p><strong><code>AngleConstraint</code></strong> — current <code>arccos(cos_angle) - theta</code> has infinite derivative at 0° and 180°. Fix:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># cos form: smooth everywhere, gradient well-conditioned</span></span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="cf">return</span> jnp.dot(v1_norm, v2_norm) <span class="op">-</span> jnp.cos(<span class="va">self</span>.angle.value)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<hr>
-</section>
-</section>
-<section id="part-2-better-solvers" class="level2">
-<h2 class="anchored" data-anchor-id="part-2-better-solvers">Part 2: Better solvers</h2>
-<section id="why-the-current-newton-raphson-fails" class="level3">
-<h3 class="anchored" data-anchor-id="why-the-current-newton-raphson-fails">Why the current Newton-Raphson fails</h3>
-<ol type="1">
-<li><strong>No step-size control</strong>: pure Newton steps can diverge far from solution.</li>
-<li><strong>Not JIT-compiled</strong>: the Python <code>for _ in range</code> + concrete <code>jnp.linalg.norm(r) &lt; tol</code> check prevents XLA compilation.</li>
-<li><strong>lstsq on every step</strong>: SVD-based overkill for exactly-constrained square systems.</li>
-<li><strong>No bounds enforcement</strong>: <code>Parameter.bounds</code> is stored but never used.</li>
-</ol>
-</section>
-<section id="drop-in-replacement-optimistix.levenbergmarquardt" class="level3">
-<h3 class="anchored" data-anchor-id="drop-in-replacement-optimistix.levenbergmarquardt">Drop-in replacement: <code>optimistix.LevenbergMarquardt</code></h3>
-<p>LM interpolates between Gauss-Newton (fast near solution) and gradient descent (stable far away) via damping parameter λ. It handles: - Singular/near-singular Jacobians (degenerate configurations). - Over-constrained systems (finds least-squares solution). - Bounded step via trust-region radius.</p>
-<p><code>optimistix</code> is <strong>already installed</strong> (v0.1.0). Tested and verified to work with jaxCAD’s residual pattern.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> optimistix <span class="im">as</span> optx</span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> lineax <span class="im">as</span> lx</span>
-<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> solve_lm(</span>
-<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>    residual_fn,</span>
-<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>    x0: Array,</span>
-<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>    <span class="op">*</span>,</span>
-<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>    rtol: <span class="bu">float</span> <span class="op">=</span> <span class="fl">1e-6</span>,</span>
-<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>    atol: <span class="bu">float</span> <span class="op">=</span> <span class="fl">1e-6</span>,</span>
-<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>    max_steps: <span class="bu">int</span> <span class="op">=</span> <span class="dv">256</span>,</span>
-<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>    throw: <span class="bu">bool</span> <span class="op">=</span> <span class="va">True</span>,</span>
-<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>) <span class="op">-&gt;</span> <span class="bu">tuple</span>[Array, <span class="bu">any</span>]:</span>
-<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Solve residual_fn(x) ≈ 0 via Levenberg-Marquardt."""</span></span>
-<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> _fn(x, args):</span>
-<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> residual_fn(x)</span>
-<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a>    solver <span class="op">=</span> optx.LevenbergMarquardt(</span>
-<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>        rtol<span class="op">=</span>rtol, atol<span class="op">=</span>atol,</span>
-<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a>        linear_solver<span class="op">=</span>lx.AutoLinearSolver(well_posed<span class="op">=</span><span class="va">False</span>),</span>
-<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a>    adjoint <span class="op">=</span> optx.ImplicitAdjoint(</span>
-<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a>        linear_solver<span class="op">=</span>lx.AutoLinearSolver(well_posed<span class="op">=</span><span class="va">False</span>),</span>
-<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb5-24"><a href="#cb5-24" aria-hidden="true" tabindex="-1"></a>    sol <span class="op">=</span> optx.least_squares(</span>
-<span id="cb5-25"><a href="#cb5-25" aria-hidden="true" tabindex="-1"></a>        _fn, solver, y0<span class="op">=</span>x0, args<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb5-26"><a href="#cb5-26" aria-hidden="true" tabindex="-1"></a>        max_steps<span class="op">=</span>max_steps,</span>
-<span id="cb5-27"><a href="#cb5-27" aria-hidden="true" tabindex="-1"></a>        adjoint<span class="op">=</span>adjoint,</span>
-<span id="cb5-28"><a href="#cb5-28" aria-hidden="true" tabindex="-1"></a>        throw<span class="op">=</span>throw,</span>
-<span id="cb5-29"><a href="#cb5-29" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb5-30"><a href="#cb5-30" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> sol.value, sol.result</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p><strong><code>ImplicitAdjoint</code> is critical</strong>: it makes differentiation through the solve O(n) (via the implicit function theorem) rather than O(n × max_steps). This means <code>jax.grad(downstream_loss)(constraint_parameters)</code> works efficiently — e.g., “how does the shape’s volume change if I increase a distance constraint by ε?”.</p>
-</section>
-<section id="jit-compatibility" class="level3">
-<h3 class="anchored" data-anchor-id="jit-compatibility">JIT compatibility</h3>
-<p><code>optimistix</code> uses <code>jax.lax.while_loop</code> internally — fully JIT-compatible. Wrap <code>solve_constraints</code> with <code>equinox.filter_jit</code>:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> equinox <span class="im">as</span> eqx</span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="at">@eqx.filter_jit</span></span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> solve_constraints_jit(sdf, <span class="op">*</span>, rtol<span class="op">=</span><span class="fl">1e-6</span>, atol<span class="op">=</span><span class="fl">1e-6</span>):</span>
-<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>    ...</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-</section>
-<section id="bounds-handling" class="level3">
-<h3 class="anchored" data-anchor-id="bounds-handling">Bounds handling</h3>
-<p>Current <code>Parameter.bounds</code> is stored but ignored. Two approaches:</p>
-<p><strong>Variable transformation (recommended for LM):</strong></p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> apply_bounds(x, lower, upper):</span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Map ℝ → (lower, upper) via sigmoid."""</span></span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> lower <span class="op">+</span> (upper <span class="op">-</span> lower) <span class="op">*</span> jax.nn.sigmoid(x)</span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> inverse_bounds(x, lower, upper):</span>
-<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Map (lower, upper) → ℝ via logit."""</span></span>
-<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>    t <span class="op">=</span> (x <span class="op">-</span> lower) <span class="op">/</span> (upper <span class="op">-</span> lower)</span>
-<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> jnp.log(t) <span class="op">-</span> jnp.log(<span class="fl">1.0</span> <span class="op">-</span> t)</span>
-<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Solve in unconstrained space, map back:</span></span>
-<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>x0_unconstrained <span class="op">=</span> inverse_bounds(x0_bounded, lower, upper)</span>
-<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>x_solved <span class="op">=</span> solve_lm(<span class="kw">lambda</span> t: residual_fn(apply_bounds(t, lower, upper)), x0_unconstrained)</span>
-<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a>x_bounded <span class="op">=</span> apply_bounds(x_solved, lower, upper)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p><strong>Box-constrained Newton</strong> (<code>optimistix.Newton</code> supports <code>lower</code>/<code>upper</code> options directly).</p>
-</section>
-<section id="robust-initialization" class="level3">
-<h3 class="anchored" data-anchor-id="robust-initialization">Robust initialization</h3>
-<p>The current code passes initial parameter values as <code>x0</code>. Better strategies:</p>
-<ol type="1">
-<li><strong>Incremental constraint adding</strong>: add constraints one at a time, solving after each. Dramatically better conditioning.</li>
-<li><strong>Connected-component decomposition</strong>: solve independent sub-systems separately (see Part 3).</li>
-<li><strong>Random restarts</strong>: retry with small perturbations when convergence fails.</li>
-</ol>
-</section>
-<section id="scipy-fallback-non-jit" class="level3">
-<h3 class="anchored" data-anchor-id="scipy-fallback-non-jit">scipy fallback (non-JIT)</h3>
-<p>For debug/fallback, <code>scipy.optimize.least_squares(method='lm')</code> with a JAX-computed Jacobian:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> scipy.optimize <span class="im">import</span> least_squares <span class="im">as</span> scipy_lm</span>
-<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> scipy_fallback(residual_fn, x0, <span class="op">*</span>, tol<span class="op">=</span><span class="fl">1e-6</span>):</span>
-<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>    result <span class="op">=</span> scipy_lm(</span>
-<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>        fun<span class="op">=</span><span class="kw">lambda</span> x: np.array(residual_fn(jnp.array(x))),</span>
-<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>        x0<span class="op">=</span>np.array(x0),</span>
-<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>        jac<span class="op">=</span><span class="kw">lambda</span> x: np.array(jax.jacobian(residual_fn)(jnp.array(x))),</span>
-<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>        method<span class="op">=</span><span class="st">'lm'</span>, ftol<span class="op">=</span>tol, xtol<span class="op">=</span>tol,</span>
-<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> jnp.array(result.x), result.success</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<hr>
-</section>
-</section>
-<section id="part-3-underover-constrained-handling" class="level2">
-<h2 class="anchored" data-anchor-id="part-3-underover-constrained-handling">Part 3: Under/over-constrained handling</h2>
-<section id="current-behavior" class="level3">
-<h3 class="anchored" data-anchor-id="current-behavior">Current behavior</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> remaining <span class="op">&gt;</span> <span class="dv">0</span>:</span>
-<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>    <span class="cf">raise</span> <span class="pp">ValueError</span>(<span class="ss">f"Under-constrained: </span><span class="sc">{</span>remaining<span class="sc">}</span><span class="ss"> DOF remaining."</span>)</span>
-<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> remaining <span class="op">&lt;</span> <span class="dv">0</span>:</span>
-<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">raise</span> <span class="pp">ValueError</span>(<span class="ss">f"Over-constrained by </span><span class="sc">{</span><span class="op">-</span>remaining<span class="sc">}</span><span class="ss"> equations."</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Hard gate before any solving. No information about <em>which</em> parameters or constraints are problematic.</p>
-</section>
-<section id="better-api-constraintsolution-result-object" class="level3">
-<h3 class="anchored" data-anchor-id="better-api-constraintsolution-result-object">Better API: <code>ConstraintSolution</code> result object</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> dataclasses <span class="im">import</span> dataclass, field</span>
-<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> enum <span class="im">import</span> Enum</span>
-<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> ConstraintStatus(Enum):</span>
-<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>    SOLVED            <span class="op">=</span> <span class="st">"solved"</span></span>
-<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>    UNDER_CONSTRAINED <span class="op">=</span> <span class="st">"under_constrained"</span></span>
-<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>    OVER_CONSTRAINED  <span class="op">=</span> <span class="st">"over_constrained"</span></span>
-<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>    FAILED            <span class="op">=</span> <span class="st">"failed_convergence"</span></span>
-<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a><span class="at">@dataclass</span></span>
-<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> ConstraintSolution:</span>
-<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>    status: ConstraintStatus</span>
-<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a>    params: <span class="bu">dict</span>               <span class="co"># best-effort solved parameter values</span></span>
-<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a>    residual_norm: <span class="bu">float</span></span>
-<span id="cb10-15"><a href="#cb10-15" aria-hidden="true" tabindex="-1"></a>    free_dof: <span class="bu">int</span>              <span class="co"># remaining unconstrained DOF (0 = exactly constrained)</span></span>
-<span id="cb10-16"><a href="#cb10-16" aria-hidden="true" tabindex="-1"></a>    violated_constraints: <span class="bu">list</span> <span class="co"># constraints with residual &gt; tol</span></span>
-<span id="cb10-17"><a href="#cb10-17" aria-hidden="true" tabindex="-1"></a>    message: <span class="bu">str</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-</section>
-<section id="under-constrained-solve-anyway" class="level3">
-<h3 class="anchored" data-anchor-id="under-constrained-solve-anyway">Under-constrained: solve anyway</h3>
-<p>Remove the DOF check. LM naturally finds the minimum-residual + minimum-norm solution. For under-determined systems (more unknowns than equations), LM finds the solution closest to <code>x0</code> — i.e., “minimum displacement from initial guess”, which is exactly the right behavior for interactive use.</p>
-<p>Optional: add soft regularization to pin unconstrained directions to initial values:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> residual_regularized(x, x0, alpha<span class="op">=</span><span class="fl">1e-3</span>):</span>
-<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> jnp.concatenate([</span>
-<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>        constraint_residuals(x),</span>
-<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>        alpha <span class="op">*</span> (x <span class="op">-</span> x0),          <span class="co"># soft pin to initial position</span></span>
-<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>    ])</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-</section>
-<section id="over-constrained-solve-and-report-conflicts" class="level3">
-<h3 class="anchored" data-anchor-id="over-constrained-solve-and-report-conflicts">Over-constrained: solve and report conflicts</h3>
-<p>Remove the check. LM minimizes <code>‖r‖²</code>. After solving, examine per-constraint residuals:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>r_chunks <span class="op">=</span> split_residuals_by_constraint(residual_fn, x_solved, constraints)</span>
-<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>violated <span class="op">=</span> [(c, <span class="bu">float</span>(jnp.linalg.norm(r))) <span class="cf">for</span> c, r <span class="kw">in</span> r_chunks <span class="cf">if</span> ... <span class="op">&gt;</span> tol]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-</section>
-<section id="conflict-detection-via-jacobian-rank" class="level3">
-<h3 class="anchored" data-anchor-id="conflict-detection-via-jacobian-rank">Conflict detection via Jacobian rank</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>J <span class="op">=</span> build_constraint_jacobian(x, param_values)</span>
-<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>U, s, Vt <span class="op">=</span> jnp.linalg.svd(J, full_matrices<span class="op">=</span><span class="va">False</span>)</span>
-<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>rank <span class="op">=</span> <span class="bu">int</span>(jnp.<span class="bu">sum</span>(s <span class="op">&gt;</span> <span class="fl">1e-10</span> <span class="op">*</span> s[<span class="dv">0</span>]))</span>
-<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>n_redundant <span class="op">=</span> J.shape[<span class="dv">0</span>] <span class="op">-</span> rank</span>
-<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a><span class="co"># U[:, rank:] columns identify which constraint combinations are redundant</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-</section>
-<section id="connected-component-decomposition" class="level3">
-<h3 class="anchored" data-anchor-id="connected-component-decomposition">Connected-component decomposition</h3>
-<p>Solve independent sub-systems separately for better performance and initialization:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> get_connected_components(graph, param_list):</span>
-<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""BFS on constraint-parameter bipartite graph."""</span></span>
-<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>    param_names <span class="op">=</span> {p.name <span class="cf">for</span> p <span class="kw">in</span> param_list}</span>
-<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>    adj <span class="op">=</span> {p.name: <span class="bu">set</span>() <span class="cf">for</span> p <span class="kw">in</span> param_list}</span>
-<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> c <span class="kw">in</span> graph.constraints:</span>
-<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>        fps <span class="op">=</span> [p.name <span class="cf">for</span> p <span class="kw">in</span> c.get_parameters() <span class="cf">if</span> p.name <span class="kw">in</span> param_names]</span>
-<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="bu">len</span>(fps)):</span>
-<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a>            <span class="cf">for</span> j <span class="kw">in</span> <span class="bu">range</span>(i<span class="op">+</span><span class="dv">1</span>, <span class="bu">len</span>(fps)):</span>
-<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a>                adj[fps[i]].add(fps[j])</span>
-<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a>                adj[fps[j]].add(fps[i])</span>
-<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a>    visited, components <span class="op">=</span> <span class="bu">set</span>(), []</span>
-<span id="cb14-12"><a href="#cb14-12" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> start <span class="kw">in</span> param_names:</span>
-<span id="cb14-13"><a href="#cb14-13" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> start <span class="kw">not</span> <span class="kw">in</span> visited:</span>
-<span id="cb14-14"><a href="#cb14-14" aria-hidden="true" tabindex="-1"></a>            comp, queue <span class="op">=</span> <span class="bu">set</span>(), [start]</span>
-<span id="cb14-15"><a href="#cb14-15" aria-hidden="true" tabindex="-1"></a>            <span class="cf">while</span> queue:</span>
-<span id="cb14-16"><a href="#cb14-16" aria-hidden="true" tabindex="-1"></a>                n <span class="op">=</span> queue.pop()</span>
-<span id="cb14-17"><a href="#cb14-17" aria-hidden="true" tabindex="-1"></a>                <span class="cf">if</span> n <span class="kw">not</span> <span class="kw">in</span> visited:</span>
-<span id="cb14-18"><a href="#cb14-18" aria-hidden="true" tabindex="-1"></a>                    visited.add(n)<span class="op">;</span> comp.add(n)</span>
-<span id="cb14-19"><a href="#cb14-19" aria-hidden="true" tabindex="-1"></a>                    queue.extend(adj[n] <span class="op">-</span> visited)</span>
-<span id="cb14-20"><a href="#cb14-20" aria-hidden="true" tabindex="-1"></a>            components.append(comp)</span>
-<span id="cb14-21"><a href="#cb14-21" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> components</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-</section>
-<section id="backward-compatible-api" class="level3">
-<h3 class="anchored" data-anchor-id="backward-compatible-api">Backward-compatible API</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> solve_constraints(sdf, <span class="op">*</span>, tol<span class="op">=</span><span class="fl">1e-6</span>, max_steps<span class="op">=</span><span class="dv">256</span>, strict<span class="op">=</span><span class="va">False</span>):</span>
-<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""</span></span>
-<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a><span class="co">    Args:</span></span>
-<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a><span class="co">        strict: If True, raise ValueError for non-exactly-constrained systems</span></span>
-<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a><span class="co">                (preserves old behavior). Default False: return ConstraintSolution.</span></span>
-<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<hr>
-</section>
-</section>
-<section id="part-4-2d-sketch-constraints" class="level2">
-<h2 class="anchored" data-anchor-id="part-4-2d-sketch-constraints">Part 4: 2D sketch constraints</h2>
-<section id="architecture-question-3d-vectors-in-a-2d-sketch" class="level3">
-<h3 class="anchored" data-anchor-id="architecture-question-3d-vectors-in-a-2d-sketch">Architecture question: 3D vectors in a 2D sketch</h3>
-<p>jaxCAD’s <code>Vector</code> is always 3D. For 2D sketching, two options:</p>
-<p><strong>Option A (near-term, no refactor)</strong>: enforce z=0 with inline residuals per constraint. Each 2D constraint also zeroes the z-components of its parameters.</p>
-<p><strong>Option B (recommended long-term)</strong>: add a <code>Vector2</code> parameter type:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="at">@dataclass</span></span>
-<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> Vector2(Parameter):</span>
-<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""2D point (x, y) for sketch geometry. 2 DOF each."""</span></span>
-<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">@property</span></span>
-<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> xy(<span class="va">self</span>) <span class="op">-&gt;</span> Array:</span>
-<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="va">self</span>.value   <span class="co"># shape (2,)</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>This gives correct DOF counting (2 DOF per point, not 3) and cleaner constraint residuals.</p>
-</section>
-<section id="most-important-2d-constraints-for-jaxcads-geometry" class="level3">
-<h3 class="anchored" data-anchor-id="most-important-2d-constraints-for-jaxcads-geometry">Most important 2D constraints for jaxCAD’s geometry</h3>
-<p><strong>For <code>Line(start: Vector, end: Vector)</code>:</strong> - <code>CoincidentConstraint(line1.end, line2.start)</code> — <em>most used constraint in practice</em> - <code>HorizontalConstraint(line)</code>, <code>VerticalConstraint(line)</code> - <code>EqualLengthConstraint(line1, line2)</code> - <code>DistanceConstraint(line.start, line.end, length)</code> — already exists</p>
-<p><strong>For <code>Circle(center: Vector, radius: Scalar, normal: Vector)</code>:</strong> - <code>ConcentricConstraint(c1, c2)</code> — 2 equations: <code>c1.center - c2.center = 0</code> - <code>EqualRadiusConstraint(c1, c2)</code> — 1 equation: <code>c1.r - c2.r = 0</code> - <code>PointOnCircleConstraint(p, circle)</code> - <code>TangentConstraint(line, circle)</code> — see residual formula in Part 1</p>
-</section>
-<section id="how-professional-2d-sketch-solvers-work" class="level3">
-<h3 class="anchored" data-anchor-id="how-professional-2d-sketch-solvers-work">How professional 2D sketch solvers work</h3>
-<table class="caption-top table">
-<colgroup>
-<col style="width: 33%">
-<col style="width: 33%">
-<col style="width: 33%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>Solver</th>
-<th>Architecture</th>
-<th>Notes</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td><strong>SolveSpace</strong> (https://github.com/solvespace/solvespace)</td>
-<td>Newton-Raphson + BFGS fallback, dense Jacobian</td>
-<td>Open-source MIT, C++; Python bindings: <code>pip install python-solvespace</code></td>
-</tr>
-<tr class="even">
-<td><strong>FreeCAD Sketcher</strong></td>
-<td><code>planegcs</code> solver (https://github.com/FreeCAD/FreeCAD/tree/master/src/Mod/Sketcher/App/planegcs), rank-revealing QR</td>
-<td>22 constraint types in <code>Constraints.h</code></td>
-</tr>
-<tr class="odd">
-<td><strong>Onshape</strong></td>
-<td>D-Cubed 2D DCM (Siemens DISW), structural decomposition</td>
-<td>Proprietary</td>
-</tr>
-</tbody>
-</table>
-<p>All three use Newton-Raphson (or variants) as the numerical core. The key investment is in: 1. <strong>Incremental constraint solving</strong> — add one constraint at a time. 2. <strong>Real-time DOF counter</strong> in the UI. 3. <strong>Conflict visualization</strong> — highlight over-constrained geometry in red.</p>
-</section>
-<section id="python-solvespace-as-a-referencefallback" class="level3">
-<h3 class="anchored" data-anchor-id="python-solvespace-as-a-referencefallback">python-solvespace as a reference/fallback</h3>
-<p><code>pip install python-solvespace</code> gives a Python API to the C++ SolveSpace solver:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> python_solvespace <span class="im">import</span> SolveSpaceSystem, Entity, Constraint, ResultFlag</span>
-<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>sys <span class="op">=</span> SolveSpaceSystem()</span>
-<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>wp <span class="op">=</span> sys.create_2d_base()</span>
-<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>p1 <span class="op">=</span> sys.add_point_2d(<span class="dv">0</span>, <span class="dv">0</span>, wp)</span>
-<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a>p2 <span class="op">=</span> sys.add_point_2d(<span class="dv">2</span>, <span class="dv">0</span>, wp)</span>
-<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a>sys.distance(p1, p2, <span class="fl">2.0</span>, wp)  <span class="co"># DistanceConstraint</span></span>
-<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> sys.solve()</span>
-<span id="cb17-9"><a href="#cb17-9" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> result <span class="op">==</span> ResultFlag.OKAY:</span>
-<span id="cb17-10"><a href="#cb17-10" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(sys.params(p2.params[<span class="dv">0</span>]), sys.params(p2.params[<span class="dv">1</span>]))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>This can serve as a validation oracle for jaxCAD’s constraint solver.</p>
-<hr>
-</section>
-</section>
-<section id="summary-recommended-changes" class="level2">
-<h2 class="anchored" data-anchor-id="summary-recommended-changes">Summary: recommended changes</h2>
-<section id="priority-0-highest-impact" class="level3">
-<h3 class="anchored" data-anchor-id="priority-0-highest-impact">Priority 0 (highest impact)</h3>
-<ol type="1">
-<li><strong>Replace <code>newton_raphson</code> with <code>optimistix.LevenbergMarquardt</code></strong> in <code>jaxcad/constraints/solve.py</code> — use <code>ImplicitAdjoint</code> for differentiability through the solve.</li>
-<li><strong>Remove hard DOF check</strong> — return <code>ConstraintSolution</code> with status field instead of raising.</li>
-<li><strong>Add <code>CoincidentConstraint</code></strong> — the most-used constraint in any sketch workflow.</li>
-<li><strong>Add <code>FixedConstraint</code></strong> — needed to eliminate rigid-body DOF and make sketches well-determined.</li>
-</ol>
-</section>
-<section id="priority-1" class="level3">
-<h3 class="anchored" data-anchor-id="priority-1">Priority 1</h3>
-<ol start="5" type="1">
-<li><strong>Fix <code>DistanceConstraint</code></strong> to use squared form (eliminate singularity at <code>p1 == p2</code>).</li>
-<li><strong>Fix <code>AngleConstraint</code></strong> to use <code>cos</code> form (eliminate singularity at 0°/180°).</li>
-<li><strong>Add <code>HorizontalConstraint</code>, <code>VerticalConstraint</code></strong>.</li>
-<li><strong>Add <code>PointOnLineConstraint</code>, <code>PointOnCircleConstraint</code></strong>, <code>TangentConstraint(line, circle)</code>.</li>
-<li><strong>Add bounds support</strong> via sigmoid transformation in <code>solve_constraints</code>.</li>
-</ol>
-</section>
-<section id="priority-2" class="level3">
-<h3 class="anchored" data-anchor-id="priority-2">Priority 2</h3>
-<ol start="10" type="1">
-<li>Add <code>EqualLengthConstraint</code>, <code>MidpointConstraint</code>, <code>ConcentricConstraint</code>.</li>
-<li>Add <code>Vector2</code> parameter type for 2D sketching.</li>
-<li>Add connected-component decomposition in <code>ConstraintGraph</code>.</li>
-<li>Add conflict identification (per-constraint residual reporting).</li>
-</ol>
-<hr>
-</section>
-</section>
-<section id="key-references" class="level2">
-<h2 class="anchored" data-anchor-id="key-references">Key references</h2>
+<section id="references" class="level2">
+<h2 class="anchored" data-anchor-id="references">References</h2>
 <table class="caption-top table">
 <colgroup>
 <col style="width: 50%">
@@ -770,28 +272,20 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </thead>
 <tbody>
 <tr class="odd">
-<td>optimistix docs</td>
-<td>https://docs.kidger.site/optimistix/</td>
-</tr>
-<tr class="even">
-<td>lineax docs</td>
-<td>https://docs.kidger.site/lineax/</td>
-</tr>
-<tr class="odd">
-<td>SolveSpace source</td>
-<td>https://github.com/solvespace/solvespace</td>
+<td>SolveSpace constraint reference</td>
+<td>https://github.com/solvespace/solvespace (<code>src/system.cpp</code>)</td>
 </tr>
 <tr class="even">
 <td>FreeCAD planegcs</td>
 <td>https://github.com/FreeCAD/FreeCAD/tree/master/src/Mod/Sketcher/App/planegcs</td>
 </tr>
 <tr class="odd">
-<td>python-solvespace</td>
+<td>python-solvespace (validation oracle)</td>
 <td>https://pypi.org/project/python-solvespace/</td>
 </tr>
 <tr class="even">
-<td>Nocedal &amp; Wright “Numerical Optimization”</td>
-<td>Ch. 4 (trust region), Ch. 10 (Levenberg-Marquardt)</td>
+<td>optimistix docs</td>
+<td>https://docs.kidger.site/optimistix/</td>
 </tr>
 </tbody>
 </table>
@@ -874,7 +368,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     }
       var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
       var mailtoRegex = new RegExp(/^mailto:/);
-        var filterRegex = new RegExp("https:\/\/andrinr\.github\.io\/jaxcad\/");
+        var filterRegex = new RegExp("https:\/\/andrinr\.github\.io\/cadjoint\/");
       var isInternal = (href) => {
           return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
       }

@@ -1,0 +1,1270 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.10.18">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>simulator-ecosystem – cadjoint</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-f83c246346592b24d02aa84ae3974412.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+</head>
+
+<body class="nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">cadjoint</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../docs/getting-started.html"> 
+<span class="menu-text">Get Started</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../docs/rendering.html"> 
+<span class="menu-text">Rendering</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../docs/viewer.html"> 
+<span class="menu-text">WebGPU Viewer</span></a>
+  </li>  
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-examples" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Examples</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-examples">    
+        <li>
+    <a class="dropdown-item" href="../examples/basics.html">
+ <span class="dropdown-text">Basics</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/rendering.html">
+ <span class="dropdown-text">Rendering</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/sketch_construction.html">
+ <span class="dropdown-text">Sketch Construction</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/constraints.html">
+ <span class="dropdown-text">Constraints</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/optimization.html">
+ <span class="dropdown-text">Optimization</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/constrained_optimization.html">
+ <span class="dropdown-text">Constrained Optimization</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="../reference/index.html"> 
+<span class="menu-text">API Reference</span></a>
+  </li>  
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/andrinr/cadjoint"> <i class="bi bi-github" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#simulator-ecosystem-survey-what-plugs-into-the-differentiable-cad-chain-next" id="toc-simulator-ecosystem-survey-what-plugs-into-the-differentiable-cad-chain-next" class="nav-link active" data-scroll-target="#simulator-ecosystem-survey-what-plugs-into-the-differentiable-cad-chain-next">Simulator ecosystem survey: what plugs into the differentiable CAD chain next</a>
+  <ul class="collapse">
+  <li><a href="#how-candidates-were-ranked" id="toc-how-candidates-were-ranked" class="nav-link" data-scroll-target="#how-candidates-were-ranked">How candidates were ranked</a>
+  <ul class="collapse">
+  <li><a href="#packaging-lanes-referenced-throughout" id="toc-packaging-lanes-referenced-throughout" class="nav-link" data-scroll-target="#packaging-lanes-referenced-throughout">Packaging lanes (referenced throughout)</a></li>
+  </ul></li>
+  <li><a href="#ranked-table-all-31-candidates" id="toc-ranked-table-all-31-candidates" class="nav-link" data-scroll-target="#ranked-table-all-31-candidates">Ranked table — all 31 candidates</a></li>
+  <li><a href="#cross-cutting-findings" id="toc-cross-cutting-findings" class="nav-link" data-scroll-target="#cross-cutting-findings">Cross-cutting findings</a>
+  <ul class="collapse">
+  <li><a href="#the-sdf-is-the-unlock-and-the-pitch-line" id="toc-the-sdf-is-the-unlock-and-the-pitch-line" class="nav-link" data-scroll-target="#the-sdf-is-the-unlock-and-the-pitch-line">The SDF is the unlock (and the pitch line)</a></li>
+  <li><a href="#two-vjp-boundary-shapes-both-already-proven-in-repo" id="toc-two-vjp-boundary-shapes-both-already-proven-in-repo" class="nav-link" data-scroll-target="#two-vjp-boundary-shapes-both-already-proven-in-repo">Two VJP boundary shapes, both already proven in-repo</a></li>
+  <li><a href="#the-fluid-domain-gap" id="toc-the-fluid-domain-gap" class="nav-link" data-scroll-target="#the-fluid-domain-gap">The fluid-domain gap</a></li>
+  <li><a href="#contact-gradients-need-the-fd-validation-discipline" id="toc-contact-gradients-need-the-fd-validation-discipline" class="nav-link" data-scroll-target="#contact-gradients-need-the-fd-validation-discipline">Contact gradients need the FD-validation discipline</a></li>
+  <li><a href="#tesseract-core-gradient-facts-verified-in-installed-1.11.0-source" id="toc-tesseract-core-gradient-facts-verified-in-installed-1.11.0-source" class="nav-link" data-scroll-target="#tesseract-core-gradient-facts-verified-in-installed-1.11.0-source">Tesseract-core gradient facts (verified in installed 1.11.0 source)</a></li>
+  <li><a href="#license-containment" id="toc-license-containment" class="nav-link" data-scroll-target="#license-containment">License containment</a></li>
+  </ul></li>
+  <li><a href="#top-candidates-in-detail" id="toc-top-candidates-in-detail" class="nav-link" data-scroll-target="#top-candidates-in-detail">Top candidates in detail</a>
+  <ul class="collapse">
+  <li><a href="#calculix-the-fortran-code-with-a-real-adjoint-score-9.0-shipped" id="toc-calculix-the-fortran-code-with-a-real-adjoint-score-9.0-shipped" class="nav-link" data-scroll-target="#calculix-the-fortran-code-with-a-real-adjoint-score-9.0-shipped">1. CalculiX — the Fortran code with a real adjoint (score 9.0) — SHIPPED</a></li>
+  <li><a href="#jax-fluids-2.0-the-jax-native-cfd-flagship-score-9.0" id="toc-jax-fluids-2.0-the-jax-native-cfd-flagship-score-9.0" class="nav-link" data-scroll-target="#jax-fluids-2.0-the-jax-native-cfd-flagship-score-9.0">2. JAX-Fluids 2.0 — the jax-native CFD flagship (score 9.0)</a></li>
+  <li><a href="#jwave-the-smallest-diff-a-new-physics-domain-score-8.5" id="toc-jwave-the-smallest-diff-a-new-physics-domain-score-8.5" class="nav-link" data-scroll-target="#jwave-the-smallest-diff-a-new-physics-domain-score-8.5">3. jwave — the smallest diff, a new physics domain (score 8.5)</a></li>
+  <li><a href="#mujoco-mjx-contact-rich-mechanism-design-score-8.0" id="toc-mujoco-mjx-contact-rich-mechanism-design-score-8.0" class="nav-link" data-scroll-target="#mujoco-mjx-contact-rich-mechanism-design-score-8.0">4. MuJoCo MJX — contact-rich mechanism design (score 8.0)</a></li>
+  <li><a href="#diffrax-an-in-repo-mechanism-layer-the-cheapest-full-chain-demo-score-8.0" id="toc-diffrax-an-in-repo-mechanism-layer-the-cheapest-full-chain-demo-score-8.0" class="nav-link" data-scroll-target="#diffrax-an-in-repo-mechanism-layer-the-cheapest-full-chain-demo-score-8.0">5. Diffrax + an in-repo mechanism layer — the cheapest full-chain demo (score 8.0)</a></li>
+  <li><a href="#xlb-a-second-physics-for-the-bracket-score-7.5" id="toc-xlb-a-second-physics-for-the-bracket-score-7.5" class="nav-link" data-scroll-target="#xlb-a-second-physics-for-the-bracket-score-7.5">6. XLB — a second physics for the bracket (score 7.5)</a></li>
+  <li><a href="#fdtdx-electromagnetics-nobody-else-offers-score-7.5" id="toc-fdtdx-electromagnetics-nobody-else-offers-score-7.5" class="nav-link" data-scroll-target="#fdtdx-electromagnetics-nobody-else-offers-score-7.5">7. fdtdx — electromagnetics nobody else offers (score 7.5)</a></li>
+  <li><a href="#firedrake-pyadjoint-the-hex-meshs-natural-fem-home-score-7.5" id="toc-firedrake-pyadjoint-the-hex-meshs-natural-fem-home-score-7.5" class="nav-link" data-scroll-target="#firedrake-pyadjoint-the-hex-meshs-natural-fem-home-score-7.5">8. Firedrake + pyadjoint — the hex mesh’s natural FEM home (score 7.5)</a></li>
+  <li><a href="#modflow-6-mf6-adj-the-other-legacy-fortran-story-score-7.5" id="toc-modflow-6-mf6-adj-the-other-legacy-fortran-story-score-7.5" class="nav-link" data-scroll-target="#modflow-6-mf6-adj-the-other-legacy-fortran-story-score-7.5">9. MODFLOW 6 + MF6-ADJ — the other legacy-Fortran story (score 7.5)</a></li>
+  <li><a href="#su2-the-credibility-grade-rans-adjoint-score-7.0" id="toc-su2-the-credibility-grade-rans-adjoint-score-7.0" class="nav-link" data-scroll-target="#su2-the-credibility-grade-rans-adjoint-score-7.0">10. SU2 — the credibility-grade RANS adjoint (score 7.0)</a></li>
+  </ul></li>
+  <li><a href="#notable-mid-table-candidates-short-form" id="toc-notable-mid-table-candidates-short-form" class="nav-link" data-scroll-target="#notable-mid-table-candidates-short-form">Notable mid-table candidates (short form)</a></li>
+  <li><a href="#rejected-parked-with-reasons" id="toc-rejected-parked-with-reasons" class="nav-link" data-scroll-target="#rejected-parked-with-reasons">Rejected / parked (with reasons)</a></li>
+  <li><a href="#recommended-next-integrations" id="toc-recommended-next-integrations" class="nav-link" data-scroll-target="#recommended-next-integrations">Recommended next integrations</a>
+  <ul class="collapse">
+  <li><a href="#jwave-ultrasound-lens-s" id="toc-jwave-ultrasound-lens-s" class="nav-link" data-scroll-target="#jwave-ultrasound-lens-s">1. jwave ultrasound lens (S)</a></li>
+  <li><a href="#jax-fluids-fairing-m-the-flagship" id="toc-jax-fluids-fairing-m-the-flagship" class="nav-link" data-scroll-target="#jax-fluids-fairing-m-the-flagship">2. JAX-Fluids fairing (M, the flagship)</a></li>
+  </ul></li>
+  </ul></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"></header>
+
+
+
+
+<section id="simulator-ecosystem-survey-what-plugs-into-the-differentiable-cad-chain-next" class="level1">
+<h1>Simulator ecosystem survey: what plugs into the differentiable CAD chain next</h1>
+<p>Status: survey (2026-08-16); <strong>#1 CalculiX has since shipped</strong> — <code>cadjoint/fem/calculix.py</code> + <code>cadjoint/fem/tesseracts/elastic_calculix/</code>, see <code>research/fem-integration.md</code>. Full integration history in git/PR #19. Five domain sweeps (JAX-native CFD/misc, mesh-based CFD adjoints, wave/EM/acoustics, multibody dynamics, legacy/Fortran FEA) merged, deduplicated, and cross-ranked. Every maintenance/license claim below was verified against the GitHub/PyPI APIs by the researchers in Aug 2026, and every differentiability claim was checked against shipped code, not papers. Companion to <code>research/fem-integration.md</code>, which defines the ABI all of this plugs into (<code>cadjoint/fem/backends.py</code> <code>SolverBackend</code>, reference tesseracts under <code>cadjoint/fem/tesseracts/</code>).</p>
+<section id="how-candidates-were-ranked" class="level2">
+<h2 class="anchored" data-anchor-id="how-candidates-were-ranked">How candidates were ranked</h2>
+<p>Composite of four axes, in this order of weight:</p>
+<ol type="1">
+<li><strong>Differentiability quality</strong> — jax-native trace &gt; discrete adjoint &gt; continuous adjoint &gt; FD-only. “Adjoint” had to be verified in shipped code; several famous codes failed this bar (see rejects).</li>
+<li><strong>Demo value</strong> — does the demo showcase <em>cadjoint’s</em> geometry pipeline (constraints → SDF → mesh), and is it visually/narratively strong?</li>
+<li><strong>Integration effort</strong> — S &lt; 1 week, M 1–3 weeks, L &gt; 3 weeks, counting the geometry adapter, not just <code>pip install</code>.</li>
+<li><strong>Usefulness for engineering CAD</strong> — physics an engineer designing parts actually cares about.</li>
+</ol>
+<section id="packaging-lanes-referenced-throughout" class="level3">
+<h3 class="anchored" data-anchor-id="packaging-lanes-referenced-throughout">Packaging lanes (referenced throughout)</h3>
+<ul>
+<li><strong>Lane A — direct fast lane</strong>: pure-JAX solver imported in-process, composes with <code>jax.grad</code> natively, like <code>JaxFemBackend</code>. No serialization overhead.</li>
+<li><strong>Lane B — Tesseract subprocess/in-process API</strong>: <code>tesseract_api.py</code> with typed schemas + hand-written <code>vector_jacobian_product</code>, loaded via <code>Tesseract.from_tesseract_api</code> (no Docker) — the proven ~0.14 s/roundtrip boundary. Right for JAX-version conflicts, non-JAX AD systems, and GPL isolation.</li>
+<li><strong>Lane C — containerized Tesseract</strong>: <code>tesseract build</code> image around a heavy or unbuildable-locally stack (OpenFOAM, SU2-AD, PETSc, GPU-only). The distribution story; also the only sane route for some codes.</li>
+</ul>
+</section>
+</section>
+<section id="ranked-table-all-31-candidates" class="level2">
+<h2 class="anchored" data-anchor-id="ranked-table-all-31-candidates">Ranked table — all 31 candidates</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 12%">
+<col style="width: 12%">
+<col style="width: 12%">
+<col style="width: 12%">
+<col style="width: 12%">
+<col style="width: 12%">
+<col style="width: 12%">
+<col style="width: 12%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>#</th>
+<th>Candidate</th>
+<th>Physics</th>
+<th>Gradient</th>
+<th>Geometry fit</th>
+<th>Lane</th>
+<th>Effort</th>
+<th>Score</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1</td>
+<td><strong>CalculiX (ccx)</strong> — <em>shipped</em></td>
+<td>structural FEA (Abaqus-like), thermal, frequency</td>
+<td>discrete adjoint, native (<code>*SENSITIVITY</code>)</td>
+<td>HEX8 <code>.inp</code> = cadjoint hex mesh 1:1</td>
+<td>B (subprocess)</td>
+<td>M</td>
+<td>9.0</td>
+</tr>
+<tr class="even">
+<td>2</td>
+<td><strong>JAX-Fluids 2.0</strong></td>
+<td>compressible NS, two-phase, levelset immersed solids</td>
+<td>jax-native</td>
+<td>SDF <strong>is</strong> the native levelset input</td>
+<td>A</td>
+<td>M</td>
+<td>9.0</td>
+</tr>
+<tr class="odd">
+<td>3</td>
+<td><strong>jwave</strong></td>
+<td>acoustics/ultrasound (time-domain + Helmholtz)</td>
+<td>jax-native</td>
+<td>SDF → material grid, ~10-line adapter</td>
+<td>A (B if jax pins clash)</td>
+<td>S</td>
+<td>8.5</td>
+</tr>
+<tr class="even">
+<td>4</td>
+<td><strong>MuJoCo MJX (JAX backend)</strong></td>
+<td>rigid multibody + contact</td>
+<td>jax-native (“mostly supported”)</td>
+<td>MJCF primitives + differentiable inertia from SDF</td>
+<td>A</td>
+<td>M</td>
+<td>8.0</td>
+</tr>
+<tr class="odd">
+<td>5</td>
+<td><strong>Diffrax + in-repo mechanism layer</strong></td>
+<td>ODE dynamics: linkages, lumped thermal, control</td>
+<td>jax-native, reference adjoints</td>
+<td>none needed — consumes cadjoint sketches directly</td>
+<td>A</td>
+<td>S</td>
+<td>8.0</td>
+</tr>
+<tr class="even">
+<td>6</td>
+<td><strong>XLB (Autodesk)</strong></td>
+<td>lattice Boltzmann, incompressible-regime flows</td>
+<td>jax-native (JAX backend only)</td>
+<td>SDF → smoothed voxel mask</td>
+<td>A</td>
+<td>M</td>
+<td>7.5</td>
+</tr>
+<tr class="odd">
+<td>7</td>
+<td><strong>fdtdx</strong></td>
+<td>3D Maxwell FDTD</td>
+<td>jax-native, constant-memory backward</td>
+<td>SDF → permittivity grid</td>
+<td>A</td>
+<td>S/M</td>
+<td>7.5</td>
+</tr>
+<tr class="even">
+<td>8</td>
+<td><strong>Firedrake + pyadjoint</strong></td>
+<td>any UFL PDE: Helmholtz acoustics, elastodynamics</td>
+<td>discrete adjoint w.r.t. <strong>mesh coordinates</strong></td>
+<td>consumes the HEX8 mesh natively — drop-in for the points-VJP contract</td>
+<td>B/C</td>
+<td>M</td>
+<td>7.5</td>
+</tr>
+<tr class="odd">
+<td>9</td>
+<td><strong>MODFLOW 6 + MF6-ADJ</strong></td>
+<td>groundwater flow (Darcy), USGS Fortran</td>
+<td>discrete adjoint (non-intrusive, via libmf6)</td>
+<td>SDF lattice <strong>is</strong> the model grid, zero meshing</td>
+<td>B (pip, in-process)</td>
+<td>M</td>
+<td>7.5</td>
+</tr>
+<tr class="even">
+<td>10</td>
+<td><strong>SU2</strong></td>
+<td>compressible/incompressible RANS, external aero</td>
+<td>discrete adjoint (CoDiPack, whole solver)</td>
+<td>needs exterior <strong>fluid</strong> mesh; surface-node VJP</td>
+<td>C</td>
+<td>L</td>
+<td>7.0</td>
+</tr>
+<tr class="odd">
+<td>11</td>
+<td>DAFoam</td>
+<td>OpenFOAM RANS, internal flow, CHT</td>
+<td>discrete adjoint (JFNK, &lt;0.1% error)</td>
+<td>fluid mesh via snappyHexMesh; surface-node VJP</td>
+<td>C (official Docker)</td>
+<td>L</td>
+<td>6.5</td>
+</tr>
+<tr class="even">
+<td>12</td>
+<td>Meep + meep.adjoint</td>
+<td>broadband 3D EM FDTD</td>
+<td>discrete adjoint (2 runs, density)</td>
+<td>SDF → MaterialGrid density</td>
+<td>C (conda/GPL-2)</td>
+<td>M</td>
+<td>6.5</td>
+</tr>
+<tr class="odd">
+<td>13</td>
+<td>PhiFlow</td>
+<td>incompressible NS (no RANS)</td>
+<td>jax-native</td>
+<td>first-class SDF obstacles</td>
+<td>A</td>
+<td>S</td>
+<td>6.0</td>
+</tr>
+<tr class="even">
+<td>14</td>
+<td>Newton (NVIDIA Warp)</td>
+<td>GPU rigid+soft body, XPBD contact</td>
+<td>discrete adjoint (<code>wp.Tape</code>)</td>
+<td>wp.Mesh from dual contouring; native SDF volumes</td>
+<td>B/C (needs NVIDIA GPU)</td>
+<td>L</td>
+<td>6.0</td>
+</tr>
+<tr class="odd">
+<td>15</td>
+<td>EMopt</td>
+<td>2D FDFD / 3D CW-FDTD photonics</td>
+<td>discrete adjoint w.r.t. <strong>polygon vertices</strong></td>
+<td>sketch <code>PolygonProfile</code> maps 1:1</td>
+<td>B/C (PETSc build)</td>
+<td>M/L</td>
+<td>6.0</td>
+</tr>
+<tr class="even">
+<td>16</td>
+<td>ADflow (MDO Lab)</td>
+<td>compressible RANS, Fortran + Tapenade</td>
+<td>discrete adjoint (battle-tested)</td>
+<td>structured multiblock CGNS — worst geometry fit</td>
+<td>C</td>
+<td>L</td>
+<td>6.0</td>
+</tr>
+<tr class="odd">
+<td>17</td>
+<td>rfx</td>
+<td>RF FDTD with ports / S-parameters</td>
+<td>jax-native</td>
+<td>CSG primitives or SDF raster</td>
+<td>A</td>
+<td>S/M</td>
+<td>5.5</td>
+</tr>
+<tr class="even">
+<td>18</td>
+<td>ceviche</td>
+<td>2D FDFD EM</td>
+<td>discrete adjoint (HIPS autograd)</td>
+<td>sketch cross-section → epsilon raster</td>
+<td>A/B</td>
+<td>S</td>
+<td>5.5</td>
+</tr>
+<tr class="odd">
+<td>19</td>
+<td>JaxSim</td>
+<td>reduced-coordinate robot dynamics</td>
+<td>jax-native</td>
+<td>URDF export; ground-contact only</td>
+<td>A</td>
+<td>M</td>
+<td>5.5</td>
+</tr>
+<tr class="even">
+<td>20</td>
+<td>OpenFOAM adjointOptimisationFoam</td>
+<td>steady RANS + SA</td>
+<td>continuous adjoint (mesh-consistent only asymptotically)</td>
+<td>fluid mesh; per-node sensitivity maps</td>
+<td>C</td>
+<td>L</td>
+<td>5.5</td>
+</tr>
+<tr class="odd">
+<td>21</td>
+<td>JAX-SPH</td>
+<td>free-surface SPH (sloshing, dam break)</td>
+<td>jax-native</td>
+<td>SDF interior seeding + surface particles</td>
+<td>A</td>
+<td>M/L</td>
+<td>5.0</td>
+</tr>
+<tr class="even">
+<td>22</td>
+<td>Tidy3D adjoint</td>
+<td>cloud GPU 3D EM FDTD</td>
+<td>discrete adjoint (PolySlab vertices)</td>
+<td>sketch-extrude → PolySlab, best CAD-EM match</td>
+<td>paid SaaS</td>
+<td>S/M</td>
+<td>5.0</td>
+</tr>
+<tr class="odd">
+<td>23</td>
+<td>Elmer FEM</td>
+<td>multiphysics (EM, thermal, CFD)</td>
+<td>adjoint only in ElmerIce (glaciology params); FD otherwise</td>
+<td>HEX8 via ElmerGrid</td>
+<td>B/C</td>
+<td>M/L</td>
+<td>5.0</td>
+</tr>
+<tr class="even">
+<td>24</td>
+<td>Nimble Physics</td>
+<td>LCP hard-contact multibody</td>
+<td>discrete adjoint (analytic, RSS’21)</td>
+<td>primitive proxies + inertias</td>
+<td>C (torch, Linux)</td>
+<td>L</td>
+<td>4.5</td>
+</tr>
+<tr class="odd">
+<td>25</td>
+<td>OpenSees / OpenSeesPy</td>
+<td>nonlinear structural frames</td>
+<td>forward DDM (partial coverage, sizing not shape)</td>
+<td>script-built frames, not CAD solids</td>
+<td>A/B</td>
+<td>S</td>
+<td>4.0</td>
+</tr>
+<tr class="even">
+<td>26</td>
+<td>FEAP / FEAPpv</td>
+<td>classic solid mechanics FEA (1976 lineage)</td>
+<td>none — FD/SPSA only</td>
+<td>trivial brick decks</td>
+<td>B</td>
+<td>M</td>
+<td>4.0</td>
+</tr>
+<tr class="odd">
+<td>27</td>
+<td>FENIAX</td>
+<td>nonlinear aeroelasticity</td>
+<td>jax-native</td>
+<td>needs Nastran condensed models, not cadjoint meshes</td>
+<td>B (GPL-3)</td>
+<td>L</td>
+<td>3.5</td>
+</tr>
+<tr class="even">
+<td>28</td>
+<td>Drake</td>
+<td>industrial multibody</td>
+<td>forward AutoDiffXd; <strong>throws under contact</strong></td>
+<td>URDF/SDF-format</td>
+<td>A/B</td>
+<td>M</td>
+<td>3.5</td>
+</tr>
+<tr class="odd">
+<td>29</td>
+<td>Code_Aster</td>
+<td>industrial nonlinear FEA (EDF)</td>
+<td>none — sensitivity feature <strong>removed</strong></td>
+<td>MED hexes fine</td>
+<td>C only</td>
+<td>L</td>
+<td>3.0</td>
+</tr>
+<tr class="even">
+<td>30</td>
+<td>Dojo.jl</td>
+<td>hard-contact multibody, IFT gradients</td>
+<td>discrete adjoint (real, in code)</td>
+<td>primitives only; <strong>stale since 2024-09</strong></td>
+<td>C (Julia)</td>
+<td>L</td>
+<td>3.0</td>
+</tr>
+<tr class="odd">
+<td>31</td>
+<td>Nek5000 / NekRS</td>
+<td>spectral-element NS</td>
+<td>none — “adjoint” is stability analysis, not design</td>
+<td>curvilinear hex <code>.re2</code> (ironically matching)</td>
+<td>C</td>
+<td>L</td>
+<td>2.5</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="cross-cutting-findings" class="level2">
+<h2 class="anchored" data-anchor-id="cross-cutting-findings">Cross-cutting findings</h2>
+<section id="the-sdf-is-the-unlock-and-the-pitch-line" class="level3">
+<h3 class="anchored" data-anchor-id="the-sdf-is-the-unlock-and-the-pitch-line">The SDF is the unlock (and the pitch line)</h3>
+<p>Every grid-based solver (JAX-Fluids, XLB, jwave, fdtdx, PhiFlow, Meep, ceviche, rfx, MODFLOW) takes geometry as a field on a regular grid. Shape gradients through a <strong>binary</strong> voxel mask are identically zero — the universal recipe is a <em>smoothed SDF indicator</em> (Brinkman penalization for LBM, smoothed-heaviside sound speed for jwave, permittivity for EM, native levelset for JAX-Fluids, sigmoid conductivity for MODFLOW). cadjoint’s traced SDF produces exactly that smooth field for free; an STL-based CAD pipeline cannot. This is the pitch line for all the Lane-A demos.</p>
+</section>
+<section id="two-vjp-boundary-shapes-both-already-proven-in-repo" class="level3">
+<h3 class="anchored" data-anchor-id="two-vjp-boundary-shapes-both-already-proven-in-repo">Two VJP boundary shapes, both already proven in-repo</h3>
+<ol type="1">
+<li><strong>Surface-node coordinates</strong> (the frozen-topology doctrine): SU2 (<code>GetMeshDisp_Sensitivity</code>), DAFoam (<code>dF/dX</code>), ADflow (<code>evalFunctionsSens</code>), adjointOptimisationFoam (sensitivity maps), Firedrake (mesh-coordinate Control), and CalculiX (per-design-node normal sensitivities) all natively emit d(objective)/d(surface nodes). cadjoint’s dual-contour vertices and Newton-snapped hex boundary nodes are already differentiable w.r.t. SDF parameters, so the chain closes exactly as it does for jax-fem.</li>
+<li><strong>Material/density fields</strong>: the SDF-sampled grid crosses the boundary as a differentiable array; the solver returns dJ/d(field). Easier, but the design stays a density soup inside the solver; shape-native paths (1) keep the design manufacturable CAD at every step and demo the system’s identity better.</li>
+</ol>
+</section>
+<section id="the-fluid-domain-gap" class="level3">
+<h3 class="anchored" data-anchor-id="the-fluid-domain-gap">The fluid-domain gap</h3>
+<p>cadjoint meshes the <strong>solid</strong>; every mesh-based CFD code needs the complementary <strong>fluid</strong> domain. The clean pattern mirroring the FEM doctrine: gmsh (already a dependency) meshes the flow domain once around the dual-contoured surface at the nominal design, topology frozen, the solver’s own mesh deformation propagates surface motion inward, and d(objective)/d(surface nodes) is the VJP boundary. This is why SU2/DAFoam/ADflow are all L-effort despite turnkey adjoints — and why the levelset/voxel candidates that skip fluid meshing entirely rank higher.</p>
+</section>
+<section id="contact-gradients-need-the-fd-validation-discipline" class="level3">
+<h3 class="anchored" data-anchor-id="contact-gradients-need-the-fd-validation-discipline">Contact gradients need the FD-validation discipline</h3>
+<p>Every multibody candidate has verified gradient fragility at contact: MJX NaN gradients in some configs (mujoco#2237), CG-solver reverse-mode issues (mujoco#1182, prefer <code>solver=newton</code> with fixed iterations), literature showing different contact formulations give different — sometimes wrong — gradients at impact. The <code>tests/fem</code> adjoint-vs-central-FD discipline must carry over: FD- validate every rollout gradient at the nominal design before trusting descent.</p>
+</section>
+<section id="tesseract-core-gradient-facts-verified-in-installed-1.11.0-source" class="level3">
+<h3 class="anchored" data-anchor-id="tesseract-core-gradient-facts-verified-in-installed-1.11.0-source">Tesseract-core gradient facts (verified in installed 1.11.0 source)</h3>
+<ul>
+<li>Gradient endpoints are <strong>not</strong> autogenerated from <code>apply</code>; only endpoints the author defines in <code>tesseract_api.py</code> register.</li>
+<li><code>runtime/experimental/finite_differences.py</code> ships <code>finite_difference_{jacobian,jvp,vjp}</code> helpers (“central”, “forward”, “stochastic” = SPSA at O(√n) samples) designed to be a one-line endpoint body — the honest fallback for adjoint-less legacy codes (FEAP, Code_Aster, general Elmer), first-class but opt-in and marked experimental.</li>
+<li><code>tesseract-runtime check-gradients</code> validates any gradient endpoint against FD at sampled indices — belongs in CI for every wrapped solver.</li>
+<li><code>tesseract init --recipe jax</code> autogenerates all endpoints, but only for JAX-traceable <code>apply</code> functions — irrelevant for legacy codes.</li>
+<li>Pasteur’s tesseract-core docs ship a JAX-CFD Navier-Stokes tesseract example worth cribbing for schema design.</li>
+</ul>
+</section>
+<section id="license-containment" class="level3">
+<h3 class="anchored" data-anchor-id="license-containment">License containment</h3>
+<p>GPL codes (CalculiX GPL-2, DAFoam/OpenFOAM/Code_Aster GPL-3, Meep GPL-2) are contained cleanly at the Tesseract process/container boundary — input decks in, result files out, no linking. LGPL (jwave, Firedrake, SU2) is fine even as a pip dependency. JAX-Fluids is MIT (verified in LICENSE — older sources wrongly say GPLv3; it was relicensed). MODFLOW 6 + mf6adj (public domain + CC0) is the most permissive stack surveyed.</p>
+<hr>
+</section>
+</section>
+<section id="top-candidates-in-detail" class="level2">
+<h2 class="anchored" data-anchor-id="top-candidates-in-detail">Top candidates in detail</h2>
+<section id="calculix-the-fortran-code-with-a-real-adjoint-score-9.0-shipped" class="level3">
+<h3 class="anchored" data-anchor-id="calculix-the-fortran-code-with-a-real-adjoint-score-9.0-shipped">1. CalculiX — the Fortran code with a real adjoint (score 9.0) — SHIPPED</h3>
+<p>Shipped as surveyed (2026-08): <code>backend="calculix"</code> runs ccx 2.23 behind a subprocess Tesseract exactly along the Lane-B plan — C3D8 decks 1:1 from the hex meshes, forward parity 1.5e-7 vs jax-fem, and the native <code>*SENSITIVITY</code> adjoint <strong>plus a derived correction</strong> for the Jacobian-variation term ccx 2.23 omits, bringing the adjoint to 2e-4 of FD. Three gradient paths (ccx adjoint / jax-fem adjoint / FD) agree on the bracket. See <code>cadjoint/fem/calculix.py</code>, <code>cadjoint/fem/tesseracts/elastic_calculix/</code>, <code>tests/fem/</code>, and the design record in <code>research/fem-integration.md</code>; the survey analysis that ranked it first is in git/PR #19.</p>
+</section>
+<section id="jax-fluids-2.0-the-jax-native-cfd-flagship-score-9.0" class="level3">
+<h3 class="anchored" data-anchor-id="jax-fluids-2.0-the-jax-native-cfd-flagship-score-9.0">2. JAX-Fluids 2.0 — the jax-native CFD flagship (score 9.0)</h3>
+<p><strong>What it is.</strong> Compressible Navier-Stokes (single/two-phase), high-order finite volume (WENO/TENO), <strong>sharp-interface levelset immersed solid boundaries</strong>, 1D/2D/3D Cartesian, scales to 512 A100s. Pure JAX, MIT (verified — relicensed from GPLv3), TU Munich, pushed 2026-08, CPC 2025 paper.</p>
+<p><strong>Gradient mechanism.</strong> The entire solver is <code>jax.numpy</code>, so <code>jax.grad</code>/<code>vjp</code> trace through the full time loop (checkpointing for memory); end-to-end gradient optimization validated in both the 2022 and 2.0 papers, including AD through distributed simulations. Verified caveat: the levelset module exists, but <strong>no shape-optimization example ships in <code>examples/</code></strong> — the differentiable driver around a solid-boundary case is ours to write, and levelset reinitialization steps may need care in the backward pass.</p>
+<p><strong>Geometry coupling.</strong> The strongest of any candidate: cadjoint’s SDF evaluated on the sim grid <strong>is</strong> the native levelset input, tracing intact. No meshing, no conversion, no smoothing layer.</p>
+<p><strong>Packaging plan.</strong> Lane A: pip install, in-process, composes with <code>jax.grad</code> directly. Tesseract only for version isolation.</p>
+<p><strong>Demo storyline.</strong> Supersonic/transonic nose-cone or fairing drag minimization: parametric revolved cadjoint profile (radius, length, bluntness as constrained Scalars) → SDF → levelset grid → 2D-then-3D Mach 2 solve → pressure drag integrated over the immersed boundary → <code>jax.grad</code> back to CAD parameters, optax loop, schlieren-style density renders per optimizer step.</p>
+<p><strong>Effort.</strong> M — geometry coupling is trivial; the work is the drag functional on the levelset boundary, the differentiable driver, and backprop-through-time memory (checkpointing).</p>
+<p>Sources: <a href="https://github.com/tumaer/JAXFLUIDS">repo</a>, <a href="https://www.sciencedirect.com/science/article/pii/S0010465524003564">JAX-Fluids 2.0, CPC 2025</a>, <a href="https://jax-fluids.readthedocs.io/en/latest/">docs</a>.</p>
+</section>
+<section id="jwave-the-smallest-diff-a-new-physics-domain-score-8.5" class="level3">
+<h3 class="anchored" data-anchor-id="jwave-the-smallest-diff-a-new-physics-domain-score-8.5">3. jwave — the smallest diff, a new physics domain (score 8.5)</h3>
+<p><strong>What it is.</strong> Acoustics/ultrasound in pure JAX (on jaxdf): time-domain k-space/FD wave propagation and time-harmonic Helmholtz in heterogeneous media, PML boundaries. LGPL-3, UCL Biomedical Ultrasound Group, SoftwareX 2023, pushed 2026-03.</p>
+<p><strong>Gradient mechanism.</strong> Proven-in-docs, not paper-ware: the FWI tutorial computes <code>jax.grad</code> of the simulation w.r.t. the sound-speed map with checkpointed backprop and runs Adam on it; the Helmholtz path documents “optimizing through GMRES” (implicit differentiation of the linear solve).</p>
+<p><strong>Geometry coupling.</strong> SDF → smoothed-heaviside sound-speed/density map on <code>Domain(N, dx)</code> — a ~10-line adapter, no meshing.</p>
+<p><strong>Packaging plan.</strong> Lane A if its JAX pin coexists with the repo’s jax 0.8.x; if not, Lane B with its own venv — which is precisely the isolation the Tesseract ABI was built for, and a good second proof of that story.</p>
+<p><strong>Demo storyline.</strong> Ultrasound focusing lens: a constraint-driven cadjoint lens profile (arc radius, thickness, aperture) revolved into an SDF in front of a flat transducer; rasterize to a sound-speed map; maximize focal pressure at a target point via time-harmonic Helmholtz (one linear solve per iteration — fast and robust). Variant: Helmholtz-resonator/speaker-port tuning of an enclosure to a target resonance.</p>
+<p><strong>Effort.</strong> S — the smallest integration on this list. S/M if version isolation is needed.</p>
+<p>Sources: <a href="https://github.com/ucl-bug/jwave">repo</a>, <a href="https://ucl-bug.github.io/jwave/notebooks/time_varying/FWI.html">FWI tutorial</a>, <a href="https://www.sciencedirect.com/science/article/pii/S2352711023000341">SoftwareX paper</a>, <a href="https://github.com/ucl-bug/jaxdf">jaxdf</a>.</p>
+</section>
+<section id="mujoco-mjx-contact-rich-mechanism-design-score-8.0" class="level3">
+<h3 class="anchored" data-anchor-id="mujoco-mjx-contact-rich-mechanism-design-score-8.0">4. MuJoCo MJX — contact-rich mechanism design (score 8.0)</h3>
+<p><strong>What it is.</strong> DeepMind’s rigid multibody dynamics with frictional contact, reimplemented in JAX (<code>mjx.step</code>). Apache-2.0, pip <code>mujoco-mjx</code>, weekly commits. Strategic fact: <strong>MJX-JAX is the differentiable backend</strong>; the newer MJX-Warp/MuJoCo-Warp backends are fast but explicitly non-differentiable (“no immediate plans”).</p>
+<p><strong>Gradient mechanism.</strong> <code>mjx.Model</code> is a pytree of arrays — <code>geom_size</code>, <code>geom_pos</code>, <code>body_mass</code>, <code>body_inertia</code>, actuator params are valid differentiation targets through an unrolled <code>lax.scan</code> rollout. Verified caveats: docs say “mostly supported”; prefer <code>solver=newton</code> with fixed iterations (CG reverse-mode issues, mujoco#1182); open NaN-gradient issue in some contact configs (mujoco#2237); stiff-contact gradients can flip sign at coarse timesteps. Keep contacts soft-ish, FD-validate per scene. SDF geoms are <strong>not</strong> supported in MJX-JAX; meshes limited to small convex decompositions.</p>
+<p><strong>Geometry coupling.</strong> Two channels: (a) capsule/box collision proxies whose sizes are traced functions of sketch parameters; (b) the robust one — cadjoint’s SDF gives <strong>exact differentiable mass/inertia/CoM by voxel integration</strong> (pure JAX) feeding <code>body_mass</code>/<code>body_inertia</code>/<code>body_ipos</code>, solid even where contact gradients are fragile.</p>
+<p><strong>Packaging plan.</strong> Lane A (pip, pure JAX, runs on CPU macOS). Tesseract only if jax pins conflict.</p>
+<p><strong>Demo storyline.</strong> Parametric two-jaw gripper designed in cadjoint (jaw profile, pivot positions, link lengths as constrained sketch parameters); MJX rolls out a close-and-shake grasp; objective = object retention + minimum actuation force; <code>jax.grad</code> flows from the rollout through <code>geom_size</code>/inertias back to sketch parameters, optimized with optax.</p>
+<p><strong>Effort.</strong> M — MJCF generation from cadjoint assemblies plus contact-gradient hygiene.</p>
+<p>Sources: <a href="https://mujoco.readthedocs.io/en/stable/mjx.html">MJX docs</a>, <a href="https://github.com/google-deepmind/mujoco/issues/2237">mujoco#2237</a>, <a href="https://github.com/google-deepmind/mujoco/issues/1182">mujoco#1182</a>, <a href="https://arxiv.org/html/2506.14186">DiffMJX</a>.</p>
+</section>
+<section id="diffrax-an-in-repo-mechanism-layer-the-cheapest-full-chain-demo-score-8.0" class="level3">
+<h3 class="anchored" data-anchor-id="diffrax-an-in-repo-mechanism-layer-the-cheapest-full-chain-demo-score-8.0">5. Diffrax + an in-repo mechanism layer — the cheapest full-chain demo (score 8.0)</h3>
+<p><strong>What it is.</strong> Not a domain solver: the reference implementation of ODE/SDE adjoints in JAX (Kidger ecosystem, Apache-2.0, the best-maintained project surveyed). Pairs with cadjoint’s <strong>own constraint solver</strong> to make a mechanism simulation layer with zero third-party solver risk.</p>
+<p><strong>Gradient mechanism.</strong> Two exact paths, both already idiomatic in this codebase: (1) kinematics = cadjoint constraint solve per crank angle, differentiated via the implicit function theorem (<code>jax.custom_vjp</code> around the solve — the same pattern as jax-fem’s <code>ad_wrapper</code>); (2) dynamics via <code>diffrax.diffeqsolve</code> with <code>RecursiveCheckpointAdjoint</code> (discretise-then- optimise, exact discrete gradients; the docs explicitly recommend it over the approximate continuous <code>BacksolveAdjoint</code>).</p>
+<p><strong>Geometry coupling.</strong> None needed — consumes cadjoint sketches directly; link inertias, if dynamic, come from differentiable SDF volume integrals.</p>
+<p><strong>Packaging plan.</strong> Lane A, <code>pip install diffrax</code>, zero packaging risk.</p>
+<p><strong>Demo storyline.</strong> The classic that sells differentiable CAD: a four-bar (or Jansen walking) linkage sketched in the playground with pin constraints; the user draws a target curve; the optimizer adjusts link-length Scalars so the coupler point traces it, <strong>mechanism animating live in the viewer as gradients update the sketch</strong>. The constraint solver is the star. Extends to minimum-motor-torque-over-cycle via diffrax dynamics.</p>
+<p><strong>Effort.</strong> S — constraint solver, viewer, and parameter plumbing all exist; new code is a time-sweep loop + IFT wrapper + demo scene.</p>
+<p>Sources: <a href="https://github.com/patrick-kidger/diffrax">repo</a>, <a href="https://docs.kidger.site/diffrax/api/adjoints/">adjoint docs</a>.</p>
+</section>
+<section id="xlb-a-second-physics-for-the-bracket-score-7.5" class="level3">
+<h3 class="anchored" data-anchor-id="xlb-a-second-physics-for-the-bracket-score-7.5">6. XLB — a second physics for the bracket (score 7.5)</h3>
+<p><strong>What it is.</strong> Autodesk Research lattice Boltzmann (weakly compressible NS), 2D/3D, LES, immersed boundaries, giga-lattice-updates/sec.&nbsp;Apache-2.0, pip <code>xlb</code>, CPC 2024 paper. Caution: recent momentum (multi-GPU, grid refinement) is on the <strong>non-differentiable</strong> Warp/Neon backends; the JAX backend is the differentiable one.</p>
+<p><strong>Gradient mechanism.</strong> <code>jax.grad</code> through unrolled LBM stepping on the JAX backend — real examples ship in-repo (<code>examples/cfd/differentiable_lbm.py</code>, <code>examples/out_of_core/autodiff_lbm.py</code>). Verified skeptically: “adjoint-based shape and topology optimization” is <strong>roadmap, not shipped</strong>. The critical integration fact: shape gradients through a binary voxel mask are identically zero — the shape-gradient path requires a smoothed indicator (Brinkman/porosity penalization or partially-saturated bounce-back) built from the SDF. That smoothing layer is our contribution, and cadjoint provides the smooth field for free.</p>
+<p><strong>Geometry coupling.</strong> SDF &lt; 0 voxelization plugs into its boundary-mask machinery directly (it ships a trimesh STL voxelizer we can skip); the smoothed-SDF variant makes it differentiable w.r.t. CAD parameters.</p>
+<p><strong>Packaging plan.</strong> Lane A, pip with extras.</p>
+<p><strong>Demo storyline.</strong> Differentiable wind tunnel: drop the <strong>existing bracket part</strong> into a 3D LBM channel, soft-mask it from the SDF, gradient-descend the sketch parameters to cut drag while a constraint holds frontal area — the same part that already runs the jax-fem elastic study gets a second physics. The killer multiphysics story. (Internal variant: manifold/heat-sink channel pressure drop at Re ~ 1e3.)</p>
+<p><strong>Effort.</strong> M — solver is pip-and-go; the work is doing the smoothed SDF-to-mask coupling right (non-degenerate gradients, FD-validated) plus rollout memory strategy.</p>
+<p>Sources: <a href="https://github.com/Autodesk/XLB">repo</a>, <a href="https://www.sciencedirect.com/science/article/abs/pii/S0010465524001103">CPC paper</a>, <a href="https://github.com/Autodesk/XLB/releases">releases</a>.</p>
+</section>
+<section id="fdtdx-electromagnetics-nobody-else-offers-score-7.5" class="level3">
+<h3 class="anchored" data-anchor-id="fdtdx-electromagnetics-nobody-else-offers-score-7.5">7. fdtdx — electromagnetics nobody else offers (score 7.5)</h3>
+<p><strong>What it is.</strong> Full 3D Maxwell FDTD (Yee grid) in pure JAX, photonics-oriented but scale-invariant. MIT, very active (pushed 2026-08, JOSS paper).</p>
+<p><strong>Gradient mechanism.</strong> Reverse-mode AD with the package’s raison d’être: it exploits <strong>time-reversibility of Maxwell’s equations</strong> to re-integrate fields backward instead of storing the time history — constant-memory gradients for millions of voxel parameters. Inverse-design examples ship in the repo.</p>
+<p><strong>Geometry coupling.</strong> SDF → smoothed permittivity in a voxel design region — the same adapter pattern as jwave/XLB. Nanophotonics-tuned defaults mean unit/scale mapping needs attention for macroscopic parts.</p>
+<p><strong>Packaging plan.</strong> Lane A, pip.</p>
+<p><strong>Demo storyline.</strong> EM-transparent CAD: optimize a sensor radome wall profile or a dielectric waveguide splitter/collimating lens so transmission at the target port/frequency is maximized — CAD parameters → SDF → permittivity → gradient. Distinctive because no other candidate gives cadjoint EM.</p>
+<p><strong>Effort.</strong> S/M — AD machinery is turnkey; its object/config system (sources, detectors, PML) and scale mapping take a few days.</p>
+<p>Sources: <a href="https://github.com/ymahlau/fdtdx">repo</a>, <a href="https://arxiv.org/abs/2412.12360">memory-efficient AD paper</a>, <a href="https://fdtdx.readthedocs.io/en/latest/">docs</a>.</p>
+</section>
+<section id="firedrake-pyadjoint-the-hex-meshs-natural-fem-home-score-7.5" class="level3">
+<h3 class="anchored" data-anchor-id="firedrake-pyadjoint-the-hex-meshs-natural-fem-home-score-7.5">8. Firedrake + pyadjoint — the hex mesh’s natural FEM home (score 7.5)</h3>
+<p><strong>What it is.</strong> UFL-based FEM over PETSc with taped discrete adjoints (pyadjoint); Helmholtz acoustics, elastodynamics, any UFL-expressible PDE on unstructured meshes <strong>including hexahedra</strong>. LGPL-3, very active, Fireshape adds a dedicated shape-optimization layer.</p>
+<p><strong>Gradient mechanism.</strong> pyadjoint tapes the forward solve and solves the discrete adjoint; crucially it shape-differentiates w.r.t. <strong>mesh coordinates</strong> via UFL’s shape-derivative support (the official shape_optimization demo uses <code>mesh.coordinates</code> as the Control). That is bit-for-bit cadjoint’s backend contract: VJP w.r.t. points on a fixed-connectivity mesh.</p>
+<p><strong>Geometry coupling.</strong> The only candidate besides CalculiX that consumes <code>sdf_to_hex_mesh</code> output natively: write points+cells to <code>.msh</code> (meshio), and the coordinate cotangent comes straight back through the tesseract VJP into <code>recompute_points</code>.</p>
+<p><strong>Packaging plan.</strong> Lane B/C: pip has binary PETSc wheels since 2025 but the stack is heavy — cleanest as a subprocess/container tesseract with its own env (schema: points, cells, BC node sets, frequency → pressure field + dJ/d(points)), mirroring <code>thermal_jaxfem</code> exactly.</p>
+<p><strong>Demo storyline.</strong> Speaker horn vibroacoustics: cadjoint horn flare (throat radius, flare exponent, length as constrained parameters) → HEX8 mesh of the air volume → Helmholtz at 1–5 kHz with a piston BC → maximize on-axis SPL or flatten frequency response; the adjoint returns dJ/d(node coords), chained through the frozen-topology snap. A genuinely engineering-CAD demo no EM candidate can tell.</p>
+<p><strong>Effort.</strong> M — env isolation, <code>.msh</code> round-trip, coordinate-cotangent extraction from pyadjoint.</p>
+<p>Sources: <a href="https://www.firedrakeproject.org/firedrake/demos/shape_optimization.py.html">shape optimization demo</a>, <a href="https://www.firedrakeproject.org/adjoint.html">adjoint docs</a>, <a href="https://fireshape.readthedocs.io/en/latest/">Fireshape</a>.</p>
+</section>
+<section id="modflow-6-mf6-adj-the-other-legacy-fortran-story-score-7.5" class="level3">
+<h3 class="anchored" data-anchor-id="modflow-6-mf6-adj-the-other-legacy-fortran-story-score-7.5">9. MODFLOW 6 + MF6-ADJ — the other legacy-Fortran story (score 7.5)</h3>
+<p><strong>What it is.</strong> USGS groundwater flow in Fortran 2008, direct lineage of 1984 MODFLOW; MF6-ADJ (INTERA, peer-reviewed in <em>Groundwater</em> 2025) is a <strong>non-intrusive discrete adjoint</strong> that drives MODFLOW 6 through its official API library (<code>libmf6</code> via modflowapi/xmipy), harvests matrices at runtime, and solves the adjoint backward — zero core-code changes. Public domain + CC0, the most permissive stack surveyed; both actively maintained; mf6adj 1.2.0 on PyPI.</p>
+<p><strong>Gradient mechanism.</strong> One backward run yields sensitivities of performance measures (heads, boundary fluxes, composites) w.r.t. per-cell hydraulic conductivity, storage, recharge, well rates — validated against analytics and FD at 100–10000x speedup. Geometry enters as a <strong>material field</strong>: SDF at cell centers → smooth sigmoid → per-cell K (pure JAX) → adjoint dJ/dK crosses the tesseract as the VJP. Caveat: a density coupling, not a boundary-fitted shape derivative; gradient quality depends on sigmoid bandwidth vs cell size.</p>
+<p><strong>Geometry coupling.</strong> Best format-fit of any candidate: the SDF lattice <strong>is</strong> the DIS model grid; the hex mesher isn’t even needed.</p>
+<p><strong>Packaging plan.</strong> Easiest surveyed: pip <code>mf6adj</code> + <code>modflowapi</code>, binaries via flopy’s get-modflow. Pure-Python in-process tesseract (Lane B); no compiler, no container required. The non-intrusive-adjoint-via-API-library pattern is worth remembering for other BMI/XMI codes.</p>
+<p><strong>Demo storyline.</strong> Slurry cutoff wall / seepage barrier as a cadjoint parametric solid (arc length, depth, thickness) → per-cell low-K field in a site-scale model with a pumped excavation → minimize inflow + bentonite-volume penalty → mf6adj adjoint bends and deepens the wall. “The USGS Fortran code that models half the world’s aquifers, inside a differentiable CAD loop — and the geometry needs no mesh at all.”</p>
+<p><strong>Effort.</strong> M — install is S-like, but the MODFLOW input stack (flopy, packages, units) and mapping mf6adj’s HDF5 output into the VJP are real work.</p>
+<p>Sources: <a href="https://github.com/INTERA-Inc/mf6adj">mf6adj</a>, <a href="https://ngwa.onlinelibrary.wiley.com/doi/10.1111/gwat.70025">Groundwater 2025 paper</a>, <a href="https://www.intera.com/modflow-6-and-adjoint-sensitivity/">INTERA announcement</a>.</p>
+</section>
+<section id="su2-the-credibility-grade-rans-adjoint-score-7.0" class="level3">
+<h3 class="anchored" data-anchor-id="su2-the-credibility-grade-rans-adjoint-score-7.0">10. SU2 — the credibility-grade RANS adjoint (score 7.0)</h3>
+<p><strong>What it is.</strong> Industry-credible compressible/incompressible RANS (SA, SST), external aero flagship, C++ with SWIG Python wrappers. LGPL-2.1, very active (v8.5).</p>
+<p><strong>Gradient mechanism.</strong> The strongest adjoint mechanism surveyed: reverse-mode AD of the <strong>entire solver</strong> via CoDiPack operator overloading, formulated as a fixed-point adjoint — numerically exact discrete gradients including the turbulence model. Verified programmatic path: <code>pysu2ad.CDiscAdjSinglezoneDriver</code> (<code>MATH_PROBLEM=DISCRETE_ADJOINT</code>, <code>OBJECTIVE_FUNCTION=DRAG</code>), then <code>GetMeshDisp_Sensitivity()</code> returns dJ/d(mesh coordinates) — literally the VJP payload the ABI wants.</p>
+<p><strong>Geometry coupling.</strong> The impedance mismatch: SU2 needs the <strong>fluid</strong> domain. gmsh meshes the exterior once around the dual-contoured surface, topology frozen; SU2_DEF propagates surface motion inward; surface node coordinates are the differentiable boundary.</p>
+<p><strong>Packaging plan.</strong> Lane C: no PyPI wheels for the adjoint module (pysu2 404s on PyPI, verified) — source build via meson (<code>-Denable-autodiff=true -Denable-pywrapper=true</code>) or a containerized tesseract built once.</p>
+<p><strong>Demo storyline.</strong> Transonic drag minimization of a cadjoint-parameterized 2D profile (PolygonProfile with constraint-driven thickness/camber): apply = deform mesh + primal solve returning C_D; VJP = pysu2ad adjoint returning dC_D/d(surface nodes), chained through the differentiable dual-contour vertices. The classic NACA0012 case with CAD as the design space.</p>
+<p><strong>Effort.</strong> L — AD build, fluid-domain meshing pipeline, and the surface-node chain rule are each real work; highest-credibility aero gradient as payoff. Second-act material, after the levelset/voxel CFD demos land.</p>
+<p>Sources: <a href="https://github.com/su2code/SU2">repo</a>, <a href="https://su2code.github.io/tutorials/Adjoint_FSI_Python/">python wrapper adjoint tutorial</a>, <a href="https://su2code.github.io/docs/Python-Wrapper-Build/">AD build docs</a>.</p>
+<hr>
+</section>
+</section>
+<section id="notable-mid-table-candidates-short-form" class="level2">
+<h2 class="anchored" data-anchor-id="notable-mid-table-candidates-short-form">Notable mid-table candidates (short form)</h2>
+<ul>
+<li><strong>DAFoam (6.5)</strong>: turnkey OpenFOAM discrete adjoint (JFNK, &lt;0.1% derivative error), official Docker images — the cleanest containerized-tesseract candidate; U-bend cooling-duct pressure-drop demo mirrors its own flagship tutorial. L effort (OpenFOAM stack + snappyHexMesh pipeline); GPL-3 contained at the container boundary. Largely interchangeable with SU2 — pick SU2 for external transonic aero, DAFoam for internal flow.</li>
+<li><strong>Meep (6.5)</strong>: built-in adjoint (exactly two timestepping runs), verified in-tree tests; conda/GPL-2 forces Lane C — which makes it the strongest “legacy C++ behind the tesseract ABI” proof before attempting Fortran. Radiation-pattern shaping of a dielectric lens antenna via the near2far adjoint.</li>
+<li><strong>PhiFlow (6.0)</strong>: first-class SDF obstacles, <code>jax.grad</code> through the pressure solve, S effort — the best effort-to-demo ratio for a weekend 2D duct/wake demo, but no RANS, so position it as the toy tier below JAX-Fluids/XLB.</li>
+<li><strong>Newton / NVIDIA Warp (6.0)</strong>: <code>wp.Tape</code> kernel-level discrete adjoints, the only candidate that natively samples volumetric SDFs (NanoVDB) with gradients — the natural long-term home for SDF-native contact — but differentiable solvers effectively need an NVIDIA GPU, forcing the container/remote leg of the Tesseract story. L effort; flagship potential later.</li>
+<li><strong>EMopt (6.0)</strong>: the only candidate whose native gradient is a <strong>boundary-shape derivative w.r.t. polygon vertices</strong> — conceptually the cleanest CAD coupling in EM (sketch <code>PolygonProfile</code> maps 1:1, designs stay manufacturable). Single-author, PETSc source build; M/L.</li>
+<li><strong>ceviche (5.5)</strong>: dormant since 2023 but MIT, tiny, vendorable; the fastest possible EM proof (days) and a clean proof that a <strong>non-JAX AD system</strong> (HIPS autograd) plugs into the ABI via a VJP endpoint.</li>
+<li><strong>rfx (5.5)</strong>: the only ports/S-parameters candidate — the patch-antenna S11 demo engineers instantly recognize — but a 6-star single-maintainer project; FD-validate its gradients before building anything on it.</li>
+</ul>
+</section>
+<section id="rejected-parked-with-reasons" class="level2">
+<h2 class="anchored" data-anchor-id="rejected-parked-with-reasons">Rejected / parked (with reasons)</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Candidate</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Nek5000/NekRS</td>
+<td>“Adjoint” is linearized-operator stability analysis (nekStab), not design gradients; FD-only for shape. Forward-validation role only.</td>
+</tr>
+<tr class="even">
+<td>Code_Aster</td>
+<td>Historical SENSIBILITE feature <strong>removed</strong>; FD-only; notoriously heavy build. Dominated by CalculiX on every axis that matters here.</td>
+</tr>
+<tr class="odd">
+<td>FEAP/FEAPpv</td>
+<td>The real ~50-year-old Fortran artifact, but a gradient vacuum (no adjoint ever); only honest as a demo of tesseract’s experimental FD/SPSA endpoints. Full FEAP source is fee/by-arrangement — a distribution problem.</td>
+</tr>
+<tr class="even">
+<td>Elmer FEM</td>
+<td>Real adjoint code exists but only in ElmerIce, inverting glaciology parameter fields; not transferable to CAD shape objectives without writing Fortran adjoints.</td>
+</tr>
+<tr class="odd">
+<td>Drake</td>
+<td>SAP contact solver <strong>throws</strong> under AutoDiffXd with any contact present; forward-mode only, ~100x slowdown.</td>
+</tr>
+<tr class="even">
+<td>Dojo.jl</td>
+<td>The best contact-gradient formulation on paper (IFT through interior-point), but stale since 2024-09 — research spike, not a shipping integration.</td>
+</tr>
+<tr class="odd">
+<td>FENIAX</td>
+<td>jax-native but consumes Nastran condensed models; cadjoint reduced to a parameter dashboard. GPL-3.</td>
+</tr>
+<tr class="even">
+<td>Brax</td>
+<td><strong>Deprecated as a physics engine</strong> — brax 0.13+ maintains only <code>brax/training</code>; repo directs physics users to MJX. Do not build on it.</td>
+</tr>
+<tr class="odd">
+<td>Genesis</td>
+<td>Rigid-body differentiability still “coming soon” (only MPM/Tool solvers differentiable as of 2026).</td>
+</tr>
+<tr class="even">
+<td>google/jax-cfd</td>
+<td>Alive but no immersed-geometry story in core (periodic/rectangular domains); strictly dominated by XLB/JAX-Fluids for CAD shape work. (Its tesseract example in Pasteur’s docs is worth cribbing for schema design.)</td>
+</tr>
+<tr class="odd">
+<td>tofea</td>
+<td>GitHub-archived 2025, autograd 2D toy.</td>
+</tr>
+<tr class="even">
+<td>jax-am</td>
+<td>GPL-3, stale; its FEM core was spun out into jax-fem, which cadjoint already integrates.</td>
+</tr>
+<tr class="odd">
+<td>sandialabs/optimism</td>
+<td>Non-standard license, largely 2D, duplicates jax-fem coverage.</td>
+</tr>
+<tr class="even">
+<td>Stride/Devito</td>
+<td>Real adjoints but AGPL-3, medium-property gradients only; jwave dominates the physics JAX-natively under LGPL.</td>
+</tr>
+<tr class="odd">
+<td>SPECFEM3D</td>
+<td>Legacy Fortran, natively eats HEX meshes, has adjoint kernels — but only w.r.t. material fields (rho, vp, vs), no shape derivative, and geophysics scaling makes a part-level demo contrived.</td>
+</tr>
+<tr class="even">
+<td>femwell</td>
+<td>No adjoint anywhere in the code (scipy/SLEPc eigensolves); FD-only.</td>
+</tr>
+<tr class="odd">
+<td>spins-b/angler</td>
+<td>Unmaintained since ~2020.</td>
+</tr>
+<tr class="even">
+<td>fmmax/meent (RCWA)</td>
+<td>Differentiable but restricted to periodic layered stacks, not free-form CAD shapes.</td>
+</tr>
+<tr class="odd">
+<td>Tidy3D</td>
+<td>Technically the most CAD-aligned 3D EM path (PolySlab vertices from sketches), but every gradient step is a paid cloud job with credentials — not a self-contained demo. Parked, not rejected.</td>
+</tr>
+<tr class="even">
+<td>Nimble</td>
+<td>Analytic LCP contact gradients are real, but single-maintainer biomechanics pivot, wheel/platform friction, torch boundary. Parked.</td>
+</tr>
+<tr class="odd">
+<td>OpenSees</td>
+<td>DDM is forward-mode sizing sensitivities with patchy element coverage — demos parametric sizing, not CAD shape. Off-thesis.</td>
+</tr>
+<tr class="even">
+<td>JAX-SPH</td>
+<td>Genuinely differentiable and the only free-surface option, but mildly stale and M/L bespoke particle-seeding glue. Watch list.</td>
+</tr>
+<tr class="odd">
+<td>adjointOptimisationFoam</td>
+<td>Subsumed by DAFoam (same ecosystem, discrete adjoint, Python API vs case-dict driving).</td>
+</tr>
+<tr class="even">
+<td>ADflow</td>
+<td>Real battle-tested Fortran adjoint, but structured multiblock CGNS + pyHyp extrusion is the worst geometry fit surveyed; CalculiX carries the Fortran story with none of that pain.</td>
+</tr>
+<tr class="odd">
+<td>DiFVM/JAX-FVM</td>
+<td>2026 arXiv differentiable unstructured FVM — immature/unreleased. Watch list.</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="recommended-next-integrations" class="level2">
+<h2 class="anchored" data-anchor-id="recommended-next-integrations">Recommended next integrations</h2>
+<p>The CalculiX tesseract — originally first in this list — shipped along its exact plan (see the shipped note above). Remaining ordering logic: (1) is the smallest diff and opens a new physics domain; (2) is the visual flagship. The diffrax linkage demo is the cheap third whenever a weekend slot opens — it needs no external solver at all.</p>
+<section id="jwave-ultrasound-lens-s" class="level3">
+<h3 class="anchored" data-anchor-id="jwave-ultrasound-lens-s">1. jwave ultrasound lens (S)</h3>
+<p>Smallest integration, new physics, proven-in-docs gradients. Concrete first steps:</p>
+<ol type="1">
+<li><code>pip install jwave</code> in a scratch venv; confirm whether its JAX pin coexists with jax 0.8.2 — that decides Lane A vs a Lane-B venv tesseract.</li>
+<li>Write the ~10-line SDF → smoothed-heaviside sound-speed adapter (<code>Domain(N, dx)</code> + <code>Medium</code>); FD-validate d(pressure at focus)/d(one CAD parameter) through the time-harmonic Helmholtz solve.</li>
+<li>Build the demo scene: revolved constraint-driven lens profile in front of a piston source, optax on (arc radius, thickness, aperture), focal-pressure objective; render the pressure field per step.</li>
+</ol>
+</section>
+<section id="jax-fluids-fairing-m-the-flagship" class="level3">
+<h3 class="anchored" data-anchor-id="jax-fluids-fairing-m-the-flagship">2. JAX-Fluids fairing (M, the flagship)</h3>
+<p>The SDF is the native levelset input — the strongest geometric fit surveyed. Concrete first steps:</p>
+<ol type="1">
+<li>Run a shipped forward levelset example (2D immersed solid); swap the levelset for a cadjoint SDF evaluated on the sim grid and confirm the forward solve is unchanged.</li>
+<li>Write the differentiable driver (their feed-forward-style API) around that case — this does not ship in <code>examples/</code> and is the main technical risk; watch levelset reinitialization in the backward pass, use checkpointing.</li>
+<li>Implement the pressure-drag functional on the immersed boundary; FD-validate d(drag)/d(one profile parameter) on a coarse 2D grid before scaling up; then the Mach-2 nose-cone optimization with per-step density renders.</li>
+</ol>
+<p>If a second legacy slot opens after CalculiX: <strong>MODFLOW 6 + MF6-ADJ</strong> is the lowest-friction packaging surveyed (pip + CC0 + zero meshing) and the better “1984 lineage” story, at the price of a density rather than shape coupling.</p>
+
+
+</section>
+</section>
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/andrinr\.github\.io\/cadjoint\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

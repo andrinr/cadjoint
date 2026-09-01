@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>Sketch → constrain → solve → solid – jaxCAD</title>
+<title>Sketch → constrain → solve → solid – cadjoint</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -80,7 +80,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <link href="../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-d94f0129d652a5a8036266edffbc062c.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-f83c246346592b24d02aa84ae3974412.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -120,7 +120,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
       <div class="navbar-container container-fluid">
       <div class="navbar-brand-container mx-auto">
     <a class="navbar-brand" href="../index.html">
-    <span class="navbar-title">jaxCAD</span>
+    <span class="navbar-title">cadjoint</span>
     </a>
   </div>
             <div id="quarto-search" class="" title="Search"></div>
@@ -179,7 +179,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </ul>
             <ul class="navbar-nav navbar-nav-scroll ms-auto">
   <li class="nav-item compact">
-    <a class="nav-link" href="https://github.com/andrinr/jaxcad"> <i class="bi bi-github" role="img">
+    <a class="nav-link" href="https://github.com/andrinr/cadjoint"> <i class="bi bi-github" role="img">
 </i> 
 <span class="menu-text"></span></a>
   </li>  
@@ -230,22 +230,22 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </header>
 
 
-<p>jaxCAD models CAD workflows with <strong>two trees sharing one set of parameters</strong>:</p>
+<p>cadjoint models CAD workflows with <strong>two trees sharing one set of parameters</strong>:</p>
 <ul>
 <li>the <strong>construction tree</strong> — sketch planes and 2D profiles whose vertices are free <code>Vector2</code> parameters. This is what you edit and constrain.</li>
 <li>the <strong>SDF tree</strong> — solids <em>generated</em> from profiles (<code>extrude</code>, <code>revolve</code>). Generation preserves parameter references, so solving constraints on the sketch, or running gradients through the solid, act on the same values.</li>
 </ul>
 <p>The construction tree is never part of the SDF render; it is projected through the same camera and drawn as a wireframe overlay.</p>
-<div id="4ff1821a" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-07-28T21:05:35.387334Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-07-28T21:05:35.387256Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-07-28T21:05:35.790723Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-07-28T21:05:35.790257Z&quot;}}" data-execution_count="1">
+<div id="4ff1821a" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:35:49.865088Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:35:49.865030Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:35:50.252012Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:35:50.251565Z&quot;}}" data-execution_count="1">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> jax</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> jax.numpy <span class="im">as</span> jnp</span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
 <span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> jaxcad <span class="im">import</span> apply_parameters, extract_parameters, functionalize</span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> jaxcad.constraints <span class="im">import</span> DistanceConstraint, FixedConstraint</span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> jaxcad.constraints.solve <span class="im">import</span> project_to_manifold, solve_constraints</span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> jaxcad.construction <span class="im">import</span> PolygonProfile, SketchPlane, extrude, revolve</span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> jaxcad.render <span class="im">import</span> (</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint <span class="im">import</span> apply_parameters, extract_parameters, functionalize</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.constraints <span class="im">import</span> DistanceConstraint, FixedConstraint</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.constraints.solve <span class="im">import</span> project_to_manifold, solve_constraints</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.construction <span class="im">import</span> PolygonProfile, SketchPlane, extrude, revolve</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.render <span class="im">import</span> (</span>
 <span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>    Camera,</span>
 <span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>    Material,</span>
 <span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>    RenderSettings,</span>
@@ -254,13 +254,13 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>    draw_profile,</span>
 <span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>    render_scene,</span>
 <span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> jaxcad.sdf <span class="im">import</span> volume</span>
-<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> jaxcad.sdf.primitives <span class="im">import</span> Plane</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf <span class="im">import</span> volume</span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf.primitives <span class="im">import</span> Plane</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <section id="sketch-a-profile" class="level2">
 <h2 class="anchored" data-anchor-id="sketch-a-profile">1. Sketch a profile</h2>
 <p>A <code>PolygonProfile</code> lives on a <code>SketchPlane</code>. Raw vertex arrays become <strong>free</strong> <code>Vector2</code> parameters (2 DOF each) — editable until constrained, like a CAD sketch.</p>
-<div id="d52a1c9f" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-07-28T21:05:35.792088Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-07-28T21:05:35.791982Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-07-28T21:05:35.826928Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-07-28T21:05:35.826526Z&quot;}}" data-execution_count="2">
+<div id="d52a1c9f" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:35:50.253344Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:35:50.253257Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:35:50.285482Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:35:50.285061Z&quot;}}" data-execution_count="2">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>profile <span class="op">=</span> PolygonProfile(</span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    [[<span class="fl">0.1</span>, <span class="op">-</span><span class="fl">0.1</span>], [<span class="fl">1.9</span>, <span class="fl">0.2</span>], [<span class="fl">1.0</span>, <span class="fl">1.5</span>]],</span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>    plane<span class="op">=</span>SketchPlane(origin<span class="op">=</span>[<span class="fl">0.0</span>, <span class="op">-</span><span class="fl">0.5</span>, <span class="fl">0.0</span>], normal<span class="op">=</span>[<span class="fl">0.0</span>, <span class="fl">0.0</span>, <span class="fl">1.0</span>]),</span>
@@ -277,7 +277,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="constrain-and-solve" class="level2">
 <h2 class="anchored" data-anchor-id="constrain-and-solve">2. Constrain and solve</h2>
 <p>Anchor two vertices and pin the apex with two distance constraints: 6 DOF, 6 constraint equations — exactly constrained. <code>solve_constraints</code> walks the construction tree, finds the constraints registered on its parameters, and solves with Levenberg–Marquardt. The solution lands on an equilateral triangle.</p>
-<div id="5d5c90b5" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-07-28T21:05:35.828059Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-07-28T21:05:35.828002Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-07-28T21:05:36.039685Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-07-28T21:05:36.039341Z&quot;}}" data-execution_count="3">
+<div id="5d5c90b5" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:35:50.286533Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:35:50.286479Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:35:50.499746Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:35:50.499195Z&quot;}}" data-execution_count="3">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>v0, v1, v2 <span class="op">=</span> profile.vertices</span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>FixedConstraint(v0, [<span class="fl">0.0</span>, <span class="fl">0.0</span>])</span>
 <span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>FixedConstraint(v1, [<span class="fl">2.0</span>, <span class="fl">0.0</span>])</span>
@@ -297,7 +297,7 @@ tri_v2: [1.        1.7320509]</code></pre>
 <section id="generate-a-solid-and-render-with-the-sketch-overlay" class="level2">
 <h2 class="anchored" data-anchor-id="generate-a-solid-and-render-with-the-sketch-overlay">3. Generate a solid and render with the sketch overlay</h2>
 <p><code>extrude</code> produces an SDF primitive that <strong>shares</strong> the profile’s vertex parameters and places it on the sketch plane. We render the solid with the forward renderer, then draw the construction tree on top: dashed plane outline, profile edges, vertex handles.</p>
-<div id="47e6256b" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-07-28T21:05:36.040973Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-07-28T21:05:36.040870Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-07-28T21:05:37.222036Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-07-28T21:05:37.221694Z&quot;}}" data-execution_count="4">
+<div id="47e6256b" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:35:50.500886Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:35:50.500787Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:35:51.755247Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:35:51.754913Z&quot;}}" data-execution_count="4">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>solid <span class="op">=</span> extrude(profile, depth<span class="op">=</span><span class="fl">0.6</span>, material<span class="op">=</span>Material(color<span class="op">=</span>[<span class="fl">0.9</span>, <span class="fl">0.55</span>, <span class="fl">0.08</span>], roughness<span class="op">=</span><span class="fl">0.35</span>))</span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>scene <span class="op">=</span> Scene(</span>
@@ -330,7 +330,7 @@ tri_v2: [1.        1.7320509]</code></pre>
 <section id="revolve" class="level2">
 <h2 class="anchored" data-anchor-id="revolve">4. Revolve</h2>
 <p>The same profile machinery drives solids of revolution. Profile coordinates are (radial, height); the profile revolves around the sketch plane’s local Y axis.</p>
-<div id="f96bb098" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-07-28T21:05:37.223215Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-07-28T21:05:37.223157Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-07-28T21:05:37.813121Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-07-28T21:05:37.812613Z&quot;}}" data-execution_count="5">
+<div id="f96bb098" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:35:51.757073Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:35:51.756993Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:35:52.403609Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:35:52.403166Z&quot;}}" data-execution_count="5">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>washer <span class="op">=</span> PolygonProfile([[<span class="fl">0.9</span>, <span class="op">-</span><span class="fl">0.18</span>], [<span class="fl">1.35</span>, <span class="op">-</span><span class="fl">0.28</span>], [<span class="fl">1.35</span>, <span class="fl">0.28</span>], [<span class="fl">0.9</span>, <span class="fl">0.18</span>]], name<span class="op">=</span><span class="st">"washer"</span>)</span>
 <span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>ring <span class="op">=</span> revolve(washer, material<span class="op">=</span>Material(color<span class="op">=</span>[<span class="fl">0.78</span>, <span class="fl">0.08</span>, <span class="fl">0.05</span>], roughness<span class="op">=</span><span class="fl">0.4</span>))</span>
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a></span>
@@ -355,7 +355,7 @@ tri_v2: [1.        1.7320509]</code></pre>
 <section id="constrained-optimization-through-the-generated-solid" class="level2">
 <h2 class="anchored" data-anchor-id="constrained-optimization-through-the-generated-solid">5. Constrained optimization through the generated solid</h2>
 <p>The full differentiable-CAD loop: a quad sketch with one anchor and one pinned edge length (3 constraint equations on 8 DOF), extruded into a solid. We optimize the remaining sketch DOF so the solid’s volume hits a target, and project back onto the constraint manifold after every gradient step.</p>
-<div id="5a2e833c" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-07-28T21:05:37.814159Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-07-28T21:05:37.814092Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-07-28T21:05:41.215995Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-07-28T21:05:41.215559Z&quot;}}" data-execution_count="6">
+<div id="5a2e833c" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:35:52.404683Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:35:52.404629Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:35:55.834355Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:35:55.834033Z&quot;}}" data-execution_count="6">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>quad <span class="op">=</span> PolygonProfile([[<span class="fl">0.0</span>, <span class="fl">0.0</span>], [<span class="fl">2.0</span>, <span class="fl">0.0</span>], [<span class="fl">2.0</span>, <span class="fl">1.0</span>], [<span class="fl">0.0</span>, <span class="fl">1.0</span>]], name<span class="op">=</span><span class="st">"quad"</span>)</span>
 <span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>q0, q1, q2, q3 <span class="op">=</span> quad.vertices</span>
 <span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>FixedConstraint(q0, [<span class="fl">0.0</span>, <span class="fl">0.0</span>])</span>
@@ -407,7 +407,7 @@ edge length: 2.0000 (pinned 2.0)</code></pre>
 <section id="optimized-solid-with-its-sketch" class="level2">
 <h2 class="anchored" data-anchor-id="optimized-solid-with-its-sketch">6. Optimized solid with its sketch</h2>
 <p><code>apply_parameters</code> is the inverse of <code>extract_parameters</code>: it writes a name-keyed value dict back into the tree’s free parameters. Since the solid and the sketch share their parameters, applying to either updates both — the overlay below shows the final constrained profile driving the solid.</p>
-<div id="e486d74a" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-07-28T21:05:41.217034Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-07-28T21:05:41.216972Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-07-28T21:05:41.812385Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-07-28T21:05:41.811896Z&quot;}}" data-execution_count="7">
+<div id="e486d74a" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:35:55.835494Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:35:55.835444Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:35:56.371600Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:35:56.371262Z&quot;}}" data-execution_count="7">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>apply_parameters(quad, params)</span>
 <span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>quad_scene <span class="op">=</span> Scene(</span>
@@ -507,7 +507,7 @@ edge length: 2.0000 (pinned 2.0)</code></pre>
     }
       var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
       var mailtoRegex = new RegExp(/^mailto:/);
-        var filterRegex = new RegExp("https:\/\/andrinr\.github\.io\/jaxcad\/");
+        var filterRegex = new RegExp("https:\/\/andrinr\.github\.io\/cadjoint\/");
       var isInternal = (href) => {
           return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
       }

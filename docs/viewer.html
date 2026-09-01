@@ -6,9 +6,9 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="description" content="Edit JAXCAD scenes in Python and render their generated WGSL live in WebGPU.">
+<meta name="description" content="Edit cadjoint scenes in Python and render their generated WGSL live in WebGPU.">
 
-<title>WebGPU Viewer – jaxCAD</title>
+<title>WebGPU Viewer – cadjoint</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -81,7 +81,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <link href="../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-d94f0129d652a5a8036266edffbc062c.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-f83c246346592b24d02aa84ae3974412.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -121,7 +121,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
       <div class="navbar-container container-fluid">
       <div class="navbar-brand-container mx-auto">
     <a class="navbar-brand" href="../index.html">
-    <span class="navbar-title">jaxCAD</span>
+    <span class="navbar-title">cadjoint</span>
     </a>
   </div>
             <div id="quarto-search" class="" title="Search"></div>
@@ -180,7 +180,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </ul>
             <ul class="navbar-nav navbar-nav-scroll ms-auto">
   <li class="nav-item compact">
-    <a class="nav-link" href="https://github.com/andrinr/jaxcad"> <i class="bi bi-github" role="img">
+    <a class="nav-link" href="https://github.com/andrinr/cadjoint"> <i class="bi bi-github" role="img">
 </i> 
 <span class="menu-text"></span></a>
   </li>  
@@ -221,7 +221,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 <div>
   <div class="description">
-    Edit JAXCAD scenes in Python and render their generated WGSL live in WebGPU.
+    Edit cadjoint scenes in Python and render their generated WGSL live in WebGPU.
   </div>
 </div>
 
@@ -238,7 +238,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </header>
 
 
-<p>JAXCAD provides two interactive WebGPU workflows: a standalone browser playground for editing complete Python scenes and a compact widget for Jupyter notebooks.</p>
+<p>cadjoint provides two interactive WebGPU workflows: a standalone browser playground for editing complete Python scenes and a compact widget for Jupyter notebooks.</p>
 <div class="callout callout-style-default callout-note callout-titled">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
@@ -253,32 +253,32 @@ Note
 </div>
 </div>
 <p><link rel="stylesheet" href="assets/webgpu-viewer.css"></p>
-<div class="jaxcad-webgpu-demo" data-jaxcad-webgpu-viewer="">
-<canvas data-viewer-canvas="" aria-label="Interactive WebGPU rendering of the JAXCAD orbital example">
+<div class="cadjoint-webgpu-demo" data-cadjoint-webgpu-viewer="">
+<canvas data-viewer-canvas="" aria-label="Interactive WebGPU rendering of the cadjoint orbital example">
 </canvas>
-<img data-viewer-fallback="" src="../examples/assets/webgpu_playground.png" alt="JAXCAD playground with Python code on the left and a rendered scene on the right">
-<div class="jaxcad-webgpu-status" data-viewer-status="" aria-live="polite">
+<img data-viewer-fallback="" src="../examples/assets/webgpu_playground.png" alt="cadjoint playground with Python code on the left and a rendered scene on the right">
+<div class="cadjoint-webgpu-status" data-viewer-status="" aria-live="polite">
 Starting WebGPU…
 </div>
-<button class="jaxcad-webgpu-reset" data-viewer-reset="" type="button">Reset camera</button>
-<div class="jaxcad-webgpu-help">
+<button class="cadjoint-webgpu-reset" data-viewer-reset="" type="button">Reset camera</button>
+<div class="cadjoint-webgpu-help">
 Drag to orbit · Scroll to zoom
 </div>
 </div>
 <script type="module" src="assets/webgpu-viewer.js"></script>
-<p>The canvas above is running the example scene directly in this page. Its shader was compiled from JAXCAD through StableHLO to WGSL; drag the scene to orbit it and scroll to zoom. The documentation is static, so editing and executing Python stays in the local playground described below.</p>
+<p>The canvas above is running the example scene directly in this page. Its shader was compiled from cadjoint through StableHLO to WGSL; drag the scene to orbit it and scroll to zoom. The documentation is static, so editing and executing Python stays in the local playground described below.</p>
 <section id="browser-playground" class="level2">
 <h2 class="anchored" data-anchor-id="browser-playground">Browser playground</h2>
-<p>From a development checkout, install JAXCAD and start the local viewer:</p>
+<p>From a development checkout, install cadjoint and start the local viewer:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> sync</span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run jaxcad-viewer <span class="at">--open</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run cadjoint-viewer <span class="at">--open</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>The module entry point works as well, and accepts a custom port:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> <span class="at">-m</span> jaxcad.viewer.playground <span class="at">--open</span> <span class="at">--port</span> 9000</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> <span class="at">-m</span> cadjoint.viewer.playground <span class="at">--open</span> <span class="at">--port</span> 9000</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>The playground opens with a complete material example. Edit the Python on the left and press <strong>Run scene</strong> or <code>Ctrl+Enter</code> (<code>Cmd+Enter</code> on macOS) to update the preview. The final SDF must be assigned to a variable named <code>scene</code>:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> jaxcad.render <span class="im">import</span> Material</span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> jaxcad.sdf.boolean <span class="im">import</span> Union</span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> jaxcad.sdf.primitives <span class="im">import</span> Plane, Sphere</span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> jaxcad.sdf.transforms <span class="im">import</span> Translate</span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.render <span class="im">import</span> Material</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf.boolean <span class="im">import</span> Union</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf.primitives <span class="im">import</span> Plane, Sphere</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf.transforms <span class="im">import</span> Translate</span>
 <span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>red <span class="op">=</span> Material(color<span class="op">=</span>[<span class="fl">0.8</span>, <span class="fl">0.035</span>, <span class="fl">0.015</span>], roughness<span class="op">=</span><span class="fl">0.42</span>)</span>
 <span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>glass <span class="op">=</span> Material(color<span class="op">=</span>[<span class="fl">0.94</span>, <span class="fl">0.98</span>, <span class="fl">1.0</span>], opacity<span class="op">=</span><span class="fl">0.0</span>, ior<span class="op">=</span><span class="fl">1.5</span>)</span>
@@ -339,7 +339,7 @@ Drag to orbit · Scroll to zoom
 <ol type="1">
 <li>The local server evaluates the Python and reads <code>scene</code>.</li>
 <li>JAX traces distance and material evaluation and lowers both to StableHLO.</li>
-<li>JAXCAD emits WGSL <code>sdf</code>, <code>material_base</code>, and <code>material_optics</code> functions.</li>
+<li>cadjoint emits WGSL <code>sdf</code>, <code>material_base</code>, and <code>material_optics</code> functions.</li>
 <li>The browser embeds those functions in either the preview or path-tracing transport runtime and builds the WebGPU pipelines.</li>
 </ol>
 <p>Compilation runs in a separate child process with a timeout, so a failed edit does not take down the viewer server. Python tracebacks and WebGPU shader errors appear under the editor.</p>
@@ -357,7 +357,7 @@ Drag to orbit · Scroll to zoom
 </ul>
 <p>The quality selector changes framebuffer resolution in both preview and path mode. In path mode it additionally changes bounce depth, sun-visibility samples, and the accumulation limit. The status pill always identifies WebGPU as the active backend and includes adapter details when the browser exposes them; the viewer has no silent WebGL fallback.</p>
 <p>Two half-float textures alternate between sampled input and render attachment. WebGPU does not allow one texture to be sampled and rendered into in the same pass, so this ping-pong design is required rather than incidental. The playground offers three quality budgets. <strong>High</strong> is the default at roughly 900,000 pixels, six bounces, two sun-visibility samples per hit, and 512 samples per pixel; <strong>Draft</strong> favors interaction, while <strong>Ultra</strong> opts into a 1.6-million-pixel, eight-bounce, four-visibility-sample, 1,024-sample budget.</p>
-<p>The finite sun is sampled only through next-event estimation and is not part of the environment radiance seen by BSDF paths, so the current strategies do not overlap. Multiple importance sampling becomes useful when emissive area lights or an importance-sampled environment map are added. The research and scope decisions are recorded in <a href="https://github.com/andrinr/jaxcad/blob/main/research/path-tracing.md"><code>research/path-tracing.md</code></a>.</p>
+<p>The finite sun is sampled only through next-event estimation and is not part of the environment radiance seen by BSDF paths, so the current strategies do not overlap. Multiple importance sampling becomes useful when emissive area lights or an importance-sampled environment map are added. The research and scope decisions are recorded in <a href="https://github.com/andrinr/cadjoint/blob/main/research/path-tracing.md"><code>research/path-tracing.md</code></a>.</p>
 <div class="callout callout-style-default callout-warning callout-titled">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
@@ -378,8 +378,8 @@ Warning
 <p>Install the optional notebook dependencies:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="ex">pip</span> install <span class="at">-e</span> <span class="st">".[viewer]"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>Then display any JAX-traceable SDF directly in a notebook:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> jaxcad.sdf.primitives <span class="im">import</span> Sphere</span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> jaxcad.viewer <span class="im">import</span> SDFViewer</span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf.primitives <span class="im">import</span> Sphere</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.viewer <span class="im">import</span> SDFViewer</span>
 <span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>scene <span class="op">=</span> Sphere(radius<span class="op">=</span><span class="fl">1.0</span>)</span>
 <span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>viewer <span class="op">=</span> SDFViewer(scene, height<span class="op">=</span><span class="dv">480</span>)</span>
@@ -393,7 +393,7 @@ Warning
 <p><strong>WebGPU is unavailable</strong></p>
 <p>Use a WebGPU-capable browser and make sure hardware acceleration is enabled. The editor can still compile and show the generated WGSL when no adapter is available.</p>
 <p><strong>The command is not found</strong></p>
-<p>Run <code>python -m jaxcad.viewer.playground --open</code>, or reinstall the current checkout so the <code>jaxcad-viewer</code> console script is created.</p>
+<p>Run <code>python -m cadjoint.viewer.playground --open</code>, or reinstall the current checkout so the <code>cadjoint-viewer</code> console script is created.</p>
 <p><strong>A scene does not compile</strong></p>
 <p>Confirm that the source assigns a callable SDF to <code>scene</code>. The error panel includes the Python traceback or WGSL compiler message needed to locate the failure.</p>
 
@@ -474,7 +474,7 @@ Warning
     }
       var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
       var mailtoRegex = new RegExp(/^mailto:/);
-        var filterRegex = new RegExp("https:\/\/andrinr\.github\.io\/jaxcad\/");
+        var filterRegex = new RegExp("https:\/\/andrinr\.github\.io\/cadjoint\/");
       var isInternal = (href) => {
           return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
       }

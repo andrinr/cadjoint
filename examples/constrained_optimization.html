@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>Constrained Optimization – jaxCAD</title>
+<title>Constrained Optimization – cadjoint</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -80,7 +80,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <link href="../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-d94f0129d652a5a8036266edffbc062c.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-f83c246346592b24d02aa84ae3974412.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -120,7 +120,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
       <div class="navbar-container container-fluid">
       <div class="navbar-brand-container mx-auto">
     <a class="navbar-brand" href="../index.html">
-    <span class="navbar-title">jaxCAD</span>
+    <span class="navbar-title">cadjoint</span>
     </a>
   </div>
             <div id="quarto-search" class="" title="Search"></div>
@@ -179,7 +179,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </ul>
             <ul class="navbar-nav navbar-nav-scroll ms-auto">
   <li class="nav-item compact">
-    <a class="nav-link" href="https://github.com/andrinr/jaxcad"> <i class="bi bi-github" role="img">
+    <a class="nav-link" href="https://github.com/andrinr/cadjoint"> <i class="bi bi-github" role="img">
 </i> 
 <span class="menu-text"></span></a>
   </li>  
@@ -231,7 +231,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 
 <p>Minimize ‖p − target‖² subject to |p| = 2 using five strategies.</p>
-<div id="23867a81" class="cell" data-execution_count="1">
+<div id="23867a81" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:36:16.108176Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:36:16.108134Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:36:16.491463Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:36:16.491126Z&quot;}}" data-execution_count="1">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> time</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> jax</span>
@@ -240,19 +240,19 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
 <span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> optax</span>
 <span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> jaxcad.constraints <span class="im">import</span> (</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.constraints <span class="im">import</span> (</span>
 <span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>    DistanceConstraint,</span>
-<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>    Vector,</span>
-<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>    constraint_residuals,</span>
-<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>    make_manifold_projection,</span>
-<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>    null_space,</span>
-<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> jaxcad.extraction <span class="im">import</span> extract_parameters</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>    constraint_residuals,</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>    make_manifold_projection,</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>    null_space,</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.extraction <span class="im">import</span> extract_parameters</span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.geometry <span class="im">import</span> Vector</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <section id="setup" class="level2">
 <h2 class="anchored" data-anchor-id="setup">Setup</h2>
 <p>p₀ = (2, 0, 0), target = (1, 1.5, 0). <code>run</code> times N steps after a warm-up call to exclude JAX compilation.</p>
-<div id="fd48eb51" class="cell" data-execution_count="2">
+<div id="fd48eb51" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:36:16.492731Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:36:16.492639Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:36:16.498147Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:36:16.497824Z&quot;}}" data-execution_count="2">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>anchor <span class="op">=</span> Vector(jnp.array([<span class="fl">0.0</span>, <span class="fl">0.0</span>, <span class="fl">0.0</span>]))</span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>p <span class="op">=</span> Vector(jnp.array([<span class="fl">2.0</span>, <span class="fl">0.0</span>, <span class="fl">0.0</span>]), free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">"p"</span>)</span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a></span>
@@ -260,7 +260,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>target <span class="op">=</span> jnp.array([<span class="fl">1.0</span>, <span class="fl">1.5</span>, <span class="fl">0.0</span>])</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
-<div id="04772075" class="cell" data-execution_count="3">
+<div id="04772075" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:36:16.499294Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:36:16.499240Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:36:16.555325Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:36:16.554960Z&quot;}}" data-execution_count="3">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>free_params, fixed_params, metadata <span class="op">=</span> extract_parameters(distance_constraint)</span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"free_params"</span>, free_params)</span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"fixed_params"</span>, fixed_params)</span>
@@ -277,7 +277,7 @@ metadata {'p': Vector(value=Array([2., 0., 0.], dtype=float32), free=True, name=
 p_star ≈ [1.109 1.664 0.   ],  optimal_loss = 0.0389</code></pre>
 </div>
 </div>
-<div id="cc85bbe1" class="cell" data-execution_count="4">
+<div id="cc85bbe1" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:36:16.556310Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:36:16.556255Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:36:16.560148Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:36:16.559930Z&quot;}}" data-execution_count="4">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>N_STEPS <span class="op">=</span> <span class="dv">40</span></span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>LAMBDA <span class="op">=</span> <span class="fl">25.0</span></span>
 <span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a></span>
@@ -317,7 +317,7 @@ p_star ≈ [1.109 1.664 0.   ],  optimal_loss = 0.0389</code></pre>
 <section id="fixed-null-space-projection" class="level2">
 <h2 class="anchored" data-anchor-id="fixed-null-space-projection">Fixed null-space projection</h2>
 <p>N computed once at x₀; gradient projected onto NNᵀ each step.</p>
-<div id="807317ed" class="cell" data-execution_count="5">
+<div id="807317ed" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:36:16.561071Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:36:16.561030Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:36:17.008323Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:36:17.008004Z&quot;}}" data-execution_count="5">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> loss_ns_fixed(reduced_vector, N):</span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> full_objective(N <span class="op">@</span> reduced_vector)</span>
 <span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a></span>
@@ -350,7 +350,7 @@ Step 35, loss 1.0072, |r| 0.4619</code></pre>
 <section id="relinearized-null-space-projection" class="level2">
 <h2 class="anchored" data-anchor-id="relinearized-null-space-projection">Relinearized null-space projection</h2>
 <p>N recomputed at the current point each step so the gradient is projected onto the tangent plane at the <em>current</em> position, not just the initial one. Plain SGD is used rather than Adam: Adam’s element-wise adaptive scaling distorts the step as the null space rotates (components that were zero acquire non-zero projections and get amplified). Violation still accumulates because steps along the tangent plane leave the curved manifold by O(lr²κ) with no correction.</p>
-<div id="d2f6e238" class="cell" data-execution_count="6">
+<div id="d2f6e238" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:36:17.009453Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:36:17.009354Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:36:17.097360Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:36:17.096990Z&quot;}}" data-execution_count="6">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>value_and_grad_full <span class="op">=</span> jax.value_and_grad(full_objective)</span>
 <span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a></span>
@@ -378,7 +378,7 @@ Step 35, loss 0.1097, |r| 0.1340</code></pre>
 <section id="manifold-projection-via-make_manifold_projection" class="level2">
 <h2 class="anchored" data-anchor-id="manifold-projection-via-make_manifold_projection">Manifold projection via <code>make_manifold_projection</code></h2>
 <p>Chain <code>make_manifold_projection(metadata)</code> after any optax optimizer. On each call to <code>optimizer.update(grads, state, params)</code> it computes <code>new_params = params + adam_update</code>, projects onto the constraint manifold via a Newton correction, then returns <code>projected − params</code> as the effective update — so <code>apply_updates(params, updates)</code> lands exactly on the manifold. The <code>run</code> loop passes <code>params=full</code> to every <code>opt.update</code> call, which is what activates the projection.</p>
-<div id="43ee783a" class="cell" data-execution_count="7">
+<div id="43ee783a" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:36:17.098305Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:36:17.098255Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:36:17.244814Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:36:17.244485Z&quot;}}" data-execution_count="7">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>optimizer_proj <span class="op">=</span> optax.chain(optax.adam(<span class="fl">0.05</span>), make_manifold_projection(metadata))</span>
 <span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>value_and_grad_proj <span class="op">=</span> jax.value_and_grad(full_objective)</span>
@@ -404,7 +404,7 @@ Step 35, loss 0.0508, |r| 0.0000</code></pre>
 <section id="riemannian-gradient-descent-relinearized-projection" class="level2">
 <h2 class="anchored" data-anchor-id="riemannian-gradient-descent-relinearized-projection">Riemannian gradient descent (relinearized + projection)</h2>
 <p>Combine both ideas: step along the <em>current</em> tangent plane (<code>grad_ns_relin</code>) then snap back to the manifold with <code>make_manifold_projection</code>. This is the hybrid — it gets the correct manifold-aware gradient direction <em>and</em> enforces the constraint exactly after every step. Chaining <code>optax.sgd</code> with <code>make_manifold_projection</code> requires no new code.</p>
-<div id="axjqtthexw" class="cell" data-execution_count="8">
+<div id="axjqtthexw" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:36:17.245818Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:36:17.245765Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:36:17.381651Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:36:17.381317Z&quot;}}" data-execution_count="8">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>optimizer_riem <span class="op">=</span> optax.chain(optax.sgd(<span class="fl">0.15</span>), make_manifold_projection(metadata))</span>
 <span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>h_riem, end_riem <span class="op">=</span> run(grad_ns_relin, opt<span class="op">=</span>optimizer_riem, full_init<span class="op">=</span>free_params)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
@@ -423,7 +423,7 @@ Step 35, loss 0.0389, |r| 0.0000</code></pre>
 <section id="penalty-method" class="level2">
 <h2 class="anchored" data-anchor-id="penalty-method">Penalty method</h2>
 <p>Augmented loss: ‖p − t‖² + λ‖r(p)‖². Penalty Hessian eigenvalue in the normal direction is 2 + 2λ; stable LR ≤ 1/(1 + 2λ).</p>
-<div id="572b58c9" class="cell" data-execution_count="9">
+<div id="572b58c9" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:36:17.382563Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:36:17.382515Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:36:17.580802Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:36:17.580420Z&quot;}}" data-execution_count="9">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>LR_PENALTY <span class="op">=</span> <span class="fl">2.5</span> <span class="op">/</span> (<span class="fl">1.0</span> <span class="op">+</span> <span class="fl">2.0</span> <span class="op">*</span> LAMBDA)</span>
 <span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>optimizer_penalty <span class="op">=</span> optax.adam(learning_rate<span class="op">=</span>LR_PENALTY)</span>
 <span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a></span>
@@ -455,7 +455,7 @@ Step 35, loss 0.1052, |r| 0.0109
 final loss=0.0511  violation=8.36e-03</code></pre>
 </div>
 </div>
-<div id="olm5410hykb" class="cell" data-execution_count="10">
+<div id="olm5410hykb" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:36:17.581742Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:36:17.581693Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:36:17.727013Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:36:17.726672Z&quot;}}" data-execution_count="10">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>STYLES <span class="op">=</span> {</span>
 <span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>    <span class="st">"fixed null-space"</span>: (h_ns_fixed, <span class="st">"steelblue"</span>, <span class="st">"-"</span>, <span class="st">"o"</span>),</span>
 <span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>    <span class="st">"relinearized null-space"</span>: (h_ns_relin, <span class="st">"darkorange"</span>, <span class="st">"--"</span>, <span class="st">"s"</span>),</span>
@@ -496,7 +496,7 @@ final loss=0.0511  violation=8.36e-03</code></pre>
 </div>
 </div>
 </div>
-<div id="afgx3ub1qvj" class="cell" data-execution_count="11">
+<div id="afgx3ub1qvj" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:36:17.727956Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:36:17.727899Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:36:17.769845Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:36:17.769447Z&quot;}}" data-execution_count="11">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>theta <span class="op">=</span> np.linspace(<span class="dv">0</span>, <span class="dv">2</span> <span class="op">*</span> np.pi, <span class="dv">300</span>)</span>
 <span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="dv">5</span>, <span class="dv">5</span>))</span>
@@ -622,7 +622,7 @@ final loss=0.0511  violation=8.36e-03</code></pre>
     }
       var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
       var mailtoRegex = new RegExp(/^mailto:/);
-        var filterRegex = new RegExp("https:\/\/andrinr\.github\.io\/jaxcad\/");
+        var filterRegex = new RegExp("https:\/\/andrinr\.github\.io\/cadjoint\/");
       var isInternal = (href) => {
           return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
       }

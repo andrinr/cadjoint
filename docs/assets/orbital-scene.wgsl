@@ -1,4 +1,4 @@
-// Generated from jaxcad.viewer.playground.EXAMPLE_SOURCE.
+// Generated from cadjoint.viewer.playground.EXAMPLE_SOURCE.
 // Regenerate with compile_source(EXAMPLE_SOURCE)["shader"].
 
 fn _where(_arg0: bool, _arg1: f32, _arg2: f32) -> f32 {

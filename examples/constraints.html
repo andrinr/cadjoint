@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>Constraint Solving in jaxCAD – jaxCAD</title>
+<title>Constraint Solving in cadjoint – cadjoint</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -80,7 +80,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <link href="../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-d94f0129d652a5a8036266edffbc062c.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-f83c246346592b24d02aa84ae3974412.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -120,7 +120,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
       <div class="navbar-container container-fluid">
       <div class="navbar-brand-container mx-auto">
     <a class="navbar-brand" href="../index.html">
-    <span class="navbar-title">jaxCAD</span>
+    <span class="navbar-title">cadjoint</span>
     </a>
   </div>
             <div id="quarto-search" class="" title="Search"></div>
@@ -179,7 +179,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </ul>
             <ul class="navbar-nav navbar-nav-scroll ms-auto">
   <li class="nav-item compact">
-    <a class="nav-link" href="https://github.com/andrinr/jaxcad"> <i class="bi bi-github" role="img">
+    <a class="nav-link" href="https://github.com/andrinr/cadjoint"> <i class="bi bi-github" role="img">
 </i> 
 <span class="menu-text"></span></a>
   </li>  
@@ -213,7 +213,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
-<h1 class="title">Constraint Solving in jaxCAD</h1>
+<h1 class="title">Constraint Solving in cadjoint</h1>
 </div>
 
 
@@ -231,17 +231,17 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 
 <p><code>solve_constraints</code> finds parameter values that satisfy all geometric constraints attached to a scene. It errors immediately if the system is under- or over-constrained, so you never silently get a wrong result.</p>
-<div id="acae54e37e7d407bbb7b55eff062a284" class="cell" data-execution_count="1">
+<div id="acae54e37e7d407bbb7b55eff062a284" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:35:37.306456Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:35:37.306401Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:35:37.701027Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:35:37.700722Z&quot;}}" data-execution_count="1">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> jax.numpy <span class="im">as</span> jnp</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.patches <span class="im">as</span> patches</span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
 <span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
 <span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> jaxcad <span class="im">import</span> extract_parameters, functionalize</span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> jaxcad.constraints <span class="im">import</span> DistanceConstraint, solve_constraints</span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> jaxcad.geometry <span class="im">import</span> Vector</span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> jaxcad.render <span class="im">import</span> render_raymarched</span>
-<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> jaxcad.sdf <span class="im">import</span> Sphere, Translate</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint <span class="im">import</span> extract_parameters, functionalize</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.constraints <span class="im">import</span> DistanceConstraint, solve_constraints</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.geometry <span class="im">import</span> Vector</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.render <span class="im">import</span> render_raymarched</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf <span class="im">import</span> Sphere, Translate</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <section id="scene-setup---trilateration" class="level2">
 <h2 class="anchored" data-anchor-id="scene-setup---trilateration">Scene setup - trilateration</h2>
@@ -251,7 +251,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li><code>p</code> is <strong>free</strong> (<code>free=True</code>) - the unknown we want to solve for.</li>
 </ul>
 <p>We also define <code>true_p = [2, 1, 0]</code> - the intended solution - so we can compute exact target distances.</p>
-<div id="8dd0d8092fe74a7c96281538738b07e2" class="cell" data-execution_count="2">
+<div id="8dd0d8092fe74a7c96281538738b07e2" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:35:37.702333Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:35:37.702246Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:35:37.708734Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:35:37.708411Z&quot;}}" data-execution_count="2">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>anchor_a <span class="op">=</span> Vector(jnp.array([<span class="fl">0.0</span>, <span class="fl">0.0</span>, <span class="fl">0.0</span>]), free<span class="op">=</span><span class="va">False</span>, name<span class="op">=</span><span class="st">"anchor_a"</span>)</span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>anchor_b <span class="op">=</span> Vector(jnp.array([<span class="fl">4.0</span>, <span class="fl">0.0</span>, <span class="fl">0.0</span>]), free<span class="op">=</span><span class="va">False</span>, name<span class="op">=</span><span class="st">"anchor_b"</span>)</span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>anchor_c <span class="op">=</span> Vector(jnp.array([<span class="fl">2.0</span>, <span class="fl">3.0</span>, <span class="fl">0.0</span>]), free<span class="op">=</span><span class="va">False</span>, name<span class="op">=</span><span class="st">"anchor_c"</span>)</span>
@@ -263,7 +263,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>scene <span class="op">=</span> Translate(Sphere(radius<span class="op">=</span><span class="fl">0.5</span>), offset<span class="op">=</span>p)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>Each distance constraint is a circle centered on an anchor with radius equal to the distance from that anchor to <code>true_p</code>. The solver finds where all three circles intersect.</p>
-<div id="8edb47106e1a46a883d545849b8ab81b" class="cell" data-execution_count="3">
+<div id="8edb47106e1a46a883d545849b8ab81b" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:35:37.709752Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:35:37.709707Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:35:37.765878Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:35:37.765455Z&quot;}}" data-execution_count="3">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>anchors <span class="op">=</span> {</span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>    <span class="st">"A"</span>: np.array([<span class="fl">0.0</span>, <span class="fl">0.0</span>]),</span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    <span class="st">"B"</span>: np.array([<span class="fl">4.0</span>, <span class="fl">0.0</span>]),</span>
@@ -333,7 +333,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="under-constrained-error" class="level2">
 <h2 class="anchored" data-anchor-id="under-constrained-error">Under-constrained error</h2>
 <p>Adding only one constraint leaves 2 DOF - <code>solve_constraints</code> raises a clear error.</p>
-<div id="8763a12b2bbd4a93a75aff182afb95dc" class="cell" data-execution_count="4">
+<div id="8763a12b2bbd4a93a75aff182afb95dc" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:35:37.766979Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:35:37.766927Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:35:37.789182Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:35:37.788916Z&quot;}}" data-execution_count="4">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>DistanceConstraint(p, anchor_a, <span class="bu">float</span>(jnp.linalg.norm(true_p <span class="op">-</span> anchor_a.value)))</span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="cf">try</span>:</span>
@@ -348,7 +348,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="fully-constrain-the-scene" class="level2">
 <h2 class="anchored" data-anchor-id="fully-constrain-the-scene">Fully constrain the scene</h2>
 <p>Add the remaining two constraints - one per anchor - each with the exact distance from <code>true_p</code> to that anchor.</p>
-<div id="7cdc8c89c7104fffa095e18ddfef8986" class="cell" data-execution_count="5">
+<div id="7cdc8c89c7104fffa095e18ddfef8986" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:35:37.790252Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:35:37.790209Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:35:37.792260Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:35:37.792024Z&quot;}}" data-execution_count="5">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>DistanceConstraint(p, anchor_b, <span class="bu">float</span>(jnp.linalg.norm(true_p <span class="op">-</span> anchor_b.value)))</span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>DistanceConstraint(p, anchor_c, <span class="bu">float</span>(jnp.linalg.norm(true_p <span class="op">-</span> anchor_c.value)))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-display" data-execution_count="5">
@@ -359,7 +359,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="solve" class="level2">
 <h2 class="anchored" data-anchor-id="solve">Solve</h2>
 <p><code>solve_constraints</code> runs Levenberg-Marquardt (via optimistix) starting from the wrong initial guess <code>(0.5, 0.5, 0)</code> and converges to the true position <code>(2, 1, 0)</code>.</p>
-<div id="938c804e27f84196a10c8828c723f798" class="cell" data-execution_count="6">
+<div id="938c804e27f84196a10c8828c723f798" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:35:37.793188Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:35:37.793146Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:35:37.980873Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:35:37.980524Z&quot;}}" data-execution_count="6">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>free_params, fixed_params, metadata <span class="op">=</span> extract_parameters(scene)</span>
 <span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>solved_params <span class="op">=</span> solve_constraints(scene, max_steps<span class="op">=</span><span class="dv">10</span>)</span>
 <span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a></span>
@@ -374,7 +374,7 @@ Solved p:   [1.9999999 1.        0.       ]</code></pre>
 <section id="render-at-the-solved-position" class="level2">
 <h2 class="anchored" data-anchor-id="render-at-the-solved-position">Render at the solved position</h2>
 <p>The solved parameter dict is drop-in compatible with <code>functionalize</code>, so the constrained scene slots directly into the optimization workflow.</p>
-<div id="59bbdb311c014d738909a11f9e486628" class="cell" data-execution_count="7">
+<div id="59bbdb311c014d738909a11f9e486628" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:35:37.981883Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:35:37.981786Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:35:38.479257Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:35:38.478884Z&quot;}}" data-execution_count="7">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>render_raymarched(</span>
 <span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>    functionalize(scene)(solved_params, fixed_params),</span>
 <span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>    camera_pos<span class="op">=</span>jnp.array([<span class="fl">3.0</span>, <span class="fl">2.0</span>, <span class="fl">3.0</span>]),</span>
@@ -467,7 +467,7 @@ Solved p:   [1.9999999 1.        0.       ]</code></pre>
     }
       var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
       var mailtoRegex = new RegExp(/^mailto:/);
-        var filterRegex = new RegExp("https:\/\/andrinr\.github\.io\/jaxcad\/");
+        var filterRegex = new RegExp("https:\/\/andrinr\.github\.io\/cadjoint\/");
       var isInternal = (href) => {
           return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
       }

@@ -1,0 +1,1088 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.10.18">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>native-mesher – cadjoint</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-f83c246346592b24d02aa84ae3974412.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+</head>
+
+<body class="nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">cadjoint</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../docs/getting-started.html"> 
+<span class="menu-text">Get Started</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../docs/rendering.html"> 
+<span class="menu-text">Rendering</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../docs/viewer.html"> 
+<span class="menu-text">WebGPU Viewer</span></a>
+  </li>  
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-examples" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Examples</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-examples">    
+        <li>
+    <a class="dropdown-item" href="../examples/basics.html">
+ <span class="dropdown-text">Basics</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/rendering.html">
+ <span class="dropdown-text">Rendering</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/sketch_construction.html">
+ <span class="dropdown-text">Sketch Construction</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/constraints.html">
+ <span class="dropdown-text">Constraints</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/optimization.html">
+ <span class="dropdown-text">Optimization</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/constrained_optimization.html">
+ <span class="dropdown-text">Constrained Optimization</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="../reference/index.html"> 
+<span class="menu-text">API Reference</span></a>
+  </li>  
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/andrinr/cadjoint"> <i class="bi bi-github" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#native-rust-dual-contouring-core" id="toc-native-rust-dual-contouring-core" class="nav-link active" data-scroll-target="#native-rust-dual-contouring-core">Native (Rust) dual-contouring core</a>
+  <ul class="collapse">
+  <li><a href="#profile-of-the-pythonjax-reference-pipeline" id="toc-profile-of-the-pythonjax-reference-pipeline" class="nav-link" data-scroll-target="#profile-of-the-pythonjax-reference-pipeline">1. Profile of the Python/JAX reference pipeline</a>
+  <ul class="collapse">
+  <li><a href="#stage-breakdown-ms" id="toc-stage-breakdown-ms" class="nav-link" data-scroll-target="#stage-breakdown-ms">Stage breakdown (ms)</a></li>
+  <li><a href="#frozen-topology-gradient-edge_hermite_data-qef_vertices-under-jax.grad-jitted" id="toc-frozen-topology-gradient-edge_hermite_data-qef_vertices-under-jax.grad-jitted" class="nav-link" data-scroll-target="#frozen-topology-gradient-edge_hermite_data-qef_vertices-under-jax.grad-jitted">Frozen-topology gradient (<code>edge_hermite_data</code> + <code>qef_vertices</code> under <code>jax.grad</code>, jitted)</a></li>
+  <li><a href="#reading-of-the-profile" id="toc-reading-of-the-profile" class="nav-link" data-scroll-target="#reading-of-the-profile">Reading of the profile</a></li>
+  </ul></li>
+  <li><a href="#design-what-moved-to-rust-what-stayed-in-jax" id="toc-design-what-moved-to-rust-what-stayed-in-jax" class="nav-link" data-scroll-target="#design-what-moved-to-rust-what-stayed-in-jax">2. Design: what moved to Rust, what stayed in JAX</a></li>
+  <li><a href="#results" id="toc-results" class="nav-link" data-scroll-target="#results">3. Results</a>
+  <ul class="collapse">
+  <li><a href="#stage-by-stage-native-vs-python" id="toc-stage-by-stage-native-vs-python" class="nav-link" data-scroll-target="#stage-by-stage-native-vs-python">Stage-by-stage, native vs Python</a></li>
+  <li><a href="#frozen-topology-gradient-step-eager-x64-grad-mode" id="toc-frozen-topology-gradient-step-eager-x64-grad-mode" class="nav-link" data-scroll-target="#frozen-topology-gradient-step-eager-x64-grad-mode">Frozen-topology gradient step (eager, x64, <code>grad</code> mode)</a></li>
+  </ul></li>
+  <li><a href="#validation" id="toc-validation" class="nav-link" data-scroll-target="#validation">4. Validation</a></li>
+  <li><a href="#caveats" id="toc-caveats" class="nav-link" data-scroll-target="#caveats">5. Caveats</a></li>
+  </ul></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"></header>
+
+
+
+
+<section id="native-rust-dual-contouring-core" class="level1">
+<h1>Native (Rust) dual-contouring core</h1>
+<p>Rewrite of the numeric heart of <code>cadjoint/meshing</code> in Rust, integrated as a cdylib behind a tesseract-jax endpoint. This document records the profile that justified the split, the design, and the measured speedups.</p>
+<section id="profile-of-the-pythonjax-reference-pipeline" class="level2">
+<h2 class="anchored" data-anchor-id="profile-of-the-pythonjax-reference-pipeline">1. Profile of the Python/JAX reference pipeline</h2>
+<p>Machine: Apple Silicon (darwin arm64), CPU jax 0.8.2, float32 pipeline. <code>benchmarks/native_mesher_bench.py profile --resolutions 32 64 128</code>. Steady-state = min over 3 repeats; “first” includes jit trace + compile.</p>
+<section id="stage-breakdown-ms" class="level3">
+<h3 class="anchored" data-anchor-id="stage-breakdown-ms">Stage breakdown (ms)</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 5%">
+<col style="width: 6%">
+<col style="width: 6%">
+<col style="width: 6%">
+<col style="width: 6%">
+<col style="width: 6%">
+<col style="width: 6%">
+<col style="width: 6%">
+<col style="width: 6%">
+<col style="width: 6%">
+<col style="width: 6%">
+<col style="width: 6%">
+<col style="width: 6%">
+<col style="width: 6%">
+<col style="width: 6%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>scene</th>
+<th style="text-align: right;">res</th>
+<th style="text-align: right;">edges</th>
+<th style="text-align: right;">cells</th>
+<th style="text-align: right;">sample 1st</th>
+<th style="text-align: right;">sample</th>
+<th style="text-align: right;">edges</th>
+<th style="text-align: right;">incidence</th>
+<th style="text-align: right;">hermite 1st</th>
+<th style="text-align: right;">hermite</th>
+<th style="text-align: right;">qef smooth 1st</th>
+<th style="text-align: right;">qef smooth</th>
+<th style="text-align: right;">qef sharp</th>
+<th style="text-align: right;">faces</th>
+<th style="text-align: right;">extract total</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>sphere</td>
+<td style="text-align: right;">32</td>
+<td style="text-align: right;">2886</td>
+<td style="text-align: right;">2888</td>
+<td style="text-align: right;">12.7</td>
+<td style="text-align: right;">10.0</td>
+<td style="text-align: right;">0.3</td>
+<td style="text-align: right;">1.5</td>
+<td style="text-align: right;">370.3</td>
+<td style="text-align: right;">28.9</td>
+<td style="text-align: right;">554.4</td>
+<td style="text-align: right;">1.4</td>
+<td style="text-align: right;">7.7</td>
+<td style="text-align: right;">1.2</td>
+<td style="text-align: right;">51.2</td>
+</tr>
+<tr class="even">
+<td>sphere</td>
+<td style="text-align: right;">64</td>
+<td style="text-align: right;">11406</td>
+<td style="text-align: right;">11408</td>
+<td style="text-align: right;">13.8</td>
+<td style="text-align: right;">10.7</td>
+<td style="text-align: right;">1.7</td>
+<td style="text-align: right;">6.4</td>
+<td style="text-align: right;">369.8</td>
+<td style="text-align: right;">28.4</td>
+<td style="text-align: right;">443.5</td>
+<td style="text-align: right;">3.1</td>
+<td style="text-align: right;">29.9</td>
+<td style="text-align: right;">4.7</td>
+<td style="text-align: right;">86.1</td>
+</tr>
+<tr class="odd">
+<td>sphere</td>
+<td style="text-align: right;">128</td>
+<td style="text-align: right;">45678</td>
+<td style="text-align: right;">45680</td>
+<td style="text-align: right;">26.5</td>
+<td style="text-align: right;">16.7</td>
+<td style="text-align: right;">12.5</td>
+<td style="text-align: right;">25.7</td>
+<td style="text-align: right;">397.0</td>
+<td style="text-align: right;">29.9</td>
+<td style="text-align: right;">449.1</td>
+<td style="text-align: right;">9.1</td>
+<td style="text-align: right;">118.5</td>
+<td style="text-align: right;">20.2</td>
+<td style="text-align: right;">228.5</td>
+</tr>
+<tr class="even">
+<td>box</td>
+<td style="text-align: right;">32</td>
+<td style="text-align: right;">1726</td>
+<td style="text-align: right;">1728</td>
+<td style="text-align: right;">19.5</td>
+<td style="text-align: right;">15.7</td>
+<td style="text-align: right;">0.2</td>
+<td style="text-align: right;">0.9</td>
+<td style="text-align: right;">590.5</td>
+<td style="text-align: right;">37.4</td>
+<td style="text-align: right;">455.3</td>
+<td style="text-align: right;">1.4</td>
+<td style="text-align: right;">3.8</td>
+<td style="text-align: right;">0.7</td>
+<td style="text-align: right;">62.8</td>
+</tr>
+<tr class="odd">
+<td>box</td>
+<td style="text-align: right;">64</td>
+<td style="text-align: right;">6782</td>
+<td style="text-align: right;">6784</td>
+<td style="text-align: right;">20.5</td>
+<td style="text-align: right;">17.9</td>
+<td style="text-align: right;">1.6</td>
+<td style="text-align: right;">3.4</td>
+<td style="text-align: right;">604.3</td>
+<td style="text-align: right;">37.6</td>
+<td style="text-align: right;">441.6</td>
+<td style="text-align: right;">3.2</td>
+<td style="text-align: right;">14.4</td>
+<td style="text-align: right;">2.8</td>
+<td style="text-align: right;">81.2</td>
+</tr>
+<tr class="even">
+<td>box</td>
+<td style="text-align: right;">128</td>
+<td style="text-align: right;">26862</td>
+<td style="text-align: right;">26864</td>
+<td style="text-align: right;">30.9</td>
+<td style="text-align: right;">24.2</td>
+<td style="text-align: right;">12.7</td>
+<td style="text-align: right;">14.5</td>
+<td style="text-align: right;">676.7</td>
+<td style="text-align: right;">42.3</td>
+<td style="text-align: right;">524.8</td>
+<td style="text-align: right;">5.6</td>
+<td style="text-align: right;">56.8</td>
+<td style="text-align: right;">11.2</td>
+<td style="text-align: right;">169.0</td>
+</tr>
+<tr class="odd">
+<td>bracket</td>
+<td style="text-align: right;">32</td>
+<td style="text-align: right;">3760</td>
+<td style="text-align: right;">3752</td>
+<td style="text-align: right;">121.1</td>
+<td style="text-align: right;">116.9</td>
+<td style="text-align: right;">0.3</td>
+<td style="text-align: right;">2.0</td>
+<td style="text-align: right;">2178.3</td>
+<td style="text-align: right;">479.4</td>
+<td style="text-align: right;">471.1</td>
+<td style="text-align: right;">1.9</td>
+<td style="text-align: right;">8.5</td>
+<td style="text-align: right;">1.5</td>
+<td style="text-align: right;">605.9</td>
+</tr>
+<tr class="even">
+<td>bracket</td>
+<td style="text-align: right;">64</td>
+<td style="text-align: right;">15179</td>
+<td style="text-align: right;">15164</td>
+<td style="text-align: right;">118.4</td>
+<td style="text-align: right;">113.1</td>
+<td style="text-align: right;">1.7</td>
+<td style="text-align: right;">8.3</td>
+<td style="text-align: right;">2135.6</td>
+<td style="text-align: right;">477.2</td>
+<td style="text-align: right;">497.2</td>
+<td style="text-align: right;">3.8</td>
+<td style="text-align: right;">34.2</td>
+<td style="text-align: right;">6.2</td>
+<td style="text-align: right;">647.6</td>
+</tr>
+<tr class="odd">
+<td>bracket</td>
+<td style="text-align: right;">128</td>
+<td style="text-align: right;">61009</td>
+<td style="text-align: right;">60980</td>
+<td style="text-align: right;">141.2</td>
+<td style="text-align: right;">122.8</td>
+<td style="text-align: right;">12.7</td>
+<td style="text-align: right;">33.6</td>
+<td style="text-align: right;">2294.0</td>
+<td style="text-align: right;">520.6</td>
+<td style="text-align: right;">540.0</td>
+<td style="text-align: right;">11.8</td>
+<td style="text-align: right;">136.6</td>
+<td style="text-align: right;">26.7</td>
+<td style="text-align: right;">850.4</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="frozen-topology-gradient-edge_hermite_data-qef_vertices-under-jax.grad-jitted" class="level3">
+<h3 class="anchored" data-anchor-id="frozen-topology-gradient-edge_hermite_data-qef_vertices-under-jax.grad-jitted">Frozen-topology gradient (<code>edge_hermite_data</code> + <code>qef_vertices</code> under <code>jax.grad</code>, jitted)</h3>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>scene</th>
+<th style="text-align: right;">res</th>
+<th style="text-align: right;">first (trace+compile)</th>
+<th style="text-align: right;">steady</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>sphere</td>
+<td style="text-align: right;">128</td>
+<td style="text-align: right;">218.4</td>
+<td style="text-align: right;">13.6</td>
+</tr>
+<tr class="even">
+<td>box</td>
+<td style="text-align: right;">128</td>
+<td style="text-align: right;">288.5</td>
+<td style="text-align: right;">8.8</td>
+</tr>
+<tr class="odd">
+<td>bracket</td>
+<td style="text-align: right;">128</td>
+<td style="text-align: right;">2499.5</td>
+<td style="text-align: right;">35.0</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="reading-of-the-profile" class="level3">
+<h3 class="anchored" data-anchor-id="reading-of-the-profile">Reading of the profile</h3>
+<ul>
+<li><strong>JAX trace/compile dominates first-touch cost</strong>, as expected: the hermite stage costs 0.4–2.3 s on first call and the frozen gradient 0.2–2.5 s to trace/compile — versus tens of ms to execute. Nothing native can fix that; it is the price of tracing the user’s SDF and it amortizes across an optimization loop.</li>
+<li><strong>The SDF-evaluating stages must stay in JAX</strong> (the SDF is a JAX function): <code>sample_grid</code> and <code>edge_hermite_data</code>. For an expensive CSG field (bracket) they dominate steady state too (123 + 521 of 850 ms at res 128).</li>
+<li><strong>The movable numeric stages grow fast and are worth moving</strong>: at res 128 the host-side discrete + linear-algebra stages (crossing detection, manifold incidence, sharp QEF SVD, dual faces) sum to 177 ms / 228 ms = 78 % (sphere), 95 ms / 169 ms = 56 % (box), 210 ms / 850 ms = 25 % (bracket) of one full extraction. The sharp QEF (batched 12x3 SVDs in NumPy) is the single largest movable stage (57–137 ms at res 128), followed by manifold incidence (15–34 ms), crossing detection (a dense 4·(n+1)^3 sweep; ~13 ms at 128) and the dual face build (11–27 ms).</li>
+</ul>
+</section>
+</section>
+<section id="design-what-moved-to-rust-what-stayed-in-jax" class="level2">
+<h2 class="anchored" data-anchor-id="design-what-moved-to-rust-what-stayed-in-jax">2. Design: what moved to Rust, what stayed in JAX</h2>
+<p>Array-in/array-out split; the exactness contract of the reference pipeline (frozen discrete topology, exact continuous gradients) is untouched.</p>
+<p><strong>Stays in JAX (gradient contract owner):</strong></p>
+<ul>
+<li><code>sample_grid</code> — batched SDF evaluation on the lattice (the SDF is JAX).</li>
+<li><code>edge_hermite_data</code> — bisection on <code>stop_gradient</code> values + one differentiable Newton correction against the true SDF; carries the exact implicit-function-theorem derivatives, verbatim from the reference.</li>
+<li>Unit normalization of Hermite gradients, the averaged vertex normals, and the final per-cell clamp of the smooth QEF vertices (<code>jnp.clip</code>), so their subgradient semantics stay bit-compatible with the reference.</li>
+<li>Octree pruning (<code>lipschitz=</code>): the octree loop interleaves SDF evaluations, so detection stays on the existing <code>adaptive.sparse_crossing_edges</code>; everything after it goes native.</li>
+</ul>
+<p><strong>Moved to Rust (<code>native/</code>, cdylib <code>cadjoint_native_mesher</code>, rayon-parallel):</strong></p>
+<ul>
+<li><code>dc_find_crossing_edges</code> — dense lattice sweep for sign changes; ordered exactly like <code>find_crossing_edges</code> (axis-major, then row-major index).</li>
+<li><code>dc_manifold_cell_incidence</code> — candidate (cell, edge, inside-corner) generation, inside-corner connected components (min-label, identical to the Python fixed point), stable grouping by (cell key, component); rows and slot order bit-identical to <code>manifold_cell_incidence</code>.</li>
+<li><code>dc_sharp_qef</code> — rank-escalating truncated-SVD QEF (Ju et al.&nbsp;style) via Jacobi eigendecomposition of the 3x3 Gram matrix; forward-only, matching <code>sharp_qef_vertices</code> semantics (masked slots, mass point over valid slots, per-rank clamped candidates, smallest-residual winner).</li>
+<li><code>dc_qef_tikhonov</code> + <code>dc_qef_tikhonov_vjp</code> — the smooth, differentiable QEF: mass point, <code>A = sum(n n^T) + lambda*count*I</code>, 3x3 solve; and its hand-derived VJP w.r.t. the Hermite points and unit normals (linear-solve differentiation: <code>u = A^{-1} vbar</code>, <code>bbar = u</code>, <code>Abar = -u x^T</code>, chained through the gather/mask/mass-point structure).</li>
+<li><code>dc_dual_faces</code> — quad emission per interior crossing edge with the frozen <code>start_inside</code> winding, (cell, edge)-keyed row lookup, and shorter-diagonal triangulation; identical to <code>dual_faces</code>.</li>
+</ul>
+<p><strong>Integration (tesseract-jax):</strong> the differentiable smooth QEF is packaged as a tesseract (<code>native/tesseract_api.py</code>) with typed <code>apply</code>, <code>abstract_eval</code>, and <code>vector_jacobian_product</code> endpoints wrapping the cdylib via ctypes, mirroring <code>cadjoint/fem/tesseracts/*</code>. It is loaded locally with <code>Tesseract.from_tesseract_api</code> and composed into JAX autodiff with <code>tesseract_jax.apply_tesseract</code>, so <code>jax.grad</code> through <code>qef_vertices_native</code> dispatches to the Rust VJP. The discrete stages are concrete host-side calls (plain ctypes), exactly as the reference’s NumPy stages are concrete host-side calls.</p>
+<p><code>cadjoint/meshing/native.py</code> exposes <code>extract_mesh_native(...)</code> with the same signature and result type as <code>extract_mesh</code>, plus <code>qef_vertices_native(...)</code> as the differentiable drop-in for <code>qef_vertices</code> in frozen-topology optimization loops. When the cdylib is missing, importing helpers raise an actionable error naming the <code>cargo build --release</code> command.</p>
+</section>
+<section id="results" class="level2">
+<h2 class="anchored" data-anchor-id="results">3. Results</h2>
+<p>Same machine and scenes as section 1; steady-state execute time (min over 5 repeats, ms), <code>benchmarks/native_mesher_bench.py compare</code>.</p>
+<section id="stage-by-stage-native-vs-python" class="level3">
+<h3 class="anchored" data-anchor-id="stage-by-stage-native-vs-python">Stage-by-stage, native vs Python</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 9%">
+<col style="width: 12%">
+<col style="width: 12%">
+<col style="width: 12%">
+<col style="width: 12%">
+<col style="width: 12%">
+<col style="width: 12%">
+<col style="width: 12%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>scene</th>
+<th style="text-align: right;">res</th>
+<th style="text-align: right;">edges</th>
+<th style="text-align: right;">edges py→nat</th>
+<th style="text-align: right;">incidence py→nat</th>
+<th style="text-align: right;">sharp QEF py→nat</th>
+<th style="text-align: right;">faces py→nat</th>
+<th style="text-align: right;">extract_mesh py→nat</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>sphere</td>
+<td style="text-align: right;">32</td>
+<td style="text-align: right;">2886</td>
+<td style="text-align: right;">0.25 → 0.13 (1.9x)</td>
+<td style="text-align: right;">1.48 → 0.55 (2.7x)</td>
+<td style="text-align: right;">7.55 → 0.43 (18x)</td>
+<td style="text-align: right;">1.19 → 0.29 (4.1x)</td>
+<td style="text-align: right;">51.6 → 41.8 (1.2x)</td>
+</tr>
+<tr class="even">
+<td>sphere</td>
+<td style="text-align: right;">64</td>
+<td style="text-align: right;">11406</td>
+<td style="text-align: right;">1.71 → 0.92 (1.9x)</td>
+<td style="text-align: right;">6.11 → 1.40 (4.4x)</td>
+<td style="text-align: right;">29.5 → 0.67 (44x)</td>
+<td style="text-align: right;">4.82 → 0.52 (9.3x)</td>
+<td style="text-align: right;">89.0 → 48.4 (1.8x)</td>
+</tr>
+<tr class="odd">
+<td>sphere</td>
+<td style="text-align: right;">128</td>
+<td style="text-align: right;">45678</td>
+<td style="text-align: right;">12.3 → 2.02 (6.1x)</td>
+<td style="text-align: right;">26.0 → 3.96 (6.6x)</td>
+<td style="text-align: right;">117.8 → 1.21 (97x)</td>
+<td style="text-align: right;">20.1 → 1.20 (17x)</td>
+<td style="text-align: right;">228 → 60.9 (3.7x)</td>
+</tr>
+<tr class="even">
+<td>box</td>
+<td style="text-align: right;">32</td>
+<td style="text-align: right;">1726</td>
+<td style="text-align: right;">0.24 → 0.11 (2.2x)</td>
+<td style="text-align: right;">0.85 → 0.51 (1.7x)</td>
+<td style="text-align: right;">3.73 → 0.34 (11x)</td>
+<td style="text-align: right;">0.69 → 0.24 (2.9x)</td>
+<td style="text-align: right;">62.8 → 58.1 (1.1x)</td>
+</tr>
+<tr class="odd">
+<td>box</td>
+<td style="text-align: right;">64</td>
+<td style="text-align: right;">6782</td>
+<td style="text-align: right;">1.63 → 0.91 (1.8x)</td>
+<td style="text-align: right;">3.45 → 0.91 (3.8x)</td>
+<td style="text-align: right;">14.2 → 0.39 (36x)</td>
+<td style="text-align: right;">2.75 → 0.42 (6.5x)</td>
+<td style="text-align: right;">80.7 → 61.5 (1.3x)</td>
+</tr>
+<tr class="even">
+<td>box</td>
+<td style="text-align: right;">128</td>
+<td style="text-align: right;">26862</td>
+<td style="text-align: right;">12.4 → 1.71 (7.3x)</td>
+<td style="text-align: right;">14.6 → 2.35 (6.2x)</td>
+<td style="text-align: right;">56.1 → 0.62 (90x)</td>
+<td style="text-align: right;">11.3 → 0.67 (17x)</td>
+<td style="text-align: right;">166 → 76.5 (2.2x)</td>
+</tr>
+<tr class="odd">
+<td>bracket</td>
+<td style="text-align: right;">32</td>
+<td style="text-align: right;">3760</td>
+<td style="text-align: right;">0.25 → 0.13 (1.9x)</td>
+<td style="text-align: right;">1.85 → 0.77 (2.4x)</td>
+<td style="text-align: right;">8.79 → 0.38 (23x)</td>
+<td style="text-align: right;">1.51 → 0.32 (4.7x)</td>
+<td style="text-align: right;">632 → 599 (1.1x)</td>
+</tr>
+<tr class="even">
+<td>bracket</td>
+<td style="text-align: right;">64</td>
+<td style="text-align: right;">15179</td>
+<td style="text-align: right;">1.70 → 0.83 (2.0x)</td>
+<td style="text-align: right;">8.15 → 1.55 (5.3x)</td>
+<td style="text-align: right;">34.6 → 0.63 (55x)</td>
+<td style="text-align: right;">6.55 → 0.63 (10x)</td>
+<td style="text-align: right;">688 → 634 (1.1x)</td>
+</tr>
+<tr class="odd">
+<td>bracket</td>
+<td style="text-align: right;">128</td>
+<td style="text-align: right;">61009</td>
+<td style="text-align: right;">12.7 → 1.84 (6.9x)</td>
+<td style="text-align: right;">33.6 → 5.17 (6.5x)</td>
+<td style="text-align: right;">137.7 → 1.29 (107x)</td>
+<td style="text-align: right;">27.2 → 1.30 (21x)</td>
+<td style="text-align: right;">866 → 676 (1.3x)</td>
+</tr>
+</tbody>
+</table>
+<p>Reading: every movable stage is faster at every size (the batched sharp QEF by up to ~100x — NumPy’s per-cell 12x3 LAPACK SVDs against rayon-parallel Jacobi Gram eigensolves; detection/incidence/faces by 6–21x at res 128). End-to-end extraction speedup is bounded by the JAX stages that must stay: 3.7x on the cheap sphere at 128, 2.2x on the box, 1.3x on the bracket whose CSG field makes <code>edge_hermite_data</code> (≈ 520 ms) the dominant cost. The remaining Python-side steady-state cost at res 128 is ≥ 90 % SDF sampling + Hermite refinement.</p>
+</section>
+<section id="frozen-topology-gradient-step-eager-x64-grad-mode" class="level3">
+<h3 class="anchored" data-anchor-id="frozen-topology-gradient-step-eager-x64-grad-mode">Frozen-topology gradient step (eager, x64, <code>grad</code> mode)</h3>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>scene</th>
+<th style="text-align: right;">res</th>
+<th style="text-align: right;">py first</th>
+<th style="text-align: right;">py steady</th>
+<th style="text-align: right;">native first</th>
+<th style="text-align: right;">native steady</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>sphere</td>
+<td style="text-align: right;">32</td>
+<td style="text-align: right;">1626</td>
+<td style="text-align: right;">54.5</td>
+<td style="text-align: right;">577</td>
+<td style="text-align: right;">55.3</td>
+</tr>
+<tr class="even">
+<td>sphere</td>
+<td style="text-align: right;">64</td>
+<td style="text-align: right;">1689</td>
+<td style="text-align: right;">58.9</td>
+<td style="text-align: right;">59.4</td>
+<td style="text-align: right;">57.9</td>
+</tr>
+<tr class="odd">
+<td>sphere</td>
+<td style="text-align: right;">128</td>
+<td style="text-align: right;">1639</td>
+<td style="text-align: right;">75.2</td>
+<td style="text-align: right;">69.0</td>
+<td style="text-align: right;">66.5</td>
+</tr>
+<tr class="even">
+<td>bracket</td>
+<td style="text-align: right;">32</td>
+<td style="text-align: right;">4354</td>
+<td style="text-align: right;">1013</td>
+<td style="text-align: right;">1025</td>
+<td style="text-align: right;">1015</td>
+</tr>
+<tr class="odd">
+<td>bracket</td>
+<td style="text-align: right;">64</td>
+<td style="text-align: right;">4524</td>
+<td style="text-align: right;">1057</td>
+<td style="text-align: right;">1060</td>
+<td style="text-align: right;">1060</td>
+</tr>
+<tr class="even">
+<td>bracket</td>
+<td style="text-align: right;">128</td>
+<td style="text-align: right;">4989</td>
+<td style="text-align: right;">1122</td>
+<td style="text-align: right;">1178</td>
+<td style="text-align: right;">1165</td>
+</tr>
+</tbody>
+</table>
+<p>The tesseract-backed QEF is opaque to tracing, so the reference’s QEF-stage trace/compile (the historic wall-clock killer: 1.6–5.0 s on every new topology/shape) disappears — first-gradient latency drops up to 28x (sphere 64: 1689 → 59 ms; the sphere-32 native first call includes the one-time tesseract load). Steady-state eager gradients are equal or slightly better (the SDF autodiff dominates). The native path also composes under <code>jax.jit</code> via tesseract-jax: jitted steady state is identical to the jitted reference (4.2 ms at sphere 64) with gradients matching to 1e-13 relative.</p>
+</section>
+</section>
+<section id="validation" class="level2">
+<h2 class="anchored" data-anchor-id="validation">4. Validation</h2>
+<p><code>tests/meshing/test_native_mesher.py</code> — 20 tests, all passing; the module skips cleanly (reason names the cargo command) when the cdylib is absent, and <code>extract_mesh_native</code> raises an ImportError-style message with the build command. Coverage:</p>
+<ul>
+<li><ol type="a">
+<li>Topology: edges / incidence / faces bit-identical per stage on box, box∪sphere, cylinder, bracket at res 16; full <code>extract_mesh</code> parity at res 16 and 32 (faces, quads, cells, winding).</li>
+</ol></li>
+<li><ol start="2" type="a">
+<li>Vertex positions and normals within 1e-6 of the reference (measured ≤ 2e-15 in f64 for the sharp QEF, ≤ 1e-15 for the Tikhonov QEF).</li>
+</ol></li>
+<li><ol start="3" type="a">
+<li>VJP: gradients of a vertex objective w.r.t. Hermite points and gradients match reference JAX autodiff (measured ≤ 4e-14 relative, asserted ≤ 1e-6).</li>
+</ol></li>
+<li><ol start="4" type="a">
+<li>End-to-end: design-parameter gradient through <code>edge_hermite_data</code> + tesseract QEF equals the reference chain (rel 1e-9) and central finite differences (rel 5e-4).</li>
+</ol></li>
+<li>Octree-pruned (<code>lipschitz=</code>) path identical to dense; empty-surface and inconsistent-inside error parity; x64 requirement surfaced clearly.</li>
+</ul>
+</section>
+<section id="caveats" class="level2">
+<h2 class="anchored" data-anchor-id="caveats">5. Caveats</h2>
+<ul>
+<li><strong>Tied quad diagonals</strong>: the shorter-diagonal triangulation compares squared diagonals of float32-cast vertices. On exactly/near symmetric quads (gap below the f32 quantization noise, common on the bracket’s coplanar regions) a one-ulp vertex difference between LAPACK SVD and the native Jacobi solver flips the choice — 7 of 11 250 quads on bracket/32, both triangulations valid and watertight. The parity test pins faces bit for bit except on such provably-tied quads.</li>
+<li><code>qef_vertices_native</code> requires jax x64 (float64 tesseract schema) and raises a clear error otherwise; <code>extract_mesh_native</code> itself has no x64 or tesseract dependency (concrete forward runs over ctypes).</li>
+<li>With <code>sharp=False</code> at default f32 precision, reference vertices carry f32 solve error (~1e-4 worst case for damped cells) while the native solve is f64 throughout; parity to 1e-6 holds under x64 (asserted), and the native result is the more accurate one at f32.</li>
+<li>The octree (<code>lipschitz</code>) detection stays on the Python <code>adaptive</code> module (it interleaves SDF evaluations); only the post-detection stages go native on that path.</li>
+<li>Rank selection in the sharp QEF near the <code>rcond</code> threshold and near repeated singular values is float-sensitive in both implementations; observed forward differences stay ≤ 2e-15 on all test scenes.</li>
+<li>Bench numbers are single-machine (Apple Silicon, CPU jax); rayon uses all cores, so speedups scale with core count for large grids.</li>
+</ul>
+
+
+</section>
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/andrinr\.github\.io\/cadjoint\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

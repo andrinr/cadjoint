@@ -1,1 +1,1 @@
-Sitemap: https://andrinr.github.io/jaxcad/sitemap.xml
+Sitemap: https://andrinr.github.io/cadjoint/sitemap.xml

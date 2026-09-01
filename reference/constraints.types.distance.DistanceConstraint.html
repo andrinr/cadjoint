@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>constraints.types.distance.distanceconstraint – jaxCAD</title>
+<title>constraints.types.distance.distanceconstraint – cadjoint</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -80,7 +80,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <link href="../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-d94f0129d652a5a8036266edffbc062c.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-f83c246346592b24d02aa84ae3974412.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -120,7 +120,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
       <div class="navbar-container container-fluid">
       <div class="navbar-brand-container mx-auto">
     <a class="navbar-brand" href="../index.html">
-    <span class="navbar-title">jaxCAD</span>
+    <span class="navbar-title">cadjoint</span>
     </a>
   </div>
             <div id="quarto-search" class="" title="Search"></div>
@@ -179,7 +179,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </ul>
             <ul class="navbar-nav navbar-nav-scroll ms-auto">
   <li class="nav-item compact">
-    <a class="nav-link" href="https://github.com/andrinr/jaxcad"> <i class="bi bi-github" role="img">
+    <a class="nav-link" href="https://github.com/andrinr/cadjoint"> <i class="bi bi-github" role="img">
 </i> 
 <span class="menu-text"></span></a>
   </li>  
@@ -199,15 +199,15 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#jaxcad.constraints.types.distance.DistanceConstraint" id="toc-jaxcad.constraints.types.distance.DistanceConstraint" class="nav-link active" data-scroll-target="#jaxcad.constraints.types.distance.DistanceConstraint">constraints.types.distance.DistanceConstraint</a>
+  <li><a href="#cadjoint.constraints.types.distance.DistanceConstraint" id="toc-cadjoint.constraints.types.distance.DistanceConstraint" class="nav-link active" data-scroll-target="#cadjoint.constraints.types.distance.DistanceConstraint">constraints.types.distance.DistanceConstraint</a>
   <ul class="collapse">
   <li><a href="#parameters" id="toc-parameters" class="nav-link" data-scroll-target="#parameters">Parameters</a></li>
   <li><a href="#example" id="toc-example" class="nav-link" data-scroll-target="#example">Example</a></li>
   <li><a href="#methods" id="toc-methods" class="nav-link" data-scroll-target="#methods">Methods</a>
   <ul class="collapse">
-  <li><a href="#jaxcad.constraints.types.distance.DistanceConstraint.compute_residual" id="toc-jaxcad.constraints.types.distance.DistanceConstraint.compute_residual" class="nav-link" data-scroll-target="#jaxcad.constraints.types.distance.DistanceConstraint.compute_residual">compute_residual</a></li>
-  <li><a href="#jaxcad.constraints.types.distance.DistanceConstraint.dof_reduction" id="toc-jaxcad.constraints.types.distance.DistanceConstraint.dof_reduction" class="nav-link" data-scroll-target="#jaxcad.constraints.types.distance.DistanceConstraint.dof_reduction">dof_reduction</a></li>
-  <li><a href="#jaxcad.constraints.types.distance.DistanceConstraint.get_parameters" id="toc-jaxcad.constraints.types.distance.DistanceConstraint.get_parameters" class="nav-link" data-scroll-target="#jaxcad.constraints.types.distance.DistanceConstraint.get_parameters">get_parameters</a></li>
+  <li><a href="#cadjoint.constraints.types.distance.DistanceConstraint.compute_residual" id="toc-cadjoint.constraints.types.distance.DistanceConstraint.compute_residual" class="nav-link" data-scroll-target="#cadjoint.constraints.types.distance.DistanceConstraint.compute_residual">compute_residual</a></li>
+  <li><a href="#cadjoint.constraints.types.distance.DistanceConstraint.dof_reduction" id="toc-cadjoint.constraints.types.distance.DistanceConstraint.dof_reduction" class="nav-link" data-scroll-target="#cadjoint.constraints.types.distance.DistanceConstraint.dof_reduction">dof_reduction</a></li>
+  <li><a href="#cadjoint.constraints.types.distance.DistanceConstraint.get_parameters" id="toc-cadjoint.constraints.types.distance.DistanceConstraint.get_parameters" class="nav-link" data-scroll-target="#cadjoint.constraints.types.distance.DistanceConstraint.get_parameters">get_parameters</a></li>
   </ul></li>
   </ul></li>
   </ul>
@@ -219,7 +219,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 
 
-<section id="jaxcad.constraints.types.distance.DistanceConstraint" class="level1">
+<section id="cadjoint.constraints.types.distance.DistanceConstraint" class="level1">
 <h1>constraints.types.distance.DistanceConstraint</h1>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>constraints.types.distance.DistanceConstraint(</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>    param1,</span>
@@ -287,21 +287,21 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </thead>
 <tbody>
 <tr class="odd">
-<td><a href="#jaxcad.constraints.types.distance.DistanceConstraint.compute_residual">compute_residual</a></td>
+<td><a href="#cadjoint.constraints.types.distance.DistanceConstraint.compute_residual">compute_residual</a></td>
 <td>Compute distance constraint residual: ||p1 - p2|| - d.</td>
 </tr>
 <tr class="even">
-<td><a href="#jaxcad.constraints.types.distance.DistanceConstraint.dof_reduction">dof_reduction</a></td>
+<td><a href="#cadjoint.constraints.types.distance.DistanceConstraint.dof_reduction">dof_reduction</a></td>
 <td>Distance constraint adds 1 scalar equation, reducing DOF by 1.</td>
 </tr>
 <tr class="odd">
-<td><a href="#jaxcad.constraints.types.distance.DistanceConstraint.get_parameters">get_parameters</a></td>
+<td><a href="#cadjoint.constraints.types.distance.DistanceConstraint.get_parameters">get_parameters</a></td>
 <td>Return both parameters involved in the distance constraint.</td>
 </tr>
 </tbody>
 </table>
-<section id="jaxcad.constraints.types.distance.DistanceConstraint.compute_residual" class="level3">
-<h3 class="anchored" data-anchor-id="jaxcad.constraints.types.distance.DistanceConstraint.compute_residual">compute_residual</h3>
+<section id="cadjoint.constraints.types.distance.DistanceConstraint.compute_residual" class="level3">
+<h3 class="anchored" data-anchor-id="cadjoint.constraints.types.distance.DistanceConstraint.compute_residual">compute_residual</h3>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>constraints.types.distance.DistanceConstraint.compute_residual(param_values)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>Compute distance constraint residual: ||p1 - p2|| - d.</p>
 <section id="parameters-1" class="level4 doc-section doc-section-parameters">
@@ -351,13 +351,13 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </table>
 </section>
 </section>
-<section id="jaxcad.constraints.types.distance.DistanceConstraint.dof_reduction" class="level3">
-<h3 class="anchored" data-anchor-id="jaxcad.constraints.types.distance.DistanceConstraint.dof_reduction">dof_reduction</h3>
+<section id="cadjoint.constraints.types.distance.DistanceConstraint.dof_reduction" class="level3">
+<h3 class="anchored" data-anchor-id="cadjoint.constraints.types.distance.DistanceConstraint.dof_reduction">dof_reduction</h3>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>constraints.types.distance.DistanceConstraint.dof_reduction()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>Distance constraint adds 1 scalar equation, reducing DOF by 1.</p>
 </section>
-<section id="jaxcad.constraints.types.distance.DistanceConstraint.get_parameters" class="level3">
-<h3 class="anchored" data-anchor-id="jaxcad.constraints.types.distance.DistanceConstraint.get_parameters">get_parameters</h3>
+<section id="cadjoint.constraints.types.distance.DistanceConstraint.get_parameters" class="level3">
+<h3 class="anchored" data-anchor-id="cadjoint.constraints.types.distance.DistanceConstraint.get_parameters">get_parameters</h3>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>constraints.types.distance.DistanceConstraint.get_parameters()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>Return both parameters involved in the distance constraint.</p>
 
@@ -440,7 +440,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     }
       var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
       var mailtoRegex = new RegExp(/^mailto:/);
-        var filterRegex = new RegExp("https:\/\/andrinr\.github\.io\/jaxcad\/");
+        var filterRegex = new RegExp("https:\/\/andrinr\.github\.io\/cadjoint\/");
       var isInternal = (href) => {
           return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
       }

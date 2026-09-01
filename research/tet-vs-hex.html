@@ -1,0 +1,1336 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.10.18">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>tet-vs-hex – cadjoint</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-f83c246346592b24d02aa84ae3974412.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+</head>
+
+<body class="nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">cadjoint</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../docs/getting-started.html"> 
+<span class="menu-text">Get Started</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../docs/rendering.html"> 
+<span class="menu-text">Rendering</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../docs/viewer.html"> 
+<span class="menu-text">WebGPU Viewer</span></a>
+  </li>  
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-examples" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Examples</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-examples">    
+        <li>
+    <a class="dropdown-item" href="../examples/basics.html">
+ <span class="dropdown-text">Basics</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/rendering.html">
+ <span class="dropdown-text">Rendering</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/sketch_construction.html">
+ <span class="dropdown-text">Sketch Construction</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/constraints.html">
+ <span class="dropdown-text">Constraints</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/optimization.html">
+ <span class="dropdown-text">Optimization</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/constrained_optimization.html">
+ <span class="dropdown-text">Constrained Optimization</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="../reference/index.html"> 
+<span class="menu-text">API Reference</span></a>
+  </li>  
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/andrinr/cadjoint"> <i class="bi bi-github" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#tet-vs-hex-for-the-fem-path-and-a-mesher-in-a-tesseract-with-an-interpolation-vjp" id="toc-tet-vs-hex-for-the-fem-path-and-a-mesher-in-a-tesseract-with-an-interpolation-vjp" class="nav-link active" data-scroll-target="#tet-vs-hex-for-the-fem-path-and-a-mesher-in-a-tesseract-with-an-interpolation-vjp">Tet vs hex for the FEM path — and a mesher-in-a-Tesseract with an interpolation VJP</a>
+  <ul class="collapse">
+  <li><a href="#tldr-recommendation" id="toc-tldr-recommendation" class="nav-link" data-scroll-target="#tldr-recommendation">TL;DR recommendation</a></li>
+  <li><a href="#install-matrix-macos-arm64-cpython-3.14.5" id="toc-install-matrix-macos-arm64-cpython-3.14.5" class="nav-link" data-scroll-target="#install-matrix-macos-arm64-cpython-3.14.5">Install matrix (macOS arm64, CPython 3.14.5)</a></li>
+  <li><a href="#route-1-dc-surface-tetgen-jax-fem-tet4tet10" id="toc-route-1-dc-surface-tetgen-jax-fem-tet4tet10" class="nav-link" data-scroll-target="#route-1-dc-surface-tetgen-jax-fem-tet4tet10">Route 1: DC surface → TetGen → jax-fem TET4/TET10</a>
+  <ul class="collapse">
+  <li><a href="#what-had-to-be-true-and-is-measured" id="toc-what-had-to-be-true-and-is-measured" class="nav-link" data-scroll-target="#what-had-to-be-true-and-is-measured">What had to be true (and is, measured)</a></li>
+  <li><a href="#mesh-quality-geometric-fidelity-accuracy-wall-clock-bracket-nominal-design" id="toc-mesh-quality-geometric-fidelity-accuracy-wall-clock-bracket-nominal-design" class="nav-link" data-scroll-target="#mesh-quality-geometric-fidelity-accuracy-wall-clock-bracket-nominal-design">Mesh quality, geometric fidelity, accuracy, wall-clock (bracket, nominal design)</a></li>
+  <li><a href="#gradient-validation-frozen-topology-adjoint-vs-central-fd-eps-1e-3" id="toc-gradient-validation-frozen-topology-adjoint-vs-central-fd-eps-1e-3" class="nav-link" data-scroll-target="#gradient-validation-frozen-topology-adjoint-vs-central-fd-eps-1e-3">Gradient validation (frozen topology, adjoint vs central FD, eps 1e-3)</a></li>
+  <li><a href="#interior-steiner-node-sensitivity-the-frozen-interior-justification-measured" id="toc-interior-steiner-node-sensitivity-the-frozen-interior-justification-measured" class="nav-link" data-scroll-target="#interior-steiner-node-sensitivity-the-frozen-interior-justification-measured">Interior (Steiner) node sensitivity — the frozen-interior justification, measured</a></li>
+  </ul></li>
+  <li><a href="#route-3-headline-the-mesher-as-a-tesseract-with-a-surface-interpolation-vjp" id="toc-route-3-headline-the-mesher-as-a-tesseract-with-a-surface-interpolation-vjp" class="nav-link" data-scroll-target="#route-3-headline-the-mesher-as-a-tesseract-with-a-surface-interpolation-vjp">Route 3 (headline): the mesher as a Tesseract with a surface-interpolation VJP</a>
+  <ul class="collapse">
+  <li><a href="#exactness-of-the-vjp-measured-sphere-14³12³-lattice" id="toc-exactness-of-the-vjp-measured-sphere-14³12³-lattice" class="nav-link" data-scroll-target="#exactness-of-the-vjp-measured-sphere-14³12³-lattice">Exactness of the VJP (measured, sphere 14³/12³ lattice)</a></li>
+  <li><a href="#the-honest-finding-sampling-the-field-is-the-approximation-not-the-vjp" id="toc-the-honest-finding-sampling-the-field-is-the-approximation-not-the-vjp" class="nav-link" data-scroll-target="#the-honest-finding-sampling-the-field-is-the-approximation-not-the-vjp">The honest finding: sampling the field is the approximation, not the VJP</a></li>
+  <li><a href="#two-tesseract-chain-mesher-elastic_jaxfem-unmodified-works" id="toc-two-tesseract-chain-mesher-elastic_jaxfem-unmodified-works" class="nav-link" data-scroll-target="#two-tesseract-chain-mesher-elastic_jaxfem-unmodified-works">Two-tesseract chain (mesher ∘ elastic_jaxfem, unmodified) — works</a></li>
+  </ul></li>
+  <li><a href="#route-2-dcqef-informed-placement-for-the-hex-mesher-measured-not-worth-it" id="toc-route-2-dcqef-informed-placement-for-the-hex-mesher-measured-not-worth-it" class="nav-link" data-scroll-target="#route-2-dcqef-informed-placement-for-the-hex-mesher-measured-not-worth-it">Route 2: DC/QEF-informed placement for the hex mesher — measured, not worth it</a></li>
+  <li><a href="#solver-support-matrix" id="toc-solver-support-matrix" class="nav-link" data-scroll-target="#solver-support-matrix">Solver support matrix</a></li>
+  <li><a href="#wall-clock-summary-m-series-cpu-warm" id="toc-wall-clock-summary-m-series-cpu-warm" class="nav-link" data-scroll-target="#wall-clock-summary-m-series-cpu-warm">Wall-clock summary (M-series CPU, warm)</a></li>
+  <li><a href="#files" id="toc-files" class="nav-link" data-scroll-target="#files">Files</a></li>
+  <li><a href="#production-verdict-2026-09-01-tet10-shipped-behind-simmeshmethod..." id="toc-production-verdict-2026-09-01-tet10-shipped-behind-simmeshmethod..." class="nav-link" data-scroll-target="#production-verdict-2026-09-01-tet10-shipped-behind-simmeshmethod...">Production verdict (2026-09-01): TET10 shipped behind <code>SimMesh(method=...)</code></a>
+  <ul class="collapse">
+  <li><a href="#grid-caveat-found-during-productionization" id="toc-grid-caveat-found-during-productionization" class="nav-link" data-scroll-target="#grid-caveat-found-during-productionization">Grid caveat found during productionization</a></li>
+  <li><a href="#thermal-on-tet-validation-bar-galerkin-exactness" id="toc-thermal-on-tet-validation-bar-galerkin-exactness" class="nav-link" data-scroll-target="#thermal-on-tet-validation-bar-galerkin-exactness">Thermal-on-tet validation (bar, Galerkin exactness)</a></li>
+  <li><a href="#the-dof-at-matched-accuracy-benchmark-benchmarkstet_vs_hex_bench.py" id="toc-the-dof-at-matched-accuracy-benchmark-benchmarkstet_vs_hex_bench.py" class="nav-link" data-scroll-target="#the-dof-at-matched-accuracy-benchmark-benchmarkstet_vs_hex_bench.py">The DOF-at-matched-accuracy benchmark (<code>benchmarks/tet_vs_hex_bench.py</code>)</a></li>
+  <li><a href="#named-mesh-tet10-gradient-the-study-path-regression-testtet10namedmeshgradient" id="toc-named-mesh-tet10-gradient-the-study-path-regression-testtet10namedmeshgradient" class="nav-link" data-scroll-target="#named-mesh-tet10-gradient-the-study-path-regression-testtet10namedmeshgradient">Named-mesh tet10 gradient (the study-path regression, <code>TestTet10NamedMeshGradient</code>)</a></li>
+  </ul></li>
+  </ul></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"></header>
+
+
+
+
+<section id="tet-vs-hex-for-the-fem-path-and-a-mesher-in-a-tesseract-with-an-interpolation-vjp" class="level1">
+<h1>Tet vs hex for the FEM path — and a mesher-in-a-Tesseract with an interpolation VJP</h1>
+<p>Status: measured prototype (2026-09-01). Answers two user questions with working code and numbers, on the bracket scene (<code>scenes/bracket.py</code> geometry via the parameterized SDF mirror in <code>examples/fem_bracket_optimization.py</code>):</p>
+<ol type="1">
+<li><em>“can’t we go dual contouring and then to hex mesh? should we use another solver that supports tet meshes for this?”</em> — Routes 1 (DC → tet → tet FEM) and 2 (DC-informed hex placement), both measured.</li>
+<li><em>“package the mesher into another tesseract and use an interpolation on the surface as the vjp map”</em> — Route 3, the headline: the <strong>whole black-box mesher as a Tesseract</strong> whose VJP w.r.t. the sampled implicit field is the implicit-function-theorem map built from trilinear interpolation weights at the frozen boundary vertices. Works, composes with the unmodified <code>elastic_jaxfem</code> solver tesseract inside one <code>jax.grad</code>, and the VJP is <em>exact</em> against autodiff of the underlying projection (mechanical check 0 rel err, end-to-end 1.4e-11).</li>
+</ol>
+<p>Prototype code: <code>cadjoint/fem/tetmesh.py</code> (tet route), <code>cadjoint/fem/tesseracts/mesher/tesseract_api.py</code> (mesher tesseract), <code>tests/fem/test_tetmesh.py</code> (regression + demo). Nothing in the production mesher/solver/backends was modified.</p>
+<section id="tldr-recommendation" class="level2">
+<h2 class="anchored" data-anchor-id="tldr-recommendation">TL;DR recommendation</h2>
+<ul>
+<li><strong>Keep HEX8 voxelize+snap as the default FEM path.</strong> At matched DOF it is the most accurate per DOF and per second of the three (see the compliance table), its element quality is far better (min scaled Jacobian 0.03–0.35 vs tet radius-ratio minima of 0.001–0.007), and its solve conditioning is what the existing iterative solvers were tuned on.</li>
+<li><strong>TET4 must not become a default: it is 20–45% overstiff at practical resolutions</strong> (volumetric/bending locking) — its one virtue is geometric fidelity (boundary deviation 8–20x better than hex at matched cell size, since its boundary <em>is</em> the DC surface). TET10 fixes the stiffness (lands within ~2% of the hex reference) but costs 5–70x hex wall-clock at matched accuracy here and inherits sliver conditioning.</li>
+<li><strong>Where the tet route wins outright: gradient fidelity for features hexes under-resolve.</strong> d(compliance)/d(rib_height) on the bracket: hex reports −0.020 (res 48) / −0.0099 (res 30) while TET10 reports −0.128 and TET4 −0.076 — the staircased hex boundary simply does not see the inclined rib moving. If a design parameter moves geometry that the hex lattice aliases, the DC→tet path produces a usable gradient where the hex path produces a near-zero one.</li>
+<li><strong>Productionize Route 3’s contract, not a solver switch:</strong> the mesher-tesseract + interpolation-VJP makes <em>any</em> mesher differentiable w.r.t. the field samples without touching its internals — measured exact against autodiff of the projection. The honest caveat (measured, below): feeding the mesher <em>lattice samples</em> instead of the true SDF changes the gradient of crease-dominated parameters (a sign flip on <code>web_thickness</code> at 32x24x19), because the trilinear interpolant smears creases. The fix is a denser sampling lattice or a hybrid apply that also receives exact crease information — not a different VJP: the VJP is provably exact for the interpolant mesher it wraps.</li>
+</ul>
+</section>
+<section id="install-matrix-macos-arm64-cpython-3.14.5" class="level2">
+<h2 class="anchored" data-anchor-id="install-matrix-macos-arm64-cpython-3.14.5">Install matrix (macOS arm64, CPython 3.14.5)</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>package</th>
+<th>result</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>tetgen</code> 0.8.4 (PyPI wheel)</td>
+<td><strong>installs and works</strong> (<code>uv pip install tetgen</code>)</td>
+</tr>
+<tr class="even">
+<td><code>wildmeshing</code> (fTetWild) 0.4.1</td>
+<td><strong>no cp314 wheel</strong> (cp39–cp313 only) — unavailable here</td>
+</tr>
+<tr class="odd">
+<td><code>gmsh</code> 4.15.2</td>
+<td>already in the venv (fem extra); not needed since tetgen worked</td>
+</tr>
+</tbody>
+</table>
+<p>TetGen is driven through PLC mode with <code>-Y</code> (<code>nobisect</code>) + quality bounds (<code>minratio 1.5</code>, <code>mindihedral 10</code>), so the DC surface triangulation is preserved <em>verbatim</em>: the first <code>num_surface</code> output nodes are bit-identical to the input DC vertices and every added Steiner vertex is strictly interior (asserted in <code>surface_to_tet_mesh</code>, regression-tested).</p>
+</section>
+<section id="route-1-dc-surface-tetgen-jax-fem-tet4tet10" class="level2">
+<h2 class="anchored" data-anchor-id="route-1-dc-surface-tetgen-jax-fem-tet4tet10">Route 1: DC surface → TetGen → jax-fem TET4/TET10</h2>
+<section id="what-had-to-be-true-and-is-measured" class="level3">
+<h3 class="anchored" data-anchor-id="what-had-to-be-true-and-is-measured">What had to be true (and is, measured)</h3>
+<ul>
+<li><strong>Project, then mesh.</strong> DC/QEF vertices are <em>near</em> but not <em>on</em> the zero set (mean |sdf| 1.1e-3, max 2.0e-2 at 32x24x19). Newton-projecting them after tetrahedralization collapses boundary slivers (min tet volume 2.7e-22 → singular stiffness). <code>sdf_to_tet_mesh</code> therefore projects the DC vertices onto the zero set first and hands TetGen the projected surface, keeping the raw DC positions as the frozen Newton restart (<code>base_points</code>). Bonus: projection removed the coarse-grid self-intersections that made raw sharp DC surfaces un-meshable at 26x19x15.</li>
+<li><strong>Exact fixed point.</strong> <code>recompute_tet_points(sdf, mesh)</code> at the nominal design reproduces <code>mesh.points</code> to max |dev| = 0.0 — the same frozen-topology contract as <code>hexmesh.recompute_points</code>.</li>
+<li><strong>jax-fem supports TET4 and TET10</strong> (confirmed by running; <code>basis.py</code> element table, meshio <code>tetra</code>/<code>tetra10</code> ordering, <code>re_order</code> handled internally). <code>tet10_from_tet4</code> promotes meshes with shared midside nodes; midsides are (traced) corner midpoints, so gradients flow through them.</li>
+<li><strong>Node-membership face selection has a hole on tets</strong> (found the hard way): at 52x39x30, 212 <em>interior</em> faces had all three corners on the loaded surface patch — jax-fem’s location-function rule selects them once per adjacent cell and double-loads faces that are not on the boundary. <code>tet_elastic_solve(..., traction_faces=...)</code> prunes the selection to exactly the requested boundary triangles and rebuilds the dependent assembly structures (<code>_restrict_traction_faces</code>). The hex path was checked clean on all meshes used (predicate faces == membership faces).</li>
+<li><strong><code>Nodes</code> selections work on tet meshes unchanged</strong> via duck typing (<code>num_points</code> / <code>points</code> / <code>all_boundary_faces</code> / <code>grid</code>) — <code>selection.py</code> was not touched.</li>
+</ul>
+</section>
+<section id="mesh-quality-geometric-fidelity-accuracy-wall-clock-bracket-nominal-design" class="level3">
+<h3 class="anchored" data-anchor-id="mesh-quality-geometric-fidelity-accuracy-wall-clock-bracket-nominal-design">Mesh quality, geometric fidelity, accuracy, wall-clock (bracket, nominal design)</h3>
+<p>Load: bolt-ball clamps + traction on the outer web wall above z = 1.0, selected by a mesh-independent center+normal rule on both mesh families. W = load work = ∫ t·u dA (= classical compliance); Wn = W/area² normalizes away residual load-patch area differences (areas differ ≤ 15% across meshes; exact wall patch ≈ 0.348). Quality: hex = min scaled Jacobian; tet = min normalized radius ratio (3 r_in/r_circ; regular tet = 1). dev = mean |sdf| at area-uniform boundary samples.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 10%">
+<col style="width: 10%">
+<col style="width: 10%">
+<col style="width: 10%">
+<col style="width: 10%">
+<col style="width: 10%">
+<col style="width: 10%">
+<col style="width: 10%">
+<col style="width: 10%">
+<col style="width: 10%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>mesh</th>
+<th>res</th>
+<th>cells</th>
+<th>DOF</th>
+<th>quality min</th>
+<th>dev mean</th>
+<th>W</th>
+<th><strong>Wn</strong></th>
+<th>t_mesh</th>
+<th>t_solve</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>HEX8</td>
+<td>24x17x13</td>
+<td>742</td>
+<td>4.3k</td>
+<td>0.352</td>
+<td>1.2e-2</td>
+<td>0.1143</td>
+<td>1.074</td>
+<td>3.6 s</td>
+<td>3.2 s</td>
+</tr>
+<tr class="even">
+<td>TET4</td>
+<td>26x19x15</td>
+<td>5 143</td>
+<td>4.5k</td>
+<td>0.001</td>
+<td>8.0e-4</td>
+<td>0.0934</td>
+<td>0.600</td>
+<td>4.1 s</td>
+<td>3.1 s</td>
+</tr>
+<tr class="odd">
+<td>TET10</td>
+<td>26x19x15</td>
+<td>5 143</td>
+<td>28.3k</td>
+<td>—</td>
+<td>8.0e-4</td>
+<td>0.1788</td>
+<td>1.148</td>
+<td>—</td>
+<td>32.9 s</td>
+</tr>
+<tr class="even">
+<td>HEX8</td>
+<td>30x21x16</td>
+<td>1 714</td>
+<td>8.2k</td>
+<td>0.028</td>
+<td>5.3e-3</td>
+<td>0.0996</td>
+<td>1.053</td>
+<td>4.2 s</td>
+<td>3.9 s</td>
+</tr>
+<tr class="odd">
+<td>TET4</td>
+<td>32x24x19</td>
+<td>7 556</td>
+<td>6.8k</td>
+<td>0.001</td>
+<td>6.3e-4</td>
+<td>0.0777</td>
+<td>0.586</td>
+<td>5.1 s</td>
+<td>4.5 s</td>
+</tr>
+<tr class="even">
+<td>TET10</td>
+<td>32x24x19</td>
+<td>7 556</td>
+<td>42.0k</td>
+<td>—</td>
+<td>6.3e-4</td>
+<td>0.1442</td>
+<td>1.088</td>
+<td>—</td>
+<td>129 s</td>
+</tr>
+<tr class="odd">
+<td>HEX8</td>
+<td>48x34x26</td>
+<td>7 460</td>
+<td>30.1k</td>
+<td>0.071</td>
+<td>2.2e-3</td>
+<td>0.1598</td>
+<td>1.123</td>
+<td>5.0 s</td>
+<td>10.2 s</td>
+</tr>
+<tr class="even">
+<td>TET4</td>
+<td>52x39x30</td>
+<td>27 136</td>
+<td>21.3k</td>
+<td>0.007</td>
+<td>2.5e-4</td>
+<td>0.1075</td>
+<td>0.896</td>
+<td>5.2 s</td>
+<td>8.8 s</td>
+</tr>
+<tr class="odd">
+<td>TET10</td>
+<td>52x39x30</td>
+<td>27 136</td>
+<td>139.5k</td>
+<td>—</td>
+<td>2.5e-4</td>
+<td>0.1358</td>
+<td>1.132</td>
+<td>—</td>
+<td>654 s</td>
+</tr>
+<tr class="even">
+<td>HEX8 ref</td>
+<td>66x48x36</td>
+<td>19 446</td>
+<td>73.1k</td>
+<td>—</td>
+<td>—</td>
+<td>0.1284</td>
+<td>1.112</td>
+<td>4.4 s</td>
+<td>33.1 s</td>
+</tr>
+</tbody>
+</table>
+<p>Readings:</p>
+<ul>
+<li>Converged Wn clusters at <strong>≈ 1.11–1.13</strong> (HEX8 ref 1.112, TET10@52 1.132). HEX8 is within 5% of it already at 8.2k DOF; <strong>TET4 is 20–47% low everywhere tested</strong> (classic constant-strain locking on bending-dominated load paths) and is still 10% low with 3.3x the DOF of the converged hex. TET10 is accurate but pays 8–60x hex wall-clock (jax-fem assembles TET10 with 4-point quadrature over 27k cells; plus sliver conditioning slows the iterative solves).</li>
+<li><strong>Geometric fidelity inverts the picture</strong>: tet boundary deviation is 8–20x smaller than hex at matched cell size (the tet boundary <em>is</em> the projected DC surface; hex has a snapped staircase). This is exactly why the rib gradient (below) is wrong on hexes.</li>
+<li>Element quality: hexes are excellent almost everywhere (mean scaled Jacobian 0.95+); tets inherit DC’s skinny surface triangles through <code>-Y</code> and carry sliver minima of 0.001–0.007 (1st percentile 0.14–0.27) — the cost of preserving the DC surface exactly. These slivers made jax-fem’s default BiCGStab diverge more than once during this study; a direct/multigrid linear solver is a prerequisite for a production tet path.</li>
+</ul>
+</section>
+<section id="gradient-validation-frozen-topology-adjoint-vs-central-fd-eps-1e-3" class="level3">
+<h3 class="anchored" data-anchor-id="gradient-validation-frozen-topology-adjoint-vs-central-fd-eps-1e-3">Gradient validation (frozen topology, adjoint vs central FD, eps 1e-3)</h3>
+<p>Objective: W (load work) at the nominal design; <code>recompute_tet_points</code> (Newton re-projection of the frozen DC vertices, interior Steiner frozen) vs <code>hexmesh.recompute_points</code>. rel = |adjoint − FD| / |FD|.</p>
+<p>TET4 @ 32x24x19 (2 256 nodes / 7 556 tets, 1 932 surface):</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>parameter</th>
+<th>adjoint</th>
+<th>central FD</th>
+<th>rel</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>web_thickness</td>
+<td>−0.30176</td>
+<td>−0.29900</td>
+<td>9.2e-3</td>
+</tr>
+<tr class="even">
+<td>rib_height</td>
+<td>−0.06403</td>
+<td>−0.07426</td>
+<td>1.4e-1</td>
+</tr>
+<tr class="odd">
+<td>plate_thickness</td>
+<td>−0.51227</td>
+<td>−0.51237</td>
+<td><strong>2.0e-4</strong></td>
+</tr>
+</tbody>
+</table>
+<p>HEX8 @ 30x21x16 (same objective):</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>parameter</th>
+<th>adjoint</th>
+<th>central FD</th>
+<th>rel</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>web_thickness</td>
+<td>−0.28732</td>
+<td>−0.28461</td>
+<td>9.5e-3</td>
+</tr>
+<tr class="even">
+<td>rib_height</td>
+<td>−0.00990</td>
+<td>−0.00990</td>
+<td>3.0e-5</td>
+</tr>
+<tr class="odd">
+<td>plate_thickness</td>
+<td>−0.64001</td>
+<td>−0.64002</td>
+<td>2.5e-5</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>The adjoint machinery itself is exact: FD spot checks of dW/d(points) at individual nodes agree to 4–5 digits (interior −1.6614e-4 vs −1.6613e-4, boundary −2.2391e-3 vs −2.2391e-3).</li>
+<li>The elevated web/rib rel on the tet path is <strong>subgradient structure, not error</strong>: sharp DC placement puts many vertices exactly on SDF creases, where the Newton re-projection is subdifferentiable — AD picks a one-sided branch, central FD averages the branches. The eps study shows FD <em>approaching the adjoint</em> as eps grows for web (−0.2818 @ 3e-4 → −0.3035 @ 3e-3 vs adjoint −0.3018) and a persistent ~15% branch gap for rib. On the crease-free sphere the same chain matches FD inside 5e-2 (regression test).</li>
+<li><strong>The rib row is the pro-tet headline</strong>: the hex discrete objective is nearly blind to <code>rib_height</code> (−0.0099 at res 30, −0.0205 at res 48) while the tet path reports −0.064 (adjoint) / −0.074 (FD) and TET10 −0.128. The hex staircase aliases the inclined rib; the DC-conforming tet boundary tracks it. High-res adjoints (load-work objective): TET10@32 = (−0.499, −0.128, −0.989), TET4@52 = (−0.354, −0.076, −0.741), HEX8@48 = (−0.464, −0.020, −1.013) — the discretizations agree on web/plate scales and disagree 5x on the rib, with the geometry-conforming meshes on one side.</li>
+</ul>
+</section>
+<section id="interior-steiner-node-sensitivity-the-frozen-interior-justification-measured" class="level3">
+<h3 class="anchored" data-anchor-id="interior-steiner-node-sensitivity-the-frozen-interior-justification-measured">Interior (Steiner) node sensitivity — the frozen-interior justification, measured</h3>
+<p>Shape-derivative argument: the discrete sensitivity to interior node motion is a mesh-motion term that vanishes in the continuous limit (Hadamard: only normal boundary motion changes the shape). Measured on TET4 @ 32x24x19 via the full adjoint dW/d(points):</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>set</th>
+<th>nodes</th>
+<th>RMS</th>
+<th>grad</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>boundary (DC)</td>
+<td>1 932</td>
+<td>5.89e-3</td>
+<td>5.03e-2</td>
+</tr>
+<tr class="even">
+<td>interior (Steiner)</td>
+<td>324</td>
+<td>3.85e-4</td>
+<td>1.91e-3</td>
+</tr>
+</tbody>
+</table>
+<p>Interior sensitivity is 15x (RMS) / 26x (max) below boundary — and FD confirms those small interior entries are real discrete values, not noise. Freezing interior nodes biases the gradient by well under the crease-branch effects above. One differentiable Jacobi-Laplacian pass propagating boundary deltas inward (<code>smooth_passes=2</code>) changed the adjoint by ~1% and did not change FD agreement — worth having for large design steps, irrelevant at validation scale.</p>
+</section>
+</section>
+<section id="route-3-headline-the-mesher-as-a-tesseract-with-a-surface-interpolation-vjp" class="level2">
+<h2 class="anchored" data-anchor-id="route-3-headline-the-mesher-as-a-tesseract-with-a-surface-interpolation-vjp">Route 3 (headline): the mesher as a Tesseract with a surface-interpolation VJP</h2>
+<p><code>cadjoint/fem/tesseracts/mesher/tesseract_api.py</code>. <code>apply</code> = lattice samples f_i → trilinear interpolant f(x) = Σ w_i(x) f_i → mesher → mesh (frozen topology; two meshers behind one <code>element</code> switch: DC+TetGen → TET4, voxelize+snap → HEX8 — the VJP is mesher-agnostic by construction). Every movable boundary vertex v satisfies f(v) = 0, so the implicit function theorem gives dv/df_i = −w_i(v) g/|g|², and the VJP rows <em>are</em> the interpolation weights at the frozen vertex positions. Interior vertices contribute zero (measured justification above). Topology is promised via shape-carrying template inputs (<code>point_ids</code>, <code>cell_template</code>) after one concrete discovery <code>apply</code>.</p>
+<section id="exactness-of-the-vjp-measured-sphere-14³12³-lattice" class="level3">
+<h3 class="anchored" data-anchor-id="exactness-of-the-vjp-measured-sphere-14³12³-lattice">Exactness of the VJP (measured, sphere 14³/12³ lattice)</h3>
+<ul>
+<li>Mechanical check vs a pure-JAX reference of the IFT map: <strong>max rel err 0.0</strong>.</li>
+<li>End-to-end: traced d(mean boundary radius)/d(radius) = 1.00624 (the 0.6% is the trilinear interpolant’s own discretization of the sphere, not VJP error).</li>
+<li>The decisive check (bracket, sharp DC, 32x24x19, full FEM cotangent): the IFT VJP vs <strong>full jax.grad through the actual Newton projection onto the interpolant</strong> — gradients agree to <strong>1.4e-11 relative</strong> on all three parameters, and the pulled-back field-cotangent maps agree per-sample. The “interpolation weights as VJP map” idea is not an approximation of the wrapped mesher’s derivative; for zero-set-conforming meshers it <em>is</em> the derivative (the dropped tangential/interior parts are gauge).</li>
+</ul>
+</section>
+<section id="the-honest-finding-sampling-the-field-is-the-approximation-not-the-vjp" class="level3">
+<h3 class="anchored" data-anchor-id="the-honest-finding-sampling-the-field-is-the-approximation-not-the-vjp">The honest finding: sampling the field is the approximation, not the VJP</h3>
+<p>Same bracket, same objective, same 1 932 DC surface vertices:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>gradient path</th>
+<th>web_thickness</th>
+<th>rib_height</th>
+<th>plate_thickness</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>mesher on <strong>true SDF</strong>, frozen reprojection (Route 1)</td>
+<td>−0.302</td>
+<td>−0.064</td>
+<td>−0.512</td>
+</tr>
+<tr class="even">
+<td>mesher on <strong>lattice samples</strong> (tesseract, IFT VJP)</td>
+<td><strong>+0.300</strong></td>
+<td>−0.078</td>
+<td>−0.557</td>
+</tr>
+<tr class="odd">
+<td>same, via autodiff of the projection (control)</td>
+<td>+0.300</td>
+<td>−0.078</td>
+<td>−0.557</td>
+</tr>
+<tr class="even">
+<td>central FD with full remeshing (truth, noisy)</td>
+<td>−0.821/−0.034 (eps 1e-3/3e-3)</td>
+<td>+1.24/+0.33</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p>The tesseract gradient equals its own mesher’s true frozen-topology gradient (control row) — but that mesher sees only the trilinear interpolant, which smears every crease across a cell, and the <code>web_thickness</code> response of the bracket is crease-dominated (the loaded wall is bounded by creases). Result: a genuine <strong>sign flip</strong> relative to the true-SDF mesher at this lattice, while full-remesh FD is too noisy to arbitrate at these eps (topology changes at |dθ| = 1e-3 — the frozen promise check trips, which is the designed behavior). Plate thickness (large smooth faces) agrees within 9% across all paths. v1 verdict: the interpolation-VJP <em>contract</em> is right and exact; the lattice-sampling <em>interface</em> needs either a finer lattice near creases or exact crease data in the schema before it can replace the in-process Route 1 recompute for crease-dominated parameters.</p>
+<p>Robustness note: DC on the interpolant is more fragile than DC on the SDF (the interpolant is C0 with gradient jumps at every cell face). Of the probed configs, sharp @ 32x24x19 meshed; smooth @ 32x24x19 and both @ 39x29x23 self-intersected in TetGen. fTetWild would likely absorb these (it welcomes dirty input) — blocked only by the missing cp314 wheel. The HEX8 mesher mode has no such fragility.</p>
+</section>
+<section id="two-tesseract-chain-mesher-elastic_jaxfem-unmodified-works" class="level3">
+<h3 class="anchored" data-anchor-id="two-tesseract-chain-mesher-elastic_jaxfem-unmodified-works">Two-tesseract chain (mesher ∘ elastic_jaxfem, unmodified) — works</h3>
+<p><code>tests/fem/test_tetmesh.py::TestTwoTesseractChain</code> doubles as the runnable demo (<code>pytest -s</code>). CAD params → SDF lattice samples → mesher tesseract (HEX8 mode — the packaged elastic tesseract’s schema is HEX8; the tet mode is the same tesseract one input flag away) → <strong>unmodified</strong> <code>elastic_jaxfem</code> tesseract → compliance (<code>sum u²</code>) + smoothed-mass objective → one <code>jax.grad</code>. Bracket @ 30x21x16 (N = 2 678 nodes, 1 664 hexes, 1 534 snapped):</p>
+<ul>
+<li>One <code>jax.value_and_grad</code> through both tesseracts: <strong>20 s</strong>; grad = (+12.43, −5.75, −350.37) at the nominal design.</li>
+<li>Central FD of the same frozen-topology objective: <strong>plate_thickness −350.37 vs −348.85, rel 4.4e-3</strong> (the clean, crease-light parameter). rib −5.75 vs −4.31 (rel 0.34) and web +12.43 vs +41.0 at eps 3e-4 (sign agrees; both parameters are kink/topology-noise dominated at this resolution — eps 1e-3 already flips voxelization topology, which the frozen promise check catches by design). The positive web component is physical for this objective: the loaded outer-wall area grows with the web (same sign as the hex-path bracket-demo table in <code>fem-integration.md</code>).</li>
+<li><strong>5 projected gradient-descent steps, one gradient each</strong>: J = 21.678 → 18.497 → 15.901 → 15.198 → 13.980 (<strong>monotone, −36%</strong>), with the frozen-topology promise breaking at every step and the driver <em>refreezing automatically</em> (re-discover + re-resolve BCs, N drifting 2678 → 2725) — the remesh-when-invalid loop the frozen-topology doctrine prescribes, falling out of the tesseract contract for free.</li>
+</ul>
+</section>
+</section>
+<section id="route-2-dcqef-informed-placement-for-the-hex-mesher-measured-not-worth-it" class="level2">
+<h2 class="anchored" data-anchor-id="route-2-dcqef-informed-placement-for-the-hex-mesher-measured-not-worth-it">Route 2: DC/QEF-informed placement for the hex mesher — measured, not worth it</h2>
+<p>Measured on the bracket (hex 24x17x13 &amp; 30x21x16 vs DC at matched cell size):</p>
+<ul>
+<li>Newton-snapped hex boundary vertices already sit on the zero set to <strong>machine precision</strong> (mean |sdf| 1.3e-17); DC’s QEF vertices are the <em>less</em> accurate ones pointwise (mean 1.1e-3). Vertex placement is not the hex path’s problem.</li>
+<li>Moving every snapped hex vertex to its closest point on the DC surface (proxy for feature-aware/QEF placement; mean move 6.0e-4, max 1.4e-2) changes sampled surface deviation by &lt; 1% (0.00528 → 0.00526 mean at res 30) and slightly <em>improves</em> the min scaled Jacobian (0.028 → 0.083) with zero inversions — i.e.&nbsp;even a free, perfect QEF placement pass moves the needle marginally.</li>
+<li>The hex path’s real geometric error (dev mean 5.3e-3 vs DC’s 6.3e-4) lives in the <strong>staircase faces between snapped vertices</strong>, which no vertex placement can fix — only conforming topology (the tet route) or cut/dual cells can. Verdict: skip Route 2; its theoretical ceiling is already measured to be negligible.</li>
+</ul>
+</section>
+<section id="solver-support-matrix" class="level2">
+<h2 class="anchored" data-anchor-id="solver-support-matrix">Solver support matrix</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>solver</th>
+<th>TET4</th>
+<th>TET10</th>
+<th>notes</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>jax-fem (in-process)</td>
+<td><strong>confirmed by running</strong> (<code>ele_type="TET4"</code>)</td>
+<td><strong>confirmed by running</strong> (<code>ele_type="TET10"</code>, meshio tetra10 order)</td>
+<td>default BiCGStab fragile on sliver tets; direct solver advisable</td>
+</tr>
+<tr class="even">
+<td>CalculiX (ccx 2.23)</td>
+<td>C3D4 deck: straightforward (same node order as meshio <code>tetra</code>)</td>
+<td>C3D10: straightforward (ccx’s canonical element; midside order matches meshio)</td>
+<td>deck writer change only (<code>*ELEMENT, TYPE=C3D4/C3D10</code> + 3/6-node face loads); the STRAINENERGY DFDN correction’s <code>d(detJ)</code> term needs re-deriving for tet shape functions — not implemented, no blocker identified</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="wall-clock-summary-m-series-cpu-warm" class="level2">
+<h2 class="anchored" data-anchor-id="wall-clock-summary-m-series-cpu-warm">Wall-clock summary (M-series CPU, warm)</h2>
+<ul>
+<li>TetGen itself is negligible: 0.03–0.16 s for 5k–27k tets (DC extraction dominates mesh build at 2–5 s for both routes).</li>
+<li>Adjoint gradient (3 params, forward+backward): TET4@32 12 s, HEX8@30 13 s, TET4@52 21 s, HEX8@48 26 s, TET10@32 207 s.</li>
+<li>Route 3 tesseract: discovery apply ~3 s; traced forward+VJP ~16 s (re-runs the mesher once in apply and once in the VJP — by design, statelessness over speed).</li>
+</ul>
+</section>
+<section id="files" class="level2">
+<h2 class="anchored" data-anchor-id="files">Files</h2>
+<ul>
+<li><code>cadjoint/fem/tetmesh.py</code> — TetMesh, <code>sdf_to_tet_mesh</code> (project-then-mesh), <code>recompute_tet_points</code> (+ optional Laplacian passes), <code>tet10_from_tet4</code>, <code>tet_elastic_solve</code> (TET4/TET10, exact <code>traction_faces</code> targeting), quality metrics, load-work helpers (tri3/tri6/quad Gauss).</li>
+<li><code>cadjoint/fem/tesseracts/mesher/tesseract_api.py</code> — the mesher tesseract (TET4/HEX8 modes, interpolation VJP, frozen-topology templates).</li>
+<li><code>tests/fem/test_tetmesh.py</code> — 26 tests (mesh contract, quality metrics, selection duck typing, recompute fixed point + gradients, TET10 promotion, TET4/TET10 solves, sphere adjoint-vs-FD, mesher tesseract, and the two-tesseract chain demo); all skip cleanly without tetgen / jax_fem / tesseract deps.</li>
+</ul>
+</section>
+<section id="production-verdict-2026-09-01-tet10-shipped-behind-simmeshmethod..." class="level2">
+<h2 class="anchored" data-anchor-id="production-verdict-2026-09-01-tet10-shipped-behind-simmeshmethod...">Production verdict (2026-09-01): TET10 shipped behind <code>SimMesh(method=...)</code></h2>
+<p>TET10 is now a first-class meshing method (user decision: “tet10 sounds a lot better”), productionized as <code>SimMesh(method="hex"|"tet4"|"tet10")</code> with hex remaining the fast default. What shipped, out of prototype status:</p>
+<ul>
+<li><code>SimMesh.method</code> (validated at construction, in <code>describe()</code>/<code>inspect()</code>), <code>build()</code> routing hex → <code>sdf_to_hex_mesh</code>, tet4/tet10 → <code>sdf_to_tet_mesh</code> (+ <code>tet10_mesh</code> promotion), with a <strong>sharp → Tikhonov DC fallback</strong> when TetGen rejects the sharp surface. <code>resolution</code> stays the sampling lattice: elements for hex, the DC extraction grid for tets (TetGen decides tet counts).</li>
+<li>Studies route both physics to tet solves: <code>tet_elastic_solve</code> promoted, and a new <code>tet_thermal_solve</code> mirroring the lifted Dirichlet formulation, both with exact boundary-face targeting (<code>_restrict_surface_faces</code> now covers heat-flux patches too). TET10 BC sets are completed with midside nodes (<code>tet10_complete_nodes</code> / <code>tet10_face_midsides</code>). <code>SimulationResult</code> is method-agnostic (tet von Mises at centroids — for TET10 the corner shape gradients vanish there, midside-only formula; meshio <code>tetra</code>/<code>tetra10</code> VTK).</li>
+<li>Frozen-topology parity: <code>recompute_tet_points</code> handles TET10 (corner surface re-projection, midsides rebuilt as traced corner midpoints; exact fixed point at the nominal design, regression-tested).</li>
+</ul>
+<section id="grid-caveat-found-during-productionization" class="level3">
+<h3 class="anchored" data-anchor-id="grid-caveat-found-during-productionization">Grid caveat found during productionization</h3>
+<p>The bracket’s filleted union (<code>smooth_min</code>) dips to <strong>z ≈ −0.063</strong>, below the demo grid floor (−0.06). Voxelization never noticed; DC extraction returns an <em>open</em> surface there and TetGen rejects it. All tet bracket work below uses the deepened box <code>bounds=(-1.3, -0.95, -0.16)</code>, <code>size=(2.6, 1.9, 1.52)</code>. Sharp DC also still self-intersects at unlucky resolutions (24x18x14 fails both modes at this box; 28x21x17 needs the smooth fallback) — the fallback absorbs some of this, the rest surfaces as a clear TetGen error naming the remedy.</p>
+</section>
+<section id="thermal-on-tet-validation-bar-galerkin-exactness" class="level3">
+<h3 class="anchored" data-anchor-id="thermal-on-tet-validation-bar-galerkin-exactness">Thermal-on-tet validation (bar, Galerkin exactness)</h3>
+<p>The projected tet boundary is the exact box, so solutions inside the FE space must be reproduced to solver tolerance — and are (<code>tests/fem/test_study.py::TestTetStudies</code>):</p>
+<ul>
+<li>linear conduction profile: max |T − (1−x)/2| &lt; 1e-6 on TET4 <strong>and</strong> TET10;</li>
+<li>heat flux with exact face targeting: max err &lt; 1e-6 (T = (q/k)(x+1));</li>
+<li>volumetric-source parabola (quadratic, in the TET10 space): max err &lt; 1e-5.</li>
+<li>Elasticity: TET10 cantilever lands in the Euler-beam window (0.7–1.3) at 15x6x6 where TET4 on the same mesh is visibly stiffer (the locking exhibit).</li>
+</ul>
+</section>
+<section id="the-dof-at-matched-accuracy-benchmark-benchmarkstet_vs_hex_bench.py" class="level3">
+<h3 class="anchored" data-anchor-id="the-dof-at-matched-accuracy-benchmark-benchmarkstet_vs_hex_bench.py">The DOF-at-matched-accuracy benchmark (<code>benchmarks/tet_vs_hex_bench.py</code>)</h3>
+<p>Same bracket compliance problem, both families on the deepened box, load patch selected by the mesh-independent center+normal wall rule (areas 0.29–0.38 vs exact ≈ 0.348; Wn = W/area² as before). Reference: hex @ 66x48x39, 72.7k DOF, Wn = 1.1056 (finest TET10 gives 1.1522 — 4.2% family spread, so the reference itself carries a few-% uncertainty; the 3% band is relative to the hex ref).</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 12%">
+<col style="width: 12%">
+<col style="width: 12%">
+<col style="width: 12%">
+<col style="width: 12%">
+<col style="width: 12%">
+<col style="width: 12%">
+<col style="width: 12%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>mesh</th>
+<th>res</th>
+<th>cells</th>
+<th>DOF</th>
+<th>Wn</th>
+<th>vs ref</th>
+<th>t_mesh</th>
+<th>t_solve</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>HEX8</td>
+<td>24x18x14</td>
+<td>964</td>
+<td>5.0k</td>
+<td>1.066</td>
+<td>−3.6%</td>
+<td>3.5 s</td>
+<td>3.6 s</td>
+</tr>
+<tr class="even">
+<td>HEX8</td>
+<td>30x22x18</td>
+<td>1 846</td>
+<td>8.8k</td>
+<td>1.086</td>
+<td><strong>−1.7%</strong></td>
+<td>3.6 s</td>
+<td>4.0 s</td>
+</tr>
+<tr class="odd">
+<td>HEX8</td>
+<td>36x26x21</td>
+<td>3 512</td>
+<td>15.1k</td>
+<td>1.097</td>
+<td>−0.8%</td>
+<td>4.1 s</td>
+<td>5.4 s</td>
+</tr>
+<tr class="even">
+<td>HEX8</td>
+<td>42x31x25</td>
+<td>4 700</td>
+<td>20.2k</td>
+<td>1.109</td>
+<td>+0.3%</td>
+<td>3.8 s</td>
+<td>7.0 s</td>
+</tr>
+<tr class="odd">
+<td>HEX8</td>
+<td>48x35x28</td>
+<td>7 702</td>
+<td>31.0k</td>
+<td>1.127</td>
+<td>+1.9%</td>
+<td>4.6 s</td>
+<td>9.0 s</td>
+</tr>
+<tr class="even">
+<td>HEX8 ref</td>
+<td>66x48x39</td>
+<td>19 306</td>
+<td>72.7k</td>
+<td>1.106</td>
+<td>—</td>
+<td>4.7 s</td>
+<td>24.6 s</td>
+</tr>
+<tr class="odd">
+<td>TET10</td>
+<td>22x16x13</td>
+<td>4 629</td>
+<td>25.3k</td>
+<td>1.139</td>
+<td><strong>+3.0%</strong></td>
+<td>4.9 s</td>
+<td>26.2 s</td>
+</tr>
+<tr class="even">
+<td>TET10</td>
+<td>24x18x14</td>
+<td>4 645</td>
+<td>26.4k</td>
+<td>1.136</td>
+<td>+2.7%</td>
+<td>5.3 s</td>
+<td>26.8 s</td>
+</tr>
+<tr class="odd">
+<td>TET10</td>
+<td>26x19x16</td>
+<td>5 750</td>
+<td>32.0k</td>
+<td>1.196</td>
+<td>+8.2%</td>
+<td>4.9 s</td>
+<td>31.7 s</td>
+</tr>
+<tr class="even">
+<td>TET10</td>
+<td>28x21x17 (smooth)</td>
+<td>7 037</td>
+<td>39.1k</td>
+<td>1.173</td>
+<td>+6.1%</td>
+<td>6.8 s</td>
+<td>241.5 s</td>
+</tr>
+<tr class="odd">
+<td>TET10</td>
+<td>30x22x18</td>
+<td>7 946</td>
+<td>44.0k</td>
+<td>1.071</td>
+<td>−3.1%</td>
+<td>5.5 s</td>
+<td>52.3 s</td>
+</tr>
+<tr class="even">
+<td>TET10</td>
+<td>32x23x19</td>
+<td>10 176</td>
+<td>53.8k</td>
+<td>1.149</td>
+<td>+4.0%</td>
+<td>5.1 s</td>
+<td>120.7 s</td>
+</tr>
+<tr class="odd">
+<td>TET10</td>
+<td>34x25x20 (smooth)</td>
+<td>11 873</td>
+<td>62.7k</td>
+<td>1.152</td>
+<td>+4.2%</td>
+<td>6.9 s</td>
+<td>119.6 s</td>
+</tr>
+</tbody>
+</table>
+<p>Matched-accuracy picks (coarsest within 3% of the reference) and the <code>d(W)/d(rib_height)</code> adjoint there (3-parameter value_and_grad wall-clock):</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+</colgroup>
+<thead>
+<tr class="header">
+<th></th>
+<th>res</th>
+<th>DOF</th>
+<th>Wn</th>
+<th>mesh+solve</th>
+<th>grad (web, rib, plate)</th>
+<th>t_grad</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>HEX8</td>
+<td>30x22x18</td>
+<td>8.8k</td>
+<td>1.086 (−1.7%)</td>
+<td><strong>7.6 s</strong></td>
+<td>(−0.287, <strong>−0.0086</strong>, −0.503)</td>
+<td>13.9 s</td>
+</tr>
+<tr class="even">
+<td>TET10</td>
+<td>22x16x13</td>
+<td>25.3k</td>
+<td>1.139 (+3.0%)</td>
+<td><strong>31.0 s</strong></td>
+<td>(−0.408, <strong>−0.0990</strong>, −0.881)</td>
+<td>50.8 s</td>
+</tr>
+</tbody>
+</table>
+<p><strong>The headline correction this benchmark exists for: at matched accuracy TET10 costs ~4x hex wall-clock (31.0 s vs 7.6 s; 2.9x DOF; gradient 3.7x) — materially better than the 8–60x of the matched-lattice tables.</strong> The earlier factor compared meshes whose accuracy differed by design; TET10 reaches the 3% band at its coarsest meshable lattice, where hex needs a similar-DOF lattice of its own. Honest caveats: the TET10 Wn ladder oscillates ±4% (its load patch rides the DC surface), so its band-edge pick is less settled than hex’s monotone ladder; and the smooth-fallback meshes pay heavy solver-conditioning penalties (241 s at 39k DOF — the “direct/multigrid solver” prerequisite stands).</p>
+<p><strong>The rib exhibit survives at matched accuracy</strong> — and is the reason to pay the 4x: hex at its matched-accuracy size still reports d(W)/d(rib_height) = −0.0086 where TET10 reports −0.0990 (11.5x). Matching hex’s <em>objective value</em> does not fix its <em>gradient blindness</em> to features the lattice staircases over; an optimizer driving <code>rib_height</code> needs the conforming mesh.</p>
+</section>
+<section id="named-mesh-tet10-gradient-the-study-path-regression-testtet10namedmeshgradient" class="level3">
+<h3 class="anchored" data-anchor-id="named-mesh-tet10-gradient-the-study-path-regression-testtet10namedmeshgradient">Named-mesh tet10 gradient (the study-path regression, <code>TestTet10NamedMeshGradient</code>)</h3>
+<p>Bracket @ 22x16x13 TET10 (25.3k DOF), <code>SimMesh(method="tet10")</code> + <code>ElasticStudy(mesh=...)</code> + <code>recompute_tet_points</code> + <code>solve(points=...)</code>, objective mean |u|, adjoint vs central FD (eps 1e-3):</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>parameter</th>
+<th>adjoint</th>
+<th>central FD</th>
+<th>rel</th>
+<th>asserted</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>web_thickness</td>
+<td>−0.034840</td>
+<td>−0.034283</td>
+<td>1.6e-2</td>
+<td>sign + magnitude window</td>
+</tr>
+<tr class="even">
+<td>rib_height</td>
+<td>−0.018134</td>
+<td>−0.022867</td>
+<td>2.1e-1</td>
+<td>sign + magnitude window</td>
+</tr>
+<tr class="odd">
+<td>plate_thickness</td>
+<td>−0.442785</td>
+<td>−0.438715</td>
+<td><strong>9.3e-3</strong></td>
+<td>≤ 1e-2 rel</td>
+</tr>
+</tbody>
+</table>
+<p>The web/rib gaps are the measured crease-subgradient structure from the gradient-validation section above (sharp DC vertices sit on SDF kinks; AD takes a one-sided branch, FD averages) — directionally exact, hence the sign/window assertions rather than tight rel bounds.</p>
+
+
+</section>
+</section>
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/andrinr\.github\.io\/cadjoint\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

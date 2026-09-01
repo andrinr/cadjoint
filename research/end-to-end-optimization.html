@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>render.marching_cubes.render_marching_cubes – jaxCAD</title>
+<title>end-to-end-optimization – cadjoint</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -25,41 +25,6 @@ ul.task-list li input[type="checkbox"] {
   width: 0.8em;
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
-}
-/* CSS for syntax highlighting */
-html { -webkit-text-size-adjust: 100%; }
-pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
-pre > code.sourceCode > span:empty { height: 1.2em; }
-.sourceCode { overflow: visible; }
-code.sourceCode > span { color: inherit; text-decoration: inherit; }
-div.sourceCode { margin: 1em 0; }
-pre.sourceCode { margin: 0; }
-@media screen {
-div.sourceCode { overflow: auto; }
-}
-@media print {
-pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
-}
-pre.numberSource code
-  { counter-reset: source-line 0; }
-pre.numberSource code > span
-  { position: relative; left: -4em; counter-increment: source-line; }
-pre.numberSource code > span > a:first-child::before
-  { content: counter(source-line);
-    position: relative; left: -1em; text-align: right; vertical-align: baseline;
-    border: none; display: inline-block;
-    -webkit-touch-callout: none; -webkit-user-select: none;
-    -khtml-user-select: none; -moz-user-select: none;
-    -ms-user-select: none; user-select: none;
-    padding: 0 4px; width: 4em;
-  }
-pre.numberSource { margin-left: 3em;  padding-left: 4px; }
-div.sourceCode
-  {   }
-@media screen {
-pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
 }
 </style>
 
@@ -80,7 +45,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <link href="../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-d94f0129d652a5a8036266edffbc062c.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-f83c246346592b24d02aa84ae3974412.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -120,7 +85,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
       <div class="navbar-container container-fluid">
       <div class="navbar-brand-container mx-auto">
     <a class="navbar-brand" href="../index.html">
-    <span class="navbar-title">jaxCAD</span>
+    <span class="navbar-title">cadjoint</span>
     </a>
   </div>
             <div id="quarto-search" class="" title="Search"></div>
@@ -179,7 +144,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </ul>
             <ul class="navbar-nav navbar-nav-scroll ms-auto">
   <li class="nav-item compact">
-    <a class="nav-link" href="https://github.com/andrinr/jaxcad"> <i class="bi bi-github" role="img">
+    <a class="nav-link" href="https://github.com/andrinr/cadjoint"> <i class="bi bi-github" role="img">
 </i> 
 <span class="menu-text"></span></a>
   </li>  
@@ -199,10 +164,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#jaxcad.render.marching_cubes.render_marching_cubes" id="toc-jaxcad.render.marching_cubes.render_marching_cubes" class="nav-link active" data-scroll-target="#jaxcad.render.marching_cubes.render_marching_cubes">render.marching_cubes.render_marching_cubes</a>
+  <li><a href="#end-to-end-optimization-measured-run-record" id="toc-end-to-end-optimization-measured-run-record" class="nav-link active" data-scroll-target="#end-to-end-optimization-measured-run-record">End-to-end optimization: measured run record</a>
   <ul class="collapse">
-  <li><a href="#parameters" id="toc-parameters" class="nav-link" data-scroll-target="#parameters">Parameters</a></li>
-  <li><a href="#returns" id="toc-returns" class="nav-link" data-scroll-target="#returns">Returns</a></li>
+  <li><a href="#measured-numbers" id="toc-measured-numbers" class="nav-link" data-scroll-target="#measured-numbers">Measured numbers</a></li>
+  <li><a href="#box-bounds-and-projection" id="toc-box-bounds-and-projection" class="nav-link" data-scroll-target="#box-bounds-and-projection">Box bounds and projection</a></li>
+  <li><a href="#artifacts-and-guards" id="toc-artifacts-and-guards" class="nav-link" data-scroll-target="#artifacts-and-guards">Artifacts and guards</a></li>
+  <li><a href="#calculix-deck-fragility-found-here-worked-around-not-fixed" id="toc-calculix-deck-fragility-found-here-worked-around-not-fixed" class="nav-link" data-scroll-target="#calculix-deck-fragility-found-here-worked-around-not-fixed">CalculiX deck fragility (found here, worked around, not fixed)</a></li>
   </ul></li>
   </ul>
 </nav>
@@ -213,114 +180,115 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 
 
-<section id="jaxcad.render.marching_cubes.render_marching_cubes" class="level1">
-<h1>render.marching_cubes.render_marching_cubes</h1>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>render.marching_cubes.render_marching_cubes(</span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>    sdf,</span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>    bounds<span class="op">=</span>(<span class="op">-</span><span class="dv">3</span>, <span class="op">-</span><span class="dv">3</span>, <span class="op">-</span><span class="dv">3</span>),</span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    size<span class="op">=</span>(<span class="dv">6</span>, <span class="dv">6</span>, <span class="dv">6</span>),</span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>    resolution<span class="op">=</span><span class="dv">50</span>,</span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>    ax<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>    color<span class="op">=</span><span class="st">'cyan'</span>,</span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>    alpha<span class="op">=</span><span class="fl">0.7</span>,</span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>    title<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>    figsize<span class="op">=</span>(<span class="dv">10</span>, <span class="dv">10</span>),</span>
-<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Render an SDF by extracting a mesh with marching cubes.</p>
-<p>Requires <code>scikit-image</code> and <code>matplotlib</code>.</p>
-<section id="parameters" class="level2 doc-section doc-section-parameters">
-<h2 class="doc-section doc-section-parameters anchored" data-anchor-id="parameters">Parameters</h2>
+<section id="end-to-end-optimization-measured-run-record" class="level1">
+<h1>End-to-end optimization: measured run record</h1>
+<p>Status: <strong>runs end to end</strong> (2026-09-01). The chain and the discrete/continuous split are documented in <code>README.md</code> § “End-to-end optimization”; the showcase is <code>examples/fem_bracket_optimization.py</code> on the L-bracket from <code>scenes/bracket.py</code>. This note keeps what the README does not carry: the measured run record, the box-bound rationale, and a known CalculiX deck fragility. Full build history in git/PR #19.</p>
+<p>Details beyond the README’s summary:</p>
+<ul>
+<li>With the default backend the compliance term is the total squared displacement; with ccx it is classical compliance (<code>f . u</code>, twice the strain energy).</li>
+<li><code>recompute_points</code> re-projects the snapped boundary vertices onto the traced SDF’s zero set with total motion clamped to half a cell diagonal (the same clamp used at extraction); every <code>--remesh-every</code> steps (default 6) topology is re-extracted. The final reported number is evaluated on a freshly extracted mesh so it does not depend on the last frozen topology.</li>
+</ul>
+<section id="measured-numbers" class="level2">
+<h2 class="anchored" data-anchor-id="measured-numbers">Measured numbers</h2>
+<p>Default 30-step run (Apple Silicon CPU, jax-fem backend, 2026-09-01; reproducible — two independent runs produced identical objective traces):</p>
 <table class="caption-top table">
-<colgroup>
-<col style="width: 9%">
-<col style="width: 23%">
-<col style="width: 54%">
-<col style="width: 12%">
-</colgroup>
 <thead>
 <tr class="header">
-<th>Name</th>
-<th>Type</th>
-<th>Description</th>
-<th>Default</th>
+<th>quantity</th>
+<th>initial</th>
+<th>final</th>
+<th>change</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
-<td>sdf</td>
-<td>Callable[[Array], Array]</td>
-<td>Signed distance function, callable <code>(point: Array[3]) → Array[]</code>.</td>
-<td><em>required</em></td>
+<td>objective</td>
+<td>17.4416</td>
+<td>4.6924</td>
+<td>-73.1%</td>
 </tr>
 <tr class="even">
-<td>bounds</td>
-<td>tuple[float, float, float]</td>
-<td>Lower corner (x, y, z) of the evaluation volume.</td>
-<td><code>(-3, -3, -3)</code></td>
+<td>compliance</td>
+<td>16.1642</td>
+<td>3.0729</td>
+<td>-81.0%</td>
 </tr>
 <tr class="odd">
-<td>size</td>
-<td>tuple[float, float, float]</td>
-<td>Extent in each dimension (dx, dy, dz).</td>
-<td><code>(6, 6, 6)</code></td>
+<td>mass</td>
+<td>1.2774</td>
+<td>1.6195</td>
+<td>+26.8%</td>
 </tr>
 <tr class="even">
-<td>resolution</td>
-<td>int</td>
-<td>Grid points per dimension.</td>
-<td><code>50</code></td>
+<td>web_thickness</td>
+<td>0.1600</td>
+<td>0.1666</td>
+<td>+4.1%</td>
 </tr>
 <tr class="odd">
-<td>ax</td>
-<td>plt.Axes | None</td>
-<td>Existing 3D axes; creates new figure if None.</td>
-<td><code>None</code></td>
+<td>rib_height</td>
+<td>0.8800</td>
+<td>1.1064</td>
+<td>+25.7%</td>
 </tr>
 <tr class="even">
-<td>color</td>
-<td>str</td>
-<td>Mesh face colour.</td>
-<td><code>'cyan'</code></td>
-</tr>
-<tr class="odd">
-<td>alpha</td>
-<td>float</td>
-<td>Mesh transparency.</td>
-<td><code>0.7</code></td>
-</tr>
-<tr class="even">
-<td>title</td>
-<td>str | None</td>
-<td>Axes title.</td>
-<td><code>None</code></td>
-</tr>
-<tr class="odd">
-<td>figsize</td>
-<td>tuple[float, float]</td>
-<td>Figure size in inches (width, height).</td>
-<td><code>(10, 10)</code></td>
+<td>plate_thickness</td>
+<td>0.2000</td>
+<td>0.3000 (upper bound)</td>
+<td>+50.0%</td>
 </tr>
 </tbody>
 </table>
+<ul>
+<li>FD vs adjoint at the initial design (central differences, eps 1e-5): rel 2.3e-5 (<code>web_thickness</code>), 2.0e-3 (<code>rib_height</code>), 3.3e-7 (<code>plate_thickness</code>).</li>
+<li>Mesh size at default resolution (30, 21, 16): 1714 hexes / 2735 nodes.</li>
+<li>Per-step timing: 4.7 s median warm eval (value + gradient), 11-42 s on re-extraction steps (retrace + XLA recompile). Some frozen-mesh phases run slower per eval (up to ~36 s) — the iterative solve needs more iterations when the thinned web conditions the system badly.</li>
+<li>Total wall time for the default 30-step run: ~9.5 min (360 s of objective/gradient evals plus FD check, meshing, and exports).</li>
+<li><code>plate_thickness</code> runs to its upper bound and stays there (its raw gradient component remains ~-40); the projected gradient norm decays 272 -&gt; 8.4.</li>
+<li>The remesh jumps are visible and material at this resolution: the step-12 re-extraction raised the objective 6.02 -&gt; 8.86 and the step-18 one lowered it 7.99 -&gt; 5.53 — the web is only ~2 cells thick, so a one-cell-layer change in the loaded wall shifts the discrete compliance substantially.</li>
+</ul>
 </section>
-<section id="returns" class="level2 doc-section doc-section-returns">
-<h2 class="doc-section doc-section-returns anchored" data-anchor-id="returns">Returns</h2>
+<section id="box-bounds-and-projection" class="level2">
+<h2 class="anchored" data-anchor-id="box-bounds-and-projection">Box bounds and projection</h2>
 <table class="caption-top table">
 <thead>
 <tr class="header">
-<th>Name</th>
-<th>Type</th>
-<th>Description</th>
+<th>parameter</th>
+<th>lower</th>
+<th>upper</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
-<td></td>
-<td>plt.Axes</td>
-<td>The matplotlib 3D axes.</td>
+<td><code>web_thickness</code></td>
+<td>0.12</td>
+<td>0.26</td>
+</tr>
+<tr class="even">
+<td><code>rib_height</code></td>
+<td>0.35</td>
+<td>1.15</td>
+</tr>
+<tr class="odd">
+<td><code>plate_thickness</code></td>
+<td>0.14</td>
+<td>0.30</td>
 </tr>
 </tbody>
 </table>
+<p>The lower thickness bounds keep the thin walls above one grid cell, so re-extraction never drops them from the topology; the upper bounds keep the part inside the sampling lattice. Projection is a <code>jnp.clip</code> after <code>optax.apply_updates</code>. The recorded <em>projected</em> gradient norm zeroes components pushing against an active bound — that is the stationarity measure that should shrink, while the raw norm can stay large at a bound-constrained optimum.</p>
+</section>
+<section id="artifacts-and-guards" class="level2">
+<h2 class="anchored" data-anchor-id="artifacts-and-guards">Artifacts and guards</h2>
+<ul>
+<li><code>examples/output/</code> collects the convergence history CSV, the convergence figure (PNG), and before/after VTU exports for ParaView. The VTUs are per-run artifacts and gitignored via <code>examples/output/.gitignore</code>; CSV and PNG are commit-worthy.</li>
+<li><code>examples/test_fem_bracket_optimization.py</code> is collected by a bare <code>pytest</code> run with no configuration, runs the smoke path in under a minute, and restores the x64 flag so the rest of the suite does not inherit it.</li>
+<li><code>--smoke</code> runs 2 optimizer steps at resolution (14, 10, 8), asserts the objective descends, and asserts adjoint/FD agreement on the web-thickness component.</li>
+</ul>
+</section>
+<section id="calculix-deck-fragility-found-here-worked-around-not-fixed" class="level2">
+<h2 class="anchored" data-anchor-id="calculix-deck-fragility-found-here-worked-around-not-fixed">CalculiX deck fragility (found here, worked around, not fixed)</h2>
+<p>The <code>--backend calculix</code> path works at both the smoke and the default resolution (single eval + FD check verified: objective 1.3769 at (30, 21, 16), web-thickness FD rel 2.3e-3 through the ccx <code>*SENSITIVITY</code> adjoint), but only after the example flushes float-noise coordinates to exact zero before the solve. The underlying issue sits in <code>cadjoint/fem/calculix.py</code>’s deck writer (<code>write_elastic_deck</code>, <code>{x:.17g}</code> node fields): ccx’s free-format reader rejects any field wider than 20 characters, and a snapped node at ~1e-17 — float noise on a coordinate plane — prints as 23 (also at risk: 17-significant- digit negatives in (-0.1, -0.01), which print as 21). HEAD’s validated configuration passed by luck of its grid values. The proper fix (bounded-width formatting in the deck writer) belongs to the fem layer, which is being reworked concurrently; the example’s <code>jnp.where(|points| &lt; 1e-9, 0, points)</code> shim is gradient-neutral because the affected coordinates are exactly zero for every nearby design.</p>
 
 
 </section>
@@ -400,7 +368,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     }
       var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
       var mailtoRegex = new RegExp(/^mailto:/);
-        var filterRegex = new RegExp("https:\/\/andrinr\.github\.io\/jaxcad\/");
+        var filterRegex = new RegExp("https:\/\/andrinr\.github\.io\/cadjoint\/");
       var isInternal = (href) => {
           return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
       }

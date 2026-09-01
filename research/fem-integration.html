@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.10.18">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>fem-integration – cadjoint</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-f83c246346592b24d02aa84ae3974412.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+</head>
+
+<body class="nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">cadjoint</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../docs/getting-started.html"> 
+<span class="menu-text">Get Started</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../docs/rendering.html"> 
+<span class="menu-text">Rendering</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../docs/viewer.html"> 
+<span class="menu-text">WebGPU Viewer</span></a>
+  </li>  
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-examples" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Examples</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-examples">    
+        <li>
+    <a class="dropdown-item" href="../examples/basics.html">
+ <span class="dropdown-text">Basics</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/rendering.html">
+ <span class="dropdown-text">Rendering</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/sketch_construction.html">
+ <span class="dropdown-text">Sketch Construction</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/constraints.html">
+ <span class="dropdown-text">Constraints</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/optimization.html">
+ <span class="dropdown-text">Optimization</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/constrained_optimization.html">
+ <span class="dropdown-text">Constrained Optimization</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="../reference/index.html"> 
+<span class="menu-text">API Reference</span></a>
+  </li>  
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/andrinr/cadjoint"> <i class="bi bi-github" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#fem-integration-sdf---hex-mesh---jax-fem-end-to-end-differentiable" id="toc-fem-integration-sdf---hex-mesh---jax-fem-end-to-end-differentiable" class="nav-link active" data-scroll-target="#fem-integration-sdf---hex-mesh---jax-fem-end-to-end-differentiable">FEM integration: SDF -&gt; hex mesh -&gt; jax-fem, end-to-end differentiable</a>
+  <ul class="collapse">
+  <li><a href="#what-works-today" id="toc-what-works-today" class="nav-link" data-scroll-target="#what-works-today">What works today</a>
+  <ul class="collapse">
+  <li><a href="#versions" id="toc-versions" class="nav-link" data-scroll-target="#versions">Versions</a></li>
+  <li><a href="#timings-2.0-x-0.3-x-0.3-bar-22x5x5-grid-320-cells-500-nodes-m-series-cpu" id="toc-timings-2.0-x-0.3-x-0.3-bar-22x5x5-grid-320-cells-500-nodes-m-series-cpu" class="nav-link" data-scroll-target="#timings-2.0-x-0.3-x-0.3-bar-22x5x5-grid-320-cells-500-nodes-m-series-cpu">Timings (2.0 x 0.3 x 0.3 bar, 22x5x5 grid, 320 cells / ~500 nodes, M-series CPU)</a></li>
+  </ul></li>
+  <li><a href="#the-gradient-path-adjoint-not-traced-report-the-truth" id="toc-the-gradient-path-adjoint-not-traced-report-the-truth" class="nav-link" data-scroll-target="#the-gradient-path-adjoint-not-traced-report-the-truth">The gradient path: adjoint, not traced (report the truth)</a>
+  <ul class="collapse">
+  <li><a href="#the-end-to-end-chain-frozen-topology-doctrine" id="toc-the-end-to-end-chain-frozen-topology-doctrine" class="nav-link" data-scroll-target="#the-end-to-end-chain-frozen-topology-doctrine">The end-to-end chain (frozen-topology doctrine)</a></li>
+  </ul></li>
+  <li><a href="#mesher-notes-cadjointfemhexmesh.py" id="toc-mesher-notes-cadjointfemhexmesh.py" class="nav-link" data-scroll-target="#mesher-notes-cadjointfemhexmesh.py">Mesher notes (<code>cadjoint/fem/hexmesh.py</code>)</a></li>
+  <li><a href="#bc-selection-design-programmatic-node-selections" id="toc-bc-selection-design-programmatic-node-selections" class="nav-link" data-scroll-target="#bc-selection-design-programmatic-node-selections">BC selection design: programmatic node selections</a></li>
+  <li><a href="#plugin-architecture-why-tesseract" id="toc-plugin-architecture-why-tesseract" class="nav-link" data-scroll-target="#plugin-architecture-why-tesseract">Plugin architecture (why Tesseract)</a></li>
+  <li><a href="#visualization" id="toc-visualization" class="nav-link" data-scroll-target="#visualization">Visualization</a></li>
+  <li><a href="#end-to-end-optimization-example-status" id="toc-end-to-end-optimization-example-status" class="nav-link" data-scroll-target="#end-to-end-optimization-example-status">End-to-end optimization example status</a></li>
+  <li><a href="#test-inventory" id="toc-test-inventory" class="nav-link" data-scroll-target="#test-inventory">Test inventory</a></li>
+  <li><a href="#bracket-demo-a-realistic-part-through-the-whole-chain" id="toc-bracket-demo-a-realistic-part-through-the-whole-chain" class="nav-link" data-scroll-target="#bracket-demo-a-realistic-part-through-the-whole-chain">Bracket demo: a realistic part through the whole chain</a></li>
+  <li><a href="#code-parity-studies-are-scene-program-citizens" id="toc-code-parity-studies-are-scene-program-citizens" class="nav-link" data-scroll-target="#code-parity-studies-are-scene-program-citizens">Code parity: studies are scene-program citizens</a></li>
+  <li><a href="#precision-hygiene-x64-is-scoped-to-the-solve" id="toc-precision-hygiene-x64-is-scoped-to-the-solve" class="nav-link" data-scroll-target="#precision-hygiene-x64-is-scoped-to-the-solve">Precision hygiene: x64 is scoped to the solve</a></li>
+  <li><a href="#calculix-a-fortran-solver-with-a-native-adjoint-behind-the-tesseract-abi" id="toc-calculix-a-fortran-solver-with-a-native-adjoint-behind-the-tesseract-abi" class="nav-link" data-scroll-target="#calculix-a-fortran-solver-with-a-native-adjoint-behind-the-tesseract-abi">CalculiX: a Fortran solver with a native adjoint behind the Tesseract ABI</a>
+  <ul class="collapse">
+  <li><a href="#getting-the-binary-what-actually-worked" id="toc-getting-the-binary-what-actually-worked" class="nav-link" data-scroll-target="#getting-the-binary-what-actually-worked">Getting the binary (what actually worked)</a></li>
+  <li><a href="#integration-shape" id="toc-integration-shape" class="nav-link" data-scroll-target="#integration-shape">Integration shape</a></li>
+  <li><a href="#the-ccx-2.23-strainenergy-sensitivity-misses-a-term-found-fixed-fd-proven" id="toc-the-ccx-2.23-strainenergy-sensitivity-misses-a-term-found-fixed-fd-proven" class="nav-link" data-scroll-target="#the-ccx-2.23-strainenergy-sensitivity-misses-a-term-found-fixed-fd-proven">The ccx 2.23 STRAINENERGY sensitivity misses a term (found, fixed, FD-proven)</a></li>
+  <li><a href="#numbers-bar-mesh-from-the-existing-tests-180-cells-336-nodes" id="toc-numbers-bar-mesh-from-the-existing-tests-180-cells-336-nodes" class="nav-link" data-scroll-target="#numbers-bar-mesh-from-the-existing-tests-180-cells-336-nodes">Numbers (bar mesh from the existing tests: 180 cells / 336 nodes)</a></li>
+  <li><a href="#vjp-coverage-honest-contract" id="toc-vjp-coverage-honest-contract" class="nav-link" data-scroll-target="#vjp-coverage-honest-contract">VJP coverage (honest contract)</a></li>
+  <li><a href="#caveats" id="toc-caveats" class="nav-link" data-scroll-target="#caveats">Caveats</a></li>
+  </ul></li>
+  <li><a href="#first-class-meshes-and-results-simmesh-simulationresult-2026-09" id="toc-first-class-meshes-and-results-simmesh-simulationresult-2026-09" class="nav-link" data-scroll-target="#first-class-meshes-and-results-simmesh-simulationresult-2026-09">First-class meshes and results: SimMesh, SimulationResult (2026-09)</a>
+  <ul class="collapse">
+  <li><a href="#simmesh-meshing-intent-as-a-scene-program-citizen" id="toc-simmesh-meshing-intent-as-a-scene-program-citizen" class="nav-link" data-scroll-target="#simmesh-meshing-intent-as-a-scene-program-citizen">SimMesh: meshing intent as a scene-program citizen</a></li>
+  <li><a href="#simulationresult-solves-you-can-look-at-twice" id="toc-simulationresult-solves-you-can-look-at-twice" class="nav-link" data-scroll-target="#simulationresult-solves-you-can-look-at-twice">SimulationResult: solves you can look at twice</a></li>
+  <li><a href="#differentiability-through-the-named-mesh-path-fd-proven" id="toc-differentiability-through-the-named-mesh-path-fd-proven" class="nav-link" data-scroll-target="#differentiability-through-the-named-mesh-path-fd-proven">Differentiability through the named-mesh path (FD-proven)</a></li>
+  <li><a href="#reference-scene" id="toc-reference-scene" class="nav-link" data-scroll-target="#reference-scene">Reference scene</a></li>
+  </ul></li>
+  </ul></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"></header>
+
+
+
+
+<section id="fem-integration-sdf---hex-mesh---jax-fem-end-to-end-differentiable" class="level1">
+<h1>FEM integration: SDF -&gt; hex mesh -&gt; jax-fem, end-to-end differentiable</h1>
+<p>Status: <strong>working end to end</strong> (2026-08-16). Design parameter -&gt; SDF -&gt; frozen-topology hex mesh -&gt; FEM solve -&gt; objective -&gt; <code>jax.grad</code>, validated against central finite differences. This note records what runs today, the honest limits, and the follow-ups.</p>
+<section id="what-works-today" class="level2">
+<h2 class="anchored" data-anchor-id="what-works-today">What works today</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Piece</th>
+<th>Status</th>
+<th>Where</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>HEX8 volumetric mesher from any cadjoint SDF</td>
+<td>working, no solver dependency</td>
+<td><code>cadjoint/fem/hexmesh.py</code></td>
+</tr>
+<tr class="even">
+<td>Thermal (Poisson) solve on the hex mesh</td>
+<td>working</td>
+<td><code>cadjoint/fem/simulate.py</code></td>
+</tr>
+<tr class="odd">
+<td>Linear elasticity + per-cell von Mises</td>
+<td>working</td>
+<td><code>cadjoint/fem/simulate.py</code></td>
+</tr>
+<tr class="even">
+<td>VTK export for ParaView</td>
+<td>working (meshio)</td>
+<td><code>ThermalResult/ElasticResult.vtk_export</code></td>
+</tr>
+<tr class="odd">
+<td>Adjoint gradients w.r.t. node coordinates</td>
+<td>working, FD-validated</td>
+<td><code>cadjoint/fem/backends.py</code></td>
+</tr>
+<tr class="even">
+<td>End-to-end design gradient</td>
+<td>working, FD-validated to ~1e-4 off kinks</td>
+<td><code>tests/fem/test_end_to_end.py</code></td>
+</tr>
+<tr class="odd">
+<td>Tesseract plugin ABI (local, no Docker)</td>
+<td>working, gradients bit-identical to direct</td>
+<td><code>cadjoint/fem/tesseracts/thermal_jaxfem/</code></td>
+</tr>
+<tr class="even">
+<td>Elastic solve packaged as a tesseract</td>
+<td>working, gradients bit-identical to direct</td>
+<td><code>cadjoint/fem/tesseracts/elastic_jaxfem/</code></td>
+</tr>
+<tr class="odd">
+<td>Differentiable Dirichlet <em>values</em> (thermal, direct backend)</td>
+<td>working via lifted solve, FD-validated</td>
+<td><code>JaxFemBackend.thermal</code> + <code>tests/fem/test_dirichlet_gradient.py</code></td>
+</tr>
+<tr class="even">
+<td>Programmatic node selection (<code>Nodes</code> + boolean algebra)</td>
+<td>working, serializable</td>
+<td><code>cadjoint/fem/selection.py</code></td>
+</tr>
+<tr class="odd">
+<td>Heat-flux (Neumann) BCs on the direct backend</td>
+<td>working, analytic-validated</td>
+<td><code>JaxFemBackend.thermal</code> surface maps</td>
+</tr>
+</tbody>
+</table>
+<section id="versions" class="level3">
+<h3 class="anchored" data-anchor-id="versions">Versions</h3>
+<ul>
+<li><code>jax-fem 0.0.12</code> on <code>jax 0.8.2</code> / Python 3.14 (macOS arm64). jax-fem ships an <strong>empty <code>install_requires</code></strong>, so the <code>fem</code> extra in <code>pyproject.toml</code> lists its real imports explicitly: <code>fenics-basix 0.11.0</code>, <code>meshio 5.3.5</code>, <code>gmsh 4.15.2</code>, <code>petsc4py 3.25.4</code> (built from source in ~1m24s via the <code>petsc</code> PyPI package), <code>pyfiglet</code>, <code>scipy</code>. All coexist with the repo’s pinned jax — no version conflicts.</li>
+<li><code>tesseract-core 1.11.0</code> (with the <code>[runtime]</code> extra) + <code>tesseract-jax 0.4.1</code>.</li>
+</ul>
+</section>
+<section id="timings-2.0-x-0.3-x-0.3-bar-22x5x5-grid-320-cells-500-nodes-m-series-cpu" class="level3">
+<h3 class="anchored" data-anchor-id="timings-2.0-x-0.3-x-0.3-bar-22x5x5-grid-320-cells-500-nodes-m-series-cpu">Timings (2.0 x 0.3 x 0.3 bar, 22x5x5 grid, 320 cells / ~500 nodes, M-series CPU)</h3>
+<ul>
+<li>Forward thermal solve: ~0.75 s cold (jit warmup), ~0.08 s warm.</li>
+<li>Elastic cantilever solve (~1000 DOF): ~1.1 s cold.</li>
+<li>Forward + adjoint VJP roundtrip, warm: <strong>direct 0.26 s, tesseract 0.39 s</strong> — the tesseract boundary costs ~0.14 s/call (JSON+base64 payload encode/decode and endpoint dispatch; each call also rebuilds the jax-fem problem). Acceptable for interop, wrong default for inner-loop optimization — hence direct-in-process is the default backend.</li>
+</ul>
+</section>
+</section>
+<section id="the-gradient-path-adjoint-not-traced-report-the-truth" class="level2">
+<h2 class="anchored" data-anchor-id="the-gradient-path-adjoint-not-traced-report-the-truth">The gradient path: adjoint, not traced (report the truth)</h2>
+<p><code>jax.grad</code> <strong>cannot trace through</strong> jax-fem’s forward solver: assembly converts to PETSc CSR (<code>TracerArrayConversionError</code> on <code>float64[1,8]</code> cell Jacobians — verified empirically). The working path is jax-fem’s <code>ad_wrapper</code>, a <code>jax.custom_vjp</code> whose backward solves the adjoint system (<code>implicit_vjp</code>: one transposed linear solve + <code>jax.vjp</code> through the residual). Consequences:</p>
+<ul>
+<li>Composes with eager <code>jax.grad</code>/<code>jax.vjp</code>; must <strong>not</strong> sit under <code>jax.jit</code>.</li>
+<li>Differentiable w.r.t. anything <code>Problem.set_params</code> consumes. Crucially, <code>Problem.initialize_geometric_quantities(fes_points=...)</code> recomputes all shape data through <code>jax.numpy</code>, so <strong>nodal coordinates are a valid parameter</strong>: coordinate gradients validated against FD (0.05% on a Poisson bar node).</li>
+<li>Dirichlet <em>values</em> are baked into DOF elimination at problem construction (<code>fe.vals_list</code>, outside <code>set_params</code>’ parameter path — verified in <code>jax_fem/solver.py</code>: <code>implicit_vjp</code>’s <code>constraint_fn</code> only re-runs <code>set_params</code>, while <code>apply_bc_vec</code> reads the frozen <code>vals_list</code>), so they are <strong>not</strong> differentiable through jax-fem directly. The direct thermal backend therefore uses the standard <strong>lift</strong>: solve <code>T = u0 + g</code> with homogeneous Dirichlet conditions on <code>u0</code>, where <code>g</code> is the nodal field interpolating the prescribed boundary values (nonzero only at the Dirichlet nodes — any discrete lift with the right boundary trace is exact). The extra weak-form flux <code>k grad(g)</code> enters as an internal variable (<code>g</code>’s quad-point gradient from <code>fes[0].shape_grads</code>, itself recomputed differentiably), so <code>d(objective)/d(dirichlet value)</code> flows through the adjoint. FD-validated on the thermal bar (hot-end temperature as the design variable; observed agreement ~1e-8 relative, asserted at rtol 5e-2 in <code>tests/fem/test_dirichlet_gradient.py</code>). Elastic clamps are identically zero, so no elastic lift is needed yet; the tesseract thermal schema still treats Dirichlet values as static inputs.</li>
+</ul>
+<section id="the-end-to-end-chain-frozen-topology-doctrine" class="level3">
+<h3 class="anchored" data-anchor-id="the-end-to-end-chain-frozen-topology-doctrine">The end-to-end chain (frozen-topology doctrine)</h3>
+<ol type="1">
+<li>Extract the mesh <strong>once</strong> at the nominal design: connectivity, the snapped-vertex set, and BC node sets are frozen (<code>HexMesh.base_points</code>, <code>.snap_mask</code>).</li>
+<li>Per candidate parameter, <code>recompute_points(sdf, mesh)</code> re-runs only the Newton projection of the snapped vertices through the <em>traced</em> SDF (pure JAX, fixed iteration count); interior lattice points stay put.</li>
+<li><code>thermal_solve(..., points=...)</code> / <code>elastic_solve(..., points=...)</code> feeds the traced points into the solver’s adjoint via <code>set_params</code>.</li>
+</ol>
+<p>Measured on the cantilever with half-height h as the design parameter (<code>J = sum(u^2)</code>): adjoint <code>dJ/dh = -172.694</code> vs central FD <code>-172.715</code> (<strong>rel err 1.2e-4</strong>) at h=0.16. At exactly h=0.15 the y/z half-extents tie and box-edge vertices sit on a subgradient kink of the SDF’s <code>max()</code>; AD returns the subgradient while central FD averages the one-sided slopes (~5% apart). Real lesson: symmetric nominal designs put snapped vertices on SDF kinks; evaluate gradients off-tie or smooth the primitive.</p>
+<p>One more autodiff trap fixed on the way: the projection’s displacement clamp used <code>jnp.linalg.norm</code>, whose gradient at zero displacement (vertex already on the surface) is 0/0; the NaN leaks through <code>minimum()</code> into every cotangent. Guarded via <code>sqrt(maximum(|d|^2, eps))</code> (<code>hexmesh.project_points</code>).</p>
+</section>
+</section>
+<section id="mesher-notes-cadjointfemhexmesh.py" class="level2">
+<h2 class="anchored" data-anchor-id="mesher-notes-cadjointfemhexmesh.py">Mesher notes (<code>cadjoint/fem/hexmesh.py</code>)</h2>
+<p>Voxelize (keep cells with <code>sdf(center) &lt; 0</code>), share vertices through the lattice, then Newton-project boundary vertices onto the zero set along the field gradient (mirrors the viewer’s <code>_project_to_seam</code>, single field). Total displacement is clamped to half the cell diagonal — for a true distance field every boundary-face vertex is within that bound of the surface (Lipschitz-1 argument), so snapping reaches the zero set (sphere test: |sdf| &lt; 1e-3 at all snapped vertices). Inversion guard: a vertex’s snap is reverted if any incident hex corner-tet determinant would go non-positive (all-positive asserted in tests). Known artifact: a vertex already on the surface but off a feature edge (e.g.&nbsp;the corner ring where a bar’s end face meets its sides) has <code>sdf = 0</code> and cannot improve, so end-ring cells distort slightly (~3% local error on the misaligned thermal bar — tested and tolerated explicitly). Cells use VTK/meshio HEX8 ordering, which jax-fem consumes directly (it reorders to basix internally).</p>
+</section>
+<section id="bc-selection-design-programmatic-node-selections" class="level2">
+<h2 class="anchored" data-anchor-id="bc-selection-design-programmatic-node-selections">BC selection design: programmatic node selections</h2>
+<p><strong>Now: first-class vertex selection</strong> (<code>cadjoint/fem/selection.py</code>), replacing the earlier <code>FaceSelector</code> face-group orientation (“the current face groups are not so good to work with” — the face-group ids depended on the mesher’s gradient-axis tagging, which is opaque for anything non-box-like and useless for sub-patches).</p>
+<ul>
+<li><code>Nodes</code> is the factory namespace: <code>Nodes.box(min_corner, max_corner)</code>, <code>Nodes.sphere(center, radius)</code>, <code>Nodes.halfspace(point, normal)</code> (selects <code>dot(x - point, normal) &gt;= 0</code>), <code>Nodes.side("+x", tol=None)</code> (axis-extreme plane; default tol resolves per mesh to half the smallest cell spacing), and <code>Nodes.predicate(fn)</code> as the code-only escape hatch (<code>fn</code> is vectorized: <code>(N, 3)</code> positions in, <code>(N,)</code> boolean mask out).</li>
+<li>Selections compose with <strong>boolean algebra</strong>: <code>&amp;</code>, <code>|</code>, <code>~</code>.</li>
+<li><strong>Boundary restriction is implicit</strong>: selections always resolve to boundary (surface) nodes, because boundary conditions only ever act on the surface. <code>~selection</code> therefore means “the rest of the surface”, never the mesh interior.</li>
+<li>Evaluation is lazy: <code>selection.mask(mesh)</code> / <code>selection.resolve(mesh)</code> run against a concrete <code>HexMesh</code>, so one selection works across resolutions and remeshes.</li>
+<li><strong>Serialization contract</strong>: <code>describe()</code> emits <code>{"kind": ..., numeric params}</code> with plain floats/lists; <code>selection_from_description(payload)</code> round-trips everything except predicates (<code>{"kind": "predicate", "name": fn_name}</code>, flagged via <code>selection.serializable == False</code>). Combinators describe as <code>{"kind": "and"|"or", "operands": [...]}</code> and <code>{"kind": "not", "operand": ...}</code>. Constructor signatures are deliberately literal-friendly (floats and 3-lists) so the viewer’s next wave can write selections into scene source as patch operations (<code>Nodes.box([0, 0, 0], [1, 1, 1])</code>).</li>
+</ul>
+<p><strong>BC semantics</strong> (<code>cadjoint/fem/study.py</code>, <code>simulate.py</code>):</p>
+<ul>
+<li>Node-valued conditions — <code>Dirichlet(nodes, value)</code>, <code>Fixed(nodes)</code> — apply to the selected node set directly.</li>
+<li>Area-integrated conditions — <code>HeatFlux(nodes, flux)</code>, <code>Traction(nodes, vector)</code> — act on the boundary faces <strong>spanned</strong> by the selection: a quad carries the load iff all four of its corners are selected (<code>hexmesh.faces_from_nodes</code>). This matches jax-fem’s own face-selection rule, so the spanned-face set and the solver’s applied set coincide by construction; a selection spanning no complete face is an error raised before solving.</li>
+<li>Node sets still cross the backend boundary as plain int arrays (the Tesseract ABI is unchanged); inside jax-fem they become 2-arg location functions (<code>isin(index, set)</code>).</li>
+</ul>
+<p><strong>Legacy face path</strong>: the mesher’s gradient-axis face groups (<code>HexMesh.boundary_faces</code>), <code>select_faces(mesh, predicate)</code> and predicate patches in <code>thermal_solve</code>/<code>elastic_solve</code> all still work — the viewer’s <code>/api/simulate</code> preview path is built on the group catalog and stays untouched. New code and studies use node selections exclusively.</p>
+<p>Later: <strong>visual picking in the viewer</strong> writes <code>Nodes.*</code> expressions into the scene program via patch ops; a picked patch serializes through <code>describe()</code> and lands in source as literal constructor calls.</p>
+</section>
+<section id="plugin-architecture-why-tesseract" class="level2">
+<h2 class="anchored" data-anchor-id="plugin-architecture-why-tesseract">Plugin architecture (why Tesseract)</h2>
+<p>Direct in-process jax-fem is the <strong>default backend and performance baseline</strong> (native JAX composition, no serialization). The Tesseract schema is the <strong>interop ABI</strong>, not a mandatory wrapper:</p>
+<ul>
+<li><code>cadjoint/fem/backends.py</code>: <code>SolverBackend</code> protocol — <code>thermal/elastic(points, cells, bcs, *, materials..., base_points)</code> returning JAX arrays with a VJP w.r.t. <code>points</code> (adjoint at minimum). <code>register_backend()</code> adds third-party solvers.</li>
+<li><code>cadjoint/fem/tesseracts/thermal_jaxfem/tesseract_api.py</code>: the reference plugin. Typed pydantic <code>InputSchema</code>/<code>OutputSchema</code> (arrays only), opaque <code>apply</code>, <code>abstract_eval</code> for shape inference, and a hand-written <code>vector_jacobian_product</code> backed by the adjoint. <code>tesseract_jax.apply_tesseract</code> composes it into <code>jax.grad</code>; gradients agree with the direct path to 0 ULP in our test.</li>
+<li><strong>Local execution verdict: no Docker needed.</strong> <code>Tesseract.from_tesseract_api</code> imports the module in-process (requires <code>tesseract-core[runtime]</code>; the bare package is missing runtime deps like mlflow). Containerized serving (<code>tesseract build</code> / <code>from_image</code>) is the distribution story, unverified here (no Docker on this machine).</li>
+<li>A third-party (even non-JAX) solver ships one <code>tesseract_api.py</code> with the same schema and endpoints — its <code>vector_jacobian_product</code> can wrap any adjoint (hand-derived, FEniCS, code-generated) — and plugs in via <code>TesseractBackend(api_path=...)</code> or <code>register_backend</code>.</li>
+<li><code>cadjoint/fem/tesseracts/elastic_jaxfem/tesseract_api.py</code>: the elastic solve packaged the same way. Variable patch counts cross the fixed-rank schema as a union <code>fixed_nodes</code> set (clamps are all-zero, patch identity irrelevant) plus <code>traction_nodes</code>/<code>traction_offsets</code> (prefix offsets) with one traction vector per patch. Differentiable input: <code>points</code> only, matching the direct backend (materials and tractions are baked into weak-form closures). <code>TesseractBackend</code> loads both tesseracts lazily and routes by kind; gradients agree with the direct path to &lt; 1e-9 in the tests. Differentiable material fields per-cell remain natural schema extensions.</li>
+</ul>
+</section>
+<section id="visualization" class="level2">
+<h2 class="anchored" data-anchor-id="visualization">Visualization</h2>
+<p>Now: <code>result.vtk_export(path)</code> writes HEX8 + point/cell data (<code>temperature</code>, <code>displacement</code>, <code>von_mises</code>) via meshio for ParaView.</p>
+<p>Follow-up (needs viewer work, out of scope here): in-viewer heatmaps require a WebGPU triangle-mesh pipeline — the current viewer raymarches SDFs and has no indexed-mesh path. Spec: upload boundary quads (split to triangles) + per-vertex scalars, colormap in fragment shader, plus a slicing mode that clips hexes against a plane and shades the cut faces from the volumetric field. The mesher already provides watertight boundary faces with normals; per-node fields come straight from the results.</p>
+</section>
+<section id="end-to-end-optimization-example-status" class="level2">
+<h2 class="anchored" data-anchor-id="end-to-end-optimization-example-status">End-to-end optimization example status</h2>
+<p>The gradient chain is proven (<code>tests/fem/test_end_to_end.py</code>): compliance of a cantilever w.r.t. its half-height through mesh + solve, adjoint vs FD. A full optimization loop (optax over multiple parameters, re-extracting topology when the design drifts past the frozen mesh’s validity) is the natural next step; the missing piece is a trust-region rule for when to re-freeze topology.</p>
+</section>
+<section id="test-inventory" class="level2">
+<h2 class="anchored" data-anchor-id="test-inventory">Test inventory</h2>
+<p><code>tests/fem/</code>: solver-dependent files <code>pytest.importorskip</code> on <code>jax_fem</code> / <code>tesseract_core</code> / <code>tesseract_jax</code>, so the suite skips (not fails) without them. <code>test_hexmesh.py</code> (mesher only), <code>test_selection.py</code> (node-selection layer: primitives, algebra, describe round-trip, <code>faces_from_nodes</code> — no solver), <code>test_simulate.py</code> (incl.&nbsp;selection-vs-predicate parity and the analytic heat-flux profile), <code>test_study.py</code>, <code>test_tesseract_backend.py</code> (elastic parity + bit-identical gradients + a generous overhead-timing bound), <code>test_dirichlet_gradient.py</code> (lifted Dirichlet values vs FD, through node selections), <code>test_end_to_end.py</code>, plus the bracket demo and render-payload files.</p>
+</section>
+<section id="bracket-demo-a-realistic-part-through-the-whole-chain" class="level2">
+<h2 class="anchored" data-anchor-id="bracket-demo-a-realistic-part-through-the-whole-chain">Bracket demo: a realistic part through the whole chain</h2>
+<p><code>scenes/bracket.py</code> is a playground scene of an L-bracket built from the construction API: a base plate and a tapered vertical web extruded from parameter-backed <code>PolygonProfile</code> sketches (<code>plate_thickness</code>, <code>web_thickness</code> as named Scalars), a triangular gusset rib whose tip is tied to a <code>rib_height</code> dimension by a <code>DistanceConstraint</code>, and two bolt holes subtracted at constraint-pinned positions (<code>FixedConstraint</code> + <code>DistanceConstraint</code> on the spacing). The scene compiles in the playground and its SDF meshes watertight with Euler characteristic -2 — genus 2, i.e. exactly the two bolt holes.</p>
+<p><code>examples/fem_bracket_optimization.py</code> mirrors the same geometry as a pure parameterized SDF and runs the frozen-topology chain end to end: HEX8 mesh at the nominal design, bolt regions clamped, a prying traction on the web tip’s outer face (chosen normal-restricted so the applied force does not scale with the thickness being optimized), objective = total squared displacement + a smoothed-volume mass penalty, and a few diagonally preconditioned gradient steps on (web thickness, rib height) via <code>recompute_points</code> + the solver adjoint. At the demo resolution the descent is monotone (~1% objective drop in 4 steps, ~30 s total): the optimizer thins the slightly oversized web to save mass while growing the gusset for stiffness. <code>tests/fem/test_bracket_demo.py</code> guards all of it — scene compile, watertightness, one-step descent, and adjoint-vs-FD agreement at the nominal (both parameters, rtol 5e-2; observed agreement is ~1e-5, the tolerance is headroom).</p>
+<p>Caveat worth carrying forward: with the web only one element thick, the raw compliance sensitivity to web thickness is discretization-dominated (fully integrated HEX8 locks in bending), so quantitative sizing of thin walls needs either finer through-thickness resolution or an incompatible-modes element. The gradient machinery itself is exact for the discrete model either way.</p>
+</section>
+<section id="code-parity-studies-are-scene-program-citizens" class="level2">
+<h2 class="anchored" data-anchor-id="code-parity-studies-are-scene-program-citizens">Code parity: studies are scene-program citizens</h2>
+<p>Simulation follows the same doctrine as sketches and constraints: <strong>code is the source of truth, visual features are a layer on top</strong>. <code>cadjoint/fem/study.py</code> makes studies declarative and first-class:</p>
+<ul>
+<li><code>ThermalStudy</code> / <code>ElasticStudy</code> are plain validated dataclasses declared directly in user programs and scripts. <code>.solve(sdf)</code> runs <code>sdf_to_hex_mesh</code> + the existing solvers and returns the usual result objects, so optimizers consume studies with no extra plumbing (a frozen mesh can be passed in for the frozen-topology gradient loop).</li>
+<li>Boundary conditions consume <code>Nodes</code> selections (see the selection section above): <code>Dirichlet(nodes, value)</code>, <code>HeatFlux(nodes, flux)</code>, <code>Fixed(nodes)</code>, <code>Traction(nodes, vector)</code>. Non-selection arguments are rejected at construction with a pointer to the <code>Nodes</code> factory.</li>
+<li><code>.describe()</code> emits the JSON-ready payload the viewer needs (name, kind, resolution, domain, material, serialized BCs, each BC embedding its selection’s description) — <code>json.dumps</code>-able, asserted in tests.</li>
+<li><code>capture_studies()</code> mirrors <code>capture_constraint_solves</code> in <code>cadjoint/constraints/solve.py</code> (ContextVar + context manager): constructing a study inside the context registers it, so the compile worker can exec a user program and collect its declared studies in order. Verified against exec’d source, including nested-context isolation.</li>
+<li><code>HeatFlux</code> <strong>solves on the direct backend now</strong>: with faces derivable from node selections, the flux enters jax-fem’s weak form as a surface integral (<code>get_surface_maps</code> returning <code>-q</code>, so <code>k grad(T) . n = q</code>; positive flux heats the body). It composes with the lifted Dirichlet formulation unchanged (the surface term does not involve the lift). Validated against the analytic linear profile <code>T(x) = (q/k)(x + 1)</code> on the bar to 1e-6. The thermal tesseract schema does not carry fluxes yet; <code>TesseractBackend.thermal</code> raises <code>NotImplementedError</code> for them.</li>
+<li><code>scenes/bracket.py</code> now declares a <code>bracket-pry</code> <code>ElasticStudy</code> in the scene program itself (bolt-ball clamps, spanned-face traction on the outer web wall), mirroring the optimization example’s selections.</li>
+</ul>
+</section>
+<section id="precision-hygiene-x64-is-scoped-to-the-solve" class="level2">
+<h2 class="anchored" data-anchor-id="precision-hygiene-x64-is-scoped-to-the-solve">Precision hygiene: x64 is scoped to the solve</h2>
+<p>jax-fem requires float64 and <code>jax_fem.solver</code> even flips <code>jax_enable_x64</code> at module import. Flipping it globally poisons every float32 computation later in the same process — the concrete symptom was <code>tests/meshing/test_adaptive.py::test_identical_crossing_edges[union]</code> failing when it ran after <code>tests/viewer/test_simulate.py</code> (the viewer’s forward solves flipped x64 via the old <code>_require_jax_fem</code>, and the sparse octree pruning’s dense-vs-sparse equivalence is x64-sensitive for the union case). Fix: every backend call now wraps itself in <code>_x64_scope()</code> (<code>backends.py</code>), enabling x64 for its own duration and restoring the caller’s setting afterwards — which also undoes the import-time flip, since <code>jax_fem.solver</code> is first imported inside the scope. Forward-only callers (the viewer preview) are therefore leak-free. Callers that differentiate <em>through</em> a solve run the backward pass after the scope has exited and must enable x64 process-wide themselves — <code>tests/fem/conftest.py</code> does it as a package fixture and the optimization example does it at import.</p>
+<p>Next wave (viewer side, not in this change): the Simulate panel becomes a patch layer — <code>add_study</code> / <code>add_study_bc</code> patch ops edit the study declarations in the program text, and the worker ships <code>describe()</code> payloads to the frontend. <code>/api/simulate</code>’s ad-hoc BC payload then survives only as a preview path for not-yet-committed panel state; committed studies always live in code. Study defaults reuse the worker’s simulate-domain convention (bounds <code>(-3,-3,-3)</code>, size <code>(6,6,6)</code>), overridable per study.</p>
+<p>Study tests: <code>test_study.py</code> (24) — construction/validation, JSON round-trip, selector-vs-predicate equivalence, exec capture, and bar-scene solves reproducing the direct thermal/elastic results through the study path.</p>
+</section>
+<section id="calculix-a-fortran-solver-with-a-native-adjoint-behind-the-tesseract-abi" class="level2">
+<h2 class="anchored" data-anchor-id="calculix-a-fortran-solver-with-a-native-adjoint-behind-the-tesseract-abi">CalculiX: a Fortran solver with a native adjoint behind the Tesseract ABI</h2>
+<p>Status: <strong>working end to end</strong> (2026-08-16). Same mesh, same BCs, same <code>jax.grad</code> call — but the elastic solve and its shape adjoint run in a CalculiX 2.23 subprocess (<code>ccx</code>, Fortran 77/90 + C, GPL-2 held at the process boundary: decks in, result files out, no linking).</p>
+<section id="getting-the-binary-what-actually-worked" class="level3">
+<h3 class="anchored" data-anchor-id="getting-the-binary-what-actually-worked">Getting the binary (what actually worked)</h3>
+<p>No Homebrew formula exists (<code>brew search calculix</code> is empty) and no conda manager was installed, so: standalone micromamba + conda-forge, which ships a native arm64 <code>ccx</code> 2.23 for macOS:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode sh code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">mkdir</span> <span class="at">-p</span> ~/.local/share/cadjoint <span class="kw">&amp;&amp;</span> <span class="bu">cd</span> ~/.local/share/cadjoint</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="ex">curl</span> <span class="at">-Ls</span> https://micro.mamba.pm/api/micromamba/osx-arm64/latest <span class="kw">|</span> <span class="fu">tar</span> <span class="at">-xj</span> bin/micromamba</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="ex">./bin/micromamba</span> create <span class="at">-y</span> <span class="at">-p</span> ./ccx-env <span class="at">-c</span> conda-forge calculix</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="ex">./ccx-env/bin/ccx</span> <span class="at">-v</span>   <span class="co"># "This is Version 2.23"</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="bu">export</span> <span class="va">CADJOINT_CCX</span><span class="op">=</span>~/.local/share/cadjoint/ccx-env/bin/ccx</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><code>cadjoint.fem.calculix.find_ccx</code> resolves the binary via <code>CADJOINT_CCX</code> / <code>CCX</code> env vars or <code>PATH</code>; every live test skips cleanly when none is found. The env above lives under <code>~/.local/share/cadjoint</code> on this machine (a /tmp install evaporated once already — keep it somewhere durable).</p>
+</section>
+<section id="integration-shape" class="level3">
+<h3 class="anchored" data-anchor-id="integration-shape">Integration shape</h3>
+<ul>
+<li><code>cadjoint/fem/calculix.py</code> — deck writer (<code>write_elastic_deck</code>: C3D8 from HexMesh, corner order is byte-identical to VTK so cells serialize 1:1; <code>*NSET</code>+<code>*BOUNDARY</code> clamps; tractions as <code>*CLOAD</code> <strong>consistent nodal forces</strong> from 2x2 Gauss on the bilinear boundary quads, exactly matching jax-fem’s surface integration), <code>.dat</code>/<code>.frd</code> parsers, the sensitivity correction (below), a <code>CalculixBackend</code>, and <code>strain_energy_solve</code> for study-style patch arguments.</li>
+<li><code>cadjoint/fem/tesseracts/elastic_calculix/tesseract_api.py</code> — mirrors the <code>elastic_jaxfem</code> schema, adds a <code>strain_energy</code> output; <code>apply</code> = write deck, run <code>ccx</code>, parse; <code>vector_jacobian_product</code> = the <code>*SENSITIVITY</code> adjoint run + normal-projection chain rule.</li>
+<li><code>backend="calculix"</code> is registered in <code>cadjoint/fem/backends.py</code> (lazy import), so <code>elastic_solve(..., backend="calculix")</code> and <code>ElasticStudy.solve(..., backend="calculix")</code> run forward through ccx; <code>examples/fem_bracket_optimization.py --backend calculix</code> runs the whole design-parameter gradient loop through the ccx adjoint.</li>
+</ul>
+</section>
+<section id="the-ccx-2.23-strainenergy-sensitivity-misses-a-term-found-fixed-fd-proven" class="level3">
+<h3 class="anchored" data-anchor-id="the-ccx-2.23-strainenergy-sensitivity-misses-a-term-found-fixed-fd-proven">The ccx 2.23 STRAINENERGY sensitivity misses a term (found, fixed, FD-proven)</h3>
+<p>The <code>*SENSITIVITY</code> step (design response STRAINENERGY, <code>*DESIGN VARIABLES, TYPE=COORDINATE</code>) writes per-design-node normal-projected sensitivities to the <code>.frd</code> as <code>DFDN</code> (raw) and <code>DFDNFIL</code> (mass-matrix-smoothed — solve of <code>M s = g</code> over the design surface, per <code>filterbackwardmain.c</code>; a <em>field</em>, not the discrete gradient). Validating raw <code>DFDN</code> against central FD of <code>E = f·u/2</code> showed the MASS response is <strong>exact</strong> (matches the analytic volume derivative to 6 digits) but STRAINENERGY was off by a <em>non-constant</em> factor (1.4–2.0x across nodes, 4.5x on a degenerate single-element cube) — so neither raw nor rescaled values are usable as-is.</p>
+<p>Reading the 2.23 sources pinned it: <code>objective_shapeener_dx.f</code> computes the frozen-displacement partial by accumulating only the stress-times- strain-increment <code>sigma . d(eps)</code> over the perturbed volume and never adds the Jacobian-variation term <code>w * d(detJ)</code> of the energy integrand. The true fixed-load shape derivative is therefore</p>
+<pre><code>dE/ds_i = DFDN_i + sum_{e∋i} sum_q w_q detJ_q (grad N_i(q) . n_i)</code></pre>
+<p>with <code>w</code> the strain-energy density of the (unperturbed) solution and <code>n_i</code> the outward node normal ccx itself writes to the <code>NORM</code> frd block. The correction is pure post-processing (<code>energy_volume_gradient</code>, closed form <code>d(detJ)/dx_ia = detJ * dN_i/dx_a</code>) computed from ccx’s own displacement output — no extra solver runs. The identity was confirmed to 6 significant digits on the cube and to rel. 2e-4 per node (faces, edges) against central FD with ccx forward solves on a 4x2x2 bar.</p>
+</section>
+<section id="numbers-bar-mesh-from-the-existing-tests-180-cells-336-nodes" class="level3">
+<h3 class="anchored" data-anchor-id="numbers-bar-mesh-from-the-existing-tests-180-cells-336-nodes">Numbers (bar mesh from the existing tests: 180 cells / 336 nodes)</h3>
+<ul>
+<li><strong>Forward parity</strong> ccx vs jax-fem, identical discrete system (fully integrated trilinear HEX8 both sides): max deviation <strong>1.5e-7 relative</strong> to the peak displacement. The floor is ccx’s 6-significant-digit text output, not the discretizations — C3D8 and jax-fem’s HEX8 are the same element.</li>
+<li><strong>Adjoint vs FD</strong> (corrected sensitivities, ccx forward solves for FD): agreement to <strong>rel. 2e-4</strong> at every checked design node.</li>
+<li><strong>Three gradient paths on one mesh</strong> (ccx <code>*SENSITIVITY</code> adjoint vs jax-fem <code>ad_wrapper</code> adjoint vs FD, strain energy objective, 228 design nodes): max deviation <strong>4.5e-5 of the gradient scale</strong>; per-node relative error ≤ 3.2e-3 on entries above 1% of scale — again set by the 5–6 digit <code>.frd</code>/<code>.dat</code> text precision plus DFDN/correction cancellation.</li>
+</ul>
+</section>
+<section id="vjp-coverage-honest-contract" class="level3">
+<h3 class="anchored" data-anchor-id="vjp-coverage-honest-contract">VJP coverage (honest contract)</h3>
+<p>Differentiability through the ccx tesseract is <strong>objective-valued</strong>:</p>
+<ul>
+<li>Supported: cotangents on the <code>strain_energy</code> output (compliance = 2E for fixed loads), w.r.t. <code>points</code>. <code>jax.grad</code> of the bracket objective (compliance + smoothed mass) flows through <code>recompute_points</code> into the SDF design parameters — demonstrated by the example’s <code>--backend calculix</code> flag (objective decreases, gradients finite and stable).</li>
+<li>Rejected with <code>NotImplementedError</code>: nonzero cotangents on the raw <code>displacement</code> field — ccx exposes adjoints for its built-in design responses only, not for arbitrary functionals. Displacement-valued objectives (e.g.&nbsp;the default example’s <code>sum(u^2)</code>) stay on the jax-fem backends. (ccx’s ALL-DISP response could add the <code>sqrt(sum u^2)</code> functional later; not wired up.)</li>
+<li>Geometry contract: the gradient is nonzero only at boundary (design) nodes and only along ccx’s outward node normals — tangential and interior components are zero. That is exact in the continuum limit (in-surface/interior mesh motion does not change the shape) and is precisely the component the Newton-snapped mesher consumes, but it is not the full discrete <code>dE/d(points)</code>. At traction-loaded nodes the VJP holds the consistent nodal loads fixed (neglects the load-area derivative); the gradient-path comparison therefore masks clamped and loaded patches.</li>
+</ul>
+</section>
+<section id="caveats" class="level3">
+<h3 class="anchored" data-anchor-id="caveats">Caveats</h3>
+<ul>
+<li>ccx prints results with 5–6 significant digits (<code>.dat</code> <code>%13.6E</code>, <code>.frd</code> <code>%12.5E</code>); everything downstream inherits that floor. Fine for optimization, unsuitable for tight bitwise cross-checks.</li>
+<li>Each objective evaluation is a fresh ccx process (~50 ms small meshes, plus one extra factorization for the sensitivity solve); the deck writer is O(mesh) Python string work. Wrong default for inner loops — the in-process jax-fem backend stays the default; <code>backend="calculix"</code> is the interop/demo path.</li>
+<li>Thermal is not wired (ccx does heat transfer; out of scope here — <code>CalculixBackend.thermal</code> raises with a pointer to the jax-fem backends).</li>
+<li>The DFDN correction is validated against ccx <strong>2.23</strong> behavior. If a future ccx fixes <code>objective_shapeener_dx.f</code>, the FD-backed live tests (<code>tests/fem/test_calculix.py::TestLiveAdjoint</code>) will catch the double count immediately.</li>
+</ul>
+<p>Tests: <code>tests/fem/test_calculix.py</code> (20) — deck-writer golden file, parser fixtures (<code>.dat</code> displacements/stresses, <code>.frd</code> DISP/NORM/SENENER with run-together fixed columns), correction-term FD identity (no binary needed), and live: cube-vs-theory, forward parity, von Mises parity, sensitivity-vs-FD, three-path gradient agreement, tesseract roundtrip + displacement-cotangent rejection. All live tests skip without a binary; full <code>tests/fem</code> = 123 green with one.</p>
+</section>
+</section>
+<section id="first-class-meshes-and-results-simmesh-simulationresult-2026-09" class="level2">
+<h2 class="anchored" data-anchor-id="first-class-meshes-and-results-simmesh-simulationresult-2026-09">First-class meshes and results: SimMesh, SimulationResult (2026-09)</h2>
+<p>The user directives behind this pass: more control over meshing, meshes and results inspectable as stored intermediate objects, object-level selection of what participates in a simulation, vertex/area BC selection — all “as long as this is fully differentiable through meshing.”</p>
+<section id="simmesh-meshing-intent-as-a-scene-program-citizen" class="level3">
+<h3 class="anchored" data-anchor-id="simmesh-meshing-intent-as-a-scene-program-citizen">SimMesh: meshing intent as a scene-program citizen</h3>
+<p><code>cadjoint/fem/simmesh.py</code> adds <code>SimMesh(name, resolution, domain=None, bounds=None, size=None, padding=0.1)</code> — a mutable dataclass declared in the scene program and captured by <code>capture_sim_meshes()</code> (a ContextVar registry parallel to <code>capture_studies()</code>, same nesting/isolation semantics). Design decisions:</p>
+<ul>
+<li><strong>One meshing path.</strong> Studies take <code>mesh=&lt;SimMesh or declared name&gt;</code> (name resolution happens at construction against the active capture context). A study without one wraps its own resolution/bounds/size/domain into an <em>anonymous</em> SimMesh (capture suppressed), so implicit and explicit meshing are literally the same code. Passing <code>mesh=</code> <strong>and</strong> resolution/bounds/size/domain on the study is a hard error — meshing intent lives in one place.</li>
+<li><strong>Domain selection.</strong> <code>domain=</code> (on SimMesh, or on an implicit-mesh study) is any SDF/callable; when set, <code>build()</code> meshes it instead of the scene SDF passed to <code>solve()</code>. <code>describe()</code> records <code>{"name": getattr(domain, "name", None), "type": type name}</code> — the bracket scene names its Difference (<code>bracket.name = "bracket"</code>) so the viewer can patch by name.</li>
+<li><strong>Auto bounds.</strong> With bounds/size omitted, <code>grid()</code> scans the default volume (-3..3, 33^3 lattice) for inside samples and pads the tight box by <code>padding</code> plus one scan spacing. Explicit bounds skip the scan.</li>
+<li><strong>Caching.</strong> <code>build(sdf)</code> caches the HexMesh on the instance, keyed on (resolution, bounds, size, padding) equality plus <em>identity</em> of the meshed field object; <code>rebuild=True</code> forces re-extraction (needed after in-place parameter mutation, which the cache cannot see). The cache is what lets several studies share one extraction and what serves the frozen-topology mesh to a traced <code>solve(points=...)</code>.</li>
+<li><strong>Inspection.</strong> <code>quality()</code> returns per-element arrays; <code>inspect()</code> a JSON summary (counts, point bounds, grid, min/mean/max per metric). Metrics live in <code>hexmesh.py</code>: <code>scaled_jacobians(points, cells)</code> — per corner det(e1,e2,e3)/(|e1||e2||e3|) over the corner tets already used by the inversion guard, element value = min over its 8 corners (cube = 1, inverted &lt; 0) — and <code>aspect_ratios(points, cells)</code> — max/min of the 12 edge lengths. Both are vectorized numpy, O(C).</li>
+</ul>
+</section>
+<section id="simulationresult-solves-you-can-look-at-twice" class="level3">
+<h3 class="anchored" data-anchor-id="simulationresult-solves-you-can-look-at-twice">SimulationResult: solves you can look at twice</h3>
+<p><code>cadjoint/fem/result.py</code>: <code>study.solve()</code> now returns <code>SimulationResult(name, kind, field, solution, sim_mesh)</code> wrapping the low-level <code>ThermalResult</code>/<code>ElasticResult</code> (which stay the raw <code>thermal_solve</code>/<code>elastic_solve</code> API — backends untouched). Delegating properties keep the viewer’s existing accesses (<code>result.temperature</code>, <code>result.von_mises()</code>, <code>result.mesh</code>) working unchanged. The instance is stored on the study as <code>last_result</code> for re-inspection without re-solving.</p>
+<p>Traced vs concrete is explicit: <code>temperature</code>/<code>displacement</code> and the objective helpers <code>mean()</code>/<code>max()</code> (temperature, resp. guarded displacement magnitude <code>sqrt(|u|^2 + 1e-30)</code> — the guard keeps gradients finite at exactly-clamped nodes) stay JAX arrays and differentiate through a traced solve; <code>nodal_scalar()</code> (display field: temperature or cell-to-node von Mises), <code>describe()</code> (counts, range, per-field min/mean/max) and <code>to_vtk()</code> (reuses the meshio writer) are concrete-only. Von Mises stays the numpy post-process it was — putting it in the objective would silently drop the geometry term of its derivative.</p>
+</section>
+<section id="differentiability-through-the-named-mesh-path-fd-proven" class="level3">
+<h3 class="anchored" data-anchor-id="differentiability-through-the-named-mesh-path-fd-proven">Differentiability through the named-mesh path (FD-proven)</h3>
+<p><code>tests/fem/test_bracket_demo.py::TestNamedMeshGradient</code> (successor of the example-driven optimization test, whose Adam smoke moved next to the example): SimMesh(24x17x13, domain=nominal bracket SDF) -&gt; build (742 cells / 1422 nodes, 836 snapped; min scaled Jacobian 0.352) -&gt; <code>ElasticStudy(mesh=...)</code> with the bolt-clamp / web-tip-load selections -&gt; per theta <code>recompute_points</code> -&gt; <code>solve(points=...)</code> -&gt; <code>result.mean()</code>. Adjoint vs central FD (eps 1e-3) at the nominal design:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>parameter</th>
+<th>adjoint</th>
+<th>central FD</th>
+<th>rel. diff</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>web_thickness</td>
+<td>0.05098049</td>
+<td>0.05097652</td>
+<td>7.8e-5</td>
+</tr>
+<tr class="even">
+<td>rib_height</td>
+<td>-0.00182567</td>
+<td>-0.00182565</td>
+<td>9.4e-6</td>
+</tr>
+<tr class="odd">
+<td>plate_thickness</td>
+<td>-0.39855593</td>
+<td>-0.39856666</td>
+<td>2.7e-5</td>
+</tr>
+</tbody>
+</table>
+<p>(The positive web component is real: the objective is mean |u| and the loaded outer wall moves with the web thickness; only plate thickness has an invariantly negative sign, which the test asserts.)</p>
+</section>
+<section id="reference-scene" class="level3">
+<h3 class="anchored" data-anchor-id="reference-scene">Reference scene</h3>
+<p><code>scenes/bracket.py</code> now unions the bracket with a rendered mounting slab (<code>mount</code>, plugs the bolt holes from below — scene surface genus 0, bracket domain still genus 2, both watertight) and declares <code>bracket_mesh = SimMesh(name="bracket-mesh", domain=bracket, ...)</code> + <code>pry_study = ElasticStudy(..., mesh=bracket_mesh)</code> — the viewer wave’s starting point for mesh cards, domain badges, and result inspection.</p>
+<p>Study constructor note for the viewer wave: <code>resolution</code> is now optional (<code>None</code> when mesh-backed) and material parameters are keyword-only (<code>dataclasses.KW_ONLY</code>); every existing call site already used keywords. <code>describe()</code> gained <code>"mesh"</code> (SimMesh name or null) and <code>"domain"</code> (name/type dict or null); <code>bounds</code>/<code>size</code> may now be null (auto bounds).</p>
+<p>Tests: <code>tests/fem</code> = 162 green with a live ccx binary (26 new in <code>test_simmesh.py</code>, 12 new study/result tests, bracket demo reworked); <code>tests/viewer</code> = 200, <code>tests/test_playground.py</code> = 61 — both untouched.</p>
+
+
+</section>
+</section>
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/andrinr\.github\.io\/cadjoint\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

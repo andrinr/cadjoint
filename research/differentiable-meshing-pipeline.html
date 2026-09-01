@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>cla – jaxCAD</title>
+<title>differentiable-meshing-pipeline – cadjoint</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -29,23 +29,23 @@ ul.task-list li input[type="checkbox"] {
 </style>
 
 
-<script src="site_libs/quarto-nav/quarto-nav.js"></script>
-<script src="site_libs/quarto-nav/headroom.min.js"></script>
-<script src="site_libs/clipboard/clipboard.min.js"></script>
-<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
-<script src="site_libs/quarto-search/fuse.min.js"></script>
-<script src="site_libs/quarto-search/quarto-search.js"></script>
-<meta name="quarto:offset" content="./">
-<script src="site_libs/quarto-html/quarto.js" type="module"></script>
-<script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
-<script src="site_libs/quarto-html/popper.min.js"></script>
-<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
-<script src="site_libs/quarto-html/anchor.min.js"></script>
-<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" id="quarto-text-highlighting-styles">
-<script src="site_libs/bootstrap/bootstrap.min.js"></script>
-<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="site_libs/bootstrap/bootstrap-d94f0129d652a5a8036266edffbc062c.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-f83c246346592b24d02aa84ae3974412.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -84,8 +84,8 @@ ul.task-list li input[type="checkbox"] {
     <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
       <div class="navbar-container container-fluid">
       <div class="navbar-brand-container mx-auto">
-    <a class="navbar-brand" href="./index.html">
-    <span class="navbar-title">jaxCAD</span>
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">cadjoint</span>
     </a>
   </div>
             <div id="quarto-search" class="" title="Search"></div>
@@ -95,15 +95,15 @@ ul.task-list li input[type="checkbox"] {
           <div class="collapse navbar-collapse" id="navbarCollapse">
             <ul class="navbar-nav navbar-nav-scroll me-auto">
   <li class="nav-item">
-    <a class="nav-link" href="./docs/getting-started.html"> 
+    <a class="nav-link" href="../docs/getting-started.html"> 
 <span class="menu-text">Get Started</span></a>
   </li>  
   <li class="nav-item">
-    <a class="nav-link" href="./docs/rendering.html"> 
+    <a class="nav-link" href="../docs/rendering.html"> 
 <span class="menu-text">Rendering</span></a>
   </li>  
   <li class="nav-item">
-    <a class="nav-link" href="./docs/viewer.html"> 
+    <a class="nav-link" href="../docs/viewer.html"> 
 <span class="menu-text">WebGPU Viewer</span></a>
   </li>  
   <li class="nav-item dropdown ">
@@ -112,39 +112,39 @@ ul.task-list li input[type="checkbox"] {
     </a>
     <ul class="dropdown-menu" aria-labelledby="nav-menu-examples">    
         <li>
-    <a class="dropdown-item" href="./examples/basics.html">
+    <a class="dropdown-item" href="../examples/basics.html">
  <span class="dropdown-text">Basics</span></a>
   </li>  
         <li>
-    <a class="dropdown-item" href="./examples/rendering.html">
+    <a class="dropdown-item" href="../examples/rendering.html">
  <span class="dropdown-text">Rendering</span></a>
   </li>  
         <li>
-    <a class="dropdown-item" href="./examples/sketch_construction.html">
+    <a class="dropdown-item" href="../examples/sketch_construction.html">
  <span class="dropdown-text">Sketch Construction</span></a>
   </li>  
         <li>
-    <a class="dropdown-item" href="./examples/constraints.html">
+    <a class="dropdown-item" href="../examples/constraints.html">
  <span class="dropdown-text">Constraints</span></a>
   </li>  
         <li>
-    <a class="dropdown-item" href="./examples/optimization.html">
+    <a class="dropdown-item" href="../examples/optimization.html">
  <span class="dropdown-text">Optimization</span></a>
   </li>  
         <li>
-    <a class="dropdown-item" href="./examples/constrained_optimization.html">
+    <a class="dropdown-item" href="../examples/constrained_optimization.html">
  <span class="dropdown-text">Constrained Optimization</span></a>
   </li>  
     </ul>
   </li>
   <li class="nav-item">
-    <a class="nav-link" href="./reference/index.html"> 
+    <a class="nav-link" href="../reference/index.html"> 
 <span class="menu-text">API Reference</span></a>
   </li>  
 </ul>
             <ul class="navbar-nav navbar-nav-scroll ms-auto">
   <li class="nav-item compact">
-    <a class="nav-link" href="https://github.com/andrinr/jaxcad"> <i class="bi bi-github" role="img">
+    <a class="nav-link" href="https://github.com/andrinr/cadjoint"> <i class="bi bi-github" role="img">
 </i> 
 <span class="menu-text"></span></a>
   </li>  
@@ -164,13 +164,11 @@ ul.task-list li input[type="checkbox"] {
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#contributor-license-agreement" id="toc-contributor-license-agreement" class="nav-link active" data-scroll-target="#contributor-license-agreement">Contributor License Agreement</a>
+  <li><a href="#differentiable-meshing-pipeline-design-ledger" id="toc-differentiable-meshing-pipeline-design-ledger" class="nav-link active" data-scroll-target="#differentiable-meshing-pipeline-design-ledger">Differentiable meshing pipeline — design ledger</a>
   <ul class="collapse">
-  <li><a href="#definitions" id="toc-definitions" class="nav-link" data-scroll-target="#definitions">1. Definitions</a></li>
-  <li><a href="#copyright-license" id="toc-copyright-license" class="nav-link" data-scroll-target="#copyright-license">2. Copyright License</a></li>
-  <li><a href="#patent-license" id="toc-patent-license" class="nav-link" data-scroll-target="#patent-license">3. Patent License</a></li>
-  <li><a href="#you-retain-your-copyright" id="toc-you-retain-your-copyright" class="nav-link" data-scroll-target="#you-retain-your-copyright">4. You retain your copyright</a></li>
-  <li><a href="#you-have-the-right-to-submit" id="toc-you-have-the-right-to-submit" class="nav-link" data-scroll-target="#you-have-the-right-to-submit">5. You have the right to submit</a></li>
+  <li><a href="#principles" id="toc-principles" class="nav-link" data-scroll-target="#principles">Principles</a></li>
+  <li><a href="#final-architecture-module-tests" id="toc-final-architecture-module-tests" class="nav-link" data-scroll-target="#final-architecture-module-tests">Final architecture (module → tests)</a></li>
+  <li><a href="#benchmark-policy" id="toc-benchmark-policy" class="nav-link" data-scroll-target="#benchmark-policy">Benchmark policy</a></li>
   </ul></li>
   </ul>
 </nav>
@@ -181,29 +179,95 @@ ul.task-list li input[type="checkbox"] {
 
 
 
-<section id="contributor-license-agreement" class="level1">
-<h1>Contributor License Agreement</h1>
-<p>By making a contribution to this project, you agree to the following terms.</p>
-<section id="definitions" class="level2">
-<h2 class="anchored" data-anchor-id="definitions">1. Definitions</h2>
-<p>“You” means the individual submitting the contribution. “Contribution” means any original work of authorship submitted to the project. “Project” means the jaxcad repository at https://github.com/andrinr/jaxcad.</p>
+<section id="differentiable-meshing-pipeline-design-ledger" class="level1">
+<h1>Differentiable meshing pipeline — design ledger</h1>
+<blockquote class="blockquote">
+<p>Trimmed to the final architecture. Full build history (stage-by-stage logs, the adversarial-review fixes, the STEP/OCCT bug hunt) is in git/PR #19.</p>
+</blockquote>
+<p>Started 2026-08-15 on <code>feature/differentiable-meshing-pipeline</code>. The previous spike (archived on <code>feature/adaptive-sdf-meshing</code>) attached a MeshSDF-style implicit gradient <em>post-hoc</em> to vertices coming out of a black-box NumPy extractor. That bridge only recovers normal-direction motion and never differentiates the construction that actually places vertices. This pipeline replaces it: build meshing bottom-up from the inputs in pure JAX, and differentiate each real construction step.</p>
+<section id="principles" class="level2">
+<h2 class="anchored" data-anchor-id="principles">Principles</h2>
+<ul>
+<li><strong>Discrete topology, continuous motion.</strong> Which grid edges cross the surface, which cells are active, and how cells connect are discrete choices, frozen per extraction. Everything continuous — crossing positions, normals, QEF vertices — carries exact JAX derivatives with respect to design parameters. Optimization loops re-extract between steps when topology may change.</li>
+<li><strong>Implicit differentiation, not unrolling.</strong> Iterative solvers run on <code>stop_gradient</code> values; a final differentiable Newton correction <code>t = t0 - f(x(t0)) / (df/dt)</code> re-attaches the gradient. At a converged root its derivative is exactly the implicit-function-theorem value <code>dt/dθ = -(∂f/∂θ) / (∂f/∂t)</code>, so gradients are exact regardless of how the root was found.</li>
+<li><strong>Black-box fields.</strong> Stages sample only the field callable and <code>jax.grad</code> of it, so primitives, CSG, transforms, and user-written fields all take the same path. Structure-aware extras (CSG branch tracking, per-primitive patch fields) are optional layers, never requirements.</li>
+<li><strong>min/max is where sharpness lives.</strong> Hard CSG enters the field through <code>jnp.minimum</code>/<code>maximum</code>. Root finding must therefore be kink-robust (bisection brackets by sign and cannot be fooled by piecewise-smooth fields); Hermite normals at seams are one-sided subgradients, which is exactly what dual contouring needs to reconstruct a crease; and the active branch switching <em>on the surface</em> is an exact, threshold-free crease signal.</li>
+</ul>
 </section>
-<section id="copyright-license" class="level2">
-<h2 class="anchored" data-anchor-id="copyright-license">2. Copyright License</h2>
-<p>You grant the project maintainers a perpetual, worldwide, non-exclusive, royalty-free, irrevocable copyright license to reproduce, prepare derivative works of, publicly display, publicly perform, sublicense (including under proprietary terms), and distribute your Contributions.</p>
+<section id="final-architecture-module-tests" class="level2">
+<h2 class="anchored" data-anchor-id="final-architecture-module-tests">Final architecture (module → tests)</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Stage</th>
+<th>Module</th>
+<th>Tests</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Hermite edge detection (bisection + secant + IFT Newton polish, frozen <code>start_inside</code>)</td>
+<td><code>cadjoint/meshing/edge_detection.py</code></td>
+<td><code>tests/meshing/test_edge_detection.py</code></td>
+</tr>
+<tr class="even">
+<td>Sharp-feature classification (normal-spread SVD + exact min/max seam cells)</td>
+<td><code>cadjoint/meshing/features.py</code></td>
+<td><code>tests/meshing/test_features.py</code></td>
+</tr>
+<tr class="odd">
+<td>Dual contouring (Tikhonov QEF gradient path; rank-revealing sharp forward path; deterministic winding)</td>
+<td><code>cadjoint/meshing/dual_contouring.py</code></td>
+<td><code>tests/meshing/test_dual_contouring.py</code>, <code>test_manifold_cells.py</code></td>
+</tr>
+<tr class="even">
+<td>Octree-pruned detection (bit-identical to dense; <code>lipschitz</code> is the caller’s contract)</td>
+<td><code>cadjoint/meshing/adaptive.py</code></td>
+<td><code>tests/meshing/test_adaptive.py</code></td>
+</tr>
+<tr class="odd">
+<td>Per-primitive patch fields (exact feature-edge signatures for known trees)</td>
+<td><code>cadjoint/meshing/patch_fields.py</code></td>
+<td><code>tests/meshing/test_patch_fields.py</code></td>
+</tr>
+<tr class="even">
+<td>Simplification (half-edge collapse under QEF + SDF error bound, features pinned bitwise)</td>
+<td><code>cadjoint/meshing/simplify.py</code></td>
+<td><code>tests/meshing/test_simplify.py</code></td>
+</tr>
+<tr class="odd">
+<td>Export (planar-patch merge, OBJ n-gons, binary STL, STEP AP214 validated against OCCT)</td>
+<td><code>cadjoint/meshing/export.py</code></td>
+<td><code>tests/meshing/test_export.py</code>, <code>tests/meshing/test_step_kernel.py</code></td>
+</tr>
+<tr class="even">
+<td>Native (Rust) kernels behind a Tesseract</td>
+<td><code>cadjoint/meshing/native.py</code>, <code>native/</code></td>
+<td><code>tests/meshing/test_native_mesher.py</code> — see <code>research/native-mesher.md</code></td>
+</tr>
+<tr class="odd">
+<td>CSG stress scenes + viewer edge view</td>
+<td>—</td>
+<td><code>tests/meshing/test_scenes.py</code>, <code>tests/viewer/test_edge_artifacts.py</code></td>
+</tr>
+</tbody>
+</table>
+<p>Known structural limitation (strict xfail in <code>test_scenes.py</code>): when a CSG seam grazes a lattice plane, uniform DC can emit nonmanifold edges — one QEF vertex per cell cannot represent two sheets crossing one cell face; wants manifold DC / cell disambiguation. Multi-size octree leaves (2:1 balancing, transition stitching) also remain open.</p>
 </section>
-<section id="patent-license" class="level2">
-<h2 class="anchored" data-anchor-id="patent-license">3. Patent License</h2>
-<p>You grant the project maintainers a perpetual, worldwide, non-exclusive, royalty-free, irrevocable patent license to make, use, sell, offer for sale, import, and otherwise transfer your Contributions.</p>
-</section>
-<section id="you-retain-your-copyright" class="level2">
-<h2 class="anchored" data-anchor-id="you-retain-your-copyright">4. You retain your copyright</h2>
-<p>You keep full ownership of your Contribution. This agreement only grants the maintainers additional rights — it does not transfer ownership.</p>
-</section>
-<section id="you-have-the-right-to-submit" class="level2">
-<h2 class="anchored" data-anchor-id="you-have-the-right-to-submit">5. You have the right to submit</h2>
-<p>You confirm that: - you wrote the Contribution yourself, or - you have the right to submit it under these terms.</p>
-<p>You are not required to provide support for your Contribution.</p>
+<section id="benchmark-policy" class="level2">
+<h2 class="anchored" data-anchor-id="benchmark-policy">Benchmark policy</h2>
+<p>Every stage tracks four dimensions from day one, in <code>benchmarks/</code>:</p>
+<ul>
+<li><strong>Geometric fidelity</strong> — analytic-shape error (roots, corners, Hausdorff distance) with pytest-enforced tolerances.</li>
+<li><strong>Gradient correctness</strong> — autodiff against analytic implicit derivatives and central finite differences, including near creases.</li>
+<li><strong>Mesh quality/topology</strong> — manifoldness, watertightness, triangle quality.</li>
+<li><strong>Performance</strong> — wall-clock and scaling vs resolution as a runnable script; timing lives in benchmarks, not in CI-gating tests.</li>
+</ul>
 
 
 </section>
@@ -283,7 +347,7 @@ ul.task-list li input[type="checkbox"] {
     }
       var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
       var mailtoRegex = new RegExp(/^mailto:/);
-        var filterRegex = new RegExp("https:\/\/andrinr\.github\.io\/jaxcad\/");
+        var filterRegex = new RegExp("https:\/\/andrinr\.github\.io\/cadjoint\/");
       var isInternal = (href) => {
           return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
       }
