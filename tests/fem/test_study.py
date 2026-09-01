@@ -14,8 +14,10 @@ from cadjoint.fem import (
     GridSpec,
     HeatFlux,
     Nodes,
+    SimMesh,
     ThermalStudy,
     Traction,
+    capture_sim_meshes,
     capture_studies,
     sdf_to_hex_mesh,
 )
@@ -253,3 +255,131 @@ class TestSolve:
         mesh = _bar_mesh()
         result = _thermal_study().solve(_bar(), mesh=mesh)
         assert result.mesh is mesh
+        assert result.sim_mesh is None
+
+
+def _bar_sim_mesh(**overrides):
+    settings = {
+        "name": "bar-mesh",
+        "resolution": _RESOLUTION,
+        "bounds": _BOUNDS,
+        "size": _SIZE,
+    }
+    settings.update(overrides)
+    return SimMesh(**settings)
+
+
+class TestNamedMesh:
+    def test_mesh_and_meshing_intent_conflict(self):
+        sim_mesh = _bar_sim_mesh()
+        with pytest.raises(ValueError, match="resolution"):
+            _thermal_study(mesh=sim_mesh)  # helper also passes resolution
+        with pytest.raises(ValueError, match="domain"):
+            _thermal_study(resolution=None, bounds=None, size=None, mesh=sim_mesh, domain=_bar())
+
+    def test_resolution_required_without_a_mesh(self):
+        with pytest.raises(ValueError, match="resolution"):
+            _thermal_study(resolution=None)
+
+    def test_unknown_mesh_name_lists_the_declared_ones(self):
+        with capture_sim_meshes():
+            _bar_sim_mesh(name="declared")
+            with pytest.raises(ValueError, match="'declared'"):
+                _thermal_study(resolution=None, bounds=None, size=None, mesh="nope")
+
+    def test_mesh_resolves_by_name_inside_capture(self):
+        with capture_sim_meshes():
+            sim_mesh = _bar_sim_mesh()
+            study = _thermal_study(resolution=None, bounds=None, size=None, mesh="bar-mesh")
+        assert study.mesh is sim_mesh
+
+    def test_describe_reports_the_mesh(self):
+        domain = _bar()
+        domain.name = "bar"
+        sim_mesh = _bar_sim_mesh(domain=domain)
+        payload = _thermal_study(resolution=None, bounds=None, size=None, mesh=sim_mesh).describe()
+        assert json.loads(json.dumps(payload)) == payload
+        assert payload["mesh"] == "bar-mesh"
+        assert payload["resolution"] == list(_RESOLUTION)
+        assert payload["bounds"] == list(_BOUNDS)
+        assert payload["domain"] == {"name": "bar", "type": "Box"}
+
+    def test_implicit_study_describe_has_null_mesh(self):
+        payload = _thermal_study().describe()
+        assert payload["mesh"] is None
+        assert payload["domain"] is None
+
+    def test_mesh_backed_solve_matches_the_implicit_path(self):
+        pytest.importorskip("jax_fem")
+        bar = _bar()
+        sim_mesh = _bar_sim_mesh()
+        study = _thermal_study(resolution=None, bounds=None, size=None, mesh=sim_mesh)
+        named = study.solve(bar)
+        implicit = _thermal_study().solve(bar)
+        assert named.sim_mesh is sim_mesh
+        np.testing.assert_allclose(
+            np.asarray(named.temperature), np.asarray(implicit.temperature), atol=1e-9
+        )
+
+    def test_two_studies_share_one_built_mesh(self):
+        pytest.importorskip("jax_fem")
+        bar = _bar()
+        sim_mesh = _bar_sim_mesh()
+        thermal = _thermal_study(resolution=None, bounds=None, size=None, mesh=sim_mesh)
+        elastic = _elastic_study(resolution=None, bounds=None, size=None, mesh=sim_mesh)
+        first = thermal.solve(bar)
+        second = elastic.solve(bar)
+        assert first.mesh is second.mesh  # one extraction, cached on the SimMesh
+
+    def test_domain_restricts_the_implicit_mesh(self):
+        pytest.importorskip("jax_fem")
+        short = Box(Vector([0.5, 0.15, 0.15], free=True, name="short"))
+        study = _thermal_study(domain=short)
+        result = study.solve(_bar())  # scene sdf is the long bar
+        assert result.mesh.points[:, 0].max() < 0.7
+        assert study._implicit_mesh.domain is short
+
+
+class TestSimulationResult:
+    def test_thermal_result_is_inspectable(self):
+        pytest.importorskip("jax_fem")
+        study = _thermal_study()
+        result = study.solve(_bar())
+        assert study.last_result is result
+        assert (result.name, result.kind, result.field) == (
+            "bar-conduction",
+            "thermal",
+            "temperature",
+        )
+        payload = result.describe()
+        assert json.loads(json.dumps(payload)) == payload
+        assert payload["nodes"] == result.mesh.num_points
+        assert payload["elements"] == result.mesh.num_cells
+        assert payload["range"][0] == pytest.approx(0.0, abs=1e-6)
+        assert payload["range"][1] == pytest.approx(1.0, abs=1e-6)
+        assert set(payload["fields"]) == {"temperature"}
+        # Objective helpers agree with plain reductions of the field.
+        assert float(result.mean()) == pytest.approx(float(np.mean(result.nodal_scalar())))
+        assert float(result.max()) == pytest.approx(1.0, abs=1e-6)
+
+    def test_elastic_result_is_inspectable(self):
+        pytest.importorskip("jax_fem")
+        study = _elastic_study()
+        result = study.solve(_bar())
+        assert (result.kind, result.field) == ("elastic", "von_mises")
+        payload = result.describe()
+        assert set(payload["fields"]) == {"displacement", "von_mises"}
+        assert payload["range"][1] > payload["range"][0] >= 0.0
+        assert result.nodal_scalar().shape == (result.mesh.num_points,)
+        assert float(result.max()) > 0.0
+        with pytest.raises(AttributeError, match="temperature"):
+            _ = result.temperature
+
+    def test_result_exports_vtk(self, tmp_path):
+        pytest.importorskip("jax_fem")
+        meshio = pytest.importorskip("meshio")
+        result = _thermal_study().solve(_bar())
+        path = tmp_path / "bar.vtk"
+        result.to_vtk(str(path))
+        exported = meshio.read(str(path))
+        assert "temperature" in exported.point_data

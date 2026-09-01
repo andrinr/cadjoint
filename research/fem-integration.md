@@ -471,3 +471,107 @@ needed), and live: cube-vs-theory, forward parity, von Mises parity,
 sensitivity-vs-FD, three-path gradient agreement, tesseract roundtrip +
 displacement-cotangent rejection. All live tests skip without a binary;
 full `tests/fem` = 123 green with one.
+
+## First-class meshes and results: SimMesh, SimulationResult (2026-09)
+
+The user directives behind this pass: more control over meshing, meshes and
+results inspectable as stored intermediate objects, object-level selection
+of what participates in a simulation, vertex/area BC selection — all "as
+long as this is fully differentiable through meshing."
+
+### SimMesh: meshing intent as a scene-program citizen
+
+`cadjoint/fem/simmesh.py` adds `SimMesh(name, resolution, domain=None,
+bounds=None, size=None, padding=0.1)` — a mutable dataclass declared in the
+scene program and captured by `capture_sim_meshes()` (a ContextVar registry
+parallel to `capture_studies()`, same nesting/isolation semantics).  Design
+decisions:
+
+- **One meshing path.** Studies take `mesh=<SimMesh or declared name>`
+  (name resolution happens at construction against the active capture
+  context).  A study without one wraps its own
+  resolution/bounds/size/domain into an *anonymous* SimMesh (capture
+  suppressed), so implicit and explicit meshing are literally the same
+  code.  Passing `mesh=` **and** resolution/bounds/size/domain on the
+  study is a hard error — meshing intent lives in one place.
+- **Domain selection.** `domain=` (on SimMesh, or on an implicit-mesh
+  study) is any SDF/callable; when set, `build()` meshes it instead of the
+  scene SDF passed to `solve()`.  `describe()` records
+  `{"name": getattr(domain, "name", None), "type": type name}` — the
+  bracket scene names its Difference (`bracket.name = "bracket"`) so the
+  viewer can patch by name.
+- **Auto bounds.** With bounds/size omitted, `grid()` scans the default
+  volume (-3..3, 33^3 lattice) for inside samples and pads the tight box
+  by `padding` plus one scan spacing.  Explicit bounds skip the scan.
+- **Caching.** `build(sdf)` caches the HexMesh on the instance, keyed on
+  (resolution, bounds, size, padding) equality plus *identity* of the
+  meshed field object; `rebuild=True` forces re-extraction (needed after
+  in-place parameter mutation, which the cache cannot see).  The cache is
+  what lets several studies share one extraction and what serves the
+  frozen-topology mesh to a traced `solve(points=...)`.
+- **Inspection.** `quality()` returns per-element arrays; `inspect()` a
+  JSON summary (counts, point bounds, grid, min/mean/max per metric).
+  Metrics live in `hexmesh.py`: `scaled_jacobians(points, cells)` — per
+  corner det(e1,e2,e3)/(|e1||e2||e3|) over the corner tets already used by
+  the inversion guard, element value = min over its 8 corners (cube = 1,
+  inverted < 0) — and `aspect_ratios(points, cells)` — max/min of the 12
+  edge lengths.  Both are vectorized numpy, O(C).
+
+### SimulationResult: solves you can look at twice
+
+`cadjoint/fem/result.py`: `study.solve()` now returns
+`SimulationResult(name, kind, field, solution, sim_mesh)` wrapping the
+low-level `ThermalResult`/`ElasticResult` (which stay the raw
+`thermal_solve`/`elastic_solve` API — backends untouched).  Delegating
+properties keep the viewer's existing accesses (`result.temperature`,
+`result.von_mises()`, `result.mesh`) working unchanged.  The instance is
+stored on the study as `last_result` for re-inspection without re-solving.
+
+Traced vs concrete is explicit: `temperature`/`displacement` and the
+objective helpers `mean()`/`max()` (temperature, resp. guarded
+displacement magnitude `sqrt(|u|^2 + 1e-30)` — the guard keeps gradients
+finite at exactly-clamped nodes) stay JAX arrays and differentiate through
+a traced solve; `nodal_scalar()` (display field: temperature or
+cell-to-node von Mises), `describe()` (counts, range, per-field
+min/mean/max) and `to_vtk()` (reuses the meshio writer) are concrete-only.
+Von Mises stays the numpy post-process it was — putting it in the
+objective would silently drop the geometry term of its derivative.
+
+### Differentiability through the named-mesh path (FD-proven)
+
+`tests/fem/test_bracket_demo.py::TestNamedMeshGradient` (successor of the
+example-driven optimization test, whose Adam smoke moved next to the
+example): SimMesh(24x17x13, domain=nominal bracket SDF) -> build (742
+cells / 1422 nodes, 836 snapped; min scaled Jacobian 0.352) ->
+`ElasticStudy(mesh=...)` with the bolt-clamp / web-tip-load selections ->
+per theta `recompute_points` -> `solve(points=...)` -> `result.mean()`.
+Adjoint vs central FD (eps 1e-3) at the nominal design:
+
+| parameter        | adjoint      | central FD   | rel. diff |
+|------------------|--------------|--------------|-----------|
+| web_thickness    |  0.05098049  |  0.05097652  | 7.8e-5    |
+| rib_height       | -0.00182567  | -0.00182565  | 9.4e-6    |
+| plate_thickness  | -0.39855593  | -0.39856666  | 2.7e-5    |
+
+(The positive web component is real: the objective is mean |u| and the
+loaded outer wall moves with the web thickness; only plate thickness has
+an invariantly negative sign, which the test asserts.)
+
+### Reference scene
+
+`scenes/bracket.py` now unions the bracket with a rendered mounting slab
+(`mount`, plugs the bolt holes from below — scene surface genus 0, bracket
+domain still genus 2, both watertight) and declares
+`bracket_mesh = SimMesh(name="bracket-mesh", domain=bracket, ...)` +
+`pry_study = ElasticStudy(..., mesh=bracket_mesh)` — the viewer wave's
+starting point for mesh cards, domain badges, and result inspection.
+
+Study constructor note for the viewer wave: `resolution` is now optional
+(`None` when mesh-backed) and material parameters are keyword-only
+(`dataclasses.KW_ONLY`); every existing call site already used keywords.
+`describe()` gained `"mesh"` (SimMesh name or null) and `"domain"`
+(name/type dict or null); `bounds`/`size` may now be null (auto bounds).
+
+Tests: `tests/fem` = 162 green with a live ccx binary (26 new in
+`test_simmesh.py`, 12 new study/result tests, bracket demo reworked);
+`tests/viewer` = 200, `tests/test_playground.py` = 61 — both untouched.

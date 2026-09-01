@@ -4,6 +4,8 @@ A realistic mounting bracket built from the construction API. The base plate
 and the vertical web are extrusions of parameter-backed sketch profiles, the
 stiffening rib is a triangular gusset tying the web to the plate, and the two
 bolt holes are subtracted cylinders whose positions are pinned by constraints.
+The bracket bolts onto a mounting slab that is rendered but excluded from
+simulation: the named ``SimMesh`` below meshes only the ``bracket`` domain.
 
 Named design parameters (drive the FEM optimization in
 ``examples/fem_bracket_optimization.py``):
@@ -14,7 +16,7 @@ Named design parameters (drive the FEM optimization in
 
 from cadjoint.constraints import DistanceConstraint, FixedConstraint, satisfy_constraints
 from cadjoint.construction import PolygonProfile, SketchPlane, Solid, extrude
-from cadjoint.fem import ElasticStudy, Fixed, Nodes, Traction
+from cadjoint.fem import ElasticStudy, Fixed, Nodes, SimMesh, Traction
 from cadjoint.geometry import Scalar, Vector, Vector2
 from cadjoint.render import Material
 from cadjoint.sdf.boolean import Difference, Union
@@ -81,8 +83,31 @@ hole_right = Solid.cylinder(radius=0.16, height=0.4, position=bolt_right, name="
 
 # ── assembly: filleted union of the structure, sharp-ish bolt holes ──────────
 body = Union(plate, web, rib, smoothness=0.05)
-scene = Difference(body, hole_left, hole_right, smoothness=0.02)
+bracket = Difference(body, hole_left, hole_right, smoothness=0.02)
+bracket.name = "bracket"  # named: the simulation mesh selects it as its domain
+
+# ── mounting slab: rendered context the bracket bolts onto ───────────────────
+# Part of the scene, not of the simulation — the SimMesh domain below picks
+# only the bracket, so the slab never enters the FEM mesh.
+mount = Solid.box(
+    size=[1.3, 0.9, 0.11],
+    position=[0.0, 0.0, -0.09],
+    material=Material(name="mount", color=[0.35, 0.37, 0.4], roughness=0.7, metallic=0.2),
+    name="mount",
+)
+scene = Union(bracket, mount, smoothness=0.02)
 satisfy_constraints(scene, steps=2)
+
+# ── simulation mesh: the bracket domain, hexed on a named grid ───────────────
+# First-class meshing intent: studies reference it, the viewer inspects it
+# (bracket_mesh.inspect() reports counts, bounds, and element quality).
+bracket_mesh = SimMesh(
+    name="bracket-mesh",
+    resolution=(24, 17, 13),
+    domain=bracket,
+    bounds=(-1.3, -0.95, -0.06),
+    size=(2.6, 1.9, 1.42),
+)
 
 # ── simulation study: bolt regions clamped, prying load on the web tip ───────
 # Node selections are programmatic: a ball around each bolt hole is fixed,
@@ -90,7 +115,6 @@ satisfy_constraints(scene, steps=2)
 # wall above z = 1.0 (mirrors examples/fem_bracket_optimization.py).
 pry_study = ElasticStudy(
     name="bracket-pry",
-    resolution=(24, 17, 13),
     youngs=1000.0,
     poisson=0.3,
     bcs=[
@@ -101,6 +125,5 @@ pry_study = ElasticStudy(
             (0.0, -2.0, 0.0),
         ),
     ],
-    bounds=(-1.3, -0.95, -0.06),
-    size=(2.6, 1.9, 1.42),
+    mesh=bracket_mesh,
 )

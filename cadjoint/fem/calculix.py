@@ -201,6 +201,21 @@ class ElasticDeck:
     num_cells: int
 
 
+def _num(value: float) -> str:
+    """Render a float within ccx's 20-character free-format field limit.
+
+    ``.17g`` overflows the limit for e.g. 17-digit negatives in (-0.1, -0.01)
+    (21 chars) or tiny snapped coordinates like ``9.9e-18`` (22 chars); ccx
+    silently truncates such fields. Degrade precision only when a field would
+    overflow — well below mesh accuracy either way (ccx prints 6 digits back).
+    """
+    for precision in (17, 15, 13):
+        rendered = f"{value:.{precision}g}"
+        if len(rendered) <= 20:
+            return rendered
+    return f"{value:.12g}"
+
+
 def _nset_lines(name: str, nodes: np.ndarray) -> list[str]:
     """*NSET block with 1-based ids, 16 per line."""
     ids = (np.asarray(nodes, dtype=np.int64).reshape(-1) + 1).tolist()
@@ -245,7 +260,7 @@ def write_elastic_deck(
     cells = np.asarray(cells, dtype=np.int64)
     lines = ["*NODE, NSET=NALL"]
     for index, (x, y, z) in enumerate(points, start=1):
-        lines.append(f"{index}, {x:.17g}, {y:.17g}, {z:.17g}")
+        lines.append(f"{index}, {_num(x)}, {_num(y)}, {_num(z)}")
     lines.append("*ELEMENT, TYPE=C3D8, ELSET=EALL")
     for index, cell in enumerate(cells + 1, start=1):
         lines.append(f"{index}, " + ", ".join(str(n) for n in cell))
@@ -262,7 +277,7 @@ def write_elastic_deck(
     lines += [
         "*MATERIAL, NAME=MAT0",
         "*ELASTIC",
-        f"{youngs:.17g}, {poisson:.17g}",
+        f"{_num(youngs)}, {_num(poisson)}",
         "*SOLID SECTION, ELSET=EALL, MATERIAL=MAT0",
         "*STEP",
         "*STATIC",
@@ -280,7 +295,7 @@ def write_elastic_deck(
     if loaded.size:
         lines.append("*CLOAD")
         for node, dof in loaded:
-            lines.append(f"{node + 1}, {dof + 1}, {forces[node, dof]:.17g}")
+            lines.append(f"{node + 1}, {dof + 1}, {_num(forces[node, dof])}")
 
     lines += ["*NODE PRINT, NSET=NALL", "U", "*EL PRINT, ELSET=EALL", "S"]
     lines += ["*NODE FILE", "U", "*END STEP"]

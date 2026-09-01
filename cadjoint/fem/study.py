@@ -16,16 +16,26 @@ directly; area-integrated conditions (:class:`HeatFlux`, :class:`Traction`)
 act on the boundary faces spanned by the selection (all four corners
 selected — :func:`~cadjoint.fem.hexmesh.faces_from_nodes`).
 
+Meshing runs through one path: a study either references a declared
+:class:`~cadjoint.fem.simmesh.SimMesh` (``mesh=<SimMesh or name>`` — the
+name resolves against the meshes captured in the same program) or wraps its
+own ``resolution``/``bounds``/``size`` into an anonymous one.  ``domain=``
+restricts which part of the scene participates in the solve.  ``solve``
+returns a :class:`~cadjoint.fem.result.SimulationResult` (also stored as
+``last_result``) and stays differentiable through a traced ``points=``
+override, exactly like the underlying solver calls.
+
 Example::
 
+    mesh = SimMesh(name="bar-mesh", resolution=(22, 5, 5))
     study = ThermalStudy(
         name="bar-conduction",
-        resolution=(22, 5, 5),
         conductivity=2.0,
         bcs=[
             Dirichlet(Nodes.side("-x"), 1.0),
             Dirichlet(Nodes.side("+x"), 0.0),
         ],
+        mesh=mesh,
     )
     result = study.solve(scene_sdf)
 """
@@ -35,13 +45,14 @@ from __future__ import annotations
 from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
-from dataclasses import dataclass, field
-from typing import Any, Callable
+from dataclasses import KW_ONLY, dataclass, field
+from typing import Any
 
 import numpy as np
 
-from cadjoint.fem.hexmesh import GridSpec, HexMesh, faces_from_nodes, sdf_to_hex_mesh
+from cadjoint.fem.hexmesh import HexMesh, faces_from_nodes
 from cadjoint.fem.selection import NodeSelection
+from cadjoint.fem.simmesh import _CAPTURED_MESHES, SimMesh, _anonymous, _domain_entry
 
 __all__ = [
     "Dirichlet",
@@ -175,13 +186,30 @@ class Traction:
         }
 
 
+def _resolve_mesh_reference(mesh: Any) -> SimMesh:
+    """Turn a ``mesh=`` argument into a SimMesh (resolving names)."""
+    if isinstance(mesh, SimMesh):
+        return mesh
+    if isinstance(mesh, str):
+        captured = _CAPTURED_MESHES.get()
+        declared = [candidate for candidate in (captured or []) if candidate.name == mesh]
+        if len(declared) == 1:
+            return declared[0]
+        if len(declared) > 1:
+            raise ValueError(f"The program declares more than one mesh named {mesh!r}.")
+        names = ", ".join(repr(candidate.name) for candidate in (captured or [])) or "none"
+        raise ValueError(
+            f"No declared SimMesh named {mesh!r} (declared: {names}). "
+            "Declare one before the study, or pass the SimMesh instance itself."
+        )
+    raise ValueError(
+        f"mesh must be a SimMesh or the name of a declared one, got {type(mesh).__name__}."
+    )
+
+
 def _validate_common(study: Any, kind: str, allowed_bcs: tuple[type, ...]) -> None:
     if not isinstance(study.name, str) or not study.name.strip():
         raise ValueError(f"{kind} study needs a non-empty name.")
-    resolution = study.resolution
-    counts = (resolution,) * 3 if isinstance(resolution, int) else tuple(resolution)
-    if len(counts) != 3 or any(int(count) != count or count < 1 for count in counts):
-        raise ValueError("resolution must be a positive integer or a triplet of them.")
     for bc in study.bcs:
         if not isinstance(bc, allowed_bcs):
             names = ", ".join(cls.__name__ for cls in allowed_bcs)
@@ -189,21 +217,63 @@ def _validate_common(study: Any, kind: str, allowed_bcs: tuple[type, ...]) -> No
                 f"{kind} study accepts boundary conditions of type {names}; "
                 f"got {type(bc).__name__}."
             )
-    object.__setattr__(study, "bounds", _triplet(study.bounds, "bounds"))
-    object.__setattr__(study, "size", _triplet(study.size, "size"))
+    if study.domain is not None and not callable(study.domain):
+        raise TypeError(
+            f"domain must be an SDF object or a callable field, got {type(study.domain).__name__}."
+        )
+    if study.mesh is not None:
+        study.mesh = _resolve_mesh_reference(study.mesh)
+        conflicts = [
+            label
+            for label, value in (
+                ("resolution", study.resolution),
+                ("bounds", study.bounds),
+                ("size", study.size),
+                ("domain", study.domain),
+            )
+            if value is not None
+        ]
+        if conflicts:
+            raise ValueError(
+                f"{kind} study got mesh= and {', '.join(conflicts)}; meshing intent "
+                "lives on the SimMesh — set those on it instead."
+            )
+        return
+    if study.resolution is None:
+        raise ValueError(f"{kind} study needs a resolution (or a mesh=SimMesh).")
+    counts = (
+        (study.resolution,) * 3 if isinstance(study.resolution, int) else tuple(study.resolution)
+    )
+    if len(counts) != 3 or any(int(count) != count or count < 1 for count in counts):
+        raise ValueError("resolution must be a positive integer or a triplet of them.")
+    study.bounds = _triplet(study.bounds if study.bounds is not None else _DEFAULT_BOUNDS, "bounds")
+    study.size = _triplet(study.size if study.size is not None else _DEFAULT_SIZE, "size")
 
 
-def _study_grid(study: Any) -> GridSpec:
-    resolution = study.resolution
-    if not isinstance(resolution, int):
-        resolution = tuple(int(count) for count in resolution)
-    return GridSpec.from_bounds(study.bounds, study.size, resolution)
+def _solve_mesh(study: Any, sdf: Any, mesh: Any) -> tuple[SimMesh | None, HexMesh]:
+    """The one meshing path for solves.
 
-
-def _as_sdf(sdf_or_callable: Any) -> Callable[[Any], Any]:
-    if not callable(sdf_or_callable):
-        raise TypeError("solve() expects an SDF object or a callable field.")
-    return sdf_or_callable
+    An explicit ``HexMesh`` is used as-is (no SimMesh attached); a SimMesh
+    (explicit argument, the study's own, or an anonymous wrap of the
+    study's resolution/bounds/size/domain) is built — reusing its cache.
+    """
+    if isinstance(mesh, HexMesh):
+        return None, mesh
+    if mesh is not None:
+        target = _resolve_mesh_reference(mesh)
+    elif study.mesh is not None:
+        target = study.mesh
+    else:
+        if study._implicit_mesh is None:
+            study._implicit_mesh = _anonymous(
+                name=f"{study.name}::mesh",
+                resolution=study.resolution,
+                domain=study.domain,
+                bounds=study.bounds,
+                size=study.size,
+            )
+        target = study._implicit_mesh
+    return target, target.build(sdf)
 
 
 def _check_resolvable(bcs: list[Any], mesh: HexMesh) -> None:
@@ -218,28 +288,66 @@ def _check_resolvable(bcs: list[Any], mesh: HexMesh) -> None:
             )
 
 
+def _mesh_payload(study: Any) -> dict[str, Any]:
+    """The describe() entries shared by both study kinds.
+
+    Mesh-backed studies report the SimMesh's resolution/bounds/size (bounds
+    may be None when the mesh derives them automatically) plus its name;
+    implicit studies report their own resolved values with ``mesh: None``.
+    """
+    mesh = study.mesh
+    if mesh is not None:
+        resolution = mesh.resolution
+        bounds, size = mesh.bounds, mesh.size
+        domain = mesh.domain
+    else:
+        resolution = study.resolution
+        bounds, size = study.bounds, study.size
+        domain = study.domain
+    return {
+        "resolution": resolution if isinstance(resolution, int) else list(resolution),
+        "bounds": list(bounds) if bounds is not None else None,
+        "size": list(size) if size is not None else None,
+        "mesh": mesh.name if mesh is not None else None,
+        "domain": _domain_entry(domain),
+    }
+
+
 @dataclass
 class ThermalStudy:
     """Declarative steady-state heat conduction study.
 
     Attributes:
         name: Study identifier (unique within a scene program).
-        resolution: Meshing resolution (cells per axis, int or triplet).
-        conductivity: Thermal conductivity ``k``.
+        resolution: Meshing resolution (cells per axis, int or triplet);
+            leave None when ``mesh`` is given.
+        conductivity: Thermal conductivity ``k`` (keyword-only).
         bcs: :class:`Dirichlet` / :class:`HeatFlux` boundary conditions
             (at least one Dirichlet is required to solve).
         source: Volumetric heat source ``q``.
-        bounds: Lower corner of the meshing domain.
-        size: Extent of the meshing domain.
+        bounds: Lower corner of the meshing domain (None: default volume).
+        size: Extent of the meshing domain (None: default volume).
+        mesh: A declared :class:`~cadjoint.fem.simmesh.SimMesh` (or its
+            name) to solve on; when given, resolution/bounds/size/domain
+            live on the mesh and must be left unset here.
+        domain: Optional SDF restricting which part of the scene is meshed
+            (implicit-mesh studies only).
+        last_result: The :class:`~cadjoint.fem.result.SimulationResult` of
+            the most recent ``solve`` (None before the first).
     """
 
     name: str
-    resolution: Any
+    resolution: Any = None
+    _: KW_ONLY
     conductivity: float
     bcs: list[Dirichlet | HeatFlux] = field(default_factory=list)
     source: float = 0.0
-    bounds: Any = _DEFAULT_BOUNDS
-    size: Any = _DEFAULT_SIZE
+    bounds: Any = None
+    size: Any = None
+    mesh: SimMesh | str | None = None
+    domain: Any = None
+    last_result: Any = field(default=None, init=False, repr=False, compare=False)
+    _implicit_mesh: SimMesh | None = field(default=None, init=False, repr=False, compare=False)
 
     def __post_init__(self):
         _validate_common(self, "Thermal", (Dirichlet, HeatFlux))
@@ -252,46 +360,60 @@ class ThermalStudy:
         return {
             "name": self.name,
             "kind": "thermal",
-            "resolution": self.resolution
-            if isinstance(self.resolution, int)
-            else list(self.resolution),
-            "bounds": list(self.bounds),
-            "size": list(self.size),
+            **_mesh_payload(self),
             "material": {"conductivity": float(self.conductivity)},
             "source": float(self.source),
             "bcs": [bc.describe() for bc in self.bcs],
         }
 
-    def solve(self, sdf, *, backend=None, mesh: HexMesh | None = None):
-        """Mesh the field and run the thermal solve.
+    def solve(
+        self, sdf=None, *, backend=None, mesh: HexMesh | SimMesh | str | None = None, points=None
+    ):
+        """Mesh the field (through the study's SimMesh) and run the solve.
 
         Args:
-            sdf: Scene SDF object or plain callable field.
+            sdf: Scene SDF object or plain callable field; optional when
+                the study's mesh declares a ``domain``.
             backend: Optional solver backend override (see
                 :func:`cadjoint.fem.simulate.thermal_solve`).
-            mesh: Optional pre-extracted mesh (skips ``sdf_to_hex_mesh``).
+            mesh: Optional mesh override — a pre-extracted
+                :class:`~cadjoint.fem.hexmesh.HexMesh`, a SimMesh, or a
+                declared mesh name.
+            points: Optional traced override of the mesh node positions
+                (``recompute_points``) for differentiable frozen-topology
+                solves; BC selections still resolve on the nominal points.
 
         Returns:
-            A :class:`cadjoint.fem.simulate.ThermalResult`.
+            A :class:`~cadjoint.fem.result.SimulationResult` (also stored
+            as ``last_result``).
         """
+        from cadjoint.fem.result import SimulationResult
         from cadjoint.fem.simulate import thermal_solve
 
         dirichlet = [bc for bc in self.bcs if isinstance(bc, Dirichlet)]
         fluxes = [bc for bc in self.bcs if isinstance(bc, HeatFlux)]
         if not dirichlet:
             raise ValueError("A thermal study needs at least one Dirichlet BC to solve.")
-        field_fn = _as_sdf(sdf)
-        if mesh is None:
-            mesh = sdf_to_hex_mesh(field_fn, _study_grid(self))
-        _check_resolvable(self.bcs, mesh)
-        return thermal_solve(
-            mesh,
+        sim_mesh, hex_mesh = _solve_mesh(self, sdf, mesh)
+        _check_resolvable(self.bcs, hex_mesh)
+        solution = thermal_solve(
+            hex_mesh,
             conductivity=float(self.conductivity),
             dirichlet=[(bc.nodes, bc.value) for bc in dirichlet],
             neumann=[(bc.nodes, bc.flux) for bc in fluxes],
             source=float(self.source),
             backend=backend,
+            points=points,
         )
+        result = SimulationResult(
+            name=self.name,
+            kind="thermal",
+            field="temperature",
+            solution=solution,
+            sim_mesh=sim_mesh,
+        )
+        self.last_result = result
+        return result
 
 
 @dataclass
@@ -300,22 +422,35 @@ class ElasticStudy:
 
     Attributes:
         name: Study identifier (unique within a scene program).
-        resolution: Meshing resolution (cells per axis, int or triplet).
-        youngs: Young's modulus.
-        poisson: Poisson ratio (in ``[0, 0.5)``).
+        resolution: Meshing resolution (cells per axis, int or triplet);
+            leave None when ``mesh`` is given.
+        youngs: Young's modulus (keyword-only).
+        poisson: Poisson ratio in ``[0, 0.5)`` (keyword-only).
         bcs: :class:`Fixed` / :class:`Traction` boundary conditions
             (at least one Fixed is required to solve).
-        bounds: Lower corner of the meshing domain.
-        size: Extent of the meshing domain.
+        bounds: Lower corner of the meshing domain (None: default volume).
+        size: Extent of the meshing domain (None: default volume).
+        mesh: A declared :class:`~cadjoint.fem.simmesh.SimMesh` (or its
+            name) to solve on; when given, resolution/bounds/size/domain
+            live on the mesh and must be left unset here.
+        domain: Optional SDF restricting which part of the scene is meshed
+            (implicit-mesh studies only).
+        last_result: The :class:`~cadjoint.fem.result.SimulationResult` of
+            the most recent ``solve`` (None before the first).
     """
 
     name: str
-    resolution: Any
+    resolution: Any = None
+    _: KW_ONLY
     youngs: float
     poisson: float
     bcs: list[Fixed | Traction] = field(default_factory=list)
-    bounds: Any = _DEFAULT_BOUNDS
-    size: Any = _DEFAULT_SIZE
+    bounds: Any = None
+    size: Any = None
+    mesh: SimMesh | str | None = None
+    domain: Any = None
+    last_result: Any = field(default=None, init=False, repr=False, compare=False)
+    _implicit_mesh: SimMesh | None = field(default=None, init=False, repr=False, compare=False)
 
     def __post_init__(self):
         _validate_common(self, "Elastic", (Fixed, Traction))
@@ -330,42 +465,56 @@ class ElasticStudy:
         return {
             "name": self.name,
             "kind": "elastic",
-            "resolution": self.resolution
-            if isinstance(self.resolution, int)
-            else list(self.resolution),
-            "bounds": list(self.bounds),
-            "size": list(self.size),
+            **_mesh_payload(self),
             "material": {"youngs": float(self.youngs), "poisson": float(self.poisson)},
             "bcs": [bc.describe() for bc in self.bcs],
         }
 
-    def solve(self, sdf, *, backend=None, mesh: HexMesh | None = None):
-        """Mesh the field and run the elastic solve.
+    def solve(
+        self, sdf=None, *, backend=None, mesh: HexMesh | SimMesh | str | None = None, points=None
+    ):
+        """Mesh the field (through the study's SimMesh) and run the solve.
 
         Args:
-            sdf: Scene SDF object or plain callable field.
+            sdf: Scene SDF object or plain callable field; optional when
+                the study's mesh declares a ``domain``.
             backend: Optional solver backend override (see
                 :func:`cadjoint.fem.simulate.elastic_solve`).
-            mesh: Optional pre-extracted mesh (skips ``sdf_to_hex_mesh``).
+            mesh: Optional mesh override — a pre-extracted
+                :class:`~cadjoint.fem.hexmesh.HexMesh`, a SimMesh, or a
+                declared mesh name.
+            points: Optional traced override of the mesh node positions
+                (``recompute_points``) for differentiable frozen-topology
+                solves; BC selections still resolve on the nominal points.
 
         Returns:
-            An :class:`cadjoint.fem.simulate.ElasticResult`.
+            A :class:`~cadjoint.fem.result.SimulationResult` (also stored
+            as ``last_result``).
         """
+        from cadjoint.fem.result import SimulationResult
         from cadjoint.fem.simulate import elastic_solve
 
         fixed = [bc for bc in self.bcs if isinstance(bc, Fixed)]
         tractions = [bc for bc in self.bcs if isinstance(bc, Traction)]
         if not fixed:
             raise ValueError("An elastic study needs at least one Fixed BC to solve.")
-        field_fn = _as_sdf(sdf)
-        if mesh is None:
-            mesh = sdf_to_hex_mesh(field_fn, _study_grid(self))
-        _check_resolvable(self.bcs, mesh)
-        return elastic_solve(
-            mesh,
+        sim_mesh, hex_mesh = _solve_mesh(self, sdf, mesh)
+        _check_resolvable(self.bcs, hex_mesh)
+        solution = elastic_solve(
+            hex_mesh,
             youngs=float(self.youngs),
             poisson=float(self.poisson),
             dirichlet=[bc.nodes for bc in fixed],
             tractions=[(bc.nodes, bc.vector) for bc in tractions],
             backend=backend,
+            points=points,
         )
+        result = SimulationResult(
+            name=self.name,
+            kind="elastic",
+            field="von_mises",
+            solution=solution,
+            sim_mesh=sim_mesh,
+        )
+        self.last_result = result
+        return result

@@ -26,10 +26,12 @@ __all__ = [
     "FaceGroup",
     "GridSpec",
     "HexMesh",
+    "aspect_ratios",
     "corner_tet_volumes",
     "faces_from_nodes",
     "project_points",
     "recompute_points",
+    "scaled_jacobians",
     "sdf_to_hex_mesh",
     "select_faces",
 ]
@@ -210,6 +212,70 @@ def corner_tet_volumes(points: np.ndarray, cells: np.ndarray) -> np.ndarray:
     tets = corners[:, _CORNER_TETS]  # (C, 8, 4, 3)
     edges = tets[:, :, 1:, :] - tets[:, :, :1, :]  # (C, 8, 3, 3)
     return np.linalg.det(edges)
+
+
+# The twelve edges of a VTK hex (bottom ring, top ring, verticals).
+_HEX_EDGES = np.array(
+    [
+        (0, 1),
+        (1, 2),
+        (2, 3),
+        (3, 0),
+        (4, 5),
+        (5, 6),
+        (6, 7),
+        (7, 4),
+        (0, 4),
+        (1, 5),
+        (2, 6),
+        (3, 7),
+    ],
+    dtype=np.int64,
+)
+
+
+def scaled_jacobians(points: np.ndarray, cells: np.ndarray) -> np.ndarray:
+    """Per-element scaled Jacobian quality metric of each hex.
+
+    At each of the eight corners the Jacobian determinant (the corner-tet
+    volume of :func:`corner_tet_volumes`) is normalized by the product of
+    the lengths of the three edges meeting at that corner; the element value
+    is the minimum over its corners.  A perfect cube scores ``1.0``; values
+    approach ``0`` as corners flatten and turn negative on inversion.
+
+    Args:
+        points: Vertex positions, ``(N, 3)``.
+        cells: HEX8 connectivity, ``(C, 8)``.
+
+    Returns:
+        Scaled Jacobian per cell, shaped ``(C,)``, in ``[-1, 1]``.
+    """
+    corners = points[cells]  # (C, 8, 3)
+    tets = corners[:, _CORNER_TETS]  # (C, 8, 4, 3)
+    edges = tets[:, :, 1:, :] - tets[:, :, :1, :]  # (C, 8, 3, 3)
+    determinants = np.linalg.det(edges)  # (C, 8)
+    lengths = np.linalg.norm(edges, axis=-1)  # (C, 8, 3)
+    denominator = np.prod(lengths, axis=-1)  # (C, 8)
+    return np.min(determinants / np.maximum(denominator, 1e-30), axis=1)
+
+
+def aspect_ratios(points: np.ndarray, cells: np.ndarray) -> np.ndarray:
+    """Per-element edge aspect ratio of each hex.
+
+    The ratio of the longest to the shortest of the twelve element edges.
+    A perfect cube scores ``1.0``; larger is worse.
+
+    Args:
+        points: Vertex positions, ``(N, 3)``.
+        cells: HEX8 connectivity, ``(C, 8)``.
+
+    Returns:
+        Aspect ratio per cell, shaped ``(C,)``, at least ``1.0``.
+    """
+    corners = points[cells]  # (C, 8, 3)
+    vectors = corners[:, _HEX_EDGES[:, 1]] - corners[:, _HEX_EDGES[:, 0]]  # (C, 12, 3)
+    lengths = np.linalg.norm(vectors, axis=-1)  # (C, 12)
+    return lengths.max(axis=1) / np.maximum(lengths.min(axis=1), 1e-30)
 
 
 def _boundary_face_rows(cells: np.ndarray) -> np.ndarray:
