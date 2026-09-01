@@ -82,6 +82,23 @@ uv run pytest tests/fem tests/meshing -q                     # gradient + parity
 uv run cadjoint-viewer --open                                # the CAD app itself
 ```
 
+## Provenance (what was built when)
+
+cadjoint's geometry foundation predates the hackathon: the repo started
+2026-01-19, and `main` as of 2026-07-31 contained the SDF primitive kernel,
+the sketch/constraint system, and the WebGPU viewer shell — the pre-existing
+library this entry composes with, in the same sense every entry composes with
+jax-fem, CalculiX, or tesseract-core itself.
+
+**Everything this submission claims was written during the hackathon window
+(Aug 3–31 AoE), verifiable commit-by-commit in git history on this branch:**
+the differentiable meshing pipeline (edge detection → dual contouring →
+exports), the FEM layer and all five Tesseracts, the CalculiX integration
+including the ccx 2.23 sensitivity correction, vertex-selection boundary
+conditions, the Rust kernel port, the surface-interpolation mesher VJP and
+its two-Tesseract validation, and the end-to-end bracket optimization. The
+whole repo is licensed Apache 2.0.
+
 ## More
 
 The interactive playground (WebGPU viewer with four editing modes) declares
