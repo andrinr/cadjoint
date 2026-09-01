@@ -1059,7 +1059,508 @@ rejected; we take the *idea* that borders move with elevation and spend it on th
 | **the recommendation** | `research/design/surfaces/9-plate-well-recommended.png` |
 | all nine panels side by side | `research/design/surfaces/contact-sheet-panels.png` |
 | the banding test | `research/design/surfaces/banding-test.png` |
+| the character study (§16) | `research/design/playful/` |
 
 The derivation scripts (`palette.mjs`, `accent.mjs`) and the standalone HTML
 mockups live in the scratchpad workspace; every number quoted above is reproducible
 from them.
+
+---
+
+## 16. Character: where the personality lives
+
+*Third pass. §3 fixed the hue, §14 fixed the surfaces, and between them they
+produced a language that is correct and severe. The criticism that prompted this
+section — "it lacks personality" — is fair, and the reason is diagnosable: the
+first two passes spent all of their attention on **static panels**, which is the
+one part of this product that is like every other tool. Nothing had been asked of
+the three things that are not: an optimizer that morphs a shape while its
+objective falls, gradients that run backward through the program, and an
+instrument lineage that is genuinely playful in real life.*
+
+*So: no constraint from §3, §10 or §14 is overturned here. **Character is found in
+time and in precision, not in colour.** Six ideas, rendered and animated in
+`research/design/playful/`; two rejected with measurements.*
+
+### 16.1 The one amendment, and the argument for it
+
+§8 says **numbers must never animate**, because "a tweened number displays values
+that were never true." That rule is right and it stays. But it does not apply to
+what the tape does, and the distinction matters enough to write down:
+
+> **Replay is not animation.** Playing a recorded trajectory back is not tweening
+> — every frame shows a value the optimizer actually held at step *k*. The rule
+> forbids inventing intermediates between two true values; it does not forbid
+> showing a sequence of true values in the order they occurred. A tape may
+> therefore run the objective, the parameters and the geometry through forty
+> real states at twelve states per second, and it is showing *more* truth than a
+> static end-state does, not less.
+>
+> The test is mechanical: **may this frame be exported as a row of the run log?**
+> If yes it is replay. If no it is a tween, and it is forbidden.
+
+Everything else in §8 survives intact: a *live* value still replaces instantly,
+and §16.8's ballistics apply only to needles, bars and rules — never to digits.
+
+### 16.2 THE TAPE — the trajectory, played
+
+`research/design/playful/1-tape.png` · **`1-tape.gif`**
+
+**Thesis:** the optimizer is the product's whole argument and it is currently a
+sparkline. Make the run a scrubbable tape: the geometry morphs, the objective
+curve draws itself, each parameter walks its own machinist's rule, and the source
+literals rewrite as it goes.
+
+- **Trigger.** A run completes, or the Optimize tab is opened on a run that has a
+  tape. Autoplay once; thereafter scrub.
+- **Rate.** 12 steps/s (83 ms per recorded step). Runs longer than ~60 steps hold
+  the *total* at ≈3.4 s by dropping frames; never exceed 25 steps/s, past which
+  the shape reads as flicker rather than as morph.
+- **The strip.** One tick per recorded step across the card width: `#37343d`
+  unplayed, `line-strong` played, `ink` at 3px and full height for the live step.
+  Every 10th tick 72% height, the rest 44%. Dragging it **snaps to the nearest
+  step** — the scrubber is detented, and it never lands between two real states.
+- **The trace.** 292 × 66 inside the card. Graticule 10 × 4 divisions at
+  `#37343d`; the two centre axes carry five subdivisions per division at
+  `#4a474f` and nothing else does (this is the real Tektronix arrangement, §16.9).
+  Trace 2.4px `ink`, drawn only as far as played. A writing head: 2px
+  `line-strong` full-height cursor plus a 3.4px `ink` dot at the live sample.
+- **The travel rules.** One per parameter, 292 × 14, spanning the parameter's
+  declared bounds: 20 minor divisions with every fifth major (8px vs 4px), the
+  interval swept so far as a 3px `ink-3` bar on the track, the start value as an
+  11px `ink-3` tick, the live value as a 17px `ink` tick. This is a machinist's
+  rule, not a slider — there is no thumb, no fill, and no track colour.
+- **Ghosting, not blur.** The last five recorded envelopes at k−3 … k−15, top
+  faces only, 1.6px `#edecef` at α 0.25 / 0.20 / 0.15 / 0.10 / 0.05, drawn
+  **after** the field. White is above both ramps' entire range (§3.4-4), so a
+  ghost can never be misread as a temperature. Ghosts exist only while the tape
+  is moving or being scrubbed; at rest there are none. (Blur was built and
+  measured; see §16.10.)
+- **Type.** The objective is the one place editorial contrast is earned: 30px
+  mono `ink` against a 9px tracked `ink-3` label. §14.11 rejected "one very large
+  number per panel" as a dashboard gesture, and that rejection stands for
+  *panels*; a 30px number is licensed **only** on the objective of a live or
+  replayed optimization, because that number is the thing the run is about.
+- **Reduced motion.** No autoplay. The tape renders at its final step, the whole
+  trace drawn and the strip fully played. Scrubbing still works — it is
+  user-driven, not motion.
+
+**Cost.** One canvas redraw per step, which the viewport does anyway; the panel
+work is three 292px canvases. Nothing scales with element count, so the 500-element
+budget is untouched. The real cost is upstream: the trajectory has to be *recorded*
+— parameters, objective and gradient per step — and kept.
+
+**Verdict: ship. This is the single biggest opportunity and it survives being
+watched.** The one honest caveat: with a fixed camera the ghosts are only legible
+because this shape grows monotonically. On a trajectory that oscillates they will
+overlap into hash, and the fallback is to ghost the *bounding envelope of the last
+five steps* as one outline rather than five.
+
+### 16.3 THE GRATICULE — the viewport becomes an instrument face
+
+`research/design/playful/3-graticule.png` · **`3-detent.gif`**
+
+**Thesis:** the viewport currently has no scale on it at all. Give it a real one,
+in the Tektronix idiom, and the precision *is* the personality.
+
+- **The graticule.** 10 horizontal × 8 vertical divisions, 1px at `#1e1d22`,
+  drawn **behind** the geometry so the part occludes it and it can never compete
+  with the field. The two centre axes — and only they — carry five subdivisions
+  per division at `#332f38`, arms 5px (9px on every fifth). Four 26px corner
+  brackets at `#413e47`, 2px: the frame stated four times rather than drawn as a
+  box.
+- **The gain readout.** Top-left, never moves:
+  `H 10.0 mm/div   V 10.0 mm/div   VIEW ISO · +X+Y+Z`. 9px tracked `ink-3` key,
+  12px mono `ink-2` value.
+- **The detent.** Zoom snaps on a **1-2-5 ladder** (20 / 10 / 5 / 2 mm/div …) over
+  160 ms on `cubic-bezier(0.2, 0, 0, 1)`, so one division is always an exact,
+  stateable number of millimetres. The readout changes **at** the detent crossing,
+  never between — it is never a lie mid-gesture. Free zoom stays available on a
+  held modifier, and while off-detent **every affected readout is prefixed `>`**,
+  which is exactly what a 2465 does with an uncalibrated scale factor.
+- **The title block.** Bottom-right, ASME Y14.100's placement. Five rows,
+  62px key / 136px value, 1px `line` rules: SCENE / STUDY / MESH / SOLVER / REV.
+  9px tracked `ink-3` keys, 10px mono `ink-2` values, `—` where a field is empty.
+  It lives in dead corner space and costs nothing at density.
+- **The legend gains percentiles.** P10 and P90 ticks of the *actual* field
+  distribution on the ramp bar, so the reader can see where the data lives inside
+  the domain. This is the ramp doing more work, not decoration.
+- **The probe.** White-hot 3.5px dot with a 1.5px `surface-void` halo, a 1px
+  leader in the drafting idiom, and the value on an opaque `surface-void` plate.
+
+**Cost.** One static canvas redrawn only on zoom. Zero per-element cost, zero
+per-frame cost. The only risk is the detent: quantized zoom is unusual in CAD, so
+ship free zoom as the default and the detent behind a modifier or a preference —
+the readout is honest either way, which is the point of the `>`.
+
+**Verdict: ship first.** It is the cheapest change that most alters the character
+of the whole screen, and it fixes an actual gap (no spatial scale anywhere).
+
+### 16.4 THE FILL — a run that says what it is doing
+
+`research/design/playful/4-fill.png` · **`4-fill.gif`**
+
+**Thesis:** a 30-second solve is currently a spinner. Replace it with five words
+that light in order and a field that fills outward from its own boundary
+conditions.
+
+- **Annunciators.** Five equal cells across the card: `COMPILE  MESH  ASSEMBLE
+  SOLVE  ADJOINT`. 9px mono at 0.13em. Unlit `#57555e` on a 2px `#2e2c34` top
+  rule; live `ink` on a 2px `ink` rule; completed `ink-3` on `line-strong`. The
+  legend words are always allocated and never reflow — this is the HP annunciator
+  strip, and its whole virtue is that the layout does not move.
+- **The mesh builds.** Bands below the front are drawn; bands above are 1.4px
+  `surface-hover` wireframe. Bottom-up, over the real duration of the meshing
+  stage.
+- **The solve fills.** The same front, now separating solved field from unsolved
+  wireframe, rising from the flux boundary. This is a *reading*: an iterative
+  solve genuinely converges outward from its boundary conditions, so the wipe is
+  not a loading bar wearing a costume.
+- **The residual is a decade rule**, nine decades 1e−1 → 1e−10 with a major tick
+  per decade, a 3px `ink-3` bar and a 14px `ink` head. The values are the solver's
+  real iterates, replaced instantly. A percentage bar would be a fabrication;
+  nobody knows what percent of a CG solve is done.
+- **The RUN key.** No spinner anywhere. RUN becomes STOP, **drops the lime**
+  (a running job is not the identity), and its background breathes between
+  `surface-control` and `surface-hover` on a 1200 ms sine. That is the only moving
+  thing on screen, which is exactly what §8 allows.
+- **Reduced motion.** The annunciators still light in sequence — that is
+  information, not motion. The front advances one stage-step at a time instead of
+  continuously, and the key stops breathing.
+
+**Cost.** The pipeline has to emit stage transitions and a residual stream. The
+front is one extra comparison per band in the renderer.
+
+**Verdict: ship.** It replaces the worst thirty seconds in the app, and the fill
+is genuinely nice to watch without being a distraction, because it is monotone and
+finite.
+
+### 16.5 THE FLAG — staleness reported by presence
+
+`research/design/playful/6-flag.png` · `6-flag-detail.png`
+
+**Thesis:** an aircraft OFF flag is spring-loaded *in*; only a good signal holds
+it out, so a dead instrument cannot hide its own flag. A greyed number can be
+misread as a number. A covered one cannot.
+
+- **The plate.** A stale or unavailable value is replaced, **in its own slot**, by
+  an opaque 45° hatch: `#4a4750` over `#211f25` at 2.5px stripes, 1px
+  `line-strong` border, exactly the width the value column occupies. Never grey
+  the value. Never remove the row — a missing row says nothing at all.
+- **UNCAL.** When any auto-coupled input is pinned by hand (mesh size, a bound, a
+  time step), the *result region itself* carries an `UNCAL` annunciator — 9px
+  tracked `ink` in a 1px `ink` box — and the viewport carries `MEAS UNCAL`
+  top-right until it is re-coupled. The plot never silently lies.
+- **Hatched bounds.** On a parameter rule, an unmanufacturable interval is drawn
+  as 45° hatch clipped to the track, not as a shortened track. A barber pole says
+  *you may not go here*; a missing region says nothing.
+- **The trend stub.** From the live sample, a six-step projection of the current
+  rate: 2px dashed `ink-3` at `[7, 6]`, with a 5px cross tick where it lands. It
+  is **absent whenever the rate is below half the last displayed digit** — and
+  that absence is the signal. A stub on screen means "still moving"; no stub means
+  "converged", with no extra label.
+
+**Cost.** Effectively none. Hatch is a `repeating-linear-gradient`; the trend stub
+is two line segments.
+
+**Verdict: ship, and ship the hatch plate even if nothing else in §16 lands.**
+This is a correctness feature wearing a character costume, which is the best kind.
+
+### 16.6 BACKWASH — the adjoint pass, drawn as order
+
+`research/design/playful/2-backwash.png` · **`2-backwash.gif`**
+
+**Thesis:** `cadjoint` = CAD + adjoint, and nothing in the UI expresses
+reverse-mode. Direction C tried to draw the gradient as bars and failed for
+competing with the field. The fix is to stop drawing the *quantity* and draw the
+**direction**: one wavefront that runs backward along the chain, lighting each
+station in reverse order, drawing no path at all.
+
+- **Trigger.** A solve or optimizer step completes and an adjoint pass runs.
+- **One wavefront position `u`**, 0 → 1.16 over **720 ms, linear**. A wavefront
+  has a speed, not an easing.
+- **Station brightness.** 0 before arrival; 1 at arrival; decaying linearly to the
+  station's rest level over Δu = 0.16 (≈100 ms).
+- **Stations, in adjoint order:** the objective value → the three ∂J/∂p rows →
+  the boundary conditions in reverse listing order → the study scalars → the BC
+  node sets in the viewport (white-hot 3.6px dots with a 1px `surface-void` halo)
+  → the marked editor lines, **walked upward** → the three `Free(...)` literals.
+- **The mark is one device everywhere:** 2px `ink` on the element's left edge
+  (gutter-side in the editor) plus the row background at
+  `rgba(237,236,239, 0.11 × brightness)`. §8 already licenses a 160 ms row flash
+  to mark a change; this is that, sequenced.
+- **Rest level 0 everywhere except free-parameter lines**, which keep a permanent
+  0.34 gutter mark. That is §13's "take C's gutter mark, and only that", and it is
+  the half of this idea that is durable.
+- **Line budget: at most 14 marked lines**, and only lines carrying a free
+  parameter or a differentiated call. §13's warning holds — ten marked lines is
+  information, twenty is wallpaper.
+- **The last beat is the product.** When the wave reaches the literals they
+  rewrite, with a 160 ms `rgba(237,236,239,0.30)` row flash. The optimizer writing
+  its own source is the thesis of the whole application; it should be the last
+  thing the eye sees.
+- **Reduced motion.** No wave. The end state in one frame: gutter marks on the
+  free-parameter lines, gradients filled in, literals rewritten with a two-frame
+  flash. Causality survives as an ordering in the DOM, not as a movement.
+
+**Cost.** One CSS custom property per station per frame for 720 ms, once per
+adjoint pass. Nothing scales with element count.
+
+**Verdict: ship the gutter mark now, defer the wave.** Having watched the GIF
+several times: **this is the idea that is more fun to describe than to watch.** As
+a mechanism it is exactly right and the ordering genuinely reads backward, but at
+1× it is twenty-odd small flashes in sequence, and it lands closer to "busy" than
+to "wave". The permanent gutter mark on free-parameter lines carries most of the
+meaning for none of the motion, and it is what I would build first. Revisit the
+wave only once the mark has shipped and the marked-line set is proven to stay
+under fourteen.
+
+### 16.7 FIRST RUN — an empty app that is still an instrument
+
+`research/design/playful/5-first-run.png` · `5-first-run-detail.png` · `5-mark.gif`
+
+**Thesis:** an empty scope is not a blank screen; it is a ruled screen waiting for
+a trace. Empty states are where an app shows it has a soul at zero cost to density,
+and today they are plain sentences.
+
+- **The empty viewport keeps its instrument.** Graticule drawn, gain readout
+  present but prefixed `>` (there is nothing to calibrate against), title block
+  present with `—` in every row it cannot fill. The legend bar becomes a 45° hatch
+  at `#26242b`/`#1b1a1f` with `—` endpoints — the same "no data" texture as §16.5,
+  so the vocabulary is one thing and not two.
+- **Empty-state copy has a form.** Name the missing precondition **in the language
+  of the program** (anything that appears in the source is `mono`), then exactly
+  one clause of dry aside, then the action as a 9px tracked mono line. Three that
+  survived reading them back:
+
+  > **Studies · none** — A study needs a mesh and at least one `Dirichlet`.
+  > *Without one the stiffness matrix is singular, and CalculiX will point that out
+  > less politely than this panel does.*
+
+  > **Optimize · none** — Three parameters are declared `Free` and nothing
+  > differentiates them yet. *Name an objective and the tape starts recording.*
+
+  > **No geometry** — `scene.py` declares three free parameters and no solid. *Add
+  > a body, or press run and watch nothing happen very accurately.*
+
+  The rule that keeps this from becoming cute: **the aside must be true and must
+  teach something.** "Singular stiffness matrix" is a real failure a user will
+  meet. Delete any sentence that is only a joke.
+- **The mark.** On session wake, the `cj` mark exercises its own glyph set once —
+  seven glyphs at 80 ms, 560 ms total — then settles. This is a nixie
+  anti-poisoning routine, which is maintenance rather than ornament, and that is
+  the only way ornament survives a system this strict. **Once per session**, never
+  on tab or mode switches, and not at all under reduced motion. If it ever feels
+  like a logo animation, it is too long; the whole budget is 560 ms.
+
+**Cost.** None. This is HTML and one 560 ms text swap.
+
+**Verdict: ship. Cheapest personality in the document.**
+
+### 16.8 The settle law — where ballistics are allowed
+
+One cross-cutting rule, because three of the six ideas want to move a mark toward
+a value:
+
+1. **Needles, bars and rules may settle. Digits may not.** A bar is not spelling
+   anything, so an intermediate position is an approximation; a digit mid-roll is
+   a wrong number.
+2. **Ballistics are VU:** 300 ms to 99% of the final value, with an overshoot of
+   1.0–1.5%; τ ≈ 160 ms to 63%. Use it for the residual head, the travel rule's
+   live tick when a value is dragged, and the legend's percentile ticks.
+3. **Overshoot budget = half the displayed precision.** This is ANSI C39.1's
+   definition of *dead-beat* — critical damping is where overshoot "does not
+   exceed an amount equal to one half the rated accuracy of the instrument". It
+   makes overshoot **computable** instead of a taste call: a bar under a value
+   shown to two decimals may overshoot by 0.005 of its range and no more.
+4. **Peak marks are asymmetric (PPM):** attack ≈10 ms so a single bad Newton
+   iteration is never missed, decay ≈8.6 dB/s so the excursion stays readable for
+   two or three seconds. Applies to max stress, max residual, worst jacobian.
+5. **One easing family still.** `cubic-bezier(0.2, 0, 0, 1)` for anything
+   arriving; the second-order settle above is not a second easing family, it is a
+   physical model, and it is confined to the four marks named in (2) and (4).
+
+And one rule inherited from Braun, restated in this language's terms:
+
+> **One element per view may break the system, and it is always either the thing
+> you act on or the thing that is moving right now.** The ET 66 spends its single
+> yellow key on `=`. Since we have no hue to spend, the break is spent in
+> **luminance, length, plane or shape — one of those four, once per view.** In
+> §16.2 it is the 30px objective; in §16.4 it is the breathing key; in §16.5 it is
+> the hatch plate. If a view has two breaks, one of them is wrong.
+
+### 16.9 What was looked at
+
+Primary sources, since the point of this section is to borrow *mechanisms* rather
+than vibes:
+
+- **Tektronix 2213 operator's manual** — "internally marked on the faceplate…
+  eight vertical and ten horizontal major divisions. Each major division is
+  divided into five subdivisions"; the BEAM FIND momentary control; "to obtain a
+  calibrated deflection factor, the VOLTS/DIV variable control must be in detent."
+  `users.physics.unc.edu/~sean/Phys351/techresource/docs/2213%20User%20Manual.pdf`
+- **Tektronix 475A data sheet** — "8 × 10 cm display. Horizontal and vertical
+  centerlines further marked in 0.2 cm increments" — i.e. the minor ticks live
+  **only** on the centre axes. `nscainc.com/wp-content/uploads/pdf/T_475A.pdf`
+- **Tektronix 2465 manual** — the CRT readout prefixes an uncalibrated scale
+  factor with `>`. `manualslib.com/manual/1400395/Tektronix-2465.html?page=33`
+- **HP 5245L manual (1963)** — "annunciator" as a spec-table term: "total width
+  of 8 digit display including illuminated units annunciator and auto-positioned
+  decimal point indication". `kennethkuhn.com/hpmuseum/scans/hp5245l.pdf`
+- **HP 3478A manual** — "The 12 character alphanumeric display includes 12
+  dedicated annunciators"; "the right most digit on the display blinks (showing
+  that the display is updated)."
+  `manualslib.com/manual/1016815/Hp-3478a.html?page=21`
+- **HP 8566B operating manual** — "If the amplitude or frequency becomes
+  uncalibrated, 'MEAS UNCAL' appears in the right-hand side of the graticule";
+  graticule/annotation/trace as independently blankable layers.
+  `research.physics.illinois.edu/bezryadin/labprotocol/8566BOperating_ProgrammingManual.pdf`
+- **Allen Inhelder, HP Measure, May 1965** — "Aesthetics are important to us, but
+  everything we do must be tempered by the practical aspects of the problem."
+  `hparchive.com/measure_magazine/HP-Measure-1965-05.pdf`
+- **V&A, Braun ET 66** — the eye is "drawn to the yellow 'equals' button, the most
+  frequently used function"; number keys polished, function keys matt, so the
+  split survives in monochrome. `collections.vam.ac.uk/item/O1360553/`
+- **Vitsœ, Rams' ten principles** — principle 8, "thorough down to the last
+  detail… nothing must be arbitrary or left to chance", is what licenses spending
+  the character budget on precision. `vitsoe.com/us/about/good-design`
+- **FAA-H-8083-15B** — the OFF flag: "the device that indicates a usable or an
+  unreliable signal may be an 'OFF' flag. It retracts from view when signal
+  strength is sufficient." **AC 25-11B §6.2.1.7:** "Failure flags should be
+  presented in the location of the information they reference or replace."
+  `faa.gov/sites/faa.gov/files/regulations_policies/handbooks_manuals/aviation/FAA-H-8083-15B.pdf`
+- **AC 23.1311-1C §17.7(b)** — "Incorporate a red arc or red barber pole extending
+  from V_NE or V_MO upward to the end of the airspeed tape" — i.e. 45° hatch is
+  the standard way to draw a forbidden region.
+  `faa.gov/documentLibrary/media/Advisory_Circular/AC_23_1311-1C.pdf`
+- **Garmin G1000 Pilot's Guide** — the trend vector: "the end of the trend vector
+  displays approximately what airspeed will be reached in six seconds if the
+  current rate of acceleration is maintained. **The trend vector is absent if the
+  speed remains constant.**" `wayman.edu/files/G1000_CessnaNavIII_PilotsGuide.pdf`
+- **Nixie cathode poisoning** — the prevention duty cycle: "for every 60 seconds
+  when the tube is on, exercise every other digit for 0.2 s", implemented in
+  practice as a "slot machine" routine.
+  `docs.daliborfarny.com/nixie-tubes/1/en/topic/cathode-poisoning-prevention-routine`
+- **ASME Y14.5-2018 §4.3.2** — "a dimension shall be expressed to the same number
+  of decimal places as its tolerance." Decimal places *are* the tolerance.
+  **ASME Y14.100-2017** for the lower-right title block.
+- **IEC 60268-17 / ITU-R BS.2054-4** — VU ballistics: 99% of full-scale deflection
+  in 300 ms, overshoot 1.0–1.5%, 63% at ≈160 ms. **IEC 60268-10** for PPM
+  asymmetry (attack τ 1.7 ms, fallback 24 dB in 2.8 s ≈ 8.6 dB/s).
+  `itu.int/dms_pub/itu-r/opb/rep/R-REP-BS.2054-4-2014-PDF-E.pdf`
+- **ANSI C39.1-1981, via Simpson's glossary** — dead-beat: critical damping is
+  where "overshoot is present but does not exceed an amount equal to one half the
+  rated accuracy of the instrument."
+  `simpsonelectric.com/technical-support/glossary-of-terms/`
+- **Grether (1949) / NRL (1965) on the three-pointer altimeter** — over 7 seconds
+  to read and >11% errors of 1 000 ft or more; misread roughly eight times more
+  often than better designs. The standing argument against any compact
+  multi-ring convergence dial.
+
+Three things the earlier framing assumed that the sources **do not support**, and
+which were dropped: there is no published HP standard assigning colours to
+functional groups (the only consistent rule is blue = the shift layer, and
+grouping is done by layout and named zones — which is a gift to an achromatic
+system); no primary HP source names Bauhaus, Braun or Rams as an influence; and
+there is no "dot at 12" as a named Braun device — the documented differentiator on
+Lubs' dials is tick **length**, not a dot.
+
+### 16.10 Rejected, with the measurement
+
+`research/design/playful/7-rejected.png`
+
+**A · Motion blur on the morphing geometry.** Built exactly as proposed: an
+accumulation buffer of five filled steps at falling alpha under the live frame.
+Measured against the true frame, pixel for pixel, over the part:
+
+```
+mean ΔE76  6.2      p95 11.0      max 21.9
+97 % of on-part pixels are above JND
+and it paints 54 % of the part's area again OUTSIDE the true silhouette
+```
+
+The smear averages five different viridis samples into one pixel, so the band is a
+colour **no node ever had**. Colour is a reading; this one reads a temperature
+that does not exist. **Rejected on correctness, not on taste** — and note that
+ghosting (§16.2) delivers the same sense of travel with zero colour error, because
+a 1px white outline is not a field value.
+
+**B · Odometer / split-flap digits on a live value.** There is a real mechanism to
+copy — a Geneva drive rolls only the column that is carrying and holds the higher
+columns in dwell, which is why a real odometer shows one half-rolled digit and not
+five. But every frame of the roll shows a value that is partly one number and
+partly another, on a screen where people read tolerances. **§8's "numbers never
+animate" is right and stays.** The ballistics belong on a needle or a bar, where
+nothing is being spelled — which is what §16.8 does with them.
+
+**C · The 0 / 10 / 90 / 100 % rise-time markers** on the left edge of the
+graticule. Built, rendered, removed. On a scope they are a *normalisation ritual*
+for a waveform — you position the trace so its zero touches 0% and its top touches
+100%, then measure between 10% and 90%. There is no analogue for a 3D field on a
+spatial axis, so on our graticule they are four labelled ticks that mean nothing.
+Cited here only so nobody adds them back for the look of the thing. The idea does
+have a home — as a "normalise to frame" gesture on the *objective trace*, which
+would make two runs comparable by eye — and that is worth its own pass.
+
+**D · Gradient magnitude as bars in the panel.** Already rejected in §12/C for
+competing with the field legend; nothing found here rehabilitates it. §16.6 shows
+what the idea should have been: draw the **direction**, in achromatic marks, and
+let the magnitude be a signed number in mono.
+
+### 16.11 Recommendation, ordered by delight per unit of cost
+
+1. **THE GRATICULE + TITLE BLOCK** (§16.3). Static, zero per-frame cost, fixes a
+   real gap — the viewport has no scale on it today — and it is the single change
+   that most alters what the whole app feels like. Ship the graticule, the gain
+   readout and the title block together; ship the detent behind a modifier.
+2. **FIRST RUN, EMPTY STATES AND THE MARK** (§16.7). An afternoon. Personality is
+   cheapest where there is no data to get in the way of it.
+3. **THE FLAG** (§16.5). Nearly free, and the hatch plate is a correctness fix
+   first and a character move second. Ship the plate even if nothing else lands.
+4. **THE TAPE** (§16.2). The largest payoff in the document and the largest
+   upstream cost — the trajectory must be recorded and kept. Worth it: this is the
+   product's argument, animated.
+5. **THE FILL** (§16.4). Needs stage events and a residual stream from the
+   pipeline. Replaces the worst thirty seconds in the app.
+6. **BACKWASH** (§16.6) — **the permanent gutter mark only.** Defer the wave until
+   the mark has shipped; at 1× the wave reads busier than it reads backward, and
+   the mark carries most of the meaning for none of the motion.
+
+Two rules join §10's refusals:
+
+16. **No motion that changes a colour that is a reading.** Trails, ghosts and
+    fronts are achromatic or they are geometry-clipped; a field pixel is either
+    its true value or it is not painted.
+17. **No indeterminate progress.** A run reports the stage it is in, in words,
+    and a quantity that is genuinely known (a residual, an element count, a step
+    index). There is no spinner and no percentage of an unknowable whole.
+
+And one joins §11's lint checks:
+
+- `replayable` — any element whose text changes on more than two consecutive
+  animation frames must be able to name the recorded step its value came from.
+  A number that cannot is a tween.
+
+### 16.12 Files
+
+| what | where |
+| --- | --- |
+| the tape, still | `research/design/playful/1-tape.png` |
+| **the tape, playing** | `research/design/playful/1-tape.gif` |
+| the adjoint pass, still | `research/design/playful/2-backwash.png` |
+| **the adjoint pass, running backward** | `research/design/playful/2-backwash.gif` |
+| the graticule and title block | `research/design/playful/3-graticule.png` |
+| **the zoom detent, 20 → 10 → 5 → 10 → 20 mm/div** | `research/design/playful/3-detent.gif` |
+| a solve, mid-fill | `research/design/playful/4-fill.png` |
+| **the whole run: compile → mesh → assemble → solve → adjoint** | `research/design/playful/4-fill.gif` |
+| first run | `research/design/playful/5-first-run.png` |
+| first run, viewport detail | `research/design/playful/5-first-run-detail.png` |
+| **the mark's wake cycle** (shown twice; it runs once per session) | `research/design/playful/5-mark.gif` |
+| flags, UNCAL and the trend stub | `research/design/playful/6-flag.png` |
+| the same, panel detail | `research/design/playful/6-flag-detail.png` |
+| **what was rejected, and the numbers** | `research/design/playful/7-rejected.png` |
+
+Every screen above is the same 1500 × 940 layout as §12's three directions, on
+§14.8's PLATE-WELL surfaces, rendered through Chromium at DPR 2. The mockups and
+the measurement scripts live in the scratchpad workspace; the ΔE figures in
+§16.10 come from `measure-blur.html` plus a Lab diff over the two renders.
