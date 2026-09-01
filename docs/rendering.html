@@ -6,6 +6,7 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
+<meta name="description" content="Predictable sphere tracing for still images, and StableHLO compilation to WGSL.">
 
 <title>Forward Renderer – cadjoint</title>
 <style>
@@ -133,13 +134,37 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <a class="nav-link" href="../docs/getting-started.html"> 
 <span class="menu-text">Get Started</span></a>
   </li>  
-  <li class="nav-item">
-    <a class="nav-link active" href="../docs/rendering.html" aria-current="page"> 
-<span class="menu-text">Rendering</span></a>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-guides" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Guides</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-guides">    
+        <li>
+    <a class="dropdown-item" href="../docs/meshing.html">
+ <span class="dropdown-text">Differentiable Meshing</span></a>
   </li>  
+        <li>
+    <a class="dropdown-item" href="../docs/simulation.html">
+ <span class="dropdown-text">Simulation</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../docs/optimization.html">
+ <span class="dropdown-text">Optimization</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../docs/tesseracts.html">
+ <span class="dropdown-text">Tesseracts</span></a>
+  </li>  
+        <li><hr class="dropdown-divider"></li>
+        <li>
+    <a class="dropdown-item" href="../docs/rendering.html">
+ <span class="dropdown-text">Forward Renderer</span></a>
+  </li>  
+    </ul>
+  </li>
   <li class="nav-item">
     <a class="nav-link" href="../docs/viewer.html"> 
-<span class="menu-text">WebGPU Viewer</span></a>
+<span class="menu-text">Playground</span></a>
   </li>  
   <li class="nav-item dropdown ">
     <a class="nav-link dropdown-toggle" href="#" id="nav-menu-examples" role="link" data-bs-toggle="dropdown" aria-expanded="false">
@@ -169,6 +194,45 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
         <li>
     <a class="dropdown-item" href="../examples/constrained_optimization.html">
  <span class="dropdown-text">Constrained Optimization</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-research" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Research</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-research">    
+        <li>
+    <a class="dropdown-item" href="../research/differentiable-meshing-pipeline.html">
+ <span class="dropdown-text">Differentiable meshing pipeline</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/native-mesher.html">
+ <span class="dropdown-text">Native (Rust) dual-contouring core</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/fem-integration.html">
+ <span class="dropdown-text">FEM integration</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/tet-vs-hex.html">
+ <span class="dropdown-text">Tet vs hex meshing</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/end-to-end-optimization.html">
+ <span class="dropdown-text">End-to-end optimization</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/path-tracing.html">
+ <span class="dropdown-text">WebGPU SDF path tracing</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/simulator-ecosystem.html">
+ <span class="dropdown-text">Simulator ecosystem survey</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/constraints.html">
+ <span class="dropdown-text">Constraint system</span></a>
   </li>  
     </ul>
   </li>
@@ -202,6 +266,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <li><a href="#scene-and-quality-settings" id="toc-scene-and-quality-settings" class="nav-link active" data-scroll-target="#scene-and-quality-settings">Scene and quality settings</a></li>
   <li><a href="#rendering-modes" id="toc-rendering-modes" class="nav-link" data-scroll-target="#rendering-modes">Rendering modes</a></li>
   <li><a href="#quality-presets" id="toc-quality-presets" class="nav-link" data-scroll-target="#quality-presets">Quality presets</a></li>
+  <li><a href="#materials" id="toc-materials" class="nav-link" data-scroll-target="#materials">Materials</a>
+  <ul class="collapse">
+  <li><a href="#transparency-and-refraction" id="toc-transparency-and-refraction" class="nav-link" data-scroll-target="#transparency-and-refraction">Transparency and refraction</a></li>
+  </ul></li>
+  <li><a href="#shader-compilation" id="toc-shader-compilation" class="nav-link" data-scroll-target="#shader-compilation">Shader compilation</a></li>
+  <li><a href="#further-reading" id="toc-further-reading" class="nav-link" data-scroll-target="#further-reading">Further reading</a></li>
   </ul>
 </nav>
     </div>
@@ -213,6 +283,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h1 class="title">Forward Renderer</h1>
 </div>
 
+<div>
+  <div class="description">
+    Predictable sphere tracing for still images, and StableHLO compilation to WGSL.
+  </div>
+</div>
 
 
 <div class="quarto-title-meta">
@@ -228,7 +303,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 
 <p>cadjoint’s image renderer is designed for predictable forward rendering. It uses early-exit sphere tracing, screen-space silhouette reconstruction, finite-difference normals, Cook–Torrance GGX materials, soft shadows, and optional reflection and refraction rays.</p>
-<p>Geometry and constraints remain JAX-native and differentiable. Rendered pixels are intentionally not an inverse-rendering or optimization API.</p>
+<p>Geometry and constraints remain JAX-native and differentiable. Rendered pixels are intentionally not an inverse-rendering or optimization API — the gradients this project cares about run through <a href="../docs/meshing.html">meshing</a> and <a href="../docs/simulation.html">simulation</a>, not through visibility.</p>
 <section id="scene-and-quality-settings" class="level2">
 <h2 class="anchored" data-anchor-id="scene-and-quality-settings">Scene and quality settings</h2>
 <p>Use <code>Scene</code> for camera, lights, and environment data and <code>RenderSettings</code> for the performance/fidelity trade-off:</p>
@@ -247,7 +322,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="co"># Presets are immutable; override only what a scene needs.</span></span>
 <span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>mirror <span class="op">=</span> replace(RenderSettings.balanced(), reflect_steps<span class="op">=</span><span class="dv">64</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>The low-level <code>raymarch(sdf, ...)</code> function remains available for compact notebook calls.</p>
+<p><code>render_scene</code> returns a <code>(H, W, 3)</code> float array. The low-level <code>raymarch(sdf, ...)</code> function remains available for compact notebook calls, and <code>render_raymarched(...)</code> wraps it to display on a matplotlib axis.</p>
 <p>Each primary trace retains its closest approach to the scene. Rays that narrowly miss a surface receive screen-space coverage across <code>RenderSettings.silhouette_smoothing</code> pixels, which removes hard hit/miss outlines without restoring differentiable visibility or fixed-step tracing. Set the value to <code>0</code> when exact binary coverage is required.</p>
 </section>
 <section id="rendering-modes" class="level2">
@@ -262,11 +337,53 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="quality-presets" class="level2">
 <h2 class="anchored" data-anchor-id="quality-presets">Quality presets</h2>
-<ul>
-<li><code>draft</code>: shorter trace budgets, direct lighting, no secondary visibility, and one sample per pixel.</li>
-<li><code>balanced</code>: more trace and shadow steps with reconstructed silhouettes and 2×2 SSAA.</li>
-<li><code>high_quality</code>: tighter surface precision, more visibility samples, and 3×3 SSAA.</li>
-</ul>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Preset</th>
+<th>Trace steps</th>
+<th>Hit ε</th>
+<th>Shadow steps</th>
+<th>SSAA</th>
+<th>Default resolution</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>draft</code></td>
+<td>72</td>
+<td>1.5e-3</td>
+<td>0</td>
+<td>1×1</td>
+<td>200 × 200</td>
+</tr>
+<tr class="even">
+<td><code>balanced</code></td>
+<td>96</td>
+<td>1e-3</td>
+<td>32</td>
+<td>2×2</td>
+<td>200 × 200</td>
+</tr>
+<tr class="odd">
+<td><code>high_quality</code></td>
+<td>160</td>
+<td>5e-4</td>
+<td>64</td>
+<td>3×3</td>
+<td>400 × 400</td>
+</tr>
+</tbody>
+</table>
+<p><code>draft</code> is direct lighting with no secondary visibility; <code>balanced</code> adds soft shadows and reconstructed silhouettes; <code>high_quality</code> tightens surface precision and doubles the shadow budget. Reflection and refraction are off in all three and must be asked for explicitly.</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
 <p><img src="assets/rendering-quality.png" class="img-fluid figure-img"></p>
@@ -274,6 +391,93 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </figure>
 </div>
 <p>The presets are starting points rather than hidden modes. Every field is public, validated, and can be changed with <code>dataclasses.replace</code>.</p>
+</section>
+<section id="materials" class="level2">
+<h2 class="anchored" data-anchor-id="materials">Materials</h2>
+<p>Attach a <code>Material</code> to any primitive. It is queried per hit point during rendering, and <code>Union</code> blends materials smoothly across a blended boundary.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.render <span class="im">import</span> Material</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf.primitives <span class="im">import</span> Sphere</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>sphere <span class="op">=</span> Sphere(</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>    radius<span class="op">=</span><span class="fl">1.0</span>,</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>    material<span class="op">=</span>Material(</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>        color<span class="op">=</span>[<span class="fl">0.22</span>, <span class="fl">0.50</span>, <span class="fl">0.95</span>],</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>        roughness<span class="op">=</span><span class="fl">0.35</span>,</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>        metallic<span class="op">=</span><span class="fl">0.0</span>,</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>        opacity<span class="op">=</span><span class="fl">1.0</span>,</span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>        ior<span class="op">=</span><span class="fl">1.0</span>,</span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<section id="transparency-and-refraction" class="level3">
+<h3 class="anchored" data-anchor-id="transparency-and-refraction">Transparency and refraction</h3>
+<p>Set <code>opacity &lt; 1</code> for transparency. With <code>refract_steps=0</code> (the default) the surface simply fades toward the background. With <code>refract_steps &gt; 0</code> the renderer performs two-bounce Snell’s-law refraction: the primary ray bends into the material, an interior march finds the back face using <code>−sdf</code> as the distance field, and the ray bends back into air to continue through the rest of the scene. Schlick-Fresnel adds the edge highlight that brightens the rim of a glass sphere at grazing angles.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> jax.numpy <span class="im">as</span> jnp</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.render <span class="im">import</span> Material, raymarch</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf.boolean <span class="im">import</span> Union</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf.primitives <span class="im">import</span> Sphere</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf.transforms <span class="im">import</span> Translate</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>glass <span class="op">=</span> Sphere(radius<span class="op">=</span><span class="fl">1.0</span>, material<span class="op">=</span>Material(</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>    color<span class="op">=</span>[<span class="fl">0.92</span>, <span class="fl">0.97</span>, <span class="fl">1.0</span>], roughness<span class="op">=</span><span class="fl">0.05</span>, opacity<span class="op">=</span><span class="fl">0.04</span>, ior<span class="op">=</span><span class="fl">1.5</span>))</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>red_ball <span class="op">=</span> Translate(</span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>    Sphere(radius<span class="op">=</span><span class="fl">0.65</span>, material<span class="op">=</span>Material(color<span class="op">=</span>[<span class="fl">0.93</span>, <span class="fl">0.26</span>, <span class="fl">0.22</span>])),</span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>    offset<span class="op">=</span>jnp.array([<span class="op">-</span><span class="fl">1.1</span>, <span class="fl">0.5</span>, <span class="op">-</span><span class="fl">3.0</span>]),</span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>image <span class="op">=</span> raymarch(</span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>    Union((glass, red_ball), smoothness<span class="op">=</span><span class="fl">0.0</span>),</span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>    camera_pos<span class="op">=</span>jnp.array([<span class="fl">0.0</span>, <span class="fl">0.5</span>, <span class="fl">5.5</span>]),</span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>    resolution<span class="op">=</span>(<span class="dv">400</span>, <span class="dv">400</span>),</span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>    background_color<span class="op">=</span>jnp.array([<span class="fl">0.07</span>, <span class="fl">0.09</span>, <span class="fl">0.16</span>]),</span>
+<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a>    refract_steps<span class="op">=</span><span class="dv">48</span>,</span>
+<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a>    max_steps<span class="op">=</span><span class="dv">80</span>,</span>
+<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a>    aa_samples<span class="op">=</span><span class="dv">2</span>,</span>
+<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Material</th>
+<th><code>ior</code></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>air / disabled</td>
+<td>1.0</td>
+</tr>
+<tr class="even">
+<td>water</td>
+<td>1.33</td>
+</tr>
+<tr class="odd">
+<td>glass</td>
+<td>1.5</td>
+</tr>
+<tr class="even">
+<td>diamond</td>
+<td>2.42</td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="shader-compilation" class="level2">
+<h2 class="anchored" data-anchor-id="shader-compilation">Shader compilation</h2>
+<p>The same scene compiles to a standalone shader function. JAX traces distance and material evaluation, lowers both to StableHLO, and cadjoint emits the shader source from there — so the browser renders the identical field the Python renderer does.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.backends <span class="im">import</span> compile_scene_to_wgsl, compile_sdf_to_wgsl</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf.primitives <span class="im">import</span> Sphere</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>wgsl <span class="op">=</span> compile_sdf_to_wgsl(Sphere(radius<span class="op">=</span><span class="fl">1.0</span>))          <span class="co"># just `fn sdf`</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>scene_wgsl <span class="op">=</span> compile_scene_to_wgsl(Sphere(radius<span class="op">=</span><span class="fl">1.0</span>))  <span class="co"># + materials</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><code>compile_scene_to_wgsl</code> emits <code>sdf</code>, <code>material_base</code> (RGB + roughness), and <code>material_optics</code> (metallic + opacity + IOR + reflectivity) from one scene snapshot, ready to embed in a WebGPU renderer. This is exactly what <a href="../docs/viewer.html">the playground</a> does on every run.</p>
+</section>
+<section id="further-reading" class="level2">
+<h2 class="anchored" data-anchor-id="further-reading">Further reading</h2>
+<ul>
+<li><a href="../examples/rendering.html">Rendering notebook</a> — composition, quality presets, and hot reload</li>
+<li><a href="../docs/viewer.html">The playground</a> — the interactive WebGPU viewport and its progressive path tracer</li>
+<li><a href="../research/path-tracing.html">WebGPU SDF path tracing</a> — design and deliberate boundaries of the browser path tracer</li>
+</ul>
 
 
 </section>

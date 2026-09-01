@@ -6,9 +6,9 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="description" content="Edit cadjoint scenes in Python and render their generated WGSL live in WebGPU.">
+<meta name="description" content="A browser CAD app where the Python source is the only state — model, sketch, mesh, solve, and optimize in one window.">
 
-<title>WebGPU Viewer – cadjoint</title>
+<title>The Playground – cadjoint</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -134,13 +134,37 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <a class="nav-link" href="../docs/getting-started.html"> 
 <span class="menu-text">Get Started</span></a>
   </li>  
-  <li class="nav-item">
-    <a class="nav-link" href="../docs/rendering.html"> 
-<span class="menu-text">Rendering</span></a>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-guides" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Guides</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-guides">    
+        <li>
+    <a class="dropdown-item" href="../docs/meshing.html">
+ <span class="dropdown-text">Differentiable Meshing</span></a>
   </li>  
+        <li>
+    <a class="dropdown-item" href="../docs/simulation.html">
+ <span class="dropdown-text">Simulation</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../docs/optimization.html">
+ <span class="dropdown-text">Optimization</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../docs/tesseracts.html">
+ <span class="dropdown-text">Tesseracts</span></a>
+  </li>  
+        <li><hr class="dropdown-divider"></li>
+        <li>
+    <a class="dropdown-item" href="../docs/rendering.html">
+ <span class="dropdown-text">Forward Renderer</span></a>
+  </li>  
+    </ul>
+  </li>
   <li class="nav-item">
     <a class="nav-link active" href="../docs/viewer.html" aria-current="page"> 
-<span class="menu-text">WebGPU Viewer</span></a>
+<span class="menu-text">Playground</span></a>
   </li>  
   <li class="nav-item dropdown ">
     <a class="nav-link dropdown-toggle" href="#" id="nav-menu-examples" role="link" data-bs-toggle="dropdown" aria-expanded="false">
@@ -173,6 +197,45 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   </li>  
     </ul>
   </li>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-research" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Research</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-research">    
+        <li>
+    <a class="dropdown-item" href="../research/differentiable-meshing-pipeline.html">
+ <span class="dropdown-text">Differentiable meshing pipeline</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/native-mesher.html">
+ <span class="dropdown-text">Native (Rust) dual-contouring core</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/fem-integration.html">
+ <span class="dropdown-text">FEM integration</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/tet-vs-hex.html">
+ <span class="dropdown-text">Tet vs hex meshing</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/end-to-end-optimization.html">
+ <span class="dropdown-text">End-to-end optimization</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/path-tracing.html">
+ <span class="dropdown-text">WebGPU SDF path tracing</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/simulator-ecosystem.html">
+ <span class="dropdown-text">Simulator ecosystem survey</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/constraints.html">
+ <span class="dropdown-text">Constraint system</span></a>
+  </li>  
+    </ul>
+  </li>
   <li class="nav-item">
     <a class="nav-link" href="../reference/index.html"> 
 <span class="menu-text">API Reference</span></a>
@@ -200,13 +263,15 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#browser-playground" id="toc-browser-playground" class="nav-link active" data-scroll-target="#browser-playground">Browser playground</a>
-  <ul class="collapse">
-  <li><a href="#controls" id="toc-controls" class="nav-link" data-scroll-target="#controls">Controls</a></li>
+  <li><a href="#start-it" id="toc-start-it" class="nav-link active" data-scroll-target="#start-it">Start it</a></li>
+  <li><a href="#three-modes" id="toc-three-modes" class="nav-link" data-scroll-target="#three-modes">Three modes</a></li>
+  <li><a href="#modelling" id="toc-modelling" class="nav-link" data-scroll-target="#modelling">Modelling</a></li>
+  <li><a href="#simulate" id="toc-simulate" class="nav-link" data-scroll-target="#simulate">Simulate</a></li>
+  <li><a href="#rendering" id="toc-rendering" class="nav-link" data-scroll-target="#rendering">Rendering</a></li>
   <li><a href="#compilation-path" id="toc-compilation-path" class="nav-link" data-scroll-target="#compilation-path">Compilation path</a></li>
-  <li><a href="#path-tracing-mode" id="toc-path-tracing-mode" class="nav-link" data-scroll-target="#path-tracing-mode">Path-tracing mode</a></li>
-  </ul></li>
+  <li><a href="#a-live-example" id="toc-a-live-example" class="nav-link" data-scroll-target="#a-live-example">A live example</a></li>
   <li><a href="#jupyter-widget" id="toc-jupyter-widget" class="nav-link" data-scroll-target="#jupyter-widget">Jupyter widget</a></li>
+  <li><a href="#developing-the-ui" id="toc-developing-the-ui" class="nav-link" data-scroll-target="#developing-the-ui">Developing the UI</a></li>
   <li><a href="#troubleshooting" id="toc-troubleshooting" class="nav-link" data-scroll-target="#troubleshooting">Troubleshooting</a></li>
   </ul>
 </nav>
@@ -216,12 +281,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
-<h1 class="title">WebGPU Viewer</h1>
+<h1 class="title">The Playground</h1>
 </div>
 
 <div>
   <div class="description">
-    Edit cadjoint scenes in Python and render their generated WGSL live in WebGPU.
+    A browser CAD app where the Python source is the only state — model, sketch, mesh, solve, and optimize in one window.
   </div>
 </div>
 
@@ -238,126 +303,23 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </header>
 
 
-<p>cadjoint provides two interactive WebGPU workflows: a standalone browser playground for editing complete Python scenes and a compact widget for Jupyter notebooks.</p>
-<div class="callout callout-style-default callout-note callout-titled">
-<div class="callout-header d-flex align-content-center">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
+<p>The playground is a local browser application: a Python editor on the left, a live WebGPU viewport on the right, and a dock of panels that read and rewrite the program in the editor. It is the interactive face of the whole toolchain — the same <code>SimMesh</code>, <code>ThermalStudy</code>, and <code>Optimization</code> declarations that a script runs are the ones the panels edit.</p>
+<p>The single rule that makes it coherent: <strong>the Python source is the only state.</strong> Dragging a sketch vertex, adding a boundary condition, or accepting an optimized design all rewrite literals in the program. There is no hidden scene graph to drift out of sync, and anything whose literals cannot be rewritten — geometry built in a loop, or from a variable — still renders, but is read-only.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="../examples/assets/playground-model.png"><img src="../examples/assets/playground-model.png" class="img-fluid figure-img"></a></p>
+<figcaption>The playground in Model mode: the scene program on the left, the parametric heat sink rendered live on the right, and the declared cool-sink optimization in the side dock</figcaption>
+</figure>
 </div>
-<div class="callout-title-container flex-fill">
-Note
-</div>
-</div>
-<div class="callout-body-container callout-body">
-<p>WebGPU requires localhost or HTTPS and a browser/platform combination with an available GPU adapter. The viewer reports adapter, device, context, shader, and device-loss failures directly over the canvas. Mozilla currently enables WebGPU by default on Windows and Apple-silicon macOS; Linux support remains <a href="https://developer.mozilla.org/en-US/docs/Mozilla/Firefox/Experimental_features">Nightly-only</a>.</p>
-</div>
-</div>
-<p><link rel="stylesheet" href="assets/webgpu-viewer.css"></p>
-<div class="cadjoint-webgpu-demo" data-cadjoint-webgpu-viewer="">
-<canvas data-viewer-canvas="" aria-label="Interactive WebGPU rendering of the cadjoint orbital example">
-</canvas>
-<img data-viewer-fallback="" src="../examples/assets/webgpu_playground.png" alt="cadjoint playground with Python code on the left and a rendered scene on the right">
-<div class="cadjoint-webgpu-status" data-viewer-status="" aria-live="polite">
-Starting WebGPU…
-</div>
-<button class="cadjoint-webgpu-reset" data-viewer-reset="" type="button">Reset camera</button>
-<div class="cadjoint-webgpu-help">
-Drag to orbit · Scroll to zoom
-</div>
-</div>
-<script type="module" src="assets/webgpu-viewer.js"></script>
-<p>The canvas above is running the example scene directly in this page. Its shader was compiled from cadjoint through StableHLO to WGSL; drag the scene to orbit it and scroll to zoom. The documentation is static, so editing and executing Python stays in the local playground described below.</p>
-<section id="browser-playground" class="level2">
-<h2 class="anchored" data-anchor-id="browser-playground">Browser playground</h2>
-<p>From a development checkout, install cadjoint and start the local viewer:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> sync</span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run cadjoint-viewer <span class="at">--open</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>The module entry point works as well, and accepts a custom port:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> <span class="at">-m</span> cadjoint.viewer.playground <span class="at">--open</span> <span class="at">--port</span> 9000</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>The playground opens with a complete material example. Edit the Python on the left and press <strong>Run scene</strong> or <code>Ctrl+Enter</code> (<code>Cmd+Enter</code> on macOS) to update the preview. The final SDF must be assigned to a variable named <code>scene</code>:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.render <span class="im">import</span> Material</span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf.boolean <span class="im">import</span> Union</span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf.primitives <span class="im">import</span> Plane, Sphere</span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf.transforms <span class="im">import</span> Translate</span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>red <span class="op">=</span> Material(color<span class="op">=</span>[<span class="fl">0.8</span>, <span class="fl">0.035</span>, <span class="fl">0.015</span>], roughness<span class="op">=</span><span class="fl">0.42</span>)</span>
-<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>glass <span class="op">=</span> Material(color<span class="op">=</span>[<span class="fl">0.94</span>, <span class="fl">0.98</span>, <span class="fl">1.0</span>], opacity<span class="op">=</span><span class="fl">0.0</span>, ior<span class="op">=</span><span class="fl">1.5</span>)</span>
-<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>scene <span class="op">=</span> Union(</span>
-<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>    Translate(Sphere(<span class="fl">0.72</span>, material<span class="op">=</span>red), [<span class="op">-</span><span class="fl">0.8</span>, <span class="op">-</span><span class="fl">0.38</span>, <span class="fl">0.0</span>]),</span>
-<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>    Translate(Sphere(<span class="fl">0.58</span>, material<span class="op">=</span>glass), [<span class="fl">0.8</span>, <span class="op">-</span><span class="fl">0.5</span>, <span class="fl">0.15</span>]),</span>
-<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>    Plane(<span class="op">-</span><span class="fl">1.1</span>, material<span class="op">=</span>Material(color<span class="op">=</span>[<span class="fl">0.1</span>, <span class="fl">0.12</span>, <span class="fl">0.16</span>])),</span>
-<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>The deterministic preview redraws only after a scene, camera, or viewport change. Select <strong>Path trace</strong> to progressively accumulate indirect lighting, material reflections, and glass transport. Accumulation resets automatically when the scene, camera, viewport, or rendering mode changes.</p>
-<section id="controls" class="level3">
-<h3 class="anchored" data-anchor-id="controls">Controls</h3>
-<table class="caption-top table">
-<colgroup>
-<col style="width: 50%">
-<col style="width: 50%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>Action</th>
-<th>Control</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>Compile the editor</td>
-<td><strong>Run scene</strong> or <code>Ctrl+Enter</code> / <code>Cmd+Enter</code></td>
-</tr>
-<tr class="even">
-<td>Orbit the camera</td>
-<td>Drag in the preview</td>
-</tr>
-<tr class="odd">
-<td>Zoom</td>
-<td>Scroll in the preview</td>
-</tr>
-<tr class="even">
-<td>Restore the example</td>
-<td><strong>Reset</strong></td>
-</tr>
-<tr class="odd">
-<td>Toggle progressive global illumination</td>
-<td><strong>Path trace</strong> / <strong>Preview</strong></td>
-</tr>
-<tr class="even">
-<td>Choose rendering quality</td>
-<td><strong>Draft</strong> / <strong>High</strong> / <strong>Ultra</strong></td>
-</tr>
-<tr class="odd">
-<td>Inspect the complete generated shader</td>
-<td><strong>WGSL</strong></td>
-</tr>
-</tbody>
-</table>
-</section>
-<section id="compilation-path" class="level3">
-<h3 class="anchored" data-anchor-id="compilation-path">Compilation path</h3>
-<p>Each update follows the same path used by the shader backend:</p>
-<ol type="1">
-<li>The local server evaluates the Python and reads <code>scene</code>.</li>
-<li>JAX traces distance and material evaluation and lowers both to StableHLO.</li>
-<li>cadjoint emits WGSL <code>sdf</code>, <code>material_base</code>, and <code>material_optics</code> functions.</li>
-<li>The browser embeds those functions in either the preview or path-tracing transport runtime and builds the WebGPU pipelines.</li>
-</ol>
-<p>Compilation runs in a separate child process with a timeout, so a failed edit does not take down the viewer server. Python tracebacks and WebGPU shader errors appear under the editor.</p>
-</section>
-<section id="path-tracing-mode" class="level3">
-<h3 class="anchored" data-anchor-id="path-tracing-mode">Path-tracing mode</h3>
-<p>The path tracer launches one jittered camera sample per pixel per animation frame and averages samples in linear HDR. It supports:</p>
-<ul>
-<li>cosine-weighted diffuse and importance-sampled GGX reflection;</li>
-<li>explicit mirror reflectivity and Schlick-Fresnel glass reflection/refraction;</li>
-<li>finite-sun next-event estimation with progressively resolved soft shadows;</li>
-<li>multi-bounce environment lighting and Russian-roulette termination;</li>
-<li>sign-crossing intersection tests with binary refinement, avoiding false silhouette and shadow hits on rays that merely pass close to a surface;</li>
-<li>ACES tone mapping in a separate presentation pass.</li>
-</ul>
-<p>The quality selector changes framebuffer resolution in both preview and path mode. In path mode it additionally changes bounce depth, sun-visibility samples, and the accumulation limit. The status pill always identifies WebGPU as the active backend and includes adapter details when the browser exposes them; the viewer has no silent WebGL fallback.</p>
-<p>Two half-float textures alternate between sampled input and render attachment. WebGPU does not allow one texture to be sampled and rendered into in the same pass, so this ping-pong design is required rather than incidental. The playground offers three quality budgets. <strong>High</strong> is the default at roughly 900,000 pixels, six bounces, two sun-visibility samples per hit, and 512 samples per pixel; <strong>Draft</strong> favors interaction, while <strong>Ultra</strong> opts into a 1.6-million-pixel, eight-bounce, four-visibility-sample, 1,024-sample budget.</p>
-<p>The finite sun is sampled only through next-event estimation and is not part of the environment radiance seen by BSDF paths, so the current strategies do not overlap. Multiple importance sampling becomes useful when emissive area lights or an importance-sampled environment map are added. The research and scope decisions are recorded in <a href="https://github.com/andrinr/cadjoint/blob/main/research/path-tracing.md"><code>research/path-tracing.md</code></a>.</p>
+<section id="start-it" class="level2">
+<h2 class="anchored" data-anchor-id="start-it">Start it</h2>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run cadjoint-viewer <span class="at">--open</span>      <span class="co"># serves http://127.0.0.1:8765/ and opens a browser</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Equivalent invocations, and the flags:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run python <span class="at">-m</span> cadjoint.viewer.playground   <span class="co"># same server, no browser launch</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run cadjoint-viewer <span class="at">--port</span> 9000            <span class="co"># pick a different port</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run cadjoint-viewer <span class="at">--help</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>No extra dependencies are needed — the server is stdlib-only — but the viewport needs a WebGPU-capable browser. Stop with <code>Ctrl+C</code>.</p>
+<p>The starter program is a <strong>parametric heat sink</strong>: a fin comb extruded from one constrained sketch profile, a revolved copper heat slug under the die, and two press-fit steel bushings. It also declares a <code>SimMesh</code>, a thermal study, and an optimization over the whole thing, so every part of the app has something real to act on the moment it opens.</p>
 <div class="callout callout-style-default callout-warning callout-titled">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
@@ -368,34 +330,201 @@ Warning
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p>The playground executes the editor contents as Python on your computer. It binds only to localhost and protects compile requests with a per-session token, but it is not a sandbox. Only run code you trust.</p>
+<p>The playground executes the editor contents as Python on your computer. It binds only to localhost and protects compile requests with a per-session token, and it compiles each edit in a timed child process so a failed edit cannot take down the server — but it is not a sandbox. Only run code you trust.</p>
 </div>
 </div>
 </section>
+<section id="three-modes" class="level2">
+<h2 class="anchored" data-anchor-id="three-modes">Three modes</h2>
+<p>The toolbar carries a segmented switcher, the way Blender scopes its tool set to a mode. <code>M</code> cycles it, <code>Esc</code> returns to Model. Each mode has its own accent colour, threaded through the tool rail, dock headers, and viewport border.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Mode</th>
+<th>For</th>
+<th>Tools</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Model</strong></td>
+<td>Solids and transforms</td>
+<td>Select, place box / sphere / cylinder, move and rotate gizmos, delete</td>
+</tr>
+<tr class="even">
+<td><strong>Sketch</strong></td>
+<td>2D profiles and constraints</td>
+<td>Everything in Model, plus polygon editing, modify, and constraint annotation</td>
+</tr>
+<tr class="odd">
+<td><strong>Simulate</strong></td>
+<td>FEM setup and results</td>
+<td>The four-tab Simulate panel; the viewport becomes a picker</td>
+</tr>
+</tbody>
+</table>
+<p>Rendering is deliberately <em>not</em> a mode. Presets, shading, shadows, and quality live in a popover behind the eye icon, which opens from any mode — how the scene is drawn is orthogonal to what you are editing.</p>
+</section>
+<section id="modelling" class="level2">
+<h2 class="anchored" data-anchor-id="modelling">Modelling</h2>
+<p>Construction geometry — sketch profiles and primitives — draws over the rendered solid as a depth-tested wireframe, so an edge behind the model is hidden by it.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Action</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Click a vertex handle</td>
+<td>Selects it and highlights the exact literal in the code</td>
+</tr>
+<tr class="even">
+<td>Drag a handle</td>
+<td>Rewrites that vertex’s coordinates and rebuilds the solid</td>
+</tr>
+<tr class="odd">
+<td><strong>Polygon</strong> (<code>P</code>), then click edges</td>
+<td>Inserts a vertex per click until <code>Esc</code></td>
+</tr>
+<tr class="even">
+<td>Select a handle, press <code>Del</code></td>
+<td>Removes that vertex</td>
+</tr>
+<tr class="odd">
+<td><strong>Box</strong> / <strong>Sphere</strong> / <strong>Cylinder</strong> (<code>B</code> / <code>S</code> / <code>C</code>), then click</td>
+<td>Writes a <code>Solid.*</code> call into the program</td>
+</tr>
+<tr class="even">
+<td>Click a solid’s outline</td>
+<td>Selects it and shows the gizmo</td>
+</tr>
+<tr class="odd">
+<td>Drag a gizmo arrow or ring</td>
+<td>Rewrites <code>position=</code> or <code>rotation=</code></td>
+</tr>
+<tr class="even">
+<td>Drag empty space / Shift-drag / scroll</td>
+<td>Orbit / pan / zoom</td>
+</tr>
+</tbody>
+</table>
+<p><code>1</code> and <code>2</code> switch between selecting whole objects and selecting sketch vertices; <code>G</code> and <code>R</code> switch the gizmo between move and rotate. <code>Ctrl/⌘ + Enter</code> runs the program, <code>Ctrl/⌘ + Z</code> undoes the last source change.</p>
+</section>
+<section id="simulate" class="level2">
+<h2 class="anchored" data-anchor-id="simulate">Simulate</h2>
+<p>Simulate mode opens a four-tab panel over the same declarations a script would read. Every edit goes through the same source-patch round-trip as the sketch tools; solving posts the study’s <em>name</em>, and the server re-derives everything from the declaration.</p>
+<p><strong>Meshes</strong> declares and regenerates <code>SimMesh</code> objects. Resolution, padding, bounds, size, and the Hex / Tet4 / Tet10 method are editable inline; regenerating reports node and element counts and shades the mesh by element quality with a histogram beside it.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="../examples/assets/playground-mesh.png" class="img-fluid figure-img"></p>
+<figcaption>The declared SimMesh discretized into tet10 elements, shaded by element quality with a quality histogram</figcaption>
+</figure>
+</div>
+<p><strong>Studies</strong> holds the study declarations, their materials, and their boundary conditions — and this is where the viewport becomes a picker. Clicking the surface proposes a <code>Nodes.sphere</code> selection sized from the mesh spacing; shift-dragging a rectangle proposes a <code>Nodes.box</code> from the world-space bounds of the vertices inside it. The proposal is written into the program as a real selection expression, so a BC picked by hand is indistinguishable from one typed by hand, and it re-resolves against whatever the mesh becomes.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="../examples/assets/playground-field.png" class="img-fluid figure-img"></p>
+<figcaption>The solved temperature field, clipped by the slice plane so the flux entering at the die interface is visible</figcaption>
+</figure>
+</div>
+<p><strong>Optimize</strong> runs the declared <code>Optimization</code> objects, streaming each step’s objective and gradient norm as it arrives. When a run finishes it lands in a player: a convergence sparkline with a moving cursor, play/pause, and a scrubber that replays the geometry along the trajectory by substituting each step’s parameter snapshot and ghost-compiling it. Only the adopted final source ever touches undo history.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="../examples/assets/playground-optimize.png" class="img-fluid figure-img"></p>
+<figcaption>The finished cool-sink optimization: convergence sparkline, trajectory scrubber, and each parameter’s before and after value</figcaption>
+</figure>
+</div>
+<p><strong>Results</strong> browses the solved surface — a field picker that swaps displayed scalars without re-solving, a deformed view for elastic results, per-vertex BC previews, and an axis-aligned slice plane.</p>
+</section>
+<section id="rendering" class="level2">
+<h2 class="anchored" data-anchor-id="rendering">Rendering</h2>
+<p>The eye icon opens the render popover. It carries three editable presets — <strong>X-Ray</strong> for modelling and inspection, <strong>Studio</strong> for clean path-traced materials, <strong>Wire</strong> for construction geometry only — over independent switches for shadows, reflections, feature edges, and the dual-contour wireframe. Presets are stored in the browser and can be edited and saved.</p>
+<p>Path tracing accumulates progressively: one jittered camera sample per pixel per frame, averaged in linear HDR, with cosine-weighted diffuse and importance-sampled GGX reflection, Schlick-Fresnel glass, finite-sun next-event estimation, multi-bounce environment lighting, Russian-roulette termination, and ACES tone mapping in a separate presentation pass. Accumulation resets automatically when the scene, camera, viewport, or mode changes.</p>
+<p>Quality is a three-step budget. <strong>High</strong> is the default at roughly 900,000 pixels, six bounces, two sun-visibility samples per hit, and 512 samples per pixel; <strong>Draft</strong> drops to 320,000 pixels, three bounces, one visibility sample, and 128 samples; <strong>Ultra</strong> opts into 1.6 million pixels, eight bounces, four visibility samples, and 1,024 samples.</p>
+<p>Two half-float textures alternate between sampled input and render attachment. WebGPU does not allow one texture to be sampled and rendered into in the same pass, so this ping-pong is required rather than incidental. The finite sun is sampled only through next-event estimation and is not part of the environment radiance seen by BSDF paths, so the strategies do not overlap; multiple importance sampling becomes useful only once emissive area lights or an importance-sampled environment map are added. The scope decisions are recorded in <a href="../research/path-tracing.html">WebGPU SDF path tracing</a>.</p>
+</section>
+<section id="compilation-path" class="level2">
+<h2 class="anchored" data-anchor-id="compilation-path">Compilation path</h2>
+<p>Each run follows the same path as the shader backend:</p>
+<ol type="1">
+<li>The local server evaluates the Python in a child process and reads <code>scene</code>.</li>
+<li>JAX traces distance and material evaluation and lowers both to StableHLO.</li>
+<li>cadjoint emits WGSL <code>sdf</code>, <code>material_base</code>, and <code>material_optics</code> functions.</li>
+<li>The browser embeds those in the preview or path-tracing runtime and builds the WebGPU pipelines.</li>
+</ol>
+<p>The code icon shows the complete generated WGSL. Python tracebacks and WGSL compiler errors appear under the editor.</p>
+</section>
+<section id="a-live-example" class="level2">
+<h2 class="anchored" data-anchor-id="a-live-example">A live example</h2>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>WebGPU requires localhost or HTTPS and a browser/platform combination with an available GPU adapter. The viewer reports adapter, device, context, shader, and device-loss failures directly over the canvas. Firefox enables WebGPU by default on Windows and Apple-silicon macOS; Linux support remains <a href="https://developer.mozilla.org/en-US/docs/Mozilla/Firefox/Experimental_features">Nightly-only</a>.</p>
+</div>
+</div>
+<p><link rel="stylesheet" href="assets/webgpu-viewer.css"></p>
+<div class="cadjoint-webgpu-demo" data-cadjoint-webgpu-viewer="">
+<canvas data-viewer-canvas="" aria-label="Interactive WebGPU rendering of the cadjoint orbital example">
+</canvas>
+<img data-viewer-fallback="" src="../examples/assets/playground-model.png" alt="The cadjoint playground with the scene program on the left and the heat sink rendered on the right">
+<div class="cadjoint-webgpu-status" data-viewer-status="" aria-live="polite">
+Starting WebGPU…
+</div>
+<button class="cadjoint-webgpu-reset" data-viewer-reset="" type="button">Reset camera</button>
+<div class="cadjoint-webgpu-help">
+Drag to orbit · Scroll to zoom
+</div>
+</div>
+<script type="module" src="assets/webgpu-viewer.js"></script>
+<p>The canvas above runs a cadjoint scene directly in this page — its shader was compiled from Python through StableHLO to WGSL and stored. Drag to orbit, scroll to zoom. The documentation is static, so editing and executing Python stays in the local playground.</p>
 </section>
 <section id="jupyter-widget" class="level2">
 <h2 class="anchored" data-anchor-id="jupyter-widget">Jupyter widget</h2>
-<p>Install the optional notebook dependencies:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="ex">pip</span> install <span class="at">-e</span> <span class="st">".[viewer]"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Then display any JAX-traceable SDF directly in a notebook:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf.primitives <span class="im">import</span> Sphere</span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.viewer <span class="im">import</span> SDFViewer</span>
-<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>scene <span class="op">=</span> Sphere(radius<span class="op">=</span><span class="fl">1.0</span>)</span>
-<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>viewer <span class="op">=</span> SDFViewer(scene, height<span class="op">=</span><span class="dv">480</span>)</span>
-<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>viewer</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>The notebook viewer supports orbit, zoom, pan, and camera reset. Recompile an existing widget after changing a scene without recreating its output cell:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>viewer.update_scene(new_scene)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>For a compact viewer inside a notebook rather than a full application:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> sync <span class="at">--extra</span> viewer</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf.primitives <span class="im">import</span> Sphere</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.viewer <span class="im">import</span> SDFViewer</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>viewer <span class="op">=</span> SDFViewer(Sphere(radius<span class="op">=</span><span class="fl">1.0</span>), height<span class="op">=</span><span class="dv">480</span>)</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>viewer</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>It supports orbit, zoom, pan, and camera reset. Recompile an existing widget after changing a scene without recreating its output cell:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>viewer.update_scene(new_scene)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>See the <a href="../examples/rendering.html">rendering notebook</a> for a complete composition and hot-reload example.</p>
+</section>
+<section id="developing-the-ui" class="level2">
+<h2 class="anchored" data-anchor-id="developing-the-ui">Developing the UI</h2>
+<p>The app is a Solid + TypeScript project in <code>frontend/</code>, built into <code>cadjoint/viewer/static</code> and committed, so installing cadjoint needs no Node toolchain.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> frontend</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="ex">npm</span> install</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="ex">npm</span> run dev        <span class="co"># Vite on :5173, proxying the API to the Python server</span></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a><span class="ex">npm</span> run build      <span class="co"># refresh cadjoint/viewer/static (commit the result)</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a><span class="ex">npm</span> test           <span class="co"># projection and picking unit tests</span></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a><span class="ex">npm</span> run e2e        <span class="co"># Playwright, drives the real server end to end</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Run <code>uv run cadjoint-viewer</code> alongside <code>npm run dev</code> so the dev server has an API to proxy to.</p>
 </section>
 <section id="troubleshooting" class="level2">
 <h2 class="anchored" data-anchor-id="troubleshooting">Troubleshooting</h2>
-<p><strong>WebGPU is unavailable</strong></p>
-<p>Use a WebGPU-capable browser and make sure hardware acceleration is enabled. The editor can still compile and show the generated WGSL when no adapter is available.</p>
-<p><strong>The command is not found</strong></p>
-<p>Run <code>python -m cadjoint.viewer.playground --open</code>, or reinstall the current checkout so the <code>cadjoint-viewer</code> console script is created.</p>
-<p><strong>A scene does not compile</strong></p>
-<p>Confirm that the source assigns a callable SDF to <code>scene</code>. The error panel includes the Python traceback or WGSL compiler message needed to locate the failure.</p>
+<p><strong>WebGPU is unavailable.</strong> Use a WebGPU-capable browser with hardware acceleration enabled. The editor can still compile and show the generated WGSL when no adapter is available.</p>
+<p><strong>The command is not found.</strong> Run <code>python -m cadjoint.viewer.playground --open</code>, or reinstall the current checkout so the <code>cadjoint-viewer</code> console script is created.</p>
+<p><strong>A scene does not compile.</strong> Confirm the program assigns an SDF to a variable named <code>scene</code>. The error panel carries the Python traceback or WGSL compiler message.</p>
 
 
 </section>

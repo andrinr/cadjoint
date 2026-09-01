@@ -6,6 +6,7 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
+<meta name="description" content="Install cadjoint and walk the arc from a parametric sketch to a gradient through a solver.">
 
 <title>Getting Started – cadjoint</title>
 <style>
@@ -133,13 +134,37 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <a class="nav-link active" href="../docs/getting-started.html" aria-current="page"> 
 <span class="menu-text">Get Started</span></a>
   </li>  
-  <li class="nav-item">
-    <a class="nav-link" href="../docs/rendering.html"> 
-<span class="menu-text">Rendering</span></a>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-guides" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Guides</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-guides">    
+        <li>
+    <a class="dropdown-item" href="../docs/meshing.html">
+ <span class="dropdown-text">Differentiable Meshing</span></a>
   </li>  
+        <li>
+    <a class="dropdown-item" href="../docs/simulation.html">
+ <span class="dropdown-text">Simulation</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../docs/optimization.html">
+ <span class="dropdown-text">Optimization</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../docs/tesseracts.html">
+ <span class="dropdown-text">Tesseracts</span></a>
+  </li>  
+        <li><hr class="dropdown-divider"></li>
+        <li>
+    <a class="dropdown-item" href="../docs/rendering.html">
+ <span class="dropdown-text">Forward Renderer</span></a>
+  </li>  
+    </ul>
+  </li>
   <li class="nav-item">
     <a class="nav-link" href="../docs/viewer.html"> 
-<span class="menu-text">WebGPU Viewer</span></a>
+<span class="menu-text">Playground</span></a>
   </li>  
   <li class="nav-item dropdown ">
     <a class="nav-link dropdown-toggle" href="#" id="nav-menu-examples" role="link" data-bs-toggle="dropdown" aria-expanded="false">
@@ -172,6 +197,45 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   </li>  
     </ul>
   </li>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-research" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Research</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-research">    
+        <li>
+    <a class="dropdown-item" href="../research/differentiable-meshing-pipeline.html">
+ <span class="dropdown-text">Differentiable meshing pipeline</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/native-mesher.html">
+ <span class="dropdown-text">Native (Rust) dual-contouring core</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/fem-integration.html">
+ <span class="dropdown-text">FEM integration</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/tet-vs-hex.html">
+ <span class="dropdown-text">Tet vs hex meshing</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/end-to-end-optimization.html">
+ <span class="dropdown-text">End-to-end optimization</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/path-tracing.html">
+ <span class="dropdown-text">WebGPU SDF path tracing</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/simulator-ecosystem.html">
+ <span class="dropdown-text">Simulator ecosystem survey</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/constraints.html">
+ <span class="dropdown-text">Constraint system</span></a>
+  </li>  
+    </ul>
+  </li>
   <li class="nav-item">
     <a class="nav-link" href="../reference/index.html"> 
 <span class="menu-text">API Reference</span></a>
@@ -199,19 +263,13 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#installation" id="toc-installation" class="nav-link active" data-scroll-target="#installation">Installation</a></li>
-  <li><a href="#core-concepts" id="toc-core-concepts" class="nav-link" data-scroll-target="#core-concepts">Core concepts</a>
-  <ul class="collapse">
-  <li><a href="#build-a-constrained-scene" id="toc-build-a-constrained-scene" class="nav-link" data-scroll-target="#build-a-constrained-scene">Build a constrained scene</a></li>
-  <li><a href="#optimize-on-the-constraint-manifold" id="toc-optimize-on-the-constraint-manifold" class="nav-link" data-scroll-target="#optimize-on-the-constraint-manifold">Optimize on the constraint manifold</a></li>
-  </ul></li>
-  <li><a href="#rendering" id="toc-rendering" class="nav-link" data-scroll-target="#rendering">Rendering</a>
-  <ul class="collapse">
-  <li><a href="#assign-materials" id="toc-assign-materials" class="nav-link" data-scroll-target="#assign-materials">Assign materials</a></li>
-  <li><a href="#basic-render" id="toc-basic-render" class="nav-link" data-scroll-target="#basic-render">Basic render</a></li>
-  <li><a href="#background-colour" id="toc-background-colour" class="nav-link" data-scroll-target="#background-colour">Background colour</a></li>
-  <li><a href="#transparency-and-glass-refraction" id="toc-transparency-and-glass-refraction" class="nav-link" data-scroll-target="#transparency-and-glass-refraction">Transparency and glass refraction</a></li>
-  </ul></li>
+  <li><a href="#install" id="toc-install" class="nav-link active" data-scroll-target="#install">Install</a></li>
+  <li><a href="#geometry-is-a-pure-function" id="toc-geometry-is-a-pure-function" class="nav-link" data-scroll-target="#geometry-is-a-pure-function">Geometry is a pure function</a></li>
+  <li><a href="#constraints-reduce-the-freedom" id="toc-constraints-reduce-the-freedom" class="nav-link" data-scroll-target="#constraints-reduce-the-freedom">Constraints reduce the freedom</a></li>
+  <li><a href="#meshing" id="toc-meshing" class="nav-link" data-scroll-target="#meshing">Meshing</a></li>
+  <li><a href="#simulation" id="toc-simulation" class="nav-link" data-scroll-target="#simulation">Simulation</a></li>
+  <li><a href="#optimization" id="toc-optimization" class="nav-link" data-scroll-target="#optimization">Optimization</a></li>
+  <li><a href="#rendering" id="toc-rendering" class="nav-link" data-scroll-target="#rendering">Rendering</a></li>
   <li><a href="#next-steps" id="toc-next-steps" class="nav-link" data-scroll-target="#next-steps">Next steps</a></li>
   </ul>
 </nav>
@@ -224,6 +282,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h1 class="title">Getting Started</h1>
 </div>
 
+<div>
+  <div class="description">
+    Install cadjoint and walk the arc from a parametric sketch to a gradient through a solver.
+  </div>
+</div>
 
 
 <div class="quarto-title-meta">
@@ -238,170 +301,160 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </header>
 
 
-<section id="installation" class="level2">
-<h2 class="anchored" data-anchor-id="installation">Installation</h2>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">pip</span> install cadjoint</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>For development:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> clone https://github.com/andrinr/cadjoint</span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> cadjoint</span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> sync</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<hr>
-</section>
-<section id="core-concepts" class="level2">
-<h2 class="anchored" data-anchor-id="core-concepts">Core concepts</h2>
-<p>cadjoint has two building blocks: parametric geometry (SDF trees with tagged parameters) and geometric constraints (relationships between parameters). Gradient-based optimization ties them together.</p>
-<section id="build-a-constrained-scene" class="level3">
-<h3 class="anchored" data-anchor-id="build-a-constrained-scene">Build a constrained scene</h3>
-<p>Parameters are <code>Vector</code> or <code>Scalar</code> objects tagged as <code>free=True</code> (differentiable) or <code>free=False</code> (fixed). Constraints link parameters together.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> jax.numpy <span class="im">as</span> jnp</span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.constraints <span class="im">import</span> DistanceConstraint</span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.geometry <span class="im">import</span> Vector</span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf <span class="im">import</span> Sphere, Translate</span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="co"># A sphere whose center is constrained to lie on a sphere of radius 2</span></span>
-<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>anchor <span class="op">=</span> Vector(jnp.array([<span class="fl">0.0</span>, <span class="fl">0.0</span>, <span class="fl">0.0</span>]), free<span class="op">=</span><span class="va">False</span>, name<span class="op">=</span><span class="st">"anchor"</span>)</span>
-<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>p <span class="op">=</span> Vector(jnp.array([<span class="fl">2.0</span>, <span class="fl">0.0</span>, <span class="fl">0.0</span>]), free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">"p"</span>)</span>
-<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>DistanceConstraint(p, anchor, <span class="fl">2.0</span>)</span>
-<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>scene <span class="op">=</span> Translate(Sphere(radius<span class="op">=</span><span class="fl">0.3</span>), offset<span class="op">=</span>p)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-</section>
-<section id="optimize-on-the-constraint-manifold" class="level3">
-<h3 class="anchored" data-anchor-id="optimize-on-the-constraint-manifold">Optimize on the constraint manifold</h3>
-<p>Because every SDF is a pure JAX function, <code>jax.grad</code> works directly. After each gradient step, project back onto the manifold to keep the constraint satisfied.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> jax</span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>target <span class="op">=</span> jnp.array([<span class="fl">1.0</span>, <span class="fl">1.5</span>, <span class="fl">0.0</span>])</span>
-<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> obj(q):</span>
-<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> jnp.<span class="bu">sum</span>((q <span class="op">-</span> target) <span class="op">**</span> <span class="dv">2</span>)</span>
-<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>lr <span class="op">=</span> <span class="fl">0.1</span></span>
-<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>p_current <span class="op">=</span> jnp.array([<span class="fl">2.0</span>, <span class="fl">0.0</span>, <span class="fl">0.0</span>])</span>
-<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> _ <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">50</span>):</span>
-<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>    grad <span class="op">=</span> jax.grad(obj)(p_current)</span>
-<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>    p_new <span class="op">=</span> p_current <span class="op">-</span> lr <span class="op">*</span> grad</span>
-<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>    p_current <span class="op">=</span> <span class="fl">2.0</span> <span class="op">*</span> p_new <span class="op">/</span> jnp.linalg.norm(p_new)  <span class="co"># project back onto manifold</span></span>
-<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(p_current)  <span class="co"># [1.109 1.664 0.] -- closest point on the sphere to target</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>The constraint stays satisfied throughout: <code>||p|| = 2.0</code> at every step.</p>
-<hr>
-<hr>
-</section>
-</section>
-<section id="rendering" class="level2">
-<h2 class="anchored" data-anchor-id="rendering">Rendering</h2>
-<p>cadjoint includes a sphere-tracing raymarcher that supports physically-inspired shading, soft shadows, anti-aliasing, transparency, and glass refraction.</p>
-<section id="assign-materials" class="level3">
-<h3 class="anchored" data-anchor-id="assign-materials">Assign materials</h3>
-<p>Attach a <code>Material</code> to any primitive. The <code>material_at</code> method is queried per hit point during rendering; <code>Union</code> blends materials smoothly at boundaries.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.render <span class="im">import</span> Material</span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf.primitives <span class="im">import</span> Sphere</span>
-<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>sphere <span class="op">=</span> Sphere(</span>
-<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>    radius<span class="op">=</span><span class="fl">1.0</span>,</span>
-<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>    material<span class="op">=</span>Material(</span>
-<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>        color<span class="op">=</span>[<span class="fl">0.22</span>, <span class="fl">0.50</span>, <span class="fl">0.95</span>],  <span class="co"># blue</span></span>
-<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>        roughness<span class="op">=</span><span class="fl">0.35</span>,</span>
-<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>        metallic<span class="op">=</span><span class="fl">0.0</span>,</span>
-<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>        opacity<span class="op">=</span><span class="fl">1.0</span>,</span>
-<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>        ior<span class="op">=</span><span class="fl">1.0</span>,                   <span class="co"># index of refraction</span></span>
-<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>    ),</span>
-<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-</section>
-<section id="basic-render" class="level3">
-<h3 class="anchored" data-anchor-id="basic-render">Basic render</h3>
-<p><code>raymarch()</code> returns a <code>(H, W, 3)</code> float32 NumPy array. <code>render_raymarched()</code> wraps it and displays on a matplotlib axis.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> jax.numpy <span class="im">as</span> jnp</span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.render <span class="im">import</span> render_raymarched</span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>render_raymarched(</span>
-<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>    sphere,</span>
-<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>    camera_pos<span class="op">=</span>jnp.array([<span class="fl">3.0</span>, <span class="fl">2.0</span>, <span class="fl">3.0</span>]),</span>
-<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>    light_dirs<span class="op">=</span>jnp.array([[<span class="fl">1.0</span>, <span class="fl">1.5</span>, <span class="fl">1.5</span>], [<span class="op">-</span><span class="fl">1.5</span>, <span class="fl">0.5</span>, <span class="op">-</span><span class="fl">0.5</span>]]),</span>
-<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>    light_colors<span class="op">=</span>jnp.array([[<span class="fl">1.0</span>, <span class="fl">0.90</span>, <span class="fl">0.70</span>], [<span class="fl">0.20</span>, <span class="fl">0.35</span>, <span class="fl">0.60</span>]]),</span>
-<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>    resolution<span class="op">=</span>(<span class="dv">400</span>, <span class="dv">400</span>),</span>
-<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>    aa_samples<span class="op">=</span><span class="dv">2</span>,</span>
-<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-</section>
-<section id="background-colour" class="level3">
-<h3 class="anchored" data-anchor-id="background-colour">Background colour</h3>
-<p>Set <code>background_color</code> to control the colour returned for rays that miss all geometry. It is also used as the target for the smooth edge fade.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>render_raymarched(</span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>    sphere,</span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>    background_color<span class="op">=</span>jnp.array([<span class="fl">0.78</span>, <span class="fl">0.91</span>, <span class="fl">1.0</span>]),  <span class="co"># sky blue</span></span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-</section>
-<section id="transparency-and-glass-refraction" class="level3">
-<h3 class="anchored" data-anchor-id="transparency-and-glass-refraction">Transparency and glass refraction</h3>
-<p>Set <code>opacity &lt; 1</code> on a material for transparency. With <code>refract_steps=0</code> (default) the surface simply fades to the background colour. With <code>refract_steps &gt; 0</code> the renderer performs two-bounce Snell’s-law refraction:</p>
-<ol type="1">
-<li>The primary ray hits the front face and bends <strong>into</strong> the material.</li>
-<li>An interior march finds the back face (using <code>−sdf</code> as the distance field).</li>
-<li>The ray bends back <strong>into air</strong> and continues through the rest of the scene.</li>
-</ol>
-<p>The Fresnel effect (Schlick approximation) adds realistic edge highlights — the rim of a glass sphere brightens at grazing angles.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> jax.numpy <span class="im">as</span> jnp</span>
-<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.render <span class="im">import</span> raymarch, Material</span>
-<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf.boolean <span class="im">import</span> Union</span>
-<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf.primitives <span class="im">import</span> Sphere</span>
-<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf.transforms <span class="im">import</span> Translate</span>
-<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>glass <span class="op">=</span> Sphere(</span>
-<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>    radius<span class="op">=</span><span class="fl">1.0</span>,</span>
-<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>    material<span class="op">=</span>Material(color<span class="op">=</span>[<span class="fl">0.92</span>, <span class="fl">0.97</span>, <span class="fl">1.0</span>], roughness<span class="op">=</span><span class="fl">0.05</span>, opacity<span class="op">=</span><span class="fl">0.04</span>, ior<span class="op">=</span><span class="fl">1.5</span>),</span>
-<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>red_ball <span class="op">=</span> Translate(</span>
-<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a>    Sphere(radius<span class="op">=</span><span class="fl">0.65</span>, material<span class="op">=</span>Material(color<span class="op">=</span>[<span class="fl">0.93</span>, <span class="fl">0.26</span>, <span class="fl">0.22</span>])),</span>
-<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a>    offset<span class="op">=</span>jnp.array([<span class="op">-</span><span class="fl">1.1</span>, <span class="fl">0.5</span>, <span class="op">-</span><span class="fl">3.0</span>]),</span>
-<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a>scene <span class="op">=</span> Union((glass, red_ball), smoothness<span class="op">=</span><span class="fl">0.0</span>)</span>
-<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a>image <span class="op">=</span> raymarch(</span>
-<span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a>    scene,</span>
-<span id="cb8-19"><a href="#cb8-19" aria-hidden="true" tabindex="-1"></a>    camera_pos<span class="op">=</span>jnp.array([<span class="fl">0.0</span>, <span class="fl">0.5</span>, <span class="fl">5.5</span>]),</span>
-<span id="cb8-20"><a href="#cb8-20" aria-hidden="true" tabindex="-1"></a>    resolution<span class="op">=</span>(<span class="dv">400</span>, <span class="dv">400</span>),</span>
-<span id="cb8-21"><a href="#cb8-21" aria-hidden="true" tabindex="-1"></a>    background_color<span class="op">=</span>jnp.array([<span class="fl">0.07</span>, <span class="fl">0.09</span>, <span class="fl">0.16</span>]),</span>
-<span id="cb8-22"><a href="#cb8-22" aria-hidden="true" tabindex="-1"></a>    refract_steps<span class="op">=</span><span class="dv">48</span>,   <span class="co"># enable two-bounce refraction</span></span>
-<span id="cb8-23"><a href="#cb8-23" aria-hidden="true" tabindex="-1"></a>    max_steps<span class="op">=</span><span class="dv">80</span>,</span>
-<span id="cb8-24"><a href="#cb8-24" aria-hidden="true" tabindex="-1"></a>    aa_samples<span class="op">=</span><span class="dv">2</span>,</span>
-<span id="cb8-25"><a href="#cb8-25" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p><strong>IOR reference values:</strong></p>
+<p>cadjoint is code-first CAD in which the entire pipeline — sketches, constraints, SDF geometry, meshing, and finite-element simulation — composes into one function JAX can differentiate end to end. This page installs it and walks that arc once, shallowly; each stage has its own page with the detail.</p>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Warning
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The API is not stable. Expect breaking changes.</p>
+</div>
+</div>
+<section id="install" class="level2">
+<h2 class="anchored" data-anchor-id="install">Install</h2>
+<p>Clone the repository and sync with <a href="https://docs.astral.sh/uv/getting-started/installation/">uv</a>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> clone https://github.com/andrinr/cadjoint</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> cadjoint</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> venv                     <span class="co"># create .venv</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> sync                     <span class="co"># CPU JAX — macOS, Linux, and Windows</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><code>uv sync</code> installs cadjoint into <code>.venv</code> in editable mode. Run commands through it with <code>uv run &lt;cmd&gt;</code>, or activate it once per shell with <code>source .venv/bin/activate</code>.</p>
+<p>The default sync pulls plain <code>jax</code>/<code>jaxlib</code>, so it works on Apple Silicon and any CPU-only machine. Everything beyond the geometry core is an extra — repeat the flag, one <code>--extra</code> per name:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> sync <span class="at">--extra</span> fem <span class="at">--extra</span> tesseract <span class="at">--extra</span> viewer</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
 <thead>
 <tr class="header">
-<th>material</th>
-<th><code>ior</code></th>
+<th>Extra</th>
+<th>Pulls in</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
-<td>air / disabled</td>
-<td>1.0</td>
+<td><code>cuda</code></td>
+<td>GPU JAX (Linux + NVIDIA only)</td>
 </tr>
 <tr class="even">
-<td>water</td>
-<td>1.33</td>
+<td><code>fem</code></td>
+<td>the jax-fem finite-element stack (basix, meshio, petsc4py, gmsh)</td>
 </tr>
 <tr class="odd">
-<td>glass</td>
-<td>1.5</td>
+<td><code>tesseract</code></td>
+<td>tesseract-core + tesseract-jax, for the cross-boundary gradient paths</td>
 </tr>
 <tr class="even">
-<td>diamond</td>
-<td>2.42</td>
+<td><code>viewer</code></td>
+<td>the Jupyter widget (<code>anywidget</code>)</td>
+</tr>
+<tr class="odd">
+<td><code>stepcheck</code></td>
+<td>OCCT kernel validation of STEP exports (dev)</td>
+</tr>
+<tr class="even">
+<td><code>docs</code></td>
+<td>the Quarto API reference (<code>quartodoc</code>)</td>
 </tr>
 </tbody>
 </table>
-<hr>
+<p>Avoid <code>--all-extras</code> on macOS — it includes <code>cuda</code>, which has no macOS wheels.</p>
+<p>The fastest way to see all of it at once is the browser app:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run cadjoint-viewer <span class="at">--open</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>It opens on a parametric heat sink that already declares a mesh, a thermal study, and an optimization. See <a href="../docs/viewer.html">the playground</a>.</p>
 </section>
+<section id="geometry-is-a-pure-function" class="level2">
+<h2 class="anchored" data-anchor-id="geometry-is-a-pure-function">Geometry is a pure function</h2>
+<p>Every scene is an SDF tree whose numbers are <code>Vector</code> or <code>Scalar</code> parameters, each tagged <code>free=True</code> (differentiable) or fixed. <code>functionalize</code> turns a tree into a pure JAX function of those parameters, which is what makes <code>jit</code>, <code>grad</code>, and <code>vmap</code> work without ceremony.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> jax.numpy <span class="im">as</span> jnp</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.geometry <span class="im">import</span> Vector</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf <span class="im">import</span> Sphere, Translate</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>p <span class="op">=</span> Vector(jnp.array([<span class="fl">2.0</span>, <span class="fl">0.0</span>, <span class="fl">0.0</span>]), free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">"p"</span>)</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>scene <span class="op">=</span> Translate(Sphere(radius<span class="op">=</span><span class="fl">0.3</span>), offset<span class="op">=</span>p)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="constraints-reduce-the-freedom" class="level2">
+<h2 class="anchored" data-anchor-id="constraints-reduce-the-freedom">Constraints reduce the freedom</h2>
+<p>Constraints are relationships between parameters. They are declared, not solved inline.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint <span class="im">import</span> extract_parameters, functionalize</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.constraints <span class="im">import</span> DistanceConstraint, satisfy_constraints</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>anchor <span class="op">=</span> Vector(jnp.array([<span class="fl">0.0</span>, <span class="fl">0.0</span>, <span class="fl">0.0</span>]), free<span class="op">=</span><span class="va">False</span>, name<span class="op">=</span><span class="st">"anchor"</span>)</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>DistanceConstraint(p, anchor, <span class="fl">2.0</span>)   <span class="co"># p must lie on a sphere of radius 2</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>satisfy_constraints(scene, steps<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>free, fixed, metadata <span class="op">=</span> extract_parameters(scene)</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>sdf <span class="op">=</span> functionalize(scene)(free, fixed)</span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="bu">float</span>(jnp.linalg.norm(free[<span class="st">"p"</span>])))  <span class="co"># 2.0</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><code>satisfy_constraints</code> projects the tree onto its constraints in place and works on under-determined systems — the usual case for a real sketch, which keeps design freedom on purpose. <code>solve_constraints</code> is the stricter sibling: it requires an exactly-determined system and refuses anything else, which is what you want when the constraints are supposed to pin the geometry down completely.</p>
+<p><code>extract_parameters</code> returns three things — the free parameters, the fixed ones, and the metadata carrying the constraint system. That metadata is what lets an optimizer project each step back onto the constraint manifold, so a constrained sketch stays constrained through a descent. The <a href="../examples/constraints.html">constraints notebook</a> works through a fully-determined system.</p>
+</section>
+<section id="meshing" class="level2">
+<h2 class="anchored" data-anchor-id="meshing">Meshing</h2>
+<p><code>cadjoint.meshing</code> dual-contours the field into a surface. It is written bottom-up in JAX, so the continuous half of the extraction — crossing positions, Hermite normals, QEF vertices — carries exact derivatives, while the discrete half (which cells are active, how they connect) stays frozen per extraction.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.meshing <span class="im">import</span> GridSpec, extract_mesh, save_stl</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>grid <span class="op">=</span> GridSpec.from_bounds((<span class="op">-</span><span class="fl">1.3</span>, <span class="op">-</span><span class="fl">1.3</span>, <span class="op">-</span><span class="fl">1.3</span>), (<span class="fl">2.6</span>, <span class="fl">2.6</span>, <span class="fl">2.6</span>), <span class="dv">26</span>)</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>mesh <span class="op">=</span> extract_mesh(<span class="kw">lambda</span> q: jnp.sqrt(jnp.<span class="bu">sum</span>(q <span class="op">*</span> q)) <span class="op">-</span> <span class="fl">1.0</span>, grid)</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>save_stl(mesh, <span class="st">"sphere.stl"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Full detail, including the exports and the Rust-accelerated kernels, in <a href="../docs/meshing.html">differentiable meshing</a>.</p>
+</section>
+<section id="simulation" class="level2">
+<h2 class="anchored" data-anchor-id="simulation">Simulation</h2>
+<p>Discretizations and physics are <em>declared</em>, so the same objects a script solves are the ones the viewer edits and the optimizer re-freezes.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.fem <span class="im">import</span> Dirichlet, HeatFlux, Nodes, SimMesh, ThermalStudy</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf.primitives <span class="im">import</span> Box</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>bar <span class="op">=</span> Box(Vector([<span class="fl">1.0</span>, <span class="fl">0.15</span>, <span class="fl">0.15</span>], free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">"size"</span>))</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>study <span class="op">=</span> ThermalStudy(</span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>    name<span class="op">=</span><span class="st">"bar-conduction"</span>,</span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>    conductivity<span class="op">=</span><span class="fl">2.0</span>,</span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>    bcs<span class="op">=</span>[Dirichlet(Nodes.side(<span class="st">"+x"</span>), <span class="fl">0.0</span>), HeatFlux(Nodes.side(<span class="st">"-x"</span>), <span class="fl">4.0</span>)],</span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>    mesh<span class="op">=</span>SimMesh(name<span class="op">=</span><span class="st">"bar-mesh"</span>, resolution<span class="op">=</span>(<span class="dv">22</span>, <span class="dv">5</span>, <span class="dv">5</span>),</span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>                 bounds<span class="op">=</span>(<span class="op">-</span><span class="fl">1.1</span>, <span class="op">-</span><span class="fl">0.25</span>, <span class="op">-</span><span class="fl">0.25</span>), size<span class="op">=</span>(<span class="fl">2.2</span>, <span class="fl">0.5</span>, <span class="fl">0.5</span>)),</span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> study.solve(bar)   <span class="co"># needs: uv sync --extra fem</span></span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(result.describe()[<span class="st">"range"</span>])   <span class="co"># [0.0, 4.0]</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Boundary conditions attach to node <em>selections</em> rather than index lists, so they survive re-meshing and a change of shape. See <a href="../docs/simulation.html">simulation</a>.</p>
+</section>
+<section id="optimization" class="level2">
+<h2 class="anchored" data-anchor-id="optimization">Optimization</h2>
+<p>An <code>Optimization</code> declares a descent. Its study form makes the simulation above the objective, and the gradient runs the whole chain — geometry, mesh, solve — in one <code>jax.grad</code> call.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.optimize <span class="im">import</span> Optimization</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>run <span class="op">=</span> Optimization(name<span class="op">=</span><span class="st">"cool-bar"</span>, study<span class="op">=</span>study, metric<span class="op">=</span><span class="st">"max"</span>,</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>                   steps<span class="op">=</span><span class="dv">3</span>, learning_rate<span class="op">=</span><span class="fl">0.01</span>).run(scene<span class="op">=</span>bar)</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(run.history[<span class="dv">0</span>][<span class="st">"objective"</span>], <span class="st">"-&gt;"</span>, run.objective)  <span class="co"># 4.0 -&gt; 2.939</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Three Adam steps thicken the bar and drop its peak temperature by a quarter, with the gradient running back through the solve, the mesh, and the SDF to the <code>size</code> parameter.</p>
+<p>Constraint projection is automatic, topology stays frozen between re-meshes, and <code>gradient_path</code> chooses how much of the chain crosses a Tesseract boundary. See <a href="../docs/optimization.html">optimization</a> and <a href="../docs/tesseracts.html">tesseracts</a>.</p>
+</section>
+<section id="rendering" class="level2">
+<h2 class="anchored" data-anchor-id="rendering">Rendering</h2>
+<p>Independently of all of the above, cadjoint renders SDFs directly — a forward sphere-tracing raymarcher for still images, and WGSL shader compilation for the browser.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.render <span class="im">import</span> Camera, RenderSettings, Scene, render_scene</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf.primitives <span class="im">import</span> Sphere</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>image <span class="op">=</span> render_scene(</span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>    Scene(Sphere(<span class="fl">1.0</span>), camera<span class="op">=</span>Camera(position<span class="op">=</span>(<span class="dv">0</span>, <span class="fl">1.5</span>, <span class="dv">5</span>), target<span class="op">=</span>(<span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">0</span>))),</span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>    RenderSettings.balanced((<span class="dv">240</span>, <span class="dv">320</span>)),</span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Rendered pixels are deliberately not an inverse-rendering API. See the <a href="../docs/rendering.html">forward renderer</a>.</p>
 </section>
 <section id="next-steps" class="level2">
 <h2 class="anchored" data-anchor-id="next-steps">Next steps</h2>
 <ul>
-<li><a href="../examples/rendering.html">Rendering notebook</a> - forward renderer, quality presets, and the interactive WebGPU viewer</li>
-<li><a href="../examples/optimization.html">Optimization</a> - differentiating through geometry parameters</li>
-<li><a href="../examples/constraints.html">Constraints</a> - solving fully-determined constraint systems</li>
-<li><a href="../examples/constrained_optimization.html">Constrained Optimization</a> - the full workflow with trajectory visualization</li>
+<li><a href="../examples/basics.html">Basics</a> — primitives, booleans, and transforms</li>
+<li><a href="../examples/sketch_construction.html">Sketch construction</a> — profiles, extrude, revolve</li>
+<li><a href="../examples/constraints.html">Constraints</a> — solving fully-determined systems</li>
+<li><a href="../examples/constrained_optimization.html">Constrained optimization</a> — the full workflow with trajectory visualization</li>
 </ul>
 
 
