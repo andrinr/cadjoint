@@ -4,13 +4,13 @@ import jax
 import jax.numpy as jnp
 import pytest
 
-from jaxcad.constraints import (
+from cadjoint.constraints import (
     DistanceConstraint,
     build_residual_fn,
     null_space,
 )
-from jaxcad.constraints.residual import _collect_constraints, compute_param_vector
-from jaxcad.geometry.parameters import Vector
+from cadjoint.constraints.residual import _collect_constraints, compute_param_vector
+from cadjoint.geometry.parameters import Vector
 
 
 def _free_and_meta(*params):

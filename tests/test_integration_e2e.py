@@ -1,21 +1,21 @@
-"""End-to-end integration tests for the complete jaxcad system.
+"""End-to-end integration tests for the complete cadjoint system.
 
 These tests verify that all layers work together:
-1. Geometry layer (Line, Circle, Rectangle)
+1. Geometry layer (Line, Circle)
 2. Constraints layer (DistanceConstraint, AngleConstraint, etc.)
-3. Construction layer (extrude, from_line, from_circle, from_point)
+3. Construction layer (from_line, from_circle, from_point)
 4. Compiler layer (extract_parameters, compile_functionalize)
 """
 
 import jax
 import jax.numpy as jnp
 
-from jaxcad import extract_parameters, functionalize
-from jaxcad.constraints import DistanceConstraint, all_parameters, total_dof_reduction
-from jaxcad.construction import extrude, from_circle, from_line, from_point
-from jaxcad.geometry.parameters import Scalar, Vector
-from jaxcad.geometry.primitives import Circle, Line, Rectangle
-from jaxcad.sdf.primitives import Sphere
+from cadjoint import extract_parameters, functionalize
+from cadjoint.constraints import DistanceConstraint, all_parameters, total_dof_reduction
+from cadjoint.construction import from_circle, from_line, from_point
+from cadjoint.geometry.parameters import Scalar, Vector
+from cadjoint.geometry.primitives import Circle, Line
+from cadjoint.sdf.primitives import Sphere
 
 
 def test_e2e_constrained_geometry_to_sdf():
@@ -99,32 +99,6 @@ def test_e2e_constrained_two_spheres():
     # Verify construction
     assert sphere1._source_point is center1
     assert sphere2._source_point is center2
-
-
-def test_e2e_rectangle_extrusion():
-    """Test rectangle creation, extrusion to box, and compilation."""
-    # Layer 1: Parametric rectangle
-    center = Vector([0, 0, 0], free=False, name="center")
-    width = Scalar(4.0, free=True, name="width")
-    height = Scalar(2.0, free=True, name="height")
-    normal = Vector([0, 0, 1], free=False, name="normal")
-
-    rect = Rectangle(center=center, width=width, height=height, normal=normal)
-
-    # Layer 3: Extrude to box
-    depth = Scalar(3.0, free=True, name="depth")
-    box = extrude(rect, depth=depth)
-
-    # Verify construction
-    assert box._source_geometry is rect
-
-    # Layer 4: Extract parameters
-    free_params, fixed_params, _ = extract_parameters(box)
-
-    # Box was created from extrude which creates a new fixed size vector
-    # The original width/height/depth parameters are in the rectangle, not extracted
-    # So we expect no free params in the box itself
-    assert isinstance(free_params, dict)  # Just verify extraction works
 
 
 def test_e2e_circle_to_cylinder_with_constraints():

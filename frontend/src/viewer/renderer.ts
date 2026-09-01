@@ -11,7 +11,19 @@
  * the overlay pipelines, and pan support added.
  */
 
-import type { ConstructionNode, GizmoMode, Selection } from "../types";
+import {
+  DEFAULT_SLICE,
+  meshBounds,
+  slicePlane,
+  type SliceState,
+} from "../simulation";
+import type {
+  ConstructionNode,
+  GizmoMode,
+  MeshEdgePayload,
+  Selection,
+  SimulationMeshPayload,
+} from "../types";
 import { AXIS_COLORS, gizmoEdges, gizmoScale, type AxisIndex } from "./gizmo";
 import {
   cameraPosition,
@@ -25,6 +37,7 @@ import {
 // Kept as a standalone .wgsl file so the shader has one source of truth that
 // both the bundler and the Python shader-validation test read.
 import OVERLAY_WGSL from "./overlay.wgsl?raw";
+import SIMULATION_WGSL from "./simulation.wgsl?raw";
 
 export interface Shaders {
   preview: string;
@@ -101,6 +114,8 @@ export interface DisplaySettings {
   /** 0 disables x-ray; 1 is fully translucent. */
   xray: number;
   showSketches: boolean;
+  showMeshEdges: boolean;
+  showMeshWireframe: boolean;
   showConstraints: boolean;
   showFixedConstraints: boolean;
   showDistanceConstraints: boolean;
@@ -117,6 +132,8 @@ export const DEFAULT_DISPLAY: DisplaySettings = {
   hideSolid: false,
   xray: 1,
   showSketches: true,
+  showMeshEdges: false,
+  showMeshWireframe: false,
   showConstraints: true,
   showFixedConstraints: true,
   showDistanceConstraints: true,
@@ -145,6 +162,8 @@ const COLORS: Record<string, Rgba> = {
   handleLocked: [0.62, 0.64, 0.6, 0.9],
   edgeSelected: [1.0, 0.95, 0.6, 1.0],
   edgeHover: [0.95, 1.0, 0.72, 1.0],
+  meshWire: [0.5, 0.56, 0.62, 0.22],
+  meshSharp: [0.35, 0.85, 1.0, 0.95],
 };
 
 export interface RendererCallbacks {
@@ -172,6 +191,7 @@ export class Renderer {
   private uniformBuffer!: GPUBuffer;
   private viewBuffer!: GPUBuffer;
   private overlayBuffer!: GPUBuffer;
+  private meshOverlayBuffer!: GPUBuffer;
 
   private previewPipeline: GPURenderPipeline | null = null;
   private previewDepthPipeline: GPURenderPipeline | null = null;
@@ -184,6 +204,7 @@ export class Renderer {
   private gizmoArrowPipeline: GPURenderPipeline | null = null;
   private gizmoScalePipeline: GPURenderPipeline | null = null;
   private overlayBindGroup: GPUBindGroup | null = null;
+  private meshOverlayBindGroup: GPUBindGroup | null = null;
 
   private depthTexture: GPUTexture | null = null;
   private accumulation: GPUTexture[] = [];
@@ -204,6 +225,44 @@ export class Renderer {
   private gizmoCapacity = 0;
   private gizmoCount = 0;
   private visibleGizmoMode: GizmoMode = "translate";
+  private meshEdgeBuffer: GPUBuffer | null = null;
+  private meshEdgeCapacity = 0;
+  private meshWireCount = 0;
+  private meshSharpCount = 0;
+  private meshEdges: MeshEdgePayload | null = null;
+
+  // FEM simulation surface: an indexed triangle mesh with a scalar per
+  // vertex, drawn instead of the raymarched solid while simulation display
+  // is on. Two bind groups share one pipeline: the base pass and the
+  // hover-highlight pass differ only in the tint uniform.
+  private simPipeline: GPURenderPipeline | null = null;
+  private simBindGroup: GPUBindGroup | null = null;
+  private simHighlightBindGroup: GPUBindGroup | null = null;
+  private simUniformBuffer: GPUBuffer | null = null;
+  private simHighlightUniformBuffer: GPUBuffer | null = null;
+  private simVertexBuffer: GPUBuffer | null = null;
+  private simIndexBuffer: GPUBuffer | null = null;
+  private simIndexCount = 0;
+  private simRange: [number, number] = [0, 0];
+  private simBounds = { min: [0, 0, 0], max: [0, 0, 0] };
+  private simHighlight: { start: number; count: number } | null = null;
+  private simClip: SliceState = { ...DEFAULT_SLICE };
+  private _simulationActive = false;
+  // Current surface payload plus the display overrides layered over it:
+  // an alternative nodal field, warped (deformed) positions, and a per-
+  // vertex highlight tint for BC previews. Any change re-interleaves the
+  // vertex buffer — tens of thousands of vertices, cheap enough per edit.
+  private simPayload: SimulationMeshPayload | null = null;
+  private simScalarOverride: readonly number[] | null = null;
+  private simPositionOverride: readonly number[] | null = null;
+  private simOverlay: Float32Array | null = null;
+  // Element-edge hairlines over the surface (payload.edges index pairs).
+  private simEdgePipeline: GPURenderPipeline | null = null;
+  private simEdgeIndexBuffer: GPUBuffer | null = null;
+  private simEdgeIndexCount = 0;
+  private _simulationEdgesVisible = false;
+  /** Which ramp fs_sim applies: solved fields vs mesh quality. */
+  simulationRamp: "field" | "quality" = "field";
 
   private shaderRevision = 0;
   private framePending = false;
@@ -305,7 +364,10 @@ export class Renderer {
       (shadows === "hard" ? DISPLAY.hardShadows : 0) |
       (reflections ? DISPLAY.reflections : 0) |
       (flatShading ? DISPLAY.flat : 0) |
-      (hideSolid ? DISPLAY.hideSolid : 0)
+      // While the simulation surface is shown the raymarched solid is hidden:
+      // the preview pass still supplies the environment background and clears
+      // depth to 1, and the FEM mesh depth-tests into that frame.
+      (hideSolid || this._simulationActive ? DISPLAY.hideSolid : 0)
     );
   }
 
@@ -343,7 +405,9 @@ export class Renderer {
       this.uniformBuffer = this.createUniform(112);  // 7 x vec4, see Uniforms in _webgpu.py
       this.viewBuffer = this.createUniform(64);
       this.overlayBuffer = this.createUniform(112);
+      this.meshOverlayBuffer = this.createUniform(112);
       this.buildOverlayPipelines();
+      this.buildSimulationPipeline();
 
       this.device.addEventListener("uncapturederror", (event) => {
         const message = (event as GPUUncapturedErrorEvent).error?.message ?? "WebGPU error";
@@ -569,6 +633,218 @@ export class Renderer {
       layout: bindGroupLayout,
       entries: [{ binding: 0, resource: { buffer: this.overlayBuffer } }],
     });
+    this.meshOverlayBindGroup = device.createBindGroup({
+      layout: bindGroupLayout,
+      entries: [{ binding: 0, resource: { buffer: this.meshOverlayBuffer } }],
+    });
+  }
+
+  /**
+   * The indexed triangle-mesh pipeline for FEM results.
+   *
+   * Follows the overlay pattern: an explicit layout (never `layout: "auto"`)
+   * so the base and highlight passes can bind different uniform buffers to
+   * one pipeline. Vertices interleave a position with the nodal scalar; the
+   * fragment stage ramps the scalar and applies the clip plane.
+   */
+  private buildSimulationPipeline(): void {
+    const device = this.device!;
+    const module = device.createShaderModule({ code: SIMULATION_WGSL, label: "Simulation WGSL" });
+    const { bindGroupLayout, pipelineLayout } = this.sharedLayout("Simulation bindings", [0]);
+
+    this.simPipeline = device.createRenderPipeline({
+      label: "Simulation surface",
+      layout: pipelineLayout,
+      vertex: {
+        module,
+        entryPoint: "vs_sim",
+        buffers: [
+          {
+            arrayStride: 32,
+            stepMode: "vertex",
+            attributes: [
+              { shaderLocation: 0, offset: 0, format: "float32x3" },
+              { shaderLocation: 1, offset: 12, format: "float32" },
+              // BC-preview tint: rgb hue + blend strength per vertex.
+              { shaderLocation: 2, offset: 16, format: "float32x4" },
+            ],
+          },
+        ],
+      },
+      fragment: { module, entryPoint: "fs_sim", targets: [{ format: this.format }] },
+      primitive: { topology: "triangle-list" },
+      depthStencil: {
+        format: DEPTH_FORMAT,
+        depthWriteEnabled: true,
+        depthCompare: "less-equal",
+      },
+    });
+
+    // Element-edge hairlines: same vertex buffer (position only), a line
+    // list over the payload's edge index pairs, nudged toward the camera in
+    // the vertex stage so they sit on top of their own faces.
+    this.simEdgePipeline = device.createRenderPipeline({
+      label: "Simulation element edges",
+      layout: pipelineLayout,
+      vertex: {
+        module,
+        entryPoint: "vs_sim_edge",
+        buffers: [
+          {
+            arrayStride: 32,
+            stepMode: "vertex",
+            attributes: [{ shaderLocation: 0, offset: 0, format: "float32x3" }],
+          },
+        ],
+      },
+      fragment: { module, entryPoint: "fs_sim_edge", targets: [{ format: this.format }] },
+      primitive: { topology: "line-list" },
+      depthStencil: {
+        format: DEPTH_FORMAT,
+        depthWriteEnabled: false,
+        depthCompare: "less-equal",
+      },
+    });
+
+    this.simUniformBuffer = this.createUniform(112);
+    this.simHighlightUniformBuffer = this.createUniform(112);
+    this.simBindGroup = device.createBindGroup({
+      layout: bindGroupLayout,
+      entries: [{ binding: 0, resource: { buffer: this.simUniformBuffer } }],
+    });
+    this.simHighlightBindGroup = device.createBindGroup({
+      layout: bindGroupLayout,
+      entries: [{ binding: 0, resource: { buffer: this.simHighlightUniformBuffer } }],
+    });
+  }
+
+  /** Whether the FEM surface replaces the raymarched solid. */
+  get simulationActive(): boolean {
+    return this._simulationActive;
+  }
+
+  set simulationActive(active: boolean) {
+    if (active === this._simulationActive) return;
+    this._simulationActive = active;
+    this.invalidate();
+  }
+
+  /** Replace the FEM surface mesh (null clears it); resets view overrides. */
+  setSimulationMesh(payload: SimulationMeshPayload | null): void {
+    this.simIndexCount = 0;
+    this.simHighlight = null;
+    this.simPayload = payload;
+    this.simScalarOverride = null;
+    this.simPositionOverride = null;
+    this.simOverlay = null;
+    if (!payload || !this.device || payload.indices.length === 0) {
+      this.invalidate();
+      return;
+    }
+    const indices = new Uint32Array(payload.indices);
+    this.simIndexBuffer?.destroy();
+    this.simIndexBuffer = this.device.createBuffer({
+      label: "simulation indices",
+      size: indices.byteLength,
+      usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
+    });
+    this.device.queue.writeBuffer(this.simIndexBuffer, 0, indices);
+    this.simIndexCount = indices.length;
+    // Element-edge hairlines, when the payload carries edge index pairs.
+    this.simEdgeIndexBuffer?.destroy();
+    this.simEdgeIndexBuffer = null;
+    this.simEdgeIndexCount = 0;
+    if (payload.edges && payload.edges.length >= 2) {
+      const edges = new Uint32Array(payload.edges);
+      this.simEdgeIndexBuffer = this.device.createBuffer({
+        label: "simulation element edges",
+        size: edges.byteLength,
+        usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
+      });
+      this.device.queue.writeBuffer(this.simEdgeIndexBuffer, 0, edges);
+      this.simEdgeIndexCount = edges.length;
+    }
+    this.simRange = payload.range;
+    this.uploadSimulationVertices();
+  }
+
+  get simulationEdgesVisible(): boolean {
+    return this._simulationEdgesVisible;
+  }
+
+  /** Show or hide the element-edge overlay on the simulation surface. */
+  set simulationEdgesVisible(visible: boolean) {
+    if (visible === this._simulationEdgesVisible) return;
+    this._simulationEdgesVisible = visible;
+    this.invalidate();
+  }
+
+  /** Swap the displayed nodal field without re-solving or re-meshing. */
+  setSimulationScalars(scalars: readonly number[] | null, range?: [number, number]): void {
+    this.simScalarOverride = scalars;
+    if (range) this.simRange = range;
+    else if (!scalars && this.simPayload) this.simRange = this.simPayload.range;
+    this.uploadSimulationVertices();
+  }
+
+  /** Deformed view: draw the surface at offset positions (null = undeformed). */
+  setSimulationPositions(positions: readonly number[] | null): void {
+    this.simPositionOverride = positions;
+    this.uploadSimulationVertices();
+  }
+
+  /** Per-vertex RGBA highlight tint (BC previews); null clears it. */
+  setSimulationOverlay(colors: Float32Array | null): void {
+    this.simOverlay = colors;
+    this.uploadSimulationVertices();
+  }
+
+  /** Re-interleave and upload the surface vertices from the current view. */
+  private uploadSimulationVertices(): void {
+    const payload = this.simPayload;
+    if (!payload || !this.device || this.simIndexCount === 0) {
+      this.invalidate();
+      return;
+    }
+    const positions = this.simPositionOverride ?? payload.positions;
+    const scalars = this.simScalarOverride ?? payload.scalars;
+    const overlay = this.simOverlay;
+    const vertexCount = payload.vertex_count;
+    const interleaved = new Float32Array(vertexCount * 8);
+    for (let index = 0; index < vertexCount; index++) {
+      const base = index * 8;
+      interleaved[base] = positions[index * 3];
+      interleaved[base + 1] = positions[index * 3 + 1];
+      interleaved[base + 2] = positions[index * 3 + 2];
+      interleaved[base + 3] = scalars[index] ?? 0;
+      if (overlay) {
+        interleaved[base + 4] = overlay[index * 4];
+        interleaved[base + 5] = overlay[index * 4 + 1];
+        interleaved[base + 6] = overlay[index * 4 + 2];
+        interleaved[base + 7] = overlay[index * 4 + 3];
+      }
+    }
+    this.simVertexBuffer?.destroy();
+    this.simVertexBuffer = this.device.createBuffer({
+      label: "simulation vertices",
+      size: interleaved.byteLength,
+      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+    });
+    this.device.queue.writeBuffer(this.simVertexBuffer, 0, interleaved);
+    this.simBounds = meshBounds(positions);
+    this.invalidate();
+  }
+
+  /** Tint one face group's triangle range on hover (null clears it). */
+  setSimulationHighlight(range: { start: number; count: number } | null): void {
+    this.simHighlight = range;
+    this.scheduleRender();
+  }
+
+  /** Move the ParaView-style clip plane of the simulation surface. */
+  setSimulationClip(clip: SliceState): void {
+    this.simClip = { ...clip };
+    this.scheduleRender();
   }
 
   /**
@@ -674,6 +950,13 @@ export class Renderer {
     this.scheduleRender();
   }
 
+  /** Replace the dual-contour mesh edges gated by the mesh-edges display flag. */
+  setMeshEdges(payload: MeshEdgePayload | null): void {
+    this.meshEdges = payload;
+    this.uploadOverlay();
+    this.scheduleRender();
+  }
+
   private uploadOverlay(): void {
     if (!this.device) return;
     const edges: number[] = [];
@@ -752,9 +1035,40 @@ export class Renderer {
       }
     }
 
+    // The extracted mesh edges share the sketch edge pipeline in one buffer:
+    // wire first, sharp second, so the two display switches can draw either
+    // instance range independently.
+    const meshSegments: number[] = [];
+    if (this.meshEdges) {
+      for (const [start, end] of this.meshEdges.wire) {
+        meshSegments.push(start[0], start[1], start[2], end[0], end[1], end[2], ...COLORS.meshWire);
+      }
+      for (const [start, end] of this.meshEdges.sharp) {
+        meshSegments.push(
+          start[0],
+          start[1],
+          start[2],
+          end[0],
+          end[1],
+          end[2],
+          ...COLORS.meshSharp,
+        );
+      }
+    }
+
     this.edgeCount = edges.length / (EDGE_STRIDE / 4);
     this.handleCount = handles.length / (HANDLE_STRIDE / 4);
     this.gizmoCount = gizmo.length / (GIZMO_STRIDE / 4);
+    this.meshWireCount = this.meshEdges?.wire.length ?? 0;
+    this.meshSharpCount = this.meshEdges?.sharp.length ?? 0;
+    this.meshEdgeBuffer = this.writeInstances(
+      this.meshEdgeBuffer,
+      new Float32Array(meshSegments),
+      EDGE_STRIDE,
+      (capacity) => (this.meshEdgeCapacity = capacity),
+      this.meshEdgeCapacity,
+      "mesh edges",
+    );
     this.edgeBuffer = this.writeInstances(
       this.edgeBuffer,
       new Float32Array(edges),
@@ -960,10 +1274,84 @@ export class Renderer {
     );
     overlay.set([DEPTH_NUDGE, 0, 0, 0], 24);
     device.queue.writeBuffer(this.overlayBuffer, 0, overlay);
+
+    // Mesh edges sit exactly on the surface creases the construction
+    // wireframe also traces; a smaller nudge keeps them consistently behind
+    // coincident construction lines instead of z-fighting into dashes.
+    overlay.set([DEPTH_NUDGE * 0.4, 0, 0, 0], 24);
+    device.queue.writeBuffer(this.meshOverlayBuffer, 0, overlay);
+
+    if (this._simulationActive && this.simUniformBuffer && this.simHighlightUniformBuffer) {
+      const { normal, offset } = slicePlane(this.simClip, this.simBounds);
+      const [low, high] = this.simRange;
+      const span = high - low;
+      const inverseRange = span > 1e-12 ? 1 / span : 0;
+      const ramp = this.simulationRamp === "quality" ? 1 : 0;
+      const sim = new Float32Array(28);
+      sim.set(matrix, 0);
+      sim.set([normal[0], normal[1], normal[2], offset], 16);
+      sim.set([low, inverseRange, 0, this.simClip.enabled ? 1 : 0], 20);
+      sim.set([ramp, 0, 0, 0], 24);
+      device.queue.writeBuffer(this.simUniformBuffer, 0, sim);
+      // The highlight pass re-draws a face group's range with a warm tint.
+      sim.set([low, inverseRange, 0.55, this.simClip.enabled ? 1 : 0], 20);
+      device.queue.writeBuffer(this.simHighlightUniformBuffer, 0, sim);
+    }
+  }
+
+  /** Draw the FEM surface (and its hovered face group) into the pass. */
+  private drawSimulation(pass: GPURenderPassEncoder): void {
+    if (
+      !this._simulationActive ||
+      !this.simPipeline ||
+      !this.simBindGroup ||
+      !this.simVertexBuffer ||
+      !this.simIndexBuffer ||
+      this.simIndexCount === 0
+    ) {
+      return;
+    }
+    pass.setPipeline(this.simPipeline);
+    pass.setBindGroup(0, this.simBindGroup);
+    pass.setVertexBuffer(0, this.simVertexBuffer);
+    pass.setIndexBuffer(this.simIndexBuffer, "uint32");
+    pass.drawIndexed(this.simIndexCount);
+    const highlight = this.simHighlight;
+    if (highlight && this.simHighlightBindGroup) {
+      pass.setBindGroup(0, this.simHighlightBindGroup);
+      pass.drawIndexed(highlight.count, 1, highlight.start);
+    }
+    if (
+      this._simulationEdgesVisible &&
+      this.simEdgePipeline &&
+      this.simEdgeIndexBuffer &&
+      this.simEdgeIndexCount > 0
+    ) {
+      pass.setPipeline(this.simEdgePipeline);
+      pass.setBindGroup(0, this.simBindGroup);
+      pass.setVertexBuffer(0, this.simVertexBuffer);
+      pass.setIndexBuffer(this.simEdgeIndexBuffer, "uint32");
+      pass.drawIndexed(this.simEdgeIndexCount);
+    }
   }
 
   private drawOverlay(pass: GPURenderPassEncoder): void {
     if (!this.overlayBindGroup) return;
+    const wantMeshWire = this.display.showMeshWireframe && this.meshWireCount > 0;
+    const wantMeshSharp = this.display.showMeshEdges && this.meshSharpCount > 0;
+    if (
+      (wantMeshWire || wantMeshSharp) &&
+      this.meshEdgeBuffer &&
+      this.edgePipeline &&
+      this.meshOverlayBindGroup
+    ) {
+      pass.setPipeline(this.edgePipeline);
+      pass.setBindGroup(0, this.meshOverlayBindGroup);
+      pass.setVertexBuffer(0, this.meshEdgeBuffer);
+      if (wantMeshWire) pass.draw(6, this.meshWireCount, 0, 0);
+      if (wantMeshSharp) pass.draw(6, this.meshSharpCount, 0, this.meshWireCount);
+      pass.setBindGroup(0, this.overlayBindGroup);
+    }
     if (this.display.showSketches && this.edgeCount && this.edgeBuffer && this.edgePipeline) {
       pass.setPipeline(this.edgePipeline);
       pass.setBindGroup(0, this.overlayBindGroup);
@@ -1020,7 +1408,9 @@ export class Renderer {
       depthLoadOp: "clear",
       depthStoreOp: "store",
     };
-    const tracing = this.pathTracing && this.pathReady && !this.interacting;
+    // The path tracer draws the SDF scene, which simulation display replaces.
+    const tracing =
+      this.pathTracing && this.pathReady && !this.interacting && !this._simulationActive;
 
     if (tracing) {
       this.ensureAccumulation();
@@ -1069,6 +1459,7 @@ export class Renderer {
       previewPass.setPipeline(this.previewPipeline);
       previewPass.setBindGroup(0, this.previewBindGroup);
       previewPass.draw(3);
+      this.drawSimulation(previewPass);
       this.drawOverlay(previewPass);
       previewPass.end();
     }
@@ -1101,6 +1492,8 @@ export class Renderer {
     this.edgeBuffer?.destroy();
     this.handleBuffer?.destroy();
     this.gizmoBuffer?.destroy();
+    this.simVertexBuffer?.destroy();
+    this.simIndexBuffer?.destroy();
     this.device?.destroy();
   }
 }

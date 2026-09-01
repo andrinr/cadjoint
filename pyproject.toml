@@ -3,10 +3,10 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "jaxcad"
+name = "cadjoint"
 version = "0.1.0"
 description = "Fully differentiable CAD software built with JAX"
-license = { text = "Elastic-2.0" }
+license = { text = "Apache-2.0" }
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
@@ -18,13 +18,34 @@ dependencies = [
 ]
 
 [project.scripts]
-jaxcad-viewer = "jaxcad.viewer.playground:main"
+cadjoint-viewer = "cadjoint.viewer.playground:main"
 
 [project.optional-dependencies]
 # CPU JAX is the default so the package installs on macOS and CPU-only Linux.
 # Install this extra on a Linux box with an NVIDIA GPU (no macOS wheels exist).
 cuda = ["jax[cuda12]>=0.4.20"]
-glsl = ["moderngl>=5.12.0"]
+# jax-fem 0.0.12 ships an empty install_requires, so its actual imports
+# (basix, meshio, gmsh, petsc4py, pyfiglet, scipy) are listed here explicitly.
+# The python_version markers keep uv's universal resolution working for the
+# project's full >=3.9 range: these solver stacks only support newer Pythons.
+fem = [
+    "jax-fem; python_version >= '3.11'",
+    "fenics-basix; python_version >= '3.11'",
+    "meshio; python_version >= '3.11'",
+    "gmsh; python_version >= '3.11'",
+    "petsc4py; python_version >= '3.11'",
+    "pyfiglet; python_version >= '3.11'",
+    "scipy; python_version >= '3.11'",
+]
+tesseract = [
+    "tesseract-core[runtime]; python_version >= '3.11'",
+    "tesseract-jax; python_version >= '3.11'",
+]
+# Dev-only STEP validation: tests/meshing/test_step_kernel.py round-trips
+# save_step output through the OCCT kernel (importorskip'd when absent).
+# cadquery-ocp ships wheels for CPython 3.10-3.14 only, so the marker keeps
+# uv's universal resolution working for the project's full >=3.9 range.
+stepcheck = ["cadquery-ocp; python_version >= '3.10' and python_version < '3.15'"]
 viewer = ["anywidget>=0.9.21"]
 dev = [
     "pytest>=7.0.0",
@@ -38,12 +59,12 @@ docs = [
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["jaxcad*"]
+include = ["cadjoint*"]
 
-# The playground UI is built from frontend/ into jaxcad/viewer/static and
-# committed, so installing jaxcad needs no Node toolchain.
+# The playground UI is built from frontend/ into cadjoint/viewer/static and
+# committed, so installing cadjoint needs no Node toolchain.
 [tool.setuptools.package-data]
-"jaxcad.viewer" = ["static/*", "static/**/*"]
+"cadjoint.viewer" = ["static/*", "static/**/*"]
 
 [dependency-groups]
 dev = [

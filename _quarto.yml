@@ -5,7 +5,7 @@ project:
     - docs/assets/**
 
 website:
-  title: jaxCAD
+  title: cadjoint
   description: Differentiable CAD with JAX and SDFs
   navbar:
     left:
@@ -33,7 +33,7 @@ website:
         href: reference/index.qmd
     right:
       - icon: github
-        href: https://github.com/andrinr/jaxcad
+        href: https://github.com/andrinr/cadjoint
 
 format:
   html:
@@ -46,7 +46,7 @@ execute:
   enabled: false  # render stored outputs, don't re-execute
 
 quartodoc:
-  package: jaxcad
+  package: cadjoint
   dir: reference
   parser: google
   sections:
@@ -91,4 +91,3 @@ quartodoc:
         - render.raymarch.render.render_scene
         - render.raymarch.render.raymarch
         - render.raymarch.render.render_raymarched
-        - render.marching_cubes.render_marching_cubes

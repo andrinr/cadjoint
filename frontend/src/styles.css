@@ -11,6 +11,24 @@
   color-scheme: dark;
 }
 
+/* Per-mode accent, threaded through the mode switcher, tool rail, dock
+   section headers, hint bar, and the viewport border. Keep the values in
+   sync with MODE_ACCENTS in src/editingMode.ts. */
+.app[data-mode="model"] {
+  --mode-accent: #d9ff57;
+  --mode-accent-rgb: 217, 255, 87;
+}
+
+.app[data-mode="sketch"] {
+  --mode-accent: #7fd6f5;
+  --mode-accent-rgb: 127, 214, 245;
+}
+
+.app[data-mode="simulate"] {
+  --mode-accent: #ffb25c;
+  --mode-accent-rgb: 255, 178, 92;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -31,8 +49,126 @@ body {
 
 .app {
   display: grid;
-  grid-template-rows: 52px 1fr;
+  grid-template-rows: 30px 52px 1fr;
   height: 100%;
+}
+
+/* Menu bar ------------------------------------------------------------- */
+
+.menu-bar {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--line);
+  background: #0b0d0c;
+}
+
+.menu {
+  position: relative;
+  display: flex;
+}
+
+.menu-title {
+  height: auto;
+  margin: 3px 0;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.menu-title:hover,
+.menu-title.active {
+  background: #171a17;
+  color: var(--ink);
+}
+
+.menu-dropdown {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 208px;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5);
+}
+
+.menu-dropdown button,
+.menu-dropdown a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  width: 100%;
+  height: 26px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.menu-dropdown button:hover:not(:disabled),
+.menu-dropdown a:hover,
+.menu-dropdown button:focus-visible,
+.menu-dropdown a:focus-visible {
+  background: #1b1f1b;
+  outline: none;
+}
+
+.menu-dropdown button:disabled {
+  opacity: 0.4;
+}
+
+.menu-dropdown small {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.menu-dropdown hr {
+  height: 1px;
+  margin: 4px 2px;
+  border: 0;
+  background: var(--line);
+}
+
+.menu-dropdown [role="menuitemcheckbox"] {
+  justify-content: flex-start;
+  gap: 7px;
+}
+
+.menu-check {
+  width: 13px;
+  color: var(--lime);
+  font-size: 10px;
+  font-style: normal;
+}
+
+.menu-scene {
+  align-self: center;
+  margin-left: auto;
+  overflow: hidden;
+  max-width: 32ch;
+  color: var(--muted);
+  font: 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Toolbar ------------------------------------------------------------- */
@@ -68,6 +204,63 @@ body {
 
 .spacer {
   flex: 1;
+}
+
+/* Mode switcher: a prominent segmented control next to the brand, the way
+   Blender and Fusion place their workspace picker. Each segment lights in
+   its own mode accent when active. */
+.mode-switcher {
+  display: flex;
+  gap: 2px;
+  margin-left: 8px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #0a0c0b;
+}
+
+.mode-switcher button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+}
+
+.mode-switcher button svg {
+  width: 15px;
+  height: 15px;
+}
+
+.mode-switcher button:hover:not(.active) {
+  border-color: transparent;
+  background: #171a17;
+  color: var(--ink);
+}
+
+.mode-switcher button[data-mode="model"] {
+  --seg-rgb: 217, 255, 87;
+}
+
+.mode-switcher button[data-mode="sketch"] {
+  --seg-rgb: 127, 214, 245;
+}
+
+.mode-switcher button[data-mode="simulate"] {
+  --seg-rgb: 255, 178, 92;
+}
+
+.mode-switcher button.active {
+  border-color: rgba(var(--seg-rgb), 0.6);
+  background: rgba(var(--seg-rgb), 0.12);
+  color: rgb(var(--seg-rgb));
 }
 
 button,
@@ -149,9 +342,9 @@ button.primary {
 }
 
 .tool-rail button.active {
-  border-color: var(--lime);
-  background: #202616;
-  color: var(--lime);
+  border-color: var(--mode-accent, var(--lime));
+  background: rgba(var(--mode-accent-rgb, 217, 255, 87), 0.12);
+  color: var(--mode-accent, var(--lime));
 }
 
 .tool-rail button:disabled {
@@ -173,26 +366,95 @@ button.primary {
 }
 
 .rail-hint {
-  color: var(--lime);
+  color: var(--mode-accent, var(--lime));
   font: 600 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
-/* Sketch history ------------------------------------------------------- */
+/* Grouped tool clusters: the parent shows the last-used child and expands
+   into a horizontal flyout of children beside the rail. */
+.tool-group {
+  position: relative;
+}
+
+.tool-rail .tool-group-parent {
+  position: relative;
+}
+
+.tool-group-caret {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-bottom: 4px solid var(--muted);
+}
+
+.tool-group-parent.active .tool-group-caret {
+  border-bottom-color: var(--mode-accent, var(--lime));
+}
+
+.tool-flyout {
+  display: none;
+  position: absolute;
+  top: -1px;
+  left: calc(100% + 10px);
+  z-index: 11;
+  gap: 4px;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(14, 17, 15, 0.94);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.45);
+}
+
+.tool-group.open .tool-flyout {
+  display: flex;
+}
+
+/* Invisible bridge so the pointer can travel from parent to flyout without
+   leaving the group and starting the close delay. */
+.tool-group.open::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 100%;
+  width: 10px;
+  height: 100%;
+}
+
+/* Sketch-plane quick picks, shown while the sketch tool is armed. */
+.plane-picks {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  padding-top: 2px;
+}
+
+.plane-picks-label {
+  color: var(--muted);
+  font: 600 8px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-align: center;
+}
+
+.tool-rail .plane-picks button {
+  width: 34px;
+  height: 22px;
+  font: 600 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.05em;
+}
+
+/* Sketch history (a dock section; the shell comes from the dock rules). */
 
 .sketch-panel {
-  position: absolute;
-  left: 62px;
-  bottom: 14px;
-  z-index: 9;
-  width: min(340px, calc(100% - 150px));
   padding: 11px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: rgba(14, 17, 15, 0.9);
-  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(10px);
+  overflow: auto;
 }
 
 .sketch-panel header {
@@ -231,6 +493,58 @@ button.primary {
   color: #cbd99a;
   background: rgba(217, 255, 87, 0.06);
   font: 600 9px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.history-chips .constraint-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.history-chips .chip-label {
+  padding: 0;
+  border: none;
+  background: none;
+}
+
+.history-chips .chip-label.editable {
+  cursor: pointer;
+  text-decoration: underline dotted rgba(217, 255, 87, 0.5);
+  text-underline-offset: 2px;
+}
+
+.history-chips .chip-value {
+  width: 46px;
+  height: auto;
+  padding: 0 2px;
+  border: 1px solid rgba(217, 255, 87, 0.4);
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.35);
+  color: inherit;
+  font: inherit;
+}
+
+.history-chips .chip-delete {
+  height: auto;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.65;
+}
+
+.history-chips .chip-delete:hover:not(:disabled) {
+  opacity: 1;
+  color: #ff9d9d;
+}
+
+.history-chips .chip-delete:disabled {
+  cursor: default;
+  opacity: 0.3;
 }
 
 .empty-history {
@@ -350,46 +664,304 @@ button.primary {
   vector-effect: non-scaling-stroke;
 }
 
-/* Material browser ----------------------------------------------------- */
+/* Right-side dock: one column of collapsible sections ------------------ */
 
-.material-launch {
+/* Object tree, sketch properties, materials, and simulate share this
+   column. Sections shrink together (flex 0 1 auto + min-height 0) and
+   scroll internally, so the dock never overlaps the ViewCube above it or
+   the hint bar below, and never runs off-screen. */
+.dock {
   position: absolute;
   top: 158px;
   right: 14px;
+  bottom: 46px;
   z-index: 9;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   gap: 8px;
-  height: 38px;
-  padding: 0 10px 0 8px;
-  border-radius: 10px;
+  width: 292px;
+  pointer-events: none;
+}
+
+.dock > * {
+  flex: 0 1 auto;
+  min-height: 0;
+  pointer-events: auto;
+}
+
+.dock > button {
+  flex: 0 0 auto;
+}
+
+/* Keep every open section usable while the dock squeezes them: each holds a
+   small minimum (header plus a couple of rows) and scrolls internally. The
+   minimums sum well below the dock height at 800px-tall viewports. */
+.dock .object-tree-panel {
+  min-height: 104px;
+}
+
+.dock .sketch-panel {
+  min-height: 118px;
+}
+
+.dock .material-panel {
+  min-height: 126px;
+}
+
+.dock .sim-panel {
+  min-height: 150px;
+}
+
+/* Render settings popover: anchored to the toolbar's eye icon, openable
+   from any mode. Height-clamped; the settings list inside scrolls. */
+.render-popover-anchor {
+  position: relative;
+  display: flex;
+}
+
+.render-popover {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 40;
+  width: 300px;
+}
+
+.render-popover .render-panel {
+  max-height: min(72vh, 640px);
+  border-top-color: var(--line);
+}
+
+/* Collapsed sections: one shared launcher look (icon · label · count).
+   The accent top border is the dock's share of the mode identity. */
+.object-tree-launch,
+.material-launch,
+.sim-launch {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  height: 36px;
+  padding: 0 12px 0 10px;
+  border: 1px solid var(--line);
+  border-top: 2px solid rgba(var(--mode-accent-rgb, 217, 255, 87), 0.42);
+  border-radius: 11px;
   background: rgba(14, 17, 15, 0.9);
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.3);
   backdrop-filter: blur(10px);
+  font-weight: 600;
+  text-align: left;
 }
 
+.object-tree-launch svg {
+  width: 15px;
+  height: 15px;
+  color: var(--muted);
+}
+
+.object-tree-launch b,
 .material-launch b {
   min-width: 18px;
+  margin-left: auto;
   padding: 3px 5px;
   border-radius: 999px;
   background: rgba(217, 255, 87, 0.1);
   color: var(--lime);
   font: 600 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  text-align: center;
 }
 
-.material-panel {
-  position: absolute;
-  top: 158px;
-  right: 14px;
-  z-index: 9;
-  width: 282px;
-  max-height: calc(100% - 210px);
-  overflow: auto;
+/* Expanded sections: one shared panel shell with the mode-accent header
+   strip along the top edge. */
+.object-tree-panel,
+.material-panel,
+.sim-panel,
+.sketch-panel,
+.render-panel {
+  width: 100%;
   border: 1px solid var(--line);
+  border-top: 2px solid rgba(var(--mode-accent-rgb, 217, 255, 87), 0.42);
   border-radius: 13px;
   background: rgba(14, 17, 15, 0.91);
   box-shadow: 0 16px 42px rgba(0, 0, 0, 0.35);
   backdrop-filter: blur(12px);
+}
+
+/* Section header kickers pick up the accent too, so an open dock reads as
+   part of the active mode at a glance. */
+.object-tree-panel > header small,
+.sketch-panel header small,
+.material-panel-title small,
+.sim-panel header small,
+.render-panel header small {
+  color: rgba(var(--mode-accent-rgb, 217, 255, 87), 0.85);
+  opacity: 1;
+}
+
+/* Object tree ----------------------------------------------------------- */
+
+.object-tree-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.object-tree-panel > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: 0 0 auto;
+  padding: 8px 7px 6px 12px;
+}
+
+.object-tree-panel > header > span {
+  display: flex;
+  flex-direction: column;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.05;
+}
+
+.object-tree-panel > header small {
+  margin-top: 3px;
+  color: var(--muted);
+  font: 600 8px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.object-tree-close {
+  width: 28px;
+  height: 28px;
+  padding: 0 0 2px;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1;
+}
+
+.object-tree-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-height: 0;
+  padding: 0 6px 8px;
+  overflow: auto;
+}
+
+.object-tree-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 26px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  color: var(--ink);
+  font-size: 11px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.object-tree-row:hover,
+.object-tree-row.hovered {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.object-tree-row.active {
+  background: rgba(var(--mode-accent-rgb, 217, 255, 87), 0.08);
+  outline: 1px solid rgba(var(--mode-accent-rgb, 217, 255, 87), 0.4);
+}
+
+.object-tree-row:focus-visible {
+  outline: 1px solid var(--mode-accent, var(--lime));
+}
+
+.object-tree-row.operator {
+  color: #cbd99a;
+  font: 600 9px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.tree-caret {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  color: var(--muted);
+  font-size: 8px;
+  cursor: pointer;
+}
+
+.tree-caret-space {
+  flex: 0 0 auto;
+  width: 14px;
+}
+
+.tree-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: var(--muted);
+}
+
+.tree-icon svg {
+  width: 13px;
+  height: 13px;
+}
+
+.tree-label {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tree-detail {
+  color: var(--muted);
+  font-size: 9px;
+  white-space: nowrap;
+}
+
+.tree-badge {
+  flex: 0 0 auto;
+  min-width: 16px;
+  margin-left: auto;
+  padding: 2px 4px;
+  border-radius: 999px;
+  background: rgba(154, 220, 244, 0.12);
+  color: #9adcf4;
+  font: 700 8px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  text-align: center;
+}
+
+.tree-badge + .tree-material {
+  margin-left: 0;
+}
+
+.tree-material {
+  flex: 0 1 auto;
+  max-width: 74px;
+  margin-left: auto;
+  padding: 2px 5px;
+  border: 1px solid rgba(217, 255, 87, 0.24);
+  border-radius: 999px;
+  background: rgba(217, 255, 87, 0.06);
+  color: #cbd99a;
+  font: 600 8px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Material browser ----------------------------------------------------- */
+
+.material-panel {
+  max-height: 100%;
+  overflow: auto;
 }
 
 .material-panel > header {
@@ -747,11 +1319,7 @@ button.primary {
   color: var(--lime);
 }
 
-/* Render settings panel ------------------------------------------------ */
-
-.display-options {
-  position: relative;
-}
+/* Render settings (the eye-icon popover in the toolbar) ----------------- */
 
 button.icon {
   display: grid;
@@ -760,35 +1328,63 @@ button.icon {
   padding: 0;
 }
 
+/* The eye is active exactly while its popover is open; it glows in the
+   current mode's accent rather than the default lime. */
+.toolbar button.icon.active {
+  border-color: rgba(var(--mode-accent-rgb, 217, 255, 87), 0.6);
+  background: rgba(var(--mode-accent-rgb, 217, 255, 87), 0.12);
+  color: var(--mode-accent, var(--lime));
+}
+
 button.primary svg {
   margin-right: 6px;
 }
 
-.display-options .popover {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  z-index: 20;
+.render-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.render-panel > header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px 8px;
+}
+
+.render-panel > header > span {
+  display: flex;
+  flex-direction: column;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.05;
+}
+
+.render-panel > header small {
+  margin-top: 3px;
+  font: 600 8px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.render-settings {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  width: 300px;
-  max-height: calc(100vh - 72px);
-  padding: 14px;
+  min-height: 0;
+  padding: 0 12px 12px;
   overflow: auto;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--panel);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
 }
 
-.display-options section {
+.render-settings section {
   display: flex;
   flex-direction: column;
   gap: 7px;
 }
 
-.display-options h4 {
+.render-settings h4 {
   margin: 0;
   color: var(--muted);
   font: 600 10px/1 system-ui;
@@ -835,8 +1431,8 @@ button.primary svg {
 }
 
 .render-preset-card.active {
-  border-color: rgba(217, 255, 87, 0.72);
-  background: rgba(217, 255, 87, 0.055);
+  border-color: rgba(var(--mode-accent-rgb, 217, 255, 87), 0.72);
+  background: rgba(var(--mode-accent-rgb, 217, 255, 87), 0.055);
 }
 
 .render-preset-card.active::after {
@@ -846,8 +1442,8 @@ button.primary svg {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--lime);
-  box-shadow: 0 0 8px rgba(217, 255, 87, 0.72);
+  background: var(--mode-accent, var(--lime));
+  box-shadow: 0 0 8px rgba(var(--mode-accent-rgb, 217, 255, 87), 0.72);
   content: "";
 }
 
@@ -957,7 +1553,7 @@ button.primary svg {
 }
 
 .render-customize > i {
-  color: var(--lime);
+  color: var(--mode-accent, var(--lime));
   font: normal 16px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
@@ -1012,8 +1608,8 @@ button.primary svg {
 }
 
 .segmented button.active {
-  background: #222a1b;
-  color: var(--lime);
+  background: rgba(var(--mode-accent-rgb, 217, 255, 87), 0.14);
+  color: var(--mode-accent, var(--lime));
 }
 
 .switch {
@@ -1031,7 +1627,7 @@ button.primary svg {
 
 .switch input {
   margin-top: 2px;
-  accent-color: var(--lime);
+  accent-color: var(--mode-accent, var(--lime));
 }
 
 .switch span {
@@ -1107,8 +1703,79 @@ button.primary svg {
 
 .panes {
   display: grid;
-  grid-template-columns: minmax(320px, 42%) 1fr;
+  /* Overridden inline by the splitter; this is the pre-mount fallback. */
+  grid-template-columns: minmax(320px, 42%) 6px 1fr;
   min-height: 0;
+  transition: grid-template-columns 220ms ease;
+}
+
+.panes.resizing {
+  transition: none;
+}
+
+.pane-splitter {
+  position: relative;
+  z-index: 31;
+  margin-left: -1px;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.pane-splitter:hover,
+.panes.resizing .pane-splitter {
+  background: rgba(217, 255, 87, 0.28);
+}
+
+.panes.editor-collapsed .pane-splitter {
+  cursor: default;
+  pointer-events: none;
+}
+
+.editor-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  overflow: hidden;
+  border-right: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.editor-rail button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0 0 2px;
+  border-radius: 7px;
+  color: var(--lime);
+  font-size: 14px;
+}
+
+.editor-rail-label {
+  color: var(--muted);
+  font: 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.14em;
+  writing-mode: vertical-rl;
+}
+
+.editor-collapse {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0 0 2px;
+  border-color: transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.editor-collapse:hover {
+  color: var(--ink);
+  background: #1b1f1b;
 }
 
 .pane {
@@ -1147,135 +1814,6 @@ button.primary svg {
   gap: 10px;
 }
 
-.autodiff-wrap {
-  position: relative;
-}
-
-.autodiff-toggle {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  height: 24px;
-  padding: 0 6px;
-  border-color: rgba(154, 220, 244, 0.3);
-  border-radius: 999px;
-  background: rgba(154, 220, 244, 0.06);
-  color: #c9efff;
-  font: 650 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.autodiff-toggle i {
-  color: #9adcf4;
-  font: 700 14px/1 Georgia, serif;
-  font-style: normal;
-}
-
-.autodiff-toggle small {
-  min-width: 17px;
-  padding: 2px 4px;
-  border-radius: 999px;
-  background: rgba(154, 220, 244, 0.12);
-  color: #9adcf4;
-  font: 700 8px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
-}
-
-.autodiff-panel {
-  position: absolute;
-  top: calc(100% + 9px);
-  right: 0;
-  z-index: 40;
-  width: 310px;
-  padding: 13px;
-  border: 1px solid rgba(154, 220, 244, 0.24);
-  border-radius: 11px;
-  background:
-    radial-gradient(circle at 100% 0, rgba(154, 220, 244, 0.08), transparent 42%),
-    rgba(14, 17, 15, 0.97);
-  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(12px);
-}
-
-.autodiff-title {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.autodiff-title > span {
-  display: grid;
-  gap: 3px;
-  color: var(--ink);
-  font-size: 12px;
-  font-weight: 650;
-}
-
-.autodiff-title small {
-  color: #9adcf4;
-  font: 650 8px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-}
-
-.autodiff-title > b {
-  color: #9adcf4;
-  font: 700 24px/1 Georgia, serif;
-}
-
-.autodiff-panel > p {
-  margin: 10px 0;
-  color: var(--muted);
-  font: 600 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
-}
-
-.autodiff-metric,
-.autodiff-panel li {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.autodiff-metric {
-  padding: 8px 9px;
-  border: 1px solid rgba(217, 255, 87, 0.15);
-  border-radius: 7px;
-  background: rgba(217, 255, 87, 0.035);
-  color: #cbd99a;
-  font-size: 10px;
-}
-
-.autodiff-metric b,
-.autodiff-panel li b {
-  color: var(--lime);
-  font: 650 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
-}
-
-.autodiff-panel ul {
-  display: grid;
-  gap: 5px;
-  margin: 8px 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.autodiff-panel li {
-  padding: 6px 3px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.045);
-}
-
-.autodiff-panel li code {
-  color: #c9efff;
-  font: 9px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
-}
-
-.autodiff-panel footer {
-  margin-top: 9px;
-  color: var(--muted);
-  font-size: 9px;
-}
-
 .pane-hint {
   color: var(--muted);
   font-size: 11px;
@@ -1301,6 +1839,19 @@ button.primary svg {
 
 .viewer-pane {
   background: #090b0a;
+}
+
+/* Subtle mode cue on the viewport itself: a thin tinted border with a
+   slightly stronger strip along the top edge. Non-interactive; sits above
+   the canvas but under every overlay. */
+.viewer-pane::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  border: 1px solid rgba(var(--mode-accent-rgb, 217, 255, 87), 0.16);
+  border-top: 2px solid rgba(var(--mode-accent-rgb, 217, 255, 87), 0.5);
+  pointer-events: none;
 }
 
 .viewer-canvas {
@@ -1424,6 +1975,23 @@ button.primary svg {
   pointer-events: none;
 }
 
+/* Active editing mode, leading the hint bar: an accent-tinted pill. */
+.viewer-hint .hint-mode {
+  padding: 2px 7px;
+  border: 1px solid rgba(var(--mode-accent-rgb, 217, 255, 87), 0.45);
+  border-radius: 999px;
+  background: rgba(var(--mode-accent-rgb, 217, 255, 87), 0.1);
+  color: var(--mode-accent, var(--lime));
+  font: 600 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* The simulate-mode slot only positions its owner's panel. */
+.mode-simulate-slot {
+  display: contents;
+}
+
 .viewer-error {
   position: absolute;
   bottom: 40px;
@@ -1482,4 +2050,875 @@ button.primary svg {
   padding: 14px 18px;
   overflow: auto;
   font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* Menu-bar dialogs (open, save-as, shortcuts) -------------------------- */
+
+.dialog-compact {
+  width: min(460px, calc(100% - 48px));
+  height: auto;
+  max-height: min(580px, calc(100% - 48px));
+}
+
+.dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  padding: 14px 18px 16px;
+  overflow: auto;
+}
+
+.dialog-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.dialog-note code {
+  color: #cbd99a;
+  font-size: 10px;
+}
+
+.dialog-error {
+  margin: 0;
+  color: #ffb3a1;
+  font-size: 11px;
+}
+
+.scene-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.scene-list button {
+  width: 100%;
+  height: 30px;
+  text-align: left;
+  font: 600 12px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.save-as-form label {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.save-as-form input[type="text"] {
+  height: 30px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #171a17;
+  color: var(--ink);
+  font: 600 12px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.save-as-form button.primary {
+  justify-self: start;
+}
+
+.shortcut-groups {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 18px;
+}
+
+.shortcut-groups h4 {
+  margin: 0 0 7px;
+  color: var(--muted);
+  font: 600 10px/1 system-ui;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.shortcut-groups ul {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.shortcut-groups li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 11px;
+}
+
+.shortcut-groups li span {
+  color: var(--ink);
+}
+
+.shortcut-groups kbd {
+  padding: 2px 6px;
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: #171a17;
+  color: #cbd99a;
+  font: 600 10px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: nowrap;
+}
+
+/* ── FEM simulate mode (a dock section) ────────────────────────────────── */
+
+.sim-panel {
+  max-height: 100%;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 11px;
+}
+
+/* When the dock shrinks the section, the panel scrolls — its rows must not
+   be flex-crushed to zero height (the face-group list used to vanish). */
+.sim-panel > * {
+  flex: 0 0 auto;
+}
+.sim-panel header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.sim-panel header span {
+  display: flex;
+  flex-direction: column;
+  font-weight: 600;
+}
+.sim-panel header small {
+  opacity: 0.6;
+  font: 600 9px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.sim-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+.sim-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 11px;
+}
+.sim-row input[type="number"],
+.sim-row select {
+  width: 76px;
+}
+.sim-help {
+  margin: 0;
+  font-size: 11px;
+  opacity: 0.75;
+}
+/* Declared studies: one card per ThermalStudy/ElasticStudy in the code. */
+.sim-studies {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.sim-study {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+.sim-study-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.sim-study-head strong {
+  font-size: 12px;
+  margin-right: auto;
+}
+.sim-kind {
+  padding: 2px 6px;
+  border-radius: 999px;
+  font: 600 9px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.sim-kind-thermal {
+  background: rgba(255, 158, 64, 0.16);
+  color: #ffb36b;
+}
+.sim-kind-elastic {
+  background: rgba(122, 176, 255, 0.16);
+  color: #9cc2ff;
+}
+.sim-delete {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border-radius: 6px;
+  line-height: 1;
+  opacity: 0.65;
+}
+.sim-delete:hover {
+  opacity: 1;
+  color: #ff9c8a;
+}
+.sim-args {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.sim-args label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 10px;
+  opacity: 0.9;
+}
+.sim-args input[type="number"] {
+  width: 72px;
+}
+.sim-bcs {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sim-bcs li {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+}
+.sim-bc-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-right: auto;
+  min-width: 0;
+}
+.sim-bc-type {
+  font-size: 10px;
+  font-weight: 600;
+}
+.sim-bc-main code {
+  font-size: 10px;
+  opacity: 0.72;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 180px;
+}
+.sim-bcs li input[type="number"] {
+  width: 52px;
+}
+.sim-bc-readonly {
+  opacity: 0.66;
+}
+.sim-add-bc {
+  height: 26px;
+  border-radius: 8px;
+  border-style: dashed;
+  font-size: 11px;
+  opacity: 0.85;
+}
+.sim-add-study {
+  gap: 6px;
+}
+.sim-add-study button {
+  flex: 1;
+  height: 28px;
+  border-radius: 9px;
+  font-size: 11px;
+}
+/* The add-BC builder: type + selection pickers over per-kind numeric forms. */
+.sim-builder {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 7px;
+  border: 1px dashed var(--line);
+  border-radius: 9px;
+}
+.sim-builder-row {
+  display: flex;
+  gap: 8px;
+}
+.sim-builder-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 10px;
+  flex: 1;
+}
+.sim-sides {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+}
+.sim-sides button {
+  height: 24px;
+  border-radius: 7px;
+  font: 600 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.sim-sides button.active {
+  color: var(--mode-accent, #ff9e40);
+  border-color: currentColor;
+}
+.sim-builder-vector {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+}
+.sim-builder-vector span {
+  width: 52px;
+  opacity: 0.8;
+}
+.sim-builder-vector input[type="number"] {
+  width: 56px;
+}
+.sim-builder-actions {
+  display: flex;
+  gap: 6px;
+}
+.sim-builder-actions button {
+  flex: 1;
+  height: 26px;
+  border-radius: 8px;
+  font-size: 11px;
+}
+.sim-vector {
+  display: flex;
+  gap: 4px;
+}
+.sim-run {
+  height: 30px;
+  border-radius: 9px;
+  font-weight: 600;
+}
+.sim-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 11px;
+}
+.sim-ramp {
+  height: 10px;
+  border-radius: 5px;
+}
+.sim-legend-values {
+  display: flex;
+  justify-content: space-between;
+  font: 500 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+/* Viewport master switch (Scene | Mesh) + the element-edge toggle. */
+.sim-view-control {
+  align-items: center;
+  justify-content: space-between;
+}
+.sim-view-control .switch {
+  flex-direction: row !important;
+  align-items: center;
+}
+.sim-slice input[type="range"] {
+  flex: 1;
+  min-width: 60px;
+}
+.sim-slice button.active {
+  color: var(--lime, #d9ff57);
+  border-color: currentColor;
+}
+.sim-slice-toggle {
+  flex-direction: row !important;
+  align-items: center;
+}
+.sim-note,
+.sim-error {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.45;
+}
+.sim-note {
+  opacity: 0.8;
+}
+.sim-error {
+  color: #ff9c8a;
+  white-space: pre-wrap;
+}
+
+/* ── Optimize panel (a Model-mode dock section) ────────────────────────── */
+
+.dock .optimize-panel {
+  min-height: 130px;
+}
+
+.opt-kind {
+  background: rgba(217, 255, 87, 0.12);
+  color: var(--lime, #d9ff57);
+}
+
+.opt-objective {
+  margin: 0;
+  font-size: 10px;
+  opacity: 0.8;
+}
+
+.opt-objective code {
+  color: var(--lime, #d9ff57);
+  font: 600 10px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.opt-parameters {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.opt-parameters li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 3px 6px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 10px;
+}
+
+.opt-parameters code {
+  font: 600 10px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+  opacity: 0.85;
+}
+
+.opt-parameter-values {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font: 500 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.opt-parameter-values i {
+  font-style: normal;
+  opacity: 0.55;
+}
+
+.opt-result {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.opt-spark svg {
+  display: block;
+  width: 100%;
+  height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.opt-spark polyline {
+  fill: none;
+  stroke: var(--lime, #d9ff57);
+  stroke-width: 1.6;
+  vector-effect: non-scaling-stroke;
+}
+
+.opt-spark .opt-cursor {
+  stroke: rgba(255, 255, 255, 0.55);
+  stroke-width: 1;
+  stroke-dasharray: 3 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.opt-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10px;
+  opacity: 0.85;
+}
+
+.opt-summary b {
+  font: 650 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--lime, #d9ff57);
+}
+
+.opt-player {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.opt-player button {
+  width: 26px;
+  height: 24px;
+  padding: 0;
+  border-radius: 7px;
+  font-size: 10px;
+}
+
+.opt-player input[type="range"] {
+  flex: 1;
+  min-width: 50px;
+}
+
+.opt-frame-label {
+  font: 500 9px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+  opacity: 0.75;
+  white-space: nowrap;
+}
+
+/* The replay is the payoff of a run — the button says so in words. */
+.opt-player button.opt-replay {
+  width: auto;
+  padding: 0 9px;
+  white-space: nowrap;
+  font-weight: 650;
+  color: var(--lime, #d9ff57);
+  border-color: rgba(217, 255, 87, 0.45);
+}
+
+.opt-player-hint {
+  display: block;
+  margin-top: -2px;
+  font-size: 9px;
+  opacity: 0.55;
+}
+
+/* ── Live run progress (streaming /api/optimize) ───────────────────────── */
+
+.opt-live {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.opt-progress {
+  position: relative;
+  height: 6px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.opt-progress i {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: var(--lime, #d9ff57);
+  transition: width 0.25s ease-out;
+}
+
+/* No step events yet (or a non-streaming server): a sweeping shimmer says
+   the run is alive even though its position is unknown. */
+.opt-progress.indeterminate i {
+  width: 35% !important;
+  animation: opt-progress-sweep 1.3s ease-in-out infinite;
+  opacity: 0.75;
+}
+
+@keyframes opt-progress-sweep {
+  0% {
+    margin-left: 0;
+  }
+  50% {
+    margin-left: 65%;
+  }
+  100% {
+    margin-left: 0;
+  }
+}
+
+.opt-live-stats {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 10px;
+  opacity: 0.85;
+}
+
+.opt-live-stats b {
+  font: 650 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--lime, #d9ff57);
+}
+
+/* ── Mesh inspector & results browsing (Simulate dock) ─────────────────── */
+
+.sim-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 2px;
+}
+
+.sim-section-head b {
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
+
+.sim-add-inline {
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 7px;
+  border-style: dashed;
+  font-size: 10px;
+  opacity: 0.85;
+}
+
+.sim-kind-mesh {
+  background: rgba(152, 234, 189, 0.16);
+  color: #9fe7bd;
+}
+
+.sim-inspect {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sim-stats {
+  display: flex;
+  gap: 10px;
+  font-size: 10px;
+  opacity: 0.9;
+}
+
+.sim-stats b {
+  font: 650 10px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--ink, #e7e6df);
+}
+
+.sim-histogram {
+  display: block;
+  width: 100%;
+  height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.sim-histogram rect {
+  fill: rgba(159, 231, 189, 0.75);
+}
+
+.sim-result-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.sim-field-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10px;
+}
+
+.sim-field-table th {
+  text-align: left;
+  font-weight: 600;
+  opacity: 0.6;
+  padding: 2px 4px;
+  border-bottom: 1px solid var(--line);
+}
+
+.sim-field-table td {
+  padding: 2px 4px;
+  font: 500 10px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.sim-field-picker {
+  align-self: stretch;
+}
+
+.sim-deform input[type="range"] {
+  flex: 1;
+  min-width: 50px;
+}
+
+/* ── BC visualization ──────────────────────────────────────────────────── */
+
+.sim-bc-swatch {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 4px;
+  border-radius: 2px;
+  vertical-align: baseline;
+}
+
+.sim-bc-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-size: 9px;
+  opacity: 0.85;
+}
+
+.sim-bc-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sim-bc-legend i {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+.sim-pick {
+  height: 24px;
+  border-radius: 7px;
+  font-size: 10px;
+}
+
+.sim-pick.active {
+  color: var(--mode-accent, #ff9e40);
+  border-color: currentColor;
+}
+
+/* Rubber-band rectangle while shift-dragging a box BC pick. */
+.bc-pick-rect {
+  position: absolute;
+  z-index: 6;
+  border: 1px dashed rgba(217, 255, 87, 0.9);
+  background: rgba(217, 255, 87, 0.08);
+  pointer-events: none;
+}
+
+/* Click-probe readout chip over the simulation surface. */
+.sim-probe {
+  position: absolute;
+  z-index: 7;
+  transform: translate(10px, -100%);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(14, 17, 15, 0.93);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+  font-size: 10px;
+}
+
+.sim-probe b {
+  font: 650 11px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--lime, #d9ff57);
+}
+
+.sim-probe span {
+  opacity: 0.75;
+}
+
+.sim-probe small {
+  font: 500 8px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+  opacity: 0.6;
+}
+
+.sim-method {
+  align-self: stretch;
+}
+
+.sim-method-hint {
+  font-size: 9px;
+  opacity: 0.6;
+}
+
+/* ── Simulate panel tabs ───────────────────────────────────────────────── */
+
+.sim-tabs {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.sim-tabs button {
+  position: relative;
+  flex: 1;
+  height: 24px;
+  padding: 0 4px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  font-size: 10px;
+  font-weight: 600;
+  opacity: 0.7;
+}
+
+.sim-tabs button:hover {
+  opacity: 1;
+}
+
+.sim-tabs button.active {
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--mode-accent, #ff9e40);
+  opacity: 1;
+}
+
+.sim-tab-badge {
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--mode-accent, #ff9e40);
+}
+
+.sim-help {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.sim-help p {
+  margin: 0;
+}
+
+.sim-probe-row {
+  padding: 4px 6px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.opt-parameters-toggle {
+  height: 20px;
+  border: none;
+  background: transparent;
+  font-size: 9px;
+  opacity: 0.65;
+  text-align: left;
+  padding: 0 2px;
+}
+
+.opt-parameters-toggle:hover {
+  opacity: 1;
 }

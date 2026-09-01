@@ -3,8 +3,8 @@
 import jax
 import jax.numpy as jnp
 
-from jaxcad.sdf.measure import volume
-from jaxcad.sdf.primitives import Box, Sphere
+from cadjoint.sdf.measure import volume
+from cadjoint.sdf.primitives import Box, Sphere
 
 BOUNDS = (-2, -2, -2)
 SIZE = (4, 4, 4)

@@ -1,0 +1,2 @@
+# Bulky per-run solver artifacts; regenerate with examples/fem_bracket_optimization.py.
+*.vtu

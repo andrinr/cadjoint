@@ -1,9 +1,9 @@
 """Tests for from_circle construction function."""
 
-from jaxcad.construction import from_circle
-from jaxcad.geometry.parameters import Scalar, Vector
-from jaxcad.geometry.primitives import Circle
-from jaxcad.sdf.primitives.cylinder import Cylinder
+from cadjoint.construction import from_circle
+from cadjoint.geometry.parameters import Scalar, Vector
+from cadjoint.geometry.primitives import Circle
+from cadjoint.sdf.primitives.cylinder import Cylinder
 
 
 def test_from_circle_basic():

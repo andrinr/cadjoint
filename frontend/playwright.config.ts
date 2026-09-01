@@ -1,6 +1,6 @@
 import { defineConfig } from "@playwright/test";
 
-const PORT = Number(process.env.JAXCAD_E2E_PORT ?? 8799);
+const PORT = Number(process.env.CADJOINT_E2E_PORT ?? 8799);
 
 /**
  * End-to-end tests run against the real playground server serving the built
@@ -22,7 +22,7 @@ export default defineConfig({
     viewport: { width: 1400, height: 900 },
   },
   webServer: {
-    command: `uv run python -m jaxcad.viewer.playground --port ${PORT}`,
+    command: `uv run python -m cadjoint.viewer.playground --port ${PORT}`,
     cwd: "..",
     url: `http://127.0.0.1:${PORT}/api/session`,
     reuseExistingServer: !process.env.CI,

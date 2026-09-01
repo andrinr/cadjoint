@@ -2,8 +2,8 @@
 
 import jax.numpy as jnp
 
-from jaxcad.geometry.parameters import Vector
-from jaxcad.geometry.primitives import Line
+from cadjoint.geometry.parameters import Vector
+from cadjoint.geometry.primitives import Line
 
 
 def test_line_basic():

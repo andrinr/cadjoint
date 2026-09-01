@@ -3,7 +3,7 @@
 import jax.numpy as jnp
 import pytest
 
-from jaxcad.sdf.primitives import Box
+from cadjoint.sdf.primitives import Box
 
 
 @pytest.mark.parametrize(

@@ -3,15 +3,15 @@
 import jax.numpy as jnp
 import pytest
 
-from jaxcad.constraints import (
+from cadjoint.constraints import (
     DistanceConstraint,
     constraint_residuals,
     project_to_manifold,
 )
-from jaxcad.constraints.solve import solve_constraints
-from jaxcad.geometry.parameters import Vector
-from jaxcad.sdf.primitives.sphere import Sphere
-from jaxcad.sdf.transforms.affine.translate import Translate
+from cadjoint.constraints.solve import solve_constraints
+from cadjoint.geometry.parameters import Vector
+from cadjoint.sdf.primitives.sphere import Sphere
+from cadjoint.sdf.transforms.affine.translate import Translate
 
 
 def _free_and_meta(*params):
@@ -62,7 +62,7 @@ def test_solve_constraints_trilateration():
 
 def test_solve_constraints_returns_free_params_dict():
     """Return value has same keys as extract_parameters free dict."""
-    from jaxcad.extraction import extract_parameters
+    from cadjoint.extraction import extract_parameters
 
     scene, _, _ = _trilateration_scene()
     free_params, _, _ = extract_parameters(scene)

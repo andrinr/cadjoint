@@ -1,0 +1,531 @@
+"""Tests for cadjoint.fem.study (declarative studies, code parity)."""
+
+from __future__ import annotations
+
+import json
+
+import numpy as np
+import pytest
+
+from cadjoint.fem import (
+    Dirichlet,
+    ElasticStudy,
+    Fixed,
+    GridSpec,
+    HeatFlux,
+    Nodes,
+    SimMesh,
+    ThermalStudy,
+    Traction,
+    capture_sim_meshes,
+    capture_studies,
+    sdf_to_hex_mesh,
+)
+from cadjoint.geometry.parameters import Vector
+from cadjoint.sdf.primitives import Box
+
+_BOUNDS = (-1.1, -0.25, -0.25)
+_SIZE = (2.2, 0.5, 0.5)
+_RESOLUTION = (22, 5, 5)
+
+
+def _bar():
+    return Box(Vector([1.0, 0.15, 0.15], free=True, name="size"))
+
+
+def _bar_mesh():
+    return sdf_to_hex_mesh(_bar(), GridSpec.from_bounds(_BOUNDS, _SIZE, _RESOLUTION))
+
+
+def _thermal_study(**overrides):
+    settings = {
+        "name": "bar-conduction",
+        "resolution": _RESOLUTION,
+        "conductivity": 2.0,
+        "bcs": [
+            Dirichlet(Nodes.side("-x"), 1.0),
+            Dirichlet(Nodes.side("+x"), 0.0),
+        ],
+        "bounds": _BOUNDS,
+        "size": _SIZE,
+    }
+    settings.update(overrides)
+    return ThermalStudy(**settings)
+
+
+def _elastic_study(**overrides):
+    settings = {
+        "name": "cantilever",
+        "resolution": _RESOLUTION,
+        "youngs": 1000.0,
+        "poisson": 0.3,
+        "bcs": [
+            Fixed(Nodes.side("-x")),
+            Traction(Nodes.side("+x"), (0.0, 0.0, -1.0)),
+        ],
+        "bounds": _BOUNDS,
+        "size": _SIZE,
+    }
+    settings.update(overrides)
+    return ElasticStudy(**settings)
+
+
+class TestValidation:
+    def test_bc_requires_a_node_selection(self):
+        with pytest.raises(ValueError, match="node selection"):
+            Dirichlet(lambda center: center[0] > 0.99, 1.0)
+        with pytest.raises(ValueError, match="node selection"):
+            Fixed("-x")
+        with pytest.raises(ValueError, match="node selection"):
+            Traction(None, (0.0, 0.0, -1.0))
+        with pytest.raises(ValueError, match="node selection"):
+            HeatFlux([1, 2, 3], 0.5)
+
+    def test_traction_vector_shape(self):
+        with pytest.raises(ValueError, match="vector"):
+            Traction(Nodes.side("+x"), (0.0, 1.0))
+
+    def test_empty_name(self):
+        with pytest.raises(ValueError, match="non-empty name"):
+            _thermal_study(name="  ")
+
+    def test_bad_resolution(self):
+        with pytest.raises(ValueError, match="resolution"):
+            _thermal_study(resolution=(22, 0, 5))
+
+    def test_bad_conductivity(self):
+        with pytest.raises(ValueError, match="conductivity"):
+            _thermal_study(conductivity=0.0)
+
+    def test_bad_poisson(self):
+        with pytest.raises(ValueError, match="poisson"):
+            _elastic_study(poisson=0.5)
+
+    def test_wrong_bc_type_for_study(self):
+        with pytest.raises(ValueError, match="accepts boundary conditions"):
+            _thermal_study(bcs=[Fixed(Nodes.side("-x"))])
+        with pytest.raises(ValueError, match="accepts boundary conditions"):
+            _elastic_study(bcs=[Dirichlet(Nodes.side("-x"), 1.0)])
+
+    def test_thermal_solve_requires_a_dirichlet(self):
+        study = _thermal_study(bcs=[])
+        with pytest.raises(ValueError, match="at least one Dirichlet"):
+            study.solve(_bar())
+
+    def test_elastic_solve_requires_a_fixed(self):
+        study = _elastic_study(bcs=[Traction(Nodes.side("+x"), (0.0, 0.0, -1.0))])
+        with pytest.raises(ValueError, match="at least one Fixed"):
+            study.solve(_bar())
+
+    def test_unmatched_selection_fails_before_solving(self):
+        study = _thermal_study(
+            bcs=[
+                Dirichlet(Nodes.side("-x"), 1.0),
+                Dirichlet(Nodes.sphere([50.0, 0.0, 0.0], 0.1), 0.0),
+            ]
+        )
+        with pytest.raises(ValueError, match="matched no boundary nodes"):
+            study.solve(_bar(), mesh=_bar_mesh())
+
+    def test_faceless_flux_selection_fails_before_solving(self):
+        # A single corner node spans no complete boundary quad, so an
+        # area-integrated BC cannot act on it.
+        study = _thermal_study(
+            bcs=[
+                Dirichlet(Nodes.side("-x"), 1.0),
+                HeatFlux(Nodes.sphere([1.0, 0.15, 0.15], 0.01), 0.5),
+            ]
+        )
+        with pytest.raises(ValueError, match="spans no complete boundary face"):
+            study.solve(_bar(), mesh=_bar_mesh())
+
+
+class TestDescribe:
+    def test_thermal_describe_is_json_ready(self):
+        study = _thermal_study()
+        payload = study.describe()
+        round_trip = json.loads(json.dumps(payload))
+        assert round_trip == payload
+        assert payload["kind"] == "thermal"
+        assert payload["name"] == "bar-conduction"
+        assert payload["resolution"] == [22, 5, 5]
+        assert payload["bounds"] == list(_BOUNDS)
+        assert payload["material"] == {"conductivity": 2.0}
+        assert payload["bcs"][0] == {
+            "type": "dirichlet",
+            "nodes": {"kind": "side", "side": "-x", "tol": None},
+            "value": 1.0,
+        }
+
+    def test_elastic_describe_is_json_ready(self):
+        payload = _elastic_study().describe()
+        assert json.loads(json.dumps(payload)) == payload
+        assert payload["kind"] == "elastic"
+        assert payload["material"] == {"youngs": 1000.0, "poisson": 0.3}
+        assert payload["bcs"][0] == {
+            "type": "fixed",
+            "nodes": {"kind": "side", "side": "-x", "tol": None},
+        }
+        assert payload["bcs"][1]["vector"] == [0.0, 0.0, -1.0]
+
+    def test_heat_flux_describe(self):
+        bc = HeatFlux(Nodes.side("+x"), 0.5)
+        assert bc.describe() == {
+            "type": "heat_flux",
+            "nodes": {"kind": "side", "side": "+x", "tol": None},
+            "flux": 0.5,
+        }
+
+    def test_composed_selection_describes_through_the_bc(self):
+        clamp = Fixed(Nodes.sphere([0.0, 0.0, 0.0], 0.5) | Nodes.box([0, 0, 0], [1, 1, 1]))
+        payload = clamp.describe()
+        assert payload["nodes"]["kind"] == "or"
+        assert json.loads(json.dumps(payload)) == payload
+
+
+class TestCapture:
+    def test_capture_collects_exec_declared_studies(self):
+        source = "\n".join(
+            [
+                "from cadjoint.fem import Dirichlet, ElasticStudy, Fixed, Nodes, ThermalStudy",
+                "ThermalStudy(name='captured-thermal', resolution=8, conductivity=1.0,",
+                "             bcs=[Dirichlet(Nodes.side('-x'), 1.0)])",
+                "ElasticStudy(name='captured-elastic', resolution=8, youngs=10.0, poisson=0.2,",
+                "             bcs=[Fixed(Nodes.side('-x'))])",
+            ]
+        )
+        with capture_studies() as studies:
+            exec(source, {})  # noqa: S102 - deliberate: user scene programs are exec'd
+        assert [study.name for study in studies] == ["captured-thermal", "captured-elastic"]
+        assert isinstance(studies[0], ThermalStudy)
+        assert isinstance(studies[1], ElasticStudy)
+
+    def test_no_capture_outside_context(self):
+        with capture_studies() as studies:
+            pass
+        _thermal_study()
+        assert studies == []
+
+    def test_nested_contexts_isolate(self):
+        with capture_studies() as outer:
+            _thermal_study(name="outer-study")
+            with capture_studies() as inner:
+                _thermal_study(name="inner-study")
+            _thermal_study(name="outer-again")
+        assert [study.name for study in inner] == ["inner-study"]
+        assert [study.name for study in outer] == ["outer-study", "outer-again"]
+
+
+class TestSolve:
+    def test_thermal_study_reproduces_direct_solve(self):
+        pytest.importorskip("jax_fem")
+        result = _thermal_study().solve(_bar())
+        temperature = np.asarray(result.temperature)
+        x = result.mesh.points[:, 0]
+        assert np.abs(temperature - (1.0 - x) / 2.0).max() < 1e-6
+
+    def test_elastic_study_reproduces_cantilever(self):
+        pytest.importorskip("jax_fem")
+        result = _elastic_study().solve(_bar())
+        displacement = np.asarray(result.displacement)
+        tip = np.isclose(result.mesh.points[:, 0], 1.0)
+        tip_uz = displacement[tip, 2].mean()
+        force = 1.0 * 0.3 * 0.3
+        inertia = 0.3 * 0.3**3 / 12.0
+        euler = -force * 2.0**3 / (3.0 * 1000.0 * inertia)
+        assert tip_uz < 0.0
+        assert 0.7 < tip_uz / euler < 1.3
+
+    def test_heat_flux_study_solves_on_the_direct_backend(self):
+        pytest.importorskip("jax_fem")
+        # -k T'' = 0 with T(-1) = 0 and k T'(1) = q: T(x) = (q/k)(x + 1).
+        study = _thermal_study(
+            bcs=[
+                Dirichlet(Nodes.side("-x"), 0.0),
+                HeatFlux(Nodes.side("+x"), 1.0),
+            ]
+        )
+        result = study.solve(_bar())
+        temperature = np.asarray(result.temperature)
+        expected = (result.mesh.points[:, 0] + 1.0) * (1.0 / 2.0)
+        assert np.abs(temperature - expected).max() < 1e-6
+
+    def test_solve_accepts_pre_extracted_mesh(self):
+        pytest.importorskip("jax_fem")
+        mesh = _bar_mesh()
+        result = _thermal_study().solve(_bar(), mesh=mesh)
+        assert result.mesh is mesh
+        assert result.sim_mesh is None
+
+
+def _bar_sim_mesh(**overrides):
+    settings = {
+        "name": "bar-mesh",
+        "resolution": _RESOLUTION,
+        "bounds": _BOUNDS,
+        "size": _SIZE,
+    }
+    settings.update(overrides)
+    return SimMesh(**settings)
+
+
+class TestNamedMesh:
+    def test_mesh_and_meshing_intent_conflict(self):
+        sim_mesh = _bar_sim_mesh()
+        with pytest.raises(ValueError, match="resolution"):
+            _thermal_study(mesh=sim_mesh)  # helper also passes resolution
+        with pytest.raises(ValueError, match="domain"):
+            _thermal_study(resolution=None, bounds=None, size=None, mesh=sim_mesh, domain=_bar())
+
+    def test_resolution_required_without_a_mesh(self):
+        with pytest.raises(ValueError, match="resolution"):
+            _thermal_study(resolution=None)
+
+    def test_unknown_mesh_name_lists_the_declared_ones(self):
+        with capture_sim_meshes():
+            _bar_sim_mesh(name="declared")
+            with pytest.raises(ValueError, match="'declared'"):
+                _thermal_study(resolution=None, bounds=None, size=None, mesh="nope")
+
+    def test_mesh_resolves_by_name_inside_capture(self):
+        with capture_sim_meshes():
+            sim_mesh = _bar_sim_mesh()
+            study = _thermal_study(resolution=None, bounds=None, size=None, mesh="bar-mesh")
+        assert study.mesh is sim_mesh
+
+    def test_describe_reports_the_mesh(self):
+        domain = _bar()
+        domain.name = "bar"
+        sim_mesh = _bar_sim_mesh(domain=domain)
+        payload = _thermal_study(resolution=None, bounds=None, size=None, mesh=sim_mesh).describe()
+        assert json.loads(json.dumps(payload)) == payload
+        assert payload["mesh"] == "bar-mesh"
+        assert payload["resolution"] == list(_RESOLUTION)
+        assert payload["bounds"] == list(_BOUNDS)
+        assert payload["domain"] == {"name": "bar", "type": "Box"}
+
+    def test_implicit_study_describe_has_null_mesh(self):
+        payload = _thermal_study().describe()
+        assert payload["mesh"] is None
+        assert payload["domain"] is None
+
+    def test_mesh_backed_solve_matches_the_implicit_path(self):
+        pytest.importorskip("jax_fem")
+        bar = _bar()
+        sim_mesh = _bar_sim_mesh()
+        study = _thermal_study(resolution=None, bounds=None, size=None, mesh=sim_mesh)
+        named = study.solve(bar)
+        implicit = _thermal_study().solve(bar)
+        assert named.sim_mesh is sim_mesh
+        np.testing.assert_allclose(
+            np.asarray(named.temperature), np.asarray(implicit.temperature), atol=1e-9
+        )
+
+    def test_two_studies_share_one_built_mesh(self):
+        pytest.importorskip("jax_fem")
+        bar = _bar()
+        sim_mesh = _bar_sim_mesh()
+        thermal = _thermal_study(resolution=None, bounds=None, size=None, mesh=sim_mesh)
+        elastic = _elastic_study(resolution=None, bounds=None, size=None, mesh=sim_mesh)
+        first = thermal.solve(bar)
+        second = elastic.solve(bar)
+        assert first.mesh is second.mesh  # one extraction, cached on the SimMesh
+
+    def test_domain_restricts_the_implicit_mesh(self):
+        pytest.importorskip("jax_fem")
+        short = Box(Vector([0.5, 0.15, 0.15], free=True, name="short"))
+        study = _thermal_study(domain=short)
+        result = study.solve(_bar())  # scene sdf is the long bar
+        assert result.mesh.points[:, 0].max() < 0.7
+        assert study._implicit_mesh.domain is short
+
+
+_TET_RESOLUTION = (21, 7, 7)  # off-lattice vs the bar faces (DC-degenerate otherwise)
+_TET_ELASTIC_RESOLUTION = (15, 6, 6)  # coarser: TET10 elasticity is the pricey solve
+
+
+def _tet_sim_mesh(method="tet4", **overrides):
+    settings = {
+        "name": f"bar-{method}",
+        "resolution": _TET_RESOLUTION,
+        "bounds": _BOUNDS,
+        "size": _SIZE,
+        "method": method,
+    }
+    settings.update(overrides)
+    return SimMesh(**settings)
+
+
+class TestTetStudies:
+    """Studies route to the tet solvers when their SimMesh method is tet.
+
+    The thermal checks exploit Galerkin exactness: the bar's DC-projected
+    tet boundary is the exact box, so solutions lying in the FE space
+    (linear profiles for TET4/TET10, the parabolic source solution for
+    TET10) must be reproduced to solver tolerance.
+    """
+
+    def test_non_jaxfem_backend_raises_on_tet_meshes(self):
+        pytest.importorskip("tetgen")
+        study = _thermal_study(resolution=None, bounds=None, size=None, mesh=_tet_sim_mesh())
+        with pytest.raises(ValueError, match="direct jax-fem"):
+            study.solve(_bar(), backend="tesseract")
+
+    @pytest.mark.parametrize("method", ["tet4", "tet10"])
+    def test_thermal_linear_profile_is_exact(self, method):
+        pytest.importorskip("tetgen")
+        pytest.importorskip("jax_fem")
+        study = _thermal_study(
+            name=f"tet-conduction-{method}",
+            resolution=None,
+            bounds=None,
+            size=None,
+            mesh=_tet_sim_mesh(method=method),
+        )
+        result = study.solve(_bar())
+        temperature = np.asarray(result.temperature)
+        x = np.asarray(result.mesh.points)[:, 0]
+        assert np.abs(temperature - (1.0 - x) / 2.0).max() < 1e-6
+
+    def test_thermal_heat_flux_solves_with_exact_face_targeting(self):
+        pytest.importorskip("tetgen")
+        pytest.importorskip("jax_fem")
+        # -k T'' = 0 with T(-1) = 0 and k T'(1) = q: T(x) = (q/k)(x + 1).
+        study = _thermal_study(
+            name="tet-flux",
+            resolution=None,
+            bounds=None,
+            size=None,
+            mesh=_tet_sim_mesh(name="bar-tet-flux"),
+            bcs=[
+                Dirichlet(Nodes.side("-x"), 0.0),
+                HeatFlux(Nodes.side("+x"), 1.0),
+            ],
+        )
+        result = study.solve(_bar())
+        temperature = np.asarray(result.temperature)
+        expected = (np.asarray(result.mesh.points)[:, 0] + 1.0) * (1.0 / 2.0)
+        assert np.abs(temperature - expected).max() < 1e-6
+
+    def test_thermal_source_parabola_is_exact_on_tet10(self):
+        pytest.importorskip("tetgen")
+        pytest.importorskip("jax_fem")
+        # -k T'' = q with T(+-1) = 0: T = (q / 2k)(1 - x^2) — inside the
+        # quadratic TET10 space, so the solve must reproduce it exactly.
+        study = _thermal_study(
+            name="tet10-source",
+            resolution=None,
+            bounds=None,
+            size=None,
+            mesh=_tet_sim_mesh(method="tet10", name="bar-tet10-source"),
+            conductivity=1.0,
+            source=2.0,
+            bcs=[
+                Dirichlet(Nodes.side("-x"), 0.0),
+                Dirichlet(Nodes.side("+x"), 0.0),
+            ],
+        )
+        result = study.solve(_bar())
+        temperature = np.asarray(result.temperature)
+        x = np.asarray(result.mesh.points)[:, 0]
+        assert np.abs(temperature - (1.0 - x**2)).max() < 1e-5
+
+    @pytest.fixture(scope="class")
+    def tet_cantilevers(self):
+        pytest.importorskip("tetgen")
+        pytest.importorskip("jax_fem")
+        bar = _bar()
+        results = {}
+        for method in ("tet4", "tet10"):
+            study = _elastic_study(
+                name=f"tet-cantilever-{method}",
+                resolution=None,
+                bounds=None,
+                size=None,
+                mesh=_tet_sim_mesh(method=method, resolution=_TET_ELASTIC_RESOLUTION),
+            )
+            results[method] = study.solve(bar)
+        return results
+
+    def test_elastic_tet10_matches_euler_beam(self, tet_cantilevers):
+        result = tet_cantilevers["tet10"]
+        displacement = np.asarray(result.displacement)
+        points = np.asarray(result.mesh.points)
+        tip_uz = displacement[points[:, 0] > 0.999, 2].mean()
+        force = 1.0 * 0.3 * 0.3
+        inertia = 0.3 * 0.3**3 / 12.0
+        euler = -force * 2.0**3 / (3.0 * 1000.0 * inertia)
+        assert tip_uz < 0.0
+        assert 0.7 < tip_uz / euler < 1.3
+
+    def test_elastic_tet4_locks_stiffer_than_tet10(self, tet_cantilevers):
+        # The documented TET4 caveat (research/tet-vs-hex.md): constant
+        # strain locks in bending, so its tip deflection is smaller.
+        def tip(result):
+            displacement = np.asarray(result.displacement)
+            points = np.asarray(result.mesh.points)
+            return displacement[points[:, 0] > 0.999, 2].mean()
+
+        assert abs(tip(tet_cantilevers["tet4"])) < abs(tip(tet_cantilevers["tet10"]))
+
+    def test_tet_result_is_method_agnostic(self, tet_cantilevers, tmp_path):
+        meshio = pytest.importorskip("meshio")
+        result = tet_cantilevers["tet10"]
+        assert (result.kind, result.field) == ("elastic", "von_mises")
+        assert result.von_mises().shape == (result.mesh.num_cells,)
+        assert result.nodal_scalar().shape == (result.mesh.num_points,)
+        payload = result.describe()
+        assert json.loads(json.dumps(payload)) == payload
+        assert payload["mesh"] == "bar-tet10"
+        assert set(payload["fields"]) == {"displacement", "von_mises"}
+        assert float(result.max()) > 0.0
+        path = tmp_path / "bar-tet10.vtk"
+        result.to_vtk(str(path))
+        exported = meshio.read(str(path))
+        assert exported.cells[0].type == "tetra10"
+        assert "displacement" in exported.point_data
+
+
+class TestSimulationResult:
+    def test_thermal_result_is_inspectable(self):
+        pytest.importorskip("jax_fem")
+        study = _thermal_study()
+        result = study.solve(_bar())
+        assert study.last_result is result
+        assert (result.name, result.kind, result.field) == (
+            "bar-conduction",
+            "thermal",
+            "temperature",
+        )
+        payload = result.describe()
+        assert json.loads(json.dumps(payload)) == payload
+        assert payload["nodes"] == result.mesh.num_points
+        assert payload["elements"] == result.mesh.num_cells
+        assert payload["range"][0] == pytest.approx(0.0, abs=1e-6)
+        assert payload["range"][1] == pytest.approx(1.0, abs=1e-6)
+        assert set(payload["fields"]) == {"temperature"}
+        # Objective helpers agree with plain reductions of the field.
+        assert float(result.mean()) == pytest.approx(float(np.mean(result.nodal_scalar())))
+        assert float(result.max()) == pytest.approx(1.0, abs=1e-6)
+
+    def test_elastic_result_is_inspectable(self):
+        pytest.importorskip("jax_fem")
+        study = _elastic_study()
+        result = study.solve(_bar())
+        assert (result.kind, result.field) == ("elastic", "von_mises")
+        payload = result.describe()
+        assert set(payload["fields"]) == {"displacement", "von_mises"}
+        assert payload["range"][1] > payload["range"][0] >= 0.0
+        assert result.nodal_scalar().shape == (result.mesh.num_points,)
+        assert float(result.max()) > 0.0
+        with pytest.raises(AttributeError, match="temperature"):
+            _ = result.temperature
+
+    def test_result_exports_vtk(self, tmp_path):
+        pytest.importorskip("jax_fem")
+        meshio = pytest.importorskip("meshio")
+        result = _thermal_study().solve(_bar())
+        path = tmp_path / "bar.vtk"
+        result.to_vtk(str(path))
+        exported = meshio.read(str(path))
+        assert "temperature" in exported.point_data

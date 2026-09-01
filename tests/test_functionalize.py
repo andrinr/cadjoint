@@ -2,11 +2,11 @@
 
 import jax.numpy as jnp
 
-from jaxcad import extract_parameters, functionalize, functionalize_scene
-from jaxcad.geometry.parameters import Scalar, Vector
-from jaxcad.render import Material
-from jaxcad.sdf.primitives.box import Box
-from jaxcad.sdf.primitives.sphere import Sphere
+from cadjoint import extract_parameters, functionalize, functionalize_scene
+from cadjoint.geometry.parameters import Scalar, Vector
+from cadjoint.render import Material
+from cadjoint.sdf.primitives.box import Box
+from cadjoint.sdf.primitives.sphere import Sphere
 
 
 def test_compile_sphere_basic():

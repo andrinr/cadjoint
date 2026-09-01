@@ -81,12 +81,35 @@ async function canvasMetrics(page: Page) {
   });
 }
 
-/** The example sketch's first vertex, in world space (plane is the world XY plane). */
-const FIRST_VERTEX: Vec3 = [-1.1, -0.7, 0];
-const ROOF_PEAK: Vec3 = [0, 1, 0];
+/**
+ * The heat-sink starter sketches on the XZ plane (normal +Y): profile
+ * u = −world-X, v = +world-Z, so a vertex [u, v] sits at world [−u, 0, v].
+ */
+/** base_l, uv [-0.9, 0.0] — the sketch's first vertex. */
+const FIRST_VERTEX: Vec3 = [0.9, 0, 0];
+/** fin2_tip_l (vertex index 9), uv [-0.08, 0.85] — free and unconstrained. */
+const FIN_TIP: Vec3 = [0.08, 0, 0.85];
+/** Midpoint of the fin comb's base edge, for outline picks. */
+const BASE_EDGE: Vec3 = [0.5, 0, 0];
 
+/**
+ * The full editor document. CodeMirror renders only the visible lines, so
+ * `.cm-content` innerText truncates tall programs (the starter is ~160
+ * lines); read the document from the editor state instead.
+ */
 async function editorText(page: Page): Promise<string> {
-  return page.locator("[data-testid=editor] .cm-content").innerText();
+  return page.evaluate(() => {
+    type DocView = { view?: { state: { doc: { toString(): string } } } };
+    const content = document.querySelector("[data-testid=editor] .cm-content") as
+      | (HTMLElement & { cmView?: DocView; cmTile?: DocView })
+      | null;
+    // CodeMirror hangs its doc view off the content element (`cmView` in
+    // older builds, `cmTile` in current ones); either path reaches the full
+    // document. innerText is the last resort and truncates tall programs.
+    const view = content?.cmView?.view ?? content?.cmTile?.view;
+    if (view) return view.state.doc.toString();
+    return content?.innerText ?? "";
+  });
 }
 
 async function waitForCompile(page: Page) {
@@ -104,62 +127,197 @@ test.beforeEach(async ({ page }) => {
   if (await dismiss.isVisible().catch(() => false)) await dismiss.click();
 });
 
+/**
+ * Click a rail tool that lives inside a grouped flyout.
+ *
+ * The rail's clusters expand on click of their parent icon; children keep
+ * their stable testids (`tool-box`, `gizmo-scale`, …) but are only visible
+ * while the flyout is open.
+ */
+async function railTool(page: Page, group: string, testid: string) {
+  const child = page.getByTestId(testid);
+  for (let attempt = 0; attempt < 2 && !(await child.isVisible()); attempt++) {
+    await page.getByTestId(`tool-group-${group}`).click();
+  }
+  await child.click();
+}
+
 test("serves the app and loads the starter sketch", async ({ page }) => {
-  await expect(page).toHaveTitle(/JAXCAD/);
+  await expect(page).toHaveTitle(/CADJOINT/);
   expect(await editorText(page)).toContain("PolygonProfile(");
-  expect(await editorText(page)).toContain("[-1.1, -0.7]");
-  expect(await editorText(page)).toContain("ring = revolve(ring_profile");
-  expect(await editorText(page)).toContain("jax.value_and_grad(clearance_metric)");
+  expect(await editorText(page)).toContain("[-0.9, 0.0]");
+  expect(await editorText(page)).toContain("slug = revolve(slug_profile");
 });
 
-test("the starter exposes its live autodiff proof without an open panel", async ({
+test("the optimize panel lists the starter optimization and edits it as source", async ({
   page,
 }) => {
-  await expect(page.getByTestId("autodiff-toggle")).toContainText("AD live");
-  await expect(page.getByTestId("autodiff-toggle")).toContainText("6");
-  await expect(page.getByTestId("autodiff-panel")).toHaveCount(0);
+  // A real study-backed run plus its auto-replay outlives the default budget.
+  test.setTimeout(300_000);
+  // Model mode owns the panel; the starter declares one study-backed
+  // optimization whose objective label reads metric(study).
+  await expect(page.getByTestId("optimize-panel")).toBeVisible();
+  const card = page.getByTestId("optimize-cool-sink");
+  await expect(card).toBeVisible();
+  await expect(card).toContainText("minimize");
+  await expect(card).toContainText("mean(sink-conduction)");
+  await expect(page.getByTestId("optimize-run-cool-sink")).toBeEnabled();
 
-  await page.getByTestId("autodiff-toggle").click();
-  const panel = page.getByTestId("autodiff-panel");
-  await expect(panel).toBeVisible();
-  await expect(panel).toContainText("Profile -> Extrude -> SDF");
-  await expect(panel).toContainText("two-probe clearance");
-  await expect(panel).toContainText("eave_right.x");
-  await expect(panel).toContainText("-0.700");
-  await expect(panel).toContainText("body_depth");
-  await expect(panel).toContainText("-0.500");
+  // Steps and learning rate edit the declaration's literals in place.
+  // Three steps keep the FEM-in-the-loop run short enough for CI.
+  await page.getByTestId("optimize-steps-cool-sink").fill("3");
+  await page.getByTestId("optimize-steps-cool-sink").blur();
+  await expect.poll(() => editorText(page), { timeout: 45_000 }).toContain("steps=3");
+  await waitForCompile(page);
 
-  await page.getByTestId("autodiff-toggle").click();
-  await expect(panel).toHaveCount(0);
+  await page.getByTestId("optimize-lr-cool-sink").fill("0.02");
+  await page.getByTestId("optimize-lr-cool-sink").blur();
+  await expect
+    .poll(() => editorText(page), { timeout: 45_000 })
+    .toContain("learning_rate=0.02");
+  await waitForCompile(page);
+
+  // A real run: the starter objective is a smoothed-volume evaluation (a few
+  // seconds even at the declared step count), and the optimizer writes the
+  // final parameter literals back into the program like a patch. While it
+  // runs the card shows a progress block (a live bar when the server
+  // streams NDJSON, an indeterminate sweep otherwise).
+  await page.getByTestId("optimize-run-cool-sink").click();
+  await expect(page.getByTestId("optimize-progress-cool-sink")).toBeVisible();
+  await expect(page.getByTestId("optimize-progress-step-cool-sink")).toContainText(
+    "step",
+  );
+  await expect(page.getByTestId("optimize-result-cool-sink")).toBeVisible({
+    timeout: 240_000,
+  });
+  await expect(page.getByTestId("optimize-history-cool-sink")).toBeVisible();
+  await expect(page.getByTestId("optimize-player")).toBeVisible();
+  await expect(page.getByTestId("optimize-player-hint")).toContainText("scrub");
+
+  // The finished run auto-plays its trajectory once (ghost-compiling
+  // intermediate literals through the editor). Catch it in flight — the
+  // button flips to Pause once adoption lands — then wait until the player
+  // rests on the final frame before asserting on the adopted source. (The
+  // catch tolerates the replay finishing between polls or a degenerate
+  // single-frame trajectory.)
+  await page
+    .waitForFunction(
+      () =>
+        document
+          .querySelector("[data-testid=optimize-play]")
+          ?.textContent?.includes("Pause") ?? false,
+      { timeout: 20_000 },
+    )
+    .catch(() => {});
+  await expect
+    .poll(
+      async () => {
+        const scrub = page.getByTestId("optimize-scrub");
+        const [value, max, label] = await Promise.all([
+          scrub.inputValue(),
+          scrub.getAttribute("max"),
+          page.getByTestId("optimize-play").textContent(),
+        ]);
+        return value === max && !(label ?? "").includes("Pause");
+      },
+      { timeout: 90_000 },
+    )
+    .toBe(true);
+  // The initial fin_depth literal is gone: the optimized value was adopted.
+  await expect
+    .poll(async () => (await editorText(page)).includes("fin_depth = Scalar(1.2,"), {
+      timeout: 45_000,
+    })
+    .toBe(false);
+  await waitForCompile(page);
+  await expect(page.getByTestId("status")).not.toContainText("failed");
+
+  // A study-backed run publishes the optimized design's solved field: the
+  // Simulate panel opens on Results showing optimization and simulation
+  // together.
+  await page.getByTestId("editmode-simulate").click();
+  await expect(page.getByTestId("simulate-legend")).toBeVisible();
+  await expect(page.getByTestId("simulate-legend")).toContainText("cool-sink");
 });
 
 test("the revolved starter object exposes its profile and operator", async ({ page }) => {
   const metrics = await canvasMetrics(page);
-  const sectionEdge = projectToCss([0.76, 1.49, 0.15], metrics);
+  const sectionEdge = projectToCss([-0.26, 0, -0.07], metrics);
   await page.mouse.click(
     metrics.left + sectionEdge.x,
     metrics.top + sectionEdge.y,
   );
 
-  await expect(page.getByTestId("selection-chip")).toHaveText("revolve section");
+  await expect(page.getByTestId("selection-chip")).toHaveText("slug section");
   await expect(page.getByTestId("sketch-panel")).toContainText("revolve");
   await expect(page.getByTestId("gizmo-translate")).toHaveClass(/active/);
   await expect(page.getByTestId("rail-hint")).toHaveText("move");
 });
 
 test("sketch constraints are drawn over the viewport", async ({ page }) => {
-  await expect(page.getByTestId("constraint-overlay")).toBeVisible();
-  await expect(page.getByTestId("constraint-fixed-overlay")).toHaveCount(2);
-  await expect(page.getByTestId("constraint-distance-overlay")).toHaveCount(3);
-  await expect(
-    page.locator('[data-testid="constraint-distance-overlay"][data-scope="object"]'),
-  ).toContainText("3.8");
-  await expect(page.getByTestId("constraint-overlay")).toContainText("2.2");
-  await expect(page.getByTestId("constraint-overlay")).toContainText("1");
+  // The starter's constraint catalog is still growing, so never hardcode
+  // counts or dimension values here: derive the expected overlay population
+  // from a fresh /compile of the session program — the same ground truth the
+  // viewer renders from. Overlay rules mirrored from ViewerPane: every fixed
+  // sketch constraint or object relation draws a marker; every *numeric*
+  // distance draws a dimension with label Number(value.toPrecision(4));
+  // relational kinds (horizontal, parallel, …) are panel chips, not overlays.
+  const truth = await page.evaluate(async () => {
+    const session = await (await fetch("/api/session")).json();
+    const compiled = await (
+      await fetch("/compile", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Cadjoint-Token": session.token,
+        },
+        body: JSON.stringify({ source: session.example }),
+      })
+    ).json();
+    let fixed = 0;
+    const sketchLabels: string[] = [];
+    for (const node of compiled.construction ?? []) {
+      for (const constraint of node.constraints ?? []) {
+        if (constraint.kind === "fixed") fixed += 1;
+        else if (constraint.kind === "distance" && typeof constraint.value === "number") {
+          sketchLabels.push(Number(constraint.value.toPrecision(4)).toString());
+        }
+      }
+    }
+    const objectLabels: string[] = [];
+    for (const relation of compiled.relations ?? []) {
+      if (relation.kind === "fixed") fixed += 1;
+      else if (relation.kind === "distance" && typeof relation.value === "number") {
+        objectLabels.push(Number(relation.value.toPrecision(4)).toString());
+      }
+    }
+    return { fixed, sketchLabels, objectLabels };
+  });
+  const distanceCount = truth.sketchLabels.length + truth.objectLabels.length;
+  // The starter must keep exercising both overlay kinds for this test to
+  // mean anything; if this fails the scene lost its constraint showcase.
+  expect(truth.fixed).toBeGreaterThan(0);
+  expect(distanceCount).toBeGreaterThan(0);
 
-  await page.getByTestId("view-front").click({ force: true });
-  await expect(page.getByTestId("constraint-fixed-overlay")).toHaveCount(2);
-  await expect(page.getByTestId("constraint-distance-overlay")).toHaveCount(3);
+  await expect(page.getByTestId("constraint-overlay")).toBeVisible();
+  await expect(page.getByTestId("constraint-fixed-overlay")).toHaveCount(truth.fixed);
+  await expect(page.getByTestId("constraint-distance-overlay")).toHaveCount(distanceCount);
+  for (const label of truth.objectLabels) {
+    await expect(
+      page.locator('[data-testid="constraint-distance-overlay"][data-scope="object"]'),
+    ).toContainText(label);
+  }
+  for (const label of truth.sketchLabels) {
+    await expect(page.getByTestId("constraint-overlay")).toContainText(label);
+  }
+
+  // Top view: the heat sink lies in the XZ plane, so both dimensions stay
+  // extended on screen (front view would collapse the fin-height one). The
+  // top face is occluded on the 3D cube at the iso camera, so a forced
+  // pointer click would land on the front face; dispatch directly instead.
+  await page.getByTestId("view-top").dispatchEvent("click");
+  await expect(page.getByTestId("constraint-fixed-overlay")).toHaveCount(truth.fixed);
+  await expect(page.getByTestId("constraint-distance-overlay")).toHaveCount(distanceCount);
 
   await page.getByTestId("display-options").click();
   await page.getByTestId("render-customize").click();
@@ -170,10 +328,12 @@ test("sketch constraints are drawn over the viewport", async ({ page }) => {
   await page.getByTestId("toggle-constraints").check();
   await page.getByTestId("toggle-fixed-constraints").uncheck();
   await expect(page.getByTestId("constraint-fixed-overlay")).toHaveCount(0);
-  await expect(page.getByTestId("constraint-distance-overlay")).toHaveCount(3);
+  await expect(page.getByTestId("constraint-distance-overlay")).toHaveCount(distanceCount);
 
   await page.getByTestId("toggle-constraint-values").uncheck();
-  await expect(page.getByTestId("constraint-overlay")).not.toContainText("2.2");
+  await expect(page.getByTestId("constraint-overlay")).not.toContainText(
+    truth.sketchLabels[0] ?? truth.objectLabels[0],
+  );
   await page.getByTestId("toggle-distance-constraints").uncheck();
   await expect(page.getByTestId("constraint-distance-overlay")).toHaveCount(0);
 });
@@ -202,7 +362,7 @@ test("clicking a sketch handle selects it and highlights its source span", async
 
   await expect(page.getByTestId("selection-chip")).toHaveText("vertex 0");
   // The editor marks exactly the literal that defines that vertex.
-  await expect(page.locator(".cm-vertex-highlight")).toHaveText("[-1.1, -0.7]");
+  await expect(page.locator(".cm-vertex-highlight")).toHaveText("[-0.9, 0.0]");
 });
 
 test("escape clears the selection", async ({ page }) => {
@@ -221,21 +381,26 @@ test("dragging a handle rewrites the vertex literal", async ({ page }) => {
   const metrics = await canvasMetrics(page);
   // Use an unconstrained point: the fixed base corner is intentionally driven
   // back to its target by the starter constraint system.
-  const from = projectToCss(ROOF_PEAK, metrics);
-  const to = projectToCss([0.2, 1.35, 0], metrics);
+  const from = projectToCss(FIN_TIP, metrics);
+  const to = projectToCss([0.25, 0, 1.1], metrics);
 
   await page.mouse.move(metrics.left + from.x, metrics.top + from.y);
   await page.mouse.down();
   await page.mouse.move(metrics.left + to.x, metrics.top + to.y, { steps: 12 });
   await page.mouse.up();
 
-  await expect(page.locator("[data-testid=editor] .cm-content")).not.toContainText("[0.0, 1.0]");
+  await expect
+    .poll(async () => (await editorText(page)).includes("[-0.08, 0.85]"), {
+      timeout: 45_000,
+    })
+    .toBe(false);
   const text = await editorText(page);
   const match = text.match(
-    /roof_peak = Vector2\(value=\[(-?[\d.]+), (-?[\d.]+)\]/,
+    /fin2_tip_l = Vector2\(value=\[(-?[\d.]+), (-?[\d.]+)\]/,
   );
   expect(match).not.toBeNull();
-  expect(Number(match![1])).toBeGreaterThan(0);
+  // World [0.25, 0, 1.1] maps to sketch uv ≈ [-0.25, 1.1] (u = −X, v = +Z).
+  expect(Number(match![1])).toBeLessThan(-0.1);
   expect(Number(match![2])).toBeGreaterThan(1);
   await waitForCompile(page);
 });
@@ -248,10 +413,10 @@ const vertexLiteralCount = async (page: Page) =>
 test("the polygon tool inserts a vertex and stays active", async ({ page }) => {
   const before = await vertexLiteralCount(page);
 
-  await page.getByTestId("tool-polygon").click();
+  await railTool(page, "create", "tool-polygon");
   const metrics = await canvasMetrics(page);
-  // Midpoint of the sketch's bottom edge.
-  const point = projectToCss([0, -0.7, 0], metrics);
+  // A point on the fin comb's base edge.
+  const point = projectToCss(BASE_EDGE, metrics);
   await page.mouse.click(metrics.left + point.x, metrics.top + point.y);
 
   // The patch and its recompile are async; poll rather than racing them.
@@ -301,13 +466,14 @@ test("the view cube tracks the camera", async ({ page }) => {
   const cube = page.locator(".view-cube .cube");
   const before = await cube.evaluate((node) => getComputedStyle(node).transform);
 
-  // Orbit by dragging empty space well clear of the sketch and the overlays.
+  // Orbit by dragging empty space well clear of the sketch, the dock (which
+  // overlays the right side), and the hint bar along the bottom.
   const metrics = await canvasMetrics(page);
-  await page.mouse.move(metrics.left + metrics.clientWidth * 0.8, metrics.top + metrics.clientHeight * 0.85);
+  await page.mouse.move(metrics.left + metrics.clientWidth * 0.42, metrics.top + metrics.clientHeight * 0.82);
   await page.mouse.down();
   await page.mouse.move(
-    metrics.left + metrics.clientWidth * 0.55,
-    metrics.top + metrics.clientHeight * 0.85,
+    metrics.left + metrics.clientWidth * 0.18,
+    metrics.top + metrics.clientHeight * 0.82,
     { steps: 10 },
   );
   await page.mouse.up();
@@ -326,7 +492,7 @@ test("the projection toggle works on its own", async ({ page }) => {
 
 test("object and gizmo picking use the orthographic camera", async ({ page }) => {
   const program = [
-    "from jaxcad.construction import Solid",
+    "from cadjoint.construction import Solid",
     'block = Solid.box(size=[0.5, 0.5, 0.5], position=[0, 0, 1.5], name="block")',
     "scene = block",
     "",
@@ -363,14 +529,14 @@ test("object and gizmo picking use the orthographic camera", async ({ page }) =>
 
 test("a solid can be deleted from the viewer", async ({ page }) => {
   const metrics = await canvasMetrics(page);
-  // The constraint system projects the starter sphere to this runtime position.
-  const outline = projectToCss([1.8726, -0.32795, 0.82205], metrics);
+  // A point on the rim of the bush_b bushing cylinder at [-0.78, 0, 0.1].
+  const outline = projectToCss([-0.71, 0, 0.16], metrics);
   await page.mouse.click(metrics.left + outline.x, metrics.top + outline.y);
-  await expect(page.getByTestId("selection-chip")).toHaveText("glass");
+  await expect(page.getByTestId("selection-chip")).toHaveText("bush_b");
 
   await page.getByTestId("delete-selection").click();
   await expect
-    .poll(async () => (await editorText(page)).includes("glass = Solid.sphere"), {
+    .poll(async () => (await editorText(page)).includes("bush_b = Solid.cylinder"), {
       timeout: 45_000,
     })
     .toBe(false);
@@ -390,12 +556,12 @@ test("selection mode decides what a click picks", async ({ page }) => {
   await page.getByTestId("mode-vertex").click();
   await page.mouse.click(metrics.left + point.x, metrics.top + point.y);
   await expect(page.getByTestId("selection-chip")).toHaveText("vertex 0");
-  await expect(page.locator(".cm-vertex-highlight")).toHaveText("[-1.1, -0.7]");
+  await expect(page.locator(".cm-vertex-highlight")).toHaveText("[-0.9, 0.0]");
 
   // Switching back to object selection promotes the point to its polygon and
   // reveals the polygon's translation gizmo without requiring another click.
   await page.getByTestId("mode-object").click();
-  await expect(page.getByTestId("selection-chip")).toHaveText("house");
+  await expect(page.getByTestId("selection-chip")).toHaveText("fin comb");
   await expect(page.getByTestId("gizmo-translate")).toHaveClass(/active/);
 });
 
@@ -403,15 +569,20 @@ test("render presets activate, edit, and persist without bloating the closed UI"
   page,
 }) => {
   const before = await editorText(page);
+  // Closed, the settings cost nothing: no panel, no cards in the DOM.
+  await expect(page.getByTestId("render-panel")).toHaveCount(0);
   await expect(page.locator(".render-preset-card")).toHaveCount(0);
+  // The eye icon opens the render-settings popover (from any mode).
   await page.getByTestId("display-options").click();
+  await expect(page.getByTestId("render-popover")).toBeVisible();
 
+  await expect(page.getByTestId("render-panel")).toBeVisible();
   await expect(page.locator(".render-preset-card")).toHaveCount(3);
   await expect(page.getByTestId("render-preset-editor")).toHaveCount(0);
   await expect(page.getByTestId("render-preset-xray")).toHaveClass(/active/);
-  const compactPanel = await page.locator(".display-options .popover").boundingBox();
+  const compactPanel = await page.getByTestId("render-panel").boundingBox();
   expect(compactPanel!.width).toBeLessThanOrEqual(310);
-  expect(compactPanel!.height).toBeLessThan(260);
+  expect(compactPanel!.height).toBeLessThan(300);
 
   await page.getByTestId("render-preset-studio").click();
   await expect(page.getByTestId("render-preset-studio")).toHaveClass(/active/);
@@ -438,7 +609,10 @@ test("render presets activate, edit, and persist without bloating the closed UI"
   await waitForCompile(page);
   const dismiss = page.getByRole("button", { name: "Dismiss" });
   if (await dismiss.isVisible().catch(() => false)) await dismiss.click();
+  // The popover is transient, but the preset state persists: reopen it.
+  await expect(page.getByTestId("render-popover")).toHaveCount(0);
   await page.getByTestId("display-options").click();
+  await expect(page.getByTestId("render-panel")).toBeVisible();
   await expect(page.getByTestId("render-preset-studio")).toHaveClass(/active/);
   await page.getByTestId("render-customize").click();
   await expect(page.getByTestId("shadows-off")).toHaveClass(/active/);
@@ -458,22 +632,21 @@ test("render presets activate, edit, and persist without bloating the closed UI"
 
 test("the source-code pane stays above floating panels", async ({ page }) => {
   await page.getByTestId("display-options").click();
-  const popover = page.locator(".display-options .popover");
-  await expect(popover).toBeVisible();
+  await expect(page.getByTestId("render-panel")).toBeVisible();
 
   const editorZ = await page
     .locator(".editor-pane")
     .evaluate((node) => Number.parseInt(getComputedStyle(node).zIndex, 10));
-  const popoverZ = await popover.evaluate((node) =>
-    Number.parseInt(getComputedStyle(node).zIndex, 10),
-  );
-  expect(editorZ).toBeGreaterThan(popoverZ);
+  const dockZ = await page
+    .locator(".dock")
+    .evaluate((node) => Number.parseInt(getComputedStyle(node).zIndex, 10));
+  expect(editorZ).toBeGreaterThan(dockZ);
 });
 
 test("editing the code updates the sketch the viewer reports", async ({ page }) => {
   await page.getByTestId("mode-vertex").click();
   const program = [
-    "from jaxcad.construction import PolygonProfile, extrude",
+    "from cadjoint.construction import PolygonProfile, extrude",
     'profile = PolygonProfile([[-2.2, -0.9], [1.0, -0.9], [0.0, 1.2]], name="t")',
     "scene = extrude(profile, depth=0.5)",
     "",
@@ -519,18 +692,19 @@ const sphereCount = async (page: Page) =>
   ((await editorText(page)).match(/Solid\.sphere/g) ?? []).length;
 
 test("placing a primitive writes a Solid call into the source", async ({ page }) => {
-  // The starter program already has one sphere, so count rather than presence.
+  // The heat-sink starter has no spheres; count anyway to stay robust.
   const before = await sphereCount(page);
 
-  await page.getByTestId("tool-sphere").click();
+  await railTool(page, "create", "tool-sphere");
   const metrics = await canvasMetrics(page);
-  // Somewhere on the world XY plane, clear of the existing sketch.
-  const point = projectToCss([2.4, 1.4, 0], metrics);
+  // Somewhere on the world XY plane, clear of the sink and of the dock
+  // panels that overlay the right side of the viewport.
+  const point = projectToCss([0, 2.4, 0], metrics);
   await page.mouse.click(metrics.left + point.x, metrics.top + point.y);
 
   await expect.poll(() => sphereCount(page), { timeout: 45_000 }).toBe(before + 1);
   // Solid is already imported by the starter program, so no duplicate appears.
-  expect(await editorText(page)).toMatch(/from jaxcad\.construction import .*\bSolid\b/);
+  expect(await editorText(page)).toMatch(/from cadjoint\.construction import .*\bSolid\b/);
 
   // CodeMirror only renders the lines in view, so scroll to the scene
   // assignment before checking the new solid was wired into it rather than
@@ -562,8 +736,8 @@ test("the material browser creates, edits, and drag-assigns materials", async ({
   );
   await page.getByTestId("material-open").click();
   await expect(page.getByTestId("material-panel")).toBeVisible();
-  await expect(page.getByTestId("material-clay")).toBeVisible();
-  await expect(page.getByTestId("material-brass")).toBeVisible();
+  await expect(page.getByTestId("material-aluminum")).toBeVisible();
+  await expect(page.getByTestId("material-copper")).toBeVisible();
 
   await page.getByTestId("material-add").click();
   await expect
@@ -582,14 +756,14 @@ test("the material browser creates, edits, and drag-assigns materials", async ({
   await waitForCompile(page);
 
   const metrics = await canvasMetrics(page);
-  const metal = projectToCss([-1.9, -0.65, 0], metrics);
-  await page.getByTestId("material-glass_material").dragTo(
+  const bushing = projectToCss([-0.78, 0, 0.1], metrics);
+  await page.getByTestId("material-copper").dragTo(
     page.getByTestId("viewer-canvas"),
-    { targetPosition: { x: metal.x, y: metal.y } },
+    { targetPosition: { x: bushing.x, y: bushing.y } },
   );
   await expect
     .poll(() => editorText(page), { timeout: 45_000 })
-    .toMatch(/metal = Solid\.cylinder\([\s\S]*?material=glass_material/);
+    .toMatch(/bush_b = Solid\.cylinder\([\s\S]*?material=copper/);
   await waitForCompile(page);
 
   await page.getByTestId("material-close").click();
@@ -598,10 +772,11 @@ test("the material browser creates, edits, and drag-assigns materials", async ({
 });
 
 test("a placed primitive can be selected and moved along an axis", async ({ page }) => {
-  await page.getByTestId("tool-box").click();
+  await railTool(page, "create", "tool-box");
   const metrics = await canvasMetrics(page);
-  // Kept near the middle of the view so the gizmo arrows stay on the canvas.
-  const drop = projectToCss([1.6, 0, 0], metrics);
+  // Kept left of centre: the gizmo arrows stay on the canvas and the drop
+  // click cannot land on the dock overlaying the right side.
+  const drop = projectToCss([-1.4, 0, 0], metrics);
   await page.mouse.click(metrics.left + drop.x, metrics.top + drop.y);
   await expect
     .poll(async () => (await editorText(page)).includes("Solid.box"), { timeout: 45_000 })
@@ -622,8 +797,8 @@ test("a placed primitive can be selected and moved along an axis", async ({ page
   await page.mouse.click(afterPlacing.left + edge.x, afterPlacing.top + edge.y);
   await expect(page.getByTestId("selection-chip")).toBeVisible();
   await expect(page.getByTestId("gizmo-translate")).toBeEnabled();
-  // A whole-object selection offers the move/rotate gizmo.
-  await expect(page.getByTestId("gizmo-translate")).toBeVisible();
+  // A whole-object selection offers the transform cluster on the rail.
+  await expect(page.getByTestId("tool-group-transform")).toBeVisible();
 
   // Drag the Y arrow upward; the vertical axis stays comfortably in frame.
   const view = await canvasMetrics(page);
@@ -649,16 +824,17 @@ test("a sketch can be moved by its plane", async ({ page }) => {
   // Selecting the sketch as an object targets its plane, which is where a
   // profile's placement actually lives.
   const metrics = await canvasMetrics(page);
-  const edge = projectToCss([0, -0.7, 0], metrics);
+  const edge = projectToCss(BASE_EDGE, metrics);
   await page.mouse.click(metrics.left + edge.x, metrics.top + edge.y);
-  await expect(page.getByTestId("selection-chip")).toHaveText("house");
+  await expect(page.getByTestId("selection-chip")).toHaveText("fin comb");
   await expect(page.getByTestId("gizmo-translate")).toBeEnabled();
   await expect(page.getByTestId("gizmo-translate")).toHaveClass(/active/);
 
-  // The arrows are centered on the polygon, not a potentially remote plane origin.
+  // The arrows are centered on the polygon, not a potentially remote plane
+  // origin; the fin comb's centroid sits near [0, 0, 0.41].
   const view = await canvasMetrics(page);
-  const from = gizmoTip([0, 0.04, 0], 1, view);
-  const to = projectToCss([0, 1.0, 0], view);
+  const from = gizmoTip([0, 0, 0.41], 1, view);
+  const to = projectToCss([0, 1.0, 0.41], view);
   await page.mouse.move(view.left + from.x, view.top + from.y);
   await page.mouse.down();
   await page.mouse.move(view.left + to.x, view.top + to.y, { steps: 12 });
@@ -674,13 +850,13 @@ test("a sketch can be moved by its plane", async ({ page }) => {
       { timeout: 45_000 },
     )
     .toBeGreaterThan(0.2);
-  expect(await editorText(page)).toContain("[-1.1, -0.7]");
+  expect(await editorText(page)).toContain("[-0.9, 0.0]");
 });
 
 test("a default polygon can move without losing parameter-backed points", async ({ page }) => {
   const program = [
-    "from jaxcad.construction import PolygonProfile, extrude",
-    "from jaxcad.geometry import Vector2",
+    "from cadjoint.construction import PolygonProfile, extrude",
+    "from cadjoint.geometry import Vector2",
     "p0 = Vector2(value=[-1.0, -0.6], free=True, name='p0')",
     "p1 = Vector2(value=[1.0, -0.6], free=True, name='p1')",
     "p2 = Vector2(value=[0.0, 0.9], free=True, name='p2')",
@@ -721,13 +897,13 @@ test("a default polygon can move without losing parameter-backed points", async 
 });
 
 test("a primitive can be scaled along an axis", async ({ page }) => {
-  await page.getByTestId("tool-box").click();
+  await railTool(page, "create", "tool-box");
   let metrics = await canvasMetrics(page);
-  const drop = projectToCss([1.5, 0.6, 0], metrics);
+  const drop = projectToCss([-1.4, 0.9, 0], metrics);
   await page.mouse.click(metrics.left + drop.x, metrics.top + drop.y);
   await waitForCompile(page);
   await expect(page.getByTestId("gizmo-scale")).toBeEnabled();
-  await page.getByTestId("gizmo-scale").click();
+  await railTool(page, "transform", "gizmo-scale");
 
   const placed = (await editorText(page)).match(
     /Solid\.box\(size=\[([^\]]+)\][^)]*position=\[([^\]]+)\]/,
@@ -755,9 +931,12 @@ test("a primitive can be scaled along an axis", async ({ page }) => {
 });
 
 test("sketch constraints and extrusion are represented in UI and code", async ({ page }) => {
-  await page.getByTestId("tool-sketch").click();
+  await railTool(page, "create", "tool-sketch");
   let metrics = await canvasMetrics(page);
-  const origin: Vec3 = [1.0, 1.4, 0];
+  // Placed left of center: the right side of the viewport hosts the dock
+  // (object tree / sketch / materials), and the vertex clicks below must land
+  // on the canvas, not on the dock's panels.
+  const origin: Vec3 = [0.0, 1.6, 0];
   const drop = projectToCss(origin, metrics);
   await page.mouse.click(metrics.left + drop.x, metrics.top + drop.y);
   await waitForCompile(page);
@@ -783,6 +962,18 @@ test("sketch constraints and extrusion are represented in UI and code", async ({
     })
     .toBe(true);
   await expect(page.getByTestId("sketch-panel")).toContainText("distance · P1–P2");
+  await waitForCompile(page);
+
+  // A relational constraint uses the same two-click flow: select the first
+  // point, arm the tool (which adopts the selection), then pick the second.
+  metrics = await canvasMetrics(page);
+  await page.mouse.click(metrics.left + first.x, metrics.top + first.y);
+  await page.getByTestId("constraint-horizontal").click();
+  await page.mouse.click(metrics.left + second.x, metrics.top + second.y);
+  await expect(page.getByTestId("sketch-panel")).toContainText("horiz · P1–P2", {
+    timeout: 45_000,
+  });
+  await waitForCompile(page);
 
   await expect(page.getByTestId("solver-panel")).toHaveCount(0);
   await page.getByTestId("solver-toggle").click();
@@ -823,6 +1014,113 @@ test("sketch constraints and extrusion are represented in UI and code", async ({
   expect(text).toContain("satisfy_constraints(sketch1, method='adam', steps=24)");
   expect(text).toContain("_body = extrude(");
   await expect(page.getByTestId("sketch-extrude")).toBeDisabled();
+  // An operator now exists, so the sketch cannot also be revolved.
+  await expect(page.getByTestId("sketch-revolve")).toBeDisabled();
+
+  // The distance chip (serialized index 1: fix, distance, horizontal) edits
+  // its numeric target in place.
+  await page.getByTestId("constraint-label-1").click();
+  await page.getByTestId("constraint-value-1").fill("1.2345");
+  await page.getByTestId("constraint-value-1").press("Enter");
+  await expect.poll(() => editorText(page), { timeout: 45_000 }).toContain("1.2345");
+  await waitForCompile(page);
+
+  // Chips delete their constraint by serialized index.
+  await page.getByTestId("constraint-delete-0").click();
+  await expect
+    .poll(async () => (await editorText(page)).includes("FixedConstraint(sketch1"), {
+      timeout: 45_000,
+    })
+    .toBe(false);
+  await waitForCompile(page);
+  await expect(page.getByTestId("status")).not.toContainText("failed");
+});
+
+test("relational constraint chips render for API-added kinds", async ({ page }) => {
+  const program = [
+    "from cadjoint.construction import PolygonProfile, extrude",
+    'profile = PolygonProfile([[-1.0, -0.8], [1.0, -0.8], [1.0, 0.8], [-1.0, 0.8]], name="quad")',
+    "scene = extrude(profile, depth=0.4)",
+    "",
+  ].join("\n");
+  // Drive /patch directly — the same API the app uses — to cover the kinds the
+  // starter program never adds, then load the accumulated source into the app.
+  const patched = await page.evaluate(async (source) => {
+    const session = (await (await fetch("/api/session")).json()) as { token: string };
+    let text = source;
+    const operations = [
+      { op: "add_constraint", line: 2, kind: "horizontal", indices: [0, 1] },
+      { op: "add_constraint", line: 2, kind: "vertical", indices: [1, 2] },
+      { op: "add_constraint", line: 2, kind: "coincident", indices: [0, 3] },
+      { op: "add_constraint", line: 2, kind: "parallel", indices: [0, 1, 2, 3] },
+      { op: "add_constraint", line: 2, kind: "perpendicular", indices: [0, 1, 1, 2] },
+    ];
+    for (const operation of operations) {
+      const response = await fetch("/patch", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Cadjoint-Token": session.token,
+        },
+        body: JSON.stringify({ source: text, ...operation }),
+      });
+      const result = (await response.json()) as {
+        ok: boolean;
+        source?: string;
+        error?: string;
+      };
+      if (!result.ok || !result.source) {
+        return { error: result.error ?? "patch failed" };
+      }
+      text = result.source;
+    }
+    return { source: text };
+  }, program);
+  expect(patched.error).toBeUndefined();
+
+  const editor = page.locator("[data-testid=editor] .cm-content");
+  await editor.click();
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.insertText(patched.source!);
+  await page.getByTestId("run").click();
+  await waitForCompile(page);
+
+  await page.getByTestId("mode-vertex").click();
+  const metrics = await canvasMetrics(page);
+  const point = projectToCss([-1.0, -0.8, 0], metrics);
+  await page.mouse.click(metrics.left + point.x, metrics.top + point.y);
+  const panel = page.getByTestId("sketch-panel");
+  await expect(panel).toBeVisible();
+  await expect(panel).toContainText("horiz · P1–P2");
+  await expect(panel).toContainText("vert · P2–P3");
+  await expect(panel).toContainText("coinc · P1–P4");
+  await expect(panel).toContainText("∥ · P1P2–P3P4");
+  await expect(panel).toContainText("⊥ · P1P2–P2P3");
+  // Every chip carries a delete affordance keyed by serialized index.
+  await expect(page.getByTestId("constraint-delete-0")).toBeVisible();
+  // This sketch already drives an extrusion, so Revolve is unavailable.
+  await expect(page.getByTestId("sketch-revolve")).toBeDisabled();
+});
+
+test("a standalone sketch can be revolved from the panel", async ({ page }) => {
+  await railTool(page, "create", "tool-sketch");
+  const metrics = await canvasMetrics(page);
+  const drop = projectToCss([1.0, 1.4, 0], metrics);
+  await page.mouse.click(metrics.left + drop.x, metrics.top + drop.y);
+  await waitForCompile(page);
+  await expect(page.getByTestId("sketch-panel")).toBeVisible();
+
+  await expect(page.getByTestId("sketch-revolve")).toBeEnabled();
+  await page.getByTestId("sketch-revolve").click();
+  await expect
+    .poll(async () => (await editorText(page)).includes("_body = revolve("), {
+      timeout: 45_000,
+    })
+    .toBe(true);
+  await waitForCompile(page);
+  await expect(page.getByTestId("status")).not.toContainText("failed");
+  await expect(page.getByTestId("sketch-revolve")).toBeDisabled();
+  await expect(page.getByTestId("sketch-panel")).toContainText("revolve");
 });
 
 test("path tracing yields to interactive dragging and resumes afterwards", async ({ page }) => {
@@ -835,21 +1133,60 @@ test("path tracing yields to interactive dragging and resumes afterwards", async
   await page.getByTestId("mode-vertex").click();
 
   const metrics = await canvasMetrics(page);
-  const from = projectToCss(ROOF_PEAK, metrics);
-  const to = projectToCss([0.25, 1.25, 0], metrics);
+  const from = projectToCss(FIN_TIP, metrics);
+  const to = projectToCss([0.25, 0, 1.1], metrics);
   await page.mouse.move(metrics.left + from.x, metrics.top + from.y);
   await page.mouse.down();
   await page.mouse.move(metrics.left + to.x, metrics.top + to.y, { steps: 10 });
   await page.mouse.up();
 
   await expect
-    .poll(async () => !(await editorText(page)).includes("[0.0, 1.0]"), {
+    .poll(async () => !(await editorText(page)).includes("[-0.08, 0.85]"), {
       timeout: 45_000,
     })
     .toBe(true);
   await waitForCompile(page);
+  // Reopening the popover mounts a fresh panel with Customize collapsed.
   await page.getByTestId("display-options").click();
+  await page.getByTestId("render-customize").click();
   await expect(page.getByTestId("toggle-path-tracing")).toBeChecked();
+});
+
+test("editing modes scope the tool rail and Escape returns to model", async ({ page }) => {
+  // Model mode is the default: the create cluster is offered, no simulate slot.
+  await expect(page.getByTestId("editmode-model")).toHaveClass(/active/);
+  await expect(page.getByTestId("hint-mode")).toHaveText("model");
+  await expect(page.getByTestId("tool-group-create")).toBeVisible();
+  await expect(page.getByTestId("mode-simulate")).toHaveCount(0);
+
+  // Simulate mode swaps the tool clusters for the simulation slot.
+  await page.getByTestId("editmode-simulate").click();
+  await expect(page.getByTestId("mode-simulate")).toBeVisible();
+  await expect(page.getByTestId("hint-mode")).toHaveText("simulate");
+  await expect(page.getByTestId("tool-group-create")).toHaveCount(0);
+
+  // Render is not a mode: the eye-icon popover opens from Simulate too, and
+  // Escape closes just the popover — the mode and selection stay put.
+  await page.getByTestId("editmode-simulate").click();
+  await page.getByTestId("display-options").click();
+  await expect(page.getByTestId("render-popover")).toBeVisible();
+  await expect(page.getByTestId("render-panel")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("render-popover")).toHaveCount(0);
+  await expect(page.getByTestId("editmode-simulate")).toHaveClass(/active/);
+
+  // The next Escape backs out to model mode.
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("editmode-model")).toHaveClass(/active/);
+  await expect(page.getByTestId("mode-simulate")).toHaveCount(0);
+
+  // Selecting a sketch auto-enters sketch mode, where constraint tools live.
+  const metrics = await canvasMetrics(page);
+  const edge = projectToCss(BASE_EDGE, metrics);
+  await page.mouse.click(metrics.left + edge.x, metrics.top + edge.y);
+  await expect(page.getByTestId("selection-chip")).toHaveText("fin comb");
+  await expect(page.getByTestId("editmode-sketch")).toHaveClass(/active/);
+  await expect(page.getByTestId("tool-group-annotate")).toBeVisible();
 });
 
 test("hovering an object highlights it before the click", async ({ page }) => {
@@ -859,7 +1196,172 @@ test("hovering an object highlights it before the click", async ({ page }) => {
   await expect(page.locator("[data-testid=viewer-canvas]")).toHaveCSS("cursor", "default");
 
   // Moving onto the sketch outline shows it is pickable.
-  const edge = projectToCss([0, -0.7, 0], metrics);
+  const edge = projectToCss(BASE_EDGE, metrics);
   await page.mouse.move(metrics.left + edge.x, metrics.top + edge.y);
   await expect(page.locator("[data-testid=viewer-canvas]")).toHaveCSS("cursor", "pointer");
+});
+
+test("studies are declared, edited, and deleted through source patches", async ({ page }) => {
+  // Patch → recompile is a round trip; poll the editor rather than racing it.
+  const editorHas = (needle: string, negate = false) =>
+    expect
+      .poll(async () => (await editorText(page)).includes(needle), { timeout: 45_000 })
+      .toBe(!negate);
+
+  // The starter declares the heat-sink conduction study up front.
+  await page.getByTestId("editmode-simulate").click();
+  await expect(page.getByTestId("simulate-panel")).toBeVisible();
+  await expect(page.getByTestId("simulate-study-sink-conduction")).toBeVisible();
+
+  // cool-sink optimizes this study, so retire the optimization first —
+  // deleting the study out from under it would leave a broken program.
+  await page.getByTestId("sim-tab-optimize").click();
+  await page.getByTestId("optimize-delete-cool-sink").click();
+  await editorHas("Optimization(", true);
+  await page.getByTestId("sim-tab-studies").click();
+
+  // Deleting it reaches the empty state, which offers to add one again.
+  await page.getByTestId("simulate-delete-sink-conduction").click();
+  await editorHas("ThermalStudy(", true);
+  await expect(page.getByTestId("simulate-empty")).toBeVisible();
+
+  // Adding a study writes a ThermalStudy declaration into the program.
+  await page.getByTestId("simulate-add-thermal").click();
+  await editorHas("ThermalStudy(");
+  const card = page.locator("[data-testid^=simulate-study-]").first();
+  await expect(card).toBeVisible();
+  const name = (await card.getAttribute("data-testid"))!.replace("simulate-study-", "");
+
+  // A boundary condition built from a box vertex selection lands as source.
+  await page.getByTestId(`simulate-add-bc-${name}`).click();
+  await page.getByTestId("simulate-builder-selection").selectOption("box");
+  await page.getByTestId("simulate-builder-value").fill("250");
+  await page.getByTestId("simulate-builder-add").click();
+  await editorHas("Nodes.box(");
+  await editorHas("value=250.0");
+
+  // Editing the BC value patches the literal in place.
+  await page.getByTestId(`simulate-bc-value-${name}-0`).fill("325");
+  await page.getByTestId(`simulate-bc-value-${name}-0`).blur();
+  await editorHas("value=325.0");
+
+  // Deleting the BC and the study removes both declarations again.
+  await page.getByTestId(`simulate-bc-delete-${name}-0`).click();
+  await editorHas("Nodes.box(", true);
+  await page.getByTestId(`simulate-delete-${name}`).click();
+  await editorHas("ThermalStudy(", true);
+  await expect(page.getByTestId("simulate-empty")).toBeVisible();
+});
+
+test("meshes are declared, inspected, and deleted through source patches", async ({
+  page,
+}) => {
+  const editorHas = (needle: string, negate = false) =>
+    expect
+      .poll(async () => (await editorText(page)).includes(needle), { timeout: 45_000 })
+      .toBe(!negate);
+
+  // The starter declares its mesh (sink-mesh) up front: the tab lists the
+  // card rather than the empty state, and the study references it.
+  await page.getByTestId("editmode-simulate").click();
+  await page.getByTestId("sim-tab-meshes").click();
+  await expect(page.getByTestId("mesh-empty")).toHaveCount(0);
+  await expect(page.getByTestId("mesh-sink-mesh")).toBeVisible();
+
+  // Generate builds the declared mesh and reports quality stats plus the
+  // histogram.
+  await page.getByTestId("mesh-inspect-sink-mesh").click();
+  await expect(page.getByTestId("mesh-stats")).toBeVisible({ timeout: 90_000 });
+  await expect(page.getByTestId("mesh-stats")).toContainText("nodes");
+  await expect(page.getByTestId("mesh-stats")).toContainText("jacobian");
+  await expect(page.getByTestId("mesh-histogram")).toBeVisible();
+
+  // The inspected mesh owns the viewport with element edges on; "Scene"
+  // hands it back to the raymarched SDF without dropping the loaded state.
+  await expect(page.getByTestId("simulate-viewport")).toBeVisible();
+  await expect(page.getByTestId("simulate-edges")).toBeChecked();
+  await page.getByTestId("simulate-viewport-scene").click();
+  await expect(page.getByTestId("simulate-viewport-scene")).toHaveClass(/active/);
+  await page.getByTestId("simulate-viewport-mesh").click();
+  await expect(page.getByTestId("simulate-viewport-mesh")).toHaveClass(/active/);
+
+  // "+ Mesh" writes a second SimMesh declaration into the program.
+  await page.getByTestId("mesh-add").click();
+  const card = page.getByTestId("mesh-mesh1");
+  await expect(card).toBeVisible();
+
+  // Editing the padding rewrites the new declaration's literal.
+  await page.getByTestId("mesh-arg-mesh1-padding").fill("0.2");
+  await page.getByTestId("mesh-arg-mesh1-padding").blur();
+  await editorHas("padding=0.2");
+
+  // Deleting it removes only that declaration — sink-mesh stays (the study
+  // references it, so it is not deletable without editing the study first).
+  await page.getByTestId("mesh-delete-mesh1").click();
+  await editorHas("padding=0.2", true);
+  await expect(page.getByTestId("mesh-mesh1")).toHaveCount(0);
+  await expect(page.getByTestId("mesh-sink-mesh")).toBeVisible();
+});
+
+test("solving the declared study reports the result and swaps to quality view", async ({
+  page,
+}) => {
+  await page.getByTestId("editmode-simulate").click();
+  await expect(page.getByTestId("simulate-study-sink-conduction")).toBeVisible();
+
+  await page.getByTestId("simulate-run-sink-conduction").click();
+  await expect(page.getByTestId("simulate-legend")).toBeVisible({ timeout: 120_000 });
+  await expect(page.getByTestId("simulate-legend")).toContainText("temperature");
+  const summary = page.getByTestId("simulate-result-summary");
+  await expect(summary).toBeVisible();
+  await expect(summary).toContainText("nodes");
+  await expect(summary).toContainText("temperature");
+
+  // Solved fields read clean: element edges default off (one toggle away).
+  await expect(page.getByTestId("simulate-edges")).not.toBeChecked();
+
+  // The quality toggle re-inspects the mesh and swaps the displayed scalars.
+  await page.getByTestId("simulate-quality-toggle").check();
+  await expect(page.getByTestId("simulate-legend")).toContainText("scaled jacobian", {
+    timeout: 90_000,
+  });
+  await page.getByTestId("simulate-quality-toggle").uncheck();
+  await expect(page.getByTestId("simulate-legend")).toContainText("temperature");
+});
+
+test("clicking the inspected mesh proposes a sphere BC selection", async ({ page }) => {
+  const editorHas = (needle: string, negate = false) =>
+    expect
+      .poll(async () => (await editorText(page)).includes(needle), { timeout: 45_000 })
+      .toBe(!negate);
+
+  await page.getByTestId("editmode-simulate").click();
+  await page.getByTestId("sim-tab-meshes").click();
+  await page.getByTestId("mesh-add").click();
+  await editorHas("SimMesh(");
+  await page.getByTestId("mesh-inspect-mesh1").click();
+  await expect(page.getByTestId("mesh-stats")).toBeVisible({ timeout: 90_000 });
+
+  // Arm viewport picking from the study's add-BC builder (Studies tab).
+  await page.getByTestId("sim-tab-studies").click();
+  await page.getByTestId("simulate-add-bc-sink-conduction").click();
+  await expect(page.getByTestId("simulate-builder")).toBeVisible();
+  await page.getByTestId("simulate-builder-pick").click();
+  await expect(page.getByTestId("viewer-hint")).toContainText("Pick BC");
+
+  // Click a point on the sink's front face; the nearest mesh vertex becomes
+  // the centre of a proposed Nodes.sphere sized from the cell spacing.
+  const metrics = await canvasMetrics(page);
+  const point = projectToCss([0.5, -0.6, 0.1], metrics);
+  await page.mouse.click(metrics.left + point.x, metrics.top + point.y);
+
+  await expect(page.getByTestId("simulate-builder-selection")).toHaveValue("sphere");
+  const radius = await page.getByTestId("simulate-builder-radius").inputValue();
+  expect(Number(radius)).toBeGreaterThan(0);
+
+  // Confirming emits the ordinary add_study_bc patch with that selection.
+  await page.getByTestId("simulate-builder-add").click();
+  await editorHas("Nodes.sphere(");
+  await waitForCompile(page);
+  await expect(page.getByTestId("status")).not.toContainText("failed");
 });

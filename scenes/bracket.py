@@ -1,0 +1,184 @@
+"""Parametric L-bracket: base plate, bolt holes, tapered web, gusset rib.
+
+A realistic mounting bracket built from the construction API. The base plate
+and the vertical web are extrusions of parameter-backed sketch profiles, the
+stiffening rib is a triangular gusset tying the web to the plate, and the two
+bolt holes are subtracted cylinders whose positions are pinned by constraints.
+The bracket bolts onto a mounting slab that is rendered but excluded from
+simulation: the named ``SimMesh`` below meshes only the ``bracket`` domain.
+
+Named design parameters (drive the FEM optimization in
+``examples/fem_bracket_optimization.py``):
+  - ``plate_thickness``: extrusion depth of the base plate
+  - ``web_thickness``: extrusion depth of the vertical web
+  - ``rib_height``: distance constraint from the rib's plate corner to its tip
+"""
+
+import jax
+import jax.numpy as jnp
+
+from cadjoint import extract_parameters, functionalize
+from cadjoint.constraints import DistanceConstraint, FixedConstraint, satisfy_constraints
+from cadjoint.construction import PolygonProfile, SketchPlane, Solid, extrude
+from cadjoint.fem import ElasticStudy, Fixed, Nodes, SimMesh, Traction
+from cadjoint.geometry import Scalar, Vector, Vector2
+from cadjoint.optimize import Optimization
+from cadjoint.render import Material
+from cadjoint.sdf.boolean import Difference, Union
+
+# ── design parameters ────────────────────────────────────────────────────────
+plate_thickness = Scalar(0.2, free=True, name="plate_thickness")
+web_thickness = Scalar(0.16, free=True, name="web_thickness")
+rib_height = Scalar(0.88, name="rib_height")
+bolt_spacing = Scalar(1.4, name="bolt_spacing")
+
+steel = Material(name="steel", color=[0.62, 0.66, 0.72], roughness=0.35, metallic=0.85)
+
+# ── base plate: rectangle sketch extruded through plate_thickness ────────────
+# The plate sits on z = 0; its mid-plane is the sketch plane at z = 0.1.
+plate_bl = Vector2(value=[-1.2, -0.8], free=True, name="plate_bl")
+plate_br = Vector2(value=[1.2, -0.8], free=True, name="plate_br")
+plate_tr = Vector2(value=[1.2, 0.8], free=True, name="plate_tr")
+plate_tl = Vector2(value=[-1.2, 0.8], free=True, name="plate_tl")
+plate_profile = PolygonProfile(
+    [plate_bl, plate_br, plate_tr, plate_tl],
+    plane=SketchPlane(origin=[0.0, 0.0, 0.1], normal=[0.0, 0.0, 1.0]),
+    name="plate",
+)
+plate = extrude(plate_profile, depth=plate_thickness, material=steel)
+
+# ── vertical web: tapered wall on the back edge (y = -0.7) ───────────────────
+# Sketch plane normal +Y gives in-plane axes u = -X, v = +Z: profile x runs
+# along -world-x, profile y is world height. The root overlaps the plate.
+web_root_right = Vector2(value=[-1.1, 0.0], free=True, name="web_root_right")
+web_root_left = Vector2(value=[1.1, 0.0], free=True, name="web_root_left")
+web_top_left = Vector2(value=[0.85, 1.2], free=True, name="web_top_left")
+web_top_right = Vector2(value=[-0.85, 1.2], free=True, name="web_top_right")
+web_profile = PolygonProfile(
+    [web_root_right, web_root_left, web_top_left, web_top_right],
+    plane=SketchPlane(origin=[0.0, -0.7, 0.0], normal=[0.0, 1.0, 0.0]),
+    name="web",
+)
+web = extrude(web_profile, depth=web_thickness, material=steel)
+
+# ── stiffening rib: triangular gusset from plate to web, centered in x ───────
+# Sketch plane normal +X gives u = -Z, v = +Y: profile (x, y) = (-z, y) world.
+rib_plate_corner = Vector2(value=[-0.02, 0.55], free=True, name="rib_plate_corner")
+rib_web_corner = Vector2(value=[-0.02, -0.62], free=True, name="rib_web_corner")
+rib_tip = Vector2(value=[-0.9, -0.62], free=True, name="rib_tip")
+rib_profile = PolygonProfile(
+    [rib_plate_corner, rib_web_corner, rib_tip],
+    plane=SketchPlane(origin=[0.0, 0.0, 0.0], normal=[1.0, 0.0, 0.0]),
+    name="rib",
+)
+rib = extrude(rib_profile, depth=0.12, material=steel)
+
+# The rib height is a named dimension: the tip must sit rib_height away from
+# the web-side base corner, straight up the web.
+DistanceConstraint(rib_web_corner, rib_tip, rib_height)
+
+# ── bolt holes: fixed positions, spacing tied by a distance constraint ───────
+bolt_left = Vector([-0.7, 0.35, 0.1], free=True, name="bolt_left")
+bolt_right = Vector([0.7, 0.35, 0.1], free=True, name="bolt_right")
+FixedConstraint(bolt_left, [-0.7, 0.35, 0.1])
+DistanceConstraint(bolt_left, bolt_right, bolt_spacing)
+
+hole_left = Solid.cylinder(radius=0.16, height=0.4, position=bolt_left, name="hole_left")
+hole_right = Solid.cylinder(radius=0.16, height=0.4, position=bolt_right, name="hole_right")
+
+# ── assembly: filleted union of the structure, sharp-ish bolt holes ──────────
+body = Union(plate, web, rib, smoothness=0.05)
+bracket = Difference(body, hole_left, hole_right, smoothness=0.02)
+bracket.name = "bracket"  # named: the simulation mesh selects it as its domain
+
+# ── mounting slab: rendered context the bracket bolts onto ───────────────────
+# Part of the scene, not of the simulation — the SimMesh domain below picks
+# only the bracket, so the slab never enters the FEM mesh.
+mount = Solid.box(
+    size=[1.3, 0.9, 0.11],
+    position=[0.0, 0.0, -0.09],
+    material=Material(name="mount", color=[0.35, 0.37, 0.4], roughness=0.7, metallic=0.2),
+    name="mount",
+)
+scene = Union(bracket, mount, smoothness=0.02)
+satisfy_constraints(scene, steps=2)
+
+# ── simulation mesh: the bracket domain, hexed on a named grid ───────────────
+# First-class meshing intent: studies reference it, the viewer inspects it
+# (bracket_mesh.inspect() reports counts, bounds, and element quality).
+bracket_mesh = SimMesh(
+    name="bracket-mesh",
+    resolution=(24, 17, 13),
+    domain=bracket,
+    bounds=(-1.3, -0.95, -0.06),
+    size=(2.6, 1.9, 1.42),
+)
+
+# Quality-path alternative: a quadratic tet mesh (method="tet10") conforms to
+# the true bracket boundary — accurate in bending where linear tets lock, and
+# it sees inclined features (the rib) that the hex lattice staircases over.
+# It solves slower than hex, so it stays a declaration here; point pry_study's
+# mesh= at it (or patch method= in the viewer) to run on it.  Note the deeper
+# z floor: tet meshing dual-contours the surface, which must be fully inside
+# the box (the filleted union dips a hair below z = 0).
+# bracket_mesh_tet10 = SimMesh(
+#     name="bracket-mesh-tet10",
+#     resolution=(26, 19, 16),
+#     domain=bracket,
+#     bounds=(-1.3, -0.95, -0.16),
+#     size=(2.6, 1.9, 1.52),
+#     method="tet10",
+# )
+
+# ── simulation study: bolt regions clamped, prying load on the web tip ───────
+# Node selections are programmatic: a ball around each bolt hole is fixed,
+# and the traction acts on the boundary faces spanned by the outer (-y) web
+# wall above z = 1.0 (mirrors examples/fem_bracket_optimization.py).
+pry_study = ElasticStudy(
+    name="bracket-pry",
+    youngs=1000.0,
+    poisson=0.3,
+    bcs=[
+        Fixed(Nodes.sphere([-0.7, 0.35, 0.1], 0.33) | Nodes.sphere([0.7, 0.35, 0.1], 0.33)),
+        Traction(
+            Nodes.halfspace([0.0, -0.7, 0.0], [0.0, -1.0, 0.0])
+            & Nodes.halfspace([0.0, 0.0, 1.0], [0.0, 0.0, 1.0]),
+            (0.0, -2.0, 0.0),
+        ),
+    ],
+    mesh=bracket_mesh,
+)
+
+# ── compliance optimization: stiffness against material, through the study ───
+# The declared study becomes the objective, mirroring
+# ``examples/fem_bracket_optimization.py``: minimize the work of the prying
+# load (classical compliance — twice the strain energy) plus a smoothed
+# material-volume penalty, differentiated straight through the
+# frozen-topology elastic solve. The volume integral samples the SDF at the
+# simulation grid's cell centers, exactly like the example's mass term.
+bracket_parameters, bracket_fixed, _ = extract_parameters(bracket)
+bracket_sdf = functionalize(bracket)
+
+mass_axes = [
+    jnp.linspace(-1.3 + 2.6 / 48, 1.3 - 2.6 / 48, 24),
+    jnp.linspace(-0.95 + 1.9 / 34, 0.95 - 1.9 / 34, 17),
+    jnp.linspace(-0.06 + 1.42 / 26, 1.36 - 1.42 / 26, 13),
+]
+mass_cells = jnp.stack(jnp.meshgrid(*mass_axes, indexing="ij"), axis=-1).reshape(-1, 3)
+mass_cell_volume = float((2.6 / 24) * (1.9 / 17) * (1.42 / 13))
+
+
+def bracket_volume(parameters):
+    sdf = bracket_sdf(parameters, bracket_fixed)
+    return mass_cell_volume * jnp.sum(jax.nn.sigmoid(-sdf(mass_cells) / 0.054))
+
+
+stiffen_bracket = Optimization(
+    name="stiff-bracket",
+    study=pry_study,
+    metric="compliance",
+    regularizer=bracket_volume,
+    regularizer_weight=1.0,
+    steps=8,
+    learning_rate=0.01,
+)

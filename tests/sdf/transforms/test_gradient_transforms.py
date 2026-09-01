@@ -8,8 +8,8 @@ For full differentiability, use the functional API in transforms.functional.
 import jax
 import jax.numpy as jnp
 
-from jaxcad.sdf.primitives import Box, Sphere
-from jaxcad.sdf.transforms import Rotate, Translate, Twist
+from cadjoint.sdf.primitives import Box, Sphere
+from cadjoint.sdf.transforms import Rotate, Translate, Twist
 
 
 def test_translate_gradient_functional():

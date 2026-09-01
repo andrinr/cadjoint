@@ -36,7 +36,7 @@ test("renders the scene with its construction overlay", async ({}, testInfo) => 
     if (message.type() === "error") errors.push(message.text());
   });
 
-  await page.goto(`http://127.0.0.1:${process.env.JAXCAD_E2E_PORT ?? 8799}/`);
+  await page.goto(`http://127.0.0.1:${process.env.CADJOINT_E2E_PORT ?? 8799}/`);
   await expect(page.getByTestId("status")).toContainText("preview", { timeout: 90_000 });
 
   const shot = await page.getByTestId("viewer-canvas").screenshot();

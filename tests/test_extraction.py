@@ -2,10 +2,10 @@
 
 import jax.numpy as jnp
 
-from jaxcad import extract_parameters
-from jaxcad.geometry.parameters import Scalar, Vector
-from jaxcad.sdf.primitives.box import Box
-from jaxcad.sdf.primitives.sphere import Sphere
+from cadjoint import extract_parameters
+from cadjoint.geometry.parameters import Scalar, Vector
+from cadjoint.sdf.primitives.box import Box
+from cadjoint.sdf.primitives.sphere import Sphere
 
 
 def test_extract_free_parameter():

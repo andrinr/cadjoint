@@ -3,9 +3,9 @@
 import jax.numpy as jnp
 import pytest
 
-from jaxcad.constraints import DistanceConstraint, FixedConstraint, satisfy_constraints
-from jaxcad.constraints.solve import capture_constraint_solves
-from jaxcad.construction import PolygonProfile
+from cadjoint.constraints import DistanceConstraint, FixedConstraint, satisfy_constraints
+from cadjoint.constraints.solve import capture_constraint_solves
+from cadjoint.construction import PolygonProfile
 
 
 def test_satisfy_constraints_updates_an_underconstrained_profile_in_place():

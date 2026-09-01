@@ -9,7 +9,7 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import numpy as np
 
-from jaxcad.render import (
+from cadjoint.render import (
     Camera,
     Material,
     RenderSettings,
@@ -17,9 +17,9 @@ from jaxcad.render import (
     make_gradient_sky,
     render_scene,
 )
-from jaxcad.sdf.boolean import Union
-from jaxcad.sdf.primitives import Plane, Sphere, Torus
-from jaxcad.sdf.transforms import Rotate, Translate
+from cadjoint.sdf.boolean import Union
+from cadjoint.sdf.primitives import Plane, Sphere, Torus
+from cadjoint.sdf.transforms import Rotate, Translate
 
 
 def build_scene(*, glass: bool) -> Scene:

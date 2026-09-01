@@ -10,7 +10,7 @@ import { For, Show, createEffect, createMemo, createSignal } from "solid-js";
 import { busy, materials, nodes } from "../state";
 import type { MaterialDefinition } from "../types";
 
-export const MATERIAL_DRAG_TYPE = "application/x-jaxcad-material";
+export const MATERIAL_DRAG_TYPE = "application/x-cadjoint-material";
 
 export interface MaterialPanelProps {
   onCreate: () => Promise<void>;

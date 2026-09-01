@@ -2,10 +2,10 @@
 
 import jax.numpy as jnp
 
-from jaxcad.construction import from_line
-from jaxcad.geometry.parameters import Scalar, Vector
-from jaxcad.geometry.primitives import Line
-from jaxcad.sdf.primitives.capsule import Capsule
+from cadjoint.construction import from_line
+from cadjoint.geometry.parameters import Scalar, Vector
+from cadjoint.geometry.primitives import Line
+from cadjoint.sdf.primitives.capsule import Capsule
 
 
 def test_from_line_basic():

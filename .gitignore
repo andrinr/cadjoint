@@ -33,9 +33,10 @@ _site/
 /reference/
 **/*.quarto_ipynb
 
-# Frontend (playground UI source; built output in jaxcad/viewer/static is committed)
+# Frontend (playground UI source; built output in cadjoint/viewer/static is committed)
 node_modules/
 test-results/
 frontend/test-results/
 frontend/playwright-report/
 frontend/.vite/
+_skipped.*

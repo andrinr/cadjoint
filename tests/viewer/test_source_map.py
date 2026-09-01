@@ -2,7 +2,7 @@
 
 import pytest
 
-from jaxcad.viewer._source_map import (
+from cadjoint.viewer._source_map import (
     PLAYGROUND_FILENAME,
     build_construction_payload,
     build_construction_relations,
@@ -12,12 +12,12 @@ from jaxcad.viewer._source_map import (
     locate_profile_call,
 )
 
-SIMPLE = """from jaxcad.construction import PolygonProfile, extrude
+SIMPLE = """from cadjoint.construction import PolygonProfile, extrude
 profile = PolygonProfile([[0.0, 0.0], [2.0, 0.0], [1.0, 1.5]], name="tri")
 scene = extrude(profile, depth=0.6)
 """
 
-MULTILINE = """from jaxcad.construction import PolygonProfile, SketchPlane, extrude
+MULTILINE = """from cadjoint.construction import PolygonProfile, SketchPlane, extrude
 quad = PolygonProfile(
     [[0, 0], [1, 0], [1, 1], [0, 1]],
     plane=SketchPlane(origin=[0, 1, 0], normal=[1, 0, 0]),
@@ -29,7 +29,7 @@ scene = extrude(quad, depth=1.0)
 
 def run(source: str):
     """Execute a program the way the compile worker does, capturing profiles."""
-    namespace = {"__builtins__": __builtins__, "__name__": "__jaxcad_playground__"}
+    namespace = {"__builtins__": __builtins__, "__name__": "__cadjoint_playground__"}
     with capture_profiles(PLAYGROUND_FILENAME) as captured:
         exec(compile(source, PLAYGROUND_FILENAME, "exec"), namespace, namespace)
     return captured, namespace
@@ -43,7 +43,7 @@ class TestCaptureProfiles:
 
     def test_captures_profiles_never_bound_to_a_variable(self):
         source = (
-            "from jaxcad.construction import PolygonProfile, extrude\n"
+            "from cadjoint.construction import PolygonProfile, extrude\n"
             "scene = extrude(PolygonProfile([[0, 0], [1, 0], [0, 1]]), depth=0.5)\n"
         )
         captured, _ = run(source)
@@ -51,7 +51,7 @@ class TestCaptureProfiles:
         assert captured[0][1] == 2
 
     def test_restores_the_original_initialiser(self):
-        from jaxcad.construction.sketch import PolygonProfile
+        from cadjoint.construction.sketch import PolygonProfile
 
         original = PolygonProfile.__init__
         with capture_profiles(PLAYGROUND_FILENAME):
@@ -94,7 +94,7 @@ class TestLocateProfileCall:
 
     def test_follows_vector2_parameters_to_their_values(self):
         source = (
-            "from jaxcad.geometry import Vector2\n"
+            "from cadjoint.geometry import Vector2\n"
             "v0 = Vector2(value=[0, 0], free=True, name='v0')\n"
             "v1 = Vector2([1, 0], free=True, name='v1')\n"
             "v2 = Vector2([0, 1], free=True, name='v2')\n"
@@ -160,7 +160,7 @@ class TestConstructionPayload:
 
     def test_profiles_built_in_a_loop_are_not_editable(self):
         source = (
-            "from jaxcad.construction import PolygonProfile, extrude\n"
+            "from cadjoint.construction import PolygonProfile, extrude\n"
             "loops = [PolygonProfile([[0, 0], [1, 0], [0, 1]], name=f'l{i}') for i in range(2)]\n"
             "scene = extrude(loops[0], depth=0.4)\n"
         )
@@ -172,7 +172,7 @@ class TestConstructionPayload:
 
     def test_variable_vertices_remain_editable_at_their_definition(self):
         source = (
-            "from jaxcad.construction import PolygonProfile, extrude\n"
+            "from cadjoint.construction import PolygonProfile, extrude\n"
             "points = [[0, 0], [1, 0], [0, 1]]\n"
             "scene = extrude(PolygonProfile(points, name='v'), depth=0.4)\n"
         )
@@ -190,8 +190,8 @@ class TestConstructionPayload:
 
     def test_named_plane_parameter_maps_to_its_origin_definition(self):
         source = (
-            "from jaxcad.construction import PolygonProfile, SketchPlane, extrude\n"
-            "from jaxcad.geometry import Vector\n"
+            "from cadjoint.construction import PolygonProfile, SketchPlane, extrude\n"
+            "from cadjoint.geometry import Vector\n"
             "origin = Vector(value=[1, 2, 3], free=True, name='origin')\n"
             "plane = SketchPlane(origin=origin)\n"
             "profile = PolygonProfile([[0, 0], [1, 0], [0, 1]], plane=plane)\n"
@@ -205,8 +205,8 @@ class TestConstructionPayload:
 
     def test_reports_constraints_and_extrusion_history(self):
         source = (
-            "from jaxcad.construction import PolygonProfile, extrude\n"
-            "from jaxcad.constraints import DistanceConstraint, FixedConstraint\n"
+            "from cadjoint.construction import PolygonProfile, extrude\n"
+            "from cadjoint.constraints import DistanceConstraint, FixedConstraint\n"
             "profile = PolygonProfile([[0, 0], [1, 0], [0, 1]])\n"
             "FixedConstraint(profile.vertices[0], [0, 0])\n"
             "DistanceConstraint(profile.vertices[0], profile.vertices[1], 1.0)\n"
@@ -219,8 +219,8 @@ class TestConstructionPayload:
 
     def test_reports_revolve_history_and_material(self):
         source = (
-            "from jaxcad.construction import PolygonProfile, revolve\n"
-            "from jaxcad.render import Material\n"
+            "from cadjoint.construction import PolygonProfile, revolve\n"
+            "from cadjoint.render import Material\n"
             "copper = Material(color=[0.9, 0.4, 0.2], metallic=0.9)\n"
             "section = PolygonProfile([[0.7, -0.2], [1, -0.2], [1, 0.2], [0.7, 0.2]])\n"
             "scene = revolve(section, material=copper)\n"
@@ -233,8 +233,8 @@ class TestConstructionPayload:
 
     def test_reports_named_materials_and_object_assignments(self):
         source = (
-            "from jaxcad.construction import Solid\n"
-            "from jaxcad.render import Material\n"
+            "from cadjoint.construction import Solid\n"
+            "from cadjoint.render import Material\n"
             "paint = Material(color=[0.2, 0.4, 0.8], roughness=0.3)\n"
             "scene = Solid.sphere(radius=0.5, material=paint, name='ball')\n"
         )
@@ -251,10 +251,10 @@ class TestConstructionPayload:
 
     def test_reports_constraints_between_primitive_positions(self):
         source = (
-            "from jaxcad.construction import Solid\n"
-            "from jaxcad.constraints import DistanceConstraint, FixedConstraint\n"
-            "from jaxcad.geometry import Vector\n"
-            "from jaxcad.sdf.boolean import Union\n"
+            "from cadjoint.construction import Solid\n"
+            "from cadjoint.constraints import DistanceConstraint, FixedConstraint\n"
+            "from cadjoint.geometry import Vector\n"
+            "from cadjoint.sdf.boolean import Union\n"
             "left_pos = Vector([-1, 0, 0], free=True, name='left_pos')\n"
             "right_pos = Vector([1, 0, 0], free=True, name='right_pos')\n"
             "left = Solid.sphere(radius=0.5, position=left_pos)\n"
@@ -273,3 +273,128 @@ class TestConstructionPayload:
                 "value": 2.0,
             },
         ]
+
+
+MESHES = """from cadjoint.fem import Dirichlet, Nodes, SimMesh, ThermalStudy
+from cadjoint.sdf.primitives import Box
+
+block = Box(size=[1.0, 1.0, 1.0])
+scene = block
+grid = SimMesh(name="grid", resolution=12, bounds=[-1.0, -1.0, -1.0], size=[2.0, 2.0, 2.0])
+SimMesh(name="anonymous", resolution=8)
+heat = ThermalStudy(
+    name="bar",
+    conductivity=1.0,
+    mesh="grid",
+    domain=block,
+    bcs=[Dirichlet(Nodes.side("-x"), value=0.0)],
+)
+"""
+
+
+class TestLocateMeshStatements:
+    def test_locates_assigned_and_bare_constructors_in_order(self):
+        from cadjoint.viewer._source_map import locate_mesh_statements
+
+        statements = locate_mesh_statements(MESHES)
+        assert [statement.index for statement in statements] == [0, 1]
+        assert [statement.name for statement in statements] == ["grid", "anonymous"]
+        assert [statement.variable for statement in statements] == ["grid", None]
+        start, end = statements[0].call_span
+        assert MESHES[start:end].startswith("SimMesh(")
+
+    def test_skips_statements_with_more_than_one_constructor(self):
+        from cadjoint.viewer._source_map import locate_mesh_statements
+
+        two = "pair = (SimMesh(name='a', resolution=8), SimMesh(name='b', resolution=8))\n"
+        assert locate_mesh_statements(two) == []
+        # A loop body is not a top-level statement; nothing is located, and
+        # the compile payload's count check marks the captured meshes
+        # non-editable instead.
+        loop = "for i in range(2):\n    SimMesh(name=str(i), resolution=8)\n"
+        assert locate_mesh_statements(loop) == []
+
+    def test_returns_none_for_unparsable_source(self):
+        from cadjoint.viewer._source_map import locate_mesh_statements
+
+        assert locate_mesh_statements("def broken(:\n") is None
+
+    def test_positional_name_is_extracted(self):
+        from cadjoint.viewer._source_map import locate_mesh_statements
+
+        source = "grid = SimMesh('grid', 12)\n"
+        statements = locate_mesh_statements(source)
+        assert statements[0].name == "grid"
+
+
+class TestStudyMeshSpans:
+    def test_study_statements_carry_mesh_and_domain_value_spans(self):
+        from cadjoint.viewer._source_map import locate_study_statements
+
+        statement = locate_study_statements(MESHES)[0]
+        start, end = statement.mesh_span
+        assert MESHES[start:end] == '"grid"'
+        start, end = statement.domain_span
+        assert MESHES[start:end] == "block"
+
+    def test_spans_are_none_when_the_keywords_are_absent(self):
+        from cadjoint.viewer._source_map import locate_study_statements
+
+        source = (
+            "from cadjoint.fem import ThermalStudy\n"
+            "scene = None\n"
+            "heat = ThermalStudy(name='t', resolution=8, conductivity=1.0, bcs=[])\n"
+        )
+        statement = locate_study_statements(source)[0]
+        assert statement.mesh_span is None
+        assert statement.domain_span is None
+
+
+OPTIMIZATIONS = """from cadjoint.optimize import Optimization
+from cadjoint.sdf.primitives import Box
+
+scene = Box(size=[1.0, 1.0, 1.0])
+
+def volume(params):
+    return params["size"].prod()
+
+shrink = Optimization(name="min-volume", objective=volume, of=scene, steps=25, learning_rate=0.03)
+Optimization("bare", volume, scene)
+"""
+
+
+class TestLocateOptimizationStatements:
+    def test_locates_assigned_and_bare_constructors_in_order(self):
+        from cadjoint.viewer._source_map import locate_optimization_statements
+
+        statements = locate_optimization_statements(OPTIMIZATIONS)
+        assert [statement.index for statement in statements] == [0, 1]
+        assert [statement.name for statement in statements] == ["min-volume", "bare"]
+        assert [statement.variable for statement in statements] == ["shrink", None]
+        start, end = statements[0].call_span
+        assert OPTIMIZATIONS[start:end].startswith("Optimization(")
+
+    def test_carries_steps_and_learning_rate_value_spans(self):
+        from cadjoint.viewer._source_map import locate_optimization_statements
+
+        first, second = locate_optimization_statements(OPTIMIZATIONS)
+        start, end = first.steps_span
+        assert OPTIMIZATIONS[start:end] == "25"
+        start, end = first.learning_rate_span
+        assert OPTIMIZATIONS[start:end] == "0.03"
+        # The bare declaration writes neither keyword.
+        assert second.steps_span is None
+        assert second.learning_rate_span is None
+
+    def test_skips_statements_with_more_than_one_constructor(self):
+        from cadjoint.viewer._source_map import locate_optimization_statements
+
+        two = "pair = (Optimization('a', f, s), Optimization('b', f, s))\n"
+        assert locate_optimization_statements(two) == []
+        loop = "for i in range(2):\n    Optimization(str(i), f, s)\n"
+        assert locate_optimization_statements(loop) == []
+
+    def test_returns_none_for_unparsable_source(self):
+        from cadjoint.viewer._source_map import locate_optimization_statements
+
+        assert locate_optimization_statements("def broken(:\n") is None

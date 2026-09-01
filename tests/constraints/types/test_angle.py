@@ -3,8 +3,8 @@
 import jax.numpy as jnp
 import pytest
 
-from jaxcad.constraints import AngleConstraint
-from jaxcad.geometry.parameters import Vector
+from cadjoint.constraints import AngleConstraint
+from cadjoint.geometry.parameters import Vector
 
 
 @pytest.mark.parametrize(

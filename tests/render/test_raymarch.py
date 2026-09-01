@@ -3,8 +3,8 @@
 import jax.numpy as jnp
 import numpy as np
 
-from jaxcad.render.material import Material
-from jaxcad.render.raymarch import (
+from cadjoint.render.material import Material
+from cadjoint.render.raymarch import (
     _camera_rays,
     _cast_shadow,
     _compute_normal,
@@ -15,9 +15,9 @@ from jaxcad.render.raymarch import (
     _trace_through_glass,
     raymarch,
 )
-from jaxcad.render.raymarch.env import _sample_env_map
-from jaxcad.render.raymarch.surface import _offset_surface
-from jaxcad.sdf.primitives import Sphere
+from cadjoint.render.raymarch.env import _sample_env_map
+from cadjoint.render.raymarch.surface import _offset_surface
+from cadjoint.sdf.primitives import Sphere
 
 
 def _sphere_sdf(radius=1.0):

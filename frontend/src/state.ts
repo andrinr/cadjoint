@@ -9,28 +9,110 @@
 
 import { createSignal } from "solid-js";
 import type {
+  BcProposal,
   ConstructionNode,
   ConstructionRelation,
   ConstraintSolverRun,
-  DifferentiabilityDemo,
   GizmoMode,
   MaterialDefinition,
+  MeshEdgePayload,
+  MeshInspectInfo,
+  OptimizationPayload,
   Selection,
   SelectionMode,
+  SimMeshPayload,
+  SimulationMeshPayload,
+  SimulationResultSummary,
+  StudyPayload,
   ToolMode,
 } from "./types";
 import { placeEdges } from "./viewer/gizmo";
+import type { PendingLoft } from "./loft";
+import {
+  autoEnterSketchMode,
+  cycleEditingMode,
+  loadEditingMode,
+  persistEditingMode,
+  type EditingMode,
+} from "./editingMode";
+import { DEFAULT_SKETCH_PLANE, type SketchPlaneChoice } from "./sketchPlanes";
 
 export const [source, setSource] = createSignal("");
 export const [nodes, setNodes] = createSignal<ConstructionNode[]>([]);
 export const [relations, setRelations] = createSignal<ConstructionRelation[]>([]);
 export const [solverRuns, setSolverRuns] = createSignal<ConstraintSolverRun[]>([]);
-export const [differentiabilityDemo, setDifferentiabilityDemo] =
-  createSignal<DifferentiabilityDemo | null>(null);
 export const [materials, setMaterials] = createSignal<MaterialDefinition[]>([]);
+export const [studies, setStudies] = createSignal<StudyPayload[]>([]);
+export const [simMeshes, setSimMeshes] = createSignal<SimMeshPayload[]>([]);
+export const [optimizations, setOptimizations] = createSignal<OptimizationPayload[]>([]);
+
+/**
+ * The FEM surface currently displayed in the viewport, if any.
+ *
+ * Owned by the SimulatePanel (a solve or a mesh inspection puts it here) and
+ * read by the ViewerPane for screen-space picking: the click probe, and the
+ * BC region proposals. `scalars`/`range`/`fieldLabel` describe the field the
+ * heatmap is showing right now (a field switch updates them without
+ * re-solving); `info` carries the mesh inspection report whose grid spacing
+ * sizes proposed sphere selections and side tolerances.
+ */
+export interface SimViewState {
+  /** Render payload with the base (undeformed) vertex positions. */
+  payload: SimulationMeshPayload;
+  info: MeshInspectInfo | null;
+  /** Scalars currently mapped through the ramp (field, or mesh quality). */
+  scalars: readonly number[];
+  range: [number, number];
+  fieldLabel: string;
+  /** Study whose BCs apply to this surface, or null for a bare mesh. */
+  studyName: string | null;
+}
+
+export const [simView, setSimView] = createSignal<SimViewState | null>(null);
+
+/**
+ * The solved field of a finished study-backed optimization run.
+ *
+ * Set by the optimize cards (wherever they are mounted) and consumed by the
+ * SimulatePanel's Results tab, so an optimization run ends showing the
+ * optimized part with its field — even when the run was started from the
+ * Model-mode panel and the user enters Simulate mode later.
+ */
+export interface OptimizeSimulateResult {
+  /** The optimization's name, for the results header. */
+  name: string;
+  field: string;
+  mesh: SimulationMeshPayload;
+  result: SimulationResultSummary | null;
+  meshInfo: MeshInspectInfo | null;
+}
+
+export const [optimizeSimulate, setOptimizeSimulate] =
+  createSignal<OptimizeSimulateResult | null>(null);
+
+/** Whether viewport clicks propose BC selections (armed by the builder). */
+export const [bcPickArmed, setBcPickArmed] = createSignal(false);
+
+/** Selection proposed from the viewport, consumed by the add-BC builder. */
+export const [bcProposal, setBcProposal] = createSignal<BcProposal | null>(null);
+
+/** Click-probe readout over the simulation surface (display only). */
+export interface SimProbe {
+  /** CSS pixel position of the chip inside the viewer pane. */
+  x: number;
+  y: number;
+  world: [number, number, number];
+  value: number;
+  label: string;
+}
+
+export const [simProbe, setSimProbe] = createSignal<SimProbe | null>(null);
+export const [meshEdges, setMeshEdges] = createSignal<MeshEdgePayload | null>(null);
 export const [selection, setSelection] = createSignal<Selection | null>(null);
 export const [hover, setHover] = createSignal<Selection | null>(null);
 export const [tool, setTool] = createSignal<ToolMode>("select");
+/** Armed first sketch of a two-click loft; the viewport picks the second. */
+export const [pendingLoft, setPendingLoft] = createSignal<PendingLoft | null>(null);
 export const [status, setStatus] = createSignal({ kind: "", text: "Starting…" });
 export const [viewerError, setViewerError] = createSignal("");
 const [dismissedError, setDismissedError] = createSignal("");
@@ -52,6 +134,52 @@ export function dismissViewerError(): void {
 export const [consoleText, setConsoleText] = createSignal("");
 export const [busy, setBusy] = createSignal(false);
 export const [dirty, setDirty] = createSignal(false);
+/** Saved scene file name, or null for an unsaved buffer. */
+export const [sceneName, setSceneName] = createSignal<string | null>(null);
+
+/** Which shell panels are shown, toggled from the Window menu. */
+export interface PanelVisibility {
+  editor: boolean;
+  objectTree: boolean;
+  materials: boolean;
+  sketch: boolean;
+}
+
+export const DEFAULT_PANELS: PanelVisibility = {
+  editor: true,
+  objectTree: true,
+  materials: true,
+  sketch: true,
+};
+
+const PANELS_STORAGE_KEY = "cadjoint.panels.v1";
+
+function loadPanels(): PanelVisibility {
+  try {
+    const raw = localStorage.getItem(PANELS_STORAGE_KEY);
+    if (!raw) return { ...DEFAULT_PANELS };
+    const parsed = JSON.parse(raw) as Partial<Record<keyof PanelVisibility, unknown>>;
+    const next = { ...DEFAULT_PANELS };
+    for (const key of Object.keys(next) as (keyof PanelVisibility)[]) {
+      if (typeof parsed[key] === "boolean") next[key] = parsed[key] as boolean;
+    }
+    return next;
+  } catch {
+    return { ...DEFAULT_PANELS };
+  }
+}
+
+export const [panels, setPanels] = createSignal<PanelVisibility>(loadPanels());
+
+export function setPanelVisible(key: keyof PanelVisibility, visible: boolean): void {
+  const next = { ...panels(), [key]: visible };
+  setPanels(next);
+  try {
+    localStorage.setItem(PANELS_STORAGE_KEY, JSON.stringify(next));
+  } catch {
+    // Persistence is a convenience; private-mode storage failures are fine.
+  }
+}
 
 /** Vertex being dragged, with its live sketch-plane position. */
 export interface DragState {
@@ -69,6 +197,49 @@ export interface GizmoDrag {
   rotation: [number, number, number];
   dimensions: Record<string, number | number[]>;
 }
+
+/** Top-level editing mode: what family of tools the rail offers. */
+const [editingModeSignal, setEditingModeSignal] = createSignal<EditingMode>(loadEditingMode());
+export const editingMode = editingModeSignal;
+
+/** Sketch profile that last auto-entered sketch mode, for cancelability. */
+let lastAutoSketchId: string | null = null;
+
+export function setEditingMode(mode: EditingMode): void {
+  setEditingModeSignal(mode);
+  persistEditingMode(mode);
+  if (mode !== "sketch") {
+    // A manual exit must not bounce back while the same sketch is selected.
+    const active = selection();
+    lastAutoSketchId = active ? active.nodeId : null;
+  }
+}
+
+/** Keyboard cycling between the editing modes. */
+export function cycleMode(step: 1 | -1 = 1): void {
+  setEditingMode(cycleEditingMode(editingMode(), step));
+}
+
+/**
+ * Feed a selection change into the sketch-mode auto-entry rule.
+ *
+ * Called from an effect in App: selecting a sketch profile enters sketch
+ * mode once; Escape or the mode switcher can leave again without fighting it.
+ */
+export function reactToSelectionForMode(): void {
+  const active = selection();
+  const node = active ? nodeById(active.nodeId) : null;
+  const next = autoEnterSketchMode(editingMode(), node, lastAutoSketchId);
+  lastAutoSketchId = next.lastAutoNodeId;
+  if (next.mode !== editingMode()) {
+    setEditingModeSignal(next.mode);
+    persistEditingMode(next.mode);
+  }
+}
+
+/** Plane the next placed sketch lands on (quick pick or a solid's face). */
+export const [sketchPlane, setSketchPlane] =
+  createSignal<SketchPlaneChoice>(DEFAULT_SKETCH_PLANE);
 
 export const [drag, setDrag] = createSignal<DragState | null>(null);
 export const [gizmoDrag, setGizmoDrag] = createSignal<GizmoDrag | null>(null);

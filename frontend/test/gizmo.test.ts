@@ -23,7 +23,7 @@ const VIEW: View = {
 
 describe("rotationMatrix", () => {
   // Cross-language check: these values come from `_rotation_matrix` in
-  // jaxcad/construction/solid.py, which computes in float32 — hence the 1e-6
+  // cadjoint/construction/solid.py, which computes in float32 — hence the 1e-6
   // tolerance. If the two implementations drift further than that, the
   // wireframe stops sitting on the solid it is supposed to outline.
   it("matches the Python composition for intrinsic XYZ angles", () => {

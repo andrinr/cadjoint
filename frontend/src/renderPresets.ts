@@ -27,7 +27,7 @@ interface PresetStorage {
   setItem(key: string, value: string): void;
 }
 
-export const RENDER_PRESET_STORAGE_KEY = "jaxcad.render-presets.v2";
+export const RENDER_PRESET_STORAGE_KEY = "cadjoint.render-presets.v2";
 
 export const DEFAULT_RENDER_PRESETS: RenderPreset[] = [
   {
@@ -99,6 +99,8 @@ function isDisplaySettings(value: unknown): value is DisplaySettings {
     typeof display.xray === "number" &&
     Number.isFinite(display.xray) &&
     typeof display.showSketches === "boolean" &&
+    typeof display.showMeshEdges === "boolean" &&
+    typeof display.showMeshWireframe === "boolean" &&
     typeof display.showConstraints === "boolean" &&
     typeof display.showFixedConstraints === "boolean" &&
     typeof display.showDistanceConstraints === "boolean" &&

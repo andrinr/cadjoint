@@ -20,22 +20,34 @@ import {
 import { MATERIAL_DRAG_TYPE } from "./MaterialPanel";
 import {
   displayProfiles,
+  meshEdges,
   drag,
   gizmoDrag,
   cameraAngles,
   busy,
+  bcPickArmed,
+  cycleMode,
+  editingMode,
+  setEditingMode,
   selectionMode,
   setCameraAngles,
+  sketchPlane,
+  setBcProposal,
   setGizmoDrag,
   setGizmoMode,
   hover,
   nodeById,
   nodes,
+  pendingLoft,
   profiles,
   relations,
   selection,
   setDrag,
   setHover,
+  setPendingLoft,
+  setSimProbe,
+  simProbe,
+  simView,
   dismissViewerError,
   setSelection,
   setSelectionMode,
@@ -44,6 +56,8 @@ import {
   tool,
   viewerError,
 } from "../state";
+import { nearestVertex, rectAabbProposal, sphereProposal } from "../bcPick";
+import { formatScalar } from "../simulation";
 import {
   add,
   intersectPlane,
@@ -70,7 +84,22 @@ import {
   scaleDimensions,
   type AxisIndex,
 } from "../viewer/gizmo";
-import type { GizmoMode } from "../types";
+import type { ConstraintKind, GizmoMode } from "../types";
+import { VIEWER_TOOL_KEYS, type ViewerToolAction } from "../shortcuts";
+import { loftPickError } from "../loft";
+import {
+  pickSurfacePoint,
+  quickPlaneEmission,
+  type SketchPlaneEmission,
+} from "../sketchPlanes";
+import {
+  CONSTRAINT_TOOL_NAMES,
+  edgeVertexIndices,
+  isEdgeConstraintTool,
+  isVertexConstraintTool,
+  type EdgeConstraintTool,
+  type VertexConstraintTool,
+} from "../constraints";
 import { Renderer, type DisplaySettings } from "../viewer/renderer";
 
 const PITCH_LIMIT = 1.45;
@@ -108,10 +137,12 @@ export interface ViewerPaneProps {
   /** Attach a source-level constraint to sketch vertices. */
   onAddConstraint: (
     line: number,
-    kind: "fixed" | "distance",
+    kind: ConstraintKind,
     indices: number[],
-    value: number | number[],
+    value?: number | number[],
   ) => Promise<void>;
+  /** Loft two named sketches, identified by their source lines. */
+  onAddLoft: (lineA: number, lineB: number) => Promise<void>;
   /** Remove a whole construction object from the program. */
   onDeleteObject: (line: number) => Promise<void>;
   /** Assign a named Python material to the object under a drop. */
@@ -122,6 +153,10 @@ type Gesture =
   | { kind: "none" }
   | { kind: "orbit"; x: number; y: number }
   | { kind: "pan"; x: number; y: number }
+  /** Pending click on the FEM surface: becomes an orbit once it moves. */
+  | { kind: "simtap"; x: number; y: number; clientX: number; clientY: number }
+  /** Shift-drag rectangle proposing a Nodes.box BC selection. */
+  | { kind: "bcrect"; x0: number; y0: number; x1: number; y1: number }
   | { kind: "drag"; nodeId: string; vertexIndex: number; moved: boolean }
   | {
       kind: "gizmo";
@@ -140,14 +175,30 @@ type Gesture =
       moved: boolean;
     };
 
+/** First pick of a two-click constraint flow, keyed by the active tool. */
+type PendingConstraint =
+  | { kind: VertexConstraintTool; first: { nodeId: string; vertexIndex: number } }
+  | {
+      kind: EdgeConstraintTool;
+      first: { nodeId: string; start: number; end: number };
+    };
+
 export function ViewerPane(props: ViewerPaneProps) {
   let canvas!: HTMLCanvasElement;
   let gesture: Gesture = { kind: "none" };
-  let distanceStart: { nodeId: string; vertexIndex: number } | null = null;
+  const [pendingConstraint, setPendingConstraint] =
+    createSignal<PendingConstraint | null>(null);
   /** Held space turns any drag into a pan, as other 3D viewports do. */
   let panHeld = false;
   const [materialDropActive, setMaterialDropActive] = createSignal(false);
   const [overlayRevision, setOverlayRevision] = createSignal(0);
+  /** BC box-pick rubber band, in CSS pixels over the canvas. */
+  const [pickRect, setPickRect] = createSignal<{
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  } | null>(null);
 
   const renderer = props.renderer;
 
@@ -261,6 +312,9 @@ export function ViewerPane(props: ViewerPaneProps) {
           continue;
         }
 
+        // Only distance constraints draw a dimension; relational kinds
+        // (horizontal, parallel, …) are shown as panel chips instead.
+        if (constraint.kind !== "distance") continue;
         const first = profile.vertices[constraint.vertices[0]];
         const second = profile.vertices[constraint.vertices[1]];
         if (!first || !second || typeof constraint.value !== "number") continue;
@@ -341,26 +395,57 @@ export function ViewerPane(props: ViewerPaneProps) {
     if (newest) setSelection({ nodeId: newest.id, vertexIndex: null });
   };
 
-  /** Place a new identity-oriented sketch where the pointer meets world XY. */
+  /**
+   * Place a new sketch on the chosen plane.
+   *
+   * Quick picks intersect the pointer ray with a world plane; "on face"
+   * ray-casts the solids under the cursor and adopts the surface point and
+   * its normal. A non-default normal is written with a second patch
+   * (`set_value planeNormal`) once the sketch exists in the source.
+   */
   const handlePlaceSketch = async (x: number, y: number) => {
     const view = pickView();
     const ray = rayFromPixel(x, y, view);
-    const hit =
-      intersectPlane(ray, [0, 0, 0], [0, 0, 1]) ??
-      add(ray.origin, scale(ray.direction, Math.max(1, renderer.camera.distance)));
-    await props.onAddSketch([hit[0], hit[1], hit[2]]);
+    const choice = sketchPlane();
+    let emission: SketchPlaneEmission;
+    if (choice === "face") {
+      const hit = pickSurfacePoint(nodes(), ray);
+      if (!hit) {
+        setStatus({ kind: "error", text: "On face: click a solid's surface." });
+        return;
+      }
+      emission = { origin: hit.point, normal: hit.normal };
+    } else {
+      emission = quickPlaneEmission(choice, ray, renderer.camera.distance);
+    }
+    await props.onAddSketch(emission.origin);
+    let sketches = profiles();
+    let newest = sketches[sketches.length - 1];
+    if (emission.normal && newest?.line != null) {
+      await props.onSetValue(newest.line, "PolygonProfile", "planeNormal", emission.normal);
+      sketches = profiles();
+      newest = sketches[sketches.length - 1];
+    }
     setTool("select");
     setSelectionMode("object");
-    const sketches = profiles();
-    const newest = sketches[sketches.length - 1];
     if (newest) setSelection({ nodeId: newest.id, vertexIndex: null });
   };
 
-  /** Pick two points and preserve their current sketch-plane distance. */
-  const handleDistanceConstraint = async (x: number, y: number) => {
+  /**
+   * Pick two points for a vertex-pair constraint.
+   *
+   * A distance constraint records the current sketch-plane distance as its
+   * target; the relational kinds carry no value.
+   */
+  const handleVertexConstraint = async (
+    kind: VertexConstraintTool,
+    x: number,
+    y: number,
+  ) => {
+    const name = CONSTRAINT_TOOL_NAMES[kind];
     const hit = pickVertex(displayProfiles(), x, y, pickView());
     if (!hit) {
-      setStatus({ kind: "error", text: "Distance: click a sketch point." });
+      setStatus({ kind: "error", text: `${name}: click a sketch point.` });
       return;
     }
     const profile = nodeById(hit.nodeId);
@@ -368,24 +453,85 @@ export function ViewerPane(props: ViewerPaneProps) {
       setStatus({ kind: "error", text: "That sketch cannot be edited from source." });
       return;
     }
-    if (!distanceStart) {
-      distanceStart = { nodeId: hit.nodeId, vertexIndex: hit.vertexIndex };
+    const pending = pendingConstraint();
+    if (pending?.kind !== kind) {
+      setPendingConstraint({
+        kind,
+        first: { nodeId: hit.nodeId, vertexIndex: hit.vertexIndex },
+      });
       setSelection({ nodeId: hit.nodeId, vertexIndex: hit.vertexIndex });
-      setStatus({ kind: "", text: "Distance: choose the second point" });
+      setStatus({ kind: "", text: `${name}: choose the second point` });
       return;
     }
-    if (distanceStart.nodeId !== hit.nodeId || distanceStart.vertexIndex === hit.vertexIndex) {
+    const start = pending.first as { nodeId: string; vertexIndex: number };
+    if (start.nodeId !== hit.nodeId || start.vertexIndex === hit.vertexIndex) {
       setStatus({ kind: "error", text: "Choose a different point in the same sketch." });
       return;
     }
-    const first = profile.vertices[distanceStart.vertexIndex].uv;
-    const second = profile.vertices[hit.vertexIndex].uv;
-    const distance = Math.hypot(second[0] - first[0], second[1] - first[1]);
-    const indices = [distanceStart.vertexIndex, hit.vertexIndex];
-    distanceStart = null;
-    await props.onAddConstraint(profile.line, "distance", indices, distance);
+    const indices = [start.vertexIndex, hit.vertexIndex];
+    let value: number | undefined;
+    if (kind === "distance") {
+      const first = profile.vertices[start.vertexIndex].uv;
+      const second = profile.vertices[hit.vertexIndex].uv;
+      value = Math.hypot(second[0] - first[0], second[1] - first[1]);
+    }
+    setPendingConstraint(null);
+    await props.onAddConstraint(profile.line, kind, indices, value);
     setTool("select");
     setSelection({ nodeId: hit.nodeId, vertexIndex: hit.vertexIndex });
+  };
+
+  /** Pick two edges for an edge-pair constraint (parallel/perpendicular). */
+  const handleEdgeConstraint = async (
+    kind: EdgeConstraintTool,
+    x: number,
+    y: number,
+  ) => {
+    const name = CONSTRAINT_TOOL_NAMES[kind];
+    const hit = pickEdge(displayProfiles(), x, y, pickView());
+    if (!hit) {
+      setStatus({ kind: "error", text: `${name}: click a sketch edge.` });
+      return;
+    }
+    const profile = nodeById(hit.nodeId);
+    if (!profile?.editable || profile.line === null) {
+      setStatus({ kind: "error", text: "That sketch cannot be edited from source." });
+      return;
+    }
+    const [start, end] = edgeVertexIndices(hit.insertIndex, profile.vertices.length);
+    const pending = pendingConstraint();
+    if (pending?.kind !== kind) {
+      setPendingConstraint({ kind, first: { nodeId: hit.nodeId, start, end } });
+      setSelection({ nodeId: hit.nodeId, vertexIndex: null });
+      setStatus({ kind: "", text: `${name}: choose the second edge` });
+      return;
+    }
+    const firstEdge = pending.first as { nodeId: string; start: number; end: number };
+    if (firstEdge.nodeId !== hit.nodeId || firstEdge.start === start) {
+      setStatus({ kind: "error", text: "Choose a different edge in the same sketch." });
+      return;
+    }
+    const indices = [firstEdge.start, firstEdge.end, start, end];
+    setPendingConstraint(null);
+    await props.onAddConstraint(profile.line, kind, indices);
+    setTool("select");
+    setSelection({ nodeId: hit.nodeId, vertexIndex: null });
+  };
+
+  /** Complete a pending loft with the sketch under the pointer. */
+  const handleLoftPick = async (x: number, y: number) => {
+    const pending = pendingLoft();
+    if (!pending) return;
+    const hit = pickNode(displayProfiles(), x, y, pickView(), 10, true);
+    const node = hit && nodeById(hit.nodeId);
+    const error = loftPickError(pending, node);
+    if (error) {
+      setStatus({ kind: "error", text: error });
+      return;
+    }
+    setPendingLoft(null);
+    setSelection({ nodeId: node!.id, vertexIndex: null });
+    await props.onAddLoft(pending.line, node!.line!);
   };
 
   /** Insert one vertex where the user clicked; the tool stays active. */
@@ -420,6 +566,58 @@ export function ViewerPane(props: ViewerPaneProps) {
     setSelection({ nodeId: target.id, vertexIndex: Math.min(index, target.vertices.length) });
   };
 
+  /** Whether pointer input should target the displayed FEM surface. */
+  const simInteractive = () =>
+    editingMode() === "simulate" && simView() !== null && renderer.simulationActive;
+
+  /** Framebuffer px → CSS px, for DOM chips anchored to projected points. */
+  const toCss = (x: number, y: number) => ({
+    x: (x * canvas.clientWidth) / Math.max(canvas.width, 1),
+    y: (y * canvas.clientHeight) / Math.max(canvas.height, 1),
+  });
+
+  /**
+   * A completed click on the FEM surface.
+   *
+   * Armed BC picking proposes a Nodes.sphere around the picked point (radius
+   * from the mesh cell spacing); otherwise the click probes: a chip shows the
+   * nearest vertex's position and the active field value. Picking works on
+   * projected vertices, so occlusion is approximate — good enough for both.
+   */
+  const handleSimTap = (x: number, y: number) => {
+    const view = simView();
+    if (!view) return;
+    const hit = nearestVertex(view.payload.positions, x, y, pickView());
+    if (!hit) {
+      setSimProbe(null);
+      return;
+    }
+    if (bcPickArmed()) {
+      setBcProposal(sphereProposal(hit.world, view.info?.grid ?? null));
+      return;
+    }
+    const anchor = toCss(hit.x, hit.y);
+    setSimProbe({
+      x: anchor.x,
+      y: anchor.y,
+      world: hit.world,
+      value: view.scalars[hit.index] ?? 0,
+      label: view.fieldLabel,
+    });
+  };
+
+  /** Rubber-band rectangle for the current bcrect gesture, in CSS px. */
+  const rectFromGesture = (rect: { x0: number; y0: number; x1: number; y1: number }) => {
+    const a = toCss(rect.x0, rect.y0);
+    const b = toCss(rect.x1, rect.y1);
+    return {
+      left: Math.min(a.x, b.x),
+      top: Math.min(a.y, b.y),
+      width: Math.abs(b.x - a.x),
+      height: Math.abs(b.y - a.y),
+    };
+  };
+
   /**
    * Reflect what the pointer can act on right now.
    *
@@ -431,10 +629,17 @@ export function ViewerPane(props: ViewerPaneProps) {
       canvas.style.cursor = "move";
       return;
     }
-    if (tool() === "distance") {
+    if (isVertexConstraintTool(tool())) {
       const hit = pickVertex(displayProfiles(), x, y, pickView());
       const next = hit ? { nodeId: hit.nodeId, vertexIndex: hit.vertexIndex } : null;
       setHover(next);
+      canvas.style.cursor = hit ? "crosshair" : "default";
+      renderer.gizmoAxis = null;
+      return;
+    }
+    if (isEdgeConstraintTool(tool())) {
+      const hit = pickEdge(displayProfiles(), x, y, pickView());
+      setHover(null);
       canvas.style.cursor = hit ? "crosshair" : "default";
       renderer.gizmoAxis = null;
       return;
@@ -492,13 +697,40 @@ export function ViewerPane(props: ViewerPaneProps) {
     canvas.setPointerCapture(event.pointerId);
     const [x, y] = toPixels(event);
 
+    // Simulate-mode surface interactions come first: with a FEM mesh shown,
+    // a left press is a pending probe/pick tap (drags fall through to orbit)
+    // and Shift-drag with armed picking rubber-bands a Nodes.box proposal.
+    if (simInteractive() && event.button === 0 && !panHeld) {
+      if (bcPickArmed() && event.shiftKey) {
+        gesture = { kind: "bcrect", x0: x, y0: y, x1: x, y1: y };
+        setPickRect(rectFromGesture(gesture));
+        return;
+      }
+      if (!event.shiftKey) {
+        gesture = { kind: "simtap", x, y, clientX: event.clientX, clientY: event.clientY };
+        return;
+      }
+    }
+
     if (tool() === "sketch" && event.button === 0) {
       void handlePlaceSketch(x, y);
       return;
     }
 
-    if (tool() === "distance" && event.button === 0) {
-      void handleDistanceConstraint(x, y);
+    // A pending loft claims the next object pick, like the constraint flows.
+    if (pendingLoft() && event.button === 0) {
+      void handleLoftPick(x, y);
+      return;
+    }
+
+    const activeTool = tool();
+    if (isVertexConstraintTool(activeTool) && event.button === 0) {
+      void handleVertexConstraint(activeTool, x, y);
+      return;
+    }
+
+    if (isEdgeConstraintTool(activeTool) && event.button === 0) {
+      void handleEdgeConstraint(activeTool, x, y);
       return;
     }
 
@@ -604,6 +836,28 @@ export function ViewerPane(props: ViewerPaneProps) {
 
     if (gesture.kind === "none") {
       updateHover(x, y);
+      return;
+    }
+
+    // A sim tap that travels becomes a plain orbit; the probe chip clears so
+    // it does not float detached from the point it annotated.
+    if (gesture.kind === "simtap") {
+      const travel = Math.hypot(
+        event.clientX - gesture.clientX,
+        event.clientY - gesture.clientY,
+      );
+      if (travel > 4) {
+        setSimProbe(null);
+        gesture = { kind: "orbit", x: event.clientX, y: event.clientY };
+        renderer.interacting = true;
+      }
+      return;
+    }
+
+    if (gesture.kind === "bcrect") {
+      gesture.x1 = x;
+      gesture.y1 = y;
+      setPickRect(rectFromGesture(gesture));
       return;
     }
 
@@ -723,6 +977,22 @@ export function ViewerPane(props: ViewerPaneProps) {
     renderer.interacting = false;
     canvas.style.cursor = "default";
 
+    if (finished.kind === "simtap") {
+      handleSimTap(finished.x, finished.y);
+      return;
+    }
+
+    if (finished.kind === "bcrect") {
+      setPickRect(null);
+      const view = simView();
+      if (view) {
+        const proposal = rectAabbProposal(view.payload.positions, finished, pickView());
+        if (proposal) setBcProposal(proposal);
+        else setStatus({ kind: "error", text: "Box pick: drag the rectangle over the mesh." });
+      }
+      return;
+    }
+
     if (finished.kind === "gizmo") {
       const active = gizmoDrag();
       const node = nodeById(finished.nodeId);
@@ -823,25 +1093,41 @@ export function ViewerPane(props: ViewerPaneProps) {
       const target = document.activeElement;
       const typing = target && (target.tagName === "TEXTAREA" || target.closest(".cm-editor"));
       if (event.key === "Escape") {
-        distanceStart = null;
-        setSelection(null);
-        setTool("select");
+        // Overlays own their Escape (dialogs, menus, popovers, flyouts close
+        // themselves in the capture phase); only a bare viewport Escape backs
+        // the editing state out.
+        const overlayOpen = document.querySelector(
+          ".dialog-backdrop, .menu-dropdown, .tool-group.open",
+        );
+        if (!overlayOpen) {
+          setPendingConstraint(null);
+          setPendingLoft(null);
+          setSelection(null);
+          setSimProbe(null);
+          setTool("select");
+          // Escape backs all the way out to the default editing mode.
+          setEditingMode("model");
+        }
       }
       if (!typing && !event.metaKey && !event.ctrlKey && !event.altKey) {
-        const shortcuts: Record<string, () => void> = {
-          "1": () => (setTool("select"), setSelectionMode("object")),
-          "2": () => (setTool("select"), setSelectionMode("vertex")),
-          p: () => setTool("polygon"),
-          b: () => setTool("box"),
-          s: () => setTool("sphere"),
-          c: () => setTool("cylinder"),
-          g: () => setGizmoMode("translate"),
-          r: () => setGizmoMode("rotate"),
+        // Key→action table shared with the Help dialog (src/shortcuts.ts).
+        // Placement shortcuts for solid primitives imply model mode, so the
+        // keys keep working from any mode without leaving a hidden tool armed.
+        const actions: Record<ViewerToolAction, () => void> = {
+          "select-object": () => (setTool("select"), setSelectionMode("object")),
+          "select-vertex": () => (setTool("select"), setSelectionMode("vertex")),
+          "tool-polygon": () => setTool("polygon"),
+          "tool-box": () => (setEditingMode("model"), setTool("box")),
+          "tool-sphere": () => (setEditingMode("model"), setTool("sphere")),
+          "tool-cylinder": () => (setEditingMode("model"), setTool("cylinder")),
+          "gizmo-translate": () => setGizmoMode("translate"),
+          "gizmo-rotate": () => setGizmoMode("rotate"),
+          "cycle-mode": () => cycleMode(event.shiftKey ? -1 : 1),
         };
-        const action = shortcuts[event.key.toLowerCase()];
+        const action = VIEWER_TOOL_KEYS[event.key.toLowerCase()];
         if (action) {
           event.preventDefault();
-          action();
+          actions[action]();
         }
       }
       const active = selection();
@@ -887,22 +1173,39 @@ export function ViewerPane(props: ViewerPaneProps) {
   });
 
   createEffect(() => {
+    renderer.setMeshEdges(meshEdges());
+  });
+
+  createEffect(() => {
     cameraAngles();
     props.display.projection;
     refreshOverlays();
   });
 
   createEffect(() => {
-    if (tool() !== "distance") {
-      distanceStart = null;
+    const activeTool = tool();
+    if (!isVertexConstraintTool(activeTool) && !isEdgeConstraintTool(activeTool)) {
+      setPendingConstraint(null);
       return;
     }
+    // A first pick made with another constraint tool does not carry over.
+    if (pendingConstraint() && pendingConstraint()!.kind !== activeTool) {
+      setPendingConstraint(null);
+    }
+    if (!isVertexConstraintTool(activeTool)) return;
+    // Activating a vertex-pair tool with a point selected uses it as the start.
     const active = selection();
-    if (!distanceStart && active?.vertexIndex != null) {
+    if (!pendingConstraint() && active?.vertexIndex != null) {
       const node = nodeById(active.nodeId);
       if (node?.kind === "profile") {
-        distanceStart = { nodeId: active.nodeId, vertexIndex: active.vertexIndex };
-        setStatus({ kind: "", text: "Distance: choose the second point" });
+        setPendingConstraint({
+          kind: activeTool,
+          first: { nodeId: active.nodeId, vertexIndex: active.vertexIndex },
+        });
+        setStatus({
+          kind: "",
+          text: `${CONSTRAINT_TOOL_NAMES[activeTool]}: choose the second point`,
+        });
       }
     }
   });
@@ -998,6 +1301,35 @@ export function ViewerPane(props: ViewerPaneProps) {
           </For>
         </svg>
       </Show>
+      <Show when={pickRect()}>
+        {(rect) => (
+          <div
+            class="bc-pick-rect"
+            style={{
+              left: `${rect().left}px`,
+              top: `${rect().top}px`,
+              width: `${rect().width}px`,
+              height: `${rect().height}px`,
+            }}
+            data-testid="bc-pick-rect"
+          />
+        )}
+      </Show>
+      <Show when={editingMode() === "simulate" && simProbe()}>
+        {(probe) => (
+          <div
+            class="sim-probe"
+            style={{ left: `${probe().x}px`, top: `${probe().y}px` }}
+            data-testid="sim-probe"
+          >
+            <b>{formatScalar(probe().value)}</b>
+            <span>{probe().label}</span>
+            <small>
+              [{probe().world.map((component) => component.toFixed(3)).join(", ")}]
+            </small>
+          </div>
+        )}
+      </Show>
       <Show when={busy()}>
         <span
           class="viewer-compile-indicator"
@@ -1017,13 +1349,33 @@ export function ViewerPane(props: ViewerPaneProps) {
           </button>
         </div>
       )}
-      <p class="viewer-hint">
-        {tool() === "polygon"
+      <p class="viewer-hint" data-testid="viewer-hint">
+        <b class="hint-mode" data-testid="hint-mode">
+          {editingMode()}
+        </b>
+        {" · "}
+        {editingMode() === "simulate"
+          ? bcPickArmed()
+            ? "Pick BC: click the mesh → sphere · Shift-drag → box · confirm in the builder"
+            : simView()
+              ? "Click the mesh to probe values · pick BC regions from the study builder · Esc returns to model"
+              : "Simulation setup · M cycles modes · Esc returns to model"
+          : pendingLoft()
+          ? "Loft: click the second sketch in the viewport · Esc to cancel"
+          : tool() === "sketch"
+          ? sketchPlane() === "face"
+            ? "Sketch: click a solid's face to place it there · Esc to cancel"
+            : `Sketch: click to place on the ${sketchPlane().toUpperCase()} plane · Esc to cancel`
+          : tool() === "polygon"
           ? "Point: click sketch edges to add vertices · Esc to finish"
-          : tool() === "distance"
-            ? distanceStart
-              ? "Distance: choose a second point in the same sketch"
-              : "Distance: choose the first sketch point"
+          : isVertexConstraintTool(tool())
+            ? pendingConstraint()
+              ? `${CONSTRAINT_TOOL_NAMES[tool() as VertexConstraintTool]}: choose a second point in the same sketch`
+              : `${CONSTRAINT_TOOL_NAMES[tool() as VertexConstraintTool]}: choose the first sketch point`
+          : isEdgeConstraintTool(tool())
+            ? pendingConstraint()
+              ? `${CONSTRAINT_TOOL_NAMES[tool() as EdgeConstraintTool]}: choose a second edge in the same sketch`
+              : `${CONSTRAINT_TOOL_NAMES[tool() as EdgeConstraintTool]}: choose the first sketch edge`
           : tool() !== "select"
             ? `Click to place a ${tool()} · Esc to cancel`
             : "Drag handles or the gizmo · Drag to orbit · Space, Shift or right-drag to pan · Del removes"}

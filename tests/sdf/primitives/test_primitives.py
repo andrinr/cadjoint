@@ -3,7 +3,7 @@
 import jax.numpy as jnp
 import pytest
 
-from jaxcad.sdf.primitives import (
+from cadjoint.sdf.primitives import (
     Box,
     Capsule,
     Cylinder,
@@ -72,7 +72,7 @@ class TestCylinder:
         assert jnp.isclose(cyl(p), 0.0, atol=1e-5)
 
 
-@pytest.mark.skip(reason="Cone primitive not yet implemented in jaxcad.sdf.primitives")
+@pytest.mark.skip(reason="Cone primitive not yet implemented in cadjoint.sdf.primitives")
 class TestCone:
     def test_apex(self):
         """Apex should be on surface or inside"""

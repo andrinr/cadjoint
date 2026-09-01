@@ -210,3 +210,133 @@ export function IsoIcon(props: IconProps) {
     </svg>
   );
 }
+
+/** Solid cube: the model editing mode. */
+export function ModelModeIcon(props: IconProps) {
+  return (
+    <svg {...base(props.size ?? 18)}>
+      <path d="M12 3l7.5 4.3v8.4L12 20l-7.5-4.3V7.3z" />
+      <path d="M4.5 7.3l7.5 4.3 7.5-4.3M12 11.6V20" />
+    </svg>
+  );
+}
+
+/** Pencil over a corner: the sketch editing mode. */
+export function SketchModeIcon(props: IconProps) {
+  return (
+    <svg {...base(props.size ?? 18)}>
+      <path d="M4 20V9l6-5" />
+      <path d="M13.2 15.6l6.4-6.4 2.1 2.1-6.4 6.4-2.9.8z" />
+      <circle cx="4" cy="20" r="1.5" fill="currentColor" />
+      <circle cx="4" cy="9" r="1.5" fill="currentColor" />
+      <circle cx="10" cy="4" r="1.5" fill="currentColor" />
+    </svg>
+  );
+}
+
+/** Field lines through a part: the simulate editing mode. */
+export function SimulateModeIcon(props: IconProps) {
+  return (
+    <svg {...base(props.size ?? 18)}>
+      <path d="M3 8c3-3.4 6-3.4 9 0s6 3.4 9 0" />
+      <path d="M3 13c3-3.4 6-3.4 9 0s6 3.4 9 0" />
+      <path d="M3 18c3-3.4 6-3.4 9 0s6 3.4 9 0" />
+    </svg>
+  );
+}
+
+/** Profile pushed upward: extrude. */
+export function ExtrudeIcon(props: IconProps) {
+  return (
+    <svg {...base(props.size ?? 18)}>
+      <path d="M5 17.5l7 3.5 7-3.5-7-3.5z" />
+      <path d="M12 12V4M9 7l3-3 3 3" />
+    </svg>
+  );
+}
+
+/** Profile swung around an axis: revolve. */
+export function RevolveIcon(props: IconProps) {
+  return (
+    <svg {...base(props.size ?? 18)}>
+      <path d="M12 3v18" stroke-dasharray="2.4 2.4" />
+      <path d="M14.5 6.5h4v5h-4z" />
+      <path d="M5 16.5c0 1.9 3.1 3.5 7 3.5s7-1.6 7-3.5" />
+      <path d="M17.6 18.9l1.4 1.1-1.8.6" />
+    </svg>
+  );
+}
+
+/** Two sections joined by walls: loft. */
+export function LoftIcon(props: IconProps) {
+  return (
+    <svg {...base(props.size ?? 18)}>
+      <ellipse cx="12" cy="5.5" rx="6" ry="2.4" />
+      <ellipse cx="12" cy="18.5" rx="8" ry="2.8" />
+      <path d="M6 5.8L4 18.2M18 5.8l2 12.4" />
+    </svg>
+  );
+}
+
+/** Two points with a dimension between them: distance constraint. */
+export function DistanceIcon(props: IconProps) {
+  return (
+    <svg {...base(props.size ?? 18)}>
+      <circle cx="4.5" cy="12" r="1.7" fill="currentColor" />
+      <circle cx="19.5" cy="12" r="1.7" fill="currentColor" />
+      <path d="M7 12h10M9 9.5L7 12l2 2.5M15 9.5l2 2.5-2 2.5" />
+    </svg>
+  );
+}
+
+/** Level points: horizontal constraint. */
+export function HorizontalIcon(props: IconProps) {
+  return (
+    <svg {...base(props.size ?? 18)}>
+      <path d="M4 12h16" />
+      <circle cx="7" cy="12" r="1.7" fill="currentColor" />
+      <circle cx="17" cy="12" r="1.7" fill="currentColor" />
+    </svg>
+  );
+}
+
+/** Stacked points: vertical constraint. */
+export function VerticalIcon(props: IconProps) {
+  return (
+    <svg {...base(props.size ?? 18)}>
+      <path d="M12 4v16" />
+      <circle cx="12" cy="7" r="1.7" fill="currentColor" />
+      <circle cx="12" cy="17" r="1.7" fill="currentColor" />
+    </svg>
+  );
+}
+
+/** Two points collapsing into one: coincident constraint. */
+export function CoincidentIcon(props: IconProps) {
+  return (
+    <svg {...base(props.size ?? 18)}>
+      <circle cx="12" cy="12" r="2" fill="currentColor" />
+      <circle cx="12" cy="12" r="5.5" />
+      <path d="M3.5 12h3M17.5 12h3" />
+    </svg>
+  );
+}
+
+/** Two edges that never meet: parallel constraint. */
+export function ParallelIcon(props: IconProps) {
+  return (
+    <svg {...base(props.size ?? 18)}>
+      <path d="M8 4L5 20M19 4l-3 16" />
+    </svg>
+  );
+}
+
+/** Edges at a right angle: perpendicular constraint. */
+export function PerpendicularIcon(props: IconProps) {
+  return (
+    <svg {...base(props.size ?? 18)}>
+      <path d="M6 4v16M6 20h14" />
+      <path d="M6 14h6v6" />
+    </svg>
+  );
+}

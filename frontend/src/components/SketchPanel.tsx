@@ -15,19 +15,45 @@ import {
 import {
   busy,
   nodeById,
+  pendingLoft,
   selection,
+  setPendingLoft,
   setSelectionMode,
   setTool,
   solverRuns,
   tool,
 } from "../state";
-import type { ConstraintSolverMethod } from "../types";
+import type { ConstraintSolverMethod, ToolMode } from "../types";
+import { constraintLabel, isEdgeConstraintTool } from "../constraints";
 
 export interface SketchPanelProps {
   onFix: () => void;
   onSolve: (method: ConstraintSolverMethod, iterations: number) => void;
   onExtrude: () => void;
+  onRevolve: () => void;
+  /** Remove the profile's index-th serialized constraint. */
+  onDeleteConstraint: (line: number, index: number) => void;
+  /** Rewrite a distance constraint's numeric target. */
+  onSetConstraintValue: (line: number, index: number, value: number) => void;
 }
+
+/** Two-click constraint tools offered in the panel's constraint row. */
+const CONSTRAINT_TOOLS: { key: ToolMode; label: string; hint: string }[] = [
+  {
+    key: "distance",
+    label: "Distance",
+    hint: "Choose two points to preserve their current distance",
+  },
+  { key: "horizontal", label: "Horiz", hint: "Choose two points to keep level" },
+  { key: "vertical", label: "Vert", hint: "Choose two points to keep stacked" },
+  { key: "coincident", label: "Coinc", hint: "Choose two points to join" },
+  { key: "parallel", label: "∥ Edges", hint: "Choose two edges to keep parallel" },
+  {
+    key: "perpendicular",
+    label: "⊥ Edges",
+    hint: "Choose two edges to keep perpendicular",
+  },
+];
 
 export function SketchPanel(props: SketchPanelProps) {
   const [solverOpen, setSolverOpen] = createSignal(false);
@@ -42,6 +68,16 @@ export function SketchPanel(props: SketchPanelProps) {
   });
   const selectedVertex = () => selection()?.vertexIndex;
   const hasExtrusion = () => profile()?.operators.some((item) => item.kind === "extrude");
+  const hasOperator = () => (profile()?.operators.length ?? 0) > 0;
+  /** Distance chip currently open for numeric editing, by constraint identity. */
+  const [editingConstraint, setEditingConstraint] = createSignal<number | null>(null);
+  const commitConstraintValue = (identity: number, raw: string) => {
+    const line = profile()?.line;
+    const value = Number(raw);
+    setEditingConstraint(null);
+    if (line == null || raw.trim() === "" || !Number.isFinite(value)) return;
+    props.onSetConstraintValue(line, identity, value);
+  };
   const lastRun = createMemo(() => {
     const node = profile();
     if (!node) return null;
@@ -80,6 +116,12 @@ export function SketchPanel(props: SketchPanelProps) {
     setSolverIterations(run.iterations);
   });
 
+  // Close an open value editor when the selection moves elsewhere.
+  createEffect(() => {
+    selection();
+    setEditingConstraint(null);
+  });
+
   return (
     <Show when={profile()}>
       {(node) => (
@@ -98,13 +140,87 @@ export function SketchPanel(props: SketchPanelProps) {
           >
             <div class="history-chips">
               <For each={node().constraints}>
-                {(constraint) => (
-                  <span>
-                    {constraint.kind === "fixed"
-                      ? `fix · P${constraint.vertices[0] + 1}`
-                      : `distance · P${constraint.vertices[0] + 1}–P${constraint.vertices[1] + 1}`}
-                  </span>
-                )}
+                {(constraint, position) => {
+                  const identity = () => constraint.index ?? position();
+                  const editing = () =>
+                    constraint.kind === "distance" &&
+                    editingConstraint() === identity();
+                  return (
+                    <span
+                      class="constraint-chip"
+                      data-testid={`constraint-chip-${identity()}`}
+                    >
+                      <Show
+                        when={editing()}
+                        fallback={
+                          <span
+                            class="chip-label"
+                            classList={{ editable: constraint.kind === "distance" }}
+                            title={
+                              constraint.kind === "distance"
+                                ? "Click to edit the target distance"
+                                : undefined
+                            }
+                            onClick={() => {
+                              if (constraint.kind === "distance") {
+                                setEditingConstraint(identity());
+                              }
+                            }}
+                            data-testid={`constraint-label-${identity()}`}
+                          >
+                            {constraintLabel(constraint)}
+                          </span>
+                        }
+                      >
+                        <input
+                          class="chip-value"
+                          type="number"
+                          step="0.1"
+                          value={
+                            typeof constraint.value === "number"
+                              ? constraint.value
+                              : ""
+                          }
+                          onChange={(event) =>
+                            commitConstraintValue(
+                              identity(),
+                              event.currentTarget.value,
+                            )
+                          }
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                              commitConstraintValue(
+                                identity(),
+                                event.currentTarget.value,
+                              );
+                            }
+                            if (event.key === "Escape") {
+                              event.stopPropagation();
+                              setEditingConstraint(null);
+                            }
+                          }}
+                          data-testid={`constraint-value-${identity()}`}
+                        />
+                      </Show>
+                      <button
+                        type="button"
+                        class="chip-delete"
+                        disabled={busy() || node().line === null}
+                        onClick={() => {
+                          const line = node().line;
+                          if (line !== null) {
+                            props.onDeleteConstraint(line, identity());
+                          }
+                        }}
+                        title="Delete this constraint"
+                        aria-label="Delete constraint"
+                        data-testid={`constraint-delete-${identity()}`}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  );
+                }}
               </For>
               <For each={node().operators}>
                 {(operator) => <span>{operator.kind}</span>}
@@ -122,19 +238,25 @@ export function SketchPanel(props: SketchPanelProps) {
             >
               Fix point
             </button>
-            <button
-              type="button"
-              class={tool() === "distance" ? "active" : ""}
-              disabled={busy()}
-              onClick={() => {
-                setSelectionMode("vertex");
-                setTool(tool() === "distance" ? "select" : "distance");
-              }}
-              title="Choose two points to preserve their current distance"
-              data-testid="constraint-distance"
-            >
-              Distance
-            </button>
+            <For each={CONSTRAINT_TOOLS}>
+              {(entry) => (
+                <button
+                  type="button"
+                  class={tool() === entry.key ? "active" : ""}
+                  disabled={busy()}
+                  onClick={() => {
+                    if (!isEdgeConstraintTool(entry.key)) {
+                      setSelectionMode("vertex");
+                    }
+                    setTool(tool() === entry.key ? "select" : entry.key);
+                  }}
+                  title={entry.hint}
+                  data-testid={`constraint-${entry.key}`}
+                >
+                  {entry.label}
+                </button>
+              )}
+            </For>
             <button
               type="button"
               class={solverOpen() ? "active" : ""}
@@ -153,6 +275,42 @@ export function SketchPanel(props: SketchPanelProps) {
               data-testid="sketch-extrude"
             >
               Extrude
+            </button>
+            <button
+              type="button"
+              disabled={busy() || hasOperator()}
+              onClick={props.onRevolve}
+              title={
+                hasOperator()
+                  ? "This sketch already drives an operation"
+                  : "Revolve around the sketch's vertical axis"
+              }
+              data-testid="sketch-revolve"
+            >
+              Revolve
+            </button>
+            <button
+              type="button"
+              class={pendingLoft()?.nodeId === node().id ? "active" : ""}
+              disabled={busy() || hasOperator() || node().line === null}
+              onClick={() => {
+                if (pendingLoft()?.nodeId === node().id) {
+                  setPendingLoft(null);
+                  return;
+                }
+                const line = node().line;
+                if (line === null) return;
+                setSelectionMode("object");
+                setPendingLoft({ nodeId: node().id, line });
+              }}
+              title={
+                hasOperator()
+                  ? "This sketch already drives an operation"
+                  : "Loft to a second sketch with the same vertex count"
+              }
+              data-testid="sketch-loft"
+            >
+              Loft
             </button>
           </div>
 

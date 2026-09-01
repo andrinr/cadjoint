@@ -3,8 +3,8 @@
 import jax.numpy as jnp
 import pytest
 
-from jaxcad.constraints import DistanceConstraint
-from jaxcad.geometry.parameters import Vector
+from cadjoint.constraints import DistanceConstraint
+from cadjoint.geometry.parameters import Vector
 
 
 @pytest.mark.parametrize(

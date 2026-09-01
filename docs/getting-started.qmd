@@ -5,14 +5,14 @@ title: Getting Started
 ## Installation
 
 ```bash
-pip install jaxcad
+pip install cadjoint
 ```
 
 For development:
 
 ```bash
-git clone https://github.com/andrinr/jaxcad
-cd jaxcad
+git clone https://github.com/andrinr/cadjoint
+cd cadjoint
 uv sync
 ```
 
@@ -20,7 +20,7 @@ uv sync
 
 ## Core concepts
 
-jaxCAD has two building blocks: parametric geometry (SDF trees with tagged parameters) and geometric constraints (relationships between parameters). Gradient-based optimization ties them together.
+cadjoint has two building blocks: parametric geometry (SDF trees with tagged parameters) and geometric constraints (relationships between parameters). Gradient-based optimization ties them together.
 
 ### Build a constrained scene
 
@@ -28,9 +28,9 @@ Parameters are `Vector` or `Scalar` objects tagged as `free=True` (differentiabl
 
 ```python
 import jax.numpy as jnp
-from jaxcad.constraints import DistanceConstraint
-from jaxcad.geometry import Vector
-from jaxcad.sdf import Sphere, Translate
+from cadjoint.constraints import DistanceConstraint
+from cadjoint.geometry import Vector
+from cadjoint.sdf import Sphere, Translate
 
 # A sphere whose center is constrained to lie on a sphere of radius 2
 anchor = Vector(jnp.array([0.0, 0.0, 0.0]), free=False, name="anchor")
@@ -70,7 +70,7 @@ The constraint stays satisfied throughout: `||p|| = 2.0` at every step.
 
 ## Rendering
 
-jaxCAD includes a sphere-tracing raymarcher that supports physically-inspired shading,
+cadjoint includes a sphere-tracing raymarcher that supports physically-inspired shading,
 soft shadows, anti-aliasing, transparency, and glass refraction.
 
 ### Assign materials
@@ -79,8 +79,8 @@ Attach a `Material` to any primitive. The `material_at` method is queried per hi
 during rendering; `Union` blends materials smoothly at boundaries.
 
 ```python
-from jaxcad.render import Material
-from jaxcad.sdf.primitives import Sphere
+from cadjoint.render import Material
+from cadjoint.sdf.primitives import Sphere
 
 sphere = Sphere(
     radius=1.0,
@@ -101,7 +101,7 @@ wraps it and displays on a matplotlib axis.
 
 ```python
 import jax.numpy as jnp
-from jaxcad.render import render_raymarched
+from cadjoint.render import render_raymarched
 
 render_raymarched(
     sphere,
@@ -140,10 +140,10 @@ a glass sphere brightens at grazing angles.
 
 ```python
 import jax.numpy as jnp
-from jaxcad.render import raymarch, Material
-from jaxcad.sdf.boolean import Union
-from jaxcad.sdf.primitives import Sphere
-from jaxcad.sdf.transforms import Translate
+from cadjoint.render import raymarch, Material
+from cadjoint.sdf.boolean import Union
+from cadjoint.sdf.primitives import Sphere
+from cadjoint.sdf.transforms import Translate
 
 glass = Sphere(
     radius=1.0,
