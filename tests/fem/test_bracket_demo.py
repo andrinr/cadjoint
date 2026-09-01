@@ -83,6 +83,53 @@ def named_mesh_state(demo):
     return study, sim_mesh, objective, theta0, value, gradient
 
 
+@pytest.fixture(scope="module")
+def tet10_named_mesh_state(demo):
+    """The tet10 variant of the named-mesh gradient chain.
+
+    Same physics and study wiring as ``named_mesh_state`` but on a
+    ``SimMesh(method="tet10")``: the frozen-topology tet mesh is built at
+    the nominal design and per candidate ``theta`` only the node positions
+    are recomputed (:func:`cadjoint.fem.recompute_tet_points` — corner
+    surface vertices re-projected, midsides rebuilt as traced corner
+    midpoints) and passed via ``points=``.  Note the deeper z floor: dual
+    contouring needs the zero surface fully inside the box, and the
+    bracket's filleted union dips just below z = 0.
+    """
+    pytest.importorskip("tetgen")
+    from cadjoint.fem import ElasticStudy, Fixed, SimMesh, Traction, recompute_tet_points
+
+    theta0 = jnp.asarray(demo.NOMINAL, dtype=jnp.float64)
+    nominal_sdf = demo.theta_sdf(np.asarray(theta0))
+    sim_mesh = SimMesh(
+        name="bracket-grad-mesh-tet10",
+        resolution=(22, 16, 13),
+        domain=nominal_sdf,
+        bounds=(-1.3, -0.95, -0.16),
+        size=(2.6, 1.9, 1.52),
+        method="tet10",
+    )
+    study = ElasticStudy(
+        name="bracket-pry-named-tet10",
+        youngs=demo._YOUNGS,
+        poisson=demo._POISSON,
+        bcs=[
+            Fixed(demo.BOLT_CLAMP),
+            Traction(demo.WEB_TIP_LOAD, demo._TRACTION),
+        ],
+        mesh=sim_mesh,
+    )
+    tet_mesh = sim_mesh.build()  # topology frozen at the nominal design
+    assert tet_mesh.cells.shape[1] == 10
+
+    def objective(theta):
+        points = recompute_tet_points(demo.theta_sdf(theta), tet_mesh)
+        return study.solve(points=points).mean()
+
+    value, gradient = jax.value_and_grad(objective)(theta0)
+    return study, sim_mesh, objective, theta0, value, gradient
+
+
 class TestBracketScene:
     def test_scene_compiles_in_the_playground(self):
         from cadjoint.viewer.playground import compile_source
@@ -161,3 +208,53 @@ class TestNamedMeshGradient:
                 float(gradient[index]),
                 finite_difference,
             )
+
+
+class TestTet10NamedMeshGradient:
+    """The named-mesh gradient chain on the quality (tet10) meshing method.
+
+    Tolerances follow the measured caveats of ``research/tet-vs-hex.md``:
+    sharp DC places many surface vertices exactly on SDF creases, where
+    the Newton re-projection is subdifferentiable — AD picks a one-sided
+    branch while central FD averages the branches, so the crease-dominated
+    parameters (``web_thickness``, ``rib_height``) legitimately disagree
+    with FD by up to ~15% while remaining directionally exact (measured:
+    web 9.2e-3, rib 1.4e-1 rel on the tet path; the same chain matches FD
+    inside 5e-2 on crease-free geometry).  ``plate_thickness`` moves large
+    smooth faces and is asserted tightly.
+    """
+
+    def test_gradient_is_finite_and_physical(self, tet10_named_mesh_state):
+        study, sim_mesh, _, _, value, gradient = tet10_named_mesh_state
+        assert float(value) > 0.0
+        assert np.all(np.isfinite(np.asarray(gradient)))
+        # Thickening the plate stiffens the bracket: displacements shrink.
+        assert float(gradient[2]) < 0.0
+        assert study.last_result is not None
+        assert study.last_result.sim_mesh is sim_mesh
+
+    def test_adjoint_gradient_matches_finite_differences(self, tet10_named_mesh_state):
+        _, _, objective, theta, _, gradient = tet10_named_mesh_state
+        eps = 1e-3
+        finite_differences = []
+        for index in range(theta.shape[0]):
+            offset = jnp.zeros_like(theta).at[index].set(eps)
+            finite_differences.append(
+                (float(objective(theta + offset)) - float(objective(theta - offset))) / (2.0 * eps)
+            )
+        adjoint = np.asarray(gradient, dtype=np.float64)
+        # plate_thickness (index 2): smooth parameter, tight agreement.
+        assert np.abs(adjoint[2] - finite_differences[2]) <= 1e-2 * abs(finite_differences[2]), (
+            adjoint[2],
+            finite_differences[2],
+        )
+        # web_thickness / rib_height: crease-subgradient parameters — assert
+        # direction (sign) and order of magnitude, not the branch average.
+        for index in (0, 1):
+            assert np.sign(adjoint[index]) == np.sign(finite_differences[index]), (
+                index,
+                adjoint[index],
+                finite_differences[index],
+            )
+            ratio = abs(adjoint[index]) / max(abs(finite_differences[index]), 1e-12)
+            assert 0.2 < ratio < 5.0, (index, adjoint[index], finite_differences[index])

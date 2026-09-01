@@ -13,7 +13,6 @@ import { MaterialPanel } from "./components/MaterialPanel";
 import { MenuBar } from "./components/MenuBar";
 import { ObjectTree } from "./components/ObjectTree";
 import { OptimizePanel } from "./components/OptimizePanel";
-import { RenderPanel } from "./components/RenderPanel";
 import { SimulatePanel } from "./components/SimulatePanel";
 import { SketchPanel } from "./components/SketchPanel";
 import { ToolRail } from "./components/ToolRail";
@@ -615,6 +614,19 @@ export function App() {
         }}
         onShowWgsl={() => setShowWgsl(true)}
         wgslReady={wgsl() !== null}
+        render={{
+          display: display(),
+          presets: renderPresets(),
+          selectedPreset: selectedRenderPreset(),
+          pathTracing: pathTracing(),
+          quality: quality(),
+          onChange: applyDisplay,
+          onQualityChange: applyQuality,
+          onPresetActivate: activateRenderPreset,
+          onPresetSave: saveRenderPreset,
+          onPresetReset: resetRenderPreset,
+          onPathTracingChange: applyPathTracing,
+        }}
       />
 
       <main
@@ -768,23 +780,6 @@ export function App() {
                       onGhostCompile={ghostCompile}
                     />
                   </div>
-                </Show>
-                {/* Render mode owns the dock with the full render settings —
-                    the panel the eye-icon popover grew into. */}
-                <Show when={editingMode() === "render"}>
-                  <RenderPanel
-                    display={display()}
-                    presets={renderPresets()}
-                    selectedPreset={selectedRenderPreset()}
-                    pathTracing={pathTracing()}
-                    quality={quality()}
-                    onChange={applyDisplay}
-                    onQualityChange={applyQuality}
-                    onPresetActivate={activateRenderPreset}
-                    onPresetSave={saveRenderPreset}
-                    onPresetReset={resetRenderPreset}
-                    onPathTracingChange={applyPathTracing}
-                  />
                 </Show>
               </div>
               <ViewCube

@@ -29,6 +29,7 @@ export type ConstraintKind =
   | "horizontal"
   | "vertical"
   | "coincident"
+  | "equal_length"
   | "parallel"
   | "perpendicular";
 

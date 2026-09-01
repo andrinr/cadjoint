@@ -1,6 +1,7 @@
 /**
- * Render-mode dock panel: the full render settings, grouped the way a
- * viewport panel usually is (formerly the eye-icon popover).
+ * The full render settings, hosted in the eye-icon popover in the top bar
+ * (usable from any editing mode; formerly a dock panel of the retired
+ * Render mode).
  *
  * Mutually exclusive choices (shading, shadows, quality) are segmented
  * controls rather than checkboxes, so the current state reads at a glance and

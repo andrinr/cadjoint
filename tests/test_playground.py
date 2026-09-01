@@ -216,10 +216,27 @@ def test_example_scene_reports_its_construction_for_the_viewer():
     for vertex in profile["vertices"]:
         start, end = vertex["span"]
         assert EXAMPLE_SOURCE[start:end].startswith("[")
-    assert [item["kind"] for item in profile["constraints"]] == [
-        "fixed",
-        "distance",
-    ]
+    # The comb is dimension-driven: the full realistic constraint set rides
+    # along, in statement order, so the viewer can chip and overlay it.
+    from collections import Counter
+
+    kinds = Counter(item["kind"] for item in profile["constraints"])
+    assert kinds == {
+        "fixed": 1,
+        "distance": 4,
+        "horizontal": 13,
+        "vertical": 8,
+        "equal_length": 4,
+    }
+    # Distance constraints carry their driving-dimension values (viewport
+    # overlays); relational constraints carry value: None.
+    distances = [item for item in profile["constraints"] if item["kind"] == "distance"]
+    assert sorted(item["value"] for item in distances) == pytest.approx([0.18, 0.44, 0.67, 1.8])
+    assert all(
+        item["value"] is None
+        for item in profile["constraints"]
+        if item["kind"] in {"horizontal", "vertical", "equal_length"}
+    )
     assert profile["material"] == "aluminum"
 
     slug_profile = profiles["slug section"]
@@ -268,27 +285,35 @@ def test_example_scene_reports_its_construction_for_the_viewer():
         }
     ]
 
-    # The starter declares its optimization; nothing descends at compile time.
+    # The starter declares ONE optimization — the study-backed showcase:
+    # the declared thermal study is the objective, with the material volume
+    # riding along as regularizer.  Nothing descends at compile time.
     assert "differentiability" not in result
     optimizations = result["optimizations"]
     assert len(optimizations) == 1
-    optimization = optimizations[0]
-    assert optimization["kind"] == "optimization"
-    assert optimization["name"] == "min-aluminum"
-    assert optimization["objective"] == "material_volume"
-    assert optimization["steps"] == 25
-    assert optimization["learning_rate"] == pytest.approx(0.03)
-    assert optimization["method"] == "adam"
-    assert optimization["index"] == 0
-    assert optimization["editable"] is True
-    assert len(optimization["parameters"]) == 17
-    assert "fin_depth" in optimization["parameters"]
-    start, end = optimization["span"]
+    cool = optimizations[0]
+    assert cool["kind"] == "optimization"
+    assert cool["name"] == "cool-sink"
+    assert cool["objective"] == "mean(sink-conduction)"
+    assert cool["study"] == "sink-conduction"
+    assert cool["metric"] == "mean"
+    assert cool["remesh_every"] == 6
+    assert cool["regularizer"] == "material_volume"
+    assert cool["regularizer_weight"] == pytest.approx(0.4)
+    assert cool["steps"] == 10
+    assert cool["learning_rate"] == pytest.approx(0.01)
+    assert cool["method"] == "adam"
+    assert cool["index"] == 0
+    assert cool["editable"] is True
+    # No declared domain: the whole scene's free parameters are the design.
+    assert "fin_depth" in cool["parameters"]
+    assert len(cool["parameters"]) > 17
+    start, end = cool["span"]
     assert EXAMPLE_SOURCE[start:end].startswith("Optimization(")
-    start, end = optimization["steps_span"]
-    assert EXAMPLE_SOURCE[start:end] == "25"
-    start, end = optimization["learning_rate_span"]
-    assert EXAMPLE_SOURCE[start:end] == "0.03"
+    start, end = cool["steps_span"]
+    assert EXAMPLE_SOURCE[start:end] == "10"
+    start, end = cool["learning_rate_span"]
+    assert EXAMPLE_SOURCE[start:end] == "0.01"
 
     assert result["relations"] == [
         {
@@ -303,34 +328,70 @@ def test_example_scene_reports_its_construction_for_the_viewer():
         },
     ]
 
-    # The starter declares its thermal study; meshes stay implicit here.
+    # The starter declares its thermal study on an explicit named SimMesh.
     studies = result["studies"]
     assert len(studies) == 1
     assert studies[0]["name"] == "sink-conduction"
     assert studies[0]["kind"] == "thermal"
     assert studies[0]["editable"] is True
     assert studies[0]["resolution"] == [20, 14, 12]
-    assert studies[0]["mesh"] is None
-    assert result["sim_meshes"] == []
+    assert studies[0]["mesh"] == "sink-mesh"
+    meshes = result["sim_meshes"]
+    assert len(meshes) == 1
+    assert meshes[0]["name"] == "sink-mesh"
+    assert meshes[0]["method"] == "hex"
+    assert meshes[0]["resolution"] == [20, 14, 12]
+    assert meshes[0]["editable"] is True
 
     assert "fn fs_main_depth(" in result["preview_shader"]
 
 
 def test_patch_source_round_trips_through_compile():
+    # The slug profile is the unconstrained sketch: a patched vertex must
+    # round-trip exactly. (The comb profile is dimension-driven — a moved
+    # vertex there gets projected back onto its constraints on execution.)
+    slug_line = max(
+        node.lineno
+        for node in ast.walk(ast.parse(EXAMPLE_SOURCE))
+        if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "PolygonProfile"
+    )
     edited = patch_source(
         {
             "source": EXAMPLE_SOURCE,
             "op": "set_vertex",
-            "line": call_line(EXAMPLE_SOURCE, "PolygonProfile"),
-            "index": 3,
-            "xy": [-0.2, 1.25],
+            "line": slug_line,
+            "index": 2,
+            "xy": [0.3, 0.1],
         }
     )
     assert edited["ok"] is True
 
     result = compile_source(edited["source"])
     assert result["ok"] is True
-    assert result["construction"][0]["vertices"][3]["uv"] == pytest.approx([-0.2, 1.25], abs=1e-6)
+    assert result["construction"][1]["vertices"][2]["uv"] == pytest.approx([0.3, 0.1], abs=1e-6)
+
+
+def test_comb_vertex_patches_project_back_onto_the_constraints():
+    # Dragging a constrained comb vertex is allowed — the program's
+    # satisfy_constraints() call projects it back onto the sketch system on
+    # the next compile, so the deck level survives the edit.
+    edited = patch_source(
+        {
+            "source": EXAMPLE_SOURCE,
+            "op": "set_vertex",
+            "line": call_line(EXAMPLE_SOURCE, "PolygonProfile"),
+            "index": 3,
+            "xy": [0.66, 0.3],
+        }
+    )
+    assert edited["ok"] is True
+    assert "[0.66, 0.3]" in edited["source"]
+
+    result = compile_source(edited["source"])
+    assert result["ok"] is True
+    # fin1_root_r (vertex 3) is pulled back to the deck line by projection.
+    uv = result["construction"][0]["vertices"][3]["uv"]
+    assert uv[1] == pytest.approx(result["construction"][0]["vertices"][2]["uv"][1], abs=5e-2)
 
 
 def test_material_patches_create_and_assign_source_definitions():
@@ -1065,3 +1126,207 @@ def test_patch_source_validates_optimization_requests(request_body, message):
 
     assert result["ok"] is False
     assert message in result["error"]
+
+
+# ── Study-backed optimizations (end-to-end differentiable simulation) ────────
+
+STUDY_OPTIMIZE_SOURCE = """import jax.numpy as jnp
+
+from cadjoint.fem import Dirichlet, Nodes, ThermalStudy
+from cadjoint.geometry import Vector
+from cadjoint.optimize import Optimization
+from cadjoint.sdf.primitives import Box
+
+size = Vector([0.8, 0.5, 0.5], free=True, name="size")
+scene = Box(size)
+
+heat = ThermalStudy(
+    name="bar-conduction",
+    resolution=8,
+    conductivity=1.0,
+    bcs=[Dirichlet(Nodes.side("-x"), value=0.0), Dirichlet(Nodes.side("+x"), value=100.0)],
+    bounds=(-1.2, -0.9, -0.9),
+    size=(2.4, 1.8, 1.8),
+)
+
+
+def volume(params):
+    return jnp.prod(2.0 * params["size"])
+
+
+cool = Optimization(
+    name="cool-bar",
+    study="bar-conduction",
+    metric="mean",
+    regularizer=volume,
+    regularizer_weight=5.0,
+    remesh_every=0,
+    steps=2,
+    learning_rate=0.05,
+)
+"""
+
+
+def test_compile_reports_a_study_backed_optimization():
+    result = compile_source(STUDY_OPTIMIZE_SOURCE)
+
+    assert result["ok"] is True
+    (optimization,) = result["optimizations"]
+    assert optimization["name"] == "cool-bar"
+    assert optimization["objective"] == "mean(bar-conduction)"
+    assert optimization["study"] == "bar-conduction"
+    assert optimization["metric"] == "mean"
+    assert optimization["remesh_every"] == 0
+    assert optimization["regularizer"] == "volume"
+    assert optimization["regularizer_weight"] == pytest.approx(5.0)
+    assert optimization["parameters"] == ["size"]
+    assert optimization["editable"] is True
+
+
+def test_study_backed_optimize_returns_the_simulate_block():
+    pytest.importorskip("jax_fem", reason="study-backed runs need the fem extra")
+    from cadjoint.viewer.playground import optimize_source
+
+    result = optimize_source({"source": STUDY_OPTIMIZE_SOURCE, "name": "cool-bar"})
+
+    assert result["ok"] is True, result.get("error")
+    assert result["kind"] == "optimize"
+    assert result["name"] == "cool-bar"
+    assert result["steps"] == 2
+
+    # The descent bookkeeping is exactly the objective form's.
+    assert len(result["history"]) == 2
+    assert result["history"][-1]["objective"] < result["history"][0]["objective"]
+    assert len(result["trajectory"]) == 3
+    assert result["trajectory"][0]["parameters"] == result["initial"]
+    assert result["trajectory"][-1]["parameters"] == result["parameters"]
+    optimized = result["parameters"]["size"]
+    assert all(after < before for after, before in zip(optimized, [0.8, 0.5, 0.5]))
+
+    # Writeback is literal text surgery, same as the objective form.
+    assert 'Vector([0.8, 0.5, 0.5], free=True, name="size")' not in result["source"]
+    assert 'name="size"' in result["source"]
+    assert 'cool = Optimization(\n    name="cool-bar"' in result["source"]
+
+    # The ADDITIVE simulate block: the optimized design solved on a fresh
+    # mesh, in the exact shapes /api/simulate responses carry.
+    simulate = result["simulate"]
+    assert set(simulate) == {"field", "mesh", "result", "mesh_info"}
+    assert simulate["field"] == "temperature"
+    mesh = simulate["mesh"]
+    assert set(mesh) >= {
+        "positions",
+        "scalars",
+        "indices",
+        "groups",
+        "range",
+        "vertex_count",
+        "edges",
+        "fields",
+        "ranges",
+    }
+    assert len(mesh["scalars"]) == mesh["vertex_count"]
+    assert mesh["fields"]["temperature"] == mesh["scalars"]
+    assert mesh["ranges"]["temperature"] == pytest.approx(mesh["range"])
+    # Element edges are index pairs into the compacted vertex list.
+    assert len(mesh["edges"]) % 2 == 0 and len(mesh["edges"]) > 0
+    assert all(0 <= index < mesh["vertex_count"] for index in mesh["edges"])
+    summary = simulate["result"]
+    assert summary["name"] == "bar-conduction"
+    assert summary["kind"] == "thermal"
+    info = simulate["mesh_info"]
+    assert info["nodes"] == summary["nodes"]
+    assert info["elements"] == summary["elements"]
+
+    # The optimized program recompiles cleanly.
+    recompiled = compile_source(result["source"])
+    assert recompiled["ok"] is True
+    assert recompiled["optimizations"][0]["editable"] is True
+
+
+def test_objective_form_optimize_carries_no_simulate_block():
+    from cadjoint.viewer.playground import optimize_source
+
+    result = optimize_source({"source": OPTIMIZE_SOURCE, "name": "fit-radius", "steps": 2})
+
+    assert result["ok"] is True
+    assert "simulate" not in result
+
+
+# ── /api/optimize streams progress as chunked NDJSON ─────────────────────────
+
+
+def test_optimize_events_stream_progress_then_done():
+    from cadjoint.viewer.playground import optimize_source_events
+
+    events = list(optimize_source_events({"source": OPTIMIZE_SOURCE, "name": "fit-radius"}))
+
+    progress = [event for event in events if event["event"] == "progress"]
+    assert len(progress) == 4  # one per declared optimizer step
+    assert [event["step"] for event in progress] == [1, 2, 3, 4]
+    assert all(event["steps"] == 4 for event in progress)
+    assert all(event["elapsed"] >= 0.0 for event in progress)
+    objectives = [event["objective"] for event in progress]
+    assert objectives[-1] < objectives[0]
+    assert all(event["grad_norm"] >= 0.0 for event in progress)
+
+    done = events[-1]
+    assert done["event"] == "done"
+    assert done["ok"] is True
+    assert len(done["history"]) == 4
+    assert "source" in done and "trajectory" in done
+
+
+def test_optimize_events_report_validation_errors_as_done():
+    from cadjoint.viewer.playground import optimize_source_events
+
+    events = list(optimize_source_events({"source": OPTIMIZE_SOURCE, "name": "   "}))
+    assert len(events) == 1
+    assert events[0]["event"] == "done"
+    assert events[0]["ok"] is False
+    assert "name" in events[0]["error"]
+
+
+def test_optimize_events_report_a_timeout_as_a_clear_error():
+    from cadjoint.viewer.playground import optimize_source_events
+
+    events = list(
+        optimize_source_events({"source": OPTIMIZE_SOURCE, "name": "fit-radius"}, timeout=0.1)
+    )
+    assert events[-1]["event"] == "done"
+    assert events[-1]["ok"] is False
+    assert "Optimization exceeded the 0.1-second timeout." == events[-1]["error"]
+
+
+def test_optimize_endpoint_streams_ndjson_over_http():
+    import threading
+    from urllib.request import urlopen
+
+    from cadjoint.viewer.playground import create_server
+
+    server = create_server(0)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        host, port = server.server_address
+        base = f"http://{host}:{port}"
+        with urlopen(f"{base}/api/session") as response:
+            token = json.loads(response.read())["token"]
+        request = post(
+            base, "/api/optimize", {"source": OPTIMIZE_SOURCE, "name": "fit-radius"}, token
+        )
+        with urlopen(request) as response:
+            assert response.status == 200
+            assert response.headers["Content-Type"].startswith("application/x-ndjson")
+            events = [json.loads(line) for line in response if line.strip()]
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+    kinds = [event["event"] for event in events]
+    assert kinds == ["progress"] * 4 + ["done"]
+    assert events[-1]["ok"] is True
+    assert events[-1]["parameters"]["radius"] == pytest.approx(
+        events[-1]["trajectory"][-1]["parameters"]["radius"]
+    )

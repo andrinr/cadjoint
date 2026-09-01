@@ -633,7 +633,9 @@ def _mesh_entries(sim_meshes: list[Any], source: str) -> list[dict[str, Any]]:
     return entries
 
 
-def _optimization_entries(optimizations: list[Any], source: str) -> list[dict[str, Any]]:
+def _optimization_entries(
+    optimizations: list[Any], source: str, scene: Any = None
+) -> list[dict[str, Any]]:
     """Serialize declared optimizations for the viewer, with locations.
 
     Mirrors :func:`_mesh_entries`: each entry is the optimization's
@@ -642,8 +644,9 @@ def _optimization_entries(optimizations: list[Any], source: str) -> list[dict[st
     and the ``steps``/``learning_rate`` argument-value spans.
     Optimizations are matched to source statements positionally; a count
     mismatch (declarations built in loops or helpers) or a literal-name
-    mismatch marks every entry non-editable.  Declaration only: nothing is
-    optimized here.
+    mismatch marks every entry non-editable.  ``scene`` lets a study-backed
+    optimization whose study meshes the whole scene report the scene's
+    free parameters.  Declaration only: nothing is optimized here.
     """
     statements = locate_optimization_statements(source) or []
     aligned = len(statements) == len(optimizations) and all(
@@ -659,7 +662,7 @@ def _optimization_entries(optimizations: list[Any], source: str) -> list[dict[st
 
         entries.append(
             {
-                **optimization.describe(),
+                **optimization.describe(scene),
                 "index": index,
                 "line": statement.statement.lineno if statement is not None else None,
                 "span": span(statement.call_span) if statement is not None else None,
@@ -742,17 +745,107 @@ def _named_study(studies: list[Any], name: Any) -> Any:
 def _boundary_vertex_nodes(mesh: Any) -> np.ndarray:
     """Node indices behind the compacted boundary vertex list.
 
-    Must mirror the compaction in
-    :func:`cadjoint.fem.render_payload.boundary_render_payload`: quads are
-    gathered group by group (sorted by group id) and their node ids
-    deduplicated with ``np.unique``, so position *i* of the render payload's
-    vertex arrays corresponds to mesh node ``result[i]``.
+    Must mirror the compaction of :func:`_render_surface_payload`: hex
+    quads are gathered group by group (sorted by group id) exactly like
+    :func:`cadjoint.fem.render_payload.boundary_render_payload`, tet
+    boundary triangles as-is, and node ids deduplicated with
+    ``np.unique`` — so position *i* of the render payload's vertex arrays
+    corresponds to mesh node ``result[i]``.
     """
-    quads = np.concatenate(
-        [mesh.boundary_faces[group_id].nodes for group_id in sorted(mesh.boundary_faces)],
-        axis=0,
-    )
-    return np.unique(quads.reshape(-1))
+    if hasattr(mesh, "boundary_faces"):
+        faces = np.concatenate(
+            [mesh.boundary_faces[group_id].nodes for group_id in sorted(mesh.boundary_faces)],
+            axis=0,
+        )
+    else:
+        faces = np.asarray(mesh.boundary_tris)
+    return np.unique(faces.reshape(-1))
+
+
+def _render_surface_payload(mesh: Any, node_scalar: np.ndarray) -> dict[str, Any]:
+    """The viewer's boundary-surface payload for any solve mesh.
+
+    Hex meshes go through the canonical
+    :func:`cadjoint.fem.render_payload.boundary_render_payload`; tet meshes
+    get the same contract built here from their outward corner triangles —
+    identical keys (``positions``/``scalars``/``indices``/``groups``/
+    ``range``/``vertex_count``) with one synthetic ``"surface"`` group, so
+    the frontend renders both without knowing the meshing method.
+    """
+    from cadjoint.fem.render_payload import boundary_render_payload
+
+    if hasattr(mesh, "boundary_faces"):
+        return boundary_render_payload(mesh, node_scalar)
+
+    scalar = np.asarray(node_scalar, dtype=np.float64).reshape(-1)
+    if scalar.shape[0] != mesh.num_points:
+        raise ValueError(
+            f"Expected one scalar per node ({mesh.num_points}), got {scalar.shape[0]}."
+        )
+    tris = np.asarray(mesh.boundary_tris)
+    used, remapped = np.unique(tris.reshape(-1), return_inverse=True)
+    triangles = remapped.reshape(-1, 3).astype(np.int64)
+    positions = np.asarray(mesh.points)[used]
+    scalars = scalar[used]
+    finite = scalars[np.isfinite(scalars)]
+    low = float(finite.min()) if finite.size else 0.0
+    high = float(finite.max()) if finite.size else 0.0
+    corners = positions[triangles]
+    normals = 0.5 * np.cross(corners[:, 1] - corners[:, 0], corners[:, 2] - corners[:, 0])
+    areas = np.linalg.norm(normals, axis=-1)
+    total = float(areas.sum())
+    weights = areas / max(total, 1e-30)
+    center = (corners.mean(axis=1) * weights[:, None]).sum(axis=0)
+    groups = [
+        {
+            "id": "surface",
+            "axis": None,
+            "side": None,
+            "center": [round(float(value), 5) for value in center],
+            "area": round(total, 6),
+            "faces": int(triangles.shape[0]),
+            "start": 0,
+            "count": int(triangles.size),
+        }
+    ]
+    return {
+        "positions": [round(float(value), 5) for value in positions.reshape(-1)],
+        "scalars": [round(float(value), 6) for value in scalars],
+        "indices": [int(value) for value in triangles.reshape(-1)],
+        "groups": groups,
+        "range": [round(low, 6), round(high, 6)],
+        "vertex_count": int(used.shape[0]),
+    }
+
+
+def _element_edge_pairs(mesh: Any) -> np.ndarray:
+    """Unique boundary-face element edges, in compacted-vertex indices.
+
+    The viewer draws real element edges over the simulated surface; the
+    triangulated render faces would show the quad-splitting diagonals, so
+    the true face perimeters ship separately.  Each hex boundary quad
+    contributes its 4 perimeter edges (tet boundary triangles their 3),
+    deduplicated across shared faces.  Indices refer to the same compacted
+    vertex list as the render payload's ``positions`` (faces gathered
+    group by group, node ids deduplicated with ``np.unique`` — the
+    :func:`_boundary_vertex_nodes` mapping).
+
+    Returns:
+        ``(E, 2)`` int64 edge pairs, each sorted, unique.
+    """
+    if hasattr(mesh, "boundary_faces"):
+        faces = np.concatenate(
+            [mesh.boundary_faces[group_id].nodes for group_id in sorted(mesh.boundary_faces)],
+            axis=0,
+        )
+        corners = ((0, 1), (1, 2), (2, 3), (3, 0))
+    else:  # tet meshes: outward corner triangles
+        faces = np.asarray(mesh.boundary_tris)
+        corners = ((0, 1), (1, 2), (2, 0))
+    _, remapped = np.unique(faces.reshape(-1), return_inverse=True)
+    compact = remapped.reshape(faces.shape).astype(np.int64)
+    edges = np.concatenate([compact[:, [a, b]] for a, b in corners], axis=0)
+    return np.unique(np.sort(edges, axis=1), axis=0)
 
 
 def _finite_range(values: np.ndarray) -> list[float]:
@@ -794,6 +887,34 @@ def _result_field_payload(result: Any, payload: dict[str, Any]) -> None:
     }
 
 
+def _study_payload(study: Any, result: Any, sdf: Any) -> dict[str, Any]:
+    """Package one concrete study result for the viewer.
+
+    The one packaging path for solved studies: ``/api/simulate`` responses
+    and the ``simulate`` block of study-backed ``/api/optimize`` responses
+    both go through here, so the frontend renders an optimized design with
+    exactly the shapes a plain simulation carries — declaration (with
+    per-BC serializability), display field, renderable surface (full field
+    catalog, ranges, displacements), result summary, and the built mesh's
+    inspection report.
+    """
+    scalar = np.asarray(result.nodal_scalar(), dtype=np.float64)
+    described = study.describe()
+    described["bcs"] = [
+        {**bc.describe(), "serializable": bc.nodes.serializable} for bc in study.bcs
+    ]
+    render_payload = _render_surface_payload(result.mesh, scalar)
+    render_payload["edges"] = [int(index) for index in _element_edge_pairs(result.mesh).reshape(-1)]
+    _result_field_payload(result, render_payload)
+    return {
+        "study": described,
+        "field": result.field,
+        "mesh": render_payload,
+        "result": result.describe(),
+        "mesh_info": result.sim_mesh.inspect(sdf) if result.sim_mesh is not None else None,
+    }
+
+
 def _simulate_study(scene: Any, studies: list[Any], request: dict[str, Any]) -> dict[str, Any]:
     """Solve one study the scene program declared, by name.
 
@@ -810,8 +931,6 @@ def _simulate_study(scene: Any, studies: list[Any], request: dict[str, Any]) -> 
     """
     import jax.numpy as jnp
 
-    from cadjoint.fem.render_payload import boundary_render_payload
-
     study = _named_study(studies, request.get("name"))
 
     try:
@@ -822,21 +941,10 @@ def _simulate_study(scene: Any, studies: list[Any], request: dict[str, Any]) -> 
     sdf = lambda p: jnp.asarray(scene(p))  # noqa: E731
     cached = bool(request.get("cached")) and study.last_result is not None
     result = study.last_result if cached else study.solve(sdf)
-    scalar = np.asarray(result.nodal_scalar(), dtype=np.float64)
-    described = study.describe()
-    described["bcs"] = [
-        {**bc.describe(), "serializable": bc.nodes.serializable} for bc in study.bcs
-    ]
-    render_payload = boundary_render_payload(result.mesh, scalar)
-    _result_field_payload(result, render_payload)
     return {
         "ok": True,
         "kind": "study",
-        "study": described,
-        "field": result.field,
-        "mesh": render_payload,
-        "result": result.describe(),
-        "mesh_info": result.sim_mesh.inspect(sdf) if result.sim_mesh is not None else None,
+        **_study_payload(study, result, sdf),
         "cached": cached,
     }
 
@@ -854,6 +962,13 @@ def _simulate_source(request: dict[str, Any]) -> dict[str, Any]:
 # The server validates requested step counts, but the declaration itself may
 # ask for more than one HTTP-bounded run should pay for; the worker caps both.
 OPTIMIZE_STEP_LIMIT = 200
+# Study-backed runs solve a FEM problem (plus its adjoint) per step.  Measured
+# per-step wall clock at the declared scene resolutions: starter thermal
+# ~3.7 s steady (~17 s on JIT/topology-refreeze steps), bracket elastic
+# compliance ~5-7 s steady (~20 s on refreeze), plus ~8 s for the final
+# fresh-mesh evaluation — so 30 steps stays under the server's 300-second
+# /api/optimize budget with headroom even for the heavier elastic runs.
+STUDY_OPTIMIZE_STEP_LIMIT = 30
 
 
 def _named_optimization(optimizations: list[Any], name: Any) -> Any:
@@ -870,7 +985,10 @@ def _named_optimization(optimizations: list[Any], name: Any) -> Any:
 
 
 def _run_optimization(
-    source: str, optimizations: list[Any], request: dict[str, Any]
+    source: str,
+    namespace: dict[str, Any],
+    request: dict[str, Any],
+    progress_out: Any = None,
 ) -> dict[str, Any]:
     """Run one declared optimization by name and patch its result into source.
 
@@ -878,15 +996,65 @@ def _run_optimization(
     written back into the program text through the same exact-repr patch
     machinery the viewer's other edits use, and the client adopts the
     returned ``source`` and recompiles — code parity, like ``/patch``.
+
+    A study-backed optimization additionally carries a ``simulate`` block —
+    the optimized design solved on a freshly extracted mesh and packaged
+    through the exact :func:`_study_payload` shapes ``/api/simulate``
+    responses use (``field``/``mesh``/``result``/``mesh_info``) — so the
+    frontend displays the optimized part with its field through the
+    existing simulation pipeline.  Study-backed steps are capped at
+    ``STUDY_OPTIMIZE_STEP_LIMIT`` (a FEM solve plus adjoint per step);
+    objective-form runs keep the ``OPTIMIZE_STEP_LIMIT`` cap.
+
+    ``progress_out`` (the worker's real stdout pipe) receives one flushed
+    NDJSON line per optimizer step as it completes —
+    ``{"event", "step", "steps", "objective", "grad_norm", "elapsed"}``
+    with ``step`` counting completed evaluations (1-based) — which the
+    playground server relays to the client as chunked NDJSON.
     """
+    import time
+
     from cadjoint.viewer._patch import set_parameter_values
 
-    optimization = _named_optimization(optimizations, request.get("name"))
+    optimization = _named_optimization(namespace["__optimizations__"], request.get("name"))
     steps = request.get("steps")
     steps = optimization.steps if steps is None else int(steps)
-    run = optimization.run(steps=min(steps, OPTIMIZE_STEP_LIMIT))
+    study_backed = optimization.study is not None
+    run_steps = min(steps, STUDY_OPTIMIZE_STEP_LIMIT if study_backed else OPTIMIZE_STEP_LIMIT)
+    started = time.monotonic()
+
+    def emit_progress(record: dict[str, float]) -> None:
+        if progress_out is None:
+            return
+        print(
+            json.dumps(
+                {
+                    "event": "progress",
+                    "step": int(record["step"]) + 1,
+                    "steps": run_steps,
+                    "objective": record["objective"],
+                    "grad_norm": record["grad_norm"],
+                    "elapsed": round(time.monotonic() - started, 3),
+                }
+            ),
+            file=progress_out,
+            flush=True,
+        )
+
+    if study_backed:
+        try:
+            import jax_fem  # noqa: F401
+        except ImportError:
+            return {
+                "ok": False,
+                "error_kind": "fem_unavailable",
+                "error": _FEM_UNAVAILABLE_MESSAGE,
+            }
+        run = optimization.run(steps=run_steps, callback=emit_progress, scene=namespace["scene"])
+    else:
+        run = optimization.run(steps=run_steps, callback=emit_progress)
     patched = set_parameter_values(source, run.parameters)
-    return {
+    payload = {
         "ok": True,
         "kind": "optimize",
         "name": optimization.name,
@@ -898,14 +1066,39 @@ def _run_optimization(
         "parameters": run.parameters,
         "initial": run.initial,
     }
+    if study_backed:
+        import jax.numpy as jnp
+
+        from cadjoint.extraction import apply_parameters
+
+        # The run restored the target's original parameter values; put the
+        # optimized ones back so the packaged payload (and any mesh rebuild
+        # inspection triggers) describes the final design consistently —
+        # matching the patched source the client is about to adopt.
+        scene = namespace["scene"]
+        apply_parameters(optimization._study_target(scene), run.parameters)
+        sdf = lambda p: jnp.asarray(scene(p))  # noqa: E731
+        packaged = _study_payload(optimization.study, run.result, sdf)
+        payload["simulate"] = {
+            key: packaged[key] for key in ("field", "mesh", "result", "mesh_info")
+        }
+    return payload
 
 
 def _optimize_source(request: dict[str, Any]) -> dict[str, Any]:
-    """Run the optimize mode: exec scene -> declared optimization -> patch."""
+    """Run the optimize mode: exec scene -> declared optimization -> patch.
+
+    Per-step progress lines stream to the worker's REAL stdout (the pipe
+    the playground server tails) while the user program's own prints stay
+    captured into ``output`` — the stdout redirect below swaps
+    ``sys.stdout``, so the reference grabbed first keeps writing to the
+    pipe.
+    """
+    progress_out = sys.stdout
     captured = io.StringIO()
     with contextlib.redirect_stdout(captured), contextlib.redirect_stderr(captured):
         namespace = _execute_scene(request["source"])
-        result = _run_optimization(request["source"], namespace["__optimizations__"], request)
+        result = _run_optimization(request["source"], namespace, request, progress_out)
     result["output"] = captured.getvalue()[-8_000:]
     return result
 
@@ -931,8 +1124,6 @@ def _inspect_mesh(
     """
     import jax.numpy as jnp
 
-    from cadjoint.fem.hexmesh import scaled_jacobians
-    from cadjoint.fem.render_payload import boundary_render_payload
     from cadjoint.fem.study import _solve_mesh
 
     sdf = lambda p: jnp.asarray(scene(p))  # noqa: E731
@@ -972,17 +1163,24 @@ def _inspect_mesh(
             f"and {len(studies)} studies."
         )
 
-    hex_mesh = target.build(sdf)
-    quality = scaled_jacobians(hex_mesh.points, hex_mesh.cells)
-    node_quality = np.full(hex_mesh.num_points, np.inf, dtype=np.float64)
-    np.minimum.at(node_quality, hex_mesh.cells.reshape(-1), np.repeat(quality, 8))
+    mesh = target.build(sdf)
+    # Method-agnostic quality heatmap: scaled jacobians for hex meshes, the
+    # radius ratio for tet meshes — each element's quality mapped onto its
+    # nodes, min-combined.
+    metrics = target.quality(sdf)
+    metric_name = "scaled_jacobian" if "scaled_jacobian" in metrics else "radius_ratio"
+    quality = np.asarray(metrics[metric_name], dtype=np.float64)
+    cells = np.asarray(mesh.cells)
+    node_quality = np.full(mesh.num_points, np.inf, dtype=np.float64)
+    np.minimum.at(node_quality, cells.reshape(-1), np.repeat(quality, cells.shape[1]))
     node_quality = np.where(np.isfinite(node_quality), node_quality, 1.0)
-    payload = boundary_render_payload(hex_mesh, node_quality)
+    payload = _render_surface_payload(mesh, node_quality)
+    payload["edges"] = [int(index) for index in _element_edge_pairs(mesh).reshape(-1)]
     return {
         "ok": True,
         "kind": "mesh_inspect",
         "name": target.name,
-        "field": "scaled_jacobian",
+        "field": metric_name,
         "info": target.inspect(sdf),
         "mesh": payload,
         "quality_scalars": payload["scalars"],
@@ -1033,7 +1231,7 @@ def _compile_source(source: str) -> dict[str, Any]:
         # happens at compile time.
         studies_payload = _study_entries(studies, source)
         sim_meshes_payload = _mesh_entries(sim_meshes, source)
-        optimizations_payload = _optimization_entries(optimizations, source)
+        optimizations_payload = _optimization_entries(optimizations, source, namespace["scene"])
         node_ids = {
             id(obj): (f"{obj.kind}_{index}" if hasattr(obj, "kind") else f"profile_{index}")
             for index, (obj, _) in enumerate(profiles)

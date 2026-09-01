@@ -5,6 +5,11 @@
  * that response, so requiring the token on writes keeps them same-origin only.
  */
 
+import {
+  parseOptimizeStreamLine,
+  splitStreamBuffer,
+  type OptimizeProgress,
+} from "./optimize";
 import type {
   CompileResponse,
   MeshInspectResponse,
@@ -106,11 +111,54 @@ export async function meshInspect(
 /**
  * Run a declared optimization through the differentiable pipeline.
  *
- * On success the response's `source` carries the optimized parameter literals
- * written back — the caller adopts it exactly like a patch response.
+ * The endpoint may stream chunked NDJSON — per-step `progress` lines, then
+ * one `done` line carrying the classic response; `onProgress` fires per
+ * step. A non-streaming server (or an error body) ships a single JSON
+ * document, which the reader falls back to parsing whole. On success the
+ * response's `source` carries the optimized parameter literals written
+ * back — the caller adopts it exactly like a patch response.
  */
-export async function optimize(body: OptimizeRequest): Promise<OptimizeResponse> {
-  return post<OptimizeResponse>("/api/optimize", body);
+export async function optimize(
+  body: OptimizeRequest,
+  onProgress?: (progress: OptimizeProgress) => void,
+): Promise<OptimizeResponse> {
+  const response = await fetch("/api/optimize", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Cadjoint-Token": token },
+    body: JSON.stringify(body),
+  });
+  if (!response.body) return readJson<OptimizeResponse>(response);
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let full = "";
+  let done: OptimizeResponse | null = null;
+  for (;;) {
+    const { value, done: finished } = await reader.read();
+    const chunk = decoder.decode(value ?? new Uint8Array(0), { stream: !finished });
+    buffer += chunk;
+    full += chunk;
+    const { lines, rest } = splitStreamBuffer(buffer);
+    buffer = rest;
+    if (finished && buffer.trim().length > 0) lines.push(buffer.trim());
+    for (const line of lines) {
+      const event = parseOptimizeStreamLine(line);
+      if (event?.kind === "progress") {
+        const { kind: _kind, ...progress } = event;
+        onProgress?.(progress);
+      } else if (event?.kind === "done") {
+        done = event.response;
+      }
+    }
+    if (finished) break;
+  }
+  if (done) return done;
+  try {
+    return JSON.parse(full) as OptimizeResponse;
+  } catch {
+    throw new Error(`Server returned a non-JSON response (${response.status}).`);
+  }
 }
 
 /** List saved scene files in the server's `scenes` workspace. */

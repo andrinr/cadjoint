@@ -63,12 +63,14 @@ def face_group_catalog(mesh: HexMesh) -> list[dict[str, Any]]:
 def cell_to_node_scalar(mesh: HexMesh, cell_values: np.ndarray) -> np.ndarray:
     """Average a per-cell scalar onto the mesh nodes.
 
-    Each node receives the mean of the values of its incident hexes — the
-    usual nodal projection for cell-centered quantities such as the
-    von Mises stress evaluated at element centers.
+    Each node receives the mean of the values of its incident elements —
+    the usual nodal projection for cell-centered quantities such as the
+    von Mises stress evaluated at element centers.  Works for any fixed
+    nodes-per-cell connectivity (HEX8, TET4, TET10 midside nodes
+    included), so results stay meshing-method-agnostic.
 
     Args:
-        mesh: The hex mesh.
+        mesh: The volume mesh (hex or tet).
         cell_values: Scalar per cell, shaped ``(C,)``.
 
     Returns:
@@ -77,10 +79,11 @@ def cell_to_node_scalar(mesh: HexMesh, cell_values: np.ndarray) -> np.ndarray:
     values = np.asarray(cell_values, dtype=np.float64).reshape(-1)
     if values.shape[0] != mesh.num_cells:
         raise ValueError(f"Expected one value per cell ({mesh.num_cells}), got {values.shape[0]}.")
+    cells = np.asarray(mesh.cells)
     sums = np.zeros(mesh.num_points, dtype=np.float64)
     counts = np.zeros(mesh.num_points, dtype=np.float64)
-    flat = mesh.cells.reshape(-1)
-    np.add.at(sums, flat, np.repeat(values, 8))
+    flat = cells.reshape(-1)
+    np.add.at(sums, flat, np.repeat(values, cells.shape[1]))
     np.add.at(counts, flat, 1.0)
     return sums / np.maximum(counts, 1.0)
 

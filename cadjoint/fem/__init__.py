@@ -23,6 +23,14 @@ from cadjoint.fem.hexmesh import (
 )
 from cadjoint.fem.selection import Nodes, NodeSelection, selection_from_description
 from cadjoint.fem.simmesh import SimMesh, capture_sim_meshes
+from cadjoint.fem.tetmesh import (
+    TetMesh,
+    recompute_tet_points,
+    sdf_to_tet_mesh,
+    tet_aspect_ratios,
+    tet_faces_from_nodes,
+    tet_radius_ratios,
+)
 
 __all__ = [
     "FaceGroup",
@@ -31,16 +39,22 @@ __all__ = [
     "NodeSelection",
     "Nodes",
     "SimMesh",
+    "TetMesh",
     "aspect_ratios",
     "capture_sim_meshes",
     "corner_tet_volumes",
     "faces_from_nodes",
     "project_points",
     "recompute_points",
+    "recompute_tet_points",
     "scaled_jacobians",
     "sdf_to_hex_mesh",
+    "sdf_to_tet_mesh",
     "select_faces",
     "selection_from_description",
+    "tet_aspect_ratios",
+    "tet_faces_from_nodes",
+    "tet_radius_ratios",
 ]
 
 # Declarative study layer (code-first simulation, capture registry for the

@@ -75,6 +75,8 @@ export function constraintLabel(
       return `vert · ${point(a)}–${point(b)}`;
     case "coincident":
       return `coinc · ${point(a)}–${point(b)}`;
+    case "equal_length":
+      return `equal · ${point(a)}${point(b)}–${point(c)}${point(d)}`;
     case "parallel":
       return `∥ · ${point(a)}${point(b)}–${point(c)}${point(d)}`;
     case "perpendicular":

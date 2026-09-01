@@ -1360,8 +1360,6 @@ export function ViewerPane(props: ViewerPaneProps) {
             : simView()
               ? "Click the mesh to probe values · pick BC regions from the study builder · Esc returns to model"
               : "Simulation setup · M cycles modes · Esc returns to model"
-          : editingMode() === "render"
-          ? "Render setup · presets & quality in the Render panel · M cycles modes · Esc returns to model"
           : pendingLoft()
           ? "Loft: click the second sketch in the viewport · Esc to cancel"
           : tool() === "sketch"

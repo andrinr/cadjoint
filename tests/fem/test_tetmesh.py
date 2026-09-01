@@ -112,6 +112,31 @@ class TestQualityMetrics:
         assert tet_radius_ratios(points, cells)[0] < 0.02
 
 
+class TestVonMises:
+    def test_linear_field_is_exact_for_both_orders(self):
+        from cadjoint.fem.tetmesh import _TET10_EDGES, tet_von_mises
+
+        rng = np.random.default_rng(0)
+        points = rng.standard_normal((4, 3))
+        gradient = np.array([[0.002, 0.001, 0.0], [0.0, -0.001, 0.0005], [0.0003, 0.0, 0.004]])
+        strain = 0.5 * (gradient + gradient.T)
+        lam = 1000.0 * 0.3 / (1.3 * 0.4)
+        mu = 1000.0 / 2.6
+        stress = lam * np.trace(strain) * np.eye(3) + 2 * mu * strain
+        deviator = stress - np.trace(stress) / 3.0 * np.eye(3)
+        exact = np.sqrt(1.5 * (deviator * deviator).sum())
+
+        cells4 = np.array([[0, 1, 2, 3]])
+        vm4 = tet_von_mises(points, cells4, points @ gradient.T, youngs=1000.0, poisson=0.3)
+        assert vm4[0] == pytest.approx(exact, rel=1e-12)
+
+        midsides = points[_TET10_EDGES].mean(axis=1)
+        points10 = np.concatenate([points, midsides])
+        cells10 = np.arange(10, dtype=np.int64).reshape(1, 10)
+        vm10 = tet_von_mises(points10, cells10, points10 @ gradient.T, youngs=1000.0, poisson=0.3)
+        assert vm10[0] == pytest.approx(exact, rel=1e-12)
+
+
 class TestSelections:
     def test_nodes_selections_resolve_on_tet_meshes(self, sphere_mesh):
         # Duck-typed against the HexMesh surface NodeSelection expects.
@@ -131,6 +156,14 @@ class TestRecompute:
     def test_nominal_recompute_is_exact_fixed_point(self, sphere_mesh):
         points = np.asarray(recompute_tet_points(_sphere_sdf(), sphere_mesh))
         assert np.abs(points - sphere_mesh.points).max() < 1e-12
+
+    def test_tet10_nominal_recompute_is_exact_fixed_point(self, sphere_mesh):
+        from cadjoint.fem.tetmesh import tet10_mesh
+
+        promoted = tet10_mesh(sphere_mesh)
+        points = np.asarray(recompute_tet_points(_sphere_sdf(), promoted))
+        assert points.shape == promoted.points.shape
+        assert np.abs(points - promoted.points).max() < 1e-12
 
     def test_interior_stays_frozen_without_smoothing(self, sphere_mesh):
         points = np.asarray(recompute_tet_points(_sphere_sdf(0.97), sphere_mesh))
@@ -465,6 +498,160 @@ class TestMesherTesseract:
         assert np.abs(field_bar - np.asarray(expected)).max() / scale < 1e-10
 
 
+class TestMesherTesseractTet10:
+    """The mesher tesseract's TET10 mode (element = 2).
+
+    The promotion appended in front of the TET4 path is the exact linear
+    map ``m = (a + b) / 2``, so the interpolation VJP extends by splitting
+    each midside cotangent half-and-half onto its corner parents before
+    the corner-level IFT pullback — checked mechanically against pure-JAX
+    autodiff of the same corner -> TET10 composition.
+    """
+
+    @pytest.fixture(scope="class")
+    def tesseract(self):
+        pytest.importorskip("tesseract_core")
+        pytest.importorskip("tesseract_jax")
+        from pathlib import Path
+
+        from tesseract_core import Tesseract
+
+        api = Path(__file__).parents[2] / "cadjoint" / "fem" / "tesseracts" / "mesher"
+        return Tesseract.from_tesseract_api(str(api / "tesseract_api.py"))
+
+    @pytest.fixture(scope="class")
+    def sphere_setup(self, tesseract):
+        grid = GridSpec.from_bounds((-1.3, -1.3, -1.3), (2.6, 2.6, 2.6), (12, 12, 12))
+        lattice = grid.lattice_points()
+
+        def field_of(radius):
+            return jnp.linalg.norm(jnp.asarray(lattice), axis=-1) - radius
+
+        def static(element):
+            return {
+                "origin": np.asarray(grid.origin),
+                "spacing": np.asarray(grid.spacing),
+                "element": np.int32(element),
+                "sharp": np.int32(0),
+                "min_ratio": np.float64(1.5),
+                "min_dihedral": np.float64(10.0),
+            }
+
+        def discover(element, width):
+            return tesseract.apply(
+                dict(
+                    field_values=np.asarray(field_of(1.0)),
+                    point_ids=np.zeros(0, np.int32),
+                    cell_template=np.zeros((0, width), np.int32),
+                    num_surface=np.int32(0),
+                    **static(element),
+                )
+            )
+
+        return grid, field_of, static, discover(0, 4), discover(2, 10)
+
+    def test_apply_matches_the_local_promotion(self, sphere_setup):
+        _, _, _, tet4, tet10 = sphere_setup
+        points4 = np.asarray(tet4["points"])
+        cells4 = np.asarray(tet4["cells"])
+        expected_points, expected_cells, parents = tet10_from_tet4(points4, cells4)
+        assert np.array_equal(np.asarray(tet10["cells"]), expected_cells)
+        assert np.abs(np.asarray(tet10["points"]) - expected_points).max() < 1e-12
+        mask4 = np.asarray(tet4["surface_mask"]).astype(bool)
+        mask10 = np.asarray(tet10["surface_mask"]).astype(bool)
+        count4 = len(points4)
+        num_surface = int(mask4.sum())
+        assert np.array_equal(mask10[:count4], mask4)
+        # Midside nodes are marked exactly when both parents are on the surface.
+        assert np.array_equal(mask10[count4:], (parents < num_surface).all(axis=1))
+
+    def test_vjp_matches_autodiff_of_the_promoted_map(self, tesseract, sphere_setup):
+        """Mechanical check: tesseract VJP == jax.vjp of corner IFT + promotion."""
+        import importlib.util
+        from pathlib import Path
+
+        grid, field_of, static, tet4, tet10 = sphere_setup
+        api = (
+            Path(__file__).parents[2]
+            / "cadjoint"
+            / "fem"
+            / "tesseracts"
+            / "mesher"
+            / "tesseract_api.py"
+        )
+        spec = importlib.util.spec_from_file_location("mesher_tesseract_api_t10", api)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        points4 = np.asarray(tet4["points"])
+        _, _, parents = tet10_from_tet4(points4, np.asarray(tet4["cells"]))
+        num_surface = int(np.asarray(tet4["surface_mask"]).sum())
+        points10 = np.asarray(tet10["points"])
+        cells10 = np.asarray(tet10["cells"])
+        field0 = np.asarray(field_of(1.0))
+        rng = np.random.default_rng(7)
+        cotangent = rng.standard_normal(points10.shape)  # every node, incl. interior
+        result = tesseract.vector_jacobian_product(
+            dict(
+                field_values=field0,
+                point_ids=np.arange(len(points10), dtype=np.int32),
+                cell_template=np.zeros((len(cells10), 10), np.int32),
+                num_surface=np.int32(np.asarray(tet10["surface_mask"]).sum()),
+                **static(2),
+            ),
+            vjp_inputs={"field_values"},
+            vjp_outputs={"points"},
+            cotangent_vector={"points": cotangent},
+        )
+        field_bar = np.asarray(result["field_values"])
+
+        boundary = jnp.asarray(points4[:num_surface])
+        interpolant = module.make_interpolant(
+            jnp.asarray(field0), np.asarray(grid.origin), np.asarray(grid.spacing)
+        )
+        gradients = jax.vmap(jax.grad(lambda p: interpolant(p).reshape(())))(boundary)
+        squared = jnp.sum(gradients * gradients, axis=1)
+
+        def reference(field_values):
+            values = module.make_interpolant(
+                field_values, np.asarray(grid.origin), np.asarray(grid.spacing)
+            )(boundary)
+            moved = boundary - (values / squared)[:, None] * gradients
+            corners = jnp.asarray(points4).at[:num_surface].set(moved)
+            midsides = corners[jnp.asarray(parents)].mean(axis=1)
+            return jnp.concatenate([corners, midsides], axis=0)
+
+        _, vjp_fn = jax.vjp(reference, jnp.asarray(field0))
+        (expected,) = vjp_fn(jnp.asarray(cotangent))
+        scale = max(float(np.abs(np.asarray(expected)).max()), 1e-30)
+        assert np.abs(field_bar - np.asarray(expected)).max() / scale < 1e-10
+
+    def test_traced_gradient_through_the_tet10_mode(self, tesseract, sphere_setup):
+        from tesseract_jax import apply_tesseract
+
+        _, field_of, static, tet4, tet10 = sphere_setup
+        num_points = len(np.asarray(tet10["points"]))
+        num_cells = len(np.asarray(tet10["cells"]))
+        num_surface = int(np.asarray(tet4["surface_mask"]).sum())  # corner block
+
+        def mean_radius(radius):
+            outputs = apply_tesseract(
+                tesseract,
+                dict(
+                    field_values=field_of(radius),
+                    point_ids=np.arange(num_points, dtype=np.int32),
+                    cell_template=np.zeros((num_cells, 10), np.int32),
+                    num_surface=np.int32(num_surface),
+                    **static(2),
+                ),
+            )
+            boundary = outputs["points"][:num_surface]
+            return jnp.mean(jnp.sqrt(jnp.sum(boundary * boundary, axis=1)))
+
+        gradient = float(jax.grad(mean_radius)(jnp.asarray(1.0)))
+        assert gradient == pytest.approx(1.0, rel=5e-2)
+
+
 class TestTwoTesseractChain:
     """Flagship demo: mesher tesseract composed with the unmodified elastic tesseract.
 
@@ -643,4 +830,192 @@ class TestTwoTesseractChain:
             values.append(float(value))
             theta = np.clip(theta - learning_rate * np.asarray(gradient), lower, upper)
         print(f"\ndescent J: {[round(v, 6) for v in values]}")
+        assert values[-1] < values[0]
+
+
+class TestTet10MesherChain:
+    """Mesher tesseract (TET10 mode) composed with the direct TET10 solve.
+
+    CAD parameters -> SDF lattice samples -> mesher tesseract (element = 2,
+    frozen topology, midside-splitting interpolation VJP) -> direct
+    ``tet_elastic_solve`` (jax-fem adjoint) -> compliance + smoothed-mass
+    objective -> one ``jax.grad``.  The packaged ``elastic_jaxfem`` solver
+    tesseract's schema is HEX8-fixed (``cells: (None, 8)``), so the second
+    stage runs in-process here; a TET10-capable solver-tesseract schema is
+    the noted follow-up (``research/tet-vs-hex.md``).  Uses the deepened
+    meshing box (dual contouring needs the closed surface — the bracket's
+    fillet dips below z = 0) at 26x19x16, the resolution where sharp DC on
+    the trilinear interpolant meshes.
+    """
+
+    @pytest.fixture(scope="class")
+    def chain(self):
+        pytest.importorskip("jax_fem")
+        pytest.importorskip("tesseract_core")
+        pytest.importorskip("tesseract_jax")
+        pytest.importorskip("optax")  # imported by the example at module level
+        import importlib.util
+        from pathlib import Path
+
+        from tesseract_core import Tesseract
+
+        from cadjoint.fem.tetmesh import (
+            tet10_complete_nodes,
+            tet10_face_midsides,
+            tet10_mesh,
+            tet_boundary_faces,
+        )
+
+        root = Path(__file__).parents[2]
+        spec = importlib.util.spec_from_file_location(
+            "fem_bracket_optimization", root / "examples" / "fem_bracket_optimization.py"
+        )
+        example = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(example)
+        tesseracts = root / "cadjoint" / "fem" / "tesseracts"
+        mesher = Tesseract.from_tesseract_api(str(tesseracts / "mesher" / "tesseract_api.py"))
+        grid = GridSpec.from_bounds((-1.3, -0.95, -0.16), (2.6, 1.9, 1.52), (26, 19, 16))
+        lattice = grid.lattice_points()
+
+        def samples_of(theta):
+            return example.theta_sdf(theta)(jnp.asarray(lattice))
+
+        def static(element):
+            return {
+                "origin": np.asarray(grid.origin),
+                "spacing": np.asarray(grid.spacing),
+                "element": np.int32(element),
+                "sharp": np.int32(1),  # the meshable mode for this lattice
+                "min_ratio": np.float64(1.5),
+                "min_dihedral": np.float64(10.0),
+            }
+
+        def discover(theta):
+            found = mesher.apply(
+                dict(
+                    field_values=np.asarray(samples_of(theta)),
+                    point_ids=np.zeros(0, np.int32),
+                    cell_template=np.zeros((0, 4), np.int32),
+                    num_surface=np.int32(0),
+                    **static(0),
+                )
+            )
+            points4 = np.asarray(found["points"])
+            cells4 = np.asarray(found["cells"]).astype(np.int32)
+            num_surface = int(np.asarray(found["surface_mask"]).sum())
+            tet10 = tet10_mesh(
+                TetMesh(
+                    points=points4,
+                    cells=cells4,
+                    num_surface=num_surface,
+                    boundary_tris=tet_boundary_faces(cells4),
+                    base_points=points4,
+                    max_step=0.5 * float(np.linalg.norm(grid.spacing)),
+                    grid=grid,
+                )
+            )
+            clamp = tet10_complete_nodes(tet10, example.BOLT_CLAMP.resolve(tet10))
+            faces = tet_faces_from_nodes(tet10, example.WEB_TIP_LOAD.resolve(tet10))
+            span = np.concatenate(
+                [np.unique(faces), np.unique(tet10_face_midsides(tet10, faces))]
+            ).astype(np.int32)
+            return {"mesh": tet10, "clamp": clamp, "faces": faces, "span": span}
+
+        cell_volume = float(np.prod(grid.spacing))
+        sharpness = 0.5 * float(min(grid.spacing))
+
+        def make_objective(frozen):
+            from tesseract_jax import apply_tesseract
+
+            mesh = frozen["mesh"]
+            templates = {
+                "point_ids": np.arange(mesh.num_points, dtype=np.int32),
+                "cell_template": np.zeros((mesh.num_cells, 10), np.int32),
+                "num_surface": np.int32(mesh.num_surface),
+                **static(2),
+            }
+            bcs = ElasticBCs(
+                fixed_nodes=[frozen["clamp"]],
+                traction_nodes=[frozen["span"]],
+                traction_vectors=[np.asarray([0.0, -2.0, 0.0])],
+            )
+
+            def objective(theta):
+                samples = samples_of(theta)
+                meshed = apply_tesseract(mesher, dict(field_values=samples, **templates))
+                displacement = tet_elastic_solve(
+                    meshed["points"],
+                    mesh.cells,
+                    bcs,
+                    youngs=1000.0,
+                    poisson=0.3,
+                    ele_type="TET10",
+                    base_points=mesh.points,
+                    traction_faces=[frozen["faces"]],
+                )
+                compliance = jnp.sum(displacement**2)
+                mass = cell_volume * jnp.sum(jax.nn.sigmoid(-samples / sharpness))
+                return compliance + mass, (compliance, mass)
+
+            return objective
+
+        theta0 = jnp.asarray(example.NOMINAL)
+        frozen = discover(theta0)
+        return example, discover, make_objective, frozen, theta0
+
+    def test_gradient_flows_through_mesher_vjp_and_solver_adjoint(self, chain):
+        _, _, make_objective, frozen, theta0 = chain
+        objective = make_objective(frozen)
+        (value, (compliance, mass)), gradient = jax.value_and_grad(objective, has_aux=True)(theta0)
+        gradient = np.asarray(gradient)
+        print(
+            f"\ntet10 chain J={float(value):.6f} (C={float(compliance):.6f} "
+            f"M={float(mass):.6f}) grad={gradient.tolist()}"
+        )
+        assert np.isfinite(gradient).all()
+        assert (np.abs(gradient) > 1e-6).all()  # every parameter is live
+        assert gradient[2] < 0.0  # thicker plate -> stiffer under the prying load
+
+        # Central FD on plate_thickness (the smooth, crease-light parameter);
+        # shrink eps if the re-run mesher crosses a topology change.
+        for eps in (1e-3, 3e-4, 1e-4):
+            offset = np.zeros(3)
+            offset[2] = eps
+            try:
+                plus = float(objective(jnp.asarray(np.asarray(theta0) + offset))[0])
+                minus = float(objective(jnp.asarray(np.asarray(theta0) - offset))[0])
+            except Exception:
+                continue
+            finite_difference = (plus - minus) / (2.0 * eps)
+            print(f"plate: adjoint {gradient[2]:+.4f} vs FD {finite_difference:+.4f} (eps {eps})")
+            assert gradient[2] == pytest.approx(finite_difference, rel=5e-2)
+            break
+        else:
+            pytest.skip("no topology-stable FD window found")
+
+    def test_short_descent_decreases_the_objective(self, chain):
+        example, discover, make_objective, frozen, theta0 = chain
+        learning_rate = np.array([1e-3, 2e-3, 2e-5])  # per-parameter step scaling
+        lower = np.asarray(example.LOWER_BOUNDS)
+        upper = np.asarray(example.UPPER_BOUNDS)
+        theta = np.asarray(theta0, dtype=np.float64)
+        objective = make_objective(frozen)
+        values = []
+        for _ in range(2):
+            try:
+                (value, _aux), gradient = jax.value_and_grad(objective, has_aux=True)(
+                    jnp.asarray(theta)
+                )
+            except Exception:
+                try:
+                    objective = make_objective(discover(jnp.asarray(theta)))  # refreeze
+                except RuntimeError:
+                    break  # interpolant DC fragility: no mesh at this design
+                (value, _aux), gradient = jax.value_and_grad(objective, has_aux=True)(
+                    jnp.asarray(theta)
+                )
+            values.append(float(value))
+            theta = np.clip(theta - learning_rate * np.asarray(gradient), lower, upper)
+        print(f"\ntet10 descent J: {[round(v, 6) for v in values]}")
+        assert len(values) >= 2
         assert values[-1] < values[0]

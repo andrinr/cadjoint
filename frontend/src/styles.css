@@ -29,11 +29,6 @@
   --mode-accent-rgb: 255, 178, 92;
 }
 
-.app[data-mode="render"] {
-  --mode-accent: #d8a6ff;
-  --mode-accent-rgb: 216, 166, 255;
-}
-
 * {
   box-sizing: border-box;
 }
@@ -260,10 +255,6 @@ body {
 
 .mode-switcher button[data-mode="simulate"] {
   --seg-rgb: 255, 178, 92;
-}
-
-.mode-switcher button[data-mode="render"] {
-  --seg-rgb: 216, 166, 255;
 }
 
 .mode-switcher button.active {
@@ -722,8 +713,24 @@ button.primary {
   min-height: 150px;
 }
 
-.dock .render-panel {
-  min-height: 160px;
+/* Render settings popover: anchored to the toolbar's eye icon, openable
+   from any mode. Height-clamped; the settings list inside scrolls. */
+.render-popover-anchor {
+  position: relative;
+  display: flex;
+}
+
+.render-popover {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 40;
+  width: 300px;
+}
+
+.render-popover .render-panel {
+  max-height: min(72vh, 640px);
+  border-top-color: var(--line);
 }
 
 /* Collapsed sections: one shared launcher look (icon · label · count).
@@ -1312,7 +1319,7 @@ button.primary {
   color: var(--lime);
 }
 
-/* Render settings panel (a dock section, owned by Render mode) ---------- */
+/* Render settings (the eye-icon popover in the toolbar) ----------------- */
 
 button.icon {
   display: grid;
@@ -1321,8 +1328,8 @@ button.icon {
   padding: 0;
 }
 
-/* The eye is active exactly while Render mode is, so it glows in that
-   mode's accent rather than the default lime. */
+/* The eye is active exactly while its popover is open; it glows in the
+   current mode's accent rather than the default lime. */
 .toolbar button.icon.active {
   border-color: rgba(var(--mode-accent-rgb, 217, 255, 87), 0.6);
   background: rgba(var(--mode-accent-rgb, 217, 255, 87), 0.12);
@@ -2580,6 +2587,81 @@ button.primary svg {
   font: 500 9px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
   opacity: 0.75;
   white-space: nowrap;
+}
+
+/* The replay is the payoff of a run — the button says so in words. */
+.opt-player button.opt-replay {
+  width: auto;
+  padding: 0 9px;
+  white-space: nowrap;
+  font-weight: 650;
+  color: var(--lime, #d9ff57);
+  border-color: rgba(217, 255, 87, 0.45);
+}
+
+.opt-player-hint {
+  display: block;
+  margin-top: -2px;
+  font-size: 9px;
+  opacity: 0.55;
+}
+
+/* ── Live run progress (streaming /api/optimize) ───────────────────────── */
+
+.opt-live {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.opt-progress {
+  position: relative;
+  height: 6px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.opt-progress i {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: var(--lime, #d9ff57);
+  transition: width 0.25s ease-out;
+}
+
+/* No step events yet (or a non-streaming server): a sweeping shimmer says
+   the run is alive even though its position is unknown. */
+.opt-progress.indeterminate i {
+  width: 35% !important;
+  animation: opt-progress-sweep 1.3s ease-in-out infinite;
+  opacity: 0.75;
+}
+
+@keyframes opt-progress-sweep {
+  0% {
+    margin-left: 0;
+  }
+  50% {
+    margin-left: 65%;
+  }
+  100% {
+    margin-left: 0;
+  }
+}
+
+.opt-live-stats {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 10px;
+  opacity: 0.85;
+}
+
+.opt-live-stats b {
+  font: 650 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--lime, #d9ff57);
 }
 
 /* ── Mesh inspector & results browsing (Simulate dock) ─────────────────── */

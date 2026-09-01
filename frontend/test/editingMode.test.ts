@@ -28,17 +28,16 @@ const boxNode = (id: string): ConstructionNode =>
   ({ id, kind: "box" }) as ConstructionNode;
 
 describe("editing mode cycling", () => {
-  it("cycles forward through model, sketch, simulate, render and wraps", () => {
+  it("cycles forward through model, sketch, simulate and wraps", () => {
     expect(cycleEditingMode("model")).toBe("sketch");
     expect(cycleEditingMode("sketch")).toBe("simulate");
-    expect(cycleEditingMode("simulate")).toBe("render");
-    expect(cycleEditingMode("render")).toBe("model");
+    expect(cycleEditingMode("simulate")).toBe("model");
   });
 
   it("cycles backwards and wraps the other way", () => {
-    expect(cycleEditingMode("model", -1)).toBe("render");
-    expect(cycleEditingMode("render", -1)).toBe("simulate");
+    expect(cycleEditingMode("model", -1)).toBe("simulate");
     expect(cycleEditingMode("simulate", -1)).toBe("sketch");
+    expect(cycleEditingMode("sketch", -1)).toBe("model");
   });
 
   it("visits each mode exactly once per full cycle", () => {
@@ -69,11 +68,10 @@ describe("mode filtering of tool groups", () => {
     expect(groups).toContain("select");
   });
 
-  it("simulate and render modes hide every tool group", () => {
+  it("simulate mode hides every tool group", () => {
     expect(railGroupsForMode("simulate")).toEqual([]);
     expect(groupVisibleInMode("delete", "simulate")).toBe(false);
-    expect(railGroupsForMode("render")).toEqual([]);
-    expect(groupVisibleInMode("select", "render")).toBe(false);
+    expect(groupVisibleInMode("select", "simulate")).toBe(false);
   });
 
   it("filters create tools per mode: solids are model-only", () => {
@@ -111,11 +109,9 @@ describe("sketch-mode auto-entry", () => {
     expect(next.lastAutoNodeId).toBeNull();
   });
 
-  it("never hijacks simulate or render mode", () => {
+  it("never hijacks simulate mode", () => {
     const simulate = autoEnterSketchMode("simulate", profileNode("s1"), null);
     expect(simulate.mode).toBe("simulate");
-    const render = autoEnterSketchMode("render", profileNode("s1"), null);
-    expect(render.mode).toBe("render");
   });
 });
 
@@ -124,13 +120,15 @@ describe("editing mode persistence", () => {
     const storage = memoryStorage();
     persistEditingMode("sketch", storage);
     expect(loadEditingMode(storage)).toBe("sketch");
-    persistEditingMode("render", storage);
-    expect(loadEditingMode(storage)).toBe("render");
+    persistEditingMode("simulate", storage);
+    expect(loadEditingMode(storage)).toBe("simulate");
   });
 
   it("falls back to model for unknown or missing values", () => {
     expect(loadEditingMode(memoryStorage())).toBe("model");
     expect(loadEditingMode(memoryStorage("banana"))).toBe("model");
+    // The retired Render mode: a stale persisted value maps to model.
+    expect(loadEditingMode(memoryStorage("render"))).toBe("model");
     expect(loadEditingMode(undefined)).toBe("model");
   });
 });

@@ -1,6 +1,7 @@
-"""Prototype: DC surface -> tetrahedral volume mesh -> jax-fem TET4/TET10.
+"""DC surface -> tetrahedral volume mesh -> jax-fem TET4/TET10.
 
-Research prototype for the "dual contouring, then volume mesh" route (see
+The tetrahedral meshing method behind ``SimMesh(method="tet4"/"tet10")``
+(validated as a research prototype first; measurements in
 ``research/tet-vs-hex.md``): the differentiable dual-contour surface from
 :func:`cadjoint.meshing.extract_mesh` is handed to TetGen as a piecewise
 linear complex with boundary splitting disabled (``-Y``), so every DC
@@ -22,12 +23,16 @@ the frozen-topology doctrine carry over unchanged:
   the research note.  An optional Laplacian pass propagates boundary
   motion inward differentiably for larger design steps.
 
-The elastic solve mirrors :meth:`cadjoint.fem.backends.JaxFemBackend.
-elastic` with the element type opened up to jax-fem's ``TET4``/``TET10``
-(quadratic tets via :func:`tet10_from_tet4`; midside nodes are edge
-midpoints of the — possibly traced — corner positions, so gradients flow
-through them, but faces stay straight-sided).  This module deliberately
-does not touch the production backend registry.
+The solves mirror :class:`cadjoint.fem.backends.JaxFemBackend` (elastic
+*and* the lifted thermal formulation) with the element type opened up to
+jax-fem's ``TET4``/``TET10`` (quadratic tets via :func:`tet10_from_tet4`;
+midside nodes are edge midpoints of the — possibly traced — corner
+positions, so gradients flow through them, but faces stay straight-sided).
+Both take exact boundary-face targeting (``traction_faces``/``flux_faces``)
+because node-membership face selection over-selects on tets (interior
+faces whose corners all lie on the loaded patch — see
+:func:`_restrict_surface_faces`).  This module deliberately does not touch
+the backend registry: tet meshes always solve on the direct jax-fem path.
 """
 
 from __future__ import annotations
@@ -37,7 +42,13 @@ from typing import Any, Callable
 
 import numpy as np
 
-from cadjoint.fem.backends import ElasticBCs, _membership_location, _require_jax_fem, _x64_scope
+from cadjoint.fem.backends import (
+    ElasticBCs,
+    ThermalBCs,
+    _membership_location,
+    _require_jax_fem,
+    _x64_scope,
+)
 from cadjoint.fem.hexmesh import FaceGroup, project_points
 from cadjoint.meshing import GridSpec, extract_mesh
 
@@ -49,18 +60,30 @@ __all__ = [
     "recompute_tet_points",
     "sdf_to_tet_mesh",
     "surface_to_tet_mesh",
+    "tet10_complete_nodes",
+    "tet10_face_midsides",
     "tet10_from_tet4",
+    "tet10_mesh",
     "tet_aspect_ratios",
     "tet_boundary_faces",
     "tet_elastic_solve",
     "tet_faces_from_nodes",
     "tet_radius_ratios",
+    "tet_thermal_solve",
     "tet_volumes",
+    "tet_von_mises",
 ]
 
 _TETGEN_MESSAGE = (
     "tetgen is not installed (PyPI wheels exist for macOS arm64 / Python 3.14): pip install tetgen"
 )
+
+# Tet solves use a direct sparse linear solver (scipy spsolve / SuperLU) for
+# both the forward Newton steps and the adjoint: preserving the DC surface
+# verbatim leaves sliver tets whose conditioning makes jax-fem's default
+# BiCGStab diverge (measured in research/tet-vs-hex.md — the "direct solver
+# prerequisite" for a production tet path).
+_TET_SOLVER_OPTIONS = {"spsolve_solver": {}}
 
 # The four triangular faces of a positive-volume tet (v0, v1, v2, v3),
 # each listed with outward orientation (face i is opposite vertex i).
@@ -73,26 +96,34 @@ _TET10_EDGES = np.array([(0, 1), (1, 2), (2, 0), (0, 3), (1, 3), (2, 3)], dtype=
 
 @dataclass(frozen=True)
 class TetMesh:
-    """A TET4 volume mesh whose boundary vertices are DC surface vertices.
+    """A TET4/TET10 volume mesh whose boundary vertices are DC surface vertices.
 
     Duck-compatible with :class:`~cadjoint.fem.selection.NodeSelection`
     resolution (``num_points`` / ``points`` / ``all_boundary_faces`` /
-    ``grid``), so ``Nodes`` selections resolve on tet meshes unchanged.
+    ``grid``), so ``Nodes`` selections resolve on tet meshes unchanged
+    (selections resolve to the *corner* boundary nodes; TET10 midside
+    completion happens at BC assembly via :func:`tet10_complete_nodes`).
 
     Attributes:
         points: Vertex positions, ``(N, 3)`` float64.  The first
-            ``num_surface`` rows are the DC surface vertices verbatim;
-            the rest are interior Steiner vertices.
-        cells: TET4 connectivity (meshio ``tetra`` order, positive
-            volumes), ``(T, 4)`` int32.
-        num_surface: Number of leading DC surface vertices.
-        boundary_tris: Outward-oriented boundary triangles (faces used by
-            exactly one tet), ``(M, 3)`` int64.
+            ``num_surface`` rows are the DC surface vertices verbatim,
+            followed by interior Steiner vertices; a TET10 mesh appends
+            the shared midside nodes after all corner vertices.
+        cells: Connectivity (meshio ``tetra``/``tetra10`` order, positive
+            volumes), ``(T, 4)`` or ``(T, 10)`` int32.
+        num_surface: Number of leading DC surface (corner) vertices.
+        boundary_tris: Outward-oriented boundary corner triangles (faces
+            used by exactly one tet), ``(M, 3)`` int64.
         base_points: Frozen nominal positions, ``(N, 3)`` — the anchor for
-            :func:`recompute_tet_points`.
+            :func:`recompute_tet_points` (for TET10, midside rows are the
+            midpoints of the corner base positions).
         max_step: Newton re-projection displacement clamp.
         grid: The DC sampling grid the surface came from (``None`` when
             built from a raw surface).
+        edge_parents: ``None`` for TET4.  For TET10 the ``(E, 2)`` corner
+            index pairs whose midpoints the appended midside nodes are
+            (row ``k`` describes node ``num_corner_points + k``; rows are
+            sorted pairs in lexicographic order).
     """
 
     points: np.ndarray
@@ -102,16 +133,34 @@ class TetMesh:
     base_points: np.ndarray
     max_step: float
     grid: GridSpec | None = None
+    edge_parents: np.ndarray | None = None
 
     @property
     def num_points(self) -> int:
-        """Number of vertices."""
+        """Number of vertices (including TET10 midside nodes)."""
         return int(self.points.shape[0])
 
     @property
     def num_cells(self) -> int:
         """Number of tetrahedra."""
         return int(self.cells.shape[0])
+
+    @property
+    def order(self) -> int:
+        """Element order: 1 for TET4, 2 for TET10."""
+        return 1 if self.edge_parents is None else 2
+
+    @property
+    def ele_type(self) -> str:
+        """The jax-fem element type string (``"TET4"`` / ``"TET10"``)."""
+        return "TET4" if self.edge_parents is None else "TET10"
+
+    @property
+    def num_corner_points(self) -> int:
+        """Number of corner vertices (excludes TET10 midside nodes)."""
+        if self.edge_parents is None:
+            return self.num_points
+        return self.num_points - int(self.edge_parents.shape[0])
 
     def all_boundary_faces(self) -> FaceGroup:
         """Boundary triangles as a :class:`FaceGroup` (nodes shaped ``(M, 3)``)."""
@@ -127,8 +176,12 @@ class TetMesh:
 
 
 def tet_boundary_faces(cells: np.ndarray) -> np.ndarray:
-    """Outward-oriented boundary triangles (faces used by exactly one tet)."""
-    faces = np.asarray(cells, dtype=np.int64)[:, _TET_FACES].reshape(-1, 3)
+    """Outward-oriented boundary corner triangles (faces used by exactly one tet).
+
+    Accepts TET4 or TET10 connectivity (only the four corner columns are
+    read), like every metric below.
+    """
+    faces = np.asarray(cells, dtype=np.int64)[:, :4][:, _TET_FACES].reshape(-1, 3)
     keys = np.sort(faces, axis=1)
     _, first_index, counts = np.unique(keys, axis=0, return_index=True, return_counts=True)
     return faces[first_index[counts == 1]]
@@ -136,7 +189,7 @@ def tet_boundary_faces(cells: np.ndarray) -> np.ndarray:
 
 def tet_volumes(points: np.ndarray, cells: np.ndarray) -> np.ndarray:
     """Signed tetrahedron volumes, ``(T,)``; positive for correct orientation."""
-    corners = np.asarray(points)[np.asarray(cells)]
+    corners = np.asarray(points)[np.asarray(cells)[:, :4]]
     return np.linalg.det(corners[:, 1:] - corners[:, :1]) / 6.0
 
 
@@ -147,7 +200,7 @@ def tet_radius_ratios(points: np.ndarray, cells: np.ndarray) -> np.ndarray:
     inradius (``3V / A_total``) and circumradius (Cayley–Menger-free
     formula via opposite-edge products).
     """
-    corners = np.asarray(points, dtype=np.float64)[np.asarray(cells)]  # (T, 4, 3)
+    corners = np.asarray(points, dtype=np.float64)[np.asarray(cells)[:, :4]]  # (T, 4, 3)
     volume = np.abs(tet_volumes(points, cells))
     faces = corners[:, _TET_FACES]  # (T, 4, 3, 3)
     face_areas = 0.5 * np.linalg.norm(
@@ -168,7 +221,7 @@ def tet_radius_ratios(points: np.ndarray, cells: np.ndarray) -> np.ndarray:
 
 def tet_aspect_ratios(points: np.ndarray, cells: np.ndarray) -> np.ndarray:
     """Longest-to-shortest edge ratio per tet, at least 1."""
-    corners = np.asarray(points, dtype=np.float64)[np.asarray(cells)]
+    corners = np.asarray(points, dtype=np.float64)[np.asarray(cells)[:, :4]]
     edges = corners[:, _TET10_EDGES[:, 1]] - corners[:, _TET10_EDGES[:, 0]]
     lengths = np.linalg.norm(edges, axis=-1)
     return lengths.max(axis=1) / np.maximum(lengths.min(axis=1), 1e-30)
@@ -330,17 +383,17 @@ def tet_faces_from_nodes(mesh: TetMesh, nodes: Any) -> np.ndarray:
 
 
 def _neighbor_lists(mesh: TetMesh) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Unique undirected vertex adjacency of the tet mesh, as flat pairs.
+    """Unique undirected corner-vertex adjacency of the tet mesh, as flat pairs.
 
     Returns:
         ``(sources, targets, degrees)`` — for every directed adjacency
-        pair ``sources[k] -> targets[k]``, plus per-node degree.
+        pair ``sources[k] -> targets[k]``, plus per-corner-node degree.
     """
-    edges = np.asarray(mesh.cells, dtype=np.int64)[:, _TET10_EDGES].reshape(-1, 2)
+    edges = np.asarray(mesh.cells, dtype=np.int64)[:, :4][:, _TET10_EDGES].reshape(-1, 2)
     edges = np.unique(np.sort(edges, axis=1), axis=0)
     sources = np.concatenate([edges[:, 0], edges[:, 1]])
     targets = np.concatenate([edges[:, 1], edges[:, 0]])
-    degrees = np.bincount(targets, minlength=mesh.num_points)
+    degrees = np.bincount(targets, minlength=mesh.num_corner_points)
     return sources, targets, degrees
 
 
@@ -356,7 +409,9 @@ def recompute_tet_points(
     Steiner vertices stay frozen by default; ``smooth_passes > 0`` runs
     that many differentiable Jacobi–Laplacian passes propagating the
     boundary *displacement* inward (boundary values pinned), which keeps
-    interior elements better shaped under larger design motions.
+    interior elements better shaped under larger design motions.  On a
+    TET10 mesh the midside nodes are recomputed as midpoints of the traced
+    corner positions, so gradients flow through them too.
 
     Args:
         sdf: Signed distance field, possibly closing over traced parameters.
@@ -368,19 +423,25 @@ def recompute_tet_points(
     """
     import jax.numpy as jnp
 
-    base = jnp.asarray(mesh.base_points)
+    corner_count = mesh.num_corner_points
+    base = jnp.asarray(mesh.base_points[:corner_count])
     count = mesh.num_surface
     projected = project_points(sdf, base[:count], mesh.max_step)
     if smooth_passes <= 0:
-        return jnp.concatenate([projected, base[count:]], axis=0)
-    boundary_delta = projected - base[:count]
-    sources, targets, degrees = _neighbor_lists(mesh)
-    weights = 1.0 / jnp.maximum(jnp.asarray(degrees, dtype=base.dtype), 1.0)
-    delta = jnp.zeros_like(base).at[:count].set(boundary_delta)
-    for _ in range(smooth_passes):
-        averaged = jnp.zeros_like(base).at[targets].add(delta[sources]) * weights[:, None]
-        delta = averaged.at[:count].set(boundary_delta)
-    return base + delta
+        corners = jnp.concatenate([projected, base[count:]], axis=0)
+    else:
+        boundary_delta = projected - base[:count]
+        sources, targets, degrees = _neighbor_lists(mesh)
+        weights = 1.0 / jnp.maximum(jnp.asarray(degrees, dtype=base.dtype), 1.0)
+        delta = jnp.zeros_like(base).at[:count].set(boundary_delta)
+        for _ in range(smooth_passes):
+            averaged = jnp.zeros_like(base).at[targets].add(delta[sources]) * weights[:, None]
+            delta = averaged.at[:count].set(boundary_delta)
+        corners = base + delta
+    if mesh.edge_parents is None:
+        return corners
+    midsides = corners[jnp.asarray(mesh.edge_parents)].mean(axis=1)
+    return jnp.concatenate([corners, midsides], axis=0)
 
 
 def tet10_from_tet4(
@@ -416,6 +477,100 @@ def tet10_from_tet4(
     return points10, cells10, unique_edges
 
 
+def tet10_mesh(mesh: TetMesh) -> TetMesh:
+    """Promote a TET4 :class:`TetMesh` to a straight-sided TET10 one.
+
+    Shared midside nodes are appended after all corner vertices (via
+    :func:`tet10_from_tet4`); the surface/interior split, the boundary
+    corner triangles, and the frozen-topology contract carry over —
+    :func:`recompute_tet_points` re-projects the corner surface vertices
+    and rebuilds midsides as traced corner midpoints, reproducing
+    ``points`` exactly at the nominal design.
+
+    Args:
+        mesh: A TET4 mesh from :func:`sdf_to_tet_mesh`.
+
+    Returns:
+        The TET10 :class:`TetMesh` (``edge_parents`` set).
+
+    Raises:
+        ValueError: If ``mesh`` is already quadratic.
+    """
+    if mesh.edge_parents is not None:
+        raise ValueError("mesh is already a TET10 mesh.")
+    points10, cells10, parents = tet10_from_tet4(mesh.points, mesh.cells)
+    base10 = np.concatenate([mesh.base_points, mesh.base_points[parents].mean(axis=1)], axis=0)
+    return TetMesh(
+        points=points10,
+        cells=cells10,
+        num_surface=mesh.num_surface,
+        boundary_tris=mesh.boundary_tris,
+        base_points=base10,
+        max_step=mesh.max_step,
+        grid=mesh.grid,
+        edge_parents=parents,
+    )
+
+
+def tet10_complete_nodes(mesh: TetMesh, nodes: Any) -> np.ndarray:
+    """Extend a corner node set with the midsides of fully contained edges.
+
+    Node selections resolve to corner boundary vertices; a TET10 boundary
+    condition must also cover the midside nodes of the selected patch
+    (clamps pin the whole quadratic face, and jax-fem's membership face
+    selection requires *all six* face nodes in the set).  A midside node
+    joins the set exactly when both its corner parents are selected.  On a
+    TET4 mesh this is the identity (modulo uniqueness/int32).
+
+    Args:
+        mesh: The tet mesh.
+        nodes: Corner node indices (any integer array-like).
+
+    Returns:
+        Sorted unique int32 node indices including qualifying midsides.
+    """
+    indices = np.unique(np.asarray(nodes).reshape(-1)).astype(np.int64)
+    if mesh.edge_parents is None:
+        return indices.astype(np.int32)
+    both = np.isin(mesh.edge_parents, indices).all(axis=1)
+    midsides = mesh.num_corner_points + np.flatnonzero(both)
+    return np.concatenate([indices, midsides]).astype(np.int32)
+
+
+def tet10_face_midsides(mesh: TetMesh, faces: np.ndarray) -> np.ndarray:
+    """Midside node indices of each corner triangle's three edges.
+
+    ``faces`` are corner triangles (e.g. rows of ``boundary_tris``); the
+    result row ``k`` holds the midside nodes of edges ``(f0, f1)``,
+    ``(f1, f2)``, ``(f2, f0)`` of face ``k`` — the TRI6 completion used
+    for quadratic surface integrals (:func:`load_work_tri6` takes the
+    concatenation ``[faces, midsides]``).
+
+    Args:
+        mesh: A TET10 mesh (``edge_parents`` set).
+        faces: Corner triangles, ``(M, 3)``.
+
+    Returns:
+        Midside node indices, ``(M, 3)`` int64.
+
+    Raises:
+        ValueError: On a TET4 mesh, or if a face edge is not a mesh edge.
+    """
+    if mesh.edge_parents is None:
+        raise ValueError("mesh has no midside nodes; promote it with tet10_mesh first.")
+    parents = np.asarray(mesh.edge_parents, dtype=np.int64)
+    corner_count = mesh.num_corner_points
+    keys = parents[:, 0] * corner_count + parents[:, 1]  # sorted (lexicographic rows)
+    tri = np.asarray(faces, dtype=np.int64)[:, :3]
+    edges = np.sort(np.stack([tri[:, (0, 1)], tri[:, (1, 2)], tri[:, (2, 0)]], axis=1), axis=2)
+    wanted = edges[..., 0] * corner_count + edges[..., 1]  # (M, 3)
+    position = np.searchsorted(keys, wanted)
+    valid = (position < keys.size) & (keys[np.minimum(position, keys.size - 1)] == wanted)
+    if not valid.all():
+        raise ValueError("faces contain an edge that is not an edge of the mesh.")
+    return corner_count + position
+
+
 def _rows_in(rows: np.ndarray, table: np.ndarray) -> np.ndarray:
     """Boolean mask of which ``rows`` (2-D int64) appear as rows of ``table``."""
     rows = np.ascontiguousarray(rows, dtype=np.int64)
@@ -424,7 +579,7 @@ def _rows_in(rows: np.ndarray, table: np.ndarray) -> np.ndarray:
     return np.isin(rows.view(void).reshape(-1), table.view(void).reshape(-1))
 
 
-def _restrict_traction_faces(problem: Any, traction_faces: list[np.ndarray]) -> None:
+def _restrict_surface_faces(problem: Any, surface_faces: list[np.ndarray]) -> None:
     """Prune jax-fem's face selection to exactly the given boundary triangles.
 
     jax-fem selects a (cell, local face) pair for a surface map whenever
@@ -433,12 +588,13 @@ def _restrict_traction_faces(problem: Any, traction_faces: list[np.ndarray]) -> 
     face whose three corners all happen to lie on the loaded surface
     patch is selected once per adjacent cell, double-loading a face that
     is not even on the boundary (observed on the bracket web at fine
-    resolutions).  This helper prunes each patch's selection to the faces
-    whose corner triple matches the requested boundary triangles, and
-    rebuilds the dependent structures (``cells_list_face_list`` and the
-    face blocks of the assembly sparsity pattern ``I``/``J``) so value
-    and index arrays stay aligned.  Surface quadrature data is recomputed
-    from the pruned selection by ``set_params`` before every solve.
+    resolutions).  This helper prunes each patch's selection (traction or
+    heat-flux alike) to the faces whose corner triple matches the
+    requested boundary triangles, and rebuilds the dependent structures
+    (``cells_list_face_list`` and the face blocks of the assembly
+    sparsity pattern ``I``/``J``) so value and index arrays stay aligned.
+    Surface quadrature data is recomputed from the pruned selection by
+    ``set_params`` before every solve.
     """
     finite_element = problem.fes[0]
     face_inds = np.asarray(finite_element.face_inds)
@@ -463,7 +619,7 @@ def _restrict_traction_faces(problem: Any, traction_faces: list[np.ndarray]) -> 
     pattern_i = np.repeat(inds[:, :, None], inds.shape[1], axis=2).reshape(-1)
     pattern_j = np.repeat(inds[:, None, :], inds.shape[1], axis=1).reshape(-1)
     new_cells_face_list = []
-    for patch, target in enumerate(traction_faces):
+    for patch, target in enumerate(surface_faces):
         binds = np.asarray(problem.boundary_inds_list[patch])
         slots = corner_slots[binds[:, 1]]
         corner_ids = np.take_along_axis(cells0[binds[:, 0]], slots, axis=1)
@@ -472,8 +628,8 @@ def _restrict_traction_faces(problem: Any, traction_faces: list[np.ndarray]) -> 
         mask = _rows_in(keys, target_keys)
         if int(mask.sum()) != target_keys.shape[0]:
             raise ValueError(
-                f"Traction patch {patch}: matched {int(mask.sum())} of "
-                f"{target_keys.shape[0]} requested boundary faces; the traction node "
+                f"Surface patch {patch}: matched {int(mask.sum())} of "
+                f"{target_keys.shape[0]} requested boundary faces; the patch node "
                 "set must contain every corner of every requested face."
             )
         pruned = binds[mask]
@@ -528,7 +684,7 @@ def tet_elastic_solve(
             triangles).  When given, jax-fem's node-membership face
             selection is pruned to exactly these faces — closing the
             interior-face double-count hole of pure node membership (see
-            :func:`_restrict_traction_faces`).  Every corner must also be
+            :func:`_restrict_surface_faces`).  Every corner must also be
             in the corresponding ``bcs.traction_nodes`` set.
 
     Returns:
@@ -586,9 +742,189 @@ def tet_elastic_solve(
                     "traction_faces must provide one face array per traction patch "
                     f"({len(traction_faces)} given for {len(bcs.traction_nodes)} patches)."
                 )
-            _restrict_traction_faces(problem, traction_faces)
-        forward = ad_wrapper(problem)
+            _restrict_surface_faces(problem, traction_faces)
+        forward = ad_wrapper(
+            problem,
+            solver_options=dict(_TET_SOLVER_OPTIONS),
+            adjoint_solver_options=dict(_TET_SOLVER_OPTIONS),
+        )
         return forward(jnp.asarray(points))[0]
+
+
+def tet_thermal_solve(
+    points: Any,
+    cells: np.ndarray,
+    bcs: ThermalBCs,
+    *,
+    conductivity: float,
+    source: float = 0.0,
+    ele_type: str = "TET4",
+    base_points: np.ndarray | None = None,
+    flux_faces: list[np.ndarray] | None = None,
+) -> Any:
+    """Steady-state heat conduction on a tet mesh via jax-fem.
+
+    Mirrors :meth:`cadjoint.fem.backends.JaxFemBackend.thermal` — the same
+    lifted Dirichlet formulation (prescribed values enter through a nodal
+    lift field ``g``, so the solve is differentiable w.r.t. traced
+    Dirichlet values) and the same Neumann surface integral for heat-flux
+    patches — with the element type opened up to ``"TET4"``/``"TET10"``.
+    ``points`` may be traced; the temperature participates in the
+    surrounding autodiff graph via jax-fem's adjoint.
+
+    Args:
+        points: Node positions, ``(N, 3)`` (traced allowed).
+        cells: Connectivity, ``(T, 4)`` or ``(T, 10)``.
+        bcs: Array-level thermal boundary conditions (the backend ABI).
+            For ``TET10``, node sets must include midside nodes
+            (:func:`tet10_complete_nodes`).
+        conductivity: Thermal conductivity ``k`` (may be traced).
+        source: Volumetric heat source ``q`` (may be traced).
+        ele_type: ``"TET4"`` or ``"TET10"``.
+        base_points: Concrete positions for problem construction when
+            ``points`` is traced (defaults to ``points``).
+        flux_faces: Optional exact face targeting: one ``(M, >=3)`` array
+            of *corner* node triples per heat-flux patch, pruning jax-fem's
+            node-membership face selection to exactly these boundary
+            triangles (see :func:`_restrict_surface_faces`).
+
+    Returns:
+        Per-node temperature, ``(N,)`` JAX array.
+    """
+    if ele_type not in ("TET4", "TET10"):
+        raise ValueError(f"ele_type must be 'TET4' or 'TET10', got {ele_type!r}.")
+    _require_jax_fem()
+    with _x64_scope():
+        import jax.numpy as jnp
+        from jax_fem.generate_mesh import Mesh
+        from jax_fem.problem import Problem
+        from jax_fem.solver import ad_wrapper
+
+        flux_values = [float(value) for value in bcs.flux_values]
+
+        class _Thermal(Problem):
+            def get_tensor_map(self):
+                def tensor_map(u_grad, kappa, _source, lift_grad):
+                    # u_grad: (vec=1, dim); lift_grad: (dim,) broadcasts in.
+                    return kappa * (u_grad + lift_grad)
+
+                return tensor_map
+
+            def get_mass_map(self):
+                def mass_map(u, _x, _kappa, source_value, _lift_grad):
+                    # Weak form: residual += integral(v * mass_map); the
+                    # source q enters as -q so that -div(k grad T) = q.
+                    return -source_value * jnp.ones_like(u)
+
+                return mass_map
+
+            def get_surface_maps(self):
+                # Weak form: residual += integral(v * surface_map); a
+                # prescribed inflow q enters as -q so k grad(T).n = q.
+                return [
+                    (lambda u, _x, value=value: -value * jnp.ones_like(u)) for value in flux_values
+                ]
+
+            def set_params(self, params):
+                params_points, kappa, source_value, lift_nodal = params
+                self.initialize_geometric_quantities([params_points])
+                fe = self.fes[0]
+                shape = (fe.num_cells, fe.num_quads)
+                # grad(g) at the quad points from the (possibly traced)
+                # nodal lift: (C, n) x (C, Q, n, dim) -> (C, Q, dim).
+                lift_grad = jnp.einsum("cn,cqnd->cqd", lift_nodal[fe.cells], fe.shape_grads)
+                self.internal_vars = [
+                    kappa * jnp.ones(shape),
+                    source_value * jnp.ones(shape),
+                    lift_grad,
+                ]
+
+        if base_points is None:
+            base_points = points
+        base_points = np.asarray(base_points, dtype=np.float64)
+        mesh = Mesh(base_points, np.asarray(cells), ele_type=ele_type)
+        dirichlet = [
+            [_membership_location(nodes) for nodes in bcs.dirichlet_nodes],
+            [0] * len(bcs.dirichlet_nodes),
+            [(lambda _point: 0.0) for _ in bcs.dirichlet_nodes],
+        ]
+        problem = _Thermal(
+            mesh=mesh,
+            vec=1,
+            dim=3,
+            ele_type=ele_type,
+            dirichlet_bc_info=dirichlet,
+            location_fns=[_membership_location(nodes) for nodes in bcs.flux_nodes],
+        )
+        if flux_faces is not None:
+            if len(flux_faces) != len(bcs.flux_nodes):
+                raise ValueError(
+                    "flux_faces must provide one face array per flux patch "
+                    f"({len(flux_faces)} given for {len(bcs.flux_nodes)} patches)."
+                )
+            _restrict_surface_faces(problem, flux_faces)
+        forward = ad_wrapper(
+            problem,
+            solver_options=dict(_TET_SOLVER_OPTIONS),
+            adjoint_solver_options=dict(_TET_SOLVER_OPTIONS),
+        )
+
+        lift = jnp.zeros(base_points.shape[0], dtype=jnp.float64)
+        for nodes, value in zip(bcs.dirichlet_nodes, bcs.dirichlet_values):
+            lift = lift.at[jnp.asarray(np.asarray(nodes, dtype=np.int32))].set(value)
+        solution = forward((jnp.asarray(points), conductivity, source, lift))
+        return solution[0][:, 0] + lift
+
+
+def tet_von_mises(
+    points: np.ndarray,
+    cells: np.ndarray,
+    displacement: np.ndarray,
+    *,
+    youngs: float,
+    poisson: float,
+) -> np.ndarray:
+    """Per-cell von Mises stress of a TET4/TET10 solution at cell centroids.
+
+    The displacement gradient is exact for TET4 (constant strain).  For
+    straight-sided TET10 it is evaluated at the element centroid, where the
+    corner shape-function gradients vanish (``(4 L_i - 1) grad L_i`` with
+    ``L_i = 1/4``) and the midside node on edge ``(a, b)`` contributes
+    ``grad L_a + grad L_b`` — so the centroid gradient depends on the
+    midside displacements only.
+
+    Args:
+        points: Node positions, ``(N, 3)``.
+        cells: Connectivity, ``(T, 4)`` or ``(T, 10)``.
+        displacement: Per-node displacement, ``(N, 3)``.
+        youngs: Young's modulus.
+        poisson: Poisson ratio.
+
+    Returns:
+        Von Mises stress per cell, shaped ``(T,)`` float64.
+    """
+    points = np.asarray(points, dtype=np.float64)
+    cells = np.asarray(cells)
+    displacement = np.asarray(displacement, dtype=np.float64)
+    corners = points[cells[:, :4]]  # (T, 4, 3)
+    edge_matrix = corners[:, 1:] - corners[:, :1]  # rows: x1-x0, x2-x0, x3-x0
+    # grad L_i (i = 1..3) are the columns of the inverse edge matrix.
+    grad_l123 = np.linalg.inv(edge_matrix).transpose(0, 2, 1)  # (T, 3, 3)
+    grad_l = np.concatenate([-grad_l123.sum(axis=1, keepdims=True), grad_l123], axis=1)
+    if cells.shape[1] == 4:
+        u_grad = np.einsum("tia,tib->tab", displacement[cells], grad_l)
+    elif cells.shape[1] == 10:
+        edge_grads = grad_l[:, _TET10_EDGES[:, 0]] + grad_l[:, _TET10_EDGES[:, 1]]  # (T, 6, 3)
+        u_grad = np.einsum("tia,tib->tab", displacement[cells[:, 4:]], edge_grads)
+    else:
+        raise ValueError(f"cells must be (T, 4) or (T, 10), got shape {cells.shape}.")
+    strain = 0.5 * (u_grad + u_grad.transpose(0, 2, 1))
+    lame_lambda = youngs * poisson / ((1 + poisson) * (1 - 2 * poisson))
+    lame_mu = youngs / (2 * (1 + poisson))
+    trace = np.trace(strain, axis1=1, axis2=2)
+    stress = lame_lambda * trace[:, None, None] * np.eye(3) + 2.0 * lame_mu * strain
+    deviator = stress - np.trace(stress, axis1=1, axis2=2)[:, None, None] / 3.0 * np.eye(3)
+    return np.sqrt(1.5 * np.einsum("tab,tab->t", deviator, deviator))
 
 
 def load_work_tris(points: Any, displacement: Any, faces: np.ndarray, traction: Any) -> Any:

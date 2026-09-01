@@ -1,5 +1,5 @@
 /**
- * Prominent segmented mode switcher: Model / Sketch / Simulate / Render.
+ * Prominent segmented mode switcher: Model / Sketch / Simulate.
  *
  * Lives in the top toolbar next to the brand, the way Blender and Fusion put
  * their workspace picker top-left. Each segment shows icon + label and lights
@@ -14,18 +14,12 @@ import { Dynamic } from "solid-js/web";
 import { For, type Component } from "solid-js";
 import { editingMode, setEditingMode } from "../state";
 import type { EditingMode } from "../editingMode";
-import {
-  ModelModeIcon,
-  RenderModeIcon,
-  SimulateModeIcon,
-  SketchModeIcon,
-} from "./icons";
+import { ModelModeIcon, SimulateModeIcon, SketchModeIcon } from "./icons";
 
 const MODES: { key: EditingMode; label: string; hint: string; icon: Component }[] = [
   { key: "model", label: "Model", hint: "Model mode — solids and transforms  (M cycles)", icon: ModelModeIcon },
   { key: "sketch", label: "Sketch", hint: "Sketch mode — 2D profiles and constraints  (M cycles)", icon: SketchModeIcon },
   { key: "simulate", label: "Simulate", hint: "Simulate mode — FEM setup  (M cycles)", icon: SimulateModeIcon },
-  { key: "render", label: "Render", hint: "Render mode — presets, shading, and quality  (M cycles)", icon: RenderModeIcon },
 ];
 
 export function ModeSwitcher() {

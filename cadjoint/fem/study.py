@@ -53,6 +53,7 @@ import numpy as np
 from cadjoint.fem.hexmesh import HexMesh, faces_from_nodes
 from cadjoint.fem.selection import NodeSelection
 from cadjoint.fem.simmesh import _CAPTURED_MESHES, SimMesh, _anonymous, _domain_entry
+from cadjoint.fem.tetmesh import TetMesh, tet_faces_from_nodes
 
 __all__ = [
     "Dirichlet",
@@ -250,14 +251,16 @@ def _validate_common(study: Any, kind: str, allowed_bcs: tuple[type, ...]) -> No
     study.size = _triplet(study.size if study.size is not None else _DEFAULT_SIZE, "size")
 
 
-def _solve_mesh(study: Any, sdf: Any, mesh: Any) -> tuple[SimMesh | None, HexMesh]:
+def _solve_mesh(study: Any, sdf: Any, mesh: Any) -> tuple[SimMesh | None, HexMesh | TetMesh]:
     """The one meshing path for solves.
 
-    An explicit ``HexMesh`` is used as-is (no SimMesh attached); a SimMesh
-    (explicit argument, the study's own, or an anonymous wrap of the
-    study's resolution/bounds/size/domain) is built — reusing its cache.
+    An explicit ``HexMesh``/``TetMesh`` is used as-is (no SimMesh
+    attached); a SimMesh (explicit argument, the study's own, or an
+    anonymous wrap of the study's resolution/bounds/size/domain) is built
+    — reusing its cache.  The mesh's method decides the solve route
+    (:mod:`cadjoint.fem.simulate` dispatches hex vs tet).
     """
-    if isinstance(mesh, HexMesh):
+    if isinstance(mesh, (HexMesh, TetMesh)):
         return None, mesh
     if mesh is not None:
         target = _resolve_mesh_reference(mesh)
@@ -276,16 +279,21 @@ def _solve_mesh(study: Any, sdf: Any, mesh: Any) -> tuple[SimMesh | None, HexMes
     return target, target.build(sdf)
 
 
-def _check_resolvable(bcs: list[Any], mesh: HexMesh) -> None:
+def _check_resolvable(bcs: list[Any], mesh: HexMesh | TetMesh) -> None:
     """Raise a selection-specific error before handing BCs to the solver."""
     for bc in bcs:
         indices = bc.nodes.resolve(mesh)
-        if isinstance(bc, (HeatFlux, Traction)) and faces_from_nodes(mesh, indices).nodes.size == 0:
-            raise ValueError(
-                f"{type(bc).__name__} selection {bc.nodes.describe()} spans no complete "
-                "boundary face; area-integrated conditions need all four corners of at "
-                "least one boundary quad selected."
-            )
+        if isinstance(bc, (HeatFlux, Traction)):
+            if isinstance(mesh, TetMesh):
+                spanned = int(tet_faces_from_nodes(mesh, indices).shape[0])
+            else:
+                spanned = int(faces_from_nodes(mesh, indices).nodes.shape[0])
+            if spanned == 0:
+                raise ValueError(
+                    f"{type(bc).__name__} selection {bc.nodes.describe()} spans no complete "
+                    "boundary face; area-integrated conditions need every corner of at "
+                    "least one boundary face selected."
+                )
 
 
 def _mesh_payload(study: Any) -> dict[str, Any]:
@@ -367,7 +375,12 @@ class ThermalStudy:
         }
 
     def solve(
-        self, sdf=None, *, backend=None, mesh: HexMesh | SimMesh | str | None = None, points=None
+        self,
+        sdf=None,
+        *,
+        backend=None,
+        mesh: HexMesh | TetMesh | SimMesh | str | None = None,
+        points=None,
     ):
         """Mesh the field (through the study's SimMesh) and run the solve.
 
@@ -377,10 +390,12 @@ class ThermalStudy:
             backend: Optional solver backend override (see
                 :func:`cadjoint.fem.simulate.thermal_solve`).
             mesh: Optional mesh override — a pre-extracted
-                :class:`~cadjoint.fem.hexmesh.HexMesh`, a SimMesh, or a
+                :class:`~cadjoint.fem.hexmesh.HexMesh` or
+                :class:`~cadjoint.fem.tetmesh.TetMesh`, a SimMesh, or a
                 declared mesh name.
             points: Optional traced override of the mesh node positions
-                (``recompute_points``) for differentiable frozen-topology
+                (``recompute_points`` / ``recompute_tet_points``, matching
+                the mesh's method) for differentiable frozen-topology
                 solves; BC selections still resolve on the nominal points.
 
         Returns:
@@ -471,7 +486,12 @@ class ElasticStudy:
         }
 
     def solve(
-        self, sdf=None, *, backend=None, mesh: HexMesh | SimMesh | str | None = None, points=None
+        self,
+        sdf=None,
+        *,
+        backend=None,
+        mesh: HexMesh | TetMesh | SimMesh | str | None = None,
+        points=None,
     ):
         """Mesh the field (through the study's SimMesh) and run the solve.
 
@@ -481,10 +501,12 @@ class ElasticStudy:
             backend: Optional solver backend override (see
                 :func:`cadjoint.fem.simulate.elastic_solve`).
             mesh: Optional mesh override — a pre-extracted
-                :class:`~cadjoint.fem.hexmesh.HexMesh`, a SimMesh, or a
+                :class:`~cadjoint.fem.hexmesh.HexMesh` or
+                :class:`~cadjoint.fem.tetmesh.TetMesh`, a SimMesh, or a
                 declared mesh name.
             points: Optional traced override of the mesh node positions
-                (``recompute_points``) for differentiable frozen-topology
+                (``recompute_points`` / ``recompute_tet_points``, matching
+                the mesh's method) for differentiable frozen-topology
                 solves; BC selections still resolve on the nominal points.
 
         Returns:

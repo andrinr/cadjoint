@@ -8,10 +8,10 @@
 
 import type { ConstructionNode } from "./types";
 
-export type EditingMode = "model" | "sketch" | "simulate" | "render";
+export type EditingMode = "model" | "sketch" | "simulate";
 
 /** Switcher order, also the keyboard cycling order. */
-export const EDITING_MODES: EditingMode[] = ["model", "sketch", "simulate", "render"];
+export const EDITING_MODES: EditingMode[] = ["model", "sketch", "simulate"];
 
 /**
  * Per-mode identity: label plus the accent color threaded through the mode
@@ -22,7 +22,6 @@ export const MODE_ACCENTS: Record<EditingMode, string> = {
   model: "#d9ff57",
   sketch: "#7fd6f5",
   simulate: "#ffb25c",
-  render: "#d8a6ff",
 };
 
 /** The next mode when cycling with the keyboard (wraps around). */
@@ -45,7 +44,6 @@ const GROUPS_BY_MODE: Record<EditingMode, RailGroupId[]> = {
   model: ["select", "create", "transform", "delete"],
   sketch: ["select", "create", "modify", "transform", "annotate", "delete"],
   simulate: [],
-  render: [],
 };
 
 /** The clusters the rail shows in `mode`, in display order. */
@@ -78,14 +76,14 @@ export function createToolVisibleInMode(tool: string, mode: EditingMode): boolea
  * Predictable and cancelable: only a *newly* selected sketch profile enters
  * sketch mode (`lastAutoNodeId` remembers the previous auto-entry, so leaving
  * sketch mode manually while the same sketch stays selected is respected),
- * and simulate/render mode is never hijacked by a selection.
+ * and simulate mode is never hijacked by a selection.
  */
 export function autoEnterSketchMode(
   mode: EditingMode,
   node: ConstructionNode | null | undefined,
   lastAutoNodeId: string | null,
 ): { mode: EditingMode; lastAutoNodeId: string | null } {
-  if (mode === "simulate" || mode === "render") return { mode, lastAutoNodeId };
+  if (mode === "simulate") return { mode, lastAutoNodeId };
   if (!node || node.kind !== "profile") {
     // Leaving the sketch (or selecting a solid) re-arms auto-entry.
     return { mode, lastAutoNodeId: null };
@@ -114,7 +112,9 @@ function defaultStorage(): StringStorage | undefined {
 export function loadEditingMode(storage: StringStorage | undefined = defaultStorage()): EditingMode {
   try {
     const raw = storage?.getItem(EDITING_MODE_STORAGE_KEY);
-    return raw === "sketch" || raw === "simulate" || raw === "render" ? raw : "model";
+    // A persisted "render" from before the mode was retired falls back to
+    // model — render settings live in the eye-icon popover now.
+    return raw === "sketch" || raw === "simulate" ? raw : "model";
   } catch {
     return "model";
   }

@@ -1,21 +1,37 @@
 """Named, first-class simulation meshes.
 
 A :class:`SimMesh` captures *meshing intent* the same way a study captures
-solving intent: which part of the scene to mesh (``domain``), at what
-``resolution``, over which box (``bounds`` + ``size``, or automatically
-scanned from the domain plus ``padding``), under a stable ``name``.  It is
-declared in the scene program, registered by :func:`capture_sim_meshes`
-(mirroring ``capture_studies``), serialized for the viewer via
+solving intent: which part of the scene to mesh (``domain``), with which
+``method`` (``"hex"`` voxelize+snap — the fast default — or the
+DC-conforming ``"tet4"``/``"tet10"`` route), at what ``resolution``, over
+which box (``bounds`` + ``size``, or automatically scanned from the domain
+plus ``padding``), under a stable ``name``.  It is declared in the scene
+program, registered by :func:`capture_sim_meshes` (mirroring
+``capture_studies``), serialized for the viewer via
 :meth:`SimMesh.describe`, and built on demand via :meth:`SimMesh.build` —
 the one meshing path both explicit and implicit study meshing run through.
 
-The built :class:`~cadjoint.fem.hexmesh.HexMesh` is cached on the instance
-until the meshing parameters or the meshed field change, so a scene program
-can pass the same mesh to several studies (and to
-:func:`~cadjoint.fem.hexmesh.recompute_points` for design gradients) and
-mesh exactly once.  Inspection is first-class: :meth:`SimMesh.quality`
+``resolution`` always means the *sampling lattice* (cells per axis of the
+grid the SDF is discretized on).  For ``method="hex"`` those lattice cells
+*are* the elements (inside cells kept, boundary vertices snapped).  For
+``method="tet4"``/``"tet10"`` the lattice is the dual-contouring extraction
+grid: the DC surface is tetrahedralized by TetGen, so element and node
+counts are decided by TetGen's fill of the interior (typically several
+tets per lattice cell) — same geometric feature size per resolution, not
+the same element count.  ``"tet10"`` promotes the TET4 mesh to quadratic
+straight-sided tets (shared midside nodes appended); it is the quality
+path — accurate in bending where TET4 locks, geometry-conforming where hex
+staircases alias — at a higher solve cost (see ``research/tet-vs-hex.md``).
+
+The built mesh (:class:`~cadjoint.fem.hexmesh.HexMesh` or
+:class:`~cadjoint.fem.tetmesh.TetMesh`) is cached on the instance until
+the meshing parameters or the meshed field change, so a scene program can
+pass the same mesh to several studies (and to
+:func:`~cadjoint.fem.hexmesh.recompute_points` /
+:func:`~cadjoint.fem.tetmesh.recompute_tet_points` for design gradients)
+and mesh exactly once.  Inspection is first-class: :meth:`SimMesh.quality`
 returns per-element quality arrays and :meth:`SimMesh.inspect` a JSON-ready
-summary (counts, bounds, grid, scaled-Jacobian / aspect-ratio statistics).
+summary (method, counts, bounds, grid, element-quality statistics).
 
 Example::
 
@@ -42,8 +58,18 @@ from cadjoint.fem.hexmesh import (
     scaled_jacobians,
     sdf_to_hex_mesh,
 )
+from cadjoint.fem.tetmesh import (
+    TetMesh,
+    sdf_to_tet_mesh,
+    tet10_mesh,
+    tet_aspect_ratios,
+    tet_radius_ratios,
+)
 
 __all__ = ["SimMesh", "capture_sim_meshes"]
+
+#: Supported meshing methods (the viewer round-trips these literals).
+_METHODS = ("hex", "tet4", "tet10")
 
 # Same default meshing volume as the implicit study path and the viewer's
 # simulate mode; also the region the automatic domain-bounds scan samples.
@@ -140,7 +166,10 @@ class SimMesh:
     Attributes:
         name: Mesh identifier (unique within a scene program; studies refer
             to it via ``mesh="<name>"``).
-        resolution: Cells per axis (positive int or triplet).
+        resolution: Sampling-lattice cells per axis (positive int or
+            triplet).  Elements for ``method="hex"``; the DC extraction
+            grid for the tet methods (see the module docstring for the
+            honest mapping).
         domain: Optional SDF (or plain callable field) selecting which part
             of the scene participates: when set, :meth:`build` meshes this
             field instead of the scene SDF handed to ``solve``/``build``.
@@ -149,6 +178,10 @@ class SimMesh:
         size: Extent of the meshing box; None exactly when ``bounds`` is.
         padding: Extra margin per side used only by the automatic bounds
             scan.
+        method: Meshing method — ``"hex"`` (voxelize+snap HEX8, the fast
+            default), ``"tet4"`` (DC surface -> TetGen TET4), or
+            ``"tet10"`` (the TET4 mesh promoted to quadratic tets — the
+            quality path).
     """
 
     name: str
@@ -157,14 +190,17 @@ class SimMesh:
     bounds: Any = None
     size: Any = None
     padding: float = 0.1
+    method: str = "hex"
 
-    _cache: tuple[Any, tuple, HexMesh] | None = field(
+    _cache: tuple[Any, tuple, HexMesh | TetMesh] | None = field(
         default=None, init=False, repr=False, compare=False
     )
 
     def __post_init__(self):
         if not isinstance(self.name, str) or not self.name.strip():
             raise ValueError("SimMesh needs a non-empty name.")
+        if self.method not in _METHODS:
+            raise ValueError(f"method must be one of {list(_METHODS)}, got {self.method!r}.")
         _resolution_counts(self.resolution)
         if (self.bounds is None) != (self.size is None):
             raise ValueError("bounds and size must be given together (or both omitted).")
@@ -195,6 +231,7 @@ class SimMesh:
         return {
             "kind": "mesh",
             "name": self.name,
+            "method": self.method,
             "resolution": self.resolution
             if isinstance(self.resolution, int)
             else list(self.resolution),
@@ -219,10 +256,19 @@ class SimMesh:
         return sdf
 
     def _parameters(self) -> tuple:
-        return (_resolution_counts(self.resolution), self.bounds, self.size, self.padding)
+        return (
+            self.method,
+            _resolution_counts(self.resolution),
+            self.bounds,
+            self.size,
+            self.padding,
+        )
 
     def grid(self, sdf: Any = None) -> GridSpec:
         """The sampling grid this mesh uses (resolving automatic bounds).
+
+        For ``method="hex"`` the grid cells are the candidate elements;
+        for the tet methods it is the DC extraction lattice.
 
         Args:
             sdf: Scene SDF, needed only when the mesh has no ``domain`` and
@@ -234,8 +280,8 @@ class SimMesh:
             bounds, size = _scan_bounds(self._field(sdf), self.padding)
         return GridSpec.from_bounds(bounds, size, _resolution_counts(self.resolution))
 
-    def build(self, sdf: Any = None, *, rebuild: bool = False) -> HexMesh:
-        """Extract (or reuse) the hex mesh for the current parameters.
+    def build(self, sdf: Any = None, *, rebuild: bool = False) -> HexMesh | TetMesh:
+        """Extract (or reuse) the volume mesh for the current parameters.
 
         The result is cached on the instance and reused while the meshing
         parameters and the meshed field object stay the same; pass
@@ -248,14 +294,32 @@ class SimMesh:
             rebuild: Discard the cached mesh and re-extract.
 
         Returns:
-            The extracted :class:`~cadjoint.fem.hexmesh.HexMesh`.
+            The extracted :class:`~cadjoint.fem.hexmesh.HexMesh`
+            (``method="hex"``) or :class:`~cadjoint.fem.tetmesh.TetMesh`
+            (``method="tet4"``/``"tet10"``; requires ``tetgen``).  Tet
+            extraction tries exact sharp-feature DC placement first and
+            falls back to the more robust Tikhonov placement when TetGen
+            rejects the sharp surface (self-intersections happen at
+            unlucky resolutions on crease-heavy geometry); if both fail,
+            the TetGen error propagates — the fix is a different
+            resolution.  The tet grid must fully contain the zero surface
+            (unlike voxelization, DC needs the closed boundary).
         """
         field_fn = self._field(sdf)
         parameters = self._parameters()
         cached = self._cache
         if not rebuild and cached is not None and cached[0] is field_fn and cached[1] == parameters:
             return cached[2]
-        mesh = sdf_to_hex_mesh(field_fn, self.grid(sdf))
+        if self.method == "hex":
+            mesh: HexMesh | TetMesh = sdf_to_hex_mesh(field_fn, self.grid(sdf))
+        else:
+            grid = self.grid(sdf)
+            try:
+                mesh = sdf_to_tet_mesh(field_fn, grid, sharp=True)
+            except RuntimeError:
+                mesh = sdf_to_tet_mesh(field_fn, grid, sharp=False)
+            if self.method == "tet10":
+                mesh = tet10_mesh(mesh)
         self._cache = (field_fn, parameters, mesh)
         return mesh
 
@@ -268,10 +332,20 @@ class SimMesh:
 
         Returns:
             ``{"scaled_jacobian": (C,), "aspect_ratio": (C,)}`` float64
-            arrays — see :func:`~cadjoint.fem.hexmesh.scaled_jacobians` and
-            :func:`~cadjoint.fem.hexmesh.aspect_ratios`.
+            arrays for hex meshes (see
+            :func:`~cadjoint.fem.hexmesh.scaled_jacobians` /
+            :func:`~cadjoint.fem.hexmesh.aspect_ratios`);
+            ``{"radius_ratio": (C,), "aspect_ratio": (C,)}`` for tet
+            meshes (see :func:`~cadjoint.fem.tetmesh.tet_radius_ratios` /
+            :func:`~cadjoint.fem.tetmesh.tet_aspect_ratios`; TET10 metrics
+            are those of the straight-sided corner tets).
         """
         mesh = self.build(sdf)
+        if isinstance(mesh, TetMesh):
+            return {
+                "radius_ratio": tet_radius_ratios(mesh.points, mesh.cells),
+                "aspect_ratio": tet_aspect_ratios(mesh.points, mesh.cells),
+            }
         return {
             "scaled_jacobian": scaled_jacobians(mesh.points, mesh.cells),
             "aspect_ratio": aspect_ratios(mesh.points, mesh.cells),
@@ -283,16 +357,19 @@ class SimMesh:
         Builds the mesh first if needed (same caching as :meth:`build`).
 
         Returns:
-            ``{"name", "nodes", "elements", "bounds": {"min", "max"},
-            "grid": {"origin", "spacing", "cells"}, "quality":
-            {"scaled_jacobian", "aspect_ratio"}}`` where each quality entry
-            is a ``{"min", "mean", "max"}`` summary over elements.
+            ``{"name", "method", "nodes", "elements", "bounds": {"min",
+            "max"}, "grid": {"origin", "spacing", "cells"}, "quality":
+            {...}}`` where each quality entry is a ``{"min", "mean",
+            "max"}`` summary over elements.  The shape is
+            method-agnostic; only the metric names under ``"quality"``
+            differ (:meth:`quality`), so a stats display can iterate them.
         """
         mesh = self.build(sdf)
         metrics = self.quality(sdf)
         grid = mesh.grid
         return {
             "name": self.name,
+            "method": self.method,
             "nodes": mesh.num_points,
             "elements": mesh.num_cells,
             "bounds": {

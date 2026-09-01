@@ -5,8 +5,10 @@ import {
   formatParameterValue,
   frameObjective,
   optimizeRequest,
+  parseOptimizeStreamLine,
   playbackFrames,
   setOptimizationValueRequest,
+  splitStreamBuffer,
   sparklineCursorX,
   sparklinePoints,
   startPlayer,
@@ -175,5 +177,69 @@ describe("sparkline", () => {
     ];
     expect(frameObjective(trajectory, 1)).toBe(2);
     expect(frameObjective(trajectory, 7)).toBeNull();
+  });
+});
+
+describe("optimize NDJSON stream parsing", () => {
+  it("splits complete lines from a chunked buffer, keeping the tail", () => {
+    const first = splitStreamBuffer('{"event":"progress","step":1}\n{"event":"prog');
+    expect(first.lines).toEqual(['{"event":"progress","step":1}']);
+    expect(first.rest).toBe('{"event":"prog');
+    const second = splitStreamBuffer(first.rest + 'ress","step":2}\n');
+    expect(second.lines).toEqual(['{"event":"progress","step":2}']);
+    expect(second.rest).toBe("");
+  });
+
+  it("drops blank and whitespace-only lines", () => {
+    const { lines, rest } = splitStreamBuffer("\n  \n{\"event\":\"done\"}\n");
+    expect(lines).toEqual(['{"event":"done"}']);
+    expect(rest).toBe("");
+  });
+
+  it("parses progress events with optional grad_norm and elapsed", () => {
+    const event = parseOptimizeStreamLine(
+      '{"event":"progress","step":3,"steps":25,"objective":0.41,"grad_norm":0.02,"elapsed":7.5}',
+    );
+    expect(event).toEqual({
+      kind: "progress",
+      step: 3,
+      steps: 25,
+      objective: 0.41,
+      gradNorm: 0.02,
+      elapsed: 7.5,
+    });
+    const sparse = parseOptimizeStreamLine(
+      '{"event":"progress","step":1,"steps":10,"objective":1}',
+    );
+    expect(sparse).toMatchObject({ kind: "progress", gradNorm: null, elapsed: null });
+  });
+
+  it("rejects progress lines missing the required numbers", () => {
+    expect(
+      parseOptimizeStreamLine('{"event":"progress","step":1,"steps":10}'),
+    ).toBeNull();
+    expect(
+      parseOptimizeStreamLine('{"event":"progress","step":"x","steps":10,"objective":1}'),
+    ).toBeNull();
+  });
+
+  it("unwraps the done event into the classic response shape", () => {
+    const event = parseOptimizeStreamLine(
+      '{"event":"done","ok":true,"name":"min-aluminum","source":"x = 1","history":[{"step":0,"objective":1,"grad_norm":0.1}]}',
+    );
+    expect(event?.kind).toBe("done");
+    if (event?.kind !== "done") throw new Error("expected done");
+    expect(event.response.ok).toBe(true);
+    expect(event.response.source).toBe("x = 1");
+    expect("event" in event.response).toBe(false);
+  });
+
+  it("returns null for untagged lines so a single-JSON body falls back whole", () => {
+    // A non-streaming server's response has no "event" discriminator …
+    expect(parseOptimizeStreamLine('{"ok":true,"source":"x = 1"}')).toBeNull();
+    // … and a pretty-printed body yields unparseable fragments per line.
+    expect(parseOptimizeStreamLine("{")).toBeNull();
+    expect(parseOptimizeStreamLine('  "ok": true,')).toBeNull();
+    expect(parseOptimizeStreamLine("null")).toBeNull();
   });
 });

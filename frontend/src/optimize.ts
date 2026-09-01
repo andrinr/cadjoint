@@ -9,7 +9,80 @@
  * DOM or app state, so it is unit-testable as-is.
  */
 
-import type { OptimizationPayload, OptimizeTrajectoryEntry } from "./types";
+import type { OptimizationPayload, OptimizeResponse, OptimizeTrajectoryEntry } from "./types";
+
+// ── /api/optimize NDJSON stream parsing ──────────────────────────────────
+//
+// A streaming server emits one JSON object per line:
+//   {"event":"progress","step":3,"steps":25,"objective":0.41,"grad_norm":…,"elapsed":…}
+//   …
+//   {"event":"done", …the full classic response…}
+// A non-streaming server ships one JSON document. The parser recognizes
+// only tagged lines; everything else returns null so the caller can fall
+// back to parsing the whole body as a single response.
+
+/** One optimizer step reported live during a streaming run. */
+export interface OptimizeProgress {
+  step: number;
+  steps: number;
+  objective: number;
+  gradNorm: number | null;
+  elapsed: number | null;
+}
+
+export type OptimizeStreamEvent =
+  | ({ kind: "progress" } & OptimizeProgress)
+  | { kind: "done"; response: OptimizeResponse };
+
+/** Split a stream buffer into complete lines plus the unfinished tail. */
+export function splitStreamBuffer(buffer: string): { lines: string[]; rest: string } {
+  const parts = buffer.split("\n");
+  const rest = parts.pop() ?? "";
+  return {
+    lines: parts.map((line) => line.trim()).filter((line) => line.length > 0),
+    rest,
+  };
+}
+
+const finite = (value: unknown): number | null => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+/**
+ * Parse one streamed line into an event, or null for anything untagged —
+ * including fragments of a plain single-JSON response, which the caller
+ * handles by parsing the accumulated body whole.
+ */
+export function parseOptimizeStreamLine(line: string): OptimizeStreamEvent | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(line);
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== "object" || parsed === null) return null;
+  const record = parsed as Record<string, unknown>;
+  if (record.event === "progress") {
+    const step = finite(record.step);
+    const steps = finite(record.steps);
+    const objective = finite(record.objective);
+    if (step === null || steps === null || objective === null) return null;
+    return {
+      kind: "progress",
+      step,
+      steps,
+      objective,
+      gradNorm: finite(record.grad_norm),
+      elapsed: finite(record.elapsed),
+    };
+  }
+  if (record.event === "done") {
+    const { event: _event, ...response } = record;
+    return { kind: "done", response: response as unknown as OptimizeResponse };
+  }
+  return null;
+}
 
 /** Body for POST /patch editing a numeric optimization argument. */
 export function setOptimizationValueRequest(

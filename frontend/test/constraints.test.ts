@@ -24,6 +24,9 @@ describe("constraintLabel", () => {
       constraintLabel({ kind: "coincident", vertices: [1, 4], value: null }),
     ).toBe("coinc · P2–P5");
     expect(
+      constraintLabel({ kind: "equal_length", vertices: [0, 1, 2, 3], value: null }),
+    ).toBe("equal · P1P2–P3P4");
+    expect(
       constraintLabel({ kind: "parallel", vertices: [0, 1, 2, 3], value: null }),
     ).toBe("∥ · P1P2–P3P4");
     expect(

@@ -87,10 +87,26 @@ export function objectiveLabel(optimization: OptimizationPayload): string {
 /** Parameter rows shown before the list collapses behind "+N more". */
 const PARAMETER_PREVIEW = 6;
 
+/** What the streaming run has reported so far. */
+interface LiveRun {
+  step: number;
+  steps: number;
+  /** Objective per received progress event, for the growing sparkline. */
+  objectives: number[];
+  /** Seconds since the run started, per the server. */
+  elapsed: number | null;
+}
+
+/** "34s", "3.4s" — coarse above ten seconds, one decimal below. */
+const formatSeconds = (value: number): string =>
+  `${value >= 10 ? value.toFixed(0) : value.toFixed(1)}s`;
+
 export function OptimizeCards(props: OptimizeCardsProps) {
   const [running, setRunning] = createSignal<string | null>(null);
   const [error, setError] = createSignal("");
   const [result, setResult] = createSignal<RunResult | null>(null);
+  /** Live progress of the in-flight run (streaming /api/optimize only). */
+  const [live, setLive] = createSignal<LiveRun | null>(null);
   const [player, setPlayer] = createSignal<PlayerState>({ frame: 0, playing: false });
   /** Optimization names whose full parameter list is expanded. */
   const [expanded, setExpanded] = createSignal<string[]>([]);
@@ -184,9 +200,23 @@ export function OptimizeCards(props: OptimizeCardsProps) {
   const run = async (optimization: OptimizationPayload) => {
     stopPlayback(false);
     setRunning(optimization.name);
+    setLive({ step: 0, steps: optimization.steps, objectives: [], elapsed: null });
     setError("");
     try {
-      const response = await api.optimize(optimizeRequest(source(), optimization.name));
+      const response = await api.optimize(
+        optimizeRequest(source(), optimization.name),
+        // Streaming servers report each step; the card shows the objective
+        // descending live. (A non-streaming server sends no events and the
+        // bar stays indeterminate until the single response lands.)
+        (progress) => {
+          setLive((current) => ({
+            step: progress.step,
+            steps: progress.steps > 0 ? progress.steps : optimization.steps,
+            objectives: [...(current?.objectives ?? []), progress.objective],
+            elapsed: progress.elapsed,
+          }));
+        },
+      );
       if (!response.ok || !response.source) {
         setError(response.error ?? "The optimization failed.");
         return;
@@ -217,10 +247,16 @@ export function OptimizeCards(props: OptimizeCardsProps) {
       }
       // The optimizer is a patch layer: adopt its source like any edit.
       await props.onAdoptSource(response.source);
+      // Replay the trajectory once, unprompted: the geometry morphing from
+      // the initial design to the optimized one IS the result — nobody
+      // should have to discover the player to see it. It ends resting on
+      // the final frame with the scrubber armed.
+      if ((response.trajectory ?? []).length > 1) play();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
     } finally {
       setRunning(null);
+      setLive(null);
     }
   };
 
@@ -325,6 +361,78 @@ export function OptimizeCards(props: OptimizeCardsProps) {
                   {running() === optimization.name ? "Optimizing…" : "Run"}
                 </button>
 
+                {/* Live progress while this card's run is in flight. */}
+                <Show when={running() === optimization.name ? live() : null}>
+                  {(current) => (
+                    <div
+                      class="opt-live"
+                      data-testid={`optimize-progress-${optimization.name}`}
+                    >
+                      <div
+                        class="opt-progress"
+                        classList={{ indeterminate: current().objectives.length === 0 }}
+                        role="progressbar"
+                        aria-valuemin="0"
+                        aria-valuemax={current().steps}
+                        aria-valuenow={current().step}
+                      >
+                        <i
+                          style={{
+                            width: `${Math.min(
+                              100,
+                              (100 * current().step) / Math.max(current().steps, 1),
+                            ).toFixed(1)}%`,
+                          }}
+                        />
+                      </div>
+                      <div class="opt-live-stats">
+                        <span data-testid={`optimize-progress-step-${optimization.name}`}>
+                          step {current().step}/{current().steps}
+                        </span>
+                        <Show
+                          when={current().elapsed !== null && current().step > 0}
+                          fallback={<span>working…</span>}
+                        >
+                          <span>
+                            {formatSeconds(current().elapsed!)}
+                            {" · "}
+                            {formatSeconds(current().elapsed! / current().step)}/step
+                          </span>
+                        </Show>
+                        <Show when={current().objectives.length > 0}>
+                          <span>
+                            objective{" "}
+                            <b>
+                              {formatScalar(
+                                current().objectives[current().objectives.length - 1],
+                              )}
+                            </b>
+                          </span>
+                        </Show>
+                      </div>
+                      <Show when={current().objectives.length > 1}>
+                        <div class="opt-spark">
+                          <svg
+                            viewBox={`0 0 ${SPARK_WIDTH} ${SPARK_HEIGHT}`}
+                            preserveAspectRatio="none"
+                            role="img"
+                            aria-label="Objective so far"
+                            data-testid={`optimize-live-${optimization.name}`}
+                          >
+                            <polyline
+                              points={sparklinePoints(
+                                current().objectives,
+                                SPARK_WIDTH,
+                                SPARK_HEIGHT,
+                              )}
+                            />
+                          </svg>
+                        </div>
+                      </Show>
+                    </div>
+                  )}
+                </Show>
+
                 <Show when={historyFor(optimization.name)}>
                   {(current) => (
                     <div class="opt-result" data-testid={`optimize-result-${optimization.name}`}>
@@ -380,6 +488,7 @@ export function OptimizeCards(props: OptimizeCardsProps) {
                         <div class="opt-player" data-testid="optimize-player">
                           <button
                             type="button"
+                            class="opt-replay"
                             onClick={() => (player().playing ? stopPlayback(false) : play())}
                             title={
                               player().playing
@@ -388,7 +497,7 @@ export function OptimizeCards(props: OptimizeCardsProps) {
                             }
                             data-testid="optimize-play"
                           >
-                            {player().playing ? "❚❚" : "▶"}
+                            {player().playing ? "❚❚ Pause" : "▶ Replay"}
                           </button>
                           <input
                             type="range"
@@ -413,6 +522,9 @@ export function OptimizeCards(props: OptimizeCardsProps) {
                             )}
                           </span>
                         </div>
+                        <small class="opt-player-hint" data-testid="optimize-player-hint">
+                          drag to scrub the optimization path
+                        </small>
                       </Show>
                     </div>
                   )}

@@ -1750,9 +1750,60 @@ def _located_parameter_call(source: str, name: str) -> ast.Call:
     return matches[0]
 
 
+def _located_derived_argument(source: str, parameter: str) -> tuple[ast.Call, str] | None:
+    """A construction call declaring *parameter* as ``<name>_<argument>``.
+
+    Solid constructors wrap raw dimension literals into free parameters
+    named after the solid — ``Solid.cylinder(radius=0.07, name="bush_a")``
+    declares ``bush_a_radius`` — so the literal keyword in the call is that
+    parameter's one source declaration.  Returns the call and the argument
+    name when exactly one top-level call matches, None otherwise.
+    """
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return None  # the caller re-raises its clearer PatchError
+    matches: list[tuple[ast.Call, str]] = []
+    for item in tree.body:
+        for node in ast.walk(item):
+            if not isinstance(node, ast.Call):
+                continue
+            base = next(
+                (
+                    keyword.value.value
+                    for keyword in node.keywords
+                    if keyword.arg == "name"
+                    and isinstance(keyword.value, ast.Constant)
+                    and isinstance(keyword.value.value, str)
+                ),
+                None,
+            )
+            if base is None or not parameter.startswith(f"{base}_"):
+                continue
+            argument = parameter[len(base) + 1 :]
+            if any(keyword.arg == argument for keyword in node.keywords):
+                matches.append((node, argument))
+    return matches[0] if len(matches) == 1 else None
+
+
 def set_parameter_value(source: str, name: str, value) -> str:
-    """Rewrite one named free parameter's value literal (exact repr)."""
-    call = _located_parameter_call(source, name)
+    """Rewrite one named free parameter's value literal (exact repr).
+
+    Explicit ``Scalar``/``Vector``/``Vector2`` declarations rewrite their
+    ``value`` literal; parameters a construction call derives from its own
+    ``name`` (``Solid.cylinder(radius=..., name="bush_a")`` declares
+    ``bush_a_radius``) rewrite the corresponding keyword literal instead.
+    """
+    try:
+        call = _located_parameter_call(source, name)
+    except PatchError:
+        derived = _located_derived_argument(source, name)
+        if derived is None:
+            raise
+        derived_call, argument = derived
+        return _rewrite_call_argument(
+            source, derived_call, (argument,), argument, _exact_value(value), "parameter"
+        )
     return _rewrite_call_argument(
         source, call, ("value",), "value", _exact_value(value), "parameter"
     )

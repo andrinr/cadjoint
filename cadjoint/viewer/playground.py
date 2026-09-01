@@ -17,10 +17,14 @@ Serves the built frontend (``cadjoint/viewer/static``) and a small JSON API:
                          a renderable surface with a scaled-jacobian quality
                          heatmap — look at a mesh before solving on it
 - ``POST /api/optimize`` run an ``Optimization`` the program declares
-                         (``cadjoint.optimize``), picked by ``name``; the
-                         optimized free-parameter values are patched back
-                         into the program text and the response's ``source``
-                         is the patched program, exactly like ``/patch``
+                         (``cadjoint.optimize``), picked by ``name``. The
+                         response STREAMS as chunked NDJSON: one
+                         ``{"event": "progress", ...}`` line per optimizer
+                         step, then ``{"event": "done", ...}`` carrying the
+                         full result — the optimized free-parameter values
+                         patched back into ``source`` exactly like
+                         ``/patch``, plus a ``simulate`` block (the solved
+                         optimized design) for study-backed runs
 - ``GET  /api/scenes``   list saved scene files in ``./scenes``
 - ``POST /api/scenes/load``  read one saved scene file
 - ``POST /api/scenes/save``  write one scene file into ``./scenes``
@@ -81,14 +85,18 @@ EXAMPLE_SOURCE = '''"""Parametric heat sink: finned extrusion, copper slug, pres
 A compact power-module heat sink and the default tour of the toolchain: the
 fin comb is one parameter-backed sketch profile extruded through a named
 depth, the copper heat slug under the die is a revolved section, and two
-steel bushings carry the mounting screws. A declared thermal study conducts
-the die's heat flux up into the fins, and the declared optimization at the
-bottom descends a real engineering objective — material volume w.r.t. the
-free parameters — straight through the same geometry the viewport renders.
+steel bushings carry the mounting screws. A named SimMesh discretizes the
+sink, the declared thermal study conducts the die's heat flux up into the
+fins on it, and the single declared optimization at the bottom descends that
+SAME simulation — mean temperature against a material-volume penalty —
+differentiably, straight through the geometry the viewport renders.
 
 Named design parameters:
   - ``fin_depth``: extrusion depth of the fin comb (along y)
   - ``fin_height``: driving dimension from a fin root to its tip
+  - ``base_width``: driving dimension across the base deck
+  - ``deck_thickness``: driving dimension from base to deck top
+  - ``fin_gap``: driving dimension between adjacent fin walls
   - ``bushing_spacing``: distance between the two mounting bushings
 """
 
@@ -96,17 +104,30 @@ import jax
 import jax.numpy as jnp
 
 from cadjoint import extract_parameters, functionalize
-from cadjoint.constraints import DistanceConstraint, FixedConstraint, satisfy_constraints
+from cadjoint.constraints import (
+    DistanceConstraint,
+    EqualLengthConstraint,
+    FixedConstraint,
+    HorizontalConstraint,
+    VerticalConstraint,
+    satisfy_constraints,
+)
 from cadjoint.construction import PolygonProfile, SketchPlane, Solid, extrude, revolve
-from cadjoint.fem import Dirichlet, HeatFlux, Nodes, ThermalStudy
+from cadjoint.fem import Dirichlet, HeatFlux, Nodes, SimMesh, ThermalStudy
 from cadjoint.geometry import Scalar, Vector, Vector2
 from cadjoint.optimize import Optimization
 from cadjoint.render import Material
 from cadjoint.sdf.boolean import Union
 
 # ── design parameters ────────────────────────────────────────────────────────
+# fin_depth is genuinely free (the optimizers move it); the other named
+# scalars are driving dimensions: constraints hold the sketch to them, so
+# editing a value here re-dimensions the comb without freeing it to drift.
 fin_depth = Scalar(1.2, free=True, name="fin_depth")
 fin_height = Scalar(0.67, name="fin_height")
+base_width = Scalar(1.8, name="base_width")
+deck_thickness = Scalar(0.18, name="deck_thickness")
+fin_gap = Scalar(0.44, name="fin_gap")
 bushing_spacing = Scalar(1.56, name="bushing_spacing")
 
 aluminum = Material(name="aluminum", color=[0.8, 0.82, 0.85], roughness=0.3, metallic=0.9)
@@ -157,20 +178,58 @@ comb_profile = PolygonProfile(
 )
 sink = extrude(comb_profile, depth=fin_depth, material=aluminum)
 
-# The fin height is a named dimension: the center fin's tip must sit
-# fin_height above its root. Constraints own this part of the sketch —
-# move a point, then Satisfy projects it back onto the system.
+# The comb is dimension-driven, like a production sketch: the base span,
+# deck thickness, fin height, and fin-to-fin gap are named dimensions;
+# horizontal/vertical constraints square the deck and the fin walls,
+# equal-length ties every fin to one shared width, and the two mirror
+# equalities center the comb on the base. One genuine sketch freedom
+# remains — the shared fin width — and the optimizers below project every
+# descent step back onto exactly this system (see cadjoint.optimize).
 FixedConstraint(base_l, [-0.9, 0.0])
+DistanceConstraint(base_l, base_r, base_width)
+HorizontalConstraint(base_l, base_r)
+VerticalConstraint(base_r, deck_r)
+VerticalConstraint(base_l, deck_l)
+HorizontalConstraint(deck_l, deck_r)
+DistanceConstraint(base_r, deck_r, deck_thickness)
+HorizontalConstraint(fin1_root_r, deck_r)
+HorizontalConstraint(fin1_root_l, deck_r)
+HorizontalConstraint(fin2_root_r, deck_r)
+HorizontalConstraint(fin2_root_l, deck_r)
+HorizontalConstraint(fin3_root_r, deck_r)
+HorizontalConstraint(fin3_root_l, deck_r)
+VerticalConstraint(fin1_root_r, fin1_tip_r)
+VerticalConstraint(fin1_root_l, fin1_tip_l)
+VerticalConstraint(fin2_root_r, fin2_tip_r)
+VerticalConstraint(fin2_root_l, fin2_tip_l)
+VerticalConstraint(fin3_root_r, fin3_tip_r)
+VerticalConstraint(fin3_root_l, fin3_tip_l)
 DistanceConstraint(fin2_root_r, fin2_tip_r, fin_height)
+HorizontalConstraint(fin2_tip_r, fin2_tip_l)
+HorizontalConstraint(fin2_tip_r, fin1_tip_r)
+HorizontalConstraint(fin1_tip_r, fin1_tip_l)
+HorizontalConstraint(fin2_tip_l, fin3_tip_r)
+HorizontalConstraint(fin3_tip_r, fin3_tip_l)
+EqualLengthConstraint(fin1_root_r, fin1_root_l, fin2_root_r, fin2_root_l)
+EqualLengthConstraint(fin2_root_r, fin2_root_l, fin3_root_r, fin3_root_l)
+EqualLengthConstraint(base_l, fin3_root_l, base_r, fin1_root_r)
+EqualLengthConstraint(base_l, fin2_root_l, base_r, fin2_root_r)
+DistanceConstraint(fin1_root_l, fin2_root_r, fin_gap)
 
 # ── copper heat slug: revolved section under the die, screw bore on axis ─────
 # Revolve spins the profile around the plane's local Y axis (world z here):
 # profile x is radius, profile y runs along the axis. The slug presses into
 # the deck from below; the die contacts its bottom face.
-slug_bore_low = Vector2(value=[0.05, -0.18], free=True, name="slug_bore_low")
-slug_rim_low = Vector2(value=[0.26, -0.18], free=True, name="slug_rim_low")
-slug_rim_high = Vector2(value=[0.26, 0.04], free=True, name="slug_rim_high")
-slug_bore_high = Vector2(value=[0.05, 0.04], free=True, name="slug_bore_high")
+#
+# Design rule: boundary-condition regions sit on pinned geometry. The slug
+# bottom carries the die's heat-flux BC, so its outline is NOT free — the
+# optimizer shapes fins and depth, never the chip interface. (The fin-top
+# Dirichlet region is safe by construction: the tips ride the fin_height
+# driving dimension, which optimization cannot change.)
+slug_bore_low = Vector2(value=[0.05, -0.18], name="slug_bore_low")
+slug_rim_low = Vector2(value=[0.26, -0.18], name="slug_rim_low")
+slug_rim_high = Vector2(value=[0.26, 0.04], name="slug_rim_high")
+slug_bore_high = Vector2(value=[0.05, 0.04], name="slug_bore_high")
 slug_profile = PolygonProfile(
     [slug_bore_low, slug_rim_low, slug_rim_high, slug_bore_high],
     plane=SketchPlane(origin=[0.0, 0.0, 0.0], normal=[0.0, 1.0, 0.0]),
@@ -189,13 +248,25 @@ bush_b = Solid.cylinder(radius=0.07, height=0.12, position=bushing_b, material=s
 scene = Union(sink, slug, bush_a, bush_b, smoothness=0.03)
 satisfy_constraints(scene, steps=2)
 
+# ── simulation mesh: the sink volume on a named grid ─────────────────────────
+# First-class meshing intent: the study below solves on it, the viewer
+# inspects it (counts, bounds, element quality), and the optimization
+# refreezes it as the design moves. Flip method to "tet10" for the
+# boundary-conforming quadratic path.
+sink_mesh = SimMesh(
+    name="sink-mesh",
+    resolution=(20, 14, 12),
+    bounds=(-1.05, -0.8, -0.3),
+    size=(2.1, 1.6, 1.4),
+    method="hex",
+)
+
 # ── thermal study: die flux on the slug bottom, ambient at the fin field ─────
 # Node selections are programmatic: the flux enters through the boundary
 # faces of the slug's bottom disc; the upper fin field is held at ambient
 # (an idealized convection sink).
 heat_study = ThermalStudy(
     name="sink-conduction",
-    resolution=(20, 14, 12),
     conductivity=2.0,
     bcs=[
         HeatFlux(
@@ -205,15 +276,12 @@ heat_study = ThermalStudy(
         ),
         Dirichlet(Nodes.halfspace([0.0, 0.0, 0.6], [0.0, 0.0, 1.0]), 0.0),
     ],
-    bounds=(-1.05, -0.8, -0.3),
-    size=(2.1, 1.6, 1.4),
+    mesh=sink_mesh,
 )
 
-# The objective is a real reverse-mode derivative path through sketch points
-# -> extrusion -> final SDF evaluation: the (smoothed) aluminum volume of the
-# fin comb as a function of the free parameters above. The declared
-# Optimization descends it with adam; run it from the viewer and the
-# optimized values are written back into this very source.
+# The regularizer is a real reverse-mode derivative path through sketch
+# points -> extrusion -> final SDF evaluation: the (smoothed) aluminum
+# volume of the fin comb as a function of the free parameters above.
 sink_parameters, sink_fixed, _ = extract_parameters(sink)
 sink_sdf = functionalize(sink)
 
@@ -227,12 +295,21 @@ def material_volume(parameters):
     return cell_volume * jnp.sum(jax.nn.sigmoid(-sdf(cells) / 0.03))
 
 
-minimize_aluminum = Optimization(
-    name="min-aluminum",
-    objective=material_volume,
-    of=sink,
-    steps=25,
-    learning_rate=0.03,
+# The declared optimization closes the loop end to end: the thermal study
+# above becomes the objective. Per step, the frozen simulation mesh follows
+# the design differentiably (node positions re-projected through the traced
+# SDF), the study solves on it, and the mean temperature descends against
+# the material-volume regularizer while every update projects back onto the
+# sketch constraints — run it from the viewer and the optimized part
+# arrives with its temperature field attached, values written back here.
+cool_sink = Optimization(
+    name="cool-sink",
+    study="sink-conduction",
+    metric="mean",
+    regularizer=material_volume,
+    regularizer_weight=0.4,
+    steps=10,
+    learning_rate=0.01,
 )
 '''
 
@@ -377,8 +454,131 @@ def mesh_inspect_source(
 
 # Optimizations run the differentiable objective once per step, which can far
 # exceed the compile budget; the step cap keeps one request's work bounded.
-OPTIMIZE_TIMEOUT_SECONDS = 120
+# Study-backed optimizations additionally run a full FEM solve (plus its
+# adjoint) per step, so the timeout covers a panel-sized study run and the
+# worker enforces a tighter measured per-run step cap for them
+# (``STUDY_OPTIMIZE_STEP_LIMIT`` in the compile worker).
+OPTIMIZE_TIMEOUT_SECONDS = 300
 OPTIMIZE_MAX_STEPS = 200
+
+
+def _validate_optimize_request(request: dict[str, Any]) -> tuple[dict | None, dict[str, Any]]:
+    """``(error, extra)`` — request-shape validation shared by both entry points."""
+    name = request.get("name")
+    if not isinstance(name, str) or not name.strip():
+        return {
+            "ok": False,
+            "error": "An optimization run needs `name`: the declared Optimization to run.",
+        }, {}
+    extra: dict[str, Any] = {"name": name}
+    steps = request.get("steps")
+    if steps is not None:
+        if not isinstance(steps, int) or isinstance(steps, bool) or steps < 1:
+            return {"ok": False, "error": "Optimization `steps` must be a positive integer."}, {}
+        if steps > OPTIMIZE_MAX_STEPS:
+            return {
+                "ok": False,
+                "error": f"Optimization `steps` is capped at {OPTIMIZE_MAX_STEPS} per request.",
+            }, {}
+        extra["steps"] = steps
+    source = request.get("source")
+    if not isinstance(source, str):
+        return {"ok": False, "error": "Source must be a string."}, {}
+    if len(source.encode("utf-8", errors="replace")) > MAX_SOURCE_BYTES:
+        return {
+            "ok": False,
+            "error": f"Source is larger than the {MAX_SOURCE_BYTES:,}-byte limit.",
+        }, {}
+    return None, extra
+
+
+def _stream_optimize_worker(source: str, extra: dict[str, Any], timeout: float):
+    """Run the optimize worker and yield its NDJSON events as they arrive.
+
+    The worker prints one flushed ``{"event": "progress", ...}`` line per
+    optimizer step and its ordinary result object as the final line; this
+    generator tails the pipe, relays the progress events immediately, and
+    closes with one ``{"event": "done", ...result}`` event.  A watchdog
+    kills the worker at *timeout* and reports it as a clear error event.
+    """
+    import threading
+
+    process = subprocess.Popen(
+        [sys.executable, "-m", "cadjoint.viewer._compile_worker"],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    stderr_text: list[str] = []
+    drain = threading.Thread(target=lambda: stderr_text.append(process.stderr.read()), daemon=True)
+    drain.start()
+    timed_out = threading.Event()
+
+    def _kill() -> None:
+        timed_out.set()
+        process.kill()
+
+    watchdog = threading.Timer(timeout, _kill)
+    watchdog.start()
+    final: dict[str, Any] | None = None
+    try:
+        process.stdin.write(json.dumps({**extra, "source": source, "mode": "optimize"}))
+        process.stdin.close()
+        for line in process.stdout:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                event = json.loads(line)
+            except json.JSONDecodeError:
+                continue  # stray non-JSON output must not corrupt the stream
+            if not isinstance(event, dict):
+                continue
+            if event.get("event") == "progress":
+                yield event
+            else:
+                final = event
+        process.wait()
+    finally:
+        watchdog.cancel()
+        drain.join(timeout=2)
+        if process.poll() is None:  # client went away mid-run: stop the work
+            process.kill()
+    if timed_out.is_set():
+        yield {
+            "event": "done",
+            "ok": False,
+            "error": f"Optimization exceeded the {timeout:g}-second timeout.",
+        }
+        return
+    if final is None or process.returncode != 0:
+        detail = (stderr_text[0].strip() if stderr_text and stderr_text[0] else "") or (
+            "The optimizer process exited unexpectedly."
+        )
+        yield {"event": "done", "ok": False, "error": detail[-8_000:]}
+        return
+    yield {"event": "done", **final}
+
+
+def optimize_source_events(request: dict[str, Any], timeout: float = OPTIMIZE_TIMEOUT_SECONDS):
+    """Yield the NDJSON event stream for one optimize request.
+
+    ``/api/optimize`` responses are chunked NDJSON: one
+    ``{"event": "progress", "step", "steps", "objective", "grad_norm",
+    "elapsed"}`` line per optimizer step as it completes (``step`` counts
+    finished evaluations, 1-based), then exactly one final
+    ``{"event": "done", ...}`` line carrying the entire ordinary response
+    object — ``ok``/``source``/``history``/``trajectory``/``parameters``
+    (plus ``simulate`` for study-backed runs), or ``ok: false`` with
+    ``error`` (and ``error_kind`` such as ``fem_unavailable``).  Request
+    validation failures arrive the same way, as an immediate ``done``.
+    """
+    error, extra = _validate_optimize_request(request)
+    if error is not None:
+        yield {"event": "done", **error}
+        return
+    yield from _stream_optimize_worker(request["source"], extra, timeout)
 
 
 def optimize_source(
@@ -389,30 +589,28 @@ def optimize_source(
     Runs an :class:`cadjoint.optimize.Optimization` the scene program itself
     declares, picked by ``name`` — objective, target object, and optimizer
     settings all come from the declaration; the optional ``steps`` overrides
-    the declared step count (both are capped at ``OPTIMIZE_MAX_STEPS``).
-    The worker writes the optimized free-parameter values back into the
-    program text through the patch machinery, so the response's ``source``
-    is the patched program — the client adopts it and recompiles, exactly
-    like a ``/patch`` response.
+    the declared step count (both are capped at ``OPTIMIZE_MAX_STEPS``;
+    study-backed runs are further capped by the worker's measured
+    ``STUDY_OPTIMIZE_STEP_LIMIT``).  The worker writes the optimized
+    free-parameter values back into the program text through the patch
+    machinery, so the response's ``source`` is the patched program — the
+    client adopts it and recompiles, exactly like a ``/patch`` response.
+    A study-backed optimization's response additionally carries a
+    ``simulate`` block (``field``/``mesh``/``result``/``mesh_info``): the
+    optimized design solved on a fresh mesh, in the exact shapes
+    ``/api/simulate`` responses use.  A missing jax-fem extra surfaces as
+    ``error_kind="fem_unavailable"``.
+
+    This is the buffered form of :func:`optimize_source_events` (the
+    ``/api/optimize`` endpoint streams the events instead): progress events
+    are consumed and the final ``done`` event is returned as a plain
+    response dict.
     """
-    name = request.get("name")
-    if not isinstance(name, str) or not name.strip():
-        return {
-            "ok": False,
-            "error": "An optimization run needs `name`: the declared Optimization to run.",
-        }
-    extra: dict[str, Any] = {"name": name}
-    steps = request.get("steps")
-    if steps is not None:
-        if not isinstance(steps, int) or isinstance(steps, bool) or steps < 1:
-            return {"ok": False, "error": "Optimization `steps` must be a positive integer."}
-        if steps > OPTIMIZE_MAX_STEPS:
-            return {
-                "ok": False,
-                "error": f"Optimization `steps` is capped at {OPTIMIZE_MAX_STEPS} per request.",
-            }
-        extra["steps"] = steps
-    return _run_worker(request.get("source"), "optimize", timeout, extra=extra)
+    final: dict[str, Any] = {}
+    for event in optimize_source_events(request, timeout):
+        if event.get("event") == "done":
+            final = {key: value for key, value in event.items() if key != "event"}
+    return final
 
 
 # Saved scenes live in one directory under the server's working directory.
@@ -1117,6 +1315,34 @@ def make_handler(token: str):
                 Cache_Control="no-store",
             )
 
+        def _stream_ndjson(self, events) -> None:
+            """Relay an event stream as chunked NDJSON, flushed per line.
+
+            HTTP/1.1 chunked framing written by hand: each event becomes one
+            ``<hex size>\\r\\n<json line>\\r\\n`` chunk pushed to the socket
+            immediately, so the client sees progress while the worker still
+            runs.  The stream always ends with the zero-length chunk; a
+            client that disconnects mid-run just terminates the generator
+            (its ``finally`` stops the worker).
+            """
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "application/x-ndjson; charset=utf-8")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("Referrer-Policy", "no-referrer")
+            self.send_header("Transfer-Encoding", "chunked")
+            self.end_headers()
+            try:
+                for event in events:
+                    chunk = (json.dumps(event) + "\n").encode("utf-8")
+                    self.wfile.write(f"{len(chunk):X}\r\n".encode("ascii"))
+                    self.wfile.write(chunk + b"\r\n")
+                    self.wfile.flush()
+                self.wfile.write(b"0\r\n\r\n")
+                self.wfile.flush()
+            except (BrokenPipeError, ConnectionResetError):
+                self.close_connection = True
+
         def _reject(self, status: HTTPStatus, message: str) -> None:
             """Refuse a request without reading its body.
 
@@ -1206,12 +1432,23 @@ def make_handler(token: str):
             if not self._host_allowed():
                 return
             path = urlsplit(self.path).path
+
+            if path == "/api/optimize":
+                # Streamed: progress events per optimizer step, then `done`
+                # with the full response — see optimize_source_events.
+                if not self._token_valid():
+                    return
+                payload = self._read_json()
+                if payload is None:
+                    return
+                self._stream_ndjson(optimize_source_events(payload))
+                return
+
             handlers = {
                 "/compile": lambda payload: compile_source(payload.get("source")),
                 "/api/mesh": lambda payload: mesh_source(payload.get("source")),
                 "/api/simulate": simulate_source,
                 "/api/mesh_inspect": mesh_inspect_source,
-                "/api/optimize": optimize_source,
                 "/patch": patch_source,
                 "/api/scenes/load": load_scene,
                 "/api/scenes/save": save_scene,

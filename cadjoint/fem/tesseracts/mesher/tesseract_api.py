@@ -59,10 +59,14 @@ class InputSchema(BaseModel):
     ``element`` picks the mesher: ``0`` = DC surface + TetGen (TET4 cells,
     boundary vertices are the DC vertices), ``1`` = voxelize + Newton-snap
     (HEX8 cells, boundary vertices are the snapped lattice vertices —
-    compatible with the packaged ``elastic_jaxfem`` solver tesseract).
+    compatible with the packaged ``elastic_jaxfem`` solver tesseract),
+    ``2`` = the TET4 mesh promoted to straight-sided TET10 (shared midside
+    nodes appended after all corner vertices, meshio ``tetra10`` order).
     The interpolation VJP is mesher-agnostic: it only needs each movable
-    boundary vertex to sit on the interpolant's zero set, which both
-    meshers guarantee.
+    boundary vertex to sit on the interpolant's zero set, which the corner
+    meshers guarantee; a TET10 midside node is the affine average of its
+    two corner parents, so its cotangent splits half-and-half onto them
+    before the corner-level IFT pullback (exact — the promotion is linear).
     """
 
     field_values: Differentiable[Array[(None, None, None), Float64]]
@@ -74,7 +78,9 @@ class InputSchema(BaseModel):
     min_dihedral: Array[(), Float64]
     # Shape-carrying templates (values unused): shapes promise the frozen
     # topology for abstract_eval — ``cell_template`` is ``(T, K)`` with
-    # ``K`` the nodes per cell (4 for TET4, 8 for HEX8).  Empty arrays =
+    # ``K`` the nodes per cell (4 for TET4, 8 for HEX8, 10 for TET10; the
+    # TET10 template thereby carries the edge structure — the deterministic
+    # forward re-derives the concrete edge pairs).  Empty arrays =
     # discovery mode (direct ``apply`` only; traced calls need the real
     # shapes).
     point_ids: Array[(None,), Int32]
@@ -134,16 +140,23 @@ def make_interpolant(field_values, origin, spacing):
 
 
 def _run_mesher(inputs: InputSchema):
-    """The opaque forward mesher; returns ``(points, cells, movable_mask)``.
+    """The opaque forward mesher.
 
-    ``movable_mask`` flags the vertices that sit on the interpolant's zero
-    set and move with the field — DC surface vertices (TET4 mode) or
-    snapped boundary lattice vertices (HEX8 mode).
+    Returns:
+        ``(points, cells, movable_mask, edge_parents)``.  ``movable_mask``
+        flags the vertices that sit on the interpolant's zero set and move
+        with the field — DC surface vertices (TET4/TET10 modes) or snapped
+        boundary lattice vertices (HEX8 mode); in TET10 mode it
+        additionally marks the midside nodes both of whose corner parents
+        are on the surface (those ride the surface too, as corner
+        averages).  ``edge_parents`` is ``None`` except in TET10 mode,
+        where row ``k`` holds the two corner indices whose midpoint node
+        ``num_corners + k`` is.
     """
 
     from cadjoint.fem.backends import _x64_scope
     from cadjoint.fem.hexmesh import project_points, sdf_to_hex_mesh
-    from cadjoint.fem.tetmesh import surface_to_tet_mesh
+    from cadjoint.fem.tetmesh import surface_to_tet_mesh, tet10_from_tet4
     from cadjoint.meshing import GridSpec, extract_mesh
 
     with _x64_scope():
@@ -152,10 +165,11 @@ def _run_mesher(inputs: InputSchema):
         spacing = tuple(float(v) for v in np.asarray(inputs.spacing))
         grid = GridSpec(origin=origin, spacing=spacing, cells=tuple(n - 1 for n in field.shape))
         interpolant = make_interpolant(field, origin, spacing)
-        if int(np.asarray(inputs.element)) == 1:
+        element = int(np.asarray(inputs.element))
+        if element == 1:
             hex_mesh = sdf_to_hex_mesh(interpolant, grid)
             mask = hex_mesh.snap_mask.astype(np.int32)
-            return hex_mesh.points, hex_mesh.cells, mask
+            return hex_mesh.points, hex_mesh.cells, mask, None
         surface = extract_mesh(interpolant, grid, sharp=bool(int(np.asarray(inputs.sharp))))
         raw = np.asarray(surface.vertices, dtype=np.float64)
         clamp = 0.5 * float(np.linalg.norm(spacing))
@@ -172,12 +186,19 @@ def _run_mesher(inputs: InputSchema):
         )
         mask = np.zeros(mesh.num_points, dtype=np.int32)
         mask[: mesh.num_surface] = 1
-        return mesh.points, mesh.cells, mask
+        if element != 2:
+            return mesh.points, mesh.cells, mask, None
+        points10, cells10, parents = tet10_from_tet4(mesh.points, mesh.cells)
+        mask10 = np.zeros(points10.shape[0], dtype=np.int32)
+        mask10[: mesh.num_surface] = 1
+        on_surface = (parents < mesh.num_surface).all(axis=1)
+        mask10[mesh.num_points + np.flatnonzero(on_surface)] = 1
+        return points10, cells10, mask10, parents
 
 
 def apply(inputs: InputSchema) -> OutputSchema:
     """Run the black-box mesher (opaque to JAX tracing; runs concretely)."""
-    points, cells, mask = _run_mesher(inputs)
+    points, cells, mask, _parents = _run_mesher(inputs)
     promised = int(inputs.point_ids.shape[0])
     if promised and promised != points.shape[0]:
         raise ValueError(
@@ -219,6 +240,12 @@ def vector_jacobian_product(
     Interior (Steiner) vertex cotangents are dropped: interior motion is
     mesh gauge with no shape meaning (their smallness for physics
     objectives is measured in the research note).
+
+    TET10 mode composes one exact linear step in front: each midside node
+    is the affine average of its two corner parents (``m = (a + b) / 2``),
+    so its cotangent splits half-and-half onto the corners before the
+    corner-level IFT pullback.  Midsides between interior corners thereby
+    land on interior corners and are dropped exactly as today.
     """
     import jax
     import jax.numpy as jnp
@@ -235,13 +262,26 @@ def vector_jacobian_product(
         raise ValueError(f"Only 'points' carries a vjp; requested: {sorted(vjp_outputs)}")
 
     with _x64_scope():
-        points, _cells, mask = _run_mesher(inputs)
+        points, _cells, mask, parents = _run_mesher(inputs)
+        points = np.asarray(points, dtype=np.float64)
+        cotangent_full = np.asarray(cotangent_vector["points"], dtype=np.float64)
+        if parents is not None:
+            # TET10: split each midside cotangent half-and-half onto its
+            # two corner parents (the promotion is the exact linear map
+            # m = (a + b) / 2), then pull back at the corners as usual.
+            corner_count = points.shape[0] - parents.shape[0]
+            corner_cotangent = cotangent_full[:corner_count].copy()
+            np.add.at(corner_cotangent, parents[:, 0], 0.5 * cotangent_full[corner_count:])
+            np.add.at(corner_cotangent, parents[:, 1], 0.5 * cotangent_full[corner_count:])
+            points = points[:corner_count]
+            mask = np.asarray(mask)[:corner_count]
+            cotangent_full = corner_cotangent
         movable = np.flatnonzero(np.asarray(mask, dtype=bool))
         field = jnp.asarray(np.asarray(inputs.field_values, dtype=np.float64))
         origin = np.asarray(inputs.origin, dtype=np.float64)
         spacing = np.asarray(inputs.spacing, dtype=np.float64)
-        boundary = jnp.asarray(np.asarray(points, dtype=np.float64)[movable])
-        cotangent = jnp.asarray(np.asarray(cotangent_vector["points"], dtype=np.float64)[movable])
+        boundary = jnp.asarray(points[movable])
+        cotangent = jnp.asarray(cotangent_full[movable])
 
         def values_at_boundary(field_values):
             return make_interpolant(field_values, origin, spacing)(boundary)

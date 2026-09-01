@@ -318,3 +318,112 @@ Measured on the bracket (hex 24x17x13 & 30x21x16 vs DC at matched cell size):
   duck typing, recompute fixed point + gradients, TET10 promotion, TET4/TET10
   solves, sphere adjoint-vs-FD, mesher tesseract, and the two-tesseract chain demo);
   all skip cleanly without tetgen / jax_fem / tesseract deps.
+
+## Production verdict (2026-09-01): TET10 shipped behind `SimMesh(method=...)`
+
+TET10 is now a first-class meshing method (user decision: "tet10 sounds a lot
+better"), productionized as `SimMesh(method="hex"|"tet4"|"tet10")` with hex
+remaining the fast default. What shipped, out of prototype status:
+
+- `SimMesh.method` (validated at construction, in `describe()`/`inspect()`),
+  `build()` routing hex → `sdf_to_hex_mesh`, tet4/tet10 → `sdf_to_tet_mesh`
+  (+ `tet10_mesh` promotion), with a **sharp → Tikhonov DC fallback** when
+  TetGen rejects the sharp surface. `resolution` stays the sampling lattice:
+  elements for hex, the DC extraction grid for tets (TetGen decides tet counts).
+- Studies route both physics to tet solves: `tet_elastic_solve` promoted, and a
+  new `tet_thermal_solve` mirroring the lifted Dirichlet formulation, both with
+  exact boundary-face targeting (`_restrict_surface_faces` now covers heat-flux
+  patches too). TET10 BC sets are completed with midside nodes
+  (`tet10_complete_nodes` / `tet10_face_midsides`). `SimulationResult` is
+  method-agnostic (tet von Mises at centroids — for TET10 the corner shape
+  gradients vanish there, midside-only formula; meshio `tetra`/`tetra10` VTK).
+- Frozen-topology parity: `recompute_tet_points` handles TET10 (corner surface
+  re-projection, midsides rebuilt as traced corner midpoints; exact fixed point
+  at the nominal design, regression-tested).
+
+### Grid caveat found during productionization
+
+The bracket's filleted union (`smooth_min`) dips to **z ≈ −0.063**, below the
+demo grid floor (−0.06). Voxelization never noticed; DC extraction returns an
+*open* surface there and TetGen rejects it. All tet bracket work below uses the
+deepened box `bounds=(-1.3, -0.95, -0.16)`, `size=(2.6, 1.9, 1.52)`. Sharp DC
+also still self-intersects at unlucky resolutions (24x18x14 fails both modes at
+this box; 28x21x17 needs the smooth fallback) — the fallback absorbs some of
+this, the rest surfaces as a clear TetGen error naming the remedy.
+
+### Thermal-on-tet validation (bar, Galerkin exactness)
+
+The projected tet boundary is the exact box, so solutions inside the FE space
+must be reproduced to solver tolerance — and are (`tests/fem/test_study.py::TestTetStudies`):
+
+- linear conduction profile: max |T − (1−x)/2| < 1e-6 on TET4 **and** TET10;
+- heat flux with exact face targeting: max err < 1e-6 (T = (q/k)(x+1));
+- volumetric-source parabola (quadratic, in the TET10 space): max err < 1e-5.
+- Elasticity: TET10 cantilever lands in the Euler-beam window (0.7–1.3) at
+  15x6x6 where TET4 on the same mesh is visibly stiffer (the locking exhibit).
+
+### The DOF-at-matched-accuracy benchmark (`benchmarks/tet_vs_hex_bench.py`)
+
+Same bracket compliance problem, both families on the deepened box, load patch
+selected by the mesh-independent center+normal wall rule (areas 0.29–0.38 vs
+exact ≈ 0.348; Wn = W/area² as before). Reference: hex @ 66x48x39, 72.7k DOF,
+Wn = 1.1056 (finest TET10 gives 1.1522 — 4.2% family spread, so the reference
+itself carries a few-% uncertainty; the 3% band is relative to the hex ref).
+
+| mesh | res | cells | DOF | Wn | vs ref | t_mesh | t_solve |
+|---|---|---|---|---|---|---|---|
+| HEX8  | 24x18x14 | 964    | 5.0k  | 1.066 | −3.6% | 3.5 s | 3.6 s |
+| HEX8  | 30x22x18 | 1 846  | 8.8k  | 1.086 | **−1.7%** | 3.6 s | 4.0 s |
+| HEX8  | 36x26x21 | 3 512  | 15.1k | 1.097 | −0.8% | 4.1 s | 5.4 s |
+| HEX8  | 42x31x25 | 4 700  | 20.2k | 1.109 | +0.3% | 3.8 s | 7.0 s |
+| HEX8  | 48x35x28 | 7 702  | 31.0k | 1.127 | +1.9% | 4.6 s | 9.0 s |
+| HEX8 ref | 66x48x39 | 19 306 | 72.7k | 1.106 | — | 4.7 s | 24.6 s |
+| TET10 | 22x16x13 | 4 629  | 25.3k | 1.139 | **+3.0%** | 4.9 s | 26.2 s |
+| TET10 | 24x18x14 | 4 645  | 26.4k | 1.136 | +2.7% | 5.3 s | 26.8 s |
+| TET10 | 26x19x16 | 5 750  | 32.0k | 1.196 | +8.2% | 4.9 s | 31.7 s |
+| TET10 | 28x21x17 (smooth) | 7 037 | 39.1k | 1.173 | +6.1% | 6.8 s | 241.5 s |
+| TET10 | 30x22x18 | 7 946  | 44.0k | 1.071 | −3.1% | 5.5 s | 52.3 s |
+| TET10 | 32x23x19 | 10 176 | 53.8k | 1.149 | +4.0% | 5.1 s | 120.7 s |
+| TET10 | 34x25x20 (smooth) | 11 873 | 62.7k | 1.152 | +4.2% | 6.9 s | 119.6 s |
+
+Matched-accuracy picks (coarsest within 3% of the reference) and the
+`d(W)/d(rib_height)` adjoint there (3-parameter value_and_grad wall-clock):
+
+| | res | DOF | Wn | mesh+solve | grad (web, rib, plate) | t_grad |
+|---|---|---|---|---|---|---|
+| HEX8  | 30x22x18 | 8.8k  | 1.086 (−1.7%) | **7.6 s** | (−0.287, **−0.0086**, −0.503) | 13.9 s |
+| TET10 | 22x16x13 | 25.3k | 1.139 (+3.0%) | **31.0 s** | (−0.408, **−0.0990**, −0.881) | 50.8 s |
+
+**The headline correction this benchmark exists for: at matched accuracy TET10
+costs ~4x hex wall-clock (31.0 s vs 7.6 s; 2.9x DOF; gradient 3.7x) —
+materially better than the 8–60x of the matched-lattice tables.** The earlier
+factor compared meshes whose accuracy differed by design; TET10 reaches the 3%
+band at its coarsest meshable lattice, where hex needs a similar-DOF lattice of
+its own. Honest caveats: the TET10 Wn ladder oscillates ±4% (its load patch
+rides the DC surface), so its band-edge pick is less settled than hex's
+monotone ladder; and the smooth-fallback meshes pay heavy solver-conditioning
+penalties (241 s at 39k DOF — the "direct/multigrid solver" prerequisite
+stands).
+
+**The rib exhibit survives at matched accuracy** — and is the reason to pay the
+4x: hex at its matched-accuracy size still reports d(W)/d(rib_height) = −0.0086
+where TET10 reports −0.0990 (11.5x). Matching hex's *objective value* does not
+fix its *gradient blindness* to features the lattice staircases over; an
+optimizer driving `rib_height` needs the conforming mesh.
+
+### Named-mesh tet10 gradient (the study-path regression, `TestTet10NamedMeshGradient`)
+
+Bracket @ 22x16x13 TET10 (25.3k DOF), `SimMesh(method="tet10")` +
+`ElasticStudy(mesh=...)` + `recompute_tet_points` + `solve(points=...)`,
+objective mean |u|, adjoint vs central FD (eps 1e-3):
+
+| parameter | adjoint | central FD | rel | asserted |
+|---|---|---|---|---|
+| web_thickness   | −0.034840 | −0.034283 | 1.6e-2 | sign + magnitude window |
+| rib_height      | −0.018134 | −0.022867 | 2.1e-1 | sign + magnitude window |
+| plate_thickness | −0.442785 | −0.438715 | **9.3e-3** | ≤ 1e-2 rel |
+
+The web/rib gaps are the measured crease-subgradient structure from the
+gradient-validation section above (sharp DC vertices sit on SDF kinks; AD takes
+a one-sided branch, FD averages) — directionally exact, hence the sign/window
+assertions rather than tight rel bounds.

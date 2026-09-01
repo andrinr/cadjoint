@@ -633,6 +633,7 @@ CONSTRAINT_CLASS_KINDS = {
     "HorizontalConstraint": "horizontal",
     "VerticalConstraint": "vertical",
     "CoincidentConstraint": "coincident",
+    "EqualLengthConstraint": "equal_length",
     "ParallelEdgesConstraint": "parallel",
     "PerpendicularEdgesConstraint": "perpendicular",
     "ParallelConstraint": "parallel",
@@ -708,7 +709,8 @@ def _constraint_call_vertices(
     elif (
         name in {"HorizontalConstraint", "VerticalConstraint", "CoincidentConstraint"}
         and (len(args) == 2)
-        or name in {"ParallelEdgesConstraint", "PerpendicularEdgesConstraint"}
+        or name
+        in {"EqualLengthConstraint", "ParallelEdgesConstraint", "PerpendicularEdgesConstraint"}
         and len(args) == 4
     ):
         result = indices(list(args))

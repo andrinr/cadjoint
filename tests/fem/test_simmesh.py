@@ -92,6 +92,7 @@ class TestDescribe:
         assert payload == {
             "kind": "mesh",
             "name": "bar-mesh",
+            "method": "hex",
             "resolution": [22, 5, 5],
             "bounds": list(_BOUNDS),
             "size": list(_SIZE),
@@ -230,6 +231,7 @@ class TestInspect:
         assert json.loads(json.dumps(report)) == report
         mesh = sim_mesh.build(_bar())
         assert report["name"] == "bar-mesh"
+        assert report["method"] == "hex"
         assert report["nodes"] == mesh.num_points
         assert report["elements"] == mesh.num_cells
         assert report["grid"]["cells"] == list(_RESOLUTION)
@@ -239,3 +241,81 @@ class TestInspect:
         for metric in ("scaled_jacobian", "aspect_ratio"):
             summary = report["quality"][metric]
             assert summary["min"] <= summary["mean"] <= summary["max"]
+
+
+# Off-lattice bounds for the tet methods: DC extraction is degenerate when
+# the surface passes exactly through sample points, so the tet fixtures use
+# a grid whose planes avoid the bar faces.
+_TET_RESOLUTION = (21, 7, 7)
+
+
+class TestMethods:
+    def test_default_method_is_hex(self):
+        sim_mesh = _bar_mesh()
+        assert sim_mesh.method == "hex"
+        assert sim_mesh.describe()["method"] == "hex"
+
+    def test_invalid_method_raises_at_construction(self):
+        # Viewer contract: a source patch writing method='tet7' must fail
+        # loudly when the program re-executes, not at build time.
+        with pytest.raises(ValueError, match="method"):
+            _bar_mesh(method="tet7")
+        with pytest.raises(ValueError, match="tet10"):
+            _bar_mesh(method="quad")
+
+    def test_method_literal_round_trips_through_describe(self):
+        # The viewer writes SimMesh(..., method='tet10') as literal source;
+        # the declaration must survive describe() for the panel to display.
+        sim_mesh = _bar_mesh(method="tet10", resolution=_TET_RESOLUTION)
+        payload = sim_mesh.describe()
+        assert payload["method"] == "tet10"
+        assert json.loads(json.dumps(payload)) == payload
+
+    def test_tet4_build_returns_a_tet_mesh_and_caches(self):
+        pytest.importorskip("tetgen")
+        from cadjoint.fem import TetMesh
+
+        sim_mesh = _bar_mesh(method="tet4", resolution=_TET_RESOLUTION)
+        bar = _bar()
+        mesh = sim_mesh.build(bar)
+        assert isinstance(mesh, TetMesh)
+        assert mesh.cells.shape[1] == 4
+        assert sim_mesh.build(bar) is mesh  # cached
+        sim_mesh.method = "tet10"  # parameter change invalidates the cache
+        promoted = sim_mesh.build(bar)
+        assert promoted is not mesh
+        assert promoted.cells.shape[1] == 10
+
+    def test_tet10_build_appends_midside_nodes(self):
+        pytest.importorskip("tetgen")
+        bar = _bar()
+        tet4 = _bar_mesh(name="t4", method="tet4", resolution=_TET_RESOLUTION).build(bar)
+        tet10 = _bar_mesh(name="t10", method="tet10", resolution=_TET_RESOLUTION).build(bar)
+        assert tet10.num_cells == tet4.num_cells
+        assert tet10.num_points > tet4.num_points
+        assert tet10.num_corner_points == tet10.num_points - tet10.edge_parents.shape[0]
+
+    def test_tet_inspect_shares_the_json_shape(self):
+        pytest.importorskip("tetgen")
+        sim_mesh = _bar_mesh(method="tet10", resolution=_TET_RESOLUTION)
+        report = sim_mesh.inspect(_bar())
+        assert json.loads(json.dumps(report)) == report
+        assert report["method"] == "tet10"
+        # Method-agnostic stats block: same keys, only metric names differ.
+        hex_report = _bar_mesh(name="hex-ref").inspect(_bar())
+        assert set(report) == set(hex_report)
+        assert set(report["quality"]) == {"radius_ratio", "aspect_ratio"}
+        assert report["grid"]["cells"] == list(_TET_RESOLUTION)
+        mesh = sim_mesh.build(_bar())
+        assert report["nodes"] == mesh.num_points
+        assert report["elements"] == mesh.num_cells
+        for summary in report["quality"].values():
+            assert summary["min"] <= summary["mean"] <= summary["max"]
+
+    def test_tet_quality_metrics_are_in_range(self):
+        pytest.importorskip("tetgen")
+        metrics = _bar_mesh(method="tet4", resolution=_TET_RESOLUTION).quality(_bar())
+        ratios = metrics["radius_ratio"]
+        assert ratios.min() > 0.0
+        assert ratios.max() <= 1.0 + 1e-9
+        assert metrics["aspect_ratio"].min() >= 1.0

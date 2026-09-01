@@ -14,10 +14,15 @@ Named design parameters (drive the FEM optimization in
   - ``rib_height``: distance constraint from the rib's plate corner to its tip
 """
 
+import jax
+import jax.numpy as jnp
+
+from cadjoint import extract_parameters, functionalize
 from cadjoint.constraints import DistanceConstraint, FixedConstraint, satisfy_constraints
 from cadjoint.construction import PolygonProfile, SketchPlane, Solid, extrude
 from cadjoint.fem import ElasticStudy, Fixed, Nodes, SimMesh, Traction
 from cadjoint.geometry import Scalar, Vector, Vector2
+from cadjoint.optimize import Optimization
 from cadjoint.render import Material
 from cadjoint.sdf.boolean import Difference, Union
 
@@ -109,6 +114,22 @@ bracket_mesh = SimMesh(
     size=(2.6, 1.9, 1.42),
 )
 
+# Quality-path alternative: a quadratic tet mesh (method="tet10") conforms to
+# the true bracket boundary — accurate in bending where linear tets lock, and
+# it sees inclined features (the rib) that the hex lattice staircases over.
+# It solves slower than hex, so it stays a declaration here; point pry_study's
+# mesh= at it (or patch method= in the viewer) to run on it.  Note the deeper
+# z floor: tet meshing dual-contours the surface, which must be fully inside
+# the box (the filleted union dips a hair below z = 0).
+# bracket_mesh_tet10 = SimMesh(
+#     name="bracket-mesh-tet10",
+#     resolution=(26, 19, 16),
+#     domain=bracket,
+#     bounds=(-1.3, -0.95, -0.16),
+#     size=(2.6, 1.9, 1.52),
+#     method="tet10",
+# )
+
 # ── simulation study: bolt regions clamped, prying load on the web tip ───────
 # Node selections are programmatic: a ball around each bolt hole is fixed,
 # and the traction acts on the boundary faces spanned by the outer (-y) web
@@ -126,4 +147,38 @@ pry_study = ElasticStudy(
         ),
     ],
     mesh=bracket_mesh,
+)
+
+# ── compliance optimization: stiffness against material, through the study ───
+# The declared study becomes the objective, mirroring
+# ``examples/fem_bracket_optimization.py``: minimize the work of the prying
+# load (classical compliance — twice the strain energy) plus a smoothed
+# material-volume penalty, differentiated straight through the
+# frozen-topology elastic solve. The volume integral samples the SDF at the
+# simulation grid's cell centers, exactly like the example's mass term.
+bracket_parameters, bracket_fixed, _ = extract_parameters(bracket)
+bracket_sdf = functionalize(bracket)
+
+mass_axes = [
+    jnp.linspace(-1.3 + 2.6 / 48, 1.3 - 2.6 / 48, 24),
+    jnp.linspace(-0.95 + 1.9 / 34, 0.95 - 1.9 / 34, 17),
+    jnp.linspace(-0.06 + 1.42 / 26, 1.36 - 1.42 / 26, 13),
+]
+mass_cells = jnp.stack(jnp.meshgrid(*mass_axes, indexing="ij"), axis=-1).reshape(-1, 3)
+mass_cell_volume = float((2.6 / 24) * (1.9 / 17) * (1.42 / 13))
+
+
+def bracket_volume(parameters):
+    sdf = bracket_sdf(parameters, bracket_fixed)
+    return mass_cell_volume * jnp.sum(jax.nn.sigmoid(-sdf(mass_cells) / 0.054))
+
+
+stiffen_bracket = Optimization(
+    name="stiff-bracket",
+    study=pry_study,
+    metric="compliance",
+    regularizer=bracket_volume,
+    regularizer_weight=1.0,
+    steps=8,
+    learning_rate=0.01,
 )

@@ -340,6 +340,152 @@ class TestNamedMesh:
         assert study._implicit_mesh.domain is short
 
 
+_TET_RESOLUTION = (21, 7, 7)  # off-lattice vs the bar faces (DC-degenerate otherwise)
+_TET_ELASTIC_RESOLUTION = (15, 6, 6)  # coarser: TET10 elasticity is the pricey solve
+
+
+def _tet_sim_mesh(method="tet4", **overrides):
+    settings = {
+        "name": f"bar-{method}",
+        "resolution": _TET_RESOLUTION,
+        "bounds": _BOUNDS,
+        "size": _SIZE,
+        "method": method,
+    }
+    settings.update(overrides)
+    return SimMesh(**settings)
+
+
+class TestTetStudies:
+    """Studies route to the tet solvers when their SimMesh method is tet.
+
+    The thermal checks exploit Galerkin exactness: the bar's DC-projected
+    tet boundary is the exact box, so solutions lying in the FE space
+    (linear profiles for TET4/TET10, the parabolic source solution for
+    TET10) must be reproduced to solver tolerance.
+    """
+
+    def test_non_jaxfem_backend_raises_on_tet_meshes(self):
+        pytest.importorskip("tetgen")
+        study = _thermal_study(resolution=None, bounds=None, size=None, mesh=_tet_sim_mesh())
+        with pytest.raises(ValueError, match="direct jax-fem"):
+            study.solve(_bar(), backend="tesseract")
+
+    @pytest.mark.parametrize("method", ["tet4", "tet10"])
+    def test_thermal_linear_profile_is_exact(self, method):
+        pytest.importorskip("tetgen")
+        pytest.importorskip("jax_fem")
+        study = _thermal_study(
+            name=f"tet-conduction-{method}",
+            resolution=None,
+            bounds=None,
+            size=None,
+            mesh=_tet_sim_mesh(method=method),
+        )
+        result = study.solve(_bar())
+        temperature = np.asarray(result.temperature)
+        x = np.asarray(result.mesh.points)[:, 0]
+        assert np.abs(temperature - (1.0 - x) / 2.0).max() < 1e-6
+
+    def test_thermal_heat_flux_solves_with_exact_face_targeting(self):
+        pytest.importorskip("tetgen")
+        pytest.importorskip("jax_fem")
+        # -k T'' = 0 with T(-1) = 0 and k T'(1) = q: T(x) = (q/k)(x + 1).
+        study = _thermal_study(
+            name="tet-flux",
+            resolution=None,
+            bounds=None,
+            size=None,
+            mesh=_tet_sim_mesh(name="bar-tet-flux"),
+            bcs=[
+                Dirichlet(Nodes.side("-x"), 0.0),
+                HeatFlux(Nodes.side("+x"), 1.0),
+            ],
+        )
+        result = study.solve(_bar())
+        temperature = np.asarray(result.temperature)
+        expected = (np.asarray(result.mesh.points)[:, 0] + 1.0) * (1.0 / 2.0)
+        assert np.abs(temperature - expected).max() < 1e-6
+
+    def test_thermal_source_parabola_is_exact_on_tet10(self):
+        pytest.importorskip("tetgen")
+        pytest.importorskip("jax_fem")
+        # -k T'' = q with T(+-1) = 0: T = (q / 2k)(1 - x^2) — inside the
+        # quadratic TET10 space, so the solve must reproduce it exactly.
+        study = _thermal_study(
+            name="tet10-source",
+            resolution=None,
+            bounds=None,
+            size=None,
+            mesh=_tet_sim_mesh(method="tet10", name="bar-tet10-source"),
+            conductivity=1.0,
+            source=2.0,
+            bcs=[
+                Dirichlet(Nodes.side("-x"), 0.0),
+                Dirichlet(Nodes.side("+x"), 0.0),
+            ],
+        )
+        result = study.solve(_bar())
+        temperature = np.asarray(result.temperature)
+        x = np.asarray(result.mesh.points)[:, 0]
+        assert np.abs(temperature - (1.0 - x**2)).max() < 1e-5
+
+    @pytest.fixture(scope="class")
+    def tet_cantilevers(self):
+        pytest.importorskip("tetgen")
+        pytest.importorskip("jax_fem")
+        bar = _bar()
+        results = {}
+        for method in ("tet4", "tet10"):
+            study = _elastic_study(
+                name=f"tet-cantilever-{method}",
+                resolution=None,
+                bounds=None,
+                size=None,
+                mesh=_tet_sim_mesh(method=method, resolution=_TET_ELASTIC_RESOLUTION),
+            )
+            results[method] = study.solve(bar)
+        return results
+
+    def test_elastic_tet10_matches_euler_beam(self, tet_cantilevers):
+        result = tet_cantilevers["tet10"]
+        displacement = np.asarray(result.displacement)
+        points = np.asarray(result.mesh.points)
+        tip_uz = displacement[points[:, 0] > 0.999, 2].mean()
+        force = 1.0 * 0.3 * 0.3
+        inertia = 0.3 * 0.3**3 / 12.0
+        euler = -force * 2.0**3 / (3.0 * 1000.0 * inertia)
+        assert tip_uz < 0.0
+        assert 0.7 < tip_uz / euler < 1.3
+
+    def test_elastic_tet4_locks_stiffer_than_tet10(self, tet_cantilevers):
+        # The documented TET4 caveat (research/tet-vs-hex.md): constant
+        # strain locks in bending, so its tip deflection is smaller.
+        def tip(result):
+            displacement = np.asarray(result.displacement)
+            points = np.asarray(result.mesh.points)
+            return displacement[points[:, 0] > 0.999, 2].mean()
+
+        assert abs(tip(tet_cantilevers["tet4"])) < abs(tip(tet_cantilevers["tet10"]))
+
+    def test_tet_result_is_method_agnostic(self, tet_cantilevers, tmp_path):
+        meshio = pytest.importorskip("meshio")
+        result = tet_cantilevers["tet10"]
+        assert (result.kind, result.field) == ("elastic", "von_mises")
+        assert result.von_mises().shape == (result.mesh.num_cells,)
+        assert result.nodal_scalar().shape == (result.mesh.num_points,)
+        payload = result.describe()
+        assert json.loads(json.dumps(payload)) == payload
+        assert payload["mesh"] == "bar-tet10"
+        assert set(payload["fields"]) == {"displacement", "von_mises"}
+        assert float(result.max()) > 0.0
+        path = tmp_path / "bar-tet10.vtk"
+        result.to_vtk(str(path))
+        exported = meshio.read(str(path))
+        assert exported.cells[0].type == "tetra10"
+        assert "displacement" in exported.point_data
+
+
 class TestSimulationResult:
     def test_thermal_result_is_inspectable(self):
         pytest.importorskip("jax_fem")

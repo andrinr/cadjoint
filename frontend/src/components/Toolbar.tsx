@@ -1,16 +1,14 @@
-/** Top bar: brand, the mode switcher, source controls, and status. */
+/**
+ * Top bar: brand, the mode switcher, source controls, status — and the
+ * render-settings popover anchored to the eye icon. Rendering (presets,
+ * shading, quality, annotations) is orthogonal to what you are editing, so
+ * the popover opens from any mode rather than being a mode itself.
+ */
 
-import { Show } from "solid-js";
-import {
-  busy,
-  dirty,
-  editingMode,
-  nodeById,
-  selection,
-  setEditingMode,
-  status,
-} from "../state";
+import { Show, createSignal, onCleanup } from "solid-js";
+import { busy, dirty, nodeById, selection, status } from "../state";
 import { ModeSwitcher } from "./ModeSwitcher";
+import { RenderPanel, type RenderPanelProps } from "./RenderPanel";
 import { CodeIcon, DisplayIcon, PlayIcon, ResetIcon } from "./icons";
 
 export interface ToolbarProps {
@@ -18,9 +16,36 @@ export interface ToolbarProps {
   onReset: () => void;
   onShowWgsl: () => void;
   wgslReady: boolean;
+  /** Everything the render-settings popover forwards to RenderPanel. */
+  render: RenderPanelProps;
 }
 
 export function Toolbar(props: ToolbarProps) {
+  const [renderOpen, setRenderOpen] = createSignal(false);
+  let anchor: HTMLDivElement | undefined;
+
+  // Escape closes the popover in the capture phase, so the viewer's own
+  // Escape handling (clear selection, return to model) never sees the key.
+  const onKeyDown = (event: KeyboardEvent) => {
+    if (event.key === "Escape" && renderOpen()) {
+      event.preventDefault();
+      event.stopPropagation();
+      setRenderOpen(false);
+    }
+  };
+  // Clicking anywhere outside the anchor dismisses like any popover.
+  const onPointerDown = (event: PointerEvent) => {
+    if (renderOpen() && anchor && !anchor.contains(event.target as Node)) {
+      setRenderOpen(false);
+    }
+  };
+  window.addEventListener("keydown", onKeyDown, true);
+  window.addEventListener("pointerdown", onPointerDown, true);
+  onCleanup(() => {
+    window.removeEventListener("keydown", onKeyDown, true);
+    window.removeEventListener("pointerdown", onPointerDown, true);
+  });
+
   return (
     <header class="toolbar">
       <div class="brand">
@@ -45,21 +70,24 @@ export function Toolbar(props: ToolbarProps) {
         {status().text}
       </span>
 
-      {/* The old render-settings popover became Render mode; the eye is now a
-          shortcut into it (and back out), so muscle memory keeps working. */}
-      <button
-        type="button"
-        class={`icon ${editingMode() === "render" ? "active" : ""}`}
-        onClick={() =>
-          setEditingMode(editingMode() === "render" ? "model" : "render")
-        }
-        title="Render settings — opens Render mode"
-        aria-label="Render settings"
-        aria-pressed={editingMode() === "render"}
-        data-testid="display-options"
-      >
-        <DisplayIcon />
-      </button>
+      <div class="render-popover-anchor" ref={anchor}>
+        <button
+          type="button"
+          class={`icon ${renderOpen() ? "active" : ""}`}
+          onClick={() => setRenderOpen(!renderOpen())}
+          title="Render settings — presets, shading, and quality"
+          aria-label="Render settings"
+          aria-expanded={renderOpen()}
+          data-testid="display-options"
+        >
+          <DisplayIcon />
+        </button>
+        <Show when={renderOpen()}>
+          <div class="render-popover" data-testid="render-popover">
+            <RenderPanel {...props.render} />
+          </div>
+        </Show>
+      </div>
       <button
         type="button"
         class="icon"
