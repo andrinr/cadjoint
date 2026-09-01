@@ -26,6 +26,41 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
 </style>
 
 
@@ -283,6 +318,16 @@ ul.task-list li input[type="checkbox"] {
   <li><a href="#re-validation-nothing-regressed-several-things-improved" id="toc-re-validation-nothing-regressed-several-things-improved" class="nav-link" data-scroll-target="#re-validation-nothing-regressed-several-things-improved">Re-validation: nothing regressed, several things improved</a></li>
   <li><a href="#on-the-alternatives-plainly" id="toc-on-the-alternatives-plainly" class="nav-link" data-scroll-target="#on-the-alternatives-plainly">On the alternatives, plainly</a></li>
   <li><a href="#files-delta" id="toc-files-delta" class="nav-link" data-scroll-target="#files-delta">Files (delta)</a></li>
+  </ul></li>
+  <li><a href="#retargeting-the-starter-chain-tests-on-measurement-2026-09-01" id="toc-retargeting-the-starter-chain-tests-on-measurement-2026-09-01" class="nav-link" data-scroll-target="#retargeting-the-starter-chain-tests-on-measurement-2026-09-01">Retargeting the starter chain tests on measurement (2026-09-01)</a>
+  <ul class="collapse">
+  <li><a href="#the-interpolant-chain-can-mesh-the-starter-the-old-24x18x15-note-was-stale" id="toc-the-interpolant-chain-can-mesh-the-starter-the-old-24x18x15-note-was-stale" class="nav-link" data-scroll-target="#the-interpolant-chain-can-mesh-the-starter-the-old-24x18x15-note-was-stale">The interpolant chain can mesh the starter — the old “24x18x15” note was stale</a></li>
+  <li><a href="#but-its-tet-mode-is-a-point-map-tetgens-steiner-count-is-not-continuous" id="toc-but-its-tet-mode-is-a-point-map-tetgens-steiner-count-is-not-continuous" class="nav-link" data-scroll-target="#but-its-tet-mode-is-a-point-map-tetgens-steiner-count-is-not-continuous">…but its tet mode is a point map: TetGen’s Steiner count is not continuous</a></li>
+  <li><a href="#its-hex-mode-is-the-mode-that-works" id="toc-its-hex-mode-is-the-mode-that-works" class="nav-link" data-scroll-target="#its-hex-mode-is-the-mode-that-works">Its hex mode is the mode that works</a></li>
+  <li><a href="#the-dc-chain-at-the-declared-resolution-which-is-what-the-playground-runs" id="toc-the-dc-chain-at-the-declared-resolution-which-is-what-the-playground-runs" class="nav-link" data-scroll-target="#the-dc-chain-at-the-declared-resolution-which-is-what-the-playground-runs">The DC chain at the declared resolution, which is what the playground runs</a></li>
+  <li><a href="#the-starter-tet-fd-failure-was-a-kink-not-a-gradient-defect" id="toc-the-starter-tet-fd-failure-was-a-kink-not-a-gradient-defect" class="nav-link" data-scroll-target="#the-starter-tet-fd-failure-was-a-kink-not-a-gradient-defect">The starter tet FD failure was a kink, not a gradient defect</a></li>
+  <li><a href="#bug-open-project_points-amplifies-its-own-linearization-by-1e12-per-step" id="toc-bug-open-project_points-amplifies-its-own-linearization-by-1e12-per-step" class="nav-link" data-scroll-target="#bug-open-project_points-amplifies-its-own-linearization-by-1e12-per-step">BUG (open): <code>project_points</code> amplifies its own linearization by 1e12 per step</a></li>
+  <li><a href="#files-delta-1" id="toc-files-delta-1" class="nav-link" data-scroll-target="#files-delta-1">Files (delta)</a></li>
   </ul></li>
   </ul></li>
   </ul>
@@ -1800,6 +1845,350 @@ step  5  RuntimeError: Direct linear solve failed on the tet system
 <li><code>cadjoint/fem/tesseracts/tetfill/</code> — <strong>unchanged</strong>. The black box stayed a black box.</li>
 <li><code>tests/fem/test_tetfill.py</code> — 26 tests (was 20): <code>TestExpiredBrackets</code> freezes a bar whose faces sit 0.0014 above a lattice plane, checks that a 0.005 design step expires <strong>304 of 336</strong> brackets, and asserts the fill stays non-degenerate (min quality 1.19e-2, zero inverted) and solvable — the old map produced <strong>347 exactly-zero-volume tets</strong> on that same step; plus a fixed-point/interior-follows check on the relaxation.</li>
 </ul>
+</section>
+</section>
+<section id="retargeting-the-starter-chain-tests-on-measurement-2026-09-01" class="level2">
+<h2 class="anchored" data-anchor-id="retargeting-the-starter-chain-tests-on-measurement-2026-09-01">Retargeting the starter chain tests on measurement (2026-09-01)</h2>
+<p>Six tests in <code>tests/fem/</code> were red. Everything below is what measurement said when they were pointed at the code as it now stands, at the starter’s <strong>declared</strong> 18x13x11 lattice unless stated otherwise. Nothing here was fixed by loosening an assert; two of the six turned out to be documenting a stale claim, one turned out to be measuring a kink, and one measurement found a live defect (last section).</p>
+<section id="the-interpolant-chain-can-mesh-the-starter-the-old-24x18x15-note-was-stale" class="level3">
+<h3 class="anchored" data-anchor-id="the-interpolant-chain-can-mesh-the-starter-the-old-24x18x15-note-was-stale">The interpolant chain can mesh the starter — the old “24x18x15” note was stale</h3>
+<p><code>tests/fem/test_starter_chain.py</code> refined the lattice to 24x18x15 on the recorded grounds that the mesher tesseract self-intersects at the declared resolution. Both halves of that are now wrong. Sweeping <code>freeze_study_chain</code> over the sink (tet10, sharp -&gt; Tikhonov fallback as <code>_discover_mesh</code> does it):</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>lattice</th>
+<th>result</th>
+<th>sharp</th>
+<th>mesh</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>18x13x11 (declared)</strong></td>
+<td><strong>OK</strong></td>
+<td>1</td>
+<td>6412 pts / 3499 cells / 860 surface</td>
+</tr>
+<tr class="even">
+<td>19x14x12</td>
+<td>OK</td>
+<td>0</td>
+<td>7447 / 4240 / 890</td>
+</tr>
+<tr class="odd">
+<td>20x15x12</td>
+<td>rejected</td>
+<td>—</td>
+<td>self-intersections</td>
+</tr>
+<tr class="even">
+<td>21x16x13</td>
+<td>rejected</td>
+<td>—</td>
+<td>self-intersections</td>
+</tr>
+<tr class="odd">
+<td>24x18x15</td>
+<td>rejected</td>
+<td>—</td>
+<td>self-intersections</td>
+</tr>
+<tr class="even">
+<td>27x20x17</td>
+<td>OK</td>
+<td>1</td>
+<td>17713 / 10506 / 1860</td>
+</tr>
+<tr class="odd">
+<td>30x22x18</td>
+<td>rejected</td>
+<td>—</td>
+<td>self-intersections</td>
+</tr>
+<tr class="even">
+<td>36x26x22</td>
+<td>rejected</td>
+<td>—</td>
+<td>self-intersections</td>
+</tr>
+<tr class="odd">
+<td>42x31x26</td>
+<td>rejected</td>
+<td>—</td>
+<td>self-intersections</td>
+</tr>
+<tr class="even">
+<td>48x36x30</td>
+<td>rejected</td>
+<td>—</td>
+<td>self-intersections</td>
+</tr>
+</tbody>
+</table>
+<p>Meshability is <strong>not monotone in the lattice</strong>: the declared resolution works and the refinement the tests were using is one of the ones that fails. Refining is not a remedy for the crease self-intersections, which is an independent argument for the DC chain being the default. (Freeze cost is ~2-3 s at any of these.)</p>
+</section>
+<section id="but-its-tet-mode-is-a-point-map-tetgens-steiner-count-is-not-continuous" class="level3">
+<h3 class="anchored" data-anchor-id="but-its-tet-mode-is-a-point-map-tetgens-steiner-count-is-not-continuous">…but its tet mode is a point map: TetGen’s Steiner count is not continuous</h3>
+<p>The frozen tet chain reaches stage-2 parity with the direct solve at <strong>exactly 0.0</strong> and evaluates at its freeze samples (<code>J = 0.968120173</code>). It cannot be evaluated anywhere else. Perturbing <code>fin_depth</code> and re-calling <code>metric_value</code>:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>step</th>
+<th>+1e-2</th>
+<th>+1e-3</th>
+<th>+1e-4</th>
+<th>+1e-6</th>
+<th>+1e-8</th>
+<th><strong>+1e-10</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>result</td>
+<td>raises</td>
+<td>raises</td>
+<td>raises</td>
+<td>raises</td>
+<td>raises</td>
+<td><strong>raises</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Every one fails with <code>Frozen-topology promise violated: caller promised 6412 points but the mesher produced 6503</code>. Negative steps of the same size fail identically. A 1e-10 step on a 1.2 mm parameter is machine noise, so this is not a design-tolerance question: TetGen’s Steiner insertion is not continuous in its input, and the whole-pipeline mesher re-runs it inside <code>apply</code>. Confirmed end to end — <code>Optimization(gradient_path="tesseract")</code> on a tet10 SimMesh dies on its <strong>first</strong> traced call (<code>promised 6486, produced 6476</code>).</p>
+<p>Perturbing the <em>lattice samples</em> directly is no better, and the sign pattern is not the cause: masking the direction to the 2552 of 3192 samples with <code>|phi| &gt; 0.05</code> (so no crossing can flip) and taking <code>h</code> down to 1e-4 still raises. This is why there is no FD check on the tet chain’s VJP — the forward map has no second point to difference against.</p>
+</section>
+<section id="its-hex-mode-is-the-mode-that-works" class="level3">
+<h3 class="anchored" data-anchor-id="its-hex-mode-is-the-mode-that-works">Its hex mode is the mode that works</h3>
+<p>No TetGen in it, so the topology only moves when a lattice sample changes sign.</p>
+<ul>
+<li>Freeze 1.5-3 s; 960 points / 560 hexes; stage-2 parity <code>max |dT| = 0.0</code>.</li>
+<li><code>J = 0.988622627</code>, adjoint <code>d(max T)/d(fin_depth) = -0.072205495</code>.</li>
+<li>Adjoint vs central FD:</li>
+</ul>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>eps</th>
+<th>5e-4</th>
+<th>3e-4</th>
+<th>1e-4</th>
+<th>3e-5</th>
+<th>1e-5</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>central FD</td>
+<td>-0.070080581</td>
+<td>-0.070080709</td>
+<td>-0.070080773</td>
+<td>-0.070080383</td>
+<td>-0.070081075</td>
+</tr>
+<tr class="even">
+<td>rel. gap</td>
+<td>2.943e-2</td>
+<td>2.943e-2</td>
+<td>2.943e-2</td>
+<td>2.943e-2</td>
+<td>2.942e-2</td>
+</tr>
+</tbody>
+</table>
+<p>The gap is <strong>constant at 2.94% over four decades of eps</strong>, so it is not FD truncation — it is the mesher tesseract’s gauge (its surface-interpolation VJP carries only the normal component of boundary-vertex motion). Tests assert rtol 5e-2 on that basis. - <code>eps &gt;= 1e-3</code> breaks: the closest lattice sample sits <code>|phi| = 4.5e-3</code> from the surface, flips, and the voxel count moves 960 -&gt; 956. The FD window is <code>eps &lt;= 5e-4</code>. - Descent (lr 0.05) is monotone: <code>0.988622627 -&gt; 0.988371046 -&gt; 0.988124474 -&gt; 0.987889036</code>. - <code>Optimization(gradient_path="tesseract")</code> completes on a hex SimMesh: <code>0.988697833 -&gt; 0.981505746</code>, 22.9 s for 2 steps, parameters restored.</p>
+</section>
+<section id="the-dc-chain-at-the-declared-resolution-which-is-what-the-playground-runs" class="level3">
+<h3 class="anchored" data-anchor-id="the-dc-chain-at-the-declared-resolution-which-is-what-the-playground-runs">The DC chain at the declared resolution, which is what the playground runs</h3>
+<p>Freeze 8.3-8.7 s; 5798 points / 3009 cells / 860 surface; DC surface 860 vertices / 1716 triangles — i.e.&nbsp;it meshes the crease-heavy comb <strong>at the scene’s own grid</strong>, no refinement.</p>
+<ul>
+<li>Fixed point: traced nodes vs frozen mesh <code>max |dx| = 0.0</code>. Stage-2 parity <code>max |dT| = 0.0</code>.</li>
+<li><code>J = 1.153307262</code>, adjoint <code>-0.166356900</code>. Against central FD:</li>
+</ul>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>eps</th>
+<th>1e-3</th>
+<th>3e-4</th>
+<th>1e-4</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>central FD</td>
+<td>-0.166357126</td>
+<td>-0.166356920</td>
+<td>-0.166356902</td>
+</tr>
+<tr class="even">
+<td>rel. err</td>
+<td><strong>1.36e-6</strong></td>
+<td>1.22e-7</td>
+<td>1.36e-8</td>
+</tr>
+</tbody>
+</table>
+<p>Clean second-order convergence — the DC chain differentiates its own objective exactly, and the residual is FD truncation. - Direct path on the <em>same</em> mesh: <code>-0.134186049</code>, ratio <strong>1.240</strong>. The two differentiate different frozen maps (DC’s QEF surface keeps tangential vertex motion; per-vertex Newton re-projection does not), so sign-and-scale is the honest assertion and the DC number is the one FD backs. - Descent (lr 0.05) monotone: <code>1.15330727 -&gt; 1.15194002 -&gt; 1.15063003 -&gt; 1.14937921</code>. - <code>Optimization(gradient_path="tesseract-dc")</code>: <code>1.13963743 -&gt; 1.12917570</code>, 46 s for 2 steps, parameters restored to 1.200000048.</p>
+</section>
+<section id="the-starter-tet-fd-failure-was-a-kink-not-a-gradient-defect" class="level3">
+<h3 class="anchored" data-anchor-id="the-starter-tet-fd-failure-was-a-kink-not-a-gradient-defect">The starter tet FD failure was a kink, not a gradient defect</h3>
+<p><code>test_fin_depth_gradient_matches_finite_differences</code> compared adjoint <code>-0.08897663</code> against central FD <code>-0.07299839</code> at rtol 5e-2 and failed. Sweeping eps over three decades on the direct tet path (<code>recompute_tet_points</code> + <code>solve(points=...)</code>, <code>mean</code> metric, mesh frozen at the nominal design):</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>eps</th>
+<th>central FD</th>
+<th>forward FD</th>
+<th>backward FD</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>3e-2</td>
+<td>-0.073833967</td>
+<td>-0.055531029</td>
+<td>-0.092136905</td>
+</tr>
+<tr class="even">
+<td>1e-2</td>
+<td>-0.073225563</td>
+<td>-0.056474785</td>
+<td>-0.089976341</td>
+</tr>
+<tr class="odd">
+<td>1e-3</td>
+<td>-0.072998389</td>
+<td>-0.056917103</td>
+<td>-0.089079676</td>
+</tr>
+<tr class="even">
+<td>1e-4</td>
+<td>-0.073040041</td>
+<td>-0.057093889</td>
+<td>-0.088986192</td>
+</tr>
+<tr class="odd">
+<td>1e-5</td>
+<td>-0.073702865</td>
+<td>-0.058435533</td>
+<td>-0.088970198</td>
+</tr>
+</tbody>
+</table>
+<p>Central FD does not converge to the adjoint at any eps — it sits at -0.0730 across the whole sweep. The <strong>one-sided</strong> differences do converge, to two different numbers: backward -&gt; <code>-0.08897</code> (the adjoint, to 6 digits) and forward -&gt; <code>-0.0570</code>. Central FD is their mean to the last digit printed. The objective has a genuine kink at the freeze design and the adjoint is its <strong>left</strong> derivative.</p>
+<p>The cause is geometric, not numerical. The comb is an extrusion, <code>max(profile_2d, |y| - fin_depth/2)</code>, and the frozen boundary nodes at the fin-tip corners sit exactly on the end cap <code>y = +-0.6</code> at <code>fin_depth = 1.2</code> — the <code>max()</code>’s branch boundary. Shrinking the depth leaves them outside, so <code>project_points</code> drags them with the cap at <code>|dx/d(fin_depth)| = 0.5</code>; growing it leaves them inside, where the cap term is not active and they do not move.</p>
+<p>Stepping off that one point restores textbook agreement. At <code>fin_depth = 1.25</code> (the boundary point Jacobian is a uniform 0.5 over all 860 surface nodes there, so the mesh map is well-conditioned):</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>eps</th>
+<th>3e-3</th>
+<th>1e-3</th>
+<th>3e-4</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>central FD</td>
+<td>-0.052300844</td>
+<td>-0.052300693</td>
+<td>-0.052300676</td>
+</tr>
+<tr class="even">
+<td>rel. err vs adjoint -0.052300674</td>
+<td>3.25e-6</td>
+<td><strong>3.61e-7</strong></td>
+<td>3.25e-8</td>
+</tr>
+</tbody>
+</table>
+<p>Sampling other base designs confirms the kink is isolated to the freeze point: adjoint and central FD agree to 7 digits at 1.2137, 1.25 and 1.30.</p>
+</section>
+<section id="bug-open-project_points-amplifies-its-own-linearization-by-1e12-per-step" class="level3">
+<h3 class="anchored" data-anchor-id="bug-open-project_points-amplifies-its-own-linearization-by-1e12-per-step">BUG (open): <code>project_points</code> amplifies its own linearization by 1e12 per step</h3>
+<p>Found while sweeping base designs for the above, and <strong>not</strong> the cause of any of the six red tests — but it is live and it destroys gradients silently.</p>
+<p>Evaluating <code>d(mean T)/d(fin_depth)</code> on the direct tet path at base designs <em>below</em> the freeze point returns garbage of astronomical magnitude, while the forward value and FD stay perfectly smooth:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 12%">
+<col style="width: 12%">
+<col style="width: 12%">
+<col style="width: 12%">
+<col style="width: 12%">
+<col style="width: 12%">
+<col style="width: 12%">
+<col style="width: 12%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>base <code>fin_depth</code></th>
+<th>1.10</th>
+<th>1.15</th>
+<th>1.17</th>
+<th>1.1873</th>
+<th>1.199</th>
+<th>1.20</th>
+<th>1.2137</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>adjoint</td>
+<td>6.9e+59</td>
+<td>1.8e+59</td>
+<td>-7.1e+59</td>
+<td>-2.3e+60</td>
+<td>-0.0892</td>
+<td>-0.0890</td>
+<td>-0.0556</td>
+</tr>
+<tr class="even">
+<td>central FD</td>
+<td>-0.1125</td>
+<td>-0.1000</td>
+<td>-0.0954</td>
+<td>-0.0916</td>
+<td>-0.0916</td>
+<td>-0.0730</td>
+<td>-0.0556</td>
+</tr>
+</tbody>
+</table>
+<p>It localizes to <code>cadjoint/fem/hexmesh.py:187</code>, inside <code>project_points</code>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>squared <span class="op">=</span> jnp.<span class="bu">sum</span>(gradient <span class="op">*</span> gradient, axis<span class="op">=-</span><span class="dv">1</span>, keepdims<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>step <span class="op">=</span> value[:, <span class="va">None</span>] <span class="op">*</span> gradient <span class="op">/</span> jnp.maximum(squared, <span class="fl">1e-12</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>At the fin-tip corner nodes the smoothed union’s gradient <strong>underflows</strong>: after the first Newton step the node sits at <code>f = 4.3e-9</code> with <code>|grad| = 3.97e-8</code>, so <code>squared = 1.6e-15</code> is below the <code>1e-12</code> floor. The floor does its job on the forward pass — the clamped step is ~1.7e-4, harmless — but it also <em>freezes the denominator as a constant</em>, so the step’s Jacobian is <code>value * Hessian / 1e-12</code>, and the measured amplification is exactly <strong>1e12 per Newton iteration</strong>:</p>
+<pre><code>after 1 steps: |dx/dd| = 5.0000e-01
+after 2 steps: |dx/dd| = 5.0000e-01
+after 3 steps: |dx/dd| = 2.2480e+08
+after 4 steps: |dx/dd| = 2.2480e+20
+...
+after 8 steps: |dx/dd| = 2.2480e+68</code></pre>
+<p>63 of 860 surface nodes exceed <code>|dx/dd| = 1e3</code> at <code>fin_depth = 1.15</code> (median over all nodes: 0.0). Eight iterations compound into ~1e68 in the point Jacobian and ~1e59 in the objective gradient. At the freeze design itself the same nodes are clean (<code>max |dx/dd| = 0.503</code>, zero nodes above 1), which is why the shipped tests never saw it — the effect needs the corner node to be strictly <em>outside</em>.</p>
+<p>A guard that only protects the forward pass is not a guard. The fix belongs where the floor is: the step (and hence its derivative) should be suppressed when the gradient underflows, e.g.&nbsp;<code>jnp.where(squared &lt; tol, 0.0, value * gradient / squared)</code>, so a node with no usable normal simply stays put in both passes instead of contributing a 1e12 multiplier. Left unfixed here — this is a <code>cadjoint/</code> change and wants its own regression test on a bare extrusion corner.</p>
+</section>
+<section id="files-delta-1" class="level3">
+<h3 class="anchored" data-anchor-id="files-delta-1">Files (delta)</h3>
+<ul>
+<li><code>tests/fem/test_starter_chain.py</code> — 16 tests (was 8, of which 5 red). Retargeted onto the DC chain at the <strong>declared</strong> resolution (<code>TestStarterDCChain</code>: meshing, stage-2 parity + fixed point, adjoint-vs-FD at rtol 1e-4, direct-path ratio bounded 1.0-1.6, 3-step descent); the interpolant chain keeps the coverage it earns (<code>TestStarterInterpolantChainHex</code>: parity, adjoint-vs-FD at the measured 2.94% gauge, descent; <code>TestStarterInterpolantChainTet</code>: parity, and the <code>Frozen-topology promise violated</code> limit asserted explicitly rather than assumed away). The end-to-end seam test now runs <code>tesseract-dc</code> on tet10 and <code>tesseract</code> on hex. 141 s.</li>
+<li><code>tests/fem/test_starter_tet.py</code> — 4 tests (was 3, of which 1 red). The FD check moved off the kink to <code>1.2 + 0.05</code> and tightened from rtol 5e-2 to <strong>1e-4</strong>; a new <code>test_the_freeze_design_sits_on_a_kink_and_the_adjoint_takes_it</code> pins the kink itself (adjoint == backward FD to 1.07e-4; central FD 18% away and bracketed by the two one-sided slopes). 24 s.</li>
+<li><code>cadjoint/**</code> — unchanged. The <code>project_points</code> defect above is reported, not patched.</li>
+</ul>
+<p>Gate: <code>pytest tests/fem -q</code> -&gt; <strong>282 passed, 14 skipped</strong>, 0 failed, 0 errors (8:31).</p>
 
 
 </section>
