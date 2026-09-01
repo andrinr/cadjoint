@@ -221,16 +221,18 @@ def material_volume(parameters):
 # The declared optimization closes the loop end to end: the thermal study
 # above becomes the objective. Per step, the frozen simulation mesh follows
 # the design differentiably (node positions re-projected through the traced
-# SDF), the study solves on it, and the mean temperature descends against
+# SDF), the study solves on it, and the PEAK temperature descends against
 # the material-volume regularizer while every update projects back onto the
 # sketch constraints — run it from the viewer and the optimized part
 # arrives with its temperature field attached, values written back here.
+# (Peak, not mean: the die is the hot spot, and a mean-temperature objective
+# degenerately rewards deleting hot material instead of cooling the chip.)
 cool_sink = Optimization(
     name="cool-sink",
     study="sink-conduction",
-    metric="mean",
+    metric="max",
     regularizer=material_volume,
     regularizer_weight=0.4,
     steps=12,
-    learning_rate=0.01,
+    learning_rate=0.004,
 )
