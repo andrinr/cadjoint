@@ -209,6 +209,18 @@ ul.task-list li input[type="checkbox"] {
   <li><a href="#recommendation-on-the-default-gradient-path" id="toc-recommendation-on-the-default-gradient-path" class="nav-link" data-scroll-target="#recommendation-on-the-default-gradient-path">Recommendation on the default gradient path</a></li>
   <li><a href="#files-1" id="toc-files-1" class="nav-link" data-scroll-target="#files-1">Files</a></li>
   </ul></li>
+  <li><a href="#the-frozen-crossing-brackets-expire-why-the-starter-died-at-step-5-2026-09-01" id="toc-the-frozen-crossing-brackets-expire-why-the-starter-died-at-step-5-2026-09-01" class="nav-link" data-scroll-target="#the-frozen-crossing-brackets-expire-why-the-starter-died-at-step-5-2026-09-01">The frozen crossing BRACKETS expire: why the starter died at step 5 (2026-09-01)</a>
+  <ul class="collapse">
+  <li><a href="#the-hypothesis-that-measurement-killed" id="toc-the-hypothesis-that-measurement-killed" class="nav-link" data-scroll-target="#the-hypothesis-that-measurement-killed">The hypothesis that measurement killed</a></li>
+  <li><a href="#the-actual-cause" id="toc-the-actual-cause" class="nav-link" data-scroll-target="#the-actual-cause">The actual cause</a></li>
+  <li><a href="#four-candidate-vertex-maps-measured" id="toc-four-candidate-vertex-maps-measured" class="nav-link" data-scroll-target="#four-candidate-vertex-maps-measured">Four candidate vertex maps, measured</a></li>
+  <li><a href="#the-interior-relaxation-kept-on-its-own-merits" id="toc-the-interior-relaxation-kept-on-its-own-merits" class="nav-link" data-scroll-target="#the-interior-relaxation-kept-on-its-own-merits">The interior relaxation, kept on its own merits</a></li>
+  <li><a href="#frozen-fill-quality-after-the-fix-same-freeze-same-parameters" id="toc-frozen-fill-quality-after-the-fix-same-freeze-same-parameters" class="nav-link" data-scroll-target="#frozen-fill-quality-after-the-fix-same-freeze-same-parameters">Frozen fill quality after the fix (same freeze, same parameters)</a></li>
+  <li><a href="#the-declared-12-step-run-completing" id="toc-the-declared-12-step-run-completing" class="nav-link" data-scroll-target="#the-declared-12-step-run-completing">The declared 12-step run, completing</a></li>
+  <li><a href="#re-validation-nothing-regressed-several-things-improved" id="toc-re-validation-nothing-regressed-several-things-improved" class="nav-link" data-scroll-target="#re-validation-nothing-regressed-several-things-improved">Re-validation: nothing regressed, several things improved</a></li>
+  <li><a href="#on-the-alternatives-plainly" id="toc-on-the-alternatives-plainly" class="nav-link" data-scroll-target="#on-the-alternatives-plainly">On the alternatives, plainly</a></li>
+  <li><a href="#files-delta" id="toc-files-delta" class="nav-link" data-scroll-target="#files-delta">Files (delta)</a></li>
+  </ul></li>
   </ul></li>
   </ul>
 </nav>
@@ -1184,6 +1196,546 @@ ul.task-list li input[type="checkbox"] {
 <li><code>cadjoint/fem/tesseracts/chain.py</code> — <code>freeze_study_chain_dc</code> / <code>FrozenDCChain</code> / <code>_freeze_dc_surface</code> (the frozen-topology JAX DC map), alongside the unchanged <code>freeze_study_chain</code>.</li>
 <li><code>cadjoint/optimize.py</code> — <code>GRADIENT_PATHS = ("direct", "tesseract", "tesseract-dc")</code> at the marked gradient-path seam.</li>
 <li><code>tests/fem/test_tetfill.py</code> — 20 tests (forward contract, <code>parents</code> table, exact VJP vs a JAX gather, frozen fill vs TetGen, chain fixed point, solver parity, adjoint vs FD with an analytic target, the seam and an end-to-end <code>Optimization</code> run); all skip cleanly without tetgen / jax_fem / tesseract deps, 17 s total.</li>
+</ul>
+</section>
+</section>
+<section id="the-frozen-crossing-brackets-expire-why-the-starter-died-at-step-5-2026-09-01" class="level2">
+<h2 class="anchored" data-anchor-id="the-frozen-crossing-brackets-expire-why-the-starter-died-at-step-5-2026-09-01">The frozen crossing BRACKETS expire: why the starter died at step 5 (2026-09-01)</h2>
+<p>The declared starter optimization (<code>scenes/starter.py</code>, <code>gradient_path="tesseract-dc"</code>, 12 steps) descended for five steps and then hard-failed inside the thermal solver tesseract:</p>
+<pre><code>step  0  objective 1.615602  |grad| 1.3867e+00   24.6 s
+step  1  objective 1.613115  |grad| 1.3989e+00    8.1 s
+step  2  objective 1.611339  |grad| 1.4029e+00    7.1 s
+step  3  objective 1.610146  |grad| 1.4106e+00    7.0 s
+step  4  objective 1.609709  |grad| 1.4205e+00    7.1 s
+step  5  RuntimeError: Direct linear solve failed on the tet system
+         (best relative residual 1.16e+00) -- tetmesh.py:140</code></pre>
+<p>Note the descent itself: <strong>-0.0059 over five steps</strong>, and a gradient norm <em>rising</em> every step. Both were already symptoms.</p>
+<section id="the-hypothesis-that-measurement-killed" class="level3">
+<h3 class="anchored" data-anchor-id="the-hypothesis-that-measurement-killed">The hypothesis that measurement killed</h3>
+<p>The obvious suspect is the frozen interior: the tetfill tesseract pins the Steiner nodes while the boundary follows the design, so the tets straddling that gap should degrade until the FEM system is ill-conditioned — and the direct path does not suffer this because <code>recompute_tet_points(..., smooth_passes=2)</code> propagates boundary motion inward. It is a good hypothesis. It is wrong, and one table settles it. Frozen fill at the step-0 design (5 691 nodes / 2 926 tets / 860 surface), re-evaluated at each step’s parameters with N Jacobi-Laplacian interior passes:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>step</th>
+<th>passes 0</th>
+<th>passes 2</th>
+<th>passes 5</th>
+<th>passes 10</th>
+<th>passes 20</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>0</td>
+<td>0.1294</td>
+<td>0.1294</td>
+<td>0.1294</td>
+<td>0.1294</td>
+<td>0.1294</td>
+</tr>
+<tr class="even">
+<td>1</td>
+<td>0.0603</td>
+<td>0.0745</td>
+<td>0.0748</td>
+<td>0.0748</td>
+<td>0.0748</td>
+</tr>
+<tr class="odd">
+<td>2</td>
+<td><strong>7.30e-7</strong></td>
+<td>7.30e-7</td>
+<td>7.30e-7</td>
+<td>7.30e-7</td>
+<td>7.30e-7</td>
+</tr>
+<tr class="even">
+<td>3</td>
+<td><strong>1.07e-6</strong></td>
+<td>1.07e-6</td>
+<td>1.07e-6</td>
+<td>1.07e-6</td>
+<td>1.07e-6</td>
+</tr>
+<tr class="odd">
+<td>4</td>
+<td><strong>7.03e-7</strong></td>
+<td>7.03e-7</td>
+<td>7.03e-7</td>
+<td>7.03e-7</td>
+<td>7.03e-7</td>
+</tr>
+<tr class="even">
+<td>5</td>
+<td><strong>0.0</strong></td>
+<td>0.0</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>0.0</td>
+</tr>
+</tbody>
+</table>
+<p>(min element quality, <code>cbrt|vol| / longest edge</code>.) Smoothing is a <strong>null operation</strong> from step 2 on — bit-identical numbers at 0 and 20 passes. The reason is in the next column: of the 204 degenerate tets at step 2, <strong>204 are boundary-only</strong> (all four corners are DC surface vertices, none touches a Steiner node), so no interior operator can reach them. The mesh is not being pulled apart from the inside. Its <em>boundary</em> is collapsing on itself.</p>
+</section>
+<section id="the-actual-cause" class="level3">
+<h3 class="anchored" data-anchor-id="the-actual-cause">The actual cause</h3>
+<p><code>_freeze_dc_surface</code> froze the crossing-edge set and then re-ran <code>edge_hermite_data</code> on it every traced call. That root search is bracketed by the <strong>frozen sign pattern at the lattice vertices</strong>, which is discrete topology, and it expires:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>step</th>
+<th>frozen brackets still valid</th>
+<th>lost</th>
+<th>min |vol|</th>
+<th>min quality</th>
+<th>inverted</th>
+<th>degenerate (&lt;1e-3)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>0</td>
+<td>858/858</td>
+<td>0</td>
+<td>6.17e-6</td>
+<td>0.1294</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr class="even">
+<td>1</td>
+<td>858/858</td>
+<td>0</td>
+<td>3.34e-6</td>
+<td>0.0603</td>
+<td>2</td>
+<td>0</td>
+</tr>
+<tr class="odd">
+<td>2</td>
+<td>690/858</td>
+<td><strong>168</strong></td>
+<td>1.56e-21</td>
+<td>7.30e-7</td>
+<td>105</td>
+<td>204</td>
+</tr>
+<tr class="even">
+<td>3</td>
+<td>690/858</td>
+<td>168</td>
+<td>2.73e-21</td>
+<td>1.07e-6</td>
+<td>104</td>
+<td>204</td>
+</tr>
+<tr class="odd">
+<td>4</td>
+<td>690/858</td>
+<td>168</td>
+<td>8.69e-22</td>
+<td>7.03e-7</td>
+<td>117</td>
+<td>204</td>
+</tr>
+<tr class="even">
+<td>5</td>
+<td>570/858</td>
+<td><strong>288</strong></td>
+<td>0.0</td>
+<td>0.0</td>
+<td>133</td>
+<td>298</td>
+</tr>
+</tbody>
+</table>
+<p>168 brackets — <strong>20% of them</strong> — die in a single optimizer step, and the collapse is immediate and total, not gradual. Why so abrupt: the sink’s grid is 18x13x11 over z ∈ [-0.3, 1.1], so lattice planes sit at z = -0.3 + 0.12727k, and the fin tips at z = 0.85 sit <strong>0.0045</strong> from the plane at 0.84545. The comb’s faces are axis-aligned, so one small design step sweeps a whole plane of lattice vertices through the surface at once.</p>
+<p><code>edge_hermite_data</code> documents its own behaviour on an expired bracket: bisection collapses toward an endpoint. The cell is then fitted to a “surface sample” that is not on the surface; <code>qef_vertices</code>’ final cell clamp pins neighbouring cells’ vertices onto their shared face; the vertices coincide; the boundary tets built on them have exactly zero volume. The solver sees an unsolvable system and is the first thing to complain, several stages downstream of the actual fault.</p>
+<p>The control confirms it end to end. The <strong>direct</strong> path’s map, on the <em>same frozen mesh</em> and the same parameters, never wavers:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>step</th>
+<th>chain (old map) motion max / mean</th>
+<th>direct motion max / mean</th>
+<th>direct min quality</th>
+<th>direct inverted</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1</td>
+<td>0.1490 / 0.0035</td>
+<td>0.0059 / 0.0028</td>
+<td>0.1299</td>
+<td>0</td>
+</tr>
+<tr class="even">
+<td>3</td>
+<td>0.1350 / 0.0159</td>
+<td>0.0179 / 0.0084</td>
+<td>0.1299</td>
+<td>0</td>
+</tr>
+<tr class="odd">
+<td>5</td>
+<td>0.1483 / 0.0229</td>
+<td>0.0299 / 0.0140</td>
+<td>0.1299</td>
+<td>0</td>
+</tr>
+</tbody>
+</table>
+<p>The real geometry moves by 0.03 at most. The old DC map amplified that into 0.148 of vertex motion — garbage in, garbage out.</p>
+</section>
+<section id="four-candidate-vertex-maps-measured" class="level3">
+<h3 class="anchored" data-anchor-id="four-candidate-vertex-maps-measured">Four candidate vertex maps, measured</h3>
+<p>All evaluated on the same frozen topology at the step-5 parameters:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>map</th>
+<th>motion max / mean</th>
+<th>min |vol|</th>
+<th>min quality</th>
+<th>inverted</th>
+<th>degenerate</th>
+<th>verdict</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>A</strong> re-solve frozen brackets (was)</td>
+<td>0.148 / 0.023</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>133</td>
+<td>298</td>
+<td>the bug</td>
+</tr>
+<tr class="even">
+<td><strong>B</strong> anchored crossings -&gt; QEF</td>
+<td>0.148 / 0.020</td>
+<td>1.6e-10</td>
+<td>5.19e-3</td>
+<td>2</td>
+<td><strong>0</strong></td>
+<td><strong>shipped</strong></td>
+</tr>
+<tr class="odd">
+<td><strong>C</strong> re-project frozen vertices</td>
+<td>0.030 / 0.014</td>
+<td>6.24e-6</td>
+<td>0.1299</td>
+<td>0</td>
+<td>0</td>
+<td>ruled out</td>
+</tr>
+<tr class="even">
+<td><strong>D</strong> A with <code>t</code> clamped to <code>[0,1]</code></td>
+<td>0.148 / 0.023</td>
+<td>7.7e-25</td>
+<td>9.4e-8</td>
+<td>115</td>
+<td>252</td>
+<td>no help</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>D</strong> shows the unclamped Newton <code>t</code> is <em>not</em> the proximate cause: keeping the sample on its edge still leaves it off the surface, and the QEF is just as poisoned.</li>
+<li><strong>C</strong> is the tempting one — it is the healthiest column in the table — and it is exactly what the <strong>bar exhibit</strong> above forbids. Re-projecting the final vertex moves it only along the SDF gradient, so <code>dJ/d(half_thickness)</code> goes from -0.0085 (truth 0) to <strong>-8.61</strong>: three orders of magnitude wrong on a quantity the physics is insensitive to. Tangential shape tracking is the whole reason this chain exists.</li>
+<li><strong>B</strong> keeps it. The frozen crossings are located once, by the bracketed root search, at the freeze design; from then on they are <em>anchors</em> that ride the traced zero set under the same clamped Newton projection the pipeline already uses. No bracket is consulted, so nothing can expire. Every sample stays a genuine surface point with a genuine normal, so the QEF is still a <strong>plane fit</strong> — and a plane fit whose samples each move along their own local normal reproduces tangential vertex motion, which is precisely what per-vertex re-projection throws away.</li>
+</ul>
+<p>One subtlety cost a measurement: <code>edge_hermite_data</code> re-evaluates a <em>degenerate</em> gradient a fraction of an edge toward the inside endpoint (landing bit-exactly on a polygon wall with a dead subgradient is common, not exotic). Without mirroring that, map B lost those planes and moved the boundary by 0.0856 <strong>at the freeze design</strong> — i.e.&nbsp;it stopped being a fixed point. With it, the fixed point is exact.</p>
+</section>
+<section id="the-interior-relaxation-kept-on-its-own-merits" class="level3">
+<h3 class="anchored" data-anchor-id="the-interior-relaxation-kept-on-its-own-merits">The interior relaxation, kept on its own merits</h3>
+<p>Interior smoothing is not the fix, but it is now applied anyway — 2 Jacobi-Laplacian sweeps, boundary pinned, shared with the direct path via <code>tetmesh.smooth_interior_delta</code>. It is applied <strong>in JAX in <code>chain.py</code>, on the tesseract’s returned nodes</strong>, not inside the tesseract:</p>
+<ul>
+<li>the tetfill forward stays a pure gather and its VJP the exact transpose of one (no smoothing operator to transpose by hand);</li>
+<li>the relaxed nodes depend on the tesseract’s output <em>only through the preserved boundary block</em>, so the cotangent reaching the tesseract is supported exactly where its pass-through is exact. The Steiner-cotangent drop stops being an approximation: the solver’s interior-node sensitivity is now <strong>transported onto the boundary</strong> through the relaxation’s transpose instead of being discarded;</li>
+<li>fixed point preserved exactly, TET10 midsides included (<code>max |dev| = 0.0</code> for both TET4 and TET10).</li>
+</ul>
+<p>Measured worth: it recovers min quality 0.0344 -&gt; 0.0624 at step 1 (where boundary motion is concentrated on a few vertices) and is a null operation at steps 2-5, for the same reason as before — those slivers are boundary-only.</p>
+</section>
+<section id="frozen-fill-quality-after-the-fix-same-freeze-same-parameters" class="level3">
+<h3 class="anchored" data-anchor-id="frozen-fill-quality-after-the-fix-same-freeze-same-parameters">Frozen fill quality after the fix (same freeze, same parameters)</h3>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>step</th>
+<th>min |vol|</th>
+<th>min quality</th>
+<th>inverted</th>
+<th>quality &lt; 0.01</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>0</td>
+<td>6.31e-6</td>
+<td>0.1304</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr class="even">
+<td>1</td>
+<td>3.68e-6</td>
+<td>0.0624</td>
+<td>2</td>
+<td>0</td>
+</tr>
+<tr class="odd">
+<td>2</td>
+<td>2.69e-6</td>
+<td>0.0632</td>
+<td>4</td>
+<td>0</td>
+</tr>
+<tr class="even">
+<td>3</td>
+<td>9.06e-8</td>
+<td>0.0368</td>
+<td>3</td>
+<td>0</td>
+</tr>
+<tr class="odd">
+<td>4</td>
+<td>8.40e-8</td>
+<td>0.0366</td>
+<td>1</td>
+<td>0</td>
+</tr>
+<tr class="even">
+<td>5</td>
+<td>1.55e-10</td>
+<td>0.0052</td>
+<td>2</td>
+<td>52</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="the-declared-12-step-run-completing" class="level3">
+<h3 class="anchored" data-anchor-id="the-declared-12-step-run-completing">The declared 12-step run, completing</h3>
+<p><code>scenes/starter.py</code>’s own <code>cool-sink</code> optimization, verbatim (<code>remesh_every</code> 6, so one refreeze at step 6), 170.4 s total:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 7%">
+<col style="width: 7%">
+<col style="width: 7%">
+<col style="width: 7%">
+<col style="width: 7%">
+<col style="width: 7%">
+<col style="width: 7%">
+<col style="width: 7%">
+<col style="width: 7%">
+<col style="width: 7%">
+<col style="width: 7%">
+<col style="width: 7%">
+<col style="width: 7%">
+<col style="width: 7%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>step</th>
+<th>0</th>
+<th>1</th>
+<th>2</th>
+<th>3</th>
+<th>4</th>
+<th>5</th>
+<th>6</th>
+<th>7</th>
+<th>8</th>
+<th>9</th>
+<th>10</th>
+<th>11</th>
+<th>final</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>J</td>
+<td>1.617200</td>
+<td>1.614708</td>
+<td>1.608122</td>
+<td>1.600740</td>
+<td>1.593071</td>
+<td>1.585311</td>
+<td>1.581312</td>
+<td>1.574670</td>
+<td>1.567995</td>
+<td>1.561397</td>
+<td>1.554886</td>
+<td>1.548351</td>
+<td><strong>1.533429</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Monotone, no solver failures, <code>fin_depth</code> 1.2000 -&gt; 1.1524. 29.7 s for step 0 (JIT), 10.2-11.5 s thereafter, 27.7 s at the step-6 refreeze. Against the broken run’s -0.0059 over five steps this is <strong>-0.0838 over twelve</strong> — the old descent was not just fragile, it was reading gradients off a mesh that had already collapsed.</p>
+</section>
+<section id="re-validation-nothing-regressed-several-things-improved" class="level3">
+<h3 class="anchored" data-anchor-id="re-validation-nothing-regressed-several-things-improved">Re-validation: nothing regressed, several things improved</h3>
+<p><strong>Mechanical VJP</strong> (unchanged code, re-checked): vs <code>jax.vjp</code> of the equivalent JAX gather, TET4 max rel err <strong>0.0</strong>, TET10 <strong>1.74e-16</strong>; primal deviation 0.0 for both.</p>
+<p><strong>Bar exhibit</strong> — the property that ruled out map C, reproduced to every printed digit:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>quantity</th>
+<th>before</th>
+<th>after</th>
+<th>truth</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>J</code></td>
+<td>1.585170</td>
+<td>1.585170</td>
+<td>1.6</td>
+</tr>
+<tr class="even">
+<td><code>dJ/d(half_length)</code></td>
+<td>+1.999469 (FD +1.999469)</td>
+<td>+1.994235 (FD +1.994235)</td>
+<td>+2</td>
+</tr>
+<tr class="odd">
+<td><code>dJ/d(half_thickness)</code></td>
+<td>-0.008474 (FD -0.008474)</td>
+<td><strong>-0.008473</strong> (FD -0.008473)</td>
+<td>0</td>
+</tr>
+<tr class="even">
+<td>direct, same mesh</td>
+<td>-8.609769</td>
+<td>-8.609769</td>
+<td>0</td>
+</tr>
+</tbody>
+</table>
+<p><code>half_length</code> moves by 0.26% and lands exactly on the direct path’s +1.994235: that is the interior relaxation, which makes interior nodes contribute to the <em>nodal</em> mean exactly as they do on the direct path. <code>half_thickness</code> — the row the exhibit is about — is unchanged, still 1000x better than re-projection.</p>
+<p><strong>Starter gradient</strong> (18x13x11, tet10, <code>d(max T)/d(fin_depth)</code>):</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th></th>
+<th>J</th>
+<th>adjoint</th>
+<th>FD 1e-3</th>
+<th>FD 3e-3</th>
+<th>FD 1e-2</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>before</td>
+<td>1.147747</td>
+<td>-0.165900</td>
+<td>-0.165900</td>
+<td>-0.165902</td>
+<td>-0.165887</td>
+</tr>
+<tr class="even">
+<td>after</td>
+<td>1.146109</td>
+<td><strong>-0.161859</strong></td>
+<td>-0.161860</td>
+<td>-0.161862</td>
+<td>-0.161891</td>
+</tr>
+</tbody>
+</table>
+<p>Adjoint-vs-FD self-consistency holds at 6 digits (rel 1.5e-6). Both numbers moved <em>toward</em> the direct path’s reference (<code>J</code> 1.145255, adjoint -0.157944): forward physics 0.22% -&gt; <strong>0.07%</strong> off, gradient 5.0% -&gt; <strong>2.5%</strong> off. Fixed point <code>max |dev| = 0.0</code>, stage-2 parity <code>max |dT| = 0.0</code>.</p>
+<p><strong>Bracket</strong> (elastic TET10 @ 22x16x13, compliance; 8 642 nodes / 4 789 tets / 1 108 surface, freeze 6.8 s, <code>J = 0.06532303</code>, parity <code>max |du| = 0.0</code>):</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>parameter</th>
+<th>adjoint</th>
+<th>FD 1e-3</th>
+<th>rel</th>
+<th>rel before</th>
+<th>direct, same mesh</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>plate_thickness</code></td>
+<td>-0.425155</td>
+<td>-0.425171</td>
+<td><strong>3.7e-5</strong></td>
+<td>8.8e-4</td>
+<td>-0.429545</td>
+</tr>
+<tr class="even">
+<td><code>web_thickness</code></td>
+<td>-0.237656</td>
+<td>-0.240457</td>
+<td><strong>1.2e-2</strong></td>
+<td>6.6e-2</td>
+<td>-0.219700</td>
+</tr>
+</tbody>
+</table>
+<p>Adjoint-vs-FD agreement is <strong>24x tighter</strong> on <code>plate_thickness</code> and <strong>5x tighter</strong> on <code>web_thickness</code> — the expiring brackets were perturbing the FD probes themselves.</p>
+</section>
+<section id="on-the-alternatives-plainly" class="level3">
+<h3 class="anchored" data-anchor-id="on-the-alternatives-plainly">On the alternatives, plainly</h3>
+<ul>
+<li><strong>Interior smoothing alone is not merely insufficient, it is a null operation</strong> for this failure (the table at the top). It ships anyway, for the reasons above, but no one should believe it fixed the starter.</li>
+<li><strong>Refreezing more often</strong> would have worked and is the wrong trade. The measured validity horizon of the frozen brackets on the starter is <strong>one step</strong> (168 lost between step 1 and step 2), so it would mean <code>remesh_every=1</code> — a full TetGen re-extraction every step (27.7 s vs 10.4 s measured here, i.e.&nbsp;~3x the wall clock), to paper over a map that should not have depended on the expiring data in the first place. With the anchored map the frozen topology survives its declared 6 steps with room to spare.</li>
+<li><strong>Quality-aware refill</strong> was not needed: after the fix the worst element over the whole refreeze interval is quality 0.0052 with zero inverted tets, and the solver never falls past its first PETSc LU attempt.</li>
+</ul>
+</section>
+<section id="files-delta" class="level3">
+<h3 class="anchored" data-anchor-id="files-delta">Files (delta)</h3>
+<ul>
+<li><code>cadjoint/fem/tesseracts/chain.py</code> — <code>_freeze_dc_surface</code> anchors the frozen crossings and projects them onto the traced zero set (mirroring <code>edge_hermite_data</code>’s degenerate-gradient fallback); new <code>_interior_relaxation</code> composes the shared Laplacian relaxation onto the tetfill tesseract’s returned nodes.</li>
+<li><code>cadjoint/fem/tetmesh.py</code> — <code>smooth_interior_delta</code> factored out of <code>recompute_tet_points</code> so the direct path and the DC chain relax through one operator; the <code>smooth_passes &lt;= 0</code> branch is left as a concatenation so the direct path stays bit-identical.</li>
+<li><code>cadjoint/fem/tesseracts/tetfill/</code> — <strong>unchanged</strong>. The black box stayed a black box.</li>
+<li><code>tests/fem/test_tetfill.py</code> — 26 tests (was 20): <code>TestExpiredBrackets</code> freezes a bar whose faces sit 0.0014 above a lattice plane, checks that a 0.005 design step expires <strong>304 of 336</strong> brackets, and asserts the fill stays non-degenerate (min quality 1.19e-2, zero inverted) and solvable — the old map produced <strong>347 exactly-zero-volume tets</strong> on that same step; plus a fixed-point/interior-follows check on the relaxation.</li>
 </ul>
 
 
