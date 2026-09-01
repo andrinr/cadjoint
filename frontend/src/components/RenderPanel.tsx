@@ -17,12 +17,38 @@ import {
 } from "../renderPresets";
 import type { DisplaySettings, ShadowMode } from "../viewer/renderer";
 import { QUALITY_PRESETS } from "../viewer/renderer";
+import { Segmented, ToggleSwitch, type SegmentedOption } from "./ui";
 
-const SHADOWS: { value: ShadowMode; label: string; hint: string }[] = [
-  { value: "off", label: "Off", hint: "No shadow rays" },
-  { value: "hard", label: "Hard", hint: "One crisp, lifted shadow ray" },
-  { value: "soft", label: "Soft", hint: "Penumbra from multiple samples" },
+const SHADOWS: SegmentedOption<ShadowMode>[] = [
+  { value: "off", label: "Off", title: "No shadow rays", testId: "shadows-off" },
+  {
+    value: "hard",
+    label: "Hard",
+    title: "One crisp, lifted shadow ray",
+    testId: "shadows-hard",
+  },
+  {
+    value: "soft",
+    label: "Soft",
+    title: "Penumbra from multiple samples",
+    testId: "shadows-soft",
+  },
 ];
+
+/** Shading is a two-way choice; `flatShading` is the underlying flag. */
+const SHADING: SegmentedOption<boolean>[] = [
+  { value: false, label: "Full", testId: "shading-full" },
+  {
+    value: true,
+    label: "Flat",
+    title: "Albedo only, no specular or environment",
+    testId: "shading-flat",
+  },
+];
+
+const QUALITIES: SegmentedOption<string>[] = Object.entries(QUALITY_PRESETS).map(
+  ([key, preset]) => ({ value: key, label: preset.label, testId: `quality-${key}` }),
+);
 
 const SWITCHES: { key: keyof DisplaySettings; label: string; hint: string }[] = [
   { key: "reflections", label: "Reflections", hint: "Environment reflections" },
@@ -150,201 +176,121 @@ export function RenderPanel(props: RenderPanelProps) {
 
             <section>
               <h4>Shading</h4>
-              <div class="segmented">
-                <button
-                  type="button"
-                  class={props.display.flatShading ? "" : "active"}
-                  onClick={() => props.onChange({ flatShading: false })}
-                  data-testid="shading-full"
-                >
-                  Full
-                </button>
-                <button
-                  type="button"
-                  class={props.display.flatShading ? "active" : ""}
-                  onClick={() => props.onChange({ flatShading: true })}
-                  title="Albedo only, no specular or environment"
-                  data-testid="shading-flat"
-                >
-                  Flat
-                </button>
-              </div>
+              <Segmented
+                options={SHADING}
+                value={props.display.flatShading}
+                onSelect={(flatShading) => props.onChange({ flatShading })}
+              />
             </section>
 
             <section>
               <h4>Shadows</h4>
-              <div class="segmented">
-                <For each={SHADOWS}>
-                  {(mode) => (
-                    <button
-                      type="button"
-                      class={props.display.shadows === mode.value ? "active" : ""}
-                      onClick={() => props.onChange({ shadows: mode.value })}
-                      title={mode.hint}
-                      data-testid={`shadows-${mode.value}`}
-                    >
-                      {mode.label}
-                    </button>
-                  )}
-                </For>
-              </div>
+              <Segmented
+                options={SHADOWS}
+                value={props.display.shadows}
+                onSelect={(shadows) => props.onChange({ shadows })}
+              />
             </section>
 
             <section>
               <h4>Quality</h4>
-              <div class="segmented">
-                <For each={Object.entries(QUALITY_PRESETS)}>
-                  {([key, preset]) => (
-                    <button
-                      type="button"
-                      class={props.quality === key ? "active" : ""}
-                      onClick={() => props.onQualityChange(key)}
-                      data-testid={`quality-${key}`}
-                    >
-                      {preset.label}
-                    </button>
-                  )}
-                </For>
-              </div>
+              <Segmented
+                options={QUALITIES}
+                value={props.quality}
+                onSelect={props.onQualityChange}
+              />
             </section>
 
             <section>
               <h4>Effects</h4>
-              <label class="switch">
-                <input
-                  type="checkbox"
-                  checked={props.pathTracing}
-                  onChange={(event) =>
-                    props.onPathTracingChange(event.currentTarget.checked)
-                  }
-                  data-testid="toggle-path-tracing"
-                />
-                <span>
-                  Path tracing
-                  <small>Progressive physically based rendering</small>
-                </span>
-              </label>
-              <label class="switch">
-                <input
-                  type="checkbox"
-                  checked={props.display.xray > 0}
-                  onChange={(event) =>
-                    props.onChange({
-                      xray: event.currentTarget.checked ? 1 : 0,
-                    })
-                  }
-                  data-testid="toggle-xray"
-                />
-                <span>
-                  X-ray
-                  <small>See construction through the solid</small>
-                </span>
-              </label>
+              <ToggleSwitch
+                checked={props.pathTracing}
+                onChange={props.onPathTracingChange}
+                testId="toggle-path-tracing"
+              >
+                Path tracing
+                <small>Progressive physically based rendering</small>
+              </ToggleSwitch>
+              <ToggleSwitch
+                checked={props.display.xray > 0}
+                onChange={(checked) => props.onChange({ xray: checked ? 1 : 0 })}
+                testId="toggle-xray"
+              >
+                X-ray
+                <small>See construction through the solid</small>
+              </ToggleSwitch>
               <For each={SWITCHES}>
                 {(entry) => (
-                  <label class="switch">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(props.display[entry.key])}
-                      onChange={(event) =>
-                        props.onChange({
-                          [entry.key]: event.currentTarget.checked,
-                        })
-                      }
-                      data-testid={`toggle-${entry.key}`}
-                    />
-                    <span>
-                      {entry.label}
-                      <small>{entry.hint}</small>
-                    </span>
-                  </label>
+                  <ToggleSwitch
+                    checked={Boolean(props.display[entry.key])}
+                    onChange={(checked) => props.onChange({ [entry.key]: checked })}
+                    testId={`toggle-${entry.key}`}
+                  >
+                    {entry.label}
+                    <small>{entry.hint}</small>
+                  </ToggleSwitch>
                 )}
               </For>
             </section>
 
             <section>
               <h4>Annotations</h4>
-              <label class="switch">
-                <input
-                  type="checkbox"
-                  checked={props.display.showSketches}
-                  onChange={(event) =>
-                    props.onChange({
-                      showSketches: event.currentTarget.checked,
-                    })
-                  }
-                  data-testid="toggle-showSketches"
-                />
-                <span>
-                  Sketch geometry
-                  <small>Edges and editable point handles</small>
-                </span>
-              </label>
-              <label class="switch">
-                <input
-                  type="checkbox"
-                  checked={props.display.showConstraints}
-                  onChange={(event) =>
-                    props.onChange({
-                      showConstraints: event.currentTarget.checked,
-                    })
-                  }
-                  data-testid="toggle-constraints"
-                />
-                <span>
-                  Constraints
-                  <small>Viewport dimensions and fixed badges</small>
-                </span>
-              </label>
+              <ToggleSwitch
+                checked={props.display.showSketches}
+                onChange={(showSketches) => props.onChange({ showSketches })}
+                testId="toggle-showSketches"
+              >
+                Sketch geometry
+                <small>Edges and editable point handles</small>
+              </ToggleSwitch>
+              <ToggleSwitch
+                checked={props.display.showConstraints}
+                onChange={(showConstraints) => props.onChange({ showConstraints })}
+                testId="toggle-constraints"
+              >
+                Constraints
+                <small>Viewport dimensions and fixed badges</small>
+              </ToggleSwitch>
               <div
                 class="annotation-options"
                 classList={{ disabled: !props.display.showConstraints }}
               >
-                <label class="switch compact">
-                  <input
-                    type="checkbox"
-                    checked={props.display.showFixedConstraints}
-                    disabled={!props.display.showConstraints}
-                    onChange={(event) =>
-                      props.onChange({
-                        showFixedConstraints: event.currentTarget.checked,
-                      })
-                    }
-                    data-testid="toggle-fixed-constraints"
-                  />
-                  <span>Fixed badges</span>
-                </label>
-                <label class="switch compact">
-                  <input
-                    type="checkbox"
-                    checked={props.display.showDistanceConstraints}
-                    disabled={!props.display.showConstraints}
-                    onChange={(event) =>
-                      props.onChange({
-                        showDistanceConstraints: event.currentTarget.checked,
-                      })
-                    }
-                    data-testid="toggle-distance-constraints"
-                  />
-                  <span>Distance dimensions</span>
-                </label>
-                <label class="switch compact">
-                  <input
-                    type="checkbox"
-                    checked={props.display.showConstraintValues}
-                    disabled={
-                      !props.display.showConstraints ||
-                      !props.display.showDistanceConstraints
-                    }
-                    onChange={(event) =>
-                      props.onChange({
-                        showConstraintValues: event.currentTarget.checked,
-                      })
-                    }
-                    data-testid="toggle-constraint-values"
-                  />
-                  <span>Dimension values</span>
-                </label>
+                <ToggleSwitch
+                  compact
+                  checked={props.display.showFixedConstraints}
+                  disabled={!props.display.showConstraints}
+                  onChange={(showFixedConstraints) =>
+                    props.onChange({ showFixedConstraints })
+                  }
+                  testId="toggle-fixed-constraints"
+                >
+                  Fixed badges
+                </ToggleSwitch>
+                <ToggleSwitch
+                  compact
+                  checked={props.display.showDistanceConstraints}
+                  disabled={!props.display.showConstraints}
+                  onChange={(showDistanceConstraints) =>
+                    props.onChange({ showDistanceConstraints })
+                  }
+                  testId="toggle-distance-constraints"
+                >
+                  Distance dimensions
+                </ToggleSwitch>
+                <ToggleSwitch
+                  compact
+                  checked={props.display.showConstraintValues}
+                  disabled={
+                    !props.display.showConstraints ||
+                    !props.display.showDistanceConstraints
+                  }
+                  onChange={(showConstraintValues) =>
+                    props.onChange({ showConstraintValues })
+                  }
+                  testId="toggle-constraint-values"
+                >
+                  Dimension values
+                </ToggleSwitch>
               </div>
             </section>
           </div>

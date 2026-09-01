@@ -24,7 +24,6 @@ import {
   optimizeRequest,
   playbackFrames,
   setOptimizationValueRequest,
-  sparklinePoints,
 } from "../optimize";
 import { formatScalar } from "../simulation";
 import {
@@ -39,6 +38,7 @@ import {
   type OptimizeRunState,
 } from "../state";
 import { TrajectoryPlayer } from "./TrajectoryPlayer";
+import { Card, CardHeader, CardList, NumberField, Sparkline } from "./ui";
 import type { OptimizationPayload } from "../types";
 
 export interface OptimizeCardsProps {
@@ -49,14 +49,6 @@ export interface OptimizeCardsProps {
   /** Compile-and-render a transient program without committing it. */
   onGhostCompile: (source: string) => Promise<boolean>;
 }
-
-const SPARK_WIDTH = 220;
-const SPARK_HEIGHT = 44;
-
-const parse = (raw: string): number | null => {
-  const value = Number(raw);
-  return Number.isFinite(value) ? value : null;
-};
 
 const formatValue = (value: number | number[] | undefined): string => {
   if (value === undefined) return "–";
@@ -183,24 +175,19 @@ export function OptimizeCards(props: OptimizeCardsProps) {
           </p>
         }
       >
-        <ul class="sim-studies" data-testid="optimize-list">
+        <CardList testId="optimize-list">
           <For each={optimizations()}>
             {(optimization) => (
-              <li class="sim-study" data-testid={`optimize-${optimization.name}`}>
-                <div class="sim-study-head">
-                  <span class="sim-kind opt-kind">{optimization.method}</span>
-                  <strong>{optimization.name}</strong>
-                  <button
-                    type="button"
-                    class="sim-delete"
-                    onClick={() => void patch(deleteOptimizationRequest(optimization))}
-                    title="Delete this optimization from the code"
-                    aria-label={`Delete optimization ${optimization.name}`}
-                    data-testid={`optimize-delete-${optimization.name}`}
-                  >
-                    ×
-                  </button>
-                </div>
+              <Card testId={`optimize-${optimization.name}`}>
+                <CardHeader
+                  kind={optimization.method}
+                  kindClass="opt-kind"
+                  name={optimization.name}
+                  onDelete={() => void patch(deleteOptimizationRequest(optimization))}
+                  deleteTitle="Delete this optimization from the code"
+                  deleteAriaLabel={`Delete optimization ${optimization.name}`}
+                  deleteTestId={`optimize-delete-${optimization.name}`}
+                />
 
                 <p class="opt-objective">
                   minimize <code>{objectiveLabel(optimization)}</code>
@@ -213,43 +200,39 @@ export function OptimizeCards(props: OptimizeCardsProps) {
                   }
                 >
                   <div class="sim-args">
-                    <label>
-                      <span>steps</span>
-                      <input
-                        type="number"
-                        min="1"
-                        step="1"
-                        value={optimization.steps}
-                        disabled={running() !== null}
-                        onChange={(event) => {
-                          const value = parse(event.currentTarget.value);
-                          if (value !== null) {
-                            void patch(
-                              setOptimizationValueRequest(optimization, "steps", Math.round(value)),
-                            );
-                          }
-                        }}
-                        data-testid={`optimize-steps-${optimization.name}`}
-                      />
-                    </label>
-                    <label>
-                      <span>learning rate</span>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={optimization.learning_rate}
-                        disabled={running() !== null}
-                        onChange={(event) => {
-                          const value = parse(event.currentTarget.value);
-                          if (value !== null) {
-                            void patch(
-                              setOptimizationValueRequest(optimization, "learning_rate", value),
-                            );
-                          }
-                        }}
-                        data-testid={`optimize-lr-${optimization.name}`}
-                      />
-                    </label>
+                    <NumberField
+                      label="steps"
+                      min="1"
+                      step="1"
+                      value={optimization.steps}
+                      disabled={running() !== null}
+                      onCommit={(value) =>
+                        void patch(
+                          setOptimizationValueRequest(
+                            optimization,
+                            "steps",
+                            Math.round(value),
+                          ),
+                        )
+                      }
+                      testId={`optimize-steps-${optimization.name}`}
+                    />
+                    <NumberField
+                      label="learning rate"
+                      step="0.01"
+                      value={optimization.learning_rate}
+                      disabled={running() !== null}
+                      onCommit={(value) =>
+                        void patch(
+                          setOptimizationValueRequest(
+                            optimization,
+                            "learning_rate",
+                            value,
+                          ),
+                        )
+                      }
+                      testId={`optimize-lr-${optimization.name}`}
+                    />
                   </div>
                 </Show>
 
@@ -314,23 +297,11 @@ export function OptimizeCards(props: OptimizeCardsProps) {
                         </Show>
                       </div>
                       <Show when={current().objectives.length > 1}>
-                        <div class="opt-spark">
-                          <svg
-                            viewBox={`0 0 ${SPARK_WIDTH} ${SPARK_HEIGHT}`}
-                            preserveAspectRatio="none"
-                            role="img"
-                            aria-label="Objective so far"
-                            data-testid={`optimize-live-${optimization.name}`}
-                          >
-                            <polyline
-                              points={sparklinePoints(
-                                current().objectives,
-                                SPARK_WIDTH,
-                                SPARK_HEIGHT,
-                              )}
-                            />
-                          </svg>
-                        </div>
+                        <Sparkline
+                          values={current().objectives}
+                          ariaLabel="Objective so far"
+                          testId={`optimize-live-${optimization.name}`}
+                        />
                       </Show>
                     </div>
                   )}
@@ -345,23 +316,11 @@ export function OptimizeCards(props: OptimizeCardsProps) {
                       <Show
                         when={current().trajectory.length > 1}
                         fallback={
-                          <div class="opt-spark">
-                            <svg
-                              viewBox={`0 0 ${SPARK_WIDTH} ${SPARK_HEIGHT}`}
-                              preserveAspectRatio="none"
-                              role="img"
-                              aria-label="Objective history"
-                              data-testid={`optimize-history-${optimization.name}`}
-                            >
-                              <polyline
-                                points={sparklinePoints(
-                                  current().history.map((entry) => entry.objective),
-                                  SPARK_WIDTH,
-                                  SPARK_HEIGHT,
-                                )}
-                              />
-                            </svg>
-                          </div>
+                          <Sparkline
+                            values={current().history.map((entry) => entry.objective)}
+                            ariaLabel="Objective history"
+                            testId={`optimize-history-${optimization.name}`}
+                          />
                         }
                       >
                         <TrajectoryPlayer
@@ -435,10 +394,10 @@ export function OptimizeCards(props: OptimizeCardsProps) {
                       : `+${optimization.parameters.length - PARAMETER_PREVIEW} more parameters`}
                   </button>
                 </Show>
-              </li>
+              </Card>
             )}
           </For>
-        </ul>
+        </CardList>
       </Show>
 
       <Show when={error()}>

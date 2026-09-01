@@ -21,7 +21,6 @@ import {
   playbackFrames,
   sparklineCursorPoint,
   sparklineCursorX,
-  sparklinePoints,
   startPlayer,
   substituteParameters,
 } from "../optimize";
@@ -33,9 +32,8 @@ import {
   setOptimizeAutoPlay,
   setOptimizePlayer,
 } from "../state";
+import { SPARK_HEIGHT, SPARK_WIDTH, Sparkline } from "./ui";
 
-const SPARK_WIDTH = 220;
-const SPARK_HEIGHT = 44;
 /** Replay pace: one ghost compile per frame, plus a beat to look at it. */
 const FRAME_MILLISECONDS = 1_500;
 
@@ -177,29 +175,24 @@ export function TrajectoryPlayer(props: TrajectoryPlayerProps) {
   return (
     <Show when={optimizeRun() && frames().length > 1}>
       <div class="opt-player-strip">
-        <div class="opt-spark">
-          <svg
-            viewBox={`0 0 ${SPARK_WIDTH} ${SPARK_HEIGHT}`}
-            preserveAspectRatio="none"
-            role="img"
-            aria-label="Objective history"
-            data-testid={props.sparkTestId ?? "optimize-trajectory"}
-          >
-            <polyline points={sparklinePoints(values(), SPARK_WIDTH, SPARK_HEIGHT)} />
-            <line
-              class="opt-cursor"
-              x1={sparklineCursorX(frameIndex(), values().length, SPARK_WIDTH)}
-              y1="0"
-              x2={sparklineCursorX(frameIndex(), values().length, SPARK_WIDTH)}
-              y2={SPARK_HEIGHT}
-            />
-            <Show when={cursorPoint()}>
-              {(point) => (
-                <circle class="opt-cursor-point" cx={point().x} cy={point().y} r="2.6" />
-              )}
-            </Show>
-          </svg>
-        </div>
+        <Sparkline
+          values={values()}
+          ariaLabel="Objective history"
+          testId={props.sparkTestId ?? "optimize-trajectory"}
+        >
+          <line
+            class="opt-cursor"
+            x1={sparklineCursorX(frameIndex(), values().length, SPARK_WIDTH)}
+            y1="0"
+            x2={sparklineCursorX(frameIndex(), values().length, SPARK_WIDTH)}
+            y2={SPARK_HEIGHT}
+          />
+          <Show when={cursorPoint()}>
+            {(point) => (
+              <circle class="opt-cursor-point" cx={point().x} cy={point().y} r="2.6" />
+            )}
+          </Show>
+        </Sparkline>
         <div class="opt-player" data-testid="optimize-player">
           <button
             type="button"

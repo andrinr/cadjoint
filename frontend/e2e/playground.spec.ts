@@ -160,7 +160,7 @@ test("the optimize panel lists the starter optimization and edits it as source",
   const card = page.getByTestId("optimize-cool-sink");
   await expect(card).toBeVisible();
   await expect(card).toContainText("minimize");
-  await expect(card).toContainText("mean(sink-conduction)");
+  await expect(card).toContainText("max(sink-conduction)");
   await expect(page.getByTestId("optimize-run-cool-sink")).toBeEnabled();
 
   // Steps and learning rate edit the declaration's literals in place.

@@ -1,0 +1,526 @@
+"""Validating ``/patch`` requests, and applying the ones that check out.
+
+``/patch`` never executes the user's program — it only rewrites literals in
+it — so what the endpoint needs is a complete description of what the
+frontend is allowed to ask for.  That description is :data:`PATCH_VALIDATORS`:
+one validator per operation, each checking that operation's fields and
+returning the keyword arguments :func:`cadjoint.viewer._patch.apply_operation`
+will run with, or the rejection to send back instead.
+
+Every rejection message the endpoint can produce lives in this module, and
+the tests pin them, so treat the strings as the API they are.  A validator
+returns ``(error, arguments)``: exactly one of the two is meaningful, and
+the checks inside one validator run in the order a caller would hit them.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Callable
+from typing import Any
+
+from cadjoint.viewer._limits import OVERSIZED_SOURCE_ERROR, exceeds_source_limit
+from cadjoint.viewer._patch import OPERATIONS, PatchError, apply_operation
+
+# ``(error, arguments)``: a rejection to return, or the keyword arguments the
+# operation runs with.  ``error`` is None exactly when the request is good.
+Checked = tuple[dict[str, Any] | None, dict[str, Any]]
+Validator = Callable[[dict[str, Any]], Checked]
+
+
+def _error(message: str) -> dict[str, Any]:
+    """One rejected request, in the shape every endpoint answers with."""
+    return {"ok": False, "error": message}
+
+
+def _integer(value: Any) -> bool:
+    """True for a plain integer — a ``bool`` does not count as one here."""
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
+def _number(value: Any) -> bool:
+    """True for a plain number — a ``bool`` does not count as one here."""
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _numbers(value: Any, count: int | None = None) -> list[float] | None:
+    """Validate a list of plain numbers, optionally of a fixed length."""
+    if not isinstance(value, (list, tuple)):
+        return None
+    if count is not None and len(value) != count:
+        return None
+    if not all(isinstance(item, (int, float)) and not isinstance(item, bool) for item in value):
+        return None
+    return [float(item) for item in value]
+
+
+def _scalar_or_numbers(value: Any) -> float | list[float] | None:
+    """A plain number or a list of them — whichever the request carries.
+
+    None means neither, which every caller reports with its own message.
+    """
+    if _number(value):
+        return float(value)
+    return _numbers(value)
+
+
+# ── Geometry ────────────────────────────────────────────────────────────────
+
+
+def _validate_add_sketch(request: dict[str, Any]) -> Checked:
+    origin = _numbers(request.get("origin"), 3)
+    if origin is None:
+        return _error("The patch request needs `origin` as three numbers."), {}
+    return None, {"origin": origin}
+
+
+def _validate_add_primitive(request: dict[str, Any]) -> Checked:
+    kind = request.get("kind")
+    if not isinstance(kind, str):
+        return _error("The patch request needs a string `kind`."), {}
+    position = _numbers(request.get("position"), 3)
+    if position is None:
+        return _error("The patch request needs `position` as three numbers."), {}
+    raw = request.get("dimensions")
+    if not isinstance(raw, dict):
+        return _error("The patch request needs a `dimensions` object."), {}
+    dimensions: dict[str, Any] = {}
+    for key, value in raw.items():
+        if _number(value):
+            dimensions[key] = float(value)
+            continue
+        vector = _numbers(value)
+        if vector is None:
+            return _error(f"Dimension `{key}` must be a number or numbers."), {}
+        dimensions[key] = vector
+    return None, {"kind": kind, "position": position, "dimensions": dimensions}
+
+
+# Material properties the request may set, each with its ``(low, high, default)``.
+_MATERIAL_RANGES = {
+    "roughness": (0.0, 1.0, 0.4),
+    "metallic": (0.0, 1.0, 0.0),
+    "opacity": (0.0, 1.0, 1.0),
+    "ior": (1.0, 3.0, 1.45),
+    "reflectivity": (0.0, 1.0, 0.0),
+}
+
+
+def _validate_add_material(request: dict[str, Any]) -> Checked:
+    color = _numbers(request.get("color"), 3)
+    if color is None or any(value < 0.0 or value > 1.0 for value in color):
+        return _error("The patch request needs `color` as three numbers from 0 to 1."), {}
+    properties: dict[str, float] = {}
+    for key, (low, high, default) in _MATERIAL_RANGES.items():
+        raw = request.get(key, default)
+        if not _number(raw) or not low <= float(raw) <= high:
+            return _error(f"The patch request needs `{key}` from {low:g} to {high:g}."), {}
+        properties[key] = float(raw)
+    return None, {"color": color, **properties}
+
+
+def _validate_assign_material(request: dict[str, Any]) -> Checked:
+    line = request.get("line")
+    material = request.get("material")
+    if not _integer(line):
+        return _error("The patch request needs an integer `line`."), {}
+    if not isinstance(material, str) or not material.isidentifier():
+        return _error("The patch request needs `material` as a Python identifier."), {}
+    return None, {"line": line, "material": material}
+
+
+def _validate_add_extrusion(request: dict[str, Any]) -> Checked:
+    line = request.get("line")
+    depth = request.get("depth", 0.5)
+    if not _integer(line):
+        return _error("The patch request needs an integer `line`."), {}
+    if not _number(depth):
+        return _error("The patch request needs a numeric `depth`."), {}
+    return None, {"line": line, "depth": float(depth)}
+
+
+def _validate_add_revolution(request: dict[str, Any]) -> Checked:
+    line = request.get("line")
+    offset = request.get("offset", 0.0)
+    if not _integer(line):
+        return _error("The patch request needs an integer `line`."), {}
+    if not _number(offset):
+        return _error("The patch request needs a numeric `offset`."), {}
+    return None, {"line": line, "offset": float(offset)}
+
+
+def _validate_add_loft(request: dict[str, Any]) -> Checked:
+    line_a = request.get("line_a")
+    line_b = request.get("line_b")
+    height = request.get("height", 1.0)
+    if not all(_integer(value) for value in (line_a, line_b)):
+        return _error("The patch request needs integer `line_a` and `line_b`."), {}
+    if not _number(height):
+        return _error("The patch request needs a numeric `height`."), {}
+    return None, {"line_a": line_a, "line_b": line_b, "height": float(height)}
+
+
+def _validate_delete_object(request: dict[str, Any]) -> Checked:
+    line = request.get("line")
+    if not _integer(line):
+        return _error("The patch request needs an integer `line`."), {}
+    return None, {"line": line}
+
+
+def _validate_set_value(request: dict[str, Any]) -> Checked:
+    arguments: dict[str, Any] = {}
+    for key in ("name", "argument"):
+        value = request.get(key)
+        if not isinstance(value, str):
+            return _error(f"The patch request needs a string `{key}`."), {}
+        arguments[key] = value
+    line = request.get("line")
+    if not _integer(line):
+        return _error("The patch request needs an integer `line`."), {}
+    arguments["line"] = line
+    raw_value = request.get("value")
+    scalar = float(raw_value) if _number(raw_value) else None
+    vector = _numbers(raw_value)
+    if scalar is None and vector is None:
+        return _error("The patch request needs `value` as a number or numbers."), {}
+    if arguments["argument"] in {"planeOrigin", "planeNormal"}:
+        if vector is None or len(vector) != 3:
+            return _error("A sketch-plane edit needs `value` as three numbers."), {}
+        if arguments["argument"] == "planeNormal" and not any(
+            abs(component) > 1e-9 for component in vector
+        ):
+            return _error("A sketch-plane normal must not be zero."), {}
+    arguments["value"] = scalar if scalar is not None else vector
+    return None, arguments
+
+
+# ── Sketch vertices ─────────────────────────────────────────────────────────
+
+
+def _validate_vertex(request: dict[str, Any]) -> Checked:
+    """``line`` + ``index``: the vertex an edit acts on.
+
+    Also the default contract — an operation this module has no entry for
+    gets these two fields checked and nothing else.
+    """
+    arguments: dict[str, Any] = {}
+    for key in ("line", "index"):
+        value = request.get(key)
+        if not _integer(value):
+            return _error(f"The patch request needs an integer `{key}`."), {}
+        arguments[key] = value
+    return None, arguments
+
+
+def _validate_placed_vertex(request: dict[str, Any]) -> Checked:
+    """A vertex edit that also places the vertex somewhere (``xy``)."""
+    error, arguments = _validate_vertex(request)
+    if error is not None:
+        return error, {}
+    xy = _numbers(request.get("xy"), 2)
+    if xy is None:
+        return _error("The patch request needs `xy` as two numbers."), {}
+    arguments["xy"] = (xy[0], xy[1])
+    return None, arguments
+
+
+# ── Constraints ─────────────────────────────────────────────────────────────
+
+# Constraint kinds and how many sketch points each one takes.
+_VALUED_CONSTRAINTS = {"fixed": 1, "distance": 2}
+_RELATIONAL_CONSTRAINTS = {
+    "horizontal": 2,
+    "vertical": 2,
+    "coincident": 2,
+    "parallel": 4,
+    "perpendicular": 4,
+}
+
+
+def _validate_add_constraint(request: dict[str, Any]) -> Checked:
+    line = request.get("line")
+    kind = request.get("kind")
+    indices = request.get("indices")
+    if not _integer(line):
+        return _error("The patch request needs an integer `line`."), {}
+    if kind not in _VALUED_CONSTRAINTS and kind not in _RELATIONAL_CONSTRAINTS:
+        allowed = ", ".join(sorted({**_VALUED_CONSTRAINTS, **_RELATIONAL_CONSTRAINTS}))
+        return _error(f"Constraint `kind` must be one of: {allowed}."), {}
+    arity = _VALUED_CONSTRAINTS.get(kind) or _RELATIONAL_CONSTRAINTS[kind]
+    if not (
+        isinstance(indices, list)
+        and len(indices) == arity
+        and all(_integer(index) for index in indices)
+    ):
+        return _error(f"`{kind}` takes exactly {arity} integer `indices`."), {}
+    value = None
+    if kind in _VALUED_CONSTRAINTS:
+        value = _scalar_or_numbers(request.get("value"))
+        if value is None:
+            return _error("The constraint needs a numeric `value`."), {}
+    return None, {"line": line, "kind": kind, "indices": indices, "value": value}
+
+
+def _validate_constraint_target(request: dict[str, Any]) -> Checked:
+    """The constraint an edit acts on: its sketch ``line`` and its ``index``."""
+    line = request.get("line")
+    index = request.get("index")
+    if not _integer(line):
+        return _error("The patch request needs an integer `line`."), {}
+    if not _integer(index) or index < 0:
+        return _error("The patch request needs a non-negative `index`."), {}
+    return None, {"line": line, "index": index}
+
+
+def _validate_set_constraint_value(request: dict[str, Any]) -> Checked:
+    error, arguments = _validate_constraint_target(request)
+    if error is not None:
+        return error, {}
+    value = _scalar_or_numbers(request.get("value"))
+    if value is None:
+        return _error("The constraint needs a numeric `value`."), {}
+    arguments["value"] = value
+    return None, arguments
+
+
+def _validate_solve_sketch(request: dict[str, Any]) -> Checked:
+    line = request.get("line")
+    if not _integer(line):
+        return _error("The patch request needs an integer `line`."), {}
+    method = request.get("method", "newton")
+    iterations = request.get("iterations", 8)
+    if method not in {"newton", "adam", "sgd"}:
+        return _error("Solver `method` must be `newton`, `adam`, or `sgd`."), {}
+    if not _integer(iterations) or not 1 <= iterations <= 512:
+        return _error("Solver `iterations` must be an integer from 1 to 512."), {}
+    return None, {"line": line, "method": method, "iterations": iterations}
+
+
+# ── Studies ─────────────────────────────────────────────────────────────────
+
+
+def _validate_add_study(request: dict[str, Any]) -> Checked:
+    kind = request.get("kind")
+    if kind not in {"thermal", "elastic"}:
+        return _error("Study `kind` must be `thermal` or `elastic`."), {}
+    name = request.get("name")
+    if name is not None and (not isinstance(name, str) or not name.strip()):
+        return _error("Study `name` must be a non-empty string."), {}
+    return None, {"kind": kind, "name": name}
+
+
+def _validate_study_target(request: dict[str, Any]) -> Checked:
+    """The study an edit acts on, named or indexed."""
+    study = request.get("study")
+    if not ((_integer(study) and study >= 0) or (isinstance(study, str) and study.strip())):
+        return _error("The patch request needs `study` as a name or a non-negative index."), {}
+    return None, {"study": study}
+
+
+def _validate_add_study_bc(request: dict[str, Any]) -> Checked:
+    error, arguments = _validate_study_target(request)
+    if error is not None:
+        return error, {}
+    bc_type = request.get("bc_type")
+    if bc_type not in {"dirichlet", "heat_flux", "fixed", "traction"}:
+        return _error("`bc_type` must be one of: dirichlet, heat_flux, fixed, traction."), {}
+    selection = request.get("selection")
+    if not isinstance(selection, dict):
+        return _error("The patch request needs `selection` as a description object."), {}
+    arguments.update(bc_type=bc_type, selection=selection)
+    raw_value = request.get("value")
+    if bc_type == "fixed":
+        if raw_value is not None:
+            return _error("A `fixed` boundary condition takes no value."), {}
+    elif bc_type == "traction":
+        vector = _numbers(raw_value, 3)
+        if vector is None:
+            return _error("A `traction` boundary condition needs `value` as three numbers."), {}
+        arguments["value"] = vector
+    else:
+        if not _number(raw_value):
+            return _error(f"A `{bc_type}` boundary condition needs a numeric `value`."), {}
+        arguments["value"] = float(raw_value)
+    return None, arguments
+
+
+def _validate_delete_study_bc(request: dict[str, Any]) -> Checked:
+    error, arguments = _validate_study_target(request)
+    if error is not None:
+        return error, {}
+    bc = request.get("bc")
+    if not _integer(bc) or bc < 0:
+        return _error("The patch request needs a non-negative `bc` index."), {}
+    arguments["bc"] = bc
+    return None, arguments
+
+
+def _validate_set_study_value(request: dict[str, Any]) -> Checked:
+    error, arguments = _validate_study_target(request)
+    if error is not None:
+        return error, {}
+    bc = request.get("bc")
+    argument = request.get("argument")
+    if (bc is None) == (argument is None):
+        return _error("The patch request needs exactly one of `bc` or `argument`."), {}
+    if bc is not None:
+        if not _integer(bc) or bc < 0:
+            return _error("The patch request needs a non-negative `bc` index."), {}
+        arguments["bc"] = bc
+    else:
+        if not isinstance(argument, str):
+            return _error("The patch request needs a string `argument`."), {}
+        arguments["argument"] = argument
+    raw_value = request.get("value")
+    if argument in {"mesh", "domain"}:
+        # These reference declared objects by name, not numbers.
+        if not isinstance(raw_value, str) or not raw_value.strip():
+            return _error(f"The patch request needs `value` as a `{argument}` name."), {}
+        arguments["value"] = raw_value
+    else:
+        value = _scalar_or_numbers(raw_value)
+        if value is None:
+            return _error("The patch request needs `value` as a number or numbers."), {}
+        arguments["value"] = value
+    return None, arguments
+
+
+# ── Simulation meshes ───────────────────────────────────────────────────────
+
+
+def _validate_add_mesh(request: dict[str, Any]) -> Checked:
+    name = request.get("name")
+    if name is not None and (not isinstance(name, str) or not name.strip()):
+        return _error("Mesh `name` must be a non-empty string."), {}
+    return None, {"name": name}
+
+
+def _validate_mesh_target(request: dict[str, Any]) -> Checked:
+    """The simulation mesh an edit acts on, named or indexed."""
+    mesh = request.get("mesh")
+    if not ((_integer(mesh) and mesh >= 0) or (isinstance(mesh, str) and mesh.strip())):
+        return _error("The patch request needs `mesh` as a name or a non-negative index."), {}
+    return None, {"mesh": mesh}
+
+
+def _validate_set_mesh_value(request: dict[str, Any]) -> Checked:
+    error, arguments = _validate_mesh_target(request)
+    if error is not None:
+        return error, {}
+    argument = request.get("argument")
+    if not isinstance(argument, str):
+        return _error("The patch request needs a string `argument`."), {}
+    arguments["argument"] = argument
+    raw_value = request.get("value")
+    if argument == "domain":
+        if not isinstance(raw_value, str) or not raw_value.strip():
+            return _error("The patch request needs `value` as a `domain` name."), {}
+        arguments["value"] = raw_value
+    elif argument == "method":
+        if raw_value not in {"hex", "tet4", "tet10"}:
+            return _error("Mesh `method` must be one of: hex, tet4, tet10."), {}
+        arguments["value"] = raw_value
+    else:
+        value = _scalar_or_numbers(raw_value)
+        if value is None:
+            return _error("The patch request needs `value` as a number or numbers."), {}
+        arguments["value"] = value
+    return None, arguments
+
+
+# ── Optimizations ───────────────────────────────────────────────────────────
+
+
+def _validate_optimization_target(request: dict[str, Any]) -> Checked:
+    """The optimization an edit acts on, named or indexed."""
+    optimization = request.get("optimization")
+    valid_index = _integer(optimization) and optimization >= 0
+    if not (valid_index or (isinstance(optimization, str) and optimization.strip())):
+        return _error(
+            "The patch request needs `optimization` as a name or a non-negative index."
+        ), {}
+    return None, {"optimization": optimization}
+
+
+def _validate_set_optimization_value(request: dict[str, Any]) -> Checked:
+    error, arguments = _validate_optimization_target(request)
+    if error is not None:
+        return error, {}
+    argument = request.get("argument")
+    if argument not in {"steps", "learning_rate"}:
+        return _error("Optimization `argument` must be `steps` or `learning_rate`."), {}
+    raw_value = request.get("value")
+    if not _number(raw_value):
+        return _error("The patch request needs a numeric `value`."), {}
+    arguments.update(argument=argument, value=raw_value)
+    return None, arguments
+
+
+# One entry per operation in ``cadjoint.viewer._patch.OPERATIONS``: this table
+# is the whole contract ``/patch`` requests must satisfy.  Operations that
+# share a shape (the four study edits all name their study the same way)
+# share the helper that checks it, one validator deep.
+PATCH_VALIDATORS: dict[str, Validator] = {
+    "set_vertex": _validate_placed_vertex,
+    "insert_vertex": _validate_placed_vertex,
+    "delete_vertex": _validate_vertex,
+    "set_value": _validate_set_value,
+    "add_primitive": _validate_add_primitive,
+    "add_material": _validate_add_material,
+    "assign_material": _validate_assign_material,
+    "add_sketch": _validate_add_sketch,
+    "add_extrusion": _validate_add_extrusion,
+    "add_revolution": _validate_add_revolution,
+    "add_loft": _validate_add_loft,
+    "add_constraint": _validate_add_constraint,
+    "delete_constraint": _validate_constraint_target,
+    "set_constraint_value": _validate_set_constraint_value,
+    "solve_sketch": _validate_solve_sketch,
+    "delete_object": _validate_delete_object,
+    "add_study": _validate_add_study,
+    "delete_study": _validate_study_target,
+    "add_study_bc": _validate_add_study_bc,
+    "delete_study_bc": _validate_delete_study_bc,
+    "set_study_value": _validate_set_study_value,
+    "add_mesh": _validate_add_mesh,
+    "delete_mesh": _validate_mesh_target,
+    "set_mesh_value": _validate_set_mesh_value,
+    "delete_optimization": _validate_optimization_target,
+    "set_optimization_value": _validate_set_optimization_value,
+}
+
+
+def patch_source(request: dict[str, Any]) -> dict[str, Any]:
+    """Apply one viewer edit to the user's program text.
+
+    Args:
+        request: ``{"source", "op", "line", "index"}`` plus ``"xy"`` for
+            operations that place a vertex.
+
+    Returns:
+        ``{"ok": True, "source": ...}`` or ``{"ok": False, "error": ...}``.
+    """
+    source = request.get("source")
+    operation = request.get("op")
+    if not isinstance(source, str):
+        return _error("The patch request must contain a string `source` field.")
+    if exceeds_source_limit(source):
+        return _error(OVERSIZED_SOURCE_ERROR)
+    if not isinstance(operation, str):
+        return _error("The patch request must contain a string `op` field.")
+    if operation not in OPERATIONS:
+        # Reject up front: otherwise an operation this server does not know
+        # falls through to the vertex-edit checks and complains about a missing
+        # `line`, which points nowhere near the real problem — usually a browser
+        # running newer assets than the server process.
+        return _error(
+            f"This server does not support the patch operation {operation!r}. "
+            "If you updated cadjoint, restart the playground server."
+        )
+
+    error, arguments = PATCH_VALIDATORS.get(operation, _validate_vertex)(request)
+    if error is not None:
+        return error
+    try:
+        return {"ok": True, "source": apply_operation(source, operation, **arguments)}
+    except PatchError as failure:
+        return _error(str(failure))

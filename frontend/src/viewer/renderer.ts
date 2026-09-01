@@ -9,6 +9,13 @@
  *
  * Ported from the previous inline playground script, with the depth attachment,
  * the overlay pipelines, and pan support added.
+ *
+ * What is left here is the device and the frame: adapter setup, the GPU
+ * buffers and textures, and the passes that draw them. The declarative parts
+ * moved out — the settings the panels write live in `display.ts`, the vertex
+ * packing in `overlayGeometry.ts`, and the pipeline descriptors in
+ * `pipelines.ts` — and are re-exported below so `viewer/renderer` stays the
+ * one import path callers know.
  */
 
 import {
@@ -24,147 +31,58 @@ import type {
   Selection,
   SimulationMeshPayload,
 } from "../types";
-import { AXIS_COLORS, gizmoEdges, gizmoScale, type AxisIndex } from "./gizmo";
+import { gizmoScale, type AxisIndex } from "./gizmo";
 import {
   cameraPosition,
   orthoHeightFor,
   viewProjection,
   type CameraState,
-  type Projection,
   type Vec3,
   type View,
 } from "./math";
-// Kept as a standalone .wgsl file so the shader has one source of truth that
-// both the bundler and the Python shader-validation test read.
-import OVERLAY_WGSL from "./overlay.wgsl?raw";
-import SIMULATION_WGSL from "./simulation.wgsl?raw";
+import {
+  DEFAULT_DISPLAY,
+  QUALITY_PRESETS,
+  VIEW_PRESETS,
+  displayFlags,
+  type DisplaySettings,
+  type QualityPreset,
+  type Shaders,
+} from "./display";
+import {
+  EDGE_STRIDE,
+  GIZMO_STRIDE,
+  HANDLE_STRIDE,
+  packConstructionOverlay,
+  packGizmoInstances,
+  packMeshEdgeInstances,
+} from "./overlayGeometry";
+import {
+  DEPTH_FORMAT,
+  compileModule,
+  createOverlayPipelines,
+  createSimulationPipelines,
+  sharedLayout,
+} from "./pipelines";
 
-export interface Shaders {
-  preview: string;
-  path: string;
-  present: string;
-}
+export {
+  DEFAULT_DISPLAY,
+  DISPLAY,
+  QUALITY_PRESETS,
+  VIEW_PRESETS,
+  displayFlags,
+  type DisplaySettings,
+  type QualityPreset,
+  type ShadowMode,
+  type Shaders,
+} from "./display";
 
-export interface QualityPreset {
-  label: string;
-  pixelBudget: number;
-  maxRatio: number;
-  bounces: number;
-  shadowSamples: number;
-  samples: number;
-}
-
-export const QUALITY_PRESETS: Record<string, QualityPreset> = {
-  draft: {
-    label: "Draft",
-    pixelBudget: 320_000,
-    maxRatio: 1,
-    bounces: 3,
-    shadowSamples: 1,
-    samples: 128,
-  },
-  high: {
-    label: "High",
-    pixelBudget: 900_000,
-    maxRatio: 1.25,
-    bounces: 6,
-    shadowSamples: 2,
-    samples: 512,
-  },
-  ultra: {
-    label: "Ultra",
-    pixelBudget: 1_600_000,
-    maxRatio: 2,
-    bounces: 8,
-    shadowSamples: 4,
-    samples: 1024,
-  },
-};
-
-const DEPTH_FORMAT: GPUTextureFormat = "depth32float";
 const BACKGROUND: GPUColorDict = { r: 0.035, g: 0.045, b: 0.035, a: 1 };
 
 /** Fraction of the distance to the camera that construction overlays are pulled forward. */
 const DEPTH_NUDGE = 0.004;
 const LINE_WIDTH_PX = 2.4;
 const HANDLE_RADIUS_PX = 6.5;
-
-const EDGE_STRIDE = 40;
-const HANDLE_STRIDE = 32;
-const GIZMO_STRIDE = 44;
-
-/** Display flag bits, matching the DISPLAY_* constants in _webgpu.py. */
-export const DISPLAY = {
-  shadows: 1,
-  reflections: 2,
-  flat: 4,
-  hideSolid: 8,
-  hardShadows: 16,
-} as const;
-
-/** Off, one crisp occlusion ray, or a penumbra. */
-export type ShadowMode = "off" | "hard" | "soft";
-
-export interface DisplaySettings {
-  projection: Projection;
-  shadows: ShadowMode;
-  reflections: boolean;
-  flatShading: boolean;
-  hideSolid: boolean;
-  /** 0 disables x-ray; 1 is fully translucent. */
-  xray: number;
-  showSketches: boolean;
-  showMeshEdges: boolean;
-  showMeshWireframe: boolean;
-  showConstraints: boolean;
-  showFixedConstraints: boolean;
-  showDistanceConstraints: boolean;
-  showConstraintValues: boolean;
-}
-
-export const DEFAULT_DISPLAY: DisplaySettings = {
-  projection: "orthographic",
-  // Flat shading with crisp shadows reads like a working drawing, which is
-  // what you want while modelling; full shading is a click away.
-  shadows: "hard",
-  reflections: true,
-  flatShading: true,
-  hideSolid: false,
-  xray: 1,
-  showSketches: true,
-  showMeshEdges: false,
-  showMeshWireframe: false,
-  showConstraints: true,
-  showFixedConstraints: true,
-  showDistanceConstraints: true,
-  showConstraintValues: true,
-};
-
-/** Orbit angles for the standard views, in radians. */
-export const VIEW_PRESETS: Record<string, { yaw: number; pitch: number }> = {
-  iso: { yaw: 0.75, pitch: 0.32 },
-  front: { yaw: 0, pitch: 0 },
-  back: { yaw: Math.PI, pitch: 0 },
-  right: { yaw: Math.PI / 2, pitch: 0 },
-  left: { yaw: -Math.PI / 2, pitch: 0 },
-  top: { yaw: 0, pitch: Math.PI / 2 },
-  bottom: { yaw: 0, pitch: -Math.PI / 2 },
-};
-
-type Rgba = readonly [number, number, number, number];
-
-const COLORS: Record<string, Rgba> = {
-  edge: [0.851, 1.0, 0.341, 0.95],
-  edgeLocked: [0.58, 0.6, 0.56, 0.7],
-  handle: [1.0, 0.506, 0.404, 1.0],
-  handleSelected: [0.98, 0.99, 0.94, 1.0],
-  handleHover: [1.0, 0.72, 0.4, 1.0],
-  handleLocked: [0.62, 0.64, 0.6, 0.9],
-  edgeSelected: [1.0, 0.95, 0.6, 1.0],
-  edgeHover: [0.95, 1.0, 0.72, 1.0],
-  meshWire: [0.5, 0.56, 0.62, 0.22],
-  meshSharp: [0.35, 0.85, 1.0, 0.95],
-};
 
 export interface RendererCallbacks {
   onStatus?: (kind: string, text: string) => void;
@@ -358,17 +276,7 @@ export class Renderer {
   }
 
   private displayFlags(): number {
-    const { shadows, reflections, flatShading, hideSolid } = this.display;
-    return (
-      (shadows === "off" ? 0 : DISPLAY.shadows) |
-      (shadows === "hard" ? DISPLAY.hardShadows : 0) |
-      (reflections ? DISPLAY.reflections : 0) |
-      (flatShading ? DISPLAY.flat : 0) |
-      // While the simulation surface is shown the raymarched solid is hidden:
-      // the preview pass still supplies the environment background and clears
-      // depth to 1, and the FEM mesh depth-tests into that frame.
-      (hideSolid || this._simulationActive ? DISPLAY.hideSolid : 0)
-    );
+    return displayFlags(this.display, this._simulationActive);
   }
 
   async init(canvas: HTMLCanvasElement): Promise<void> {
@@ -406,8 +314,7 @@ export class Renderer {
       this.viewBuffer = this.createUniform(64);
       this.overlayBuffer = this.createUniform(112);
       this.meshOverlayBuffer = this.createUniform(112);
-      this.buildOverlayPipelines();
-      this.buildSimulationPipeline();
+      this.buildPipelines();
 
       this.device.addEventListener("uncapturederror", (event) => {
         const message = (event as GPUUncapturedErrorEvent).error?.message ?? "WebGPU error";
@@ -445,282 +352,32 @@ export class Renderer {
     });
   }
 
-  private async checkedModule(code: string, label: string): Promise<GPUShaderModule> {
-    const module = this.device!.createShaderModule({ code, label });
-    const info = await module.getCompilationInfo();
-    const errors = info.messages.filter((message) => message.type === "error");
-    if (errors.length) {
-      throw new Error(
-        errors.map((m) => `${label} ${m.lineNum}:${m.linePos} ${m.message}`).join("\n"),
-      );
-    }
-    return module;
-  }
-
-  /**
-   * A bind group layout shared by several pipelines.
-   *
-   * `layout: "auto"` derives a layout that is *exclusive* to one pipeline, so a
-   * bind group built from one pipeline cannot be bound to another even when the
-   * bindings are identical. Declaring the layout explicitly lets the edge and
-   * handle passes — and the two preview variants — share a single bind group.
-   */
-  private sharedLayout(label: string, bindings: number[]): {
-    bindGroupLayout: GPUBindGroupLayout;
-    pipelineLayout: GPUPipelineLayout;
-  } {
+  /** Install the overlay and simulation pipelines on a fresh device. */
+  private buildPipelines(): void {
     const device = this.device!;
-    const bindGroupLayout = device.createBindGroupLayout({
-      label,
-      entries: bindings.map((binding) => ({
-        binding,
-        visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
-        buffer: { type: "uniform" as const },
-      })),
-    });
-    return {
-      bindGroupLayout,
-      pipelineLayout: device.createPipelineLayout({ bindGroupLayouts: [bindGroupLayout] }),
-    };
-  }
+    const overlay = createOverlayPipelines(
+      device,
+      this.format,
+      this.overlayBuffer,
+      this.meshOverlayBuffer,
+    );
+    this.edgePipeline = overlay.edgePipeline;
+    this.handlePipeline = overlay.handlePipeline;
+    this.gizmoEdgePipeline = overlay.gizmoEdgePipeline;
+    this.gizmoArrowPipeline = overlay.gizmoArrowPipeline;
+    this.gizmoScalePipeline = overlay.gizmoScalePipeline;
+    this.overlayBindGroup = overlay.overlayBindGroup;
+    this.meshOverlayBindGroup = overlay.meshOverlayBindGroup;
 
-  private buildOverlayPipelines(): void {
-    const device = this.device!;
-    const module = device.createShaderModule({ code: OVERLAY_WGSL, label: "Overlay WGSL" });
-    const { bindGroupLayout, pipelineLayout } = this.sharedLayout("Overlay bindings", [0]);
-    const blend: GPUBlendState = {
-      color: { srcFactor: "src-alpha", dstFactor: "one-minus-src-alpha", operation: "add" },
-      alpha: { srcFactor: "one", dstFactor: "one-minus-src-alpha", operation: "add" },
-    };
-    const depthStencil: GPUDepthStencilState = {
-      format: DEPTH_FORMAT,
-      depthWriteEnabled: true,
-      depthCompare: "less-equal",
-    };
-
-    this.edgePipeline = device.createRenderPipeline({
-      label: "Overlay edges",
-      layout: pipelineLayout,
-      vertex: {
-        module,
-        entryPoint: "vs_edge",
-        buffers: [
-          {
-            arrayStride: EDGE_STRIDE,
-            stepMode: "instance",
-            attributes: [
-              { shaderLocation: 0, offset: 0, format: "float32x3" },
-              { shaderLocation: 1, offset: 12, format: "float32x3" },
-              { shaderLocation: 2, offset: 24, format: "float32x4" },
-            ],
-          },
-        ],
-      },
-      fragment: { module, entryPoint: "fs_edge", targets: [{ format: this.format, blend }] },
-      primitive: { topology: "triangle-list" },
-      depthStencil,
-    });
-
-    this.handlePipeline = device.createRenderPipeline({
-      label: "Overlay handles",
-      layout: pipelineLayout,
-      vertex: {
-        module,
-        entryPoint: "vs_handle",
-        buffers: [
-          {
-            arrayStride: HANDLE_STRIDE,
-            stepMode: "instance",
-            attributes: [
-              { shaderLocation: 0, offset: 0, format: "float32x3" },
-              { shaderLocation: 1, offset: 12, format: "float32x4" },
-              { shaderLocation: 2, offset: 28, format: "float32" },
-            ],
-          },
-        ],
-      },
-      fragment: { module, entryPoint: "fs_handle", targets: [{ format: this.format, blend }] },
-      primitive: { topology: "triangle-list" },
-      depthStencil,
-    });
-
-    const alwaysVisibleDepth: GPUDepthStencilState = {
-      format: DEPTH_FORMAT,
-      depthWriteEnabled: false,
-      depthCompare: "always",
-    };
-
-    this.gizmoEdgePipeline = device.createRenderPipeline({
-      label: "Always-visible rotation gizmo",
-      layout: pipelineLayout,
-      vertex: {
-        module,
-        entryPoint: "vs_edge",
-        buffers: [
-          {
-            arrayStride: GIZMO_STRIDE,
-            stepMode: "instance",
-            attributes: [
-              { shaderLocation: 0, offset: 0, format: "float32x3" },
-              { shaderLocation: 1, offset: 12, format: "float32x3" },
-              { shaderLocation: 2, offset: 24, format: "float32x4" },
-            ],
-          },
-        ],
-      },
-      fragment: { module, entryPoint: "fs_edge", targets: [{ format: this.format, blend }] },
-      primitive: { topology: "triangle-list" },
-      depthStencil: alwaysVisibleDepth,
-    });
-
-    this.gizmoArrowPipeline = device.createRenderPipeline({
-      label: "Always-visible translation gizmo",
-      layout: pipelineLayout,
-      vertex: {
-        module,
-        entryPoint: "vs_gizmo_arrow",
-        buffers: [
-          {
-            arrayStride: GIZMO_STRIDE,
-            stepMode: "instance",
-            attributes: [
-              { shaderLocation: 0, offset: 0, format: "float32x3" },
-              { shaderLocation: 1, offset: 12, format: "float32x3" },
-              { shaderLocation: 2, offset: 24, format: "float32x4" },
-              { shaderLocation: 3, offset: 40, format: "float32" },
-            ],
-          },
-        ],
-      },
-      fragment: {
-        module,
-        entryPoint: "fs_gizmo_arrow",
-        targets: [{ format: this.format, blend }],
-      },
-      primitive: { topology: "triangle-list" },
-      depthStencil: alwaysVisibleDepth,
-    });
-
-    this.gizmoScalePipeline = device.createRenderPipeline({
-      label: "Always-visible scale gizmo",
-      layout: pipelineLayout,
-      vertex: {
-        module,
-        entryPoint: "vs_gizmo_scale",
-        buffers: [
-          {
-            arrayStride: GIZMO_STRIDE,
-            stepMode: "instance",
-            attributes: [
-              { shaderLocation: 0, offset: 0, format: "float32x3" },
-              { shaderLocation: 1, offset: 12, format: "float32x3" },
-              { shaderLocation: 2, offset: 24, format: "float32x4" },
-              { shaderLocation: 3, offset: 40, format: "float32" },
-            ],
-          },
-        ],
-      },
-      fragment: {
-        module,
-        entryPoint: "fs_gizmo_arrow",
-        targets: [{ format: this.format, blend }],
-      },
-      primitive: { topology: "triangle-list" },
-      depthStencil: alwaysVisibleDepth,
-    });
-
-    this.overlayBindGroup = device.createBindGroup({
-      layout: bindGroupLayout,
-      entries: [{ binding: 0, resource: { buffer: this.overlayBuffer } }],
-    });
-    this.meshOverlayBindGroup = device.createBindGroup({
-      layout: bindGroupLayout,
-      entries: [{ binding: 0, resource: { buffer: this.meshOverlayBuffer } }],
-    });
-  }
-
-  /**
-   * The indexed triangle-mesh pipeline for FEM results.
-   *
-   * Follows the overlay pattern: an explicit layout (never `layout: "auto"`)
-   * so the base and highlight passes can bind different uniform buffers to
-   * one pipeline. Vertices interleave a position with the nodal scalar; the
-   * fragment stage ramps the scalar and applies the clip plane.
-   */
-  private buildSimulationPipeline(): void {
-    const device = this.device!;
-    const module = device.createShaderModule({ code: SIMULATION_WGSL, label: "Simulation WGSL" });
-    const { bindGroupLayout, pipelineLayout } = this.sharedLayout("Simulation bindings", [0]);
-
-    this.simPipeline = device.createRenderPipeline({
-      label: "Simulation surface",
-      layout: pipelineLayout,
-      vertex: {
-        module,
-        entryPoint: "vs_sim",
-        buffers: [
-          {
-            arrayStride: 32,
-            stepMode: "vertex",
-            attributes: [
-              { shaderLocation: 0, offset: 0, format: "float32x3" },
-              { shaderLocation: 1, offset: 12, format: "float32" },
-              // BC-preview tint: rgb hue + blend strength per vertex.
-              { shaderLocation: 2, offset: 16, format: "float32x4" },
-            ],
-          },
-        ],
-      },
-      fragment: { module, entryPoint: "fs_sim", targets: [{ format: this.format }] },
-      primitive: { topology: "triangle-list" },
-      depthStencil: {
-        format: DEPTH_FORMAT,
-        depthWriteEnabled: true,
-        depthCompare: "less-equal",
-      },
-    });
-
-    // Element-edge hairlines: same vertex buffer (position only), a line
-    // list over the payload's edge index pairs, nudged toward the camera in
-    // the vertex stage so they sit on top of their own faces.
-    this.simEdgePipeline = device.createRenderPipeline({
-      label: "Simulation element edges",
-      layout: pipelineLayout,
-      vertex: {
-        module,
-        entryPoint: "vs_sim_edge",
-        buffers: [
-          {
-            arrayStride: 32,
-            stepMode: "vertex",
-            // The scalar rides along so the hairline can pick a colour that
-            // contrasts with the ramp value underneath it.
-            attributes: [
-              { shaderLocation: 0, offset: 0, format: "float32x3" },
-              { shaderLocation: 1, offset: 12, format: "float32" },
-            ],
-          },
-        ],
-      },
-      fragment: { module, entryPoint: "fs_sim_edge", targets: [{ format: this.format }] },
-      primitive: { topology: "line-list" },
-      depthStencil: {
-        format: DEPTH_FORMAT,
-        depthWriteEnabled: false,
-        depthCompare: "less-equal",
-      },
-    });
-
-    this.simUniformBuffer = this.createUniform(112);
-    this.simHighlightUniformBuffer = this.createUniform(112);
-    this.simBindGroup = device.createBindGroup({
-      layout: bindGroupLayout,
-      entries: [{ binding: 0, resource: { buffer: this.simUniformBuffer } }],
-    });
-    this.simHighlightBindGroup = device.createBindGroup({
-      layout: bindGroupLayout,
-      entries: [{ binding: 0, resource: { buffer: this.simHighlightUniformBuffer } }],
-    });
+    const simulation = createSimulationPipelines(device, this.format, (size) =>
+      this.createUniform(size),
+    );
+    this.simPipeline = simulation.simPipeline;
+    this.simEdgePipeline = simulation.simEdgePipeline;
+    this.simUniformBuffer = simulation.simUniformBuffer;
+    this.simHighlightUniformBuffer = simulation.simHighlightUniformBuffer;
+    this.simBindGroup = simulation.simBindGroup;
+    this.simHighlightBindGroup = simulation.simHighlightBindGroup;
   }
 
   /** Whether the FEM surface replaces the raymarched solid. */
@@ -867,8 +524,8 @@ export class Renderer {
     const revision = ++this.shaderRevision;
     this.pathReady = false;
 
-    const previewModule = await this.checkedModule(shaders.preview, "Preview WGSL");
-    const preview = this.sharedLayout("Preview bindings", [0, 2]);
+    const previewModule = await compileModule(this.device, shaders.preview, "Preview WGSL");
+    const preview = sharedLayout(this.device, "Preview bindings", [0, 2]);
     const previewDescriptor = (writeMask: number): GPURenderPipelineDescriptor => ({
       layout: preview.pipelineLayout,
       vertex: { module: previewModule, entryPoint: "vs_main" },
@@ -903,8 +560,8 @@ export class Renderer {
     this.invalidate();
 
     const [pathModule, presentModule] = await Promise.all([
-      this.checkedModule(shaders.path, "Path tracer WGSL"),
-      this.checkedModule(shaders.present, "Present WGSL"),
+      compileModule(this.device, shaders.path, "Path tracer WGSL"),
+      compileModule(this.device, shaders.present, "Present WGSL"),
     ]);
     const [pathPipeline, presentPipeline] = await Promise.all([
       this.device.createRenderPipelineAsync({
@@ -964,102 +621,26 @@ export class Renderer {
 
   private uploadOverlay(): void {
     if (!this.device) return;
-    const edges: number[] = [];
-    const handles: number[] = [];
-    const gizmo: number[] = [];
+    const { edges, handles } = packConstructionOverlay(
+      this.profiles,
+      this.selection,
+      this.hover,
+    );
 
-    for (const node of this.profiles) {
-      // The payload ships a ready-made wireframe, so boxes, spheres, and
-      // sketches all draw through one path.
-      const selected = this.selection?.nodeId === node.id;
-      // Whole-object hover previews the pick before it is committed.
-      const hovered = this.hover?.nodeId === node.id && this.hover.vertexIndex === null;
-      const edgeColor = selected
-        ? COLORS.edgeSelected
-        : hovered
-          ? COLORS.edgeHover
-          : node.editable
-            ? COLORS.edge
-            : COLORS.edgeLocked;
-      for (const [start, end] of node.edges) {
-        edges.push(start[0], start[1], start[2], end[0], end[1], end[2], ...edgeColor);
-      }
-      for (let index = 0; index < node.vertices.length; index++) {
-        const isSelected =
-          this.selection?.nodeId === node.id && this.selection.vertexIndex === index;
-        const hovered = this.hover?.nodeId === node.id && this.hover.vertexIndex === index;
-        const handleColor = !node.editable
-          ? COLORS.handleLocked
-          : isSelected
-            ? COLORS.handleSelected
-            : hovered
-              ? COLORS.handleHover
-              : COLORS.handle;
-        const position = node.vertices[index].world;
-        handles.push(
-          position[0],
-          position[1],
-          position[2],
-          ...handleColor,
-          isSelected || hovered ? 1 : 0,
-        );
-      }
-    }
-
-    // Transform controls have their own buffer and pass. Translation only
-    // needs one instance per axis; rotation keeps its segmented rings.
+    // Transform controls have their own buffer and pass.
     const target = this.gizmoTarget();
+    let gizmo: number[] = [];
     if (target) {
-      const size = gizmoScale(this.view, target.origin);
       this.visibleGizmoMode = this.gizmoModeFor(target.node);
-      for (const group of gizmoEdges(target.origin, size, this.visibleGizmoMode)) {
-        const base = AXIS_COLORS[group.axis];
-        const active = this.gizmoAxis === group.axis;
-        const color: Rgba = active
-          ? [
-              base[0] + (1 - base[0]) * 0.38,
-              base[1] + (1 - base[1]) * 0.38,
-              base[2] + (1 - base[2]) * 0.38,
-              1,
-            ]
-          : [base[0], base[1], base[2], 0.98];
-        const visibleEdges =
-          this.visibleGizmoMode === "rotate" ? group.edges : group.edges.slice(0, 1);
-        for (const [start, end] of visibleEdges) {
-          gizmo.push(
-            start[0],
-            start[1],
-            start[2],
-            end[0],
-            end[1],
-            end[2],
-            ...color,
-            active ? 1 : 0,
-          );
-        }
-      }
+      gizmo = packGizmoInstances(
+        target.origin,
+        gizmoScale(this.view, target.origin),
+        this.visibleGizmoMode,
+        this.gizmoAxis,
+      );
     }
 
-    // The extracted mesh edges share the sketch edge pipeline in one buffer:
-    // wire first, sharp second, so the two display switches can draw either
-    // instance range independently.
-    const meshSegments: number[] = [];
-    if (this.meshEdges) {
-      for (const [start, end] of this.meshEdges.wire) {
-        meshSegments.push(start[0], start[1], start[2], end[0], end[1], end[2], ...COLORS.meshWire);
-      }
-      for (const [start, end] of this.meshEdges.sharp) {
-        meshSegments.push(
-          start[0],
-          start[1],
-          start[2],
-          end[0],
-          end[1],
-          end[2],
-          ...COLORS.meshSharp,
-        );
-      }
-    }
+    const meshSegments = packMeshEdgeInstances(this.meshEdges);
 
     this.edgeCount = edges.length / (EDGE_STRIDE / 4);
     this.handleCount = handles.length / (HANDLE_STRIDE / 4);
