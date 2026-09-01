@@ -1,44 +1,22 @@
-# End-to-end optimization: parameters -> SDF -> mesh -> FEM -> optax
+# End-to-end optimization: measured run record
 
-Status: **runs end to end** (2026-09-01). Named CAD parameters descend through the
-full differentiable chain under a real optimizer; the adjoint gradient is
-FD-validated at the initial design. The showcase lives in
-`examples/fem_bracket_optimization.py`.
+Status: **runs end to end** (2026-09-01). The chain and the discrete/continuous
+split are documented in `README.md` § "End-to-end optimization"; the showcase is
+`examples/fem_bracket_optimization.py` on the L-bracket from `scenes/bracket.py`.
+This note keeps what the README does not carry: the measured run record, the
+box-bound rationale, and a known CalculiX deck fragility. Full build history in
+git/PR #19.
 
-## The chain
+Details beyond the README's summary:
 
-The example optimizes the L-bracket that `scenes/bracket.py` declares, over the
-same three named Scalars the scene program exposes:
-
-named CAD parameters (`web_thickness`, `rib_height`, `plate_thickness`)
--> bracket SDF (pure primitive fields mirroring `scenes/bracket.py`)
--> HEX8 mesh (`sdf_to_hex_mesh`)
--> frozen-topology node re-projection (`recompute_points`)
--> jax-fem elastic solve (or CalculiX's native `*SENSITIVITY` adjoint via
-`--backend calculix`)
--> compliance + smoothed-mass objective
--> optax Adam with box projection (`jnp.clip` after `optax.apply_updates`).
-
-The bolt-hole regions are clamped, a prying traction pulls the web tip, and the
-objective trades stiffness against material use. With the default backend the
-compliance term is the total squared displacement; with ccx it is classical
-compliance (`f . u`, twice the strain energy).
-
-## The discrete/continuous split
-
-Which cells are inside and how they connect is a *discrete* decision — it cannot
-be differentiated. So topology is frozen while the optimizer runs, and per
-candidate only the node positions are recomputed differentiably:
-`recompute_points` re-projects the snapped boundary vertices onto the traced
-SDF's zero set, with total motion clamped to half a cell diagonal (the same
-clamp used at extraction).
-
-That clamp bounds how far a frozen mesh can follow the design, so every
-`--remesh-every` steps (default 6) the topology is re-extracted at the current
-design and the continuous chain restarts from the new mesh. The objective may
-jump at those steps because the discretization changes — that is the split being
-honest, not a bug. The final reported number is evaluated on a freshly extracted
-mesh so it does not depend on the last frozen topology.
+- With the default backend the compliance term is the total squared
+  displacement; with ccx it is classical compliance (`f . u`, twice the strain
+  energy).
+- `recompute_points` re-projects the snapped boundary vertices onto the traced
+  SDF's zero set with total motion clamped to half a cell diagonal (the same
+  clamp used at extraction); every `--remesh-every` steps (default 6) topology
+  is re-extracted. The final reported number is evaluated on a freshly
+  extracted mesh so it does not depend on the last frozen topology.
 
 ## Measured numbers
 

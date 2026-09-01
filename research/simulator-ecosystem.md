@@ -1,6 +1,9 @@
 # Simulator ecosystem survey: what plugs into the differentiable CAD chain next
 
-Status: **survey, no code** (2026-08-16). Five domain sweeps (JAX-native CFD/misc,
+Status: survey (2026-08-16); **#1 CalculiX has since shipped** —
+`cadjoint/fem/calculix.py` + `cadjoint/fem/tesseracts/elastic_calculix/`,
+see `research/fem-integration.md`. Full integration history in git/PR #19.
+Five domain sweeps (JAX-native CFD/misc,
 mesh-based CFD adjoints, wave/EM/acoustics, multibody dynamics, legacy/Fortran FEA)
 merged, deduplicated, and cross-ranked. Every maintenance/license claim below was
 verified against the GitHub/PyPI APIs by the researchers in Aug 2026, and every
@@ -40,7 +43,7 @@ Composite of four axes, in this order of weight:
 
 | # | Candidate | Physics | Gradient | Geometry fit | Lane | Effort | Score |
 |---|---|---|---|---|---|---|---|
-| 1 | **CalculiX (ccx)** | structural FEA (Abaqus-like), thermal, frequency | discrete adjoint, native (`*SENSITIVITY`) | HEX8 `.inp` = cadjoint hex mesh 1:1 | B (subprocess) | M | 9.0 |
+| 1 | **CalculiX (ccx)** — *shipped* | structural FEA (Abaqus-like), thermal, frequency | discrete adjoint, native (`*SENSITIVITY`) | HEX8 `.inp` = cadjoint hex mesh 1:1 | B (subprocess) | M | 9.0 |
 | 2 | **JAX-Fluids 2.0** | compressible NS, two-phase, levelset immersed solids | jax-native | SDF **is** the native levelset input | A | M | 9.0 |
 | 3 | **jwave** | acoustics/ultrasound (time-domain + Helmholtz) | jax-native | SDF → material grid, ~10-line adapter | A (B if jax pins clash) | S | 8.5 |
 | 4 | **MuJoCo MJX (JAX backend)** | rigid multibody + contact | jax-native ("mostly supported") | MJCF primitives + differentiable inertia from SDF | A | M | 8.0 |
@@ -148,58 +151,17 @@ most permissive stack surveyed.
 
 ## Top candidates in detail
 
-### 1. CalculiX — the Fortran code with a real adjoint (score 9.0)
+### 1. CalculiX — the Fortran code with a real adjoint (score 9.0) — SHIPPED
 
-**What it is.** Abaqus-like structural FEA in Fortran 77/90 + C (Guido Dhondt,
-MTU Aero Engines lineage, ~1998; v2.23 released late 2025, active forum,
-conda-forge binaries). GPL-2.
-
-**Gradient mechanism.** Native, built-in, and the reason it tops this list: a
-`*SENSITIVITY` procedure step after `*STATIC` (or `*FREQUENCY, STORAGE=YES`)
-computes adjoint-based sensitivities of built-in objectives (`*OBJECTIVE`:
-MASS, STRAIN ENERGY/compliance, EIGENFREQUENCY, ALL-DISP) w.r.t.
-`*DESIGN VARIABLES, TYPE=COORDINATE` — a surface node set. One adjoint-cost
-pass yields the gradient w.r.t. all design nodes, written to `.frd`,
-**projected on the local surface normal** (in-surface motion doesn't change
-geometry). That projection composes *exactly* with cadjoint's mesher: the
-Newton-snapped boundary vertices move along the SDF gradient (the surface
-normal) by construction, so the normal-projected sensitivity is precisely the
-derivative the chain rule needs. Restrictions: true 3D elements only (C3D8
-fine); objectives limited to the built-in list, so the backend contract is
-**objective-valued**, not field-valued — which is exactly what the bracket
-demo's compliance + mass objective wants.
-
-**Geometry coupling.** Byte-for-byte: `sdf_to_hex_mesh` HEX8 points/cells →
-meshio (already a `cadjoint[fem]` dependency) writes Abaqus `.inp` C3D8 decks
-directly. `Nodes` selections serialize to `*NSET` + `*BOUNDARY`/`*CLOAD`;
-design-variable node set = the mesher's `snap_mask` surface nodes.
-
-**Packaging plan.** Lane B: conda-forge `calculix` binary + a subprocess
-tesseract. Schema mirrors `elastic_jaxfem` (points Differentiable, cells,
-fixed/traction node sets) + an objective spec; `apply` = write `.inp`, run
-`ccx`, parse `.frd`/`.dat`; `vector_jacobian_product` = the `*SENSITIVITY`
-run, then map per-design-node normal sensitivities to d(objective)/d(points)
-via the stored node normals, times the cotangent. No f2py, no Docker locally;
-`tesseract build` container for distribution. GPL-2 stays behind the process
-boundary.
-
-**Demo storyline.** Rerun the existing L-bracket study (`scenes/bracket.py`,
-`examples/fem_bracket_optimization.py`) with a 1990s Fortran Abaqus-clone as
-the solver — same mesh, same BCs, same objective — and put **three independent
-gradient paths on one screen**: ccx adjoint vs the in-repo jax-fem adjoint vs
-`tesseract-runtime check-gradients` FD. "A battle-tested Fortran turbine-blade
-FEA code is now one `jax.grad` call away from parametric CAD."
-
-**Effort.** M — deck writer + `.frd` parser + normal-projection chain rule are
-straightforward; robust output parsing and two-step orchestration need care.
-Every cadjoint-side piece already exists.
-
-Sources: [ccx *SENSITIVITY docs](https://www.feacluster.com/CalculiX/ccx_2.18/doc/ccx/node187.html),
-[design variables](https://www.feacluster.com/CalculiX/ccx_2.18/doc/ccx/node23.html),
-[ccx 2.23 manual](https://www.dhondt.de/ccx_2.23.pdf),
-[dhondt.de](http://www.dhondt.de/new_calc.htm),
-[conda-forge package](https://anaconda.org/conda-forge/calculix),
-[ccx-shape](https://github.com/fandaL/ccx-shape).
+Shipped as surveyed (2026-08): `backend="calculix"` runs ccx 2.23 behind a
+subprocess Tesseract exactly along the Lane-B plan — C3D8 decks 1:1 from the
+hex meshes, forward parity 1.5e-7 vs jax-fem, and the native `*SENSITIVITY`
+adjoint **plus a derived correction** for the Jacobian-variation term ccx 2.23
+omits, bringing the adjoint to 2e-4 of FD. Three gradient paths (ccx adjoint /
+jax-fem adjoint / FD) agree on the bracket. See `cadjoint/fem/calculix.py`,
+`cadjoint/fem/tesseracts/elastic_calculix/`, `tests/fem/`, and the design
+record in `research/fem-integration.md`; the survey analysis that ranked it
+first is in git/PR #19.
 
 ### 2. JAX-Fluids 2.0 — the jax-native CFD flagship (score 9.0)
 
@@ -596,32 +558,13 @@ Sources: [repo](https://github.com/su2code/SU2),
 
 ## Recommended next integrations
 
-Ordering logic: (1) is the explicitly wanted Fortran/legacy story and lands the
-strongest validation demo on geometry we already have; (2) is the smallest diff
-and opens a new physics domain; (3) is the visual flagship. The diffrax linkage
-demo is the cheap fourth whenever a weekend slot opens — it needs no external
-solver at all.
+The CalculiX tesseract — originally first in this list — shipped along its
+exact plan (see the shipped note above). Remaining ordering logic: (1) is the
+smallest diff and opens a new physics domain; (2) is the visual flagship. The
+diffrax linkage demo is the cheap third whenever a weekend slot opens — it
+needs no external solver at all.
 
-### 1. CalculiX tesseract (Fortran/legacy, M)
-
-The only living Fortran code with a native adjoint whose input matches
-`sdf_to_hex_mesh` byte-for-byte. Concrete first steps:
-
-1. `conda install -c conda-forge calculix`; hand-write a minimal C3D8 `.inp`
-   for the existing thermal bar mesh via meshio; run `ccx` and parse `.dat` to
-   confirm displacement parity with jax-fem on the identical mesh.
-2. Add a `*SENSITIVITY` step (`*OBJECTIVE STRAIN ENERGY`,
-   `*DESIGN VARIABLES, TYPE=COORDINATE` on the `snap_mask` node set); parse
-   the `.frd` normal sensitivities and check dJ/d(normal offset) against
-   central FD on a single node.
-3. Write `cadjoint/fem/tesseracts/elastic_calculix/tesseract_api.py` cloning the
-   `elastic_jaxfem` schema; `vector_jacobian_product` = sensitivity run +
-   normal-projection chain rule (stored node normals × cotangent).
-4. Wire `tesseract-runtime check-gradients` into CI; then rerun
-   `examples/fem_bracket_optimization.py` with `backend="calculix"` and put
-   the three gradient paths (ccx adjoint / jax-fem adjoint / FD) on one plot.
-
-### 2. jwave ultrasound lens (S)
+### 1. jwave ultrasound lens (S)
 
 Smallest integration, new physics, proven-in-docs gradients. Concrete first
 steps:
@@ -635,7 +578,7 @@ steps:
    piston source, optax on (arc radius, thickness, aperture), focal-pressure
    objective; render the pressure field per step.
 
-### 3. JAX-Fluids fairing (M, the flagship)
+### 2. JAX-Fluids fairing (M, the flagship)
 
 The SDF is the native levelset input — the strongest geometric fit surveyed.
 Concrete first steps:
