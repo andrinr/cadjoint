@@ -236,6 +236,15 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <li><a href="#reference-scene" id="toc-reference-scene" class="nav-link" data-scroll-target="#reference-scene">Reference scene</a></li>
   </ul></li>
   <li><a href="#solver-tesseract-schema-deltas-tet4tet10-cells-thermal-fluxes-2026-09-01" id="toc-solver-tesseract-schema-deltas-tet4tet10-cells-thermal-fluxes-2026-09-01" class="nav-link" data-scroll-target="#solver-tesseract-schema-deltas-tet4tet10-cells-thermal-fluxes-2026-09-01">Solver-tesseract schema deltas: TET4/TET10 cells + thermal fluxes (2026-09-01)</a></li>
+  <li><a href="#container-conformance-the-five-tesseracts-actually-built-2026-09-01" id="toc-container-conformance-the-five-tesseracts-actually-built-2026-09-01" class="nav-link" data-scroll-target="#container-conformance-the-five-tesseracts-actually-built-2026-09-01">Container conformance: the five Tesseracts, actually built (2026-09-01)</a>
+  <ul class="collapse">
+  <li><a href="#conformance-against-the-installed-sdk" id="toc-conformance-against-the-installed-sdk" class="nav-link" data-scroll-target="#conformance-against-the-installed-sdk">Conformance against the installed SDK</a></li>
+  <li><a href="#why-three-packages-had-to-move-from-pip-to-conda" id="toc-why-three-packages-had-to-move-from-pip-to-conda" class="nav-link" data-scroll-target="#why-three-packages-had-to-move-from-pip-to-conda">Why three packages had to move from pip to conda</a></li>
+  <li><a href="#build-results" id="toc-build-results" class="nav-link" data-scroll-target="#build-results">Build results</a></li>
+  <li><a href="#container-round-trips-served-image-vs.-in-process-same-inputs" id="toc-container-round-trips-served-image-vs.-in-process-same-inputs" class="nav-link" data-scroll-target="#container-round-trips-served-image-vs.-in-process-same-inputs">Container round trips (served image vs.&nbsp;in-process, same inputs)</a></li>
+  <li><a href="#two-limitations-of-the-served-boundary-tesseract-core-1.11" id="toc-two-limitations-of-the-served-boundary-tesseract-core-1.11" class="nav-link" data-scroll-target="#two-limitations-of-the-served-boundary-tesseract-core-1.11">Two limitations of the served boundary (tesseract-core 1.11)</a></li>
+  <li><a href="#housekeeping" id="toc-housekeeping" class="nav-link" data-scroll-target="#housekeeping">Housekeeping</a></li>
+  </ul></li>
   </ul></li>
   </ul>
 </nav>
@@ -556,8 +565,152 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li>New <code>cadjoint/fem/tesseracts/chain.py</code>: <code>freeze_study_chain(study, sim_mesh, field)</code> — the frozen mesher+solver chain behind <code>Optimization(gradient_path="tesseract")</code> (see research/tet-vs-hex.md for the measurements and the default recommendation).</li>
 </ul>
 <p>Tesseract schemas reject extra input keys (pydantic extra=forbid via tesseract-core), so every schema fed by <code>TesseractBackend</code>’s input dict must carry the union of its fields — that is why <code>elastic_calculix</code> grew the (rejected-if-set) face fields.</p>
+</section>
+<section id="container-conformance-the-five-tesseracts-actually-built-2026-09-01" class="level2">
+<h2 class="anchored" data-anchor-id="container-conformance-the-five-tesseracts-actually-built-2026-09-01">Container conformance: the five Tesseracts, actually built (2026-09-01)</h2>
+<p>Until now the packaged Tesseracts only ever ran in-process via <code>Tesseract.from_tesseract_api</code>. This section records what happened when all five were built into real Docker images with <code>tesseract build</code> and exercised through a served HTTP client, on macOS 15 / Apple Silicon, Docker 29.7.2, <code>linux/arm64</code>, tesseract-core 1.11.0.</p>
+<section id="conformance-against-the-installed-sdk" class="level3">
+<h3 class="anchored" data-anchor-id="conformance-against-the-installed-sdk">Conformance against the installed SDK</h3>
+<p>Everything was checked against the <em>installed</em> contract, not against memory: <code>tesseract_core.sdk.api_parse.TesseractConfig</code> / <code>TesseractBuildConfig</code> (the pydantic models behind <code>tesseract_config.yaml</code>, <code>extra="forbid"</code> on both), <code>sdk/templates/Dockerfile.base</code> (where each <code>build_config</code> field actually lands), and <code>sdk/engine.py</code> (<code>parse_requirements</code>, <code>_stage_local_dependency</code>, <code>prepare_build_context</code>).</p>
+<p>Confirmed mechanics worth writing down:</p>
+<ul>
+<li><strong>Local dependencies.</strong> Requirement lines starting with <code>.</code>, <code>/</code> or <code>file://</code> are split out of <code>tesseract_requirements.txt</code>, <code>copytree</code>’d into <code>&lt;context&gt;/local_requirements/&lt;name&gt;</code> and rewritten to <code>./local_requirements/&lt;name&gt;</code>; extras (<code>[fem]</code>) are preserved. The same staging runs for the <code>pip:</code> sub-list of a conda <code>tesseract_environment.yaml</code>. So <code>../../../..</code> from a package directory is the supported way to install cadjoint itself. Staging the 1.9 GB repo root takes ~9 s on APFS (<code>copytree</code> clones); the generated <code>.dockerignore</code> drops <code>.venv</code>, <code>.git</code> and <code>__pycache__</code> before the context is sent to the daemon, but nothing else (<code>node_modules</code>, <code>native/target</code> do travel).</li>
+<li><strong>System dependencies.</strong> <code>build_config.extra_packages</code> is apt-only and is rendered <em>twice</em> — once in the build stage, once in the run stage — which is what makes an apt-installed runtime library survive the multi-stage <code>COPY</code>.</li>
+<li><strong>Custom build steps.</strong> <code>build_config.custom_build_steps</code> are injected verbatim into the run stage, after <code>package_data</code> and before the <code>tesseract-runtime check</code>, while the image is still <code>USER root</code>. The build context is shared with the build stage, so <code>COPY ["__tesseract_source__/…", …]</code> reaches the package’s own source files.</li>
+<li><strong>Mutual exclusions.</strong> <code>python_version</code> is rejected together with the conda provider and with <code>inherit_base_image_packages</code>. Versions must match <code>^\d+\.\d+\.\d+[a-zA-Z-0-9]*$</code>.</li>
+</ul>
+<p>The inherited configs were schema-valid but two of the three mechanisms they relied on did not survive contact with a real build (below).</p>
+</section>
+<section id="why-three-packages-had-to-move-from-pip-to-conda" class="level3">
+<h3 class="anchored" data-anchor-id="why-three-packages-had-to-move-from-pip-to-conda">Why three packages had to move from pip to conda</h3>
+<p><code>thermal_jaxfem</code> and <code>elastic_jaxfem</code> declared <code>../../../..[fem]</code> + <code>python_version: "3.12"</code>. That build fails on Linux, and not by accident:</p>
+<ul>
+<li><strong>gmsh</strong> publishes wheels for <code>manylinux_2_24_x86_64</code>, <code>macosx_*</code> and <code>win_amd64</code> only — no aarch64 wheel exists, so the resolver refuses the <code>[fem]</code> extra outright on this machine.</li>
+<li><strong>petsc4py</strong> publishes <em>no</em> wheels on PyPI at all, for any platform or version (checked 3.23.7 … 3.25.5: zero <code>.whl</code> files). Its sdist runs PETSc’s <code>configure</code>, which is why the first build died with <code>RuntimeError: 256</code> out of <code>setup.py</code>. Retargeting to <code>linux/amd64</code> fixes gmsh but not this.</li>
+</ul>
+<p>Both are hard imports on the used path (<code>jax_fem.solver</code> does <code>from petsc4py import PETSc</code>; <code>jax_fem.generate_mesh</code> does <code>import gmsh</code>), so neither can be dropped. conda-forge carries both for <code>linux-aarch64</code>, so those two packages now declare <code>build_config.requirements.provider: conda</code> with <code>base_image: condaforge/miniforge3:latest</code> and a <code>tesseract_environment.yaml</code>; jax-fem itself (not on conda-forge, empty <code>install_requires</code>) and cadjoint stay in the <code>pip:</code> sub-list, deliberately <em>without</em> the <code>[fem]</code> extra so the extra cannot drag gmsh back in from PyPI.</p>
+<p><code>elastic_calculix</code> moved for the same structural reason with a better outcome: it declared <code>extra_packages: [calculix-ccx]</code>, and Debian’s package is <strong>ccx 2.20</strong> — older than the 2.23 whose <code>STRAINENERGY</code>/DFDN behaviour the adjoint correction in <code>cadjoint/fem/calculix.py</code> is written against. conda-forge ships <code>calculix</code> <strong>2.23</strong> for linux-aarch64, so the package now installs that and pins <code>CADJOINT_CCX=/python-env/bin/ccx</code>.</p>
+</section>
+<section id="build-results" class="level3">
+<h3 class="anchored" data-anchor-id="build-results">Build results</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Package</th>
+<th>Provider</th>
+<th>Build</th>
+<th>Image</th>
+<th>Fix forced by the build</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>mesher</code></td>
+<td>pip</td>
+<td>39 s</td>
+<td>1.36 GB</td>
+<td>none — inherited config built as written</td>
+</tr>
+<tr class="even">
+<td><code>qef_native</code></td>
+<td>pip</td>
+<td>74 s</td>
+<td>1.39 GB</td>
+<td>base image bookworm → trixie; <code>ca-certificates</code></td>
+</tr>
+<tr class="odd">
+<td><code>elastic_calculix</code></td>
+<td>conda</td>
+<td>87 s</td>
+<td>2.57 GB</td>
+<td>apt <code>calculix-ccx</code> 2.20 → conda-forge <code>calculix</code> 2.23</td>
+</tr>
+<tr class="even">
+<td><code>thermal_jaxfem</code></td>
+<td>conda</td>
+<td>181 s</td>
+<td>5.51 GB</td>
+<td>pip <code>[fem]</code> → conda provider (gmsh/petsc4py)</td>
+</tr>
+<tr class="odd">
+<td><code>elastic_jaxfem</code></td>
+<td>conda</td>
+<td>194 s</td>
+<td>5.51 GB</td>
+<td>same</td>
+</tr>
+</tbody>
+</table>
+<p>The native package needed two corrections beyond the inherited config. Debian bookworm’s cargo is 0.66 (rustc 1.63) and cannot read this crate’s <strong>Cargo.lock format v4</strong> (needs cargo ≥ 1.78), so the base image moved to <code>debian:trixie-slim</code> (cargo 1.85) rather than dropping the lockfile — the build now runs <code>cargo build --release --locked</code>. The slim image also has no <code>ca-certificates</code>, so cargo could not reach <code>index.crates.io</code> (<code>[77] Problem with the SSL CA cert</code>). The toolchain is installed, used and <code>apt-get purge</code>d inside one <code>RUN</code>, which is safe because a Rust cdylib links libstd statically.</p>
+</section>
+<section id="container-round-trips-served-image-vs.-in-process-same-inputs" class="level3">
+<h3 class="anchored" data-anchor-id="container-round-trips-served-image-vs.-in-process-same-inputs">Container round trips (served image vs.&nbsp;in-process, same inputs)</h3>
+<p>Every number below is a served <code>Tesseract.from_image(...)</code> HTTP call compared against <code>Tesseract.from_tesseract_api(...)</code> in the host process.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Tesseract</th>
+<th>Case</th>
+<th>Forward</th>
+<th>VJP</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>mesher</code></td>
+<td>HEX8, 9³ lattice, 117 pts / 56 cells</td>
+<td>points max abs diff <strong>1.11e-16</strong>; cells and surface mask identical</td>
+<td><code>field_values</code> bar max abs diff <strong>6.66e-16</strong> (max abs value 3.31)</td>
+</tr>
+<tr class="even">
+<td><code>thermal_jaxfem</code></td>
+<td>TET4 bar, 42 pts / 72 cells, Dirichlet + flux faces</td>
+<td>temperature max abs diff <strong>2.78e-16</strong> (max T 0.551)</td>
+<td><code>points</code> <strong>4.88e-15</strong>, <code>conductivity</code> <strong>6.66e-16</strong>, <code>source</code> <strong>3.33e-16</strong></td>
+</tr>
+<tr class="odd">
+<td><code>elastic_jaxfem</code></td>
+<td>TET4 bar, 42 pts / 72 cells, exact face traction</td>
+<td>displacement max abs diff <strong>1.16e-16</strong> (max u 1.30e-2)</td>
+<td><code>points</code> <strong>6.94e-16</strong> (max abs 6.71e-2)</td>
+</tr>
+<tr class="even">
+<td><code>qef_native</code></td>
+<td>24 cells / 96 Hermite edges, λ=0.05</td>
+<td>vertices <strong>0.0</strong> (bit-identical)</td>
+<td><code>points_bar</code> <strong>0.0</strong>, <code>normals_bar</code> <strong>0.0</strong></td>
+</tr>
+</tbody>
+</table>
+<p><code>elastic_calculix</code> has no in-process reference here (the host has no ccx binary), so it was validated three ways instead, all inside the container: <code>ccx -v</code> reports <strong>2.23</strong> at <code>/python-env/bin/ccx</code>; on a 22×5×5 hex bar the served <code>apply</code> gives <code>strain_energy = 1.508852250e-2</code>, <code>max|u| = 3.353357e-1</code> in 0.38 s, and the served <code>vector_jacobian_product</code> (0.03 s) matches central finite differences taken through the <em>container’s own</em> <code>apply</code> to <strong>6.5e-4</strong> relative on the three largest gradient rows — the ~6-significant-digit limit of ccx’s text output, consistent with the 2e-4·scale bound already recorded for the in-process path. Cross-solver, the container’s ccx displacement matches in-process jax-fem on the same mesh to <strong>1.2e-7</strong> relative.</p>
+<p>Serve latency is ~1 s for every image; the first <code>apply</code> carries a one-off JAX/import cost (mesher 1.8 s, jax-fem images 3–3.6 s) and later calls run at in-process speed.</p>
+</section>
+<section id="two-limitations-of-the-served-boundary-tesseract-core-1.11" class="level3">
+<h3 class="anchored" data-anchor-id="two-limitations-of-the-served-boundary-tesseract-core-1.11">Two limitations of the served boundary (tesseract-core 1.11)</h3>
+<ol type="1">
+<li><strong>Zero-size arrays cannot cross HTTP.</strong> <code>runtime/array_encoding.py</code>’s <code>get_array_model</code> maps a polymorphic (<code>None</code>) dimension to <code>PositiveInt</code>, so an encoded array with a <code>0</code> in its shape fails the <code>EncodedArrayModel</code> branch, falls through to <code>python_to_array</code>, and is reported as <code>array_non_numeric</code>. Reproduced minimally: <code>Array[(None,), Int32]</code> accepts a base64-encoded <code>(3,)</code> array and rejects a <code>(0,)</code> one, even though <code>Base64ArrayData</code> and <code>_load_base64_arraydict</code> both handle the empty buffer fine. Consequences: the mesher’s discovery mode (empty <code>point_ids</code> / <code>cell_template</code>) is in-process only, and any “this feature is unused” convention built on an empty array needs a non-empty spelling. For that reason <code>elastic_calculix</code> now rejects only a <em>populated</em> face-patch set (<code>offsets[-1] &gt; offsets[0]</code>) instead of any non-empty <code>traction_face_offsets</code> array, so a served caller can say “no face targeting” with <code>[0, 0]</code>. The upstream fix is <code>NonNegativeInt</code> for polymorphic dimensions.</li>
+<li><strong>TetGen topology is not portable.</strong> The same field and the same TetGen 0.8.4 produce <strong>182 points / 673 cells</strong> on macOS-arm64 and <strong>185 points</strong> in the Linux-aarch64 container — Steiner insertion differs with the compiler/libm, and the mesher’s frozen-topology promise correctly rejects the mismatch. A frozen topology must therefore be discovered on the same platform that will execute it. HEX8 mode (voxelize + Newton-snap, pure numpy/JAX) is bit-reproducible across both, which is why the container parity test uses it.</li>
+</ol>
+</section>
+<section id="housekeeping" class="level3">
+<h3 class="anchored" data-anchor-id="housekeeping">Housekeeping</h3>
+<p><code>native/run_&lt;uuid&gt;/logs/</code> directories are per-invocation artifacts dropped by <code>tesseract-runtime</code> next to the Tesseract it executes, not build output; two stale ones were deleted and <code>/run_*/</code> added to <code>native/.gitignore</code>.</p>
 
 
+</section>
 </section>
 </section>
 
