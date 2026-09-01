@@ -87,8 +87,8 @@ async function canvasMetrics(page: Page) {
  */
 /** base_l, uv [-0.9, 0.0] — the sketch's first vertex. */
 const FIRST_VERTEX: Vec3 = [0.9, 0, 0];
-/** fin2_tip_l (vertex index 9), uv [-0.08, 0.85] — free and unconstrained. */
-const FIN_TIP: Vec3 = [0.08, 0, 0.85];
+/** fin2_tip_l (vertex index 9), uv [-0.15, 0.85] — free and unconstrained. */
+const FIN_TIP: Vec3 = [0.15, 0, 0.85];
 /** Midpoint of the fin comb's base edge, for outline picks. */
 const BASE_EDGE: Vec3 = [0.5, 0, 0];
 
@@ -390,7 +390,7 @@ test("dragging a handle rewrites the vertex literal", async ({ page }) => {
   await page.mouse.up();
 
   await expect
-    .poll(async () => (await editorText(page)).includes("[-0.08, 0.85]"), {
+    .poll(async () => (await editorText(page)).includes("[-0.15, 0.85]"), {
       timeout: 45_000,
     })
     .toBe(false);
@@ -1141,7 +1141,7 @@ test("path tracing yields to interactive dragging and resumes afterwards", async
   await page.mouse.up();
 
   await expect
-    .poll(async () => !(await editorText(page)).includes("[-0.08, 0.85]"), {
+    .poll(async () => !(await editorText(page)).includes("[-0.15, 0.85]"), {
       timeout: 45_000,
     })
     .toBe(true);

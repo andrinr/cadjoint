@@ -139,21 +139,24 @@ steel = Material(name="steel", color=[0.55, 0.57, 0.6], roughness=0.4, metallic=
 # Sketch plane normal +Y gives in-plane axes u = -X, v = +Z: profile y is
 # world height. Extrusion spans ±fin_depth/2 around y = 0. Every vertex is a
 # live sketch point — drag a fin tip in the viewport and rerun.
+# The initial comb is DELIBERATELY overbuilt — brick-thick fins wasting
+# material — so running cool-sink visibly slims and tapers it into a
+# well-proportioned sink instead of nudging an already-decent one.
 base_l = Vector2(value=[-0.9, 0.0], free=True, name="base_l")
 base_r = Vector2(value=[0.9, 0.0], free=True, name="base_r")
 deck_r = Vector2(value=[0.9, 0.18], free=True, name="deck_r")
-fin1_root_r = Vector2(value=[0.68, 0.18], free=True, name="fin1_root_r")
-fin1_tip_r = Vector2(value=[0.68, 0.85], free=True, name="fin1_tip_r")
-fin1_tip_l = Vector2(value=[0.52, 0.85], free=True, name="fin1_tip_l")
-fin1_root_l = Vector2(value=[0.52, 0.18], free=True, name="fin1_root_l")
-fin2_root_r = Vector2(value=[0.08, 0.18], free=True, name="fin2_root_r")
-fin2_tip_r = Vector2(value=[0.08, 0.85], free=True, name="fin2_tip_r")
-fin2_tip_l = Vector2(value=[-0.08, 0.85], free=True, name="fin2_tip_l")
-fin2_root_l = Vector2(value=[-0.08, 0.18], free=True, name="fin2_root_l")
-fin3_root_r = Vector2(value=[-0.52, 0.18], free=True, name="fin3_root_r")
-fin3_tip_r = Vector2(value=[-0.52, 0.85], free=True, name="fin3_tip_r")
-fin3_tip_l = Vector2(value=[-0.68, 0.85], free=True, name="fin3_tip_l")
-fin3_root_l = Vector2(value=[-0.68, 0.18], free=True, name="fin3_root_l")
+fin1_root_r = Vector2(value=[0.75, 0.18], free=True, name="fin1_root_r")
+fin1_tip_r = Vector2(value=[0.75, 0.85], free=True, name="fin1_tip_r")
+fin1_tip_l = Vector2(value=[0.45, 0.85], free=True, name="fin1_tip_l")
+fin1_root_l = Vector2(value=[0.45, 0.18], free=True, name="fin1_root_l")
+fin2_root_r = Vector2(value=[0.15, 0.18], free=True, name="fin2_root_r")
+fin2_tip_r = Vector2(value=[0.15, 0.85], free=True, name="fin2_tip_r")
+fin2_tip_l = Vector2(value=[-0.15, 0.85], free=True, name="fin2_tip_l")
+fin2_root_l = Vector2(value=[-0.15, 0.18], free=True, name="fin2_root_l")
+fin3_root_r = Vector2(value=[-0.45, 0.18], free=True, name="fin3_root_r")
+fin3_tip_r = Vector2(value=[-0.45, 0.85], free=True, name="fin3_tip_r")
+fin3_tip_l = Vector2(value=[-0.75, 0.85], free=True, name="fin3_tip_l")
+fin3_root_l = Vector2(value=[-0.75, 0.18], free=True, name="fin3_root_l")
 deck_l = Vector2(value=[-0.9, 0.18], free=True, name="deck_l")
 comb_profile = PolygonProfile(
     [
