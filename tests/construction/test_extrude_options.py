@@ -7,10 +7,10 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from jaxcad.construction import PolygonProfile, extrude
-from jaxcad.geometry.parameters import Scalar, Vector
-from jaxcad.geometry.primitives import Rectangle
-from jaxcad.sdf.primitives import ExtrudedPolygon
+from cadjoint.construction import PolygonProfile, extrude
+from cadjoint.geometry.parameters import Scalar, Vector
+from cadjoint.geometry.primitives import Rectangle
+from cadjoint.sdf.primitives import ExtrudedPolygon
 
 SQUARE = [[-1.0, -1.0], [1.0, -1.0], [1.0, 1.0], [-1.0, 1.0]]
 # Elongated in x so a rotated slice is distinguishable from the plain one.

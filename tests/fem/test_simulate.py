@@ -1,4 +1,4 @@
-"""Tests for jaxcad.fem.simulate (thermal + elastic solves via jax-fem)."""
+"""Tests for cadjoint.fem.simulate (thermal + elastic solves via jax-fem)."""
 # Imports follow pytest.importorskip by design.
 # ruff: noqa: E402
 
@@ -9,11 +9,11 @@ import pytest
 
 pytest.importorskip("jax_fem")
 
-from jaxcad.fem.hexmesh import GridSpec, sdf_to_hex_mesh
-from jaxcad.fem.selection import Nodes
-from jaxcad.fem.simulate import elastic_solve, thermal_solve
-from jaxcad.geometry.parameters import Vector
-from jaxcad.sdf.primitives import Box
+from cadjoint.fem.hexmesh import GridSpec, sdf_to_hex_mesh
+from cadjoint.fem.selection import Nodes
+from cadjoint.fem.simulate import elastic_solve, thermal_solve
+from cadjoint.geometry.parameters import Vector
+from cadjoint.sdf.primitives import Box
 
 # Bar of 2.0 x 0.3 x 0.3 along x.
 _HALF = (1.0, 0.15, 0.15)

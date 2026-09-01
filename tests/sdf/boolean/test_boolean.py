@@ -2,8 +2,8 @@
 
 import jax.numpy as jnp
 
-from jaxcad.sdf.boolean import Difference, Intersection, Union
-from jaxcad.sdf.primitives import Box, Sphere
+from cadjoint.sdf.boolean import Difference, Intersection, Union
+from cadjoint.sdf.primitives import Box, Sphere
 
 
 class TestUnion:
@@ -108,7 +108,7 @@ class TestDifference:
 
     def test_drill_hole(self):
         """Classic use case: drill a hole through a sphere"""
-        from jaxcad.sdf.primitives import Cylinder
+        from cadjoint.sdf.primitives import Cylinder
 
         sphere = Sphere(radius=2.0)
         cylinder = Cylinder(radius=0.5, height=3.0)

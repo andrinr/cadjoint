@@ -1,7 +1,7 @@
 """Tests for the CalculiX (ccx) integration.
 
 Unit tests (deck writer, parsers, the volume-term correction) run
-everywhere; live tests require a ``ccx`` binary (JAXCAD_CCX / CCX env
+everywhere; live tests require a ``ccx`` binary (CADJOINT_CCX / CCX env
 var or PATH — e.g. ``micromamba create -p ./ccx-env -c conda-forge
 calculix``) and skip cleanly without one.
 """
@@ -13,8 +13,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from jaxcad.fem.backends import ElasticBCs
-from jaxcad.fem.calculix import (
+from cadjoint.fem.backends import ElasticBCs
+from cadjoint.fem.calculix import (
     consistent_nodal_forces,
     energy_volume_gradient,
     find_ccx,
@@ -26,7 +26,7 @@ from jaxcad.fem.calculix import (
 )
 
 _CCX = find_ccx()
-needs_ccx = pytest.mark.skipif(_CCX is None, reason="ccx binary not found (JAXCAD_CCX/CCX/PATH)")
+needs_ccx = pytest.mark.skipif(_CCX is None, reason="ccx binary not found (CADJOINT_CCX/CCX/PATH)")
 
 # A single unit-cube element (VTK corner order).
 _CUBE_POINTS = np.array(
@@ -249,7 +249,7 @@ class TestEnergyVolumeGradient:
 
 def _frozen_density_energy(points, displacement, lame_lambda, lame_mu):
     """sum_q w_q(base geometry) * detJ_q(points) for the cube element."""
-    from jaxcad.fem.calculix import _HEX_GAUSS_GRADS
+    from cadjoint.fem.calculix import _HEX_GAUSS_GRADS
 
     base = _CUBE_POINTS[_CUBE_CELLS][0]
     corners = points[_CUBE_CELLS][0]
@@ -274,9 +274,9 @@ def _frozen_density_energy(points, displacement, lame_lambda, lame_mu):
 @pytest.fixture(scope="module")
 def bar_mesh():
     pytest.importorskip("jax")
-    from jaxcad.fem.hexmesh import GridSpec, sdf_to_hex_mesh
-    from jaxcad.geometry.parameters import Vector
-    from jaxcad.sdf.primitives import Box
+    from cadjoint.fem.hexmesh import GridSpec, sdf_to_hex_mesh
+    from cadjoint.geometry.parameters import Vector
+    from cadjoint.sdf.primitives import Box
 
     bar = Box(Vector([1.0, 0.15, 0.15], free=True, name="size"))
     grid = GridSpec.from_bounds((-1.1, -0.25, -0.25), (2.2, 0.5, 0.5), (22, 5, 5))
@@ -298,7 +298,7 @@ _TRACTIONS = [(_tip, [0.0, 0.0, -1.0])]
 @needs_ccx
 class TestLiveForward:
     def test_cube_matches_axial_theory(self, tmp_path):
-        from jaxcad.fem.calculix import elastic_ccx_solve
+        from cadjoint.fem.calculix import elastic_ccx_solve
 
         solution = elastic_ccx_solve(
             _CUBE_POINTS,
@@ -323,7 +323,7 @@ class TestLiveForward:
         text output, not by the discretizations.
         """
         pytest.importorskip("jax_fem")
-        from jaxcad.fem.simulate import elastic_solve
+        from cadjoint.fem.simulate import elastic_solve
 
         direct = elastic_solve(
             bar_mesh,
@@ -348,15 +348,15 @@ class TestLiveForward:
 
     def test_von_mises_parity_with_jaxfem(self, bar_mesh):
         pytest.importorskip("jax_fem")
-        from jaxcad.fem.backends import ElasticBCs as BCs
-        from jaxcad.fem.calculix import elastic_ccx_solve, von_mises
-        from jaxcad.fem.simulate import elastic_solve
+        from cadjoint.fem.backends import ElasticBCs as BCs
+        from cadjoint.fem.calculix import elastic_ccx_solve, von_mises
+        from cadjoint.fem.simulate import elastic_solve
 
         direct = elastic_solve(
             bar_mesh, youngs=1000.0, poisson=0.3, dirichlet=_FIXED, tractions=_TRACTIONS
         )
         reference = direct.von_mises()
-        from jaxcad.fem.simulate import _face_patch, _node_patch
+        from cadjoint.fem.simulate import _face_patch, _node_patch
 
         bcs = BCs(
             fixed_nodes=[_node_patch(bar_mesh, _clamp)],
@@ -384,7 +384,7 @@ class TestLiveAdjoint:
         plus the volume-term correction equals dE/d(normal offset) at
         every checked design node.
         """
-        from jaxcad.fem.calculix import elastic_ccx_solve
+        from cadjoint.fem.calculix import elastic_ccx_solve
 
         # 4x2x2 bar of 0.5-sized cells (mixed face/edge/corner nodes).
         nx, ny, nz = 5, 3, 3
@@ -449,8 +449,8 @@ class TestLiveAdjoint:
         import jax
         import jax.numpy as jnp
 
-        from jaxcad.fem.calculix import elastic_ccx_solve
-        from jaxcad.fem.simulate import _face_patch, _node_patch, elastic_solve
+        from cadjoint.fem.calculix import elastic_ccx_solve
+        from cadjoint.fem.simulate import _face_patch, _node_patch, elastic_solve
 
         bcs = ElasticBCs(
             fixed_nodes=[_node_patch(bar_mesh, _clamp)],
@@ -530,7 +530,7 @@ class TestLiveAdjoint:
 class TestLiveTesseract:
     def test_backend_registry_roundtrip(self):
         pytest.importorskip("tesseract_core")
-        from jaxcad.fem.backends import available_backends, get_backend
+        from cadjoint.fem.backends import available_backends, get_backend
 
         assert "calculix" in available_backends()
         backend = get_backend("calculix")
@@ -545,8 +545,8 @@ class TestLiveTesseract:
         import jax
         import jax.numpy as jnp
 
-        from jaxcad.fem.calculix import CalculixBackend, elastic_ccx_solve
-        from jaxcad.fem.simulate import _face_patch, _node_patch
+        from cadjoint.fem.calculix import CalculixBackend, elastic_ccx_solve
+        from cadjoint.fem.simulate import _face_patch, _node_patch
 
         bcs = ElasticBCs(
             fixed_nodes=[_node_patch(bar_mesh, _clamp)],
@@ -577,7 +577,7 @@ class TestLiveTesseract:
         import jax
         import jax.numpy as jnp
 
-        from jaxcad.fem.simulate import elastic_solve
+        from cadjoint.fem.simulate import elastic_solve
 
         def objective(points):
             result = elastic_solve(
@@ -598,7 +598,7 @@ class TestLiveTesseract:
     def test_strain_energy_solve_helper(self, bar_mesh):
         pytest.importorskip("tesseract_core")
         pytest.importorskip("tesseract_jax")
-        from jaxcad.fem.calculix import strain_energy_solve
+        from cadjoint.fem.calculix import strain_energy_solve
 
         energy = strain_energy_solve(
             bar_mesh,

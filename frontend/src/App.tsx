@@ -99,7 +99,7 @@ export function App() {
 
   // Editor/viewport splitter. Null means "the stylesheet default" until the
   // user drags; the value persists like the other layout preferences.
-  const EDITOR_WIDTH_KEY = "jaxcad.editorWidth.v1";
+  const EDITOR_WIDTH_KEY = "cadjoint.editorWidth.v1";
   const EDITOR_MIN = 280;
   const VIEWER_MIN = 360;
   const storedWidth = Number(localStorage.getItem(EDITOR_WIDTH_KEY));

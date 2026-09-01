@@ -6,8 +6,8 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from jaxcad.construction import PolygonProfile, loft
-from jaxcad.meshing import GridSpec, extract_mesh
+from cadjoint.construction import PolygonProfile, loft
+from cadjoint.meshing import GridSpec, extract_mesh
 from tests.meshing.test_dual_contouring import (
     euler_characteristic,
     signed_volume,

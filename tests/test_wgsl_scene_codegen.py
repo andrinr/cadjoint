@@ -6,11 +6,11 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from jaxcad.backends.wgsl import compile_scene_to_wgsl, compile_sdf_to_wgsl
-from jaxcad.render import Material
-from jaxcad.sdf.boolean import Union
-from jaxcad.sdf.primitives import Sphere
-from jaxcad.sdf.transforms.affine import Translate
+from cadjoint.backends.wgsl import compile_scene_to_wgsl, compile_sdf_to_wgsl
+from cadjoint.render import Material
+from cadjoint.sdf.boolean import Union
+from cadjoint.sdf.primitives import Sphere
+from cadjoint.sdf.transforms.affine import Translate
 
 
 def _material_scene():
@@ -43,7 +43,7 @@ def _material_scene():
 
 
 def test_scene_material_selection_follows_union_and_transform_coordinates():
-    from jaxcad import extract_parameters, functionalize_scene
+    from cadjoint import extract_parameters, functionalize_scene
 
     scene = _material_scene()
     free_parameters, fixed_parameters, _ = extract_parameters(scene)
@@ -118,7 +118,7 @@ def test_legacy_sdf_compiler_still_emits_only_the_sdf_contract():
 
 
 def test_wgsl_emitter_validates_custom_entry_point_and_output():
-    from jaxcad.backends.wgsl._wgsl_emitter import StableHLOToWGSL
+    from cadjoint.backends.wgsl._wgsl_emitter import StableHLOToWGSL
 
     compiler = StableHLOToWGSL()
     point = jnp.zeros(3, dtype=jnp.float32)

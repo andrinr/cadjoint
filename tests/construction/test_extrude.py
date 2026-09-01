@@ -2,10 +2,10 @@
 
 import jax.numpy as jnp
 
-from jaxcad.construction import extrude
-from jaxcad.geometry.parameters import Scalar, Vector
-from jaxcad.geometry.primitives import Rectangle
-from jaxcad.sdf.primitives.box import Box
+from cadjoint.construction import extrude
+from cadjoint.geometry.parameters import Scalar, Vector
+from cadjoint.geometry.primitives import Rectangle
+from cadjoint.sdf.primitives.box import Box
 
 
 def test_extrude_basic():

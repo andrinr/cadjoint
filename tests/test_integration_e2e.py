@@ -1,4 +1,4 @@
-"""End-to-end integration tests for the complete jaxcad system.
+"""End-to-end integration tests for the complete cadjoint system.
 
 These tests verify that all layers work together:
 1. Geometry layer (Line, Circle, Rectangle)
@@ -10,12 +10,12 @@ These tests verify that all layers work together:
 import jax
 import jax.numpy as jnp
 
-from jaxcad import extract_parameters, functionalize
-from jaxcad.constraints import DistanceConstraint, all_parameters, total_dof_reduction
-from jaxcad.construction import extrude, from_circle, from_line, from_point
-from jaxcad.geometry.parameters import Scalar, Vector
-from jaxcad.geometry.primitives import Circle, Line, Rectangle
-from jaxcad.sdf.primitives import Sphere
+from cadjoint import extract_parameters, functionalize
+from cadjoint.constraints import DistanceConstraint, all_parameters, total_dof_reduction
+from cadjoint.construction import extrude, from_circle, from_line, from_point
+from cadjoint.geometry.parameters import Scalar, Vector
+from cadjoint.geometry.primitives import Circle, Line, Rectangle
+from cadjoint.sdf.primitives import Sphere
 
 
 def test_e2e_constrained_geometry_to_sdf():

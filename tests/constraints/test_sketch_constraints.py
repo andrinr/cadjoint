@@ -4,7 +4,7 @@ import jax
 import jax.numpy as jnp
 import pytest
 
-from jaxcad.constraints import (
+from cadjoint.constraints import (
     CoincidentConstraint,
     DistanceConstraint,
     EqualLengthConstraint,
@@ -17,10 +17,10 @@ from jaxcad.constraints import (
     build_residual_fn,
     satisfy_constraints,
 )
-from jaxcad.constraints.residual import compute_param_vector
-from jaxcad.constraints.solve import solve_constraints
-from jaxcad.construction import PolygonProfile
-from jaxcad.geometry.parameters import Vector2
+from cadjoint.constraints.residual import compute_param_vector
+from cadjoint.constraints.solve import solve_constraints
+from cadjoint.construction import PolygonProfile
+from cadjoint.geometry.parameters import Vector2
 
 
 def _points(*xys):

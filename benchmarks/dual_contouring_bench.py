@@ -13,10 +13,10 @@ Reports, per shape and resolution:
   exists for);
 - signed-volume error against the analytic solid volume;
 - sampled surface deviation (max |field| over area-uniform mesh samples) and
-  sampled self-intersection count from :func:`jaxcad.meshing.mesh_report`;
+  sampled self-intersection count from :func:`cadjoint.meshing.mesh_report`;
 - 5th-percentile triangle minimum angle (degrees);
 - triangle count and wall time of error-bounded simplification
-  (:func:`jaxcad.meshing.simplify.simplify_mesh` at a quarter cell size);
+  (:func:`cadjoint.meshing.simplify.simplify_mesh` at a quarter cell size);
 - wall time of one reverse-mode gradient of a mesh loss w.r.t. a design
   parameter.
 """
@@ -31,17 +31,17 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from jaxcad.meshing.diagnostics import mesh_report
-from jaxcad.meshing.dual_contouring import extract_mesh, qef_vertices
-from jaxcad.meshing.edge_detection import (
+from cadjoint.meshing.diagnostics import mesh_report
+from cadjoint.meshing.dual_contouring import extract_mesh, qef_vertices
+from cadjoint.meshing.edge_detection import (
     GridSpec,
     edge_hermite_data,
     find_crossing_edges,
     sample_grid,
 )
-from jaxcad.meshing.features import cell_edge_incidence
-from jaxcad.meshing.simplify import simplify_mesh
-from jaxcad.sdf.primitives import Box
+from cadjoint.meshing.features import cell_edge_incidence
+from cadjoint.meshing.simplify import simplify_mesh
+from cadjoint.sdf.primitives import Box
 
 BOX_SIZE = np.array([0.4, 0.5, 0.6])
 BOX_CORNERS = (

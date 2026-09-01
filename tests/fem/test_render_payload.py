@@ -1,4 +1,4 @@
-"""Tests for the viewer-facing FEM surface payload (jaxcad.fem.render_payload)."""
+"""Tests for the viewer-facing FEM surface payload (cadjoint.fem.render_payload)."""
 
 from __future__ import annotations
 
@@ -7,14 +7,14 @@ from collections import Counter
 import numpy as np
 import pytest
 
-from jaxcad.fem.hexmesh import GridSpec, sdf_to_hex_mesh
-from jaxcad.fem.render_payload import (
+from cadjoint.fem.hexmesh import GridSpec, sdf_to_hex_mesh
+from cadjoint.fem.render_payload import (
     boundary_render_payload,
     cell_to_node_scalar,
     face_group_catalog,
 )
-from jaxcad.geometry.parameters import Vector
-from jaxcad.sdf.primitives import Box, Sphere
+from cadjoint.geometry.parameters import Vector
+from cadjoint.sdf.primitives import Box, Sphere
 
 
 def _box_mesh():

@@ -1,4 +1,4 @@
-"""Tests for jaxcad.fem.hexmesh (SDF voxelization + boundary snapping)."""
+"""Tests for cadjoint.fem.hexmesh (SDF voxelization + boundary snapping)."""
 
 from __future__ import annotations
 
@@ -8,15 +8,15 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from jaxcad.fem.hexmesh import (
+from cadjoint.fem.hexmesh import (
     GridSpec,
     corner_tet_volumes,
     recompute_points,
     sdf_to_hex_mesh,
     select_faces,
 )
-from jaxcad.geometry.parameters import Scalar, Vector
-from jaxcad.sdf.primitives import Box, Sphere
+from cadjoint.geometry.parameters import Scalar, Vector
+from cadjoint.sdf.primitives import Box, Sphere
 
 
 def _box(half=0.5):

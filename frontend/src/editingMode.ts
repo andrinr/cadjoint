@@ -94,7 +94,7 @@ export function autoEnterSketchMode(
   return { mode: "sketch", lastAutoNodeId: node.id };
 }
 
-export const EDITING_MODE_STORAGE_KEY = "jaxcad.editingMode.v1";
+export const EDITING_MODE_STORAGE_KEY = "cadjoint.editingMode.v1";
 
 /** Minimal storage surface so tests can inject a memory store. */
 export interface StringStorage {

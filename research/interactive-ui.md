@@ -43,9 +43,9 @@ This loop is already fully supported by jaxCAD's existing code. The UI framework
 import matplotlib.pyplot as plt
 import numpy as np
 import jax.numpy as jnp
-from jaxcad.geometry.parameters import Vector
-from jaxcad.constraints.solve import newton_raphson
-from jaxcad.constraints.graph import ConstraintGraph
+from cadjoint.geometry.parameters import Vector
+from cadjoint.constraints.solve import newton_raphson
+from cadjoint.constraints.graph import ConstraintGraph
 
 # Scene
 p1 = Vector([0.0, 0.0, 0.0], free=True, name="p1")
@@ -136,8 +136,8 @@ def drag_on_manifold(delta_mouse, null_space):
 
 ```python
 # Cell 1 — define scene
-import marimo as mo, jaxcad as jc, jax.numpy as jnp
-from jaxcad.geometry.parameters import Scalar
+import marimo as mo, cadjoint as jc, jax.numpy as jnp
+from cadjoint.geometry.parameters import Scalar
 
 radius_p = Scalar(1.0, free=True, name="radius")
 sphere = jc.Sphere(radius=radius_p)
@@ -157,8 +157,8 @@ mo.mpl.interactive(ax.figure)
 ```python
 def parameter_sliders(sdf):
     """Generate one slider per free Scalar parameter."""
-    from jaxcad.extraction import extract_parameters
-    from jaxcad.geometry.parameters import Scalar
+    from cadjoint.extraction import extract_parameters
+    from cadjoint.geometry.parameters import Scalar
     free, _ = extract_parameters(sdf)
     sliders = {}
     for path, param in free.items():
@@ -204,8 +204,8 @@ on_drag: update param.value
 ```python
 import anywidget, traitlets, jax, jax.numpy as jnp, numpy as np
 from skimage import measure
-from jaxcad.extraction import extract_parameters
-from jaxcad.geometry.parameters import Vector
+from cadjoint.extraction import extract_parameters
+from cadjoint.geometry.parameters import Vector
 
 class SceneWidget(anywidget.AnyWidget):
     handles        = traitlets.List([]).tag(sync=True)
@@ -476,11 +476,11 @@ hello_imgui.run(gui_loop)
 
 **Zero new dependencies.** Implement drag events on matplotlib canvas for `Line`/`Circle`/`Rectangle` geometry. Wire to `newton_raphson` (or the new LM solver) for live constraint re-solving during drag. ~100 lines of code.
 
-Key file to add: `jaxcad/ui/sketch_editor.py`
+Key file to add: `cadjoint/ui/sketch_editor.py`
 
 ### Phase 2 — Marimo parameter sliders
 
-Add a `jaxcad.ui.sliders(sdf)` helper:
+Add a `cadjoint.ui.sliders(sdf)` helper:
 ```python
 def sliders(sdf):
     """Return (mo.vstack of sliders, dict of {name: slider}) for all free Scalars."""
@@ -489,7 +489,7 @@ Works with Marimo's reactive re-execution — no callbacks needed. ~20 lines.
 
 ### Phase 3 — anywidget + three.js 3D handles
 
-The code sketches above are essentially complete (~200 lines Python + ~100 lines JavaScript). Add as `jaxcad/ui/scene_widget.py` with the JavaScript inlined as a string. Requires `pip install anywidget scikit-image`.
+The code sketches above are essentially complete (~200 lines Python + ~100 lines JavaScript). Add as `cadjoint/ui/scene_widget.py` with the JavaScript inlined as a string. Requires `pip install anywidget scikit-image`.
 
 ### Phase 4 (optional)
 
@@ -502,8 +502,8 @@ FastAPI web app for sharing, or imgui-bundle for a desktop application with prod
 The bridge from jaxCAD's parameter system to any UI is already there:
 
 ```python
-from jaxcad.extraction import extract_parameters
-from jaxcad.geometry.parameters import Vector, Scalar
+from cadjoint.extraction import extract_parameters
+from cadjoint.geometry.parameters import Vector, Scalar
 
 free, _ = extract_parameters(scene)
 

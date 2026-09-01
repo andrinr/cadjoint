@@ -6,16 +6,16 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from jaxcad.meshing.diagnostics import surface_deviation
-from jaxcad.meshing.dual_contouring import Mesh, extract_mesh
-from jaxcad.meshing.edge_detection import GridSpec, find_crossing_edges, sample_grid
-from jaxcad.meshing.features import (
+from cadjoint.meshing.diagnostics import surface_deviation
+from cadjoint.meshing.dual_contouring import Mesh, extract_mesh
+from cadjoint.meshing.edge_detection import GridSpec, find_crossing_edges, sample_grid
+from cadjoint.meshing.features import (
     active_branches,
     detect_branch_changes,
     manifold_cell_incidence,
 )
-from jaxcad.meshing.simplify import simplify_mesh
-from jaxcad.sdf.primitives import Box
+from cadjoint.meshing.simplify import simplify_mesh
+from cadjoint.sdf.primitives import Box
 
 BOX_SIZE = np.array([0.4, 0.5, 0.6])
 BOX_CORNERS = (
@@ -184,7 +184,7 @@ class TestCsgUnion:
         incidence = manifold_cell_incidence(edges, grid, np.asarray(values < 0.0))
         assert incidence.count == np.asarray(mesh.vertices).shape[0]
 
-        from jaxcad.meshing.edge_detection import edge_hermite_data
+        from cadjoint.meshing.edge_detection import edge_hermite_data
 
         hermite = edge_hermite_data(union_sdf, grid, edges)
         branches = active_branches([sphere_a, sphere_b], hermite.points)

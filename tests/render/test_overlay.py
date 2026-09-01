@@ -2,8 +2,8 @@
 
 import jax.numpy as jnp
 
-from jaxcad.construction import PolygonProfile, SketchPlane
-from jaxcad.render import Camera, project_points
+from cadjoint.construction import PolygonProfile, SketchPlane
+from cadjoint.render import Camera, project_points
 
 
 class TestProjectPoints:

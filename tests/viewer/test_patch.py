@@ -4,7 +4,7 @@ import ast
 
 import pytest
 
-from jaxcad.viewer._patch import (
+from cadjoint.viewer._patch import (
     PatchError,
     apply_operation,
     delete_vertex,
@@ -12,14 +12,14 @@ from jaxcad.viewer._patch import (
     set_vertex,
 )
 
-SIMPLE = """from jaxcad.construction import PolygonProfile, extrude
+SIMPLE = """from cadjoint.construction import PolygonProfile, extrude
 
 # keep this comment
 profile = PolygonProfile([[0.0, 0.0], [2.0, 0.0], [1.0, 1.5]], name="tri")
 scene = extrude(profile, depth=0.6)
 """
 
-MULTILINE = """from jaxcad.construction import PolygonProfile, extrude
+MULTILINE = """from cadjoint.construction import PolygonProfile, extrude
 quad = PolygonProfile(
     [[0, 0], [1, 0], [1, 1], [0, 1]],
     name="quad",
@@ -27,8 +27,8 @@ quad = PolygonProfile(
 scene = extrude(quad, depth=1.0)
 """
 
-PARAMETERIZED = """from jaxcad.construction import PolygonProfile
-from jaxcad.geometry import Vector2
+PARAMETERIZED = """from cadjoint.construction import PolygonProfile
+from cadjoint.geometry import Vector2
 v0 = Vector2(value=[0, 0], free=True, name="v0")
 v1 = Vector2(value=[1, 0], free=True, name="v1")
 v2 = Vector2(value=[0, 1], free=True, name="v2")
@@ -148,7 +148,7 @@ class TestApplyOperation:
 
 class TestRoundTrip:
     def test_patched_source_still_compiles_a_scene(self):
-        from jaxcad.viewer._source_map import (
+        from cadjoint.viewer._source_map import (
             PLAYGROUND_FILENAME,
             build_construction_payload,
             capture_profiles,
@@ -173,8 +173,8 @@ class TestRoundTrip:
         assert patched[start:end] == "[0.75, -0.25]"
 
 
-PRIMITIVES = """from jaxcad.construction import Solid
-from jaxcad.sdf.boolean import Union
+PRIMITIVES = """from cadjoint.construction import Solid
+from cadjoint.sdf.boolean import Union
 
 block = Solid.box(size=[0.5, 0.5, 0.5], position=[1.0, 0.0, 0.0], name="block")
 scene = Union(block)
@@ -193,13 +193,13 @@ def call_arguments(source: str, line: int, name: str) -> dict:
 
 class TestSetValue:
     def test_rewrites_an_existing_keyword(self):
-        from jaxcad.viewer._patch import set_value
+        from cadjoint.viewer._patch import set_value
 
         patched = set_value(PRIMITIVES, 4, "box", "position", [1.5, 0.25, -0.5])
         assert call_arguments(patched, 4, "box")["position"] == [1.5, 0.25, -0.5]
 
     def test_adds_a_keyword_that_is_not_there_yet(self):
-        from jaxcad.viewer._patch import set_value
+        from cadjoint.viewer._patch import set_value
 
         # A solid written without `rotation=` must still be rotatable.
         patched = set_value(PRIMITIVES, 4, "box", "rotation", [0, 0.5, 0])
@@ -210,24 +210,24 @@ class TestSetValue:
         assert call_arguments(again, 4, "box")["rotation"] == [0, 1.0, 0]
 
     def test_accepts_scalar_arguments(self):
-        from jaxcad.viewer._patch import set_value
+        from cadjoint.viewer._patch import set_value
 
-        source = "from jaxcad.construction import Solid\nball = Solid.sphere(radius=0.5, position=[0, 0, 0])\n"
+        source = "from cadjoint.construction import Solid\nball = Solid.sphere(radius=0.5, position=[0, 0, 0])\n"
         patched = set_value(source, 2, "sphere", "radius", 1.25)
         assert call_arguments(patched, 2, "sphere")["radius"] == 1.25
 
     def test_rejects_an_unknown_call(self):
-        from jaxcad.viewer._patch import set_value
+        from cadjoint.viewer._patch import set_value
 
         with pytest.raises(PatchError, match="No editable"):
             set_value(PRIMITIVES, 1, "box", "position", [0, 0, 0])
 
     def test_updates_a_named_vector_parameter_at_its_definition(self):
-        from jaxcad.viewer._patch import set_value
+        from cadjoint.viewer._patch import set_value
 
         source = (
-            "from jaxcad.construction import Solid\n"
-            "from jaxcad.geometry import Vector\n"
+            "from cadjoint.construction import Solid\n"
+            "from cadjoint.geometry import Vector\n"
             "location = Vector(value=[1, 2, 3], free=True, name='location')\n"
             "ball = Solid.sphere(radius=0.5, position=location)\n"
         )
@@ -236,11 +236,11 @@ class TestSetValue:
         assert "position=location" in patched
 
     def test_updates_a_named_scalar_parameter_at_its_definition(self):
-        from jaxcad.viewer._patch import set_value
+        from cadjoint.viewer._patch import set_value
 
         source = (
-            "from jaxcad.construction import Solid\n"
-            "from jaxcad.geometry import Scalar\n"
+            "from cadjoint.construction import Solid\n"
+            "from cadjoint.geometry import Scalar\n"
             "radius = Scalar(0.5, free=True, name='radius')\n"
             "ball = Solid.sphere(radius=radius, position=[0, 0, 0])\n"
         )
@@ -249,32 +249,32 @@ class TestSetValue:
         assert "radius=radius" in patched
 
     def test_makes_a_default_profile_plane_explicit_when_moved(self):
-        from jaxcad.viewer._patch import set_value
+        from cadjoint.viewer._patch import set_value
 
         source = (
-            "from jaxcad.construction import PolygonProfile\n"
+            "from cadjoint.construction import PolygonProfile\n"
             "profile = PolygonProfile([[0, 0], [1, 0], [0, 1]])\n"
         )
         patched = set_value(source, 2, "PolygonProfile", "planeOrigin", [2, 3, 4])
         assert "SketchPlane(origin=[2, 3, 4])" in patched
-        assert "from jaxcad.construction import" in patched and "SketchPlane" in patched
+        assert "from cadjoint.construction import" in patched and "SketchPlane" in patched
 
     def test_makes_a_default_profile_plane_explicit_when_reoriented(self):
-        from jaxcad.viewer._patch import set_value
+        from cadjoint.viewer._patch import set_value
 
         source = (
-            "from jaxcad.construction import PolygonProfile\n"
+            "from cadjoint.construction import PolygonProfile\n"
             "profile = PolygonProfile([[0, 0], [1, 0], [0, 1]])\n"
         )
         patched = set_value(source, 2, "PolygonProfile", "planeNormal", [0, 1, 0])
         assert "SketchPlane(normal=[0, 1, 0])" in patched
-        assert "from jaxcad.construction import" in patched and "SketchPlane" in patched
+        assert "from cadjoint.construction import" in patched and "SketchPlane" in patched
 
     def test_adds_a_normal_to_an_existing_sketch_plane(self):
-        from jaxcad.viewer._patch import set_value
+        from cadjoint.viewer._patch import set_value
 
         source = (
-            "from jaxcad.construction import PolygonProfile, SketchPlane\n"
+            "from cadjoint.construction import PolygonProfile, SketchPlane\n"
             "profile = PolygonProfile([[0, 0], [1, 0], [0, 1]], "
             "plane=SketchPlane(origin=[1, 2, 3]), name='s')\n"
         )
@@ -284,10 +284,10 @@ class TestSetValue:
         assert patched.count("plane=") == 1
 
     def test_rewrites_an_existing_sketch_plane_normal_in_place(self):
-        from jaxcad.viewer._patch import set_value
+        from cadjoint.viewer._patch import set_value
 
         source = (
-            "from jaxcad.construction import PolygonProfile, SketchPlane\n"
+            "from cadjoint.construction import PolygonProfile, SketchPlane\n"
             "profile = PolygonProfile([[0, 0], [1, 0], [0, 1]], "
             "plane=SketchPlane(origin=[1, 2, 3], normal=[0, 0, 1]), name='s')\n"
         )
@@ -299,39 +299,39 @@ class TestSetValue:
 
 class TestAddPrimitive:
     def test_extends_an_existing_union(self):
-        from jaxcad.viewer._patch import add_primitive
+        from cadjoint.viewer._patch import add_primitive
 
         patched = add_primitive(PRIMITIVES, "sphere", [0.0, 1.0, 0.0], {"radius": 0.4})
         assert "sphere1 = Solid.sphere(radius=0.4, position=[0, 1, 0]" in patched
         assert "scene = Union(block, sphere1)" in patched
 
     def test_wraps_a_scene_that_is_not_a_union(self):
-        from jaxcad.viewer._patch import add_primitive
+        from cadjoint.viewer._patch import add_primitive
 
         source = (
-            "from jaxcad.construction import Solid\n"
+            "from cadjoint.construction import Solid\n"
             'scene = Solid.box(size=[1, 1, 1], position=[0, 0, 0], name="b")\n'
         )
         patched = add_primitive(source, "cylinder", [2.0, 0, 0], {"radius": 0.3, "height": 0.8})
-        assert "from jaxcad.sdf.boolean import Union" in patched
+        assert "from cadjoint.sdf.boolean import Union" in patched
         assert patched.rstrip().endswith("cylinder1)")
 
     def test_generates_names_that_do_not_collide(self):
-        from jaxcad.viewer._patch import add_primitive
+        from cadjoint.viewer._patch import add_primitive
 
         once = add_primitive(PRIMITIVES, "sphere", [0, 0, 0], {"radius": 0.4})
         twice = add_primitive(once, "sphere", [1, 0, 0], {"radius": 0.4})
         assert "sphere1 =" in twice and "sphere2 =" in twice
 
     def test_adds_the_Solid_import_when_missing(self):
-        from jaxcad.viewer._patch import add_primitive
+        from cadjoint.viewer._patch import add_primitive
 
-        source = "from jaxcad.sdf.primitives import Sphere\nscene = Sphere(1.0)\n"
+        source = "from cadjoint.sdf.primitives import Sphere\nscene = Sphere(1.0)\n"
         patched = add_primitive(source, "box", [0, 0, 0], {"size": [0.5, 0.5, 0.5]})
-        assert "from jaxcad.construction import Solid" in patched
+        assert "from cadjoint.construction import Solid" in patched
 
     def test_requires_a_scene_assignment(self):
-        from jaxcad.viewer._patch import add_primitive
+        from cadjoint.viewer._patch import add_primitive
 
         with pytest.raises(PatchError, match="scene = "):
             add_primitive("x = 1\n", "sphere", [0, 0, 0], {"radius": 0.5})
@@ -339,20 +339,20 @@ class TestAddPrimitive:
 
 class TestMaterials:
     def test_creates_a_named_material_before_the_scene(self):
-        from jaxcad.viewer._patch import add_material
+        from cadjoint.viewer._patch import add_material
 
         patched = add_material(PRIMITIVES, [0.2, 0.4, 0.8], roughness=0.25)
-        assert "from jaxcad.render import Material" in patched
+        assert "from cadjoint.render import Material" in patched
         assert "material1 = Material(" in patched
         assert patched.index("material1 =") < patched.index("scene =")
         assert ast.parse(patched)
 
     def test_assigns_and_replaces_a_primitive_material(self):
-        from jaxcad.viewer._patch import assign_material
+        from cadjoint.viewer._patch import assign_material
 
         source = (
-            "from jaxcad.construction import Solid\n"
-            "from jaxcad.render import Material\n"
+            "from cadjoint.construction import Solid\n"
+            "from cadjoint.render import Material\n"
             "red = Material(color=[1, 0, 0])\n"
             "blue = Material(color=[0, 0, 1])\n"
             "ball = Solid.sphere(radius=0.5, material=red)\n"
@@ -362,11 +362,11 @@ class TestMaterials:
         assert "Solid.sphere(radius=0.5, material=blue)" in patched
 
     def test_assigns_material_to_a_profiles_extrusion(self):
-        from jaxcad.viewer._patch import assign_material
+        from cadjoint.viewer._patch import assign_material
 
         source = (
-            "from jaxcad.construction import PolygonProfile, extrude\n"
-            "from jaxcad.render import Material\n"
+            "from cadjoint.construction import PolygonProfile, extrude\n"
+            "from cadjoint.render import Material\n"
             "paint = Material(color=[0.2, 0.4, 0.8])\n"
             "profile = PolygonProfile([[0, 0], [1, 0], [0, 1]])\n"
             "body = extrude(profile, depth=0.5)\n"
@@ -376,7 +376,7 @@ class TestMaterials:
         assert "extrude(profile, depth=0.5, material=paint)" in patched
 
     def test_rejects_a_name_that_is_not_a_material_definition(self):
-        from jaxcad.viewer._patch import assign_material
+        from cadjoint.viewer._patch import assign_material
 
         with pytest.raises(PatchError, match="not a named Material"):
             assign_material(PRIMITIVES, 4, "block")
@@ -384,7 +384,7 @@ class TestMaterials:
 
 class TestSketchHistoryOperations:
     def test_adds_a_standalone_sketch_before_the_scene(self):
-        from jaxcad.viewer._patch import add_sketch
+        from cadjoint.viewer._patch import add_sketch
 
         patched = add_sketch(PRIMITIVES, [2, 3, 0])
         assert "sketch1 = PolygonProfile(" in patched
@@ -393,11 +393,11 @@ class TestSketchHistoryOperations:
         assert ast.parse(patched)
 
     def test_extrudes_a_named_sketch_into_the_scene(self):
-        from jaxcad.viewer._patch import add_extrusion
+        from cadjoint.viewer._patch import add_extrusion
 
         source = (
-            "from jaxcad.construction import PolygonProfile\n"
-            "from jaxcad.sdf.primitives import Sphere\n"
+            "from cadjoint.construction import PolygonProfile\n"
+            "from cadjoint.sdf.primitives import Sphere\n"
             "profile = PolygonProfile([[0, 0], [1, 0], [0, 1]])\n"
             "scene = Sphere(0.2)\n"
         )
@@ -407,10 +407,10 @@ class TestSketchHistoryOperations:
         assert ast.parse(patched)
 
     def test_adds_constraints_and_a_projection_step(self):
-        from jaxcad.viewer._patch import add_constraint, solve_sketch
+        from cadjoint.viewer._patch import add_constraint, solve_sketch
 
         source = (
-            "from jaxcad.construction import PolygonProfile, extrude\n"
+            "from cadjoint.construction import PolygonProfile, extrude\n"
             "profile = PolygonProfile([[0, 0], [2, 0], [0, 1]])\n"
             "scene = extrude(profile, depth=0.5)\n"
         )
@@ -426,10 +426,10 @@ class TestSketchHistoryOperations:
         assert ast.parse(patched)
 
     def test_solve_step_is_idempotent(self):
-        from jaxcad.viewer._patch import solve_sketch
+        from cadjoint.viewer._patch import solve_sketch
 
         source = (
-            "from jaxcad.construction import PolygonProfile, extrude\n"
+            "from cadjoint.construction import PolygonProfile, extrude\n"
             "profile = PolygonProfile([[0, 0], [1, 0], [0, 1]])\n"
             "scene = extrude(profile, depth=0.5)\n"
         )
@@ -440,9 +440,9 @@ class TestSketchHistoryOperations:
         assert "steps=24" in twice
 
     def test_rejects_invalid_solver_settings(self):
-        from jaxcad.viewer._patch import solve_sketch
+        from cadjoint.viewer._patch import solve_sketch
 
-        source = "from jaxcad.construction import PolygonProfile\nprofile = PolygonProfile([[0, 0], [1, 0], [0, 1]])\n"
+        source = "from cadjoint.construction import PolygonProfile\nprofile = PolygonProfile([[0, 0], [1, 0], [0, 1]])\n"
         with pytest.raises(PatchError, match="method"):
             solve_sketch(source, 2, method="bfgs")
         with pytest.raises(PatchError, match="iterations"):
@@ -451,11 +451,11 @@ class TestSketchHistoryOperations:
 
 class TestDeleteObject:
     def test_removes_a_solid_and_its_use_in_the_scene(self):
-        from jaxcad.viewer._patch import delete_object
+        from cadjoint.viewer._patch import delete_object
 
         source = (
-            "from jaxcad.construction import Solid\n"
-            "from jaxcad.sdf.boolean import Union\n"
+            "from cadjoint.construction import Solid\n"
+            "from cadjoint.sdf.boolean import Union\n"
             'ball = Solid.sphere(radius=0.5, position=[0, 0, 0], name="ball")\n'
             'block = Solid.box(size=[1, 1, 1], position=[2, 0, 0], name="block")\n'
             "scene = Union(ball, block)\n"
@@ -469,10 +469,10 @@ class TestDeleteObject:
         assert scene == "scene = Union(block)"
 
     def test_refuses_when_the_value_is_used_elsewhere(self):
-        from jaxcad.viewer._patch import delete_object
+        from cadjoint.viewer._patch import delete_object
 
         source = (
-            "from jaxcad.construction import PolygonProfile, extrude\n"
+            "from cadjoint.construction import PolygonProfile, extrude\n"
             "profile = PolygonProfile([[0, 0], [1, 0], [0, 1]], name='p')\n"
             "scene = extrude(profile, depth=0.5)\n"
         )
@@ -480,13 +480,13 @@ class TestDeleteObject:
             delete_object(source, 2)
 
     def test_removes_constraints_owned_by_a_deleted_objects_position(self):
-        from jaxcad.viewer._patch import delete_object
+        from cadjoint.viewer._patch import delete_object
 
         source = (
-            "from jaxcad.construction import Solid\n"
-            "from jaxcad.constraints import DistanceConstraint\n"
-            "from jaxcad.geometry import Vector\n"
-            "from jaxcad.sdf.boolean import Union\n"
+            "from cadjoint.construction import Solid\n"
+            "from cadjoint.constraints import DistanceConstraint\n"
+            "from cadjoint.geometry import Vector\n"
+            "from cadjoint.sdf.boolean import Union\n"
             "left_pos = Vector([-1, 0, 0], free=True, name='left_pos')\n"
             "right_pos = Vector([1, 0, 0], free=True, name='right_pos')\n"
             "left = Solid.sphere(radius=0.5, position=left_pos)\n"
@@ -500,11 +500,11 @@ class TestDeleteObject:
         assert "scene = Union(right)" in patched
 
     def test_removes_an_inline_solid_from_the_scene(self):
-        from jaxcad.viewer._patch import delete_object
+        from cadjoint.viewer._patch import delete_object
 
         source = (
-            "from jaxcad.construction import Solid\n"
-            "from jaxcad.sdf.boolean import Union\n"
+            "from cadjoint.construction import Solid\n"
+            "from cadjoint.sdf.boolean import Union\n"
             "scene = Union(\n"
             "    Solid.sphere(radius=1.0),\n"
             "    Solid.box(size=[1, 1, 1]),\n"
@@ -515,11 +515,11 @@ class TestDeleteObject:
         assert "Solid.box" in patched
 
     def test_refuses_two_objects_built_on_one_line(self):
-        from jaxcad.viewer._patch import delete_object
+        from cadjoint.viewer._patch import delete_object
 
         source = (
-            "from jaxcad.construction import Solid\n"
-            "from jaxcad.sdf.boolean import Union\n"
+            "from cadjoint.construction import Solid\n"
+            "from cadjoint.sdf.boolean import Union\n"
             "scene = Union(Solid.sphere(radius=1.0), Solid.box(size=[1, 1, 1]))\n"
         )
         with pytest.raises(PatchError, match="No single construction call"):
@@ -537,7 +537,7 @@ class TestConstraintEditing:
         )
 
     def test_relational_kinds_emit_their_classes(self):
-        from jaxcad.viewer.playground import EXAMPLE_SOURCE
+        from cadjoint.viewer.playground import EXAMPLE_SOURCE
 
         line = self._profile_line(EXAMPLE_SOURCE)
         cases = {
@@ -552,10 +552,10 @@ class TestConstraintEditing:
                 EXAMPLE_SOURCE, "add_constraint", line=line, kind=kind, indices=indices
             )
             assert f"{symbol}(profile.vertices[0]" in patched
-            assert "from jaxcad.constraints import" in patched or symbol in patched
+            assert "from cadjoint.constraints import" in patched or symbol in patched
 
     def test_delete_constraint_removes_bare_name_statement(self):
-        from jaxcad.viewer.playground import EXAMPLE_SOURCE
+        from cadjoint.viewer.playground import EXAMPLE_SOURCE
 
         line = self._profile_line(EXAMPLE_SOURCE)
         patched = apply_operation(EXAMPLE_SOURCE, "delete_constraint", line=line, index=0)
@@ -568,7 +568,7 @@ class TestConstraintEditing:
         assert patched == EXAMPLE_SOURCE.replace(removed[0] + "\n", "")
 
     def test_delete_constraint_removes_subscript_statement(self):
-        from jaxcad.viewer.playground import EXAMPLE_SOURCE
+        from cadjoint.viewer.playground import EXAMPLE_SOURCE
 
         line = self._profile_line(EXAMPLE_SOURCE)
         grown = apply_operation(
@@ -582,14 +582,14 @@ class TestConstraintEditing:
         assert "HorizontalConstraint(profile.vertices" not in shrunk
 
     def test_delete_constraint_rejects_out_of_range(self):
-        from jaxcad.viewer.playground import EXAMPLE_SOURCE
+        from cadjoint.viewer.playground import EXAMPLE_SOURCE
 
         line = self._profile_line(EXAMPLE_SOURCE)
         with pytest.raises(PatchError, match="out of range"):
             apply_operation(EXAMPLE_SOURCE, "delete_constraint", line=line, index=99)
 
     def test_set_constraint_value_follows_scalar_indirection(self):
-        from jaxcad.viewer.playground import EXAMPLE_SOURCE
+        from cadjoint.viewer.playground import EXAMPLE_SOURCE
 
         line = self._profile_line(EXAMPLE_SOURCE)
         patched = apply_operation(
@@ -598,7 +598,7 @@ class TestConstraintEditing:
         assert "Scalar(2.5" in patched
 
     def test_set_constraint_value_rejects_relational(self):
-        from jaxcad.viewer.playground import EXAMPLE_SOURCE
+        from cadjoint.viewer.playground import EXAMPLE_SOURCE
 
         line = self._profile_line(EXAMPLE_SOURCE)
         grown = apply_operation(
@@ -612,7 +612,7 @@ class TestConstraintEditing:
 
 class TestAddRevolution:
     def test_revolves_a_fresh_sketch(self):
-        from jaxcad.viewer.playground import EXAMPLE_SOURCE
+        from cadjoint.viewer.playground import EXAMPLE_SOURCE
 
         grown = apply_operation(EXAMPLE_SOURCE, "add_sketch", origin=[0.5, 0.5, 0.0])
         sketch_line = next(
@@ -625,7 +625,7 @@ class TestAddRevolution:
         assert ", sketch1_body" in patched
 
     def test_refuses_a_second_operator(self):
-        from jaxcad.viewer.playground import EXAMPLE_SOURCE
+        from cadjoint.viewer.playground import EXAMPLE_SOURCE
 
         line = next(
             number + 1
@@ -646,13 +646,13 @@ def _sketch_line(source: str, variable: str) -> int:
 
 class TestAddLoft:
     def _two_sketches(self) -> str:
-        from jaxcad.viewer.playground import EXAMPLE_SOURCE
+        from cadjoint.viewer.playground import EXAMPLE_SOURCE
 
         grown = apply_operation(EXAMPLE_SOURCE, "add_sketch", origin=[0.5, 0.5, 0.0])
         return apply_operation(grown, "add_sketch", origin=[0.5, 0.5, 1.0])
 
     def test_lofts_two_fresh_sketches(self):
-        from jaxcad.viewer.playground import compile_source
+        from cadjoint.viewer.playground import compile_source
 
         source = self._two_sketches()
         patched = apply_operation(
@@ -664,7 +664,7 @@ class TestAddLoft:
         )
         assert "sketch1_body = loft(sketch1, sketch2, height=1.5)" in patched
         assert ", sketch1_body" in patched
-        assert "from jaxcad.construction import" in patched and "loft" in patched
+        assert "from cadjoint.construction import" in patched and "loft" in patched
         assert patched.index("sketch1_body =") < patched.index("scene =")
         result = compile_source(patched)
         assert result["ok"], result.get("error")
@@ -693,7 +693,7 @@ class TestAddLoft:
             apply_operation(source, "add_loft", line_a=line, line_b=line)
 
     def test_refuses_a_sketch_with_an_operator(self):
-        from jaxcad.viewer.playground import EXAMPLE_SOURCE
+        from cadjoint.viewer.playground import EXAMPLE_SOURCE
 
         grown = apply_operation(EXAMPLE_SOURCE, "add_sketch", origin=[0.5, 0.5, 0.0])
         extruded_line = next(
@@ -726,9 +726,9 @@ class TestAddLoft:
             )
 
 
-STUDIES = """from jaxcad.construction import Solid
-from jaxcad.fem import Dirichlet, Nodes, ThermalStudy
-from jaxcad.sdf.boolean import Union
+STUDIES = """from cadjoint.construction import Solid
+from cadjoint.fem import Dirichlet, Nodes, ThermalStudy
+from cadjoint.sdf.boolean import Union
 
 block = Solid.box(size=[0.5, 0.5, 0.5], position=[1.0, 0.0, 0.0], name="block")
 scene = Union(block)
@@ -745,19 +745,19 @@ BOX_SELECTION = {"kind": "box", "min_corner": [0.0, 0.0, 0.0], "max_corner": [1.
 
 class TestAddStudy:
     def test_appends_a_thermal_study_after_the_scene(self):
-        from jaxcad.viewer._patch import add_study
+        from cadjoint.viewer._patch import add_study
 
         patched = add_study(PRIMITIVES, "thermal")
         assert (
             "study1 = ThermalStudy(name='study1', resolution=20, conductivity=1.0, bcs=[])"
             in patched
         )
-        assert "from jaxcad.fem import ThermalStudy" in patched
+        assert "from cadjoint.fem import ThermalStudy" in patched
         assert patched.index("scene =") < patched.index("study1 =")
         assert ast.parse(patched)
 
     def test_appends_an_elastic_study_after_the_last_study(self):
-        from jaxcad.viewer._patch import add_study
+        from cadjoint.viewer._patch import add_study
 
         patched = add_study(STUDIES, "elastic", name="cantilever")
         assert (
@@ -765,14 +765,14 @@ class TestAddStudy:
             "youngs=200.0, poisson=0.3, bcs=[])" in patched
         )
         assert patched.index("heat = ") < patched.index("study1 =")
-        # The existing jaxcad.fem import is extended in place, so every
+        # The existing cadjoint.fem import is extended in place, so every
         # original line keeps its number and only the new study line is added.
-        assert "from jaxcad.fem import Dirichlet, Nodes, ThermalStudy, ElasticStudy" in patched
-        assert patched.count("from jaxcad.fem import") == 1
+        assert "from cadjoint.fem import Dirichlet, Nodes, ThermalStudy, ElasticStudy" in patched
+        assert patched.count("from cadjoint.fem import") == 1
         assert len(patched.splitlines()) == len(STUDIES.splitlines()) + 1
 
     def test_keeps_lines_above_the_insertion_untouched(self):
-        from jaxcad.viewer._patch import add_study
+        from cadjoint.viewer._patch import add_study
 
         original = PRIMITIVES.splitlines()
         patched = add_study(PRIMITIVES, "thermal").splitlines()
@@ -799,7 +799,7 @@ class TestAddStudy:
             apply_operation("x = 1\n", "add_study", kind="thermal", name=None)
 
     def test_added_study_round_trips_through_exec(self):
-        from jaxcad.fem import capture_studies
+        from cadjoint.fem import capture_studies
 
         patched = apply_operation(PRIMITIVES, "add_study", kind="thermal", name=None)
         patched = apply_operation(
@@ -820,7 +820,7 @@ class TestDeleteStudy:
     def test_removes_a_named_study_statement(self):
         patched = apply_operation(STUDIES, "delete_study", study="bar-conduction")
         assert "ThermalStudy" not in patched.replace(
-            "from jaxcad.fem import Dirichlet, Nodes, ThermalStudy", ""
+            "from cadjoint.fem import Dirichlet, Nodes, ThermalStudy", ""
         )
         assert "scene = Union(block)" in patched
         assert ast.parse(patched)
@@ -869,7 +869,7 @@ class TestStudyBc:
 
     def test_adds_a_missing_bcs_keyword(self):
         source = (
-            "from jaxcad.fem import ThermalStudy\n"
+            "from cadjoint.fem import ThermalStudy\n"
             "scene = None\n"
             "study = ThermalStudy(name='t', resolution=8, conductivity=1.0)\n"
         )
@@ -886,7 +886,7 @@ class TestStudyBc:
 
     def test_creates_imports_beside_the_study_and_extends_them_in_place(self):
         source = (
-            "from jaxcad.fem import ThermalStudy\n"
+            "from cadjoint.fem import ThermalStudy\n"
             "scene = None\n"
             "study = ThermalStudy(name='t', resolution=8, conductivity=1.0, bcs=[])\n"
         )
@@ -898,7 +898,7 @@ class TestStudyBc:
             selection=BOX_SELECTION,
             value=1.0,
         )
-        assert "from jaxcad.fem import ThermalStudy, Dirichlet, Nodes" in once
+        assert "from cadjoint.fem import ThermalStudy, Dirichlet, Nodes" in once
         # A second condition reuses the import line: no line drift.
         twice = apply_operation(
             once,
@@ -908,7 +908,7 @@ class TestStudyBc:
             selection={"kind": "side", "side": "+x"},
             value=0.0,
         )
-        assert twice.count("from jaxcad.fem import") == 1
+        assert twice.count("from cadjoint.fem import") == 1
         assert len(twice.splitlines()) == len(once.splitlines())
 
     def test_renders_composed_selections(self):
@@ -1001,7 +1001,7 @@ class TestStudyBc:
         patched = apply_operation(STUDIES, "delete_study_bc", study="bar-conduction", bc=1)
         patched = apply_operation(patched, "delete_study_bc", study="bar-conduction", bc=0)
         assert "Dirichlet" not in patched.replace(
-            "from jaxcad.fem import Dirichlet, Nodes, ThermalStudy", ""
+            "from cadjoint.fem import Dirichlet, Nodes, ThermalStudy", ""
         )
         assert "bcs=[" in patched
         assert ast.parse(patched)
@@ -1012,7 +1012,7 @@ class TestStudyBc:
 
     def test_predicate_conditions_reject_edits(self):
         source = (
-            "from jaxcad.fem import Dirichlet, Nodes, ThermalStudy\n"
+            "from cadjoint.fem import Dirichlet, Nodes, ThermalStudy\n"
             "def hot_end(points):\n"
             "    return points[:, 0] > 0.9\n"
             "scene = None\n"
@@ -1034,7 +1034,7 @@ class TestSetStudyValue:
 
     def test_rewrites_a_positional_bc_value(self):
         source = (
-            "from jaxcad.fem import Dirichlet, Nodes, ThermalStudy\n"
+            "from cadjoint.fem import Dirichlet, Nodes, ThermalStudy\n"
             "scene = None\n"
             "study = ThermalStudy(name='t', resolution=8, conductivity=1.0,\n"
             "                     bcs=[Dirichlet(Nodes.side('-x'), 1.0)])\n"
@@ -1107,7 +1107,7 @@ class TestSetStudyValue:
 
     def test_follows_named_scalar_indirection(self):
         source = (
-            "from jaxcad.fem import ThermalStudy\n"
+            "from cadjoint.fem import ThermalStudy\n"
             "scene = None\n"
             "k = 2.0\n"
             "study = ThermalStudy(name='t', resolution=8, conductivity=k, bcs=[])\n"

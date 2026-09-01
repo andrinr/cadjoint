@@ -1,4 +1,4 @@
-"""Tests for jaxcad.fem.study (declarative studies, code parity)."""
+"""Tests for cadjoint.fem.study (declarative studies, code parity)."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import json
 import numpy as np
 import pytest
 
-from jaxcad.fem import (
+from cadjoint.fem import (
     Dirichlet,
     ElasticStudy,
     Fixed,
@@ -19,8 +19,8 @@ from jaxcad.fem import (
     capture_studies,
     sdf_to_hex_mesh,
 )
-from jaxcad.geometry.parameters import Vector
-from jaxcad.sdf.primitives import Box
+from cadjoint.geometry.parameters import Vector
+from cadjoint.sdf.primitives import Box
 
 _BOUNDS = (-1.1, -0.25, -0.25)
 _SIZE = (2.2, 0.5, 0.5)
@@ -185,7 +185,7 @@ class TestCapture:
     def test_capture_collects_exec_declared_studies(self):
         source = "\n".join(
             [
-                "from jaxcad.fem import Dirichlet, ElasticStudy, Fixed, Nodes, ThermalStudy",
+                "from cadjoint.fem import Dirichlet, ElasticStudy, Fixed, Nodes, ThermalStudy",
                 "ThermalStudy(name='captured-thermal', resolution=8, conductivity=1.0,",
                 "             bcs=[Dirichlet(Nodes.side('-x'), 1.0)])",
                 "ElasticStudy(name='captured-elastic', resolution=8, youngs=10.0, poisson=0.2,",

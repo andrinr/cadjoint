@@ -8,16 +8,16 @@ differences. This note records what runs today, the honest limits, and the follo
 
 | Piece | Status | Where |
 |---|---|---|
-| HEX8 volumetric mesher from any jaxcad SDF | working, no solver dependency | `jaxcad/fem/hexmesh.py` |
-| Thermal (Poisson) solve on the hex mesh | working | `jaxcad/fem/simulate.py` |
-| Linear elasticity + per-cell von Mises | working | `jaxcad/fem/simulate.py` |
+| HEX8 volumetric mesher from any cadjoint SDF | working, no solver dependency | `cadjoint/fem/hexmesh.py` |
+| Thermal (Poisson) solve on the hex mesh | working | `cadjoint/fem/simulate.py` |
+| Linear elasticity + per-cell von Mises | working | `cadjoint/fem/simulate.py` |
 | VTK export for ParaView | working (meshio) | `ThermalResult/ElasticResult.vtk_export` |
-| Adjoint gradients w.r.t. node coordinates | working, FD-validated | `jaxcad/fem/backends.py` |
+| Adjoint gradients w.r.t. node coordinates | working, FD-validated | `cadjoint/fem/backends.py` |
 | End-to-end design gradient | working, FD-validated to ~1e-4 off kinks | `tests/fem/test_end_to_end.py` |
-| Tesseract plugin ABI (local, no Docker) | working, gradients bit-identical to direct | `jaxcad/fem/tesseracts/thermal_jaxfem/` |
-| Elastic solve packaged as a tesseract | working, gradients bit-identical to direct | `jaxcad/fem/tesseracts/elastic_jaxfem/` |
+| Tesseract plugin ABI (local, no Docker) | working, gradients bit-identical to direct | `cadjoint/fem/tesseracts/thermal_jaxfem/` |
+| Elastic solve packaged as a tesseract | working, gradients bit-identical to direct | `cadjoint/fem/tesseracts/elastic_jaxfem/` |
 | Differentiable Dirichlet *values* (thermal, direct backend) | working via lifted solve, FD-validated | `JaxFemBackend.thermal` + `tests/fem/test_dirichlet_gradient.py` |
-| Programmatic node selection (`Nodes` + boolean algebra) | working, serializable | `jaxcad/fem/selection.py` |
+| Programmatic node selection (`Nodes` + boolean algebra) | working, serializable | `cadjoint/fem/selection.py` |
 | Heat-flux (Neumann) BCs on the direct backend | working, analytic-validated | `JaxFemBackend.thermal` surface maps |
 
 ### Versions
@@ -93,7 +93,7 @@ One more autodiff trap fixed on the way: the projection's displacement clamp use
 surface) is 0/0; the NaN leaks through `minimum()` into every cotangent. Guarded
 via `sqrt(maximum(|d|^2, eps))` (`hexmesh.project_points`).
 
-## Mesher notes (`jaxcad/fem/hexmesh.py`)
+## Mesher notes (`cadjoint/fem/hexmesh.py`)
 
 Voxelize (keep cells with `sdf(center) < 0`), share vertices through the lattice,
 then Newton-project boundary vertices onto the zero set along the field gradient
@@ -111,7 +111,7 @@ jax-fem consumes directly (it reorders to basix internally).
 
 ## BC selection design: programmatic node selections
 
-**Now: first-class vertex selection** (`jaxcad/fem/selection.py`), replacing the
+**Now: first-class vertex selection** (`cadjoint/fem/selection.py`), replacing the
 earlier `FaceSelector` face-group orientation ("the current face groups are not
 so good to work with" — the face-group ids depended on the mesher's
 gradient-axis tagging, which is opaque for anything non-box-like and useless
@@ -140,7 +140,7 @@ for sub-patches).
   (floats and 3-lists) so the viewer's next wave can write selections into
   scene source as patch operations (`Nodes.box([0, 0, 0], [1, 1, 1])`).
 
-**BC semantics** (`jaxcad/fem/study.py`, `simulate.py`):
+**BC semantics** (`cadjoint/fem/study.py`, `simulate.py`):
 
 - Node-valued conditions — `Dirichlet(nodes, value)`, `Fixed(nodes)` — apply
   to the selected node set directly.
@@ -171,11 +171,11 @@ Direct in-process jax-fem is the **default backend and performance baseline**
 (native JAX composition, no serialization). The Tesseract schema is the
 **interop ABI**, not a mandatory wrapper:
 
-- `jaxcad/fem/backends.py`: `SolverBackend` protocol —
+- `cadjoint/fem/backends.py`: `SolverBackend` protocol —
   `thermal/elastic(points, cells, bcs, *, materials..., base_points)` returning
   JAX arrays with a VJP w.r.t. `points` (adjoint at minimum). `register_backend()`
   adds third-party solvers.
-- `jaxcad/fem/tesseracts/thermal_jaxfem/tesseract_api.py`: the reference plugin.
+- `cadjoint/fem/tesseracts/thermal_jaxfem/tesseract_api.py`: the reference plugin.
   Typed pydantic `InputSchema`/`OutputSchema` (arrays only), opaque `apply`,
   `abstract_eval` for shape inference, and a hand-written
   `vector_jacobian_product` backed by the adjoint. `tesseract_jax.apply_tesseract`
@@ -190,7 +190,7 @@ Direct in-process jax-fem is the **default backend and performance baseline**
   schema and endpoints — its `vector_jacobian_product` can wrap any adjoint
   (hand-derived, FEniCS, code-generated) — and plugs in via
   `TesseractBackend(api_path=...)` or `register_backend`.
-- `jaxcad/fem/tesseracts/elastic_jaxfem/tesseract_api.py`: the elastic solve
+- `cadjoint/fem/tesseracts/elastic_jaxfem/tesseract_api.py`: the elastic solve
   packaged the same way. Variable patch counts cross the fixed-rank schema as
   a union `fixed_nodes` set (clamps are all-zero, patch identity irrelevant)
   plus `traction_nodes`/`traction_offsets` (prefix offsets) with one traction
@@ -269,7 +269,7 @@ The gradient machinery itself is exact for the discrete model either way.
 ## Code parity: studies are scene-program citizens
 
 Simulation follows the same doctrine as sketches and constraints: **code is the
-source of truth, visual features are a layer on top**. `jaxcad/fem/study.py`
+source of truth, visual features are a layer on top**. `cadjoint/fem/study.py`
 makes studies declarative and first-class:
 
 - `ThermalStudy` / `ElasticStudy` are plain validated dataclasses declared
@@ -285,7 +285,7 @@ makes studies declarative and first-class:
   resolution, domain, material, serialized BCs, each BC embedding its
   selection's description) — `json.dumps`-able, asserted in tests.
 - `capture_studies()` mirrors `capture_constraint_solves` in
-  `jaxcad/constraints/solve.py` (ContextVar + context manager): constructing
+  `cadjoint/constraints/solve.py` (ContextVar + context manager): constructing
   a study inside the context registers it, so the compile worker can exec a
   user program and collect its declared studies in order. Verified against
   exec'd source, including nested-context isolation.
@@ -345,29 +345,32 @@ manager was installed, so: standalone micromamba + conda-forge, which ships
 a native arm64 `ccx` 2.23 for macOS:
 
 ```sh
-curl -Ls -o micromamba.tar.bz2 https://micro.mamba.pm/api/micromamba/osx-arm64/latest
-tar -xjf micromamba.tar.bz2 bin/micromamba
+mkdir -p ~/.local/share/cadjoint && cd ~/.local/share/cadjoint
+curl -Ls https://micro.mamba.pm/api/micromamba/osx-arm64/latest | tar -xj bin/micromamba
 ./bin/micromamba create -y -p ./ccx-env -c conda-forge calculix
 ./ccx-env/bin/ccx -v   # "This is Version 2.23"
+export CADJOINT_CCX=~/.local/share/cadjoint/ccx-env/bin/ccx
 ```
 
-`jaxcad.fem.calculix.find_ccx` resolves the binary via `JAXCAD_CCX` / `CCX`
-env vars or `PATH`; every live test skips cleanly when none is found.
+`cadjoint.fem.calculix.find_ccx` resolves the binary via `CADJOINT_CCX` / `CCX`
+env vars or `PATH`; every live test skips cleanly when none is found. The
+env above lives under `~/.local/share/cadjoint` on this machine (a /tmp
+install evaporated once already — keep it somewhere durable).
 
 ### Integration shape
 
-- `jaxcad/fem/calculix.py` — deck writer (`write_elastic_deck`: C3D8 from
+- `cadjoint/fem/calculix.py` — deck writer (`write_elastic_deck`: C3D8 from
   HexMesh, corner order is byte-identical to VTK so cells serialize 1:1;
   `*NSET`+`*BOUNDARY` clamps; tractions as `*CLOAD` **consistent nodal
   forces** from 2x2 Gauss on the bilinear boundary quads, exactly matching
   jax-fem's surface integration), `.dat`/`.frd` parsers, the sensitivity
   correction (below), a `CalculixBackend`, and `strain_energy_solve` for
   study-style patch arguments.
-- `jaxcad/fem/tesseracts/elastic_calculix/tesseract_api.py` — mirrors the
+- `cadjoint/fem/tesseracts/elastic_calculix/tesseract_api.py` — mirrors the
   `elastic_jaxfem` schema, adds a `strain_energy` output; `apply` = write
   deck, run `ccx`, parse; `vector_jacobian_product` = the `*SENSITIVITY`
   adjoint run + normal-projection chain rule.
-- `backend="calculix"` is registered in `jaxcad/fem/backends.py` (lazy
+- `backend="calculix"` is registered in `cadjoint/fem/backends.py` (lazy
   import), so `elastic_solve(..., backend="calculix")` and
   `ElasticStudy.solve(..., backend="calculix")` run forward through ccx;
   `examples/fem_bracket_optimization.py --backend calculix` runs the whole

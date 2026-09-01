@@ -5,7 +5,7 @@ Differentiable SDF primitives, transformations, and constraint system built with
 > [!WARNING]
 > The API is not stable. Expect breaking changes.
 
-[![JAXCAD WebGPU playground with Python source beside a live rendered scene](examples/assets/viewer.png)](https://andrinr.github.io/jaxcad/docs/viewer.html)
+[![CADJOINT WebGPU playground with Python source beside a live rendered scene](examples/assets/viewer.png)](https://andrinr.github.io/cadjoint/docs/viewer.html)
 
 ---
 
@@ -37,15 +37,15 @@ Clone the repo and sync with
 [uv](https://docs.astral.sh/uv/getting-started/installation/):
 
 ```bash
-git clone https://github.com/andrinr/jaxcad
-cd jaxcad
+git clone https://github.com/andrinr/cadjoint
+cd cadjoint
 uv venv                     # create .venv (--python 3.12 pins a version)
 uv sync                     # CPU JAX — macOS, Linux, and Windows
 # uv sync --extra cuda      # Linux + NVIDIA GPU
 uv run pre-commit install   # optional: lint and format on commit
 ```
 
-`uv sync` installs jaxcad into `.venv` in editable mode — creating the
+`uv sync` installs cadjoint into `.venv` in editable mode — creating the
 environment first if you skipped `uv venv`. Run commands through it with
 `uv run <cmd>`, or activate it once per shell:
 
@@ -77,15 +77,15 @@ Avoid `--all-extras` on macOS — it includes `cuda`, which has no macOS wheels.
 Start a local server for the split-pane Python editor and live WebGPU preview:
 
 ```bash
-uv run jaxcad-viewer --open   # serves http://127.0.0.1:8765/ and opens your browser
+uv run cadjoint-viewer --open   # serves http://127.0.0.1:8765/ and opens your browser
 ```
 
 Equivalent invocations and options (drop `uv run` inside an activated `.venv`):
 
 ```bash
-uv run python -m jaxcad.viewer.playground   # same server, no browser launch
-uv run jaxcad-viewer --port 9000            # pick a different port
-uv run jaxcad-viewer --help                 # list all flags
+uv run python -m cadjoint.viewer.playground   # same server, no browser launch
+uv run cadjoint-viewer --port 9000            # pick a different port
+uv run cadjoint-viewer --help                 # list all flags
 ```
 
 Then open <http://127.0.0.1:8765/> if you did not pass `--open`. No extra
@@ -126,8 +126,8 @@ Solids created this way come from the construction layer, so they are ordinary
 parametric geometry as well as viewer objects:
 
 ```python
-from jaxcad.construction import Solid
-from jaxcad.sdf.boolean import Union
+from cadjoint.construction import Solid
+from cadjoint.sdf.boolean import Union
 
 scene = Union(
     Solid.box(size=[1, 1, 0.5], position=[0, 0, 0], rotation=[0, 0, 0.4]),
@@ -143,19 +143,19 @@ X, Y, Z angles in radians, matching the underlying primitives.
 ### Developing the playground UI
 
 The UI is a Solid + TypeScript app in `frontend/`, built into
-`jaxcad/viewer/static` and committed, so installing jaxcad needs no Node
+`cadjoint/viewer/static` and committed, so installing cadjoint needs no Node
 toolchain. To work on it:
 
 ```bash
 cd frontend
 npm install
 npm run dev        # Vite on :5173, proxying the API to the Python server
-npm run build      # refresh jaxcad/viewer/static (commit the result)
+npm run build      # refresh cadjoint/viewer/static (commit the result)
 npm test           # projection and picking unit tests
 npm run e2e        # Playwright, drives the real server end to end
 ```
 
-Run `uv run jaxcad-viewer` alongside `npm run dev` so the dev server has an API
+Run `uv run cadjoint-viewer` alongside `npm run dev` so the dev server has an API
 to proxy to.
 
 ## Shader compilation and live viewer
@@ -163,9 +163,9 @@ to proxy to.
 Compile an SDF to a standalone shader function:
 
 ```python
-from jaxcad.backends import GLSLBackend, WGSLBackend
-from jaxcad.backends.wgsl import compile_scene_to_wgsl
-from jaxcad.sdf.primitives import Sphere
+from cadjoint.backends import GLSLBackend, WGSLBackend
+from cadjoint.backends.wgsl import compile_scene_to_wgsl
+from cadjoint.sdf.primitives import Sphere
 
 sphere = Sphere(radius=1.0)
 glsl = GLSLBackend().compile_sdf(sphere)
@@ -184,7 +184,7 @@ uv sync --extra viewer
 ```
 
 ```python
-from jaxcad.viewer import SDFViewer
+from cadjoint.viewer import SDFViewer
 
 SDFViewer(sphere)
 ```
@@ -195,7 +195,7 @@ hot-reload examples.
 For a split-pane Python editor and live WebGPU preview in the browser, see
 [Interactive browser playground](#interactive-browser-playground) above.
 
-The [WebGPU viewer guide](https://andrinr.github.io/jaxcad/docs/viewer.html) includes
+The [WebGPU viewer guide](https://andrinr.github.io/cadjoint/docs/viewer.html) includes
 a live interactive scene and covers the local playground, camera controls,
 generated shader inspection, and the Jupyter widget.
 
@@ -206,8 +206,8 @@ For offscreen OpenGL rendering, install the `glsl` extra instead.
 The image renderer groups scene data and quality controls explicitly:
 
 ```python
-from jaxcad.render import Camera, RenderSettings, Scene, render_scene
-from jaxcad.sdf.primitives import Sphere
+from cadjoint.render import Camera, RenderSettings, Scene, render_scene
+from cadjoint.sdf.primitives import Sphere
 
 scene = Scene(
     Sphere(1.0),
@@ -217,7 +217,7 @@ image = render_scene(scene, RenderSettings.balanced((240, 320)))
 ```
 
 Use `RenderSettings.draft()`, `.balanced()`, or `.high_quality()` to choose an
-explicit performance/fidelity trade-off. See the [forward renderer guide](https://andrinr.github.io/jaxcad/docs/rendering.html)
+explicit performance/fidelity trade-off. See the [forward renderer guide](https://andrinr.github.io/cadjoint/docs/rendering.html)
 for mode and quality comparisons.
 
 ## Tests
@@ -246,4 +246,4 @@ Inspired by [Fidget](https://www.mattkeeter.com/projects/fidget/) and [Inigo Qui
 
 ## License
 
-[Elastic License 2.0](LICENSE) — free for personal, research, and internal business use. Offering jaxcad as a hosted or managed service requires a commercial license. Contact [andrin.rehmann@gmail.com](mailto:andrin.rehmann@gmail.com) for commercial enquiries.
+[Elastic License 2.0](LICENSE) — free for personal, research, and internal business use. Offering cadjoint as a hosted or managed service requires a commercial license. Contact [andrin.rehmann@gmail.com](mailto:andrin.rehmann@gmail.com) for commercial enquiries.

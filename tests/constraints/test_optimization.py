@@ -4,13 +4,13 @@ import jax
 import jax.numpy as jnp
 import optax
 
-from jaxcad.constraints import (
+from cadjoint.constraints import (
     DistanceConstraint,
     constraint_residuals,
     make_manifold_projection,
     null_space,
 )
-from jaxcad.geometry.parameters import Vector
+from cadjoint.geometry.parameters import Vector
 
 
 def _free_and_meta(*params):

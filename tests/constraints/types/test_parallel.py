@@ -3,8 +3,8 @@
 import jax.numpy as jnp
 import pytest
 
-from jaxcad.constraints import ParallelConstraint
-from jaxcad.geometry.parameters import Vector
+from cadjoint.constraints import ParallelConstraint
+from cadjoint.geometry.parameters import Vector
 
 
 @pytest.mark.parametrize(

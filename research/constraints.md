@@ -417,7 +417,7 @@ This can serve as a validation oracle for jaxCAD's constraint solver.
 ## Summary: recommended changes
 
 ### Priority 0 (highest impact)
-1. **Replace `newton_raphson` with `optimistix.LevenbergMarquardt`** in `jaxcad/constraints/solve.py` — use `ImplicitAdjoint` for differentiability through the solve.
+1. **Replace `newton_raphson` with `optimistix.LevenbergMarquardt`** in `cadjoint/constraints/solve.py` — use `ImplicitAdjoint` for differentiability through the solve.
 2. **Remove hard DOF check** — return `ConstraintSolution` with status field instead of raising.
 3. **Add `CoincidentConstraint`** — the most-used constraint in any sketch workflow.
 4. **Add `FixedConstraint`** — needed to eliminate rigid-body DOF and make sketches well-determined.

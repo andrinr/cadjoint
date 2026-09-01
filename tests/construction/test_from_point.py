@@ -2,9 +2,9 @@
 
 import jax.numpy as jnp
 
-from jaxcad.construction import from_point
-from jaxcad.geometry.parameters import Scalar, Vector
-from jaxcad.sdf.primitives.sphere import Sphere
+from cadjoint.construction import from_point
+from cadjoint.geometry.parameters import Scalar, Vector
+from cadjoint.sdf.primitives.sphere import Sphere
 
 
 def test_from_point_basic():

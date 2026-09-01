@@ -172,7 +172,7 @@ export interface CompileResponse {
   output: string;
 }
 
-/** A serialized node selection, mirroring jaxcad.fem.selection describe(). */
+/** A serialized node selection, mirroring cadjoint.fem.selection describe(). */
 export type StudySelection =
   | { kind: "box"; min_corner: number[]; max_corner: number[] }
   | { kind: "sphere"; center: number[]; radius: number }

@@ -12,14 +12,14 @@ import pytest
 
 wgpu = pytest.importorskip("wgpu", reason="wgpu is needed to validate WGSL")
 
-from jaxcad.backends.wgsl import compile_scene_to_wgsl  # noqa: E402
-from jaxcad.sdf.boolean import Union  # noqa: E402
-from jaxcad.sdf.primitives import Sphere  # noqa: E402
-from jaxcad.viewer._pathtracer import (  # noqa: E402
+from cadjoint.backends.wgsl import compile_scene_to_wgsl  # noqa: E402
+from cadjoint.sdf.boolean import Union  # noqa: E402
+from cadjoint.sdf.primitives import Sphere  # noqa: E402
+from cadjoint.viewer._pathtracer import (  # noqa: E402
     WGSL_PRESENT_TEMPLATE,
     build_path_tracer_shader,
 )
-from jaxcad.viewer._webgpu import build_viewer_shader  # noqa: E402
+from cadjoint.viewer._webgpu import build_viewer_shader  # noqa: E402
 
 OVERLAY_WGSL = Path(__file__).resolve().parents[2] / "frontend/src/viewer/overlay.wgsl"
 SIMULATION_WGSL = Path(__file__).resolve().parents[2] / "frontend/src/viewer/simulation.wgsl"
@@ -64,7 +64,7 @@ def test_overlay_shader_compiles(device):
 
 def test_sketch_scene_shader_compiles(device):
     """Extruded and revolved sketch polygons must survive shader lowering."""
-    from jaxcad.construction import PolygonProfile, extrude, revolve
+    from cadjoint.construction import PolygonProfile, extrude, revolve
 
     profile = PolygonProfile([[0.0, 0.0], [2.0, 0.0], [1.5, 1.2], [0.2, 1.0]], name="p")
     section = PolygonProfile(

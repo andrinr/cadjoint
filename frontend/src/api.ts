@@ -42,7 +42,7 @@ export async function startSession(): Promise<SessionResponse> {
 async function post<T>(path: string, body: unknown): Promise<T> {
   const response = await fetch(path, {
     method: "POST",
-    headers: { "Content-Type": "application/json", "X-Jaxcad-Token": token },
+    headers: { "Content-Type": "application/json", "X-Cadjoint-Token": token },
     body: JSON.stringify(body),
   });
   return readJson<T>(response);

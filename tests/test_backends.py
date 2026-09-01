@@ -23,7 +23,7 @@ import pytest
 
 
 def _compile(fn, point=None):
-    from jaxcad.backends.glsl import compile_sdf_to_glsl
+    from cadjoint.backends.glsl import compile_sdf_to_glsl
 
     return compile_sdf_to_glsl(fn, example_point=point)
 
@@ -38,10 +38,10 @@ def _balanced(code: str) -> bool:
 
 def _compile_target(target, fn, point=None):
     if target == "glsl":
-        from jaxcad.backends.glsl import compile_sdf_to_glsl
+        from cadjoint.backends.glsl import compile_sdf_to_glsl
 
         return compile_sdf_to_glsl(fn, example_point=point)
-    from jaxcad.backends.wgsl import compile_sdf_to_wgsl
+    from cadjoint.backends.wgsl import compile_sdf_to_wgsl
 
     return compile_sdf_to_wgsl(fn, example_point=point)
 
@@ -52,7 +52,7 @@ def _compile_target(target, fn, point=None):
 def test_stable_hlo_export_sphere():
     from jax.export import export
 
-    from jaxcad.sdf.primitives.sphere import Sphere
+    from cadjoint.sdf.primitives.sphere import Sphere
 
     sphere = Sphere(radius=1.0)
     exported = export(jax.jit(sphere))(jnp.zeros(3))
@@ -67,7 +67,7 @@ def test_stable_hlo_export_sphere():
 def test_stable_hlo_export_box():
     from jax.export import export
 
-    from jaxcad.sdf.primitives.box import Box
+    from cadjoint.sdf.primitives.box import Box
 
     box = Box(size=[0.5, 0.5, 0.5])
     exported = export(jax.jit(box))(jnp.zeros(3))
@@ -81,7 +81,7 @@ def test_stable_hlo_gradients():
     """jax.grad of an SDF also exports cleanly to StableHLO."""
     from jax.export import export
 
-    from jaxcad.sdf.primitives.sphere import Sphere
+    from cadjoint.sdf.primitives.sphere import Sphere
 
     sphere = Sphere(radius=1.0)
     grad_fn = jax.grad(sphere)
@@ -93,8 +93,8 @@ def test_stable_hlo_gradients():
 
 
 def test_type_mapping():
-    from jaxcad.backends._type_utils import mlir_type_to_glsl
-    from jaxcad.backends.wgsl._wgsl_emitter import mlir_type_to_wgsl
+    from cadjoint.backends._type_utils import mlir_type_to_glsl
+    from cadjoint.backends.wgsl._wgsl_emitter import mlir_type_to_wgsl
 
     assert mlir_type_to_glsl("tensor<f32>") == "float"
     assert mlir_type_to_glsl("tensor<2xf32>") == "vec2"
@@ -110,7 +110,7 @@ def test_type_mapping():
 
 
 def test_type_mapping_rejects_unsupported_types():
-    from jaxcad.backends._type_utils import mlir_type_to_glsl
+    from cadjoint.backends._type_utils import mlir_type_to_glsl
 
     with pytest.raises(ValueError, match="ranked MLIR tensor"):
         mlir_type_to_glsl("f32")
@@ -121,8 +121,8 @@ def test_type_mapping_rejects_unsupported_types():
 
 
 def test_matrix_literals_use_shader_column_order():
-    from jaxcad.backends._type_utils import glsl_literal
-    from jaxcad.backends.wgsl._wgsl_emitter import wgsl_literal
+    from cadjoint.backends._type_utils import glsl_literal
+    from cadjoint.backends.wgsl._wgsl_emitter import wgsl_literal
 
     value = np.array([[1, 2, 3], [4, 5, 6]], dtype=np.float32)
     values = "1.000000, 4.000000, 2.000000, 5.000000, 3.000000, 6.000000"
@@ -131,7 +131,7 @@ def test_matrix_literals_use_shader_column_order():
 
 
 def test_wgsl_literals_preserve_small_nonzero_values():
-    from jaxcad.backends.wgsl._wgsl_emitter import wgsl_literal
+    from cadjoint.backends.wgsl._wgsl_emitter import wgsl_literal
 
     assert wgsl_literal(np.float32(1e-10), (), np.float32) == "1e-10"
     assert wgsl_literal(np.float32(5e-7), (), np.float32) == "5e-07"
@@ -221,7 +221,7 @@ def test_dot_product():
 
 
 def test_sphere_glsl():
-    from jaxcad.sdf.primitives.sphere import Sphere
+    from cadjoint.sdf.primitives.sphere import Sphere
 
     sphere = Sphere(radius=1.5)
     code = _compile(sphere)
@@ -230,7 +230,7 @@ def test_sphere_glsl():
 
 
 def test_sphere_glsl_balanced():
-    from jaxcad.sdf.primitives.sphere import Sphere
+    from cadjoint.sdf.primitives.sphere import Sphere
 
     code = _compile(Sphere(radius=1.0))
     assert _balanced(code)
@@ -240,7 +240,7 @@ def test_sphere_glsl_balanced():
 
 
 def test_box_glsl():
-    from jaxcad.sdf.primitives.box import Box
+    from cadjoint.sdf.primitives.box import Box
 
     box = Box(size=[0.5, 1.0, 0.5])
     code = _compile(box)
@@ -253,9 +253,9 @@ def test_box_glsl():
 
 
 def test_union_glsl():
-    from jaxcad.sdf.boolean.union import Union
-    from jaxcad.sdf.primitives.box import Box
-    from jaxcad.sdf.primitives.sphere import Sphere
+    from cadjoint.sdf.boolean.union import Union
+    from cadjoint.sdf.primitives.box import Box
+    from cadjoint.sdf.primitives.sphere import Sphere
 
     scene = Union(Sphere(1.0), Box([0.5, 0.5, 0.5]), smoothness=0.1)
     code = _compile(scene)
@@ -269,8 +269,8 @@ def test_union_glsl():
 
 
 def test_translate_glsl():
-    from jaxcad.sdf.primitives.sphere import Sphere
-    from jaxcad.sdf.transforms.affine.translate import Translate
+    from cadjoint.sdf.primitives.sphere import Sphere
+    from cadjoint.sdf.transforms.affine.translate import Translate
 
     scene = Translate(Sphere(1.0), offset=jnp.array([1.0, 0.0, 0.0]))
     code = _compile(scene)
@@ -283,7 +283,7 @@ def test_translate_glsl():
 
 
 def test_cylinder_glsl():
-    from jaxcad.sdf.primitives.cylinder import Cylinder
+    from cadjoint.sdf.primitives.cylinder import Cylinder
 
     cyl = Cylinder(radius=0.5, height=1.0)
     code = _compile(cyl)
@@ -291,7 +291,7 @@ def test_cylinder_glsl():
 
 
 def test_capsule_glsl():
-    from jaxcad.sdf.primitives.capsule import Capsule
+    from cadjoint.sdf.primitives.capsule import Capsule
 
     cap = Capsule(radius=0.3, height=1.5)
     code = _compile(cap)
@@ -302,8 +302,8 @@ def test_capsule_glsl():
 
 
 def _builtin_scenes():
-    from jaxcad.sdf.boolean import Difference, Intersection, Union, Xor
-    from jaxcad.sdf.primitives import (
+    from cadjoint.sdf.boolean import Difference, Intersection, Union, Xor
+    from cadjoint.sdf.primitives import (
         Box,
         Capsule,
         Cylinder,
@@ -312,8 +312,8 @@ def _builtin_scenes():
         Sphere,
         Torus,
     )
-    from jaxcad.sdf.transforms.affine import Rotate, Scale, Translate
-    from jaxcad.sdf.transforms.deformations import Twist
+    from cadjoint.sdf.transforms.affine import Rotate, Scale, Translate
+    from cadjoint.sdf.transforms.deformations import Twist
 
     sphere = Sphere(1.0)
     box = Box(jnp.array([0.7, 0.8, 0.9]))
@@ -369,8 +369,8 @@ def test_rotate_and_scale_emit_required_operations():
 
 
 def test_fragment_shader_options_are_validated():
-    from jaxcad.backends.glsl import build_fragment_shader
-    from jaxcad.sdf.primitives import Sphere
+    from cadjoint.backends.glsl import build_fragment_shader
+    from cadjoint.sdf.primitives import Sphere
 
     with pytest.raises(ValueError, match="max_steps"):
         build_fragment_shader(Sphere(1.0), max_steps=0)
@@ -384,8 +384,8 @@ def test_fragment_shader_options_are_validated():
 
 
 def test_glsl_backend_api():
-    from jaxcad.backends import GLSLBackend
-    from jaxcad.sdf.primitives.sphere import Sphere
+    from cadjoint.backends import GLSLBackend
+    from cadjoint.sdf.primitives.sphere import Sphere
 
     backend = GLSLBackend()
     assert backend.name == "glsl"
@@ -394,8 +394,8 @@ def test_glsl_backend_api():
 
 
 def test_wgsl_backend():
-    from jaxcad.backends import WGSLBackend
-    from jaxcad.sdf.primitives.sphere import Sphere
+    from cadjoint.backends import WGSLBackend
+    from cadjoint.sdf.primitives.sphere import Sphere
 
     backend = WGSLBackend()
     assert backend.name == "wgsl"
@@ -409,7 +409,7 @@ def test_wgsl_backend():
 
 
 def test_glsl_renderer_validates_render_inputs_before_gpu_calls():
-    from jaxcad.backends.glsl.renderer import GLSLRenderer
+    from cadjoint.backends.glsl.renderer import GLSLRenderer
 
     renderer = GLSLRenderer.__new__(GLSLRenderer)
     renderer._ctx = object()
@@ -432,7 +432,7 @@ def test_glsl_renderer_validates_render_inputs_before_gpu_calls():
 
 def test_glsl_renderer():
     pytest.importorskip("moderngl")
-    from jaxcad.backends.glsl.renderer import GLSLRenderer
+    from cadjoint.backends.glsl.renderer import GLSLRenderer
 
     try:
         GLSLRenderer()

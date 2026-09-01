@@ -33,7 +33,7 @@ website:
         href: reference/index.qmd
     right:
       - icon: github
-        href: https://github.com/andrinr/jaxcad
+        href: https://github.com/andrinr/cadjoint
 
 format:
   html:
@@ -46,7 +46,7 @@ execute:
   enabled: false  # render stored outputs, don't re-execute
 
 quartodoc:
-  package: jaxcad
+  package: cadjoint
   dir: reference
   parser: google
   sections:

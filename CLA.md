@@ -6,7 +6,7 @@ By making a contribution to this project, you agree to the following terms.
 
 "You" means the individual submitting the contribution.
 "Contribution" means any original work of authorship submitted to the project.
-"Project" means the jaxcad repository at https://github.com/andrinr/jaxcad.
+"Project" means the cadjoint repository at https://github.com/andrinr/cadjoint.
 
 ## 2. Copyright License
 

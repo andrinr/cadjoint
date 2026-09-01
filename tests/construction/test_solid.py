@@ -6,10 +6,10 @@ import jax
 import jax.numpy as jnp
 import pytest
 
-from jaxcad import apply_parameters, extract_parameters, functionalize
-from jaxcad.construction import ConstructionPrimitive, Solid
-from jaxcad.sdf.boolean import Union
-from jaxcad.sdf.primitives import Box, Sphere
+from cadjoint import apply_parameters, extract_parameters, functionalize
+from cadjoint.construction import ConstructionPrimitive, Solid
+from cadjoint.sdf.boolean import Union
+from cadjoint.sdf.primitives import Box, Sphere
 
 
 class TestGeneratedSolids:

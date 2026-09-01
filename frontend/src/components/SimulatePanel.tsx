@@ -539,7 +539,7 @@ export function SimulatePanel(props: SimulatePanelProps) {
       <Show when={unavailable()}>
         <p class="sim-note" data-testid="simulate-unavailable">
           FEM solves need the optional jax-fem extra on the server. Install it
-          with <code> pip install jaxcad[fem]</code> and restart the playground.
+          with <code> pip install cadjoint[fem]</code> and restart the playground.
           Study declarations still compile and stay editable without it.
         </p>
       </Show>

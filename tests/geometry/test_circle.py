@@ -3,8 +3,8 @@
 import jax.numpy as jnp
 import pytest
 
-from jaxcad.geometry.parameters import Scalar, Vector
-from jaxcad.geometry.primitives import Circle
+from cadjoint.geometry.parameters import Scalar, Vector
+from cadjoint.geometry.primitives import Circle
 
 
 def test_circle_basic():

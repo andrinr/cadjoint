@@ -19,7 +19,7 @@
 
 ## Current state
 
-`jaxcad/render.py` has two paths:
+`cadjoint/render.py` has two paths:
 
 | Method | How | Bottleneck |
 |---|---|---|
@@ -48,12 +48,12 @@ Walk jaxCAD's Python SDF tree and emit a GLSL `float sceneSDF(vec3 p)` function.
 Add a `to_glsl(p: str) -> str` method to each SDF class, returning a GLSL expression string for the SDF value at point named `p`.
 
 ```python
-# jaxcad/sdf/primitives/sphere.py
+# cadjoint/sdf/primitives/sphere.py
 def to_glsl(self, p: str = "p") -> str:
     r = float(self.params['radius'].value)
     return f"(length({p}) - {r:.6f})"
 
-# jaxcad/sdf/boolean/union.py
+# cadjoint/sdf/boolean/union.py
 def to_glsl(self, p: str = "p") -> str:
     children = [c.to_glsl(p) for c in self.sdfs]
     k = float(self.params.get('smoothness', 0.0))
@@ -65,7 +65,7 @@ def to_glsl(self, p: str = "p") -> str:
             result = f"min({result}, {expr})"
     return result
 
-# jaxcad/sdf/transforms/affine/translate.py
+# cadjoint/sdf/transforms/affine/translate.py
 def to_glsl(self, p: str = "p") -> str:
     o = self.params['offset'].xyz
     inner_p = f"({p} - vec3({o[0]:.6f},{o[1]:.6f},{o[2]:.6f}))"
@@ -300,7 +300,7 @@ SlangPy integrates with PyTorch autograd (not JAX directly):
 ```python
 import slangpy, torch
 
-module = slangpy.load_module("jaxcad_sdf.slang")
+module = slangpy.load_module("cadjoint_sdf.slang")
 
 # PyTorch tensors with grad tracking
 radius = torch.tensor(1.0, requires_grad=True)

@@ -11,9 +11,9 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from jaxcad.render.raymarch import _compute_normal, _sphere_trace, raymarch
-from jaxcad.sdf.primitives import Box
-from jaxcad.sdf.transforms import Twist
+from cadjoint.render.raymarch import _compute_normal, _sphere_trace, raymarch
+from cadjoint.sdf.primitives import Box
+from cadjoint.sdf.transforms import Twist
 
 # ---------------------------------------------------------------------------
 # Helpers

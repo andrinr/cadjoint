@@ -1,7 +1,7 @@
 """CSG stress scenes for the full meshing pipeline.
 
 Each scene is a hard CSG combination (``jnp.minimum``/``jnp.maximum`` over
-primitive SDFs) meshed with :func:`jaxcad.meshing.extract_mesh` and checked
+primitive SDFs) meshed with :func:`cadjoint.meshing.extract_mesh` and checked
 for watertightness, topology (Euler characteristic), signed volume against
 an analytic or numerically integrated reference, vertex residuals, and
 extraction determinism.  Selected scenes additionally verify that octree
@@ -17,8 +17,8 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from jaxcad.meshing import GridSpec, Mesh, extract_mesh
-from jaxcad.sdf.primitives import Box, Cylinder, Sphere
+from cadjoint.meshing import GridSpec, Mesh, extract_mesh
+from cadjoint.sdf.primitives import Box, Cylinder, Sphere
 
 
 def undirected_edge_counts(faces: np.ndarray) -> np.ndarray:

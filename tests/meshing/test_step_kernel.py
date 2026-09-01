@@ -1,6 +1,6 @@
 """Validate STEP export against a real CAD kernel (OCCT via cadquery-ocp).
 
-Round-trips :func:`jaxcad.meshing.export.save_step` output through the OCCT
+Round-trips :func:`cadjoint.meshing.export.save_step` output through the OCCT
 STEP reader and asserts what a downstream CAD system would care about: the
 file parses, transfers to a single ``BRepCheck``-valid closed solid, keeps
 exactly the faces :func:`merge_planar_faces` produced (after degenerate-edge
@@ -16,10 +16,10 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from jaxcad.meshing.dual_contouring import Mesh, extract_mesh
-from jaxcad.meshing.edge_detection import GridSpec
-from jaxcad.meshing.export import _weld_degenerate_edges, merge_planar_faces, save_step
-from jaxcad.sdf.primitives import Box
+from cadjoint.meshing.dual_contouring import Mesh, extract_mesh
+from cadjoint.meshing.edge_detection import GridSpec
+from cadjoint.meshing.export import _weld_degenerate_edges, merge_planar_faces, save_step
+from cadjoint.sdf.primitives import Box
 
 pytest.importorskip("OCP")
 

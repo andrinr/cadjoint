@@ -1,4 +1,4 @@
-"""Tests for jaxcad.meshing.edge_detection (crossing detection + Hermite data)."""
+"""Tests for cadjoint.meshing.edge_detection (crossing detection + Hermite data)."""
 
 from __future__ import annotations
 
@@ -7,16 +7,16 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from jaxcad import extract_parameters, functionalize
-from jaxcad.geometry.parameters import Scalar, Vector
-from jaxcad.meshing.edge_detection import (
+from cadjoint import extract_parameters, functionalize
+from cadjoint.geometry.parameters import Scalar, Vector
+from cadjoint.meshing.edge_detection import (
     GridSpec,
     detect_edges,
     edge_hermite_data,
     find_crossing_edges,
     sample_grid,
 )
-from jaxcad.sdf.primitives import Box, Sphere
+from cadjoint.sdf.primitives import Box, Sphere
 
 
 def sphere_sdf(radius):
@@ -338,7 +338,7 @@ class TestGradientFallback:
         # on the surface, where polygon SDFs used to have a dead subgradient
         # (epsilon-smoothed sqrt at zero).  Degenerate root gradients now
         # fall back to a nudged evaluation on the same smooth branch.
-        from jaxcad.sdf.primitives.polygon import ExtrudedPolygon
+        from cadjoint.sdf.primitives.polygon import ExtrudedPolygon
 
         profile = [
             jnp.array([-1.1, -0.7]),

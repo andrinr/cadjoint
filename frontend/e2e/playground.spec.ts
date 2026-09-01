@@ -120,7 +120,7 @@ async function railTool(page: Page, group: string, testid: string) {
 }
 
 test("serves the app and loads the starter sketch", async ({ page }) => {
-  await expect(page).toHaveTitle(/JAXCAD/);
+  await expect(page).toHaveTitle(/CADJOINT/);
   expect(await editorText(page)).toContain("PolygonProfile(");
   expect(await editorText(page)).toContain("[-1.1, -0.7]");
   expect(await editorText(page)).toContain("ring = revolve(ring_profile");
@@ -341,7 +341,7 @@ test("the projection toggle works on its own", async ({ page }) => {
 
 test("object and gizmo picking use the orthographic camera", async ({ page }) => {
   const program = [
-    "from jaxcad.construction import Solid",
+    "from cadjoint.construction import Solid",
     'block = Solid.box(size=[0.5, 0.5, 0.5], position=[0, 0, 1.5], name="block")',
     "scene = block",
     "",
@@ -494,7 +494,7 @@ test("the source-code pane stays above floating panels", async ({ page }) => {
 test("editing the code updates the sketch the viewer reports", async ({ page }) => {
   await page.getByTestId("mode-vertex").click();
   const program = [
-    "from jaxcad.construction import PolygonProfile, extrude",
+    "from cadjoint.construction import PolygonProfile, extrude",
     'profile = PolygonProfile([[-2.2, -0.9], [1.0, -0.9], [0.0, 1.2]], name="t")',
     "scene = extrude(profile, depth=0.5)",
     "",
@@ -551,7 +551,7 @@ test("placing a primitive writes a Solid call into the source", async ({ page })
 
   await expect.poll(() => sphereCount(page), { timeout: 45_000 }).toBe(before + 1);
   // Solid is already imported by the starter program, so no duplicate appears.
-  expect(await editorText(page)).toMatch(/from jaxcad\.construction import .*\bSolid\b/);
+  expect(await editorText(page)).toMatch(/from cadjoint\.construction import .*\bSolid\b/);
 
   // CodeMirror only renders the lines in view, so scroll to the scene
   // assignment before checking the new solid was wired into it rather than
@@ -700,8 +700,8 @@ test("a sketch can be moved by its plane", async ({ page }) => {
 
 test("a default polygon can move without losing parameter-backed points", async ({ page }) => {
   const program = [
-    "from jaxcad.construction import PolygonProfile, extrude",
-    "from jaxcad.geometry import Vector2",
+    "from cadjoint.construction import PolygonProfile, extrude",
+    "from cadjoint.geometry import Vector2",
     "p0 = Vector2(value=[-1.0, -0.6], free=True, name='p0')",
     "p1 = Vector2(value=[1.0, -0.6], free=True, name='p1')",
     "p2 = Vector2(value=[0.0, 0.9], free=True, name='p2')",
@@ -883,7 +883,7 @@ test("sketch constraints and extrusion are represented in UI and code", async ({
 
 test("relational constraint chips render for API-added kinds", async ({ page }) => {
   const program = [
-    "from jaxcad.construction import PolygonProfile, extrude",
+    "from cadjoint.construction import PolygonProfile, extrude",
     'profile = PolygonProfile([[-1.0, -0.8], [1.0, -0.8], [1.0, 0.8], [-1.0, 0.8]], name="quad")',
     "scene = extrude(profile, depth=0.4)",
     "",
@@ -905,7 +905,7 @@ test("relational constraint chips render for API-added kinds", async ({ page }) 
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-Jaxcad-Token": session.token,
+          "X-Cadjoint-Token": session.token,
         },
         body: JSON.stringify({ source: text, ...operation }),
       });

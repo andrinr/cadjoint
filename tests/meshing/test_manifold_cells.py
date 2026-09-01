@@ -7,7 +7,7 @@ end in the same cell column in x (walls at x = 0.03 and x = -0.03, both
 inside the column [-0.05, 0.075]).  In that column's middle-layer cells the
 inside corners split into two *diagonal* groups — box_lo's at the bottom
 west, box_hi's at the top east — that are not connected along any cell
-edge, so :func:`jaxcad.meshing.features.manifold_cell_incidence` emits two
+edge, so :func:`cadjoint.meshing.features.manifold_cell_incidence` emits two
 rows (two QEF vertices) per cell.  Uniform dual contouring's single shared
 vertex fused the two slabs there into edges bordered by four triangles;
 with the split the extraction yields two separate watertight pancakes.
@@ -18,14 +18,14 @@ from __future__ import annotations
 import jax.numpy as jnp
 import numpy as np
 
-from jaxcad.meshing import (
+from cadjoint.meshing import (
     GridSpec,
     extract_mesh,
     find_crossing_edges,
     manifold_cell_incidence,
     sample_grid,
 )
-from jaxcad.sdf.primitives import Box
+from cadjoint.sdf.primitives import Box
 from tests.meshing.test_scenes import euler_characteristic, undirected_edge_counts
 
 SLAB_HALF = jnp.array([0.215, 0.4, 0.03])

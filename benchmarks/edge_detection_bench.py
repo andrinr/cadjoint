@@ -22,8 +22,8 @@ import jax.numpy as jnp
 import numpy as np
 from jax import Array
 
-from jaxcad.meshing import GridSpec, edge_hermite_data, find_crossing_edges, sample_grid
-from jaxcad.sdf.primitives import Box
+from cadjoint.meshing import GridSpec, edge_hermite_data, find_crossing_edges, sample_grid
+from cadjoint.sdf.primitives import Box
 
 try:
     from skimage import measure as _skimage_measure

@@ -11,12 +11,12 @@ from urllib.request import Request, urlopen
 import numpy as np
 import pytest
 
-from jaxcad.viewer import _compile_worker
-from jaxcad.viewer.playground import create_server, simulate_source
+from cadjoint.viewer import _compile_worker
+from cadjoint.viewer.playground import create_server, simulate_source
 
 BOX_SOURCE = """
-from jaxcad.geometry import Vector
-from jaxcad.sdf.primitives import Box
+from cadjoint.geometry import Vector
+from cadjoint.sdf.primitives import Box
 
 scene = Box(Vector([0.8, 0.5, 0.5], free=True, name="size"))
 """
@@ -84,8 +84,8 @@ class TestSimulateValidation:
 
 
 def _box_scene():
-    from jaxcad.geometry import Vector
-    from jaxcad.sdf.primitives import Box
+    from cadjoint.geometry import Vector
+    from cadjoint.sdf.primitives import Box
 
     return Box(Vector([0.8, 0.5, 0.5], free=True, name="size"))
 
@@ -179,7 +179,7 @@ def _running_server():
 def _post(base: str, path: str, payload: dict, token: str | None = None) -> Request:
     headers = {"Content-Type": "application/json"}
     if token is not None:
-        headers["X-Jaxcad-Token"] = token
+        headers["X-Cadjoint-Token"] = token
     return Request(base + path, data=json.dumps(payload).encode(), headers=headers, method="POST")
 
 
@@ -191,7 +191,7 @@ class TestHttp:
             assert error.value.code == 403
 
     def test_fem_unavailable_maps_to_501(self, monkeypatch):
-        from jaxcad.viewer import playground
+        from cadjoint.viewer import playground
 
         def unavailable(request, timeout=0):
             return {"ok": False, "error_kind": "fem_unavailable", "error": "install the extra"}
@@ -289,7 +289,7 @@ class TestSolves:
 
 
 def _bar_study():
-    from jaxcad.fem import Dirichlet, Nodes, ThermalStudy
+    from cadjoint.fem import Dirichlet, Nodes, ThermalStudy
 
     return ThermalStudy(
         name="bar",
@@ -350,7 +350,7 @@ class TestStudySimulate:
 
     def test_elastic_study_reports_von_mises(self):
         pytest.importorskip("jax_fem", reason="study solve needs the fem extra")
-        from jaxcad.fem import ElasticStudy, Fixed, Nodes, Traction
+        from cadjoint.fem import ElasticStudy, Fixed, Nodes, Traction
 
         study = ElasticStudy(
             name="cantilever",
@@ -374,9 +374,9 @@ class TestStudySimulate:
         pytest.importorskip("jax_fem", reason="study solve needs the fem extra")
         source = "\n".join(
             [
-                "from jaxcad.fem import Dirichlet, Nodes, ThermalStudy",
-                "from jaxcad.geometry import Vector",
-                "from jaxcad.sdf.primitives import Box",
+                "from cadjoint.fem import Dirichlet, Nodes, ThermalStudy",
+                "from cadjoint.geometry import Vector",
+                "from cadjoint.sdf.primitives import Box",
                 "",
                 'scene = Box(Vector([0.8, 0.5, 0.5], free=True, name="size"))',
                 "heat = ThermalStudy(name='bar', resolution=8, conductivity=1.0,",

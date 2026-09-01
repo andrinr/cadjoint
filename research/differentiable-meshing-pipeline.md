@@ -38,7 +38,7 @@ benchmarks before the next stage starts.
 ## Stages
 
 1. **Edge detection — grid crossings (done).**
-   `jaxcad.meshing.edge_detection`: sample a lattice, find sign-changing
+   `cadjoint.meshing.edge_detection`: sample a lattice, find sign-changing
    edges host-side, refine each crossing with vectorized bisection + secant +
    differentiable Newton polish, and evaluate spatial gradients at the roots
    (Hermite data). Robustness rules an adversarial review forced in: the
@@ -55,13 +55,13 @@ benchmarks before the next stage starts.
    `dt/dr` matches the analytic implicit derivative to 4e-7 across all 1830
    edges; a sphere at (1000, 2000, -500) stays below 6e-5.
 2. **Edge detection — sharp features (done).**
-   `jaxcad.meshing.features`: per-cell classification into face / crease /
+   `cadjoint.meshing.features`: per-cell classification into face / crease /
    corner via singular values of the incident unit normals (`σ2/σ1` ≈ tangent
    of half the normal fan angle), plus exact hard-CSG seam cells from
    min/max branch changes. Measures are differentiable; labels are frozen
    like the edge set.
 3. **Mesh generation from Hermite data (done).**
-   `jaxcad.meshing.dual_contouring`: one vertex per active cell, with two
+   `cadjoint.meshing.dual_contouring`: one vertex per active cell, with two
    placements sharing one contract. The differentiable path is a
    Tikhonov-regularized QEF — batched linear algebra with no
    SVD/eigendecomposition in the gradient path, so planar cells cannot NaN
@@ -81,7 +81,7 @@ benchmarks before the next stage starts.
    Euler characteristic, signed volume, corner error, and triangle minimum
    angles are tested and benchmarked; Hausdorff sampling and
    self-intersection checks remain open.
-5. **Adaptivity (partial).** `jaxcad.meshing.adaptive` descends an octree
+5. **Adaptivity (partial).** `cadjoint.meshing.adaptive` descends an octree
    over the cell lattice, discarding blocks where
    `|f(center) - level| > half_diagonal × L`, then evaluates only the
    surviving cells' corners. The octree adapts the *search*, not the mesh:
@@ -147,7 +147,7 @@ shared contract:
 - **Construction**: `loft(profile_a, profile_b, height)` interpolates two
   equal-count vertex loops along the sketch normal (per-slice-exact polygon
   distance, documented as a bound in 3D); `extrude` gains `draft` and
-  `twist` (twist documented non-1-Lipschitz); `jaxcad.sdf.operations` adds
+  `twist` (twist documented non-1-Lipschitz); `cadjoint.sdf.operations` adds
   shell, offset, mirror, and linear/polar patterns. Everything traces to
   WGSL for the viewer and differentiates with respect to profile vertices.
 

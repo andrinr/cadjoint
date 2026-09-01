@@ -1,4 +1,4 @@
-"""Tests for jaxcad.meshing.export (planar merging and OBJ/STL/STEP writers)."""
+"""Tests for cadjoint.meshing.export (planar merging and OBJ/STL/STEP writers)."""
 
 from __future__ import annotations
 
@@ -8,10 +8,10 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from jaxcad.meshing.dual_contouring import Mesh, extract_mesh
-from jaxcad.meshing.edge_detection import GridSpec
-from jaxcad.meshing.export import merge_planar_faces, save_obj, save_step, save_stl
-from jaxcad.sdf.primitives import Box
+from cadjoint.meshing.dual_contouring import Mesh, extract_mesh
+from cadjoint.meshing.edge_detection import GridSpec
+from cadjoint.meshing.export import merge_planar_faces, save_obj, save_step, save_stl
+from cadjoint.sdf.primitives import Box
 
 BOX_SIZE = jnp.array([0.4, 0.5, 0.6])
 # Spacing 0.11 from -0.77 puts no lattice plane on a box face at +-0.4/0.5/0.6.
@@ -169,7 +169,7 @@ class TestSaveStl:
         save_stl(coarse_sphere_mesh, path, binary=False)
         text = path.read_text()
         assert text.startswith("solid ")
-        assert text.rstrip().endswith("endsolid jaxcad")
+        assert text.rstrip().endswith("endsolid cadjoint")
         assert text.count("facet normal") == coarse_sphere_mesh.faces.shape[0]
         assert text.count("vertex") == 3 * coarse_sphere_mesh.faces.shape[0]
 
@@ -191,7 +191,7 @@ def parse_step_entities(text: str) -> dict[int, str]:
 
     Asserts that every entity id is defined exactly once.  Test helper only;
     it understands exactly the single-line ``#n = BODY;`` records that
-    :func:`~jaxcad.meshing.export.save_step` writes.
+    :func:`~cadjoint.meshing.export.save_step` writes.
     """
     data = text.split("DATA;", 1)[1].split("ENDSEC;", 1)[0]
     entities: dict[int, str] = {}

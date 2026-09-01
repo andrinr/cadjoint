@@ -3,7 +3,7 @@
 import jax.numpy as jnp
 import pytest
 
-from jaxcad.sdf.primitives import Sphere
+from cadjoint.sdf.primitives import Sphere
 
 
 @pytest.mark.parametrize(

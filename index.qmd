@@ -6,7 +6,7 @@ title: jaxCAD
 
 jaxCAD combines parametric geometry, geometric constraints, and automatic differentiation to enable gradient-based shape optimization.
 
-[![JAXCAD WebGPU playground with Python source beside a live rendered scene](examples/assets/webgpu_playground.png)](docs/viewer.qmd)
+[![CADJOINT WebGPU playground with Python source beside a live rendered scene](examples/assets/webgpu_playground.png)](docs/viewer.qmd)
 
 Build a scene in Python and inspect the generated WGSL in a live, interactive
 WebGPU preview. [Open the WebGPU viewer guide](docs/viewer.qmd).
@@ -29,11 +29,11 @@ draft, balanced, and high-quality presets with real output comparisons.
 
 ```python
 import jax.numpy as jnp
-from jaxcad.geometry.parameters import Vector
-from jaxcad.sdf.primitives import Sphere
-from jaxcad.sdf.transforms import Translate
-from jaxcad.constraints import DistanceConstraint, solve_constraints
-from jaxcad import extract_parameters, functionalize
+from cadjoint.geometry.parameters import Vector
+from cadjoint.sdf.primitives import Sphere
+from cadjoint.sdf.transforms import Translate
+from cadjoint.constraints import DistanceConstraint, solve_constraints
+from cadjoint import extract_parameters, functionalize
 
 # Unknown point — wrong initial guess
 p = Vector(jnp.array([0.5, 0.5, 0.0]), free=True, name='p')

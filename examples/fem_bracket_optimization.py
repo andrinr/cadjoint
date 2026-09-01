@@ -8,7 +8,7 @@ The bolt-hole regions of the base plate are clamped, a prying traction pulls
 the tip of the vertical web, and the objective trades stiffness (compliance)
 against material use (a smoothed volume integral of the SDF).  Topology is
 extracted once at the nominal design; per candidate only the node positions
-are recomputed differentiably (:func:`jaxcad.fem.hexmesh.recompute_points`),
+are recomputed differentiably (:func:`cadjoint.fem.hexmesh.recompute_points`),
 which is what lets ``jax.grad`` flow from the objective back to the design
 parameters through the solver's adjoint.
 
@@ -18,7 +18,7 @@ Run directly (requires the ``fem`` extra)::
 
 With ``--backend calculix`` the compliance term instead runs through the
 CalculiX tesseract (requires the ``tesseract`` extra and a ``ccx`` binary
-— see :mod:`jaxcad.fem.calculix`): the objective becomes classical
+— see :mod:`cadjoint.fem.calculix`): the objective becomes classical
 compliance (``f . u``, twice the strain energy) plus the same mass term,
 and its gradient flows through ccx's native ``*SENSITIVITY`` adjoint
 instead of jax-fem's — a 1990s Fortran Abaqus clone one ``jax.grad``
@@ -26,7 +26,7 @@ away from the design parameters.
 
 Writes ``fem_bracket_before.vtu`` / ``fem_bracket_after.vtu`` for ParaView.
 """
-# Guarded jax-fem import must precede the jaxcad.fem imports.
+# Guarded jax-fem import must precede the cadjoint.fem imports.
 # ruff: noqa: E402
 
 from __future__ import annotations
@@ -35,7 +35,7 @@ try:  # importorskip-style guard: this demo needs the fem extra.
     import jax_fem  # noqa: F401
 except ImportError as error:  # pragma: no cover - exercised without the extra
     raise SystemExit(
-        "This example requires jax-fem (install with: pip install jaxcad[fem])."
+        "This example requires jax-fem (install with: pip install cadjoint[fem])."
     ) from error
 
 import dataclasses
@@ -44,13 +44,13 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from jaxcad.fem.hexmesh import GridSpec, HexMesh, recompute_points, sdf_to_hex_mesh
-from jaxcad.fem.selection import Nodes
-from jaxcad.fem.simulate import elastic_solve
-from jaxcad.sdf.boolean.smooth import smooth_min
-from jaxcad.sdf.primitives.box import Box
-from jaxcad.sdf.primitives.cylinder import Cylinder
-from jaxcad.sdf.primitives.polygon import ExtrudedPolygon
+from cadjoint.fem.hexmesh import GridSpec, HexMesh, recompute_points, sdf_to_hex_mesh
+from cadjoint.fem.selection import Nodes
+from cadjoint.fem.simulate import elastic_solve
+from cadjoint.sdf.boolean.smooth import smooth_min
+from cadjoint.sdf.primitives.box import Box
+from cadjoint.sdf.primitives.cylinder import Cylinder
+from cadjoint.sdf.primitives.polygon import ExtrudedPolygon
 
 jax.config.update("jax_enable_x64", True)
 
@@ -186,7 +186,7 @@ def make_objective(mesh: HexMesh, backend: str | None = None):
 
     ccx_backend = None
     if backend == "calculix":
-        from jaxcad.fem.calculix import CalculixBackend
+        from cadjoint.fem.calculix import CalculixBackend
 
         ccx_backend = CalculixBackend()
 
@@ -198,7 +198,7 @@ def make_objective(mesh: HexMesh, backend: str | None = None):
 
         points = recompute_points(sdf, mesh)
         if ccx_backend is not None:
-            from jaxcad.fem.calculix import strain_energy_solve
+            from cadjoint.fem.calculix import strain_energy_solve
 
             compliance = 2.0 * strain_energy_solve(
                 mesh,

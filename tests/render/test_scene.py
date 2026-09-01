@@ -6,8 +6,8 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from jaxcad.render import Camera, RenderSettings, Scene, raymarch, render_scene
-from jaxcad.sdf.primitives import Sphere
+from cadjoint.render import Camera, RenderSettings, Scene, raymarch, render_scene
+from cadjoint.sdf.primitives import Sphere
 
 
 def test_quality_presets_increase_work_and_fidelity():

@@ -10,12 +10,12 @@ from urllib.request import Request, urlopen
 import numpy as np
 import pytest
 
-from jaxcad.viewer._pathtracer import (
+from cadjoint.viewer._pathtracer import (
     WGSL_PRESENT_TEMPLATE,
     build_path_tracer_shader,
 )
-from jaxcad.viewer._webgpu import build_viewer_shader, ensure_material_wgsl
-from jaxcad.viewer.playground import (
+from cadjoint.viewer._webgpu import build_viewer_shader, ensure_material_wgsl
+from cadjoint.viewer.playground import (
     EXAMPLE_SOURCE,
     compile_source,
     create_server,
@@ -87,8 +87,8 @@ def test_thin_slab_sharp_edges_stay_on_their_own_rim():
     # them.  Only the four short true corner edges of the box may remain
     # near-vertical, so the cross-rail fraction stays tiny.
     source = (
-        "from jaxcad.geometry import Vector\n"
-        "from jaxcad.sdf.primitives import Box\n"
+        "from cadjoint.geometry import Vector\n"
+        "from cadjoint.sdf.primitives import Box\n"
         "\n"
         "scene = Box(size=Vector([0.9, 0.9, 0.08]))\n"
     )
@@ -113,8 +113,8 @@ def test_compile_source_reports_missing_scene():
 
 def test_compile_source_reports_profile_solver_loss_history():
     source = (
-        "from jaxcad.construction import PolygonProfile, extrude\n"
-        "from jaxcad.constraints import DistanceConstraint, satisfy_constraints\n"
+        "from cadjoint.construction import PolygonProfile, extrude\n"
+        "from cadjoint.constraints import DistanceConstraint, satisfy_constraints\n"
         "profile = PolygonProfile([[0, 0], [2, 0], [0, 1]], name='solved')\n"
         "DistanceConstraint(profile.vertices[0], profile.vertices[1], 1.0)\n"
         "satisfy_constraints(profile, method='newton', steps=2)\n"
@@ -140,7 +140,7 @@ def test_compile_source_enforces_timeout():
 
 def test_shader_builder_rejects_reserved_marker():
     with pytest.raises(ValueError, match="reserved marker"):
-        build_viewer_shader("fn sdf() {} // __JAXCAD_SDF_CODE__")
+        build_viewer_shader("fn sdf() {} // __CADJOINT_SDF_CODE__")
 
 
 def test_preview_builder_supplies_default_material_for_plain_sdf():
@@ -193,7 +193,7 @@ fn material_optics(p: vec3<f32>) -> vec4<f32> {
 
 def test_path_tracer_builder_rejects_reserved_marker():
     with pytest.raises(ValueError, match="reserved marker"):
-        build_path_tracer_shader("// __JAXCAD_SCENE_CODE__")
+        build_path_tracer_shader("// __CADJOINT_SCENE_CODE__")
 
 
 def test_example_scene_reports_its_construction_for_the_viewer():
@@ -379,7 +379,7 @@ def running_server():
 def post(base: str, path: str, payload: dict, token: str | None = None) -> Request:
     headers = {"Content-Type": "application/json"}
     if token is not None:
-        headers["X-Jaxcad-Token"] = token
+        headers["X-Cadjoint-Token"] = token
     return Request(base + path, data=json.dumps(payload).encode(), headers=headers, method="POST")
 
 
@@ -570,9 +570,9 @@ def test_patch_rejects_an_operation_this_server_does_not_know():
 
 # ── Simulation studies as first-class code citizens ─────────────────────────
 
-STUDY_SOURCE = """from jaxcad.fem import Dirichlet, Nodes, ThermalStudy
-from jaxcad.geometry import Vector
-from jaxcad.sdf.primitives import Box
+STUDY_SOURCE = """from cadjoint.fem import Dirichlet, Nodes, ThermalStudy
+from cadjoint.geometry import Vector
+from cadjoint.sdf.primitives import Box
 
 scene = Box(Vector([0.8, 0.5, 0.5], free=True, name="size"))
 heat = ThermalStudy(
@@ -609,7 +609,7 @@ def test_compile_reports_declared_studies_for_the_viewer():
 
 
 def test_compile_reports_a_scene_without_studies_as_an_empty_list():
-    result = compile_source("from jaxcad.sdf.primitives import Sphere\nscene = Sphere(1.0)\n")
+    result = compile_source("from cadjoint.sdf.primitives import Sphere\nscene = Sphere(1.0)\n")
 
     assert result["ok"] is True
     assert result["studies"] == []
@@ -694,7 +694,7 @@ def test_patch_source_validates_study_requests(request_body, message):
 
 
 def test_simulate_study_requires_a_declared_study_name():
-    from jaxcad.viewer.playground import simulate_source
+    from cadjoint.viewer.playground import simulate_source
 
     result = simulate_source({"source": STUDY_SOURCE, "kind": "study"})
     assert result["ok"] is False

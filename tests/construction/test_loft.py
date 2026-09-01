@@ -7,9 +7,9 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from jaxcad import extract_parameters, functionalize
-from jaxcad.construction import PolygonProfile, SketchPlane, extrude, loft
-from jaxcad.sdf.primitives import LoftedPolygon
+from cadjoint import extract_parameters, functionalize
+from cadjoint.construction import PolygonProfile, SketchPlane, extrude, loft
+from cadjoint.sdf.primitives import LoftedPolygon
 
 SQUARE = [[-1.0, -1.0], [1.0, -1.0], [1.0, 1.0], [-1.0, 1.0]]
 SMALL_SQUARE = [[-0.5, -0.5], [0.5, -0.5], [0.5, 0.5], [-0.5, 0.5]]

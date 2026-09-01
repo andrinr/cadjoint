@@ -20,15 +20,15 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from jaxcad.geometry.parameters import Vector
-from jaxcad.sdf import Box, Cylinder, Sphere, Translate, Union
-from jaxcad.viewer._compile_worker import (
+from cadjoint.geometry.parameters import Vector
+from cadjoint.sdf import Box, Cylinder, Sphere, Translate, Union
+from cadjoint.viewer._compile_worker import (
     _MESH_EDGE_RESOLUTION,
     _MESH_EDGE_SIZE,
     _execute_scene,
     _mesh_edge_payload,
 )
-from jaxcad.viewer.playground import EXAMPLE_SOURCE
+from cadjoint.viewer.playground import EXAMPLE_SOURCE
 
 CELL = max(_MESH_EDGE_SIZE) / _MESH_EDGE_RESOLUTION
 

@@ -3,7 +3,7 @@
 Frozen-topology doctrine: connectivity, the snapped-vertex set, and BC node
 sets are extracted once at the nominal design; per candidate parameter only
 the node positions are recomputed (differentiably, through the traced SDF's
-Newton projection in :func:`jaxcad.fem.recompute_points`) and fed to the
+Newton projection in :func:`cadjoint.fem.recompute_points`) and fed to the
 solver via the ``points`` override.  Gradients flow through jax-fem's
 adjoint (``ad_wrapper``); the forward solver itself is not jax-traceable
 (PETSc assembly), so this is the adjoint path, exercised through the
@@ -22,11 +22,11 @@ pytest.importorskip("jax_fem")
 import jax
 import jax.numpy as jnp
 
-from jaxcad.fem.hexmesh import GridSpec, recompute_points, sdf_to_hex_mesh
-from jaxcad.fem.selection import Nodes
-from jaxcad.fem.simulate import elastic_solve
-from jaxcad.geometry.parameters import Vector
-from jaxcad.sdf.primitives import Box
+from cadjoint.fem.hexmesh import GridSpec, recompute_points, sdf_to_hex_mesh
+from cadjoint.fem.selection import Nodes
+from cadjoint.fem.simulate import elastic_solve
+from cadjoint.geometry.parameters import Vector
+from cadjoint.sdf.primitives import Box
 
 _NOMINAL_HALF_HEIGHT = 0.15
 

@@ -1,9 +1,9 @@
 {
-  "name": "jaxcad-playground",
+  "name": "cadjoint-playground",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Browser CAD frontend for the JAXCAD playground server",
+  "description": "Browser CAD frontend for the CADJOINT playground server",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

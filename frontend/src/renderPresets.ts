@@ -27,7 +27,7 @@ interface PresetStorage {
   setItem(key: string, value: string): void;
 }
 
-export const RENDER_PRESET_STORAGE_KEY = "jaxcad.render-presets.v2";
+export const RENDER_PRESET_STORAGE_KEY = "cadjoint.render-presets.v2";
 
 export const DEFAULT_RENDER_PRESETS: RenderPreset[] = [
   {

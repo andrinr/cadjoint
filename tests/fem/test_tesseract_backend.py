@@ -20,11 +20,11 @@ pytest.importorskip("tesseract_jax")
 import jax
 import jax.numpy as jnp
 
-from jaxcad.fem.hexmesh import GridSpec, sdf_to_hex_mesh
-from jaxcad.fem.selection import Nodes
-from jaxcad.fem.simulate import thermal_solve
-from jaxcad.geometry.parameters import Vector
-from jaxcad.sdf.primitives import Box
+from cadjoint.fem.hexmesh import GridSpec, sdf_to_hex_mesh
+from cadjoint.fem.selection import Nodes
+from cadjoint.fem.simulate import thermal_solve
+from cadjoint.geometry.parameters import Vector
+from cadjoint.sdf.primitives import Box
 
 
 def _hot(center):
@@ -114,7 +114,7 @@ class TestTesseractElastic:
     _TRACTIONS = [(_cold, [0.0, 0.0, -1.0])]
 
     def _solve(self, mesh, backend=None, points=None):
-        from jaxcad.fem.simulate import elastic_solve
+        from cadjoint.fem.simulate import elastic_solve
 
         return elastic_solve(
             mesh,

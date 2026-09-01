@@ -6,8 +6,8 @@ merged, deduplicated, and cross-ranked. Every maintenance/license claim below wa
 verified against the GitHub/PyPI APIs by the researchers in Aug 2026, and every
 differentiability claim was checked against shipped code, not papers. Companion to
 `research/fem-integration.md`, which defines the ABI all of this plugs into
-(`jaxcad/fem/backends.py` `SolverBackend`, reference tesseracts under
-`jaxcad/fem/tesseracts/`).
+(`cadjoint/fem/backends.py` `SolverBackend`, reference tesseracts under
+`cadjoint/fem/tesseracts/`).
 
 ## How candidates were ranked
 
@@ -16,7 +16,7 @@ Composite of four axes, in this order of weight:
 1. **Differentiability quality** — jax-native trace > discrete adjoint >
    continuous adjoint > FD-only. "Adjoint" had to be verified in shipped code;
    several famous codes failed this bar (see rejects).
-2. **Demo value** — does the demo showcase *jaxcad's* geometry pipeline
+2. **Demo value** — does the demo showcase *cadjoint's* geometry pipeline
    (constraints → SDF → mesh), and is it visually/narratively strong?
 3. **Integration effort** — S < 1 week, M 1–3 weeks, L > 3 weeks, counting the
    geometry adapter, not just `pip install`.
@@ -40,11 +40,11 @@ Composite of four axes, in this order of weight:
 
 | # | Candidate | Physics | Gradient | Geometry fit | Lane | Effort | Score |
 |---|---|---|---|---|---|---|---|
-| 1 | **CalculiX (ccx)** | structural FEA (Abaqus-like), thermal, frequency | discrete adjoint, native (`*SENSITIVITY`) | HEX8 `.inp` = jaxcad hex mesh 1:1 | B (subprocess) | M | 9.0 |
+| 1 | **CalculiX (ccx)** | structural FEA (Abaqus-like), thermal, frequency | discrete adjoint, native (`*SENSITIVITY`) | HEX8 `.inp` = cadjoint hex mesh 1:1 | B (subprocess) | M | 9.0 |
 | 2 | **JAX-Fluids 2.0** | compressible NS, two-phase, levelset immersed solids | jax-native | SDF **is** the native levelset input | A | M | 9.0 |
 | 3 | **jwave** | acoustics/ultrasound (time-domain + Helmholtz) | jax-native | SDF → material grid, ~10-line adapter | A (B if jax pins clash) | S | 8.5 |
 | 4 | **MuJoCo MJX (JAX backend)** | rigid multibody + contact | jax-native ("mostly supported") | MJCF primitives + differentiable inertia from SDF | A | M | 8.0 |
-| 5 | **Diffrax + in-repo mechanism layer** | ODE dynamics: linkages, lumped thermal, control | jax-native, reference adjoints | none needed — consumes jaxcad sketches directly | A | S | 8.0 |
+| 5 | **Diffrax + in-repo mechanism layer** | ODE dynamics: linkages, lumped thermal, control | jax-native, reference adjoints | none needed — consumes cadjoint sketches directly | A | S | 8.0 |
 | 6 | **XLB (Autodesk)** | lattice Boltzmann, incompressible-regime flows | jax-native (JAX backend only) | SDF → smoothed voxel mask | A | M | 7.5 |
 | 7 | **fdtdx** | 3D Maxwell FDTD | jax-native, constant-memory backward | SDF → permittivity grid | A | S/M | 7.5 |
 | 8 | **Firedrake + pyadjoint** | any UFL PDE: Helmholtz acoustics, elastodynamics | discrete adjoint w.r.t. **mesh coordinates** | consumes the HEX8 mesh natively — drop-in for the points-VJP contract | B/C | M | 7.5 |
@@ -66,7 +66,7 @@ Composite of four axes, in this order of weight:
 | 24 | Nimble Physics | LCP hard-contact multibody | discrete adjoint (analytic, RSS'21) | primitive proxies + inertias | C (torch, Linux) | L | 4.5 |
 | 25 | OpenSees / OpenSeesPy | nonlinear structural frames | forward DDM (partial coverage, sizing not shape) | script-built frames, not CAD solids | A/B | S | 4.0 |
 | 26 | FEAP / FEAPpv | classic solid mechanics FEA (1976 lineage) | none — FD/SPSA only | trivial brick decks | B | M | 4.0 |
-| 27 | FENIAX | nonlinear aeroelasticity | jax-native | needs Nastran condensed models, not jaxcad meshes | B (GPL-3) | L | 3.5 |
+| 27 | FENIAX | nonlinear aeroelasticity | jax-native | needs Nastran condensed models, not cadjoint meshes | B (GPL-3) | L | 3.5 |
 | 28 | Drake | industrial multibody | forward AutoDiffXd; **throws under contact** | URDF/SDF-format | A/B | M | 3.5 |
 | 29 | Code_Aster | industrial nonlinear FEA (EDF) | none — sensitivity feature **removed** | MED hexes fine | C only | L | 3.0 |
 | 30 | Dojo.jl | hard-contact multibody, IFT gradients | discrete adjoint (real, in code) | primitives only; **stale since 2024-09** | C (Julia) | L | 3.0 |
@@ -81,7 +81,7 @@ rfx, MODFLOW) takes geometry as a field on a regular grid. Shape gradients
 through a **binary** voxel mask are identically zero — the universal recipe is a
 *smoothed SDF indicator* (Brinkman penalization for LBM, smoothed-heaviside
 sound speed for jwave, permittivity for EM, native levelset for JAX-Fluids,
-sigmoid conductivity for MODFLOW). jaxcad's traced SDF produces exactly that
+sigmoid conductivity for MODFLOW). cadjoint's traced SDF produces exactly that
 smooth field for free; an STL-based CAD pipeline cannot. This is the pitch line
 for all the Lane-A demos.
 
@@ -91,7 +91,7 @@ for all the Lane-A demos.
    (`GetMeshDisp_Sensitivity`), DAFoam (`dF/dX`), ADflow (`evalFunctionsSens`),
    adjointOptimisationFoam (sensitivity maps), Firedrake (mesh-coordinate
    Control), and CalculiX (per-design-node normal sensitivities) all natively
-   emit d(objective)/d(surface nodes). jaxcad's dual-contour vertices and
+   emit d(objective)/d(surface nodes). cadjoint's dual-contour vertices and
    Newton-snapped hex boundary nodes are already differentiable w.r.t. SDF
    parameters, so the chain closes exactly as it does for jax-fem.
 2. **Material/density fields**: the SDF-sampled grid crosses the boundary as a
@@ -102,7 +102,7 @@ for all the Lane-A demos.
 
 ### The fluid-domain gap
 
-jaxcad meshes the **solid**; every mesh-based CFD code needs the complementary
+cadjoint meshes the **solid**; every mesh-based CFD code needs the complementary
 **fluid** domain. The clean pattern mirroring the FEM doctrine: gmsh (already a
 dependency) meshes the flow domain once around the dual-contoured surface at the
 nominal design, topology frozen, the solver's own mesh deformation propagates
@@ -161,7 +161,7 @@ MASS, STRAIN ENERGY/compliance, EIGENFREQUENCY, ALL-DISP) w.r.t.
 `*DESIGN VARIABLES, TYPE=COORDINATE` — a surface node set. One adjoint-cost
 pass yields the gradient w.r.t. all design nodes, written to `.frd`,
 **projected on the local surface normal** (in-surface motion doesn't change
-geometry). That projection composes *exactly* with jaxcad's mesher: the
+geometry). That projection composes *exactly* with cadjoint's mesher: the
 Newton-snapped boundary vertices move along the SDF gradient (the surface
 normal) by construction, so the normal-projected sensitivity is precisely the
 derivative the chain rule needs. Restrictions: true 3D elements only (C3D8
@@ -170,7 +170,7 @@ fine); objectives limited to the built-in list, so the backend contract is
 demo's compliance + mass objective wants.
 
 **Geometry coupling.** Byte-for-byte: `sdf_to_hex_mesh` HEX8 points/cells →
-meshio (already a `jaxcad[fem]` dependency) writes Abaqus `.inp` C3D8 decks
+meshio (already a `cadjoint[fem]` dependency) writes Abaqus `.inp` C3D8 decks
 directly. `Nodes` selections serialize to `*NSET` + `*BOUNDARY`/`*CLOAD`;
 design-variable node set = the mesher's `snap_mask` surface nodes.
 
@@ -192,7 +192,7 @@ FEA code is now one `jax.grad` call away from parametric CAD."
 
 **Effort.** M — deck writer + `.frd` parser + normal-projection chain rule are
 straightforward; robust output parsing and two-step orchestration need care.
-Every jaxcad-side piece already exists.
+Every cadjoint-side piece already exists.
 
 Sources: [ccx *SENSITIVITY docs](https://www.feacluster.com/CalculiX/ccx_2.18/doc/ccx/node187.html),
 [design variables](https://www.feacluster.com/CalculiX/ccx_2.18/doc/ccx/node23.html),
@@ -216,7 +216,7 @@ but **no shape-optimization example ships in `examples/`** — the
 differentiable driver around a solid-boundary case is ours to write, and
 levelset reinitialization steps may need care in the backward pass.
 
-**Geometry coupling.** The strongest of any candidate: jaxcad's SDF evaluated
+**Geometry coupling.** The strongest of any candidate: cadjoint's SDF evaluated
 on the sim grid **is** the native levelset input, tracing intact. No meshing,
 no conversion, no smoothing layer.
 
@@ -224,7 +224,7 @@ no conversion, no smoothing layer.
 directly. Tesseract only for version isolation.
 
 **Demo storyline.** Supersonic/transonic nose-cone or fairing drag
-minimization: parametric revolved jaxcad profile (radius, length, bluntness as
+minimization: parametric revolved cadjoint profile (radius, length, bluntness as
 constrained Scalars) → SDF → levelset grid → 2D-then-3D Mach 2 solve →
 pressure drag integrated over the immersed boundary → `jax.grad` back to CAD
 parameters, optax loop, schlieren-style density renders per optimizer step.
@@ -256,7 +256,7 @@ checkpointed backprop and runs Adam on it; the Helmholtz path documents
 if not, Lane B with its own venv — which is precisely the isolation the
 Tesseract ABI was built for, and a good second proof of that story.
 
-**Demo storyline.** Ultrasound focusing lens: a constraint-driven jaxcad lens
+**Demo storyline.** Ultrasound focusing lens: a constraint-driven cadjoint lens
 profile (arc radius, thickness, aperture) revolved into an SDF in front of a
 flat transducer; rasterize to a sound-speed map; maximize focal pressure at a
 target point via time-harmonic Helmholtz (one linear solve per iteration —
@@ -290,7 +290,7 @@ are **not** supported in MJX-JAX; meshes limited to small convex
 decompositions.
 
 **Geometry coupling.** Two channels: (a) capsule/box collision proxies whose
-sizes are traced functions of sketch parameters; (b) the robust one — jaxcad's
+sizes are traced functions of sketch parameters; (b) the robust one — cadjoint's
 SDF gives **exact differentiable mass/inertia/CoM by voxel integration** (pure
 JAX) feeding `body_mass`/`body_inertia`/`body_ipos`, solid even where contact
 gradients are fragile.
@@ -298,13 +298,13 @@ gradients are fragile.
 **Packaging plan.** Lane A (pip, pure JAX, runs on CPU macOS). Tesseract only
 if jax pins conflict.
 
-**Demo storyline.** Parametric two-jaw gripper designed in jaxcad (jaw
+**Demo storyline.** Parametric two-jaw gripper designed in cadjoint (jaw
 profile, pivot positions, link lengths as constrained sketch parameters);
 MJX rolls out a close-and-shake grasp; objective = object retention + minimum
 actuation force; `jax.grad` flows from the rollout through
 `geom_size`/inertias back to sketch parameters, optimized with optax.
 
-**Effort.** M — MJCF generation from jaxcad assemblies plus contact-gradient
+**Effort.** M — MJCF generation from cadjoint assemblies plus contact-gradient
 hygiene.
 
 Sources: [MJX docs](https://mujoco.readthedocs.io/en/stable/mjx.html),
@@ -316,18 +316,18 @@ Sources: [MJX docs](https://mujoco.readthedocs.io/en/stable/mjx.html),
 
 **What it is.** Not a domain solver: the reference implementation of ODE/SDE
 adjoints in JAX (Kidger ecosystem, Apache-2.0, the best-maintained project
-surveyed). Pairs with jaxcad's **own constraint solver** to make a mechanism
+surveyed). Pairs with cadjoint's **own constraint solver** to make a mechanism
 simulation layer with zero third-party solver risk.
 
 **Gradient mechanism.** Two exact paths, both already idiomatic in this
-codebase: (1) kinematics = jaxcad constraint solve per crank angle,
+codebase: (1) kinematics = cadjoint constraint solve per crank angle,
 differentiated via the implicit function theorem (`jax.custom_vjp` around the
 solve — the same pattern as jax-fem's `ad_wrapper`); (2) dynamics via
 `diffrax.diffeqsolve` with `RecursiveCheckpointAdjoint` (discretise-then-
 optimise, exact discrete gradients; the docs explicitly recommend it over the
 approximate continuous `BacksolveAdjoint`).
 
-**Geometry coupling.** None needed — consumes jaxcad sketches directly; link
+**Geometry coupling.** None needed — consumes cadjoint sketches directly; link
 inertias, if dynamic, come from differentiable SDF volume integrals.
 
 **Packaging plan.** Lane A, `pip install diffrax`, zero packaging risk.
@@ -360,7 +360,7 @@ shape and topology optimization" is **roadmap, not shipped**. The critical
 integration fact: shape gradients through a binary voxel mask are identically
 zero — the shape-gradient path requires a smoothed indicator
 (Brinkman/porosity penalization or partially-saturated bounce-back) built from
-the SDF. That smoothing layer is our contribution, and jaxcad provides the
+the SDF. That smoothing layer is our contribution, and cadjoint provides the
 smooth field for free.
 
 **Geometry coupling.** SDF < 0 voxelization plugs into its boundary-mask
@@ -404,7 +404,7 @@ unit/scale mapping needs attention for macroscopic parts.
 **Demo storyline.** EM-transparent CAD: optimize a sensor radome wall profile
 or a dielectric waveguide splitter/collimating lens so transmission at the
 target port/frequency is maximized — CAD parameters → SDF → permittivity →
-gradient. Distinctive because no other candidate gives jaxcad EM.
+gradient. Distinctive because no other candidate gives cadjoint EM.
 
 **Effort.** S/M — AD machinery is turnkey; its object/config system (sources,
 detectors, PML) and scale mapping take a few days.
@@ -424,7 +424,7 @@ adds a dedicated shape-optimization layer.
 discrete adjoint; crucially it shape-differentiates w.r.t. **mesh
 coordinates** via UFL's shape-derivative support (the official
 shape_optimization demo uses `mesh.coordinates` as the Control). That is
-bit-for-bit jaxcad's backend contract: VJP w.r.t. points on a
+bit-for-bit cadjoint's backend contract: VJP w.r.t. points on a
 fixed-connectivity mesh.
 
 **Geometry coupling.** The only candidate besides CalculiX that consumes
@@ -437,7 +437,7 @@ stack is heavy — cleanest as a subprocess/container tesseract with its own
 env (schema: points, cells, BC node sets, frequency → pressure field +
 dJ/d(points)), mirroring `thermal_jaxfem` exactly.
 
-**Demo storyline.** Speaker horn vibroacoustics: jaxcad horn flare (throat
+**Demo storyline.** Speaker horn vibroacoustics: cadjoint horn flare (throat
 radius, flare exponent, length as constrained parameters) → HEX8 mesh of the
 air volume → Helmholtz at 1–5 kHz with a piston BC → maximize on-axis SPL or
 flatten frequency response; the adjoint returns dJ/d(node coords), chained
@@ -477,7 +477,7 @@ via flopy's get-modflow. Pure-Python in-process tesseract (Lane B); no
 compiler, no container required. The non-intrusive-adjoint-via-API-library
 pattern is worth remembering for other BMI/XMI codes.
 
-**Demo storyline.** Slurry cutoff wall / seepage barrier as a jaxcad
+**Demo storyline.** Slurry cutoff wall / seepage barrier as a cadjoint
 parametric solid (arc length, depth, thickness) → per-cell low-K field in a
 site-scale model with a pumped excavation → minimize inflow + bentonite-volume
 penalty → mf6adj adjoint bends and deepens the wall. "The USGS Fortran code
@@ -514,7 +514,7 @@ the differentiable boundary.
 on PyPI, verified) — source build via meson (`-Denable-autodiff=true
 -Denable-pywrapper=true`) or a containerized tesseract built once.
 
-**Demo storyline.** Transonic drag minimization of a jaxcad-parameterized 2D
+**Demo storyline.** Transonic drag minimization of a cadjoint-parameterized 2D
 profile (PolygonProfile with constraint-driven thickness/camber): apply =
 deform mesh + primal solve returning C_D; VJP = pysu2ad adjoint returning
 dC_D/d(surface nodes), chained through the differentiable dual-contour
@@ -574,12 +574,12 @@ Sources: [repo](https://github.com/su2code/SU2),
 | Elmer FEM | Real adjoint code exists but only in ElmerIce, inverting glaciology parameter fields; not transferable to CAD shape objectives without writing Fortran adjoints. |
 | Drake | SAP contact solver **throws** under AutoDiffXd with any contact present; forward-mode only, ~100x slowdown. |
 | Dojo.jl | The best contact-gradient formulation on paper (IFT through interior-point), but stale since 2024-09 — research spike, not a shipping integration. |
-| FENIAX | jax-native but consumes Nastran condensed models; jaxcad reduced to a parameter dashboard. GPL-3. |
+| FENIAX | jax-native but consumes Nastran condensed models; cadjoint reduced to a parameter dashboard. GPL-3. |
 | Brax | **Deprecated as a physics engine** — brax 0.13+ maintains only `brax/training`; repo directs physics users to MJX. Do not build on it. |
 | Genesis | Rigid-body differentiability still "coming soon" (only MPM/Tool solvers differentiable as of 2026). |
 | google/jax-cfd | Alive but no immersed-geometry story in core (periodic/rectangular domains); strictly dominated by XLB/JAX-Fluids for CAD shape work. (Its tesseract example in Pasteur's docs is worth cribbing for schema design.) |
 | tofea | GitHub-archived 2025, autograd 2D toy. |
-| jax-am | GPL-3, stale; its FEM core was spun out into jax-fem, which jaxcad already integrates. |
+| jax-am | GPL-3, stale; its FEM core was spun out into jax-fem, which cadjoint already integrates. |
 | sandialabs/optimism | Non-standard license, largely 2D, duplicates jax-fem coverage. |
 | Stride/Devito | Real adjoints but AGPL-3, medium-property gradients only; jwave dominates the physics JAX-natively under LGPL. |
 | SPECFEM3D | Legacy Fortran, natively eats HEX meshes, has adjoint kernels — but only w.r.t. material fields (rho, vp, vs), no shape derivative, and geophysics scaling makes a part-level demo contrived. |
@@ -614,7 +614,7 @@ The only living Fortran code with a native adjoint whose input matches
    `*DESIGN VARIABLES, TYPE=COORDINATE` on the `snap_mask` node set); parse
    the `.frd` normal sensitivities and check dJ/d(normal offset) against
    central FD on a single node.
-3. Write `jaxcad/fem/tesseracts/elastic_calculix/tesseract_api.py` cloning the
+3. Write `cadjoint/fem/tesseracts/elastic_calculix/tesseract_api.py` cloning the
    `elastic_jaxfem` schema; `vector_jacobian_product` = sensitivity run +
    normal-projection chain rule (stored node normals × cotangent).
 4. Wire `tesseract-runtime check-gradients` into CI; then rerun
@@ -641,7 +641,7 @@ The SDF is the native levelset input — the strongest geometric fit surveyed.
 Concrete first steps:
 
 1. Run a shipped forward levelset example (2D immersed solid); swap the
-   levelset for a jaxcad SDF evaluated on the sim grid and confirm the forward
+   levelset for a cadjoint SDF evaluated on the sim grid and confirm the forward
    solve is unchanged.
 2. Write the differentiable driver (their feed-forward-style API) around that
    case — this does not ship in `examples/` and is the main technical risk;

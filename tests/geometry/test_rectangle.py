@@ -2,8 +2,8 @@
 
 import jax.numpy as jnp
 
-from jaxcad.geometry.parameters import Scalar, Vector
-from jaxcad.geometry.primitives import Rectangle
+from cadjoint.geometry.parameters import Scalar, Vector
+from cadjoint.geometry.primitives import Rectangle
 
 
 def test_rectangle_basic():

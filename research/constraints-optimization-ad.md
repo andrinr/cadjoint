@@ -191,7 +191,7 @@ def constrained_gradient_step(x, loss_fn, residual_fn, lr):
 def optimize_on_manifold(loss_fn, residual_fn, param_list, n_steps=100,
                           relinearize_every=5, lr=0.01):
     """Null-space gradient descent with periodic re-linearization."""
-    from jaxcad.constraints.graph import ConstraintGraph
+    from cadjoint.constraints.graph import ConstraintGraph
 
     graph = ConstraintGraph.from_parameters(param_list)
     base_point = jnp.concatenate([p.xyz for p in param_list])
@@ -301,9 +301,9 @@ Computed as: 1 forward solve + 1 adjoint linear solve. O(n) total, independent o
 
 ```python
 import jax, jax.numpy as jnp, optimistix as optx, lineax as lx
-from jaxcad import functionalize, extract_parameters
-from jaxcad.geometry import Vector
-from jaxcad.sdf import Sphere, Translate
+from cadjoint import functionalize, extract_parameters
+from cadjoint.geometry import Vector
+from cadjoint.sdf import Sphere, Translate
 
 def volume_of_sdf(sdf_fn, resolution=32):
     """Estimate SDF volume by signed voxel counting."""
@@ -332,8 +332,8 @@ def sensitivity_demo():
     p      = Vector(jnp.array([1., 0., 0.]), free=True,  name="p")
     scene  = Translate(Sphere(radius=0.5), offset=p)
 
-    from jaxcad.constraints import DistanceConstraint
-    from jaxcad.constraints.graph import ConstraintGraph
+    from cadjoint.constraints import DistanceConstraint
+    from cadjoint.constraints.graph import ConstraintGraph
     c = DistanceConstraint(p, anchor, 2.0)
 
     param_list = [p]

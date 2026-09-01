@@ -85,7 +85,7 @@ export const DEFAULT_PANELS: PanelVisibility = {
   sketch: true,
 };
 
-const PANELS_STORAGE_KEY = "jaxcad.panels.v1";
+const PANELS_STORAGE_KEY = "cadjoint.panels.v1";
 
 function loadPanels(): PanelVisibility {
   try {

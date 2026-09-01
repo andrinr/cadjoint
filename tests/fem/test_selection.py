@@ -1,4 +1,4 @@
-"""Tests for jaxcad.fem.selection (programmatic node selection)."""
+"""Tests for cadjoint.fem.selection (programmatic node selection)."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import json
 import numpy as np
 import pytest
 
-from jaxcad.fem import (
+from cadjoint.fem import (
     GridSpec,
     Nodes,
     faces_from_nodes,
@@ -15,9 +15,9 @@ from jaxcad.fem import (
     select_faces,
     selection_from_description,
 )
-from jaxcad.fem.selection import boundary_node_mask
-from jaxcad.geometry.parameters import Vector
-from jaxcad.sdf.primitives import Box
+from cadjoint.fem.selection import boundary_node_mask
+from cadjoint.geometry.parameters import Vector
+from cadjoint.sdf.primitives import Box
 
 # Bar of 2.0 x 0.3 x 0.3 along x on a face-aligned grid (spacing 0.1).
 _BOUNDS = (-1.1, -0.25, -0.25)

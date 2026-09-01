@@ -9,13 +9,13 @@ import jax
 import jax.numpy as jnp
 import pytest
 
-from jaxcad import apply_parameters, extract_parameters, functionalize
-from jaxcad.constraints import DistanceConstraint, FixedConstraint
-from jaxcad.constraints.solve import project_to_manifold, solve_constraints
-from jaxcad.construction import PolygonProfile, SketchPlane, extrude, revolve
-from jaxcad.geometry import Vector2, as_parameter
-from jaxcad.sdf import Sphere, volume
-from jaxcad.sdf.primitives import Box, polygon_sdf_2d
+from cadjoint import apply_parameters, extract_parameters, functionalize
+from cadjoint.constraints import DistanceConstraint, FixedConstraint
+from cadjoint.constraints.solve import project_to_manifold, solve_constraints
+from cadjoint.construction import PolygonProfile, SketchPlane, extrude, revolve
+from cadjoint.geometry import Vector2, as_parameter
+from cadjoint.sdf import Sphere, volume
+from cadjoint.sdf.primitives import Box, polygon_sdf_2d
 
 SQUARE = [[-1.0, -0.75], [1.0, -0.75], [1.0, 0.75], [-1.0, 0.75]]
 

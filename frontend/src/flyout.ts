@@ -111,7 +111,7 @@ export class FlyoutController {
   }
 }
 
-export const LAST_USED_STORAGE_KEY = "jaxcad.railLastUsed.v1";
+export const LAST_USED_STORAGE_KEY = "cadjoint.railLastUsed.v1";
 
 export interface StringStorage {
   getItem(key: string): string | null;

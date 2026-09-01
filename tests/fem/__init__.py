@@ -1,1 +1,1 @@
-"""Tests for jaxcad.fem."""
+"""Tests for cadjoint.fem."""

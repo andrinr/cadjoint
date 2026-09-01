@@ -2,7 +2,7 @@
  * Camera, projection, and ray math for the viewer.
  *
  * Everything here mirrors the ray construction inside the preview shader
- * (`jaxcad/viewer/_webgpu.py`, `trace_pixel`):
+ * (`cadjoint/viewer/_webgpu.py`, `trace_pixel`):
  *
  *   uv  = (frag.xy / res - 0.5) * (aspect, -1)
  *   dir = normalize(forward + 1.5 * (uv.x * right + uv.y * up))

@@ -3,7 +3,7 @@
 import jax.numpy as jnp
 import pytest
 
-from jaxcad.sdf.primitives import Cylinder
+from cadjoint.sdf.primitives import Cylinder
 
 
 @pytest.mark.parametrize(

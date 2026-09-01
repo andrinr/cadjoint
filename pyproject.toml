@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "jaxcad"
+name = "cadjoint"
 version = "0.1.0"
 description = "Fully differentiable CAD software built with JAX"
 license = { text = "Elastic-2.0" }
@@ -18,7 +18,7 @@ dependencies = [
 ]
 
 [project.scripts]
-jaxcad-viewer = "jaxcad.viewer.playground:main"
+cadjoint-viewer = "cadjoint.viewer.playground:main"
 
 [project.optional-dependencies]
 # CPU JAX is the default so the package installs on macOS and CPU-only Linux.
@@ -60,12 +60,12 @@ docs = [
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["jaxcad*"]
+include = ["cadjoint*"]
 
-# The playground UI is built from frontend/ into jaxcad/viewer/static and
-# committed, so installing jaxcad needs no Node toolchain.
+# The playground UI is built from frontend/ into cadjoint/viewer/static and
+# committed, so installing cadjoint needs no Node toolchain.
 [tool.setuptools.package-data]
-"jaxcad.viewer" = ["static/*", "static/**/*"]
+"cadjoint.viewer" = ["static/*", "static/**/*"]
 
 [dependency-groups]
 dev = [

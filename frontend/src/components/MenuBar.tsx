@@ -45,7 +45,7 @@ const PANEL_ITEMS: { key: keyof PanelVisibility; label: string }[] = [
   { key: "sketch", label: "Sketch panel" },
 ];
 
-const REPO_README_URL = "https://github.com/andrinr/jaxcad#readme";
+const REPO_README_URL = "https://github.com/andrinr/cadjoint#readme";
 
 export function MenuBar(props: MenuBarProps) {
   const [openMenu, setOpenMenu] = createSignal<MenuId | null>(null);
@@ -351,7 +351,7 @@ export function MenuBar(props: MenuBarProps) {
                 onKeyDown={onMenuKeyDown}
                 data-testid="menu-help-readme"
               >
-                <span>JAXCAD README</span>
+                <span>CADJOINT README</span>
                 <small>↗</small>
               </a>
             </div>

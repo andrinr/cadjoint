@@ -440,6 +440,124 @@ wheels = [
 ]
 
 [[package]]
+name = "cadjoint"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "imageio" },
+    { name = "jax", version = "0.4.30", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "jax", version = "0.6.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.10.*'" },
+    { name = "jax", version = "0.8.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "numpy", version = "2.0.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.10.*'" },
+    { name = "numpy", version = "2.4.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "optax", version = "0.2.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "optax", version = "0.2.8", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
+    { name = "optimistix", version = "0.0.10", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "optimistix", version = "0.0.11", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.10.*'" },
+    { name = "optimistix", version = "0.1.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+]
+
+[package.optional-dependencies]
+cuda = [
+    { name = "jax", version = "0.4.30", source = { registry = "https://pypi.org/simple" }, extra = ["cuda12"], marker = "python_full_version < '3.10'" },
+    { name = "jax", version = "0.6.2", source = { registry = "https://pypi.org/simple" }, extra = ["cuda12"], marker = "python_full_version == '3.10.*'" },
+    { name = "jax", version = "0.8.2", source = { registry = "https://pypi.org/simple" }, extra = ["cuda12"], marker = "python_full_version >= '3.11'" },
+]
+dev = [
+    { name = "matplotlib", version = "3.9.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "matplotlib", version = "3.10.8", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
+    { name = "pre-commit", version = "4.3.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "pre-commit", version = "4.5.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
+    { name = "pytest", version = "8.4.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "pytest", version = "9.0.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
+]
+docs = [
+    { name = "griffe" },
+    { name = "quartodoc" },
+]
+fem = [
+    { name = "fenics-basix", marker = "python_full_version >= '3.11'" },
+    { name = "gmsh", marker = "python_full_version >= '3.11'" },
+    { name = "jax-fem", version = "0.0.11", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.11.*'" },
+    { name = "jax-fem", version = "0.0.12", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
+    { name = "meshio", marker = "python_full_version >= '3.11'" },
+    { name = "petsc4py", marker = "python_full_version >= '3.11'" },
+    { name = "pyfiglet", marker = "python_full_version >= '3.11'" },
+    { name = "scipy", version = "1.17.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+]
+glsl = [
+    { name = "moderngl" },
+]
+stepcheck = [
+    { name = "cadquery-ocp", marker = "python_full_version >= '3.10' and python_full_version < '3.15'" },
+]
+tesseract = [
+    { name = "tesseract-core", extra = ["runtime"], marker = "python_full_version >= '3.11'" },
+    { name = "tesseract-jax", version = "0.4.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.11.*'" },
+    { name = "tesseract-jax", version = "0.4.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
+]
+viewer = [
+    { name = "anywidget", version = "0.9.21", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "anywidget", version = "0.11.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "matplotlib", version = "3.9.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "matplotlib", version = "3.10.8", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
+    { name = "pre-commit", version = "4.3.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "pre-commit", version = "4.5.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
+    { name = "pytest", version = "8.4.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "pytest", version = "9.0.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
+    { name = "ruff" },
+    { name = "scikit-image", version = "0.24.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "scikit-image", version = "0.25.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.10.*'" },
+    { name = "scikit-image", version = "0.26.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "wgpu", version = "0.24.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "wgpu", version = "0.31.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.10.*'" },
+    { name = "wgpu", version = "0.32.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "anywidget", marker = "extra == 'viewer'", specifier = ">=0.9.21" },
+    { name = "cadquery-ocp", marker = "python_full_version >= '3.10' and python_full_version < '3.15' and extra == 'stepcheck'" },
+    { name = "fenics-basix", marker = "python_full_version >= '3.11' and extra == 'fem'" },
+    { name = "gmsh", marker = "python_full_version >= '3.11' and extra == 'fem'" },
+    { name = "griffe", marker = "extra == 'docs'", specifier = "<1.0" },
+    { name = "imageio", specifier = ">=2.37.2" },
+    { name = "jax", specifier = ">=0.4.20" },
+    { name = "jax", extras = ["cuda12"], marker = "extra == 'cuda'", specifier = ">=0.4.20" },
+    { name = "jax-fem", marker = "python_full_version >= '3.11' and extra == 'fem'" },
+    { name = "matplotlib", marker = "extra == 'dev'", specifier = ">=3.7.0" },
+    { name = "meshio", marker = "python_full_version >= '3.11' and extra == 'fem'" },
+    { name = "moderngl", marker = "extra == 'glsl'", specifier = ">=5.12.0" },
+    { name = "numpy", specifier = ">=1.24.0" },
+    { name = "optax", specifier = ">=0.2.4" },
+    { name = "optimistix", specifier = ">=0.0.10" },
+    { name = "petsc4py", marker = "python_full_version >= '3.11' and extra == 'fem'" },
+    { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=3.0.0" },
+    { name = "pyfiglet", marker = "python_full_version >= '3.11' and extra == 'fem'" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0.0" },
+    { name = "quartodoc", marker = "extra == 'docs'", specifier = ">=0.7" },
+    { name = "scipy", marker = "python_full_version >= '3.11' and extra == 'fem'" },
+    { name = "tesseract-core", extras = ["runtime"], marker = "python_full_version >= '3.11' and extra == 'tesseract'" },
+    { name = "tesseract-jax", marker = "python_full_version >= '3.11' and extra == 'tesseract'" },
+]
+provides-extras = ["cuda", "fem", "tesseract", "stepcheck", "glsl", "viewer", "dev", "docs"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "matplotlib", specifier = ">=3.7.0" },
+    { name = "pre-commit", specifier = ">=3.0.0" },
+    { name = "pytest", specifier = ">=7.0.0" },
+    { name = "ruff", specifier = ">=0.8.0" },
+    { name = "scikit-image", specifier = ">=0.21.0" },
+    { name = "wgpu", specifier = ">=0.19.0" },
+]
+
+[[package]]
 name = "cadquery-ocp"
 version = "7.9.3.1.1"
 source = { registry = "https://pypi.org/simple" }
@@ -2330,124 +2448,6 @@ resolution-markers = [
 sdist = { url = "https://files.pythonhosted.org/packages/2a/0a/ffe865f2190340a06abfe19745230634d9ba7f4f873277767667514ab4a2/jax_fem-0.0.12.tar.gz", hash = "sha256:dba6608b435a233c58ddf85eb1b092c5989210a6751618f641065c36362a8bea", size = 72845683, upload-time = "2026-06-13T03:32:04.615Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f8/48/775898730245a72ac9988a415490760a6a522fe527af1fce961175425127/jax_fem-0.0.12-py3-none-any.whl", hash = "sha256:b2d499b45be73d368d024467c2b6dee65034e39065c3f9720530b02a63cdb7a5", size = 75321, upload-time = "2026-06-13T03:31:29.75Z" },
-]
-
-[[package]]
-name = "jaxcad"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "imageio" },
-    { name = "jax", version = "0.4.30", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
-    { name = "jax", version = "0.6.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.10.*'" },
-    { name = "jax", version = "0.8.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
-    { name = "numpy", version = "2.0.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
-    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.10.*'" },
-    { name = "numpy", version = "2.4.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
-    { name = "optax", version = "0.2.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
-    { name = "optax", version = "0.2.8", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
-    { name = "optimistix", version = "0.0.10", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
-    { name = "optimistix", version = "0.0.11", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.10.*'" },
-    { name = "optimistix", version = "0.1.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
-]
-
-[package.optional-dependencies]
-cuda = [
-    { name = "jax", version = "0.4.30", source = { registry = "https://pypi.org/simple" }, extra = ["cuda12"], marker = "python_full_version < '3.10'" },
-    { name = "jax", version = "0.6.2", source = { registry = "https://pypi.org/simple" }, extra = ["cuda12"], marker = "python_full_version == '3.10.*'" },
-    { name = "jax", version = "0.8.2", source = { registry = "https://pypi.org/simple" }, extra = ["cuda12"], marker = "python_full_version >= '3.11'" },
-]
-dev = [
-    { name = "matplotlib", version = "3.9.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
-    { name = "matplotlib", version = "3.10.8", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
-    { name = "pre-commit", version = "4.3.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
-    { name = "pre-commit", version = "4.5.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
-    { name = "pytest", version = "8.4.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
-    { name = "pytest", version = "9.0.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
-]
-docs = [
-    { name = "griffe" },
-    { name = "quartodoc" },
-]
-fem = [
-    { name = "fenics-basix", marker = "python_full_version >= '3.11'" },
-    { name = "gmsh", marker = "python_full_version >= '3.11'" },
-    { name = "jax-fem", version = "0.0.11", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.11.*'" },
-    { name = "jax-fem", version = "0.0.12", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
-    { name = "meshio", marker = "python_full_version >= '3.11'" },
-    { name = "petsc4py", marker = "python_full_version >= '3.11'" },
-    { name = "pyfiglet", marker = "python_full_version >= '3.11'" },
-    { name = "scipy", version = "1.17.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
-]
-glsl = [
-    { name = "moderngl" },
-]
-stepcheck = [
-    { name = "cadquery-ocp", marker = "python_full_version >= '3.10' and python_full_version < '3.15'" },
-]
-tesseract = [
-    { name = "tesseract-core", extra = ["runtime"], marker = "python_full_version >= '3.11'" },
-    { name = "tesseract-jax", version = "0.4.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.11.*'" },
-    { name = "tesseract-jax", version = "0.4.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
-]
-viewer = [
-    { name = "anywidget", version = "0.9.21", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
-    { name = "anywidget", version = "0.11.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "matplotlib", version = "3.9.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
-    { name = "matplotlib", version = "3.10.8", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
-    { name = "pre-commit", version = "4.3.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
-    { name = "pre-commit", version = "4.5.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
-    { name = "pytest", version = "8.4.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
-    { name = "pytest", version = "9.0.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
-    { name = "ruff" },
-    { name = "scikit-image", version = "0.24.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
-    { name = "scikit-image", version = "0.25.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.10.*'" },
-    { name = "scikit-image", version = "0.26.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
-    { name = "wgpu", version = "0.24.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
-    { name = "wgpu", version = "0.31.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.10.*'" },
-    { name = "wgpu", version = "0.32.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "anywidget", marker = "extra == 'viewer'", specifier = ">=0.9.21" },
-    { name = "cadquery-ocp", marker = "python_full_version >= '3.10' and python_full_version < '3.15' and extra == 'stepcheck'" },
-    { name = "fenics-basix", marker = "python_full_version >= '3.11' and extra == 'fem'" },
-    { name = "gmsh", marker = "python_full_version >= '3.11' and extra == 'fem'" },
-    { name = "griffe", marker = "extra == 'docs'", specifier = "<1.0" },
-    { name = "imageio", specifier = ">=2.37.2" },
-    { name = "jax", specifier = ">=0.4.20" },
-    { name = "jax", extras = ["cuda12"], marker = "extra == 'cuda'", specifier = ">=0.4.20" },
-    { name = "jax-fem", marker = "python_full_version >= '3.11' and extra == 'fem'" },
-    { name = "matplotlib", marker = "extra == 'dev'", specifier = ">=3.7.0" },
-    { name = "meshio", marker = "python_full_version >= '3.11' and extra == 'fem'" },
-    { name = "moderngl", marker = "extra == 'glsl'", specifier = ">=5.12.0" },
-    { name = "numpy", specifier = ">=1.24.0" },
-    { name = "optax", specifier = ">=0.2.4" },
-    { name = "optimistix", specifier = ">=0.0.10" },
-    { name = "petsc4py", marker = "python_full_version >= '3.11' and extra == 'fem'" },
-    { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=3.0.0" },
-    { name = "pyfiglet", marker = "python_full_version >= '3.11' and extra == 'fem'" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0.0" },
-    { name = "quartodoc", marker = "extra == 'docs'", specifier = ">=0.7" },
-    { name = "scipy", marker = "python_full_version >= '3.11' and extra == 'fem'" },
-    { name = "tesseract-core", extras = ["runtime"], marker = "python_full_version >= '3.11' and extra == 'tesseract'" },
-    { name = "tesseract-jax", marker = "python_full_version >= '3.11' and extra == 'tesseract'" },
-]
-provides-extras = ["cuda", "fem", "tesseract", "stepcheck", "glsl", "viewer", "dev", "docs"]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "matplotlib", specifier = ">=3.7.0" },
-    { name = "pre-commit", specifier = ">=3.0.0" },
-    { name = "pytest", specifier = ">=7.0.0" },
-    { name = "ruff", specifier = ">=0.8.0" },
-    { name = "scikit-image", specifier = ">=0.21.0" },
-    { name = "wgpu", specifier = ">=0.19.0" },
 ]
 
 [[package]]

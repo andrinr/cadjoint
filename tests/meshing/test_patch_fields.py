@@ -14,7 +14,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from jaxcad.meshing import (
+from cadjoint.meshing import (
     GridSpec,
     exact_feature_mask,
     extract_mesh,
@@ -23,8 +23,8 @@ from jaxcad.meshing import (
     signature_function,
     world_frame_leaves,
 )
-from jaxcad.sdf.boolean import Union
-from jaxcad.sdf.primitives import (
+from cadjoint.sdf.boolean import Union
+from cadjoint.sdf.primitives import (
     Box,
     Cylinder,
     ExtrudedPolygon,
@@ -32,7 +32,7 @@ from jaxcad.sdf.primitives import (
     Sphere,
     Torus,
 )
-from jaxcad.sdf.transforms import Rotate, Scale, Translate, Twist
+from cadjoint.sdf.transforms import Rotate, Scale, Translate, Twist
 
 # Box patch order is [+x, -x, +y, -y, +z, -z]: index 2*axis + side.
 BOX_SIZE = np.array([0.8, 0.6, 0.5])

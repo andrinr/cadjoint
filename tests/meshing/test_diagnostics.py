@@ -1,4 +1,4 @@
-"""Tests for jaxcad.meshing.diagnostics (deviation, intersections, quality)."""
+"""Tests for cadjoint.meshing.diagnostics (deviation, intersections, quality)."""
 
 from __future__ import annotations
 
@@ -6,14 +6,14 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from jaxcad.meshing.diagnostics import (
+from cadjoint.meshing.diagnostics import (
     mesh_report,
     self_intersections,
     surface_deviation,
     triangle_quality,
 )
-from jaxcad.meshing.dual_contouring import Mesh, extract_mesh
-from jaxcad.meshing.edge_detection import GridSpec
+from cadjoint.meshing.dual_contouring import Mesh, extract_mesh
+from cadjoint.meshing.edge_detection import GridSpec
 
 SPHERE_GRID = GridSpec.from_bounds((-1.3, -1.3, -1.3), (2.6, 2.6, 2.6), 26)
 

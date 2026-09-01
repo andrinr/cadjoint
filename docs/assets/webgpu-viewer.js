@@ -162,11 +162,11 @@ async function startViewer(root) {
     scheduleRender();
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
-    console.error("JAXCAD WebGPU documentation viewer failed:", error);
+    console.error("CADJOINT WebGPU documentation viewer failed:", error);
     showFallback(root, `${detail} · showing preview`);
   }
 }
 
-for (const root of document.querySelectorAll("[data-jaxcad-webgpu-viewer]")) {
+for (const root of document.querySelectorAll("[data-cadjoint-webgpu-viewer]")) {
   startViewer(root);
 }

@@ -24,8 +24,8 @@ export function Toolbar(props: ToolbarProps) {
   return (
     <header class="toolbar">
       <div class="brand">
-        <span class="mark">jx</span>
-        <span>JAXCAD</span>
+        <span class="mark">cj</span>
+        <span>CADJOINT</span>
       </div>
 
       <ModeSwitcher />

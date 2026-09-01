@@ -1,4 +1,4 @@
-.jaxcad-webgpu-demo {
+.cadjoint-webgpu-demo {
   position: relative;
   width: 100%;
   aspect-ratio: 16 / 9;
@@ -10,43 +10,43 @@
   box-shadow: 0 1rem 2.5rem rgba(22, 28, 22, 0.14);
 }
 
-.jaxcad-webgpu-demo canvas,
-.jaxcad-webgpu-demo [data-viewer-fallback] {
+.cadjoint-webgpu-demo canvas,
+.cadjoint-webgpu-demo [data-viewer-fallback] {
   display: block;
   width: 100%;
   height: 100%;
 }
 
-.jaxcad-webgpu-demo canvas {
+.cadjoint-webgpu-demo canvas {
   cursor: grab;
   touch-action: none;
 }
 
-.jaxcad-webgpu-demo canvas:active {
+.cadjoint-webgpu-demo canvas:active {
   cursor: grabbing;
 }
 
-.jaxcad-webgpu-demo [data-viewer-fallback] {
+.cadjoint-webgpu-demo [data-viewer-fallback] {
   display: none;
   object-fit: cover;
 }
 
-.jaxcad-webgpu-demo.is-fallback canvas {
+.cadjoint-webgpu-demo.is-fallback canvas {
   display: none;
 }
 
-.jaxcad-webgpu-demo.is-fallback [data-viewer-fallback] {
+.cadjoint-webgpu-demo.is-fallback [data-viewer-fallback] {
   display: block;
 }
 
-.jaxcad-webgpu-status,
-.jaxcad-webgpu-reset,
-.jaxcad-webgpu-help {
+.cadjoint-webgpu-status,
+.cadjoint-webgpu-reset,
+.cadjoint-webgpu-help {
   position: absolute;
   z-index: 1;
 }
 
-.jaxcad-webgpu-status {
+.cadjoint-webgpu-status {
   top: 1rem;
   left: 1rem;
   display: flex;
@@ -61,7 +61,7 @@
   font-size: 0.76rem;
 }
 
-.jaxcad-webgpu-status::before {
+.cadjoint-webgpu-status::before {
   content: "";
   width: 0.48rem;
   height: 0.48rem;
@@ -70,16 +70,16 @@
   background: #92988f;
 }
 
-.jaxcad-webgpu-demo.is-live .jaxcad-webgpu-status::before {
+.cadjoint-webgpu-demo.is-live .cadjoint-webgpu-status::before {
   background: #d9ff57;
   box-shadow: 0 0 0.7rem #d9ff57;
 }
 
-.jaxcad-webgpu-demo.is-error .jaxcad-webgpu-status::before {
+.cadjoint-webgpu-demo.is-error .cadjoint-webgpu-status::before {
   background: #ff8167;
 }
 
-.jaxcad-webgpu-reset {
+.cadjoint-webgpu-reset {
   top: 0.85rem;
   right: 0.85rem;
   padding: 0.45rem 0.7rem;
@@ -91,11 +91,11 @@
   cursor: pointer;
 }
 
-.jaxcad-webgpu-reset:hover {
+.cadjoint-webgpu-reset:hover {
   border-color: rgba(217, 255, 87, 0.72);
 }
 
-.jaxcad-webgpu-help {
+.cadjoint-webgpu-help {
   right: 1rem;
   bottom: 0.8rem;
   color: rgba(238, 240, 234, 0.68);
@@ -103,17 +103,17 @@
   pointer-events: none;
 }
 
-.jaxcad-webgpu-demo.is-fallback .jaxcad-webgpu-reset,
-.jaxcad-webgpu-demo.is-fallback .jaxcad-webgpu-help {
+.cadjoint-webgpu-demo.is-fallback .cadjoint-webgpu-reset,
+.cadjoint-webgpu-demo.is-fallback .cadjoint-webgpu-help {
   display: none;
 }
 
 @media (max-width: 600px) {
-  .jaxcad-webgpu-demo {
+  .cadjoint-webgpu-demo {
     aspect-ratio: 4 / 3;
   }
 
-  .jaxcad-webgpu-help {
+  .cadjoint-webgpu-help {
     display: none;
   }
 }

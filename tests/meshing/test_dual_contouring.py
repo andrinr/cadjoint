@@ -1,4 +1,4 @@
-"""Tests for jaxcad.meshing.dual_contouring (QEF vertices + dual connectivity)."""
+"""Tests for cadjoint.meshing.dual_contouring (QEF vertices + dual connectivity)."""
 
 from __future__ import annotations
 
@@ -9,15 +9,15 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from jaxcad.meshing.dual_contouring import extract_mesh, qef_vertices
-from jaxcad.meshing.edge_detection import (
+from cadjoint.meshing.dual_contouring import extract_mesh, qef_vertices
+from cadjoint.meshing.edge_detection import (
     GridSpec,
     edge_hermite_data,
     find_crossing_edges,
     sample_grid,
 )
-from jaxcad.meshing.features import cell_edge_incidence
-from jaxcad.sdf.primitives import Box
+from cadjoint.meshing.features import cell_edge_incidence
+from cadjoint.sdf.primitives import Box
 
 
 def sphere_sdf(radius):

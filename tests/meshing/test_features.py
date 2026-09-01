@@ -1,4 +1,4 @@
-"""Tests for sharp-feature detection in :mod:`jaxcad.meshing.features`."""
+"""Tests for sharp-feature detection in :mod:`cadjoint.meshing.features`."""
 
 from __future__ import annotations
 
@@ -9,13 +9,13 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from jaxcad.meshing.edge_detection import (
+from cadjoint.meshing.edge_detection import (
     GridSpec,
     detect_edges,
     edge_hermite_data,
     find_crossing_edges,
 )
-from jaxcad.meshing.features import (
+from cadjoint.meshing.features import (
     CORNER,
     CREASE,
     FACE,
@@ -24,8 +24,8 @@ from jaxcad.meshing.features import (
     classify_feature_cells,
     detect_branch_changes,
 )
-from jaxcad.sdf.primitives import Box, Sphere
-from jaxcad.sdf.primitives.cylinder import Cylinder
+from cadjoint.sdf.primitives import Box, Sphere
+from cadjoint.sdf.primitives.cylinder import Cylinder
 
 
 def _cell_centers(incidence, grid: GridSpec) -> np.ndarray:
@@ -316,7 +316,7 @@ class TestValidation:
 
 class TestFeatureCellLinks:
     def test_box_feature_chains_connect_corners(self):
-        from jaxcad.meshing.features import feature_cell_links
+        from cadjoint.meshing.features import feature_cell_links
 
         grid = GridSpec.from_bounds((-0.75,) * 3, (1.5,) * 3, 15)
         sdf = lambda p: Box.sdf(p, jnp.array([0.5, 0.5, 0.5]))  # noqa: E731
@@ -339,7 +339,7 @@ class TestFeatureCellLinks:
         assert all(int(row) in linked for row in corner_rows)
 
     def test_empty_mask_yields_no_links(self):
-        from jaxcad.meshing.features import feature_cell_links
+        from cadjoint.meshing.features import feature_cell_links
 
         grid = GridSpec.from_bounds((-1.3,) * 3, (2.6,) * 3, 13)
         edges, _hermite = detect_edges(lambda p: jnp.linalg.norm(p) - 1.0, grid)
@@ -348,7 +348,7 @@ class TestFeatureCellLinks:
         assert links.shape == (0, 2)
 
     def test_junction_mask_drops_corner_shortcuts(self):
-        from jaxcad.meshing.features import feature_cell_links
+        from cadjoint.meshing.features import feature_cell_links
 
         grid = GridSpec.from_bounds((-0.75,) * 3, (1.5,) * 3, 15)
         sdf = lambda p: Box.sdf(p, jnp.array([0.5, 0.5, 0.5]))  # noqa: E731

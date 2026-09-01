@@ -3,8 +3,8 @@
 import jax.numpy as jnp
 import pytest
 
-from jaxcad.sdf.primitives import Box, Sphere
-from jaxcad.sdf.transforms import Rotate, Scale, Translate
+from cadjoint.sdf.primitives import Box, Sphere
+from cadjoint.sdf.transforms import Rotate, Scale, Translate
 
 
 def test_translate():

@@ -50,14 +50,14 @@ def nominal_state(demo):
 
 class TestBracketScene:
     def test_scene_compiles_in_the_playground(self):
-        from jaxcad.viewer.playground import compile_source
+        from cadjoint.viewer.playground import compile_source
 
         result = compile_source(_SCENE_PATH.read_text())
         assert result.get("ok"), result.get("error")
         assert result.get("scene_wgsl")
 
     def test_scene_sdf_meshes_watertight(self):
-        from jaxcad.meshing import GridSpec, extract_mesh, mesh_report
+        from cadjoint.meshing import GridSpec, extract_mesh, mesh_report
 
         namespace: dict = {}
         exec(compile(_SCENE_PATH.read_text(), str(_SCENE_PATH), "exec"), namespace, namespace)

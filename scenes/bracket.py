@@ -12,12 +12,12 @@ Named design parameters (drive the FEM optimization in
   - ``rib_height``: distance constraint from the rib's plate corner to its tip
 """
 
-from jaxcad.constraints import DistanceConstraint, FixedConstraint, satisfy_constraints
-from jaxcad.construction import PolygonProfile, SketchPlane, Solid, extrude
-from jaxcad.fem import ElasticStudy, Fixed, Nodes, Traction
-from jaxcad.geometry import Scalar, Vector, Vector2
-from jaxcad.render import Material
-from jaxcad.sdf.boolean import Difference, Union
+from cadjoint.constraints import DistanceConstraint, FixedConstraint, satisfy_constraints
+from cadjoint.construction import PolygonProfile, SketchPlane, Solid, extrude
+from cadjoint.fem import ElasticStudy, Fixed, Nodes, Traction
+from cadjoint.geometry import Scalar, Vector, Vector2
+from cadjoint.render import Material
+from cadjoint.sdf.boolean import Difference, Union
 
 # ── design parameters ────────────────────────────────────────────────────────
 plate_thickness = Scalar(0.2, free=True, name="plate_thickness")
