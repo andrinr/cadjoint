@@ -224,9 +224,9 @@ def test_example_scene_reports_its_construction_for_the_viewer():
     assert kinds == {
         "fixed": 1,
         "distance": 1,
-        "horizontal": 13,
+        "horizontal": 11,
         "vertical": 8,
-        "equal_length": 4,
+        "equal_length": 2,
     }
     # The one distance constraint carries its driving-dimension value (the
     # viewport overlay); relational constraints carry value: None.

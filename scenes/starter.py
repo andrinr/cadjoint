@@ -14,10 +14,11 @@ Named design parameters:
   - ``base_width``: driving dimension across the base deck
   - ``bushing_spacing``: distance between the two mounting bushings
 
-The comb sketch keeps exactly five meaningful design freedoms under its
-constraints — fin depth, shared fin tip height, shared fin width, mirrored
-outer-fin spacing, and deck thickness; everything else is a relation
-(horizontal/vertical/equal/mirror) or pinned (base span, the slug's die
+The comb sketch keeps nine meaningful design freedoms under its
+constraints — fin depth, a tip height and root width PER FIN (the
+optimizer sizes all three fins individually), symmetric outer-fin
+spacing, and deck thickness; everything else is a relation
+(horizontal/vertical/mirror) or pinned (base span, the slug's die
 interface).
 """
 
@@ -97,13 +98,13 @@ comb_profile = PolygonProfile(
 sink = extrude(comb_profile, depth=fin_depth, material=aluminum)
 
 # The comb is a production-style constrained sketch that still keeps real
-# design freedom. Relations — horizontal/vertical squaring, equal fin
-# widths, mirror symmetry about the base — shape HOW the comb may move;
-# the pinned base span anchors it. Exactly four sketch freedoms survive
-# (plus fin_depth): deck thickness (deck_r level), shared fin width,
-# mirrored outer-fin spacing, and shared fin tip height. The optimizer
-# below explores those and only those: every descent step is projected
-# back onto this system (see cadjoint.optimize).
+# design freedom. Relations — horizontal/vertical squaring, symmetric
+# margins about the base — shape HOW the comb may move; the pinned base
+# span anchors it. Each fin keeps its OWN tip height and root width (the
+# optimizer sizes all three individually), alongside deck thickness,
+# symmetric outer-fin spacing, and fin_depth — nine freedoms in all.
+# Every descent step is projected back onto this system (see
+# cadjoint.optimize).
 FixedConstraint(base_l, [-0.9, 0.0])
 DistanceConstraint(base_l, base_r, base_width)
 HorizontalConstraint(base_l, base_r)
@@ -122,13 +123,9 @@ VerticalConstraint(fin2_root_r, fin2_tip_r)
 VerticalConstraint(fin2_root_l, fin2_tip_l)
 VerticalConstraint(fin3_root_r, fin3_tip_r)
 VerticalConstraint(fin3_root_l, fin3_tip_l)
-HorizontalConstraint(fin2_tip_r, fin2_tip_l)
-HorizontalConstraint(fin2_tip_r, fin1_tip_r)
 HorizontalConstraint(fin1_tip_r, fin1_tip_l)
-HorizontalConstraint(fin2_tip_l, fin3_tip_r)
+HorizontalConstraint(fin2_tip_r, fin2_tip_l)
 HorizontalConstraint(fin3_tip_r, fin3_tip_l)
-EqualLengthConstraint(fin1_root_r, fin1_root_l, fin2_root_r, fin2_root_l)
-EqualLengthConstraint(fin2_root_r, fin2_root_l, fin3_root_r, fin3_root_l)
 EqualLengthConstraint(base_l, fin3_root_l, base_r, fin1_root_r)
 EqualLengthConstraint(base_l, fin2_root_l, base_r, fin2_root_r)
 
