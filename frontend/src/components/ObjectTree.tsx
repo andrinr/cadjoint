@@ -89,9 +89,11 @@ export function ObjectTree() {
     >
       <aside class="object-tree-panel" data-testid="object-tree-panel">
         <header>
+          {/* Kicker first, title second — the same order every dock panel
+              header uses, so the eyebrow line is always the top line. */}
           <span>
-            Object tree
             <small>read-only</small>
+            Object tree
           </span>
           <button
             type="button"

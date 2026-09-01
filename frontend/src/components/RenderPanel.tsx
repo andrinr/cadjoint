@@ -89,9 +89,10 @@ export function RenderPanel(props: RenderPanelProps) {
   return (
     <aside class="render-panel" data-testid="render-panel">
       <header>
+        {/* Kicker first, title second — see ObjectTree. */}
         <span>
-          Render
           <small>presets &amp; display</small>
+          Render
         </span>
       </header>
       <div class="render-settings">

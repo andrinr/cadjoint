@@ -126,12 +126,17 @@ export function SketchPanel(props: SketchPanelProps) {
     <Show when={profile()}>
       {(node) => (
         <aside class="sketch-panel" data-testid="sketch-panel">
+          {/* The point count belongs on the kicker line, not beside the
+              two-line title stack: as a sibling it had no shared baseline or
+              centre with the stack it sat next to. */}
           <header>
             <span>
-              <small>Sketch</small>
+              <small>
+                Sketch
+                <b>{node().vertices.length} pts</b>
+              </small>
               {node().name ?? "profile"}
             </span>
-            <b>{node().vertices.length} pts</b>
           </header>
 
           <Show

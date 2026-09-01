@@ -48,33 +48,52 @@ const highlightField = StateField.define<DecorationSet>({
  * CodeMirror ships no highlighting unless a style is installed — the language
  * package only supplies the parser — so this defines one on the app's palette
  * rather than pulling in the default light-leaning theme.
+ *
+ * Every colour is a design token (src/tokens.ts, mirrored into styles.css), so
+ * the source pane and the panels around it are painted from one system. The
+ * mapping is deliberate rather than decorative: keywords take the model
+ * accent because they are the language's own vocabulary, literals take the
+ * sketch and simulate accents because they are the values the tools edit, and
+ * comments drop to the muted ink every de-emphasised label in the app uses.
+ *
+ * The two greys that used to sit here (#6d746a comments, #5d615a gutter) were
+ * measured at 3.87:1 and 2.95:1 against the pane — both below AA — so they are
+ * gone; --ink-3 clears 4.5:1 on --surface-panel.
  */
 const highlightStyle = HighlightStyle.define([
-  { tag: tags.comment, color: "#6d746a", fontStyle: "italic" },
-  { tag: tags.keyword, color: "#d9ff57" },
-  { tag: [tags.controlKeyword, tags.moduleKeyword], color: "#c7f04a" },
-  { tag: [tags.string, tags.special(tags.string)], color: "#ffb37a" },
-  { tag: [tags.number, tags.bool, tags.null], color: "#8fd8ff" },
-  { tag: [tags.className, tags.typeName, tags.namespace], color: "#ff8167" },
-  { tag: tags.function(tags.variableName), color: "#e7e6df" },
-  { tag: tags.definition(tags.variableName), color: "#f2efe6" },
-  { tag: tags.propertyName, color: "#cfe8a0" },
-  { tag: [tags.operator, tags.punctuation, tags.separator], color: "#9aa294" },
-  { tag: tags.self, color: "#ff8167", fontStyle: "italic" },
+  { tag: tags.comment, color: "var(--ink-3)", fontStyle: "italic" },
+  { tag: tags.keyword, color: "var(--accent-model)" },
+  { tag: [tags.controlKeyword, tags.moduleKeyword], color: "var(--accent-model-ink)" },
+  { tag: [tags.string, tags.special(tags.string)], color: "var(--accent-simulate)" },
+  { tag: [tags.number, tags.bool, tags.null], color: "var(--accent-sketch)" },
+  { tag: [tags.className, tags.typeName, tags.namespace], color: "var(--danger)" },
+  { tag: tags.function(tags.variableName), color: "var(--ink)" },
+  { tag: tags.definition(tags.variableName), color: "var(--ink)" },
+  { tag: tags.propertyName, color: "var(--accent-model-ink)" },
+  { tag: [tags.operator, tags.punctuation, tags.separator], color: "var(--ink-2)" },
+  { tag: tags.self, color: "var(--danger)", fontStyle: "italic" },
 ]);
 
 const theme = EditorView.theme(
   {
-    "&": { height: "100%", fontSize: "13px", backgroundColor: "var(--panel)" },
-    ".cm-scroller": { fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" },
-    ".cm-content": { caretColor: "var(--lime)" },
-    ".cm-gutters": { backgroundColor: "var(--panel)", border: "none", color: "#5d615a" },
-    ".cm-activeLine": { backgroundColor: "rgba(255,255,255,0.03)" },
+    "&": {
+      height: "100%",
+      fontSize: "var(--text-md)",
+      backgroundColor: "var(--surface-panel)",
+    },
+    ".cm-scroller": { fontFamily: "var(--font-mono)", lineHeight: "var(--leading-normal)" },
+    ".cm-content": { caretColor: "var(--mode-accent, var(--accent-model))" },
+    ".cm-gutters": {
+      backgroundColor: "var(--surface-panel)",
+      border: "none",
+      color: "var(--ink-3)",
+    },
+    ".cm-activeLine": { backgroundColor: "var(--surface-inset)" },
     ".cm-activeLineGutter": { backgroundColor: "transparent" },
     ".cm-vertex-highlight": {
-      backgroundColor: "rgba(217,255,87,0.28)",
-      outline: "1px solid rgba(217,255,87,0.75)",
-      borderRadius: "3px",
+      backgroundColor: "rgba(var(--mode-accent-rgb, var(--accent-model-rgb)), 0.28)",
+      outline: "1px solid rgba(var(--mode-accent-rgb, var(--accent-model-rgb)), 0.75)",
+      borderRadius: "var(--radius-xs)",
     },
     "&.cm-focused": { outline: "none" },
   },
