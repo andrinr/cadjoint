@@ -8,6 +8,7 @@ import {
   parseOptimizeStreamLine,
   playbackFrames,
   setOptimizationValueRequest,
+  sparklineCursorPoint,
   splitStreamBuffer,
   sparklineCursorX,
   sparklinePoints,
@@ -161,6 +162,20 @@ describe("sparkline", () => {
       .split(" ")
       .map((pair) => pair.split(",").map(Number));
     expect(pairs[0][1]).toBeCloseTo(20, 0);
+  });
+
+  it("highlights the cursor's sparkline point at the value's height", () => {
+    const values = [4, 3, 2, 1];
+    const top = sparklineCursorPoint(values, 0, 90, 40)!;
+    const bottom = sparklineCursorPoint(values, 3, 90, 40)!;
+    expect(top.x).toBe(0);
+    expect(bottom.x).toBe(90);
+    expect(top.y).toBeLessThan(bottom.y);
+    // Out-of-range indices clamp; empty input yields nothing.
+    expect(sparklineCursorPoint(values, 99, 90, 40)!.x).toBe(90);
+    expect(sparklineCursorPoint([], 0, 90, 40)).toBeNull();
+    // A flat run centers vertically.
+    expect(sparklineCursorPoint([2, 2], 1, 90, 40)!.y).toBeCloseTo(20, 0);
   });
 
   it("positions the cursor proportionally", () => {

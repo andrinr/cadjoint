@@ -2922,3 +2922,16 @@ button.primary svg {
 .opt-parameters-toggle:hover {
   opacity: 1;
 }
+
+/* Shared trajectory player strip (Optimize card + Results tab). */
+.opt-player-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.opt-spark .opt-cursor-point {
+  fill: var(--lime, #d9ff57);
+  stroke: rgba(0, 0, 0, 0.55);
+  stroke-width: 1;
+}

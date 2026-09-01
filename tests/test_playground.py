@@ -223,15 +223,15 @@ def test_example_scene_reports_its_construction_for_the_viewer():
     kinds = Counter(item["kind"] for item in profile["constraints"])
     assert kinds == {
         "fixed": 1,
-        "distance": 4,
+        "distance": 1,
         "horizontal": 13,
         "vertical": 8,
         "equal_length": 4,
     }
-    # Distance constraints carry their driving-dimension values (viewport
-    # overlays); relational constraints carry value: None.
+    # The one distance constraint carries its driving-dimension value (the
+    # viewport overlay); relational constraints carry value: None.
     distances = [item for item in profile["constraints"] if item["kind"] == "distance"]
-    assert sorted(item["value"] for item in distances) == pytest.approx([0.18, 0.44, 0.67, 1.8])
+    assert [item["value"] for item in distances] == pytest.approx([1.8])
     assert all(
         item["value"] is None
         for item in profile["constraints"]
@@ -300,7 +300,7 @@ def test_example_scene_reports_its_construction_for_the_viewer():
     assert cool["remesh_every"] == 6
     assert cool["regularizer"] == "material_volume"
     assert cool["regularizer_weight"] == pytest.approx(0.4)
-    assert cool["steps"] == 10
+    assert cool["steps"] == 12
     assert cool["learning_rate"] == pytest.approx(0.01)
     assert cool["method"] == "adam"
     assert cool["index"] == 0
@@ -311,7 +311,7 @@ def test_example_scene_reports_its_construction_for_the_viewer():
     start, end = cool["span"]
     assert EXAMPLE_SOURCE[start:end].startswith("Optimization(")
     start, end = cool["steps_span"]
-    assert EXAMPLE_SOURCE[start:end] == "10"
+    assert EXAMPLE_SOURCE[start:end] == "12"
     start, end = cool["learning_rate_span"]
     assert EXAMPLE_SOURCE[start:end] == "0.01"
 
@@ -328,19 +328,20 @@ def test_example_scene_reports_its_construction_for_the_viewer():
         },
     ]
 
-    # The starter declares its thermal study on an explicit named SimMesh.
+    # The starter declares its thermal study on an explicit named SimMesh —
+    # the boundary-conforming quadratic tet path.
     studies = result["studies"]
     assert len(studies) == 1
     assert studies[0]["name"] == "sink-conduction"
     assert studies[0]["kind"] == "thermal"
     assert studies[0]["editable"] is True
-    assert studies[0]["resolution"] == [20, 14, 12]
+    assert studies[0]["resolution"] == [18, 13, 11]
     assert studies[0]["mesh"] == "sink-mesh"
     meshes = result["sim_meshes"]
     assert len(meshes) == 1
     assert meshes[0]["name"] == "sink-mesh"
-    assert meshes[0]["method"] == "hex"
-    assert meshes[0]["resolution"] == [20, 14, 12]
+    assert meshes[0]["method"] == "tet10"
+    assert meshes[0]["resolution"] == [18, 13, 11]
     assert meshes[0]["editable"] is True
 
     assert "fn fs_main_depth(" in result["preview_shader"]

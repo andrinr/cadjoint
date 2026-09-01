@@ -32,6 +32,7 @@ import {
 import {
   bcProposal,
   nodes,
+  optimizeRun,
   optimizeSimulate,
   setBcPickArmed,
   setBcProposal,
@@ -45,6 +46,7 @@ import {
   studies,
 } from "../state";
 import { OptimizeCards } from "./OptimizeCards";
+import { TrajectoryPlayer } from "./TrajectoryPlayer";
 import {
   BC_LABELS,
   addBcRequest,
@@ -1430,6 +1432,23 @@ export function SimulatePanel(props: SimulatePanelProps) {
                     </tbody>
                   </table>
                 </div>
+              )}
+            </Show>
+
+            {/* The step-through control lands with the user: when this
+                result came from an optimization run, its trajectory player
+                mounts here too (same shared state as the Optimize card).
+                Replay hands the viewport to the raymarched scene so the
+                geometry visibly morphs, then restores the mesh view. */}
+            <Show when={optimizeRun()?.name === current().name ? optimizeRun() : null}>
+              {(run) => (
+                <TrajectoryPlayer
+                  onGhostCompile={props.onGhostCompile}
+                  sparkTestId="results-optimize-history"
+                  fieldNote={run().study !== null}
+                  onReplayStart={() => setViewport("scene")}
+                  onReplayEnd={() => setViewport("mesh")}
+                />
               )}
             </Show>
 
