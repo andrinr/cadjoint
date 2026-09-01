@@ -1439,17 +1439,24 @@ export function SimulatePanel(props: SimulatePanelProps) {
                 result came from an optimization run, its trajectory player
                 mounts here too (same shared state as the Optimize card).
                 Replay hands the viewport to the raymarched scene so the
-                geometry visibly morphs, then restores the mesh view. */}
+                geometry visibly morphs, then puts back whichever view the
+                user was in when it started. */}
             <Show when={optimizeRun()?.name === current().name ? optimizeRun() : null}>
-              {(run) => (
-                <TrajectoryPlayer
-                  onGhostCompile={props.onGhostCompile}
-                  sparkTestId="results-optimize-history"
-                  fieldNote={run().study !== null}
-                  onReplayStart={() => setViewport("scene")}
-                  onReplayEnd={() => setViewport("mesh")}
-                />
-              )}
+              {(run) => {
+                let viewBeforeReplay: "scene" | "mesh" = viewportMode();
+                return (
+                  <TrajectoryPlayer
+                    onGhostCompile={props.onGhostCompile}
+                    sparkTestId="results-optimize-history"
+                    fieldNote={run().study !== null}
+                    onReplayStart={() => {
+                      viewBeforeReplay = viewportMode();
+                      setViewport("scene");
+                    }}
+                    onReplayEnd={() => setViewport(viewBeforeReplay)}
+                  />
+                );
+              }}
             </Show>
 
             <label class="switch compact">
