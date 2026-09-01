@@ -104,11 +104,23 @@ fn soft_shadow(ro: vec3<f32>, rd: vec3<f32>, k: f32) -> f32 {
   return clamp(visibility, 0.0, 1.0);
 }
 
+// The viewport ground.
+//
+// `u.bg_color` is the ground colour in *linear radiance*: the caller has
+// already inverted this shader's tone map and gamma, so a ray that hits
+// nothing lands on exactly the colour the viewport declares.
+//
+// It is flat, and the flatness is the point. The old version was a gradient —
+// ground at 0.45x, sky brightened to 1.8x and mixed toward a hard-coded blue
+// — which a dark viewport needs, because there the environment is the only
+// thing lighting a miss. Two things rule it out here. A light ground washes
+// every face toward its own value, so the gradient's bright half erases the
+// model; and the default projection is orthographic, where every primary ray
+// shares one direction, so a direction-dependent environment collapses to a
+// single colour that *changes as the camera orbits*. A ground you measure a
+// field against cannot be a function of the camera.
 fn environment_radiance(direction: vec3<f32>) -> vec3<f32> {
-  let horizon = max(u.bg_color.xyz, vec3<f32>(0.01));
-  let ground = horizon * 0.45;
-  let sky = mix(horizon * 1.8, vec3<f32>(0.58, 0.70, 0.92), 0.55);
-  return mix(ground, sky, smoothstep(-0.2, 0.7, direction.y));
+  return max(u.bg_color.xyz, vec3<f32>(0.001));
 }
 
 fn fresnel_schlick(cosine: f32, f0: vec3<f32>) -> vec3<f32> {
@@ -163,20 +175,40 @@ fn shade_material(
     }
   }
 
+  // Silhouette contour.
+  //
+  // On a dark ground a part reads because it is the bright thing; on a light
+  // one it has to read by its edge, because the tone map pushes any lit face
+  // and the background into the same shoulder. This darkens only the sliver
+  // where the surface turns away from the eye — a drawn outline that follows
+  // the geometry, costing no value anywhere on the interior.
+  let facing = abs(dot(normal, view_direction));
+  let contour = mix(0.16, 1.0, smoothstep(0.0, 0.30, facing));
+
   if (display_flag(DISPLAY_FLAT)) {
     // Flat shading: albedo lit only by incidence and shadowing — no specular
-    // and no environment. The ambient floor keeps unlit faces readable while
-    // still letting a shadow register.
-    return base_color * mix(0.35, 1.0, normal_dot_light * visibility);
+    // and no environment. The floor was 0.35 against a black viewport, where
+    // the only risk was an unlit face disappearing; on paper the risk is the
+    // opposite, a lit face washing into the ground. The range is quoted in
+    // linear radiance and the tone map's shoulder eats most of the top of it:
+    // 0.30..0.92 of a 0.85 albedo lands at sRGB 166..224 against a 230 ground,
+    // which is the pale blob. 0.13..0.48 lands at 105..193 — a solid grey part
+    // — and the contour closes the silhouette.
+    return base_color * mix(0.13, 0.48, normal_dot_light * visibility) * contour;
   }
   let light_radiance =
     vec3<f32>(1.0, 0.92, 0.82) * max(u.light_dir.w, 1.0);
   let direct =
     (diffuse + specular) * light_radiance * normal_dot_light * visibility;
-  let ambient = base_color * environment_radiance(normal) * 0.18;
+  // The dome is now roughly the background's own radiance rather than a dark
+  // gradient, so the same 0.18 coefficient delivers about five times the
+  // ambient it used to. 0.07 keeps the unlit side of a part where it was in
+  // absolute terms, which is what stops the whole model flattening to the
+  // ground's value.
+  let ambient = base_color * environment_radiance(normal) * 0.07;
   let reflected = environment_radiance(reflect(ray_direction, normal));
   let mirror = select(0.0, reflectivity, display_flag(DISPLAY_REFLECTIONS));
-  let opaque = mix(direct + ambient, reflected, mirror);
+  let opaque = mix(direct + ambient, reflected, mirror) * contour;
   let glass_fresnel = fresnel_schlick(
     max(dot(view_direction, normal), 0.0),
     vec3<f32>(0.04),
@@ -250,9 +282,18 @@ fn trace_pixel(frag_xy: vec2<f32>) -> TraceResult {
       // Fade faces that point at the viewer and keep grazing angles solid, so
       // silhouettes and creases stay legible while interiors turn translucent.
       let facing = 1.0 - abs(dot(normal, ray.direction));
-      let alpha = mix(0.12, 0.95, facing * facing);
+      let alpha = mix(0.42, 0.97, facing * facing);
+      // On paper a face cannot fade toward the background: the ground is the
+      // brightest thing on screen, so "transparent" and "absent" would be the
+      // same pixel and an x-rayed solid disappears entirely (measured: sRGB
+      // 222 of geometry against a 225 ground). It fades toward a veil instead
+      // — the ground knocked down a fifth — and it fades less far, so the
+      // ghost is a pale tint at sRGB ~208 with its grazing edges running down
+      // to ~104. That is the same reading the dark viewport got from the
+      // opposite direction: faint where you look through the part, strong
+      // where the surface turns away.
       result.color = mix(
-        environment_radiance(ray.direction),
+        environment_radiance(ray.direction) * 0.80,
         result.color,
         mix(1.0, alpha, xray),
       );

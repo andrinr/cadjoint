@@ -13,7 +13,10 @@ struct SimUniforms {
   clip      : vec4<f32>,
   // min scalar, 1 / (max - min), hover tint strength, clip enabled flag.
   params    : vec4<f32>,
-  // x: ramp selector (0 = field/viridis, 1 = quality/magma); yzw unused.
+  // x: ramp selector (0 = field/viridis, 1 = quality/magma).
+  // yzw: camera position in world space. The facet normal comes from
+  // screen-space derivatives, whose sign depends on the derivative order, so
+  // the eye vector is needed both to orient it and to find the silhouette.
   extra     : vec4<f32>,
 };
 @group(0) @binding(0) var<uniform> s: SimUniforms;
@@ -83,10 +86,32 @@ fn fs_sim(input: SimVertex) -> @location(0) vec4<f32> {
   color = mix(color, vec3<f32>(1.0, 0.62, 0.25), s.params.z);
   // Flat facet shading from screen-space derivatives; clipped cross sections
   // keep their facet normal too, which reads like a real cut.
-  let normal = normalize(cross(dpdx(input.world), dpdy(input.world)));
-  let light = normalize(vec3<f32>(0.55, 0.8, 0.35));
-  let shade = 0.62 + 0.38 * abs(dot(normal, light));
-  return vec4<f32>(color * shade, 1.0);
+  //
+  // On the paper viewport the field can no longer be read by its own
+  // brightness: viridis(1) is 1.02:1 against `#e6e6e9` and magma(1) is
+  // 1.15:1, so a hot region and the ground are the same luminance. Two
+  // changes carry the form instead.
+  //
+  // 1. A signed Lambert term rather than `abs(dot(...))`. `abs` was a
+  //    dark-ground trick — it kept every facet emitting — but it folds the
+  //    normal sphere in half, so a facet turned away from the key light was
+  //    drawn as bright as one turned into it. With the eye vector in
+  //    `extra.yzw` the derivative normal can be oriented, so the term can be
+  //    signed and faces pointing away can go properly dark. The key light
+  //    also moved off the diagonal: at (0.55, 0.8, 0.35) the three visible
+  //    faces of an axis-aligned part all sat within 0.15 of each other, and
+  //    on paper facet separation is most of what draws the form.
+  // 2. A silhouette contour. The outermost sliver of the surface — where the
+  //    facet turns away from the eye — is darkened hard. That is the only
+  //    thing separating a yellow field from a white ground, and it costs no
+  //    colour fidelity anywhere but the rim.
+  let eye = normalize(s.extra.yzw - input.world);
+  var normal = normalize(cross(dpdx(input.world), dpdy(input.world)));
+  normal = normal * sign(dot(normal, eye) + 1e-6);
+  let light = normalize(vec3<f32>(0.30, 0.86, 0.42));
+  let shade = 0.42 + 0.58 * max(dot(normal, light), 0.0);
+  let contour = mix(0.32, 1.0, smoothstep(0.0, 0.2, abs(dot(normal, eye))));
+  return vec4<f32>(color * shade * contour, 1.0);
 }
 
 // ── element edges: the mesh's boundary-face edge lines ───────────────────

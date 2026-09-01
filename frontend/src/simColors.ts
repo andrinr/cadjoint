@@ -1,9 +1,9 @@
 /**
  * The single source of truth for every simulation/meshing color role.
  *
- * The viewport is dark and two scalar ramps live on it, so each role is
- * chosen for a specific legibility contract (asserted numerically in
- * test/simColors.test.ts):
+ * The viewport is a light paper ground and two scalar ramps live on it, so
+ * each role is chosen for a specific legibility contract (asserted
+ * numerically in test/simColors.test.ts):
  *
  * - FIELD ramp — viridis, for solved nodal fields (temperature, stress).
  *   Its yellow-green→yellow high end is *reserved*: no overlay hue may sit
@@ -12,9 +12,11 @@
  *   viridis end to end, so a quality heatmap is never mistaken for a
  *   temperature field.
  * - BC overlay hues — four saturated colors, mutually distinguishable,
- *   ≥3:1 contrast against the dark viewport background, and clear of the
+ *   ≥3:1 contrast against the paper viewport background, and clear of the
  *   Simulate amber accent, the selection lime, and both ramps' high ends.
- * - Proposal cyan — the builder's live selection preview.
+ *   All four are *darker* than paper: on a light ground an overlay reads by
+ *   being heavier than its surround, not brighter.
+ * - Proposal teal — the builder's live selection preview.
  * - Element edges — near-black charcoal: crisp over both ramps' mid/high
  *   ranges (where nearly all pixels of a well-formed mesh sit); over the
  *   darkest field regions edge legibility falls back to facet shading.
@@ -88,31 +90,41 @@ export const fieldRampCss = (stops = 12): string => rampGradient(fieldRamp, stop
 export const qualityRampCss = (stops = 12): string => rampGradient(qualityRamp, stops);
 
 /**
- * The viewport's effective dark background, for contrast assertions.
+ * The viewport's paper ground, for contrast assertions — `#e6e6e9`.
  *
- * The raymarched environment is a dark gradient; this is its brightest
- * representative sample, so a ratio passing here passes everywhere.
+ * The raymarched environment is a shallow dome around this value; the dome
+ * only ever goes *darker* than it (see `environment_radiance` in
+ * `cadjoint/viewer/_webgpu.py`), so this is its brightest representative
+ * sample and a ratio passing here passes everywhere in the viewport.
+ *
+ * Measured: OKLab L 0.926, and 19.2 ΔOKLab from its nearest viridis sample
+ * (viridis(1.00) `#fae720`) — the field separates from the ground as a
+ * colour even where it does not separate as a luminance.
  */
-export const VIEWPORT_BACKGROUND: Rgb = [0.09, 0.1, 0.09];
+export const VIEWPORT_BACKGROUND: Rgb = [0.902, 0.902, 0.914];
 
 /**
  * BC-type overlay hues (area tint + the panel's row swatches and legend).
  *
- * azure / orange / violet / red: mutually distinguishable, ≥3:1 against
- * the dark viewport, and none sits on either ramp's reserved high end.
+ * azure / ochre / violet / red: mutually distinguishable, ≥3:1 against the
+ * paper viewport, and none sits on either ramp's reserved high end. Each is
+ * the darkest-but-one step of its own hue that still holds full chroma —
+ * on paper the hue survives the darkening, and the ramps stay the most
+ * saturated thing on screen because they still own both ends of L.
  */
 export const BC_TYPE_COLORS: Record<StudyBcType, Rgb> = {
-  dirichlet: [0.24, 0.545, 1.0],
-  heat_flux: [1.0, 0.54, 0.15],
-  fixed: [0.72, 0.42, 1.0],
-  traction: [1.0, 0.3, 0.37],
+  dirichlet: [0.122, 0.482, 0.961],
+  heat_flux: [0.753, 0.408, 0.114],
+  fixed: [0.667, 0.322, 0.965],
+  traction: [0.953, 0.161, 0.286],
 };
 
 /**
- * The builder's live proposal preview: bright cyan. Not on either ramp's
- * high end, far from the selection lime and the Simulate amber accent.
+ * The builder's live proposal preview: deep teal. Not on either ramp's
+ * high end, far from the selection lime and the Simulate amber accent, and
+ * 4.1:1 against paper — the pale cyan this replaces measured 1.3:1 there.
  */
-export const PROPOSAL_COLOR: Rgb = [0.25, 0.9, 1.0];
+export const PROPOSAL_COLOR: Rgb = [0.106, 0.475, 0.529];
 
 /**
  * Element-edge lines, dark tone: drawn where the ramp value under the

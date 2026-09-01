@@ -150,12 +150,12 @@ fn sdf_normal(position: vec3<f32>) -> vec3<f32> {
   ));
 }
 
+// The viewport ground — see the identical function in `_webgpu.py` for why it
+// is flat. Keep the two in sync: the preview and the accumulated path trace
+// are the same picture at two sample counts, and a background that changes
+// when the trace starts reads as a bug.
 fn environment_radiance(direction: vec3<f32>) -> vec3<f32> {
-  let horizon = max(u.bg_color.xyz, vec3<f32>(0.01));
-  let ground = horizon * 0.45;
-  let sky = mix(horizon * 1.8, vec3<f32>(0.58, 0.70, 0.92), 0.55);
-  let blend = smoothstep(-0.2, 0.7, direction.y);
-  return mix(ground, sky, blend);
+  return max(u.bg_color.xyz, vec3<f32>(0.001));
 }
 
 fn orthonormal_basis(normal: vec3<f32>) -> mat3x3<f32> {
@@ -366,7 +366,16 @@ fn trace_path(
 
     let intersection = trace_scene(origin, direction);
     if (!intersection.hit) {
-      radiance += throughput * environment_radiance(direction);
+      // Backplate and light dome are the same colour but not the same
+      // intensity. A camera ray that misses has to land on exactly the paper
+      // the viewport declares; a *bounce* ray that misses is the studio's
+      // fill light, and at paper's own radiance a white part lit by a white
+      // dome converges on the ground and the silhouette dissolves. The dome
+      // is therefore half the backplate — the standard backplate/HDRI split,
+      // and the only knob that keeps a light part legible on a light ground
+      // without touching the BSDF.
+      let dome = select(0.5, 1.0, bounce == 0u);
+      radiance += throughput * environment_radiance(direction) * dome;
       break;
     }
 

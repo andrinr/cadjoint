@@ -33,8 +33,14 @@ import { contrastRatio, type Rgb } from "./simColors";
  * repaint is a change here and nowhere else.
  */
 export const CHROME = {
+  // The viewport is paper. It is the one surface in the app that is light,
+  // and it is light because it is not chrome: it is the ground the field is
+  // measured against, and viridis' closest sample to it sits 19.2 ΔOKLab away
+  // (`VIEWPORT_BACKGROUND` in src/simColors.ts carries that argument). Chrome
+  // ink never lands here — VIEWPORT_INK below is what is drawn on it.
+  "surface-viewport": "#e6e6e9",
+
   // Surfaces, darkest (furthest back) to lightest (nearest the pointer).
-  "surface-viewport": "#090b0a",
   "surface-base": "#0a0c0b",
   "surface-bar": "#0b0d0c",
   "surface-bar-alt": "#0d0f0e",
@@ -76,9 +82,35 @@ export const CHROME = {
   info: "#9adcf4",
   "info-ink": "#c9efff",
   ok: "#9fe7bd",
+
+  // ── viewport ink ────────────────────────────────────────────────────────
+  // Everything drawn *inside* the viewport rectangle by the DOM: dimension
+  // labels, the hint bar, the mode cue on the viewport border. On paper the
+  // polarity flips — annotations are dark ink with a light halo, not light
+  // ink with a dark one — so chrome's three ink levels cannot be reused here
+  // (`ink` measures 1.06:1 on `#e6e6e9`). Every tone here clears AA on paper
+  // — 14.4 / 7.0 / 4.6 / 4.6 / 4.6 / 4.6 — and the three mode tones are the
+  // mode accents at the weight paper needs: the lime, unchanged, measured
+  // 1.01:1 there and was simply not visible.
+  "viewport-ink": "#17171b",
+  "viewport-ink-2": "#4a4a53",
+  "viewport-mark": "#1769a9",
+  "viewport-model": "#5b6d15",
+  "viewport-sketch": "#18707d",
+  "viewport-simulate": "#8f5a16",
 } as const;
 
 export type ChromeToken = keyof typeof CHROME;
+
+/** Ink drawn directly on the viewport's paper ground; owes WCAG AA there. */
+export const VIEWPORT_TONES: ChromeToken[] = [
+  "viewport-ink",
+  "viewport-ink-2",
+  "viewport-mark",
+  "viewport-model",
+  "viewport-sketch",
+  "viewport-simulate",
+];
 
 /** Editing modes, in switcher and keyboard-cycling order. */
 export const MODE_ACCENTS = {
@@ -115,9 +147,13 @@ export const TEXT_TONES: ChromeToken[] = [
   "ok",
 ];
 
-/** Surfaces text and marks are drawn on, brightest last (worst case). */
+/**
+ * Chrome surfaces text and marks are drawn on, brightest last (worst case).
+ *
+ * `surface-viewport` is deliberately absent: it is paper, chrome ink is never
+ * drawn on it, and VIEWPORT_TONES is measured against it separately.
+ */
 export const TEXT_SURFACES: ChromeToken[] = [
-  "surface-viewport",
   "surface-base",
   "surface-bar",
   "surface-bar-alt",

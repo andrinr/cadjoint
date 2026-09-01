@@ -18,7 +18,12 @@
 
 :root {
   /* ── colour: surfaces, back to front ───────────────────────────────── */
-  --surface-viewport: #090b0a;
+  /* The viewport is paper — the one light surface in the app, because it is
+     the ground a measurement is read against rather than chrome. Everything
+     drawn on it uses the --viewport-* ink below, never --ink. */
+  --surface-viewport: #e6e6e9;
+  --surface-viewport-94: rgba(230, 230, 233, 0.94);
+  --surface-viewport-70: rgba(230, 230, 233, 0.7);
   --surface-base: #0a0c0b;
   --surface-bar: #0b0d0c;
   --surface-bar-alt: #0d0f0e;
@@ -66,6 +71,21 @@
   --info: #9adcf4;
   --info-ink: #c9efff;
   --ok: #9fe7bd;
+
+  /* ── colour: viewport ink ──────────────────────────────────────────── */
+  /* Ink drawn inside the viewport rectangle, where the ground is paper and
+     the polarity is therefore inverted: dark ink with a light halo. Mirrors
+     the same names in src/tokens.ts; each clears AA on --surface-viewport. */
+  --viewport-ink: #17171b;
+  --viewport-ink-2: #4a4a53;
+  --viewport-mark: #1769a9;
+  --viewport-model: #5b6d15;
+  --viewport-sketch: #18707d;
+  --viewport-simulate: #8f5a16;
+  --viewport-mark-rgb: 23, 105, 169;
+  --viewport-model-rgb: 91, 109, 21;
+  --viewport-sketch-rgb: 24, 112, 125;
+  --viewport-simulate-rgb: 143, 90, 22;
 
   /* Accent alpha ladder. An accent appears at exactly six strengths, and
      each step means something: a wash is a surface barely touched, a tint is
@@ -158,22 +178,30 @@
   color-scheme: dark;
 }
 
-/* Per-mode accent, threaded through the mode switcher, tool rail, dock
-   section headers, hint bar, and the viewport border. MODE_ACCENTS in
-   src/tokens.ts is the source; test/tokens.test.ts asserts the match. */
+/* Per-mode accent, threaded through the mode switcher, tool rail and dock
+   section headers, plus a viewport-weight twin for the hint bar, the
+   viewport border and anything else drawn on paper — the chrome accents are
+   1.0-1.5:1 there. MODE_ACCENTS in src/tokens.ts is the source;
+   test/tokens.test.ts asserts the match. */
 .app[data-mode="model"] {
   --mode-accent: var(--accent-model);
   --mode-accent-rgb: var(--accent-model-rgb);
+  --viewport-accent: var(--viewport-model);
+  --viewport-accent-rgb: var(--viewport-model-rgb);
 }
 
 .app[data-mode="sketch"] {
   --mode-accent: var(--accent-sketch);
   --mode-accent-rgb: var(--accent-sketch-rgb);
+  --viewport-accent: var(--viewport-sketch);
+  --viewport-accent-rgb: var(--viewport-sketch-rgb);
 }
 
 .app[data-mode="simulate"] {
   --mode-accent: var(--accent-simulate);
   --mode-accent-rgb: var(--accent-simulate-rgb);
+  --viewport-accent: var(--viewport-simulate);
+  --viewport-accent-rgb: var(--viewport-simulate-rgb);
 }
 
 * {
@@ -1078,7 +1106,9 @@ input[type="checkbox"] {
   height: var(--control-xl);
   padding: 0 var(--space-5) 0 var(--space-4);
   border: 1px solid var(--line);
-  border-top: 2px solid rgba(var(--mode-accent-rgb, var(--accent-model-rgb)), var(--alpha-edge));
+  /* The mode strip is the one edge of this button that meets the paper, so it
+     is drawn at viewport weight: the chrome lime measures 1.04:1 there. */
+  border-top: 2px solid rgba(var(--viewport-accent-rgb, var(--viewport-model-rgb)), var(--alpha-mark));
   border-radius: var(--radius-lg);
   background: var(--surface-float-90);
   box-shadow: var(--shadow-md);
@@ -1092,7 +1122,7 @@ input[type="checkbox"] {
 .material-launch:hover,
 .sim-launch:hover {
   border-color: var(--line-strong);
-  border-top-color: rgba(var(--mode-accent-rgb, var(--accent-model-rgb)), var(--alpha-edge));
+  border-top-color: var(--viewport-accent, var(--viewport-model));
 }
 
 .object-tree-launch svg {
@@ -1625,9 +1655,13 @@ input[type="checkbox"] {
   width: 60px;
   height: 60px;
   padding: 0;
-  border: 1px solid rgba(var(--mode-accent-rgb, var(--accent-model-rgb)), var(--alpha-veil));
+  /* Opaque, and edged in the viewport's accent weight. Both are consequences
+     of the paper ground: at 82% the face composited toward it and its ink-3
+     label measured 3.63:1, and the chrome lime edge measured 1.04:1 against
+     the paper it sits on. */
+  border: 1px solid rgba(var(--viewport-accent-rgb, var(--viewport-model-rgb)), var(--alpha-mark));
   border-radius: var(--radius-xs);
-  background: var(--surface-float-80);
+  background: var(--surface-float);
   color: var(--ink-3);
   font: var(--type-kicker);
   letter-spacing: var(--tracking-caps);
@@ -1658,9 +1692,15 @@ input[type="checkbox"] {
   height: var(--control-sm);
   padding: 0;
   border-radius: var(--radius-sm);
-  background: var(--surface-float-80);
+  background: var(--surface-float);
   font: var(--type-kicker);
   letter-spacing: 0.06em;
+}
+
+/* These two sit straight on the paper, so their active edge is drawn at
+   viewport weight; the shared control accent measures 1.04:1 there. */
+.cube-actions button.active {
+  border-color: rgba(var(--viewport-accent-rgb, var(--viewport-model-rgb)), var(--alpha-mark));
 }
 
 .view-menu {
@@ -2278,9 +2318,9 @@ button.icon {
   position: absolute;
   inset: 0;
   z-index: 6;
-  border: 1px solid rgba(var(--mode-accent-rgb, var(--accent-model-rgb)), var(--alpha-tint-strong));
+  border: 1px solid rgba(var(--viewport-accent-rgb, var(--viewport-model-rgb)), var(--alpha-veil));
   border-top: 2px solid
-    rgba(var(--mode-accent-rgb, var(--accent-model-rgb)), var(--alpha-edge));
+    rgba(var(--viewport-accent-rgb, var(--viewport-model-rgb)), var(--alpha-mark));
   pointer-events: none;
   transition: border-color var(--dur-slow) var(--ease);
 }
@@ -2296,7 +2336,7 @@ button.icon {
 
 .viewer-canvas.material-drop-active {
   outline: 2px solid
-    rgba(var(--mode-accent-rgb, var(--accent-model-rgb)), var(--alpha-mark));
+    rgba(var(--viewport-accent-rgb, var(--viewport-model-rgb)), var(--alpha-mark));
   outline-offset: -7px;
 }
 
@@ -2312,7 +2352,9 @@ button.icon {
   border: 1px solid
     rgba(var(--mode-accent-rgb, var(--accent-model-rgb)), var(--alpha-veil));
   border-radius: var(--radius-pill);
-  background: var(--surface-float-80);
+  /* Opaque: over paper an 82% chip composites toward the ground and the
+     accent label loses its measured ratio. */
+  background: var(--surface-float-96);
   color: var(--mode-accent, var(--accent-model));
   font: var(--type-kicker);
   letter-spacing: var(--tracking-caps);
@@ -2356,15 +2398,18 @@ button.icon {
   pointer-events: none;
 }
 
+/* Dimensions on paper: the mark blue, and — the part that inverts with the
+   ground — a dark label inside a paper halo. Light-on-dark was the right way
+   round over a black viewport and is unreadable over this one. */
 .constraint-distance {
-  fill: var(--info);
-  stroke: rgba(var(--info-rgb), var(--alpha-edge));
+  fill: var(--viewport-mark);
+  stroke: rgba(var(--viewport-mark-rgb), var(--alpha-edge));
   stroke-width: 1;
   vector-effect: non-scaling-stroke;
 }
 
 .constraint-distance .dimension {
-  stroke: var(--info);
+  stroke: var(--viewport-mark);
   stroke-width: 1.35;
 }
 
@@ -2374,8 +2419,8 @@ button.icon {
 }
 
 .constraint-distance text {
-  fill: var(--info-ink);
-  stroke: rgba(9, 11, 10, 0.94);
+  fill: var(--viewport-ink);
+  stroke: var(--surface-viewport-94);
   stroke-width: 5px;
   paint-order: stroke fill;
   font: var(--type-mono-strong);
@@ -2385,19 +2430,19 @@ button.icon {
 }
 
 .constraint-fixed circle {
-  fill: var(--surface-float-90);
-  stroke: var(--accent-model);
+  fill: var(--surface-viewport-94);
+  stroke: var(--viewport-model);
   stroke-width: 1.2;
 }
 
 .constraint-fixed rect {
-  fill: var(--accent-model);
+  fill: var(--viewport-model);
   stroke: none;
 }
 
 .constraint-fixed path {
   fill: none;
-  stroke: var(--accent-model);
+  stroke: var(--viewport-model);
   stroke-width: 1.4;
   stroke-linecap: round;
 }
@@ -2411,7 +2456,7 @@ button.icon {
   margin: 0;
   overflow: hidden;
   text-align: right;
-  color: var(--ink-3);
+  color: var(--viewport-ink-2);
   font-size: var(--text-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2421,10 +2466,13 @@ button.icon {
 /* Active editing mode, leading the hint bar: an accent-tinted pill. */
 .viewer-hint .hint-mode {
   padding: var(--space-1) var(--space-3);
-  border: 1px solid rgba(var(--mode-accent-rgb, var(--accent-model-rgb)), var(--alpha-edge));
+  border: 1px solid rgba(var(--viewport-accent-rgb, var(--viewport-model-rgb)), var(--alpha-edge));
   border-radius: var(--radius-pill);
-  background: rgba(var(--mode-accent-rgb, var(--accent-model-rgb)), var(--alpha-tint));
-  color: var(--mode-accent, var(--accent-model));
+  /* Opaque paper, not an accent wash: the wash lifts the ground far enough
+     to take the tone to 4.3:1, and an opaque pill also knocks the geometry
+     out from under the text. */
+  background: var(--surface-viewport);
+  color: var(--viewport-accent, var(--viewport-model));
   font: var(--type-kicker);
   letter-spacing: var(--tracking-caps);
   text-transform: uppercase;
@@ -3358,8 +3406,8 @@ button.icon {
 .bc-pick-rect {
   position: absolute;
   z-index: 6;
-  border: 1px dashed rgba(var(--mode-accent-rgb, var(--accent-model-rgb)), var(--alpha-mark));
-  background: rgba(var(--mode-accent-rgb, var(--accent-model-rgb)), var(--alpha-wash));
+  border: 1px dashed rgba(var(--viewport-accent-rgb, var(--viewport-model-rgb)), var(--alpha-mark));
+  background: rgba(var(--viewport-accent-rgb, var(--viewport-model-rgb)), var(--alpha-tint));
   pointer-events: none;
 }
 

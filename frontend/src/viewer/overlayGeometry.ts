@@ -23,17 +23,35 @@ export const GIZMO_STRIDE = 44;
 
 export type Rgba = readonly [number, number, number, number];
 
+/**
+ * Construction-overlay ink, tuned for the paper viewport.
+ *
+ * Every value here is *darker* than the ground: on `#e6e6e9` an overlay reads
+ * by weight, not by glow, so the whole set is the same hues the dark viewport
+ * used, dropped to the lightest step that still clears ~3:1 against paper.
+ * Measured against paper (`#e6e6e9`) and against the lightest facet the SDF
+ * shading produces (`#c8c8cb`):
+ *
+ *   edge           #6a7f1a   3.62 / 2.70      edgeSelected   #915b16  4.54 / 3.39
+ *   edgeHover      #809821   2.62 / 1.96      handle         #db3c1c  3.61 / 2.69
+ *   handleSelected #17171b  14.35 / 10.71     handleHover    #d66b21  2.82 / 2.10
+ *   meshSharp      #1f8696   3.43 / 2.56      meshWire       #5a5a60  5.50 / 4.10
+ *
+ * The hover tones sit deliberately below 3:1 — hover is a transient state
+ * shown next to its resting colour, and the pair is separated by lightness
+ * as well as by the shape under the pointer.
+ */
 export const COLORS: Record<string, Rgba> = {
-  edge: [0.851, 1.0, 0.341, 0.95],
-  edgeLocked: [0.58, 0.6, 0.56, 0.7],
-  handle: [1.0, 0.506, 0.404, 1.0],
-  handleSelected: [0.98, 0.99, 0.94, 1.0],
-  handleHover: [1.0, 0.72, 0.4, 1.0],
-  handleLocked: [0.62, 0.64, 0.6, 0.9],
-  edgeSelected: [1.0, 0.95, 0.6, 1.0],
-  edgeHover: [0.95, 1.0, 0.72, 1.0],
-  meshWire: [0.5, 0.56, 0.62, 0.22],
-  meshSharp: [0.35, 0.85, 1.0, 0.95],
+  edge: [0.416, 0.498, 0.102, 0.95],
+  edgeLocked: [0.482, 0.482, 0.502, 0.7],
+  handle: [0.859, 0.235, 0.11, 1.0],
+  handleSelected: [0.09, 0.09, 0.106, 1.0],
+  handleHover: [0.839, 0.42, 0.129, 1.0],
+  handleLocked: [0.549, 0.549, 0.569, 0.9],
+  edgeSelected: [0.569, 0.357, 0.086, 1.0],
+  edgeHover: [0.502, 0.596, 0.129, 1.0],
+  meshWire: [0.353, 0.353, 0.376, 0.3],
+  meshSharp: [0.122, 0.525, 0.588, 0.95],
 };
 
 /**

@@ -3,7 +3,7 @@
  * (src/simColors.ts documents the intent; this file holds it to numbers):
  *
  * - the two ramps stay visually distinct along their whole length,
- * - BC overlay hues clear 3:1 WCAG contrast against the dark viewport,
+ * - BC overlay hues clear 3:1 WCAG contrast against the paper viewport,
  *   stay mutually distinguishable, and keep off both ramps' high ends,
  * - element-edge charcoal stays crisp over the ramps' mid/high ranges,
  * - the WGSL copies of the ramp polynomials and the edge color match the
@@ -41,14 +41,25 @@ describe("field vs quality ramps", () => {
     }
   });
 
-  it("both end bright: high field values and good quality read as light", () => {
-    expect(contrastRatio(fieldRamp(1), VIEWPORT_BACKGROUND)).toBeGreaterThan(7);
-    expect(contrastRatio(qualityRamp(1), VIEWPORT_BACKGROUND)).toBeGreaterThan(7);
+  it("both start dark: the cold end of a field separates from paper", () => {
+    // The polarity of this contract flips with the ground. On a dark viewport
+    // the assertion was that the ramps' *high* ends read (13.8 and 16.3:1
+    // there) while their cold ends vanished into the background at 1.17 and
+    // 1.19:1. On paper the mirror holds: the cold ends carry 12.1 and 16.9:1
+    // and the hot ends measure 1.02 and 1.15:1.
+    //
+    // Which end merges is a real trade, not a wash — the hot end is the end
+    // anyone is looking at — and it is why the FEM surface now draws a
+    // silhouette contour (see fs_sim in viewer/simulation.wgsl). Luminance is
+    // no longer what separates a hot region from the ground; hue is, at 19.2
+    // ΔOKLab, plus a drawn edge.
+    expect(contrastRatio(fieldRamp(0), VIEWPORT_BACKGROUND)).toBeGreaterThan(7);
+    expect(contrastRatio(qualityRamp(0), VIEWPORT_BACKGROUND)).toBeGreaterThan(7);
   });
 });
 
 describe("BC overlay hues", () => {
-  it("clear 3:1 contrast against the dark viewport", () => {
+  it("clear 3:1 contrast against the paper viewport", () => {
     for (const [type, color] of bcEntries) {
       expect(contrastRatio(color, VIEWPORT_BACKGROUND), type).toBeGreaterThanOrEqual(3);
     }

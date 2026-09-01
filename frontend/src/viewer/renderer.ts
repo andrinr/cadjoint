@@ -77,7 +77,37 @@ export {
   type Shaders,
 } from "./display";
 
-const BACKGROUND: GPUColorDict = { r: 0.035, g: 0.045, b: 0.035, a: 1 };
+/**
+ * The viewport's paper ground, `#e6e6e9`, as the swapchain sees it.
+ *
+ * The colour target is `bgra8unorm` and the SDF shaders gamma-encode
+ * themselves, so this is a *display-encoded* value: it is what a `loadOp:
+ * "clear"` writes, and it is what the fullscreen preview pass has to land on
+ * for a ray that hits nothing. Mirrored as `VIEWPORT_BACKGROUND` in
+ * `src/simColors.ts`, which is where every overlay measures itself against it.
+ */
+const BACKGROUND: GPUColorDict = { r: 0.902, g: 0.902, b: 0.914, a: 1 };
+
+/**
+ * The same paper, as *linear radiance* for `u.bg_color`.
+ *
+ * `environment_radiance` in `cadjoint/viewer/_webgpu.py` returns this
+ * unchanged and the result goes through ACES then gamma 2.2, so handing it the
+ * display value would land the background near `#c4c4c8` — visibly grey
+ * against the chrome. These are the pre-images of the three channels above
+ * under `pow(aces(x), 1/2.2)`, solved once here rather than per fragment.
+ */
+const BACKGROUND_RADIANCE: readonly [number, number, number] = [0.9684, 0.9684, 1.0819];
+
+/**
+ * Key-light intensity for the PBR and path-traced modes.
+ *
+ * A dark ground let the key run hot — the geometry was the only bright thing
+ * on screen. Against paper the same 3.0 pushed every lit face into the tone
+ * map's shoulder, where it converged with the background; 1.5 keeps the lit
+ * faces below the ground and lets the shading, not the exposure, carry form.
+ */
+const KEY_LIGHT_INTENSITY = 1.5;
 
 /** Fraction of the distance to the camera that construction overlays are pulled forward. */
 const DEPTH_NUDGE = 0.004;
@@ -838,8 +868,8 @@ export class Renderer {
       this.canvas.width, this.canvas.height, 0, 0,
       position[0], position[1], position[2], 0,
       this.camera.target[0], this.camera.target[1], this.camera.target[2], 0,
-      0.55, 0.8, 0.35, 3,
-      BACKGROUND.r, BACKGROUND.g, BACKGROUND.b, 1,
+      0.55, 0.8, 0.35, KEY_LIGHT_INTENSITY,
+      BACKGROUND_RADIANCE[0], BACKGROUND_RADIANCE[1], BACKGROUND_RADIANCE[2], 1,
       this.sampleCount, this.quality.bounces, this.quality.shadowSamples, 0,
       this.display.projection === "orthographic" ? 1 : 0,
       orthoHeightFor(this.camera.distance),
@@ -877,7 +907,11 @@ export class Renderer {
       sim.set(matrix, 0);
       sim.set([normal[0], normal[1], normal[2], offset], 16);
       sim.set([low, inverseRange, 0, this.simClip.enabled ? 1 : 0], 20);
-      sim.set([ramp, 0, 0, 0], 24);
+      // extra.yzw is the camera position: the FEM surface builds its facet
+      // normal from screen-space derivatives, and on the paper ground it needs
+      // the eye vector both to orient that normal and to darken the
+      // silhouette, which is what separates a hot field from the background.
+      sim.set([ramp, position[0], position[1], position[2]], 24);
       device.queue.writeBuffer(this.simUniformBuffer, 0, sim);
       // The highlight pass re-draws a face group's range with a warm tint.
       sim.set([low, inverseRange, 0.55, this.simClip.enabled ? 1 : 0], 20);

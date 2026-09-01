@@ -25,6 +25,7 @@ import {
   contrastRatio,
   fieldRamp,
   qualityRamp,
+  relativeLuminance,
   type Rgb,
 } from "../src/simColors";
 import {
@@ -39,6 +40,7 @@ import {
   SPACE,
   TEXT_SURFACES,
   TEXT_TONES,
+  VIEWPORT_TONES,
   TYPE_SCALE,
   WEIGHTS,
   chromeContrast,
@@ -188,6 +190,22 @@ describe("chrome legibility", () => {
     }
   });
 
+  it("clears WCAG AA for every viewport tone, on paper", () => {
+    // The viewport is the one light surface in the app, so it gets its own
+    // ink and its own assertion; chrome ink measures 1.06:1 here.
+    for (const tone of VIEWPORT_TONES) {
+      expect(chromeContrast(tone, "surface-viewport"), tone).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it("keeps chrome ink off the paper viewport", () => {
+    // Not a style rule — a bound. If any of these ever became legible on
+    // paper it would mean the viewport had stopped being paper.
+    for (const tone of ["ink", "ink-2", "ink-3"] as ChromeToken[]) {
+      expect(chromeContrast(tone, "surface-viewport"), tone).toBeLessThan(3);
+    }
+  });
+
   it("keeps the mode accents distinguishable from each other", () => {
     const accents = Object.values(MODE_ACCENTS).map(hexToRgb);
     for (let a = 0; a < accents.length; a++) {
@@ -235,13 +253,18 @@ describe("chrome stays clear of the data palette", () => {
     }
   });
 
-  it("keeps every chrome surface darker than the viewport's brightest sample", () => {
-    // Panels frame the viewport; they never out-glow what they frame.
+  it("keeps every chrome surface below the viewport's paper ground", () => {
+    // Panels frame the viewport; they are never the brighter thing. With a
+    // paper ground that stops being a contrast bound and becomes an ordering
+    // one — the chrome sits under the paper, and by a wide margin, so the
+    // frame reads as a frame and the field keeps the eye.
+    const paper = relativeLuminance(VIEWPORT_BACKGROUND);
     for (const surface of TEXT_SURFACES) {
+      expect(relativeLuminance(hexToRgb(CHROME[surface])), surface).toBeLessThan(paper);
       expect(
         contrastRatio(hexToRgb(CHROME[surface]), VIEWPORT_BACKGROUND),
         surface,
-      ).toBeLessThan(2);
+      ).toBeGreaterThan(10);
     }
   });
 });
