@@ -235,6 +235,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <li><a href="#differentiability-through-the-named-mesh-path-fd-proven" id="toc-differentiability-through-the-named-mesh-path-fd-proven" class="nav-link" data-scroll-target="#differentiability-through-the-named-mesh-path-fd-proven">Differentiability through the named-mesh path (FD-proven)</a></li>
   <li><a href="#reference-scene" id="toc-reference-scene" class="nav-link" data-scroll-target="#reference-scene">Reference scene</a></li>
   </ul></li>
+  <li><a href="#solver-tesseract-schema-deltas-tet4tet10-cells-thermal-fluxes-2026-09-01" id="toc-solver-tesseract-schema-deltas-tet4tet10-cells-thermal-fluxes-2026-09-01" class="nav-link" data-scroll-target="#solver-tesseract-schema-deltas-tet4tet10-cells-thermal-fluxes-2026-09-01">Solver-tesseract schema deltas: TET4/TET10 cells + thermal fluxes (2026-09-01)</a></li>
   </ul></li>
   </ul>
 </nav>
@@ -542,9 +543,21 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p><code>scenes/bracket.py</code> now unions the bracket with a rendered mounting slab (<code>mount</code>, plugs the bolt holes from below — scene surface genus 0, bracket domain still genus 2, both watertight) and declares <code>bracket_mesh = SimMesh(name="bracket-mesh", domain=bracket, ...)</code> + <code>pry_study = ElasticStudy(..., mesh=bracket_mesh)</code> — the viewer wave’s starting point for mesh cards, domain badges, and result inspection.</p>
 <p>Study constructor note for the viewer wave: <code>resolution</code> is now optional (<code>None</code> when mesh-backed) and material parameters are keyword-only (<code>dataclasses.KW_ONLY</code>); every existing call site already used keywords. <code>describe()</code> gained <code>"mesh"</code> (SimMesh name or null) and <code>"domain"</code> (name/type dict or null); <code>bounds</code>/<code>size</code> may now be null (auto bounds).</p>
 <p>Tests: <code>tests/fem</code> = 162 green with a live ccx binary (26 new in <code>test_simmesh.py</code>, 12 new study/result tests, bracket demo reworked); <code>tests/viewer</code> = 200, <code>tests/test_playground.py</code> = 61 — both untouched.</p>
-
-
 </section>
+</section>
+<section id="solver-tesseract-schema-deltas-tet4tet10-cells-thermal-fluxes-2026-09-01" class="level2">
+<h2 class="anchored" data-anchor-id="solver-tesseract-schema-deltas-tet4tet10-cells-thermal-fluxes-2026-09-01">Solver-tesseract schema deltas: TET4/TET10 cells + thermal fluxes (2026-09-01)</h2>
+<p>Schema changes to the packaged solver tesseracts (element type inferred from <code>cells.shape[1]</code>: 4/8/10; <code>(None, None)</code> in the schema):</p>
+<ul>
+<li><code>elastic_jaxfem</code>: + <code>traction_faces (None,3) Int32</code>, <code>traction_face_offsets (None,) Int32</code> (exact tet face targeting; empty = node membership). HEX8 path byte-identical to before.</li>
+<li><code>thermal_jaxfem</code>: + <code>flux_nodes/flux_offsets (None,) Int32</code>, <code>flux_values (None,) Float64</code>, <code>flux_faces (None,3) Int32</code>, <code>flux_face_offsets (None,) Int32</code>. Differentiable inputs unchanged (points, conductivity, source); flux values static like the direct backend’s closures.</li>
+<li><code>elastic_calculix</code>: + the two traction-face fields for parity with the base-class input dict (HEX8-only, must be empty).</li>
+<li><code>TesseractBackend</code> passes the new fields (empty face arrays on hex); heat-flux BCs now route through <code>backend="tesseract"</code> — parity with the direct backend &lt; 1e-9 (<code>tests/fem/test_tesseract_backend.py</code>).</li>
+<li>New <code>cadjoint/fem/tesseracts/chain.py</code>: <code>freeze_study_chain(study, sim_mesh, field)</code> — the frozen mesher+solver chain behind <code>Optimization(gradient_path="tesseract")</code> (see research/tet-vs-hex.md for the measurements and the default recommendation).</li>
+</ul>
+<p>Tesseract schemas reject extra input keys (pydantic extra=forbid via tesseract-core), so every schema fed by <code>TesseractBackend</code>’s input dict must carry the union of its fields — that is why <code>elastic_calculix</code> grew the (rejected-if-set) face fields.</p>
+
+
 </section>
 </section>
 

@@ -192,6 +192,11 @@ ul.task-list li input[type="checkbox"] {
   <li><a href="#the-dof-at-matched-accuracy-benchmark-benchmarkstet_vs_hex_bench.py" id="toc-the-dof-at-matched-accuracy-benchmark-benchmarkstet_vs_hex_bench.py" class="nav-link" data-scroll-target="#the-dof-at-matched-accuracy-benchmark-benchmarkstet_vs_hex_bench.py">The DOF-at-matched-accuracy benchmark (<code>benchmarks/tet_vs_hex_bench.py</code>)</a></li>
   <li><a href="#named-mesh-tet10-gradient-the-study-path-regression-testtet10namedmeshgradient" id="toc-named-mesh-tet10-gradient-the-study-path-regression-testtet10namedmeshgradient" class="nav-link" data-scroll-target="#named-mesh-tet10-gradient-the-study-path-regression-testtet10namedmeshgradient">Named-mesh tet10 gradient (the study-path regression, <code>TestTet10NamedMeshGradient</code>)</a></li>
   </ul></li>
+  <li><a href="#tet10-two-tesseract-chain-the-gradient-path-seam-2026-09-01" id="toc-tet10-two-tesseract-chain-the-gradient-path-seam-2026-09-01" class="nav-link" data-scroll-target="#tet10-two-tesseract-chain-the-gradient-path-seam-2026-09-01">TET10 two-Tesseract chain + the gradient-path seam (2026-09-01)</a>
+  <ul class="collapse">
+  <li><a href="#starter-heat-sink-on-the-chain-the-crease-heavy-validation" id="toc-starter-heat-sink-on-the-chain-the-crease-heavy-validation" class="nav-link" data-scroll-target="#starter-heat-sink-on-the-chain-the-crease-heavy-validation">Starter heat sink on the chain (the crease-heavy validation)</a></li>
+  <li><a href="#the-seam-optimization...-gradient_path" id="toc-the-seam-optimization...-gradient_path" class="nav-link" data-scroll-target="#the-seam-optimization...-gradient_path">The seam: <code>Optimization(..., gradient_path=)</code></a></li>
+  </ul></li>
   </ul></li>
   </ul>
 </nav>
@@ -921,6 +926,31 @@ ul.task-list li input[type="checkbox"] {
 </tbody>
 </table>
 <p>The web/rib gaps are the measured crease-subgradient structure from the gradient-validation section above (sharp DC vertices sit on SDF kinks; AD takes a one-sided branch, FD averages) — directionally exact, hence the sign/window assertions rather than tight rel bounds.</p>
+</section>
+</section>
+<section id="tet10-two-tesseract-chain-the-gradient-path-seam-2026-09-01" class="level2">
+<h2 class="anchored" data-anchor-id="tet10-two-tesseract-chain-the-gradient-path-seam-2026-09-01">TET10 two-Tesseract chain + the gradient-path seam (2026-09-01)</h2>
+<p>The packaged SOLVER tesseract schemas are now element-agnostic, completing the TET10 two-tesseract chain and opening the playground door:</p>
+<ul>
+<li><code>elastic_jaxfem</code> / <code>thermal_jaxfem</code>: <code>cells</code> is <code>(T, K)</code> with K = 4/8/10 picking TET4/HEX8/TET10 (meshio order); tet modes reuse <code>tet_elastic_solve</code> / <code>tet_thermal_solve</code> verbatim (same spsolve options, same adjoint contract — <code>points</code> differentiable). Optional exact-face targeting crosses the boundary as <code>traction_faces</code>/<code>flux_faces</code> + prefix-offset arrays (empty = pure node membership, the HEX8 behavior).</li>
+<li><code>thermal_jaxfem</code> additionally carries heat-flux (Neumann) patches: <code>flux_nodes</code>/<code>flux_offsets</code>/<code>flux_values</code>, mirroring the direct backend’s surface-map path; <code>TesseractBackend.thermal</code> forwards HeatFlux BCs now (the old NotImplementedError is gone).</li>
+<li><code>elastic_calculix</code> accepts the two new face fields for schema parity (HEX8-only; non-empty raises).</li>
+</ul>
+<p>Solver-stage parity (tests/fem/test_tesseract_tet.py, bar mesh 13x7x6): TET4 and TET10, elastic and thermal, apply == direct solve at max diff &lt; 1e-9 (measured 0.0 for the starter chain below); traced gradients through the tesseract boundary equal the direct adjoint &lt; 1e-9; the thermal design-gradient through <code>recompute_tet_points</code> + tesseract equals the direct route to 1e-9 relative (both -71.734 on the bar half-height, where central FD reads -60.42 — the known crease-subgradient gap, not a boundary artifact).</p>
+<section id="starter-heat-sink-on-the-chain-the-crease-heavy-validation" class="level3">
+<h3 class="anchored" data-anchor-id="starter-heat-sink-on-the-chain-the-crease-heavy-validation">Starter heat sink on the chain (the crease-heavy validation)</h3>
+<p>Lattice caveat (measured): the mesher tesseract meshes the <em>trilinear interpolant</em>, which self-intersects at the starter’s declared 18x13x11 resolution (both sharp modes). 24x18x15 is the coarsest lattice where sharp DC meshes the sink: 11 390 TET10 nodes / 6 459 tets / 1 384 surface vertices. The direct path meshes the true SDF at the declared resolution — the chain needs a finer lattice for the same scene.</p>
+<p>Measured on the frozen chain (mesher TET10 + flux-capable thermal tesseract, objective max temperature, conductivity 2.0, die flux 6.0):</p>
+<ul>
+<li>stage-2 parity vs <code>tet_thermal_solve</code> on the same mesh: max |dT| = 0.0;</li>
+<li>physics: T in [0, 1.139], slug bottom mean 0.990 vs held fin field 0.0;</li>
+<li>d(max T)/d(fin_depth) through both tesseracts: <strong>-0.2498</strong> (deeper fins cool the die — the sign the physics demands), via one <code>jax.grad</code> through mesher-VJP + solver adjoint.</li>
+</ul>
+<p>The direct-path comparator (<code>recompute_tet_points</code> on the same frozen mesh, smooth_passes=2 + direct TET10 solve) and the 4-step descent were still factorizing at freeze time (SuperLU on the 11.4k-DOF TET10 system dominates; the direct path re-solves per FD/descent step) — the harness tests <code>tests/fem/test_starter_chain.py::TestStarterChain</code> assert the sign-consistency and descent when they complete. Hex seam smoke (bar 22x5x5, Dirichlet+flux): tesseract path J=1.000000 grad_norm=3.637 vs direct J=1.000000 grad_norm=8.119 — same forward value, both descend, the norm gap is the box-crease gauge difference.</p>
+</section>
+<section id="the-seam-optimization...-gradient_path" class="level3">
+<h3 class="anchored" data-anchor-id="the-seam-optimization...-gradient_path">The seam: <code>Optimization(..., gradient_path=)</code></h3>
+<p><code>cadjoint/optimize.py</code> now takes <code>gradient_path="direct"|"tesseract"</code> (study form only, <strong>default unchanged: “direct”</strong>). “tesseract” swaps the per-step derivative chain at the marked seam for <code>cadjoint/fem/tesseracts/chain.py::freeze_study_chain</code>: lattice samples -&gt; mesher tesseract (frozen-topology templates, sharp-&gt;Tikhonov fallback, interpolation VJP) -&gt; solver tesseract adjoint -&gt; metric (mean/max both physics; compliance reuses the traction-work helper). Refreeze failures degrade exactly like the direct path (keep previous topology mid-run, clear error at step 0); the final reported result is always evaluated on the direct path. Default-flip recommendation: NOT yet — the interpolant needs a finer lattice than the declared meshes (18x13x11 starter fails to mesh), the VJP drops tangential crease motion, and the direct-vs-chain magnitude comparison on the starter is still running; revisit with those numbers in hand.</p>
 
 
 </section>
