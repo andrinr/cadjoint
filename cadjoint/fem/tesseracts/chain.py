@@ -7,13 +7,15 @@ cut**:
   whole meshing pipeline in the ``mesher`` tesseract and carries
   ``d(points)/d(field samples)`` with its surface-interpolation VJP.
 * :func:`freeze_study_chain_dc` (``gradient_path="tesseract-dc"``) keeps
-  dual contouring in JAX — frozen crossing edges, differentiable Newton on
-  the **true SDF**, QEF through a differentiable linear solve, then the
-  same Newton projection ``tetmesh.sdf_to_tet_mesh`` applies before TetGen
-  — and wraps only TetGen, in the ``tetfill`` tesseract, whose VJP is an
-  exact pass-through on the vertices ``-Y`` preserves.  This is the narrow
-  cut the user asked for: only the tet meshing is a black box, the rest is
-  natively differentiable.
+  dual contouring in JAX — frozen crossing edges riding the **true SDF**
+  under clamped Newton projection, QEF through a differentiable linear
+  solve, then the same Newton projection ``tetmesh.sdf_to_tet_mesh``
+  applies before TetGen — and wraps only TetGen, in the ``tetfill``
+  tesseract, whose VJP is an exact pass-through on the vertices ``-Y``
+  preserves.  Its frozen interior then follows the boundary through the
+  direct path's Laplacian relaxation (:func:`_interior_relaxation`).  This
+  is the narrow cut the user asked for: only the tet meshing is a black
+  box, the rest is natively differentiable.
 
 :func:`freeze_study_chain` freezes a study's mesh topology through the
 packaged mesher tesseract (dual-contour surface + TetGen, or voxelize+snap
@@ -386,6 +388,11 @@ _PROJECTION_STEPS = 12
 #: TetGen quality bounds, matching ``sdf_to_tet_mesh``'s defaults.
 _MIN_RATIO = 1.5
 _MIN_DIHEDRAL = 10.0
+#: Jacobi-Laplacian sweeps that let the frozen interior (Steiner) nodes
+#: follow the boundary, applied in JAX to the tetfill tesseract's returned
+#: nodes -- the same count and the same operator
+#: ``tetmesh.recompute_tet_points`` uses on the direct path.
+_INTERIOR_PASSES = 2
 
 
 @dataclass(frozen=True)
@@ -393,9 +400,10 @@ class FrozenDCChain:
     """A frozen-topology chain whose only black box is TetGen.
 
     The gradient path is ``design field -> JAX dual contouring (frozen
-    edges, differentiable Newton on the true SDF, differentiable QEF) ->
-    Newton projection -> tetfill tesseract (pass-through VJP) -> solver
-    tesseract (adjoint) -> metric``.  Unlike :class:`FrozenChain` the
+    crossing anchors projected onto the true SDF, differentiable QEF) ->
+    Newton projection -> tetfill tesseract (pass-through VJP) -> interior
+    relaxation -> solver tesseract (adjoint) -> metric``.  Unlike
+    :class:`FrozenChain` the
     entry point is the *field callable*, not lattice samples: dual
     contouring evaluates the true SDF at its own refined points, which is
     precisely the fidelity the whole-pipeline mesher gives up.
@@ -440,13 +448,33 @@ def _freeze_dc_surface(
 
     Runs the :mod:`cadjoint.meshing` pipeline once concretely to fix the
     discrete choices (crossing edge set, manifold cell incidence, quad
-    triangulation) and returns a closure that re-derives the vertex
-    positions from any — traced — SDF over that frozen topology:
-    :func:`~cadjoint.meshing.edge_hermite_data` (bisection on
-    ``stop_gradient`` values plus differentiable Newton on the true SDF),
-    :func:`~cadjoint.meshing.qef_vertices` (a differentiable linear solve),
-    then the same clamped Newton projection ``sdf_to_tet_mesh`` applies
-    before handing the surface to TetGen.
+    triangulation, and the crossing points on the edges) and returns a
+    closure that re-derives the vertex positions from any — traced — SDF
+    over that frozen topology: the frozen crossings ride the traced zero
+    set by clamped Newton projection, :func:`~cadjoint.meshing.qef_vertices`
+    fits one vertex per active cell to the planes they span (a
+    differentiable linear solve), and the same clamped Newton projection
+    ``sdf_to_tet_mesh`` applies lands it on the surface.
+
+    **Why the crossings are anchored rather than re-solved.**  The obvious
+    map re-runs :func:`~cadjoint.meshing.edge_hermite_data` on the frozen
+    edge set every traced call.  That is wrong, and it is what used to break
+    the starter heat sink at step 5 of its own optimization: the root search
+    is bracketed by the *frozen sign pattern at the lattice vertices*, which
+    is discrete topology and expires.  Measured on ``scenes/starter.py``,
+    **168 of 858 brackets (20%) are already invalid one optimizer step
+    later** — the fin faces sit within 0.005 of a lattice plane, so a whole
+    plane of vertices changes sign at once.  On an expired edge bisection
+    collapses toward an endpoint, so the cell is fitted to a sample that is
+    not on the surface, ``qef_vertices``' cell clamp then pins neighbouring
+    cells' vertices onto their shared face, and the boundary tets built on
+    them go to zero volume (204 degenerate tets at step 2, ``min |vol|``
+    1.6e-21) until the FEM system is unsolvable.  Projecting the frozen
+    crossings instead needs no bracket at all, is defined for every design,
+    and keeps every sample a genuine surface point with a genuine normal —
+    so the QEF's plane fit still recovers **tangential** vertex motion, the
+    property the bar exhibit in ``research/tet-vs-hex.md`` shows plain
+    per-vertex re-projection throws away.
 
     Sharp-feature placement (:func:`~cadjoint.meshing.sharp_qef_vertices`)
     is deliberately *not* used: its singular-value truncation has no usable
@@ -463,6 +491,9 @@ def _freeze_dc_surface(
         RuntimeError: When the field does not cross the grid, or the
             surface is open at the grid boundary (TetGen needs it closed).
     """
+    import jax
+    import jax.numpy as jnp
+
     from cadjoint.fem.hexmesh import project_points
     from cadjoint.meshing import (
         dual_faces,
@@ -472,6 +503,7 @@ def _freeze_dc_surface(
         qef_vertices,
         sample_grid,
     )
+    from cadjoint.meshing.edge_detection import HermiteData
 
     values = sample_grid(field, grid)
     edges = find_crossing_edges(values)
@@ -480,8 +512,35 @@ def _freeze_dc_surface(
     incidence = manifold_cell_incidence(edges, grid, values < 0)
     max_step = 0.5 * float(np.linalg.norm(grid.spacing))
 
+    # The frozen crossings: located once, by the bracketed root search, on
+    # the concrete design.  From here on they are anchors that ride the
+    # traced surface, never re-solved against the expiring bracket.
+    frozen = edge_hermite_data(field, grid, edges)
+    anchors = jnp.asarray(np.asarray(frozen.points, dtype=np.float64))
+    frozen_t = jax.lax.stop_gradient(frozen.t)
+    # Edge direction times a fraction of an edge, toward the inside
+    # endpoint: the offset edge_hermite_data itself uses to re-evaluate a
+    # dead subgradient.  Landing bit-exactly on a wall whose SDF has no
+    # gradient there is common, not exotic (epsilon-smoothed norms, polygon
+    # boundaries), and without this the QEF loses those planes outright.
+    directions = np.eye(3, dtype=np.float64)[np.asarray(edges.axis, dtype=np.int32)] * np.asarray(
+        grid.spacing, dtype=np.float64
+    )
+    inward = jnp.asarray(np.where(edges.start_inside, -1e-3, 1e-3)[:, None] * directions)
+
     def extract(sdf: Callable[[Any], Any]) -> Any:
-        hermite = edge_hermite_data(sdf, grid, edges)
+        value_and_grad = jax.vmap(jax.value_and_grad(lambda p: jnp.asarray(sdf(p)).reshape(())))
+        samples = project_points(sdf, anchors, max_step, steps=_PROJECTION_STEPS)
+        residuals, gradients = value_and_grad(samples)
+        fallback = jax.vmap(jax.grad(lambda p: jnp.asarray(sdf(p)).reshape(())))(
+            jax.lax.stop_gradient(samples) + inward
+        )
+        degenerate = jnp.sum(jax.lax.stop_gradient(gradients) ** 2, axis=-1) < 1e-12
+        gradients = jnp.where(degenerate[:, None], fallback, gradients)
+        # ``t`` keeps the frozen crossing parameter for provenance — a
+        # projected sample no longer lives on its edge — and nothing
+        # qef_vertices reads depends on it.
+        hermite = HermiteData(points=samples, gradients=gradients, t=frozen_t, values=residuals)
         vertices, _normals = qef_vertices(hermite, incidence, grid)
         return project_points(sdf, vertices, max_step, steps=_PROJECTION_STEPS)
 
@@ -494,6 +553,53 @@ def _freeze_dc_surface(
             "the meshing box"
         )
     return faces.astype(np.int32), vertices, extract
+
+
+def _interior_relaxation(mesh: Any) -> Callable[[Any], Any]:
+    """The JAX map that lets a frozen fill's interior follow its boundary.
+
+    The tetfill tesseract holds the interior (Steiner) nodes at their frozen
+    positions, so a boundary that has marched away from them leaves the
+    straddling tets progressively worse shaped.  This composes
+    :func:`~cadjoint.fem.tetmesh.smooth_interior_delta` — a fixed number of
+    Jacobi–Laplacian sweeps over the frozen connectivity, boundary pinned —
+    onto the tesseract's returned ``nodes``, and re-derives TET10 midsides
+    as midpoints of the relaxed corners.
+
+    Deliberately applied **here** rather than inside the tesseract.  The
+    tesseract's forward stays a pure gather and its VJP stays the exact
+    transpose of one (``tests/fem/test_tetfill.py``, agreement ~1e-16), with
+    no smoothing operator to transpose by hand; JAX carries the relaxation's
+    own derivative.  It also tightens the chain rather than loosening it:
+    the relaxed nodes depend on ``nodes`` only through the preserved
+    boundary block, so the cotangent that reaches the tesseract is supported
+    exactly where its pass-through is exact, and the solver's interior-node
+    sensitivity is *transported to the boundary* instead of being dropped.
+
+    Args:
+        mesh: The frozen ``TetMesh`` (TET4 or TET10).
+
+    Returns:
+        ``nodes -> nodes``, the identity when there is nothing to relax.
+    """
+    import jax.numpy as jnp
+
+    from cadjoint.fem.tetmesh import smooth_interior_delta
+
+    corner_count = mesh.num_corner_points
+    count = mesh.num_surface
+    if _INTERIOR_PASSES <= 0 or corner_count <= count:
+        return lambda nodes: nodes
+    base = jnp.asarray(np.asarray(mesh.points[:corner_count], dtype=np.float64))
+    parents = None if mesh.edge_parents is None else jnp.asarray(mesh.edge_parents)
+
+    def relax(nodes: Any) -> Any:
+        corners = base + smooth_interior_delta(mesh, nodes[:count] - base[:count], _INTERIOR_PASSES)
+        if parents is None:
+            return corners
+        return jnp.concatenate([corners, corners[parents].mean(axis=1)], axis=0)
+
+    return relax
 
 
 def freeze_study_chain_dc(
@@ -521,8 +627,11 @@ def freeze_study_chain_dc(
             measured: a 1e-4 design step already changes the Steiner count
             on the box bar — so ``False`` re-runs the black box per step
             and is only usable where the topology happens to survive.
-            Either way the derivative is identical: the VJP drops interior
-            cotangents in both modes.
+            Frozen mode additionally relaxes the held interior toward the
+            moving boundary (:func:`_interior_relaxation`), so the two
+            modes' derivatives differ there: TetGen-in-the-loop mode drops
+            the solver's interior cotangents, frozen mode transports them
+            onto the boundary through the relaxation's transpose.
 
     Returns:
         The :class:`FrozenDCChain`.
@@ -606,11 +715,13 @@ def freeze_study_chain_dc(
     }
     kind, solver_name, output, inputs = _solver_stage(study, mesh)
     solver = _tesseract(solver_name)
+    relax = _interior_relaxation(mesh) if freeze_interior else None
 
     def solve(surface_points):
         filled = apply_tesseract(tetfill, dict(points=surface_points, **templates))
-        solved = apply_tesseract(solver, dict(points=filled["nodes"], **inputs))
-        return filled["nodes"], solved[output]
+        nodes = filled["nodes"] if relax is None else relax(filled["nodes"])
+        solved = apply_tesseract(solver, dict(points=nodes, **inputs))
+        return nodes, solved[output]
 
     return FrozenDCChain(
         mesh=mesh,

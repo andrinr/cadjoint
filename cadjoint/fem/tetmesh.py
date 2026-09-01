@@ -471,6 +471,49 @@ def _neighbor_lists(mesh: TetMesh) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     return sources, targets, degrees
 
 
+def smooth_interior_delta(mesh: TetMesh, boundary_delta: Any, passes: int) -> Any:
+    """Propagate boundary-vertex displacement into the frozen interior.
+
+    ``passes`` Jacobi–Laplacian sweeps over the mesh's frozen corner
+    adjacency, with the leading ``mesh.num_surface`` rows pinned to
+    ``boundary_delta`` and the interior (Steiner) rows relaxed.  A fixed
+    iteration count over frozen topology is one linear operator, so JAX
+    differentiates and transposes it exactly; at zero boundary displacement
+    it is the identity, which keeps a frozen mesh a fixed point of the map
+    that uses it.
+
+    Shared by the direct path (:func:`recompute_tet_points`) and the DC
+    Tesseract chain, so both let the interior follow the boundary through
+    the *same* operator.
+
+    Args:
+        mesh: The frozen mesh; its corner adjacency defines the operator.
+        boundary_delta: Surface-vertex displacement from the frozen
+            positions, ``(mesh.num_surface, 3)``.
+        passes: Number of sweeps; ``<= 0`` holds the interior fixed.
+
+    Returns:
+        Corner-node displacement, ``(mesh.num_corner_points, 3)``.
+    """
+    import jax.numpy as jnp
+
+    count = mesh.num_surface
+    boundary_delta = jnp.asarray(boundary_delta)
+    delta = (
+        jnp.zeros((mesh.num_corner_points, 3), dtype=boundary_delta.dtype)
+        .at[:count]
+        .set(boundary_delta)
+    )
+    if passes <= 0:
+        return delta
+    sources, targets, degrees = _neighbor_lists(mesh)
+    weights = 1.0 / jnp.maximum(jnp.asarray(degrees, dtype=delta.dtype), 1.0)
+    for _ in range(passes):
+        averaged = jnp.zeros_like(delta).at[targets].add(delta[sources]) * weights[:, None]
+        delta = averaged.at[:count].set(boundary_delta)
+    return delta
+
+
 def recompute_tet_points(
     sdf: Callable[[Any], Any], mesh: TetMesh, *, smooth_passes: int = 0
 ) -> Any:
@@ -502,16 +545,11 @@ def recompute_tet_points(
     count = mesh.num_surface
     projected = project_points(sdf, base[:count], mesh.max_step)
     if smooth_passes <= 0:
+        # Kept as a concatenation rather than base + a zero delta: the
+        # boundary rows then pass through bit-for-bit, not to one ulp.
         corners = jnp.concatenate([projected, base[count:]], axis=0)
     else:
-        boundary_delta = projected - base[:count]
-        sources, targets, degrees = _neighbor_lists(mesh)
-        weights = 1.0 / jnp.maximum(jnp.asarray(degrees, dtype=base.dtype), 1.0)
-        delta = jnp.zeros_like(base).at[:count].set(boundary_delta)
-        for _ in range(smooth_passes):
-            averaged = jnp.zeros_like(base).at[targets].add(delta[sources]) * weights[:, None]
-            delta = averaged.at[:count].set(boundary_delta)
-        corners = base + delta
+        corners = base + smooth_interior_delta(mesh, projected - base[:count], smooth_passes)
     if mesh.edge_parents is None:
         return corners
     midsides = corners[jnp.asarray(mesh.edge_parents)].mean(axis=1)

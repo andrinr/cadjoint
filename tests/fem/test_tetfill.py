@@ -36,7 +36,7 @@ import jax.numpy as jnp
 from cadjoint.fem.hexmesh import project_points
 from cadjoint.fem.tesseracts.chain import _tesseract, freeze_study_chain_dc
 from cadjoint.fem.tetmesh import tet10_from_tet4
-from cadjoint.meshing import GridSpec, extract_mesh
+from cadjoint.meshing import GridSpec, extract_mesh, find_crossing_edges, sample_grid
 
 _MIN_RATIO = np.float64(1.5)
 _MIN_DIHEDRAL = np.float64(10.0)
@@ -311,6 +311,22 @@ class TestDCChain:
         # Analytic target: mean T = q L / k = 2 * half_length, so dJ/dL = 2.
         assert 1.5 < float(gradient) < 2.5
 
+    def test_the_frozen_interior_follows_the_boundary(self, bar_chain):
+        """The relaxation is the identity at the freeze design, and only there.
+
+        Holding the Steiner nodes while the boundary marches away is what
+        degrades the straddling tets between refreezes, so the chain relaxes
+        the frozen interior toward the moving boundary — but the frozen mesh
+        must stay a fixed point of the whole map, midside nodes included.
+        """
+        _study, chain, half0 = bar_chain
+        nominal, _solved = chain._solve(chain.dc_surface(_bar_field(half0)))
+        assert np.abs(np.asarray(nominal) - np.asarray(chain.mesh.points)).max() == 0.0
+        moved, _solved = chain._solve(chain.dc_surface(_bar_field(half0 + 0.05)))
+        interior = slice(chain.mesh.num_surface, chain.mesh.num_corner_points)
+        frozen_interior = np.asarray(chain.mesh.points)[interior]
+        assert np.abs(np.asarray(moved)[interior] - frozen_interior).max() > 1e-6
+
     def test_hex_meshes_are_rejected(self):
         from cadjoint.fem import Dirichlet, Nodes, SimMesh, ThermalStudy
 
@@ -323,6 +339,101 @@ class TestDCChain:
         )
         with pytest.raises(ValueError, match="tet SimMesh"):
             freeze_study_chain_dc(study, declaration, _bar_field(jnp.asarray(0.8)))
+
+
+def _tet_quality(points, cells):
+    """``(signed volumes, cbrt|vol| / longest edge)`` over the corner tets."""
+    from cadjoint.fem.tetmesh import _TET10_EDGES, tet_volumes
+
+    volume = tet_volumes(np.asarray(points), np.asarray(cells)[:, :4])
+    corner = np.asarray(points)[np.asarray(cells)[:, :4]][:, _TET10_EDGES]
+    lengths = np.linalg.norm(corner[:, :, 0] - corner[:, :, 1], axis=-1)
+    return volume, np.cbrt(np.abs(volume)) / np.maximum(lengths.max(axis=1), 1e-30)
+
+
+@pytest.fixture(scope="module")
+def expiry_chain():
+    """A bar frozen with its faces a hair above a lattice plane.
+
+    The starter heat sink's fin faces sit within 0.005 of a lattice plane,
+    so one optimizer step flips a whole plane of lattice vertices at once
+    and invalidates a fifth of the frozen crossing brackets.  This is that
+    situation in miniature and on purpose: ``half_thickness = 0.43`` is
+    0.0014 above the lattice plane at 0.428571, so a 0.005 design step
+    expires almost every bracket the chain froze.
+    """
+    from cadjoint.fem import Dirichlet, HeatFlux, Nodes, SimMesh, ThermalStudy
+    from cadjoint.sdf.primitives.box import Box
+
+    declaration = SimMesh(
+        name="tetfill-expiry",
+        resolution=(14, 7, 7),
+        bounds=(-1.1, -0.6, -0.6),
+        size=(2.2, 1.2, 1.2),
+        method="tet4",
+    )
+    study = ThermalStudy(
+        name="tetfill-expiry-study",
+        conductivity=1.0,
+        bcs=[HeatFlux(Nodes.side("-x"), 2.0), Dirichlet(Nodes.side("+x"), 0.0)],
+        mesh=declaration,
+    )
+
+    def field(thickness):
+        size = jnp.stack([jnp.asarray(0.8), jnp.asarray(thickness), jnp.asarray(thickness)])
+        return lambda point: Box.sdf(jnp.asarray(point), size)
+
+    nominal = jnp.asarray(0.43)
+    return study, declaration, field, freeze_study_chain_dc(study, declaration, field(nominal))
+
+
+class TestExpiredBrackets:
+    """The traced surface must not depend on the frozen crossing BRACKETS.
+
+    The crossing brackets are discrete topology and they expire: once a
+    lattice vertex changes sign, a frozen bracket no longer contains a root,
+    bisection collapses toward an endpoint, and the cell is fitted to a
+    sample that is not on the surface.  ``qef_vertices`` then clamps
+    neighbouring cells' vertices onto their shared face and the boundary
+    tets built on them go to zero volume — which is what used to kill the
+    starter heat sink's own optimization at step 5, with the FEM solve
+    failing on an unsolvable system rather than anything visibly wrong
+    upstream.  Anchoring the crossings and projecting them onto the traced
+    zero set needs no bracket at all.
+    """
+
+    def test_a_small_design_step_expires_almost_every_bracket(self, expiry_chain):
+        _study, declaration, field, chain = expiry_chain
+        grid = declaration.grid(field(jnp.asarray(0.43)))
+        frozen = find_crossing_edges(sample_grid(field(jnp.asarray(0.43)), grid))
+        stepped = find_crossing_edges(sample_grid(field(jnp.asarray(0.425)), grid))
+
+        def keys(edges):
+            return set(map(tuple, np.column_stack([edges.axis.astype(np.int64), edges.index])))
+
+        expired = len(keys(frozen) - keys(stepped))
+        print(f"\nexpiry bar: {expired}/{frozen.count} brackets expired on a 0.005 step")
+        assert expired > 0.5 * frozen.count
+        assert chain.mesh.num_surface > 0
+
+    @pytest.mark.parametrize("thickness", [0.425, 0.42, 0.38])
+    def test_expired_brackets_do_not_collapse_the_fill(self, expiry_chain, thickness):
+        """Zero-volume tets here are the failure; the old map produced 347."""
+        _study, _declaration, field, chain = expiry_chain
+        nodes, _solved = chain._solve(chain.dc_surface(field(jnp.asarray(thickness))))
+        volume, shape = _tet_quality(np.asarray(nodes), chain.mesh.cells)
+        print(
+            f"\nexpiry bar @ {thickness}: min |vol| {np.abs(volume).min():.3e} "
+            f"min quality {shape.min():.3e} inverted {int((volume <= 0).sum())}"
+        )
+        assert int((volume <= 0).sum()) == 0
+        assert shape.min() > 5e-3
+
+    def test_the_fill_stays_solvable_after_the_step(self, expiry_chain):
+        """The end of the chain: an unsolvable system is how this surfaced."""
+        _study, _declaration, field, chain = expiry_chain
+        _nodes, solved = chain._solve(chain.dc_surface(field(jnp.asarray(0.42))))
+        assert np.isfinite(np.asarray(solved)).all()
 
 
 class TestGradientPathSeam:

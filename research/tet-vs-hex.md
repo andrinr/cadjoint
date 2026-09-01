@@ -691,3 +691,242 @@ against the interpolant chain's outright **sign flip** on the same parameter.
   vs a JAX gather, frozen fill vs TetGen, chain fixed point, solver parity, adjoint vs
   FD with an analytic target, the seam and an end-to-end `Optimization` run); all skip
   cleanly without tetgen / jax_fem / tesseract deps, 17 s total.
+
+## The frozen crossing BRACKETS expire: why the starter died at step 5 (2026-09-01)
+
+The declared starter optimization (`scenes/starter.py`, `gradient_path="tesseract-dc"`,
+12 steps) descended for five steps and then hard-failed inside the thermal solver
+tesseract:
+
+```
+step  0  objective 1.615602  |grad| 1.3867e+00   24.6 s
+step  1  objective 1.613115  |grad| 1.3989e+00    8.1 s
+step  2  objective 1.611339  |grad| 1.4029e+00    7.1 s
+step  3  objective 1.610146  |grad| 1.4106e+00    7.0 s
+step  4  objective 1.609709  |grad| 1.4205e+00    7.1 s
+step  5  RuntimeError: Direct linear solve failed on the tet system
+         (best relative residual 1.16e+00) -- tetmesh.py:140
+```
+
+Note the descent itself: **-0.0059 over five steps**, and a gradient norm *rising*
+every step. Both were already symptoms.
+
+### The hypothesis that measurement killed
+
+The obvious suspect is the frozen interior: the tetfill tesseract pins the Steiner
+nodes while the boundary follows the design, so the tets straddling that gap should
+degrade until the FEM system is ill-conditioned — and the direct path does not suffer
+this because `recompute_tet_points(..., smooth_passes=2)` propagates boundary motion
+inward. It is a good hypothesis. It is wrong, and one table settles it. Frozen fill at
+the step-0 design (5 691 nodes / 2 926 tets / 860 surface), re-evaluated at each step's
+parameters with N Jacobi-Laplacian interior passes:
+
+| step | passes 0 | passes 2 | passes 5 | passes 10 | passes 20 |
+|---|---|---|---|---|---|
+| 0 | 0.1294 | 0.1294 | 0.1294 | 0.1294 | 0.1294 |
+| 1 | 0.0603 | 0.0745 | 0.0748 | 0.0748 | 0.0748 |
+| 2 | **7.30e-7** | 7.30e-7 | 7.30e-7 | 7.30e-7 | 7.30e-7 |
+| 3 | **1.07e-6** | 1.07e-6 | 1.07e-6 | 1.07e-6 | 1.07e-6 |
+| 4 | **7.03e-7** | 7.03e-7 | 7.03e-7 | 7.03e-7 | 7.03e-7 |
+| 5 | **0.0** | 0.0 | 0.0 | 0.0 | 0.0 |
+
+(min element quality, `cbrt|vol| / longest edge`.) Smoothing is a **null operation**
+from step 2 on — bit-identical numbers at 0 and 20 passes. The reason is in the next
+column: of the 204 degenerate tets at step 2, **204 are boundary-only** (all four
+corners are DC surface vertices, none touches a Steiner node), so no interior operator
+can reach them. The mesh is not being pulled apart from the inside. Its *boundary* is
+collapsing on itself.
+
+### The actual cause
+
+`_freeze_dc_surface` froze the crossing-edge set and then re-ran `edge_hermite_data` on
+it every traced call. That root search is bracketed by the **frozen sign pattern at the
+lattice vertices**, which is discrete topology, and it expires:
+
+| step | frozen brackets still valid | lost | min \|vol\| | min quality | inverted | degenerate (<1e-3) |
+|---|---|---|---|---|---|---|
+| 0 | 858/858 | 0 | 6.17e-6 | 0.1294 | 0 | 0 |
+| 1 | 858/858 | 0 | 3.34e-6 | 0.0603 | 2 | 0 |
+| 2 | 690/858 | **168** | 1.56e-21 | 7.30e-7 | 105 | 204 |
+| 3 | 690/858 | 168 | 2.73e-21 | 1.07e-6 | 104 | 204 |
+| 4 | 690/858 | 168 | 8.69e-22 | 7.03e-7 | 117 | 204 |
+| 5 | 570/858 | **288** | 0.0 | 0.0 | 133 | 298 |
+
+168 brackets — **20% of them** — die in a single optimizer step, and the collapse is
+immediate and total, not gradual. Why so abrupt: the sink's grid is 18x13x11 over
+z ∈ [-0.3, 1.1], so lattice planes sit at z = -0.3 + 0.12727k, and the fin tips at
+z = 0.85 sit **0.0045** from the plane at 0.84545. The comb's faces are axis-aligned,
+so one small design step sweeps a whole plane of lattice vertices through the surface
+at once.
+
+`edge_hermite_data` documents its own behaviour on an expired bracket: bisection
+collapses toward an endpoint. The cell is then fitted to a "surface sample" that is not
+on the surface; `qef_vertices`' final cell clamp pins neighbouring cells' vertices onto
+their shared face; the vertices coincide; the boundary tets built on them have exactly
+zero volume. The solver sees an unsolvable system and is the first thing to complain,
+several stages downstream of the actual fault.
+
+The control confirms it end to end. The **direct** path's map, on the *same frozen
+mesh* and the same parameters, never wavers:
+
+| step | chain (old map) motion max / mean | direct motion max / mean | direct min quality | direct inverted |
+|---|---|---|---|---|
+| 1 | 0.1490 / 0.0035 | 0.0059 / 0.0028 | 0.1299 | 0 |
+| 3 | 0.1350 / 0.0159 | 0.0179 / 0.0084 | 0.1299 | 0 |
+| 5 | 0.1483 / 0.0229 | 0.0299 / 0.0140 | 0.1299 | 0 |
+
+The real geometry moves by 0.03 at most. The old DC map amplified that into 0.148 of
+vertex motion — garbage in, garbage out.
+
+### Four candidate vertex maps, measured
+
+All evaluated on the same frozen topology at the step-5 parameters:
+
+| map | motion max / mean | min \|vol\| | min quality | inverted | degenerate | verdict |
+|---|---|---|---|---|---|---|
+| **A** re-solve frozen brackets (was) | 0.148 / 0.023 | 0.0 | 0.0 | 133 | 298 | the bug |
+| **B** anchored crossings -> QEF | 0.148 / 0.020 | 1.6e-10 | 5.19e-3 | 2 | **0** | **shipped** |
+| **C** re-project frozen vertices | 0.030 / 0.014 | 6.24e-6 | 0.1299 | 0 | 0 | ruled out |
+| **D** A with `t` clamped to `[0,1]` | 0.148 / 0.023 | 7.7e-25 | 9.4e-8 | 115 | 252 | no help |
+
+- **D** shows the unclamped Newton `t` is *not* the proximate cause: keeping the sample
+  on its edge still leaves it off the surface, and the QEF is just as poisoned.
+- **C** is the tempting one — it is the healthiest column in the table — and it is
+  exactly what the **bar exhibit** above forbids. Re-projecting the final vertex moves
+  it only along the SDF gradient, so `dJ/d(half_thickness)` goes from -0.0085 (truth 0)
+  to **-8.61**: three orders of magnitude wrong on a quantity the physics is insensitive
+  to. Tangential shape tracking is the whole reason this chain exists.
+- **B** keeps it. The frozen crossings are located once, by the bracketed root search,
+  at the freeze design; from then on they are *anchors* that ride the traced zero set
+  under the same clamped Newton projection the pipeline already uses. No bracket is
+  consulted, so nothing can expire. Every sample stays a genuine surface point with a
+  genuine normal, so the QEF is still a **plane fit** — and a plane fit whose samples
+  each move along their own local normal reproduces tangential vertex motion, which is
+  precisely what per-vertex re-projection throws away.
+
+One subtlety cost a measurement: `edge_hermite_data` re-evaluates a *degenerate*
+gradient a fraction of an edge toward the inside endpoint (landing bit-exactly on a
+polygon wall with a dead subgradient is common, not exotic). Without mirroring that,
+map B lost those planes and moved the boundary by 0.0856 **at the freeze design** —
+i.e. it stopped being a fixed point. With it, the fixed point is exact.
+
+### The interior relaxation, kept on its own merits
+
+Interior smoothing is not the fix, but it is now applied anyway — 2 Jacobi-Laplacian
+sweeps, boundary pinned, shared with the direct path via
+`tetmesh.smooth_interior_delta`. It is applied **in JAX in `chain.py`, on the
+tesseract's returned nodes**, not inside the tesseract:
+
+- the tetfill forward stays a pure gather and its VJP the exact transpose of one (no
+  smoothing operator to transpose by hand);
+- the relaxed nodes depend on the tesseract's output *only through the preserved
+  boundary block*, so the cotangent reaching the tesseract is supported exactly where
+  its pass-through is exact. The Steiner-cotangent drop stops being an approximation:
+  the solver's interior-node sensitivity is now **transported onto the boundary**
+  through the relaxation's transpose instead of being discarded;
+- fixed point preserved exactly, TET10 midsides included (`max |dev| = 0.0` for both
+  TET4 and TET10).
+
+Measured worth: it recovers min quality 0.0344 -> 0.0624 at step 1 (where boundary
+motion is concentrated on a few vertices) and is a null operation at steps 2-5, for the
+same reason as before — those slivers are boundary-only.
+
+### Frozen fill quality after the fix (same freeze, same parameters)
+
+| step | min \|vol\| | min quality | inverted | quality < 0.01 |
+|---|---|---|---|---|
+| 0 | 6.31e-6 | 0.1304 | 0 | 0 |
+| 1 | 3.68e-6 | 0.0624 | 2 | 0 |
+| 2 | 2.69e-6 | 0.0632 | 4 | 0 |
+| 3 | 9.06e-8 | 0.0368 | 3 | 0 |
+| 4 | 8.40e-8 | 0.0366 | 1 | 0 |
+| 5 | 1.55e-10 | 0.0052 | 2 | 52 |
+
+### The declared 12-step run, completing
+
+`scenes/starter.py`'s own `cool-sink` optimization, verbatim (`remesh_every` 6, so one
+refreeze at step 6), 170.4 s total:
+
+| step | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | final |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| J | 1.617200 | 1.614708 | 1.608122 | 1.600740 | 1.593071 | 1.585311 | 1.581312 | 1.574670 | 1.567995 | 1.561397 | 1.554886 | 1.548351 | **1.533429** |
+
+Monotone, no solver failures, `fin_depth` 1.2000 -> 1.1524. 29.7 s for step 0 (JIT),
+10.2-11.5 s thereafter, 27.7 s at the step-6 refreeze. Against the broken run's
+-0.0059 over five steps this is **-0.0838 over twelve** — the old descent was not just
+fragile, it was reading gradients off a mesh that had already collapsed.
+
+### Re-validation: nothing regressed, several things improved
+
+**Mechanical VJP** (unchanged code, re-checked): vs `jax.vjp` of the equivalent JAX
+gather, TET4 max rel err **0.0**, TET10 **1.74e-16**; primal deviation 0.0 for both.
+
+**Bar exhibit** — the property that ruled out map C, reproduced to every printed digit:
+
+| quantity | before | after | truth |
+|---|---|---|---|
+| `J` | 1.585170 | 1.585170 | 1.6 |
+| `dJ/d(half_length)` | +1.999469 (FD +1.999469) | +1.994235 (FD +1.994235) | +2 |
+| `dJ/d(half_thickness)` | -0.008474 (FD -0.008474) | **-0.008473** (FD -0.008473) | 0 |
+| direct, same mesh | -8.609769 | -8.609769 | 0 |
+
+`half_length` moves by 0.26% and lands exactly on the direct path's +1.994235: that is
+the interior relaxation, which makes interior nodes contribute to the *nodal* mean
+exactly as they do on the direct path. `half_thickness` — the row the exhibit is about
+— is unchanged, still 1000x better than re-projection.
+
+**Starter gradient** (18x13x11, tet10, `d(max T)/d(fin_depth)`):
+
+| | J | adjoint | FD 1e-3 | FD 3e-3 | FD 1e-2 |
+|---|---|---|---|---|---|
+| before | 1.147747 | -0.165900 | -0.165900 | -0.165902 | -0.165887 |
+| after | 1.146109 | **-0.161859** | -0.161860 | -0.161862 | -0.161891 |
+
+Adjoint-vs-FD self-consistency holds at 6 digits (rel 1.5e-6). Both numbers moved
+*toward* the direct path's reference (`J` 1.145255, adjoint -0.157944): forward physics
+0.22% -> **0.07%** off, gradient 5.0% -> **2.5%** off. Fixed point `max |dev| = 0.0`,
+stage-2 parity `max |dT| = 0.0`.
+
+**Bracket** (elastic TET10 @ 22x16x13, compliance; 8 642 nodes / 4 789 tets / 1 108
+surface, freeze 6.8 s, `J = 0.06532303`, parity `max |du| = 0.0`):
+
+| parameter | adjoint | FD 1e-3 | rel | rel before | direct, same mesh |
+|---|---|---|---|---|---|
+| `plate_thickness` | -0.425155 | -0.425171 | **3.7e-5** | 8.8e-4 | -0.429545 |
+| `web_thickness` | -0.237656 | -0.240457 | **1.2e-2** | 6.6e-2 | -0.219700 |
+
+Adjoint-vs-FD agreement is **24x tighter** on `plate_thickness` and **5x tighter** on
+`web_thickness` — the expiring brackets were perturbing the FD probes themselves.
+
+### On the alternatives, plainly
+
+- **Interior smoothing alone is not merely insufficient, it is a null operation** for
+  this failure (the table at the top). It ships anyway, for the reasons above, but no
+  one should believe it fixed the starter.
+- **Refreezing more often** would have worked and is the wrong trade. The measured
+  validity horizon of the frozen brackets on the starter is **one step** (168 lost
+  between step 1 and step 2), so it would mean `remesh_every=1` — a full TetGen
+  re-extraction every step (27.7 s vs 10.4 s measured here, i.e. ~3x the wall clock),
+  to paper over a map that should not have depended on the expiring data in the first
+  place. With the anchored map the frozen topology survives its declared 6 steps with
+  room to spare.
+- **Quality-aware refill** was not needed: after the fix the worst element over the
+  whole refreeze interval is quality 0.0052 with zero inverted tets, and the solver
+  never falls past its first PETSc LU attempt.
+
+### Files (delta)
+
+- `cadjoint/fem/tesseracts/chain.py` — `_freeze_dc_surface` anchors the frozen
+  crossings and projects them onto the traced zero set (mirroring `edge_hermite_data`'s
+  degenerate-gradient fallback); new `_interior_relaxation` composes the shared
+  Laplacian relaxation onto the tetfill tesseract's returned nodes.
+- `cadjoint/fem/tetmesh.py` — `smooth_interior_delta` factored out of
+  `recompute_tet_points` so the direct path and the DC chain relax through one
+  operator; the `smooth_passes <= 0` branch is left as a concatenation so the direct
+  path stays bit-identical.
+- `cadjoint/fem/tesseracts/tetfill/` — **unchanged**. The black box stayed a black box.
+- `tests/fem/test_tetfill.py` — 26 tests (was 20): `TestExpiredBrackets` freezes a bar
+  whose faces sit 0.0014 above a lattice plane, checks that a 0.005 design step expires
+  **304 of 336** brackets, and asserts the fill stays non-degenerate (min quality
+  1.19e-2, zero inverted) and solvable — the old map produced **347 exactly-zero-volume
+  tets** on that same step; plus a fixed-point/interior-follows check on the relaxation.
