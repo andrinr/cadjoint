@@ -93,11 +93,14 @@ differentiably, straight through the geometry the viewport renders.
 
 Named design parameters:
   - ``fin_depth``: extrusion depth of the fin comb (along y)
-  - ``fin_height``: driving dimension from a fin root to its tip
   - ``base_width``: driving dimension across the base deck
-  - ``deck_thickness``: driving dimension from base to deck top
-  - ``fin_gap``: driving dimension between adjacent fin walls
   - ``bushing_spacing``: distance between the two mounting bushings
+
+The comb sketch keeps exactly five meaningful design freedoms under its
+constraints — fin depth, shared fin tip height, shared fin width, mirrored
+outer-fin spacing, and deck thickness; everything else is a relation
+(horizontal/vertical/equal/mirror) or pinned (base span, the slug's die
+interface).
 """
 
 import jax
@@ -120,14 +123,11 @@ from cadjoint.render import Material
 from cadjoint.sdf.boolean import Union
 
 # ── design parameters ────────────────────────────────────────────────────────
-# fin_depth is genuinely free (the optimizers move it); the other named
-# scalars are driving dimensions: constraints hold the sketch to them, so
-# editing a value here re-dimensions the comb without freeing it to drift.
+# fin_depth is genuinely free (the optimizer moves it); the named scalars
+# are driving dimensions: constraints hold the sketch to them, so editing a
+# value here re-dimensions the part without freeing it to drift.
 fin_depth = Scalar(1.2, free=True, name="fin_depth")
-fin_height = Scalar(0.67, name="fin_height")
 base_width = Scalar(1.8, name="base_width")
-deck_thickness = Scalar(0.18, name="deck_thickness")
-fin_gap = Scalar(0.44, name="fin_gap")
 bushing_spacing = Scalar(1.56, name="bushing_spacing")
 
 aluminum = Material(name="aluminum", color=[0.8, 0.82, 0.85], roughness=0.3, metallic=0.9)
@@ -178,20 +178,20 @@ comb_profile = PolygonProfile(
 )
 sink = extrude(comb_profile, depth=fin_depth, material=aluminum)
 
-# The comb is dimension-driven, like a production sketch: the base span,
-# deck thickness, fin height, and fin-to-fin gap are named dimensions;
-# horizontal/vertical constraints square the deck and the fin walls,
-# equal-length ties every fin to one shared width, and the two mirror
-# equalities center the comb on the base. One genuine sketch freedom
-# remains — the shared fin width — and the optimizers below project every
-# descent step back onto exactly this system (see cadjoint.optimize).
+# The comb is a production-style constrained sketch that still keeps real
+# design freedom. Relations — horizontal/vertical squaring, equal fin
+# widths, mirror symmetry about the base — shape HOW the comb may move;
+# the pinned base span anchors it. Exactly four sketch freedoms survive
+# (plus fin_depth): deck thickness (deck_r level), shared fin width,
+# mirrored outer-fin spacing, and shared fin tip height. The optimizer
+# below explores those and only those: every descent step is projected
+# back onto this system (see cadjoint.optimize).
 FixedConstraint(base_l, [-0.9, 0.0])
 DistanceConstraint(base_l, base_r, base_width)
 HorizontalConstraint(base_l, base_r)
 VerticalConstraint(base_r, deck_r)
 VerticalConstraint(base_l, deck_l)
 HorizontalConstraint(deck_l, deck_r)
-DistanceConstraint(base_r, deck_r, deck_thickness)
 HorizontalConstraint(fin1_root_r, deck_r)
 HorizontalConstraint(fin1_root_l, deck_r)
 HorizontalConstraint(fin2_root_r, deck_r)
@@ -204,7 +204,6 @@ VerticalConstraint(fin2_root_r, fin2_tip_r)
 VerticalConstraint(fin2_root_l, fin2_tip_l)
 VerticalConstraint(fin3_root_r, fin3_tip_r)
 VerticalConstraint(fin3_root_l, fin3_tip_l)
-DistanceConstraint(fin2_root_r, fin2_tip_r, fin_height)
 HorizontalConstraint(fin2_tip_r, fin2_tip_l)
 HorizontalConstraint(fin2_tip_r, fin1_tip_r)
 HorizontalConstraint(fin1_tip_r, fin1_tip_l)
@@ -214,7 +213,6 @@ EqualLengthConstraint(fin1_root_r, fin1_root_l, fin2_root_r, fin2_root_l)
 EqualLengthConstraint(fin2_root_r, fin2_root_l, fin3_root_r, fin3_root_l)
 EqualLengthConstraint(base_l, fin3_root_l, base_r, fin1_root_r)
 EqualLengthConstraint(base_l, fin2_root_l, base_r, fin2_root_r)
-DistanceConstraint(fin1_root_l, fin2_root_r, fin_gap)
 
 # ── copper heat slug: revolved section under the die, screw bore on axis ─────
 # Revolve spins the profile around the plane's local Y axis (world z here):
@@ -224,8 +222,8 @@ DistanceConstraint(fin1_root_l, fin2_root_r, fin_gap)
 # Design rule: boundary-condition regions sit on pinned geometry. The slug
 # bottom carries the die's heat-flux BC, so its outline is NOT free — the
 # optimizer shapes fins and depth, never the chip interface. (The fin-top
-# Dirichlet region is safe by construction: the tips ride the fin_height
-# driving dimension, which optimization cannot change.)
+# Dirichlet region below is anchored generously instead: its threshold sits
+# far under the tips, so the height freedom cannot move the fins out of it.)
 slug_bore_low = Vector2(value=[0.05, -0.18], name="slug_bore_low")
 slug_rim_low = Vector2(value=[0.26, -0.18], name="slug_rim_low")
 slug_rim_high = Vector2(value=[0.26, 0.04], name="slug_rim_high")
@@ -251,14 +249,15 @@ satisfy_constraints(scene, steps=2)
 # ── simulation mesh: the sink volume on a named grid ─────────────────────────
 # First-class meshing intent: the study below solves on it, the viewer
 # inspects it (counts, bounds, element quality), and the optimization
-# refreezes it as the design moves. Flip method to "tet10" for the
-# boundary-conforming quadratic path.
+# refreezes it as the design moves. method="tet10" is the quality path —
+# boundary-conforming quadratic tets from the dual-contoured surface
+# (method="hex" is the fast voxelize+snap alternative).
 sink_mesh = SimMesh(
     name="sink-mesh",
-    resolution=(20, 14, 12),
+    resolution=(18, 13, 11),
     bounds=(-1.05, -0.8, -0.3),
     size=(2.1, 1.6, 1.4),
-    method="hex",
+    method="tet10",
 )
 
 # ── thermal study: die flux on the slug bottom, ambient at the fin field ─────
@@ -274,7 +273,7 @@ heat_study = ThermalStudy(
             & Nodes.sphere([0.0, 0.0, -0.18], 0.4),
             6.0,
         ),
-        Dirichlet(Nodes.halfspace([0.0, 0.0, 0.6], [0.0, 0.0, 1.0]), 0.0),
+        Dirichlet(Nodes.halfspace([0.0, 0.0, 0.45], [0.0, 0.0, 1.0]), 0.0),
     ],
     mesh=sink_mesh,
 )
@@ -308,7 +307,7 @@ cool_sink = Optimization(
     metric="mean",
     regularizer=material_volume,
     regularizer_weight=0.4,
-    steps=10,
+    steps=12,
     learning_rate=0.01,
 )
 '''
