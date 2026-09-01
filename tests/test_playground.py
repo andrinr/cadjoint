@@ -70,6 +70,8 @@ def test_mesh_endpoint_reports_mesh_edges_for_the_viewer():
     mesh_edges = result["mesh_edges"]
     assert mesh_edges is not None
     assert mesh_edges["resolution"] >= 8
+    # Observability: which dual-contouring backend produced the edges.
+    assert isinstance(mesh_edges["native"], bool)
     for group in ("wire", "sharp"):
         assert len(mesh_edges[group]) > 0
         for segment in mesh_edges[group][:16]:
@@ -201,15 +203,15 @@ def test_example_scene_reports_its_construction_for_the_viewer():
 
     assert result["ok"] is True
     profiles = {node["name"]: node for node in result["construction"] if node["kind"] == "profile"}
-    nodes = {node["kind"]: node for node in result["construction"] if node["kind"] != "profile"}
-    # Extrude and revolve sketches sit alongside two editable primitives.
-    assert set(profiles) == {"house", "revolve section"}
-    assert set(nodes) == {"sphere", "cylinder"}
+    nodes = {node["name"]: node for node in result["construction"] if node["kind"] != "profile"}
+    # Extrude and revolve sketches sit alongside the two bushing cylinders.
+    assert set(profiles) == {"fin comb", "slug section"}
+    assert set(nodes) == {"bush_a", "bush_b"}
 
-    profile = profiles["house"]
+    profile = profiles["fin comb"]
     assert profile["editable"] is True
-    assert profile["name"] == "house"
-    assert len(profile["vertices"]) == 5
+    assert profile["name"] == "fin comb"
+    assert len(profile["vertices"]) == 16
     # Every vertex carries the span the viewer highlights and patches.
     for vertex in profile["vertices"]:
         start, end = vertex["span"]
@@ -217,80 +219,87 @@ def test_example_scene_reports_its_construction_for_the_viewer():
     assert [item["kind"] for item in profile["constraints"]] == [
         "fixed",
         "distance",
-        "distance",
     ]
-    assert profile["material"] == "clay"
+    assert profile["material"] == "aluminum"
 
-    revolve_profile = profiles["revolve section"]
-    assert revolve_profile["operators"] == [
+    slug_profile = profiles["slug section"]
+    assert slug_profile["operators"] == [
         {"kind": "revolve", "line": call_line(EXAMPLE_SOURCE, "revolve")}
     ]
-    assert revolve_profile["material"] == "polished_copper"
-    assert revolve_profile["transform"]["position"] == pytest.approx([0.0, 1.65, 0.15], abs=1e-6)
+    assert slug_profile["material"] == "copper"
+    assert slug_profile["transform"]["position"] == pytest.approx([0.0, 0.0, 0.0], abs=1e-6)
 
-    glass = nodes["sphere"]
-    assert glass["editable"] is True
-    metal_position = nodes["cylinder"]["transform"]["position"]
+    bush_a = nodes["bush_a"]
+    assert bush_a["kind"] == "cylinder"
+    assert bush_a["editable"] is True
+    # The bushing pattern is constraint-driven: one pinned, the other held at
+    # the named spacing.
+    assert bush_a["transform"]["position"] == pytest.approx([0.78, 0.0, 0.1], abs=1e-5)
+    bush_b_position = nodes["bush_b"]["transform"]["position"]
     distance = (
-        sum((glass["transform"]["position"][axis] - metal_position[axis]) ** 2 for axis in range(3))
+        sum(
+            (bush_a["transform"]["position"][axis] - bush_b_position[axis]) ** 2
+            for axis in range(3)
+        )
         ** 0.5
     )
-    assert distance == pytest.approx(3.8, abs=1e-5)
-    assert glass["transform"]["position"] != pytest.approx([2.2, -0.3, 0.35], abs=1e-3)
-    assert glass["material"] == "glass_material"
+    assert distance == pytest.approx(1.56, abs=1e-5)
+    assert bush_a["material"] == "steel"
     # A wireframe the viewer can draw without knowing the shape's topology.
-    assert len(glass["edges"]) > 0
-    start, end = glass["spans"]["position"]
-    assert EXAMPLE_SOURCE[start:end] == "[2.2, -0.3, 0.35]"
-
-    metal = nodes["cylinder"]
-    assert metal["transform"]["rotation"] == pytest.approx([1.5708, 0.0, 0.0], abs=1e-5)
-    assert "rotation" in metal["spans"]
-    assert metal["material"] == "brass"
+    assert len(bush_a["edges"]) > 0
+    # Named-parameter indirection: the position span points at the Vector literal.
+    start, end = bush_a["spans"]["position"]
+    assert EXAMPLE_SOURCE[start:end] == "[0.78, 0.0, 0.1]"
 
     materials = {material["name"]: material for material in result["materials"]}
-    assert set(materials) == {
-        "clay",
-        "glass_material",
-        "brass",
-        "polished_copper",
-        "ground",
-    }
-    assert materials["brass"]["metallic"] == pytest.approx(1.0)
-    assert materials["glass_material"]["opacity"] == pytest.approx(0.18)
-    assert materials["polished_copper"]["metallic"] == pytest.approx(0.92)
+    assert set(materials) == {"aluminum", "copper", "steel"}
+    assert materials["aluminum"]["metallic"] == pytest.approx(0.9)
+    assert materials["copper"]["roughness"] == pytest.approx(0.18)
+    assert materials["steel"]["metallic"] == pytest.approx(0.85)
 
+    # The starter's constraints are satisfied by construction, so the solve
+    # converges instantly with a flat loss history.
     assert result["solver_runs"] == [
         {
             "node": None,
             "method": "newton",
             "iterations": 2,
-            "losses": pytest.approx([0.0135935191, 0.0, 0.0], abs=1e-6),
+            "losses": pytest.approx([0.0, 0.0, 0.0], abs=1e-9),
         }
     ]
 
     autodiff = result["differentiability"]
     assert autodiff["pipeline"] == "Profile -> Extrude -> SDF"
-    assert autodiff["metric"] == "two-probe clearance"
-    assert autodiff["parameter_count"] == 6
-    assert autodiff["value"] == pytest.approx(0.85)
+    assert autodiff["metric"] == "aluminum volume (smoothed)"
+    assert autodiff["parameter_count"] == 17
+    assert autodiff["value"] == pytest.approx(0.8331418633, abs=1e-6)
     assert autodiff["sensitivities"] == [
-        {"parameter": "eave_right.x", "value": pytest.approx(-0.7)},
-        {"parameter": "body_depth", "value": pytest.approx(-0.5)},
+        {"parameter": "fin_depth", "value": pytest.approx(0.6889996529, abs=1e-6)},
+        {"parameter": "fin2_tip_l.y", "value": pytest.approx(0.1042722091, abs=1e-6)},
     ]
 
     assert result["relations"] == [
         {
-            "kind": "distance",
-            "nodes": ["cylinder_2", "sphere_1"],
-            "value": pytest.approx(3.8),
-        },
-        {
             "kind": "fixed",
             "nodes": ["cylinder_2"],
-            "value": pytest.approx([-1.9, -0.65, 0.0]),
+            "value": pytest.approx([0.78, 0.0, 0.1], abs=1e-6),
+        },
+        {
+            "kind": "distance",
+            "nodes": ["cylinder_2", "cylinder_3"],
+            "value": pytest.approx(1.56, abs=1e-6),
         },
     ]
+
+    # The starter declares its thermal study; meshes stay implicit here.
+    studies = result["studies"]
+    assert len(studies) == 1
+    assert studies[0]["name"] == "sink-conduction"
+    assert studies[0]["kind"] == "thermal"
+    assert studies[0]["editable"] is True
+    assert studies[0]["resolution"] == [20, 14, 12]
+    assert studies[0]["mesh"] is None
+    assert result["sim_meshes"] == []
 
     assert "fn fs_main_depth(" in result["preview_shader"]
 
@@ -328,7 +337,7 @@ def test_material_patches_create_and_assign_source_definitions():
         {
             "source": created["source"],
             "op": "assign_material",
-            "line": call_line(created["source"], "sphere"),
+            "line": call_line(created["source"], "cylinder"),
             "material": "material1",
         }
     )
@@ -337,8 +346,8 @@ def test_material_patches_create_and_assign_source_definitions():
 
     result = compile_source(assigned["source"])
     assert result["ok"] is True
-    sphere = next(node for node in result["construction"] if node["kind"] == "sphere")
-    assert sphere["material"] == "material1"
+    bush = next(node for node in result["construction"] if node.get("name") == "bush_a")
+    assert bush["material"] == "material1"
 
 
 @pytest.mark.parametrize(
@@ -439,7 +448,7 @@ def test_solver_patch_endpoint_forwards_optimizer_controls():
     )
 
     assert result["ok"] is True
-    assert "satisfy_constraints(profile, method='adam', steps=24)" in result["source"]
+    assert "satisfy_constraints(comb_profile, method='adam', steps=24)" in result["source"]
 
 
 def test_patch_endpoint_reports_failures_without_crashing():
@@ -613,6 +622,7 @@ def test_compile_reports_a_scene_without_studies_as_an_empty_list():
 
     assert result["ok"] is True
     assert result["studies"] == []
+    assert result["sim_meshes"] == []
 
 
 def test_study_patches_round_trip_through_compile():
@@ -703,3 +713,135 @@ def test_simulate_study_requires_a_declared_study_name():
     result = simulate_source({"source": STUDY_SOURCE, "kind": "study", "name": "   "})
     assert result["ok"] is False
     assert "name" in result["error"]
+
+
+# ── Simulation meshes as first-class code citizens ──────────────────────────
+
+MESH_SOURCE = """from cadjoint.fem import Dirichlet, Nodes, SimMesh, ThermalStudy
+from cadjoint.geometry import Vector
+from cadjoint.sdf.primitives import Box
+
+scene = Box(Vector([0.8, 0.5, 0.5], free=True, name="size"))
+grid = SimMesh(name="box-grid", resolution=[12, 8, 8], bounds=[-1.0, -0.75, -0.75],
+               size=[2.0, 1.5, 1.5], padding=0.2)
+heat = ThermalStudy(
+    name="bar-conduction",
+    conductivity=2.0,
+    mesh="box-grid",
+    bcs=[Dirichlet(Nodes.side("-x"), value=1.0), Dirichlet(Nodes.side("+x"), value=0.0)],
+)
+"""
+
+
+def test_mesh_endpoint_handles_scenes_that_reference_meshes_by_name():
+    # `mesh="..."` resolves through the capture registry at construction
+    # time, so every worker mode must exec inside it — not just compiles.
+    result = mesh_source(MESH_SOURCE)
+
+    assert result["ok"] is True
+    assert result["mesh_edges"] is not None
+
+
+def test_compile_reports_declared_meshes_for_the_viewer():
+    result = compile_source(MESH_SOURCE)
+
+    assert result["ok"] is True
+    meshes = result["sim_meshes"]
+    assert len(meshes) == 1
+    mesh = meshes[0]
+    assert mesh["kind"] == "mesh"
+    assert mesh["name"] == "box-grid"
+    assert mesh["index"] == 0
+    assert mesh["editable"] is True
+    assert mesh["line"] == call_line(MESH_SOURCE, "SimMesh")
+    assert mesh["resolution"] == [12, 8, 8]
+    assert mesh["bounds"] == [-1.0, -0.75, -0.75]
+    assert mesh["size"] == [2.0, 1.5, 1.5]
+    assert mesh["padding"] == 0.2
+    assert mesh["domain"] is None
+    start, end = mesh["span"]
+    assert MESH_SOURCE[start:end].startswith("SimMesh(")
+
+    # The study references the mesh; its mesh= span is editable.
+    study = result["studies"][0]
+    assert study["mesh"] == "box-grid"
+    assert study["resolution"] == [12, 8, 8]
+    start, end = study["mesh_span"]
+    assert MESH_SOURCE[start:end] == '"box-grid"'
+    assert study["domain_span"] is None
+
+
+def test_mesh_patches_round_trip_through_compile():
+    added = patch_source({"source": STUDY_SOURCE, "op": "add_mesh", "name": "grid"})
+    assert added["ok"] is True
+    assert "mesh1 = SimMesh(name='grid', resolution=20)" in added["source"]
+    # Declared before the study so the study can reference it by name.
+    assert added["source"].index("SimMesh(") < added["source"].index("ThermalStudy(")
+
+    sized = patch_source(
+        {
+            "source": added["source"],
+            "op": "set_mesh_value",
+            "mesh": "grid",
+            "argument": "resolution",
+            "value": [10, 6, 6],
+        }
+    )
+    assert sized["ok"] is True
+    assert "resolution=[10, 6, 6]" in sized["source"]
+
+    wired = patch_source(
+        {
+            "source": sized["source"],
+            "op": "set_study_value",
+            "study": "bar-conduction",
+            "argument": "mesh",
+            "value": "grid",
+        }
+    )
+    assert wired["ok"] is True
+    assert "mesh='grid'" in wired["source"]
+
+    result = compile_source(wired["source"])
+    assert result["ok"] is True
+    assert [mesh["name"] for mesh in result["sim_meshes"]] == ["grid"]
+    assert result["studies"][0]["mesh"] == "grid"
+    assert result["studies"][0]["resolution"] == [10, 6, 6]
+
+    # The referenced mesh cannot be deleted until the study lets go of it.
+    refused = patch_source({"source": wired["source"], "op": "delete_mesh", "mesh": "grid"})
+    assert refused["ok"] is False
+    assert "referenced" in refused["error"]
+
+    deleted = patch_source({"source": sized["source"], "op": "delete_mesh", "mesh": "grid"})
+    assert deleted["ok"] is True
+    assert "SimMesh(" not in deleted["source"].split("import")[-1].split("\n", 1)[1]
+
+
+@pytest.mark.parametrize(
+    ("request_body", "message"),
+    [
+        ({"op": "add_mesh", "name": "  "}, "non-empty"),
+        ({"op": "delete_mesh"}, "`mesh`"),
+        ({"op": "delete_mesh", "mesh": -1}, "`mesh`"),
+        ({"op": "set_mesh_value", "mesh": 0, "argument": 7, "value": 1.0}, "`argument`"),
+        ({"op": "set_mesh_value", "mesh": 0, "argument": "resolution", "value": "ten"}, "`value`"),
+        (
+            {"op": "set_mesh_value", "mesh": 0, "argument": "domain", "value": 3.0},
+            "`domain` name",
+        ),
+        (
+            {"op": "set_study_value", "study": 0, "argument": "mesh", "value": 3.0},
+            "`mesh` name",
+        ),
+        (
+            {"op": "set_study_value", "study": 0, "argument": "domain", "value": ""},
+            "`domain` name",
+        ),
+    ],
+)
+def test_patch_source_validates_mesh_requests(request_body, message):
+    result = patch_source({"source": MESH_SOURCE, **request_body})
+
+    assert result["ok"] is False
+    assert message in result["error"]

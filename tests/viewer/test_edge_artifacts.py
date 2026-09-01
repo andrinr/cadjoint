@@ -28,7 +28,6 @@ from cadjoint.viewer._compile_worker import (
     _execute_scene,
     _mesh_edge_payload,
 )
-from cadjoint.viewer.playground import EXAMPLE_SOURCE
 
 CELL = max(_MESH_EDGE_SIZE) / _MESH_EDGE_RESOLUTION
 
@@ -37,6 +36,142 @@ CROSSING_INTERIOR = 0.05
 DEBRIS_LENGTH = 3.0 * CELL
 COVERAGE_REACH = 1.5 * CELL
 COVERAGE_MINIMUM = 0.9
+
+# The house-and-ring scene these analytic curves were derived for.  It was
+# the playground starter before the heat-sink swap; the battery keeps it as
+# its own fixture because every curve below (profile outline, lateral
+# edges, revolved-corner circles) is computed from these exact literals.
+HOUSE_SOURCE = """import jax
+import jax.numpy as jnp
+
+from cadjoint import extract_parameters, functionalize
+from cadjoint.construction import PolygonProfile, SketchPlane, Solid, extrude, revolve
+from cadjoint.constraints import DistanceConstraint, FixedConstraint, satisfy_constraints
+from cadjoint.geometry import Scalar, Vector, Vector2
+from cadjoint.render import Material
+from cadjoint.sdf.boolean import Union
+from cadjoint.sdf.primitives import Plane
+
+# Named dimensions and points remain editable from either the code or viewport.
+wall_width = Scalar(2.2, name="wall_width")
+wall_height = Scalar(1.0, name="wall_height")
+base_left = Vector2(value=[-1.1, -0.7], free=True, name="base_left")
+base_right = Vector2(value=[1.1, -0.7], free=True, name="base_right")
+eave_right = Vector2(value=[1.1, 0.3], free=True, name="eave_right")
+roof_peak = Vector2(value=[0.0, 1.0], free=True, name="roof_peak")
+eave_left = Vector2(value=[-1.1, 0.3], free=True, name="eave_left")
+
+profile = PolygonProfile(
+    [base_left, base_right, eave_right, roof_peak, eave_left],
+    plane=SketchPlane(origin=[0.0, 0.0, 0.0], normal=[0.0, 0.0, 1.0]),
+    name="house",
+)
+
+# These constraints own part of the sketch shape. Move a point, then use
+# Satisfy in the sketch panel to project it back onto this system.
+FixedConstraint(base_left, [-1.1, -0.7])
+DistanceConstraint(base_left, base_right, wall_width)
+DistanceConstraint(base_right, eave_right, wall_height)
+
+# Named materials appear in the material browser and can be dragged onto solids.
+clay = Material(name="clay", color=[0.85, 0.45, 0.12], roughness=0.35)
+glass_material = Material(
+    name="glass_material",
+    color=[0.72, 0.86, 1.0],
+    roughness=0.04,
+    opacity=0.18,
+    ior=1.45,
+)
+brass = Material(
+    name="brass",
+    color=[0.95, 0.78, 0.35],
+    roughness=0.12,
+    metallic=1.0,
+    reflectivity=0.55,
+)
+polished_copper = Material(
+    name="polished_copper",
+    color=[0.9, 0.38, 0.16],
+    roughness=0.18,
+    metallic=0.92,
+    reflectivity=0.48,
+)
+ground = Material(name="ground", color=[0.12, 0.14, 0.18], roughness=0.8)
+
+# Object positions can also be parameters. The initial glass position is a
+# seed; the distance constraint below drives it to `fixture_spacing`.
+glass_position = Vector([2.2, -0.3, 0.35], free=True, name="glass_position")
+metal_position = Vector([-1.9, -0.65, 0.0], free=True, name="metal_position")
+fixture_spacing = Scalar(3.8, name="fixture_spacing")
+body_depth = Scalar(0.9, free=True, name="body_depth")
+
+body = extrude(profile, depth=body_depth, material=clay)
+glass = Solid.sphere(
+    radius=0.5,
+    position=glass_position,
+    material=glass_material,
+    name="glass",
+)
+metal = Solid.cylinder(
+    radius=0.36,
+    height=0.55,
+    position=metal_position,
+    rotation=[1.5708, 0.0, 0.0],
+    material=brass,
+    name="metal",
+)
+
+FixedConstraint(metal_position, [-1.9, -0.65, 0.0])
+DistanceConstraint(metal_position, glass_position, fixture_spacing)
+
+# A second parameter-backed sketch demonstrates the revolve operator. Its
+# X coordinate is radius from the local Y axis; revolving the small section
+# produces the copper ring while preserving editable source points.
+ring_inner_low = Vector2(value=[0.62, -0.16], free=True, name="ring_inner_low")
+ring_outer_low = Vector2(value=[0.9, -0.16], free=True, name="ring_outer_low")
+ring_outer_high = Vector2(value=[0.9, 0.16], free=True, name="ring_outer_high")
+ring_inner_high = Vector2(value=[0.62, 0.16], free=True, name="ring_inner_high")
+ring_profile = PolygonProfile(
+    [ring_inner_low, ring_outer_low, ring_outer_high, ring_inner_high],
+    plane=SketchPlane(origin=[0.0, 1.65, 0.15], normal=[0.0, 0.0, 1.0]),
+    name="revolve section",
+)
+ring = revolve(ring_profile, material=polished_copper)
+
+scene = Union(
+    body,
+    glass,
+    metal,
+    ring,
+    Plane(-1.25, material=ground),
+    smoothness=0.0,
+)
+satisfy_constraints(scene, steps=2)
+
+# This is a real reverse-mode derivative through sketch points -> extrusion ->
+# final SDF evaluation. Change the profile or depth and rerun: both
+# sensitivities update in the compact AD panel above the code.
+body_parameters, body_fixed, _ = extract_parameters(body)
+body_sdf = functionalize(body)
+
+def clearance_metric(parameters):
+    sdf = body_sdf(parameters, body_fixed)
+    side_clearance = sdf(jnp.array([1.6, 0.0, 0.0]))
+    top_clearance = sdf(jnp.array([0.0, 0.0, 0.8]))
+    return side_clearance + top_clearance
+
+clearance, clearance_gradient = jax.value_and_grad(clearance_metric)(body_parameters)
+differentiability_demo = {
+    "pipeline": "Profile -> Extrude -> SDF",
+    "metric": "two-probe clearance",
+    "value": float(clearance),
+    "parameter_count": len(body_parameters),
+    "sensitivities": [
+        {"parameter": "eave_right.x", "value": float(clearance_gradient["eave_right"][0])},
+        {"parameter": "body_depth", "value": float(clearance_gradient["body_depth"])},
+    ],
+}
+"""
 
 RING_ORIGIN = "origin=[0.0, 1.65, 0.15]"
 RING_YS = (0.95, 1.05, 1.12, 1.2, 1.35, 1.65)
@@ -88,7 +223,7 @@ def _box_edges(half, center=(0.0, 0.0, 0.0)) -> list[tuple[str, np.ndarray]]:
 
 
 def _example_config(ring_y: float):
-    """The playground example with the copper ring moved to ``ring_y``.
+    """The house scene with the copper ring moved to ``ring_y``.
 
     The house body is an extruded polygon whose edges are exactly computable:
     the profile outline at both extrusion caps plus the lateral edges at the
@@ -97,8 +232,8 @@ def _example_config(ring_y: float):
     height they intersect (or trade surface ownership with) the roof, so only
     the house edges stay analytically complete.
     """
-    source = EXAMPLE_SOURCE.replace(RING_ORIGIN, f"origin=[0.0, {ring_y}, 0.15]")
-    assert ring_y == 1.65 or source != EXAMPLE_SOURCE, "ring origin not found in example"
+    source = HOUSE_SOURCE.replace(RING_ORIGIN, f"origin=[0.0, {ring_y}, 0.15]")
+    assert ring_y == 1.65 or source != HOUSE_SOURCE, "ring origin not found in the house scene"
     namespace = _execute_scene(source)
     profile = [
         np.asarray(namespace[name].value, dtype=np.float64)

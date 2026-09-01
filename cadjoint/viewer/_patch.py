@@ -15,6 +15,7 @@ from __future__ import annotations
 import ast
 
 from cadjoint.viewer._source_map import (
+    MeshStatement,
     Span,
     StudyStatement,
     _called_name,
@@ -25,6 +26,7 @@ from cadjoint.viewer._source_map import (
     _vertices_argument,
     locate_call,
     locate_constraint_statements,
+    locate_mesh_statements,
     locate_profile_call,
     locate_study_statements,
 )
@@ -1258,44 +1260,164 @@ def _format_study_argument(argument: str, value) -> str:
     return _exact_number(value)
 
 
-def _set_study_argument(source: str, located: StudyStatement, argument, value) -> str:
-    """Rewrite one numeric study keyword in place (or add it when absent)."""
-    fields = _STUDY_FIELDS[located.kind]
-    if not isinstance(argument, str) or argument not in fields or argument in {"name", "bcs"}:
-        allowed = ", ".join(field for field in fields if field not in {"name", "bcs"})
-        raise PatchError(f"A {located.kind} study's editable arguments are: {allowed}.")
-    expression = _format_study_argument(argument, value)
+def _rewrite_call_argument(
+    source: str, call: ast.Call, fields: tuple[str, ...], argument: str, expression: str, noun: str
+) -> str:
+    """Rewrite one call argument in place (or append it as a keyword).
+
+    The argument is found as a keyword, or positionally through its slot in
+    *fields*; a name bound to a literal follows the assignment indirection
+    of :func:`_editable_value_node`.
+    """
     target = next(
-        (keyword.value for keyword in located.call.keywords if keyword.arg == argument),
+        (keyword.value for keyword in call.keywords if keyword.arg == argument),
         None,
     )
-    if target is None:
+    if target is None and argument in fields:
         position = fields.index(argument)
-        if position < len(located.call.args):
-            target = located.call.args[position]
+        if position < len(call.args):
+            target = call.args[position]
     if target is None:
-        return _set_keyword_expression(source, located.call, argument, expression)
+        return _set_keyword_expression(source, call, argument, expression)
     tree = ast.parse(source)
     literal = _editable_value_node(target, tree)
     if literal is None:
-        raise PatchError(f"The study's `{argument}` value is not an editable literal.")
+        raise PatchError(f"The {noun}'s `{argument}` value is not an editable literal.")
     offsets = _line_offsets(source)
     start, end = _node_span(source, offsets, literal)
     return _validate(source[:start] + expression + source[end:])
 
 
+def _assigned_before(source: str, before_line: int) -> set[str]:
+    """Names assigned by module-level statements above *before_line*."""
+    tree = ast.parse(source)
+    defined: set[str] = set()
+    for statement in tree.body:
+        if statement.lineno >= before_line:
+            continue
+        if isinstance(statement, ast.Assign):
+            targets = statement.targets
+        elif isinstance(statement, ast.AnnAssign):
+            targets = [statement.target]
+        else:
+            continue
+        defined.update(target.id for target in targets if isinstance(target, ast.Name))
+    return defined
+
+
+def _domain_expression(source: str, value, before_line: int, noun: str) -> str:
+    """Validate a ``domain`` value: the name of an object assigned above.
+
+    The patcher never executes code, so "exists among construction nodes"
+    is checked structurally: the name must be assigned by a module-level
+    statement before the edited declaration (execution order), which is
+    where every named scene object lives.
+    """
+    if not isinstance(value, str) or not value.isidentifier():
+        raise PatchError("`domain` needs the variable name of a named scene object.")
+    if value not in _assigned_before(source, before_line):
+        raise PatchError(
+            f"`{value}` is not assigned before the {noun}; `domain` must name an "
+            "existing construction object."
+        )
+    return value
+
+
+def _set_study_mesh(source: str, located: StudyStatement, value) -> str:
+    """Point a study at a declared SimMesh (removing conflicting keywords).
+
+    The mesh is referenced by its declared ``name`` (written as a string
+    literal) or by its assignment variable (written as a bare name).  The
+    study contract keeps meshing intent on the SimMesh, so any
+    ``resolution``/``bounds``/``size``/``domain`` arguments the study still
+    carries are removed as part of the same edit.
+    """
+    if not isinstance(value, str) or not value.strip():
+        raise PatchError("`mesh` needs the name of a declared SimMesh.")
+    meshes = locate_mesh_statements(source) or []
+    by_name = [mesh for mesh in meshes if mesh.name == value]
+    by_variable = [mesh for mesh in meshes if mesh.variable == value]
+    if len(by_name) == 1:
+        expression = repr(value)
+    elif not by_name and len(by_variable) == 1:
+        expression = value
+    else:
+        declared = ", ".join(
+            repr(mesh.name or mesh.variable or f"#{mesh.index}") for mesh in meshes
+        )
+        raise PatchError(
+            f"No single SimMesh named {value!r}; the program declares: {declared or 'none'}."
+        )
+
+    offsets = _line_offsets(source)
+    removals = [
+        _argument_span(source, offsets, keyword)
+        for keyword in located.call.keywords
+        if keyword.arg in {"resolution", "bounds", "size", "domain"}
+    ]
+    if len(located.call.args) > 1:  # positional resolution
+        removals.append(_argument_span(source, offsets, located.call.args[1]))
+
+    def whole_line(start: int, end: int) -> tuple[int, int]:
+        """Swallow the line when the removal leaves it blank (multiline calls)."""
+        line_start = source.rfind("\n", 0, start) + 1
+        if not source[line_start:start].strip() and source[end : end + 1] == "\n":
+            return line_start, end + 1
+        return start, end
+
+    patched = source
+    for start, end in sorted((whole_line(start, end) for start, end in removals), reverse=True):
+        patched = patched[:start] + patched[end:]
+    relocated = _located_study(patched, located.index)
+    if relocated.mesh_span is not None:
+        start, end = relocated.mesh_span
+        return _validate(patched[:start] + expression + patched[end:])
+    return _validate(_set_keyword_expression(patched, relocated.call, "mesh", expression))
+
+
+def _set_study_domain(source: str, located: StudyStatement, value) -> str:
+    """Point an implicit-mesh study at a named scene object as its domain."""
+    if any(keyword.arg == "mesh" for keyword in located.call.keywords):
+        raise PatchError(
+            "This study solves on a SimMesh; set the mesh's `domain` instead (set_mesh_value)."
+        )
+    expression = _domain_expression(source, value, located.statement.lineno, "study")
+    if located.domain_span is not None:
+        start, end = located.domain_span
+        return _validate(source[:start] + expression + source[end:])
+    return _validate(_set_keyword_expression(source, located.call, "domain", expression))
+
+
+def _set_study_argument(source: str, located: StudyStatement, argument, value) -> str:
+    """Rewrite one study keyword in place (or add it when absent)."""
+    if argument == "mesh":
+        return _set_study_mesh(source, located, value)
+    if argument == "domain":
+        return _set_study_domain(source, located, value)
+    fields = _STUDY_FIELDS[located.kind]
+    if not isinstance(argument, str) or argument not in fields or argument in {"name", "bcs"}:
+        allowed = ", ".join(field for field in fields if field not in {"name", "bcs"})
+        raise PatchError(
+            f"A {located.kind} study's editable arguments are: {allowed}, mesh, domain."
+        )
+    expression = _format_study_argument(argument, value)
+    return _rewrite_call_argument(source, located.call, fields, argument, expression, "study")
+
+
 def set_study_value(source: str, study, value, bc=None, argument=None) -> str:
-    """Edit a BC's scalar/vector value or a study's numeric keyword in place.
+    """Edit a BC's scalar/vector value or a study's keyword in place.
 
     Args:
         source: The program text.
         study: Study reference — payload index or name.
-        value: The new number(s); written with exact float ``repr`` so typed
-            values round-trip (``resolution`` stays integral).
+        value: The new number(s), written with exact float ``repr`` so typed
+            values round-trip (``resolution`` stays integral); for
+            ``argument="mesh"`` the name of a declared SimMesh; for
+            ``argument="domain"`` the variable name of a named scene object.
         bc: Index of the boundary condition whose value to rewrite.
         argument: Study keyword to rewrite instead (``resolution``,
             ``conductivity``, ``source``, ``youngs``, ``poisson``,
-            ``bounds``, ``size``).
+            ``bounds``, ``size``, ``mesh``, ``domain``).
 
     Returns:
         The patched source.
@@ -1310,6 +1432,177 @@ def set_study_value(source: str, study, value, bc=None, argument=None) -> str:
     if bc is not None:
         return _set_study_bc_value(source, located, bc, value)
     return _set_study_argument(source, located, argument, value)
+
+
+# ── Simulation meshes ────────────────────────────────────────────────────────
+# SimMesh declarations are patched like studies: located by stable index or
+# name (cadjoint.viewer._source_map.locate_mesh_statements), edited by span
+# surgery on their constructor call.
+
+# Constructor field order, for resolving positionally written arguments;
+# `name` is excluded from editing.
+_MESH_FIELDS = ("name", "resolution", "domain", "bounds", "size", "padding")
+_MESH_NUMERIC_ARGUMENTS = ("resolution", "bounds", "size", "padding")
+
+
+def _located_mesh(source: str, mesh) -> MeshStatement:
+    """Resolve a mesh reference — payload index, name, or variable."""
+    statements = locate_mesh_statements(source)
+    if statements is None:
+        raise PatchError("Source is not valid Python.")
+    if isinstance(mesh, bool) or not isinstance(mesh, (int, str)):
+        raise PatchError("A mesh is referenced by its name or its non-negative index.")
+    if isinstance(mesh, int):
+        if not 0 <= mesh < len(statements):
+            raise PatchError(
+                f"Mesh index {mesh} is out of range; the program declares {len(statements)}."
+            )
+        return statements[mesh]
+    matches = [
+        statement for statement in statements if mesh in (statement.name, statement.variable)
+    ]
+    if len(matches) != 1:
+        declared = ", ".join(
+            repr(statement.name or statement.variable or f"#{statement.index}")
+            for statement in statements
+        )
+        raise PatchError(
+            f"No single mesh named {mesh!r}; the program declares: {declared or 'none'}."
+        )
+    return matches[0]
+
+
+def add_mesh(source: str, name: str | None = None) -> str:
+    """Declare a new simulation mesh at the end of the scene program.
+
+    Writes a kind-less ``meshN = SimMesh(name=..., resolution=20)``
+    declaration (importing ``SimMesh`` from ``cadjoint.fem`` beside it) —
+    after the last existing mesh, otherwise before the first study (a study
+    can only reference meshes declared above it), otherwise after the
+    ``scene`` assignment.
+
+    Args:
+        source: The program text.
+        name: Optional mesh display name; the generated variable name is
+            used when omitted.
+
+    Returns:
+        The patched source.
+
+    Raises:
+        PatchError: On a duplicate name or a program without a ``scene``
+            assignment to anchor the mesh.
+    """
+    try:
+        tree = ast.parse(source)
+    except SyntaxError as error:
+        raise PatchError(f"Source is not valid Python: {error}") from error
+    if name is not None and (not isinstance(name, str) or not name.strip()):
+        raise PatchError("Mesh `name` must be a non-empty string.")
+    meshes = locate_mesh_statements(source) or []
+    taken_names = {mesh.name for mesh in meshes if mesh.name is not None}
+    if name is not None and name in taken_names:
+        raise PatchError(f"A mesh named {name!r} already exists.")
+    taken = _module_names(tree)
+    index = 1
+    while f"mesh{index}" in taken or f"mesh{index}" in taken_names:
+        index += 1
+    variable = f"mesh{index}"
+    mesh_name = name if name is not None else variable
+
+    studies = locate_study_statements(source) or []
+    if meshes:
+        insert = _after_statement(source, meshes[-1].statement)
+    elif studies:
+        insert = _line_offsets(source)[studies[0].statement.lineno - 1]
+    else:
+        anchor = _scene_assignment(tree)
+        if anchor is None:
+            raise PatchError(
+                "Add a `scene = ...` assignment before declaring meshes from the viewer."
+            )
+        insert = _after_statement(source, anchor)
+    statement = f"{variable} = SimMesh(name={mesh_name!r}, resolution=20)\n"
+    patched = source[:insert] + statement + source[insert:]
+    patched = _ensure_import(
+        patched, ast.parse(patched), "cadjoint.fem", "SimMesh", prefer_offset=insert
+    )
+    return _validate(patched)
+
+
+def delete_mesh(source: str, mesh) -> str:
+    """Remove one mesh declaration, refusing while anything references it.
+
+    A mesh is referenced either through its assignment variable (used by a
+    study's ``mesh=`` or anywhere else in the program) or through its name
+    as a ``mesh="..."`` string argument.
+    """
+    located = _located_mesh(source, mesh)
+    tree = ast.parse(source)
+    if located.variable is not None:
+        uses = _name_references(tree, located.variable, located.statement)
+        if uses:
+            raise PatchError(
+                f"`{located.variable}` is used elsewhere in the program, so it cannot be "
+                "deleted from the viewer. Remove those uses first."
+            )
+    if located.name is not None:
+        referenced = any(
+            isinstance(node, ast.Call)
+            and any(
+                keyword.arg == "mesh"
+                and isinstance(keyword.value, ast.Constant)
+                and keyword.value.value == located.name
+                for keyword in node.keywords
+            )
+            for node in ast.walk(tree)
+        )
+        if referenced:
+            raise PatchError(
+                f"Mesh {located.name!r} is referenced by a study, so it cannot be deleted "
+                "from the viewer. Point the study at another mesh first."
+            )
+    offsets = _line_offsets(source)
+    start = offsets[located.statement.lineno - 1]
+    end = offsets[min(located.statement.end_lineno or located.statement.lineno, len(offsets) - 1)]
+    return _validate(source[:start] + source[end:])
+
+
+def set_mesh_value(source: str, mesh, argument, value) -> str:
+    """Edit one SimMesh argument in place (or add it when absent).
+
+    Args:
+        source: The program text.
+        mesh: Mesh reference — payload index, name, or variable.
+        argument: ``resolution``, ``bounds``, ``size``, ``padding`` (numeric,
+            written with exact float ``repr``; ``resolution`` stays
+            integral), or ``domain`` (the variable name of a named scene
+            object).
+        value: The new number(s) or name.
+
+    Returns:
+        The patched source.
+
+    Raises:
+        PatchError: On an unknown argument, an invalid value, or a target
+            that is not an editable literal.
+    """
+    located = _located_mesh(source, mesh)
+    if argument == "domain":
+        expression = _domain_expression(source, value, located.statement.lineno, "mesh")
+        return _rewrite_call_argument(
+            source, located.call, _MESH_FIELDS, "domain", expression, "mesh"
+        )
+    if not isinstance(argument, str) or argument not in _MESH_NUMERIC_ARGUMENTS:
+        allowed = ", ".join((*_MESH_NUMERIC_ARGUMENTS, "domain"))
+        raise PatchError(f"A mesh's editable arguments are: {allowed}.")
+    if argument == "padding":
+        if not isinstance(value, (int, float)) or isinstance(value, bool) or float(value) < 0.0:
+            raise PatchError("`padding` must be a non-negative number.")
+        expression = _exact_number(value)
+    else:
+        expression = _format_study_argument(argument, value)
+    return _rewrite_call_argument(source, located.call, _MESH_FIELDS, argument, expression, "mesh")
 
 
 CONSTRUCTION_CALLS = {"PolygonProfile", "box", "sphere", "cylinder"}
@@ -1518,6 +1811,9 @@ OPERATIONS = {
     "add_study_bc": add_study_bc,
     "delete_study_bc": delete_study_bc,
     "set_study_value": set_study_value,
+    "add_mesh": add_mesh,
+    "delete_mesh": delete_mesh,
+    "set_mesh_value": set_mesh_value,
 }
 
 

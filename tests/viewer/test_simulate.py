@@ -1,4 +1,10 @@
-"""Tests for the playground's FEM simulation mode (/api/simulate)."""
+"""Tests for the playground's FEM endpoints (/api/simulate, /api/mesh_inspect).
+
+The ad-hoc request-body simulation kinds ("probe"/"thermal"/"elastic") are
+retired: /api/simulate only runs studies the scene program declares, and
+/api/mesh_inspect replaces the probe — it builds a declared SimMesh (or a
+study's implicit mesh) and reports it with a quality heatmap.
+"""
 
 from __future__ import annotations
 
@@ -8,11 +14,10 @@ from contextlib import contextmanager
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
-import numpy as np
 import pytest
 
 from cadjoint.viewer import _compile_worker
-from cadjoint.viewer.playground import create_server, simulate_source
+from cadjoint.viewer.playground import create_server, mesh_inspect_source, simulate_source
 
 BOX_SOURCE = """
 from cadjoint.geometry import Vector
@@ -26,56 +31,29 @@ scene = Box(Vector([0.8, 0.5, 0.5], free=True, name="size"))
 
 
 class TestSimulateValidation:
-    def test_unknown_kind_is_rejected(self):
-        result = simulate_source({"source": BOX_SOURCE, "kind": "modal"})
-        assert result["ok"] is False
-        assert "kind" in result["error"]
-
-    def test_resolution_bounds(self):
-        for resolution in (0, 3, 65, 2.5, True, "16"):
-            result = simulate_source(
-                {"source": BOX_SOURCE, "kind": "probe", "resolution": resolution}
-            )
-            assert result["ok"] is False
-            assert "resolution" in result["error"]
-
-    def test_bc_group_shapes(self):
-        for group in ("x+", "++", 3, {"axis": "w", "side": "+"}, {"axis": "x"}):
-            result = simulate_source(
-                {
-                    "source": BOX_SOURCE,
-                    "kind": "thermal",
-                    "bcs": [{"group": group, "type": "dirichlet", "value": 1.0}],
-                }
-            )
-            assert result["ok"] is False, group
-
-    def test_bc_type_and_value_shapes(self):
-        bad = [
-            {"group": "+x", "type": "neumann", "value": 1.0},
-            {"group": "+x", "type": "dirichlet", "value": "hot"},
-            {"group": "+x", "type": "traction", "value": 1.0},
-            {"group": "+x", "type": "traction", "value": [1.0, 2.0]},
-            "not an object",
-        ]
-        for bc in bad:
-            result = simulate_source({"source": BOX_SOURCE, "kind": "elastic", "bcs": [bc]})
-            assert result["ok"] is False, bc
-
-    def test_material_keys_and_values(self):
-        for material in ({"density": 1.0}, {"youngs": "steel"}, [1.0]):
-            result = simulate_source(
-                {"source": BOX_SOURCE, "kind": "elastic", "material": material}
-            )
-            assert result["ok"] is False, material
-
-    def test_source_must_be_a_string(self):
-        result = simulate_source({"kind": "probe"})
-        assert result["ok"] is False
+    def test_only_study_kind_is_accepted(self):
+        for kind in ("modal", "probe", "thermal", "elastic"):
+            result = simulate_source({"source": BOX_SOURCE, "kind": kind, "name": "bar"})
+            assert result["ok"] is False, kind
+            assert "study" in result["error"]
 
     def test_study_kind_requires_a_name(self):
         for name in (None, "", "   ", 7):
             result = simulate_source({"source": BOX_SOURCE, "kind": "study", "name": name})
+            assert result["ok"] is False, name
+            assert "name" in result["error"]
+
+    def test_cached_must_be_a_boolean(self):
+        for cached in ("yes", 1, [True]):
+            result = simulate_source(
+                {"source": BOX_SOURCE, "kind": "study", "name": "bar", "cached": cached}
+            )
+            assert result["ok"] is False, cached
+            assert "cached" in result["error"]
+
+    def test_mesh_inspect_name_must_be_a_non_empty_string(self):
+        for name in ("", "   ", 7):
+            result = mesh_inspect_source({"source": BOX_SOURCE, "name": name})
             assert result["ok"] is False, name
             assert "name" in result["error"]
 
@@ -90,73 +68,18 @@ def _box_scene():
     return Box(Vector([0.8, 0.5, 0.5], free=True, name="size"))
 
 
-class TestProbe:
-    def test_probe_returns_catalog_and_surface(self):
-        result = _compile_worker._simulate_scene(_box_scene(), {"kind": "probe", "resolution": 12})
-        assert result["ok"] is True
-        assert result["field"] is None
-        mesh = result["mesh"]
-        groups = {group["id"] for group in mesh["groups"]}
-        assert groups == {"+x", "-x", "+y", "-y", "+z", "-z"}
-        for group in mesh["groups"]:
-            assert set(group) >= {"id", "axis", "side", "center", "area", "faces", "start", "count"}
-        indices = np.asarray(mesh["indices"])
-        assert indices.max() < mesh["vertex_count"]
-        assert len(mesh["scalars"]) == mesh["vertex_count"]
+def _bar_study():
+    from cadjoint.fem import Dirichlet, Nodes, ThermalStudy
 
-    def test_unknown_group_names_the_available_ones(self):
-        with pytest.raises(ValueError, match=r"\+x"):
-            _compile_worker._simulate_scene(
-                _box_scene(),
-                {
-                    "kind": "thermal",
-                    "resolution": 8,
-                    "bcs": [{"group": "-q", "type": "dirichlet", "value": 0.0}],
-                },
-            )
-
-    def test_unknown_kind_raises(self):
-        with pytest.raises(ValueError, match="kind"):
-            _compile_worker._simulate_scene(_box_scene(), {"kind": "modal", "resolution": 8})
-
-
-class TestMissingExtra:
-    def test_fem_unavailable_is_a_typed_error(self, monkeypatch):
-        import builtins
-
-        real_import = builtins.__import__
-
-        def no_jax_fem(name, *args, **kwargs):
-            if name == "jax_fem" or name.startswith("jax_fem."):
-                raise ImportError("No module named 'jax_fem'")
-            return real_import(name, *args, **kwargs)
-
-        monkeypatch.setattr(builtins, "__import__", no_jax_fem)
-        result = _compile_worker._simulate_scene(
-            _box_scene(),
-            {
-                "kind": "thermal",
-                "resolution": 8,
-                "bcs": [{"group": "+x", "type": "dirichlet", "value": 0.0}],
-            },
-        )
-        assert result["ok"] is False
-        assert result["error_kind"] == "fem_unavailable"
-        assert "fem" in result["error"]
-
-    def test_probe_works_without_the_extra(self, monkeypatch):
-        import builtins
-
-        real_import = builtins.__import__
-
-        def no_jax_fem(name, *args, **kwargs):
-            if name == "jax_fem" or name.startswith("jax_fem."):
-                raise ImportError("No module named 'jax_fem'")
-            return real_import(name, *args, **kwargs)
-
-        monkeypatch.setattr(builtins, "__import__", no_jax_fem)
-        result = _compile_worker._simulate_scene(_box_scene(), {"kind": "probe", "resolution": 8})
-        assert result["ok"] is True
+    return ThermalStudy(
+        name="bar",
+        resolution=10,
+        conductivity=1.0,
+        bcs=[
+            Dirichlet(Nodes.side("-x"), 0.0),
+            Dirichlet(Nodes.side("+x"), 100.0),
+        ],
+    )
 
 
 # ── HTTP layer ──────────────────────────────────────────────────────────────
@@ -184,10 +107,11 @@ def _post(base: str, path: str, payload: dict, token: str | None = None) -> Requ
 
 
 class TestHttp:
-    def test_simulate_endpoint_requires_the_session_token(self):
+    @pytest.mark.parametrize("path", ["/api/simulate", "/api/mesh_inspect"])
+    def test_fem_endpoints_require_the_session_token(self, path):
         with _running_server() as base:
             with pytest.raises(HTTPError) as error:
-                urlopen(_post(base, "/api/simulate", {"source": BOX_SOURCE, "kind": "probe"}))
+                urlopen(_post(base, path, {"source": BOX_SOURCE, "kind": "study", "name": "b"}))
             assert error.value.code == 403
 
     def test_fem_unavailable_maps_to_501(self, monkeypatch):
@@ -207,7 +131,7 @@ class TestHttp:
                     _post(
                         base,
                         "/api/simulate",
-                        {"source": BOX_SOURCE, "kind": "thermal"},
+                        {"source": BOX_SOURCE, "kind": "study", "name": "bar"},
                         token=token,
                     )
                 )
@@ -224,82 +148,14 @@ class TestHttp:
                     _post(
                         base,
                         "/api/simulate",
-                        {"source": BOX_SOURCE, "kind": "modal"},
+                        {"source": BOX_SOURCE, "kind": "thermal"},
                         token=token,
                     )
                 )
             assert error.value.code == 422
 
 
-# ── Real solves (need jax-fem; run in-process to skip the subprocess cost) ──
-
-
-class TestSolves:
-    def test_thermal_solve_produces_a_gradient(self):
-        pytest.importorskip("jax_fem", reason="thermal solve needs the fem extra")
-        result = _compile_worker._simulate_scene(
-            _box_scene(),
-            {
-                "kind": "thermal",
-                "resolution": 10,
-                "bcs": [
-                    {"group": "-x", "type": "dirichlet", "value": 0.0},
-                    {"group": "+x", "type": "dirichlet", "value": 100.0},
-                ],
-                "material": {"conductivity": 1.0},
-            },
-        )
-        assert result["ok"] is True
-        assert result["field"] == "temperature"
-        mesh = result["mesh"]
-        low, high = mesh["range"]
-        assert low == pytest.approx(0.0, abs=1e-3)
-        assert high == pytest.approx(100.0, abs=1e-3)
-        # Boundary temperatures interpolate between the two prescribed faces.
-        assert all(-1e-3 <= value <= 100.0 + 1e-3 for value in mesh["scalars"])
-
-    def test_elastic_solve_reports_von_mises(self):
-        pytest.importorskip("jax_fem", reason="elastic solve needs the fem extra")
-        result = _compile_worker._simulate_scene(
-            _box_scene(),
-            {
-                "kind": "elastic",
-                "resolution": 8,
-                "bcs": [
-                    {"group": "-x", "type": "dirichlet", "value": 0.0},
-                    {"group": "+x", "type": "traction", "value": [0.0, 0.0, -1.0]},
-                ],
-                "material": {"youngs": 200.0, "poisson": 0.3},
-            },
-        )
-        assert result["ok"] is True
-        assert result["field"] == "von_mises"
-        low, high = result["mesh"]["range"]
-        assert high > low >= 0.0
-
-    def test_thermal_without_dirichlet_is_rejected(self):
-        pytest.importorskip("jax_fem", reason="solver path needs the fem extra")
-        with pytest.raises(ValueError, match="fixed-temperature"):
-            _compile_worker._simulate_scene(
-                _box_scene(), {"kind": "thermal", "resolution": 8, "bcs": []}
-            )
-
-
 # ── Declared studies run by name (code-parity path) ─────────────────────────
-
-
-def _bar_study():
-    from cadjoint.fem import Dirichlet, Nodes, ThermalStudy
-
-    return ThermalStudy(
-        name="bar",
-        resolution=10,
-        conductivity=1.0,
-        bcs=[
-            Dirichlet(Nodes.side("-x"), 0.0),
-            Dirichlet(Nodes.side("+x"), 100.0),
-        ],
-    )
 
 
 class TestStudySimulate:
@@ -341,12 +197,25 @@ class TestStudySimulate:
         assert result["ok"] is True
         assert result["kind"] == "study"
         assert result["field"] == "temperature"
+        assert result["cached"] is False
         low, high = result["mesh"]["range"]
         assert low == pytest.approx(0.0, abs=1e-3)
         assert high == pytest.approx(100.0, abs=1e-3)
         # The declaration itself rides along, with per-BC serializability.
         assert result["study"]["name"] == "bar"
         assert [bc["serializable"] for bc in result["study"]["bcs"]] == [True, True]
+        # The result summary is the SimulationResult's describe() payload.
+        summary = result["result"]
+        assert summary["name"] == "bar"
+        assert summary["kind"] == "thermal"
+        assert summary["field"] == "temperature"
+        assert summary["range"] == pytest.approx([low, high], abs=1e-6)
+        assert set(summary["fields"]) == {"temperature"}
+        # The built mesh's inspection report rides along too.
+        info = result["mesh_info"]
+        assert info["nodes"] == summary["nodes"]
+        assert info["elements"] == summary["elements"]
+        assert set(info["quality"]) == {"scaled_jacobian", "aspect_ratio"}
 
     def test_elastic_study_reports_von_mises(self):
         pytest.importorskip("jax_fem", reason="study solve needs the fem extra")
@@ -369,6 +238,34 @@ class TestStudySimulate:
         assert result["field"] == "von_mises"
         low, high = result["mesh"]["range"]
         assert high > low >= 0.0
+        assert set(result["result"]["fields"]) == {"displacement", "von_mises"}
+
+    def test_cached_serves_the_last_result_without_resolving(self):
+        pytest.importorskip("jax_fem", reason="study solve needs the fem extra")
+        study = _bar_study()
+        scene = _box_scene()
+        first = _compile_worker._simulate_study(scene, [study], {"kind": "study", "name": "bar"})
+        assert first["cached"] is False
+        assert study.last_result is not None
+
+        def explode(*args, **kwargs):  # pragma: no cover - must not run
+            raise AssertionError("cached request must not re-solve")
+
+        study.solve = explode
+        second = _compile_worker._simulate_study(
+            scene, [study], {"kind": "study", "name": "bar", "cached": True}
+        )
+        assert second["cached"] is True
+        assert second["result"] == first["result"]
+        assert second["mesh"]["range"] == first["mesh"]["range"]
+
+    def test_cached_falls_back_to_solving_when_nothing_is_stored(self):
+        pytest.importorskip("jax_fem", reason="study solve needs the fem extra")
+        result = _compile_worker._simulate_study(
+            _box_scene(), [_bar_study()], {"kind": "study", "name": "bar", "cached": True}
+        )
+        assert result["ok"] is True
+        assert result["cached"] is False
 
     def test_worker_simulate_source_dispatches_studies(self):
         pytest.importorskip("jax_fem", reason="study solve needs the fem extra")
@@ -390,3 +287,108 @@ class TestStudySimulate:
         assert result["ok"] is True
         assert result["field"] == "temperature"
         assert "output" in result
+
+    def test_studies_resolve_declared_meshes_by_name(self):
+        pytest.importorskip("jax_fem", reason="study solve needs the fem extra")
+        source = "\n".join(
+            [
+                "from cadjoint.fem import Dirichlet, Nodes, SimMesh, ThermalStudy",
+                "from cadjoint.geometry import Vector",
+                "from cadjoint.sdf.primitives import Box",
+                "",
+                'scene = Box(Vector([0.8, 0.5, 0.5], free=True, name="size"))',
+                "grid = SimMesh(name='grid', resolution=8, bounds=(-1.0, -0.75, -0.75),",
+                "               size=(2.0, 1.5, 1.5))",
+                "heat = ThermalStudy(name='bar', conductivity=1.0, mesh='grid',",
+                "                    bcs=[Dirichlet(Nodes.side('-x'), 0.0),",
+                "                         Dirichlet(Nodes.side('+x'), 1.0)])",
+            ]
+        )
+        result = _compile_worker._simulate_source(
+            {"source": source, "kind": "study", "name": "bar"}
+        )
+        assert result["ok"] is True
+        assert result["study"]["mesh"] == "grid"
+        assert result["result"]["mesh"] == "grid"
+        assert result["mesh_info"]["name"] == "grid"
+
+
+# ── Mesh inspection (probe successor) ───────────────────────────────────────
+
+MESH_SOURCE = "\n".join(
+    [
+        "from cadjoint.fem import SimMesh",
+        "from cadjoint.geometry import Vector",
+        "from cadjoint.sdf.primitives import Box",
+        "",
+        'scene = Box(Vector([0.8, 0.5, 0.5], free=True, name="size"))',
+        "grid = SimMesh(name='grid', resolution=8, bounds=(-1.0, -0.75, -0.75),",
+        "               size=(2.0, 1.5, 1.5))",
+        "",
+    ]
+)
+
+
+class TestMeshInspect:
+    def test_named_mesh_reports_info_and_quality_surface(self):
+        result = _compile_worker._mesh_inspect_source({"source": MESH_SOURCE, "name": "grid"})
+        assert result["ok"] is True
+        assert result["name"] == "grid"
+        assert result["field"] == "scaled_jacobian"
+        info = result["info"]
+        assert info["nodes"] > 0 and info["elements"] > 0
+        assert set(info["quality"]) == {"scaled_jacobian", "aspect_ratio"}
+        assert info["grid"]["cells"] == [8, 8, 8]
+        mesh = result["mesh"]
+        assert set(mesh) >= {"positions", "scalars", "indices", "groups", "range", "vertex_count"}
+        assert len(mesh["scalars"]) == mesh["vertex_count"]
+        # The heatmap is the per-vertex min scaled jacobian: in (0, 1].
+        assert result["quality_scalars"] == mesh["scalars"]
+        assert all(0.0 < value <= 1.0 + 1e-9 for value in result["quality_scalars"])
+        low, high = mesh["range"]
+        assert 0.0 < low <= high <= 1.0 + 1e-9
+
+    def test_single_declared_mesh_needs_no_name(self):
+        result = _compile_worker._mesh_inspect_source({"source": MESH_SOURCE})
+        assert result["ok"] is True
+        assert result["name"] == "grid"
+
+    def test_a_study_name_builds_its_implicit_mesh(self):
+        source = "\n".join(
+            [
+                "from cadjoint.fem import Dirichlet, Nodes, ThermalStudy",
+                "from cadjoint.geometry import Vector",
+                "from cadjoint.sdf.primitives import Box",
+                "",
+                'scene = Box(Vector([0.8, 0.5, 0.5], free=True, name="size"))',
+                "heat = ThermalStudy(name='bar', resolution=8, conductivity=1.0,",
+                "                    bcs=[Dirichlet(Nodes.side('-x'), 0.0)])",
+            ]
+        )
+        result = _compile_worker._mesh_inspect_source({"source": source, "name": "bar"})
+        assert result["ok"] is True
+        assert result["name"] == "bar::mesh"
+        assert result["info"]["elements"] > 0
+
+    def test_unknown_name_lists_meshes_and_studies(self):
+        # The worker's main() turns these into {"ok": False} responses.
+        with pytest.raises(ValueError, match="'nope'"):
+            _compile_worker._inspect_mesh(_box_scene(), [], [], {"name": "nope"})
+        with pytest.raises(ValueError, match="'grid'"):
+            _compile_worker._mesh_inspect_source({"source": MESH_SOURCE, "name": "nope"})
+
+    def test_ambiguity_without_a_name_is_an_error(self):
+        with pytest.raises(ValueError, match="name"):
+            _compile_worker._mesh_inspect_source({"source": BOX_SOURCE})
+
+    def test_endpoint_round_trips_over_http(self):
+        with _running_server() as base:
+            with urlopen(f"{base}/api/session") as response:
+                token = json.loads(response.read())["token"]
+            with urlopen(
+                _post(base, "/api/mesh_inspect", {"source": MESH_SOURCE, "name": "grid"}, token)
+            ) as response:
+                result = json.loads(response.read())
+        assert result["ok"] is True
+        assert result["info"]["name"] == "grid"
+        assert len(result["quality_scalars"]) == result["mesh"]["vertex_count"]

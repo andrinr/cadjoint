@@ -8,10 +8,14 @@ Serves the built frontend (``cadjoint/viewer/static``) and a small JSON API:
 - ``POST /patch``        rewrite sketch vertex literals in the user's source
 - ``POST /api/mesh``     run the source again and return only the dual-contour
                          mesh edges (requested lazily by the viewer)
-- ``POST /api/simulate`` mesh the scene into hexahedra and run a thermal or
-                         elastic FEM solve (or just probe the face groups);
-                         ``kind="study"`` runs a study the program declares
-                         (``cadjoint.fem.study``) picked by ``name``
+- ``POST /api/simulate`` run a study the program declares (``cadjoint.fem``)
+                         picked by ``name`` (``kind="study"``); the response
+                         carries the solved surface, the result summary, and
+                         the built mesh's inspection report
+- ``POST /api/mesh_inspect`` build a declared ``SimMesh`` (or a study's
+                         implicit mesh) and return its inspection report plus
+                         a renderable surface with a scaled-jacobian quality
+                         heatmap — look at a mesh before solving on it
 - ``GET  /api/scenes``   list saved scene files in ``./scenes``
 - ``POST /api/scenes/load``  read one saved scene file
 - ``POST /api/scenes/save``  write one scene file into ``./scenes``
@@ -67,137 +71,167 @@ CONTENT_SECURITY_POLICY = (
     "form-action 'none'"
 )
 
-EXAMPLE_SOURCE = """import jax
+EXAMPLE_SOURCE = '''"""Parametric heat sink: finned extrusion, copper slug, press-fit bushings.
+
+A compact power-module heat sink and the default tour of the toolchain: the
+fin comb is one parameter-backed sketch profile extruded through a named
+depth, the copper heat slug under the die is a revolved section, and two
+steel bushings carry the mounting screws. A declared thermal study conducts
+the die's heat flux up into the fins, and the block at the bottom takes a
+real engineering gradient — material volume w.r.t. the named dimensions —
+straight through the same geometry the viewport renders.
+
+Named design parameters:
+  - ``fin_depth``: extrusion depth of the fin comb (along y)
+  - ``fin_height``: driving dimension from a fin root to its tip
+  - ``bushing_spacing``: distance between the two mounting bushings
+"""
+
+import jax
 import jax.numpy as jnp
 
 from cadjoint import extract_parameters, functionalize
-from cadjoint.construction import PolygonProfile, SketchPlane, Solid, extrude, revolve
 from cadjoint.constraints import DistanceConstraint, FixedConstraint, satisfy_constraints
+from cadjoint.construction import PolygonProfile, SketchPlane, Solid, extrude, revolve
+from cadjoint.fem import Dirichlet, HeatFlux, Nodes, ThermalStudy
 from cadjoint.geometry import Scalar, Vector, Vector2
 from cadjoint.render import Material
 from cadjoint.sdf.boolean import Union
-from cadjoint.sdf.primitives import Plane
 
-# Named dimensions and points remain editable from either the code or viewport.
-wall_width = Scalar(2.2, name="wall_width")
-wall_height = Scalar(1.0, name="wall_height")
-base_left = Vector2(value=[-1.1, -0.7], free=True, name="base_left")
-base_right = Vector2(value=[1.1, -0.7], free=True, name="base_right")
-eave_right = Vector2(value=[1.1, 0.3], free=True, name="eave_right")
-roof_peak = Vector2(value=[0.0, 1.0], free=True, name="roof_peak")
-eave_left = Vector2(value=[-1.1, 0.3], free=True, name="eave_left")
+# ── design parameters ────────────────────────────────────────────────────────
+fin_depth = Scalar(1.2, free=True, name="fin_depth")
+fin_height = Scalar(0.67, name="fin_height")
+bushing_spacing = Scalar(1.56, name="bushing_spacing")
 
-profile = PolygonProfile(
-    [base_left, base_right, eave_right, roof_peak, eave_left],
-    plane=SketchPlane(origin=[0.0, 0.0, 0.0], normal=[0.0, 0.0, 1.0]),
-    name="house",
+aluminum = Material(name="aluminum", color=[0.8, 0.82, 0.85], roughness=0.3, metallic=0.9)
+copper = Material(name="copper", color=[0.9, 0.45, 0.22], roughness=0.18, metallic=0.95)
+steel = Material(name="steel", color=[0.55, 0.57, 0.6], roughness=0.4, metallic=0.85)
+
+# ── fin comb: base deck + three fins as one sketch profile ───────────────────
+# Sketch plane normal +Y gives in-plane axes u = -X, v = +Z: profile y is
+# world height. Extrusion spans ±fin_depth/2 around y = 0. Every vertex is a
+# live sketch point — drag a fin tip in the viewport and rerun.
+base_l = Vector2(value=[-0.9, 0.0], free=True, name="base_l")
+base_r = Vector2(value=[0.9, 0.0], free=True, name="base_r")
+deck_r = Vector2(value=[0.9, 0.18], free=True, name="deck_r")
+fin1_root_r = Vector2(value=[0.68, 0.18], free=True, name="fin1_root_r")
+fin1_tip_r = Vector2(value=[0.68, 0.85], free=True, name="fin1_tip_r")
+fin1_tip_l = Vector2(value=[0.52, 0.85], free=True, name="fin1_tip_l")
+fin1_root_l = Vector2(value=[0.52, 0.18], free=True, name="fin1_root_l")
+fin2_root_r = Vector2(value=[0.08, 0.18], free=True, name="fin2_root_r")
+fin2_tip_r = Vector2(value=[0.08, 0.85], free=True, name="fin2_tip_r")
+fin2_tip_l = Vector2(value=[-0.08, 0.85], free=True, name="fin2_tip_l")
+fin2_root_l = Vector2(value=[-0.08, 0.18], free=True, name="fin2_root_l")
+fin3_root_r = Vector2(value=[-0.52, 0.18], free=True, name="fin3_root_r")
+fin3_tip_r = Vector2(value=[-0.52, 0.85], free=True, name="fin3_tip_r")
+fin3_tip_l = Vector2(value=[-0.68, 0.85], free=True, name="fin3_tip_l")
+fin3_root_l = Vector2(value=[-0.68, 0.18], free=True, name="fin3_root_l")
+deck_l = Vector2(value=[-0.9, 0.18], free=True, name="deck_l")
+comb_profile = PolygonProfile(
+    [
+        base_l,
+        base_r,
+        deck_r,
+        fin1_root_r,
+        fin1_tip_r,
+        fin1_tip_l,
+        fin1_root_l,
+        fin2_root_r,
+        fin2_tip_r,
+        fin2_tip_l,
+        fin2_root_l,
+        fin3_root_r,
+        fin3_tip_r,
+        fin3_tip_l,
+        fin3_root_l,
+        deck_l,
+    ],
+    plane=SketchPlane(origin=[0.0, 0.0, 0.0], normal=[0.0, 1.0, 0.0]),
+    name="fin comb",
 )
+sink = extrude(comb_profile, depth=fin_depth, material=aluminum)
 
-# These constraints own part of the sketch shape. Move a point, then use
-# Satisfy in the sketch panel to project it back onto this system.
-FixedConstraint(base_left, [-1.1, -0.7])
-DistanceConstraint(base_left, base_right, wall_width)
-DistanceConstraint(base_right, eave_right, wall_height)
+# The fin height is a named dimension: the center fin's tip must sit
+# fin_height above its root. Constraints own this part of the sketch —
+# move a point, then Satisfy projects it back onto the system.
+FixedConstraint(base_l, [-0.9, 0.0])
+DistanceConstraint(fin2_root_r, fin2_tip_r, fin_height)
 
-# Named materials appear in the material browser and can be dragged onto solids.
-clay = Material(name="clay", color=[0.85, 0.45, 0.12], roughness=0.35)
-glass_material = Material(
-    name="glass_material",
-    color=[0.72, 0.86, 1.0],
-    roughness=0.04,
-    opacity=0.18,
-    ior=1.45,
+# ── copper heat slug: revolved section under the die, screw bore on axis ─────
+# Revolve spins the profile around the plane's local Y axis (world z here):
+# profile x is radius, profile y runs along the axis. The slug presses into
+# the deck from below; the die contacts its bottom face.
+slug_bore_low = Vector2(value=[0.05, -0.18], free=True, name="slug_bore_low")
+slug_rim_low = Vector2(value=[0.26, -0.18], free=True, name="slug_rim_low")
+slug_rim_high = Vector2(value=[0.26, 0.04], free=True, name="slug_rim_high")
+slug_bore_high = Vector2(value=[0.05, 0.04], free=True, name="slug_bore_high")
+slug_profile = PolygonProfile(
+    [slug_bore_low, slug_rim_low, slug_rim_high, slug_bore_high],
+    plane=SketchPlane(origin=[0.0, 0.0, 0.0], normal=[0.0, 1.0, 0.0]),
+    name="slug section",
 )
-brass = Material(
-    name="brass",
-    color=[0.95, 0.78, 0.35],
-    roughness=0.12,
-    metallic=1.0,
-    reflectivity=0.55,
-)
-polished_copper = Material(
-    name="polished_copper",
-    color=[0.9, 0.38, 0.16],
-    roughness=0.18,
-    metallic=0.92,
-    reflectivity=0.48,
-)
-ground = Material(name="ground", color=[0.12, 0.14, 0.18], roughness=0.8)
+slug = revolve(slug_profile, material=copper)
 
-# Object positions can also be parameters. The initial glass position is a
-# seed; the distance constraint below drives it to `fixture_spacing`.
-glass_position = Vector([2.2, -0.3, 0.35], free=True, name="glass_position")
-metal_position = Vector([-1.9, -0.65, 0.0], free=True, name="metal_position")
-fixture_spacing = Scalar(3.8, name="fixture_spacing")
-body_depth = Scalar(0.9, free=True, name="body_depth")
+# ── mounting bushings: fixed pattern, spacing tied by a constraint ───────────
+bushing_a = Vector([0.78, 0.0, 0.1], free=True, name="bushing_a")
+bushing_b = Vector([-0.78, 0.0, 0.1], free=True, name="bushing_b")
+FixedConstraint(bushing_a, [0.78, 0.0, 0.1])
+DistanceConstraint(bushing_a, bushing_b, bushing_spacing)
+bush_a = Solid.cylinder(radius=0.07, height=0.12, position=bushing_a, material=steel, name="bush_a")
+bush_b = Solid.cylinder(radius=0.07, height=0.12, position=bushing_b, material=steel, name="bush_b")
 
-body = extrude(profile, depth=body_depth, material=clay)
-glass = Solid.sphere(
-    radius=0.5,
-    position=glass_position,
-    material=glass_material,
-    name="glass",
-)
-metal = Solid.cylinder(
-    radius=0.36,
-    height=0.55,
-    position=metal_position,
-    rotation=[1.5708, 0.0, 0.0],
-    material=brass,
-    name="metal",
-)
-
-FixedConstraint(metal_position, [-1.9, -0.65, 0.0])
-DistanceConstraint(metal_position, glass_position, fixture_spacing)
-
-# A second parameter-backed sketch demonstrates the revolve operator. Its
-# X coordinate is radius from the local Y axis; revolving the small section
-# produces the copper ring while preserving editable source points.
-ring_inner_low = Vector2(value=[0.62, -0.16], free=True, name="ring_inner_low")
-ring_outer_low = Vector2(value=[0.9, -0.16], free=True, name="ring_outer_low")
-ring_outer_high = Vector2(value=[0.9, 0.16], free=True, name="ring_outer_high")
-ring_inner_high = Vector2(value=[0.62, 0.16], free=True, name="ring_inner_high")
-ring_profile = PolygonProfile(
-    [ring_inner_low, ring_outer_low, ring_outer_high, ring_inner_high],
-    plane=SketchPlane(origin=[0.0, 1.65, 0.15], normal=[0.0, 0.0, 1.0]),
-    name="revolve section",
-)
-ring = revolve(ring_profile, material=polished_copper)
-
-scene = Union(
-    body,
-    glass,
-    metal,
-    ring,
-    Plane(-1.25, material=ground),
-    smoothness=0.0,
-)
+scene = Union(sink, slug, bush_a, bush_b, smoothness=0.03)
 satisfy_constraints(scene, steps=2)
 
+# ── thermal study: die flux on the slug bottom, ambient at the fin field ─────
+# Node selections are programmatic: the flux enters through the boundary
+# faces of the slug's bottom disc; the upper fin field is held at ambient
+# (an idealized convection sink).
+heat_study = ThermalStudy(
+    name="sink-conduction",
+    resolution=(20, 14, 12),
+    conductivity=2.0,
+    bcs=[
+        HeatFlux(
+            Nodes.halfspace([0.0, 0.0, -0.12], [0.0, 0.0, -1.0])
+            & Nodes.sphere([0.0, 0.0, -0.18], 0.4),
+            6.0,
+        ),
+        Dirichlet(Nodes.halfspace([0.0, 0.0, 0.6], [0.0, 0.0, 1.0]), 0.0),
+    ],
+    bounds=(-1.05, -0.8, -0.3),
+    size=(2.1, 1.6, 1.4),
+)
+
 # This is a real reverse-mode derivative through sketch points -> extrusion ->
-# final SDF evaluation. Change the profile or depth and rerun: both
-# sensitivities update in the compact AD panel above the code.
-body_parameters, body_fixed, _ = extract_parameters(body)
-body_sdf = functionalize(body)
+# final SDF evaluation: the aluminum volume of the fin comb, and how it moves
+# with the extrusion depth and the center fin's tip. Drag a vertex or edit
+# fin_depth and rerun: the sensitivities update in the AD panel above.
+sink_parameters, sink_fixed, _ = extract_parameters(sink)
+sink_sdf = functionalize(sink)
 
-def clearance_metric(parameters):
-    sdf = body_sdf(parameters, body_fixed)
-    side_clearance = sdf(jnp.array([1.6, 0.0, 0.0]))
-    top_clearance = sdf(jnp.array([0.0, 0.0, 0.8]))
-    return side_clearance + top_clearance
+axes = [jnp.linspace(-1.0, 1.0, 15), jnp.linspace(-0.7, 0.7, 15), jnp.linspace(-0.05, 0.95, 15)]
+cells = jnp.stack(jnp.meshgrid(*axes, indexing="ij"), axis=-1).reshape(-1, 3)
+cell_volume = float((2.0 / 14) * (1.4 / 14) * (1.0 / 14))
 
-clearance, clearance_gradient = jax.value_and_grad(clearance_metric)(body_parameters)
+
+def material_volume(parameters):
+    sdf = sink_sdf(parameters, sink_fixed)
+    return cell_volume * jnp.sum(jax.nn.sigmoid(-sdf(cells) / 0.03))
+
+
+volume, volume_gradient = jax.value_and_grad(material_volume)(sink_parameters)
 differentiability_demo = {
     "pipeline": "Profile -> Extrude -> SDF",
-    "metric": "two-probe clearance",
-    "value": float(clearance),
-    "parameter_count": len(body_parameters),
+    "metric": "aluminum volume (smoothed)",
+    "value": float(volume),
+    "parameter_count": len(sink_parameters),
     "sensitivities": [
-        {"parameter": "eave_right.x", "value": float(clearance_gradient["eave_right"][0])},
-        {"parameter": "body_depth", "value": float(clearance_gradient["body_depth"])},
+        {"parameter": "fin_depth", "value": float(volume_gradient["fin_depth"])},
+        {"parameter": "fin2_tip_l.y", "value": float(volume_gradient["fin2_tip_l"][1])},
     ],
 }
-"""
+'''
 
 MISSING_BUILD_PAGE = """<!doctype html>
 <html><head><meta charset="utf-8"><title>CADJOINT Playground</title></head>
@@ -267,39 +301,13 @@ def mesh_source(source: str, timeout: float = COMPILE_TIMEOUT_SECONDS) -> dict[s
     return _run_worker(source, "mesh", timeout)
 
 
-# FEM solves cover meshing plus a PETSc-assembled solve, which can far exceed
-# the ordinary compile budget.
+# FEM solves cover meshing plus the assembled solve, which can far exceed the
+# ordinary compile budget.
 SIMULATE_TIMEOUT_SECONDS = 180
-SIMULATE_KINDS = ("probe", "thermal", "elastic", "study")
-SIMULATE_BC_TYPES = ("dirichlet", "traction")
-SIMULATE_MATERIAL_KEYS = ("conductivity", "source", "youngs", "poisson")
-MIN_SIMULATE_RESOLUTION = 4
-MAX_SIMULATE_RESOLUTION = 64
-
-
-def _validate_simulate_bc(bc: Any) -> str | None:
-    """Return an error message for one boundary-condition entry, or None."""
-    if not isinstance(bc, dict):
-        return "Each boundary condition must be an object."
-    spec = bc.get("group")
-    if isinstance(spec, dict):
-        if spec.get("axis") not in {"x", "y", "z"} or spec.get("side") not in {"+", "-"}:
-            return "A predicate spec needs `axis` of x/y/z and `side` of +/-."
-    elif not (isinstance(spec, str) and len(spec) == 2 and spec[0] in "+-" and spec[1] in "xyz"):
-        return "Each boundary condition needs `group` as an id like `+x` or a predicate spec."
-    if bc.get("type") not in SIMULATE_BC_TYPES:
-        return "Boundary condition `type` must be `dirichlet` or `traction`."
-    value = bc.get("value", 0.0)
-    if bc["type"] == "traction":
-        if not (
-            isinstance(value, (list, tuple))
-            and len(value) == 3
-            and all(isinstance(item, (int, float)) and not isinstance(item, bool) for item in value)
-        ):
-            return "A traction boundary condition needs `value` as three numbers."
-    elif not isinstance(value, (int, float)) or isinstance(value, bool):
-        return "A dirichlet boundary condition needs a numeric `value`."
-    return None
+SIMULATE_KINDS = ("study",)
+# Mesh inspection only builds the hex mesh (no solve), but big grids still
+# outgrow the compile budget.
+MESH_INSPECT_TIMEOUT_SECONDS = 60
 
 
 def simulate_source(
@@ -307,67 +315,61 @@ def simulate_source(
 ) -> dict[str, Any]:
     """Validate a simulation request and run it in a disposable child process.
 
-    ``kind="probe"`` only meshes the scene, returning the boundary surface and
-    its face-group catalog for the BC UI; ``"thermal"``/``"elastic"`` also
-    solve, as an ad-hoc preview from request-supplied BCs.  ``kind="study"``
-    instead runs a study the scene program itself declares (a first-class
-    :mod:`cadjoint.fem.study` object), picked by ``name`` — resolution,
-    material, and boundary conditions all come from the declaration.  The
-    worker reports a missing jax-fem extra as
-    ``error_kind="fem_unavailable"``, which the HTTP layer maps to 501.
+    ``kind="study"`` (the only kind) runs a study the scene program itself
+    declares (a first-class :mod:`cadjoint.fem.study` object), picked by
+    ``name`` — mesh, material, and boundary conditions all come from the
+    declaration.  With ``cached=True`` the worker serves the study's
+    ``last_result`` without re-solving when one exists; every request runs a
+    fresh worker process, so that cache only ever holds a result the scene
+    program computed itself (a module-level ``solve()``) — it is per worker
+    process, never shared across requests.  The worker reports a missing
+    jax-fem extra as ``error_kind="fem_unavailable"``, which the HTTP layer
+    maps to 501.
     """
-    kind = request.get("kind", "probe")
+    kind = request.get("kind", "study")
     if kind not in SIMULATE_KINDS:
-        allowed = ", ".join(SIMULATE_KINDS)
-        return {"ok": False, "error": f"Simulation `kind` must be one of: {allowed}."}
-    if kind == "study":
-        name = request.get("name")
-        if not isinstance(name, str) or not name.strip():
-            return {
-                "ok": False,
-                "error": "A study simulation needs `name`: the declared study to run.",
-            }
-        return _run_worker(
-            request.get("source"),
-            "simulate",
-            timeout,
-            extra={"kind": kind, "name": name},
-        )
-    resolution = request.get("resolution", 20)
-    if (
-        not isinstance(resolution, int)
-        or isinstance(resolution, bool)
-        or not MIN_SIMULATE_RESOLUTION <= resolution <= MAX_SIMULATE_RESOLUTION
-    ):
         return {
             "ok": False,
             "error": (
-                f"Simulation `resolution` must be an integer from "
-                f"{MIN_SIMULATE_RESOLUTION} to {MAX_SIMULATE_RESOLUTION}."
+                "Simulation `kind` must be `study`: declare a ThermalStudy/ElasticStudy "
+                "in the program and run it by name."
             ),
         }
-    bcs = request.get("bcs", [])
-    if not isinstance(bcs, list):
-        return {"ok": False, "error": "Simulation `bcs` must be a list."}
-    for bc in bcs:
-        error = _validate_simulate_bc(bc)
-        if error is not None:
-            return {"ok": False, "error": error}
-    material = request.get("material", {})
-    if not isinstance(material, dict):
-        return {"ok": False, "error": "Simulation `material` must be an object."}
-    for key, value in material.items():
-        if key not in SIMULATE_MATERIAL_KEYS:
-            allowed = ", ".join(SIMULATE_MATERIAL_KEYS)
-            return {"ok": False, "error": f"Material key `{key}` is not one of: {allowed}."}
-        if not isinstance(value, (int, float)) or isinstance(value, bool):
-            return {"ok": False, "error": f"Material `{key}` must be a number."}
+    name = request.get("name")
+    if not isinstance(name, str) or not name.strip():
+        return {
+            "ok": False,
+            "error": "A study simulation needs `name`: the declared study to run.",
+        }
+    cached = request.get("cached", False)
+    if not isinstance(cached, bool):
+        return {"ok": False, "error": "Simulation `cached` must be a boolean."}
     return _run_worker(
         request.get("source"),
         "simulate",
         timeout,
-        extra={"kind": kind, "resolution": resolution, "bcs": bcs, "material": material},
+        extra={"kind": kind, "name": name, "cached": cached},
     )
+
+
+def mesh_inspect_source(
+    request: dict[str, Any], timeout: float = MESH_INSPECT_TIMEOUT_SECONDS
+) -> dict[str, Any]:
+    """Build one declared SimMesh in a disposable child process and report it.
+
+    ``name`` picks a declared :class:`cadjoint.fem.SimMesh` by name — or a
+    declared study, whose mesh (explicit or implicit) is built instead.  With
+    no ``name``, a single declared mesh (or, failing that, a single study) is
+    used.  The response carries the JSON inspection summary (``info``), a
+    renderable boundary surface (``mesh``), and the per-vertex
+    scaled-jacobian quality field (``quality_scalars``) so the viewer can
+    show a mesh-quality heatmap before anything is solved.
+    """
+    name = request.get("name")
+    if name is not None and (not isinstance(name, str) or not name.strip()):
+        return {"ok": False, "error": "`name` must be a non-empty string when given."}
+    extra = {"name": name} if name is not None else {}
+    return _run_worker(request.get("source"), "mesh_inspect", timeout, extra=extra)
 
 
 # Saved scenes live in one directory under the server's working directory.
@@ -887,18 +889,80 @@ def patch_source(request: dict[str, Any]) -> dict[str, Any]:
                     return {"ok": False, "error": "The patch request needs a string `argument`."}
                 arguments["argument"] = argument
             raw_value = request.get("value")
-            scalar = (
-                float(raw_value)
-                if isinstance(raw_value, (int, float)) and not isinstance(raw_value, bool)
-                else None
-            )
-            vector = numbers(raw_value)
-            if scalar is None and vector is None:
-                return {
-                    "ok": False,
-                    "error": "The patch request needs `value` as a number or numbers.",
-                }
-            arguments["value"] = scalar if scalar is not None else vector
+            if argument in {"mesh", "domain"}:
+                # These reference declared objects by name, not numbers.
+                if not isinstance(raw_value, str) or not raw_value.strip():
+                    return {
+                        "ok": False,
+                        "error": f"The patch request needs `value` as a `{argument}` name.",
+                    }
+                arguments["value"] = raw_value
+            else:
+                scalar = (
+                    float(raw_value)
+                    if isinstance(raw_value, (int, float)) and not isinstance(raw_value, bool)
+                    else None
+                )
+                vector = numbers(raw_value)
+                if scalar is None and vector is None:
+                    return {
+                        "ok": False,
+                        "error": "The patch request needs `value` as a number or numbers.",
+                    }
+                arguments["value"] = scalar if scalar is not None else vector
+
+        try:
+            return {"ok": True, "source": apply_operation(source, operation, **arguments)}
+        except PatchError as error:
+            return {"ok": False, "error": str(error)}
+
+    if operation == "add_mesh":
+        name = request.get("name")
+        if name is not None and (not isinstance(name, str) or not name.strip()):
+            return {"ok": False, "error": "Mesh `name` must be a non-empty string."}
+        try:
+            return {"ok": True, "source": apply_operation(source, operation, name=name)}
+        except PatchError as error:
+            return {"ok": False, "error": str(error)}
+
+    if operation in {"delete_mesh", "set_mesh_value"}:
+        mesh = request.get("mesh")
+        if not (
+            (isinstance(mesh, int) and not isinstance(mesh, bool) and mesh >= 0)
+            or (isinstance(mesh, str) and mesh.strip())
+        ):
+            return {
+                "ok": False,
+                "error": "The patch request needs `mesh` as a name or a non-negative index.",
+            }
+        arguments = {"mesh": mesh}
+
+        if operation == "set_mesh_value":
+            argument = request.get("argument")
+            if not isinstance(argument, str):
+                return {"ok": False, "error": "The patch request needs a string `argument`."}
+            arguments["argument"] = argument
+            raw_value = request.get("value")
+            if argument == "domain":
+                if not isinstance(raw_value, str) or not raw_value.strip():
+                    return {
+                        "ok": False,
+                        "error": "The patch request needs `value` as a `domain` name.",
+                    }
+                arguments["value"] = raw_value
+            else:
+                scalar = (
+                    float(raw_value)
+                    if isinstance(raw_value, (int, float)) and not isinstance(raw_value, bool)
+                    else None
+                )
+                vector = numbers(raw_value)
+                if scalar is None and vector is None:
+                    return {
+                        "ok": False,
+                        "error": "The patch request needs `value` as a number or numbers.",
+                    }
+                arguments["value"] = scalar if scalar is not None else vector
 
         try:
             return {"ok": True, "source": apply_operation(source, operation, **arguments)}
@@ -1063,6 +1127,7 @@ def make_handler(token: str):
                 "/compile": lambda payload: compile_source(payload.get("source")),
                 "/api/mesh": lambda payload: mesh_source(payload.get("source")),
                 "/api/simulate": simulate_source,
+                "/api/mesh_inspect": mesh_inspect_source,
                 "/patch": patch_source,
                 "/api/scenes/load": load_scene,
                 "/api/scenes/save": save_scene,

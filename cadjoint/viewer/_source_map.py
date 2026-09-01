@@ -791,6 +791,9 @@ class StudyStatement:
     the resolved literal boundary-condition list (None when the argument is
     absent or not a literal container), and ``bc_spans`` are the character
     spans of its elements so single conditions can be edited or deleted.
+    ``mesh_span`` and ``domain_span`` are the character spans of the
+    ``mesh=`` / ``domain=`` keyword *values* (None when absent) so those
+    references stay editable from the viewer.
     """
 
     index: int
@@ -803,6 +806,8 @@ class StudyStatement:
     bcs: ast.List | ast.Tuple | None
     bcs_span: Span | None
     bc_spans: tuple[Span, ...]
+    mesh_span: Span | None
+    domain_span: Span | None
 
 
 def locate_study_statements(source: str) -> list[StudyStatement] | None:
@@ -870,6 +875,14 @@ def locate_study_statements(source: str) -> list[StudyStatement] | None:
                 bc_spans = []
                 break
             bc_spans.append(span)
+
+        def keyword_span(argument: str, keywords=call.keywords) -> Span | None:
+            value = next(
+                (keyword.value for keyword in keywords if keyword.arg == argument),
+                None,
+            )
+            return _node_span(source, offsets, value) if value is not None else None
+
         statements.append(
             StudyStatement(
                 index=len(statements),
@@ -882,6 +895,93 @@ def locate_study_statements(source: str) -> list[StudyStatement] | None:
                 bcs=bcs,
                 bcs_span=bcs_span,
                 bc_spans=tuple(bc_spans),
+                mesh_span=keyword_span("mesh"),
+                domain_span=keyword_span("domain"),
+            )
+        )
+    return statements
+
+
+MESH_CALL_NAME = "SimMesh"
+
+
+@dataclass(frozen=True)
+class MeshStatement:
+    """One top-level ``SimMesh`` constructor statement, in source order.
+
+    Mirrors :class:`StudyStatement`: statement order equals construction
+    order for top-level declarations, so the position doubles as a stable
+    index shared by the compile payload and the mesh patch operations.
+    ``name`` is the literal ``name=`` argument (or first positional string),
+    ``variable`` the assignment target when there is exactly one.
+    """
+
+    index: int
+    name: str | None
+    variable: str | None
+    statement: ast.stmt
+    call: ast.Call
+    call_span: Span
+
+
+def locate_mesh_statements(source: str) -> list[MeshStatement] | None:
+    """Top-level ``SimMesh`` constructors, in source order.
+
+    Mirrors :func:`locate_study_statements`: only unambiguous top-level
+    statements (an assignment or a bare expression containing exactly one
+    ``SimMesh`` constructor) are located.  Meshes built in loops or helper
+    functions are not — the compile payload detects the count mismatch
+    against the captured meshes and marks every entry non-editable.
+
+    Args:
+        source: The full program text.
+
+    Returns:
+        The mesh statements in source order, or None when the source cannot
+        be parsed.
+    """
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return None
+    offsets = _line_offsets(source)
+    statements: list[MeshStatement] = []
+    for item in tree.body:
+        if not isinstance(item, (ast.Assign, ast.AnnAssign, ast.Expr)):
+            continue
+        calls = [node for node in ast.walk(item) if _called_name(node) == MESH_CALL_NAME]
+        if len(calls) != 1:
+            continue
+        call = calls[0]
+        call_span = _node_span(source, offsets, call)
+        if call_span is None:
+            continue
+        name_node = next(
+            (keyword.value for keyword in call.keywords if keyword.arg == "name"),
+            call.args[0] if call.args else None,
+        )
+        name = (
+            name_node.value
+            if isinstance(name_node, ast.Constant) and isinstance(name_node.value, str)
+            else None
+        )
+        variable = None
+        if (
+            isinstance(item, ast.Assign)
+            and len(item.targets) == 1
+            and isinstance(item.targets[0], ast.Name)
+        ):
+            variable = item.targets[0].id
+        elif isinstance(item, ast.AnnAssign) and isinstance(item.target, ast.Name):
+            variable = item.target.id
+        statements.append(
+            MeshStatement(
+                index=len(statements),
+                name=name,
+                variable=variable,
+                statement=item,
+                call=call,
+                call_span=call_span,
             )
         )
     return statements

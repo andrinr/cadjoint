@@ -273,3 +273,78 @@ class TestConstructionPayload:
                 "value": 2.0,
             },
         ]
+
+
+MESHES = """from cadjoint.fem import Dirichlet, Nodes, SimMesh, ThermalStudy
+from cadjoint.sdf.primitives import Box
+
+block = Box(size=[1.0, 1.0, 1.0])
+scene = block
+grid = SimMesh(name="grid", resolution=12, bounds=[-1.0, -1.0, -1.0], size=[2.0, 2.0, 2.0])
+SimMesh(name="anonymous", resolution=8)
+heat = ThermalStudy(
+    name="bar",
+    conductivity=1.0,
+    mesh="grid",
+    domain=block,
+    bcs=[Dirichlet(Nodes.side("-x"), value=0.0)],
+)
+"""
+
+
+class TestLocateMeshStatements:
+    def test_locates_assigned_and_bare_constructors_in_order(self):
+        from cadjoint.viewer._source_map import locate_mesh_statements
+
+        statements = locate_mesh_statements(MESHES)
+        assert [statement.index for statement in statements] == [0, 1]
+        assert [statement.name for statement in statements] == ["grid", "anonymous"]
+        assert [statement.variable for statement in statements] == ["grid", None]
+        start, end = statements[0].call_span
+        assert MESHES[start:end].startswith("SimMesh(")
+
+    def test_skips_statements_with_more_than_one_constructor(self):
+        from cadjoint.viewer._source_map import locate_mesh_statements
+
+        two = "pair = (SimMesh(name='a', resolution=8), SimMesh(name='b', resolution=8))\n"
+        assert locate_mesh_statements(two) == []
+        # A loop body is not a top-level statement; nothing is located, and
+        # the compile payload's count check marks the captured meshes
+        # non-editable instead.
+        loop = "for i in range(2):\n    SimMesh(name=str(i), resolution=8)\n"
+        assert locate_mesh_statements(loop) == []
+
+    def test_returns_none_for_unparsable_source(self):
+        from cadjoint.viewer._source_map import locate_mesh_statements
+
+        assert locate_mesh_statements("def broken(:\n") is None
+
+    def test_positional_name_is_extracted(self):
+        from cadjoint.viewer._source_map import locate_mesh_statements
+
+        source = "grid = SimMesh('grid', 12)\n"
+        statements = locate_mesh_statements(source)
+        assert statements[0].name == "grid"
+
+
+class TestStudyMeshSpans:
+    def test_study_statements_carry_mesh_and_domain_value_spans(self):
+        from cadjoint.viewer._source_map import locate_study_statements
+
+        statement = locate_study_statements(MESHES)[0]
+        start, end = statement.mesh_span
+        assert MESHES[start:end] == '"grid"'
+        start, end = statement.domain_span
+        assert MESHES[start:end] == "block"
+
+    def test_spans_are_none_when_the_keywords_are_absent(self):
+        from cadjoint.viewer._source_map import locate_study_statements
+
+        source = (
+            "from cadjoint.fem import ThermalStudy\n"
+            "scene = None\n"
+            "heat = ThermalStudy(name='t', resolution=8, conductivity=1.0, bcs=[])\n"
+        )
+        statement = locate_study_statements(source)[0]
+        assert statement.mesh_span is None
+        assert statement.domain_span is None

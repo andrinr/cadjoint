@@ -24,6 +24,7 @@ from cadjoint.viewer._source_map import (
     build_construction_relations,
     build_material_payload,
     capture_profiles,
+    locate_mesh_statements,
     locate_study_statements,
 )
 from cadjoint.viewer._webgpu import build_viewer_shader
@@ -172,6 +173,26 @@ def _mesh_edge_payload(scene: Any) -> dict[str, Any] | None:
             sample_grid,
             sharp_qef_vertices,
         )
+        from cadjoint.meshing.native import native_available
+
+        # The Rust core is a bit-identical drop-in for the heavy stages
+        # (detection, incidence, QEF placement, faces); the SDF-evaluating
+        # stages stay in JAX either way.  Fall back to the reference Python
+        # pipeline when the native library is not built.
+        native = native_available()
+        if native:
+            from cadjoint.meshing.native import (
+                dual_faces_native as dual_faces,
+            )
+            from cadjoint.meshing.native import (
+                find_crossing_edges_native as find_crossing_edges,
+            )
+            from cadjoint.meshing.native import (
+                manifold_cell_incidence_native as manifold_cell_incidence,
+            )
+            from cadjoint.meshing.native import (
+                sharp_qef_vertices_native as sharp_qef_vertices,
+            )
 
         grid = GridSpec.from_bounds(_MESH_EDGE_BOUNDS, _MESH_EDGE_SIZE, _MESH_EDGE_RESOLUTION)
         sdf = lambda p: jnp.asarray(scene(p))  # noqa: E731
@@ -564,6 +585,7 @@ def _mesh_edge_payload(scene: Any) -> dict[str, Any] | None:
             "wire": segments(vertices[wire_edges]),
             "sharp": segments(vertices[links]),
             "resolution": _MESH_EDGE_RESOLUTION,
+            "native": native,
         }
     except Exception as error:  # noqa: BLE001 - viewer extra must never break compiles
         print(f"mesh edge view unavailable: {error}")
@@ -602,6 +624,12 @@ def _study_entries(studies: list[Any], source: str) -> list[dict[str, Any]]:
                 "line": statement.statement.lineno if statement is not None else None,
                 "span": list(statement.call_span) if statement is not None else None,
                 "editable": statement is not None,
+                "mesh_span": list(statement.mesh_span)
+                if statement is not None and statement.mesh_span is not None
+                else None,
+                "domain_span": list(statement.domain_span)
+                if statement is not None and statement.domain_span is not None
+                else None,
                 "bcs": [
                     {
                         **bc.describe(),
@@ -615,15 +643,58 @@ def _study_entries(studies: list[Any], source: str) -> list[dict[str, Any]]:
     return entries
 
 
+def _mesh_entries(sim_meshes: list[Any], source: str) -> list[dict[str, Any]]:
+    """Serialize declared simulation meshes for the viewer, with locations.
+
+    Mirrors :func:`_study_entries`: each entry is the mesh's ``describe()``
+    dict plus a stable ``index``, the statement's ``line`` and the
+    constructor call's character ``span``, and an ``editable`` flag.  Meshes
+    are matched to source statements positionally; a count mismatch (meshes
+    built in loops or helpers) or a literal-name mismatch marks every entry
+    non-editable.  Declaration only: nothing is built here.
+    """
+    statements = locate_mesh_statements(source) or []
+    aligned = len(statements) == len(sim_meshes) and all(
+        statement.name is None or statement.name == mesh.name
+        for statement, mesh in zip(statements, sim_meshes)
+    )
+    entries: list[dict[str, Any]] = []
+    for index, mesh in enumerate(sim_meshes):
+        statement = statements[index] if aligned else None
+        entries.append(
+            {
+                **mesh.describe(),
+                "index": index,
+                "line": statement.statement.lineno if statement is not None else None,
+                "span": list(statement.call_span) if statement is not None else None,
+                "editable": statement is not None,
+            }
+        )
+    return entries
+
+
 def _execute_scene(source: str) -> dict[str, Any]:
-    """Run playground source and return its namespace (the scene lives inside)."""
+    """Run playground source and return its namespace (the scene lives inside).
+
+    The exec always happens inside :func:`capture_sim_meshes` +
+    :func:`capture_studies` registries: a scene program that references a
+    declared mesh by name (``mesh="..."``) can only resolve it through an
+    active capture context, so every worker mode needs them, whether or not
+    it looks at the captured lists afterwards.
+    """
+    from cadjoint.fem.simmesh import capture_sim_meshes
+    from cadjoint.fem.study import capture_studies
+
     namespace: dict[str, Any] = {
         "__builtins__": __builtins__,
         "__name__": "__cadjoint_playground__",
     }
-    exec(compile(source, PLAYGROUND_FILENAME, "exec"), namespace, namespace)
+    with capture_sim_meshes() as sim_meshes, capture_studies() as studies:
+        exec(compile(source, PLAYGROUND_FILENAME, "exec"), namespace, namespace)
     if "scene" not in namespace:
         raise ValueError("Your program must assign the SDF to a variable named `scene`.")
+    namespace["__sim_meshes__"] = sim_meshes
+    namespace["__studies__"] = studies
     return namespace
 
 
@@ -645,146 +716,41 @@ def _mesh_source(source: str) -> dict[str, Any]:
     }
 
 
-# Simulation meshing volume: matches the raymarcher's view volume so what the
-# user sees is what gets meshed.  Resolution is a per-request choice.
-_SIMULATE_BOUNDS = (-3.0, -3.0, -3.0)
-_SIMULATE_SIZE = (6.0, 6.0, 6.0)
 _FEM_UNAVAILABLE_MESSAGE = (
     "FEM simulation needs the 'fem' extra (jax-fem). Install it with: pip install cadjoint[fem]"
 )
 
 
-def _membership_predicate(centers: np.ndarray) -> Any:
-    """A single-argument face predicate matching centroids of one group.
-
-    Kept unary via a closure (not a defaulted lambda argument):
-    ``select_faces`` inspects the predicate's arity, and a second parameter —
-    even a defaulted one — would make it pass the face normal into it.
-    """
-    members = {tuple(np.round(center, 9)) for center in centers}
-
-    def predicate(center: np.ndarray) -> bool:
-        return tuple(np.round(center, 9)) in members
-
-    return predicate
-
-
-def _resolve_bc_groups(mesh: Any, bcs: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Attach a face predicate to each boundary condition, by face-group id.
-
-    A condition names its patch either as a group id (``"+x"``) or as a
-    predicate spec ``{"axis": "x", "side": "+"}``; both resolve to one of the
-    gradient-axis groups the mesher tagged.  The returned predicate matches a
-    boundary face by centroid membership in that group.
-    """
-    resolved = []
-    for bc in bcs:
-        spec = bc.get("group")
-        group_id = f"{spec.get('side')}{spec.get('axis')}" if isinstance(spec, dict) else str(spec)
-        group = mesh.boundary_faces.get(group_id)
-        if group is None:
-            available = ", ".join(sorted(mesh.boundary_faces))
-            raise ValueError(
-                f"Boundary condition targets face group {group_id!r}, "
-                f"but this mesh only has: {available}."
-            )
-        resolved.append(
-            {**bc, "group_id": group_id, "predicate": _membership_predicate(group.centers)}
-        )
-    return resolved
-
-
-def _simulate_scene(scene: Any, request: dict[str, Any]) -> dict[str, Any]:
-    """Mesh the scene and, unless probing, solve the requested FEM problem."""
-    import jax.numpy as jnp
-
-    from cadjoint.fem.hexmesh import GridSpec, sdf_to_hex_mesh
-    from cadjoint.fem.render_payload import (
-        boundary_render_payload,
-        cell_to_node_scalar,
-    )
-
-    kind = request.get("kind", "probe")
-    resolution = int(request.get("resolution", 20))
-    material = request.get("material") or {}
-    sdf = lambda p: jnp.asarray(scene(p))  # noqa: E731
-
-    grid = GridSpec.from_bounds(_SIMULATE_BOUNDS, _SIMULATE_SIZE, resolution)
-    mesh = sdf_to_hex_mesh(sdf, grid)
-
-    if kind == "probe":
-        # Meshing only: the catalog and geometry the BC UI is built from.
-        payload = boundary_render_payload(mesh, np.zeros(mesh.num_points))
-        return {"ok": True, "kind": kind, "field": None, "mesh": payload}
-
-    try:
-        import jax_fem  # noqa: F401
-    except ImportError:
-        return {"ok": False, "error_kind": "fem_unavailable", "error": _FEM_UNAVAILABLE_MESSAGE}
-
-    from cadjoint.fem.simulate import elastic_solve, thermal_solve
-
-    bcs = _resolve_bc_groups(mesh, request.get("bcs") or [])
-    if kind == "thermal":
-        dirichlet = [
-            (bc["predicate"], float(bc.get("value", 0.0)))
-            for bc in bcs
-            if bc.get("type") == "dirichlet"
-        ]
-        if not dirichlet:
-            raise ValueError("A thermal solve needs at least one fixed-temperature face group.")
-        result = thermal_solve(
-            mesh,
-            conductivity=float(material.get("conductivity", 1.0)),
-            source=float(material.get("source", 0.0)),
-            dirichlet=dirichlet,
-        )
-        scalar = np.asarray(result.temperature, dtype=np.float64)
-        field = "temperature"
-    elif kind == "elastic":
-        fixed = [bc["predicate"] for bc in bcs if bc.get("type") == "dirichlet"]
-        tractions = [
-            (bc["predicate"], np.asarray(bc.get("value"), dtype=np.float64))
-            for bc in bcs
-            if bc.get("type") == "traction"
-        ]
-        if not fixed:
-            raise ValueError("An elastic solve needs at least one fixed-support face group.")
-        result = elastic_solve(
-            mesh,
-            youngs=float(material.get("youngs", 200.0)),
-            poisson=float(material.get("poisson", 0.3)),
-            dirichlet=fixed,
-            tractions=tractions,
-        )
-        scalar = cell_to_node_scalar(mesh, result.von_mises())
-        field = "von_mises"
-    else:
-        raise ValueError(f"Unknown simulation kind: {kind!r}.")
-
-    return {"ok": True, "kind": kind, "field": field, "mesh": boundary_render_payload(mesh, scalar)}
-
-
-def _simulate_study(scene: Any, studies: list[Any], request: dict[str, Any]) -> dict[str, Any]:
-    """Solve one study the scene program declared, by name.
-
-    The study is the source of truth: meshing volume, resolution, material,
-    and boundary conditions all come from its declaration — the request only
-    picks which one to run.  Non-serializable (predicate) selections solve
-    fine here since the declared objects are used directly.
-    """
-    import jax.numpy as jnp
-
-    from cadjoint.fem.render_payload import boundary_render_payload, cell_to_node_scalar
-
-    name = request.get("name")
+def _named_study(studies: list[Any], name: Any) -> Any:
+    """The one declared study called *name* (or raise, listing the others)."""
     matches = [study for study in studies if study.name == name]
     if not matches:
         declared = ", ".join(repr(study.name) for study in studies) or "none"
         raise ValueError(f"The program declares no study named {name!r} (declared: {declared}).")
     if len(matches) > 1:
         raise ValueError(f"The program declares more than one study named {name!r}.")
-    study = matches[0]
+    return matches[0]
+
+
+def _simulate_study(scene: Any, studies: list[Any], request: dict[str, Any]) -> dict[str, Any]:
+    """Solve one study the scene program declared, by name.
+
+    The study is the source of truth: mesh, material, and boundary
+    conditions all come from its declaration — the request only picks which
+    one to run.  Non-serializable (predicate) selections solve fine here
+    since the declared objects are used directly.
+
+    With ``cached=True`` the study's ``last_result`` is served without
+    re-solving when it exists.  The cache lives on the study object, so over
+    the HTTP API — where every request runs a fresh worker process — it only
+    ever hits when the scene program itself called ``solve()`` while it
+    executed; it is a per-worker-process cache, not a server-side one.
+    """
+    import jax.numpy as jnp
+
+    from cadjoint.fem.render_payload import boundary_render_payload
+
+    study = _named_study(studies, request.get("name"))
 
     try:
         import jax_fem  # noqa: F401
@@ -792,14 +758,10 @@ def _simulate_study(scene: Any, studies: list[Any], request: dict[str, Any]) -> 
         return {"ok": False, "error_kind": "fem_unavailable", "error": _FEM_UNAVAILABLE_MESSAGE}
 
     sdf = lambda p: jnp.asarray(scene(p))  # noqa: E731
-    result = study.solve(sdf)
+    cached = bool(request.get("cached")) and study.last_result is not None
+    result = study.last_result if cached else study.solve(sdf)
+    scalar = np.asarray(result.nodal_scalar(), dtype=np.float64)
     described = study.describe()
-    if described["kind"] == "thermal":
-        scalar = np.asarray(result.temperature, dtype=np.float64)
-        field = "temperature"
-    else:
-        scalar = cell_to_node_scalar(result.mesh, result.von_mises())
-        field = "von_mises"
     described["bcs"] = [
         {**bc.describe(), "serializable": bc.nodes.serializable} for bc in study.bcs
     ]
@@ -807,24 +769,111 @@ def _simulate_study(scene: Any, studies: list[Any], request: dict[str, Any]) -> 
         "ok": True,
         "kind": "study",
         "study": described,
-        "field": field,
+        "field": result.field,
         "mesh": boundary_render_payload(result.mesh, scalar),
+        "result": result.describe(),
+        "mesh_info": result.sim_mesh.inspect(sdf) if result.sim_mesh is not None else None,
+        "cached": cached,
     }
 
 
 def _simulate_source(request: dict[str, Any]) -> dict[str, Any]:
-    """Run the FEM simulation mode: exec scene -> hex mesh -> solve -> payload."""
+    """Run the FEM simulation mode: exec scene -> declared study -> payload."""
     captured = io.StringIO()
     with contextlib.redirect_stdout(captured), contextlib.redirect_stderr(captured):
-        if request.get("kind") == "study":
-            from cadjoint.fem.study import capture_studies
+        namespace = _execute_scene(request["source"])
+        result = _simulate_study(namespace["scene"], namespace["__studies__"], request)
+    result["output"] = captured.getvalue()[-8_000:]
+    return result
 
-            with capture_studies() as studies:
-                namespace = _execute_scene(request["source"])
-            result = _simulate_study(namespace["scene"], studies, request)
+
+def _inspect_mesh(
+    scene: Any, sim_meshes: list[Any], studies: list[Any], request: dict[str, Any]
+) -> dict[str, Any]:
+    """Build one declared (or study-implicit) SimMesh and describe it.
+
+    Resolution of the ``name`` request field:
+
+    * a declared ``SimMesh`` name wins;
+    * otherwise a declared study's name selects that study's mesh (its
+      ``mesh=`` SimMesh, or the anonymous mesh implied by its
+      resolution/bounds/size/domain);
+    * with no name at all, a single declared mesh — or, failing that, a
+      single declared study — is used.
+
+    Returns the JSON inspection summary plus a renderable boundary surface
+    whose scalars are the per-vertex scaled-jacobian quality field (each
+    element's quality mapped to its 8 corners, min-combined), so the
+    viewer can show a quality heatmap before anything is solved.
+    """
+    import jax.numpy as jnp
+
+    from cadjoint.fem.hexmesh import scaled_jacobians
+    from cadjoint.fem.render_payload import boundary_render_payload
+    from cadjoint.fem.study import _solve_mesh
+
+    sdf = lambda p: jnp.asarray(scene(p))  # noqa: E731
+    name = request.get("name")
+
+    def implicit(study: Any) -> Any:
+        if study.mesh is not None:
+            return study.mesh
+        sim_mesh, _ = _solve_mesh(study, sdf, None)
+        return sim_mesh
+
+    declared = ", ".join(repr(mesh.name) for mesh in sim_meshes) or "none"
+    if name is not None:
+        matches = [mesh for mesh in sim_meshes if mesh.name == name]
+        if len(matches) > 1:
+            raise ValueError(f"The program declares more than one mesh named {name!r}.")
+        if matches:
+            target = matches[0]
         else:
-            namespace = _execute_scene(request["source"])
-            result = _simulate_scene(namespace["scene"], request)
+            study_matches = [study for study in studies if study.name == name]
+            if len(study_matches) > 1:
+                raise ValueError(f"The program declares more than one study named {name!r}.")
+            if not study_matches:
+                studies_declared = ", ".join(repr(study.name) for study in studies) or "none"
+                raise ValueError(
+                    f"No declared mesh or study named {name!r} "
+                    f"(meshes: {declared}; studies: {studies_declared})."
+                )
+            target = implicit(study_matches[0])
+    elif len(sim_meshes) == 1:
+        target = sim_meshes[0]
+    elif not sim_meshes and len(studies) == 1:
+        target = implicit(studies[0])
+    else:
+        raise ValueError(
+            f"Pass `name` to pick a mesh: the program declares meshes {declared} "
+            f"and {len(studies)} studies."
+        )
+
+    hex_mesh = target.build(sdf)
+    quality = scaled_jacobians(hex_mesh.points, hex_mesh.cells)
+    node_quality = np.full(hex_mesh.num_points, np.inf, dtype=np.float64)
+    np.minimum.at(node_quality, hex_mesh.cells.reshape(-1), np.repeat(quality, 8))
+    node_quality = np.where(np.isfinite(node_quality), node_quality, 1.0)
+    payload = boundary_render_payload(hex_mesh, node_quality)
+    return {
+        "ok": True,
+        "kind": "mesh_inspect",
+        "name": target.name,
+        "field": "scaled_jacobian",
+        "info": target.inspect(sdf),
+        "mesh": payload,
+        "quality_scalars": payload["scalars"],
+    }
+
+
+def _mesh_inspect_source(request: dict[str, Any]) -> dict[str, Any]:
+    """Run the mesh-inspection mode: exec scene -> build SimMesh -> payload."""
+    captured = io.StringIO()
+    with contextlib.redirect_stdout(captured), contextlib.redirect_stderr(captured):
+        namespace = _execute_scene(request["source"])
+        result = _inspect_mesh(
+            namespace["scene"], namespace["__sim_meshes__"], namespace["__studies__"], request
+        )
     result["output"] = captured.getvalue()[-8_000:]
     return result
 
@@ -834,6 +883,7 @@ def _compile_source(source: str) -> dict[str, Any]:
         "__builtins__": __builtins__,
         "__name__": "__cadjoint_playground__",
     }
+    from cadjoint.fem.simmesh import capture_sim_meshes
     from cadjoint.fem.study import capture_studies
 
     captured = io.StringIO()
@@ -841,6 +891,7 @@ def _compile_source(source: str) -> dict[str, Any]:
         with (
             capture_constraint_solves() as solver_reports,
             capture_profiles(PLAYGROUND_FILENAME) as profiles,
+            capture_sim_meshes() as sim_meshes,
             capture_studies() as studies,
         ):
             exec(compile(source, PLAYGROUND_FILENAME, "exec"), namespace, namespace)
@@ -852,9 +903,10 @@ def _compile_source(source: str) -> dict[str, Any]:
         construction = build_construction_payload(profiles, source)
         relations = build_construction_relations(profiles)
         materials = build_material_payload(namespace, source)
-        # Declaration only: studies are serialized from their describe()
-        # payloads — no meshing or solving happens at compile time.
+        # Declaration only: studies and meshes are serialized from their
+        # describe() payloads — no meshing or solving happens at compile time.
         studies_payload = _study_entries(studies, source)
+        sim_meshes_payload = _mesh_entries(sim_meshes, source)
         differentiability = _differentiability_payload(namespace)
         node_ids = {
             id(obj): (f"{obj.kind}_{index}" if hasattr(obj, "kind") else f"profile_{index}")
@@ -882,6 +934,7 @@ def _compile_source(source: str) -> dict[str, Any]:
         "relations": relations,
         "materials": materials,
         "studies": studies_payload,
+        "sim_meshes": sim_meshes_payload,
         "differentiability": differentiability,
         # The mesh-edge view is requested lazily via `mode: "mesh"` — computing
         # it here used to dominate the compile round-trip.
@@ -902,6 +955,8 @@ def main() -> None:
             result = _mesh_source(source)
         elif mode == "simulate":
             result = _simulate_source(request)
+        elif mode == "mesh_inspect":
+            result = _mesh_inspect_source(request)
         elif mode == "compile":
             result = _compile_source(source)
         else:

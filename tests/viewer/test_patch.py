@@ -551,7 +551,7 @@ class TestConstraintEditing:
             patched = apply_operation(
                 EXAMPLE_SOURCE, "add_constraint", line=line, kind=kind, indices=indices
             )
-            assert f"{symbol}(profile.vertices[0]" in patched
+            assert f"{symbol}(comb_profile.vertices[0]" in patched
             assert "from cadjoint.constraints import" in patched or symbol in patched
 
     def test_delete_constraint_removes_bare_name_statement(self):
@@ -559,10 +559,10 @@ class TestConstraintEditing:
 
         line = self._profile_line(EXAMPLE_SOURCE)
         patched = apply_operation(EXAMPLE_SOURCE, "delete_constraint", line=line, index=0)
-        assert "FixedConstraint(base_left" not in patched
+        assert "FixedConstraint(base_l," not in patched
         # Only that statement changed: removing its line reproduces the rest.
         removed = [
-            text for text in EXAMPLE_SOURCE.splitlines() if "FixedConstraint(base_left" in text
+            text for text in EXAMPLE_SOURCE.splitlines() if "FixedConstraint(base_l," in text
         ]
         assert len(removed) == 1
         assert patched == EXAMPLE_SOURCE.replace(removed[0] + "\n", "")
@@ -575,11 +575,11 @@ class TestConstraintEditing:
             EXAMPLE_SOURCE, "add_constraint", line=line, kind="horizontal", indices=[0, 1]
         )
         # Creation order appends: the new constraint sits after the starter's
-        # three bare-name statements, at index 3.
+        # two bare-name statements, at index 2.
         shrunk = apply_operation(
-            grown, "delete_constraint", line=self._profile_line(grown), index=3
+            grown, "delete_constraint", line=self._profile_line(grown), index=2
         )
-        assert "HorizontalConstraint(profile.vertices" not in shrunk
+        assert "HorizontalConstraint(comb_profile.vertices" not in shrunk
 
     def test_delete_constraint_rejects_out_of_range(self):
         from cadjoint.viewer.playground import EXAMPLE_SOURCE
@@ -606,7 +606,7 @@ class TestConstraintEditing:
         )
         with pytest.raises(PatchError, match="editable value"):
             apply_operation(
-                grown, "set_constraint_value", line=self._profile_line(grown), index=3, value=1.0
+                grown, "set_constraint_value", line=self._profile_line(grown), index=2, value=1.0
             )
 
 
@@ -1136,3 +1136,197 @@ class TestSetStudyValue:
             )
         with pytest.raises(PatchError, match="exactly one"):
             apply_operation(STUDIES, "set_study_value", study="bar-conduction", value=1.0)
+
+
+# ── Simulation mesh operations ───────────────────────────────────────────────
+
+MESHES = """from cadjoint.construction import Solid
+from cadjoint.fem import Dirichlet, Nodes, SimMesh, ThermalStudy
+from cadjoint.sdf.boolean import Union
+
+block = Solid.box(size=[0.5, 0.5, 0.5], position=[1.0, 0.0, 0.0], name="block")
+scene = Union(block)
+grid = SimMesh(name="block-grid", resolution=12, bounds=[0.0, -0.5, -0.5], size=[2.0, 1.0, 1.0])
+heat = ThermalStudy(
+    name="bar-conduction",
+    conductivity=2.0,
+    mesh="block-grid",
+    bcs=[Dirichlet(Nodes.side("-x"), value=1.0), Dirichlet(Nodes.side("+x"), value=0.0)],
+)
+"""
+
+
+class TestAddMesh:
+    def test_appends_a_mesh_after_the_scene(self):
+        patched = apply_operation(PRIMITIVES, "add_mesh", name=None)
+        assert "mesh1 = SimMesh(name='mesh1', resolution=20)" in patched
+        assert "from cadjoint.fem import SimMesh" in patched
+        assert patched.index("scene =") < patched.index("mesh1 =")
+        assert ast.parse(patched)
+
+    def test_lands_before_the_first_study(self):
+        # A study resolves `mesh="name"` at construction time, so a mesh
+        # declared after it would be invisible to it.
+        patched = apply_operation(STUDIES, "add_mesh", name="grid")
+        assert patched.index("mesh1 = SimMesh(") < patched.index("heat = ThermalStudy(")
+
+    def test_appends_after_the_last_existing_mesh(self):
+        patched = apply_operation(MESHES, "add_mesh", name="fine")
+        assert patched.index("grid = SimMesh(") < patched.index("mesh1 = SimMesh(")
+        assert patched.index("mesh1 = SimMesh(") < patched.index("heat = ThermalStudy(")
+
+    def test_generates_names_that_do_not_collide(self):
+        once = apply_operation(PRIMITIVES, "add_mesh", name=None)
+        twice = apply_operation(once, "add_mesh", name=None)
+        assert "mesh1 = SimMesh(" in twice
+        assert "mesh2 = SimMesh(" in twice
+
+    def test_rejects_a_duplicate_name(self):
+        with pytest.raises(PatchError, match="already exists"):
+            apply_operation(MESHES, "add_mesh", name="block-grid")
+
+    def test_requires_a_scene_assignment(self):
+        with pytest.raises(PatchError, match="scene = "):
+            apply_operation("x = 1\n", "add_mesh", name=None)
+
+    def test_added_mesh_round_trips_through_exec(self):
+        from cadjoint.fem import capture_sim_meshes
+
+        patched = apply_operation(PRIMITIVES, "add_mesh", name="grid")
+        with capture_sim_meshes() as meshes:
+            exec(compile(patched, "<test>", "exec"), {})
+        assert [mesh.name for mesh in meshes] == ["grid"]
+        assert meshes[0].resolution == 20
+
+
+class TestDeleteMesh:
+    def test_removes_an_unreferenced_mesh(self):
+        source = MESHES.replace('mesh="block-grid",\n', "resolution=8,\n")
+        patched = apply_operation(source, "delete_mesh", mesh="block-grid")
+        assert "SimMesh(" not in patched.split("import")[-1]
+        assert ast.parse(patched)
+
+    def test_resolves_a_mesh_by_index_and_variable(self):
+        source = MESHES.replace('mesh="block-grid",\n', "resolution=8,\n")
+        assert "grid = SimMesh" not in apply_operation(source, "delete_mesh", mesh=0)
+        assert "grid = SimMesh" not in apply_operation(source, "delete_mesh", mesh="grid")
+
+    def test_refuses_while_a_study_references_the_name(self):
+        with pytest.raises(PatchError, match="referenced by a study"):
+            apply_operation(MESHES, "delete_mesh", mesh="block-grid")
+
+    def test_refuses_while_the_variable_is_used(self):
+        source = MESHES.replace('mesh="block-grid",\n', "mesh=grid,\n")
+        with pytest.raises(PatchError, match="used elsewhere"):
+            apply_operation(source, "delete_mesh", mesh="block-grid")
+
+    def test_rejects_an_unknown_reference(self):
+        with pytest.raises(PatchError, match="No single mesh"):
+            apply_operation(MESHES, "delete_mesh", mesh="nope")
+        with pytest.raises(PatchError, match="out of range"):
+            apply_operation(MESHES, "delete_mesh", mesh=4)
+
+
+class TestSetMeshValue:
+    def test_rewrites_numeric_arguments_in_place(self):
+        patched = apply_operation(
+            MESHES, "set_mesh_value", mesh="block-grid", argument="resolution", value=[24, 12, 12]
+        )
+        assert "resolution=[24, 12, 12]" in patched
+        patched = apply_operation(
+            patched, "set_mesh_value", mesh=0, argument="bounds", value=[-1.0, -1.0, -1.0]
+        )
+        assert "bounds=[-1.0, -1.0, -1.0]" in patched
+        patched = apply_operation(
+            patched, "set_mesh_value", mesh="grid", argument="size", value=[2.0, 2.0, 2.0]
+        )
+        assert "size=[2.0, 2.0, 2.0]" in patched
+
+    def test_adds_a_missing_keyword(self):
+        patched = apply_operation(
+            MESHES, "set_mesh_value", mesh="block-grid", argument="padding", value=0.25
+        )
+        assert "padding=0.25" in patched
+        assert ast.parse(patched)
+
+    def test_padding_must_be_non_negative(self):
+        with pytest.raises(PatchError, match="non-negative"):
+            apply_operation(
+                MESHES, "set_mesh_value", mesh="block-grid", argument="padding", value=-0.1
+            )
+
+    def test_resolution_stays_integral(self):
+        with pytest.raises(PatchError, match="whole numbers"):
+            apply_operation(
+                MESHES, "set_mesh_value", mesh="block-grid", argument="resolution", value=10.5
+            )
+
+    def test_sets_the_domain_to_a_named_object(self):
+        patched = apply_operation(
+            MESHES, "set_mesh_value", mesh="block-grid", argument="domain", value="block"
+        )
+        assert "domain=block" in patched
+        assert ast.parse(patched)
+
+    def test_rejects_a_domain_that_is_not_assigned_above(self):
+        with pytest.raises(PatchError, match="not assigned before"):
+            apply_operation(
+                MESHES, "set_mesh_value", mesh="block-grid", argument="domain", value="mystery"
+            )
+
+    def test_rejects_unknown_arguments(self):
+        with pytest.raises(PatchError, match="editable arguments"):
+            apply_operation(MESHES, "set_mesh_value", mesh="block-grid", argument="name", value=1.0)
+
+
+class TestSetStudyMeshAndDomain:
+    def test_points_a_study_at_a_declared_mesh_by_name(self):
+        patched = apply_operation(
+            STUDIES.replace(
+                "from cadjoint.fem import Dirichlet, Nodes, ThermalStudy",
+                "from cadjoint.fem import Dirichlet, Nodes, SimMesh, ThermalStudy",
+            ).replace(
+                "scene = Union(block)\n",
+                "scene = Union(block)\ngrid = SimMesh(name='block-grid', resolution=8)\n",
+            ),
+            "set_study_value",
+            study="bar-conduction",
+            argument="mesh",
+            value="block-grid",
+        )
+        assert "mesh='block-grid'" in patched
+        # Meshing intent moves onto the SimMesh: the study's own resolution
+        # keyword is removed as part of the same edit.
+        assert "resolution=12" not in patched
+        assert ast.parse(patched)
+
+    def test_accepts_a_mesh_variable_reference(self):
+        patched = apply_operation(
+            MESHES, "set_study_value", study="bar-conduction", argument="mesh", value="grid"
+        )
+        assert "mesh=grid" in patched
+
+    def test_rejects_an_undeclared_mesh(self):
+        with pytest.raises(PatchError, match="No single SimMesh"):
+            apply_operation(
+                STUDIES, "set_study_value", study="bar-conduction", argument="mesh", value="nope"
+            )
+
+    def test_sets_the_domain_of_an_implicit_study(self):
+        patched = apply_operation(
+            STUDIES, "set_study_value", study="bar-conduction", argument="domain", value="block"
+        )
+        assert "domain=block" in patched
+        assert ast.parse(patched)
+
+    def test_domain_of_a_mesh_backed_study_lives_on_the_mesh(self):
+        with pytest.raises(PatchError, match="set the mesh's `domain`"):
+            apply_operation(
+                MESHES, "set_study_value", study="bar-conduction", argument="domain", value="block"
+            )
+
+    def test_rejects_a_domain_that_is_not_assigned_above(self):
+        with pytest.raises(PatchError, match="not assigned before"):
+            apply_operation(
+                STUDIES, "set_study_value", study="bar-conduction", argument="domain", value="ghost"
+            )
