@@ -154,12 +154,18 @@ slug_profile = PolygonProfile(
 slug = revolve(slug_profile, material=copper)
 
 # ── mounting bushings: fixed pattern, spacing tied by a constraint ───────────
+# Standard press-fit parts: their radius/height are pinned Scalars (not
+# free), so optimization never resizes catalog hardware.
 bushing_a = Vector([0.78, 0.0, 0.1], free=True, name="bushing_a")
 bushing_b = Vector([-0.78, 0.0, 0.1], free=True, name="bushing_b")
 FixedConstraint(bushing_a, [0.78, 0.0, 0.1])
 DistanceConstraint(bushing_a, bushing_b, bushing_spacing)
-bush_a = Solid.cylinder(radius=0.07, height=0.12, position=bushing_a, material=steel, name="bush_a")
-bush_b = Solid.cylinder(radius=0.07, height=0.12, position=bushing_b, material=steel, name="bush_b")
+bush_a = Solid.cylinder(
+    radius=Scalar(0.07), height=Scalar(0.12), position=bushing_a, material=steel, name="bush_a"
+)
+bush_b = Solid.cylinder(
+    radius=Scalar(0.07), height=Scalar(0.12), position=bushing_b, material=steel, name="bush_b"
+)
 
 scene = Union(sink, slug, bush_a, bush_b, smoothness=0.03)
 satisfy_constraints(scene, steps=2)
