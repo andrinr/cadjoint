@@ -39,3 +39,4 @@ test-results/
 frontend/test-results/
 frontend/playwright-report/
 frontend/.vite/
+_skipped.*
