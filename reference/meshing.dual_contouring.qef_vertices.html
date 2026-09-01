@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>index – cadjoint</title>
+<title>meshing.dual_contouring.qef_vertices – cadjoint</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -25,6 +25,41 @@ ul.task-list li input[type="checkbox"] {
   width: 0.8em;
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
 }
 </style>
 
@@ -201,7 +236,7 @@ ul.task-list li input[type="checkbox"] {
     </ul>
   </li>
   <li class="nav-item">
-    <a class="nav-link active" href="../reference/index.html" aria-current="page"> 
+    <a class="nav-link" href="../reference/index.html"> 
 <span class="menu-text">API Reference</span></a>
   </li>  
 </ul>
@@ -227,23 +262,10 @@ ul.task-list li input[type="checkbox"] {
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#function-reference" id="toc-function-reference" class="nav-link active" data-scroll-target="#function-reference">Function reference</a>
+  <li><a href="#cadjoint.meshing.dual_contouring.qef_vertices" id="toc-cadjoint.meshing.dual_contouring.qef_vertices" class="nav-link active" data-scroll-target="#cadjoint.meshing.dual_contouring.qef_vertices">meshing.dual_contouring.qef_vertices</a>
   <ul class="collapse">
-  <li><a href="#parameter-extraction" id="toc-parameter-extraction" class="nav-link" data-scroll-target="#parameter-extraction">Parameter Extraction</a></li>
-  <li><a href="#functionalize" id="toc-functionalize" class="nav-link" data-scroll-target="#functionalize">Functionalize</a></li>
-  <li><a href="#shader-compilation" id="toc-shader-compilation" class="nav-link" data-scroll-target="#shader-compilation">Shader compilation</a></li>
-  <li><a href="#parametrization" id="toc-parametrization" class="nav-link" data-scroll-target="#parametrization">Parametrization</a></li>
-  <li><a href="#constraints-types" id="toc-constraints-types" class="nav-link" data-scroll-target="#constraints-types">Constraints — types</a></li>
-  <li><a href="#constraints-solver" id="toc-constraints-solver" class="nav-link" data-scroll-target="#constraints-solver">Constraints — solver</a></li>
-  <li><a href="#geometry" id="toc-geometry" class="nav-link" data-scroll-target="#geometry">Geometry</a></li>
-  <li><a href="#meshing-extraction" id="toc-meshing-extraction" class="nav-link" data-scroll-target="#meshing-extraction">Meshing — extraction</a></li>
-  <li><a href="#meshing-adaptive-simplify-native" id="toc-meshing-adaptive-simplify-native" class="nav-link" data-scroll-target="#meshing-adaptive-simplify-native">Meshing — adaptive, simplify, native</a></li>
-  <li><a href="#meshing-export-and-diagnostics" id="toc-meshing-export-and-diagnostics" class="nav-link" data-scroll-target="#meshing-export-and-diagnostics">Meshing — export and diagnostics</a></li>
-  <li><a href="#simulation-meshes-and-studies" id="toc-simulation-meshes-and-studies" class="nav-link" data-scroll-target="#simulation-meshes-and-studies">Simulation — meshes and studies</a></li>
-  <li><a href="#simulation-selections-and-bcs" id="toc-simulation-selections-and-bcs" class="nav-link" data-scroll-target="#simulation-selections-and-bcs">Simulation — selections and BCs</a></li>
-  <li><a href="#simulation-backends" id="toc-simulation-backends" class="nav-link" data-scroll-target="#simulation-backends">Simulation — backends</a></li>
-  <li><a href="#optimization" id="toc-optimization" class="nav-link" data-scroll-target="#optimization">Optimization</a></li>
-  <li><a href="#render" id="toc-render" class="nav-link" data-scroll-target="#render">Render</a></li>
+  <li><a href="#parameters" id="toc-parameters" class="nav-link" data-scroll-target="#parameters">Parameters</a></li>
+  <li><a href="#returns" id="toc-returns" class="nav-link" data-scroll-target="#returns">Returns</a></li>
   </ul></li>
   </ul>
 </nav>
@@ -254,385 +276,83 @@ ul.task-list li input[type="checkbox"] {
 
 
 
-<section id="function-reference" class="level1 doc doc-index">
-<h1 class="doc doc-index">Function reference</h1>
-<section id="parameter-extraction" class="level2">
-<h2 class="anchored" data-anchor-id="parameter-extraction">Parameter Extraction</h2>
+<section id="cadjoint.meshing.dual_contouring.qef_vertices" class="level1">
+<h1>meshing.dual_contouring.qef_vertices</h1>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>meshing.dual_contouring.qef_vertices(</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>    hermite,</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>    incidence,</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    grid,</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>    <span class="op">*</span>,</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>    regularization<span class="op">=</span><span class="fl">0.001</span>,</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Place one vertex per active cell from its Hermite tangent planes.</p>
+<p>Minimizes <code>Σ (nᵢ · (v - pᵢ))²</code> plus a Tikhonov pull toward the cell’s Hermite mass point, scaled so <code>regularization</code> is relative to the normal count. Planar cells (rank-1 systems) land on the face near the mass point, crease cells slide onto the crease line, and corner cells reproduce the corner; the bias a corner inherits from the regularization is of order <code>regularization × cell size</code>.</p>
+<p>Fully JAX-traceable: call under <code>jax.grad</code>/<code>jax.jit</code> with a <code>hermite</code> built from traced parameters to differentiate vertex positions. Vertices are clamped to their cell as a final safety net; the clamp binds only on degenerate cells.</p>
+<section id="parameters" class="level2 doc-section doc-section-parameters">
+<h2 class="doc-section doc-section-parameters anchored" data-anchor-id="parameters">Parameters</h2>
 <table class="caption-top table">
+<colgroup>
+<col style="width: 17%">
+<col style="width: 16%">
+<col style="width: 52%">
+<col style="width: 13%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+<th>Default</th>
+</tr>
+</thead>
 <tbody>
 <tr class="odd">
-<td><a href="../reference/extraction.extract_parameters.html#cadjoint.extraction.extract_parameters">extraction.extract_parameters</a></td>
-<td>Extract parameters from a Fluent tree.</td>
+<td>hermite</td>
+<td>HermiteData</td>
+<td>Stage-1 Hermite data for the frozen edge set.</td>
+<td><em>required</em></td>
+</tr>
+<tr class="even">
+<td>incidence</td>
+<td>CellIncidence</td>
+<td>Cell-to-edge mapping for the same edge set.</td>
+<td><em>required</em></td>
+</tr>
+<tr class="odd">
+<td>grid</td>
+<td>GridSpec</td>
+<td>The sampling grid (cell bounds for clamping).</td>
+<td><em>required</em></td>
+</tr>
+<tr class="even">
+<td>regularization</td>
+<td>float</td>
+<td>Relative Tikhonov weight; must be positive.</td>
+<td><code>0.001</code></td>
 </tr>
 </tbody>
 </table>
 </section>
-<section id="functionalize" class="level2">
-<h2 class="anchored" data-anchor-id="functionalize">Functionalize</h2>
+<section id="returns" class="level2 doc-section doc-section-returns">
+<h2 class="doc-section doc-section-returns anchored" data-anchor-id="returns">Returns</h2>
 <table class="caption-top table">
+<colgroup>
+<col style="width: 2%">
+<col style="width: 7%">
+<col style="width: 89%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
 <tbody>
 <tr class="odd">
-<td><a href="../reference/functionalize.functionalize.html#cadjoint.functionalize.functionalize">functionalize.functionalize</a></td>
-<td>Compile an SDF to a pure function with free and fixed parameters.</td>
-</tr>
-<tr class="even">
-<td><a href="../reference/functionalize.functionalize_scene.html#cadjoint.functionalize.functionalize_scene">functionalize.functionalize_scene</a></td>
-<td>Compile a geometry SDF tree to pure (sdf, material_fn) closures.</td>
-</tr>
-</tbody>
-</table>
-</section>
-<section id="shader-compilation" class="level2">
-<h2 class="anchored" data-anchor-id="shader-compilation">Shader compilation</h2>
-<table class="caption-top table">
-<tbody>
-<tr class="odd">
-<td><a href="../reference/backends.wgsl.codegen.compile_sdf_to_wgsl.html#cadjoint.backends.wgsl.codegen.compile_sdf_to_wgsl">backends.wgsl.codegen.compile_sdf_to_wgsl</a></td>
-<td>Compile a JAX SDF function to a WGSL function string.</td>
-</tr>
-<tr class="even">
-<td><a href="../reference/backends.wgsl.codegen.compile_scene_to_wgsl.html#cadjoint.backends.wgsl.codegen.compile_scene_to_wgsl">backends.wgsl.codegen.compile_scene_to_wgsl</a></td>
-<td>Compile an SDF and its material evaluation to one WGSL module.</td>
-</tr>
-</tbody>
-</table>
-</section>
-<section id="parametrization" class="level2">
-<h2 class="anchored" data-anchor-id="parametrization">Parametrization</h2>
-<table class="caption-top table">
-<tbody>
-<tr class="odd">
-<td><a href="../reference/parametrization.to_normalized.html#cadjoint.parametrization.to_normalized">parametrization.to_normalized</a></td>
-<td><code>to_unconstrained</code> followed by <code>normalize</code>.</td>
-</tr>
-<tr class="even">
-<td><a href="../reference/parametrization.from_normalized.html#cadjoint.parametrization.from_normalized">parametrization.from_normalized</a></td>
-<td><code>unnormalize</code> followed by <code>to_constrained</code>.</td>
-</tr>
-<tr class="odd">
-<td><a href="../reference/parametrization.compute_param_scales.html#cadjoint.parametrization.compute_param_scales">parametrization.compute_param_scales</a></td>
-<td>Compute per-parameter normalization scales.</td>
-</tr>
-</tbody>
-</table>
-</section>
-<section id="constraints-types" class="level2">
-<h2 class="anchored" data-anchor-id="constraints-types">Constraints — types</h2>
-<table class="caption-top table">
-<tbody>
-<tr class="odd">
-<td><a href="../reference/constraints.types.base.Constraint.html#cadjoint.constraints.types.base.Constraint">constraints.types.base.Constraint</a></td>
-<td>Base class for geometric constraints.</td>
-</tr>
-<tr class="even">
-<td><a href="../reference/constraints.types.distance.DistanceConstraint.html#cadjoint.constraints.types.distance.DistanceConstraint">constraints.types.distance.DistanceConstraint</a></td>
-<td>Constraint that fixes the distance between two points/vectors.</td>
-</tr>
-<tr class="odd">
-<td><a href="../reference/constraints.types.angle.AngleConstraint.html#cadjoint.constraints.types.angle.AngleConstraint">constraints.types.angle.AngleConstraint</a></td>
-<td>Constraint that fixes the angle between two vectors.</td>
-</tr>
-<tr class="even">
-<td><a href="../reference/constraints.types.parallel.ParallelConstraint.html#cadjoint.constraints.types.parallel.ParallelConstraint">constraints.types.parallel.ParallelConstraint</a></td>
-<td>Constraint that forces two vectors to be parallel.</td>
-</tr>
-<tr class="odd">
-<td><a href="../reference/constraints.types.perpendicular.PerpendicularConstraint.html#cadjoint.constraints.types.perpendicular.PerpendicularConstraint">constraints.types.perpendicular.PerpendicularConstraint</a></td>
-<td>Constraint that forces two vectors to be perpendicular.</td>
-</tr>
-</tbody>
-</table>
-</section>
-<section id="constraints-solver" class="level2">
-<h2 class="anchored" data-anchor-id="constraints-solver">Constraints — solver</h2>
-<table class="caption-top table">
-<tbody>
-<tr class="odd">
-<td><a href="../reference/constraints.solve.solve_constraints.html#cadjoint.constraints.solve.solve_constraints">constraints.solve.solve_constraints</a></td>
-<td>Solve geometric constraints attached to a scene’s free parameters.</td>
-</tr>
-<tr class="even">
-<td><a href="../reference/constraints.solve.satisfy_constraints.html#cadjoint.constraints.solve.satisfy_constraints">constraints.solve.satisfy_constraints</a></td>
-<td>Project a construction/SDF tree onto its attached constraints in place.</td>
-</tr>
-<tr class="odd">
-<td><a href="../reference/constraints.solve.project_to_manifold.html#cadjoint.constraints.solve.project_to_manifold">constraints.solve.project_to_manifold</a></td>
-<td>Project free_params onto the constraint manifold via Newton correction(s).</td>
-</tr>
-<tr class="even">
-<td><a href="../reference/constraints.solve.constraint_residuals.html#cadjoint.constraints.solve.constraint_residuals">constraints.solve.constraint_residuals</a></td>
-<td>Evaluate the constraint residuals at free_params.</td>
-</tr>
-<tr class="odd">
-<td><a href="../reference/constraints.solve.make_manifold_projection.html#cadjoint.constraints.solve.make_manifold_projection">constraints.solve.make_manifold_projection</a></td>
-<td>Return an optax transform that projects params onto the constraint manifold.</td>
-</tr>
-</tbody>
-</table>
-</section>
-<section id="geometry" class="level2">
-<h2 class="anchored" data-anchor-id="geometry">Geometry</h2>
-<table class="caption-top table">
-<tbody>
-<tr class="odd">
-<td><a href="../reference/geometry.parameters.Vector.html#cadjoint.geometry.parameters.Vector">geometry.parameters.Vector</a></td>
-<td>3D vector parameter (position, offset, direction, size).</td>
-</tr>
-<tr class="even">
-<td><a href="../reference/geometry.parameters.Scalar.html#cadjoint.geometry.parameters.Scalar">geometry.parameters.Scalar</a></td>
-<td>Scalar parameter (radius, distance, angle, scale, strength, etc.).</td>
-</tr>
-</tbody>
-</table>
-</section>
-<section id="meshing-extraction" class="level2">
-<h2 class="anchored" data-anchor-id="meshing-extraction">Meshing — extraction</h2>
-<table class="caption-top table">
-<tbody>
-<tr class="odd">
-<td><a href="../reference/meshing.edge_detection.GridSpec.html#cadjoint.meshing.edge_detection.GridSpec">meshing.edge_detection.GridSpec</a></td>
-<td>Regular sampling grid described by static Python values.</td>
-</tr>
-<tr class="even">
-<td><a href="../reference/meshing.dual_contouring.Mesh.html#cadjoint.meshing.dual_contouring.Mesh">meshing.dual_contouring.Mesh</a></td>
-<td>Dual-contour surface mesh.</td>
-</tr>
-<tr class="odd">
-<td><a href="../reference/meshing.dual_contouring.extract_mesh.html#cadjoint.meshing.dual_contouring.extract_mesh">meshing.dual_contouring.extract_mesh</a></td>
-<td>Extract a feature-preserving dual-contour mesh from an implicit field.</td>
-</tr>
-<tr class="even">
-<td><a href="../reference/meshing.edge_detection.sample_grid.html#cadjoint.meshing.edge_detection.sample_grid">meshing.edge_detection.sample_grid</a></td>
-<td>Evaluate the field at every lattice vertex.</td>
-</tr>
-<tr class="odd">
-<td><a href="../reference/meshing.edge_detection.find_crossing_edges.html#cadjoint.meshing.edge_detection.find_crossing_edges">meshing.edge_detection.find_crossing_edges</a></td>
-<td>Find every lattice edge whose endpoints lie on opposite sides of <code>level</code>.</td>
-</tr>
-<tr class="even">
-<td><a href="../reference/meshing.edge_detection.edge_hermite_data.html#cadjoint.meshing.edge_detection.edge_hermite_data">meshing.edge_detection.edge_hermite_data</a></td>
-<td>Locate the surface crossing on every edge and evaluate its gradient.</td>
-</tr>
-<tr class="odd">
-<td><a href="../reference/meshing.edge_detection.detect_edges.html#cadjoint.meshing.edge_detection.detect_edges">meshing.edge_detection.detect_edges</a></td>
-<td>Sample, detect crossing edges, and refine Hermite data in one call.</td>
-</tr>
-<tr class="even">
-<td><a href="../reference/meshing.features.manifold_cell_incidence.html#cadjoint.meshing.features.manifold_cell_incidence">meshing.features.manifold_cell_incidence</a></td>
-<td>Group crossing edges by cell <em>and</em> by inside-corner component.</td>
-</tr>
-<tr class="odd">
-<td><a href="../reference/meshing.features.classify_feature_cells.html#cadjoint.meshing.features.classify_feature_cells">meshing.features.classify_feature_cells</a></td>
-<td>Classify active cells as face, crease, or corner from normal spread.</td>
-</tr>
-<tr class="even">
-<td><a href="../reference/meshing.dual_contouring.qef_vertices.html#cadjoint.meshing.dual_contouring.qef_vertices">meshing.dual_contouring.qef_vertices</a></td>
-<td>Place one vertex per active cell from its Hermite tangent planes.</td>
-</tr>
-<tr class="odd">
-<td><a href="../reference/meshing.dual_contouring.sharp_qef_vertices.html#cadjoint.meshing.dual_contouring.sharp_qef_vertices">meshing.dual_contouring.sharp_qef_vertices</a></td>
-<td>Place vertices with a rank-revealing QEF that lands exactly on features.</td>
-</tr>
-<tr class="even">
-<td><a href="../reference/meshing.dual_contouring.dual_faces.html#cadjoint.meshing.dual_contouring.dual_faces">meshing.dual_contouring.dual_faces</a></td>
-<td>Connect cell vertices with one oriented quad per crossing edge.</td>
-</tr>
-</tbody>
-</table>
-</section>
-<section id="meshing-adaptive-simplify-native" class="level2">
-<h2 class="anchored" data-anchor-id="meshing-adaptive-simplify-native">Meshing — adaptive, simplify, native</h2>
-<table class="caption-top table">
-<tbody>
-<tr class="odd">
-<td><a href="../reference/meshing.adaptive.surface_cells.html#cadjoint.meshing.adaptive.surface_cells">meshing.adaptive.surface_cells</a></td>
-<td>Find every unit cell that may contain the level set, by octree descent.</td>
-</tr>
-<tr class="even">
-<td><a href="../reference/meshing.adaptive.sparse_crossing_edges.html#cadjoint.meshing.adaptive.sparse_crossing_edges">meshing.adaptive.sparse_crossing_edges</a></td>
-<td>Detect crossing edges without sampling the full lattice.</td>
-</tr>
-<tr class="odd">
-<td><a href="../reference/meshing.simplify.simplify_mesh.html#cadjoint.meshing.simplify.simplify_mesh">meshing.simplify.simplify_mesh</a></td>
-<td>Simplify a dual-contour mesh by error-bounded, feature-safe collapses.</td>
-</tr>
-<tr class="even">
-<td><a href="../reference/meshing.native.native_available.html#cadjoint.meshing.native.native_available">meshing.native.native_available</a></td>
-<td>Whether the native cdylib can be located (without loading it).</td>
-</tr>
-<tr class="odd">
-<td><a href="../reference/meshing.native.extract_mesh_native.html#cadjoint.meshing.native.extract_mesh_native">meshing.native.extract_mesh_native</a></td>
-<td>Native counterpart of :func:<code>cadjoint.meshing.extract_mesh</code>.</td>
-</tr>
-<tr class="even">
-<td><a href="../reference/meshing.native.qef_vertices_native.html#cadjoint.meshing.native.qef_vertices_native">meshing.native.qef_vertices_native</a></td>
-<td>Differentiable drop-in for :func:<code>cadjoint.meshing.qef_vertices</code>.</td>
-</tr>
-</tbody>
-</table>
-</section>
-<section id="meshing-export-and-diagnostics" class="level2">
-<h2 class="anchored" data-anchor-id="meshing-export-and-diagnostics">Meshing — export and diagnostics</h2>
-<table class="caption-top table">
-<tbody>
-<tr class="odd">
-<td><a href="../reference/meshing.export.save_obj.html#cadjoint.meshing.export.save_obj">meshing.export.save_obj</a></td>
-<td>Write a Wavefront OBJ file with merged planar n-gon faces.</td>
-</tr>
-<tr class="even">
-<td><a href="../reference/meshing.export.save_stl.html#cadjoint.meshing.export.save_stl">meshing.export.save_stl</a></td>
-<td>Write the mesh triangles as an STL file.</td>
-</tr>
-<tr class="odd">
-<td><a href="../reference/meshing.export.save_step.html#cadjoint.meshing.export.save_step">meshing.export.save_step</a></td>
-<td>Write a minimal faceted STEP AP214 boundary representation.</td>
-</tr>
-<tr class="even">
-<td><a href="../reference/meshing.export.merge_planar_faces.html#cadjoint.meshing.export.merge_planar_faces">meshing.export.merge_planar_faces</a></td>
-<td>Merge coplanar mesh quads into large polygon faces.</td>
-</tr>
-<tr class="odd">
-<td><a href="../reference/meshing.diagnostics.mesh_report.html#cadjoint.meshing.diagnostics.mesh_report">meshing.diagnostics.mesh_report</a></td>
-<td>Bundle every diagnostic into one report.</td>
-</tr>
-<tr class="even">
-<td><a href="../reference/meshing.diagnostics.surface_deviation.html#cadjoint.meshing.diagnostics.surface_deviation">meshing.diagnostics.surface_deviation</a></td>
-<td>Sampled one-sided deviation of the mesh from the implicit surface.</td>
-</tr>
-<tr class="odd">
-<td><a href="../reference/meshing.diagnostics.triangle_quality.html#cadjoint.meshing.diagnostics.triangle_quality">meshing.diagnostics.triangle_quality</a></td>
-<td>Triangle shape statistics: minimum angles, aspect ratios, degeneracy.</td>
-</tr>
-<tr class="even">
-<td><a href="../reference/meshing.diagnostics.self_intersections.html#cadjoint.meshing.diagnostics.self_intersections">meshing.diagnostics.self_intersections</a></td>
-<td>Sampled self-intersection test over non-adjacent triangle pairs.</td>
-</tr>
-</tbody>
-</table>
-</section>
-<section id="simulation-meshes-and-studies" class="level2">
-<h2 class="anchored" data-anchor-id="simulation-meshes-and-studies">Simulation — meshes and studies</h2>
-<table class="caption-top table">
-<tbody>
-<tr class="odd">
-<td><a href="../reference/fem.simmesh.SimMesh.html#cadjoint.fem.simmesh.SimMesh">fem.simmesh.SimMesh</a></td>
-<td>A declarable, named meshing intent — the scene program’s mesh object.</td>
-</tr>
-<tr class="even">
-<td><a href="../reference/fem.study.ThermalStudy.html#cadjoint.fem.study.ThermalStudy">fem.study.ThermalStudy</a></td>
-<td>Declarative steady-state heat conduction study.</td>
-</tr>
-<tr class="odd">
-<td><a href="../reference/fem.study.ElasticStudy.html#cadjoint.fem.study.ElasticStudy">fem.study.ElasticStudy</a></td>
-<td>Declarative small-strain linear elasticity study.</td>
-</tr>
-<tr class="even">
-<td><a href="../reference/fem.result.SimulationResult.html#cadjoint.fem.result.SimulationResult">fem.result.SimulationResult</a></td>
-<td>One solved study: named, typed, inspectable, exportable.</td>
-</tr>
-</tbody>
-</table>
-</section>
-<section id="simulation-selections-and-bcs" class="level2">
-<h2 class="anchored" data-anchor-id="simulation-selections-and-bcs">Simulation — selections and BCs</h2>
-<table class="caption-top table">
-<tbody>
-<tr class="odd">
-<td><a href="../reference/fem.selection.Nodes.html#cadjoint.fem.selection.Nodes">fem.selection.Nodes</a></td>
-<td>Factory namespace for :class:<code>NodeSelection</code> values.</td>
-</tr>
-<tr class="even">
-<td><a href="../reference/fem.selection.NodeSelection.html#cadjoint.fem.selection.NodeSelection">fem.selection.NodeSelection</a></td>
-<td>A composable, mesh-independent description of a node set.</td>
-</tr>
-<tr class="odd">
-<td><a href="../reference/fem.study.Dirichlet.html#cadjoint.fem.study.Dirichlet">fem.study.Dirichlet</a></td>
-<td>Prescribed temperature on a set of boundary nodes.</td>
-</tr>
-<tr class="even">
-<td><a href="../reference/fem.study.HeatFlux.html#cadjoint.fem.study.HeatFlux">fem.study.HeatFlux</a></td>
-<td>Prescribed heat inflow per area on the faces spanned by a selection.</td>
-</tr>
-<tr class="odd">
-<td><a href="../reference/fem.study.Fixed.html#cadjoint.fem.study.Fixed">fem.study.Fixed</a></td>
-<td>Fully clamped node set (all displacement components zero).</td>
-</tr>
-<tr class="even">
-<td><a href="../reference/fem.study.Traction.html#cadjoint.fem.study.Traction">fem.study.Traction</a></td>
-<td>Constant traction (force per area) on the faces spanned by a selection.</td>
-</tr>
-</tbody>
-</table>
-</section>
-<section id="simulation-backends" class="level2">
-<h2 class="anchored" data-anchor-id="simulation-backends">Simulation — backends</h2>
-<table class="caption-top table">
-<tbody>
-<tr class="odd">
-<td><a href="../reference/fem.backends.SolverBackend.html#cadjoint.fem.backends.SolverBackend">fem.backends.SolverBackend</a></td>
-<td>Protocol every FEM backend implements.</td>
-</tr>
-<tr class="even">
-<td><a href="../reference/fem.backends.get_backend.html#cadjoint.fem.backends.get_backend">fem.backends.get_backend</a></td>
-<td>Resolve a backend name (or pass an instance through).</td>
-</tr>
-<tr class="odd">
-<td><a href="../reference/fem.backends.register_backend.html#cadjoint.fem.backends.register_backend">fem.backends.register_backend</a></td>
-<td>Register a solver backend factory under <code>name</code>.</td>
-</tr>
-<tr class="even">
-<td><a href="../reference/fem.backends.available_backends.html#cadjoint.fem.backends.available_backends">fem.backends.available_backends</a></td>
-<td>Names of registered backends (not necessarily importable).</td>
-</tr>
-</tbody>
-</table>
-</section>
-<section id="optimization" class="level2">
-<h2 class="anchored" data-anchor-id="optimization">Optimization</h2>
-<table class="caption-top table">
-<tbody>
-<tr class="odd">
-<td><a href="../reference/optimize.Optimization.html#cadjoint.optimize.Optimization">optimize.Optimization</a></td>
-<td>Declarative gradient-based optimization of a scene’s free parameters.</td>
-</tr>
-<tr class="even">
-<td><a href="../reference/optimize.OptimizationRun.html#cadjoint.optimize.OptimizationRun">optimize.OptimizationRun</a></td>
-<td>One finished optimization: its descent history and both endpoints.</td>
-</tr>
-<tr class="odd">
-<td><a href="../reference/optimize.capture_optimizations.html#cadjoint.optimize.capture_optimizations">optimize.capture_optimizations</a></td>
-<td>Collect every optimization constructed inside this context.</td>
-</tr>
-</tbody>
-</table>
-</section>
-<section id="render" class="level2">
-<h2 class="anchored" data-anchor-id="render">Render</h2>
-<table class="caption-top table">
-<tbody>
-<tr class="odd">
-<td><a href="../reference/render.scene.Camera.html#cadjoint.render.scene.Camera">render.scene.Camera</a></td>
-<td>Perspective camera used by :func:<code>cadjoint.render.render_scene</code>.</td>
-</tr>
-<tr class="even">
-<td><a href="../reference/render.scene.Scene.html#cadjoint.render.scene.Scene">render.scene.Scene</a></td>
-<td>Geometry, camera, lighting, and background for one forward render.</td>
-</tr>
-<tr class="odd">
-<td><a href="../reference/render.settings.RenderSettings.html#cadjoint.render.settings.RenderSettings">render.settings.RenderSettings</a></td>
-<td>Quality and performance controls for the forward renderer.</td>
-</tr>
-<tr class="even">
-<td><a href="../reference/render.raymarch.render.render_scene.html#cadjoint.render.raymarch.render.render_scene">render.raymarch.render.render_scene</a></td>
-<td>Render a :class:<code>Scene</code> with an explicit quality preset or settings.</td>
-</tr>
-<tr class="odd">
-<td><a href="../reference/render.raymarch.render.raymarch.html#cadjoint.render.raymarch.render.raymarch">render.raymarch.render.raymarch</a></td>
-<td>Render an SDF to an <code>(height, width, 3)</code> NumPy image.</td>
-</tr>
-<tr class="even">
-<td><a href="../reference/render.raymarch.render.render_raymarched.html#cadjoint.render.raymarch.render.render_raymarched">render.raymarch.render.render_raymarched</a></td>
-<td>Render an SDF with :func:<code>raymarch</code> and display it with matplotlib.</td>
+<td></td>
+<td>tuple[Array, Array]</td>
+<td><code>(vertices, normals)</code>, both shaped <code>(cell_count, 3)</code>. Normals are the safely averaged incident unit normals; a cell whose normals cancel (opposed thin-sheet subgradients) falls back to its first sample’s normal so downstream orientation and shading stay finite.</td>
 </tr>
 </tbody>
 </table>
