@@ -88,7 +88,7 @@ depth, the copper heat slug under the die is a revolved section, and two
 steel bushings carry the mounting screws. A named SimMesh discretizes the
 sink, the declared thermal study conducts the die's heat flux up into the
 fins on it, and the single declared optimization at the bottom descends that
-SAME simulation — mean temperature against a material-volume penalty —
+SAME simulation — peak temperature against a material-volume penalty —
 differentiably, straight through the geometry the viewport renders.
 
 Named design parameters:

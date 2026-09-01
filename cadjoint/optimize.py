@@ -751,15 +751,20 @@ class Optimization:
             inner = fn(values, fixed)
             return lambda p: jnp.asarray(inner(p))
 
-        def objective_on(mesh: Any):
-            # GRADIENT-PATH SEAM.  This is the one place the design->points
-            # derivative path is chosen: the DIRECT frozen-topology path —
-            # node positions re-projected onto the true SDF
-            # (recompute_points / recompute_tet_points), validated on
-            # crease-heavy geometry.  If the interpolation-tesseract path is
-            # cleared as default, swap the recompute function here.
-            recompute = recompute_tet_points if isinstance(mesh, TetMesh) else recompute_points
+        # GRADIENT-PATH SEAM.  This is the one place the design->points
+        # derivative path is chosen: the DIRECT frozen-topology path — node
+        # positions re-projected onto the true SDF (recompute_points /
+        # recompute_tet_points), validated on crease-heavy geometry.  If the
+        # interpolation-tesseract path is cleared as default, swap the
+        # recompute call here.  Tet meshes smooth the boundary displacement
+        # into the interior so frozen Steiner tets stay well shaped (and the
+        # solve well conditioned) as the design moves between refreezes.
+        def recompute(field: Any, mesh: Any) -> Any:
+            if isinstance(mesh, TetMesh):
+                return recompute_tet_points(field, mesh, smooth_passes=2)
+            return recompute_points(field, mesh)
 
+        def objective_on(mesh: Any):
             def objective(params):
                 points = recompute(field_at(params), mesh)
                 result = study.solve(mesh=mesh, points=points)
@@ -862,11 +867,6 @@ class Optimization:
                         "optimization cannot move it."
                     )
                     final_mesh = frozen[0]
-                    recompute = (
-                        recompute_tet_points
-                        if isinstance(final_mesh, TetMesh)
-                        else recompute_points
-                    )
                     final_points = recompute(final_field, final_mesh)
                     result = study.solve(mesh=final_mesh, points=final_points)
                 final_value = jnp.asarray(self._metric_value(result, final_mesh, final_points))

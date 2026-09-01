@@ -243,14 +243,14 @@ class TestStarterScene:
         scene = namespace["scene"]
 
         described = optimization.describe(scene)
-        assert described["objective"] == "mean(sink-conduction)"
+        assert described["objective"] == "max(sink-conduction)"
         assert described["study"] == "sink-conduction"
-        assert described["metric"] == "mean"
+        assert described["metric"] == "max"
         assert described["remesh_every"] == 6
         assert described["regularizer"] == "material_volume"
         assert described["regularizer_weight"] == pytest.approx(0.4)
         assert described["steps"] == 12
-        assert described["learning_rate"] == pytest.approx(0.01)
+        assert described["learning_rate"] == pytest.approx(0.004)
         # The study solves on the explicitly declared SimMesh (quality path).
         assert namespace["heat_study"].mesh is namespace["sink_mesh"]
         assert namespace["sink_mesh"].method == "tet10"

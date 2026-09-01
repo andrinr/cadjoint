@@ -294,14 +294,14 @@ def test_example_scene_reports_its_construction_for_the_viewer():
     cool = optimizations[0]
     assert cool["kind"] == "optimization"
     assert cool["name"] == "cool-sink"
-    assert cool["objective"] == "mean(sink-conduction)"
+    assert cool["objective"] == "max(sink-conduction)"
     assert cool["study"] == "sink-conduction"
-    assert cool["metric"] == "mean"
+    assert cool["metric"] == "max"
     assert cool["remesh_every"] == 6
     assert cool["regularizer"] == "material_volume"
     assert cool["regularizer_weight"] == pytest.approx(0.4)
     assert cool["steps"] == 12
-    assert cool["learning_rate"] == pytest.approx(0.01)
+    assert cool["learning_rate"] == pytest.approx(0.004)
     assert cool["method"] == "adam"
     assert cool["index"] == 0
     assert cool["editable"] is True
@@ -313,7 +313,7 @@ def test_example_scene_reports_its_construction_for_the_viewer():
     start, end = cool["steps_span"]
     assert EXAMPLE_SOURCE[start:end] == "12"
     start, end = cool["learning_rate_span"]
-    assert EXAMPLE_SOURCE[start:end] == "0.01"
+    assert EXAMPLE_SOURCE[start:end] == "0.004"
 
     assert result["relations"] == [
         {
