@@ -298,11 +298,11 @@ no two stages agree on how to compute a derivative.
 CAD parameters θ  ──►  constraints ──► SDF        (JAX autodiff)
         │                              │
         │                              ▼
-        │                    lattice SDF samples   (JAX autodiff)
-        │                              │
+        │                  dual-contoured surface   (JAX autodiff:
+        │                              │             Newton on the true SDF)
         │                              ▼
-        │              ┌─ mesher Tesseract ──────┐ (frozen topology;
-        │              │  DC surface → tet/hex   │  interpolation VJP)
+        │              ┌─ tetfill Tesseract ─────┐ (TetGen; frozen topology,
+        │              │  surface → TET4/TET10   │  exact pass-through VJP)
         │              └───────────┬─────────────┘
         │                          ▼
         │              ┌─ solver Tesseract ──────┐ (jax-fem adjoint, or
@@ -311,6 +311,21 @@ CAD parameters θ  ──►  constraints ──► SDF        (JAX autodiff)
         │                          ▼
         └──────────  ∂J/∂θ  ◄──  objective J      (JAX autodiff)
 ```
+
+**This is what the playground runs.** The starter scene's `cool-sink`
+optimization declares `gradient_path="tesseract-dc"`, so pressing Run in the
+browser drives exactly this chain — roughly 8 s per step on the heat sink,
+streamed live, with the optimized parameters written back into the source.
+`gradient_path="direct"` runs the same objective fully in-process for
+comparison.
+
+A second, more general boundary also ships: the `mesher` Tesseract wraps the
+*whole* pipeline (samples → surface → mesh) and derives its VJP from the
+interpolated field alone, so it differentiates meshers that do not preserve
+their input vertices — at the cost of the interpolant smearing sharp features.
+`tetfill` is sharper wherever TetGen's vertex-preserving mode applies;
+`mesher` is the one to reach for when the mesher is a true black box (and it
+carries the HEX8 path). Numbers for both: `research/tet-vs-hex.md`.
 
 `examples/fem_bracket_optimization.py` runs this loop for real: optax Adam over
 named CAD parameters, objective down 73% in 30 steps, adjoint checked against

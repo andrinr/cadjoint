@@ -89,7 +89,8 @@ steel bushings carry the mounting screws. A named SimMesh discretizes the
 sink, the declared thermal study conducts the die's heat flux up into the
 fins on it, and the single declared optimization at the bottom descends that
 SAME simulation — peak temperature against a material-volume penalty —
-differentiably, straight through the geometry the viewport renders.
+differentiably, straight through the geometry the viewport renders, with
+the mesher and the solver each crossing a Tesseract boundary.
 
 Named design parameters:
   - ``fin_depth``: extrusion depth of the fin comb (along y)
@@ -313,6 +314,12 @@ cool_sink = Optimization(
     regularizer_weight=0.4,
     steps=12,
     learning_rate=0.004,
+    # Run the loop through two Tesseracts: the tetfill mesher (TetGen behind
+    # an exact pass-through VJP) feeding the jax-fem solver tesseract.  The
+    # dual contouring upstream stays differentiable in JAX against the true
+    # SDF, which is what keeps the fin creases sharp.  "direct" runs the
+    # same objective fully in-process.
+    gradient_path="tesseract-dc",
 )
 '''
 
