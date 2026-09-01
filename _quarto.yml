@@ -124,11 +124,7 @@ quartodoc:
         - meshing.edge_detection.detect_edges
         - meshing.features.manifold_cell_incidence
         - meshing.features.classify_feature_cells
-        # meshing.dual_contouring.qef_vertices — omitted: its wrapped
-        # `Returns:` description crashes griffe's Google parser (each
-        # same-indent line is read as another return value, then indexed
-        # against the 2-tuple annotation). Re-add once the continuation
-        # lines carry a hanging indent.
+        - meshing.dual_contouring.qef_vertices
         - meshing.dual_contouring.sharp_qef_vertices
         - meshing.dual_contouring.dual_faces
     - title: Meshing — adaptive, simplify, native
@@ -144,8 +140,7 @@ quartodoc:
         - meshing.export.save_obj
         - meshing.export.save_stl
         - meshing.export.save_step
-        # meshing.export.merge_planar_faces — omitted for the same griffe
-        # `Returns:` wrapping crash as meshing.dual_contouring.qef_vertices.
+        - meshing.export.merge_planar_faces
         - meshing.diagnostics.mesh_report
         - meshing.diagnostics.surface_deviation
         - meshing.diagnostics.triangle_quality

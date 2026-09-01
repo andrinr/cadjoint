@@ -146,8 +146,9 @@ def merge_planar_faces(
 
     Returns:
         ``(polygons, triangles)``: ordered vertex-index loops (one simple
-        polygon each, indices into ``mesh.vertices``) and the leftover
-        triangles ``(t, 3)`` covering every quad not absorbed by a polygon.
+            polygon each, indices into ``mesh.vertices``) and the leftover
+            triangles ``(t, 3)`` covering every quad not absorbed by a
+            polygon.
     """
     quads = np.asarray(mesh.quads, dtype=np.int32)
     quad_count = quads.shape[0]

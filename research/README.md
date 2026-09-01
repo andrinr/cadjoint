@@ -33,4 +33,4 @@ their full text is in git history (PR #19).
 ## Screenshots
 
 `app/` and `edge-view/` hold the viewer screenshots embedded in PR #19
-(feature-edge QA, simulate-panel parity, the four editing modes).
+(feature-edge QA, simulate-panel parity, the editing modes).

@@ -16,7 +16,7 @@ FEM simulation composed into one function JAX can differentiate end to end.
 - **Boolean ops** — union, intersection, subtraction with smooth blending
 - **Transforms** — translate, rotate, scale, mirror, repeat
 - **Forward raymarcher** — early-exit sphere tracing, reconstructed silhouettes, GGX materials, soft shadows, reflections, refraction, and anti-aliasing
-- **Shader backends** — compile 3D SDFs through StableHLO to GLSL or WGSL
+- **Shader backend** — compile 3D SDFs through StableHLO to WGSL
 - **WebGPU viewers** — interactively inspect SDFs or progressively path-trace
   materials in the browser playground
 - **Sketch construction** — 2D profiles on work planes, extruded or revolved into
@@ -209,7 +209,6 @@ The [WebGPU viewer guide](https://andrinr.github.io/cadjoint/docs/viewer.html) i
 a live interactive scene and covers the local playground, camera controls,
 generated shader inspection, and the Jupyter widget.
 
-For offscreen OpenGL rendering, install the `glsl` extra instead.
 
 ## Forward rendering
 
@@ -290,7 +289,8 @@ no two stages agree on how to compute a derivative.
 | `cadjoint/fem/tesseracts/elastic_jaxfem` | jax-fem linear elasticity + von Mises | same | same; gradients bit-identical to the in-process path |
 | `cadjoint/fem/tesseracts/elastic_calculix` | **CalculiX 2.23, Fortran**, over a subprocess (text decks in, result files out) | Language, licence (GPL-2 isolated), and AD strategy | The solver's native `*SENSITIVITY` discrete adjoint, plus a correction we derived for a missing Jacobian-variation term in ccx 2.23 — validated to 2e-4 of finite differences |
 | `native/tesseract_api.py` | **Rust** dual-contouring kernels (batched QEF solves, rayon-parallel, 90–107× faster than the reference) | Language and memory model (cdylib over ctypes) | Hand-derived linear-solve VJP, matches JAX autodiff to ~4e-14 |
-| `cadjoint/fem/tesseracts/mesher` *(experimental, in validation)* | The **whole black-box mesher** — dual-contoured surface into a tetrahedral volume mesher whose internals nobody differentiates | The boundary everyone gives up on: a discrete, non-differentiable meshing algorithm | **Surface-interpolation VJP**: a boundary vertex lies on the zero set of the trilinearly interpolated SDF samples, so the implicit function theorem gives `∂v/∂fᵢ = −wᵢ(v)·∇f/|∇f|²` — the interpolation weights at the frozen vertex locations *are* the VJP rows. Any mesher becomes differentiable without touching its internals; only the Hadamard-meaningful normal motion is carried |
+| `cadjoint/fem/tesseracts/tetfill` | **TetGen** — the tet fill alone, with dual contouring left differentiable in JAX upstream | A discrete meshing algorithm, cut at the narrowest place it can be cut | **Pass-through gather**: TetGen's `-Y` preserves the input vertices bit-for-bit, so the VJP is the exact transpose of a gather (0.0 relative error for TET4, 1.25e-16 for TET10); Steiner nodes take zero cotangent, and interior relaxation carries their sensitivity onto the boundary |
+| `cadjoint/fem/tesseracts/mesher` | The **whole black-box mesher** — dual-contoured surface into a tetrahedral volume mesher whose internals nobody differentiates | The boundary everyone gives up on: a discrete, non-differentiable meshing algorithm | **Surface-interpolation VJP**: a boundary vertex lies on the zero set of the trilinearly interpolated SDF samples, so the implicit function theorem gives `∂v/∂fᵢ = −wᵢ(v)·∇f/|∇f|²` — the interpolation weights at the frozen vertex locations *are* the VJP rows. Any mesher becomes differentiable without touching its internals; only the Hadamard-meaningful normal motion is carried |
 
 ### The composition
 
@@ -352,7 +352,7 @@ without changing a line of the objective.
 
 ### Building and serving them as containers
 
-Each of the five directories above is a complete Tesseract package —
+Each of the six directories above is a complete Tesseract package —
 `tesseract_api.py` plus `tesseract_config.yaml` plus a requirements file — so
 `tesseract build` turns it into a Docker image with no extra glue:
 

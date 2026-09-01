@@ -130,9 +130,10 @@ def qef_vertices(
 
     Returns:
         ``(vertices, normals)``, both shaped ``(cell_count, 3)``.  Normals
-        are the safely averaged incident unit normals; a cell whose normals
-        cancel (opposed thin-sheet subgradients) falls back to its first
-        sample's normal so downstream orientation and shading stay finite.
+            are the safely averaged incident unit normals; a cell whose
+            normals cancel (opposed thin-sheet subgradients) falls back to
+            its first sample's normal so downstream orientation and shading
+            stay finite.
     """
     if not regularization > 0:
         raise ValueError("regularization must be positive.")
