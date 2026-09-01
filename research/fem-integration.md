@@ -603,3 +603,156 @@ Tesseract schemas reject extra input keys (pydantic extra=forbid via
 tesseract-core), so every schema fed by `TesseractBackend`'s input dict
 must carry the union of its fields — that is why `elastic_calculix` grew
 the (rejected-if-set) face fields.
+
+## Container conformance: the five Tesseracts, actually built (2026-09-01)
+
+Until now the packaged Tesseracts only ever ran in-process via
+`Tesseract.from_tesseract_api`. This section records what happened when
+all five were built into real Docker images with `tesseract build` and
+exercised through a served HTTP client, on macOS 15 / Apple Silicon,
+Docker 29.7.2, `linux/arm64`, tesseract-core 1.11.0.
+
+### Conformance against the installed SDK
+
+Everything was checked against the *installed* contract, not against
+memory: `tesseract_core.sdk.api_parse.TesseractConfig` /
+`TesseractBuildConfig` (the pydantic models behind `tesseract_config.yaml`,
+`extra="forbid"` on both), `sdk/templates/Dockerfile.base` (where each
+`build_config` field actually lands), and `sdk/engine.py`
+(`parse_requirements`, `_stage_local_dependency`, `prepare_build_context`).
+
+Confirmed mechanics worth writing down:
+
+- **Local dependencies.** Requirement lines starting with `.`, `/` or
+  `file://` are split out of `tesseract_requirements.txt`, `copytree`'d into
+  `<context>/local_requirements/<name>` and rewritten to
+  `./local_requirements/<name>`; extras (`[fem]`) are preserved. The same
+  staging runs for the `pip:` sub-list of a conda
+  `tesseract_environment.yaml`. So `../../../..` from a package directory is
+  the supported way to install cadjoint itself. Staging the 1.9 GB repo root
+  takes ~9 s on APFS (`copytree` clones); the generated `.dockerignore`
+  drops `.venv`, `.git` and `__pycache__` before the context is sent to the
+  daemon, but nothing else (`node_modules`, `native/target` do travel).
+- **System dependencies.** `build_config.extra_packages` is apt-only and is
+  rendered *twice* — once in the build stage, once in the run stage — which
+  is what makes an apt-installed runtime library survive the multi-stage
+  `COPY`.
+- **Custom build steps.** `build_config.custom_build_steps` are injected
+  verbatim into the run stage, after `package_data` and before the
+  `tesseract-runtime check`, while the image is still `USER root`. The build
+  context is shared with the build stage, so `COPY
+  ["__tesseract_source__/…", …]` reaches the package's own source files.
+- **Mutual exclusions.** `python_version` is rejected together with the
+  conda provider and with `inherit_base_image_packages`. Versions must match
+  `^\d+\.\d+\.\d+[a-zA-Z-0-9]*$`.
+
+The inherited configs were schema-valid but two of the three mechanisms
+they relied on did not survive contact with a real build (below).
+
+### Why three packages had to move from pip to conda
+
+`thermal_jaxfem` and `elastic_jaxfem` declared `../../../..[fem]` +
+`python_version: "3.12"`. That build fails on Linux, and not by accident:
+
+- **gmsh** publishes wheels for `manylinux_2_24_x86_64`, `macosx_*` and
+  `win_amd64` only — no aarch64 wheel exists, so the resolver refuses the
+  `[fem]` extra outright on this machine.
+- **petsc4py** publishes *no* wheels on PyPI at all, for any platform or
+  version (checked 3.23.7 … 3.25.5: zero `.whl` files). Its sdist runs
+  PETSc's `configure`, which is why the first build died with
+  `RuntimeError: 256` out of `setup.py`. Retargeting to `linux/amd64` fixes
+  gmsh but not this.
+
+Both are hard imports on the used path (`jax_fem.solver` does `from petsc4py
+import PETSc`; `jax_fem.generate_mesh` does `import gmsh`), so neither can be
+dropped. conda-forge carries both for `linux-aarch64`, so those two packages
+now declare `build_config.requirements.provider: conda` with
+`base_image: condaforge/miniforge3:latest` and a
+`tesseract_environment.yaml`; jax-fem itself (not on conda-forge, empty
+`install_requires`) and cadjoint stay in the `pip:` sub-list, deliberately
+*without* the `[fem]` extra so the extra cannot drag gmsh back in from PyPI.
+
+`elastic_calculix` moved for the same structural reason with a better
+outcome: it declared `extra_packages: [calculix-ccx]`, and Debian's package
+is **ccx 2.20** — older than the 2.23 whose `STRAINENERGY`/DFDN behaviour
+the adjoint correction in `cadjoint/fem/calculix.py` is written against.
+conda-forge ships `calculix` **2.23** for linux-aarch64, so the package now
+installs that and pins `CADJOINT_CCX=/python-env/bin/ccx`.
+
+### Build results
+
+| Package | Provider | Build | Image | Fix forced by the build |
+| --- | --- | --- | --- | --- |
+| `mesher` | pip | 39 s | 1.36 GB | none — inherited config built as written |
+| `qef_native` | pip | 74 s | 1.39 GB | base image bookworm → trixie; `ca-certificates` |
+| `elastic_calculix` | conda | 87 s | 2.57 GB | apt `calculix-ccx` 2.20 → conda-forge `calculix` 2.23 |
+| `thermal_jaxfem` | conda | 181 s | 5.51 GB | pip `[fem]` → conda provider (gmsh/petsc4py) |
+| `elastic_jaxfem` | conda | 194 s | 5.51 GB | same |
+
+The native package needed two corrections beyond the inherited config.
+Debian bookworm's cargo is 0.66 (rustc 1.63) and cannot read this crate's
+**Cargo.lock format v4** (needs cargo ≥ 1.78), so the base image moved to
+`debian:trixie-slim` (cargo 1.85) rather than dropping the lockfile — the
+build now runs `cargo build --release --locked`. The slim image also has no
+`ca-certificates`, so cargo could not reach `index.crates.io`
+(`[77] Problem with the SSL CA cert`). The toolchain is installed, used and
+`apt-get purge`d inside one `RUN`, which is safe because a Rust cdylib links
+libstd statically.
+
+### Container round trips (served image vs. in-process, same inputs)
+
+Every number below is a served `Tesseract.from_image(...)` HTTP call
+compared against `Tesseract.from_tesseract_api(...)` in the host process.
+
+| Tesseract | Case | Forward | VJP |
+| --- | --- | --- | --- |
+| `mesher` | HEX8, 9³ lattice, 117 pts / 56 cells | points max abs diff **1.11e-16**; cells and surface mask identical | `field_values` bar max abs diff **6.66e-16** (max abs value 3.31) |
+| `thermal_jaxfem` | TET4 bar, 42 pts / 72 cells, Dirichlet + flux faces | temperature max abs diff **2.78e-16** (max T 0.551) | `points` **4.88e-15**, `conductivity` **6.66e-16**, `source` **3.33e-16** |
+| `elastic_jaxfem` | TET4 bar, 42 pts / 72 cells, exact face traction | displacement max abs diff **1.16e-16** (max u 1.30e-2) | `points` **6.94e-16** (max abs 6.71e-2) |
+| `qef_native` | 24 cells / 96 Hermite edges, λ=0.05 | vertices **0.0** (bit-identical) | `points_bar` **0.0**, `normals_bar` **0.0** |
+
+`elastic_calculix` has no in-process reference here (the host has no ccx
+binary), so it was validated three ways instead, all inside the container:
+`ccx -v` reports **2.23** at `/python-env/bin/ccx`; on a 22×5×5 hex bar the
+served `apply` gives `strain_energy = 1.508852250e-2`, `max|u| = 3.353357e-1`
+in 0.38 s, and the served `vector_jacobian_product` (0.03 s) matches central
+finite differences taken through the *container's own* `apply` to **6.5e-4**
+relative on the three largest gradient rows — the ~6-significant-digit limit
+of ccx's text output, consistent with the 2e-4·scale bound already recorded
+for the in-process path. Cross-solver, the container's ccx displacement
+matches in-process jax-fem on the same mesh to **1.2e-7** relative.
+
+Serve latency is ~1 s for every image; the first `apply` carries a
+one-off JAX/import cost (mesher 1.8 s, jax-fem images 3–3.6 s) and later
+calls run at in-process speed.
+
+### Two limitations of the served boundary (tesseract-core 1.11)
+
+1. **Zero-size arrays cannot cross HTTP.** `runtime/array_encoding.py`'s
+   `get_array_model` maps a polymorphic (`None`) dimension to `PositiveInt`,
+   so an encoded array with a `0` in its shape fails the `EncodedArrayModel`
+   branch, falls through to `python_to_array`, and is reported as
+   `array_non_numeric`. Reproduced minimally: `Array[(None,), Int32]` accepts
+   a base64-encoded `(3,)` array and rejects a `(0,)` one, even though
+   `Base64ArrayData` and `_load_base64_arraydict` both handle the empty
+   buffer fine. Consequences: the mesher's discovery mode (empty `point_ids`
+   / `cell_template`) is in-process only, and any "this feature is unused"
+   convention built on an empty array needs a non-empty spelling. For that
+   reason `elastic_calculix` now rejects only a *populated* face-patch set
+   (`offsets[-1] > offsets[0]`) instead of any non-empty `traction_face_offsets`
+   array, so a served caller can say "no face targeting" with `[0, 0]`. The
+   upstream fix is `NonNegativeInt` for polymorphic dimensions.
+2. **TetGen topology is not portable.** The same field and the same TetGen
+   0.8.4 produce **182 points / 673 cells** on macOS-arm64 and **185 points**
+   in the Linux-aarch64 container — Steiner insertion differs with the
+   compiler/libm, and the mesher's frozen-topology promise correctly rejects
+   the mismatch. A frozen topology must therefore be discovered on the same
+   platform that will execute it. HEX8 mode (voxelize + Newton-snap, pure
+   numpy/JAX) is bit-reproducible across both, which is why the container
+   parity test uses it.
+
+### Housekeeping
+
+`native/run_<uuid>/logs/` directories are per-invocation artifacts dropped by
+`tesseract-runtime` next to the Tesseract it executes, not build output; two
+stale ones were deleted and `/run_*/` added to `native/.gitignore`.

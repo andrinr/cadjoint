@@ -335,9 +335,75 @@ without changing a line of the objective.
   `Tesseract.from_tesseract_api` — no Docker, ~0.14 s per apply/VJP roundtrip —
   with containerization available when a component needs isolation.
 
+### Building and serving them as containers
+
+Each of the five directories above is a complete Tesseract package —
+`tesseract_api.py` plus `tesseract_config.yaml` plus a requirements file — so
+`tesseract build` turns it into a Docker image with no extra glue:
+
+```bash
+uv sync --extra tesseract          # installs the tesseract-core SDK
+tesseract build native                                  # ~1 min
+tesseract build cadjoint/fem/tesseracts/mesher          # ~1 min
+tesseract build cadjoint/fem/tesseracts/elastic_calculix # ~1.5 min
+tesseract build cadjoint/fem/tesseracts/thermal_jaxfem  # ~3 min
+tesseract build cadjoint/fem/tesseracts/elastic_jaxfem  # ~3 min
+```
+
+Then serve one and call it like any other Tesseract — the same client code
+that runs it in-process runs it in a container:
+
+```python
+from tesseract_core import Tesseract
+
+with Tesseract.from_image("cadjoint_qef_native:latest") as t:
+    vertices = t.apply(inputs)["vertices"]
+    grads = t.vector_jacobian_product(
+        inputs, vjp_inputs=["points", "normals"],
+        vjp_outputs=["vertices"], cotangent_vector={"vertices": cotangent},
+    )
+```
+
+`tesseract serve <image>` plus `Tesseract.from_url(...)` works identically for
+a long-lived server. What each image contains, and what it costs:
+
+| Image | Requirements provider | The non-obvious payload | Size |
+| --- | --- | --- | --- |
+| `cadjoint_mesher` | pip | cadjoint + TetGen + SciPy on a uv-installed CPython 3.12 | 1.36 GB |
+| `cadjoint_qef_native` | pip | the Rust cdylib, `cargo build --release --locked` inside the image (toolchain installed and purged in one layer), pinned via `CADJOINT_NATIVE_MESHER` | 1.39 GB |
+| `cadjoint_elastic_calculix` | conda | **the ccx 2.23 Fortran binary** from conda-forge at `/python-env/bin/ccx`, pinned via `CADJOINT_CCX` | 2.57 GB |
+| `cadjoint_thermal_jaxfem` | conda | the full jax-fem stack: PETSc/petsc4py 3.25.5, gmsh, fenics-basix, meshio | 5.51 GB |
+| `cadjoint_elastic_jaxfem` | conda | same | 5.51 GB |
+
+Two packages use pip (`tesseract_requirements.txt`), three use the SDK's conda
+provider (`tesseract_environment.yaml`) — because petsc4py publishes *no* PyPI
+wheels at all and gmsh publishes manylinux wheels for x86-64 only, so the
+jax-fem stack is simply not pip-installable on Linux, and ccx is a Fortran
+binary that no Python requirement can supply. In every case cadjoint itself
+is installed as a local path dependency (`../../../..`), which `tesseract
+build` stages into the build context automatically.
+
+Two behaviours to know when calling a *served* image rather than an
+in-process one (both are properties of tesseract-core 1.11, not of cadjoint):
+
+- **Zero-size arrays cannot cross the HTTP boundary.** Polymorphic array
+  dimensions validate as `PositiveInt`, so an empty `(0, …)` input is
+  rejected. The mesher's discovery mode (empty `point_ids` / `cell_template`)
+  therefore has to run in-process; pass the frozen topology it returns to the
+  served image.
+- **TetGen topology is platform-dependent.** The same field meshes to 182
+  points on macOS/arm64 and 185 in the Linux container, so a frozen-topology
+  promise made on the host does not transfer to the container for TET4/TET10.
+  HEX8 (voxelize + Newton-snap) is deterministic across both.
+
+`tests/fem/test_tesseract_packaging.py` validates every package against the
+installed SDK schema without Docker, and round-trips the built images against
+the in-process path when Docker is present.
+
 Design notes: `research/fem-integration.md` (solver ABI, adjoint mechanics,
-the ccx sensitivity correction), `research/native-mesher.md` (Rust core and
-its VJP), `research/tet-vs-hex.md` (the mesher-Tesseract validation matrix).
+the ccx sensitivity correction, container conformance and measured numbers),
+`research/native-mesher.md` (Rust core and its VJP), `research/tet-vs-hex.md`
+(the mesher-Tesseract validation matrix).
 
 ## Tesseract Hackathon 2026 entry
 

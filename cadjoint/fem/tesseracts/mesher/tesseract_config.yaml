@@ -1,0 +1,18 @@
+# Tesseract configuration file (tesseract-core 1.11 contract: a Tesseract
+# package is tesseract_api.py + tesseract_config.yaml + a requirements file
+# in one directory; `tesseract build <dir>` turns it into a Docker image).
+
+name: "cadjoint_mesher"
+version: "0.1.0"
+description: >-
+  The whole cadjoint meshing pipeline (dual-contour surface extraction,
+  Newton projection, TetGen volume meshing / HEX8 voxelization / TET10
+  promotion) as one opaque apply endpoint, differentiable w.r.t. the
+  implicit field through a surface-interpolation vector_jacobian_product.
+
+build_config:
+  # Everything this package needs (cadjoint, tetgen, scipy) has linux-aarch64
+  # and linux-64 wheels, so the default pip provider is enough -- unlike the
+  # jax-fem solver packages, which need conda for petsc4py and gmsh.
+  # Decouple the interpreter from the base image's system Python.
+  python_version: "3.12"

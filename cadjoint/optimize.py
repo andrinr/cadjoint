@@ -98,6 +98,8 @@ __all__ = ["Optimization", "OptimizationRun", "capture_optimizations"]
 
 METHODS = ("adam", "sgd")
 METRICS = ("mean", "max", "compliance")
+#: Study-form design->points derivative paths (see ``Optimization.gradient_path``).
+GRADIENT_PATHS = ("direct", "tesseract", "tesseract-dc")
 TRAJECTORY_LIMIT = 100
 
 _CAPTURED_OPTIMIZATIONS: ContextVar[list[Optimization] | None] = ContextVar(
@@ -336,9 +338,13 @@ class Optimization:
             meshes the *trilinear interpolant* of the samples, so it can
             need a finer lattice than the direct path and its gradient
             carries only normal boundary motion (measured in
-            ``research/tet-vs-hex.md``).  Requires the ``tesseract``
-            extra.  The final reported result is always evaluated on the
-            direct path.
+            ``research/tet-vs-hex.md``).  ``"tesseract-dc"`` is the narrow
+            cut: dual contouring stays in JAX on the true SDF and only
+            TetGen is wrapped (tetfill tesseract, exact pass-through VJP
+            on the vertices ``-Y`` preserves), so it meshes the same
+            geometry the direct path does — tet ``SimMesh`` only.  Both
+            tesseract paths require the ``tesseract`` extra.  The final
+            reported result is always evaluated on the direct path.
         steps: Default number of optimizer steps (keyword-only).
         learning_rate: Optimizer step size (keyword-only).
         method: ``"adam"`` (default) or ``"sgd"`` (keyword-only).  Runs
@@ -445,9 +451,10 @@ class Optimization:
             or self.remesh_every < 0
         ):
             raise ValueError("remesh_every must be a non-negative integer (0: never remesh).")
-        if self.gradient_path not in ("direct", "tesseract"):
+        if self.gradient_path not in GRADIENT_PATHS:
             raise ValueError(
-                f"gradient_path must be 'direct' or 'tesseract' (got {self.gradient_path!r})."
+                f"gradient_path must be one of: {', '.join(GRADIENT_PATHS)} "
+                f"(got {self.gradient_path!r})."
             )
 
     def _study_kind(self) -> str:
@@ -785,8 +792,17 @@ class Optimization:
         #   crease-heavy starter heat sink (research/tet-vs-hex.md), but it
         #   meshes the interpolant (can need a finer lattice) and drops
         #   tangential vertex motion — kept opt-in until cleared as default.
-        use_tesseract = self.gradient_path == "tesseract"
-        if use_tesseract:
+        # - "tesseract-dc": the narrow cut — JAX dual contouring on the TRUE
+        #   SDF (frozen edges, differentiable Newton + QEF) -> tetfill
+        #   tesseract (TetGen only; exact pass-through VJP on the vertices
+        #   -Y preserves) -> solver tesseract adjoint.  Same geometry as the
+        #   direct path, black box confined to the one component that is
+        #   genuinely one.
+        use_dc_chain = self.gradient_path == "tesseract-dc"
+        use_tesseract = self.gradient_path in ("tesseract", "tesseract-dc")
+        if use_dc_chain:
+            from cadjoint.fem.tesseracts.chain import freeze_study_chain_dc
+        elif use_tesseract:
             from cadjoint.fem.tesseracts.chain import freeze_study_chain
 
         def recompute(field: Any, mesh: Any) -> Any:
@@ -797,8 +813,13 @@ class Optimization:
         def objective_on(mesh: Any, chain: Any = None):
             def objective(params):
                 if chain is not None:
-                    samples = field_at(params)(jnp.asarray(chain.lattice))
-                    value = chain.metric_value(samples, self.metric)
+                    if use_dc_chain:
+                        # The DC chain differentiates the true SDF itself,
+                        # so it takes the field callable, not lattice samples.
+                        value = chain.metric_value(field_at(params), self.metric)
+                    else:
+                        samples = field_at(params)(jnp.asarray(chain.lattice))
+                        value = chain.metric_value(samples, self.metric)
                 else:
                     points = recompute(field_at(params), mesh)
                     result = study.solve(mesh=mesh, points=points)
@@ -824,7 +845,10 @@ class Optimization:
             apply_parameters(target, held)
             chain = None
             try:
-                if use_tesseract:
+                if use_dc_chain:
+                    chain = freeze_study_chain_dc(study, sim_mesh, field_at(held))
+                    mesh = chain.mesh
+                elif use_tesseract:
                     chain = freeze_study_chain(study, sim_mesh, field_at(held))
                     mesh = chain.mesh
                 else:

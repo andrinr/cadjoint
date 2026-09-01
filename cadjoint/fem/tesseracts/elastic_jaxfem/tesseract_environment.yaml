@@ -1,0 +1,40 @@
+# conda environment for the cadjoint_elastic_jaxfem Tesseract.
+#
+# Consumed by `tesseract build` via build_config.requirements.provider=conda
+# (the SDK runs `conda env create --file tesseract_environment.yaml -p
+# /python-env`). No `name:` key: the prefix is supplied by the SDK.
+#
+# Identical to thermal_jaxfem's: the conda half carries everything that needs
+# compiled artifacts -- most of all petsc4py (jax_fem.solver does `from
+# petsc4py import PETSc`) and gmsh (jax_fem.generate_mesh does `import gmsh`),
+# neither of which pip can supply on linux-aarch64.
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - pip
+  - numpy
+  - scipy
+  - jax
+  - petsc4py
+  - fenics-basix
+  - meshio
+  - gmsh
+  - python-gmsh
+  - pyfiglet
+  - optax
+  - optimistix
+  - imageio
+  - pip:
+      # jax-fem is not packaged on conda-forge; its sdist declares no
+      # install_requires, so the imports above must be satisfied by conda.
+      - jax-fem
+      # TET4/TET10 volume meshing helpers (cadjoint.fem.tetmesh imports
+      # tetgen lazily; it is not part of cadjoint's declared extras).
+      - tetgen
+      # Local dependency: lines starting with "." / "/" / "file://" in the
+      # pip sub-list are staged into the build context by `tesseract build`
+      # and installed from there. Resolves to the cadjoint repository root.
+      # Deliberately *without* the [fem] extra -- that extra would drag gmsh
+      # and petsc4py back in from PyPI and break the build.
+      - ../../../..

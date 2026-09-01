@@ -1,0 +1,11 @@
+# Python requirements for the cadjoint_qef_native Tesseract.
+#
+# The relative path is the docs-supported local-dependency form: lines
+# starting with "." / "/" / "file://" are staged into the build context by
+# `tesseract build` (tesseract_core.sdk.engine.parse_requirements) and pip-
+# installed inside the image. It resolves to the cadjoint repository root
+# (cadjoint.meshing.native needs only the core install: numpy + ctypes).
+#
+# The Rust cdylib itself is compiled inside the image via
+# build_config.custom_build_steps in tesseract_config.yaml.
+..

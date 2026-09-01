@@ -1,0 +1,20 @@
+# Tesseract configuration file (tesseract-core 1.11 contract: a Tesseract
+# package is tesseract_api.py + tesseract_config.yaml + a requirements file
+# in one directory; `tesseract build <dir>` turns it into a Docker image).
+
+name: "cadjoint_tetfill"
+version: "0.1.0"
+description: >-
+  TetGen volume filling of a watertight triangulated surface (TET4, or
+  TET10 after straight-sided promotion), differentiable w.r.t. the surface
+  vertices through an exact pass-through vector_jacobian_product: TetGen's
+  -Y mode preserves the input vertices verbatim, so the boundary map is a
+  gather. The narrow cut: dual contouring stays in JAX, only the black box
+  is wrapped.
+
+build_config:
+  # Everything this package needs (cadjoint, tetgen, scipy) has linux-aarch64
+  # and linux-64 wheels, so the default pip provider is enough -- unlike the
+  # jax-fem solver packages, which need conda for petsc4py and gmsh.
+  # Decouple the interpreter from the base image's system Python.
+  python_version: "3.12"

@@ -1,0 +1,25 @@
+# Tesseract configuration file (tesseract-core 1.11 contract: a Tesseract
+# package is tesseract_api.py + tesseract_config.yaml + a requirements file
+# in one directory; `tesseract build <dir>` turns it into a Docker image).
+
+name: "cadjoint_elastic_jaxfem"
+version: "0.1.0"
+description: >-
+  Small-strain linear elasticity on HEX8/TET4/TET10 meshes via jax-fem
+  (HEX8) and cadjoint's direct sparse tet solver (TET4/TET10), with an
+  adjoint vector_jacobian_product for points. Part of the cadjoint
+  differentiable meshing pipeline.
+
+build_config:
+  # Same story as thermal_jaxfem: petsc4py publishes no PyPI wheels at all and
+  # gmsh publishes manylinux wheels for x86_64 only, so the jax-fem stack is
+  # not pip-installable on Linux. conda-forge carries both, so this Tesseract
+  # uses the SDK's conda requirements provider and declares its environment in
+  # tesseract_environment.yaml instead of tesseract_requirements.txt.
+  requirements:
+    provider: conda
+  # `conda env create` needs conda on PATH in the build stage; miniforge is
+  # Debian-based (the base_image contract) and defaults to conda-forge.
+  base_image: "condaforge/miniforge3:latest"
+  # NB: build_config.python_version is rejected together with the conda
+  # provider (the interpreter is pinned in tesseract_environment.yaml).

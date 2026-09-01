@@ -1,0 +1,14 @@
+# Python requirements for the cadjoint_tetfill Tesseract.
+#
+# The relative path is the docs-supported local-dependency form: lines
+# starting with "." / "/" / "file://" are staged into the build context by
+# `tesseract build` (tesseract_core.sdk.engine.parse_requirements) and pip-
+# installed inside the image. It resolves to the cadjoint repository root
+# (core install: jax, numpy, optax, optimistix, imageio).
+../../../..
+
+# The forward is TetGen; the tet mesh data structures and the TET10
+# promotion live in cadjoint.fem.tetmesh, which imports tetgen and scipy
+# lazily (neither is part of cadjoint's core dependencies).
+tetgen
+scipy

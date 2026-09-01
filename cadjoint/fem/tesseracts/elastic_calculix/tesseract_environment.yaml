@@ -1,0 +1,27 @@
+# conda environment for the cadjoint_elastic_calculix Tesseract.
+#
+# Consumed by `tesseract build` via build_config.requirements.provider=conda
+# (the SDK runs `conda env create --file tesseract_environment.yaml -p
+# /python-env`). No `name:` key: the prefix is supplied by the SDK.
+#
+# `calculix` is the point of using conda here: it is the ccx solver binary
+# (2.23, matching the DFDN-corrected adjoint in cadjoint.fem.calculix), which
+# no pip requirement can supply. Everything else is the cadjoint core install
+# -- the deck writer and the .dat/.frd parsers need numpy + jax only, not the
+# jax-fem stack.
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - pip
+  - calculix
+  - numpy
+  - jax
+  - optax
+  - optimistix
+  - imageio
+  - pip:
+      # Local dependency: lines starting with "." / "/" / "file://" in the
+      # pip sub-list are staged into the build context by `tesseract build`
+      # and installed from there. Resolves to the cadjoint repository root.
+      - ../../../..

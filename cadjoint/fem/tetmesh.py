@@ -78,14 +78,75 @@ _TETGEN_MESSAGE = (
     "tetgen is not installed (PyPI wheels exist for macOS arm64 / Python 3.14): pip install tetgen"
 )
 
-# Tet solves use a direct sparse linear solver (PETSc LU) for both the
-# forward Newton steps and the adjoint: preserving the DC surface verbatim
-# leaves sliver tets whose conditioning makes jax-fem's default BiCGStab
-# diverge (measured in research/tet-vs-hex.md — the "direct solver
-# prerequisite" for a production tet path).  PETSc LU over scipy spsolve:
-# SuperLU's default ordering was observed to hit catastrophic fill on some
-# sliver-heavy TET10 meshes (minutes-to-hours for a 15k-DOF solve).
-_TET_SOLVER_OPTIONS = {"petsc_solver": {"ksp_type": "preonly", "pc_type": "lu"}}
+
+def _tet_direct_linear_solver(A: Any, b: Any, _x0: Any, _options: dict) -> Any:
+    """Layered robust direct solve for sliver-tet stiffness systems.
+
+    Preserving the DC surface verbatim leaves sliver tets whose
+    conditioning defeats every single off-the-shelf solver somewhere
+    (all observed, see research/tet-vs-hex.md): jax-fem's default
+    BiCGStab diverges outright; PETSc LU hits (near-)zero pivots on some
+    elastic sliver meshes even with a nonzero factor shift; SuperLU
+    survives those but its COLAMD ordering blew up (hours of fill) on one
+    thermal mesh.  So: try PETSc LU with a nonzero pivot shift first
+    (fast, fill-safe nested-dissection ordering), verify the residual,
+    and fall back to SuperLU orderings when the factorization was bad.
+
+    Signature per jax-fem's ``custom_solver`` contract: ``(A, b, x0,
+    linear_options) -> x`` with ``A`` a PETSc AIJ matrix.
+    """
+    import scipy.sparse
+    import scipy.sparse.linalg
+    from petsc4py import PETSc
+
+    rhs = np.asarray(b, dtype=np.float64)
+    scale = max(float(np.linalg.norm(rhs)), 1e-30)
+
+    def residual(x: np.ndarray) -> float:
+        y = PETSc.Vec().createSeq(len(rhs))
+        vec = PETSc.Vec().createSeq(len(rhs))
+        vec.setValues(range(len(rhs)), x)
+        A.mult(vec, y)
+        return float(np.linalg.norm(y.getArray() - rhs)) / scale
+
+    petsc_rhs = PETSc.Vec().createSeq(len(rhs))
+    petsc_rhs.setValues(range(len(rhs)), rhs)
+    ksp = PETSc.KSP().create()
+    ksp.setOperators(A)
+    ksp.setType("preonly")
+    ksp.pc.setType("lu")
+    ksp.pc.setFactorShift(PETSc.Mat.FactorShiftType.NONZERO, 1e-12)
+    solution = PETSc.Vec().createSeq(len(rhs))
+    ksp.solve(petsc_rhs, solution)
+    x = np.array(solution.getArray())
+    if np.isfinite(x).all() and residual(x) < 1e-8:
+        return x
+
+    indptr, indices, data = A.getValuesCSR()
+    matrix = scipy.sparse.csr_matrix((data, indices, indptr))
+    best = x
+    best_residual = residual(x) if np.isfinite(x).all() else np.inf
+    for ordering in ("COLAMD", "MMD_AT_PLUS_A"):
+        candidate = scipy.sparse.linalg.spsolve(matrix, rhs, permc_spec=ordering)
+        if not np.isfinite(candidate).all():
+            continue
+        candidate_residual = residual(candidate)
+        if candidate_residual < best_residual:
+            best, best_residual = candidate, candidate_residual
+        if candidate_residual < 1e-8:
+            return candidate
+    if best_residual < 1e-4:
+        return best
+    raise RuntimeError(
+        f"Direct linear solve failed on the tet system (best relative residual "
+        f"{best_residual:.2e}); the mesh likely contains degenerate sliver tets — "
+        "re-extract at a different resolution."
+    )
+
+
+# Both the forward Newton steps and the adjoint run through the layered
+# direct solver above.
+_TET_SOLVER_OPTIONS = {"custom_solver": _tet_direct_linear_solver}
 
 # The four triangular faces of a positive-volume tet (v0, v1, v2, v3),
 # each listed with outward orientation (face i is opposite vertex i).
@@ -304,6 +365,17 @@ def surface_to_tet_mesh(
     volumes = tet_volumes(nodes, cells)
     if np.any(volumes <= 0.0):
         raise RuntimeError(f"TetGen produced {int((volumes <= 0).sum())} non-positive tets.")
+    # Positive but numerically zero volumes (observed down to 1e-20 on
+    # borderline DC surfaces) make the stiffness singular for every direct
+    # solver; reject them here so callers get the designed remesh-at-a-
+    # different-resolution error instead of a garbage solve.
+    degenerate_threshold = 1e-9 * float(np.median(volumes))
+    if float(volumes.min()) < degenerate_threshold:
+        raise RuntimeError(
+            f"TetGen produced numerically degenerate tets (min volume {volumes.min():.2e} "
+            f"vs median {np.median(volumes):.2e}); the surface is borderline at this "
+            "resolution — re-extract on a different grid or with sharp=False."
+        )
     if grid is not None:
         max_step = 0.5 * float(np.linalg.norm(grid.spacing))
     else:

@@ -60,7 +60,14 @@ def _solve(inputs: InputSchema, *, sensitivities: bool):
     """Run ccx on the deck encoded by ``inputs``."""
     from cadjoint.fem.calculix import _unpack_elastic_bcs, elastic_ccx_solve
 
-    if np.asarray(inputs.traction_face_offsets).size:
+    # A *populated* face-patch set is the tet feature; an empty one is just the
+    # HEX8 caller saying "no face targeting".  Both the zero-length array and a
+    # degenerate offsets array whose patches are all empty mean that -- the
+    # latter because tesseract-core 1.11 cannot carry a zero-size array over the
+    # HTTP boundary (polymorphic dimensions validate as PositiveInt), so a served
+    # image can only be told "no faces" by an all-equal offsets array.
+    face_offsets = np.asarray(inputs.traction_face_offsets)
+    if face_offsets.size and int(face_offsets[-1]) > int(face_offsets[0]):
         raise ValueError(
             "traction_faces targeting is a tet feature of elastic_jaxfem; "
             "the CalculiX tesseract is HEX8-only and uses node sets."

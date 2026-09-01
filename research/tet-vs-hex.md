@@ -499,3 +499,195 @@ needs a finer lattice than the declared meshes (18x13x11 starter fails to
 mesh), the VJP drops tangential crease motion, and the direct-vs-chain
 magnitude comparison on the starter is still running; revisit with those
 numbers in hand.
+
+## The narrow cut: only TetGen is a black box (`tetfill`, 2026-09-01)
+
+User's design objection, verbatim: *"i dont understand why the whole meshing pipeline
+is in the meshing tesseract? i think its only the tet meshing that needs this the rest
+should already natively be differentiable"* — **correct, and the measurements below
+say the wide cut was costing real accuracy.**
+
+### The argument for cutting at TetGen
+
+Everything in `cadjoint/meshing` is already differentiable *by construction*: crossing
+edges are frozen per extraction, the root on each edge is bisected on
+`stop_gradient` values and then Newton-corrected on the **true SDF**
+(`edge_hermite_data`), and QEF placement is a `jnp.linalg.solve` of a 3x3 system
+(`qef_vertices`). The Newton projection `sdf_to_tet_mesh` applies before handing the
+surface to TetGen is the same `project_points` the hex path uses. None of it needs a
+hand-written VJP. Only TetGen is a compiled black box.
+
+The `mesher` tesseract nevertheless swallows the whole pipeline, and pays for it
+twice: (1) the field crosses the boundary as *lattice samples*, so its DC runs on the
+**trilinear interpolant**, which smears every crease across a cell — the measured
+cause of the `web_thickness` sign flip above and of the interpolant DC's TetGen
+self-intersections; (2) its VJP can only be the implicit-function-theorem map on that
+interpolant, i.e. exact for a mesher that is not the one the direct path uses.
+
+`cadjoint/fem/tesseracts/tetfill/` cuts at the seam instead. Inputs: a watertight
+surface (`points` + `triangles`) and TetGen's options. Outputs: `nodes`, `cells`, a
+`(P, 2)` `parents` table and a `steiner_mask`. Because TetGen runs with `-Y`
+(`nobisect`), the input vertices survive **verbatim** (asserted bit-for-bit in the
+forward, not to a tolerance — the whole VJP rests on it), so the boundary map is a
+*gather* and its VJP is the gather's transpose:
+
+- preserved vertex `i < V`: cotangent passes straight through (its `parents` row is
+  `(i, i)`, and every parent carries weight 0.5, so `0.5 + 0.5 = 1`);
+- Steiner node: no parents, cotangent dropped — justified by the measured interior
+  sensitivity above (15x RMS / 26x max below the boundary on the bracket TET4);
+- TET10 midside: `parents` lists its two corners, so the cotangent splits
+  half-and-half (`m = (a + b)/2` is exactly linear — the same step the `mesher`
+  tesseract takes).
+
+### Frozen fill: why the traced call does not re-run TetGen
+
+Measured, and the reason for a second mode: **TetGen's quality-driven Steiner
+insertion is not continuous in the input surface.** On the box bar below a design
+perturbation of **1e-4** already changes the Steiner count (222 -> 232 nodes), which
+breaks the frozen-topology promise and makes both descent and finite differences
+impossible. So `interior_points` (empty = run TetGen, non-empty = re-evaluate the
+frozen fill with the interior held and `cell_template` carrying the connectivity
+verbatim) is a first-class input, and the chain pins it by default. This is not a
+weakening: holding the interior is exactly what `recompute_tet_points` does on the
+direct path, and exactly what the VJP already asserts by dropping Steiner cotangents —
+so in frozen mode the forward *is* the gather its derivative transposes, and the two
+are consistent by construction rather than to a tolerance. Verified: the frozen fill
+reproduces the TetGen fill node-for-node, cell-for-cell, parents-for-parents.
+
+### VJP exactness (mechanical, sphere 10^3 lattice, 224 surface vertices)
+
+VJP vs `jax.vjp` of the equivalent JAX gather (`concat(points, frozen_interior)`, plus
+corner-mean midsides for TET10), random cotangent:
+
+| element | mesh | max rel err |
+|---|---|---|
+| TET4  | 309 nodes / 1 132 tets | **0.0** (bit-exact) |
+| TET10 | 1 971 nodes / 1 132 tets | **1.25e-16** |
+
+A cotangent supported only on Steiner nodes pulls back to exactly 0.
+
+### The chain: `freeze_study_chain_dc` / `gradient_path="tesseract-dc"`
+
+`CAD params -> JAX dual contouring on the true SDF (frozen edges + incidence +
+triangulation, differentiable Hermite roots, differentiable QEF, Newton projection)
+-> tetfill tesseract -> solver tesseract -> metric`, one `jax.grad`. Frozen topology
+per extraction exactly like the interpolant chain. One deliberate restriction:
+the traced surface uses the **Tikhonov** QEF, not `sharp_qef_vertices` — singular-value
+truncation has no usable derivative, and mixing placements would break the fixed point
+(the frozen mesh's boundary must equal the traced surface at the nominal design; it
+does, to `max |dev| = 0.0`).
+
+### Bar exhibit: where frozen-base re-projection differentiates the wrong shape
+
+Box bar, `SimMesh(method="tet4")` @ 14x7x7 (222 nodes / 591 tets / 210 surface), heat
+flux 2.0 in at `-x`, held 0 at `+x`, `k = 1`. The exact solution `T = (q/k)(L - x)`
+gives mean `T = q L / k = 2 L`, and is **independent of the cross-section**.
+
+| quantity | tesseract-dc | direct (same frozen mesh) | truth |
+|---|---|---|---|
+| forward `J` | 1.585170 | 1.585170 (parity **0.0**) | 1.6 (exact) |
+| `dJ/d(half_length)` | **+1.999469** (central FD **+1.999469**) | — | +2 |
+| `dJ/d(half_thickness)` | **-0.0085** (FD -0.0085 at eps 1e-3 *and* 3e-3) | **-8.61** | 0 |
+
+The last row is the finding. `recompute_tet_points` moves each frozen boundary vertex
+along the SDF gradient, which cannot move an end-cap vertex *tangentially*: as the bar
+thickens, the caps do not widen, the meshed shape stops being a box, and the direct
+path reports a derivative three orders of magnitude too large for a quantity that is
+physically insensitive. Re-extracting DC from the true SDF has no such gauge: every
+vertex is re-derived, so the chain tracks the real shape. Tangential motion is gauge
+*for the objective* only when the shape's tangential extent does not change — which is
+exactly the assumption the DC chain does not need to make.
+
+### Starter heat sink at its DECLARED resolution (the crease-heavy headline)
+
+`scenes/starter.py` verbatim (18x13x11, `method="tet10"`, k = 2.0, die flux 6.0),
+objective max temperature, parameter `fin_depth`:
+
+| gradient path | mesh (nodes / cells / surface) | `J = max T` | `d(max T)/d(fin_depth)` |
+|---|---|---|---|
+| `direct` (own sharp-DC mesh, true SDF) | 5 963 / 3 136 / 860 | 1.145255 | **-0.157944** |
+| **`tesseract-dc`** (JAX DC + tetfill) | 5 722 / 2 953 / 860 | 1.147747 | **-0.165900** |
+| `tesseract` (interpolant mesher) | 6 412 / 3 499 / 860 | **0.968120** | **-0.090242** |
+| `direct`, on the DC chain's own frozen mesh | 5 722 / 2 953 / 860 | 1.147747 | -0.135649 |
+
+- **Meshing:** the DC chain meshes the sink at the declared 18x13x11 in 7.5 s. Honest
+  correction to the earlier section: the interpolant chain *also* meshes at 18x13x11
+  today (it did not when that note was written); it is at **24x18x15** — the lattice
+  `tests/fem/test_starter_chain.py` pins — that the interpolant DC now self-intersects
+  and TetGen refuses (that suite currently fails at HEAD, independent of this work).
+  So the claim to make is not "the interpolant chain cannot mesh the starter" but the
+  sharper one: **the interpolant chain's meshability is resolution-lottery, and its
+  *physics* is wrong even when it meshes** — its `max T` is 16% below both true-SDF
+  meshers, because the trilinear interpolant rounds the fin comb off.
+- **Gradient:** `tesseract-dc` lands within **5%** of the direct path's adjoint on the
+  same scene; the interpolant chain is **43% low**.
+- **Stage-2 parity:** the packaged thermal tesseract equals `study.solve` on the
+  chain's frozen mesh at max `|dT| = 0.0`.
+- **The chain's adjoint is its own FD, to 6 digits** — on the crease-heavy fin comb,
+  where the direct path's adjoint-vs-FD gap is 15-20% (the crease-subgradient
+  structure measured above):
+
+  | central FD eps | 1e-3 | 3e-3 | 1e-2 |
+  |---|---|---|---|
+  | `d(max T)/d(fin_depth)` | -0.165900 | -0.165902 | -0.165887 |
+
+  (adjoint -0.165900). Pinning the interior is what buys this: the design step no
+  longer perturbs a discrete Steiner set, so the whole map is smooth.
+- **Descent** (plain gradient steps, lr 0.05, no refreeze):
+  `J = 1.147747 -> 1.146387 -> 1.145090 -> 1.143849 -> 1.142663` (monotone,
+  `fin_depth` 1.200 -> 1.232 — deeper fins cool the die). 17.2 s for the first
+  `value_and_grad` (JIT), **6.1 s** each thereafter.
+
+### Bracket (elastic, TET10 @ 22x16x13, deepened box, compliance)
+
+8 744 nodes / 4 873 tets / 1 108 surface vertices; freeze 5.8 s.
+
+- Stage-2 parity vs `study.solve` on the same frozen mesh: max `|du| = 0.0`.
+- `J = 0.06532372`.
+
+| parameter | tesseract-dc adjoint | central FD (eps 1e-3) | rel | direct, same mesh |
+|---|---|---|---|---|
+| `plate_thickness` | -0.430398 | -0.430021 | **8.8e-4** | -0.430191 |
+| `web_thickness`   | -0.253404 | -0.237647 | 6.6e-2 | -0.219726 |
+
+`plate_thickness` (large smooth faces) is exact to 0.09% against FD and 0.05% against
+the direct adjoint — an order tighter than the direct path's own 9.3e-3 in the
+named-mesh table above. `web_thickness` keeps the known crease structure (the loaded
+wall is bounded by creases) but all three numbers now agree in sign and to ~15%,
+against the interpolant chain's outright **sign flip** on the same parameter.
+
+### Recommendation on the default gradient path
+
+1. **Ship `gradient_path="direct"` as the default, unchanged.** It needs no extra
+   dependency, and it is the only path that uses **sharp** DC placement — vertices
+   landing exactly on creases and corners. `sharp_qef_vertices` has no usable
+   derivative (singular-value truncation), so the DC chain must use the Tikhonov QEF;
+   the measured cost is small here (starter `max T` 1.1477 vs 1.1453, 0.2%), but it is
+   a real geometric-fidelity regression and the one blocker to flipping the default.
+   **Differentiable sharp placement is the work item that would unblock it.**
+2. **Make `"tesseract-dc"` the recommended Tesseract path, and stop recommending
+   `"tesseract"` for tet meshes.** On every axis measured on the same scene,
+   tesseract-dc dominates the interpolant chain: forward physics (0.2% vs 16% from the
+   direct path), gradient (5% vs 43%), meshability at the declared resolution, and
+   adjoint-vs-FD self-consistency (6 digits vs a chain whose FD probes change
+   topology). The interpolant chain keeps exactly one advantage — it is
+   mesher-agnostic, so it remains the right wrapper for a mesher that does *not*
+   preserve its input vertices (the `-Y` contract is what makes the pass-through VJP
+   possible at all), and it is the only one with a HEX8 mode.
+3. **Where tesseract-dc should be preferred over `direct` today:** any objective whose
+   parameter changes the shape's *tangential* extent (the bar exhibit: direct is 1000x
+   off there), and any workflow that needs the mesher to run out of process.
+
+### Files
+
+- `cadjoint/fem/tesseracts/tetfill/` — `tesseract_api.py` (TetGen forward + frozen
+  fill, gather VJP), `tesseract_config.yaml`, `tesseract_requirements.txt`.
+- `cadjoint/fem/tesseracts/chain.py` — `freeze_study_chain_dc` / `FrozenDCChain` /
+  `_freeze_dc_surface` (the frozen-topology JAX DC map), alongside the unchanged
+  `freeze_study_chain`.
+- `cadjoint/optimize.py` — `GRADIENT_PATHS = ("direct", "tesseract", "tesseract-dc")`
+  at the marked gradient-path seam.
+- `tests/fem/test_tetfill.py` — 20 tests (forward contract, `parents` table, exact VJP
+  vs a JAX gather, frozen fill vs TetGen, chain fixed point, solver parity, adjoint vs
+  FD with an analytic target, the seam and an end-to-end `Optimization` run); all skip
+  cleanly without tetgen / jax_fem / tesseract deps, 17 s total.

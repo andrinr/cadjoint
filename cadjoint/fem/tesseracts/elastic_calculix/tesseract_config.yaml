@@ -1,0 +1,33 @@
+# Tesseract configuration file (tesseract-core 1.11 contract: a Tesseract
+# package is tesseract_api.py + tesseract_config.yaml + a requirements file
+# in one directory; `tesseract build <dir>` turns it into a Docker image).
+
+name: "cadjoint_elastic_calculix"
+version: "0.1.0"
+description: >-
+  Small-strain linear elasticity on HEX8 meshes solved by CalculiX (ccx)
+  in a subprocess, with ccx's native discrete adjoint serving an
+  objective-valued vector_jacobian_product for the strain_energy output.
+  CalculiX is GPL-2; it stays behind the subprocess boundary and is
+  installed as a separate binary, not linked into cadjoint (Apache-2.0).
+
+# find_ccx() resolution order is CADJOINT_CCX -> CCX -> PATH. conda-forge's
+# `calculix` package installs the solver as $PREFIX/bin/ccx, and the SDK puts
+# /python-env/bin on PATH, so PATH lookup would already work; pinning it makes
+# the image self-documenting and immune to PATH edits.
+env:
+  CADJOINT_CCX: "/python-env/bin/ccx"
+
+build_config:
+  # ccx is a Fortran binary, so it cannot come from tesseract_requirements.txt.
+  # Debian's apt package (calculix-ccx) is 2.20, but cadjoint's adjoint applies
+  # the ccx>=2.23 STRAINENERGY/DFDN correction, so this uses conda-forge's
+  # `calculix` 2.23 (available for linux-aarch64 and linux-64) via the SDK's
+  # conda requirements provider.
+  requirements:
+    provider: conda
+  # `conda env create` needs conda on PATH in the build stage; miniforge is
+  # Debian-based (the base_image contract) and defaults to conda-forge.
+  base_image: "condaforge/miniforge3:latest"
+  # NB: build_config.python_version is rejected together with the conda
+  # provider (the interpreter is pinned in tesseract_environment.yaml).

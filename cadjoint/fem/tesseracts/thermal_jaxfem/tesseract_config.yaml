@@ -1,0 +1,27 @@
+# Tesseract configuration file (tesseract-core 1.11 contract: a Tesseract
+# package is tesseract_api.py + tesseract_config.yaml + a requirements file
+# in one directory; `tesseract build <dir>` turns it into a Docker image).
+
+name: "cadjoint_thermal_jaxfem"
+version: "0.1.0"
+description: >-
+  Steady-state thermal solve (-div(k grad T) = q) on HEX8/TET4/TET10 meshes
+  via jax-fem, with an adjoint vector_jacobian_product for points,
+  conductivity, and source. Part of the cadjoint differentiable meshing
+  pipeline.
+
+build_config:
+  # The jax-fem stack is not pip-installable on Linux: petsc4py publishes no
+  # wheels on PyPI at all (its sdist wants a configured PETSc tree), and gmsh
+  # ships manylinux wheels for x86_64 only -- so an aarch64 pip build fails
+  # twice over. conda-forge carries both for linux-aarch64 and linux-64, so
+  # this Tesseract uses the SDK's conda requirements provider: the Python
+  # environment is declared in tesseract_environment.yaml instead of
+  # tesseract_requirements.txt.
+  requirements:
+    provider: conda
+  # `conda env create` needs conda on PATH in the build stage; miniforge is
+  # Debian-based (the base_image contract) and defaults to conda-forge.
+  base_image: "condaforge/miniforge3:latest"
+  # NB: build_config.python_version is rejected together with the conda
+  # provider (the interpreter is pinned in tesseract_environment.yaml).
