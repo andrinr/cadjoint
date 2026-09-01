@@ -574,10 +574,13 @@ class TestConstraintEditing:
         grown = apply_operation(
             EXAMPLE_SOURCE, "add_constraint", line=line, kind="horizontal", indices=[0, 1]
         )
-        # Creation order appends: the new constraint sits after the starter's
-        # two bare-name statements, at index 2.
+        # Creation order appends: the new subscript statement sits after all
+        # of the starter's bare-name constraint statements — the last index.
+        from cadjoint.viewer._source_map import locate_constraint_statements
+
+        index = len(locate_constraint_statements(grown, self._profile_line(grown))) - 1
         shrunk = apply_operation(
-            grown, "delete_constraint", line=self._profile_line(grown), index=2
+            grown, "delete_constraint", line=self._profile_line(grown), index=index
         )
         assert "HorizontalConstraint(comb_profile.vertices" not in shrunk
 
