@@ -15,8 +15,7 @@ Generators (construction → SDF):
 - revolve(profile, offset) → RevolvedPolygon placed on the profile's plane
 - loft(profile_a, profile_b, height) → LoftedPolygon placed on profile_a's plane
 
-Legacy helpers:
-- extrude(rectangle, depth) → Box
+Geometry-entity helpers:
 - from_line(line, radius) → Capsule
 - from_circle(circle, height) → Cylinder
 - from_point(point, radius) → Sphere

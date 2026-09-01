@@ -1,15 +1,11 @@
 """Forward rendering utilities for cadjoint SDFs.
 
-Two backends:
-- :func:`render_scene` / :func:`raymarch` — early-exit sphere tracing with
-  reconstructed silhouettes, finite-difference normals, soft shadows, and GGX
-  shading.
-- :func:`render_marching_cubes` — mesh extraction via marching cubes (requires
-  scikit-image).
+:func:`render_scene` / :func:`raymarch` — early-exit sphere tracing with
+reconstructed silhouettes, finite-difference normals, soft shadows, and GGX
+shading.
 """
 
 from cadjoint.functionalize import functionalize_scene
-from cadjoint.render.marching_cubes import render_marching_cubes
 from cadjoint.render.material import Material
 from cadjoint.render.overlay import draw_plane, draw_profile, project_points
 from cadjoint.render.raymarch import (
@@ -25,7 +21,6 @@ __all__ = [
     "raymarch",
     "render_scene",
     "render_raymarched",
-    "render_marching_cubes",
     "Material",
     "Camera",
     "Scene",

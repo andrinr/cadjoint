@@ -7,16 +7,13 @@ This module contains 2D and 3D geometric entities that can be used to:
 
 Entities:
 - Line: Parametric line segment in 3D
-- Rectangle: Parametric rectangle in 3D
 - Circle: Parametric circle in 3D
 """
 
 from cadjoint.geometry.primitives.circle import Circle
 from cadjoint.geometry.primitives.line import Line
-from cadjoint.geometry.primitives.rectangle import Rectangle
 
 __all__ = [
     "Line",
-    "Rectangle",
     "Circle",
 ]

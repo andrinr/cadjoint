@@ -5,11 +5,9 @@ from __future__ import annotations
 import jax
 import jax.numpy as jnp
 import numpy as np
-import pytest
 
 from cadjoint.construction import PolygonProfile, extrude
-from cadjoint.geometry.parameters import Scalar, Vector
-from cadjoint.geometry.primitives import Rectangle
+from cadjoint.geometry.parameters import Scalar
 from cadjoint.sdf.primitives import ExtrudedPolygon
 
 SQUARE = [[-1.0, -1.0], [1.0, -1.0], [1.0, 1.0], [-1.0, 1.0]]
@@ -211,23 +209,3 @@ class TestDifferentiability:
         gradient = np.asarray(jax.grad(loss)(jnp.asarray(SQUARE[0], dtype=jnp.float32)))
         assert np.isfinite(gradient).all()
         assert np.abs(gradient).max() > 0.0
-
-
-class TestLegacyRectanglePath:
-    def rectangle(self) -> Rectangle:
-        return Rectangle(
-            center=Vector([0, 0, 0], name="center"),
-            width=Scalar(2.0, name="width"),
-            height=Scalar(1.0, name="height"),
-            normal=Vector([0, 0, 1], name="normal"),
-        )
-
-    def test_rectangle_rejects_draft_and_twist(self):
-        with pytest.raises(ValueError, match="PolygonProfile"):
-            extrude(self.rectangle(), depth=1.0, draft=5.0)
-        with pytest.raises(ValueError, match="PolygonProfile"):
-            extrude(self.rectangle(), depth=1.0, twist=5.0)
-
-    def test_rectangle_accepts_explicit_zeros(self):
-        box = extrude(self.rectangle(), depth=1.0, draft=0.0, twist=0.0)
-        assert box is not None

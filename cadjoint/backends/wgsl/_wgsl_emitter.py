@@ -1,13 +1,13 @@
 """StableHLO MLIR → WGSL compiler.
 
-Same pipeline as the GLSL emitter but targeting WebGPU Shading Language.
-Key differences from GLSL:
-  - Types parameterised: f32, vec3<f32>, mat3x3<f32>
-  - Function syntax: fn name(p: vec3<f32>) -> f32 { ... }
-  - Immutable bindings: let _v0: f32 = expr;
-  - atan2(y, x) instead of atan(y, x) for two-arg arctangent
-  - inverseSqrt (capital S)
-  - % for float remainder instead of mod()
+Pipeline:
+  jax.export(jax.jit(fn))(*args).mlir_module()   →  StableHLO MLIR text
+  StableHLOToWGSL.convert(mlir_text)             →  WGSL function string(s)
+
+Each ``func.func`` in the module becomes a WGSL function.
+``@main`` is renamed to the entry point; helper functions keep their names.
+Helpers are emitted before the entry point so forward declarations are not
+needed.
 """
 
 from __future__ import annotations
@@ -16,8 +16,79 @@ import re
 
 import numpy as np
 
-from .._stablehlo_emitter import _strip_locs, _validate_point_shader_export
-from .._type_utils import _shader_shape, parse_mlir_tensor_type
+# ── MLIR parsing helpers ──────────────────────────────────────────────────────
+
+_LOC_RE = re.compile(r"\s+loc\([^)]*(?:\([^)]*\)[^)]*)*\)")
+
+
+def _strip_locs(text: str) -> str:
+    """Remove MLIR location annotations that require extra dialect infra."""
+    text = _LOC_RE.sub("", text)
+    text = re.sub(r"^#loc.*\n", "", text, flags=re.MULTILINE)
+    return text
+
+
+def _validate_point_shader_export(
+    exported,
+    *,
+    shader_description: str,
+    output_shape: tuple[int, ...],
+    output_description: str,
+) -> None:
+    """Validate a point-query shader export before source generation."""
+    if len(exported.in_avals) != 1:
+        raise ValueError(f"{shader_description} must accept exactly one point argument")
+    point = exported.in_avals[0]
+    if tuple(point.shape) != (3,) or np.dtype(point.dtype) != np.float32:
+        raise ValueError(
+            f"{shader_description} must accept one float32 point with shape (3,), "
+            f"got {point.dtype}{tuple(point.shape)}"
+        )
+    if len(exported.out_avals) != 1:
+        raise ValueError(f"{shader_description} must return exactly one value")
+    output = exported.out_avals[0]
+    if tuple(output.shape) != output_shape or np.dtype(output.dtype) != np.float32:
+        raise ValueError(
+            f"{shader_description} must return one {output_description}, "
+            f"got {output.dtype}{tuple(output.shape)}"
+        )
+
+
+_MLIR_DTYPE_MAP = {
+    "f32": np.float32,
+    "f64": np.float64,
+    "i32": np.int32,
+    "i64": np.int64,
+    "i1": np.bool_,
+    "ui32": np.uint32,
+}
+
+_MLIR_TENSOR_RE = re.compile(r"^tensor<(.+)>$")
+
+
+def parse_mlir_tensor_type(mlir_type_str: str) -> tuple[tuple[int, ...], np.dtype]:
+    """Parse ``'tensor<3xf32>'`` → ``((3,), np.float32)``."""
+    m = _MLIR_TENSOR_RE.match(mlir_type_str)
+    if not m:
+        raise ValueError(f"Expected a ranked MLIR tensor type, got {mlir_type_str!r}")
+    inner = m.group(1)
+    parts = inner.split("x")
+    dtype = _MLIR_DTYPE_MAP.get(parts[-1])
+    if dtype is None:
+        raise ValueError(f"The WGSL backend does not support MLIR dtype {parts[-1]!r}")
+    try:
+        shape = tuple(int(dimension) for dimension in parts[:-1])
+    except ValueError as exc:
+        raise ValueError(
+            f"The WGSL backend requires static tensor shapes: {mlir_type_str!r}"
+        ) from exc
+    return shape, np.dtype(dtype)
+
+
+def _shader_shape(shape: tuple[int, ...]) -> tuple[int, ...]:
+    """Collapse singleton dimensions that shaders represent as scalars/vectors."""
+    return tuple(dimension for dimension in shape if dimension != 1)
+
 
 # ── WGSL type mapping ─────────────────────────────────────────────────────────
 

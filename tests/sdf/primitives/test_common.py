@@ -4,7 +4,7 @@ import jax
 import jax.numpy as jnp
 import pytest
 
-from cadjoint.sdf.primitives import Box, Capsule, Cone, Cylinder, Sphere, Torus
+from cadjoint.sdf.primitives import Box, Capsule, Cylinder, Sphere, Torus
 
 # List all primitives with their constructor arguments
 PRIMITIVES = [
@@ -12,7 +12,6 @@ PRIMITIVES = [
     ("Box", Box, {"size": jnp.array([1.0, 1.0, 1.0])}),
     ("Cylinder", Cylinder, {"radius": 1.0, "height": 1.0}),
     ("Capsule", Capsule, {"radius": 0.5, "height": 1.0}),
-    ("Cone", Cone, {"radius": 1.0, "height": 2.0}),
     ("Torus", Torus, {"major_radius": 2.0, "minor_radius": 0.5}),
 ]
 

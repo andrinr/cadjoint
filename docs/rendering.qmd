@@ -2,7 +2,7 @@
 title: Forward Renderer
 ---
 
-jaxCAD's image renderer is designed for predictable forward rendering. It uses
+cadjoint's image renderer is designed for predictable forward rendering. It uses
 early-exit sphere tracing, screen-space silhouette reconstruction,
 finite-difference normals, Cook–Torrance GGX materials, soft shadows, and
 optional reflection and refraction rays.

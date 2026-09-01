@@ -69,26 +69,6 @@ from cadjoint.constraints.types.perpendicular_edges import PerpendicularEdgesCon
 from cadjoint.constraints.types.point_on_line import PointOnLineConstraint
 from cadjoint.constraints.types.vertical import VerticalConstraint
 
-# Re-export parameter types for convenience
-from cadjoint.geometry.parameters import Parameter, Scalar, Vector, Vector2
-
-# Convenience aliases (for backward compatibility with planned API)
-Distance = DistanceConstraint
-Angle = AngleConstraint
-Parallel = ParallelConstraint
-Perpendicular = PerpendicularConstraint
-Fixed = FixedConstraint
-Horizontal = HorizontalConstraint
-Vertical = VerticalConstraint
-Coincident = CoincidentConstraint
-EqualLength = EqualLengthConstraint
-PointOnLine = PointOnLineConstraint
-ParallelEdges = ParallelEdgesConstraint
-PerpendicularEdges = PerpendicularEdgesConstraint
-
-# Type alias for Point (just a Vector)
-Point = Vector
-
 __all__ = [
     # Base class
     "Constraint",
@@ -121,23 +101,4 @@ __all__ = [
     "constraint_residuals",
     "make_bounds_projection",
     "make_manifold_projection",
-    # Aliases
-    "Distance",
-    "Angle",
-    "Parallel",
-    "Perpendicular",
-    "Fixed",
-    "Horizontal",
-    "Vertical",
-    "Coincident",
-    "EqualLength",
-    "PointOnLine",
-    "ParallelEdges",
-    "PerpendicularEdges",
-    # Re-exports
-    "Parameter",
-    "Scalar",
-    "Vector",
-    "Vector2",
-    "Point",
 ]

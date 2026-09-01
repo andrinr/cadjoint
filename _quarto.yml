@@ -5,7 +5,7 @@ project:
     - docs/assets/**
 
 website:
-  title: jaxCAD
+  title: cadjoint
   description: Differentiable CAD with JAX and SDFs
   navbar:
     left:
@@ -91,4 +91,3 @@ quartodoc:
         - render.raymarch.render.render_scene
         - render.raymarch.render.raymarch
         - render.raymarch.render.render_raymarched
-        - render.marching_cubes.render_marching_cubes

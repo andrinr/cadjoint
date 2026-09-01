@@ -24,9 +24,7 @@ jobs:
 
       - name: Run tests
         run: |
-          pytest tests/ \
-            --ignore=tests/sdf/primitives/test_common.py \
-            -q
+          pytest tests/ -q
 
   lint:
     runs-on: ubuntu-latest

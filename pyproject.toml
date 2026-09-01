@@ -46,7 +46,6 @@ tesseract = [
 # cadquery-ocp ships wheels for CPython 3.10-3.14 only, so the marker keeps
 # uv's universal resolution working for the project's full >=3.9 range.
 stepcheck = ["cadquery-ocp; python_version >= '3.10' and python_version < '3.15'"]
-glsl = ["moderngl>=5.12.0"]
 viewer = ["anywidget>=0.9.21"]
 dev = [
     "pytest>=7.0.0",

@@ -20,7 +20,7 @@ uv sync
 
 ## Core concepts
 
-jaxCAD has two building blocks: parametric geometry (SDF trees with tagged parameters) and geometric constraints (relationships between parameters). Gradient-based optimization ties them together.
+cadjoint has two building blocks: parametric geometry (SDF trees with tagged parameters) and geometric constraints (relationships between parameters). Gradient-based optimization ties them together.
 
 ### Build a constrained scene
 
@@ -70,7 +70,7 @@ The constraint stays satisfied throughout: `||p|| = 2.0` at every step.
 
 ## Rendering
 
-jaxCAD includes a sphere-tracing raymarcher that supports physically-inspired shading,
+cadjoint includes a sphere-tracing raymarcher that supports physically-inspired shading,
 soft shadows, anti-aliasing, transparency, and glass refraction.
 
 ### Assign materials

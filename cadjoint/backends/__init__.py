@@ -1,5 +1,15 @@
-from .base import ShaderBackend
-from .glsl import GLSLBackend
-from .wgsl import WGSLBackend
+"""Shader code generation: compile JAX SDF functions to WGSL."""
 
-__all__ = ["ShaderBackend", "GLSLBackend", "WGSLBackend"]
+from .wgsl import (
+    MATERIAL_BASE_ENTRY_POINT,
+    MATERIAL_OPTICS_ENTRY_POINT,
+    compile_scene_to_wgsl,
+    compile_sdf_to_wgsl,
+)
+
+__all__ = [
+    "MATERIAL_BASE_ENTRY_POINT",
+    "MATERIAL_OPTICS_ENTRY_POINT",
+    "compile_scene_to_wgsl",
+    "compile_sdf_to_wgsl",
+]

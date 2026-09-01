@@ -1,10 +1,10 @@
 ---
-title: jaxCAD
+title: cadjoint
 ---
 
 **Differentiable CAD** built on JAX and Signed Distance Functions (SDFs).
 
-jaxCAD combines parametric geometry, geometric constraints, and automatic differentiation to enable gradient-based shape optimization.
+cadjoint combines parametric geometry, geometric constraints, and automatic differentiation to enable gradient-based shape optimization.
 
 [![CADJOINT WebGPU playground with Python source beside a live rendered scene](examples/assets/webgpu_playground.png)](docs/viewer.qmd)
 
