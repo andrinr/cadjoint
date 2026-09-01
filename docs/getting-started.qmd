@@ -1,185 +1,197 @@
 ---
 title: Getting Started
+description: Install cadjoint and walk the arc from a parametric sketch to a gradient through a solver.
 ---
 
-## Installation
+cadjoint is code-first CAD in which the entire pipeline — sketches, constraints,
+SDF geometry, meshing, and finite-element simulation — composes into one
+function JAX can differentiate end to end. This page installs it and walks that
+arc once, shallowly; each stage has its own page with the detail.
 
-```bash
-pip install cadjoint
-```
+::: {.callout-warning}
+The API is not stable. Expect breaking changes.
+:::
 
-For development:
+## Install
+
+Clone the repository and sync with
+[uv](https://docs.astral.sh/uv/getting-started/installation/):
 
 ```bash
 git clone https://github.com/andrinr/cadjoint
 cd cadjoint
-uv sync
+uv venv                     # create .venv
+uv sync                     # CPU JAX — macOS, Linux, and Windows
 ```
 
----
+`uv sync` installs cadjoint into `.venv` in editable mode. Run commands through
+it with `uv run <cmd>`, or activate it once per shell with
+`source .venv/bin/activate`.
 
-## Core concepts
+The default sync pulls plain `jax`/`jaxlib`, so it works on Apple Silicon and
+any CPU-only machine. Everything beyond the geometry core is an extra — repeat
+the flag, one `--extra` per name:
 
-cadjoint has two building blocks: parametric geometry (SDF trees with tagged parameters) and geometric constraints (relationships between parameters). Gradient-based optimization ties them together.
+```bash
+uv sync --extra fem --extra tesseract --extra viewer
+```
 
-### Build a constrained scene
+| Extra | Pulls in |
+|---|---|
+| `cuda` | GPU JAX (Linux + NVIDIA only) |
+| `fem` | the jax-fem finite-element stack (basix, meshio, petsc4py, gmsh) |
+| `tesseract` | tesseract-core + tesseract-jax, for the cross-boundary gradient paths |
+| `viewer` | the Jupyter widget (`anywidget`) |
+| `stepcheck` | OCCT kernel validation of STEP exports (dev) |
+| `docs` | the Quarto API reference (`quartodoc`) |
 
-Parameters are `Vector` or `Scalar` objects tagged as `free=True` (differentiable) or `free=False` (fixed). Constraints link parameters together.
+Avoid `--all-extras` on macOS — it includes `cuda`, which has no macOS wheels.
+
+The fastest way to see all of it at once is the browser app:
+
+```bash
+uv run cadjoint-viewer --open
+```
+
+It opens on a parametric heat sink that already declares a mesh, a thermal
+study, and an optimization. See [the playground](viewer.qmd).
+
+## Geometry is a pure function
+
+Every scene is an SDF tree whose numbers are `Vector` or `Scalar` parameters,
+each tagged `free=True` (differentiable) or fixed. `functionalize` turns a tree
+into a pure JAX function of those parameters, which is what makes `jit`, `grad`,
+and `vmap` work without ceremony.
 
 ```python
 import jax.numpy as jnp
-from cadjoint.constraints import DistanceConstraint
 from cadjoint.geometry import Vector
 from cadjoint.sdf import Sphere, Translate
 
-# A sphere whose center is constrained to lie on a sphere of radius 2
-anchor = Vector(jnp.array([0.0, 0.0, 0.0]), free=False, name="anchor")
 p = Vector(jnp.array([2.0, 0.0, 0.0]), free=True, name="p")
-DistanceConstraint(p, anchor, 2.0)
-
 scene = Translate(Sphere(radius=0.3), offset=p)
 ```
 
-### Optimize on the constraint manifold
+## Constraints reduce the freedom
 
-Because every SDF is a pure JAX function, `jax.grad` works directly. After each gradient step, project back onto the manifold to keep the constraint satisfied.
+Constraints are relationships between parameters. They are declared, not solved
+inline.
 
 ```python
-import jax
+from cadjoint import extract_parameters, functionalize
+from cadjoint.constraints import DistanceConstraint, satisfy_constraints
 
-target = jnp.array([1.0, 1.5, 0.0])
+anchor = Vector(jnp.array([0.0, 0.0, 0.0]), free=False, name="anchor")
+DistanceConstraint(p, anchor, 2.0)   # p must lie on a sphere of radius 2
 
-def obj(q):
-    return jnp.sum((q - target) ** 2)
+satisfy_constraints(scene, steps=8)
+free, fixed, metadata = extract_parameters(scene)
+sdf = functionalize(scene)(free, fixed)
 
-lr = 0.1
-p_current = jnp.array([2.0, 0.0, 0.0])
-for _ in range(50):
-    grad = jax.grad(obj)(p_current)
-    p_new = p_current - lr * grad
-    p_current = 2.0 * p_new / jnp.linalg.norm(p_new)  # project back onto manifold
-
-print(p_current)  # [1.109 1.664 0.] -- closest point on the sphere to target
+print(float(jnp.linalg.norm(free["p"])))  # 2.0
 ```
 
-The constraint stays satisfied throughout: `||p|| = 2.0` at every step.
+`satisfy_constraints` projects the tree onto its constraints in place and works
+on under-determined systems — the usual case for a real sketch, which keeps
+design freedom on purpose. `solve_constraints` is the stricter sibling: it
+requires an exactly-determined system and refuses anything else, which is what
+you want when the constraints are supposed to pin the geometry down completely.
 
----
+`extract_parameters` returns three things — the free parameters, the fixed ones,
+and the metadata carrying the constraint system. That metadata is what lets an
+optimizer project each step back onto the constraint manifold, so a constrained
+sketch stays constrained through a descent. The
+[constraints notebook](../examples/constraints.ipynb) works through a
+fully-determined system.
 
----
+## Meshing
+
+`cadjoint.meshing` dual-contours the field into a surface. It is written
+bottom-up in JAX, so the continuous half of the extraction — crossing positions,
+Hermite normals, QEF vertices — carries exact derivatives, while the discrete
+half (which cells are active, how they connect) stays frozen per extraction.
+
+```python
+from cadjoint.meshing import GridSpec, extract_mesh, save_stl
+
+grid = GridSpec.from_bounds((-1.3, -1.3, -1.3), (2.6, 2.6, 2.6), 26)
+mesh = extract_mesh(lambda q: jnp.sqrt(jnp.sum(q * q)) - 1.0, grid)
+save_stl(mesh, "sphere.stl")
+```
+
+Full detail, including the exports and the Rust-accelerated kernels, in
+[differentiable meshing](meshing.qmd).
+
+## Simulation
+
+Discretizations and physics are *declared*, so the same objects a script solves
+are the ones the viewer edits and the optimizer re-freezes.
+
+```python
+from cadjoint.fem import Dirichlet, HeatFlux, Nodes, SimMesh, ThermalStudy
+from cadjoint.sdf.primitives import Box
+
+bar = Box(Vector([1.0, 0.15, 0.15], free=True, name="size"))
+
+study = ThermalStudy(
+    name="bar-conduction",
+    conductivity=2.0,
+    bcs=[Dirichlet(Nodes.side("+x"), 0.0), HeatFlux(Nodes.side("-x"), 4.0)],
+    mesh=SimMesh(name="bar-mesh", resolution=(22, 5, 5),
+                 bounds=(-1.1, -0.25, -0.25), size=(2.2, 0.5, 0.5)),
+)
+
+result = study.solve(bar)   # needs: uv sync --extra fem
+print(result.describe()["range"])   # [0.0, 4.0]
+```
+
+Boundary conditions attach to node *selections* rather than index lists, so they
+survive re-meshing and a change of shape. See [simulation](simulation.qmd).
+
+## Optimization
+
+An `Optimization` declares a descent. Its study form makes the simulation above
+the objective, and the gradient runs the whole chain — geometry, mesh, solve —
+in one `jax.grad` call.
+
+```python
+from cadjoint.optimize import Optimization
+
+run = Optimization(name="cool-bar", study=study, metric="max",
+                   steps=3, learning_rate=0.01).run(scene=bar)
+print(run.history[0]["objective"], "->", run.objective)  # 4.0 -> 2.939
+```
+
+Three Adam steps thicken the bar and drop its peak temperature by a quarter,
+with the gradient running back through the solve, the mesh, and the SDF to the
+`size` parameter.
+
+Constraint projection is automatic, topology stays frozen between re-meshes, and
+`gradient_path` chooses how much of the chain crosses a Tesseract boundary. See
+[optimization](optimization.qmd) and [tesseracts](tesseracts.qmd).
 
 ## Rendering
 
-cadjoint includes a sphere-tracing raymarcher that supports physically-inspired shading,
-soft shadows, anti-aliasing, transparency, and glass refraction.
-
-### Assign materials
-
-Attach a `Material` to any primitive. The `material_at` method is queried per hit point
-during rendering; `Union` blends materials smoothly at boundaries.
+Independently of all of the above, cadjoint renders SDFs directly — a forward
+sphere-tracing raymarcher for still images, and WGSL shader compilation for the
+browser.
 
 ```python
-from cadjoint.render import Material
+from cadjoint.render import Camera, RenderSettings, Scene, render_scene
 from cadjoint.sdf.primitives import Sphere
 
-sphere = Sphere(
-    radius=1.0,
-    material=Material(
-        color=[0.22, 0.50, 0.95],  # blue
-        roughness=0.35,
-        metallic=0.0,
-        opacity=1.0,
-        ior=1.0,                   # index of refraction
-    ),
+image = render_scene(
+    Scene(Sphere(1.0), camera=Camera(position=(0, 1.5, 5), target=(0, 0, 0))),
+    RenderSettings.balanced((240, 320)),
 )
 ```
 
-### Basic render
-
-`raymarch()` returns a `(H, W, 3)` float32 NumPy array. `render_raymarched()`
-wraps it and displays on a matplotlib axis.
-
-```python
-import jax.numpy as jnp
-from cadjoint.render import render_raymarched
-
-render_raymarched(
-    sphere,
-    camera_pos=jnp.array([3.0, 2.0, 3.0]),
-    light_dirs=jnp.array([[1.0, 1.5, 1.5], [-1.5, 0.5, -0.5]]),
-    light_colors=jnp.array([[1.0, 0.90, 0.70], [0.20, 0.35, 0.60]]),
-    resolution=(400, 400),
-    aa_samples=2,
-)
-```
-
-### Background colour
-
-Set `background_color` to control the colour returned for rays that miss all geometry.
-It is also used as the target for the smooth edge fade.
-
-```python
-render_raymarched(
-    sphere,
-    background_color=jnp.array([0.78, 0.91, 1.0]),  # sky blue
-)
-```
-
-### Transparency and glass refraction
-
-Set `opacity < 1` on a material for transparency. With `refract_steps=0` (default)
-the surface simply fades to the background colour. With `refract_steps > 0` the
-renderer performs two-bounce Snell's-law refraction:
-
-1. The primary ray hits the front face and bends **into** the material.
-2. An interior march finds the back face (using `−sdf` as the distance field).
-3. The ray bends back **into air** and continues through the rest of the scene.
-
-The Fresnel effect (Schlick approximation) adds realistic edge highlights — the rim of
-a glass sphere brightens at grazing angles.
-
-```python
-import jax.numpy as jnp
-from cadjoint.render import raymarch, Material
-from cadjoint.sdf.boolean import Union
-from cadjoint.sdf.primitives import Sphere
-from cadjoint.sdf.transforms import Translate
-
-glass = Sphere(
-    radius=1.0,
-    material=Material(color=[0.92, 0.97, 1.0], roughness=0.05, opacity=0.04, ior=1.5),
-)
-red_ball = Translate(
-    Sphere(radius=0.65, material=Material(color=[0.93, 0.26, 0.22])),
-    offset=jnp.array([-1.1, 0.5, -3.0]),
-)
-scene = Union((glass, red_ball), smoothness=0.0)
-
-image = raymarch(
-    scene,
-    camera_pos=jnp.array([0.0, 0.5, 5.5]),
-    resolution=(400, 400),
-    background_color=jnp.array([0.07, 0.09, 0.16]),
-    refract_steps=48,   # enable two-bounce refraction
-    max_steps=80,
-    aa_samples=2,
-)
-```
-
-**IOR reference values:**
-
-| material | `ior` |
-|----------|-------|
-| air / disabled | 1.0 |
-| water | 1.33 |
-| glass | 1.5 |
-| diamond | 2.42 |
-
----
+Rendered pixels are deliberately not an inverse-rendering API. See the
+[forward renderer](rendering.qmd).
 
 ## Next steps
 
-- [Rendering notebook](../examples/rendering.ipynb) - forward renderer, quality presets, and the interactive WebGPU viewer
-- [Optimization](../examples/optimization.ipynb) - differentiating through geometry parameters
-- [Constraints](../examples/constraints.ipynb) - solving fully-determined constraint systems
-- [Constrained Optimization](../examples/constrained_optimization.ipynb) - the full workflow with trajectory visualization
+- [Basics](../examples/basics.ipynb) — primitives, booleans, and transforms
+- [Sketch construction](../examples/sketch_construction.ipynb) — profiles, extrude, revolve
+- [Constraints](../examples/constraints.ipynb) — solving fully-determined systems
+- [Constrained optimization](../examples/constrained_optimization.ipynb) — the full workflow with trajectory visualization

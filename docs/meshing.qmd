@@ -1,0 +1,233 @@
+---
+title: Differentiable Meshing
+description: Dual contouring built bottom-up in JAX, so every continuous stage carries an exact derivative.
+---
+
+`cadjoint.meshing` turns a signed distance field into a surface mesh. It is not
+a wrapper around a black-box extractor with a gradient bolted on afterwards:
+every stage is written against the field callable and `jax.grad` of it, so the
+continuous half of the pipeline differentiates exactly with respect to the CAD
+parameters that produced the field.
+
+The governing split is **discrete topology, continuous motion**. Which lattice
+edges cross the surface, which cells are active, and how cells connect are
+discrete choices — they are frozen per extraction and cannot be differentiated.
+Crossing positions, Hermite normals, and QEF vertices are continuous, and those
+carry derivatives. An optimization loop therefore holds topology fixed while
+gradients flow through node positions, and re-extracts every few steps.
+
+## Extract a mesh
+
+`GridSpec` describes the sampling lattice; `extract_mesh` runs the whole chain
+and returns a `Mesh`.
+
+```python
+import jax.numpy as jnp
+from cadjoint.meshing import GridSpec, extract_mesh
+
+def sphere_sdf(p):
+    return jnp.sqrt(jnp.sum(p * p)) - 1.0
+
+grid = GridSpec.from_bounds((-1.3, -1.3, -1.3), (2.6, 2.6, 2.6), 26)
+mesh = extract_mesh(sphere_sdf, grid)
+
+print(mesh.vertices.shape, mesh.faces.shape, mesh.quads.shape)
+# (1832, 3) (3660, 3) (1830, 4)
+```
+
+`from_bounds(bounds, size, resolution)` takes a corner, an extent, and either
+one cell count or a per-axis triple. A `Mesh` is a `NamedTuple` of `vertices`
+and `normals` (JAX arrays, one per active cell), `faces` (triangles), `quads`
+(the native dual-contour output), and `cells` (the lattice index each vertex
+came from).
+
+`extract_mesh` defaults to `sharp=True`, which places vertices with a
+rank-revealing SVD so creases and corners come out crisp. That path is
+forward-only — the SVD truncation is not differentiable. Pass `sharp=False` for
+the Tikhonov-regularized QEF, which is smooth and differentiable everywhere.
+
+## Differentiating through it
+
+The differentiable recipe is explicit rather than hidden: sample the lattice,
+freeze the discrete structure, then rebuild only the continuous stages inside
+the traced function.
+
+```python
+import jax
+import jax.numpy as jnp
+from cadjoint.meshing import (
+    GridSpec, edge_hermite_data, find_crossing_edges,
+    manifold_cell_incidence, qef_vertices, sample_grid,
+)
+
+def sphere(radius):
+    return lambda p: jnp.sqrt(jnp.sum(p * p)) - radius
+
+grid = GridSpec.from_bounds((-1.3, -1.3, -1.3), (2.6, 2.6, 2.6), 26)
+
+# Discrete half — frozen once, outside the gradient.
+values = sample_grid(sphere(1.0), grid)
+edges = find_crossing_edges(values)
+incidence = manifold_cell_incidence(edges, grid, values < 0.0)
+
+# Continuous half — re-evaluated under the trace.
+def loss(radius):
+    hermite = edge_hermite_data(sphere(radius), grid, edges)
+    vertices, _ = qef_vertices(hermite, incidence, grid)
+    return jnp.sum(vertices ** 2)
+
+print(jax.grad(loss)(jnp.float32(1.0)))  # 3638.59
+```
+
+The gradient is exact, not an approximation of the extractor. Root finding runs
+bisection and secant iterations on `stop_gradient` values and then applies one
+differentiable Newton correction, `t = t0 - f(x(t0)) / (df/dt)`. At a converged
+root its derivative is precisely the implicit-function-theorem value
+`dt/dθ = -(∂f/∂θ) / (∂f/∂t)`, so how the root was found does not affect the
+derivative that comes out.
+
+Bisection also matters for correctness, not just speed. Hard CSG enters the
+field through `jnp.minimum` / `jnp.maximum`, which makes it piecewise smooth;
+a bracketing method keyed on sign cannot be fooled by the kink, and the
+one-sided Hermite normals at a seam are exactly the subgradients dual
+contouring needs to reconstruct a crease.
+
+## Stages
+
+`extract_mesh` is a convenience over stages that are individually public, so a
+caller can substitute or instrument any of them.
+
+| Stage | Module | Key entry points |
+|---|---|---|
+| Hermite edge detection | `meshing.edge_detection` | `sample_grid`, `find_crossing_edges`, `edge_hermite_data`, `detect_edges` |
+| Feature classification | `meshing.features` | `manifold_cell_incidence`, `classify_feature_cells`, `active_branches`, `detect_branch_changes` |
+| Dual contouring | `meshing.dual_contouring` | `qef_vertices`, `sharp_qef_vertices`, `dual_faces`, `extract_mesh` |
+| Adaptive octree | `meshing.adaptive` | `surface_cells`, `sparse_crossing_edges` |
+| Simplification | `meshing.simplify` | `simplify_mesh` |
+| Export | `meshing.export` | `save_obj`, `save_stl`, `save_step`, `merge_planar_faces` |
+| Diagnostics | `meshing.diagnostics` | `mesh_report`, `surface_deviation`, `triangle_quality` |
+
+Features are classified two ways. `classify_feature_cells` measures normal
+spread with an SVD and reports each cell as `FACE`, `CREASE`, or `CORNER`.
+`active_branches` + `detect_branch_changes` are exact instead of thresholded:
+they record which CSG branch wins the `min`/`max` at each sample, and a cell
+where the winner changes *is* a seam, with no tolerance to tune.
+
+### Adaptive octree
+
+Sampling the full lattice is wasteful when the surface occupies a thin shell of
+it. `surface_cells` and `sparse_crossing_edges` prune with an octree that
+descends only into blocks whose distance bound admits a crossing. The results
+are bit-identical to dense detection; `lipschitz` is the caller's contract that
+the field does not grow faster than that bound (1.0 for a true distance
+function).
+
+```python
+from cadjoint.meshing import GridSpec, surface_cells
+import jax.numpy as jnp
+
+grid = GridSpec.from_bounds((-1.3, -1.3, -1.3), (2.6, 2.6, 2.6), 26)
+stats = {}
+cells = surface_cells(lambda p: jnp.sqrt(jnp.sum(p * p)) - 1.0,
+                      grid, lipschitz=1.0, stats=stats)
+print(cells.shape[0], stats["evaluations"])  # 2216 5857
+```
+
+5857 field evaluations instead of the 19683 lattice points a dense sweep would
+touch, for the same set of crossings.
+
+## Export
+
+Three writers, all taking the `Mesh` and a path:
+
+```python
+import jax.numpy as jnp
+from cadjoint.meshing import GridSpec, extract_mesh, save_obj, save_step, save_stl
+
+grid = GridSpec.from_bounds((-1.3, -1.3, -1.3), (2.6, 2.6, 2.6), 26)
+mesh = extract_mesh(lambda p: jnp.sqrt(jnp.sum(p * p)) - 1.0, grid)
+
+save_obj(mesh, "part.obj")    # merge_planar=True by default
+save_stl(mesh, "part.stl")    # binary=True by default
+save_step(mesh, "part.step")  # AP214 faceted BREP, metres
+```
+
+`save_obj` merges coplanar triangles into n-gons first, so a flat wall exports
+as one face rather than a fan of triangles; `merge_planar_faces` exposes that
+directly with an angle and plane tolerance. `save_step` writes a `CLOSED_SHELL`
+inside a `MANIFOLD_SOLID_BREP` and is validated against the OCCT kernel in
+`tests/meshing/test_step_kernel.py`.
+
+## Checking a mesh
+
+`mesh_report` bundles the four diagnostics used throughout the test suite:
+
+```python
+import jax.numpy as jnp
+from cadjoint.meshing import GridSpec, extract_mesh, mesh_report
+
+sdf = lambda p: jnp.sqrt(jnp.sum(p * p)) - 1.0
+grid = GridSpec.from_bounds((-1.3, -1.3, -1.3), (2.6, 2.6, 2.6), 26)
+mesh = extract_mesh(sdf, grid)
+
+report = mesh_report(sdf, mesh, samples=512, pairs=1024, seed=1)
+print(report["watertight"], report["euler_characteristic"])
+print(report["surface_deviation"])
+# True 2
+# {'max_abs': 0.00294, 'mean_abs': 0.00083, 'samples': 512}
+```
+
+Surface deviation samples the mesh and evaluates the true field there, so it
+measures how far the discretization strayed from the geometry it claims to
+represent — a max absolute error of 0.0029 on a unit sphere at 26 cells.
+
+## Native (Rust) kernels
+
+The stages that evaluate the SDF must stay in JAX, because the SDF *is* a JAX
+function. The stages that do discrete bookkeeping and small dense linear
+algebra do not, and those are the ones that grow with resolution: at 128 cells
+they are 78% of a sphere extraction and 56% of a box.
+
+`cadjoint/meshing/native.py` binds a Rust cdylib (rayon-parallel, in `native/`)
+that reimplements exactly those: crossing detection, manifold incidence,
+batched QEF solves, and the dual face build. Discrete outputs are bit-identical
+to the Python path; continuous outputs agree to float64. The measured speedup
+on the batched QEF solves is 90–107×.
+
+```python
+from cadjoint.meshing import native
+
+if native.native_available():
+    mesh = native.extract_mesh_native(sdf, grid)
+```
+
+The library is discovered under `native/target/release/`, or from the path in
+`CADJOINT_NATIVE_MESHER` when that is set. Build it with:
+
+```bash
+cargo build --release --manifest-path native/Cargo.toml
+```
+
+`native.qef_vertices_native` is the differentiable entry point. It routes
+through the Tesseract in `native/tesseract_api.py`, whose
+`vector_jacobian_product` is a hand-derived linear-solve VJP that matches JAX
+autodiff to ~4e-14. It requires x64:
+
+```python
+import jax
+jax.config.update("jax_enable_x64", True)
+```
+
+## Known limitations
+
+One QEF vertex per cell cannot represent two surface sheets crossing one cell
+face, so when a CSG seam grazes a lattice plane uniform dual contouring can
+emit nonmanifold edges. This is tracked as a strict `xfail` in
+`tests/meshing/test_scenes.py` and wants cell disambiguation. Multi-size
+octree leaves (2:1 balancing, transition stitching) are also open.
+
+## Further reading
+
+- [Differentiable meshing pipeline](../research/differentiable-meshing-pipeline.md) — design principles, the full stage/test map, and the benchmark policy.
+- [Native (Rust) dual-contouring core](../research/native-mesher.md) — the profile that justified the split, the JAX/Rust boundary, and measured speedups.
+- [Simulation](simulation.qmd) — turning this surface into a volume mesh a solver can use.

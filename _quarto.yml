@@ -11,9 +11,20 @@ website:
     left:
       - text: Get Started
         href: docs/getting-started.qmd
-      - text: Rendering
-        href: docs/rendering.qmd
-      - text: WebGPU Viewer
+      - text: Guides
+        menu:
+          - text: Differentiable Meshing
+            href: docs/meshing.qmd
+          - text: Simulation
+            href: docs/simulation.qmd
+          - text: Optimization
+            href: docs/optimization.qmd
+          - text: Tesseracts
+            href: docs/tesseracts.qmd
+          - text: "---"
+          - text: Forward Renderer
+            href: docs/rendering.qmd
+      - text: Playground
         href: docs/viewer.qmd
       - text: Examples
         menu:
@@ -29,6 +40,24 @@ website:
             href: examples/optimization.ipynb
           - text: Constrained Optimization
             href: examples/constrained_optimization.ipynb
+      - text: Research
+        menu:
+          - text: Differentiable meshing pipeline
+            href: research/differentiable-meshing-pipeline.md
+          - text: Native (Rust) dual-contouring core
+            href: research/native-mesher.md
+          - text: FEM integration
+            href: research/fem-integration.md
+          - text: Tet vs hex meshing
+            href: research/tet-vs-hex.md
+          - text: End-to-end optimization
+            href: research/end-to-end-optimization.md
+          - text: WebGPU SDF path tracing
+            href: research/path-tracing.md
+          - text: Simulator ecosystem survey
+            href: research/simulator-ecosystem.md
+          - text: Constraint system
+            href: research/constraints.md
       - text: API Reference
         href: reference/index.qmd
     right:
@@ -76,6 +105,7 @@ quartodoc:
     - title: Constraints — solver
       contents:
         - constraints.solve.solve_constraints
+        - constraints.solve.satisfy_constraints
         - constraints.solve.project_to_manifold
         - constraints.solve.constraint_residuals
         - constraints.solve.make_manifold_projection
@@ -83,6 +113,68 @@ quartodoc:
       contents:
         - geometry.parameters.Vector
         - geometry.parameters.Scalar
+    - title: Meshing — extraction
+      contents:
+        - meshing.edge_detection.GridSpec
+        - meshing.dual_contouring.Mesh
+        - meshing.dual_contouring.extract_mesh
+        - meshing.edge_detection.sample_grid
+        - meshing.edge_detection.find_crossing_edges
+        - meshing.edge_detection.edge_hermite_data
+        - meshing.edge_detection.detect_edges
+        - meshing.features.manifold_cell_incidence
+        - meshing.features.classify_feature_cells
+        # meshing.dual_contouring.qef_vertices — omitted: its wrapped
+        # `Returns:` description crashes griffe's Google parser (each
+        # same-indent line is read as another return value, then indexed
+        # against the 2-tuple annotation). Re-add once the continuation
+        # lines carry a hanging indent.
+        - meshing.dual_contouring.sharp_qef_vertices
+        - meshing.dual_contouring.dual_faces
+    - title: Meshing — adaptive, simplify, native
+      contents:
+        - meshing.adaptive.surface_cells
+        - meshing.adaptive.sparse_crossing_edges
+        - meshing.simplify.simplify_mesh
+        - meshing.native.native_available
+        - meshing.native.extract_mesh_native
+        - meshing.native.qef_vertices_native
+    - title: Meshing — export and diagnostics
+      contents:
+        - meshing.export.save_obj
+        - meshing.export.save_stl
+        - meshing.export.save_step
+        # meshing.export.merge_planar_faces — omitted for the same griffe
+        # `Returns:` wrapping crash as meshing.dual_contouring.qef_vertices.
+        - meshing.diagnostics.mesh_report
+        - meshing.diagnostics.surface_deviation
+        - meshing.diagnostics.triangle_quality
+        - meshing.diagnostics.self_intersections
+    - title: Simulation — meshes and studies
+      contents:
+        - fem.simmesh.SimMesh
+        - fem.study.ThermalStudy
+        - fem.study.ElasticStudy
+        - fem.result.SimulationResult
+    - title: Simulation — selections and BCs
+      contents:
+        - fem.selection.Nodes
+        - fem.selection.NodeSelection
+        - fem.study.Dirichlet
+        - fem.study.HeatFlux
+        - fem.study.Fixed
+        - fem.study.Traction
+    - title: Simulation — backends
+      contents:
+        - fem.backends.SolverBackend
+        - fem.backends.get_backend
+        - fem.backends.register_backend
+        - fem.backends.available_backends
+    - title: Optimization
+      contents:
+        - optimize.Optimization
+        - optimize.OptimizationRun
+        - optimize.capture_optimizations
     - title: Render
       contents:
         - render.scene.Camera

@@ -1,16 +1,175 @@
 ---
-title: WebGPU Viewer
-description: Edit cadjoint scenes in Python and render their generated WGSL live in WebGPU.
+title: The Playground
+description: A browser CAD app where the Python source is the only state — model, sketch, mesh, solve, and optimize in one window.
 ---
 
-cadjoint provides two interactive WebGPU workflows: a standalone browser playground
-for editing complete Python scenes and a compact widget for Jupyter notebooks.
+The playground is a local browser application: a Python editor on the left, a
+live WebGPU viewport on the right, and a dock of panels that read and rewrite
+the program in the editor. It is the interactive face of the whole toolchain —
+the same `SimMesh`, `ThermalStudy`, and `Optimization` declarations that a
+script runs are the ones the panels edit.
+
+The single rule that makes it coherent: **the Python source is the only state.**
+Dragging a sketch vertex, adding a boundary condition, or accepting an optimized
+design all rewrite literals in the program. There is no hidden scene graph to
+drift out of sync, and anything whose literals cannot be rewritten — geometry
+built in a loop, or from a variable — still renders, but is read-only.
+
+[![The playground in Model mode: the scene program on the left, the parametric heat sink rendered live on the right, and the declared cool-sink optimization in the side dock](../examples/assets/playground-model.png)](../examples/assets/playground-model.png)
+
+## Start it
+
+```bash
+uv run cadjoint-viewer --open      # serves http://127.0.0.1:8765/ and opens a browser
+```
+
+Equivalent invocations, and the flags:
+
+```bash
+uv run python -m cadjoint.viewer.playground   # same server, no browser launch
+uv run cadjoint-viewer --port 9000            # pick a different port
+uv run cadjoint-viewer --help
+```
+
+No extra dependencies are needed — the server is stdlib-only — but the viewport
+needs a WebGPU-capable browser. Stop with `Ctrl+C`.
+
+The starter program is a **parametric heat sink**: a fin comb extruded from one
+constrained sketch profile, a revolved copper heat slug under the die, and two
+press-fit steel bushings. It also declares a `SimMesh`, a thermal study, and an
+optimization over the whole thing, so every part of the app has something real
+to act on the moment it opens.
+
+::: {.callout-warning}
+The playground executes the editor contents as Python on your computer. It binds
+only to localhost and protects compile requests with a per-session token, and it
+compiles each edit in a timed child process so a failed edit cannot take down
+the server — but it is not a sandbox. Only run code you trust.
+:::
+
+## Three modes
+
+The toolbar carries a segmented switcher, the way Blender scopes its tool set to
+a mode. `M` cycles it, `Esc` returns to Model. Each mode has its own accent
+colour, threaded through the tool rail, dock headers, and viewport border.
+
+| Mode | For | Tools |
+|---|---|---|
+| **Model** | Solids and transforms | Select, place box / sphere / cylinder, move and rotate gizmos, delete |
+| **Sketch** | 2D profiles and constraints | Everything in Model, plus polygon editing, modify, and constraint annotation |
+| **Simulate** | FEM setup and results | The four-tab Simulate panel; the viewport becomes a picker |
+
+Rendering is deliberately *not* a mode. Presets, shading, shadows, and quality
+live in a popover behind the eye icon, which opens from any mode — how the scene
+is drawn is orthogonal to what you are editing.
+
+## Modelling
+
+Construction geometry — sketch profiles and primitives — draws over the rendered
+solid as a depth-tested wireframe, so an edge behind the model is hidden by it.
+
+| Action | Result |
+|---|---|
+| Click a vertex handle | Selects it and highlights the exact literal in the code |
+| Drag a handle | Rewrites that vertex's coordinates and rebuilds the solid |
+| **Polygon** (`P`), then click edges | Inserts a vertex per click until `Esc` |
+| Select a handle, press `Del` | Removes that vertex |
+| **Box** / **Sphere** / **Cylinder** (`B` / `S` / `C`), then click | Writes a `Solid.*` call into the program |
+| Click a solid's outline | Selects it and shows the gizmo |
+| Drag a gizmo arrow or ring | Rewrites `position=` or `rotation=` |
+| Drag empty space / Shift-drag / scroll | Orbit / pan / zoom |
+
+`1` and `2` switch between selecting whole objects and selecting sketch
+vertices; `G` and `R` switch the gizmo between move and rotate.
+`Ctrl/⌘ + Enter` runs the program, `Ctrl/⌘ + Z` undoes the last source change.
+
+## Simulate
+
+Simulate mode opens a four-tab panel over the same declarations a script would
+read. Every edit goes through the same source-patch round-trip as the sketch
+tools; solving posts the study's *name*, and the server re-derives everything
+from the declaration.
+
+**Meshes** declares and regenerates `SimMesh` objects. Resolution, padding,
+bounds, size, and the Hex / Tet4 / Tet10 method are editable inline; regenerating
+reports node and element counts and shades the mesh by element quality with a
+histogram beside it.
+
+![The declared SimMesh discretized into tet10 elements, shaded by element quality with a quality histogram](../examples/assets/playground-mesh.png)
+
+**Studies** holds the study declarations, their materials, and their boundary
+conditions — and this is where the viewport becomes a picker. Clicking the
+surface proposes a `Nodes.sphere` selection sized from the mesh spacing;
+shift-dragging a rectangle proposes a `Nodes.box` from the world-space bounds of
+the vertices inside it. The proposal is written into the program as a real
+selection expression, so a BC picked by hand is indistinguishable from one typed
+by hand, and it re-resolves against whatever the mesh becomes.
+
+![The solved temperature field, clipped by the slice plane so the flux entering at the die interface is visible](../examples/assets/playground-field.png)
+
+**Optimize** runs the declared `Optimization` objects, streaming each step's
+objective and gradient norm as it arrives. When a run finishes it lands in a
+player: a convergence sparkline with a moving cursor, play/pause, and a scrubber
+that replays the geometry along the trajectory by substituting each step's
+parameter snapshot and ghost-compiling it. Only the adopted final source ever
+touches undo history.
+
+![The finished cool-sink optimization: convergence sparkline, trajectory scrubber, and each parameter's before and after value](../examples/assets/playground-optimize.png)
+
+**Results** browses the solved surface — a field picker that swaps displayed
+scalars without re-solving, a deformed view for elastic results, per-vertex BC
+previews, and an axis-aligned slice plane.
+
+## Rendering
+
+The eye icon opens the render popover. It carries three editable presets —
+**X-Ray** for modelling and inspection, **Studio** for clean path-traced
+materials, **Wire** for construction geometry only — over independent switches
+for shadows, reflections, feature edges, and the dual-contour wireframe. Presets
+are stored in the browser and can be edited and saved.
+
+Path tracing accumulates progressively: one jittered camera sample per pixel per
+frame, averaged in linear HDR, with cosine-weighted diffuse and
+importance-sampled GGX reflection, Schlick-Fresnel glass, finite-sun next-event
+estimation, multi-bounce environment lighting, Russian-roulette termination, and
+ACES tone mapping in a separate presentation pass. Accumulation resets
+automatically when the scene, camera, viewport, or mode changes.
+
+Quality is a three-step budget. **High** is the default at roughly 900,000
+pixels, six bounces, two sun-visibility samples per hit, and 512 samples per
+pixel; **Draft** drops to 320,000 pixels, three bounces, one visibility sample,
+and 128 samples; **Ultra** opts into 1.6 million pixels, eight bounces, four
+visibility samples, and 1,024 samples.
+
+Two half-float textures alternate between sampled input and render attachment.
+WebGPU does not allow one texture to be sampled and rendered into in the same
+pass, so this ping-pong is required rather than incidental. The finite sun is
+sampled only through next-event estimation and is not part of the environment
+radiance seen by BSDF paths, so the strategies do not overlap; multiple
+importance sampling becomes useful only once emissive area lights or an
+importance-sampled environment map are added. The scope decisions are recorded
+in [WebGPU SDF path tracing](../research/path-tracing.md).
+
+## Compilation path
+
+Each run follows the same path as the shader backend:
+
+1. The local server evaluates the Python in a child process and reads `scene`.
+2. JAX traces distance and material evaluation and lowers both to StableHLO.
+3. cadjoint emits WGSL `sdf`, `material_base`, and `material_optics` functions.
+4. The browser embeds those in the preview or path-tracing runtime and builds
+   the WebGPU pipelines.
+
+The code icon shows the complete generated WGSL. Python tracebacks and WGSL
+compiler errors appear under the editor.
+
+## A live example
 
 ::: {.callout-note}
 WebGPU requires localhost or HTTPS and a browser/platform combination with an
 available GPU adapter. The viewer reports adapter, device, context, shader, and
-device-loss failures directly over the canvas. Mozilla currently enables WebGPU
-by default on Windows and Apple-silicon macOS; Linux support remains
+device-loss failures directly over the canvas. Firefox enables WebGPU by default
+on Windows and Apple-silicon macOS; Linux support remains
 [Nightly-only](https://developer.mozilla.org/en-US/docs/Mozilla/Firefox/Experimental_features).
 :::
 
@@ -18,7 +177,7 @@ by default on Windows and Apple-silicon macOS; Linux support remains
 
 <div class="cadjoint-webgpu-demo" data-cadjoint-webgpu-viewer>
   <canvas data-viewer-canvas aria-label="Interactive WebGPU rendering of the cadjoint orbital example"></canvas>
-  <img data-viewer-fallback src="../examples/assets/webgpu_playground.png" alt="cadjoint playground with Python code on the left and a rendered scene on the right">
+  <img data-viewer-fallback src="../examples/assets/playground-model.png" alt="The cadjoint playground with the scene program on the left and the heat sink rendered on the right">
   <div class="cadjoint-webgpu-status" data-viewer-status aria-live="polite">Starting WebGPU…</div>
   <button class="cadjoint-webgpu-reset" data-viewer-reset type="button">Reset camera</button>
   <div class="cadjoint-webgpu-help">Drag to orbit · Scroll to zoom</div>
@@ -26,137 +185,29 @@ by default on Windows and Apple-silicon macOS; Linux support remains
 
 <script type="module" src="assets/webgpu-viewer.js"></script>
 
-The canvas above is running the example scene directly in this page. Its shader
-was compiled from cadjoint through StableHLO to WGSL; drag the scene to orbit it and
-scroll to zoom. The documentation is static, so editing and executing Python stays
-in the local playground described below.
-
-## Browser playground
-
-From a development checkout, install cadjoint and start the local viewer:
-
-```bash
-uv sync
-uv run cadjoint-viewer --open
-```
-
-The module entry point works as well, and accepts a custom port:
-
-```bash
-python -m cadjoint.viewer.playground --open --port 9000
-```
-
-The playground opens with a complete material example. Edit the Python on the
-left and press **Run scene** or `Ctrl+Enter` (`Cmd+Enter` on macOS) to update the
-preview. The final SDF must be assigned to a variable named `scene`:
-
-```python
-from cadjoint.render import Material
-from cadjoint.sdf.boolean import Union
-from cadjoint.sdf.primitives import Plane, Sphere
-from cadjoint.sdf.transforms import Translate
-
-red = Material(color=[0.8, 0.035, 0.015], roughness=0.42)
-glass = Material(color=[0.94, 0.98, 1.0], opacity=0.0, ior=1.5)
-scene = Union(
-    Translate(Sphere(0.72, material=red), [-0.8, -0.38, 0.0]),
-    Translate(Sphere(0.58, material=glass), [0.8, -0.5, 0.15]),
-    Plane(-1.1, material=Material(color=[0.1, 0.12, 0.16])),
-)
-```
-
-The deterministic preview redraws only after a scene, camera, or viewport change.
-Select **Path trace** to progressively accumulate indirect lighting, material
-reflections, and glass transport. Accumulation resets automatically when the
-scene, camera, viewport, or rendering mode changes.
-
-### Controls
-
-| Action | Control |
-|---|---|
-| Compile the editor | **Run scene** or `Ctrl+Enter` / `Cmd+Enter` |
-| Orbit the camera | Drag in the preview |
-| Zoom | Scroll in the preview |
-| Restore the example | **Reset** |
-| Toggle progressive global illumination | **Path trace** / **Preview** |
-| Choose rendering quality | **Draft** / **High** / **Ultra** |
-| Inspect the complete generated shader | **WGSL** |
-
-### Compilation path
-
-Each update follows the same path used by the shader backend:
-
-1. The local server evaluates the Python and reads `scene`.
-2. JAX traces distance and material evaluation and lowers both to StableHLO.
-3. cadjoint emits WGSL `sdf`, `material_base`, and `material_optics` functions.
-4. The browser embeds those functions in either the preview or path-tracing
-   transport runtime and builds the WebGPU pipelines.
-
-Compilation runs in a separate child process with a timeout, so a failed edit does
-not take down the viewer server. Python tracebacks and WebGPU shader errors appear
-under the editor.
-
-### Path-tracing mode
-
-The path tracer launches one jittered camera sample per pixel per animation
-frame and averages samples in linear HDR. It supports:
-
-- cosine-weighted diffuse and importance-sampled GGX reflection;
-- explicit mirror reflectivity and Schlick-Fresnel glass reflection/refraction;
-- finite-sun next-event estimation with progressively resolved soft shadows;
-- multi-bounce environment lighting and Russian-roulette termination;
-- sign-crossing intersection tests with binary refinement, avoiding false
-  silhouette and shadow hits on rays that merely pass close to a surface;
-- ACES tone mapping in a separate presentation pass.
-
-The quality selector changes framebuffer resolution in both preview and path
-mode. In path mode it additionally changes bounce depth, sun-visibility samples,
-and the accumulation limit. The status pill always identifies WebGPU as the
-active backend and includes adapter details when the browser exposes them; the
-viewer has no silent WebGL fallback.
-
-Two half-float textures alternate between sampled input and render attachment.
-WebGPU does not allow one texture to be sampled and rendered into in the same
-pass, so this ping-pong design is required rather than incidental. The playground
-offers three quality budgets. **High** is the default at roughly 900,000 pixels,
-six bounces, two sun-visibility samples per hit, and 512 samples per pixel;
-**Draft** favors interaction, while **Ultra** opts into a 1.6-million-pixel,
-eight-bounce, four-visibility-sample, 1,024-sample budget.
-
-The finite sun is sampled only through next-event estimation and is not part of
-the environment radiance seen by BSDF paths, so the current strategies do not
-overlap. Multiple importance sampling becomes useful when emissive area lights
-or an importance-sampled environment map are added. The research and scope
-decisions are recorded in
-[`research/path-tracing.md`](https://github.com/andrinr/cadjoint/blob/main/research/path-tracing.md).
-
-::: {.callout-warning}
-The playground executes the editor contents as Python on your computer. It binds
-only to localhost and protects compile requests with a per-session token, but it
-is not a sandbox. Only run code you trust.
-:::
+The canvas above runs a cadjoint scene directly in this page — its shader was
+compiled from Python through StableHLO to WGSL and stored. Drag to orbit, scroll
+to zoom. The documentation is static, so editing and executing Python stays in
+the local playground.
 
 ## Jupyter widget
 
-Install the optional notebook dependencies:
+For a compact viewer inside a notebook rather than a full application:
 
 ```bash
-pip install -e ".[viewer]"
+uv sync --extra viewer
 ```
-
-Then display any JAX-traceable SDF directly in a notebook:
 
 ```python
 from cadjoint.sdf.primitives import Sphere
 from cadjoint.viewer import SDFViewer
 
-scene = Sphere(radius=1.0)
-viewer = SDFViewer(scene, height=480)
+viewer = SDFViewer(Sphere(radius=1.0), height=480)
 viewer
 ```
 
-The notebook viewer supports orbit, zoom, pan, and camera reset. Recompile an
-existing widget after changing a scene without recreating its output cell:
+It supports orbit, zoom, pan, and camera reset. Recompile an existing widget
+after changing a scene without recreating its output cell:
 
 ```python
 viewer.update_scene(new_scene)
@@ -165,19 +216,34 @@ viewer.update_scene(new_scene)
 See the [rendering notebook](../examples/rendering.ipynb) for a complete
 composition and hot-reload example.
 
+## Developing the UI
+
+The app is a Solid + TypeScript project in `frontend/`, built into
+`cadjoint/viewer/static` and committed, so installing cadjoint needs no Node
+toolchain.
+
+```bash
+cd frontend
+npm install
+npm run dev        # Vite on :5173, proxying the API to the Python server
+npm run build      # refresh cadjoint/viewer/static (commit the result)
+npm test           # projection and picking unit tests
+npm run e2e        # Playwright, drives the real server end to end
+```
+
+Run `uv run cadjoint-viewer` alongside `npm run dev` so the dev server has an API
+to proxy to.
+
 ## Troubleshooting
 
-**WebGPU is unavailable**
+**WebGPU is unavailable.** Use a WebGPU-capable browser with hardware
+acceleration enabled. The editor can still compile and show the generated WGSL
+when no adapter is available.
 
-Use a WebGPU-capable browser and make sure hardware acceleration is enabled. The
-editor can still compile and show the generated WGSL when no adapter is available.
+**The command is not found.** Run `python -m cadjoint.viewer.playground --open`,
+or reinstall the current checkout so the `cadjoint-viewer` console script is
+created.
 
-**The command is not found**
-
-Run `python -m cadjoint.viewer.playground --open`, or reinstall the current checkout
-so the `cadjoint-viewer` console script is created.
-
-**A scene does not compile**
-
-Confirm that the source assigns a callable SDF to `scene`. The error panel includes
-the Python traceback or WGSL compiler message needed to locate the failure.
+**A scene does not compile.** Confirm the program assigns an SDF to a variable
+named `scene`. The error panel carries the Python traceback or WGSL compiler
+message.

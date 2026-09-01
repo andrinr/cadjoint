@@ -1,5 +1,6 @@
 ---
 title: Forward Renderer
+description: Predictable sphere tracing for still images, and StableHLO compilation to WGSL.
 ---
 
 cadjoint's image renderer is designed for predictable forward rendering. It uses
@@ -8,7 +9,9 @@ finite-difference normals, Cook–Torrance GGX materials, soft shadows, and
 optional reflection and refraction rays.
 
 Geometry and constraints remain JAX-native and differentiable. Rendered pixels
-are intentionally not an inverse-rendering or optimization API.
+are intentionally not an inverse-rendering or optimization API — the gradients
+this project cares about run through [meshing](meshing.qmd) and
+[simulation](simulation.qmd), not through visibility.
 
 ## Scene and quality settings
 
@@ -33,8 +36,9 @@ final = render_scene(scene, RenderSettings.high_quality((480, 640)))
 mirror = replace(RenderSettings.balanced(), reflect_steps=64)
 ```
 
-The low-level `raymarch(sdf, ...)` function remains available for compact
-notebook calls.
+`render_scene` returns a `(H, W, 3)` float array. The low-level
+`raymarch(sdf, ...)` function remains available for compact notebook calls, and
+`render_raymarched(...)` wraps it to display on a matplotlib axis.
 
 Each primary trace retains its closest approach to the scene. Rays that narrowly
 miss a surface receive screen-space coverage across
@@ -52,11 +56,107 @@ only when requested.
 
 ## Quality presets
 
-- `draft`: shorter trace budgets, direct lighting, no secondary visibility, and one sample per pixel.
-- `balanced`: more trace and shadow steps with reconstructed silhouettes and 2×2 SSAA.
-- `high_quality`: tighter surface precision, more visibility samples, and 3×3 SSAA.
+| Preset | Trace steps | Hit ε | Shadow steps | SSAA | Default resolution |
+|---|---|---|---|---|---|
+| `draft` | 72 | 1.5e-3 | 0 | 1×1 | 200 × 200 |
+| `balanced` | 96 | 1e-3 | 32 | 2×2 | 200 × 200 |
+| `high_quality` | 160 | 5e-4 | 64 | 3×3 | 400 × 400 |
+
+`draft` is direct lighting with no secondary visibility; `balanced` adds soft
+shadows and reconstructed silhouettes; `high_quality` tightens surface precision
+and doubles the shadow budget. Reflection and refraction are off in all three
+and must be asked for explicitly.
 
 ![Draft, balanced, and high-quality forward renders](assets/rendering-quality.png)
 
 The presets are starting points rather than hidden modes. Every field is public,
 validated, and can be changed with `dataclasses.replace`.
+
+## Materials
+
+Attach a `Material` to any primitive. It is queried per hit point during
+rendering, and `Union` blends materials smoothly across a blended boundary.
+
+```python
+from cadjoint.render import Material
+from cadjoint.sdf.primitives import Sphere
+
+sphere = Sphere(
+    radius=1.0,
+    material=Material(
+        color=[0.22, 0.50, 0.95],
+        roughness=0.35,
+        metallic=0.0,
+        opacity=1.0,
+        ior=1.0,
+    ),
+)
+```
+
+### Transparency and refraction
+
+Set `opacity < 1` for transparency. With `refract_steps=0` (the default) the
+surface simply fades toward the background. With `refract_steps > 0` the
+renderer performs two-bounce Snell's-law refraction: the primary ray bends into
+the material, an interior march finds the back face using `−sdf` as the distance
+field, and the ray bends back into air to continue through the rest of the
+scene. Schlick-Fresnel adds the edge highlight that brightens the rim of a glass
+sphere at grazing angles.
+
+```python
+import jax.numpy as jnp
+from cadjoint.render import Material, raymarch
+from cadjoint.sdf.boolean import Union
+from cadjoint.sdf.primitives import Sphere
+from cadjoint.sdf.transforms import Translate
+
+glass = Sphere(radius=1.0, material=Material(
+    color=[0.92, 0.97, 1.0], roughness=0.05, opacity=0.04, ior=1.5))
+red_ball = Translate(
+    Sphere(radius=0.65, material=Material(color=[0.93, 0.26, 0.22])),
+    offset=jnp.array([-1.1, 0.5, -3.0]),
+)
+
+image = raymarch(
+    Union((glass, red_ball), smoothness=0.0),
+    camera_pos=jnp.array([0.0, 0.5, 5.5]),
+    resolution=(400, 400),
+    background_color=jnp.array([0.07, 0.09, 0.16]),
+    refract_steps=48,
+    max_steps=80,
+    aa_samples=2,
+)
+```
+
+| Material | `ior` |
+|---|---|
+| air / disabled | 1.0 |
+| water | 1.33 |
+| glass | 1.5 |
+| diamond | 2.42 |
+
+## Shader compilation
+
+The same scene compiles to a standalone shader function. JAX traces distance and
+material evaluation, lowers both to StableHLO, and cadjoint emits the shader
+source from there — so the browser renders the identical field the Python
+renderer does.
+
+```python
+from cadjoint.backends import compile_scene_to_wgsl, compile_sdf_to_wgsl
+from cadjoint.sdf.primitives import Sphere
+
+wgsl = compile_sdf_to_wgsl(Sphere(radius=1.0))          # just `fn sdf`
+scene_wgsl = compile_scene_to_wgsl(Sphere(radius=1.0))  # + materials
+```
+
+`compile_scene_to_wgsl` emits `sdf`, `material_base` (RGB + roughness), and
+`material_optics` (metallic + opacity + IOR + reflectivity) from one scene
+snapshot, ready to embed in a WebGPU renderer. This is exactly what
+[the playground](viewer.qmd) does on every run.
+
+## Further reading
+
+- [Rendering notebook](../examples/rendering.ipynb) — composition, quality presets, and hot reload
+- [The playground](viewer.qmd) — the interactive WebGPU viewport and its progressive path tracer
+- [WebGPU SDF path tracing](../research/path-tracing.md) — design and deliberate boundaries of the browser path tracer
