@@ -4,9 +4,9 @@ A compact power-module heat sink and the default tour of the toolchain: the
 fin comb is one parameter-backed sketch profile extruded through a named
 depth, the copper heat slug under the die is a revolved section, and two
 steel bushings carry the mounting screws. A declared thermal study conducts
-the die's heat flux up into the fins, and the block at the bottom takes a
-real engineering gradient — material volume w.r.t. the named dimensions —
-straight through the same geometry the viewport renders.
+the die's heat flux up into the fins, and the declared optimization at the
+bottom descends a real engineering objective — material volume w.r.t. the
+free parameters — straight through the same geometry the viewport renders.
 
 Named design parameters:
   - ``fin_depth``: extrusion depth of the fin comb (along y)
@@ -22,6 +22,7 @@ from cadjoint.constraints import DistanceConstraint, FixedConstraint, satisfy_co
 from cadjoint.construction import PolygonProfile, SketchPlane, Solid, extrude, revolve
 from cadjoint.fem import Dirichlet, HeatFlux, Nodes, ThermalStudy
 from cadjoint.geometry import Scalar, Vector, Vector2
+from cadjoint.optimize import Optimization
 from cadjoint.render import Material
 from cadjoint.sdf.boolean import Union
 
@@ -130,10 +131,11 @@ heat_study = ThermalStudy(
     size=(2.1, 1.6, 1.4),
 )
 
-# This is a real reverse-mode derivative through sketch points -> extrusion ->
-# final SDF evaluation: the aluminum volume of the fin comb, and how it moves
-# with the extrusion depth and the center fin's tip. Drag a vertex or edit
-# fin_depth and rerun: the sensitivities update in the AD panel above.
+# The objective is a real reverse-mode derivative path through sketch points
+# -> extrusion -> final SDF evaluation: the (smoothed) aluminum volume of the
+# fin comb as a function of the free parameters above. The declared
+# Optimization descends it with adam; run it from the viewer and the
+# optimized values are written back into this very source.
 sink_parameters, sink_fixed, _ = extract_parameters(sink)
 sink_sdf = functionalize(sink)
 
@@ -147,14 +149,10 @@ def material_volume(parameters):
     return cell_volume * jnp.sum(jax.nn.sigmoid(-sdf(cells) / 0.03))
 
 
-volume, volume_gradient = jax.value_and_grad(material_volume)(sink_parameters)
-differentiability_demo = {
-    "pipeline": "Profile -> Extrude -> SDF",
-    "metric": "aluminum volume (smoothed)",
-    "value": float(volume),
-    "parameter_count": len(sink_parameters),
-    "sensitivities": [
-        {"parameter": "fin_depth", "value": float(volume_gradient["fin_depth"])},
-        {"parameter": "fin2_tip_l.y", "value": float(volume_gradient["fin2_tip_l"][1])},
-    ],
-}
+minimize_aluminum = Optimization(
+    name="min-aluminum",
+    objective=material_volume,
+    of=sink,
+    steps=25,
+    learning_rate=0.03,
+)

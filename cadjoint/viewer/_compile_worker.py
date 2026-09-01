@@ -5,7 +5,6 @@ from __future__ import annotations
 import contextlib
 import io
 import json
-import math
 import sys
 import traceback
 from typing import Any
@@ -25,49 +24,10 @@ from cadjoint.viewer._source_map import (
     build_material_payload,
     capture_profiles,
     locate_mesh_statements,
+    locate_optimization_statements,
     locate_study_statements,
 )
 from cadjoint.viewer._webgpu import build_viewer_shader
-
-
-def _differentiability_payload(namespace: dict[str, Any]) -> dict[str, Any] | None:
-    """Serialize an optional, source-computed autodiff demonstration.
-
-    The program computes the derivative itself, keeping the proof transparent
-    and editable. A malformed optional demo never prevents its scene from
-    compiling.
-    """
-    demo = namespace.get("differentiability_demo")
-    if not isinstance(demo, dict):
-        return None
-    try:
-        value = float(demo["value"])
-        parameter_count = int(demo["parameter_count"])
-        sensitivities = [
-            {
-                "parameter": str(item["parameter"]),
-                "value": float(item["value"]),
-            }
-            for item in demo["sensitivities"]
-            if isinstance(item, dict)
-        ]
-        if (
-            not math.isfinite(value)
-            or parameter_count < 1
-            or not sensitivities
-            or any(not math.isfinite(item["value"]) for item in sensitivities)
-        ):
-            return None
-        return {
-            "pipeline": str(demo["pipeline"]),
-            "metric": str(demo["metric"]),
-            "value": value,
-            "parameter_count": parameter_count,
-            "sensitivities": sensitivities,
-        }
-    except (KeyError, TypeError, ValueError):
-        return None
-
 
 # Mesh-edge view settings.  The grid matches the raymarcher's view volume.
 # Detection stays dense rather than Lipschitz-pruned: user-written fields
@@ -673,28 +633,75 @@ def _mesh_entries(sim_meshes: list[Any], source: str) -> list[dict[str, Any]]:
     return entries
 
 
+def _optimization_entries(optimizations: list[Any], source: str) -> list[dict[str, Any]]:
+    """Serialize declared optimizations for the viewer, with locations.
+
+    Mirrors :func:`_mesh_entries`: each entry is the optimization's
+    ``describe()`` dict plus a stable ``index``, the statement's ``line``
+    and the constructor call's character ``span``, an ``editable`` flag,
+    and the ``steps``/``learning_rate`` argument-value spans.
+    Optimizations are matched to source statements positionally; a count
+    mismatch (declarations built in loops or helpers) or a literal-name
+    mismatch marks every entry non-editable.  Declaration only: nothing is
+    optimized here.
+    """
+    statements = locate_optimization_statements(source) or []
+    aligned = len(statements) == len(optimizations) and all(
+        statement.name is None or statement.name == optimization.name
+        for statement, optimization in zip(statements, optimizations)
+    )
+    entries: list[dict[str, Any]] = []
+    for index, optimization in enumerate(optimizations):
+        statement = statements[index] if aligned else None
+
+        def span(value) -> list[int] | None:
+            return list(value) if value is not None else None
+
+        entries.append(
+            {
+                **optimization.describe(),
+                "index": index,
+                "line": statement.statement.lineno if statement is not None else None,
+                "span": span(statement.call_span) if statement is not None else None,
+                "editable": statement is not None,
+                "steps_span": span(statement.steps_span) if statement is not None else None,
+                "learning_rate_span": span(statement.learning_rate_span)
+                if statement is not None
+                else None,
+            }
+        )
+    return entries
+
+
 def _execute_scene(source: str) -> dict[str, Any]:
     """Run playground source and return its namespace (the scene lives inside).
 
     The exec always happens inside :func:`capture_sim_meshes` +
-    :func:`capture_studies` registries: a scene program that references a
-    declared mesh by name (``mesh="..."``) can only resolve it through an
-    active capture context, so every worker mode needs them, whether or not
-    it looks at the captured lists afterwards.
+    :func:`capture_studies` + :func:`capture_optimizations` registries: a
+    scene program that references a declared mesh by name (``mesh="..."``)
+    can only resolve it through an active capture context, so every worker
+    mode needs them, whether or not it looks at the captured lists
+    afterwards.
     """
     from cadjoint.fem.simmesh import capture_sim_meshes
     from cadjoint.fem.study import capture_studies
+    from cadjoint.optimize import capture_optimizations
 
     namespace: dict[str, Any] = {
         "__builtins__": __builtins__,
         "__name__": "__cadjoint_playground__",
     }
-    with capture_sim_meshes() as sim_meshes, capture_studies() as studies:
+    with (
+        capture_sim_meshes() as sim_meshes,
+        capture_studies() as studies,
+        capture_optimizations() as optimizations,
+    ):
         exec(compile(source, PLAYGROUND_FILENAME, "exec"), namespace, namespace)
     if "scene" not in namespace:
         raise ValueError("Your program must assign the SDF to a variable named `scene`.")
     namespace["__sim_meshes__"] = sim_meshes
     namespace["__studies__"] = studies
+    namespace["__optimizations__"] = optimizations
     return namespace
 
 
@@ -732,6 +739,61 @@ def _named_study(studies: list[Any], name: Any) -> Any:
     return matches[0]
 
 
+def _boundary_vertex_nodes(mesh: Any) -> np.ndarray:
+    """Node indices behind the compacted boundary vertex list.
+
+    Must mirror the compaction in
+    :func:`cadjoint.fem.render_payload.boundary_render_payload`: quads are
+    gathered group by group (sorted by group id) and their node ids
+    deduplicated with ``np.unique``, so position *i* of the render payload's
+    vertex arrays corresponds to mesh node ``result[i]``.
+    """
+    quads = np.concatenate(
+        [mesh.boundary_faces[group_id].nodes for group_id in sorted(mesh.boundary_faces)],
+        axis=0,
+    )
+    return np.unique(quads.reshape(-1))
+
+
+def _finite_range(values: np.ndarray) -> list[float]:
+    """``[min, max]`` over the finite entries, like the render payload's range."""
+    finite = values[np.isfinite(values)]
+    low = float(finite.min()) if finite.size else 0.0
+    high = float(finite.max()) if finite.size else 0.0
+    return [round(low, 6), round(high, 6)]
+
+
+def _result_field_payload(result: Any, payload: dict[str, Any]) -> None:
+    """Attach the full per-vertex field catalog to a render payload.
+
+    The base payload carries one display scalar per vertex; inspection
+    wants every solved field.  Thermal results expose ``temperature``
+    (identical to the display scalars, kept for a uniform shape); elastic
+    results expose ``von_mises`` (the display scalars) plus
+    ``displacement_magnitude``, and the raw per-vertex ``displacements``
+    so the viewer can draw a warped surface.  ``ranges`` maps each field
+    to its finite ``[lo, hi]``.  Mapping happens here, viewer-side, from
+    the concrete SimulationResult arrays.
+    """
+    if result.kind == "thermal":
+        payload["fields"] = {"temperature": list(payload["scalars"])}
+    else:
+        used = _boundary_vertex_nodes(result.mesh)
+        displacement = np.asarray(result.solution.displacement, dtype=np.float64)[used]
+        magnitude = np.linalg.norm(displacement, axis=-1)
+        payload["fields"] = {
+            "von_mises": list(payload["scalars"]),
+            "displacement_magnitude": [round(float(value), 6) for value in magnitude],
+        }
+        payload["displacements"] = [
+            [round(float(component), 6) for component in row] for row in displacement
+        ]
+    payload["ranges"] = {
+        name: _finite_range(np.asarray(values, dtype=np.float64))
+        for name, values in payload["fields"].items()
+    }
+
+
 def _simulate_study(scene: Any, studies: list[Any], request: dict[str, Any]) -> dict[str, Any]:
     """Solve one study the scene program declared, by name.
 
@@ -765,12 +827,14 @@ def _simulate_study(scene: Any, studies: list[Any], request: dict[str, Any]) -> 
     described["bcs"] = [
         {**bc.describe(), "serializable": bc.nodes.serializable} for bc in study.bcs
     ]
+    render_payload = boundary_render_payload(result.mesh, scalar)
+    _result_field_payload(result, render_payload)
     return {
         "ok": True,
         "kind": "study",
         "study": described,
         "field": result.field,
-        "mesh": boundary_render_payload(result.mesh, scalar),
+        "mesh": render_payload,
         "result": result.describe(),
         "mesh_info": result.sim_mesh.inspect(sdf) if result.sim_mesh is not None else None,
         "cached": cached,
@@ -783,6 +847,65 @@ def _simulate_source(request: dict[str, Any]) -> dict[str, Any]:
     with contextlib.redirect_stdout(captured), contextlib.redirect_stderr(captured):
         namespace = _execute_scene(request["source"])
         result = _simulate_study(namespace["scene"], namespace["__studies__"], request)
+    result["output"] = captured.getvalue()[-8_000:]
+    return result
+
+
+# The server validates requested step counts, but the declaration itself may
+# ask for more than one HTTP-bounded run should pay for; the worker caps both.
+OPTIMIZE_STEP_LIMIT = 200
+
+
+def _named_optimization(optimizations: list[Any], name: Any) -> Any:
+    """The one declared optimization called *name* (or raise, listing them)."""
+    matches = [optimization for optimization in optimizations if optimization.name == name]
+    if not matches:
+        declared = ", ".join(repr(optimization.name) for optimization in optimizations) or "none"
+        raise ValueError(
+            f"The program declares no optimization named {name!r} (declared: {declared})."
+        )
+    if len(matches) > 1:
+        raise ValueError(f"The program declares more than one optimization named {name!r}.")
+    return matches[0]
+
+
+def _run_optimization(
+    source: str, optimizations: list[Any], request: dict[str, Any]
+) -> dict[str, Any]:
+    """Run one declared optimization by name and patch its result into source.
+
+    The optimizer is a patch layer: the optimized free-parameter values are
+    written back into the program text through the same exact-repr patch
+    machinery the viewer's other edits use, and the client adopts the
+    returned ``source`` and recompiles — code parity, like ``/patch``.
+    """
+    from cadjoint.viewer._patch import set_parameter_values
+
+    optimization = _named_optimization(optimizations, request.get("name"))
+    steps = request.get("steps")
+    steps = optimization.steps if steps is None else int(steps)
+    run = optimization.run(steps=min(steps, OPTIMIZE_STEP_LIMIT))
+    patched = set_parameter_values(source, run.parameters)
+    return {
+        "ok": True,
+        "kind": "optimize",
+        "name": optimization.name,
+        "method": run.method,
+        "steps": run.steps,
+        "source": patched,
+        "history": run.history,
+        "trajectory": run.trajectory,
+        "parameters": run.parameters,
+        "initial": run.initial,
+    }
+
+
+def _optimize_source(request: dict[str, Any]) -> dict[str, Any]:
+    """Run the optimize mode: exec scene -> declared optimization -> patch."""
+    captured = io.StringIO()
+    with contextlib.redirect_stdout(captured), contextlib.redirect_stderr(captured):
+        namespace = _execute_scene(request["source"])
+        result = _run_optimization(request["source"], namespace["__optimizations__"], request)
     result["output"] = captured.getvalue()[-8_000:]
     return result
 
@@ -885,6 +1008,7 @@ def _compile_source(source: str) -> dict[str, Any]:
     }
     from cadjoint.fem.simmesh import capture_sim_meshes
     from cadjoint.fem.study import capture_studies
+    from cadjoint.optimize import capture_optimizations
 
     captured = io.StringIO()
     with contextlib.redirect_stdout(captured), contextlib.redirect_stderr(captured):
@@ -893,6 +1017,7 @@ def _compile_source(source: str) -> dict[str, Any]:
             capture_profiles(PLAYGROUND_FILENAME) as profiles,
             capture_sim_meshes() as sim_meshes,
             capture_studies() as studies,
+            capture_optimizations() as optimizations,
         ):
             exec(compile(source, PLAYGROUND_FILENAME, "exec"), namespace, namespace)
         if "scene" not in namespace:
@@ -903,11 +1028,12 @@ def _compile_source(source: str) -> dict[str, Any]:
         construction = build_construction_payload(profiles, source)
         relations = build_construction_relations(profiles)
         materials = build_material_payload(namespace, source)
-        # Declaration only: studies and meshes are serialized from their
-        # describe() payloads — no meshing or solving happens at compile time.
+        # Declaration only: studies, meshes, and optimizations are serialized
+        # from their describe() payloads — no meshing, solving, or descending
+        # happens at compile time.
         studies_payload = _study_entries(studies, source)
         sim_meshes_payload = _mesh_entries(sim_meshes, source)
-        differentiability = _differentiability_payload(namespace)
+        optimizations_payload = _optimization_entries(optimizations, source)
         node_ids = {
             id(obj): (f"{obj.kind}_{index}" if hasattr(obj, "kind") else f"profile_{index}")
             for index, (obj, _) in enumerate(profiles)
@@ -935,7 +1061,7 @@ def _compile_source(source: str) -> dict[str, Any]:
         "materials": materials,
         "studies": studies_payload,
         "sim_meshes": sim_meshes_payload,
-        "differentiability": differentiability,
+        "optimizations": optimizations_payload,
         # The mesh-edge view is requested lazily via `mode: "mesh"` — computing
         # it here used to dominate the compile round-trip.
         "mesh_edges": None,
@@ -957,6 +1083,8 @@ def main() -> None:
             result = _simulate_source(request)
         elif mode == "mesh_inspect":
             result = _mesh_inspect_source(request)
+        elif mode == "optimize":
+            result = _optimize_source(request)
         elif mode == "compile":
             result = _compile_source(source)
         else:

@@ -16,6 +16,7 @@ import ast
 
 from cadjoint.viewer._source_map import (
     MeshStatement,
+    OptimizationStatement,
     Span,
     StudyStatement,
     _called_name,
@@ -27,6 +28,7 @@ from cadjoint.viewer._source_map import (
     locate_call,
     locate_constraint_statements,
     locate_mesh_statements,
+    locate_optimization_statements,
     locate_profile_call,
     locate_study_statements,
 )
@@ -1443,6 +1445,7 @@ def set_study_value(source: str, study, value, bc=None, argument=None) -> str:
 # `name` is excluded from editing.
 _MESH_FIELDS = ("name", "resolution", "domain", "bounds", "size", "padding")
 _MESH_NUMERIC_ARGUMENTS = ("resolution", "bounds", "size", "padding")
+_MESH_METHODS = ("hex", "tet4", "tet10")
 
 
 def _located_mesh(source: str, mesh) -> MeshStatement:
@@ -1576,8 +1579,9 @@ def set_mesh_value(source: str, mesh, argument, value) -> str:
         mesh: Mesh reference — payload index, name, or variable.
         argument: ``resolution``, ``bounds``, ``size``, ``padding`` (numeric,
             written with exact float ``repr``; ``resolution`` stays
-            integral), or ``domain`` (the variable name of a named scene
-            object).
+            integral), ``domain`` (the variable name of a named scene
+            object), or ``method`` (one of ``hex``/``tet4``/``tet10``,
+            written as a string literal).
         value: The new number(s) or name.
 
     Returns:
@@ -1593,8 +1597,12 @@ def set_mesh_value(source: str, mesh, argument, value) -> str:
         return _rewrite_call_argument(
             source, located.call, _MESH_FIELDS, "domain", expression, "mesh"
         )
+    if argument == "method":
+        if value not in _MESH_METHODS:
+            raise PatchError(f"Mesh `method` must be one of: {', '.join(_MESH_METHODS)}.")
+        return _set_keyword_expression(source, located.call, "method", repr(value))
     if not isinstance(argument, str) or argument not in _MESH_NUMERIC_ARGUMENTS:
-        allowed = ", ".join((*_MESH_NUMERIC_ARGUMENTS, "domain"))
+        allowed = ", ".join((*_MESH_NUMERIC_ARGUMENTS, "domain", "method"))
         raise PatchError(f"A mesh's editable arguments are: {allowed}.")
     if argument == "padding":
         if not isinstance(value, (int, float)) or isinstance(value, bool) or float(value) < 0.0:
@@ -1603,6 +1611,163 @@ def set_mesh_value(source: str, mesh, argument, value) -> str:
     else:
         expression = _format_study_argument(argument, value)
     return _rewrite_call_argument(source, located.call, _MESH_FIELDS, argument, expression, "mesh")
+
+
+# ── Optimizations ────────────────────────────────────────────────────────────
+# Optimization declarations are patched like studies and meshes: located by
+# stable index or name (cadjoint.viewer._source_map.locate_optimization_statements),
+# edited by span surgery on their constructor call.  There is deliberately no
+# add operation: an objective is code, so the panel points users at the editor
+# to declare one.
+
+# Constructor field order, for resolving positionally written arguments;
+# `steps`/`learning_rate`/`method` are keyword-only in the constructor.
+_OPTIMIZATION_FIELDS = ("name", "objective", "of")
+_OPTIMIZATION_ARGUMENTS = ("steps", "learning_rate")
+
+
+def _located_optimization(source: str, optimization) -> OptimizationStatement:
+    """Resolve an optimization reference — payload index, name, or variable."""
+    statements = locate_optimization_statements(source)
+    if statements is None:
+        raise PatchError("Source is not valid Python.")
+    if isinstance(optimization, bool) or not isinstance(optimization, (int, str)):
+        raise PatchError("An optimization is referenced by its name or its non-negative index.")
+    if isinstance(optimization, int):
+        if not 0 <= optimization < len(statements):
+            raise PatchError(
+                f"Optimization index {optimization} is out of range; the program declares "
+                f"{len(statements)}."
+            )
+        return statements[optimization]
+    matches = [
+        statement
+        for statement in statements
+        if optimization in (statement.name, statement.variable)
+    ]
+    if len(matches) != 1:
+        declared = ", ".join(
+            repr(statement.name or statement.variable or f"#{statement.index}")
+            for statement in statements
+        )
+        raise PatchError(
+            f"No single optimization named {optimization!r}; the program declares: "
+            f"{declared or 'none'}."
+        )
+    return matches[0]
+
+
+def delete_optimization(source: str, optimization) -> str:
+    """Remove one optimization declaration, identified by index or name."""
+    located = _located_optimization(source, optimization)
+    if located.variable is not None:
+        tree = ast.parse(source)
+        uses = _name_references(tree, located.variable, located.statement)
+        if uses:
+            raise PatchError(
+                f"`{located.variable}` is used elsewhere in the program, so it cannot be "
+                "deleted from the viewer. Remove those uses first."
+            )
+    offsets = _line_offsets(source)
+    start = offsets[located.statement.lineno - 1]
+    end = offsets[min(located.statement.end_lineno or located.statement.lineno, len(offsets) - 1)]
+    return _validate(source[:start] + source[end:])
+
+
+def set_optimization_value(source: str, optimization, argument, value) -> str:
+    """Edit an optimization's ``steps`` or ``learning_rate`` in place.
+
+    Args:
+        source: The program text.
+        optimization: Optimization reference — payload index, name, or
+            variable.
+        argument: ``steps`` (positive whole number, written integral) or
+            ``learning_rate`` (positive number, written with exact float
+            ``repr``).
+        value: The new number.
+
+    Returns:
+        The patched source.
+
+    Raises:
+        PatchError: On an unknown argument, an invalid value, or a target
+            that is not an editable literal.
+    """
+    located = _located_optimization(source, optimization)
+    if not isinstance(argument, str) or argument not in _OPTIMIZATION_ARGUMENTS:
+        allowed = ", ".join(_OPTIMIZATION_ARGUMENTS)
+        raise PatchError(f"An optimization's editable arguments are: {allowed}.")
+    if argument == "steps":
+        if (
+            not isinstance(value, (int, float))
+            or isinstance(value, bool)
+            or float(value) != int(value)
+            or int(value) < 1
+        ):
+            raise PatchError("`steps` must be a positive whole number.")
+        expression = str(int(value))
+    else:
+        if not isinstance(value, (int, float)) or isinstance(value, bool) or not float(value) > 0:
+            raise PatchError("`learning_rate` must be a positive number.")
+        expression = _exact_number(value)
+    return _rewrite_call_argument(
+        source, located.call, _OPTIMIZATION_FIELDS, argument, expression, "optimization"
+    )
+
+
+# ── Optimized-parameter writeback ────────────────────────────────────────────
+# /api/optimize turns a finished run into a source patch: each optimized free
+# parameter's declaration literal is rewritten with the exact-repr conventions
+# of set_constraint_value, so the optimizer stays a patch layer over the code.
+
+_PARAMETER_CALL_NAMES = ("Scalar", "Vector", "Vector2")
+
+
+def _located_parameter_call(source: str, name: str) -> ast.Call:
+    """The one top-level parameter constructor declaring ``name=<name>``."""
+    try:
+        tree = ast.parse(source)
+    except SyntaxError as error:
+        raise PatchError(f"Source is not valid Python: {error}") from error
+    matches = [
+        node
+        for item in tree.body
+        for node in ast.walk(item)
+        if _called_name(node) in _PARAMETER_CALL_NAMES
+        and any(
+            keyword.arg == "name"
+            and isinstance(keyword.value, ast.Constant)
+            and keyword.value.value == name
+            for keyword in node.keywords
+        )
+    ]
+    if len(matches) != 1:
+        raise PatchError(
+            f"The optimized parameter {name!r} maps to {len(matches)} "
+            "Scalar/Vector/Vector2 declarations in the program; every free parameter "
+            "needs exactly one top-level declaration to write its value back."
+        )
+    return matches[0]
+
+
+def set_parameter_value(source: str, name: str, value) -> str:
+    """Rewrite one named free parameter's value literal (exact repr)."""
+    call = _located_parameter_call(source, name)
+    return _rewrite_call_argument(
+        source, call, ("value",), "value", _exact_value(value), "parameter"
+    )
+
+
+def set_parameter_values(source: str, values: dict) -> str:
+    """Write a dict of optimized parameter values back into the program.
+
+    Each rewrite re-locates its declaration, so earlier edits cannot
+    invalidate later spans.  Parameter order is name-sorted for
+    deterministic output.
+    """
+    for name in sorted(values):
+        source = set_parameter_value(source, name, values[name])
+    return source
 
 
 CONSTRUCTION_CALLS = {"PolygonProfile", "box", "sphere", "cylinder"}
@@ -1814,6 +1979,8 @@ OPERATIONS = {
     "add_mesh": add_mesh,
     "delete_mesh": delete_mesh,
     "set_mesh_value": set_mesh_value,
+    "delete_optimization": delete_optimization,
+    "set_optimization_value": set_optimization_value,
 }
 
 

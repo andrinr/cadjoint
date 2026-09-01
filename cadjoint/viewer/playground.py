@@ -16,6 +16,11 @@ Serves the built frontend (``cadjoint/viewer/static``) and a small JSON API:
                          implicit mesh) and return its inspection report plus
                          a renderable surface with a scaled-jacobian quality
                          heatmap — look at a mesh before solving on it
+- ``POST /api/optimize`` run an ``Optimization`` the program declares
+                         (``cadjoint.optimize``), picked by ``name``; the
+                         optimized free-parameter values are patched back
+                         into the program text and the response's ``source``
+                         is the patched program, exactly like ``/patch``
 - ``GET  /api/scenes``   list saved scene files in ``./scenes``
 - ``POST /api/scenes/load``  read one saved scene file
 - ``POST /api/scenes/save``  write one scene file into ``./scenes``
@@ -77,9 +82,9 @@ A compact power-module heat sink and the default tour of the toolchain: the
 fin comb is one parameter-backed sketch profile extruded through a named
 depth, the copper heat slug under the die is a revolved section, and two
 steel bushings carry the mounting screws. A declared thermal study conducts
-the die's heat flux up into the fins, and the block at the bottom takes a
-real engineering gradient — material volume w.r.t. the named dimensions —
-straight through the same geometry the viewport renders.
+the die's heat flux up into the fins, and the declared optimization at the
+bottom descends a real engineering objective — material volume w.r.t. the
+free parameters — straight through the same geometry the viewport renders.
 
 Named design parameters:
   - ``fin_depth``: extrusion depth of the fin comb (along y)
@@ -95,6 +100,7 @@ from cadjoint.constraints import DistanceConstraint, FixedConstraint, satisfy_co
 from cadjoint.construction import PolygonProfile, SketchPlane, Solid, extrude, revolve
 from cadjoint.fem import Dirichlet, HeatFlux, Nodes, ThermalStudy
 from cadjoint.geometry import Scalar, Vector, Vector2
+from cadjoint.optimize import Optimization
 from cadjoint.render import Material
 from cadjoint.sdf.boolean import Union
 
@@ -203,10 +209,11 @@ heat_study = ThermalStudy(
     size=(2.1, 1.6, 1.4),
 )
 
-# This is a real reverse-mode derivative through sketch points -> extrusion ->
-# final SDF evaluation: the aluminum volume of the fin comb, and how it moves
-# with the extrusion depth and the center fin's tip. Drag a vertex or edit
-# fin_depth and rerun: the sensitivities update in the AD panel above.
+# The objective is a real reverse-mode derivative path through sketch points
+# -> extrusion -> final SDF evaluation: the (smoothed) aluminum volume of the
+# fin comb as a function of the free parameters above. The declared
+# Optimization descends it with adam; run it from the viewer and the
+# optimized values are written back into this very source.
 sink_parameters, sink_fixed, _ = extract_parameters(sink)
 sink_sdf = functionalize(sink)
 
@@ -220,17 +227,13 @@ def material_volume(parameters):
     return cell_volume * jnp.sum(jax.nn.sigmoid(-sdf(cells) / 0.03))
 
 
-volume, volume_gradient = jax.value_and_grad(material_volume)(sink_parameters)
-differentiability_demo = {
-    "pipeline": "Profile -> Extrude -> SDF",
-    "metric": "aluminum volume (smoothed)",
-    "value": float(volume),
-    "parameter_count": len(sink_parameters),
-    "sensitivities": [
-        {"parameter": "fin_depth", "value": float(volume_gradient["fin_depth"])},
-        {"parameter": "fin2_tip_l.y", "value": float(volume_gradient["fin2_tip_l"][1])},
-    ],
-}
+minimize_aluminum = Optimization(
+    name="min-aluminum",
+    objective=material_volume,
+    of=sink,
+    steps=25,
+    learning_rate=0.03,
+)
 '''
 
 MISSING_BUILD_PAGE = """<!doctype html>
@@ -370,6 +373,46 @@ def mesh_inspect_source(
         return {"ok": False, "error": "`name` must be a non-empty string when given."}
     extra = {"name": name} if name is not None else {}
     return _run_worker(request.get("source"), "mesh_inspect", timeout, extra=extra)
+
+
+# Optimizations run the differentiable objective once per step, which can far
+# exceed the compile budget; the step cap keeps one request's work bounded.
+OPTIMIZE_TIMEOUT_SECONDS = 120
+OPTIMIZE_MAX_STEPS = 200
+
+
+def optimize_source(
+    request: dict[str, Any], timeout: float = OPTIMIZE_TIMEOUT_SECONDS
+) -> dict[str, Any]:
+    """Validate an optimize request and run it in a disposable child process.
+
+    Runs an :class:`cadjoint.optimize.Optimization` the scene program itself
+    declares, picked by ``name`` — objective, target object, and optimizer
+    settings all come from the declaration; the optional ``steps`` overrides
+    the declared step count (both are capped at ``OPTIMIZE_MAX_STEPS``).
+    The worker writes the optimized free-parameter values back into the
+    program text through the patch machinery, so the response's ``source``
+    is the patched program — the client adopts it and recompiles, exactly
+    like a ``/patch`` response.
+    """
+    name = request.get("name")
+    if not isinstance(name, str) or not name.strip():
+        return {
+            "ok": False,
+            "error": "An optimization run needs `name`: the declared Optimization to run.",
+        }
+    extra: dict[str, Any] = {"name": name}
+    steps = request.get("steps")
+    if steps is not None:
+        if not isinstance(steps, int) or isinstance(steps, bool) or steps < 1:
+            return {"ok": False, "error": "Optimization `steps` must be a positive integer."}
+        if steps > OPTIMIZE_MAX_STEPS:
+            return {
+                "ok": False,
+                "error": f"Optimization `steps` is capped at {OPTIMIZE_MAX_STEPS} per request.",
+            }
+        extra["steps"] = steps
+    return _run_worker(request.get("source"), "optimize", timeout, extra=extra)
 
 
 # Saved scenes live in one directory under the server's working directory.
@@ -950,6 +993,13 @@ def patch_source(request: dict[str, Any]) -> dict[str, Any]:
                         "error": "The patch request needs `value` as a `domain` name.",
                     }
                 arguments["value"] = raw_value
+            elif argument == "method":
+                if raw_value not in {"hex", "tet4", "tet10"}:
+                    return {
+                        "ok": False,
+                        "error": "Mesh `method` must be one of: hex, tet4, tet10.",
+                    }
+                arguments["value"] = raw_value
             else:
                 scalar = (
                     float(raw_value)
@@ -963,6 +1013,39 @@ def patch_source(request: dict[str, Any]) -> dict[str, Any]:
                         "error": "The patch request needs `value` as a number or numbers.",
                     }
                 arguments["value"] = scalar if scalar is not None else vector
+
+        try:
+            return {"ok": True, "source": apply_operation(source, operation, **arguments)}
+        except PatchError as error:
+            return {"ok": False, "error": str(error)}
+
+    if operation in {"delete_optimization", "set_optimization_value"}:
+        optimization = request.get("optimization")
+        valid_index = (
+            isinstance(optimization, int)
+            and not isinstance(optimization, bool)
+            and optimization >= 0
+        )
+        if not (valid_index or (isinstance(optimization, str) and optimization.strip())):
+            return {
+                "ok": False,
+                "error": (
+                    "The patch request needs `optimization` as a name or a non-negative index."
+                ),
+            }
+        arguments = {"optimization": optimization}
+
+        if operation == "set_optimization_value":
+            argument = request.get("argument")
+            if argument not in {"steps", "learning_rate"}:
+                return {
+                    "ok": False,
+                    "error": "Optimization `argument` must be `steps` or `learning_rate`.",
+                }
+            raw_value = request.get("value")
+            if not isinstance(raw_value, (int, float)) or isinstance(raw_value, bool):
+                return {"ok": False, "error": "The patch request needs a numeric `value`."}
+            arguments.update(argument=argument, value=raw_value)
 
         try:
             return {"ok": True, "source": apply_operation(source, operation, **arguments)}
@@ -1128,6 +1211,7 @@ def make_handler(token: str):
                 "/api/mesh": lambda payload: mesh_source(payload.get("source")),
                 "/api/simulate": simulate_source,
                 "/api/mesh_inspect": mesh_inspect_source,
+                "/api/optimize": optimize_source,
                 "/patch": patch_source,
                 "/api/scenes/load": load_scene,
                 "/api/scenes/save": save_scene,

@@ -1274,6 +1274,24 @@ class TestSetMeshValue:
                 MESHES, "set_mesh_value", mesh="block-grid", argument="domain", value="mystery"
             )
 
+    def test_sets_the_meshing_method_as_a_string_literal(self):
+        patched = apply_operation(
+            MESHES, "set_mesh_value", mesh="block-grid", argument="method", value="tet10"
+        )
+        assert "method='tet10'" in patched
+        assert ast.parse(patched)
+        rewritten = apply_operation(
+            patched, "set_mesh_value", mesh="block-grid", argument="method", value="hex"
+        )
+        assert "method='hex'" in rewritten
+        assert "tet10" not in rewritten
+
+    def test_rejects_an_unknown_meshing_method(self):
+        with pytest.raises(PatchError, match="hex, tet4, tet10"):
+            apply_operation(
+                MESHES, "set_mesh_value", mesh="block-grid", argument="method", value="voxel"
+            )
+
     def test_rejects_unknown_arguments(self):
         with pytest.raises(PatchError, match="editable arguments"):
             apply_operation(MESHES, "set_mesh_value", mesh="block-grid", argument="name", value=1.0)
@@ -1330,3 +1348,135 @@ class TestSetStudyMeshAndDomain:
             apply_operation(
                 STUDIES, "set_study_value", study="bar-conduction", argument="domain", value="ghost"
             )
+
+
+OPTIMIZATIONS = """from cadjoint.geometry import Scalar, Vector2
+from cadjoint.optimize import Optimization
+from cadjoint.sdf.primitives import Box
+
+wall_width = Scalar(0.4, free=True, name="wall_width")
+anchor = Vector2(value=[0.5, 0.85], free=True, name="anchor")
+scene = Box(size=[1.0, 1.0, 1.0])
+
+
+def volume(params):
+    return params["wall_width"]
+
+
+shrink = Optimization(name="min-volume", objective=volume, of=scene, steps=25, learning_rate=0.03)
+"""
+
+
+class TestDeleteOptimization:
+    def test_removes_a_named_optimization_statement(self):
+        patched = apply_operation(OPTIMIZATIONS, "delete_optimization", optimization="min-volume")
+        assert "shrink = " not in patched
+        assert "def volume(params):" in patched
+        assert ast.parse(patched)
+
+    def test_resolves_by_index_and_by_variable(self):
+        assert "shrink = " not in apply_operation(
+            OPTIMIZATIONS, "delete_optimization", optimization=0
+        )
+        assert "shrink = " not in apply_operation(
+            OPTIMIZATIONS, "delete_optimization", optimization="shrink"
+        )
+
+    def test_keeps_every_line_above_the_deletion_untouched(self):
+        patched = apply_operation(OPTIMIZATIONS, "delete_optimization", optimization="min-volume")
+        original = OPTIMIZATIONS.splitlines()
+        assert patched.splitlines() == original[:-1]
+
+    def test_refuses_when_the_optimization_is_used_elsewhere(self):
+        source = OPTIMIZATIONS + "result = shrink.run()\n"
+        with pytest.raises(PatchError, match="used elsewhere"):
+            apply_operation(source, "delete_optimization", optimization="shrink")
+
+    def test_rejects_an_unknown_reference(self):
+        with pytest.raises(PatchError, match="No single optimization"):
+            apply_operation(OPTIMIZATIONS, "delete_optimization", optimization="nope")
+        with pytest.raises(PatchError, match="out of range"):
+            apply_operation(OPTIMIZATIONS, "delete_optimization", optimization=4)
+
+
+class TestSetOptimizationValue:
+    def test_rewrites_steps_keeping_them_integral(self):
+        patched = apply_operation(
+            OPTIMIZATIONS,
+            "set_optimization_value",
+            optimization="min-volume",
+            argument="steps",
+            value=40,
+        )
+        assert "steps=40" in patched
+        assert len(patched.splitlines()) == len(OPTIMIZATIONS.splitlines())
+
+    def test_rewrites_the_learning_rate_with_exact_repr(self):
+        patched = apply_operation(
+            OPTIMIZATIONS,
+            "set_optimization_value",
+            optimization=0,
+            argument="learning_rate",
+            value=0.005,
+        )
+        assert "learning_rate=0.005" in patched
+
+    def test_adds_an_absent_keyword(self):
+        bare = OPTIMIZATIONS.replace(", steps=25, learning_rate=0.03", "")
+        patched = apply_operation(
+            bare,
+            "set_optimization_value",
+            optimization="min-volume",
+            argument="steps",
+            value=8,
+        )
+        assert "of=scene, steps=8)" in patched
+
+    def test_rejects_unknown_arguments_and_bad_values(self):
+        with pytest.raises(PatchError, match="editable arguments"):
+            apply_operation(
+                OPTIMIZATIONS,
+                "set_optimization_value",
+                optimization=0,
+                argument="method",
+                value=1,
+            )
+        with pytest.raises(PatchError, match="whole number"):
+            apply_operation(
+                OPTIMIZATIONS,
+                "set_optimization_value",
+                optimization=0,
+                argument="steps",
+                value=2.5,
+            )
+        with pytest.raises(PatchError, match="positive"):
+            apply_operation(
+                OPTIMIZATIONS,
+                "set_optimization_value",
+                optimization=0,
+                argument="learning_rate",
+                value=-0.1,
+            )
+
+
+class TestSetParameterValues:
+    def test_rewrites_named_scalar_and_vector2_literals_exactly(self):
+        from cadjoint.viewer._patch import set_parameter_values
+
+        patched = set_parameter_values(
+            OPTIMIZATIONS,
+            {"wall_width": 0.9750000238418579, "anchor": [0.51, 0.8399999737739563]},
+        )
+        assert "Scalar(0.9750000238418579, free=True" in patched
+        assert "value=[0.51, 0.8399999737739563]" in patched
+        assert len(patched.splitlines()) == len(OPTIMIZATIONS.splitlines())
+        assert ast.parse(patched)
+
+    def test_rejects_a_parameter_without_a_single_declaration(self):
+        from cadjoint.viewer._patch import set_parameter_values
+
+        with pytest.raises(PatchError, match="exactly one"):
+            set_parameter_values(OPTIMIZATIONS, {"ghost": 1.0})
+        doubled = OPTIMIZATIONS + 'again = Scalar(0.5, name="wall_width")\n'
+        with pytest.raises(PatchError, match="exactly one"):
+            set_parameter_values(doubled, {"wall_width": 1.0})

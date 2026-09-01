@@ -348,3 +348,53 @@ class TestStudyMeshSpans:
         statement = locate_study_statements(source)[0]
         assert statement.mesh_span is None
         assert statement.domain_span is None
+
+
+OPTIMIZATIONS = """from cadjoint.optimize import Optimization
+from cadjoint.sdf.primitives import Box
+
+scene = Box(size=[1.0, 1.0, 1.0])
+
+def volume(params):
+    return params["size"].prod()
+
+shrink = Optimization(name="min-volume", objective=volume, of=scene, steps=25, learning_rate=0.03)
+Optimization("bare", volume, scene)
+"""
+
+
+class TestLocateOptimizationStatements:
+    def test_locates_assigned_and_bare_constructors_in_order(self):
+        from cadjoint.viewer._source_map import locate_optimization_statements
+
+        statements = locate_optimization_statements(OPTIMIZATIONS)
+        assert [statement.index for statement in statements] == [0, 1]
+        assert [statement.name for statement in statements] == ["min-volume", "bare"]
+        assert [statement.variable for statement in statements] == ["shrink", None]
+        start, end = statements[0].call_span
+        assert OPTIMIZATIONS[start:end].startswith("Optimization(")
+
+    def test_carries_steps_and_learning_rate_value_spans(self):
+        from cadjoint.viewer._source_map import locate_optimization_statements
+
+        first, second = locate_optimization_statements(OPTIMIZATIONS)
+        start, end = first.steps_span
+        assert OPTIMIZATIONS[start:end] == "25"
+        start, end = first.learning_rate_span
+        assert OPTIMIZATIONS[start:end] == "0.03"
+        # The bare declaration writes neither keyword.
+        assert second.steps_span is None
+        assert second.learning_rate_span is None
+
+    def test_skips_statements_with_more_than_one_constructor(self):
+        from cadjoint.viewer._source_map import locate_optimization_statements
+
+        two = "pair = (Optimization('a', f, s), Optimization('b', f, s))\n"
+        assert locate_optimization_statements(two) == []
+        loop = "for i in range(2):\n    Optimization(str(i), f, s)\n"
+        assert locate_optimization_statements(loop) == []
+
+    def test_returns_none_for_unparsable_source(self):
+        from cadjoint.viewer._source_map import locate_optimization_statements
+
+        assert locate_optimization_statements("def broken(:\n") is None

@@ -201,6 +201,12 @@ class TestStudySimulate:
         low, high = result["mesh"]["range"]
         assert low == pytest.approx(0.0, abs=1e-3)
         assert high == pytest.approx(100.0, abs=1e-3)
+        # The uniform field catalog for inspection: thermal exposes its one
+        # field (identical to the display scalars) plus its range.
+        assert set(result["mesh"]["fields"]) == {"temperature"}
+        assert result["mesh"]["fields"]["temperature"] == result["mesh"]["scalars"]
+        assert result["mesh"]["ranges"]["temperature"] == pytest.approx([low, high])
+        assert "displacements" not in result["mesh"]
         # The declaration itself rides along, with per-BC serializability.
         assert result["study"]["name"] == "bar"
         assert [bc["serializable"] for bc in result["study"]["bcs"]] == [True, True]
@@ -239,6 +245,26 @@ class TestStudySimulate:
         low, high = result["mesh"]["range"]
         assert high > low >= 0.0
         assert set(result["result"]["fields"]) == {"displacement", "von_mises"}
+
+        # Full inspection catalog: both scalar fields per boundary vertex,
+        # per-field ranges, and the raw displacement vectors for a warped
+        # (deformed) view.
+        payload = result["mesh"]
+        count = payload["vertex_count"]
+        assert set(payload["fields"]) == {"von_mises", "displacement_magnitude"}
+        assert payload["fields"]["von_mises"] == payload["scalars"]
+        assert len(payload["fields"]["displacement_magnitude"]) == count
+        assert payload["ranges"]["von_mises"] == pytest.approx([low, high])
+        magnitude_low, magnitude_high = payload["ranges"]["displacement_magnitude"]
+        assert magnitude_high > magnitude_low >= 0.0
+        assert len(payload["displacements"]) == count
+        for vector, magnitude in zip(
+            payload["displacements"], payload["fields"]["displacement_magnitude"]
+        ):
+            assert len(vector) == 3
+            assert sum(component**2 for component in vector) ** 0.5 == pytest.approx(
+                magnitude, abs=1e-4
+            )
 
     def test_cached_serves_the_last_result_without_resolving(self):
         pytest.importorskip("jax_fem", reason="study solve needs the fem extra")

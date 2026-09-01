@@ -987,6 +987,107 @@ def locate_mesh_statements(source: str) -> list[MeshStatement] | None:
     return statements
 
 
+OPTIMIZATION_CALL_NAME = "Optimization"
+
+
+@dataclass(frozen=True)
+class OptimizationStatement:
+    """One top-level ``Optimization`` constructor statement, in source order.
+
+    Mirrors :class:`MeshStatement`: statement order equals construction
+    order for top-level declarations, so the position doubles as a stable
+    index shared by the compile payload and the optimization patch
+    operations.  ``name`` is the literal ``name=`` argument (or first
+    positional string), ``variable`` the assignment target when there is
+    exactly one.  ``steps_span`` and ``learning_rate_span`` are the
+    character spans of those keyword *values* (None when absent) so the
+    viewer can edit them in place.
+    """
+
+    index: int
+    name: str | None
+    variable: str | None
+    statement: ast.stmt
+    call: ast.Call
+    call_span: Span
+    steps_span: Span | None
+    learning_rate_span: Span | None
+
+
+def locate_optimization_statements(source: str) -> list[OptimizationStatement] | None:
+    """Top-level ``Optimization`` constructors, in source order.
+
+    Mirrors :func:`locate_mesh_statements`: only unambiguous top-level
+    statements (an assignment or a bare expression containing exactly one
+    ``Optimization`` constructor) are located.  Optimizations built in
+    loops or helper functions are not — the compile payload detects the
+    count mismatch against the captured optimizations and marks every
+    entry non-editable.
+
+    Args:
+        source: The full program text.
+
+    Returns:
+        The optimization statements in source order, or None when the
+        source cannot be parsed.
+    """
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return None
+    offsets = _line_offsets(source)
+    statements: list[OptimizationStatement] = []
+    for item in tree.body:
+        if not isinstance(item, (ast.Assign, ast.AnnAssign, ast.Expr)):
+            continue
+        calls = [node for node in ast.walk(item) if _called_name(node) == OPTIMIZATION_CALL_NAME]
+        if len(calls) != 1:
+            continue
+        call = calls[0]
+        call_span = _node_span(source, offsets, call)
+        if call_span is None:
+            continue
+        name_node = next(
+            (keyword.value for keyword in call.keywords if keyword.arg == "name"),
+            call.args[0] if call.args else None,
+        )
+        name = (
+            name_node.value
+            if isinstance(name_node, ast.Constant) and isinstance(name_node.value, str)
+            else None
+        )
+        variable = None
+        if (
+            isinstance(item, ast.Assign)
+            and len(item.targets) == 1
+            and isinstance(item.targets[0], ast.Name)
+        ):
+            variable = item.targets[0].id
+        elif isinstance(item, ast.AnnAssign) and isinstance(item.target, ast.Name):
+            variable = item.target.id
+
+        def keyword_span(argument: str, keywords=call.keywords) -> Span | None:
+            value = next(
+                (keyword.value for keyword in keywords if keyword.arg == argument),
+                None,
+            )
+            return _node_span(source, offsets, value) if value is not None else None
+
+        statements.append(
+            OptimizationStatement(
+                index=len(statements),
+                name=name,
+                variable=variable,
+                statement=item,
+                call=call,
+                call_span=call_span,
+                steps_span=keyword_span("steps"),
+                learning_rate_span=keyword_span("learning_rate"),
+            )
+        )
+    return statements
+
+
 def _runtime_constraint_entry(constraint, vertex_indices: dict[int, int]) -> dict | None:
     """Serialize one runtime constraint whose parameters are profile vertices."""
     kind = CONSTRAINT_CLASS_KINDS.get(constraint.__class__.__name__)

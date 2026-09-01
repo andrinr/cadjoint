@@ -41,11 +41,7 @@ COVERAGE_MINIMUM = 0.9
 # the playground starter before the heat-sink swap; the battery keeps it as
 # its own fixture because every curve below (profile outline, lateral
 # edges, revolved-corner circles) is computed from these exact literals.
-HOUSE_SOURCE = """import jax
-import jax.numpy as jnp
-
-from cadjoint import extract_parameters, functionalize
-from cadjoint.construction import PolygonProfile, SketchPlane, Solid, extrude, revolve
+HOUSE_SOURCE = """from cadjoint.construction import PolygonProfile, SketchPlane, Solid, extrude, revolve
 from cadjoint.constraints import DistanceConstraint, FixedConstraint, satisfy_constraints
 from cadjoint.geometry import Scalar, Vector, Vector2
 from cadjoint.render import Material
@@ -147,30 +143,6 @@ scene = Union(
     smoothness=0.0,
 )
 satisfy_constraints(scene, steps=2)
-
-# This is a real reverse-mode derivative through sketch points -> extrusion ->
-# final SDF evaluation. Change the profile or depth and rerun: both
-# sensitivities update in the compact AD panel above the code.
-body_parameters, body_fixed, _ = extract_parameters(body)
-body_sdf = functionalize(body)
-
-def clearance_metric(parameters):
-    sdf = body_sdf(parameters, body_fixed)
-    side_clearance = sdf(jnp.array([1.6, 0.0, 0.0]))
-    top_clearance = sdf(jnp.array([0.0, 0.0, 0.8]))
-    return side_clearance + top_clearance
-
-clearance, clearance_gradient = jax.value_and_grad(clearance_metric)(body_parameters)
-differentiability_demo = {
-    "pipeline": "Profile -> Extrude -> SDF",
-    "metric": "two-probe clearance",
-    "value": float(clearance),
-    "parameter_count": len(body_parameters),
-    "sensitivities": [
-        {"parameter": "eave_right.x", "value": float(clearance_gradient["eave_right"][0])},
-        {"parameter": "body_depth", "value": float(clearance_gradient["body_depth"])},
-    ],
-}
 """
 
 RING_ORIGIN = "origin=[0.0, 1.65, 0.15]"

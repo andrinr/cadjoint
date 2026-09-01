@@ -268,15 +268,27 @@ def test_example_scene_reports_its_construction_for_the_viewer():
         }
     ]
 
-    autodiff = result["differentiability"]
-    assert autodiff["pipeline"] == "Profile -> Extrude -> SDF"
-    assert autodiff["metric"] == "aluminum volume (smoothed)"
-    assert autodiff["parameter_count"] == 17
-    assert autodiff["value"] == pytest.approx(0.8331418633, abs=1e-6)
-    assert autodiff["sensitivities"] == [
-        {"parameter": "fin_depth", "value": pytest.approx(0.6889996529, abs=1e-6)},
-        {"parameter": "fin2_tip_l.y", "value": pytest.approx(0.1042722091, abs=1e-6)},
-    ]
+    # The starter declares its optimization; nothing descends at compile time.
+    assert "differentiability" not in result
+    optimizations = result["optimizations"]
+    assert len(optimizations) == 1
+    optimization = optimizations[0]
+    assert optimization["kind"] == "optimization"
+    assert optimization["name"] == "min-aluminum"
+    assert optimization["objective"] == "material_volume"
+    assert optimization["steps"] == 25
+    assert optimization["learning_rate"] == pytest.approx(0.03)
+    assert optimization["method"] == "adam"
+    assert optimization["index"] == 0
+    assert optimization["editable"] is True
+    assert len(optimization["parameters"]) == 17
+    assert "fin_depth" in optimization["parameters"]
+    start, end = optimization["span"]
+    assert EXAMPLE_SOURCE[start:end].startswith("Optimization(")
+    start, end = optimization["steps_span"]
+    assert EXAMPLE_SOURCE[start:end] == "25"
+    start, end = optimization["learning_rate_span"]
+    assert EXAMPLE_SOURCE[start:end] == "0.03"
 
     assert result["relations"] == [
         {
@@ -403,7 +415,8 @@ def test_session_endpoint_hands_out_a_token_and_the_example():
 
 
 @pytest.mark.parametrize(
-    "path", ["/compile", "/patch", "/api/mesh", "/api/scenes/load", "/api/scenes/save"]
+    "path",
+    ["/compile", "/patch", "/api/mesh", "/api/optimize", "/api/scenes/load", "/api/scenes/save"],
 )
 def test_write_endpoints_require_the_session_token(path):
     with running_server() as base:
@@ -831,6 +844,10 @@ def test_mesh_patches_round_trip_through_compile():
             "`domain` name",
         ),
         (
+            {"op": "set_mesh_value", "mesh": 0, "argument": "method", "value": "voxel"},
+            "hex, tet4, tet10",
+        ),
+        (
             {"op": "set_study_value", "study": 0, "argument": "mesh", "value": 3.0},
             "`mesh` name",
         ),
@@ -842,6 +859,209 @@ def test_mesh_patches_round_trip_through_compile():
 )
 def test_patch_source_validates_mesh_requests(request_body, message):
     result = patch_source({"source": MESH_SOURCE, **request_body})
+
+    assert result["ok"] is False
+    assert message in result["error"]
+
+
+def test_mesh_method_patches_write_a_string_literal():
+    # Text surgery only: the declared enum is validated here, the literal is
+    # written as a keyword, and nothing executes.
+    patched = patch_source(
+        {
+            "source": MESH_SOURCE,
+            "op": "set_mesh_value",
+            "mesh": "box-grid",
+            "argument": "method",
+            "value": "tet4",
+        }
+    )
+
+    assert patched["ok"] is True
+    assert "method='tet4'" in patched["source"]
+
+
+# ── Optimizations as first-class code citizens ──────────────────────────────
+
+OPTIMIZE_SOURCE = """from cadjoint.geometry import Scalar
+from cadjoint.optimize import Optimization
+from cadjoint.sdf.primitives import Sphere
+
+radius = Scalar(0.8, free=True, name="radius")
+scene = Sphere(radius)
+
+
+def fit(params):
+    return (params["radius"] - 0.25) ** 2
+
+
+shrink = Optimization(name="fit-radius", objective=fit, of=scene, steps=4, learning_rate=0.1)
+"""
+
+
+def test_compile_reports_declared_optimizations_for_the_viewer():
+    result = compile_source(OPTIMIZE_SOURCE)
+
+    assert result["ok"] is True
+    optimizations = result["optimizations"]
+    assert len(optimizations) == 1
+    optimization = optimizations[0]
+    assert optimization["kind"] == "optimization"
+    assert optimization["name"] == "fit-radius"
+    assert optimization["objective"] == "fit"
+    assert optimization["parameters"] == ["radius"]
+    assert optimization["steps"] == 4
+    assert optimization["learning_rate"] == pytest.approx(0.1)
+    assert optimization["editable"] is True
+    assert optimization["line"] == call_line(OPTIMIZE_SOURCE, "Optimization")
+    start, end = optimization["span"]
+    assert OPTIMIZE_SOURCE[start:end].startswith("Optimization(")
+
+
+def test_compile_reports_a_scene_without_optimizations_as_an_empty_list():
+    result = compile_source("from cadjoint.sdf.primitives import Sphere\nscene = Sphere(1.0)\n")
+
+    assert result["ok"] is True
+    assert result["optimizations"] == []
+
+
+def test_optimize_endpoint_descends_and_patches_the_source_back():
+    from cadjoint.viewer.playground import optimize_source
+
+    result = optimize_source({"source": OPTIMIZE_SOURCE, "name": "fit-radius"})
+
+    assert result["ok"] is True
+    assert result["kind"] == "optimize"
+    assert result["name"] == "fit-radius"
+    assert result["steps"] == 4
+    assert "output" in result
+
+    # The differentiable path descends: four steps, monotone here.
+    assert len(result["history"]) == 4
+    assert result["history"][-1]["objective"] < result["history"][0]["objective"]
+    assert all(record["grad_norm"] >= 0.0 for record in result["history"])
+
+    # The trajectory replays the parameter path from the initial state.
+    assert len(result["trajectory"]) == 5
+    assert result["trajectory"][0]["step"] == 0
+    assert result["trajectory"][0]["parameters"] == result["initial"]
+    assert result["trajectory"][-1]["parameters"] == result["parameters"]
+
+    assert result["initial"]["radius"] == pytest.approx(0.8, abs=1e-6)
+    optimized = result["parameters"]["radius"]
+    assert abs(optimized - 0.25) < abs(0.8 - 0.25)
+
+    # Writeback is literal text surgery: the declaration now carries the
+    # optimized value with exact repr, and the rest of the file is intact.
+    assert "radius = Scalar(0.8, free=True" not in result["source"]
+    assert f'radius = Scalar({optimized!r}, free=True, name="radius")' in result["source"]
+    assert 'shrink = Optimization(name="fit-radius"' in result["source"]
+    recompiled = compile_source(result["source"])
+    assert recompiled["ok"] is True
+    assert recompiled["optimizations"][0]["editable"] is True
+
+
+def test_optimize_endpoint_honors_a_step_override():
+    from cadjoint.viewer.playground import optimize_source
+
+    result = optimize_source({"source": OPTIMIZE_SOURCE, "name": "fit-radius", "steps": 2})
+
+    assert result["ok"] is True
+    assert result["steps"] == 2
+    assert len(result["history"]) == 2
+    assert len(result["trajectory"]) == 3
+
+
+def test_optimize_endpoint_reports_an_unknown_optimization():
+    from cadjoint.viewer.playground import optimize_source
+
+    result = optimize_source({"source": OPTIMIZE_SOURCE, "name": "nope"})
+
+    assert result["ok"] is False
+    assert "declares no optimization named 'nope'" in result["error"]
+    assert "'fit-radius'" in result["error"]
+
+
+@pytest.mark.parametrize(
+    ("request_body", "message"),
+    [
+        ({}, "needs `name`"),
+        ({"name": "   "}, "needs `name`"),
+        ({"name": "fit-radius", "steps": 0}, "positive integer"),
+        ({"name": "fit-radius", "steps": True}, "positive integer"),
+        ({"name": "fit-radius", "steps": 2.5}, "positive integer"),
+        ({"name": "fit-radius", "steps": 500}, "capped at 200"),
+    ],
+)
+def test_optimize_endpoint_validates_its_request(request_body, message):
+    from cadjoint.viewer.playground import optimize_source
+
+    result = optimize_source({"source": OPTIMIZE_SOURCE, **request_body})
+
+    assert result["ok"] is False
+    assert message in result["error"]
+
+
+def test_optimization_patches_round_trip_through_compile():
+    stepped = patch_source(
+        {
+            "source": OPTIMIZE_SOURCE,
+            "op": "set_optimization_value",
+            "optimization": "fit-radius",
+            "argument": "steps",
+            "value": 6,
+        }
+    )
+    assert stepped["ok"] is True
+    assert "steps=6" in stepped["source"]
+
+    tuned = patch_source(
+        {
+            "source": stepped["source"],
+            "op": "set_optimization_value",
+            "optimization": 0,
+            "argument": "learning_rate",
+            "value": 0.02,
+        }
+    )
+    assert tuned["ok"] is True
+    assert "learning_rate=0.02" in tuned["source"]
+
+    result = compile_source(tuned["source"])
+    assert result["ok"] is True
+    assert result["optimizations"][0]["steps"] == 6
+    assert result["optimizations"][0]["learning_rate"] == pytest.approx(0.02)
+
+    deleted = patch_source(
+        {"source": tuned["source"], "op": "delete_optimization", "optimization": "fit-radius"}
+    )
+    assert deleted["ok"] is True
+    assert "shrink = " not in deleted["source"]
+
+
+@pytest.mark.parametrize(
+    ("request_body", "message"),
+    [
+        ({"op": "delete_optimization"}, "`optimization`"),
+        ({"op": "delete_optimization", "optimization": -1}, "`optimization`"),
+        ({"op": "delete_optimization", "optimization": "  "}, "`optimization`"),
+        (
+            {"op": "set_optimization_value", "optimization": 0, "argument": "method", "value": 1},
+            "`steps` or `learning_rate`",
+        ),
+        (
+            {
+                "op": "set_optimization_value",
+                "optimization": 0,
+                "argument": "steps",
+                "value": "many",
+            },
+            "numeric `value`",
+        ),
+    ],
+)
+def test_patch_source_validates_optimization_requests(request_body, message):
+    result = patch_source({"source": OPTIMIZE_SOURCE, **request_body})
 
     assert result["ok"] is False
     assert message in result["error"]
