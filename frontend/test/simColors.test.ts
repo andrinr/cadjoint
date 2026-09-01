@@ -17,6 +17,7 @@ import { describe, expect, it } from "vitest";
 import {
   BC_TYPE_COLORS,
   ELEMENT_EDGE_COLOR,
+  ELEMENT_EDGE_COLOR_LIGHT,
   MAGMA_COEFFICIENTS,
   PROPOSAL_COLOR,
   VIEWPORT_BACKGROUND,
@@ -126,12 +127,18 @@ describe("WGSL constants stay in sync with simColors.ts", () => {
     );
   });
 
-  it("element-edge color matches", () => {
-    const match = wgsl.match(/fs_sim_edge[\s\S]*?vec4<f32>\(([^)]*)\);\s*\}\s*$/);
-    expect(match).toBeTruthy();
-    const [r, g, b] = match![1].split(",").map((part) => Number(part.trim()));
-    expect(r).toBeCloseTo(ELEMENT_EDGE_COLOR[0], 9);
-    expect(g).toBeCloseTo(ELEMENT_EDGE_COLOR[1], 9);
-    expect(b).toBeCloseTo(ELEMENT_EDGE_COLOR[2], 9);
+  it("both element-edge tones match", () => {
+    // The edge shader picks between a dark and a light hairline by the ramp
+    // luminance underneath it; both constants must stay in sync.
+    const body = wgsl.slice(wgsl.indexOf("fn fs_sim_edge"));
+    const tones = [...body.matchAll(/return vec4<f32>\(([^)]*)\);/g)].map((match) =>
+      match[1].split(",").slice(0, 3).map((part) => Number(part.trim())),
+    );
+    expect(tones).toHaveLength(2);
+    for (const [index, expected] of [ELEMENT_EDGE_COLOR, ELEMENT_EDGE_COLOR_LIGHT].entries()) {
+      expect(tones[index][0]).toBeCloseTo(expected[0], 9);
+      expect(tones[index][1]).toBeCloseTo(expected[1], 9);
+      expect(tones[index][2]).toBeCloseTo(expected[2], 9);
+    }
   });
 });

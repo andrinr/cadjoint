@@ -115,10 +115,19 @@ export const BC_TYPE_COLORS: Record<StudyBcType, Rgb> = {
 export const PROPOSAL_COLOR: Rgb = [0.25, 0.9, 1.0];
 
 /**
- * Element-edge lines: near-black charcoal (see the module comment for the
- * dark-field caveat). Mirrored as a constant in simulation.wgsl.
+ * Element-edge lines, dark tone: drawn where the ramp value under the
+ * hairline is bright. Mirrored as a constant in simulation.wgsl.
  */
-export const ELEMENT_EDGE_COLOR: Rgb = [0.07, 0.08, 0.09];
+export const ELEMENT_EDGE_COLOR: Rgb = [0.05, 0.05, 0.06];
+
+/**
+ * Element-edge lines, light tone: drawn where the ramp value under the
+ * hairline is dark (viridis' purple end swallows a charcoal line). The
+ * shader picks between the two by the ramp colour's relative luminance, so
+ * the wireframe stays legible across the whole field. Mirrored in
+ * simulation.wgsl.
+ */
+export const ELEMENT_EDGE_COLOR_LIGHT: Rgb = [0.86, 0.9, 0.94];
 
 /** Quality accent for panel chrome tied to the quality ramp (histogram). */
 export const QUALITY_ACCENT: Rgb = qualityRamp(0.75);

@@ -97,14 +97,21 @@ fn fs_sim(input: SimVertex) -> @location(0) vec4<f32> {
 struct SimEdgeVertex {
   @builtin(position) position : vec4<f32>,
   @location(0) world          : vec3<f32>,
+  @location(1) scalar         : f32,
 };
 
 @vertex
-fn vs_sim_edge(@location(0) position : vec3<f32>) -> SimEdgeVertex {
+fn vs_sim_edge(
+  @location(0) position : vec3<f32>,
+  @location(1) scalar   : f32,
+) -> SimEdgeVertex {
   var out: SimEdgeVertex;
   out.position = s.view_proj * vec4<f32>(position, 1.0);
-  out.position.z = out.position.z - 0.0015 * out.position.w;
+  // A larger nudge than the faces get: hairlines that z-fight with their
+  // own surface read as dashed, which looks like missing elements.
+  out.position.z = out.position.z - 0.004 * out.position.w;
   out.world = position;
+  out.scalar = scalar;
   return out;
 }
 
@@ -113,6 +120,21 @@ fn fs_sim_edge(input: SimEdgeVertex) -> @location(0) vec4<f32> {
   if (s.params.w > 0.5 && dot(input.world, s.clip.xyz) > s.clip.w) {
     discard;
   }
-  // ELEMENT_EDGE_COLOR — keep in sync with src/simColors.ts.
-  return vec4<f32>(0.07, 0.08, 0.09, 1.0);
+  // A single fixed hairline colour cannot stay legible across a whole ramp:
+  // charcoal vanishes in viridis' dark end, white vanishes in its bright
+  // end. Evaluate the same ramp the surface uses and pick whichever of the
+  // two edge tones contrasts with it.
+  let t = clamp((input.scalar - s.params.x) * s.params.y, 0.0, 1.0);
+  var under = viridis(t);
+  if (s.extra.x > 0.5) {
+    under = magma(t);
+  }
+  let luminance = dot(clamp(under, vec3<f32>(0.0), vec3<f32>(1.0)),
+                      vec3<f32>(0.2126, 0.7152, 0.0722));
+  // ELEMENT_EDGE_COLOR / ELEMENT_EDGE_COLOR_LIGHT — keep in sync with
+  // src/simColors.ts.
+  if (luminance > 0.32) {
+    return vec4<f32>(0.05, 0.05, 0.06, 1.0);
+  }
+  return vec4<f32>(0.86, 0.90, 0.94, 1.0);
 }
