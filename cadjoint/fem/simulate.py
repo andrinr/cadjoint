@@ -1,18 +1,26 @@
 """Thermal and structural simulation on SDF-extracted hex and tet meshes.
 
-Public entry points :func:`thermal_solve` and :func:`elastic_solve` resolve
-boundary patches — :class:`~cadjoint.fem.selection.NodeSelection` values or
-legacy face predicates — against the mesh, hand array-level BCs to a
-pluggable solver backend (:mod:`cadjoint.fem.backends`; direct in-process
-jax-fem by default), and return small result objects with VTK export for
-ParaView.
+What belongs here: the imperative entry points and the *patch resolution*
+between them and the solver ABI — turning a user's selection or predicate
+into the node index sets and exact face lists a backend consumes, and
+wrapping the returned field in a result object.  Public entry points
+:func:`thermal_solve` and :func:`elastic_solve` resolve boundary patches —
+:class:`~cadjoint.fem.selection.NodeSelection` values or legacy face
+predicates — against the mesh, hand array-level BCs to a pluggable solver
+backend (:mod:`cadjoint.fem.backends`; direct in-process jax-fem by
+default), and return small result objects with VTK export for ParaView.
+
+What does *not* belong here: the finite-element formulations
+(:mod:`cadjoint.fem.jaxfem`), the boundary-face rules the patch resolution
+calls into (:mod:`cadjoint.fem.boundary`), or the derived quantities the
+result objects expose (:mod:`cadjoint.fem.postprocess`).
 
 Patch semantics: a ``NodeSelection`` used for a node-valued condition
 (prescribed temperature, clamp) applies to its selected node set directly;
 used for an area-integrated condition (traction, heat flux) it spans the
 boundary faces all of whose corners are selected
-(:func:`~cadjoint.fem.hexmesh.faces_from_nodes` on hex meshes,
-:func:`~cadjoint.fem.tetmesh.tet_faces_from_nodes` on tet meshes).  A
+(:func:`~cadjoint.fem.boundary.faces_from_nodes` on hex meshes,
+:func:`~cadjoint.fem.boundary.tet_faces_from_nodes` on tet meshes).  A
 callable patch is the legacy face-predicate form resolved via
 :func:`~cadjoint.fem.select_faces`.
 
@@ -42,17 +50,18 @@ from typing import Any, Callable
 import numpy as np
 
 from cadjoint.fem.backends import ElasticBCs, SolverBackend, ThermalBCs, get_backend
-from cadjoint.fem.hexmesh import HexMesh, faces_from_nodes, select_faces
-from cadjoint.fem.selection import NodeSelection
-from cadjoint.fem.tetmesh import (
-    TetMesh,
+from cadjoint.fem.boundary import (
+    faces_from_nodes,
+    select_faces,
     tet10_complete_nodes,
     tet10_face_midsides,
-    tet_elastic_solve,
     tet_faces_from_nodes,
-    tet_thermal_solve,
-    tet_von_mises,
 )
+from cadjoint.fem.hexmesh import HexMesh
+from cadjoint.fem.jaxfem import tet_elastic_solve, tet_thermal_solve
+from cadjoint.fem.postprocess import hex_von_mises, tet_von_mises
+from cadjoint.fem.selection import NodeSelection
+from cadjoint.fem.tetmesh import TetMesh
 
 __all__ = ["ElasticResult", "ThermalResult", "elastic_solve", "thermal_solve"]
 
@@ -62,22 +71,6 @@ Patch = NodeSelection | Predicate
 
 #: A solvable volume mesh (HEX8, or TET4/TET10 via the tet path).
 SolveMesh = HexMesh | TetMesh
-
-# Trilinear corner signs of the VTK hex in reference coordinates [-1, 1]^3;
-# dN_i/dxi at the element center is _CORNER_SIGNS[i] / 8.
-_CORNER_SIGNS = np.array(
-    [
-        (-1, -1, -1),
-        (1, -1, -1),
-        (1, 1, -1),
-        (-1, 1, -1),
-        (-1, -1, 1),
-        (1, -1, 1),
-        (1, 1, 1),
-        (-1, 1, 1),
-    ],
-    dtype=np.float64,
-)
 
 
 def _patch_nodes(mesh: HexMesh, predicate: Predicate) -> np.ndarray:
@@ -233,9 +226,10 @@ class ElasticResult:
         """Per-cell von Mises stress evaluated at each element center.
 
         On hex meshes the displacement gradient is taken from the
-        trilinear (HEX8) basis at the element center; on tet meshes from
-        the TET4/TET10 basis at the centroid
-        (:func:`~cadjoint.fem.tetmesh.tet_von_mises`).
+        trilinear (HEX8) basis at the element center
+        (:func:`~cadjoint.fem.postprocess.hex_von_mises`); on tet meshes
+        from the TET4/TET10 basis at the centroid
+        (:func:`~cadjoint.fem.postprocess.tet_von_mises`).
 
         Returns:
             Von Mises stress per cell, shaped ``(C,)``.
@@ -243,23 +237,8 @@ class ElasticResult:
         points = np.asarray(self.mesh.points, dtype=np.float64)
         displacement = np.asarray(self.displacement, dtype=np.float64)
         cells = np.asarray(self.mesh.cells)
-        if cells.shape[1] != 8:
-            return tet_von_mises(
-                points, cells, displacement, youngs=self.youngs, poisson=self.poisson
-            )
-        grad_ref = _CORNER_SIGNS / 8.0  # (8, 3): dN/dxi at the center
-        corner_positions = points[cells]  # (C, 8, 3)
-        corner_disp = displacement[cells]  # (C, 8, 3)
-        jacobian = np.einsum("cia,ib->cab", corner_positions, grad_ref)  # dx/dxi
-        grad_phys = np.einsum("ib,cab->cia", grad_ref, np.linalg.inv(jacobian).transpose(0, 2, 1))
-        u_grad = np.einsum("cia,cib->cab", corner_disp, grad_phys)  # du_a/dx_b
-        strain = 0.5 * (u_grad + u_grad.transpose(0, 2, 1))
-        lame_lambda = self.youngs * self.poisson / ((1 + self.poisson) * (1 - 2 * self.poisson))
-        lame_mu = self.youngs / (2 * (1 + self.poisson))
-        trace = np.trace(strain, axis1=1, axis2=2)
-        stress = lame_lambda * trace[:, None, None] * np.eye(3) + 2.0 * lame_mu * strain
-        deviator = stress - np.trace(stress, axis1=1, axis2=2)[:, None, None] / 3.0 * np.eye(3)
-        return np.sqrt(1.5 * np.einsum("cab,cab->c", deviator, deviator))
+        recover = hex_von_mises if cells.shape[1] == 8 else tet_von_mises
+        return recover(points, cells, displacement, youngs=self.youngs, poisson=self.poisson)
 
     def vtk_export(self, path: str) -> None:
         """Write mesh + displacement + von Mises stress as VTK for ParaView."""

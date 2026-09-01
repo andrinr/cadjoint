@@ -10,11 +10,11 @@ Element types: the schema is element-agnostic — ``cells`` is ``(T, K)``
 and ``K`` picks the element (4 = TET4, 8 = HEX8, 10 = TET10; meshio
 ``tetra``/``hexahedron``/``tetra10`` node order).  HEX8 runs the direct
 backend's solve verbatim; TET4/TET10 reuse
-:func:`cadjoint.fem.tetmesh.tet_elastic_solve` (direct sparse solver,
+:func:`cadjoint.fem.jaxfem.tet_elastic_solve` (direct sparse solver,
 identical to the in-process tet path).  For TET10, boundary-condition node
 sets must include the patches' midside nodes
-(:func:`cadjoint.fem.tetmesh.tet10_complete_nodes` /
-:func:`~cadjoint.fem.tetmesh.tet10_face_midsides`).
+(:func:`cadjoint.fem.boundary.tet10_complete_nodes` /
+:func:`~cadjoint.fem.boundary.tet10_face_midsides`).
 
 Boundary-condition encoding (variable patch counts over fixed-rank
 arrays): ``fixed_nodes`` is the union of all fully-clamped patches (all
@@ -76,8 +76,8 @@ def _split(flat: np.ndarray, offsets: np.ndarray) -> list[np.ndarray]:
 
 def _solve(points, inputs, base_points):
     """Run the jax-fem elastic solve; differentiable via its adjoint VJP."""
-    from cadjoint.fem.backends import ElasticBCs, JaxFemBackend
-    from cadjoint.fem.tetmesh import tet_elastic_solve
+    from cadjoint.fem.backends import ElasticBCs
+    from cadjoint.fem.jaxfem import JaxFemBackend, tet_elastic_solve
 
     cells = np.asarray(inputs.cells)
     try:

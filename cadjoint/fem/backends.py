@@ -1,7 +1,22 @@
-"""Pluggable FEM solver backends.
+"""The FEM solver ABI, the backend registry, and the Tesseract interop path.
 
-The solver layer is split so jax-fem is one backend rather than a
-hard-wired dependency:
+What belongs here: the contract every solver plugs into, and nothing that
+solves.  Concretely — the array-level boundary-condition payloads
+(:class:`ThermalBCs` / :class:`ElasticBCs`), the :class:`SolverBackend`
+protocol, the name -> factory registry (:func:`get_backend`,
+:func:`register_backend`), the cross-process interop backend
+(:class:`TesseractBackend`), and the small shared utilities every solver
+needs (:func:`_x64_scope`, :func:`_require_jax_fem`,
+:func:`_membership_location`).
+
+What does *not* belong here: finite-element formulations.  Every direct
+jax-fem solve — HEX8 *and* TET4/TET10 — lives in :mod:`cadjoint.fem.jaxfem`;
+CalculiX lives in :mod:`cadjoint.fem.calculix`.  The registry reaches them
+through lazy factories, so this module imports no solver implementation and
+stays importable without jax-fem, tesseract-core or ccx.
+
+The split exists so jax-fem is one backend rather than a hard-wired
+dependency:
 
 - **ABI**: boundary conditions and mesh data cross the backend boundary as
   plain arrays (:class:`ThermalBCs` / :class:`ElasticBCs` hold node index
@@ -10,8 +25,9 @@ hard-wired dependency:
   cross a Tesseract schema, so third-party — even non-JAX — solvers can
   plug in by shipping a tesseract with ``apply`` + ``vector_jacobian_product``
   endpoints.
-- **Default**: :class:`JaxFemBackend` runs jax-fem in-process (native JAX
-  composition, no serialization boundary) — the performance baseline.
+- **Default**: :class:`~cadjoint.fem.jaxfem.JaxFemBackend` runs jax-fem
+  in-process (native JAX composition, no serialization boundary) — the
+  performance baseline.
 - **Interop**: :class:`TesseractBackend` routes through
   ``tesseract_jax.apply_tesseract`` and the packaged reference tesseract in
   :mod:`cadjoint.fem.tesseracts`, proving the plugin contract.
@@ -23,9 +39,9 @@ material parameters where noted) is defined — via jax-fem's adjoint
 ``vector_jacobian_product`` endpoint for tesseract backends.  The direct
 thermal solve is additionally differentiable w.r.t. the prescribed
 Dirichlet *values* (lifted formulation; see
-:meth:`JaxFemBackend.thermal`).  Forward solves are not jax-traceable
-end-to-end (PETSc assembly), so none of these calls may sit under
-``jax.jit``.
+:meth:`~cadjoint.fem.jaxfem.JaxFemBackend.thermal`).  Forward solves are not
+jax-traceable end-to-end (PETSc assembly), so none of these calls may sit
+under ``jax.jit``.
 
 Precision contract: each backend call enables jax's x64 mode only for its
 own duration (see :func:`_x64_scope`) so forward solves never leak float64
@@ -184,163 +200,6 @@ def _membership_location(node_set: np.ndarray) -> Callable[..., Any]:
     return location
 
 
-class JaxFemBackend:
-    """Direct in-process jax-fem backend (default; performance baseline).
-
-    Gradients flow through jax-fem's adjoint (``ad_wrapper``): the forward
-    solve runs concretely (PETSc-assembled Newton), the VJP solves the
-    adjoint system and back-propagates through the residual — including
-    through the nodal coordinates via
-    ``Problem.initialize_geometric_quantities``.
-    """
-
-    name = "jaxfem"
-
-    def thermal(self, points, cells, bcs, *, conductivity, source, base_points=None):
-        """See :meth:`SolverBackend.thermal`.
-
-        Dirichlet values are differentiable: jax-fem bakes prescribed values
-        into the DOF elimination at problem construction (outside the
-        adjoint's parameter path), so the solve is lifted — ``T = u0 + g``
-        with ``g`` the nodal field interpolating the prescribed boundary
-        values and ``u0`` solved under *homogeneous* Dirichlet conditions
-        with the extra flux ``k grad(g)`` in the weak form.  ``g`` enters
-        through ``set_params`` (as an internal variable via its quad-point
-        gradient), so ``d(objective)/d(dirichlet value)`` flows through the
-        adjoint.
-
-        Heat-flux (Neumann) patches enter the weak form as surface
-        integrals ``-integral(v * q)`` over the faces spanned by each
-        ``flux_nodes`` set, so ``k grad(T) . n = q`` on the patch (``q``
-        positive heats the body).  The lift composes unchanged: the surface
-        term does not involve ``g``.
-        """
-        _require_jax_fem()
-        with _x64_scope():
-            import jax.numpy as jnp
-            from jax_fem.generate_mesh import Mesh
-            from jax_fem.problem import Problem
-            from jax_fem.solver import ad_wrapper
-
-            flux_values = [float(value) for value in bcs.flux_values]
-
-            class _Thermal(Problem):
-                def get_tensor_map(self):
-                    def tensor_map(u_grad, kappa, _source, lift_grad):
-                        # u_grad: (vec=1, dim); lift_grad: (dim,) broadcasts in.
-                        return kappa * (u_grad + lift_grad)
-
-                    return tensor_map
-
-                def get_mass_map(self):
-                    def mass_map(u, _x, _kappa, source_value, _lift_grad):
-                        # Weak form: residual += integral(v * mass_map); the
-                        # source q enters as -q so that -div(k grad T) = q.
-                        return -source_value * jnp.ones_like(u)
-
-                    return mass_map
-
-                def get_surface_maps(self):
-                    # Weak form: residual += integral(v * surface_map); a
-                    # prescribed inflow q enters as -q so k grad(T).n = q.
-                    return [
-                        (lambda u, _x, value=value: -value * jnp.ones_like(u))
-                        for value in flux_values
-                    ]
-
-                def set_params(self, params):
-                    params_points, kappa, source_value, lift_nodal = params
-                    self.initialize_geometric_quantities([params_points])
-                    fe = self.fes[0]
-                    shape = (fe.num_cells, fe.num_quads)
-                    # grad(g) at the quad points from the (possibly traced)
-                    # nodal lift: (C, 8) x (C, Q, 8, dim) -> (C, Q, dim).
-                    lift_grad = jnp.einsum("cn,cqnd->cqd", lift_nodal[fe.cells], fe.shape_grads)
-                    self.internal_vars = [
-                        kappa * jnp.ones(shape),
-                        source_value * jnp.ones(shape),
-                        lift_grad,
-                    ]
-
-            if base_points is None:
-                base_points = points
-            base_points = np.asarray(base_points, dtype=np.float64)
-            mesh = Mesh(base_points, np.asarray(cells), ele_type="HEX8")
-            dirichlet = [
-                [_membership_location(nodes) for nodes in bcs.dirichlet_nodes],
-                [0] * len(bcs.dirichlet_nodes),
-                [(lambda _point: 0.0) for _ in bcs.dirichlet_nodes],
-            ]
-            problem = _Thermal(
-                mesh=mesh,
-                vec=1,
-                dim=3,
-                ele_type="HEX8",
-                dirichlet_bc_info=dirichlet,
-                location_fns=[_membership_location(nodes) for nodes in bcs.flux_nodes],
-            )
-            forward = ad_wrapper(problem)
-
-            lift = jnp.zeros(base_points.shape[0], dtype=jnp.float64)
-            for nodes, value in zip(bcs.dirichlet_nodes, bcs.dirichlet_values):
-                lift = lift.at[jnp.asarray(np.asarray(nodes, dtype=np.int32))].set(value)
-            solution = forward((jnp.asarray(points), conductivity, source, lift))
-            return solution[0][:, 0] + lift
-
-    def elastic(self, points, cells, bcs, *, youngs, poisson, base_points=None):
-        """See :meth:`SolverBackend.elastic`."""
-        _require_jax_fem()
-        with _x64_scope():
-            import jax.numpy as jnp
-            from jax_fem.generate_mesh import Mesh
-            from jax_fem.problem import Problem
-            from jax_fem.solver import ad_wrapper
-
-            lame_lambda = youngs * poisson / ((1.0 + poisson) * (1.0 - 2.0 * poisson))
-            lame_mu = youngs / (2.0 * (1.0 + poisson))
-            tractions = [np.asarray(vector, dtype=np.float64) for vector in bcs.traction_vectors]
-
-            class _Elastic(Problem):
-                def get_tensor_map(self):
-                    def stress(u_grad):
-                        strain = 0.5 * (u_grad + u_grad.T)
-                        return lame_lambda * jnp.trace(strain) * jnp.eye(3) + 2.0 * lame_mu * strain
-
-                    return stress
-
-                def get_surface_maps(self):
-                    # Weak form: residual += integral(v * surface_map); a
-                    # traction t enters as -t so that sigma.n = t on the patch.
-                    return [
-                        (lambda _u, _x, vector=vector: -jnp.asarray(vector)) for vector in tractions
-                    ]
-
-                def set_params(self, params):
-                    self.initialize_geometric_quantities([params])
-
-            if base_points is None:
-                base_points = points
-            mesh = Mesh(
-                np.asarray(base_points, dtype=np.float64), np.asarray(cells), ele_type="HEX8"
-            )
-            fixed_locations = [_membership_location(nodes) for nodes in bcs.fixed_nodes]
-            dirichlet = [
-                [location for location in fixed_locations for _ in range(3)],
-                [component for _ in fixed_locations for component in range(3)],
-                [(lambda _point: 0.0) for _ in fixed_locations for _ in range(3)],
-            ]
-            problem = _Elastic(
-                mesh=mesh,
-                vec=3,
-                dim=3,
-                ele_type="HEX8",
-                dirichlet_bc_info=dirichlet,
-                location_fns=[_membership_location(nodes) for nodes in bcs.traction_nodes],
-            )
-            forward = ad_wrapper(problem)
-            return forward(jnp.asarray(points))[0]
-
-
 class TesseractBackend:
     """Backend routing through Tesseracts (interop ABI reference).
 
@@ -484,6 +343,18 @@ class TesseractBackend:
             return outputs["displacement"]
 
 
+def _jaxfem_backend() -> SolverBackend:
+    """Factory for the direct jax-fem backend (lazy import keeps the layers apart).
+
+    The implementation lives in :mod:`cadjoint.fem.jaxfem`, which imports
+    this module for the ABI; resolving it lazily keeps the dependency
+    one-directional.
+    """
+    from cadjoint.fem.jaxfem import JaxFemBackend
+
+    return JaxFemBackend()
+
+
 def _calculix_backend() -> SolverBackend:
     """Factory for the CalculiX backend (lazy import keeps ccx optional)."""
     from cadjoint.fem.calculix import CalculixBackend
@@ -492,10 +363,27 @@ def _calculix_backend() -> SolverBackend:
 
 
 _REGISTRY: dict[str, Callable[[], SolverBackend]] = {
-    "jaxfem": JaxFemBackend,
+    "jaxfem": _jaxfem_backend,
     "tesseract": TesseractBackend,
     "calculix": _calculix_backend,
 }
+
+
+def __getattr__(name: str) -> Any:
+    """Resolve :class:`~cadjoint.fem.jaxfem.JaxFemBackend` for legacy importers.
+
+    ``JaxFemBackend`` was defined here before the solver formulations moved
+    to :mod:`cadjoint.fem.jaxfem`; the packaged tesseracts and downstream
+    code still import it from this module.  Serving it through PEP 562
+    keeps ``from cadjoint.fem.backends import JaxFemBackend`` working
+    without a module-level import back into the solver layer (which would
+    make the two modules circular).
+    """
+    if name == "JaxFemBackend":
+        from cadjoint.fem.jaxfem import JaxFemBackend
+
+        return JaxFemBackend
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def register_backend(name: str, factory: Callable[[], SolverBackend]) -> None:

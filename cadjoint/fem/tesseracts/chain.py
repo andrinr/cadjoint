@@ -151,13 +151,14 @@ def _discover_mesh(sim_mesh: Any, samples: np.ndarray, grid: Any) -> tuple[Any, 
         RuntimeError: When the mesher rejects the design (the optimizer's
             refreeze fallback catches exactly this).
     """
-    from cadjoint.fem.hexmesh import (
+    from cadjoint.fem.boundary import (
         FaceGroup,
-        HexMesh,
         _boundary_face_rows,
         _face_geometry,
+        tet_boundary_faces,
     )
-    from cadjoint.fem.tetmesh import TetMesh, tet10_mesh, tet_boundary_faces
+    from cadjoint.fem.hexmesh import HexMesh
+    from cadjoint.fem.tetmesh import TetMesh, tet10_mesh
 
     mesher = _tesseract("mesher")
     method = sim_mesh.method
@@ -240,7 +241,8 @@ def _discover_mesh(sim_mesh: Any, samples: np.ndarray, grid: Any) -> tuple[Any, 
 
 def _node_patch(mesh: Any, selection: Any) -> np.ndarray:
     """Node-valued patch (Dirichlet / clamp) on the frozen mesh."""
-    from cadjoint.fem.tetmesh import TetMesh, tet10_complete_nodes
+    from cadjoint.fem.boundary import tet10_complete_nodes
+    from cadjoint.fem.tetmesh import TetMesh
 
     indices = selection.resolve(mesh)
     if isinstance(mesh, TetMesh):
@@ -250,8 +252,8 @@ def _node_patch(mesh: Any, selection: Any) -> np.ndarray:
 
 def _face_patch(mesh: Any, selection: Any) -> tuple[np.ndarray, np.ndarray | None]:
     """Area-integrated patch: spanning node set + exact tet faces (or None)."""
-    from cadjoint.fem.hexmesh import faces_from_nodes
-    from cadjoint.fem.tetmesh import TetMesh, tet10_face_midsides, tet_faces_from_nodes
+    from cadjoint.fem.boundary import faces_from_nodes, tet10_face_midsides, tet_faces_from_nodes
+    from cadjoint.fem.tetmesh import TetMesh
 
     indices = selection.resolve(mesh)
     if isinstance(mesh, TetMesh):
@@ -494,7 +496,7 @@ def _freeze_dc_surface(
     import jax
     import jax.numpy as jnp
 
-    from cadjoint.fem.hexmesh import project_points
+    from cadjoint.fem.motion import project_points
     from cadjoint.meshing import (
         dual_faces,
         edge_hermite_data,
@@ -561,7 +563,7 @@ def _interior_relaxation(mesh: Any) -> Callable[[Any], Any]:
     The tetfill tesseract holds the interior (Steiner) nodes at their frozen
     positions, so a boundary that has marched away from them leaves the
     straddling tets progressively worse shaped.  This composes
-    :func:`~cadjoint.fem.tetmesh.smooth_interior_delta` — a fixed number of
+    :func:`~cadjoint.fem.motion.smooth_interior_delta` — a fixed number of
     Jacobi–Laplacian sweeps over the frozen connectivity, boundary pinned —
     onto the tesseract's returned ``nodes``, and re-derives TET10 midsides
     as midpoints of the relaxed corners.
@@ -584,7 +586,7 @@ def _interior_relaxation(mesh: Any) -> Callable[[Any], Any]:
     """
     import jax.numpy as jnp
 
-    from cadjoint.fem.tetmesh import smooth_interior_delta
+    from cadjoint.fem.motion import smooth_interior_delta
 
     corner_count = mesh.num_corner_points
     count = mesh.num_surface
@@ -647,7 +649,8 @@ def freeze_study_chain_dc(
     except ImportError as error:
         raise ImportError(_TESSERACT_EXTRA_MESSAGE) from error
 
-    from cadjoint.fem.tetmesh import TetMesh, tet10_mesh, tet_boundary_faces
+    from cadjoint.fem.boundary import tet_boundary_faces
+    from cadjoint.fem.tetmesh import TetMesh, tet10_mesh
 
     method = sim_mesh.method
     if method not in ("tet4", "tet10"):

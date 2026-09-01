@@ -27,8 +27,8 @@ The built mesh (:class:`~cadjoint.fem.hexmesh.HexMesh` or
 :class:`~cadjoint.fem.tetmesh.TetMesh`) is cached on the instance until
 the meshing parameters or the meshed field change, so a scene program can
 pass the same mesh to several studies (and to
-:func:`~cadjoint.fem.hexmesh.recompute_points` /
-:func:`~cadjoint.fem.tetmesh.recompute_tet_points` for design gradients)
+:func:`~cadjoint.fem.motion.recompute_points` /
+:func:`~cadjoint.fem.motion.recompute_tet_points` for design gradients)
 and mesh exactly once.  Inspection is first-class: :meth:`SimMesh.quality`
 returns per-element quality arrays and :meth:`SimMesh.inspect` a JSON-ready
 summary (method, counts, bounds, grid, element-quality statistics).
@@ -51,20 +51,14 @@ from typing import Any
 
 import numpy as np
 
-from cadjoint.fem.hexmesh import (
-    GridSpec,
-    HexMesh,
+from cadjoint.fem.hexmesh import GridSpec, HexMesh, sdf_to_hex_mesh
+from cadjoint.fem.quality import (
     aspect_ratios,
     scaled_jacobians,
-    sdf_to_hex_mesh,
-)
-from cadjoint.fem.tetmesh import (
-    TetMesh,
-    sdf_to_tet_mesh,
-    tet10_mesh,
     tet_aspect_ratios,
     tet_radius_ratios,
 )
+from cadjoint.fem.tetmesh import TetMesh, sdf_to_tet_mesh, tet10_mesh
 
 __all__ = ["SimMesh", "capture_sim_meshes"]
 
@@ -333,11 +327,11 @@ class SimMesh:
         Returns:
             ``{"scaled_jacobian": (C,), "aspect_ratio": (C,)}`` float64
             arrays for hex meshes (see
-            :func:`~cadjoint.fem.hexmesh.scaled_jacobians` /
-            :func:`~cadjoint.fem.hexmesh.aspect_ratios`);
+            :func:`~cadjoint.fem.quality.scaled_jacobians` /
+            :func:`~cadjoint.fem.quality.aspect_ratios`);
             ``{"radius_ratio": (C,), "aspect_ratio": (C,)}`` for tet
-            meshes (see :func:`~cadjoint.fem.tetmesh.tet_radius_ratios` /
-            :func:`~cadjoint.fem.tetmesh.tet_aspect_ratios`; TET10 metrics
+            meshes (see :func:`~cadjoint.fem.quality.tet_radius_ratios` /
+            :func:`~cadjoint.fem.quality.tet_aspect_ratios`; TET10 metrics
             are those of the straight-sided corner tets).
         """
         mesh = self.build(sdf)

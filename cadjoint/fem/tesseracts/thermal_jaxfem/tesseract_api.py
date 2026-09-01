@@ -11,7 +11,7 @@ solver plugs into cadjoint by shipping exactly this file shape and pointing
 Element types: the schema is element-agnostic — ``cells`` is ``(T, K)``
 and ``K`` picks the element (4 = TET4, 8 = HEX8, 10 = TET10; meshio node
 order).  HEX8 runs the direct backend's lifted solve verbatim; TET4/TET10
-reuse :func:`cadjoint.fem.tetmesh.tet_thermal_solve` (direct sparse
+reuse :func:`cadjoint.fem.jaxfem.tet_thermal_solve` (direct sparse
 solver, identical to the in-process tet path).  For TET10, boundary node
 sets must include the patches' midside nodes.
 
@@ -75,8 +75,8 @@ def _split(flat: np.ndarray, offsets: np.ndarray) -> list[np.ndarray]:
 
 def _solve(points, inputs, conductivity, source, base_points):
     """Run the jax-fem thermal solve; differentiable via its adjoint VJP."""
-    from cadjoint.fem.backends import JaxFemBackend, ThermalBCs
-    from cadjoint.fem.tetmesh import tet_thermal_solve
+    from cadjoint.fem.backends import ThermalBCs
+    from cadjoint.fem.jaxfem import JaxFemBackend, tet_thermal_solve
 
     cells = np.asarray(inputs.cells)
     try:

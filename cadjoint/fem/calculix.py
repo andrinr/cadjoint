@@ -49,7 +49,8 @@ from typing import Any
 import numpy as np
 
 from cadjoint.fem.backends import _TESSERACT_EXTRA_MESSAGE, ElasticBCs, TesseractBackend, _x64_scope
-from cadjoint.fem.hexmesh import _boundary_face_rows
+from cadjoint.fem.boundary import _boundary_face_rows
+from cadjoint.fem.elements import HEX_CORNER_SIGNS
 
 __all__ = [
     "CalculixBackend",
@@ -73,21 +74,6 @@ _CCX_INSTALL_MESSAGE = (
     "CalculiX binary (ccx) not found. Point the CADJOINT_CCX or CCX environment "
     "variable at a ccx executable, or put one on PATH — e.g. from conda-forge: "
     "micromamba create -p ./ccx-env -c conda-forge calculix"
-)
-
-# Trilinear HEX8 corner signs in reference coordinates [-1, 1]^3 (VTK order).
-_CORNER_SIGNS = np.array(
-    [
-        (-1, -1, -1),
-        (1, -1, -1),
-        (1, 1, -1),
-        (-1, 1, -1),
-        (-1, -1, 1),
-        (1, -1, 1),
-        (1, 1, 1),
-        (-1, 1, 1),
-    ],
-    dtype=np.float64,
 )
 
 # 2x2x2 Gauss abscissae (weights are all 1).
@@ -130,7 +116,7 @@ def _hex_gauss_gradients() -> np.ndarray:
     points = np.array(
         [(a, b, c) for a in (-g, g) for b in (-g, g) for c in (-g, g)], dtype=np.float64
     )
-    s = _CORNER_SIGNS  # (8, 3)
+    s = HEX_CORNER_SIGNS  # (8, 3)
     out = np.zeros((8, 8, 3))
     for q, xi in enumerate(points):
         out[q, :, 0] = 0.125 * s[:, 0] * (1 + s[:, 1] * xi[1]) * (1 + s[:, 2] * xi[2])

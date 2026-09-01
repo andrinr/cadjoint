@@ -14,7 +14,7 @@ vertex selection composed with ``&``/``|``/``~``.  Node-valued conditions
 (:class:`Dirichlet`, :class:`Fixed`) apply to the selected node set
 directly; area-integrated conditions (:class:`HeatFlux`, :class:`Traction`)
 act on the boundary faces spanned by the selection (all four corners
-selected — :func:`~cadjoint.fem.hexmesh.faces_from_nodes`).
+selected — :func:`~cadjoint.fem.boundary.faces_from_nodes`).
 
 Meshing runs through one path: a study either references a declared
 :class:`~cadjoint.fem.simmesh.SimMesh` (``mesh=<SimMesh or name>`` — the
@@ -50,10 +50,11 @@ from typing import Any
 
 import numpy as np
 
-from cadjoint.fem.hexmesh import HexMesh, faces_from_nodes
+from cadjoint.fem.boundary import faces_from_nodes, tet_faces_from_nodes
+from cadjoint.fem.hexmesh import HexMesh
 from cadjoint.fem.selection import NodeSelection
 from cadjoint.fem.simmesh import _CAPTURED_MESHES, SimMesh, _anonymous, _domain_entry
-from cadjoint.fem.tetmesh import TetMesh, tet_faces_from_nodes
+from cadjoint.fem.tetmesh import TetMesh
 
 __all__ = [
     "Dirichlet",
