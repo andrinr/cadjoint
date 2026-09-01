@@ -1,60 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_SLICE,
-  canSolve,
   formatScalar,
   meshBounds,
   rampCss,
-  requestBcs,
-  setAssignment,
   slicePlane,
   viridis,
-  type BcMap,
 } from "../src/simulation";
-
-describe("boundary-condition state", () => {
-  it("assigns, replaces, and removes per-group conditions immutably", () => {
-    const empty: BcMap = {};
-    const one = setAssignment(empty, "+x", { type: "dirichlet", value: 100 });
-    expect(empty).toEqual({});
-    expect(one["+x"]).toEqual({ type: "dirichlet", value: 100 });
-
-    const replaced = setAssignment(one, "+x", { type: "traction", value: [0, 0, -1] });
-    expect(replaced["+x"].type).toBe("traction");
-    expect(one["+x"].type).toBe("dirichlet");
-
-    const removed = setAssignment(replaced, "+x", null);
-    expect(removed).toEqual({});
-    expect(replaced["+x"]).toBeDefined();
-  });
-
-  it("drops traction assignments from thermal requests", () => {
-    const bcs: BcMap = {
-      "+x": { type: "dirichlet", value: 100 },
-      "-x": { type: "traction", value: [1, 0, 0] },
-    };
-    expect(requestBcs(bcs, "thermal")).toEqual([
-      { group: "+x", type: "dirichlet", value: 100 },
-    ]);
-    expect(requestBcs(bcs, "elastic")).toHaveLength(2);
-  });
-
-  it("emits groups in a stable sorted order", () => {
-    const bcs: BcMap = {
-      "-z": { type: "dirichlet", value: 0 },
-      "+x": { type: "dirichlet", value: 1 },
-    };
-    expect(requestBcs(bcs, "thermal").map((bc) => bc.group)).toEqual(["+x", "-z"]);
-  });
-
-  it("requires an anchoring dirichlet patch to solve", () => {
-    expect(canSolve({}, "thermal")).toBe(false);
-    expect(canSolve({ "+x": { type: "traction", value: [1, 0, 0] } }, "elastic")).toBe(false);
-    expect(canSolve({ "+x": { type: "dirichlet", value: 0 } }, "elastic")).toBe(true);
-    // A traction-only thermal map cannot solve either: tractions are dropped.
-    expect(canSolve({ "+x": { type: "traction", value: [1, 0, 0] } }, "thermal")).toBe(false);
-  });
-});
 
 describe("viridis ramp", () => {
   it("matches the colormap's endpoints and midpoint", () => {

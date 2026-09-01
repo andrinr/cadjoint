@@ -18,6 +18,7 @@ import type {
   MeshEdgePayload,
   Selection,
   SelectionMode,
+  StudyPayload,
   ToolMode,
 } from "./types";
 import { placeEdges } from "./viewer/gizmo";
@@ -38,6 +39,7 @@ export const [solverRuns, setSolverRuns] = createSignal<ConstraintSolverRun[]>([
 export const [differentiabilityDemo, setDifferentiabilityDemo] =
   createSignal<DifferentiabilityDemo | null>(null);
 export const [materials, setMaterials] = createSignal<MaterialDefinition[]>([]);
+export const [studies, setStudies] = createSignal<StudyPayload[]>([]);
 export const [meshEdges, setMeshEdges] = createSignal<MeshEdgePayload | null>(null);
 export const [selection, setSelection] = createSignal<Selection | null>(null);
 export const [hover, setHover] = createSignal<Selection | null>(null);

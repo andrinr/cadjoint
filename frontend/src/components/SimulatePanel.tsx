@@ -1,59 +1,72 @@
 /**
- * FEM simulation panel.
+ * FEM simulation panel — a patch layer over studies declared in the code.
  *
- * Drives the /api/simulate endpoint: a probe meshes the current scene into
- * hexahedra and returns its boundary face groups; the user assigns boundary
- * conditions per group (hover tints the group's faces in the viewport),
- * sets material parameters, and runs a thermal or elastic solve. Results
- * render through the renderer's triangle-mesh pipeline with a viridis ramp
- * legend and a ParaView-style slicing slider.
+ * The compile payload lists every ThermalStudy/ElasticStudy in the scene
+ * program; this panel renders them and edits them exclusively through /patch
+ * source operations (add_study, add_study_bc, set_study_value, …), the same
+ * round-trip the sketch tools use. Boundary conditions target programmatic
+ * vertex selections (side/box/sphere/halfspace) rather than face groups.
+ * Solving posts the study's *name*; the server re-derives everything from the
+ * declaration and returns a nodal field rendered through the renderer's
+ * triangle-mesh pipeline with a viridis ramp and a ParaView-style slice.
  */
 
-import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
+import { For, Index, Show, createSignal, onCleanup, onMount } from "solid-js";
 import * as api from "../api";
+import { DEFAULT_SLICE, formatScalar, rampCss, type SliceState } from "../simulation";
+import { source, studies } from "../state";
 import {
-  DEFAULT_SLICE,
-  canSolve,
-  formatScalar,
-  rampCss,
-  requestBcs,
-  setAssignment,
-  type BcAssignment,
-  type BcMap,
-  type SliceState,
-} from "../simulation";
-import { source } from "../state";
-import type { SimulationFaceGroup } from "../types";
+  BC_LABELS,
+  addBcRequest,
+  addStudyRequest,
+  bcTypesFor,
+  bcValue,
+  defaultDraft,
+  deleteBcRequest,
+  deleteStudyRequest,
+  describeSelection,
+  setArgumentRequest,
+  setBcValueRequest,
+  studyArguments,
+  type BcDraft,
+  type BuilderSelectionKind,
+} from "../studies";
+import type { StudyPayload } from "../types";
 import type { Renderer } from "../viewer/renderer";
 
 export interface SimulatePanelProps {
   renderer: Renderer;
+  /** Serialized /patch queue owned by the app shell. */
+  onPatch: (body: Record<string, unknown>) => Promise<void>;
 }
 
 const AXIS_LABELS = ["X", "Y", "Z"] as const;
+const SIDES = ["+x", "-x", "+y", "-y", "+z", "-z"] as const;
+const SELECTION_KINDS: { value: BuilderSelectionKind; label: string }[] = [
+  { value: "side", label: "Side" },
+  { value: "box", label: "Box" },
+  { value: "sphere", label: "Sphere" },
+  { value: "halfspace", label: "Half-space" },
+];
 
-type AssignmentChoice = "none" | "dirichlet" | "traction";
+/** Numeric input helper: commit only finite values. */
+const parse = (raw: string): number | null => {
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : null;
+};
 
 export function SimulatePanel(props: SimulatePanelProps) {
-  const [expanded, setExpanded] = createSignal(false);
-  const [kind, setKind] = createSignal<"thermal" | "elastic">("thermal");
-  const [resolution, setResolution] = createSignal(20);
-  const [groups, setGroups] = createSignal<SimulationFaceGroup[]>([]);
-  const [bcs, setBcs] = createSignal<BcMap>({});
-  const [material, setMaterial] = createSignal<Record<string, number>>({
-    conductivity: 1,
-    source: 0,
-    youngs: 200,
-    poisson: 0.3,
-  });
-  const [running, setRunning] = createSignal(false);
-  /** What the in-flight request is doing, for accurate button feedback. */
-  const [phase, setPhase] = createSignal<"mesh" | "solve">("mesh");
+  /** Which study's add-BC builder is open, by study index. */
+  const [building, setBuilding] = createSignal<number | null>(null);
+  const [draft, setDraft] = createSignal<BcDraft>(defaultDraft("thermal"));
+  const [solving, setSolving] = createSignal<string | null>(null);
   const [error, setError] = createSignal("");
   const [unavailable, setUnavailable] = createSignal(false);
-  const [result, setResult] = createSignal<{ field: string; range: [number, number] } | null>(
-    null,
-  );
+  const [result, setResult] = createSignal<{
+    name: string;
+    field: string;
+    range: [number, number];
+  } | null>(null);
   const [slice, setSlice] = createSignal<SliceState>({ ...DEFAULT_SLICE });
 
   const applySlice = (patch: Partial<SliceState>) => {
@@ -62,51 +75,23 @@ export function SimulatePanel(props: SimulatePanelProps) {
     props.renderer.setSimulationClip(next);
   };
 
-  /** Mesh the scene and load its face-group catalog (no solve). */
-  const probe = async () => {
-    setRunning(true);
-    setPhase("mesh");
-    setError("");
-    setResult(null);
-    try {
-      const response = await api.simulate({
-        source: source(),
-        kind: "probe",
-        resolution: resolution(),
-        bcs: [],
-        material: {},
-      });
-      if (!response.ok || !response.mesh) {
-        setError(response.error ?? "Meshing failed.");
-        return;
-      }
-      setGroups(response.mesh.groups);
-      // Drop assignments whose group no longer exists at this resolution.
-      const known = new Set(response.mesh.groups.map((group) => group.id));
-      setBcs(
-        Object.fromEntries(Object.entries(bcs()).filter(([id]) => known.has(id))),
-      );
-      props.renderer.setSimulationMesh(response.mesh);
-      props.renderer.simulationActive = true;
-      props.renderer.setSimulationClip(slice());
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : String(caught));
-    } finally {
-      setRunning(false);
-    }
-  };
+  // Entering simulate mode mounts the panel; hand the viewport to the mesh
+  // view, and give it back to the raymarched scene when the mode is left.
+  onMount(() => {
+    if (result()) props.renderer.simulationActive = true;
+  });
+  onCleanup(() => {
+    props.renderer.simulationActive = false;
+  });
 
-  const run = async () => {
-    setRunning(true);
-    setPhase("solve");
+  const solve = async (study: StudyPayload) => {
+    setSolving(study.name);
     setError("");
     try {
-      const response = await api.simulate({
+      const response = await api.simulateStudy({
         source: source(),
-        kind: kind(),
-        resolution: resolution(),
-        bcs: requestBcs(bcs(), kind()),
-        material: material(),
+        kind: "study",
+        name: study.name,
       });
       if (response.error_kind === "fem_unavailable") {
         setUnavailable(true);
@@ -117,299 +102,404 @@ export function SimulatePanel(props: SimulatePanelProps) {
         setError(response.error ?? "The solve failed.");
         return;
       }
-      setGroups(response.mesh.groups);
-      setResult({ field: response.field ?? "", range: response.mesh.range });
+      setResult({
+        name: study.name,
+        field: response.field ?? "",
+        range: response.mesh.range,
+      });
       props.renderer.setSimulationMesh(response.mesh);
       props.renderer.simulationActive = true;
       props.renderer.setSimulationClip(slice());
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
     } finally {
-      setRunning(false);
+      setSolving(null);
     }
   };
 
-  const open = () => {
-    setExpanded(true);
-    if (groups().length === 0) void probe();
-    else props.renderer.simulationActive = true;
+  /** Route one patch body through the app queue, surfacing failures here. */
+  const patch = async (body: Record<string, unknown>) => {
+    setError("");
+    await props.onPatch(body);
   };
 
-  const close = () => {
-    props.renderer.setSimulationHighlight(null);
-    props.renderer.simulationActive = false;
-    setExpanded(false);
+  const openBuilder = (study: StudyPayload) => {
+    setDraft(defaultDraft(study.kind));
+    setBuilding(study.index);
   };
 
-  // The shell mounts this panel when the user enters simulate mode, so open
-  // right away; leaving the mode unmounts it, which must hand the viewport
-  // back to the raymarched scene.
-  onMount(open);
-  onCleanup(() => {
-    props.renderer.setSimulationHighlight(null);
-    props.renderer.simulationActive = false;
-  });
-
-  const choiceFor = (id: string): AssignmentChoice => bcs()[id]?.type ?? "none";
-
-  const assign = (id: string, choice: AssignmentChoice) => {
-    const assignment: BcAssignment | null =
-      choice === "none"
-        ? null
-        : choice === "traction"
-          ? { type: "traction", value: [0, 0, -1] }
-          : { type: "dirichlet", value: kind() === "thermal" ? 100 : 0 };
-    setBcs(setAssignment(bcs(), id, assignment));
+  const submitBc = async (study: StudyPayload) => {
+    await patch(addBcRequest(study, draft()));
+    setBuilding(null);
   };
 
-  const setBcValue = (id: string, value: number, component?: number) => {
-    const current = bcs()[id];
-    if (!current) return;
-    if (current.type === "traction" && component !== undefined) {
-      const vector = [...current.value] as [number, number, number];
-      vector[component] = value;
-      setBcs(setAssignment(bcs(), id, { type: "traction", value: vector }));
-    } else if (current.type === "dirichlet") {
-      setBcs(setAssignment(bcs(), id, { type: "dirichlet", value }));
-    }
+  const setVector = (
+    key: "minCorner" | "maxCorner" | "center" | "point" | "normal" | "vector",
+    component: number,
+    raw: string,
+  ) => {
+    const value = parse(raw);
+    if (value === null) return;
+    const next = { ...draft() };
+    const vector = [...next[key]] as [number, number, number];
+    vector[component] = value;
+    next[key] = vector;
+    setDraft(next);
   };
 
-  const setMaterialValue = (key: string, raw: string) => {
-    const value = Number(raw);
-    if (Number.isFinite(value)) setMaterial({ ...material(), [key]: value });
-  };
-
-  const hoverGroup = (group: SimulationFaceGroup | null) => {
-    props.renderer.setSimulationHighlight(
-      group ? { start: group.start, count: group.count } : null,
-    );
-  };
-
-  const dirichletLabel = () => (kind() === "thermal" ? "Fixed temperature" : "Fixed support");
+  const vectorRow = (
+    key: "minCorner" | "maxCorner" | "center" | "point" | "normal",
+    label: string,
+  ) => (
+    <label class="sim-builder-vector">
+      <span>{label}</span>
+      <Index each={[0, 1, 2]}>
+        {(component) => (
+          <input
+            type="number"
+            step="0.1"
+            value={draft()[key][component()]}
+            onChange={(event) => setVector(key, component(), event.currentTarget.value)}
+            title={`${label} ${AXIS_LABELS[component()]}`}
+          />
+        )}
+      </Index>
+    </label>
+  );
 
   return (
-    <Show
-      when={expanded()}
-      fallback={
-        <button
-          type="button"
-          class="sim-launch"
-          onClick={open}
-          title="Open the FEM simulation panel"
-          data-testid="simulate-open"
-        >
-          Simulate
-        </button>
-      }
-    >
-      <aside class="sim-panel" data-testid="simulate-panel">
-        <header>
-          <span>
-            <small>FEM</small>
-            Simulate
-          </span>
-          <button
-            type="button"
-            onClick={close}
-            title="Close simulation"
-            aria-label="Close simulation"
-            data-testid="simulate-close"
-          >
-            ×
-          </button>
-        </header>
+    <aside class="sim-panel" data-testid="simulate-panel">
+      <header>
+        <span>
+          <small>FEM</small>
+          Studies
+        </span>
+      </header>
 
-        <div class="sim-row">
-          <label>
-            <span>Study</span>
-            <select
-              value={kind()}
-              disabled={running()}
-              onChange={(event) =>
-                setKind(event.currentTarget.value as "thermal" | "elastic")
-              }
-              data-testid="simulate-kind"
-            >
-              <option value="thermal">Thermal</option>
-              <option value="elastic">Elastic</option>
-            </select>
-          </label>
-          <label>
-            <span>Resolution</span>
-            <input
-              type="number"
-              min="4"
-              max="64"
-              value={resolution()}
-              disabled={running()}
-              onChange={(event) => {
-                const value = Math.round(Number(event.currentTarget.value));
-                if (Number.isFinite(value)) {
-                  setResolution(Math.min(64, Math.max(4, value)));
-                }
-              }}
-              data-testid="simulate-resolution"
-            />
-          </label>
-          <button
-            type="button"
-            disabled={running()}
-            onClick={() => void probe()}
-            title="Re-mesh the scene and refresh the face groups"
-            data-testid="simulate-remesh"
-          >
-            Remesh
-          </button>
-        </div>
-
-        <Show when={groups().length > 0}>
-          <p class="sim-help">Face groups — hover to highlight, assign conditions:</p>
-          <ul class="sim-groups" data-testid="simulate-groups">
-            <For each={groups()}>
-              {(group) => (
-                <li
-                  onMouseEnter={() => hoverGroup(group)}
-                  onMouseLeave={() => hoverGroup(null)}
-                  data-testid={`simulate-group-${group.id}`}
-                >
-                  <code>{group.id}</code>
-                  <small>
-                    {group.faces} faces · {formatScalar(group.area)} area
-                  </small>
-                  <select
-                    value={choiceFor(group.id)}
-                    disabled={running()}
-                    onChange={(event) =>
-                      assign(group.id, event.currentTarget.value as AssignmentChoice)
-                    }
-                    data-testid={`simulate-bc-${group.id}`}
+      <Show
+        when={studies().length > 0}
+        fallback={
+          <p class="sim-help" data-testid="simulate-empty">
+            No studies declared. Add one — it becomes a ThermalStudy or
+            ElasticStudy call in the code, and stays editable from either side.
+          </p>
+        }
+      >
+        <ul class="sim-studies" data-testid="simulate-studies">
+          <For each={studies()}>
+            {(study) => (
+              <li class="sim-study" data-testid={`simulate-study-${study.name}`}>
+                <div class="sim-study-head">
+                  <span class={`sim-kind sim-kind-${study.kind}`}>{study.kind}</span>
+                  <strong>{study.name}</strong>
+                  <button
+                    type="button"
+                    class="sim-delete"
+                    onClick={() => void patch(deleteStudyRequest(study))}
+                    title="Delete this study from the code"
+                    aria-label={`Delete study ${study.name}`}
+                    data-testid={`simulate-delete-${study.name}`}
                   >
-                    <option value="none">Free</option>
-                    <option value="dirichlet">{dirichletLabel()}</option>
-                    <Show when={kind() === "elastic"}>
-                      <option value="traction">Traction</option>
-                    </Show>
-                  </select>
-                  <Show when={bcs()[group.id]?.type === "dirichlet" && kind() === "thermal"}>
-                    <input
-                      type="number"
-                      value={bcs()[group.id]!.value as number}
-                      disabled={running()}
-                      onChange={(event) =>
-                        setBcValue(group.id, Number(event.currentTarget.value))
-                      }
-                      title="Prescribed temperature"
-                    />
-                  </Show>
-                  <Show when={bcs()[group.id]?.type === "traction"}>
-                    <span class="sim-vector">
-                      <For each={[0, 1, 2]}>
-                        {(component) => (
+                    ×
+                  </button>
+                </div>
+
+                <Show
+                  when={study.editable}
+                  fallback={
+                    <p class="sim-note">
+                      Defined dynamically in code — edit it there.
+                    </p>
+                  }
+                >
+                  <div class="sim-args">
+                    <For each={studyArguments(study)}>
+                      {(argument) => (
+                        <label>
+                          <span>{argument.key}</span>
                           <input
                             type="number"
-                            value={(bcs()[group.id]!.value as number[])[component]}
-                            disabled={running()}
-                            onChange={(event) =>
-                              setBcValue(
-                                group.id,
-                                Number(event.currentTarget.value),
-                                component,
-                              )
-                            }
-                            title={`Traction ${AXIS_LABELS[component]}`}
+                            value={argument.value}
+                            disabled={solving() !== null}
+                            onChange={(event) => {
+                              const value = parse(event.currentTarget.value);
+                              if (value !== null) {
+                                void patch(setArgumentRequest(study, argument.key, value));
+                              }
+                            }}
+                            data-testid={`simulate-arg-${study.name}-${argument.key}`}
                           />
-                        )}
-                      </For>
-                    </span>
+                        </label>
+                      )}
+                    </For>
+                  </div>
+
+                  <ul class="sim-bcs" data-testid={`simulate-bcs-${study.name}`}>
+                    <For each={study.bcs}>
+                      {(bc, bcIndex) => (
+                        <li classList={{ "sim-bc-readonly": !bc.serializable }}>
+                          <div class="sim-bc-main">
+                            <span class="sim-bc-type">{BC_LABELS[bc.type]}</span>
+                            <code title={describeSelection(bc.nodes)}>
+                              {describeSelection(bc.nodes)}
+                            </code>
+                          </div>
+                          <Show
+                            when={bc.serializable}
+                            fallback={<small class="sim-note">edit in code</small>}
+                          >
+                            <Show when={bcValue(bc) !== null}>
+                              <Show
+                                when={bc.type === "traction"}
+                                fallback={
+                                  <input
+                                    type="number"
+                                    value={bcValue(bc) as number}
+                                    disabled={solving() !== null}
+                                    onChange={(event) => {
+                                      const value = parse(event.currentTarget.value);
+                                      if (value !== null) {
+                                        void patch(setBcValueRequest(study, bcIndex(), value));
+                                      }
+                                    }}
+                                    title={BC_LABELS[bc.type]}
+                                    data-testid={`simulate-bc-value-${study.name}-${bcIndex()}`}
+                                  />
+                                }
+                              >
+                                <span class="sim-vector">
+                                  <Index each={bcValue(bc) as number[]}>
+                                    {(component, index) => (
+                                      <input
+                                        type="number"
+                                        value={component()}
+                                        disabled={solving() !== null}
+                                        onChange={(event) => {
+                                          const value = parse(event.currentTarget.value);
+                                          if (value === null) return;
+                                          const vector = [...(bcValue(bc) as number[])];
+                                          vector[index] = value;
+                                          void patch(
+                                            setBcValueRequest(study, bcIndex(), vector),
+                                          );
+                                        }}
+                                        title={`Traction ${AXIS_LABELS[index]}`}
+                                      />
+                                    )}
+                                  </Index>
+                                </span>
+                              </Show>
+                            </Show>
+                            <button
+                              type="button"
+                              class="sim-delete"
+                              onClick={() => void patch(deleteBcRequest(study, bcIndex()))}
+                              title="Remove this boundary condition"
+                              aria-label="Remove boundary condition"
+                              data-testid={`simulate-bc-delete-${study.name}-${bcIndex()}`}
+                            >
+                              ×
+                            </button>
+                          </Show>
+                        </li>
+                      )}
+                    </For>
+                  </ul>
+
+                  <Show
+                    when={building() === study.index}
+                    fallback={
+                      <button
+                        type="button"
+                        class="sim-add-bc"
+                        onClick={() => openBuilder(study)}
+                        data-testid={`simulate-add-bc-${study.name}`}
+                      >
+                        + Boundary condition
+                      </button>
+                    }
+                  >
+                    <div class="sim-builder" data-testid="simulate-builder">
+                      <div class="sim-builder-row">
+                        <label>
+                          <span>Type</span>
+                          <select
+                            value={draft().bcType}
+                            onChange={(event) =>
+                              setDraft({
+                                ...draft(),
+                                bcType: event.currentTarget
+                                  .value as BcDraft["bcType"],
+                              })
+                            }
+                            data-testid="simulate-builder-type"
+                          >
+                            <For each={bcTypesFor(study.kind)}>
+                              {(type) => <option value={type}>{BC_LABELS[type]}</option>}
+                            </For>
+                          </select>
+                        </label>
+                        <label>
+                          <span>Select</span>
+                          <select
+                            value={draft().selectionKind}
+                            onChange={(event) =>
+                              setDraft({
+                                ...draft(),
+                                selectionKind: event.currentTarget
+                                  .value as BuilderSelectionKind,
+                              })
+                            }
+                            data-testid="simulate-builder-selection"
+                          >
+                            <For each={SELECTION_KINDS}>
+                              {(kind) => <option value={kind.value}>{kind.label}</option>}
+                            </For>
+                          </select>
+                        </label>
+                      </div>
+
+                      <Show when={draft().selectionKind === "side"}>
+                        <div class="sim-sides" data-testid="simulate-builder-sides">
+                          <For each={SIDES}>
+                            {(side) => (
+                              <button
+                                type="button"
+                                classList={{ active: draft().side === side }}
+                                onClick={() => setDraft({ ...draft(), side })}
+                              >
+                                {side}
+                              </button>
+                            )}
+                          </For>
+                        </div>
+                      </Show>
+                      <Show when={draft().selectionKind === "box"}>
+                        {vectorRow("minCorner", "Min")}
+                        {vectorRow("maxCorner", "Max")}
+                      </Show>
+                      <Show when={draft().selectionKind === "sphere"}>
+                        {vectorRow("center", "Center")}
+                        <label class="sim-builder-vector">
+                          <span>Radius</span>
+                          <input
+                            type="number"
+                            step="0.1"
+                            value={draft().radius}
+                            onChange={(event) => {
+                              const value = parse(event.currentTarget.value);
+                              if (value !== null) setDraft({ ...draft(), radius: value });
+                            }}
+                          />
+                        </label>
+                      </Show>
+                      <Show when={draft().selectionKind === "halfspace"}>
+                        {vectorRow("point", "Point")}
+                        {vectorRow("normal", "Normal")}
+                      </Show>
+
+                      <Show when={draft().bcType === "dirichlet" || draft().bcType === "heat_flux"}>
+                        <label class="sim-builder-vector">
+                          <span>{BC_LABELS[draft().bcType]}</span>
+                          <input
+                            type="number"
+                            value={draft().value}
+                            onChange={(event) => {
+                              const value = parse(event.currentTarget.value);
+                              if (value !== null) setDraft({ ...draft(), value });
+                            }}
+                            data-testid="simulate-builder-value"
+                          />
+                        </label>
+                      </Show>
+                      <Show when={draft().bcType === "traction"}>
+                        <label class="sim-builder-vector">
+                          <span>Vector</span>
+                          <Index each={[0, 1, 2]}>
+                            {(component) => (
+                              <input
+                                type="number"
+                                step="0.1"
+                                value={draft().vector[component()]}
+                                onChange={(event) =>
+                                  setVector("vector", component(), event.currentTarget.value)
+                                }
+                                title={`Traction ${AXIS_LABELS[component()]}`}
+                              />
+                            )}
+                          </Index>
+                        </label>
+                      </Show>
+
+                      <div class="sim-builder-actions">
+                        <button
+                          type="button"
+                          onClick={() => void submitBc(study)}
+                          data-testid="simulate-builder-add"
+                        >
+                          Add
+                        </button>
+                        <button type="button" onClick={() => setBuilding(null)}>
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
                   </Show>
-                </li>
-              )}
-            </For>
-          </ul>
-        </Show>
+                </Show>
 
-        <div class="sim-row sim-material">
-          <Show
-            when={kind() === "thermal"}
-            fallback={
-              <>
-                <label>
-                  <span>Young's</span>
-                  <input
-                    type="number"
-                    value={material().youngs}
-                    disabled={running()}
-                    onChange={(event) => setMaterialValue("youngs", event.currentTarget.value)}
-                    data-testid="simulate-youngs"
-                  />
-                </label>
-                <label>
-                  <span>Poisson</span>
-                  <input
-                    type="number"
-                    step="0.05"
-                    value={material().poisson}
-                    disabled={running()}
-                    onChange={(event) => setMaterialValue("poisson", event.currentTarget.value)}
-                    data-testid="simulate-poisson"
-                  />
-                </label>
-              </>
-            }
-          >
-            <label>
-              <span>Conductivity</span>
-              <input
-                type="number"
-                value={material().conductivity}
-                disabled={running()}
-                onChange={(event) =>
-                  setMaterialValue("conductivity", event.currentTarget.value)
-                }
-                data-testid="simulate-conductivity"
-              />
-            </label>
-            <label>
-              <span>Heat source</span>
-              <input
-                type="number"
-                value={material().source}
-                disabled={running()}
-                onChange={(event) => setMaterialValue("source", event.currentTarget.value)}
-                data-testid="simulate-source"
-              />
-            </label>
-          </Show>
-        </div>
+                <button
+                  type="button"
+                  class="sim-run"
+                  disabled={solving() !== null || unavailable() || study.bcs.length === 0}
+                  onClick={() => void solve(study)}
+                  title={
+                    study.bcs.length > 0
+                      ? "Mesh the scene and run this study"
+                      : "Add at least one boundary condition first"
+                  }
+                  data-testid={`simulate-run-${study.name}`}
+                >
+                  {solving() === study.name ? "Meshing + solving…" : "Solve"}
+                </button>
+              </li>
+            )}
+          </For>
+        </ul>
+      </Show>
 
+      <div class="sim-row sim-add-study">
         <button
           type="button"
-          class="sim-run"
-          disabled={running() || unavailable() || !canSolve(bcs(), kind())}
-          onClick={() => void run()}
-          title={
-            canSolve(bcs(), kind())
-              ? "Run the finite-element solve"
-              : `Assign at least one ${dirichletLabel().toLowerCase()} first`
-          }
-          data-testid="simulate-run"
+          onClick={() => void patch(addStudyRequest("thermal"))}
+          data-testid="simulate-add-thermal"
         >
-          {running() ? (phase() === "mesh" ? "Meshing…" : "Solving…") : "Run"}
+          + Thermal study
         </button>
+        <button
+          type="button"
+          onClick={() => void patch(addStudyRequest("elastic"))}
+          data-testid="simulate-add-elastic"
+        >
+          + Elastic study
+        </button>
+      </div>
 
-        <Show when={result()}>
-          {(current) => (
-            <div class="sim-legend" data-testid="simulate-legend">
-              <small>{current().field.replaceAll("_", " ")}</small>
-              <div class="sim-ramp" style={{ background: rampCss() }} />
-              <div class="sim-legend-values">
-                <span>{formatScalar(current().range[0])}</span>
-                <span>{formatScalar(current().range[1])}</span>
-              </div>
+      <Show when={result()}>
+        {(current) => (
+          <div class="sim-legend" data-testid="simulate-legend">
+            <small>
+              {current().name} · {current().field.replaceAll("_", " ")}
+            </small>
+            <div class="sim-ramp" style={{ background: rampCss() }} />
+            <div class="sim-legend-values">
+              <span>{formatScalar(current().range[0])}</span>
+              <span>{formatScalar(current().range[1])}</span>
             </div>
-          )}
-        </Show>
+          </div>
+        )}
+      </Show>
 
+      <Show when={result()}>
         <div class="sim-row sim-slice">
           <label class="sim-slice-toggle">
             <input
@@ -440,26 +530,24 @@ export function SimulatePanel(props: SimulatePanelProps) {
             step="0.01"
             value={slice().fraction}
             disabled={!slice().enabled}
-            onInput={(event) =>
-              applySlice({ fraction: Number(event.currentTarget.value) })
-            }
+            onInput={(event) => applySlice({ fraction: Number(event.currentTarget.value) })}
             data-testid="simulate-slice-fraction"
           />
         </div>
+      </Show>
 
-        <Show when={unavailable()}>
-          <p class="sim-note" data-testid="simulate-unavailable">
-            FEM solves need the optional jax-fem extra on the server. Install it with
-            <code> pip install jaxcad[fem]</code> and restart the playground. Meshing and
-            face groups still work without it.
-          </p>
-        </Show>
-        <Show when={error() && !unavailable()}>
-          <p class="sim-error" data-testid="simulate-error">
-            {error()}
-          </p>
-        </Show>
-      </aside>
-    </Show>
+      <Show when={unavailable()}>
+        <p class="sim-note" data-testid="simulate-unavailable">
+          FEM solves need the optional jax-fem extra on the server. Install it
+          with <code> pip install jaxcad[fem]</code> and restart the playground.
+          Study declarations still compile and stay editable without it.
+        </p>
+      </Show>
+      <Show when={error() && !unavailable()}>
+        <p class="sim-error" data-testid="simulate-error">
+          {error()}
+        </p>
+      </Show>
+    </aside>
   );
 }

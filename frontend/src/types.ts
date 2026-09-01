@@ -168,7 +168,49 @@ export interface CompileResponse {
   materials: MaterialDefinition[];
   differentiability: DifferentiabilityDemo | null;
   mesh_edges: MeshEdgePayload | null;
+  studies?: StudyPayload[];
   output: string;
+}
+
+/** A serialized node selection, mirroring jaxcad.fem.selection describe(). */
+export type StudySelection =
+  | { kind: "box"; min_corner: number[]; max_corner: number[] }
+  | { kind: "sphere"; center: number[]; radius: number }
+  | { kind: "halfspace"; point: number[]; normal: number[] }
+  | { kind: "side"; side: string; tol: number | null }
+  | { kind: "predicate"; name: string }
+  | { kind: "and" | "or"; operands: StudySelection[] }
+  | { kind: "not"; operand: StudySelection };
+
+export type StudyBcType = "dirichlet" | "heat_flux" | "fixed" | "traction";
+
+/** One boundary condition of a declared study. */
+export interface StudyBc {
+  type: StudyBcType;
+  nodes: StudySelection;
+  value?: number;
+  flux?: number;
+  vector?: [number, number, number];
+  /** False only for predicate selections, which the viewer cannot edit. */
+  serializable: boolean;
+  span: [number, number] | null;
+}
+
+/** One ThermalStudy/ElasticStudy declared in the scene program. */
+export interface StudyPayload {
+  index: number;
+  name: string;
+  kind: "thermal" | "elastic";
+  resolution: number | [number, number, number];
+  bounds: [number, number, number];
+  size: [number, number, number];
+  material: Record<string, number>;
+  source?: number;
+  line: number | null;
+  span: [number, number] | null;
+  /** False when the declaration cannot be aligned to source (loops etc.). */
+  editable: boolean;
+  bcs: StudyBc[];
 }
 
 export type PatchOperation =
@@ -187,7 +229,12 @@ export type PatchOperation =
   | "delete_constraint"
   | "set_constraint_value"
   | "solve_sketch"
-  | "delete_object";
+  | "delete_object"
+  | "add_study"
+  | "delete_study"
+  | "add_study_bc"
+  | "delete_study_bc"
+  | "set_study_value";
 
 export interface PatchResponse {
   ok: boolean;
@@ -291,12 +338,21 @@ export interface SimulateRequest {
   material: Record<string, number>;
 }
 
+/** Run a study declared in the scene program, resolved server-side by name. */
+export interface SimulateStudyRequest {
+  source: string;
+  kind: "study";
+  name: string;
+}
+
 export interface SimulateResponse {
   ok: boolean;
-  kind?: SimulationKind;
+  kind?: SimulationKind | "study";
   /** Which nodal field `mesh.scalars` carries; null for a probe. */
   field?: "temperature" | "von_mises" | null;
   mesh?: SimulationMeshPayload;
+  /** The solved study's description, echoed on `kind: "study"` responses. */
+  study?: StudyPayload;
   error?: string;
   /** `fem_unavailable` when the jax-fem extra is not installed (HTTP 501). */
   error_kind?: string;

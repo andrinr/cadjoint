@@ -49,6 +49,7 @@ import {
   setRelations,
   setSceneName,
   setSolverRuns,
+  setStudies,
   setSelection,
   setSource,
   reportViewerError,
@@ -294,6 +295,7 @@ export function App() {
       setSolverRuns(result.solver_runs ?? []);
       setDifferentiabilityDemo(result.differentiability ?? null);
       setMaterials(result.materials ?? []);
+      setStudies(result.studies ?? []);
       // Mesh edges are no longer part of the compile payload; clear the stale
       // overlay and let the lazy /api/mesh effect refill it when wanted.
       setMeshEdges(null);
@@ -706,7 +708,7 @@ export function App() {
                     drive the renderer freely inside it. */}
                 <Show when={editingMode() === "simulate"}>
                   <div class="mode-simulate-slot" data-testid="mode-simulate">
-                    <SimulatePanel renderer={renderer} />
+                    <SimulatePanel renderer={renderer} onPatch={applyPatch} />
                   </div>
                 </Show>
                 {/* Render mode owns the dock with the full render settings —

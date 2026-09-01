@@ -2342,34 +2342,189 @@ button.primary svg {
   font-size: 11px;
   opacity: 0.75;
 }
-.sim-groups {
+/* Declared studies: one card per ThermalStudy/ElasticStudy in the code. */
+.sim-studies {
   margin: 0;
   padding: 0;
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 5px;
-  max-height: 190px;
-  overflow: auto;
+  gap: 9px;
 }
-.sim-groups li {
+.sim-study {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+.sim-study-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.sim-study-head strong {
+  font-size: 12px;
+  margin-right: auto;
+}
+.sim-kind {
+  padding: 2px 6px;
+  border-radius: 999px;
+  font: 600 9px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.sim-kind-thermal {
+  background: rgba(255, 158, 64, 0.16);
+  color: #ffb36b;
+}
+.sim-kind-elastic {
+  background: rgba(122, 176, 255, 0.16);
+  color: #9cc2ff;
+}
+.sim-delete {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border-radius: 6px;
+  line-height: 1;
+  opacity: 0.65;
+}
+.sim-delete:hover {
+  opacity: 1;
+  color: #ff9c8a;
+}
+.sim-args {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.sim-args label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 10px;
+  opacity: 0.9;
+}
+.sim-args input[type="number"] {
+  width: 72px;
+}
+.sim-bcs {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sim-bcs li {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 6px;
   padding: 4px 6px;
   border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
 }
-.sim-groups li:hover {
-  background: rgba(255, 158, 64, 0.12);
-}
-.sim-groups li small {
-  opacity: 0.6;
-  font-size: 10px;
+.sim-bc-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
   margin-right: auto;
+  min-width: 0;
 }
-.sim-groups li input[type="number"] {
+.sim-bc-type {
+  font-size: 10px;
+  font-weight: 600;
+}
+.sim-bc-main code {
+  font-size: 10px;
+  opacity: 0.72;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 180px;
+}
+.sim-bcs li input[type="number"] {
   width: 52px;
+}
+.sim-bc-readonly {
+  opacity: 0.66;
+}
+.sim-add-bc {
+  height: 26px;
+  border-radius: 8px;
+  border-style: dashed;
+  font-size: 11px;
+  opacity: 0.85;
+}
+.sim-add-study {
+  gap: 6px;
+}
+.sim-add-study button {
+  flex: 1;
+  height: 28px;
+  border-radius: 9px;
+  font-size: 11px;
+}
+/* The add-BC builder: type + selection pickers over per-kind numeric forms. */
+.sim-builder {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 7px;
+  border: 1px dashed var(--line);
+  border-radius: 9px;
+}
+.sim-builder-row {
+  display: flex;
+  gap: 8px;
+}
+.sim-builder-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 10px;
+  flex: 1;
+}
+.sim-sides {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+}
+.sim-sides button {
+  height: 24px;
+  border-radius: 7px;
+  font: 600 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.sim-sides button.active {
+  color: var(--mode-accent, #ff9e40);
+  border-color: currentColor;
+}
+.sim-builder-vector {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+}
+.sim-builder-vector span {
+  width: 52px;
+  opacity: 0.8;
+}
+.sim-builder-vector input[type="number"] {
+  width: 56px;
+}
+.sim-builder-actions {
+  display: flex;
+  gap: 6px;
+}
+.sim-builder-actions button {
+  flex: 1;
+  height: 26px;
+  border-radius: 8px;
+  font-size: 11px;
 }
 .sim-vector {
   display: flex;

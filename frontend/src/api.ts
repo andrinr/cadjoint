@@ -16,6 +16,7 @@ import type {
   SessionResponse,
   SimulateRequest,
   SimulateResponse,
+  SimulateStudyRequest,
 } from "./types";
 
 let token = "";
@@ -81,6 +82,13 @@ export async function mesh(source: string): Promise<MeshResponse> {
  * when the optional jax-fem extra is missing — so callers can render them.
  */
 export async function simulate(body: SimulateRequest): Promise<SimulateResponse> {
+  return post<SimulateResponse>("/api/simulate", body);
+}
+
+/** Run a study declared in the program; the declaration owns mesh and BCs. */
+export async function simulateStudy(
+  body: SimulateStudyRequest,
+): Promise<SimulateResponse> {
   return post<SimulateResponse>("/api/simulate", body);
 }
 

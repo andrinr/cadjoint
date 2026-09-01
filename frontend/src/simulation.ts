@@ -2,51 +2,12 @@
  * Pure logic for the FEM simulate mode.
  *
  * Everything the SimulatePanel and the renderer share that is not WebGPU:
- * per-group boundary-condition state, the viridis ramp (kept in sync with the
- * constants baked into simulation.wgsl), and the clip-plane math behind the
- * ParaView-style slicing slider. No DOM, no signals — unit-testable as-is.
+ * the viridis ramp (kept in sync with the constants baked into
+ * simulation.wgsl) and the clip-plane math behind the ParaView-style slicing
+ * slider. Boundary-condition state lives in the scene program itself — the
+ * panel edits it through /patch, so there is no client-side BC model here.
+ * No DOM, no signals — unit-testable as-is.
  */
-
-import type { SimulationBc, SimulationKind } from "./types";
-
-/** What the user assigned to one face group. */
-export type BcAssignment =
-  | { type: "dirichlet"; value: number }
-  | { type: "traction"; value: [number, number, number] };
-
-/** Face-group id -> assignment; groups without an entry carry no condition. */
-export type BcMap = Record<string, BcAssignment>;
-
-/** Return a new map with `groupId` assigned, or removed when null. */
-export function setAssignment(
-  bcs: BcMap,
-  groupId: string,
-  assignment: BcAssignment | null,
-): BcMap {
-  const next = { ...bcs };
-  if (assignment === null) delete next[groupId];
-  else next[groupId] = assignment;
-  return next;
-}
-
-/**
- * Boundary conditions for a solve request.
- *
- * A thermal solve only understands fixed temperatures, so traction
- * assignments are dropped rather than sent to fail server validation;
- * an elastic solve keeps both (dirichlet means "fully clamped" there).
- */
-export function requestBcs(bcs: BcMap, kind: SimulationKind): SimulationBc[] {
-  return Object.entries(bcs)
-    .filter(([, assignment]) => kind === "elastic" || assignment.type === "dirichlet")
-    .sort(([a], [b]) => (a < b ? -1 : 1))
-    .map(([group, assignment]) => ({ group, type: assignment.type, value: assignment.value }));
-}
-
-/** True when `bcs` can drive a solve of `kind` (needs an anchor patch). */
-export function canSolve(bcs: BcMap, kind: SimulationKind): boolean {
-  return requestBcs(bcs, kind).some((bc) => bc.type === "dirichlet");
-}
 
 // Polynomial fit of matplotlib's viridis (degree 6 per channel) — the same
 // coefficients live in simulation.wgsl; keep the two lists in sync.

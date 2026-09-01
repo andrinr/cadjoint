@@ -1044,3 +1044,43 @@ test("hovering an object highlights it before the click", async ({ page }) => {
   await page.mouse.move(metrics.left + edge.x, metrics.top + edge.y);
   await expect(page.locator("[data-testid=viewer-canvas]")).toHaveCSS("cursor", "pointer");
 });
+
+test("studies are declared, edited, and deleted through source patches", async ({ page }) => {
+  // Patch → recompile is a round trip; poll the editor rather than racing it.
+  const editorHas = (needle: string, negate = false) =>
+    expect
+      .poll(async () => (await editorText(page)).includes(needle), { timeout: 45_000 })
+      .toBe(!negate);
+
+  // The starter scene declares no studies: the panel offers to add one.
+  await page.getByTestId("editmode-simulate").click();
+  await expect(page.getByTestId("simulate-panel")).toBeVisible();
+  await expect(page.getByTestId("simulate-empty")).toBeVisible();
+
+  // Adding a study writes a ThermalStudy declaration into the program.
+  await page.getByTestId("simulate-add-thermal").click();
+  await editorHas("ThermalStudy(");
+  const card = page.locator("[data-testid^=simulate-study-]").first();
+  await expect(card).toBeVisible();
+  const name = (await card.getAttribute("data-testid"))!.replace("simulate-study-", "");
+
+  // A boundary condition built from a box vertex selection lands as source.
+  await page.getByTestId(`simulate-add-bc-${name}`).click();
+  await page.getByTestId("simulate-builder-selection").selectOption("box");
+  await page.getByTestId("simulate-builder-value").fill("250");
+  await page.getByTestId("simulate-builder-add").click();
+  await editorHas("Nodes.box(");
+  await editorHas("value=250.0");
+
+  // Editing the BC value patches the literal in place.
+  await page.getByTestId(`simulate-bc-value-${name}-0`).fill("325");
+  await page.getByTestId(`simulate-bc-value-${name}-0`).blur();
+  await editorHas("value=325.0");
+
+  // Deleting the BC and the study removes both declarations again.
+  await page.getByTestId(`simulate-bc-delete-${name}-0`).click();
+  await editorHas("Nodes.box(", true);
+  await page.getByTestId(`simulate-delete-${name}`).click();
+  await editorHas("ThermalStudy(", true);
+  await expect(page.getByTestId("simulate-empty")).toBeVisible();
+});
