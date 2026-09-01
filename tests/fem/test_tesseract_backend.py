@@ -52,15 +52,18 @@ class TestTesseractThermal:
         difference = np.abs(np.asarray(tesseract.temperature) - np.asarray(direct.temperature))
         assert difference.max() < 1e-9
 
-    def test_heat_flux_is_rejected_by_the_schema(self, bar_mesh):
-        with pytest.raises(NotImplementedError, match="tesseract schema"):
-            thermal_solve(
-                bar_mesh,
-                conductivity=2.0,
-                dirichlet=[(Nodes.side("-x"), 0.0)],
-                neumann=[(Nodes.side("+x"), 1.0)],
-                backend="tesseract",
-            )
+    def test_heat_flux_matches_direct_backend(self, bar_mesh):
+        kwargs = {
+            "conductivity": 2.0,
+            "dirichlet": [(Nodes.side("-x"), 0.0)],
+            "neumann": [(Nodes.side("+x"), 1.0)],
+        }
+        direct = thermal_solve(bar_mesh, **kwargs)
+        tesseract = thermal_solve(bar_mesh, backend="tesseract", **kwargs)
+        difference = np.abs(np.asarray(tesseract.temperature) - np.asarray(direct.temperature))
+        assert difference.max() < 1e-9
+        # The flux genuinely heats the +x end (guard against 0 == 0).
+        assert float(np.asarray(direct.temperature).max()) > 1e-3
 
     def test_gradient_through_tesseract_boundary(self, bar_mesh):
         points = jnp.asarray(bar_mesh.points, dtype=jnp.float64)

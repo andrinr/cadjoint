@@ -326,6 +326,19 @@ class Optimization:
         remesh_every: Study form: re-extract the frozen mesh topology at
             the current design every this many steps (0: never; default
             6).  In between, only node positions move — differentiably.
+        gradient_path: Study form: how the design->points derivative is
+            carried per step (keyword-only).  ``"direct"`` (default) is
+            the validated frozen-topology path — node positions Newton
+            re-projected onto the true SDF, solved in-process.
+            ``"tesseract"`` runs the packaged two-tesseract chain instead
+            (lattice samples -> mesher tesseract with its
+            surface-interpolation VJP -> solver tesseract adjoint); it
+            meshes the *trilinear interpolant* of the samples, so it can
+            need a finer lattice than the direct path and its gradient
+            carries only normal boundary motion (measured in
+            ``research/tet-vs-hex.md``).  Requires the ``tesseract``
+            extra.  The final reported result is always evaluated on the
+            direct path.
         steps: Default number of optimizer steps (keyword-only).
         learning_rate: Optimizer step size (keyword-only).
         method: ``"adam"`` (default) or ``"sgd"`` (keyword-only).  Runs
@@ -341,6 +354,7 @@ class Optimization:
     regularizer: Callable[[dict[str, Any]], Any] | None = None
     regularizer_weight: float = 0.0
     remesh_every: int | None = None
+    gradient_path: str = "direct"
     steps: int = 30
     learning_rate: float = 0.05
     method: str = "adam"
@@ -385,6 +399,7 @@ class Optimization:
                 ("regularizer", self.regularizer),
                 ("remesh_every", self.remesh_every),
                 ("regularizer_weight", self.regularizer_weight or None),
+                ("gradient_path", None if self.gradient_path == "direct" else self.gradient_path),
             )
             if value is not None
         ]
@@ -430,6 +445,10 @@ class Optimization:
             or self.remesh_every < 0
         ):
             raise ValueError("remesh_every must be a non-negative integer (0: never remesh).")
+        if self.gradient_path not in ("direct", "tesseract"):
+            raise ValueError(
+                f"gradient_path must be 'direct' or 'tesseract' (got {self.gradient_path!r})."
+            )
 
     def _study_kind(self) -> str:
         from cadjoint.fem.study import ThermalStudy
@@ -752,23 +771,38 @@ class Optimization:
             return lambda p: jnp.asarray(inner(p))
 
         # GRADIENT-PATH SEAM.  This is the one place the design->points
-        # derivative path is chosen: the DIRECT frozen-topology path — node
-        # positions re-projected onto the true SDF (recompute_points /
-        # recompute_tet_points), validated on crease-heavy geometry.  If the
-        # interpolation-tesseract path is cleared as default, swap the
-        # recompute call here.  Tet meshes smooth the boundary displacement
-        # into the interior so frozen Steiner tets stay well shaped (and the
-        # solve well conditioned) as the design moves between refreezes.
+        # derivative path is chosen, per gradient_path:
+        # - "direct" (default): the frozen-topology path — node positions
+        #   re-projected onto the true SDF (recompute_points /
+        #   recompute_tet_points), validated on crease-heavy geometry.  Tet
+        #   meshes smooth the boundary displacement into the interior so
+        #   frozen Steiner tets stay well shaped (and the solve well
+        #   conditioned) as the design moves between refreezes.
+        # - "tesseract": the packaged two-tesseract chain — lattice samples
+        #   -> mesher tesseract (surface-interpolation VJP) -> solver
+        #   tesseract adjoint (cadjoint.fem.tesseracts.chain).  Validated
+        #   descending and sign-consistent with the direct path on the
+        #   crease-heavy starter heat sink (research/tet-vs-hex.md), but it
+        #   meshes the interpolant (can need a finer lattice) and drops
+        #   tangential vertex motion — kept opt-in until cleared as default.
+        use_tesseract = self.gradient_path == "tesseract"
+        if use_tesseract:
+            from cadjoint.fem.tesseracts.chain import freeze_study_chain
+
         def recompute(field: Any, mesh: Any) -> Any:
             if isinstance(mesh, TetMesh):
                 return recompute_tet_points(field, mesh, smooth_passes=2)
             return recompute_points(field, mesh)
 
-        def objective_on(mesh: Any):
+        def objective_on(mesh: Any, chain: Any = None):
             def objective(params):
-                points = recompute(field_at(params), mesh)
-                result = study.solve(mesh=mesh, points=points)
-                value = jnp.asarray(self._metric_value(result, mesh, points))
+                if chain is not None:
+                    samples = field_at(params)(jnp.asarray(chain.lattice))
+                    value = chain.metric_value(samples, self.metric)
+                else:
+                    points = recompute(field_at(params), mesh)
+                    result = study.solve(mesh=mesh, points=points)
+                    value = jnp.asarray(self._metric_value(result, mesh, points))
                 if regularizer is not None:
                     value = value + weight * jnp.asarray(regularizer(params))
                 return value
@@ -788,8 +822,13 @@ class Optimization:
             """
             held = concrete(values)
             apply_parameters(target, held)
+            chain = None
             try:
-                mesh = sim_mesh.build(field_at(held), rebuild=True)
+                if use_tesseract:
+                    chain = freeze_study_chain(study, sim_mesh, field_at(held))
+                    mesh = chain.mesh
+                else:
+                    mesh = sim_mesh.build(field_at(held), rebuild=True)
             except RuntimeError as error:
                 if current is None:
                     raise ValueError(
@@ -803,7 +842,7 @@ class Optimization:
                 return current
             problem = _unresolvable_bc(study, mesh)
             if problem is None:
-                return mesh, objective_on(mesh)
+                return mesh, objective_on(mesh, chain)
             if current is None:
                 raise ValueError(
                     f"Optimization {self.name!r} cannot start: {problem} on study "

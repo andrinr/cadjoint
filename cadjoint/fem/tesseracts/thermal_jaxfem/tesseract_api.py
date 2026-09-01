@@ -8,13 +8,32 @@ endpoint backed by jax-fem's adjoint.  A third-party — even non-JAX —
 solver plugs into cadjoint by shipping exactly this file shape and pointing
 ``cadjoint.fem.backends.TesseractBackend(api_path=...)`` at it.
 
+Element types: the schema is element-agnostic — ``cells`` is ``(T, K)``
+and ``K`` picks the element (4 = TET4, 8 = HEX8, 10 = TET10; meshio node
+order).  HEX8 runs the direct backend's lifted solve verbatim; TET4/TET10
+reuse :func:`cadjoint.fem.tetmesh.tet_thermal_solve` (direct sparse
+solver, identical to the in-process tet path).  For TET10, boundary node
+sets must include the patches' midside nodes.
+
+Heat-flux (Neumann) patches mirror the direct backend's surface-map path:
+``flux_nodes`` concatenates the vertex sets spanning each patch,
+``flux_offsets`` are the ``P + 1`` prefix offsets (patch ``p`` spans
+``flux_nodes[offsets[p]:offsets[p+1]]``), and ``flux_values`` prescribe
+the inflow per area (positive heats the body).  A boundary face carries
+the flux when all of its nodes are in the patch set; on tet meshes that
+node-membership rule over-selects (interior faces whose corners all lie
+on the patch), so ``flux_faces`` + ``flux_face_offsets`` optionally carry
+the exact boundary corner triangles per patch (empty = pure membership,
+the HEX8 behavior).
+
 Runs locally without Docker via ``Tesseract.from_tesseract_api`` (used by
 ``TesseractBackend``), or containerized with ``tesseract build`` for
 distribution.
 
 Differentiable inputs: ``points``, ``conductivity``, ``source``.  Dirichlet
 values are static (jax-fem bakes them into the DOF elimination, outside the
-adjoint's parameter path).
+adjoint's parameter path); flux values are static like the direct backend's
+(baked into weak-form closures).
 """
 
 from __future__ import annotations
@@ -23,14 +42,21 @@ import numpy as np
 from pydantic import BaseModel
 from tesseract_core.runtime import Array, Differentiable, Float64, Int32, ShapeDType
 
+_ELE_TYPES = {4: "TET4", 8: "HEX8", 10: "TET10"}
+
 
 class InputSchema(BaseModel):
-    """Thermal problem: -div(k grad T) = q on a HEX8 mesh."""
+    """Thermal problem: -div(k grad T) = q on a HEX8 / TET4 / TET10 mesh."""
 
     points: Differentiable[Array[(None, 3), Float64]]
-    cells: Array[(None, 8), Int32]
+    cells: Array[(None, None), Int32]
     dirichlet_nodes: Array[(None,), Int32]
     dirichlet_values: Array[(None,), Float64]
+    flux_nodes: Array[(None,), Int32]
+    flux_offsets: Array[(None,), Int32]
+    flux_values: Array[(None,), Float64]
+    flux_faces: Array[(None, 3), Int32]
+    flux_face_offsets: Array[(None,), Int32]
     conductivity: Differentiable[Array[(), Float64]]
     source: Differentiable[Array[(), Float64]]
 
@@ -41,24 +67,57 @@ class OutputSchema(BaseModel):
     temperature: Differentiable[Array[(None,), Float64]]
 
 
-def _solve(points, cells, dirichlet_nodes, dirichlet_values, conductivity, source, base_points):
+def _split(flat: np.ndarray, offsets: np.ndarray) -> list[np.ndarray]:
+    """Slice a concatenated per-patch array by its prefix offsets."""
+    offsets = np.asarray(offsets, dtype=np.int64)
+    return [flat[start:stop] for start, stop in zip(offsets[:-1], offsets[1:])]
+
+
+def _solve(points, inputs, conductivity, source, base_points):
     """Run the jax-fem thermal solve; differentiable via its adjoint VJP."""
     from cadjoint.fem.backends import JaxFemBackend, ThermalBCs
+    from cadjoint.fem.tetmesh import tet_thermal_solve
 
-    nodes = np.asarray(dirichlet_nodes, dtype=np.int32)
-    values = np.asarray(dirichlet_values, dtype=np.float64)
+    cells = np.asarray(inputs.cells)
+    try:
+        ele_type = _ELE_TYPES[cells.shape[1]]
+    except KeyError:
+        raise ValueError(
+            f"cells must be (T, 4), (T, 8), or (T, 10); got shape {cells.shape}."
+        ) from None
+    nodes = np.asarray(inputs.dirichlet_nodes, dtype=np.int32)
+    values = np.asarray(inputs.dirichlet_values, dtype=np.float64)
     patches = [(nodes[values == value], float(value)) for value in np.unique(values)]
     bcs = ThermalBCs(
         dirichlet_nodes=[patch_nodes for patch_nodes, _ in patches],
         dirichlet_values=[value for _, value in patches],
+        flux_nodes=_split(np.asarray(inputs.flux_nodes, dtype=np.int32), inputs.flux_offsets),
+        flux_values=[float(value) for value in np.asarray(inputs.flux_values)],
     )
-    return JaxFemBackend().thermal(
+    face_offsets = np.asarray(inputs.flux_face_offsets, dtype=np.int64)
+    faces = None
+    if face_offsets.size:
+        faces = _split(np.asarray(inputs.flux_faces, dtype=np.int64), face_offsets)
+    if ele_type == "HEX8":
+        if faces is not None:
+            raise ValueError("flux_faces targeting is a tet feature; HEX8 uses node sets.")
+        return JaxFemBackend().thermal(
+            points,
+            cells,
+            bcs,
+            conductivity=conductivity,
+            source=source,
+            base_points=base_points,
+        )
+    return tet_thermal_solve(
         points,
-        np.asarray(cells),
+        cells,
         bcs,
         conductivity=conductivity,
         source=source,
+        ele_type=ele_type,
         base_points=base_points,
+        flux_faces=faces,
     )
 
 
@@ -66,11 +125,9 @@ def apply(inputs: InputSchema) -> OutputSchema:
     """Forward solve (opaque to JAX tracing; runs concretely)."""
     temperature = _solve(
         inputs.points,
-        inputs.cells,
-        inputs.dirichlet_nodes,
-        inputs.dirichlet_values,
-        inputs.conductivity,
-        inputs.source,
+        inputs,
+        np.asarray(inputs.conductivity)[()],
+        np.asarray(inputs.source)[()],
         base_points=np.asarray(inputs.points, dtype=np.float64),
     )
     return OutputSchema(temperature=np.asarray(temperature))
@@ -92,7 +149,7 @@ def vector_jacobian_product(
 
     Composes jax.vjp over the solve closure; inside, jax-fem's ``ad_wrapper``
     (custom_vjp) solves the adjoint system, so no tracing of the forward
-    solver is required.
+    solver is required.  The contract is identical across HEX8/TET4/TET10.
     """
     import jax
     import jax.numpy as jnp
@@ -103,9 +160,7 @@ def vector_jacobian_product(
     def fun(params: dict):
         return _solve(
             params.get("points", inputs.points),
-            inputs.cells,
-            inputs.dirichlet_nodes,
-            inputs.dirichlet_values,
+            inputs,
             params.get("conductivity", np.asarray(inputs.conductivity)[()]),
             params.get("source", np.asarray(inputs.source)[()]),
             base_points=np.asarray(inputs.points, dtype=np.float64),

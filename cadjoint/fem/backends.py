@@ -392,11 +392,6 @@ class TesseractBackend:
         import jax.numpy as jnp
         from tesseract_jax import apply_tesseract
 
-        if bcs.flux_nodes:
-            raise NotImplementedError(
-                "Heat-flux patches are not part of the thermal tesseract schema yet; "
-                "use the direct 'jaxfem' backend for HeatFlux boundary conditions."
-            )
         if bcs.dirichlet_nodes:
             nodes = np.concatenate([np.asarray(n, dtype=np.int32) for n in bcs.dirichlet_nodes])
             values = np.concatenate(
@@ -408,6 +403,15 @@ class TesseractBackend:
         else:
             nodes = np.zeros(0, dtype=np.int32)
             values = np.zeros(0, dtype=np.float64)
+        if bcs.flux_nodes:
+            flux_nodes = np.concatenate([np.asarray(n, dtype=np.int32) for n in bcs.flux_nodes])
+            flux_values = np.asarray(bcs.flux_values, dtype=np.float64)
+        else:
+            flux_nodes = np.zeros(0, dtype=np.int32)
+            flux_values = np.zeros(0, dtype=np.float64)
+        flux_offsets = np.concatenate(
+            [[0], np.cumsum([len(n) for n in bcs.flux_nodes], dtype=np.int64)]
+        ).astype(np.int32)
         with _x64_scope():
             outputs = apply_tesseract(
                 self._tesseract_for("thermal"),
@@ -416,6 +420,13 @@ class TesseractBackend:
                     "cells": np.asarray(cells, dtype=np.int32),
                     "dirichlet_nodes": nodes,
                     "dirichlet_values": jnp.asarray(values),
+                    "flux_nodes": flux_nodes,
+                    "flux_offsets": flux_offsets,
+                    "flux_values": flux_values,
+                    # Exact-face targeting is a tet feature; hex meshes use
+                    # pure node membership (empty offsets = disabled).
+                    "flux_faces": np.zeros((0, 3), dtype=np.int32),
+                    "flux_face_offsets": np.zeros(0, dtype=np.int32),
                     "conductivity": jnp.asarray(conductivity, dtype=jnp.float64),
                     "source": jnp.asarray(source, dtype=jnp.float64),
                 },
@@ -462,6 +473,10 @@ class TesseractBackend:
                     "traction_nodes": traction_nodes,
                     "traction_offsets": offsets,
                     "traction_vectors": traction_vectors,
+                    # Exact-face targeting is a tet feature; hex meshes use
+                    # pure node membership (empty offsets = disabled).
+                    "traction_faces": np.zeros((0, 3), dtype=np.int32),
+                    "traction_face_offsets": np.zeros(0, dtype=np.int32),
                     "youngs": np.asarray(youngs, dtype=np.float64),
                     "poisson": np.asarray(poisson, dtype=np.float64),
                 },

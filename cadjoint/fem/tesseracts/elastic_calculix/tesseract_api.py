@@ -30,7 +30,12 @@ from tesseract_core.runtime import Array, Differentiable, Float64, Int32, ShapeD
 
 
 class InputSchema(BaseModel):
-    """Small-strain linear elasticity on a HEX8 mesh (see elastic_jaxfem)."""
+    """Small-strain linear elasticity on a HEX8 mesh (see elastic_jaxfem).
+
+    ``traction_faces``/``traction_face_offsets`` exist for schema parity
+    with ``elastic_jaxfem`` (whose tet modes use them for exact face
+    targeting); the ccx path is HEX8-only and requires them empty.
+    """
 
     points: Differentiable[Array[(None, 3), Float64]]
     cells: Array[(None, 8), Int32]
@@ -38,6 +43,8 @@ class InputSchema(BaseModel):
     traction_nodes: Array[(None,), Int32]
     traction_offsets: Array[(None,), Int32]
     traction_vectors: Array[(None, 3), Float64]
+    traction_faces: Array[(None, 3), Int32]
+    traction_face_offsets: Array[(None,), Int32]
     youngs: Array[(), Float64]
     poisson: Array[(), Float64]
 
@@ -53,6 +60,11 @@ def _solve(inputs: InputSchema, *, sensitivities: bool):
     """Run ccx on the deck encoded by ``inputs``."""
     from cadjoint.fem.calculix import _unpack_elastic_bcs, elastic_ccx_solve
 
+    if np.asarray(inputs.traction_face_offsets).size:
+        raise ValueError(
+            "traction_faces targeting is a tet feature of elastic_jaxfem; "
+            "the CalculiX tesseract is HEX8-only and uses node sets."
+        )
     return elastic_ccx_solve(
         np.asarray(inputs.points, dtype=np.float64),
         np.asarray(inputs.cells, dtype=np.int64),
