@@ -138,8 +138,8 @@ class Dirichlet:
 class HeatFlux:
     """Prescribed heat inflow per area on the faces spanned by a selection.
 
-    Positive flux heats the body.  Solvable on the direct backend (Neumann
-    surface integral); the tesseract schema does not carry fluxes yet.
+    Positive flux heats the body.  Solvable on the direct backend and the
+    thermal tesseract alike (Neumann surface integral either way).
     """
 
     nodes: NodeSelection

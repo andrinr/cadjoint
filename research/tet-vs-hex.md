@@ -427,3 +427,75 @@ The web/rib gaps are the measured crease-subgradient structure from the
 gradient-validation section above (sharp DC vertices sit on SDF kinks; AD takes
 a one-sided branch, FD averages) — directionally exact, hence the sign/window
 assertions rather than tight rel bounds.
+
+## TET10 two-Tesseract chain + the gradient-path seam (2026-09-01)
+
+The packaged SOLVER tesseract schemas are now element-agnostic, completing
+the TET10 two-tesseract chain and opening the playground door:
+
+- `elastic_jaxfem` / `thermal_jaxfem`: `cells` is `(T, K)` with K = 4/8/10
+  picking TET4/HEX8/TET10 (meshio order); tet modes reuse
+  `tet_elastic_solve` / `tet_thermal_solve` verbatim (same spsolve options,
+  same adjoint contract — `points` differentiable). Optional exact-face
+  targeting crosses the boundary as `traction_faces`/`flux_faces` +
+  prefix-offset arrays (empty = pure node membership, the HEX8 behavior).
+- `thermal_jaxfem` additionally carries heat-flux (Neumann) patches:
+  `flux_nodes`/`flux_offsets`/`flux_values`, mirroring the direct backend's
+  surface-map path; `TesseractBackend.thermal` forwards HeatFlux BCs now
+  (the old NotImplementedError is gone).
+- `elastic_calculix` accepts the two new face fields for schema parity
+  (HEX8-only; non-empty raises).
+
+Solver-stage parity (tests/fem/test_tesseract_tet.py, bar mesh 13x7x6):
+TET4 and TET10, elastic and thermal, apply == direct solve at max diff
+< 1e-9 (measured 0.0 for the starter chain below); traced gradients through
+the tesseract boundary equal the direct adjoint < 1e-9; the thermal
+design-gradient through `recompute_tet_points` + tesseract equals the
+direct route to 1e-9 relative (both -71.734 on the bar half-height, where
+central FD reads -60.42 — the known crease-subgradient gap, not a boundary
+artifact).
+
+### Starter heat sink on the chain (the crease-heavy validation)
+
+Lattice caveat (measured): the mesher tesseract meshes the *trilinear
+interpolant*, which self-intersects at the starter's declared 18x13x11
+resolution (both sharp modes). 24x18x15 is the coarsest lattice where
+sharp DC meshes the sink: 11 390 TET10 nodes / 6 459 tets / 1 384 surface
+vertices. The direct path meshes the true SDF at the declared resolution —
+the chain needs a finer lattice for the same scene.
+
+Measured on the frozen chain (mesher TET10 + flux-capable thermal
+tesseract, objective max temperature, conductivity 2.0, die flux 6.0):
+
+- stage-2 parity vs `tet_thermal_solve` on the same mesh: max |dT| = 0.0;
+- physics: T in [0, 1.139], slug bottom mean 0.990 vs held fin field 0.0;
+- d(max T)/d(fin_depth) through both tesseracts: **-0.2498** (deeper fins
+  cool the die — the sign the physics demands), via one `jax.grad` through
+  mesher-VJP + solver adjoint.
+
+The direct-path comparator (`recompute_tet_points` on the same frozen
+mesh, smooth_passes=2 + direct TET10 solve) and the 4-step descent were
+still factorizing at freeze time (SuperLU on the 11.4k-DOF TET10 system
+dominates; the direct path re-solves per FD/descent step) — the harness
+tests `tests/fem/test_starter_chain.py::TestStarterChain` assert the
+sign-consistency and descent when they complete. Hex seam smoke (bar
+22x5x5, Dirichlet+flux): tesseract path J=1.000000 grad_norm=3.637 vs
+direct J=1.000000 grad_norm=8.119 — same forward value, both descend, the
+norm gap is the box-crease gauge difference.
+
+### The seam: `Optimization(..., gradient_path=)`
+
+`cadjoint/optimize.py` now takes `gradient_path="direct"|"tesseract"`
+(study form only, **default unchanged: "direct"**). "tesseract" swaps the
+per-step derivative chain at the marked seam for
+`cadjoint/fem/tesseracts/chain.py::freeze_study_chain`: lattice samples ->
+mesher tesseract (frozen-topology templates, sharp->Tikhonov fallback,
+interpolation VJP) -> solver tesseract adjoint -> metric (mean/max both
+physics; compliance reuses the traction-work helper). Refreeze failures
+degrade exactly like the direct path (keep previous topology mid-run,
+clear error at step 0); the final reported result is always evaluated on
+the direct path. Default-flip recommendation: NOT yet — the interpolant
+needs a finer lattice than the declared meshes (18x13x11 starter fails to
+mesh), the VJP drops tangential crease motion, and the direct-vs-chain
+magnitude comparison on the starter is still running; revisit with those
+numbers in hand.

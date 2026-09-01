@@ -575,3 +575,31 @@ Study constructor note for the viewer wave: `resolution` is now optional
 Tests: `tests/fem` = 162 green with a live ccx binary (26 new in
 `test_simmesh.py`, 12 new study/result tests, bracket demo reworked);
 `tests/viewer` = 200, `tests/test_playground.py` = 61 — both untouched.
+
+## Solver-tesseract schema deltas: TET4/TET10 cells + thermal fluxes (2026-09-01)
+
+Schema changes to the packaged solver tesseracts (element type inferred
+from `cells.shape[1]`: 4/8/10; `(None, None)` in the schema):
+
+- `elastic_jaxfem`: + `traction_faces (None,3) Int32`,
+  `traction_face_offsets (None,) Int32` (exact tet face targeting; empty =
+  node membership). HEX8 path byte-identical to before.
+- `thermal_jaxfem`: + `flux_nodes/flux_offsets (None,) Int32`,
+  `flux_values (None,) Float64`, `flux_faces (None,3) Int32`,
+  `flux_face_offsets (None,) Int32`. Differentiable inputs unchanged
+  (points, conductivity, source); flux values static like the direct
+  backend's closures.
+- `elastic_calculix`: + the two traction-face fields for parity with the
+  base-class input dict (HEX8-only, must be empty).
+- `TesseractBackend` passes the new fields (empty face arrays on hex);
+  heat-flux BCs now route through `backend="tesseract"` — parity with the
+  direct backend < 1e-9 (`tests/fem/test_tesseract_backend.py`).
+- New `cadjoint/fem/tesseracts/chain.py`: `freeze_study_chain(study,
+  sim_mesh, field)` — the frozen mesher+solver chain behind
+  `Optimization(gradient_path="tesseract")` (see research/tet-vs-hex.md
+  for the measurements and the default recommendation).
+
+Tesseract schemas reject extra input keys (pydantic extra=forbid via
+tesseract-core), so every schema fed by `TesseractBackend`'s input dict
+must carry the union of its fields — that is why `elastic_calculix` grew
+the (rejected-if-set) face fields.

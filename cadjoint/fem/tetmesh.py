@@ -78,12 +78,14 @@ _TETGEN_MESSAGE = (
     "tetgen is not installed (PyPI wheels exist for macOS arm64 / Python 3.14): pip install tetgen"
 )
 
-# Tet solves use a direct sparse linear solver (scipy spsolve / SuperLU) for
-# both the forward Newton steps and the adjoint: preserving the DC surface
-# verbatim leaves sliver tets whose conditioning makes jax-fem's default
-# BiCGStab diverge (measured in research/tet-vs-hex.md — the "direct solver
-# prerequisite" for a production tet path).
-_TET_SOLVER_OPTIONS = {"spsolve_solver": {}}
+# Tet solves use a direct sparse linear solver (PETSc LU) for both the
+# forward Newton steps and the adjoint: preserving the DC surface verbatim
+# leaves sliver tets whose conditioning makes jax-fem's default BiCGStab
+# diverge (measured in research/tet-vs-hex.md — the "direct solver
+# prerequisite" for a production tet path).  PETSc LU over scipy spsolve:
+# SuperLU's default ordering was observed to hit catastrophic fill on some
+# sliver-heavy TET10 meshes (minutes-to-hours for a 15k-DOF solve).
+_TET_SOLVER_OPTIONS = {"petsc_solver": {"ksp_type": "preonly", "pc_type": "lu"}}
 
 # The four triangular faces of a positive-volume tet (v0, v1, v2, v3),
 # each listed with outward orientation (face i is opposite vertex i).
