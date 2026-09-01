@@ -756,3 +756,128 @@ calls run at in-process speed.
 `native/run_<uuid>/logs/` directories are per-invocation artifacts dropped by
 `tesseract-runtime` next to the Tesseract it executes, not build output; two
 stale ones were deleted and `/run_*/` added to `native/.gitignore`.
+
+## The projection's floored denominator was a 1e12-per-iteration adjoint amplifier (2026-09-01)
+
+`project_points` (`cadjoint/fem/hexmesh.py`) is the one Newton projection the whole
+mesh half of the gradient chain runs through: `sdf_to_hex_mesh`'s boundary snap,
+`recompute_points`, `sdf_to_tet_mesh`'s pre-tetrahedralization projection, and
+`recompute_tet_points` all call it. Its step is `-f(x) grad f / |grad f|^2`, and the
+denominator was guarded as `jnp.maximum(squared, 1e-12)`.
+
+**The defect.** A floor is not a guard. Where `squared` falls under `1e-12` the
+denominator stops being a function of `x` and becomes the *constant* `1e-12`, so the
+step's Jacobian collapses to `value * Hessian / 1e-12` — a 1e12 amplification per
+iteration, compounding over all eight. The forward pass stays perfectly finite and
+smooth (the step itself is `value * grad / 1e-12`, and where `grad` is a bit-exact
+zero it is exactly zero), so nothing downstream of the forward value ever hinted at
+it. Reverse mode, meanwhile, was returning numbers around 1e+68.
+
+**Where the dead gradients come from.** The same degeneracy `edge_detection._refine`
+already documents: a vertex lands bit-exactly on a wall of a polygon-derived SDF,
+where `ExtrudedPolygon.sdf`'s `jnp.maximum(d2, dz)` ties and JAX splits the
+subgradient evenly between two branches that cancel. On the starter heat sink at its
+declared 18x13x11 grid, 17 of the 860 DC surface vertices start with `|grad| ==
+0.0` exactly — nine on the fin-tip corner line (`z = 0.85`, a profile vertex of the
+comb) and eight on the slug-bottom rim (`z = -0.18`) — and 110 to 131 more join them
+after the first Newton iteration lands them on those same walls.
+
+**Why every shipped test missed it.** At the freeze design (`fin_depth = 1.2`) those
+nodes carry `value == 0.0` exactly, so `value * Hessian / 1e-12` is zero and the
+measured maximum per-node amplification is the healthy 0.503 that
+`tests/fem/test_starter_tet.py` records. Step off the freeze design by any amount and
+the residual becomes ~1.2e-8 — small in the forward pass, 1.2e+4 after the floor.
+
+**The fix.** The repo's double-`where` idiom, applied so the *gradient* is also zero
+when the guard trips:
+
+```python
+usable = jax.lax.stop_gradient(squared) > _MIN_GRADIENT_SQUARED   # 1e-8
+step = jnp.where(usable, value[:, None] * gradient / jnp.where(usable, squared, 1.0), 0.0)
+```
+
+The inner `where` keeps the suppressed division finite so no NaN can reach the
+cotangent; the outer one zeroes value and derivative together. The threshold is on
+`|grad|^2`, not on the step: a signed *distance* field has `|grad| = 1` almost
+everywhere, so `|grad| < 1e-4` never means "a shallow field", it means the
+linearization is float noise. That is 1e4 more margin than the old floor had, and the
+measured field has a clean gap — the starter's surface nodes are either exactly 0 or
+above 0.195.
+
+**Before / after**, starter heat sink, `fin_depth`, objective `sum(points**2)` through
+`recompute_tet_points(..., smooth_passes=2)` on the frozen 860-vertex DC surface:
+
+| `fin_depth` | adjoint (floored) | adjoint (guarded) | central FD (1e-5) |
+|---|---|---|---|
+| 1.10   | -3.867e+68 | +1.186e+02 | +118.574 |
+| 1.15   | -3.532e+68 | +1.239e+02 | +123.851 |
+| 1.1873 | +2.648e+69 | +1.278e+02 | +127.787 |
+| 1.19   | +5.438e+69 | +1.281e+02 | +128.072 |
+| 1.21   | +4.604e+01 | +4.591e+01 | +45.913  |
+| 1.25   | +4.750e+01 | +4.737e+01 | +47.375  |
+
+Per-node boundary Jacobian `|dx/d fin_depth|` over the 860 surface nodes: max
+**4.2e+68 -> 0.500** (median 0.0 either way; 9-10 nodes exceeded 1e3 before, none
+after). Note the old code was *already correct* above the freeze design (1.21, 1.25)
+— the blow-up is one-sided, which is another reason it hid.
+
+**The forward pass improved too.** The floored step was flinging 14-35 of the 860
+vertices off the zero set (it multiplied a ~1e-8 residual by a ~4e4 factor and let
+the displacement clamp absorb the rest). Max `|sdf|` residual over the projected
+surface: **1.62e-2 -> 9.0e-5**; mean **4.14e-5 -> 4.25e-7**. The sphere hex test's
+snapped-vertex residual is 1.1e-16, unchanged.
+
+**`tetmesh` shares the code, not a second copy.** `cadjoint/fem/tetmesh.py` imports
+`project_points` from `hexmesh` and calls it from both `sdf_to_tet_mesh` and
+`recompute_tet_points`, so the one fix covers the tet path — which is in fact the
+path the defect was measured on. `smooth_interior_delta`'s
+`jnp.maximum(degrees, 1.0)` is not the same idiom: `degrees` is a frozen numpy
+adjacency count, never traced. The other `np.maximum(..., 1e-30)` guards in `tetmesh`
+and `hexmesh` are in numpy quality metrics that nothing differentiates.
+
+**Not fixed, because it is not a defect:** `project_points`' displacement clamp still
+floors at `jnp.maximum(squared_displacement, 1e-24)`. That one is benign — below the
+floor, `scale = jnp.minimum(1.0, max_step / 1e-12)` selects the constant `1.0`
+branch, so no frozen denominator ever reaches the output.
+
+**Regression fence:** `tests/fem/test_projection.py`. A fast half builds a wedge whose
+crease has a bit-exact dead subgradient (a minimal model of the polygon tie) and
+pins the guard's contract: the point does not move, the adjoint is exactly zero
+(**4.0e+04** on the old code), and no NaN reaches the cotangent. A starter half
+sweeps `fin_depth` over the measured designs and asserts the per-node Jacobian stays
+under 1e3, the projected vertices stay within 1e-3 of the zero set (the old code
+misses by 16x), and the adjoint matches central differences off the freeze-design
+kink.
+
+**Re-validation of everything downstream of this path** (`pytest tests/fem -q`:
+**291 passed, 14 skipped** — the 282/14 baseline plus the nine new projection tests,
+with no existing test edited; ruff clean). Every shipped gradient check still passes
+inside its own fence, but the numbers moved slightly, because the forward projection
+genuinely changed at the 14-35 nodes it used to fling off the surface — and because a
+different projected DC surface makes TetGen insert a different number of Steiner
+points (985 -> 990 on the repro grid). Recorded here since the docstrings in
+`test_starter_chain.py` and `test_starter_tet.py` still quote the pre-fix values:
+
+| measurement | pre-fix | post-fix |
+|---|---|---|
+| DC chain `J` / adjoint / FD(1e-3) | 1.15330727 / -0.166356900 / -0.166357126 | 1.147698874 / **-0.161124633** / -0.161124858 |
+| direct-path adjoint (same mesh) | -0.134186049 | **-0.130809776** |
+| DC/direct ratio (fenced 1.0-1.6) | 1.240 | **1.232** |
+| starter tet @ 1.25, adjoint vs FD(1e-3) | -0.0890 (3.6e-7 rel) | **-0.053691748** vs -0.053691768 (3.7e-7 rel) |
+| starter tet @ the freeze kink: adjoint / bwd / fwd / central | -0.0890 / - / - / -0.0730 | **-0.091623843** / -0.091633779 / -0.058621438 / -0.075127609 |
+| hex chain `J` / adjoint / FD(1e-4) | 0.988622627 / -0.072205495 / -0.070080773 | **identical** |
+| bracket bar chain, adjoint vs FD | +1.994235 / +1.994235 | **identical** |
+| bracket plate, adjoint vs FD(1e-3) | -350.3737 / -348.8485 | **identical** |
+
+The hex chain and the bracket demo are bit-identical, which is the expected control:
+their start points are lattice vertices where `|grad|` never drops below 0.707, so the
+guard never trips. Only the DC/tet path, whose start points are surface vertices
+sitting *on* the polygon walls, was ever affected. Adjoint-vs-FD agreement is
+unchanged in quality (1.4e-6 on the DC chain, 3.7e-7 on the tet path), and both
+descents stay monotone (DC 1.14769887 -> 1.14641564 -> 1.14518502).
+
+Unrelated and still open: the frozen-topology objective is genuinely **kinked at the
+freeze design** and the adjoint correctly returns the left derivative there. That is
+the extrusion's cap-branch switch, not this defect — it is present identically before
+and after the fix (measured left slope 128.6, right slope 45.8 on `sum(points**2)`)
+and is already pinned by its own test in `test_starter_tet.py`.
