@@ -6,7 +6,7 @@ FEM simulation composed into one function JAX can differentiate end to end.
 > [!WARNING]
 > The API is not stable. Expect breaking changes.
 
-[![CADJOINT WebGPU playground with Python source beside a live rendered scene](examples/assets/viewer.png)](https://andrinr.github.io/cadjoint/docs/viewer.html)
+[![The cadjoint playground in Model mode: scene.py on the left, the parametric heat sink rendered live on the right, and the declared cool-sink optimization in the side panel](examples/assets/playground-model.png)](https://andrinr.github.io/cadjoint/docs/viewer.html)
 
 ---
 
@@ -29,7 +29,6 @@ FEM simulation composed into one function JAX can differentiate end to end.
 - **Constraint system** — geometric constraints (distance, angle, coincident) with Riemannian gradient descent and Newton projection onto the constraint manifold
 - **JAX-native** — every scene is a pure function; `jit`, `grad`, and `vmap` work out of the box
 
-![primitives](examples/assets/constrained_optim.png)
 ---
 
 ## Install
@@ -143,6 +142,16 @@ SDF the factory returns, so constraints and `jax.grad` reach them exactly as
 they do for sketch vertices. `size` is half-extents and `rotation` is intrinsic
 X, Y, Z angles in radians, matching the underlying primitives.
 
+![Simulate mode with the sink-mesh SimMesh generated into 2969 tet10 elements, shaded by element quality with the edges and quality histogram shown](examples/assets/playground-mesh.png)
+
+*Simulate → Meshes: the declared `SimMesh` discretized into tet10 elements,
+shaded by element quality with a quality histogram beside it.*
+
+![The sink-conduction thermal study solved in the playground, sliced through X so the hot die interface and the temperature gradient into the fins are visible](examples/assets/playground-field.png)
+
+*Simulate → Studies: the solved temperature field on the same mesh, clipped by
+the slice plane so the heat flux entering at the die interface is visible.*
+
 ### Developing the playground UI
 
 The UI is a Solid + TypeScript app in `frontend/`, built into
@@ -248,9 +257,17 @@ uv run python examples/fem_bracket_optimization.py --smoke    # 2 cheap steps
 Requires the `fem` extra (`uv sync --extra fem`). The run validates the adjoint
 gradient against finite differences, descends for 30 steps, prints a summary
 table, and writes convergence CSV + figure and before/after VTK files to
-`examples/output/`:
+`examples/output/`.
 
-![Convergence of the bracket optimization](examples/output/fem_bracket_convergence.png)
+The same loop runs interactively in the playground:
+
+![The cool-sink optimization finished in the playground: convergence sparkline, trajectory scrubber, objective 1.618 to 1.601 over 4 steps, and the before/after parameter table](examples/assets/playground-optimize.png)
+
+*Simulate → Optimize: four Adam steps of `cool-sink`, minimizing peak
+temperature. The panel shows the convergence sparkline, a scrubber that replays
+the geometry along the trajectory, and each parameter's before → after value;
+the optimizer writes the new `fin_depth` straight back into `scene.py` on the
+left.*
 
 ## Tesseracts: one differentiable function across four AD strategies
 
@@ -380,10 +397,6 @@ quarto preview           # serve locally at localhost:4321
 ---
 
 Inspired by [Fidget](https://www.mattkeeter.com/projects/fidget/) and [Inigo Quilez's distance functions](https://iquilezles.org/articles/distfunctions/).
-
----
-
-![primitives](examples/assets/thingy.png)
 
 ## License
 
