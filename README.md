@@ -322,6 +322,45 @@ Design notes: `research/fem-integration.md` (solver ABI, adjoint mechanics,
 the ccx sensitivity correction), `research/native-mesher.md` (Rust core and
 its VJP), `research/tet-vs-hex.md` (the mesher-Tesseract validation matrix).
 
+## Tesseract Hackathon 2026 entry
+
+cadjoint is an entry in the [Tesseract Hackathon 2026](https://si-tesseract.discourse.group)
+(**Track 01 — Inverse design & shape optimization**). The entry state is
+frozen on the branch
+[`tesseract-hackathon-2026`](https://github.com/andrinr/cadjoint/tree/tesseract-hackathon-2026),
+which is kept permanently; development continues on `main`.
+
+**The headline workflow** is the two-Tesseract differentiable chain built on
+a surface-interpolation VJP:
+
+```
+CAD params θ ──► SDF lattice samples ──► ┌ mesher Tesseract ┐ ──► ┌ solver Tesseract ┐ ──► J
+   (JAX)              (JAX)              │  black-box mesh  │      │  FEM adjoint     │
+                                         └──────────────────┘      └──────────────────┘
+                     ∂J/∂θ  ◄──  one jax.grad call through both boundaries
+```
+
+The mesher Tesseract wraps a *non-differentiable* meshing pipeline (dual-
+contoured surface → TetGen / hex voxelization). Its VJP never looks inside
+the mesher: a boundary vertex `v` lies on the zero set of the trilinearly
+interpolated lattice samples, so the implicit function theorem gives
+`∂v/∂fᵢ = −wᵢ(v)·∇f/|∇f|²` — **the interpolation weights at the frozen
+vertex locations are the VJP rows**, making any mesher differentiable from
+its inputs and outputs alone. Composed with the unmodified jax-fem solver
+Tesseract, one `jax.grad` call crosses both boundaries: the VJP matches
+autodiff of the same map to 1.4e-11, finite differences confirm the smooth
+parameters, and five gradient steps drop the bracket objective 36%, with
+the Tesseract's frozen-topology promise detecting when a step demands
+re-meshing. Validation matrix: `research/tet-vs-hex.md`; runnable demo:
+`tests/fem/test_tetmesh.py::TestTwoTesseractChain` (with `-s`).
+
+Provenance: the geometry foundation (SDF kernel, constraints, viewer shell)
+predates the hackathon; every contribution above — the meshing pipeline,
+all Tesseracts, the CalculiX adjoint correction, the mesher VJP, and the
+end-to-end optimization — was written during the hackathon window
+(Aug 3–31, 2026), verifiable commit-by-commit on the frozen branch. Whole
+repo under Apache 2.0.
+
 ## Tests
 
 ```bash
