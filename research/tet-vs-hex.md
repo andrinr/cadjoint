@@ -930,3 +930,218 @@ Adjoint-vs-FD agreement is **24x tighter** on `plate_thickness` and **5x tighter
   **304 of 336** brackets, and asserts the fill stays non-degenerate (min quality
   1.19e-2, zero inverted) and solvable — the old map produced **347 exactly-zero-volume
   tets** on that same step; plus a fixed-point/interior-follows check on the relaxation.
+
+## Retargeting the starter chain tests on measurement (2026-09-01)
+
+Six tests in `tests/fem/` were red. Everything below is what measurement said when
+they were pointed at the code as it now stands, at the starter's **declared**
+18x13x11 lattice unless stated otherwise. Nothing here was fixed by loosening an
+assert; two of the six turned out to be documenting a stale claim, one turned out
+to be measuring a kink, and one measurement found a live defect (last section).
+
+### The interpolant chain can mesh the starter — the old "24x18x15" note was stale
+
+`tests/fem/test_starter_chain.py` refined the lattice to 24x18x15 on the recorded
+grounds that the mesher tesseract self-intersects at the declared resolution. Both
+halves of that are now wrong. Sweeping `freeze_study_chain` over the sink (tet10,
+sharp -> Tikhonov fallback as `_discover_mesh` does it):
+
+| lattice | result | sharp | mesh |
+|---|---|---|---|
+| **18x13x11 (declared)** | **OK** | 1 | 6412 pts / 3499 cells / 860 surface |
+| 19x14x12 | OK | 0 | 7447 / 4240 / 890 |
+| 20x15x12 | rejected | — | self-intersections |
+| 21x16x13 | rejected | — | self-intersections |
+| 24x18x15 | rejected | — | self-intersections |
+| 27x20x17 | OK | 1 | 17713 / 10506 / 1860 |
+| 30x22x18 | rejected | — | self-intersections |
+| 36x26x22 | rejected | — | self-intersections |
+| 42x31x26 | rejected | — | self-intersections |
+| 48x36x30 | rejected | — | self-intersections |
+
+Meshability is **not monotone in the lattice**: the declared resolution works and
+the refinement the tests were using is one of the ones that fails. Refining is not
+a remedy for the crease self-intersections, which is an independent argument for
+the DC chain being the default. (Freeze cost is ~2-3 s at any of these.)
+
+### ...but its tet mode is a point map: TetGen's Steiner count is not continuous
+
+The frozen tet chain reaches stage-2 parity with the direct solve at **exactly 0.0**
+and evaluates at its freeze samples (`J = 0.968120173`). It cannot be evaluated
+anywhere else. Perturbing `fin_depth` and re-calling `metric_value`:
+
+| step | +1e-2 | +1e-3 | +1e-4 | +1e-6 | +1e-8 | **+1e-10** |
+|---|---|---|---|---|---|---|
+| result | raises | raises | raises | raises | raises | **raises** |
+
+Every one fails with `Frozen-topology promise violated: caller promised 6412 points
+but the mesher produced 6503`. Negative steps of the same size fail identically. A
+1e-10 step on a 1.2 mm parameter is machine noise, so this is not a design-tolerance
+question: TetGen's Steiner insertion is not continuous in its input, and the
+whole-pipeline mesher re-runs it inside `apply`. Confirmed end to end —
+`Optimization(gradient_path="tesseract")` on a tet10 SimMesh dies on its **first**
+traced call (`promised 6486, produced 6476`).
+
+Perturbing the *lattice samples* directly is no better, and the sign pattern is not
+the cause: masking the direction to the 2552 of 3192 samples with `|phi| > 0.05`
+(so no crossing can flip) and taking `h` down to 1e-4 still raises. This is why
+there is no FD check on the tet chain's VJP — the forward map has no second point
+to difference against.
+
+### Its hex mode is the mode that works
+
+No TetGen in it, so the topology only moves when a lattice sample changes sign.
+
+- Freeze 1.5-3 s; 960 points / 560 hexes; stage-2 parity `max |dT| = 0.0`.
+- `J = 0.988622627`, adjoint `d(max T)/d(fin_depth) = -0.072205495`.
+- Adjoint vs central FD:
+
+| eps | 5e-4 | 3e-4 | 1e-4 | 3e-5 | 1e-5 |
+|---|---|---|---|---|---|
+| central FD | -0.070080581 | -0.070080709 | -0.070080773 | -0.070080383 | -0.070081075 |
+| rel. gap | 2.943e-2 | 2.943e-2 | 2.943e-2 | 2.943e-2 | 2.942e-2 |
+
+  The gap is **constant at 2.94% over four decades of eps**, so it is not FD
+  truncation — it is the mesher tesseract's gauge (its surface-interpolation VJP
+  carries only the normal component of boundary-vertex motion). Tests assert
+  rtol 5e-2 on that basis.
+- `eps >= 1e-3` breaks: the closest lattice sample sits `|phi| = 4.5e-3` from the
+  surface, flips, and the voxel count moves 960 -> 956. The FD window is `eps <= 5e-4`.
+- Descent (lr 0.05) is monotone: `0.988622627 -> 0.988371046 -> 0.988124474 -> 0.987889036`.
+- `Optimization(gradient_path="tesseract")` completes on a hex SimMesh:
+  `0.988697833 -> 0.981505746`, 22.9 s for 2 steps, parameters restored.
+
+### The DC chain at the declared resolution, which is what the playground runs
+
+Freeze 8.3-8.7 s; 5798 points / 3009 cells / 860 surface; DC surface 860 vertices /
+1716 triangles — i.e. it meshes the crease-heavy comb **at the scene's own grid**,
+no refinement.
+
+- Fixed point: traced nodes vs frozen mesh `max |dx| = 0.0`. Stage-2 parity `max |dT| = 0.0`.
+- `J = 1.153307262`, adjoint `-0.166356900`. Against central FD:
+
+| eps | 1e-3 | 3e-4 | 1e-4 |
+|---|---|---|---|
+| central FD | -0.166357126 | -0.166356920 | -0.166356902 |
+| rel. err | **1.36e-6** | 1.22e-7 | 1.36e-8 |
+
+  Clean second-order convergence — the DC chain differentiates its own objective
+  exactly, and the residual is FD truncation.
+- Direct path on the *same* mesh: `-0.134186049`, ratio **1.240**. The two
+  differentiate different frozen maps (DC's QEF surface keeps tangential vertex
+  motion; per-vertex Newton re-projection does not), so sign-and-scale is the
+  honest assertion and the DC number is the one FD backs.
+- Descent (lr 0.05) monotone: `1.15330727 -> 1.15194002 -> 1.15063003 -> 1.14937921`.
+- `Optimization(gradient_path="tesseract-dc")`: `1.13963743 -> 1.12917570`, 46 s for
+  2 steps, parameters restored to 1.200000048.
+
+### The starter tet FD failure was a kink, not a gradient defect
+
+`test_fin_depth_gradient_matches_finite_differences` compared adjoint `-0.08897663`
+against central FD `-0.07299839` at rtol 5e-2 and failed. Sweeping eps over three
+decades on the direct tet path (`recompute_tet_points` + `solve(points=...)`,
+`mean` metric, mesh frozen at the nominal design):
+
+| eps | central FD | forward FD | backward FD |
+|---|---|---|---|
+| 3e-2 | -0.073833967 | -0.055531029 | -0.092136905 |
+| 1e-2 | -0.073225563 | -0.056474785 | -0.089976341 |
+| 1e-3 | -0.072998389 | -0.056917103 | -0.089079676 |
+| 1e-4 | -0.073040041 | -0.057093889 | -0.088986192 |
+| 1e-5 | -0.073702865 | -0.058435533 | -0.088970198 |
+
+Central FD does not converge to the adjoint at any eps — it sits at -0.0730 across
+the whole sweep. The **one-sided** differences do converge, to two different
+numbers: backward -> `-0.08897` (the adjoint, to 6 digits) and forward -> `-0.0570`.
+Central FD is their mean to the last digit printed. The objective has a genuine kink
+at the freeze design and the adjoint is its **left** derivative.
+
+The cause is geometric, not numerical. The comb is an extrusion,
+`max(profile_2d, |y| - fin_depth/2)`, and the frozen boundary nodes at the fin-tip
+corners sit exactly on the end cap `y = +-0.6` at `fin_depth = 1.2` — the `max()`'s
+branch boundary. Shrinking the depth leaves them outside, so `project_points` drags
+them with the cap at `|dx/d(fin_depth)| = 0.5`; growing it leaves them inside, where
+the cap term is not active and they do not move.
+
+Stepping off that one point restores textbook agreement. At `fin_depth = 1.25` (the
+boundary point Jacobian is a uniform 0.5 over all 860 surface nodes there, so the
+mesh map is well-conditioned):
+
+| eps | 3e-3 | 1e-3 | 3e-4 |
+|---|---|---|---|
+| central FD | -0.052300844 | -0.052300693 | -0.052300676 |
+| rel. err vs adjoint -0.052300674 | 3.25e-6 | **3.61e-7** | 3.25e-8 |
+
+Sampling other base designs confirms the kink is isolated to the freeze point:
+adjoint and central FD agree to 7 digits at 1.2137, 1.25 and 1.30.
+
+### BUG (open): `project_points` amplifies its own linearization by 1e12 per step
+
+Found while sweeping base designs for the above, and **not** the cause of any of the
+six red tests — but it is live and it destroys gradients silently.
+
+Evaluating `d(mean T)/d(fin_depth)` on the direct tet path at base designs *below*
+the freeze point returns garbage of astronomical magnitude, while the forward value
+and FD stay perfectly smooth:
+
+| base `fin_depth` | 1.10 | 1.15 | 1.17 | 1.1873 | 1.199 | 1.20 | 1.2137 |
+|---|---|---|---|---|---|---|---|
+| adjoint | 6.9e+59 | 1.8e+59 | -7.1e+59 | -2.3e+60 | -0.0892 | -0.0890 | -0.0556 |
+| central FD | -0.1125 | -0.1000 | -0.0954 | -0.0916 | -0.0916 | -0.0730 | -0.0556 |
+
+It localizes to `cadjoint/fem/hexmesh.py:187`, inside `project_points`:
+
+```python
+squared = jnp.sum(gradient * gradient, axis=-1, keepdims=True)
+step = value[:, None] * gradient / jnp.maximum(squared, 1e-12)
+```
+
+At the fin-tip corner nodes the smoothed union's gradient **underflows**: after the
+first Newton step the node sits at `f = 4.3e-9` with `|grad| = 3.97e-8`, so
+`squared = 1.6e-15` is below the `1e-12` floor. The floor does its job on the
+forward pass — the clamped step is ~1.7e-4, harmless — but it also *freezes the
+denominator as a constant*, so the step's Jacobian is `value * Hessian / 1e-12`, and
+the measured amplification is exactly **1e12 per Newton iteration**:
+
+```
+after 1 steps: |dx/dd| = 5.0000e-01
+after 2 steps: |dx/dd| = 5.0000e-01
+after 3 steps: |dx/dd| = 2.2480e+08
+after 4 steps: |dx/dd| = 2.2480e+20
+...
+after 8 steps: |dx/dd| = 2.2480e+68
+```
+
+63 of 860 surface nodes exceed `|dx/dd| = 1e3` at `fin_depth = 1.15` (median over
+all nodes: 0.0). Eight iterations compound into ~1e68 in the point Jacobian and
+~1e59 in the objective gradient. At the freeze design itself the same nodes are
+clean (`max |dx/dd| = 0.503`, zero nodes above 1), which is why the shipped tests
+never saw it — the effect needs the corner node to be strictly *outside*.
+
+A guard that only protects the forward pass is not a guard. The fix belongs where
+the floor is: the step (and hence its derivative) should be suppressed when the
+gradient underflows, e.g. `jnp.where(squared < tol, 0.0, value * gradient / squared)`,
+so a node with no usable normal simply stays put in both passes instead of
+contributing a 1e12 multiplier. Left unfixed here — this is a `cadjoint/` change and
+wants its own regression test on a bare extrusion corner.
+
+### Files (delta)
+
+- `tests/fem/test_starter_chain.py` — 16 tests (was 8, of which 5 red). Retargeted
+  onto the DC chain at the **declared** resolution (`TestStarterDCChain`: meshing,
+  stage-2 parity + fixed point, adjoint-vs-FD at rtol 1e-4, direct-path ratio bounded
+  1.0-1.6, 3-step descent); the interpolant chain keeps the coverage it earns
+  (`TestStarterInterpolantChainHex`: parity, adjoint-vs-FD at the measured 2.94%
+  gauge, descent; `TestStarterInterpolantChainTet`: parity, and the
+  `Frozen-topology promise violated` limit asserted explicitly rather than assumed
+  away). The end-to-end seam test now runs `tesseract-dc` on tet10 and `tesseract`
+  on hex. 141 s.
+- `tests/fem/test_starter_tet.py` — 4 tests (was 3, of which 1 red). The FD check
+  moved off the kink to `1.2 + 0.05` and tightened from rtol 5e-2 to **1e-4**; a new
+  `test_the_freeze_design_sits_on_a_kink_and_the_adjoint_takes_it` pins the kink
+  itself (adjoint == backward FD to 1.07e-4; central FD 18% away and bracketed by the
+  two one-sided slopes). 24 s.
+- `cadjoint/**` — unchanged. The `project_points` defect above is reported, not
+  patched.
+
+Gate: `pytest tests/fem -q` -> **282 passed, 14 skipped**, 0 failed, 0 errors (8:31).
