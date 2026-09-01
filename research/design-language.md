@@ -577,7 +577,466 @@ Reasoning, having looked at all three rendered rather than described:
 
 ---
 
-## 14. Files
+## 14. Surfaces: light, depth and translucency
+
+*Second pass. §3 fixed the hue and the refusals; it left the surfaces themselves
+flat and very dark — five near-blacks between L 0.145 and 0.310, elevation by
+luminance alone. This section asks whether that is right, and answers with nine
+rendered variants of the same screen and the numbers behind each. Images in
+`research/design/surfaces/`; every figure below is reproducible from
+`variants.mjs` / `final.mjs` in the scratchpad workspace.*
+
+### 14.1 The number the whole section turns on
+
+**viridis' darkest sample is L 0.290** — `viridis(0.00) = #460155`, the coldest
+pixel any solved field can contain. The ramp never goes below it:
+
+```
+viridis  L 0.290 (t=0.00, #460155)  ..  0.914 (t=1.00, #fae720)
+magma    L 0.000 (t=0.00, #000000)  ..  0.970 (t=1.00, #fff8bf)
+```
+
+So the field has a **floor**, and chrome has a ceiling. A panel fill at L 0.335
+is not merely "a bit light": it is measurably brighter than 11% of every
+temperature field the app will ever draw, and the eye reads the brighter thing
+as the subject. That single number decides how far up the ladder chrome may go,
+and it is the reason variant 3 (GRAPHITE) fails and variant 9 does not.
+
+magma reaches black, so it cannot set the ceiling; it is also the *quality* ramp,
+which is read in short bursts. viridis is the ramp that owns the screen.
+
+### 14.2 What the current stack actually measures
+
+| ladder | span | steps | smallest step |
+| --- | --- | --- | --- |
+| cadjoint today (8 near-blacks) | **8.70** ΔOKLab | 7 | 0.47 |
+| §3's proposal, ZERO (5 surfaces) | 16.52 | 4 | 3.51 |
+| Linear's reported dark ladder | 7.82 | 4 | **0.44** |
+| **this section's recommendation** | **24.41** | 6 | 2.72 |
+
+Linear is worth putting in the table because it is the reference everyone
+reaches for, and because its ladder is *also* compressed — its last two surfaces
+(`#18191a` → `#191a1b`) are 0.44 ΔOKLab apart, a quarter of a JND. That is fine
+for Linear: it is a text application on a black ground, its ceiling is the top of
+the sRGB gamut, and it can carry hierarchy on hairlines because nothing on screen
+competes with them. cadjoint has neither the same subject nor the same ceiling.
+It has *more* headroom than Linear below its ceiling (0.110 → 0.290 is a usable
+18 ΔOKLab of ladder) and a stronger reason to use it: the panel has to hold its
+own against a colour-mapped field 40 px to its left.
+
+### 14.3 The nine variants
+
+All nine are the same DOM, the same layout and the same field image; only the
+surface system changes. Renders at 1500×940, examined at 1× before judging.
+
+| # | name | thesis | measured |
+| --- | --- | --- | --- |
+| 1 | **CONTROL · Today** | The shipped palette. 8 near-blacks on h 165° (viridis' *middle*), flat fills, elevation by shadow. | span 8.70 / 7 steps; 5 of 7 steps under JND. Cards and inputs are invisible as objects; the panel reads as one black hole with a border doing all the work. |
+| 2 | **ZERO · direction A** | §3's answer: h 299°, five surfaces, flat fills, L 0.145–0.310. | span 16.52 / 4. Clearly better than today. But cards at Δ 4.5 from the panel still read as a tint, not a plate, and underlined values read as text rather than as controls. |
+| 3 | **GRAPHITE · elevated, flat** | How light can chrome go? Gunmetal panels, L 0.125–0.45, flat fills, inputs as inset darker holes. | Panel L 0.335 → **outshines 11% of the viridis range**. Editor at L 0.265 turns 40% of the screen into a grey slab. And the inset inputs read as *disabled*: a value in a hole darker than its card looks switched off. |
+| 4 | **PLATE · elevated + lit** | Graphite's ladder plus one global light direction: top-lit washes, 1px lit-top / dark-bottom edges, a gradient viewport well, inputs as lighter planes. | Same ladder, transformed. The lit inputs read as editable where Graphite's read as dead; the cards read as objects. Still too light: panel L 0.296–0.345 crosses the floor. |
+| 5 | **WELL · ceilinged + lit** | PLATE's light model with the stack pulled back under the floor. L 0.115–0.325. | The first variant where nothing competes with the field and everything is still separable. Cards and controls poke 1–3 above the floor. |
+| 6 | **WELL-WARM** | WELL on a warm neutral (h 78°) instead of the ramps' violet zero. | See §14.5 — the difference is **below JND at every surface**. |
+| 7 | **GLASS** | The whole panel 68–70% opaque over `blur(28px) saturate(.45) brightness(.62)`. | ink-3 falls to **3.42:1**; backdrop σ under a column of glyphs **triples**. |
+| 7b | **GLASS-NAIVE** | The same at 52–55% with `blur(16px)` and no brightness knockdown — the version copied off a marketing site. | ink-2 **4.34:1**, ink-3 **2.68:1**. Both fail AA. |
+| 8 | **APERTURE** | Selective translucency: a 40%-opaque shell, every number-bearing block an opaque plate on top of it. | Contrast identical to fully opaque (ink-3 4.54 vs 4.58). Costs nothing — and buys almost nothing. |
+| 9 | **PLATE-WELL** | **The recommendation.** WELL's architecture, re-spaced so no fill over 4 000 px² exceeds L 0.290; light model kept, noise dropped, translucency dropped. | span 24.41 / 6 steps, smallest 2.72; 0% of viridis outshone by any large fill. |
+
+### 14.4 Light, not shadow
+
+The finding that mattered most was not in the palette, it was in variants 3 vs 4:
+**the same lightness ladder reads as dead or alive depending on whether there is
+a light direction.** Graphite and Plate differ by nothing except a ±2.7 ΔOKLab
+vertical wash and a pair of 1px edges, and Graphite's number fields read as
+disabled while Plate's read as editable.
+
+So the language gains one physical commitment: **there is a single light source,
+it is above the screen, and every raised element is lit by it.**
+
+- **Wash.** A panel or a card is a vertical gradient of **±1.4 ΔOKLab about its
+  nominal** (panel `#25232a` → `#1e1d22`, amplitude 2.75; card `#2c2931` →
+  `#26242b`, amplitude 2.21). Just over one JND — perceptible as a direction,
+  never as a stripe.
+- **Edges.** Anything raised carries `inset 0 1px 0 var(--edge-lit)` and
+  `inset 0 -1px 0 var(--edge-dark)`. Those are 9.76 and 11.46 ΔOKLab from the
+  surface they edge, i.e. **the 1px edge is a far stronger separator than the
+  fill step it decorates** — which is the whole point: it buys separation without
+  spending lightness budget against the field's floor.
+- **Direction of elevation is inverted from today.** Controls are *lighter*
+  planes, never darker holes. This is not taste: at panel L ≥ 0.25 a darker inset
+  is the same signal the app uses for "disabled", and variant 3 shows it read that
+  way.
+- **Shadow stays at one.** §5's rule survives: exactly one cast shadow in the
+  app, on the panel that floats over the viewport. The edge lights are not
+  shadows; they are the same light model seen from the other side.
+- **The viewport is a well.** `radial-gradient(118% 92% at 46% 33%, #161519,
+  #040305)` — 5 ΔOKLab from centre to corner. It is below conscious notice and it
+  does one job: it stops the viewport being a flat black rectangle and gives the
+  geometry somewhere to sit.
+
+This is what the industry converged on independently. Linear "trusts surface lift
+and hairline borders to carry every bit of hierarchy", raising each level's white
+overlay 0.02 → 0.04 → 0.05 rather than casting shadows; Radix's scale reserves
+steps 3/4/5 for component background / hover / pressed, i.e. elevation *is* the
+scale; Geist spends steps 100/200/300 on default / hover / active background and
+400/500/600 on the matching borders. All three encode the same idea: **elevation
+is a step on a scale, and a border is a second scale that moves with it.**
+
+### 14.5 Temperature: not a decision
+
+The hypothesis was that a warm neutral would read "made" where a cool one reads
+"rendered". Measured, at the chroma the language actually permits chrome (C ≤ 0.014):
+
+| surface | C | h 299° | h 78° | ΔOKLab |
+| --- | --- | --- | --- | --- |
+| void | 0.004 | `#050506` | `#060504` | 0.73 |
+| base | 0.007 | `#18161a` | `#191714` | 1.37 |
+| panel | 0.009 | `#232126` | `#24221d` | 1.85 |
+| raised | 0.010 | `#2b2a2f` | `#2e2a25` | 1.85 |
+| hover | 0.011 | `#353339` | `#37332e` | 1.95 |
+| line | 0.013 | `#3e3c43` | `#413c36` | 2.25 |
+
+A **221° hue rotation** — violet to warm, most of the way round the wheel — moves
+every surface by less than or barely at one JND. Rendered side by side (variants 5
+and 6) they are indistinguishable at 1×.
+
+The temperature only becomes visible if chroma rises: Δ 3.76 at C 0.020, Δ 5.50 at
+C 0.030, Δ 8.31 at C 0.045. But C > 0.03 is exactly what §11's `chrome-hue` lint
+forbids, and for good reason — at that chroma the chrome has a hue, and every hue
+on screen is supposed to be a number.
+
+**Verdict: chrome temperature is not a design decision at this chroma; it is a
+rounding error.** Keep h 299°, because it is derived from where the two ramps
+agree and therefore costs nothing to justify. Anyone who wants the greys to feel
+warmer is asking for C ≥ 0.03, and that is a different, larger argument that this
+language has already lost on purpose. (Linear's own 2026 refresh moved "from a
+cool, blue-ish hue toward a warmer gray" — which is a real change only because
+their neutral carries more chroma than ours is allowed to.)
+
+### 14.6 Banding: measured, and the fix is worse than the disease
+
+Four gradients at the L ranges the system actually uses, rendered at 1500px wide
+and measured across a scanline:
+
+| gradient | distinct 8-bit values | median band width | **max single-step ΔOKLab** |
+| --- | --- | --- | --- |
+| viewport well 0.163 → 0.094 | 35 | 1px | 0.83 |
+| panel wash 0.272 → 0.234 | 20 | 1px | 0.43 |
+| card wash 0.345 → 0.296 | 25 | 1px | 0.39 |
+| worst case 0.200 → 0.090 | 60 | 1px | 1.21 |
+| *+ noise overlay (0.055 opacity)* | *132–250* | *1px* | ***1.08–2.14*** |
+
+Median band width is **1px in every case**: the browser is already
+error-diffusing the gradient, so there are no bands to see — the transitions are
+dithered, not stepped. Every single step is under 1.25 ΔOKLab, well below the
+JND of ≈ 2.
+
+Adding a film-grain overlay raises the maximum step to 1.08–2.14 — **at or above
+JND** — and multiplies the distinct values by 4–7×. At 1× the noise is visible as
+mottling on the card wash, and the banding it was meant to hide is not.
+
+**Verdict: no noise, no dither, no grain. The artifact does not exist at these
+amplitudes, and the remedy is measurably louder than the disease.** This holds
+because the washes are shallow by design (±1.4 ΔOKLab); a deeper gradient would
+change the answer, which is another reason not to have one.
+
+### 14.7 Translucency
+
+The language currently refuses glassmorphism outright (§10.6). Having built and
+measured it, the refusal is **right for the reason it gives, and for a second
+reason it does not give — but it is stated too broadly.**
+
+Background luminance under the glyph-bearing regions of the panel, over a
+deliberately worst-case backdrop (the field repositioned so its bright viridis
+region — mean L 0.331, p95 0.576, peak 0.748 — sits behind the panel):
+
+| variant | bg L under glyphs | **σ** | ink | ink-2 | ink-3 |
+| --- | --- | --- | --- | --- | --- |
+| opaque (variant 5/9) | 0.238–0.285 | **0.020** | 12.24 | 7.41 | **4.58** ✓ |
+| APERTURE, selective | 0.142–0.288 | **0.016** | 12.12 | 7.34 | **4.54** ✓ |
+| GLASS, tuned | 0.239–0.363 | **0.048** | 9.12 | 5.52 | **3.42** ✗ |
+| GLASS-NAIVE, blur only | 0.221–0.416 | **0.077** | 7.17 | 4.34 ✗ | **2.68** ✗ |
+
+Three things fall out.
+
+1. **Full translucency fails on the third ink level, not the first.** `ink` is
+   never in danger — it clears AAA over anything. It is `ink-3`, the label and
+   unit level, that collapses: 4.58 → 3.42 tuned, 2.68 naive. Since §7 puts every
+   *label* at 9px `ink-3` and every *unit* at `ink-3` beside its value, glass
+   breaks precisely the type that carries what a number means.
+2. **The tuned version only survives because it is not really transparent.**
+   `brightness(0.62)` is doing the work; it is a dimming filter with a blur
+   attached. Take the knockdown away — variant 7b, which is what "add a
+   backdrop-blur" means in practice — and ink-2 fails too.
+3. **The real objection is σ, not the mean.** The spread of the background under
+   a single column of glyphs goes from 0.016–0.020 (a designed, assertable,
+   lintable constant) to 0.048–0.077. A translucent panel does not have a
+   contrast ratio; it has a *distribution*, and the distribution moves when the
+   camera orbits. That is what §10.6 means by "unassertable", and the numbers
+   support it.
+
+**A fourth thing, which is the one that should actually settle it, and which none
+of the contrast maths above catches: the panel contains a colormap legend.**
+
+`.sim-ramp` — the viridis bar with its two labelled endpoints — lives inside this
+panel, and §3.4 permits it there precisely because "the chrome around it stays
+neutral". Translucency breaks that invariant. The swatch pixels stay correct; the
+*ground the eye judges them against* does not. Measured ΔE76 of the panel ground
+as the field behind it sweeps viridis(0) → viridis(1):
+
+| panel α | ground over `#440154` | ground over `#fde725` | ΔE76 |
+| --- | --- | --- | --- |
+| 0.82 | `#170e1b` | `#393712` | **36.4** |
+| 0.91 | `#120f15` | `#232410` | **18.9** |
+| 0.96 | `#101011` | `#17190f` | 8.3 |
+| **1.00** | `#0e110f` | `#0e110f` | **0.0** |
+
+Simultaneous contrast is not a subtlety here: a viridis chip read against an
+olive-shifted ground is judged as a different colour than the same chip against a
+neutral one. For a legend whose entire job is colour-matching against the field,
+that is a **correctness defect in an instrument**, not a style preference. It is
+also the only argument in this section that a translucency advocate cannot
+answer by turning a knob — there is no alpha above 0 at which the ground is
+constant.
+
+There is a related failure below α ≈ 0.5: `ink-3` passes through zero contrast
+(1.62:1) and re-emerges as dark-on-light as the field heats. A label that
+*inverts polarity* mid-solve is worse than one that is merely dim.
+
+**On the engineering cost, the earlier framing here was wrong and is corrected.**
+A first measurement in this workspace — a 306×546 panel over a 2D canvas
+repainted every frame — found no difference at all (opaque 4.10–4.25 ms/frame,
+blurred 4.14–4.15; the two opaque runs differed by more than opaque differed from
+blurred). That test was simply insensitive: it was CPU-bound on the canvas paint,
+on a small surface. A properly isolated measurement (M-series, Chromium 151,
+3024×1890 canvas) separates the two effects:
+
+| condition | ms/frame | marginal |
+| --- | --- | --- |
+| no panel | 21.99 | — |
+| opaque panel | 21.99 | −0.01 |
+| α 0.85, **no blur** | 21.97 | **−0.02** |
+| α 0.85, `blur(20px)` | 22.48 | **+0.49** |
+
+**Translucency itself is free. Only the blur costs** — about 0.48 ms, ≈ 2.9% of a
+60 fps budget. And the cost does not scale with the panel, it scales with the
+*canvas*: holding the panel at 306×520 and varying only DPR gives +0.055 ms at
+1.43 MPix, +0.479 at 5.72, +0.627 at 12.86. Sweeping the panel from 0.06 to 5.64
+MPix leaves it flat at ~0.5 ms; sweeping the blur radius from 2 to 120px likewise
+(Skia downsamples above sigma 4).
+
+The mechanism is in Chromium's compositor, not in a blog post —
+`cc/trees/damage_tracker.cc`:
+
+```cpp
+if (render_surface->BackdropFilters().HasFilterThatMovesPixels() &&
+    intersects_damage_under) {
+  damage_for_this_update_.Union(surface_rect_in_target_space, ...);
+}
+```
+
+A blur is a pixel-moving filter, so **any damage beneath the panel unions the
+panel's whole surface rect into the frame's damage**. The viewport damages itself
+every frame for the whole accumulation window, so there is no cached-blur path
+while a solve or a path-trace runs — exactly the window in which the GPU is most
+contended. "It is only a 306px panel, it must be cheap" is the wrong model.
+
+So the honest cost statement is: *translucency is free, blur is not, and the
+reason blur is not free is a whole-canvas damage union that gets worse on the
+larger displays this app is most likely to be used on.*
+
+**Selective translucency passes the contrast test but fails a design one.**
+APERTURE holds AA exactly (4.54 vs 4.58) because no glyph ever leaves an opaque
+plate — a legitimate construction that costs nothing measurable. But what it buys
+is a ~10px translucent frame, and Figma shipped precisely that idea in UI3:
+floating panels pulled a few pixels off the edge so the canvas showed around
+them. The reported complaint was that "designs seemed to peek out from behind
+them in a way that was distracting", and Figma reverted to docked panels. A 10px
+window onto the model is not enough to answer "what is under the panel" and is
+enough to add motion at the edge of the thing you are reading.
+
+**Two precedents worth naming, because both are closer to this product than any
+marketing site.** Excalidraw — floating panels over a live canvas — removed
+`backdrop-filter` and *kept* the translucency, for exactly the performance
+reason above (issue #3505 / PR #3506). And Linear publicly declined Apple's
+Liquid Glass APIs in October 2025, in terms that could have been written for
+this section: *"refraction can make dense professional interfaces harder to
+read. By relying on precise blurs, masking, and lighting, we maintained a sense
+of depth without losing clarity."* The team building the closest analogue to
+cadjoint's chrome looked at the most heavily marketed translucency system of the
+decade and said no to it on legibility grounds.
+
+**Verdict: the panel is opaque, and the refusal is restated so it says why.**
+Replace §10.6:
+
+> **6. No text, and no colormap, on a backdrop that is a function of the data.**
+> A surface carrying glyphs or a legend is opaque — its contrast and its
+> surround must be constants the linter can assert. This is not a taste
+> position about glass: at any α < 1 the panel ground shifts by up to ΔE76 36
+> as the field sweeps, which makes a viridis legend read differently depending
+> on what is behind the panel, and below α ≈ 0.5 `ink-3` inverts polarity
+> mid-solve.
+>
+> Translucency without blur is free and does not fail contrast on its own;
+> `backdrop-filter` is not free, because a pixel-moving filter unions the
+> panel's whole rect into frame damage every frame the viewport redraws. If a
+> translucent panel is ever justified, it is translucent *without* a blur,
+> α ≥ 0.96, it contains no ramp, and it honours `prefers-reduced-transparency`.
+>
+> The need this was trying to serve — *what is under the panel?* — is answered
+> by a **peek**: hold a key and the panel drops to 15% with its text hidden
+> entirely, for as long as it is held. That gives the whole panel's worth of
+> geometry instead of a 10px sliver, it is unambiguous, and it never asks
+> anyone to read a number off a moving ground.
+
+### 14.8 The recommended stack
+
+Nine tokens on the ladder, four wash values, two edge values, three inks. All on
+h 299° with C = min(0.014, 0.045·L), so the tint stays constant in appearance.
+
+| token | hex | L | C | Δ from previous | % of viridis outshone |
+| --- | --- | --- | --- | --- | --- |
+| `surface-void` | `#050406` | 0.110 | 0.007 | — | 0.0% |
+| `surface-base` | `#131216` | 0.185 | 0.008 | 7.47 | 0.0% |
+| `surface-bar` | `#19181d` | 0.212 | 0.010 | 2.72 | 0.0% |
+| `surface-panel` | `#222026` | 0.248 | 0.012 | 3.59 | 0.0% |
+| `surface-card` | `#29272e` | 0.278 | 0.013 | 2.95 | 0.0% |
+| `surface-control` | `#343139` | 0.319 | 0.015 | 4.17 | 4.9% |
+| `surface-hover` | `#3d3a42` | 0.355 | 0.014 | 3.51 | 10.1% |
+
+Washes and edges:
+
+| token | hex | L | job |
+| --- | --- | --- | --- |
+| `panel-lit` | `#25232a` | 0.261 | top of the panel wash |
+| `panel-shade` | `#1e1d22` | 0.234 | bottom of the panel wash |
+| `card-lit` | `#2c2931` | 0.287 | top of the card wash |
+| `card-shade` | `#26242b` | 0.265 | bottom of the card wash |
+| `edge-lit` | `#45424a` | 0.385 | the 1px lit top of anything raised |
+| `edge-dark` | `#0b0b0e` | 0.151 | the 1px shaded bottom |
+| `line` | `#3a3840` | 0.346 | structural hairline |
+| `line-strong` | `#535159` | 0.440 | control edges, hover |
+| `ink` | `#edecef` | 0.945 | values, active state |
+| `ink-2` | `#bbbabe` | 0.791 | body, icons |
+| `ink-3` | `#939197` | 0.660 | labels, units, secondary |
+
+Span **24.41 ΔOKLab over six steps**, smallest step 2.72 — nearly three times
+today's total range, with every step above JND. Panel wash amplitude 2.75, card
+wash 2.21. `edge-lit` sits 9.76 from `card-lit` and `edge-dark` 11.46 from
+`card-shade`.
+
+Contrast, WCAG 2.1, ink on every resting surface (washes measured at both ends):
+
+| | void | base | bar | panel↓ | panel↑ | card↓ | card↑ | control | hover |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `ink` | 17.39 | 15.85 | 15.00 | 14.23 | 13.19 | 13.03 | 12.15 | 10.85 | 9.48 |
+| `ink-2` | 10.60 | 9.66 | 9.14 | 8.68 | 8.04 | 7.94 | 7.41 | 6.62 | 5.78 |
+| `ink-3` | 6.56 | 5.98 | 5.66 | 5.37 | 4.98 | 4.92 | 4.59 | **4.10** | **3.58** |
+
+`ink` and `ink-2` clear AA everywhere. `ink-3` clears AA on every surface up to
+and including `card-lit` (4.59) and **fails on `surface-control` and
+`surface-hover`** — so, exactly as §3.3 already rules for hover: **`ink-3` is
+forbidden on `surface-control` and `surface-hover`; a control's own label is
+`ink-2`.** That is what you want anyway — the label inside a control is not
+secondary, it is the control.
+
+Distance to the ramps, so chrome is provably not a sample of anything:
+
+| token | nearest viridis | nearest magma |
+| --- | --- | --- |
+| `surface-panel` | Δ 13.4 (t 0.00) | Δ 8.7 (t 0.10) |
+| `surface-card` | Δ 12.6 (t 0.01) | Δ 10.1 (t 0.13) |
+| `surface-control` | Δ 12.1 (t 0.08) | Δ 11.9 (t 0.16) |
+| `line-strong` | Δ 8.6 (t 0.27) | Δ 15.9 (t 0.34) |
+
+The tightest is `line-strong` at 8.6 from viridis(0.27) — a 1px hairline against
+a ramp sample, which is inside §3.4's ≤ 2px stroke allowance.
+
+### 14.9 Two new rules, and one amended
+
+Added to §10's refusals:
+
+14. **No chrome fill larger than 4 000 px² may exceed L 0.290** — viridis'
+    darkest sample. Panels, cards, bars, the editor and the viewport are all
+    subject to it. A 145×24 input is not, which is why `surface-control` is
+    allowed at 0.319; a 306px-wide panel header is not exempt at any lightness.
+15. **No inset control.** A control is a plane lit from above: `surface-control`
+    fill, `edge-lit` on its top pixel, `edge-dark` on its bottom. A field drawn
+    darker than the card it sits in reads as disabled, which is a different
+    message.
+
+Amended:
+
+6. ~~No glassmorphism, no blur-behind panels.~~ → **No text, and no colormap, on
+   a backdrop that is a function of the data** — as restated in full in §14.7.
+   The panel is opaque; "what is under the panel" is a held peek to 15% with the
+   text hidden, not a permanently translucent panel.
+5. Unchanged in intent, sharpened in fact: **no decorative gradient** — but the
+   ±1.4 ΔOKLab wash that expresses the light direction is not decoration and not
+   a colormap; it is below the threshold at which a gradient reads as a gradient,
+   and it is the mechanism that makes elevation legible without spending
+   lightness against the field's floor.
+
+And one lint check joins §11's four:
+
+- `field-floor` — any element whose painted area exceeds 4 000 px² and whose
+  background resolves to OKLab L > 0.290, outside the viewport rectangle.
+
+### 14.10 Recommendation
+
+**Ship variant 9, PLATE-WELL** (`research/design/surfaces/9-plate-well-recommended.png`).
+
+- It is the only variant where the ladder is fully legible *and* nothing on it
+  outshines the field. Variants 3 and 4 buy separability by crossing the floor;
+  variants 1 and 2 stay under the floor by giving up separability. 9 gets both
+  because the light model supplies separation that the fill values do not have
+  to pay for.
+- The light direction is the substantive change, not the lightness. It is what
+  turns a number field from a hole into a plate, and it is one line of CSS per
+  element rather than a new colour.
+- The translucency work should ship as a *refusal with a receipt*: the numbers in
+  §14.7 are the answer next time someone proposes glass, and the held peek is the
+  feature that request was actually asking for.
+- Noise and warmth were both hypotheses that measurement killed, which is the
+  point of measuring. Neither costs anything to drop.
+
+One thing this section deliberately does **not** settle. Every contrast figure
+above is WCAG 2.1, which is the standard the existing `tokens.test.ts` asserts.
+Under APCA — the perceptual model that actually predicts thin light-on-dark text
+— `ink-3` at 9px is weak on the upper surfaces regardless of what the ladder
+does, and no alpha or elevation choice fixes that. If that turns out to matter
+more than surfaces do, the lever is the *type* (`ink-3` at 10px/500 rather than
+9px/400), not the greys. Worth its own pass; out of scope for this one.
+
+### 14.11 What was looked at
+
+Beyond the nine renders: Radix Colors' 12-step scale (steps 1–2 app/subtle
+background, 3/4/5 component background–hover–pressed, 6/7/8 borders, 11/12 text);
+Vercel Geist's 10-step equivalent (100/200/300 background–hover–active,
+400/500/600 the matching border triple); Linear's published UI redesign notes
+(reduced dividers, a warmer and less saturated neutral, hierarchy carried by
+surface lift rather than shadow) and its reported four-step ladder, measured
+above; Linear's October 2025 statement declining Apple's Liquid Glass on
+legibility grounds; Figma's UI3 floating-panel rollback and the forum record of
+why; Excalidraw's removal of `backdrop-filter` from panels over a live canvas
+(#3505 / #3506); Chromium's `cc/trees/damage_tracker.cc` for the mechanism; and
+Blender theming guidance on keeping the viewport ground close enough to the
+material that objects stay differentiable without producing retina burn.
+
+**Rejected on purpose.** *One very large number per panel* — a 40px hero metric
+is a dashboard gesture; at 500 elements it steals the eye from the field and
+there is no single number in a study that deserves it. *Rounded, softened,
+low-contrast separation* (Linear's direction) — right for a text app, wrong here,
+because our separation problem is between chrome and a colour-mapped image, not
+between rows of text. *Border-led hierarchy* (Geist's 400/500/600 triple) — a
+resting border at 3:1 turns every panel into a drawn box, which §3.3 already
+rejected; we take the *idea* that borders move with elevation and spend it on the
+1px edge lights instead. *Glass, in all its 2026 forms* — for the reasons in
+§14.7.
+
+
+## 15. Files
+
 
 | what | where |
 | --- | --- |
@@ -587,6 +1046,19 @@ Reasoning, having looked at all three rendered rather than described:
 | direction B | `research/design/direction-b-plate.png` |
 | direction C | `research/design/direction-c-adjoint.png` |
 | reference (today) | `research/refactor/before-4-studies.png` |
+| the surface study (§15) | `research/design/surfaces/` |
+| control (today's palette) | `research/design/surfaces/1-control-today.png` |
+| §3's proposal rendered | `research/design/surfaces/2-zero.png` |
+| elevated, flat | `research/design/surfaces/3-graphite.png` |
+| elevated, light-modelled | `research/design/surfaces/4-plate.png` |
+| ceilinged, light-modelled | `research/design/surfaces/5-well.png` |
+| warm neutral | `research/design/surfaces/6-well-warm.png` |
+| translucent, worst-case backdrop | `research/design/surfaces/7-glass-worst-case.png` |
+| translucent, no brightness knockdown | `research/design/surfaces/7b-glass-naive-worst-case.png` |
+| selective translucency, worst case | `research/design/surfaces/8-aperture-worst-case.png` |
+| **the recommendation** | `research/design/surfaces/9-plate-well-recommended.png` |
+| all nine panels side by side | `research/design/surfaces/contact-sheet-panels.png` |
+| the banding test | `research/design/surfaces/banding-test.png` |
 
 The derivation scripts (`palette.mjs`, `accent.mjs`) and the standalone HTML
 mockups live in the scratchpad workspace; every number quoted above is reproducible
