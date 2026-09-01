@@ -249,19 +249,22 @@ class TestStarterScene:
         assert described["remesh_every"] == 6
         assert described["regularizer"] == "material_volume"
         assert described["regularizer_weight"] == pytest.approx(0.4)
-        assert described["steps"] == 10
+        assert described["steps"] == 12
         assert described["learning_rate"] == pytest.approx(0.01)
-        # The study solves on the explicitly declared SimMesh.
+        # The study solves on the explicitly declared SimMesh (quality path).
         assert namespace["heat_study"].mesh is namespace["sink_mesh"]
-        assert namespace["sink_mesh"].method == "hex"
+        assert namespace["sink_mesh"].method == "tet10"
         # No declared domain: the scene's free parameters are the design.
         assert "fin_depth" in described["parameters"]
         assert set(namespace["sink_parameters"]) <= set(described["parameters"])
         # Without the scene the parameter list degrades gracefully.
         assert optimization.describe()["parameters"] == []
 
-        run = optimization.run(3, scene=scene)
-        assert len(run.history) == 3
+        # Five steps: the tet10 objective is rougher across the first adam
+        # step than the hex one (re-projected DC surface points), so descent
+        # is asserted over a short window rather than a single step.
+        run = optimization.run(5, scene=scene)
+        assert len(run.history) == 5
         assert run.history[-1]["objective"] < run.history[0]["objective"]
         assert all(
             jnp.isfinite(record["objective"]) and jnp.isfinite(record["grad_norm"])

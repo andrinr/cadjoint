@@ -18,6 +18,8 @@ import type {
   MeshEdgePayload,
   MeshInspectInfo,
   OptimizationPayload,
+  OptimizeHistoryEntry,
+  OptimizeTrajectoryEntry,
   Selection,
   SelectionMode,
   SimMeshPayload,
@@ -27,6 +29,7 @@ import type {
   ToolMode,
 } from "./types";
 import { placeEdges } from "./viewer/gizmo";
+import type { PlayerState } from "./optimize";
 import type { PendingLoft } from "./loft";
 import {
   autoEnterSketchMode,
@@ -89,6 +92,34 @@ export interface OptimizeSimulateResult {
 
 export const [optimizeSimulate, setOptimizeSimulate] =
   createSignal<OptimizeSimulateResult | null>(null);
+
+/**
+ * The last completed optimization run, shared so the trajectory player can
+ * mount wherever the user lands (the Optimize card, or the Simulate
+ * panel's Results tab for study-backed runs) with one state.
+ */
+export interface OptimizeRunState {
+  name: string;
+  /** The adopted program with the final literals written back. */
+  source: string;
+  history: OptimizeHistoryEntry[];
+  trajectory: OptimizeTrajectoryEntry[];
+  parameters: Record<string, number | number[]>;
+  initial: Record<string, number | number[]>;
+  /** The backing study's name for study-backed runs, else null. */
+  study: string | null;
+}
+
+export const [optimizeRun, setOptimizeRun] = createSignal<OptimizeRunState | null>(null);
+
+/** Replay cursor over the shared run (frame index + playing flag). */
+export const [optimizePlayer, setOptimizePlayer] = createSignal<PlayerState>({
+  frame: 0,
+  playing: false,
+});
+
+/** One-shot post-run replay request, consumed by the mounted player. */
+export const [optimizeAutoPlay, setOptimizeAutoPlay] = createSignal(false);
 
 /** Whether viewport clicks propose BC selections (armed by the builder). */
 export const [bcPickArmed, setBcPickArmed] = createSignal(false);

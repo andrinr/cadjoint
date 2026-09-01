@@ -17,28 +17,29 @@
  * nothing lands in undo history — only the adopted final source does.
  */
 
-import { For, Show, createMemo, createSignal, onCleanup } from "solid-js";
+import { For, Show, createSignal } from "solid-js";
 import * as api from "../api";
 import {
-  advancePlayer,
   deleteOptimizationRequest,
-  frameObjective,
   optimizeRequest,
   playbackFrames,
   setOptimizationValueRequest,
-  sparklineCursorX,
   sparklinePoints,
-  startPlayer,
-  substituteParameters,
-  type PlayerState,
 } from "../optimize";
 import { formatScalar } from "../simulation";
-import { busy, optimizations, setOptimizeSimulate, source } from "../state";
-import type {
-  OptimizationPayload,
-  OptimizeHistoryEntry,
-  OptimizeTrajectoryEntry,
-} from "../types";
+import {
+  busy,
+  optimizations,
+  optimizeRun,
+  setOptimizeAutoPlay,
+  setOptimizePlayer,
+  setOptimizeRun,
+  setOptimizeSimulate,
+  source,
+  type OptimizeRunState,
+} from "../state";
+import { TrajectoryPlayer } from "./TrajectoryPlayer";
+import type { OptimizationPayload } from "../types";
 
 export interface OptimizeCardsProps {
   /** Serialized /patch queue owned by the app shell. */
@@ -49,21 +50,8 @@ export interface OptimizeCardsProps {
   onGhostCompile: (source: string) => Promise<boolean>;
 }
 
-/** A completed run, kept for the summary block and the replay player. */
-interface RunResult {
-  name: string;
-  /** The adopted program with the final literals written back. */
-  source: string;
-  history: OptimizeHistoryEntry[];
-  trajectory: OptimizeTrajectoryEntry[];
-  parameters: Record<string, number | number[]>;
-  initial: Record<string, number | number[]>;
-}
-
 const SPARK_WIDTH = 220;
 const SPARK_HEIGHT = 44;
-/** Replay pace: one ghost compile per frame, plus a beat to look at it. */
-const FRAME_MILLISECONDS = 1_500;
 
 const parse = (raw: string): number | null => {
   const value = Number(raw);
@@ -104,101 +92,15 @@ const formatSeconds = (value: number): string =>
 export function OptimizeCards(props: OptimizeCardsProps) {
   const [running, setRunning] = createSignal<string | null>(null);
   const [error, setError] = createSignal("");
-  const [result, setResult] = createSignal<RunResult | null>(null);
   /** Live progress of the in-flight run (streaming /api/optimize only). */
   const [live, setLive] = createSignal<LiveRun | null>(null);
-  const [player, setPlayer] = createSignal<PlayerState>({ frame: 0, playing: false });
   /** Optimization names whose full parameter list is expanded. */
   const [expanded, setExpanded] = createSignal<string[]>([]);
 
-  const frames = createMemo(() => {
-    const run = result();
-    return run ? playbackFrames(run.trajectory.length) : [];
-  });
-
-  // Ghost compiles are serialized: scrubbing queues at most one frame, and a
-  // new request simply replaces the queued one until the compile in flight
-  // finishes — the slider stays responsive while the render honestly lags.
-  // "final" restores the exact adopted source instead of a substitution.
-  let replayBusy = false;
-  let queuedFrame: number | "final" | null = null;
-
-  const renderFrame = async (frameIndex: number | "final") => {
-    const run = result();
-    if (!run) return;
-    if (frameIndex === "final") {
-      await props.onGhostCompile(run.source);
-      return;
-    }
-    const frameList = frames();
-    if (frameList.length === 0) return;
-    const entry = run.trajectory[frameList[Math.min(frameIndex, frameList.length - 1)]];
-    if (!entry) return;
-    await props.onGhostCompile(substituteParameters(run.source, entry.parameters));
-  };
-
-  const showFrame = (frameIndex: number | "final") => {
-    queuedFrame = frameIndex;
-    if (replayBusy) return;
-    replayBusy = true;
-    void (async () => {
-      while (queuedFrame !== null) {
-        const next = queuedFrame;
-        queuedFrame = null;
-        await renderFrame(next);
-      }
-      replayBusy = false;
-    })();
-  };
-
-  let playTimer: ReturnType<typeof setInterval> | undefined;
-
-  const stopPlayback = (restoreFinal: boolean) => {
-    if (playTimer !== undefined) {
-      clearInterval(playTimer);
-      playTimer = undefined;
-    }
-    setPlayer((state) => ({ ...state, playing: false }));
-    if (restoreFinal && result()) {
-      setPlayer({ frame: Math.max(frames().length - 1, 0), playing: false });
-      showFrame("final");
-    }
-  };
-
-  const play = () => {
-    const count = frames().length;
-    if (count === 0) return;
-    const started = startPlayer(player(), count);
-    setPlayer(started);
-    showFrame(started.frame);
-    if (playTimer !== undefined) clearInterval(playTimer);
-    playTimer = setInterval(() => {
-      const next = advancePlayer(player(), frames().length);
-      setPlayer(next);
-      if (!next.playing) {
-        stopPlayback(true);
-        return;
-      }
-      showFrame(next.frame);
-    }, FRAME_MILLISECONDS);
-  };
-
-  const scrub = (frameIndex: number) => {
-    stopPlayback(false);
-    setPlayer({ frame: frameIndex, playing: false });
-    showFrame(frameIndex);
-  };
-
-  onCleanup(() => {
-    // Leaving the mode mid-replay must not strand a ghost frame on screen.
-    const run = result();
-    const mid = playTimer !== undefined || player().frame < frames().length - 1;
-    if (playTimer !== undefined) clearInterval(playTimer);
-    if (run && mid) showFrame("final");
-  });
-
   const run = async (optimization: OptimizationPayload) => {
-    stopPlayback(false);
+    // Retire the previous run first: any mounted player unmounts and stops.
+    setOptimizeRun(null);
+    setOptimizeAutoPlay(false);
     setRunning(optimization.name);
     setLive({ step: 0, steps: optimization.steps, objectives: [], elapsed: null });
     setError("");
@@ -221,15 +123,16 @@ export function OptimizeCards(props: OptimizeCardsProps) {
         setError(response.error ?? "The optimization failed.");
         return;
       }
-      setResult({
+      setOptimizeRun({
         name: optimization.name,
         source: response.source,
         history: response.history ?? [],
         trajectory: response.trajectory ?? [],
         parameters: response.parameters ?? {},
         initial: response.initial ?? {},
+        study: optimization.study ?? null,
       });
-      setPlayer({
+      setOptimizePlayer({
         frame: Math.max(playbackFrames((response.trajectory ?? []).length).length - 1, 0),
         playing: false,
       });
@@ -247,11 +150,11 @@ export function OptimizeCards(props: OptimizeCardsProps) {
       }
       // The optimizer is a patch layer: adopt its source like any edit.
       await props.onAdoptSource(response.source);
-      // Replay the trajectory once, unprompted: the geometry morphing from
-      // the initial design to the optimized one IS the result — nobody
-      // should have to discover the player to see it. It ends resting on
-      // the final frame with the scrubber armed.
-      if ((response.trajectory ?? []).length > 1) play();
+      // Queue exactly one unprompted replay: the geometry morphing from the
+      // initial design to the optimized one IS the result. Whichever
+      // trajectory player is mounted where the user lands (this card, or
+      // the Results tab for study-backed runs) consumes it.
+      if ((response.trajectory ?? []).length > 1) setOptimizeAutoPlay(true);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
     } finally {
@@ -265,8 +168,8 @@ export function OptimizeCards(props: OptimizeCardsProps) {
     await props.onPatch(body);
   };
 
-  const historyFor = (name: string): RunResult | null => {
-    const current = result();
+  const historyFor = (name: string): OptimizeRunState | null => {
+    const current = optimizeRun();
     return current && current.name === name ? current : null;
   };
 
@@ -436,40 +339,37 @@ export function OptimizeCards(props: OptimizeCardsProps) {
                 <Show when={historyFor(optimization.name)}>
                   {(current) => (
                     <div class="opt-result" data-testid={`optimize-result-${optimization.name}`}>
-                      <div class="opt-spark">
-                        <svg
-                          viewBox={`0 0 ${SPARK_WIDTH} ${SPARK_HEIGHT}`}
-                          preserveAspectRatio="none"
-                          role="img"
-                          aria-label="Objective history"
-                          data-testid={`optimize-history-${optimization.name}`}
-                        >
-                          <polyline
-                            points={sparklinePoints(
-                              current().history.map((entry) => entry.objective),
-                              SPARK_WIDTH,
-                              SPARK_HEIGHT,
-                            )}
-                          />
-                          <Show when={frames().length > 0}>
-                            <line
-                              class="opt-cursor"
-                              x1={sparklineCursorX(
-                                frames()[Math.min(player().frame, frames().length - 1)] ?? 0,
-                                current().trajectory.length || current().history.length,
-                                SPARK_WIDTH,
-                              )}
-                              y1="0"
-                              x2={sparklineCursorX(
-                                frames()[Math.min(player().frame, frames().length - 1)] ?? 0,
-                                current().trajectory.length || current().history.length,
-                                SPARK_WIDTH,
-                              )}
-                              y2={SPARK_HEIGHT}
-                            />
-                          </Show>
-                        </svg>
-                      </div>
+                      {/* The shared trajectory player (sparkline + cursor +
+                          scrubber); runs without a replayable trajectory
+                          fall back to the plain history sparkline. */}
+                      <Show
+                        when={current().trajectory.length > 1}
+                        fallback={
+                          <div class="opt-spark">
+                            <svg
+                              viewBox={`0 0 ${SPARK_WIDTH} ${SPARK_HEIGHT}`}
+                              preserveAspectRatio="none"
+                              role="img"
+                              aria-label="Objective history"
+                              data-testid={`optimize-history-${optimization.name}`}
+                            >
+                              <polyline
+                                points={sparklinePoints(
+                                  current().history.map((entry) => entry.objective),
+                                  SPARK_WIDTH,
+                                  SPARK_HEIGHT,
+                                )}
+                              />
+                            </svg>
+                          </div>
+                        }
+                      >
+                        <TrajectoryPlayer
+                          onGhostCompile={props.onGhostCompile}
+                          sparkTestId={`optimize-history-${optimization.name}`}
+                          fieldNote={Boolean(optimization.study)}
+                        />
+                      </Show>
                       <div class="opt-summary">
                         <span>
                           objective{" "}
@@ -483,49 +383,6 @@ export function OptimizeCards(props: OptimizeCardsProps) {
                         </span>
                         <span>{current().history.length} steps</span>
                       </div>
-
-                      <Show when={current().trajectory.length > 1}>
-                        <div class="opt-player" data-testid="optimize-player">
-                          <button
-                            type="button"
-                            class="opt-replay"
-                            onClick={() => (player().playing ? stopPlayback(false) : play())}
-                            title={
-                              player().playing
-                                ? "Pause the replay"
-                                : "Replay the optimization in the viewport"
-                            }
-                            data-testid="optimize-play"
-                          >
-                            {player().playing ? "❚❚ Pause" : "▶ Replay"}
-                          </button>
-                          <input
-                            type="range"
-                            min="0"
-                            max={Math.max(frames().length - 1, 0)}
-                            step="1"
-                            value={Math.min(player().frame, Math.max(frames().length - 1, 0))}
-                            onInput={(event) => scrub(Number(event.currentTarget.value))}
-                            title="Scrub through the optimization steps"
-                            data-testid="optimize-scrub"
-                          />
-                          <span class="opt-frame-label">
-                            step {current().trajectory[
-                              frames()[Math.min(player().frame, frames().length - 1)] ?? 0
-                            ]?.step ?? 0}
-                            {" · "}
-                            {formatScalar(
-                              frameObjective(
-                                current().trajectory,
-                                frames()[Math.min(player().frame, frames().length - 1)] ?? 0,
-                              ) ?? NaN,
-                            )}
-                          </span>
-                        </div>
-                        <small class="opt-player-hint" data-testid="optimize-player-hint">
-                          drag to scrub the optimization path
-                        </small>
-                      </Show>
                     </div>
                   )}
                 </Show>

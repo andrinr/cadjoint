@@ -222,6 +222,26 @@ export function sparklineCursorX(
   return (Math.min(step, count - 1) / (count - 1)) * width;
 }
 
+/** X,Y of the highlighted sparkline point for one value index, or null. */
+export function sparklineCursorPoint(
+  values: readonly number[],
+  index: number,
+  width: number,
+  height: number,
+): { x: number; y: number } | null {
+  if (values.length === 0) return null;
+  const clamped = Math.min(Math.max(index, 0), values.length - 1);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = max - min;
+  const pad = 1.5;
+  const t = span > 0 ? (values[clamped] - min) / span : 0.5;
+  return {
+    x: values.length > 1 ? (clamped * width) / (values.length - 1) : width / 2,
+    y: pad + (1 - t) * (height - 2 * pad),
+  };
+}
+
 /** Objective value of a trajectory frame, for the player readout. */
 export function frameObjective(
   trajectory: readonly OptimizeTrajectoryEntry[],
