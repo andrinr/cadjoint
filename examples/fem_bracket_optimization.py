@@ -1,32 +1,47 @@
 """End-to-end shape optimization of the L-bracket from ``scenes/bracket.py``.
 
-Chain: design parameters -> bracket SDF -> HEX8 mesh (frozen topology) ->
-linear elastic solve (jax-fem adjoint) -> compliance + mass objective ->
-gradient descent on web thickness and rib height.
+The flagship demonstration of the whole differentiable chain::
 
-The bolt-hole regions of the base plate are clamped, a prying traction pulls
-the tip of the vertical web, and the objective trades stiffness (compliance)
-against material use (a smoothed volume integral of the SDF).  Topology is
-extracted once at the nominal design; per candidate only the node positions
-are recomputed differentiably (:func:`cadjoint.fem.hexmesh.recompute_points`),
-which is what lets ``jax.grad`` flow from the objective back to the design
-parameters through the solver's adjoint.
+    named CAD parameters -> bracket SDF -> HEX8 mesh (frozen topology,
+    periodically re-extracted) -> linear elastic solve (jax-fem adjoint,
+    or CalculiX's native *SENSITIVITY) -> compliance + mass objective ->
+    optax Adam with box projection
 
-Run directly (requires the ``fem`` extra)::
+Three named design parameters are optimized — ``web_thickness``,
+``rib_height`` and ``plate_thickness``, the same named Scalars the scene
+program declares — under box bounds that keep the geometry meshable.  The
+bolt-hole regions of the base plate are clamped, a prying traction pulls the
+tip of the vertical web, and the objective trades stiffness (compliance)
+against material use (a smoothed volume integral of the SDF).
+
+The discrete/continuous split drives the re-extraction schedule: which cells
+are inside and how they connect is a *discrete* decision that cannot be
+differentiated, so topology is frozen while the optimizer runs and only the
+node positions are recomputed differentiably per candidate
+(:func:`cadjoint.fem.hexmesh.recompute_points` — motion is clamped to half a
+cell diagonal).  Every ``--remesh-every`` steps the topology is re-extracted
+at the current design so large shape changes stay well represented; the
+objective may jump slightly at those steps because the discretization
+changes.
+
+Artifacts land in ``examples/output/``: convergence history as CSV, a
+convergence figure (PNG), and before/after VTK files for ParaView.
+
+Run directly (requires the ``fem`` extra plus ``optax``)::
 
     python examples/fem_bracket_optimization.py
+    python examples/fem_bracket_optimization.py --smoke   # 2 cheap steps
+    python examples/fem_bracket_optimization.py --backend calculix
 
 With ``--backend calculix`` the compliance term instead runs through the
-CalculiX tesseract (requires the ``tesseract`` extra and a ``ccx`` binary
-— see :mod:`cadjoint.fem.calculix`): the objective becomes classical
-compliance (``f . u``, twice the strain energy) plus the same mass term,
-and its gradient flows through ccx's native ``*SENSITIVITY`` adjoint
-instead of jax-fem's — a 1990s Fortran Abaqus clone one ``jax.grad``
-away from the design parameters.
-
-Writes ``fem_bracket_before.vtu`` / ``fem_bracket_after.vtu`` for ParaView.
+CalculiX tesseract (requires the ``tesseract`` extra and a ``ccx`` binary —
+see :mod:`cadjoint.fem.calculix`): the objective becomes classical
+compliance (``f . u``, twice the strain energy) and its gradient flows
+through ccx's native ``*SENSITIVITY`` adjoint instead of jax-fem's — a
+1990s Fortran Abaqus clone one ``jax.grad`` away from the design
+parameters.
 """
-# Guarded jax-fem import must precede the cadjoint.fem imports.
+# Guarded third-party imports must precede the cadjoint.fem imports.
 # ruff: noqa: E402
 
 from __future__ import annotations
@@ -38,7 +53,14 @@ except ImportError as error:  # pragma: no cover - exercised without the extra
         "This example requires jax-fem (install with: pip install cadjoint[fem])."
     ) from error
 
-import dataclasses
+try:
+    import optax
+except ImportError as error:  # pragma: no cover - exercised without optax
+    raise SystemExit("This example requires optax (install with: pip install optax).") from error
+
+import csv
+import time
+from pathlib import Path
 
 import jax
 import jax.numpy as jnp
@@ -54,11 +76,18 @@ from cadjoint.sdf.primitives.polygon import ExtrudedPolygon
 
 jax.config.update("jax_enable_x64", True)
 
-# Nominal design (matches scenes/bracket.py): the two optimized parameters
-# are the web thickness and the rib height; the plate thickness stays fixed.
-NOMINAL_WEB_THICKNESS = 0.16
-NOMINAL_RIB_HEIGHT = 0.88
-PLATE_THICKNESS = 0.2
+# The three optimized parameters (order everywhere: theta[0], theta[1],
+# theta[2]) and their nominal values — matching the named Scalars in
+# ``scenes/bracket.py``.
+PARAMETER_NAMES = ("web_thickness", "rib_height", "plate_thickness")
+NOMINAL = (0.16, 0.88, 0.20)
+
+# Box bounds project every Adam update back into meshable geometry: the
+# lower thickness bounds stay above one grid cell so the thin walls never
+# drop out of the extracted topology, and the upper bounds keep the part
+# inside the sampling lattice.
+LOWER_BOUNDS = (0.12, 0.35, 0.14)
+UPPER_BOUNDS = (0.26, 1.15, 0.30)
 
 # Fixed geometry shared with the scene.
 _PLATE_HALF = (1.2, 0.8)
@@ -77,13 +106,12 @@ _MASS_WEIGHT = 1.0
 _YOUNGS = 1000.0
 _POISSON = 0.3
 
-# Per-parameter step sizes for plain gradient descent: the compliance is far
-# more sensitive to the web thickness than to the rib height, so the rib gets
-# a proportionally larger step (a fixed diagonal preconditioner).
-_LEARNING_RATES = (1.5e-3, 4e-2)
+DEFAULT_RESOLUTION = (30, 21, 16)
+SMOKE_RESOLUTION = (14, 10, 8)
+OUTPUT_DIR = Path(__file__).resolve().parent / "output"
 
 
-def bracket_sdf(p, web_thickness, rib_height, plate_thickness=PLATE_THICKNESS):
+def bracket_sdf(p, web_thickness, rib_height, plate_thickness):
     """Signed distance of the bracket, differentiable in the design parameters.
 
     Mirrors ``scenes/bracket.py`` with pure primitive fields: base plate box,
@@ -137,18 +165,23 @@ def bracket_sdf(p, web_thickness, rib_height, plate_thickness=PLATE_THICKNESS):
     return body
 
 
-def build_grid() -> GridSpec:
+def theta_sdf(theta):
+    """Close ``bracket_sdf`` over a parameter vector ``theta``."""
+
+    def sdf(p):
+        return bracket_sdf(p, theta[0], theta[1], theta[2])
+
+    return sdf
+
+
+def build_grid(resolution=DEFAULT_RESOLUTION) -> GridSpec:
     """Sampling lattice enclosing the bracket with a small margin."""
-    return GridSpec.from_bounds((-1.3, -0.95, -0.06), (2.6, 1.9, 1.42), (24, 17, 13))
+    return GridSpec.from_bounds((-1.3, -0.95, -0.06), (2.6, 1.9, 1.42), resolution)
 
 
-def build_mesh() -> HexMesh:
-    """Extract the frozen-topology HEX8 mesh at the nominal design."""
-
-    def nominal(p):
-        return bracket_sdf(p, NOMINAL_WEB_THICKNESS, NOMINAL_RIB_HEIGHT)
-
-    return sdf_to_hex_mesh(nominal, build_grid())
+def extract_topology(theta, grid: GridSpec) -> HexMesh:
+    """Extract a frozen-topology HEX8 mesh at the design ``theta``."""
+    return sdf_to_hex_mesh(theta_sdf(np.asarray(theta, dtype=np.float64)), grid)
 
 
 # Clamped nodes: a ball around each bolt hole (through the plate thickness).
@@ -164,17 +197,17 @@ WEB_TIP_LOAD = Nodes.halfspace([0.0, -0.7, 0.0], [0.0, -1.0, 0.0]) & Nodes.halfs
 )
 
 
-def make_objective(mesh: HexMesh, backend: str | None = None):
-    """Objective ``theta = (web_thickness, rib_height) -> compliance + mass``.
+def make_objective(mesh: HexMesh, grid: GridSpec, backend: str | None = None):
+    """Objective ``theta -> (compliance + mass, aux)`` on a frozen mesh.
 
     With the default backend, compliance is the total squared displacement
     under the prying load (jax-fem adjoint); with ``backend="calculix"``
     it is the classical compliance ``f . u`` (twice the strain energy,
     ccx ``*SENSITIVITY`` adjoint).  Mass is a smoothed volume integral of
     the inside indicator on the (fixed) lattice of cell centers, so both
-    terms are differentiable in ``theta``.
+    terms are differentiable in ``theta``.  Returns ``has_aux``-style
+    ``(total, {"compliance": ..., "mass": ...})``.
     """
-    grid = build_grid()
     nx, ny, nz = grid.cells
     spacing = np.asarray(grid.spacing)
     index = np.stack(
@@ -191,11 +224,7 @@ def make_objective(mesh: HexMesh, backend: str | None = None):
         ccx_backend = CalculixBackend()
 
     def objective(theta):
-        web_thickness, rib_height = theta[0], theta[1]
-
-        def sdf(p):
-            return bracket_sdf(p, web_thickness, rib_height)
-
+        sdf = theta_sdf(theta)
         points = recompute_points(sdf, mesh)
         if ccx_backend is not None:
             from cadjoint.fem.calculix import strain_energy_solve
@@ -220,77 +249,278 @@ def make_objective(mesh: HexMesh, backend: str | None = None):
             )
             compliance = jnp.sum(result.displacement**2)
         mass = cell_volume * jnp.sum(jax.nn.sigmoid(-sdf(centers) / sharpness))
-        return compliance + _MASS_WEIGHT * mass
+        return compliance + _MASS_WEIGHT * mass, {"compliance": compliance, "mass": mass}
 
     return objective
 
 
-def run_optimization(
-    steps: int = 4,
-    learning_rates=_LEARNING_RATES,
-    export_vtk: bool = False,
-    backend: str | None = None,
-):
-    """Gradient descent on (web thickness, rib height) with frozen topology.
+def check_gradient(objective, theta, eps: float = 1e-5, parameters=None):
+    """Compare the adjoint gradient against central finite differences.
+
+    Both sides differentiate the same frozen-topology objective, so the
+    discrepancy measures adjoint correctness (plus FD truncation/solver
+    noise), not remeshing effects.
 
     Args:
-        steps: Gradient-descent iterations.
-        learning_rates: Per-parameter step sizes; small so node motion stays
-            well inside the frozen mesh's snap clamp.
-        export_vtk: Write before/after VTK files for ParaView.
-        backend: ``None`` (jax-fem, squared-displacement compliance) or
-            ``"calculix"`` (ccx adjoint, classical ``f . u`` compliance).
+        objective: ``theta -> (value, aux)`` objective.
+        theta: Parameter vector to check at.
+        eps: Central-difference half step.
+        parameters: Indices to check (default: all).
 
     Returns:
-        ``(history, theta)`` — a list of ``(objective, web_thickness,
-        rib_height)`` per evaluated design, and the final parameters.
+        List of ``(name, adjoint, fd, rel_delta)`` tuples.
     """
-    mesh = build_mesh()
-    print(f"mesh: {mesh.num_cells} hexes, {mesh.num_points} nodes")
-    objective = make_objective(mesh, backend=backend)
-    value_and_grad = jax.value_and_grad(objective)
-    rates = jnp.asarray(learning_rates, dtype=jnp.float64)
+    _, gradient = jax.value_and_grad(objective, has_aux=True)(theta)
+    rows = []
+    for i in parameters if parameters is not None else range(len(PARAMETER_NAMES)):
+        unit = jnp.zeros_like(theta).at[i].set(1.0)
+        plus, _ = objective(theta + eps * unit)
+        minus, _ = objective(theta - eps * unit)
+        fd = float((plus - minus) / (2.0 * eps))
+        adjoint = float(gradient[i])
+        rel = abs(adjoint - fd) / max(abs(fd), 1e-12)
+        rows.append((PARAMETER_NAMES[i], adjoint, fd, rel))
+    return rows
 
-    theta = jnp.array([NOMINAL_WEB_THICKNESS, NOMINAL_RIB_HEIGHT], dtype=jnp.float64)
-    history: list[tuple[float, float, float]] = []
-    for step in range(steps):
-        value, gradient = value_and_grad(theta)
-        history.append((float(value), float(theta[0]), float(theta[1])))
-        print(
-            f"step {step}: objective={float(value):.6f} "
-            f"web_thickness={float(theta[0]):.4f} rib_height={float(theta[1]):.4f} "
-            f"grad=({float(gradient[0]):+.4f}, {float(gradient[1]):+.4f})"
-        )
-        theta = theta - rates * gradient
-    final = float(objective(theta))
-    history.append((final, float(theta[0]), float(theta[1])))
-    print(
-        f"final: objective={final:.6f} "
-        f"web_thickness={float(theta[0]):.4f} rib_height={float(theta[1]):.4f}"
+
+def export_vtk(theta, grid: GridSpec, path: Path) -> None:
+    """Solve at ``theta`` on a freshly extracted mesh and write a VTU file."""
+    mesh = extract_topology(theta, grid)
+    result = elastic_solve(
+        mesh,
+        youngs=_YOUNGS,
+        poisson=_POISSON,
+        dirichlet=[BOLT_CLAMP],
+        tractions=[(WEB_TIP_LOAD, list(_TRACTION))],
     )
+    result.vtk_export(str(path))
+    print(f"wrote {path}")
 
-    if export_vtk:
-        for name, candidate in (("before", history[0]), ("after", history[-1])):
 
-            def sdf(p, candidate=candidate):
-                return bracket_sdf(p, candidate[1], candidate[2])
+def write_history_csv(history, path: Path) -> None:
+    """Save the convergence history as one CSV row per evaluated design."""
+    fields = [
+        "step",
+        "objective",
+        "compliance",
+        "mass",
+        "grad_norm",
+        "proj_grad_norm",
+        *PARAMETER_NAMES,
+        *[f"grad_{name}" for name in PARAMETER_NAMES],
+        "remeshed",
+        "eval_seconds",
+    ]
+    with open(path, "w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields)
+        writer.writeheader()
+        writer.writerows(history)
+    print(f"wrote {path}")
 
-            # Bake the candidate's recomputed node positions into a concrete
-            # mesh so the exported file shows the actual candidate geometry.
-            points = np.asarray(recompute_points(sdf, mesh))
-            candidate_mesh = dataclasses.replace(mesh, points=points)
-            result = elastic_solve(
-                candidate_mesh,
-                youngs=_YOUNGS,
-                poisson=_POISSON,
-                dirichlet=[BOLT_CLAMP],
-                tractions=[(WEB_TIP_LOAD, list(_TRACTION))],
-            )
-            path = f"fem_bracket_{name}.vtu"
-            result.vtk_export(path)
-            print(f"wrote {path}")
+
+def plot_convergence(history, path: Path) -> None:
+    """Render the convergence figure: objective, gradient norm, parameters."""
+    try:
+        import matplotlib
+    except ImportError:  # pragma: no cover - plotting is optional
+        print("matplotlib not installed; skipping the convergence figure")
+        return
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    surface, text, muted, grid_color = "#fcfcfb", "#0b0b0b", "#52514e", "#e4e4e0"
+    series = {"web_thickness": "#2a78d6", "rib_height": "#eb6834", "plate_thickness": "#1baf7a"}
+    steps = [row["step"] for row in history]
+    remesh_steps = [row["step"] for row in history if row["remeshed"] and row["step"] > 0]
+
+    figure, axes = plt.subplots(3, 1, sharex=True, figsize=(7.2, 8.0), dpi=150)
+    figure.patch.set_facecolor(surface)
+    titles = ("Objective (compliance + mass)", "Projected gradient norm", "Parameters")
+    for axis, title in zip(axes, titles):
+        axis.set_facecolor(surface)
+        axis.set_title(title, loc="left", fontsize=11, color=text)
+        axis.grid(True, color=grid_color, linewidth=0.8)
+        axis.tick_params(colors=muted, labelsize=9)
+        for spine in axis.spines.values():
+            spine.set_visible(False)
+        for step in remesh_steps:
+            axis.axvline(step, color="#c6c6c0", linewidth=1.0, linestyle=(0, (3, 3)), zorder=0)
+
+    axes[0].plot(steps, [row["objective"] for row in history], color=series["web_thickness"], lw=2)
+    axes[1].plot(
+        steps, [row["proj_grad_norm"] for row in history], color=series["web_thickness"], lw=2
+    )
+    axes[1].set_yscale("log")
+    for name, color in series.items():
+        values = [row[name] for row in history]
+        axes[2].plot(steps, values, color=color, lw=2, label=name)
+        axes[2].annotate(
+            name,
+            (steps[-1], values[-1]),
+            textcoords="offset points",
+            xytext=(6, 0),
+            fontsize=8,
+            color=muted,
+        )
+    axes[2].legend(loc="best", frameon=False, fontsize=8, labelcolor=muted)
+    axes[2].set_xlabel("optimizer step (vertical lines: topology re-extraction)", color=muted)
+    axes[2].set_xmargin(0.14)  # room for the direct labels
+    figure.tight_layout()
+    figure.savefig(path, facecolor=surface, bbox_inches="tight")
+    plt.close(figure)
+    print(f"wrote {path}")
+
+
+def print_summary(history) -> None:
+    """Print a before/after summary table of the optimization."""
+    first, last = history[0], history[-1]
+    rows = [
+        ("objective", first["objective"], last["objective"]),
+        ("compliance", first["compliance"], last["compliance"]),
+        ("mass", first["mass"], last["mass"]),
+        *[(name, first[name], last[name]) for name in PARAMETER_NAMES],
+    ]
+    print(f"\n{'quantity':<16}{'initial':>12}{'final':>12}{'change':>10}")
+    print("-" * 50)
+    for name, before, after in rows:
+        change = 100.0 * (after - before) / abs(before)
+        print(f"{name:<16}{before:>12.4f}{after:>12.4f}{change:>+9.1f}%")
+
+
+def run_optimization(
+    steps: int = 30,
+    learning_rate: float = 0.015,
+    remesh_every: int = 6,
+    resolution=DEFAULT_RESOLUTION,
+    backend: str | None = None,
+    fd_check: bool = True,
+    export: bool = True,
+    output_dir: Path = OUTPUT_DIR,
+):
+    """Projected Adam on (web thickness, rib height, plate thickness).
+
+    Args:
+        steps: Optimizer iterations.
+        learning_rate: Adam learning rate (parameters are all O(0.1-1)).
+        remesh_every: Re-extract the mesh topology every this many steps;
+            in between, topology is frozen and only node positions move.
+        resolution: Meshing lattice resolution (cells per axis).
+        backend: ``None`` (jax-fem, squared-displacement compliance) or
+            ``"calculix"`` (ccx adjoint, classical ``f . u`` compliance).
+        fd_check: Validate the adjoint gradient against central finite
+            differences at the initial design.
+        export: Write CSV / PNG / before-after VTU artifacts.
+        output_dir: Directory for the artifacts.
+
+    Returns:
+        ``(history, theta)`` — one dict per evaluated design, and the final
+        parameter vector.
+    """
+    grid = build_grid(resolution)
+    lower = jnp.asarray(LOWER_BOUNDS, dtype=jnp.float64)
+    upper = jnp.asarray(UPPER_BOUNDS, dtype=jnp.float64)
+    theta = jnp.asarray(NOMINAL, dtype=jnp.float64)
+
+    mesh = extract_topology(theta, grid)
+    print(f"mesh: {mesh.num_cells} hexes, {mesh.num_points} nodes")
+    objective = make_objective(mesh, grid, backend=backend)
+    value_and_grad = jax.value_and_grad(objective, has_aux=True)
+
+    if fd_check:
+        print("adjoint vs central finite differences at the initial design:")
+        for name, adjoint, fd, rel in check_gradient(objective, theta):
+            print(f"  d/d {name:<16} adjoint {adjoint:+.6f}  fd {fd:+.6f}  rel {rel:.2e}")
+
+    optimizer = optax.adam(learning_rate)
+    opt_state = optimizer.init(theta)
+    history: list[dict] = []
+
+    def record(step, value, aux, gradient, remeshed, seconds):
+        # Projected gradient: at an active box bound the component pushing
+        # further out is not a usable descent direction, so it is zeroed —
+        # this is the norm that should shrink toward stationarity.
+        blocked = ((theta <= lower) & (gradient > 0)) | ((theta >= upper) & (gradient < 0))
+        projected = jnp.where(blocked, 0.0, gradient)
+        entry = {
+            "step": step,
+            "objective": float(value),
+            "compliance": float(aux["compliance"]),
+            "mass": float(aux["mass"]),
+            "grad_norm": float(jnp.linalg.norm(gradient)),
+            "proj_grad_norm": float(jnp.linalg.norm(projected)),
+            "remeshed": int(remeshed),
+            "eval_seconds": round(seconds, 3),
+        }
+        entry.update({name: float(theta[i]) for i, name in enumerate(PARAMETER_NAMES)})
+        entry.update({f"grad_{name}": float(gradient[i]) for i, name in enumerate(PARAMETER_NAMES)})
+        history.append(entry)
+        print(
+            f"step {step:>3}: objective={entry['objective']:.6f} "
+            f"(compliance={entry['compliance']:.4f} mass={entry['mass']:.4f}) "
+            f"|proj grad|={entry['proj_grad_norm']:.4f} theta=("
+            + ", ".join(f"{float(theta[i]):.4f}" for i in range(3))
+            + (")  [remeshed]" if remeshed and step > 0 else ")")
+            + f"  {seconds:.1f}s"
+        )
+
+    for step in range(steps):
+        remeshed = step > 0 and remesh_every > 0 and step % remesh_every == 0
+        if remeshed:
+            # Discrete refresh: re-extract cells + connectivity at the current
+            # design; the continuous chain restarts from the new topology.
+            mesh = extract_topology(theta, grid)
+            objective = make_objective(mesh, grid, backend=backend)
+            value_and_grad = jax.value_and_grad(objective, has_aux=True)
+        started = time.perf_counter()
+        (value, aux), gradient = value_and_grad(theta)
+        record(step, value, aux, gradient, remeshed, time.perf_counter() - started)
+        updates, opt_state = optimizer.update(gradient, opt_state, theta)
+        theta = jnp.clip(optax.apply_updates(theta, updates), lower, upper)
+
+    # Final evaluation on a freshly extracted mesh: the number reported for
+    # the optimized design does not depend on the last frozen topology.
+    mesh = extract_topology(theta, grid)
+    objective = make_objective(mesh, grid, backend=backend)
+    started = time.perf_counter()
+    (value, aux), gradient = jax.value_and_grad(objective, has_aux=True)(theta)
+    record(steps, value, aux, gradient, True, time.perf_counter() - started)
+    print_summary(history)
+
+    if export:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        write_history_csv(history, output_dir / "fem_bracket_convergence.csv")
+        plot_convergence(history, output_dir / "fem_bracket_convergence.png")
+        export_vtk(
+            jnp.asarray(NOMINAL, dtype=jnp.float64), grid, output_dir / "fem_bracket_before.vtu"
+        )
+        export_vtk(theta, grid, output_dir / "fem_bracket_after.vtu")
 
     return history, theta
+
+
+def run_smoke() -> None:
+    """Two cheap optimizer steps at low resolution; asserts descent.
+
+    Used by ``--smoke`` and by ``examples/test_fem_bracket_optimization.py``
+    to keep the flagship example from rotting: the adjoint must agree with
+    finite differences and two Adam steps must not increase the objective.
+    """
+    history, _ = run_optimization(
+        steps=2,
+        remesh_every=0,
+        resolution=SMOKE_RESOLUTION,
+        fd_check=False,
+        export=False,
+    )
+    grid = build_grid(SMOKE_RESOLUTION)
+    theta = jnp.asarray(NOMINAL, dtype=jnp.float64)
+    objective = make_objective(extract_topology(theta, grid), grid)
+    (name, adjoint, fd, rel) = check_gradient(objective, theta, parameters=[0])[0]
+    print(f"smoke gradient check d/d {name}: adjoint {adjoint:+.6f} fd {fd:+.6f} rel {rel:.2e}")
+    assert rel < 5e-2, f"adjoint disagrees with finite differences (rel {rel:.2e})"
+    descent = history[-1]["objective"] - history[0]["objective"]
+    assert descent < 1e-9, f"objective did not descend over the smoke steps ({descent:+.6f})"
+    print(f"smoke ok: descent {history[0]['objective']:.6f} -> {history[-1]['objective']:.6f}")
 
 
 if __name__ == "__main__":
@@ -303,10 +533,25 @@ if __name__ == "__main__":
         default="jaxfem",
         help="solver/adjoint for the compliance term (calculix needs a ccx binary)",
     )
-    parser.add_argument("--steps", type=int, default=4, help="gradient-descent iterations")
-    arguments = parser.parse_args()
-    run_optimization(
-        steps=arguments.steps,
-        export_vtk=True,
-        backend=None if arguments.backend == "jaxfem" else arguments.backend,
+    parser.add_argument("--steps", type=int, default=30, help="optimizer iterations")
+    parser.add_argument("--lr", type=float, default=0.015, help="Adam learning rate")
+    parser.add_argument(
+        "--remesh-every", type=int, default=6, help="re-extract topology every N steps (0: never)"
     )
+    parser.add_argument(
+        "--skip-fd-check", action="store_true", help="skip the finite-difference gradient check"
+    )
+    parser.add_argument(
+        "--smoke", action="store_true", help="2 cheap steps at low resolution, assert descent"
+    )
+    arguments = parser.parse_args()
+    if arguments.smoke:
+        run_smoke()
+    else:
+        run_optimization(
+            steps=arguments.steps,
+            learning_rate=arguments.lr,
+            remesh_every=arguments.remesh_every,
+            backend=None if arguments.backend == "jaxfem" else arguments.backend,
+            fd_check=not arguments.skip_fd_check,
+        )

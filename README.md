@@ -220,6 +220,37 @@ Use `RenderSettings.draft()`, `.balanced()`, or `.high_quality()` to choose an
 explicit performance/fidelity trade-off. See the [forward renderer guide](https://andrinr.github.io/cadjoint/docs/rendering.html)
 for mode and quality comparisons.
 
+## End-to-end optimization
+
+The pipeline is differentiable from the first named dimension to the last
+solver residual, and `examples/fem_bracket_optimization.py` walks the whole
+chain on the parametric L-bracket from `scenes/bracket.py`:
+
+**named CAD parameters** (`web_thickness`, `rib_height`, `plate_thickness`)
+→ **bracket SDF** → **HEX8 mesh** (frozen topology, node positions recomputed
+differentiably per candidate) → **linear elastic solve** (jax-fem adjoint, or
+CalculiX's native `*SENSITIVITY` via `--backend calculix`) → **compliance +
+mass objective** → **optax Adam** with box-bound projection.
+
+Meshing splits into a discrete half (which cells are inside, how they connect)
+and a continuous half (where the nodes sit). The discrete half cannot be
+differentiated, so topology stays frozen while gradients flow through the node
+positions, and every few steps the mesh is re-extracted at the current design —
+the small objective jumps at those steps are the discretization being refreshed.
+
+```bash
+uv pip install optax                              # optimizer (one-off)
+uv run python examples/fem_bracket_optimization.py            # ~10 min, CPU
+uv run python examples/fem_bracket_optimization.py --smoke    # 2 cheap steps
+```
+
+Requires the `fem` extra (`uv sync --extra fem`). The run validates the adjoint
+gradient against finite differences, descends for 30 steps, prints a summary
+table, and writes convergence CSV + figure and before/after VTK files to
+`examples/output/`:
+
+![Convergence of the bracket optimization](examples/output/fem_bracket_convergence.png)
+
 ## Tests
 
 ```bash
