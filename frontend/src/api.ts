@@ -7,7 +7,10 @@
 
 import type {
   CompileResponse,
+  MeshInspectResponse,
   MeshResponse,
+  OptimizeRequest,
+  OptimizeResponse,
   PatchOperation,
   PatchResponse,
   SceneListResponse,
@@ -90,6 +93,24 @@ export async function simulateStudy(
   body: SimulateStudyRequest,
 ): Promise<SimulateResponse> {
   return post<SimulateResponse>("/api/simulate", body);
+}
+
+/** Build a declared SimMesh and return its quality report + surface. */
+export async function meshInspect(
+  source: string,
+  name: string,
+): Promise<MeshInspectResponse> {
+  return post<MeshInspectResponse>("/api/mesh_inspect", { source, name });
+}
+
+/**
+ * Run a declared optimization through the differentiable pipeline.
+ *
+ * On success the response's `source` carries the optimized parameter literals
+ * written back — the caller adopts it exactly like a patch response.
+ */
+export async function optimize(body: OptimizeRequest): Promise<OptimizeResponse> {
+  return post<OptimizeResponse>("/api/optimize", body);
 }
 
 /** List saved scene files in the server's `scenes` workspace. */

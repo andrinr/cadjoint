@@ -12,6 +12,7 @@ import { EditorPane } from "./components/EditorPane";
 import { MaterialPanel } from "./components/MaterialPanel";
 import { MenuBar } from "./components/MenuBar";
 import { ObjectTree } from "./components/ObjectTree";
+import { OptimizePanel } from "./components/OptimizePanel";
 import { RenderPanel } from "./components/RenderPanel";
 import { SimulatePanel } from "./components/SimulatePanel";
 import { SketchPanel } from "./components/SketchPanel";
@@ -40,14 +41,15 @@ import {
   selection,
   setBusy,
   setConsoleText,
-  setDifferentiabilityDemo,
   setDirty,
   setMaterials,
   setMeshEdges,
   setNodes,
+  setOptimizations,
   setPanelVisible,
   setRelations,
   setSceneName,
+  setSimMeshes,
   setSolverRuns,
   setStudies,
   setSelection,
@@ -285,7 +287,6 @@ export function App() {
       if (!result.ok) {
         setStatus({ kind: "error", text: "Compile failed" });
         setConsoleText(result.error ?? "Unknown compile error.");
-        setDifferentiabilityDemo(null);
         return;
       }
       setDirty(false);
@@ -293,9 +294,10 @@ export function App() {
       setNodes(result.construction ?? []);
       setRelations(result.relations ?? []);
       setSolverRuns(result.solver_runs ?? []);
-      setDifferentiabilityDemo(result.differentiability ?? null);
       setMaterials(result.materials ?? []);
       setStudies(result.studies ?? []);
+      setSimMeshes(result.sim_meshes ?? []);
+      setOptimizations(result.optimizations ?? []);
       // Mesh edges are no longer part of the compile payload; clear the stale
       // overlay and let the lazy /api/mesh effect refill it when wanted.
       setMeshEdges(null);
@@ -322,7 +324,6 @@ export function App() {
     } catch (error) {
       setStatus({ kind: "error", text: "Compile failed" });
       setConsoleText(error instanceof Error ? error.message : String(error));
-      setDifferentiabilityDemo(null);
     } finally {
       setBusy(false);
       if (rerunRequested) {
@@ -361,6 +362,47 @@ export function App() {
     const queued = patchQueue.then(() => performPatch(body));
     patchQueue = queued.catch(() => undefined);
     return queued;
+  };
+
+  /**
+   * Adopt server-produced source exactly like a patch response.
+   *
+   * The optimizer is a patch layer too: a successful /api/optimize returns
+   * the program with the optimized literals written back, and the app treats
+   * it as one committed edit (history snapshot via run()).
+   */
+  const adoptSource = (text: string): Promise<void> => {
+    const queued = patchQueue.then(async () => {
+      setSource(text);
+      await run();
+    });
+    patchQueue = queued.catch(() => undefined);
+    return queued;
+  };
+
+  /**
+   * Compile-and-render a transient program without committing it.
+   *
+   * The optimization replay player scrubs through parameter snapshots by
+   * substituting literals client-side; each frame shows in the editor and the
+   * viewport but never lands in the undo history — only the adopted final
+   * source does. Construction/studies state is refreshed by the caller's
+   * closing adoptSource, so this only swaps the shaders.
+   */
+  const ghostCompile = async (text: string): Promise<boolean> => {
+    setSource(text);
+    try {
+      const result = await api.compile(text);
+      if (!result.ok) return false;
+      await renderer.setShaders({
+        preview: result.preview_shader,
+        path: result.path_shader,
+        present: result.present_shader,
+      });
+      return true;
+    } catch {
+      return false;
+    }
   };
 
   const patch = (
@@ -702,13 +744,29 @@ export function App() {
                     }
                   />
                 </Show>
+                {/* Optimize: run declared optimizations over the free
+                    parameters through the differentiable path. Lives in
+                    Model mode next to the object tree — it edits the same
+                    design parameters the modeling tools do. */}
+                <Show when={editingMode() === "model"}>
+                  <OptimizePanel
+                    onPatch={applyPatch}
+                    onAdoptSource={adoptSource}
+                    onGhostCompile={ghostCompile}
+                  />
+                </Show>
                 {/* Simulate-mode slot: shown by the mode system (switcher, M
                     cycling, Escape returns to model); the panel internals
                     belong to the FEM feature, which may expand/collapse and
                     drive the renderer freely inside it. */}
                 <Show when={editingMode() === "simulate"}>
                   <div class="mode-simulate-slot" data-testid="mode-simulate">
-                    <SimulatePanel renderer={renderer} onPatch={applyPatch} />
+                    <SimulatePanel
+                      renderer={renderer}
+                      onPatch={applyPatch}
+                      onAdoptSource={adoptSource}
+                      onGhostCompile={ghostCompile}
+                    />
                   </div>
                 </Show>
                 {/* Render mode owns the dock with the full render settings —

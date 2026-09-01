@@ -248,6 +248,21 @@ export class Renderer {
   private simHighlight: { start: number; count: number } | null = null;
   private simClip: SliceState = { ...DEFAULT_SLICE };
   private _simulationActive = false;
+  // Current surface payload plus the display overrides layered over it:
+  // an alternative nodal field, warped (deformed) positions, and a per-
+  // vertex highlight tint for BC previews. Any change re-interleaves the
+  // vertex buffer — tens of thousands of vertices, cheap enough per edit.
+  private simPayload: SimulationMeshPayload | null = null;
+  private simScalarOverride: readonly number[] | null = null;
+  private simPositionOverride: readonly number[] | null = null;
+  private simOverlay: Float32Array | null = null;
+  // Element-edge hairlines over the surface (payload.edges index pairs).
+  private simEdgePipeline: GPURenderPipeline | null = null;
+  private simEdgeIndexBuffer: GPUBuffer | null = null;
+  private simEdgeIndexCount = 0;
+  private _simulationEdgesVisible = false;
+  /** Which ramp fs_sim applies: solved fields vs mesh quality. */
+  simulationRamp: "field" | "quality" = "field";
 
   private shaderRevision = 0;
   private framePending = false;
@@ -645,11 +660,13 @@ export class Renderer {
         entryPoint: "vs_sim",
         buffers: [
           {
-            arrayStride: 16,
+            arrayStride: 32,
             stepMode: "vertex",
             attributes: [
               { shaderLocation: 0, offset: 0, format: "float32x3" },
               { shaderLocation: 1, offset: 12, format: "float32" },
+              // BC-preview tint: rgb hue + blend strength per vertex.
+              { shaderLocation: 2, offset: 16, format: "float32x4" },
             ],
           },
         ],
@@ -663,8 +680,34 @@ export class Renderer {
       },
     });
 
-    this.simUniformBuffer = this.createUniform(96);
-    this.simHighlightUniformBuffer = this.createUniform(96);
+    // Element-edge hairlines: same vertex buffer (position only), a line
+    // list over the payload's edge index pairs, nudged toward the camera in
+    // the vertex stage so they sit on top of their own faces.
+    this.simEdgePipeline = device.createRenderPipeline({
+      label: "Simulation element edges",
+      layout: pipelineLayout,
+      vertex: {
+        module,
+        entryPoint: "vs_sim_edge",
+        buffers: [
+          {
+            arrayStride: 32,
+            stepMode: "vertex",
+            attributes: [{ shaderLocation: 0, offset: 0, format: "float32x3" }],
+          },
+        ],
+      },
+      fragment: { module, entryPoint: "fs_sim_edge", targets: [{ format: this.format }] },
+      primitive: { topology: "line-list" },
+      depthStencil: {
+        format: DEPTH_FORMAT,
+        depthWriteEnabled: false,
+        depthCompare: "less-equal",
+      },
+    });
+
+    this.simUniformBuffer = this.createUniform(112);
+    this.simHighlightUniformBuffer = this.createUniform(112);
     this.simBindGroup = device.createBindGroup({
       layout: bindGroupLayout,
       entries: [{ binding: 0, resource: { buffer: this.simUniformBuffer } }],
@@ -686,30 +729,19 @@ export class Renderer {
     this.invalidate();
   }
 
-  /** Replace the FEM surface mesh (null clears it). */
+  /** Replace the FEM surface mesh (null clears it); resets view overrides. */
   setSimulationMesh(payload: SimulationMeshPayload | null): void {
     this.simIndexCount = 0;
     this.simHighlight = null;
+    this.simPayload = payload;
+    this.simScalarOverride = null;
+    this.simPositionOverride = null;
+    this.simOverlay = null;
     if (!payload || !this.device || payload.indices.length === 0) {
       this.invalidate();
       return;
     }
-    const vertexCount = payload.vertex_count;
-    const interleaved = new Float32Array(vertexCount * 4);
-    for (let index = 0; index < vertexCount; index++) {
-      interleaved[index * 4] = payload.positions[index * 3];
-      interleaved[index * 4 + 1] = payload.positions[index * 3 + 1];
-      interleaved[index * 4 + 2] = payload.positions[index * 3 + 2];
-      interleaved[index * 4 + 3] = payload.scalars[index];
-    }
     const indices = new Uint32Array(payload.indices);
-    this.simVertexBuffer?.destroy();
-    this.simVertexBuffer = this.device.createBuffer({
-      label: "simulation vertices",
-      size: interleaved.byteLength,
-      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-    });
-    this.device.queue.writeBuffer(this.simVertexBuffer, 0, interleaved);
     this.simIndexBuffer?.destroy();
     this.simIndexBuffer = this.device.createBuffer({
       label: "simulation indices",
@@ -718,8 +750,88 @@ export class Renderer {
     });
     this.device.queue.writeBuffer(this.simIndexBuffer, 0, indices);
     this.simIndexCount = indices.length;
+    // Element-edge hairlines, when the payload carries edge index pairs.
+    this.simEdgeIndexBuffer?.destroy();
+    this.simEdgeIndexBuffer = null;
+    this.simEdgeIndexCount = 0;
+    if (payload.edges && payload.edges.length >= 2) {
+      const edges = new Uint32Array(payload.edges);
+      this.simEdgeIndexBuffer = this.device.createBuffer({
+        label: "simulation element edges",
+        size: edges.byteLength,
+        usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
+      });
+      this.device.queue.writeBuffer(this.simEdgeIndexBuffer, 0, edges);
+      this.simEdgeIndexCount = edges.length;
+    }
     this.simRange = payload.range;
-    this.simBounds = meshBounds(payload.positions);
+    this.uploadSimulationVertices();
+  }
+
+  get simulationEdgesVisible(): boolean {
+    return this._simulationEdgesVisible;
+  }
+
+  /** Show or hide the element-edge overlay on the simulation surface. */
+  set simulationEdgesVisible(visible: boolean) {
+    if (visible === this._simulationEdgesVisible) return;
+    this._simulationEdgesVisible = visible;
+    this.invalidate();
+  }
+
+  /** Swap the displayed nodal field without re-solving or re-meshing. */
+  setSimulationScalars(scalars: readonly number[] | null, range?: [number, number]): void {
+    this.simScalarOverride = scalars;
+    if (range) this.simRange = range;
+    else if (!scalars && this.simPayload) this.simRange = this.simPayload.range;
+    this.uploadSimulationVertices();
+  }
+
+  /** Deformed view: draw the surface at offset positions (null = undeformed). */
+  setSimulationPositions(positions: readonly number[] | null): void {
+    this.simPositionOverride = positions;
+    this.uploadSimulationVertices();
+  }
+
+  /** Per-vertex RGBA highlight tint (BC previews); null clears it. */
+  setSimulationOverlay(colors: Float32Array | null): void {
+    this.simOverlay = colors;
+    this.uploadSimulationVertices();
+  }
+
+  /** Re-interleave and upload the surface vertices from the current view. */
+  private uploadSimulationVertices(): void {
+    const payload = this.simPayload;
+    if (!payload || !this.device || this.simIndexCount === 0) {
+      this.invalidate();
+      return;
+    }
+    const positions = this.simPositionOverride ?? payload.positions;
+    const scalars = this.simScalarOverride ?? payload.scalars;
+    const overlay = this.simOverlay;
+    const vertexCount = payload.vertex_count;
+    const interleaved = new Float32Array(vertexCount * 8);
+    for (let index = 0; index < vertexCount; index++) {
+      const base = index * 8;
+      interleaved[base] = positions[index * 3];
+      interleaved[base + 1] = positions[index * 3 + 1];
+      interleaved[base + 2] = positions[index * 3 + 2];
+      interleaved[base + 3] = scalars[index] ?? 0;
+      if (overlay) {
+        interleaved[base + 4] = overlay[index * 4];
+        interleaved[base + 5] = overlay[index * 4 + 1];
+        interleaved[base + 6] = overlay[index * 4 + 2];
+        interleaved[base + 7] = overlay[index * 4 + 3];
+      }
+    }
+    this.simVertexBuffer?.destroy();
+    this.simVertexBuffer = this.device.createBuffer({
+      label: "simulation vertices",
+      size: interleaved.byteLength,
+      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+    });
+    this.device.queue.writeBuffer(this.simVertexBuffer, 0, interleaved);
+    this.simBounds = meshBounds(positions);
     this.invalidate();
   }
 
@@ -1174,10 +1286,12 @@ export class Renderer {
       const [low, high] = this.simRange;
       const span = high - low;
       const inverseRange = span > 1e-12 ? 1 / span : 0;
-      const sim = new Float32Array(24);
+      const ramp = this.simulationRamp === "quality" ? 1 : 0;
+      const sim = new Float32Array(28);
       sim.set(matrix, 0);
       sim.set([normal[0], normal[1], normal[2], offset], 16);
       sim.set([low, inverseRange, 0, this.simClip.enabled ? 1 : 0], 20);
+      sim.set([ramp, 0, 0, 0], 24);
       device.queue.writeBuffer(this.simUniformBuffer, 0, sim);
       // The highlight pass re-draws a face group's range with a warm tint.
       sim.set([low, inverseRange, 0.55, this.simClip.enabled ? 1 : 0], 20);
@@ -1206,6 +1320,18 @@ export class Renderer {
     if (highlight && this.simHighlightBindGroup) {
       pass.setBindGroup(0, this.simHighlightBindGroup);
       pass.drawIndexed(highlight.count, 1, highlight.start);
+    }
+    if (
+      this._simulationEdgesVisible &&
+      this.simEdgePipeline &&
+      this.simEdgeIndexBuffer &&
+      this.simEdgeIndexCount > 0
+    ) {
+      pass.setPipeline(this.simEdgePipeline);
+      pass.setBindGroup(0, this.simBindGroup);
+      pass.setVertexBuffer(0, this.simVertexBuffer);
+      pass.setIndexBuffer(this.simEdgeIndexBuffer, "uint32");
+      pass.drawIndexed(this.simEdgeIndexCount);
     }
   }
 

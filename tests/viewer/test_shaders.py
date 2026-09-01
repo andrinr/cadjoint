@@ -193,18 +193,19 @@ OVERLAY_BLEND = {
                 {"shader_location": 2, "offset": 28, "format": "float32"},
             ],
         ),
-        # The simulation surface: interleaved position + scalar per vertex,
-        # drawn indexed and opaque (no blend).
+        # The simulation surface: interleaved position + scalar + overlay
+        # vector per vertex, drawn indexed and opaque (no blend).
         (
             "simulation.wgsl",
             "vs_sim",
             "fs_sim",
-            16,
+            32,
             "vertex",
             None,
             [
                 {"shader_location": 0, "offset": 0, "format": "float32x3"},
                 {"shader_location": 1, "offset": 12, "format": "float32"},
+                {"shader_location": 2, "offset": 16, "format": "float32x4"},
             ],
         ),
     ],

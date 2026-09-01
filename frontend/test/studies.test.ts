@@ -22,6 +22,8 @@ const study: StudyPayload = {
   resolution: 20,
   bounds: [0, 0, 0],
   size: [2, 2, 2],
+  mesh: null,
+  domain: null,
   material: { conductivity: 1.5 },
   source: 0.25,
   line: 10,

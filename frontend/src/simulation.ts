@@ -9,44 +9,15 @@
  * No DOM, no signals — unit-testable as-is.
  */
 
-// Polynomial fit of matplotlib's viridis (degree 6 per channel) — the same
-// coefficients live in simulation.wgsl; keep the two lists in sync.
-const VIRIDIS: readonly (readonly [number, number, number])[] = [
-  [0.2744554245, 0.0057679624, 0.3326638811],
-  [0.1077083262, 1.3964696839, 1.3867705979],
-  [-0.3272410968, 0.2148135645, 0.0919768808],
-  [-4.5999315182, -5.7582381893, -19.2918089503],
-  [6.2037359013, 14.1539649474, 56.6562995652],
-  [4.7517868889, -13.7494394044, -65.3209678276],
-  [-5.432077171, 4.641571316, 26.2721076045],
-] as const;
+// Every color role (field ramp, quality ramp, overlays, edges) lives in
+// simColors.ts; these re-exports keep the ramp's historical home working.
+import { fieldRamp, fieldRampCss } from "./simColors";
 
-/** Map a normalized scalar through the viridis ramp; clamps to [0, 1]. */
-export function viridis(t: number): [number, number, number] {
-  const x = Math.min(1, Math.max(0, t));
-  const color = [0, 0, 0];
-  for (let channel = 0; channel < 3; channel++) {
-    // Horner evaluation from the highest-order coefficient down.
-    let value = VIRIDIS[VIRIDIS.length - 1][channel];
-    for (let order = VIRIDIS.length - 2; order >= 0; order--) {
-      value = value * x + VIRIDIS[order][channel];
-    }
-    color[channel] = Math.min(1, Math.max(0, value));
-  }
-  return color as [number, number, number];
-}
+/** Map a normalized scalar through the FIELD (viridis) ramp. */
+export const viridis = fieldRamp;
 
-/** CSS linear-gradient for the result legend, sampled from the same ramp. */
-export function rampCss(stops = 12): string {
-  const colors: string[] = [];
-  for (let index = 0; index <= stops; index++) {
-    const [red, green, blue] = viridis(index / stops).map((value) =>
-      Math.round(value * 255),
-    );
-    colors.push(`rgb(${red}, ${green}, ${blue})`);
-  }
-  return `linear-gradient(to right, ${colors.join(", ")})`;
-}
+/** CSS linear-gradient for the field legend, sampled from the same ramp. */
+export const rampCss = fieldRampCss;
 
 /** Compact legend label: fixed digits for ordinary values, exponent outside. */
 export function formatScalar(value: number): string {
@@ -56,6 +27,89 @@ export function formatScalar(value: number): string {
     return value.toExponential(2);
   }
   return value.toFixed(3).replace(/\.?0+$/, "") || "0";
+}
+
+/** What the results browser should feed the heatmap right now. */
+export interface ResultViewInput {
+  /** The field the solve response's mesh scalars carry. */
+  defaultField: string;
+  /** Field chosen in the picker, or null before any switch. */
+  activeField: string | null;
+  /** Whether the mesh-quality view overrides the field view. */
+  qualityView: boolean;
+  fields: Record<string, number[]>;
+  ranges: Record<string, [number, number]>;
+  payloadScalars: readonly number[];
+  payloadRange: [number, number];
+  /** Per-vertex quality, fetched lazily; null until available. */
+  qualityScalars: readonly number[] | null;
+  qualityRange: [number, number] | null;
+}
+
+export interface ResultView {
+  scalars: readonly number[];
+  range: [number, number];
+  label: string;
+}
+
+/**
+ * Resolve the field picker + quality toggle into concrete display scalars.
+ *
+ * The quality view only takes over once its per-vertex scalars exist (they
+ * are fetched on demand); otherwise the active field falls back through the
+ * per-vertex field table to the payload's own scalars.
+ */
+export function resolveResultView(input: ResultViewInput): ResultView {
+  if (input.qualityView && input.qualityScalars) {
+    const range: [number, number] =
+      input.qualityRange ??
+      [Math.min(...input.qualityScalars), Math.max(...input.qualityScalars)];
+    return { scalars: input.qualityScalars, range, label: "scaled jacobian" };
+  }
+  const field = input.activeField ?? input.defaultField;
+  return {
+    scalars: input.fields[field] ?? input.payloadScalars,
+    range: input.ranges[field] ?? input.payloadRange,
+    label: field.replaceAll("_", " "),
+  };
+}
+
+/**
+ * Default warp factor for the deformed view: 10% of the mesh diagonal at the
+ * largest displacement, the usual "make it visible" scaling for FEM plots.
+ */
+export function autoDeformScale(
+  bounds: { min: readonly number[]; max: readonly number[] },
+  displacements: readonly (readonly [number, number, number])[],
+): number {
+  let peak = 0;
+  for (const [dx, dy, dz] of displacements) {
+    const magnitude = Math.hypot(dx, dy, dz);
+    if (magnitude > peak) peak = magnitude;
+  }
+  if (peak <= 0) return 1;
+  const diagonal = Math.hypot(
+    bounds.max[0] - bounds.min[0],
+    bounds.max[1] - bounds.min[1],
+    bounds.max[2] - bounds.min[2],
+  );
+  return (0.1 * (diagonal || 1)) / peak;
+}
+
+/** Vertex positions offset by scaled displacements (flat xyz layout). */
+export function applyDisplacements(
+  positions: readonly number[],
+  displacements: readonly (readonly [number, number, number])[],
+  scale: number,
+): number[] {
+  const warped = positions.slice() as number[];
+  const count = Math.min(displacements.length, Math.floor(positions.length / 3));
+  for (let index = 0; index < count; index++) {
+    warped[index * 3] += displacements[index][0] * scale;
+    warped[index * 3 + 1] += displacements[index][1] * scale;
+    warped[index * 3 + 2] += displacements[index][2] * scale;
+  }
+  return warped;
 }
 
 /** Slicing control state: a plane perpendicular to one axis. */

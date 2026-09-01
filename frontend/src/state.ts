@@ -9,15 +9,20 @@
 
 import { createSignal } from "solid-js";
 import type {
+  BcProposal,
   ConstructionNode,
   ConstructionRelation,
   ConstraintSolverRun,
-  DifferentiabilityDemo,
   GizmoMode,
   MaterialDefinition,
   MeshEdgePayload,
+  MeshInspectInfo,
+  OptimizationPayload,
   Selection,
   SelectionMode,
+  SimMeshPayload,
+  SimulationMeshPayload,
+  SimulationResultSummary,
   StudyPayload,
   ToolMode,
 } from "./types";
@@ -36,10 +41,72 @@ export const [source, setSource] = createSignal("");
 export const [nodes, setNodes] = createSignal<ConstructionNode[]>([]);
 export const [relations, setRelations] = createSignal<ConstructionRelation[]>([]);
 export const [solverRuns, setSolverRuns] = createSignal<ConstraintSolverRun[]>([]);
-export const [differentiabilityDemo, setDifferentiabilityDemo] =
-  createSignal<DifferentiabilityDemo | null>(null);
 export const [materials, setMaterials] = createSignal<MaterialDefinition[]>([]);
 export const [studies, setStudies] = createSignal<StudyPayload[]>([]);
+export const [simMeshes, setSimMeshes] = createSignal<SimMeshPayload[]>([]);
+export const [optimizations, setOptimizations] = createSignal<OptimizationPayload[]>([]);
+
+/**
+ * The FEM surface currently displayed in the viewport, if any.
+ *
+ * Owned by the SimulatePanel (a solve or a mesh inspection puts it here) and
+ * read by the ViewerPane for screen-space picking: the click probe, and the
+ * BC region proposals. `scalars`/`range`/`fieldLabel` describe the field the
+ * heatmap is showing right now (a field switch updates them without
+ * re-solving); `info` carries the mesh inspection report whose grid spacing
+ * sizes proposed sphere selections and side tolerances.
+ */
+export interface SimViewState {
+  /** Render payload with the base (undeformed) vertex positions. */
+  payload: SimulationMeshPayload;
+  info: MeshInspectInfo | null;
+  /** Scalars currently mapped through the ramp (field, or mesh quality). */
+  scalars: readonly number[];
+  range: [number, number];
+  fieldLabel: string;
+  /** Study whose BCs apply to this surface, or null for a bare mesh. */
+  studyName: string | null;
+}
+
+export const [simView, setSimView] = createSignal<SimViewState | null>(null);
+
+/**
+ * The solved field of a finished study-backed optimization run.
+ *
+ * Set by the optimize cards (wherever they are mounted) and consumed by the
+ * SimulatePanel's Results tab, so an optimization run ends showing the
+ * optimized part with its field — even when the run was started from the
+ * Model-mode panel and the user enters Simulate mode later.
+ */
+export interface OptimizeSimulateResult {
+  /** The optimization's name, for the results header. */
+  name: string;
+  field: string;
+  mesh: SimulationMeshPayload;
+  result: SimulationResultSummary | null;
+  meshInfo: MeshInspectInfo | null;
+}
+
+export const [optimizeSimulate, setOptimizeSimulate] =
+  createSignal<OptimizeSimulateResult | null>(null);
+
+/** Whether viewport clicks propose BC selections (armed by the builder). */
+export const [bcPickArmed, setBcPickArmed] = createSignal(false);
+
+/** Selection proposed from the viewport, consumed by the add-BC builder. */
+export const [bcProposal, setBcProposal] = createSignal<BcProposal | null>(null);
+
+/** Click-probe readout over the simulation surface (display only). */
+export interface SimProbe {
+  /** CSS pixel position of the chip inside the viewer pane. */
+  x: number;
+  y: number;
+  world: [number, number, number];
+  value: number;
+  label: string;
+}
+
+export const [simProbe, setSimProbe] = createSignal<SimProbe | null>(null);
 export const [meshEdges, setMeshEdges] = createSignal<MeshEdgePayload | null>(null);
 export const [selection, setSelection] = createSignal<Selection | null>(null);
 export const [hover, setHover] = createSignal<Selection | null>(null);

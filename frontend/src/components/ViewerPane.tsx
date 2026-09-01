@@ -25,12 +25,14 @@ import {
   gizmoDrag,
   cameraAngles,
   busy,
+  bcPickArmed,
   cycleMode,
   editingMode,
   setEditingMode,
   selectionMode,
   setCameraAngles,
   sketchPlane,
+  setBcProposal,
   setGizmoDrag,
   setGizmoMode,
   hover,
@@ -43,6 +45,9 @@ import {
   setDrag,
   setHover,
   setPendingLoft,
+  setSimProbe,
+  simProbe,
+  simView,
   dismissViewerError,
   setSelection,
   setSelectionMode,
@@ -51,6 +56,8 @@ import {
   tool,
   viewerError,
 } from "../state";
+import { nearestVertex, rectAabbProposal, sphereProposal } from "../bcPick";
+import { formatScalar } from "../simulation";
 import {
   add,
   intersectPlane,
@@ -146,6 +153,10 @@ type Gesture =
   | { kind: "none" }
   | { kind: "orbit"; x: number; y: number }
   | { kind: "pan"; x: number; y: number }
+  /** Pending click on the FEM surface: becomes an orbit once it moves. */
+  | { kind: "simtap"; x: number; y: number; clientX: number; clientY: number }
+  /** Shift-drag rectangle proposing a Nodes.box BC selection. */
+  | { kind: "bcrect"; x0: number; y0: number; x1: number; y1: number }
   | { kind: "drag"; nodeId: string; vertexIndex: number; moved: boolean }
   | {
       kind: "gizmo";
@@ -181,6 +192,13 @@ export function ViewerPane(props: ViewerPaneProps) {
   let panHeld = false;
   const [materialDropActive, setMaterialDropActive] = createSignal(false);
   const [overlayRevision, setOverlayRevision] = createSignal(0);
+  /** BC box-pick rubber band, in CSS pixels over the canvas. */
+  const [pickRect, setPickRect] = createSignal<{
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  } | null>(null);
 
   const renderer = props.renderer;
 
@@ -548,6 +566,58 @@ export function ViewerPane(props: ViewerPaneProps) {
     setSelection({ nodeId: target.id, vertexIndex: Math.min(index, target.vertices.length) });
   };
 
+  /** Whether pointer input should target the displayed FEM surface. */
+  const simInteractive = () =>
+    editingMode() === "simulate" && simView() !== null && renderer.simulationActive;
+
+  /** Framebuffer px → CSS px, for DOM chips anchored to projected points. */
+  const toCss = (x: number, y: number) => ({
+    x: (x * canvas.clientWidth) / Math.max(canvas.width, 1),
+    y: (y * canvas.clientHeight) / Math.max(canvas.height, 1),
+  });
+
+  /**
+   * A completed click on the FEM surface.
+   *
+   * Armed BC picking proposes a Nodes.sphere around the picked point (radius
+   * from the mesh cell spacing); otherwise the click probes: a chip shows the
+   * nearest vertex's position and the active field value. Picking works on
+   * projected vertices, so occlusion is approximate — good enough for both.
+   */
+  const handleSimTap = (x: number, y: number) => {
+    const view = simView();
+    if (!view) return;
+    const hit = nearestVertex(view.payload.positions, x, y, pickView());
+    if (!hit) {
+      setSimProbe(null);
+      return;
+    }
+    if (bcPickArmed()) {
+      setBcProposal(sphereProposal(hit.world, view.info?.grid ?? null));
+      return;
+    }
+    const anchor = toCss(hit.x, hit.y);
+    setSimProbe({
+      x: anchor.x,
+      y: anchor.y,
+      world: hit.world,
+      value: view.scalars[hit.index] ?? 0,
+      label: view.fieldLabel,
+    });
+  };
+
+  /** Rubber-band rectangle for the current bcrect gesture, in CSS px. */
+  const rectFromGesture = (rect: { x0: number; y0: number; x1: number; y1: number }) => {
+    const a = toCss(rect.x0, rect.y0);
+    const b = toCss(rect.x1, rect.y1);
+    return {
+      left: Math.min(a.x, b.x),
+      top: Math.min(a.y, b.y),
+      width: Math.abs(b.x - a.x),
+      height: Math.abs(b.y - a.y),
+    };
+  };
+
   /**
    * Reflect what the pointer can act on right now.
    *
@@ -626,6 +696,21 @@ export function ViewerPane(props: ViewerPaneProps) {
   const onPointerDown = (event: PointerEvent) => {
     canvas.setPointerCapture(event.pointerId);
     const [x, y] = toPixels(event);
+
+    // Simulate-mode surface interactions come first: with a FEM mesh shown,
+    // a left press is a pending probe/pick tap (drags fall through to orbit)
+    // and Shift-drag with armed picking rubber-bands a Nodes.box proposal.
+    if (simInteractive() && event.button === 0 && !panHeld) {
+      if (bcPickArmed() && event.shiftKey) {
+        gesture = { kind: "bcrect", x0: x, y0: y, x1: x, y1: y };
+        setPickRect(rectFromGesture(gesture));
+        return;
+      }
+      if (!event.shiftKey) {
+        gesture = { kind: "simtap", x, y, clientX: event.clientX, clientY: event.clientY };
+        return;
+      }
+    }
 
     if (tool() === "sketch" && event.button === 0) {
       void handlePlaceSketch(x, y);
@@ -754,6 +839,28 @@ export function ViewerPane(props: ViewerPaneProps) {
       return;
     }
 
+    // A sim tap that travels becomes a plain orbit; the probe chip clears so
+    // it does not float detached from the point it annotated.
+    if (gesture.kind === "simtap") {
+      const travel = Math.hypot(
+        event.clientX - gesture.clientX,
+        event.clientY - gesture.clientY,
+      );
+      if (travel > 4) {
+        setSimProbe(null);
+        gesture = { kind: "orbit", x: event.clientX, y: event.clientY };
+        renderer.interacting = true;
+      }
+      return;
+    }
+
+    if (gesture.kind === "bcrect") {
+      gesture.x1 = x;
+      gesture.y1 = y;
+      setPickRect(rectFromGesture(gesture));
+      return;
+    }
+
     if (gesture.kind === "gizmo") {
       canvas.style.cursor = "grabbing";
       const view = pickView();
@@ -870,6 +977,22 @@ export function ViewerPane(props: ViewerPaneProps) {
     renderer.interacting = false;
     canvas.style.cursor = "default";
 
+    if (finished.kind === "simtap") {
+      handleSimTap(finished.x, finished.y);
+      return;
+    }
+
+    if (finished.kind === "bcrect") {
+      setPickRect(null);
+      const view = simView();
+      if (view) {
+        const proposal = rectAabbProposal(view.payload.positions, finished, pickView());
+        if (proposal) setBcProposal(proposal);
+        else setStatus({ kind: "error", text: "Box pick: drag the rectangle over the mesh." });
+      }
+      return;
+    }
+
     if (finished.kind === "gizmo") {
       const active = gizmoDrag();
       const node = nodeById(finished.nodeId);
@@ -980,6 +1103,7 @@ export function ViewerPane(props: ViewerPaneProps) {
           setPendingConstraint(null);
           setPendingLoft(null);
           setSelection(null);
+          setSimProbe(null);
           setTool("select");
           // Escape backs all the way out to the default editing mode.
           setEditingMode("model");
@@ -1177,6 +1301,35 @@ export function ViewerPane(props: ViewerPaneProps) {
           </For>
         </svg>
       </Show>
+      <Show when={pickRect()}>
+        {(rect) => (
+          <div
+            class="bc-pick-rect"
+            style={{
+              left: `${rect().left}px`,
+              top: `${rect().top}px`,
+              width: `${rect().width}px`,
+              height: `${rect().height}px`,
+            }}
+            data-testid="bc-pick-rect"
+          />
+        )}
+      </Show>
+      <Show when={editingMode() === "simulate" && simProbe()}>
+        {(probe) => (
+          <div
+            class="sim-probe"
+            style={{ left: `${probe().x}px`, top: `${probe().y}px` }}
+            data-testid="sim-probe"
+          >
+            <b>{formatScalar(probe().value)}</b>
+            <span>{probe().label}</span>
+            <small>
+              [{probe().world.map((component) => component.toFixed(3)).join(", ")}]
+            </small>
+          </div>
+        )}
+      </Show>
       <Show when={busy()}>
         <span
           class="viewer-compile-indicator"
@@ -1202,7 +1355,11 @@ export function ViewerPane(props: ViewerPaneProps) {
         </b>
         {" · "}
         {editingMode() === "simulate"
-          ? "Simulation setup · M cycles modes · Esc returns to model"
+          ? bcPickArmed()
+            ? "Pick BC: click the mesh → sphere · Shift-drag → box · confirm in the builder"
+            : simView()
+              ? "Click the mesh to probe values · pick BC regions from the study builder · Esc returns to model"
+              : "Simulation setup · M cycles modes · Esc returns to model"
           : editingMode() === "render"
           ? "Render setup · presets & quality in the Render panel · M cycles modes · Esc returns to model"
           : pendingLoft()

@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_SLICE,
+  applyDisplacements,
+  autoDeformScale,
   formatScalar,
   meshBounds,
   rampCss,
+  resolveResultView,
   slicePlane,
   viridis,
 } from "../src/simulation";
@@ -91,5 +94,104 @@ describe("mesh bounds", () => {
 
   it("defaults leave slicing off at full extent", () => {
     expect(DEFAULT_SLICE).toEqual({ axis: 0, fraction: 1, enabled: false });
+  });
+});
+
+describe("deformed view scaling", () => {
+  const bounds = { min: [0, 0, 0], max: [3, 4, 0] }; // diagonal 5
+
+  it("targets 10% of the mesh diagonal at the peak displacement", () => {
+    const displacements: [number, number, number][] = [
+      [0, 0, 0],
+      [0, 0.25, 0],
+      [0.25, 0, 0],
+    ];
+    expect(autoDeformScale(bounds, displacements)).toBeCloseTo(2); // 0.5 / 0.25
+  });
+
+  it("degrades safely for zero displacement", () => {
+    expect(autoDeformScale(bounds, [[0, 0, 0]])).toBe(1);
+  });
+
+  it("offsets vertices by scale × displacement", () => {
+    const warped = applyDisplacements(
+      [1, 1, 1, 2, 2, 2],
+      [
+        [0.1, 0, -0.1],
+        [0, 0.2, 0],
+      ],
+      2,
+    );
+    expect(warped[0]).toBeCloseTo(1.2);
+    expect(warped[2]).toBeCloseTo(0.8);
+    expect(warped[4]).toBeCloseTo(2.4);
+    expect(warped[5]).toBeCloseTo(2);
+  });
+
+  it("ignores trailing vertices without a displacement entry", () => {
+    const warped = applyDisplacements([0, 0, 0, 5, 5, 5], [[1, 1, 1]], 1);
+    expect(warped.slice(3)).toEqual([5, 5, 5]);
+  });
+});
+
+describe("result view resolution", () => {
+  const base = {
+    defaultField: "von_mises",
+    activeField: null as string | null,
+    qualityView: false,
+    fields: {
+      von_mises: [1, 2, 3],
+      displacement_magnitude: [0.1, 0.2, 0.3],
+    },
+    ranges: {
+      von_mises: [1, 3] as [number, number],
+      displacement_magnitude: [0.1, 0.3] as [number, number],
+    },
+    payloadScalars: [9, 9, 9],
+    payloadRange: [9, 9] as [number, number],
+    qualityScalars: null as number[] | null,
+    qualityRange: null as [number, number] | null,
+  };
+
+  it("shows the default field before any switch", () => {
+    const view = resolveResultView(base);
+    expect(view.scalars).toEqual([1, 2, 3]);
+    expect(view.range).toEqual([1, 3]);
+    expect(view.label).toBe("von mises");
+  });
+
+  it("switches fields without re-solving", () => {
+    const view = resolveResultView({ ...base, activeField: "displacement_magnitude" });
+    expect(view.scalars).toEqual([0.1, 0.2, 0.3]);
+    expect(view.label).toBe("displacement magnitude");
+  });
+
+  it("falls back to the payload scalars for an unknown field", () => {
+    const view = resolveResultView({ ...base, activeField: "temperature" });
+    expect(view.scalars).toEqual([9, 9, 9]);
+    expect(view.range).toEqual([9, 9]);
+  });
+
+  it("only enters the quality view once its scalars exist", () => {
+    const pending = resolveResultView({ ...base, qualityView: true });
+    expect(pending.label).toBe("von mises");
+    const ready = resolveResultView({
+      ...base,
+      qualityView: true,
+      qualityScalars: [0.4, 0.9, 1],
+      qualityRange: [0.4, 1],
+    });
+    expect(ready.scalars).toEqual([0.4, 0.9, 1]);
+    expect(ready.range).toEqual([0.4, 1]);
+    expect(ready.label).toBe("scaled jacobian");
+  });
+
+  it("derives the quality range from the scalars when no summary exists", () => {
+    const view = resolveResultView({
+      ...base,
+      qualityView: true,
+      qualityScalars: [0.5, 0.7],
+    });
+    expect(view.range).toEqual([0.5, 0.7]);
   });
 });

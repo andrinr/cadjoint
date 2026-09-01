@@ -1807,135 +1807,6 @@ button.primary svg {
   gap: 10px;
 }
 
-.autodiff-wrap {
-  position: relative;
-}
-
-.autodiff-toggle {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  height: 24px;
-  padding: 0 6px;
-  border-color: rgba(154, 220, 244, 0.3);
-  border-radius: 999px;
-  background: rgba(154, 220, 244, 0.06);
-  color: #c9efff;
-  font: 650 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.autodiff-toggle i {
-  color: #9adcf4;
-  font: 700 14px/1 Georgia, serif;
-  font-style: normal;
-}
-
-.autodiff-toggle small {
-  min-width: 17px;
-  padding: 2px 4px;
-  border-radius: 999px;
-  background: rgba(154, 220, 244, 0.12);
-  color: #9adcf4;
-  font: 700 8px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
-}
-
-.autodiff-panel {
-  position: absolute;
-  top: calc(100% + 9px);
-  right: 0;
-  z-index: 40;
-  width: 310px;
-  padding: 13px;
-  border: 1px solid rgba(154, 220, 244, 0.24);
-  border-radius: 11px;
-  background:
-    radial-gradient(circle at 100% 0, rgba(154, 220, 244, 0.08), transparent 42%),
-    rgba(14, 17, 15, 0.97);
-  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(12px);
-}
-
-.autodiff-title {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.autodiff-title > span {
-  display: grid;
-  gap: 3px;
-  color: var(--ink);
-  font-size: 12px;
-  font-weight: 650;
-}
-
-.autodiff-title small {
-  color: #9adcf4;
-  font: 650 8px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-}
-
-.autodiff-title > b {
-  color: #9adcf4;
-  font: 700 24px/1 Georgia, serif;
-}
-
-.autodiff-panel > p {
-  margin: 10px 0;
-  color: var(--muted);
-  font: 600 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
-}
-
-.autodiff-metric,
-.autodiff-panel li {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.autodiff-metric {
-  padding: 8px 9px;
-  border: 1px solid rgba(217, 255, 87, 0.15);
-  border-radius: 7px;
-  background: rgba(217, 255, 87, 0.035);
-  color: #cbd99a;
-  font-size: 10px;
-}
-
-.autodiff-metric b,
-.autodiff-panel li b {
-  color: var(--lime);
-  font: 650 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
-}
-
-.autodiff-panel ul {
-  display: grid;
-  gap: 5px;
-  margin: 8px 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.autodiff-panel li {
-  padding: 6px 3px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.045);
-}
-
-.autodiff-panel li code {
-  color: #c9efff;
-  font: 9px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
-}
-
-.autodiff-panel footer {
-  margin-top: 9px;
-  color: var(--muted);
-  font-size: 9px;
-}
-
 .pane-hint {
   color: var(--muted);
   font-size: 11px;
@@ -2550,6 +2421,15 @@ button.primary svg {
   justify-content: space-between;
   font: 500 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
 }
+/* Viewport master switch (Scene | Mesh) + the element-edge toggle. */
+.sim-view-control {
+  align-items: center;
+  justify-content: space-between;
+}
+.sim-view-control .switch {
+  flex-direction: row !important;
+  align-items: center;
+}
 .sim-slice input[type="range"] {
   flex: 1;
   min-width: 60px;
@@ -2574,4 +2454,389 @@ button.primary svg {
 .sim-error {
   color: #ff9c8a;
   white-space: pre-wrap;
+}
+
+/* ── Optimize panel (a Model-mode dock section) ────────────────────────── */
+
+.dock .optimize-panel {
+  min-height: 130px;
+}
+
+.opt-kind {
+  background: rgba(217, 255, 87, 0.12);
+  color: var(--lime, #d9ff57);
+}
+
+.opt-objective {
+  margin: 0;
+  font-size: 10px;
+  opacity: 0.8;
+}
+
+.opt-objective code {
+  color: var(--lime, #d9ff57);
+  font: 600 10px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.opt-parameters {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.opt-parameters li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 3px 6px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 10px;
+}
+
+.opt-parameters code {
+  font: 600 10px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+  opacity: 0.85;
+}
+
+.opt-parameter-values {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font: 500 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.opt-parameter-values i {
+  font-style: normal;
+  opacity: 0.55;
+}
+
+.opt-result {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.opt-spark svg {
+  display: block;
+  width: 100%;
+  height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.opt-spark polyline {
+  fill: none;
+  stroke: var(--lime, #d9ff57);
+  stroke-width: 1.6;
+  vector-effect: non-scaling-stroke;
+}
+
+.opt-spark .opt-cursor {
+  stroke: rgba(255, 255, 255, 0.55);
+  stroke-width: 1;
+  stroke-dasharray: 3 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.opt-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10px;
+  opacity: 0.85;
+}
+
+.opt-summary b {
+  font: 650 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--lime, #d9ff57);
+}
+
+.opt-player {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.opt-player button {
+  width: 26px;
+  height: 24px;
+  padding: 0;
+  border-radius: 7px;
+  font-size: 10px;
+}
+
+.opt-player input[type="range"] {
+  flex: 1;
+  min-width: 50px;
+}
+
+.opt-frame-label {
+  font: 500 9px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+  opacity: 0.75;
+  white-space: nowrap;
+}
+
+/* ── Mesh inspector & results browsing (Simulate dock) ─────────────────── */
+
+.sim-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 2px;
+}
+
+.sim-section-head b {
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
+
+.sim-add-inline {
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 7px;
+  border-style: dashed;
+  font-size: 10px;
+  opacity: 0.85;
+}
+
+.sim-kind-mesh {
+  background: rgba(152, 234, 189, 0.16);
+  color: #9fe7bd;
+}
+
+.sim-inspect {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sim-stats {
+  display: flex;
+  gap: 10px;
+  font-size: 10px;
+  opacity: 0.9;
+}
+
+.sim-stats b {
+  font: 650 10px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--ink, #e7e6df);
+}
+
+.sim-histogram {
+  display: block;
+  width: 100%;
+  height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.sim-histogram rect {
+  fill: rgba(159, 231, 189, 0.75);
+}
+
+.sim-result-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.sim-field-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10px;
+}
+
+.sim-field-table th {
+  text-align: left;
+  font-weight: 600;
+  opacity: 0.6;
+  padding: 2px 4px;
+  border-bottom: 1px solid var(--line);
+}
+
+.sim-field-table td {
+  padding: 2px 4px;
+  font: 500 10px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.sim-field-picker {
+  align-self: stretch;
+}
+
+.sim-deform input[type="range"] {
+  flex: 1;
+  min-width: 50px;
+}
+
+/* ── BC visualization ──────────────────────────────────────────────────── */
+
+.sim-bc-swatch {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 4px;
+  border-radius: 2px;
+  vertical-align: baseline;
+}
+
+.sim-bc-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-size: 9px;
+  opacity: 0.85;
+}
+
+.sim-bc-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sim-bc-legend i {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+.sim-pick {
+  height: 24px;
+  border-radius: 7px;
+  font-size: 10px;
+}
+
+.sim-pick.active {
+  color: var(--mode-accent, #ff9e40);
+  border-color: currentColor;
+}
+
+/* Rubber-band rectangle while shift-dragging a box BC pick. */
+.bc-pick-rect {
+  position: absolute;
+  z-index: 6;
+  border: 1px dashed rgba(217, 255, 87, 0.9);
+  background: rgba(217, 255, 87, 0.08);
+  pointer-events: none;
+}
+
+/* Click-probe readout chip over the simulation surface. */
+.sim-probe {
+  position: absolute;
+  z-index: 7;
+  transform: translate(10px, -100%);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(14, 17, 15, 0.93);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+  font-size: 10px;
+}
+
+.sim-probe b {
+  font: 650 11px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--lime, #d9ff57);
+}
+
+.sim-probe span {
+  opacity: 0.75;
+}
+
+.sim-probe small {
+  font: 500 8px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+  opacity: 0.6;
+}
+
+.sim-method {
+  align-self: stretch;
+}
+
+.sim-method-hint {
+  font-size: 9px;
+  opacity: 0.6;
+}
+
+/* ── Simulate panel tabs ───────────────────────────────────────────────── */
+
+.sim-tabs {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.sim-tabs button {
+  position: relative;
+  flex: 1;
+  height: 24px;
+  padding: 0 4px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  font-size: 10px;
+  font-weight: 600;
+  opacity: 0.7;
+}
+
+.sim-tabs button:hover {
+  opacity: 1;
+}
+
+.sim-tabs button.active {
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--mode-accent, #ff9e40);
+  opacity: 1;
+}
+
+.sim-tab-badge {
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--mode-accent, #ff9e40);
+}
+
+.sim-help {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.sim-help p {
+  margin: 0;
+}
+
+.sim-probe-row {
+  padding: 4px 6px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.opt-parameters-toggle {
+  height: 20px;
+  border: none;
+  background: transparent;
+  font-size: 9px;
+  opacity: 0.65;
+  text-align: left;
+  padding: 0 2px;
+}
+
+.opt-parameters-toggle:hover {
+  opacity: 1;
 }
