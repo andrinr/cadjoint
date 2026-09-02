@@ -1,0 +1,143 @@
+/* cadjoint banner — tokens.
+   Light stack sampled from research/design/brutalist/5-light-dock.png
+   Dark stack from design-language.md §14.8 (h 299°).
+   Accent from the brutalist studies: #f87318, used ONLY as a fill behind
+   near-black type (#0a0a0c on #f87318 = 7.02:1). Never as ink on paper
+   (#f87318 on #e6e6e9 = 2.26:1, fails). */
+
+:root {
+  --paper:        #e6e6e9;   /* L 0.926 */
+  --paper-lit:    #edecee;
+  --paper-white:  #f8f7f8;
+  --grid:         #9f9da5;   /* 2.15:1 on paper — an exposed hairline, not a border */
+  --rule:         #605e65;   /* structural rule / ink-3 */
+  --ink:          #18161a;   /* 14.43:1 on paper */
+  --ink-2:        #48464d;   /*  7.46:1 */
+  --ink-3:        #605e65;   /*  5.13:1 */
+
+  --plate:        #050407;   /* surface-void */
+  --plate-line:   #1e1d22;   /* graticule (as rendered in the source plate) */
+  --plate-ink:    #bbbabe;
+  --plate-ink-2:  #8e8c94;
+  --bracket:      #8e8c94;
+
+  --accent:       #f87318;
+  --accent-ink:   #0a0a0c;   /* 7.02:1 on accent */
+
+  --mod: 80px;
+  --hair: 1px;
+
+  --mono: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, monospace;
+}
+
+.dark {
+  --paper:        #131216;   /* §14.8 surface-base */
+  --paper-lit:    #19181d;   /* surface-bar */
+  --paper-white:  #222026;   /* surface-panel */
+  --grid:         #4c4a52;   /* 2.14:1 on #131216 — same reading as the light grid */
+  --rule:         #939197;
+  --ink:          #edecef;   /* 15.85:1 */
+  --ink-2:        #bbbabe;   /*  9.66:1 */
+  --ink-3:        #939197;   /*  5.98:1 */
+  --plate:        #000000;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { background: #ffffff; }
+body { font-family: var(--mono); -webkit-font-smoothing: antialiased; }
+
+.canvas {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--paper);
+  background-image:
+    repeating-linear-gradient(to right,  var(--grid) 0 var(--hair), transparent var(--hair) var(--mod)),
+    repeating-linear-gradient(to bottom, var(--grid) 0 var(--hair), transparent var(--hair) var(--mod));
+  color: var(--ink);
+}
+
+/* the plate: a dark tile set into the page, radius 0, no shadow */
+.plate { position: absolute; background: var(--plate); overflow: hidden; }
+.plate img {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: cover; display: block;
+}
+.br { position: absolute; width: 22px; height: 22px; pointer-events: none; }
+.br.tl { top: 10px; left: 10px;  border-top: 1px solid var(--bracket); border-left: 1px solid var(--bracket); }
+.br.tr { top: 10px; right: 10px; border-top: 1px solid var(--bracket); border-right: 1px solid var(--bracket); }
+.br.bl { bottom: 10px; left: 10px;  border-bottom: 1px solid var(--bracket); border-left: 1px solid var(--bracket); }
+.br.br2{ bottom: 10px; right: 10px; border-bottom: 1px solid var(--bracket); border-right: 1px solid var(--bracket); }
+
+/* tracked uppercase micro-label */
+.lab {
+  font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--ink-3); line-height: 1; white-space: nowrap;
+}
+.lab.on-plate { color: var(--plate-ink-2); }
+.val { font-size: 13px; letter-spacing: 0.01em; color: var(--ink); line-height: 1;
+       font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* accent: a fill behind near-black type, never ink */
+.acc {
+  background: var(--accent); color: var(--accent-ink);
+  font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+  line-height: 1; padding: 7px 10px 6px; display: inline-block; white-space: nowrap;
+}
+/* registration marks — pinned to grid intersections, nothing else */
+.reg { position: absolute; width: 10px; height: 10px; background: var(--accent);
+       transform: translate(-5px, -5px); }
+
+.wm { font-weight: 700; letter-spacing: -0.045em; line-height: 0.82; color: var(--ink); }
+
+/* ── plate internals, per design-language §16.3 ───────────────────────── */
+.plate .grat { position: absolute; inset: 0; width: 100%; height: 100%; }
+.plate .geom { position: absolute; object-fit: contain; }
+.plate .brk  { position: absolute; inset: 0; pointer-events: none; }
+.plate .brk i { position: absolute; width: 26px; height: 26px; }
+.plate .brk i.a { top: 12px; left: 12px;     border-top: 2px solid #413e47; border-left: 2px solid #413e47; }
+.plate .brk i.b { top: 12px; right: 12px;    border-top: 2px solid #413e47; border-right: 2px solid #413e47; }
+.plate .brk i.c { bottom: 12px; left: 12px;  border-bottom: 2px solid #413e47; border-left: 2px solid #413e47; }
+.plate .brk i.d { bottom: 12px; right: 12px; border-bottom: 2px solid #413e47; border-right: 2px solid #413e47; }
+
+.gain { position: absolute; display: grid; grid-auto-flow: column;
+        column-gap: 26px; align-items: baseline; }
+.gain b { display: block; font-size: 10px; letter-spacing: 0.18em; font-weight: 400;
+          color: #939197; text-transform: uppercase; line-height: 1.6; white-space: nowrap; }
+.gain span { display: block; font-size: 12px; color: #bbbabe; line-height: 1.2;
+             font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* title block — ASME Y14.100 placement, bottom right */
+.tblock { position: absolute; border-top: 1px solid #3a3840; }
+.tblock div { display: grid; grid-template-columns: 62px 136px;
+              border-bottom: 1px solid #3a3840; align-items: center; height: 17px; }
+.tblock b { font-size: 9px; letter-spacing: 0.18em; font-weight: 400; color: #939197;
+            text-transform: uppercase; }
+.tblock span { font-size: 10px; color: #bbbabe; font-variant-numeric: tabular-nums; }
+
+/* the probe: white-hot dot, 1px leader, value on an opaque void plate */
+.probe { position: absolute; }
+.probe .dot { position: absolute; width: 7px; height: 7px; border-radius: 50%;
+              background: #fcfbfe; box-shadow: 0 0 0 1.5px #050407; }
+.probe .lead { position: absolute; height: 1px; background: #bbbabe; }
+.probe .rd { position: absolute; background: #050407; color: #edecef; font-size: 12px;
+             padding: 5px 8px; white-space: nowrap; font-variant-numeric: tabular-nums;
+             border: 1px solid #3a3840; }
+
+/* dark theme: the plate stays; the paper inverts. Luminance alone can no longer
+   separate a black plate from a near-black page, so the edge is stated as a
+   hairline at the same 2.14:1 reading the grid uses. */
+.dark .plate { outline: 1px solid var(--grid); }
+
+/* a live capture of the running app: a light plate, stated by a hairline edge
+   (the viewport ground is the paper, so luminance cannot state the boundary). */
+.plate.live { background: var(--paper); outline: 1px solid var(--grid); }
+.plate.live img { object-fit: cover; }
+.plate.live .brk i { border-color: var(--ink-3) !important; }
+
+/* the corrected probe readout — an opaque plate, per §16.3 */
+.probe-plate {
+  background: #050407; border: 1px solid #3a3840; color: #edecef;
+  display: flex; align-items: center; justify-content: center;
+  letter-spacing: 0.08em; font-variant-numeric: tabular-nums;
+  font-family: var(--mono); line-height: 1;
+}

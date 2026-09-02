@@ -1,0 +1,85 @@
+cadjoint banner — tokens and measurements
+=========================================
+Sources: light stack sampled from research/design/brutalist/5-light-dock.png;
+dark stack from research/design-language.md §14.8; plate internals from §16.3;
+field image cropped from research/design/combined/6-dark-plate-object.png
+(the solved sink-conduction field, alpha-keyed off the plate ground). The README
+hero instead comes from a LIVE capture of the running playground — see capture.mjs.
+
+LIGHT PAPER  (the chosen direction, 5-light-dock)
+  role          hex        L      C       on paper
+  paper         #e6e6e9  0.926  0.004   1.00:1
+  paper-lit     #edecee  0.944  0.003   1.06:1
+  grid          #9f9da5  0.700  0.012   2.15:1
+  rule / ink-3  #605e65  0.486  0.011   5.13:1
+  ink-2         #48464d  0.399  0.012   7.46:1
+  ink           #18161a  0.204  0.008   14.43:1
+
+DARK PAPER  (§14.8 ladder, hue 299°)
+  paper         #131216  0.185  0.008   1.00:1
+  paper-lit     #19181d  0.212  0.010   1.06:1
+  grid          #4c4a52  0.414  0.013   2.14:1
+  rule / ink-3  #939197  0.660  0.009   5.98:1
+  ink-2         #bbbabe  0.791  0.006   9.66:1
+  ink           #edecef  0.945  0.004   15.85:1
+
+ACCENT — a fill behind near-black type, never ink
+  accent        #f87318  0.704  0.185
+  accent-ink    #0a0a0c  on #f87318            7.02:1   AA + AAA
+  #f87318 as ink on #e6e6e9 paper               2.26:1   FAILS — never used this way
+  #f87318 as ink on #131216 paper               6.62:1   not used either
+
+PLATE INTERNALS  (design-language §16.3, unchanged)
+  plate ground               #050407   1.00:1 on plate
+  graticule                  #1e1d22   1.22:1 on plate
+  centre-axis subdivisions   #332f38   1.56:1 on plate
+  corner brackets            #413e47   1.95:1 on plate
+  rules / probe border       #3a3840   1.77:1 on plate
+  label ink-3                #939197   6.56:1 on plate
+  value ink-2                #bbbabe   10.60:1 on plate
+  value ink                  #edecef   17.38:1 on plate
+
+GEOMETRY
+  48px graticule division, laid out from the plate centre outward;
+  five subdivisions per division on the two centre axes only, arms 5px / 9px on every fifth.
+  26px / 2px corner brackets. Page cell grid 80px. Radius 0 everywhere. No shadows.
+
+FACTS PRINTED IN THE BANNERS  (all checked against the repo, 25d1477)
+  LICENCE       Apache 2.0            LICENSE at the repo root
+  SCENE         starter.py            scenes/starter.py — scenes are Python, there is no .cj format
+  STUDY         sink-conduction       ThermalStudy(name=...) in starter.py
+  MESH          sink-mesh · tet10     SimMesh(name=..., method="tet10")
+  SOLVER        jax-fem               tet meshes solve on the direct jax-fem path only
+  REV           25d1477               git rev-parse --short HEAD
+  FIELD RANGE   0 .. 1.134            the Results legend of a real solve of starter.py
+  PROBE         MAX 1.134             the peak of that field; drawn as a CSS plate over
+                                      the source render's mocked-up readout
+  OBJECTIVE     cool-sink · max temperature · 12 steps   Optimization(...) in starter.py
+  GRATICULE     H/V 1.00 m/div · ISO +X−Y+Z              the app's own readout at 1x zoom
+
+MEASURED ON THE RENDERS
+  a-dock                2560x1280  max chroma 0.198 · accent 1.23% of px · chrome outside plate/legend/accent: max chroma 0.013, px over 0.03 = 0
+  a-dock-dark           2560x1280  max chroma 0.198 · accent 1.23% of px · chrome outside plate/legend/accent: max chroma 0.013, px over 0.03 = 0
+  b-bleed               2560x1280  max chroma 0.194 · accent 0.20% of px · chrome outside plate/legend/accent: max chroma 0.013, px over 0.03 = 0
+  b-bleed-dark          2560x1280  max chroma 0.194 · accent 0.20% of px · chrome outside plate/legend/accent: max chroma 0.013, px over 0.03 = 0
+  c-field               2560x1280  max chroma 0.195 · accent 1.16% of px · the plate is the whole frame; no chrome outside it
+  readme                3200x800  max chroma 0.197 · accent 1.55% of px · chrome outside plate/legend/accent: max chroma 0.013, px over 0.03 = 0
+  readme-dark           3200x800  max chroma 0.197 · accent 1.55% of px · chrome outside plate/legend/accent: max chroma 0.013, px over 0.03 = 0
+  readme-live-dry       3200x800  max chroma 0.200 · accent 1.55% of px · chrome outside plate/legend/accent: max chroma 0.013, px over 0.03 = 0
+  readme-live-dry-dark  3200x800  max chroma 0.200 · accent 1.55% of px · chrome outside plate/legend/accent: max chroma 0.013, px over 0.03 = 0
+
+  viridis peaks at chroma 0.194-0.198 in every render; the accent sits at 0.185;
+  all remaining chrome is at or below 0.016. The field is the most saturated thing
+  in the image, the single accent block is second, and nothing else is a colour.
+
+FILES
+  a-dock.png / a-dock-dark.png        DOCK    social preview 1280x640 @2x  (shipped)
+  b-bleed.png / b-bleed-dark.png      BLEED   social preview 1280x640 @2x  (poster alternative)
+  c-field.png                         FIELD   social preview 1280x640 @2x  (dark-native)
+  readme.png / readme-dark.png        README header, mockup hero — superseded
+  readme-live-dry.png / -dark.png     README header, LIVE hero — dry run, export held
+  assets/geom-field.png               the solved sink, keyed off its plate ground
+  assets/hero-capture.png             the live viewport capture (regenerate with capture.mjs)
+  assets/hero-capture-context.png     the whole window at capture time, for sanity
+  capture.mjs                         live capture: node capture.mjs --port N [--zoom 5]
+  render.mjs, plate.js, _tokens.css   banner sources ( ?dark on any file renders dark )

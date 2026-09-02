@@ -1,0 +1,56 @@
+<meta charset="utf-8"><link rel="stylesheet" href="_tokens.css">
+<style>
+  .canvas { width: 1280px; height: 640px; }
+  .rule { position: absolute; height: 1px; background: var(--rule); }
+  .ramp { position: absolute; height: 8px; background: linear-gradient(to right,
+      #440154,#472d7b,#3b528b,#2c728e,#21918c,#28ae80,#5ec962,#addc30,#fde725); }
+  .mark { position:absolute; background: var(--accent); color: var(--accent-ink);
+          display: flex; align-items: center; justify-content: center;
+          font-weight: 700; font-size: 20px; letter-spacing: 0.02em; }
+  .wm { position: absolute; font-size: 258px; letter-spacing: 0; line-height: 1;
+        white-space: nowrap; font-weight: 700; color: var(--ink); }
+  .raw { text-transform: none; }
+  .chain { position: absolute; font-size: 15px; letter-spacing: 0.12em;
+           color: var(--ink-2); line-height: 1; }
+</style>
+<body><div class="canvas">
+
+  <div class="mark" style="left:80px; top:44px; width:40px; height:40px;">cj</div>
+  <div class="lab"  style="position:absolute; left:136px; top:58px;">DIFFERENTIABLE CODE-FIRST CAD</div>
+  <div class="lab"  style="position:absolute; right:80px; top:58px;">GITHUB.COM/ANDRINR/CADJOINT</div>
+
+  <!-- the name is bigger than the frame: the wordmark is cropped by the plate edge -->
+  <div class="wm" style="left:80px; top:64px;">cadjoint</div>
+
+  <div class="rule"  style="left:80px; top:320px; width:1120px;"></div>
+  <div class="chain" style="left:80px; top:344px;">ONE&nbsp;PURE&nbsp;JAX&nbsp;FUNCTION&nbsp;—&nbsp;SKETCH,&nbsp;CONSTRAINTS,&nbsp;SDF,&nbsp;MESH&nbsp;AND&nbsp;FEM,&nbsp;DIFFERENTIATED&nbsp;END&nbsp;TO&nbsp;END</div>
+  <div class="reg" style="left:80px;   top:320px;"></div>
+  <div class="reg" style="left:1200px; top:320px;"></div>
+
+  <!-- full-bleed plate: the instrument runs the whole width -->
+  <div class="plate" data-grat data-div="48" style="left:0; top:384px; width:1280px; height:256px;">
+    <img class="geom" src="assets/geom-field.png" alt="" data-probe="MAX 1.134"
+         style="left:456px; top:8px; width:282px; height:220px;">
+    <div class="brk"><i class="a"></i><i class="b"></i><i class="c"></i><i class="d"></i></div>
+    <div class="gain" style="left:80px; top:28px;">
+      <div><b>H</b><span>1.00 m/div</span></div>
+      <div><b>V</b><span>1.00 m/div</span></div>
+      <div><b>VIEW</b><span>ISO · +X−Y+Z</span></div>
+    </div>
+    <div class="lab" style="position:absolute; left:80px; bottom:76px; color:#939197;">FIELD · TEMPERATURE</div>
+    <div class="ramp" style="left:80px; bottom:56px; width:280px;"></div>
+    <div class="lab" style="position:absolute; left:80px;  bottom:36px; color:#939197;">0</div>
+    <div class="lab" style="position:absolute; left:360px; bottom:36px; color:#939197; transform:translateX(-100%);">1.134</div>
+    <div class="gain" style="right:80px; top:28px;">
+      <div><b>OBJECTIVE</b><span>cool-sink · max temperature · 12 steps</span></div>
+    </div>
+    <div class="tblock" style="right:80px; bottom:24px; width:198px;">
+      <div><b>SCENE</b><span>starter.py</span></div>
+      <div><b>STUDY</b><span>sink-conduction</span></div>
+      <div><b>MESH</b><span>sink-mesh · tet10</span></div>
+      <div><b>SOLVER</b><span>jax-fem</span></div>
+      <div><b>REV</b><span>25d1477</span></div>
+    </div>
+  </div>
+
+</div><script src="plate.js"></script></body>
