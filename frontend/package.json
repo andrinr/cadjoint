@@ -19,6 +19,7 @@
     "@codemirror/state": "^6.5.0",
     "@codemirror/view": "^6.36.1",
     "@lezer/highlight": "^1.2.1",
+    "dockview": "^8.2.0",
     "solid-js": "^1.9.3"
   },
   "devDependencies": {

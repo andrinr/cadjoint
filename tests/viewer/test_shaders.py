@@ -566,13 +566,14 @@ def test_orthographic_projection_renders(device, scene_code):
 
 @pytest.mark.parametrize(
     ("label", "camera"),
-    [("top", (0.0, 6.0, 0.0)), ("bottom", (0.0, -6.0, 0.0))],
+    [("top", (0.0, 0.0, 6.0)), ("bottom", (0.0, 0.0, -6.0))],
 )
 def test_pole_views_do_not_degenerate(device, scene_code, label, camera):
-    """Looking straight down or up is where cross(forward, +Y) collapses.
+    """Looking straight down or up is where cross(forward, +Z) collapses.
 
-    Without the reference-vector fallback in camera_basis the frame is NaN and
-    the frame comes out blank, so this renders from directly overhead.
+    The world is Z-up, so the poles are on the Z axis. Without the
+    reference-vector fallback in camera_basis the frame is NaN and the image
+    comes out blank, so this renders from directly overhead.
     """
     channel = render_preview(
         device,

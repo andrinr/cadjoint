@@ -1,29 +1,53 @@
-// WGSL for the viewport graticule — the instrument faceplate behind the scene.
+// WGSL for the viewport's ground grid — where the floor is.
 //
 // One fullscreen triangle, emitted at the far plane (z = 1) and depth-tested
 // `less-equal` against the depth the SDF pass writes. A ray miss writes exactly
-// 1.0, so the graticule paints on the background and is rejected wherever any
+// 1.0, so the grid paints on the background and is rejected wherever any
 // geometry, FEM surface or path-traced silhouette wrote a nearer depth. That is
 // what "drawn behind the geometry so the part occludes it" means here, and it
-// costs no sorting, no readback, and no second coordinate system.
+// costs no sorting, no readback and no second pass over the scene.
 //
-// Everything is computed from `@builtin(position)`, i.e. framebuffer pixels, so
-// the pattern is registered with the frame by construction. The colours arrive
-// as uniforms from the token layer; there are no literals in here.
+// What the fragment does is raycast the ground plane. The camera basis arrives
+// as uniforms, each fragment reconstructs the same ray the preview shader would
+// have used, intersects it with z = 0 — the world is Z-up, so the floor is the
+// XY plane a sketch lies on — and rules a square grid in *world* coordinates on
+// it. The grid therefore recedes with perspective and slides under the part as
+// you orbit, which is the whole reason it tells you anything about where things
+// are.
+//
+// Two things keep the horizon from turning into moiré. Coverage is measured in
+// pixels through `fwidth`, so a line is one pixel wide however oblique the
+// plane is; and the pattern fades out both with distance from the orbit target
+// and as the cell size falls below a few pixels, so the far field dissolves
+// instead of aliasing.
+//
+// It is deliberately faint — a minor line is about 1.35:1 against the paper,
+// below the band structure is held to. It is a spatial cue, not structure, and
+// it has to disappear the moment attention lands on the geometry over it.
+//
+// The colours arrive as uniforms from the token layer; there are no literals.
 
 struct Graticule {
-  // width, height (framebuffer px), division size (px), line width (px)
+  // width, height (framebuffer px), line width (px), 1 when orthographic
   frame   : vec4<f32>,
-  // division lines: rgb + alpha
+  // camera position xyz, orthographic frame height in world units
+  eye     : vec4<f32>,
+  // camera right xyz, viewport aspect
+  right   : vec4<f32>,
+  // camera up xyz, grid spacing in world units
+  up      : vec4<f32>,
+  // camera forward xyz, the projection's field scale
+  forward : vec4<f32>,
+  // minor grid lines: rgb + alpha
   line    : vec4<f32>,
-  // the two centre axes and their subdivision ticks: rgb + alpha
+  // every nth line, drawn a step firmer: rgb + alpha
+  major   : vec4<f32>,
+  // the two ground axes (X at y = 0, Y at x = 0): rgb + alpha
   axis    : vec4<f32>,
-  // corner brackets: rgb + alpha
-  bracket : vec4<f32>,
-  // subdivisions per division, tick arm (px), fifth-tick arm (px), bracket arm (px)
-  marks   : vec4<f32>,
-  // bracket weight (px), bracket inset (px), interior line limit, unused
-  edge    : vec4<f32>,
+  // fade start, fade end (world radius), axis width multiple, lines per major
+  fade    : vec4<f32>,
+  // orbit centre xyz — the fade is measured from it, unused w
+  centre  : vec4<f32>,
 };
 @group(0) @binding(0) var<uniform> g: Graticule;
 
@@ -36,12 +60,7 @@ fn vs_graticule(@builtin(vertex_index) vertex_index : u32) -> @builtin(position)
   return vec4<f32>(corners[vertex_index], 1.0, 1.0);
 }
 
-/// A 1px-feathered box over [lo, hi]: 1 inside, 0 outside, ramped at the edge.
-fn band(x: f32, lo: f32, hi: f32) -> f32 {
-  return clamp(min(x - lo, hi - x) + 0.5, 0.0, 1.0);
-}
-
-/// Coverage of a line of half-width `half_width` at distance `distance`.
+/// Coverage of a line of half-width `half_width` at distance `distance` px.
 fn hairline(distance: f32, half_width: f32) -> f32 {
   return clamp(half_width - distance + 0.5, 0.0, 1.0);
 }
@@ -59,73 +78,83 @@ fn over(dst: vec4<f32>, src_rgb: vec3<f32>, src_a: f32) -> vec4<f32> {
 @fragment
 fn fs_graticule(@builtin(position) frag : vec4<f32>) -> @location(0) vec4<f32> {
   let size = g.frame.xy;
-  let division = max(g.frame.z, 1.0);
-  let half_width = g.frame.w * 0.5;
-  // Signed pixel offset from the faceplate centre, which is the viewport
-  // centre — the point the orbit target always projects to.
-  //
-  // Landed on a pixel *centre* rather than on `size * 0.5`. `@builtin(position)`
-  // samples at x.5, so an even framebuffer puts the exact centre on a pixel
-  // boundary and the two centre axes come out as a pair of half-covered
-  // pixels — measurably weaker than the ordinary division lines they are
-  // supposed to lead. The half-pixel shift is 0.07% of the frame, far below
-  // anything the gain claims.
-  let centre = floor(size * 0.5) + 0.5;
-  let offset = frag.xy - centre;
+  let half_width = g.frame.z * 0.5;
+  let orthographic = g.frame.w > 0.5;
+  let aspect = g.right.w;
+  let spacing = max(g.up.w, 1e-6);
 
-  // Each line is snapped to the nearest pixel centre, so every hairline lands
-  // on one whole pixel at its full token weight instead of splitting across
-  // two at half strength — which is what made the three weights (line, axis,
-  // bracket) indistinguishable in a screenshot. Lines are snapped
-  // *individually*, so the error is bounded at half a pixel and never
-  // accumulates: a measurement across four divisions is out by under 0.15%.
-  let index = round(offset / division);
-  let distance = abs(offset - round(index * division));
-  // The outermost horizontal pair coincides with the viewport's top and bottom
-  // edges; the corner brackets state the frame instead of a drawn box (§16.3).
-  let limit = g.edge.z;
+  // The same field coordinates the projection in `viewer/math.ts` uses:
+  // px = (u / aspect + 0.5) * width, py = (0.5 - v) * height.
+  let u = (frag.x / size.x - 0.5) * aspect;
+  let v = 0.5 - frag.y / size.y;
+  let lateral = g.right.xyz * u + g.up.xyz * v;
 
-  var paint = vec4<f32>(0.0, 0.0, 0.0, 0.0);
-
-  // Division lines, everything but the two centre axes.
-  var grid = 0.0;
-  if (abs(index.x) > 0.5) {
-    grid = max(grid, hairline(distance.x, half_width));
-  }
-  if (abs(index.y) > 0.5 && abs(index.y) < limit + 0.5) {
-    grid = max(grid, hairline(distance.y, half_width));
-  }
-  paint = over(paint, g.line.rgb, grid * g.line.a);
-
-  // The two centre axes, and — only on them — five subdivisions per division.
-  // Verbatim 475A: "horizontal and vertical centerlines further marked in
-  // 0.2 cm increments"; nothing else carries minor ticks.
-  let subdivision = division / max(g.marks.x, 1.0);
-  let tick_index = round(offset / subdivision);
-  let tick_distance = abs(offset - round(tick_index * subdivision));
-  let fifth = abs(tick_index - round(tick_index / 5.0) * 5.0) < vec2<f32>(0.5);
-  let arm = select(vec2<f32>(g.marks.y), vec2<f32>(g.marks.z), fifth);
-
-  var axis = 0.0;
-  if (abs(index.x) < 0.5) {
-    axis = max(axis, hairline(distance.x, half_width));
-  }
-  if (abs(index.y) < 0.5) {
-    axis = max(axis, hairline(distance.y, half_width));
-  }
-  // Ticks on the horizontal axis stand off it vertically, and vice versa.
-  axis = max(axis, hairline(tick_distance.x, half_width) * band(abs(offset.y), -1.0, arm.x));
-  axis = max(axis, hairline(tick_distance.y, half_width) * band(abs(offset.x), -1.0, arm.y));
-  paint = over(paint, g.axis.rgb, axis * g.axis.a);
-
-  // Four corner brackets: the frame stated four times rather than drawn.
-  let inset = g.edge.y;
-  let weight = g.edge.x;
-  let reach = g.marks.w;
-  let near = min(frag.xy, size - frag.xy);
-  let bracket = max(
-    band(near.x, inset, inset + weight) * band(near.y, inset - 1.0, inset + reach),
-    band(near.y, inset, inset + weight) * band(near.x, inset - 1.0, inset + reach),
+  // Perspective rays fan out from the eye; orthographic rays are parallel and
+  // the fan becomes an offset of the origin. One `select` rather than a branch,
+  // because the derivatives below need uniform control flow.
+  let ray_origin = select(g.eye.xyz, g.eye.xyz + lateral * g.eye.w, orthographic);
+  let ray_dir = select(
+    normalize(g.forward.xyz + lateral * g.forward.w),
+    g.forward.xyz,
+    orthographic,
   );
-  return over(paint, g.bracket.rgb, bracket * g.bracket.a);
+
+  // Intersect the floor. `t` is the distance along a unit ray, so it doubles as
+  // the depth the fade is measured in.
+  let denominator = ray_dir.z;
+  let t = -ray_origin.z / select(denominator, 1e-6, abs(denominator) < 1e-6);
+  let hit = select(0.0, 1.0, abs(denominator) >= 1e-6 && t > 0.0);
+  let ground = ray_origin + ray_dir * t;
+  let plane = ground.xy;
+
+  // Derivatives are taken unconditionally: WGSL requires uniform control flow
+  // for them, and a quad that straddles the horizon simply reports an enormous
+  // width, which the coverage below turns into nothing. That is the correct
+  // answer there anyway.
+  let cell = plane / spacing;
+  let cell_width = fwidth(cell);
+  let plane_width = fwidth(plane);
+
+  // Distance to the nearest ruled line, converted from cells to pixels, so a
+  // line is one pixel wide no matter how oblique the plane is.
+  let to_line = abs(cell - round(cell));
+  let line_px = to_line / max(cell_width, vec2<f32>(1e-8));
+  let minor = hairline(min(line_px.x, line_px.y), half_width);
+
+  // Every nth line again, a step firmer — the only hierarchy the plane has,
+  // and what lets you count cells without reading each one.
+  let major_cell = cell / max(g.fade.w, 1.0);
+  let major_width = fwidth(major_cell);
+  let major_to_line = abs(major_cell - round(major_cell));
+  let major_px = major_to_line / max(major_width, vec2<f32>(1e-8));
+  let major = hairline(min(major_px.x, major_px.y), half_width);
+
+  // Fade outward from the orbit target, not from the eye: what you are looking
+  // at is the part of the floor worth ruling, and everything past it dissolves
+  // rather than aliasing into moiré at the horizon. The second fade catches the
+  // same failure arriving from the other direction — a steep view close up,
+  // where a cell falls below a couple of pixels.
+  let radius = length(plane - g.centre.xy);
+  let distance_fade = 1.0 - smoothstep(g.fade.x, g.fade.y, radius);
+  let density_fade = 1.0 - smoothstep(0.125, 0.5, max(cell_width.x, cell_width.y));
+  let major_density = 1.0 - smoothstep(0.125, 0.5, max(major_width.x, major_width.y));
+  let visibility = hit * distance_fade;
+
+  var paint = over(paint_zero(), g.line.rgb, minor * g.line.a * visibility * density_fade);
+  paint = over(paint, g.major.rgb, major * g.major.a * visibility * major_density);
+
+  // The two ground axes: the X axis is the line y = 0, the Y axis is x = 0.
+  // A step above a major line and not subject to the density fade — they are
+  // two marks, not a pattern, so they cannot moiré, and they are what says
+  // which way the world is pointing once the grid itself has faded out.
+  let axis_px = abs(plane) / max(plane_width, vec2<f32>(1e-8));
+  let axis_half = half_width * g.fade.z;
+  let axis = max(hairline(axis_px.y, axis_half), hairline(axis_px.x, axis_half));
+  return over(paint, g.axis.rgb, axis * g.axis.a * visibility);
+}
+
+/// The empty accumulator. A function so the compositing chain reads as one
+/// expression from nothing to the final colour.
+fn paint_zero() -> vec4<f32> {
+  return vec4<f32>(0.0, 0.0, 0.0, 0.0);
 }

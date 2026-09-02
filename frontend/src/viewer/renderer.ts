@@ -33,7 +33,9 @@ import type {
 } from "../types";
 import { gizmoScale, type AxisIndex } from "./gizmo";
 import {
+  cameraBasis,
   cameraPosition,
+  FOV_SCALE,
   orthoHeightFor,
   viewProjection,
   type CameraState,
@@ -66,7 +68,7 @@ import {
   createSimulationPipelines,
   sharedLayout,
 } from "./pipelines";
-import { DIVISIONS } from "./graticule";
+import { GRID_ALPHA, GRID_FADE, GRID_MAJOR_EVERY, gridSpacing } from "./graticule";
 import { CHROME, hexToRgb } from "../tokens";
 
 export {
@@ -119,28 +121,18 @@ const LINE_WIDTH_PX = 2.4;
 const HANDLE_RADIUS_PX = 6.5;
 
 /**
- * The graticule's metrics, in CSS pixels (the renderer scales them into
- * framebuffer pixels, which are fewer than CSS pixels under the quality
- * budget's resolution cap).
+ * The ground grid's metrics.
  *
- * The tick arms and the 26px bracket are §16.3's numbers; the hairline is 1px
- * because this is furniture and a 2px grid on paper reads as a table.
+ * The line width is in CSS pixels (the renderer scales it into framebuffer
+ * pixels, which are fewer than CSS pixels under the quality budget's
+ * resolution cap): 1px, because this is furniture and a 2px grid on paper
+ * reads as a table. The fades are multiples of the orbit distance, so the
+ * plane dissolves at the same *apparent* place however far out you are.
  */
 const GRATICULE = {
   lineWidth: 1,
-  /** 475A: the centre axes carry five subdivisions per division, nothing else. */
-  subdivisions: 5,
-  tickArm: 4,
-  fifthTickArm: 7,
-  bracketArm: 26,
-  bracketWeight: 2,
-  bracketInset: 10,
-  /**
-   * Outermost horizontal division line drawn. With eight divisions the ±4
-   * boundaries land on the viewport's top and bottom edges, where they would
-   * be half-clipped hairlines; the corner brackets state the frame instead.
-   */
-  interiorLimit: 3,
+  /** The two ground axes carry more weight than a grid line, and no more. */
+  axisWidth: 1.6,
 } as const;
 
 export interface RendererCallbacks {
@@ -183,6 +175,15 @@ export class Renderer {
   private gizmoScalePipeline: GPURenderPipeline | null = null;
   private overlayBindGroup: GPUBindGroup | null = null;
   private meshOverlayBindGroup: GPUBindGroup | null = null;
+  /**
+   * How firmly the floor is printed, 0…1.
+   *
+   * Set by the viewer pane: sketching on a plane that is not the floor steps
+   * the grid back so the sketch's own plane is the reference. Everything else
+   * about the grid is fixed by the token layer.
+   */
+  groundEmphasis = 1;
+
   private graticulePipeline: GPURenderPipeline | null = null;
   private graticuleBindGroup: GPUBindGroup | null = null;
 
@@ -445,6 +446,11 @@ export class Renderer {
     this.simHighlightUniformBuffer = simulation.simHighlightUniformBuffer;
     this.simBindGroup = simulation.simBindGroup;
     this.simHighlightBindGroup = simulation.simHighlightBindGroup;
+
+    // Draw the empty viewport as soon as there is a device to draw it with.
+    // Before the first compile there is no scene shader and nothing else would
+    // ask for a frame, and an unpainted swap chain is the black the user saw.
+    this.invalidate();
   }
 
   /** Whether the FEM surface replaces the raymarched solid. */
@@ -887,6 +893,21 @@ export class Renderer {
     }
   }
 
+  /**
+   * Re-attach the swap chain to the canvas.
+   *
+   * `resize()` reconfigures whenever the backing store changes, which covers
+   * almost everything. The exception is a canvas that is moved in the DOM
+   * without changing size — which is what a dock rebuild does when the new
+   * layout happens to give the viewport the same rectangle. The element and
+   * its context survive that move, but configuring again costs nothing and
+   * removes the question.
+   */
+  reconfigure(): void {
+    if (!this.device || !this.context) return;
+    this.context.configure({ device: this.device, format: this.format, alphaMode: "opaque" });
+  }
+
   invalidate(): void {
     this.sampleCount = 0;
     this.scheduleRender();
@@ -905,7 +926,7 @@ export class Renderer {
       this.canvas.width, this.canvas.height, 0, 0,
       position[0], position[1], position[2], 0,
       this.camera.target[0], this.camera.target[1], this.camera.target[2], 0,
-      0.55, 0.8, 0.35, KEY_LIGHT_INTENSITY,
+      0.55, 0.35, 0.8, KEY_LIGHT_INTENSITY,
       BACKGROUND_RADIANCE[0], BACKGROUND_RADIANCE[1], BACKGROUND_RADIANCE[2], 1,
       this.sampleCount, this.quality.bounces, this.quality.shadowSamples, 0,
       this.display.projection === "orthographic" ? 1 : 0,
@@ -959,42 +980,48 @@ export class Renderer {
   }
 
   /**
-   * The faceplate's metrics, in framebuffer pixels.
+   * The camera the ground grid raycasts with, and the grid's own metrics.
    *
-   * Two pixel systems meet here: the graticule is specified in CSS pixels
-   * (§16.3's 26px bracket is 26 CSS px) while the shader works in framebuffer
-   * pixels, and the quality budget's resolution cap makes the framebuffer
-   * *smaller* than the CSS box at large viewports. Every length is therefore
-   * scaled by the same ratio the framebuffer was, which is also what keeps the
-   * division square: it is derived from the framebuffer height alone.
+   * The basis is recomputed here rather than passed through the view matrix
+   * because the shader needs the same three vectors `primary_ray` uses, not a
+   * matrix: it reconstructs the ray for its fragment and intersects the floor
+   * with it. The line width is the one length in CSS pixels, scaled by the
+   * ratio the framebuffer was, so a hairline is a hairline at every quality
+   * tier.
    */
   private writeGraticuleUniforms(): void {
     const scale = this.canvas.width / Math.max(this.canvas.clientWidth, 1);
     const px = (css: number) => css * scale;
-    const tone = (name: "graticule-line" | "graticule-axis" | "graticule-frame") =>
-      hexToRgb(CHROME[name]);
+    const tone = (name: "graticule-line" | "graticule-axis") => hexToRgb(CHROME[name]);
     const [lineR, lineG, lineB] = tone("graticule-line");
     const [axisR, axisG, axisB] = tone("graticule-axis");
-    const [frameR, frameG, frameB] = tone("graticule-frame");
+    const position = cameraPosition(this.camera);
+    const { forward, right, up } = cameraBasis(position, this.camera.target);
+    const distance = this.camera.distance;
+    const target = this.camera.target;
+    // One dimmer for the whole plane, so the three weights keep their order.
+    const emphasis = this.groundEmphasis;
     this.device!.queue.writeBuffer(
       this.graticuleBuffer,
       0,
       new Float32Array([
         this.canvas.width,
         this.canvas.height,
-        this.canvas.height / DIVISIONS,
         Math.max(1, px(GRATICULE.lineWidth)),
-        lineR, lineG, lineB, 1,
-        axisR, axisG, axisB, 1,
-        frameR, frameG, frameB, 1,
-        GRATICULE.subdivisions,
-        px(GRATICULE.tickArm),
-        px(GRATICULE.fifthTickArm),
-        px(GRATICULE.bracketArm),
-        Math.max(1, px(GRATICULE.bracketWeight)),
-        px(GRATICULE.bracketInset),
-        GRATICULE.interiorLimit,
-        0,
+        this.display.projection === "orthographic" ? 1 : 0,
+        position[0], position[1], position[2], orthoHeightFor(distance),
+        right[0], right[1], right[2],
+        this.canvas.width / Math.max(this.canvas.height, 1),
+        up[0], up[1], up[2], gridSpacing(distance),
+        forward[0], forward[1], forward[2], FOV_SCALE,
+        lineR, lineG, lineB, GRID_ALPHA.minor * emphasis,
+        lineR, lineG, lineB, GRID_ALPHA.major * emphasis,
+        axisR, axisG, axisB, GRID_ALPHA.axis * emphasis,
+        distance * GRID_FADE.start,
+        distance * GRID_FADE.end,
+        GRATICULE.axisWidth,
+        GRID_MAJOR_EVERY,
+        target[0], target[1], target[2], 0,
       ]),
     );
   }
@@ -1026,7 +1053,9 @@ export class Renderer {
     pass.setVertexBuffer(0, this.simVertexBuffer);
     pass.setIndexBuffer(this.simIndexBuffer, "uint32");
     pass.drawIndexed(this.simIndexCount);
-    const highlight = this.simHighlight;
+    // The BC preview is a mark on the surface, not part of the field, so it
+    // goes with the rest of the construction overlay.
+    const highlight = this.display.showOverlays ? this.simHighlight : null;
     if (highlight && this.simHighlightBindGroup) {
       pass.setBindGroup(0, this.simHighlightBindGroup);
       pass.drawIndexed(highlight.count, 1, highlight.start);
@@ -1062,6 +1091,10 @@ export class Renderer {
       if (wantMeshSharp) pass.draw(6, this.meshSharpCount, 0, this.meshWireCount);
       pass.setBindGroup(0, this.overlayBindGroup);
     }
+    // Everything below is the construction overlay: what the app draws *about*
+    // the model. One switch turns the lot off for a presentation frame; the
+    // mesh edges above belong to the mesh and keep their own.
+    if (!this.display.showOverlays) return;
     if (this.display.showSketches && this.edgeCount && this.edgeBuffer && this.edgePipeline) {
       pass.setPipeline(this.edgePipeline);
       pass.setBindGroup(0, this.overlayBindGroup);
@@ -1102,10 +1135,48 @@ export class Renderer {
     }
   }
 
+  /**
+   * The viewport with nothing in it: paper, and the floor ruled on it.
+   *
+   * Before the first compile, and whenever a shader rebuild or a compile error
+   * has left no preview pipeline, there is still a viewport to draw. Clearing
+   * to black is what an uninitialised swap chain does, and it looks like a
+   * fault; clearing to the same paper the chrome is on, with the ground grid
+   * over it, says "nothing here yet" instead.
+   */
+  private renderEmpty(): void {
+    const device = this.device!;
+    this.writeUniforms();
+    const encoder = device.createCommandEncoder();
+    const pass = encoder.beginRenderPass({
+      colorAttachments: [
+        {
+          view: this.context!.getCurrentTexture().createView(),
+          clearValue: BACKGROUND,
+          loadOp: "clear",
+          storeOp: "store",
+        },
+      ],
+      depthStencilAttachment: {
+        view: this.ensureDepthTexture(),
+        depthClearValue: 1,
+        depthLoadOp: "clear",
+        depthStoreOp: "store",
+      },
+    });
+    this.drawGraticule(pass);
+    pass.end();
+    device.queue.submit([encoder.finish()]);
+  }
+
   private render(): void {
     this.framePending = false;
-    if (!this.device || !this.context || !this.previewPipeline || !this.previewBindGroup) return;
+    if (!this.device || !this.context) return;
     this.resize();
+    if (!this.previewPipeline || !this.previewBindGroup) {
+      this.renderEmpty();
+      return;
+    }
     this.writeUniforms();
 
     const device = this.device;

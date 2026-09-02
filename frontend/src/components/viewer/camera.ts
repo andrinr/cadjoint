@@ -75,20 +75,21 @@ export function zoomCamera(camera: CameraState, wheelDelta: number): CameraState
 }
 
 /**
- * Wheel zoom that lands on the graticule's 1-2-5 gain ladder.
+ * Wheel zoom that lands on the ground grid's 1-2-5 spacing ladder.
  *
- * One notch is one rung, so a division is always worth an exact, stateable
- * number of millimetres and the readout drops its `>` prefix. Held behind a
- * modifier because quantized zoom is unusual in CAD (§16.3): free zoom stays
- * the default, and the prefix keeps the readout honest either way.
+ * One notch is one rung, so a cell is always an exact, stateable number of
+ * millimetres across and the framing lines up with it. Held behind a modifier
+ * because quantized zoom is unusual in CAD (§10.1): free zoom stays the
+ * default, and the grid is ruled on a rung either way — what the modifier buys
+ * is a cell that fills exactly an eighth of the frame.
  *
- * The snap is instantaneous rather than the 160 ms glide §16.3 sketches. A
- * glide would pass the gain through every value between two rungs, and §16.3's
- * own rule is that the readout "changes *at* the detent crossing, never
- * between" — the only ways to honour both are to hold a second, pinned copy
- * of the gain for the duration, or to not move through the intermediate
- * values at all. The second is cheaper, is what `prefers-reduced-motion` would
- * force anyway, and preserves the graticule's zero-per-frame cost.
+ * The snap is instantaneous rather than a `dur-base` glide (§8). A glide would
+ * pass the spacing through every value between two rungs, and the readout is
+ * supposed to change *at* the detent crossing, never between — the only ways
+ * to honour both are to hold a second, pinned copy of the spacing for the
+ * duration, or to not move through the intermediate values at all. The second
+ * is cheaper, is what `prefers-reduced-motion` would force anyway, and
+ * preserves the grid's zero-per-frame cost.
  */
 export function detentZoomCamera(camera: CameraState, wheelDelta: number): CameraState {
   if (wheelDelta === 0) return camera;

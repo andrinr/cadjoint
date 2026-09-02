@@ -18,6 +18,7 @@ import { createEffect, createMemo, createSignal, onCleanup, onMount } from "soli
 import { MATERIAL_DRAG_TYPE } from "./MaterialPanel";
 import {
   displayProfiles,
+  editingMode,
   meshEdges,
   drag,
   cameraAngles,
@@ -42,6 +43,7 @@ import {
 } from "../state";
 import { rectAabbProposal } from "../bcPick";
 import { intersectPlane, rayFromPixel, worldToPlane } from "../viewer/math";
+import { GRID_ALPHA } from "../viewer/graticule";
 import { pickEdge, pickNode, pickVertex, type PickView } from "../viewer/hittest";
 import {
   CONSTRAINT_TOOL_NAMES,
@@ -60,6 +62,7 @@ import { ViewerHint } from "./viewer/ViewerHint";
 import { ViewerOverlays, type PickRect } from "./viewer/ViewerOverlays";
 import type { Gesture, PendingConstraint } from "./viewer/gestures";
 import type { ViewerPaneProps } from "./viewer/props";
+import { DOCK_REBUILT_EVENT } from "../windows/events";
 
 export type { ViewerPaneProps } from "./viewer/props";
 
@@ -474,15 +477,28 @@ export function ViewerPane(props: ViewerPaneProps) {
     });
     observer.observe(canvas);
 
+    // A dock rebuild moves this pane between the library's own wrappers. The
+    // canvas element survives that (which is why the GPU context does), but
+    // the swap chain is re-attached here in case the new layout happens to
+    // hand the viewport the same rectangle and `resize()` short-circuits.
+    const onDockRebuilt = () => {
+      renderer.reconfigure();
+      renderer.resize();
+      refreshOverlays();
+      renderer.invalidate();
+    };
+
     window.addEventListener("keydown", keyboard.onKeyDown);
     window.addEventListener("keydown", keyboard.onPanKey);
     window.addEventListener("keyup", keyboard.onPanKey);
+    window.addEventListener(DOCK_REBUILT_EVENT, onDockRebuilt);
 
     onCleanup(() => {
       observer.disconnect();
       window.removeEventListener("keydown", keyboard.onKeyDown);
       window.removeEventListener("keydown", keyboard.onPanKey);
       window.removeEventListener("keyup", keyboard.onPanKey);
+      window.removeEventListener(DOCK_REBUILT_EVENT, onDockRebuilt);
       renderer.destroy();
     });
   });
@@ -494,6 +510,27 @@ export function ViewerPane(props: ViewerPaneProps) {
 
   createEffect(() => {
     renderer.setMeshEdges(meshEdges());
+  });
+
+  /**
+   * Step the floor grid back while sketching off the floor.
+   *
+   * A sketch on the XZ plane — which is where the starter's fin comb lives —
+   * is drawn standing up, and a floor ruled underneath it argues with it for
+   * the eye. The floor still has a job (it says which way up the world is), so
+   * it dims rather than disappearing. On the XY plane itself the sketch and
+   * the floor are the same plane and there is nothing to arbitrate.
+   */
+  createEffect(() => {
+    const active = selection();
+    const node = active ? nodeById(active.nodeId) : null;
+    const normal = node?.plane?.normal;
+    const onFloor = !normal || Math.abs(normal[2]) > 0.999;
+    const dim = editingMode() === "sketch" && !onFloor;
+    const next = dim ? GRID_ALPHA.offPlane : 1;
+    if (renderer.groundEmphasis === next) return;
+    renderer.groundEmphasis = next;
+    renderer.invalidate();
   });
 
   createEffect(() => {
@@ -567,14 +604,14 @@ export function ViewerPane(props: ViewerPaneProps) {
         }}
       />
       <ConstraintOverlay
-        show={props.display.showConstraints}
+        show={props.display.showOverlays && props.display.showConstraints}
         showDistance={props.display.showDistanceConstraints}
         showFixed={props.display.showFixedConstraints}
         showValues={props.display.showConstraintValues}
         geometry={constraintOverlay()}
       />
       <Graticule show={props.display.showGraticule} camera={graticuleCamera()} />
-      <ViewerOverlays pickRect={pickRect()} />
+      <ViewerOverlays pickRect={props.display.showOverlays ? pickRect() : null} />
       <ViewerHint pendingConstraint={pendingConstraint()} />
     </section>
   );

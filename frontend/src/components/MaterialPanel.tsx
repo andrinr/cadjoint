@@ -8,6 +8,7 @@
 
 import { For, Show, createEffect, createMemo, createSignal } from "solid-js";
 import { busy, materials, nodes } from "../state";
+import { windowManager } from "../windows/manager";
 import type { MaterialDefinition } from "../types";
 
 export const MATERIAL_DRAG_TYPE = "application/x-cadjoint-material";
@@ -56,7 +57,6 @@ function previewStyle(material: MaterialDefinition): string {
 }
 
 export function MaterialPanel(props: MaterialPanelProps) {
-  const [expanded, setExpanded] = createSignal(false);
   const [activeId, setActiveId] = createSignal<string | null>(null);
   const active = createMemo(
     () => materials().find((material) => material.id === activeId()) ?? materials()[0],
@@ -76,23 +76,7 @@ export function MaterialPanel(props: MaterialPanelProps) {
     props.onSetValue(material.line, argument, Number(raw));
 
   return (
-    <Show
-      when={expanded()}
-      fallback={
-        <button
-          type="button"
-          class="material-launch"
-          onClick={() => setExpanded(true)}
-          title="Open material browser"
-          data-testid="material-open"
-        >
-          <span class="material-panel-icon" aria-hidden="true" />
-          Materials
-          <b>{materials().length}</b>
-        </button>
-      }
-    >
-      <aside class="material-panel" data-testid="material-panel">
+    <aside class="material-panel" data-testid="material-panel">
         <header>
           <div class="material-panel-title">
             <span class="material-panel-icon" aria-hidden="true" />
@@ -115,12 +99,12 @@ export function MaterialPanel(props: MaterialPanelProps) {
           <button
             type="button"
             class="material-close"
-            onClick={() => setExpanded(false)}
-            title="Close material browser"
-            aria-label="Close materials"
+            onClick={() => windowManager()?.minimise("materials")}
+            title="Park the material browser in the tray"
+            aria-label="Park the material browser"
             data-testid="material-close"
           >
-            ×
+            —
           </button>
         </header>
 
@@ -242,7 +226,6 @@ export function MaterialPanel(props: MaterialPanelProps) {
             </section>
           )}
         </Show>
-      </aside>
-    </Show>
+    </aside>
   );
 }

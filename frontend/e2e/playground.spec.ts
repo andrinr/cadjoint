@@ -30,12 +30,14 @@ const norm = (a: Vec3): Vec3 => {
   return [a[0] / n, a[1] / n, a[2] / n];
 };
 
+/** Z-up, matching `cameraPosition` in `src/viewer/math`: azimuth about +Z
+ *  measured from −Y, so yaw 0 / pitch 0 is the Front view. */
 function cameraPosition(camera: CameraSpec = CAMERA): Vec3 {
   const cp = Math.cos(camera.pitch);
   return [
     camera.target[0] + camera.distance * cp * Math.sin(camera.yaw),
-    camera.target[1] + camera.distance * Math.sin(camera.pitch),
-    camera.target[2] + camera.distance * cp * Math.cos(camera.yaw),
+    camera.target[1] - camera.distance * cp * Math.cos(camera.yaw),
+    camera.target[2] + camera.distance * Math.sin(camera.pitch),
   ];
 }
 
@@ -48,7 +50,9 @@ function projectToCss(
 ) {
   const position = cameraPosition(camera);
   const forward = norm(sub(camera.target, position));
-  const right = norm(cross(forward, [0, 1, 0]));
+  // World up is +Z, with the +Y fallback the app uses at the poles.
+  const reference: Vec3 = Math.abs(forward[2]) > 0.999 ? [0, 1, 0] : [0, 0, 1];
+  const right = norm(cross(forward, reference));
   const up = cross(right, forward);
   const delta = sub(world, position);
   const viewDepth = dot(delta, forward);
@@ -154,8 +158,10 @@ test("the optimize panel lists the starter optimization and edits it as source",
 }) => {
   // A real study-backed run plus its auto-replay outlives the default budget.
   test.setTimeout(300_000);
-  // Model mode owns the panel; the starter declares one study-backed
-  // optimization whose objective label reads metric(study).
+  // Model mode's desk carries the panel, tabbed behind the material browser;
+  // the starter declares one study-backed optimization whose objective label
+  // reads metric(study).
+  await page.getByTestId("window-tab-optimize").click();
   await expect(page.getByTestId("optimize-panel")).toBeVisible();
   const card = page.getByTestId("optimize-cool-sink");
   await expect(card).toBeVisible();
@@ -630,17 +636,26 @@ test("render presets activate, edit, and persist without bloating the closed UI"
   expect(await editorText(page)).toBe(before);
 });
 
-test("the source-code pane stays above floating panels", async ({ page }) => {
-  await page.getByTestId("display-options").click();
-  await expect(page.getByTestId("render-panel")).toBeVisible();
+test("a floated window covers the pane it is dropped over", async ({ page }) => {
+  // The panels used to float over the viewport and had to be ordered against
+  // the code pane by hand. They are real windows now, so the only overlap
+  // left is a deliberate one: a group lifted out of the grid.
+  await page.evaluate(() => window.__cadjointWindows!.float("objects"));
+  const floating = page.locator(".dv-groupview-floating");
+  await expect(floating).toHaveCount(1);
 
-  const editorZ = await page
-    .locator(".editor-pane")
-    .evaluate((node) => Number.parseInt(getComputedStyle(node).zIndex, 10));
-  const dockZ = await page
-    .locator(".dock")
-    .evaluate((node) => Number.parseInt(getComputedStyle(node).zIndex, 10));
-  expect(editorZ).toBeGreaterThan(dockZ);
+  const editor = (await page.locator(".win-body[data-window=editor]").boundingBox())!;
+  const lifted = (await floating.boundingBox())!;
+  // It is over the editor's column, and it is opaque there.
+  expect(lifted.x).toBeLessThan(editor.x + editor.width);
+  const opaque = await floating.evaluate((node) => {
+    const body = node.querySelector<HTMLElement>(".win-body")!;
+    return getComputedStyle(body).backgroundColor;
+  });
+  expect(opaque).not.toContain("rgba(0, 0, 0, 0)");
+
+  await page.evaluate(() => window.__cadjointWindows!.dock("objects"));
+  await expect(page.locator(".dv-groupview-floating")).toHaveCount(0);
 });
 
 test("editing the code updates the sketch the viewer reports", async ({ page }) => {
@@ -726,15 +741,9 @@ test("placing a primitive writes a Solid call into the source", async ({ page })
 });
 
 test("the material browser creates, edits, and drag-assigns materials", async ({ page }) => {
-  await expect(page.getByTestId("material-panel")).toHaveCount(0);
-  const materialButton = await page.getByTestId("material-open").boundingBox();
-  const projectionButton = await page.getByTestId("projection-toggle").boundingBox();
-  expect(materialButton).not.toBeNull();
-  expect(projectionButton).not.toBeNull();
-  expect(materialButton!.y).toBeGreaterThan(
-    projectionButton!.y + projectionButton!.height + 6,
-  );
-  await page.getByTestId("material-open").click();
+  // Materials is a docked window in Model mode, sharing a tab strip with
+  // Optimize. It opens active, so the browser is on screen straight away.
+  await expect(page.getByTestId("window-tab-materials")).toBeVisible();
   await expect(page.getByTestId("material-panel")).toBeVisible();
   await expect(page.getByTestId("material-aluminum")).toBeVisible();
   await expect(page.getByTestId("material-copper")).toBeVisible();
@@ -766,9 +775,13 @@ test("the material browser creates, edits, and drag-assigns materials", async ({
     .toMatch(/bush_b = Solid\.cylinder\([\s\S]*?material=copper/);
   await waitForCompile(page);
 
+  // The panel's own control parks the window: it leaves the dock and turns
+  // into a tray entry, and clicking that brings it back where it was.
   await page.getByTestId("material-close").click();
   await expect(page.getByTestId("material-panel")).toHaveCount(0);
-  await expect(page.getByTestId("material-open")).toBeVisible();
+  await expect(page.getByTestId("window-restore-materials")).toBeVisible();
+  await page.getByTestId("window-restore-materials").click();
+  await expect(page.getByTestId("material-panel")).toBeVisible();
 });
 
 test("a placed primitive can be selected and moved along an axis", async ({ page }) => {
@@ -1364,4 +1377,33 @@ test("clicking the inspected mesh proposes a sphere BC selection", async ({ page
   await editorHas("Nodes.sphere(");
   await waitForCompile(page);
   await expect(page.getByTestId("status")).not.toContainText("failed");
+});
+
+test("the construction overlay can be switched off for a presentation frame", async ({
+  page,
+}) => {
+  // Select the comb so its handles, marks and gizmo are all on screen.
+  const metrics = await canvasMetrics(page);
+  const edge = projectToCss(BASE_EDGE, metrics);
+  await page.mouse.click(metrics.left + edge.x, metrics.top + edge.y);
+  await expect(page.getByTestId("selection-chip")).toHaveText("fin comb");
+  await expect(page.locator(".constraint-distance").first()).toBeVisible();
+
+  await page.getByTestId("display-options").click();
+  await page.getByTestId("render-customize").click();
+  const toggle = page.getByTestId("toggle-construction-overlay");
+  await expect(toggle).toBeVisible();
+  await expect(toggle).toBeChecked();
+  await toggle.uncheck();
+
+  // Every mark the app draws *about* the model is gone…
+  await expect(page.locator(".constraint-distance")).toHaveCount(0);
+  await expect(page.getByTestId("constraint-overlay")).toHaveCount(0);
+  // …while the viewport, its ground grid and the title block stay.
+  await expect(page.getByTestId("viewer-canvas")).toBeVisible();
+  await expect(page.getByTestId("title-block")).toBeVisible();
+  await expect(page.getByTestId("graticule-gain")).toBeVisible();
+
+  await toggle.check();
+  await expect(page.locator(".constraint-distance").first()).toBeVisible();
 });

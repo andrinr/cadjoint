@@ -24,15 +24,17 @@ struct CameraBasis {
   up      : vec3<f32>,
 };
 
-// Orthonormal camera frame. World up is +Y, except when the view direction is
-// almost parallel to it — looking straight down is exactly what the Top preset
-// asks for, and cross(forward, +Y) is degenerate there.
+// Orthonormal camera frame. World up is +Z — the library is Z-up, since a
+// SketchPlane's default normal is +Z and sketches lie on the XY floor — except
+// when the view direction is almost parallel to it: looking straight down is
+// exactly what the Top preset asks for, and cross(forward, +Z) is degenerate
+// there.
 fn camera_basis(camera: vec3<f32>, look_at: vec3<f32>) -> CameraBasis {
   var basis: CameraBasis;
   basis.forward = safe_normalize(look_at - camera);
-  var reference = vec3<f32>(0.0, 1.0, 0.0);
-  if (abs(basis.forward.y) > 0.999) {
-    reference = vec3<f32>(0.0, 0.0, 1.0);
+  var reference = vec3<f32>(0.0, 0.0, 1.0);
+  if (abs(basis.forward.z) > 0.999) {
+    reference = vec3<f32>(0.0, 1.0, 0.0);
   }
   basis.right = safe_normalize(cross(basis.forward, reference));
   basis.up = cross(basis.right, basis.forward);

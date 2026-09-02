@@ -1,11 +1,13 @@
 /**
- * The graticule's two contracts.
+ * The ground grid's two contracts.
  *
- * 1. The gain is a *measurement*: one division is worth a definite number of
- *    millimetres, derived from the camera and the scene's declared unit, and
- *    it says so honestly — off the 1-2-5 ladder, or under a projection where
- *    the scale is not uniform over the frame, the reading is marked
- *    uncalibrated. A grid whose readout can be wrong is decoration.
+ * 1. The spacing is a *measurement*: the lines really are a definite number of
+ *    millimetres apart in the world, derived from the camera and the scene's
+ *    declared unit, always on the 1-2-5 ladder so the readout never has to
+ *    hedge about the number itself. What it does still hedge about is whether
+ *    you can measure with it *on screen*: under perspective a cell shrinks
+ *    with depth, and the reading is marked uncalibrated. A grid whose readout
+ *    can be wrong is decoration.
  * 2. The tones are *furniture*: measured against paper they must land inside
  *    a band, not merely above a floor. Too weak and the grid is invisible;
  *    too strong and it competes with the field it exists to sit behind.
@@ -19,6 +21,10 @@ import {
   formatGain,
   gainFor,
   gainOf,
+  GRID_ALPHA,
+  GRID_FADE,
+  GRID_MAJOR_EVERY,
+  gridSpacing,
   isDetented,
   nearestDetent,
   octant,
@@ -112,20 +118,38 @@ describe("the scale derivation", () => {
     }
   });
 
-  it("reads the default framing as an uncalibrated 862.5 mm per division", () => {
-    // The renderer's starting camera: distance 4.6, FOV_SCALE 1.5.
-    const gain = gainOf(4.6, "orthographic");
-    expect(gain.mm).toBeCloseTo(862.5, 9);
-    expect(gain.calibrated).toBe(false);
+  it("snaps the default framing to a whole rung", () => {
+    // The renderer's starting camera: distance 4.6, FOV_SCALE 1.5, which
+    // frames 862.5 mm to a division — so the grid is ruled at 1 m, and the
+    // readout states 1 m rather than 863.
+    expect(gainFor(orthoHeightFor(4.6))).toBeCloseTo(862.5, 9);
+    expect(gainOf(4.6, "orthographic").mm).toBe(1000);
   });
 
-  it("is calibrated on the ladder under an orthographic camera", () => {
+  it("only ever states a spacing that is on the ladder", () => {
+    for (let distance = MIN_DISTANCE; distance < MAX_DISTANCE; distance *= 1.07) {
+      const { mm } = gainOf(distance, "orthographic");
+      expect(isDetented(mm), `${distance}`).toBe(true);
+    }
+  });
+
+  it("rules the grid in world units at the spacing it states", () => {
+    for (const distance of [MIN_DISTANCE, 1, 4.6, 20, MAX_DISTANCE]) {
+      expect(gridSpacing(distance)).toBeCloseTo(
+        gainOf(distance, "orthographic").mm / MM_PER_UNIT,
+        12,
+      );
+    }
+    expect(gridSpacing(4.6)).toBeCloseTo(1, 12);
+  });
+
+  it("is calibrated under an orthographic camera, where the image is to scale", () => {
     const gain = gainOf(distanceForGain(1000), "orthographic");
     expect(gain.mm).toBeCloseTo(1000, 9);
     expect(gain.calibrated).toBe(true);
   });
 
-  it("is never calibrated under perspective, where the scale varies with depth", () => {
+  it("is never calibrated under perspective, where a cell shrinks with depth", () => {
     const gain = gainOf(distanceForGain(1000), "perspective");
     expect(gain.mm).toBeCloseTo(1000, 9);
     expect(gain.calibrated).toBe(false);
@@ -134,8 +158,8 @@ describe("the scale derivation", () => {
   it("covers the whole zoom range with rungs", () => {
     const closest = gainOf(MIN_DISTANCE, "orthographic").mm;
     const furthest = gainOf(MAX_DISTANCE, "orthographic").mm;
-    expect(closest).toBeCloseTo(75, 6);
-    expect(furthest).toBeCloseTo(11_250, 6);
+    expect(closest).toBe(100);
+    expect(furthest).toBe(10_000);
     const reachable = [100, 200, 500, 1000, 2000, 5000, 10_000];
     for (const rung of reachable) {
       const distance = distanceForGain(rung);
@@ -173,11 +197,15 @@ describe("the view readout", () => {
     expect(viewLabel(VIEW_PRESETS.front.yaw + 0.4, 0)).toBe("FREE");
   });
 
-  it("spells the octant the camera stands in", () => {
-    expect(octant(VIEW_PRESETS.iso.yaw, VIEW_PRESETS.iso.pitch)).toBe("+X+Y+Z");
-    expect(octant(VIEW_PRESETS.front.yaw, VIEW_PRESETS.front.pitch)).toBe("+Z");
+  it("spells the octant the camera stands in, in a Z-up world", () => {
+    // Front looks along +Y from −Y; Top stands on +Z; Left stands on −X.
+    expect(octant(VIEW_PRESETS.iso.yaw, VIEW_PRESETS.iso.pitch)).toBe("+X−Y+Z");
+    expect(octant(VIEW_PRESETS.front.yaw, VIEW_PRESETS.front.pitch)).toBe("−Y");
+    expect(octant(VIEW_PRESETS.back.yaw, VIEW_PRESETS.back.pitch)).toBe("+Y");
     expect(octant(VIEW_PRESETS.left.yaw, VIEW_PRESETS.left.pitch)).toBe("−X");
-    expect(octant(VIEW_PRESETS.top.yaw, VIEW_PRESETS.top.pitch)).toBe("+Y");
+    expect(octant(VIEW_PRESETS.right.yaw, VIEW_PRESETS.right.pitch)).toBe("+X");
+    expect(octant(VIEW_PRESETS.top.yaw, VIEW_PRESETS.top.pitch)).toBe("+Z");
+    expect(octant(VIEW_PRESETS.bottom.yaw, VIEW_PRESETS.bottom.pitch)).toBe("−Z");
   });
 });
 
@@ -214,7 +242,50 @@ describe("detented zoom", () => {
   });
 });
 
-describe("the graticule reads as structure, not as content", () => {
+describe("the floor is quieter than structure", () => {
+  /** A token laid on paper at `alpha`, which is what the shader composites. */
+  const printed = (tone: "graticule-line" | "graticule-axis", alpha: number) => {
+    const ink = hexToRgb(CHROME[tone]);
+    const mixed = ink.map((channel, index) => channel * alpha + PAPER[index] * (1 - alpha));
+    return contrastRatio(mixed as [number, number, number], PAPER);
+  };
+
+  it("prints a minor line below the band structure is held to", () => {
+    // A spatial cue, not structure: 1.3–1.4 is where it stops surviving being
+    // attended away from, which is the whole requirement.
+    const minor = printed("graticule-line", GRID_ALPHA.minor);
+    expect(minor).toBeGreaterThan(1.3);
+    expect(minor).toBeLessThan(1.4);
+  });
+
+  it("keeps the three weights separable and in order", () => {
+    const minor = printed("graticule-line", GRID_ALPHA.minor);
+    const major = printed("graticule-line", GRID_ALPHA.major);
+    const axis = printed("graticule-axis", GRID_ALPHA.axis);
+    expect(major).toBeGreaterThan(minor + 0.15);
+    expect(axis).toBeGreaterThan(major + 0.05);
+    // And the strongest of them is still under the structural floor.
+    expect(axis).toBeLessThan(1.75);
+  });
+
+  it("steps the whole plane back together when a sketch owns the reference", () => {
+    const full = printed("graticule-line", GRID_ALPHA.minor);
+    const dimmed = printed("graticule-line", GRID_ALPHA.minor * GRID_ALPHA.offPlane);
+    expect(dimmed).toBeLessThan(full);
+    // Still visible: the floor keeps saying which way up the world is.
+    expect(dimmed).toBeGreaterThan(1.1);
+  });
+
+  it("fades outward from the target before the far field can alias", () => {
+    expect(GRID_FADE.start).toBeLessThan(GRID_FADE.end);
+    // The fade has to begin outside the framed height, or the grid under the
+    // part you are looking at is already dissolving.
+    expect(GRID_FADE.start).toBeGreaterThan(FOV_SCALE / 2);
+    expect(GRID_MAJOR_EVERY).toBe(5);
+  });
+});
+
+describe("the graticule tones stay furniture", () => {
   it("holds every tone inside the furniture band on paper", () => {
     for (const tone of GRATICULE_TONES) {
       const ratio = contrastRatio(hexToRgb(CHROME[tone]), PAPER);
@@ -229,7 +300,7 @@ describe("the graticule reads as structure, not as content", () => {
     }
   });
 
-  it("keeps the three weights separable and in order", () => {
+  it("keeps the token tones separable and in order", () => {
     const ratios = GRATICULE_TONES.map((tone) =>
       contrastRatio(hexToRgb(CHROME[tone]), PAPER),
     );

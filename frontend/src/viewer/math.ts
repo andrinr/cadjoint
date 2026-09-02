@@ -56,9 +56,9 @@ function viewOrthoHeight(view: View): number {
 }
 
 export interface CameraState {
-  /** Rotation about the world Y axis, radians. */
+  /** Azimuth about the world Z axis, radians; 0 looks along +Y (Front). */
   yaw: number;
-  /** Elevation above the XZ plane, radians, clamped by the controller. */
+  /** Elevation above the XY ground plane, radians, clamped by the controller. */
   pitch: number;
   /** Distance from the orbit target. */
   distance: number;
@@ -100,25 +100,36 @@ export function normalize(a: Vec3): Vec3 {
   return n < 1e-12 ? [0, 0, 0] : [a[0] / n, a[1] / n, a[2] / n];
 }
 
-/** World-space camera position for an orbit state. */
+/**
+ * World-space camera position for an orbit state.
+ *
+ * The world is Z-up, because the library is: `SketchPlane`'s default normal is
+ * +Z, so a sketch lies on the XY floor, and the starter's FEM boundary
+ * conditions select its die side and fin field by `z`. The viewer used to
+ * assume +Y and drew every part standing on its edge.
+ *
+ * Azimuth is measured about +Z from −Y, so yaw 0 / pitch 0 puts the camera at
+ * −Y looking toward +Y — the Front view — and the preset angles keep the
+ * meanings their names claim: yaw +π/2 is Right, pitch +π/2 is Top.
+ */
 export function cameraPosition(camera: CameraState): Vec3 {
   const cp = Math.cos(camera.pitch);
   return [
     camera.target[0] + camera.distance * cp * Math.sin(camera.yaw),
-    camera.target[1] + camera.distance * Math.sin(camera.pitch),
-    camera.target[2] + camera.distance * cp * Math.cos(camera.yaw),
+    camera.target[1] - camera.distance * cp * Math.cos(camera.yaw),
+    camera.target[2] + camera.distance * Math.sin(camera.pitch),
   ];
 }
 
 /**
  * Orthonormal camera frame, matching `camera_basis` in the shaders.
  *
- * World up is +Y, except when looking almost straight up or down — the Top and
- * Bottom presets do exactly that, and cross(forward, +Y) is degenerate there.
+ * World up is +Z, except when looking almost straight up or down — the Top and
+ * Bottom presets do exactly that, and cross(forward, +Z) is degenerate there.
  */
 export function cameraBasis(position: Vec3, target: Vec3): Basis {
   const forward = normalize(subtract(target, position));
-  const reference: Vec3 = Math.abs(forward[1]) > 0.999 ? [0, 0, 1] : [0, 1, 0];
+  const reference: Vec3 = Math.abs(forward[2]) > 0.999 ? [0, 1, 0] : [0, 0, 1];
   const right = normalize(cross(forward, reference));
   const up = cross(right, forward);
   return { forward, right, up };

@@ -241,8 +241,19 @@ export function RenderPanel(props: RenderPanelProps) {
                 onChange={(showGraticule) => props.onChange({ showGraticule })}
                 testId="toggle-graticule"
               >
-                Graticule
-                <small>Scale grid, gain readout, and title block</small>
+                Ground grid
+                <small>Floor plane, scale readout, and title block</small>
+              </ToggleSwitch>
+              {/* The master switch over everything drawn *about* the model.
+                  First in the section, because the finer switches below are
+                  all inside it. */}
+              <ToggleSwitch
+                checked={props.display.showOverlays}
+                onChange={(showOverlays) => props.onChange({ showOverlays })}
+                testId="toggle-construction-overlay"
+              >
+                Construction overlay
+                <small>Sketches, handles, gizmo, constraints, BC preview</small>
               </ToggleSwitch>
               <ToggleSwitch
                 checked={props.display.showSketches}

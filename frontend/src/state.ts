@@ -183,33 +183,32 @@ export const DEFAULT_PANELS: PanelVisibility = {
   sketch: true,
 };
 
-const PANELS_STORAGE_KEY = "cadjoint.panels.v1";
+export const [panels, setPanels] = createSignal<PanelVisibility>({ ...DEFAULT_PANELS });
 
-function loadPanels(): PanelVisibility {
-  try {
-    const raw = localStorage.getItem(PANELS_STORAGE_KEY);
-    if (!raw) return { ...DEFAULT_PANELS };
-    const parsed = JSON.parse(raw) as Partial<Record<keyof PanelVisibility, unknown>>;
-    const next = { ...DEFAULT_PANELS };
-    for (const key of Object.keys(next) as (keyof PanelVisibility)[]) {
-      if (typeof parsed[key] === "boolean") next[key] = parsed[key] as boolean;
-    }
-    return next;
-  } catch {
-    return { ...DEFAULT_PANELS };
-  }
+/**
+ * Who actually opens and closes windows.
+ *
+ * The dock (`windows/WindowLayout`) is the source of truth: it owns the
+ * arrangement, the per-mode layouts, and the browser-local record. It
+ * registers here on mount so the menu bar's coarse Window items keep working
+ * unchanged, and mirrors the result back into `panels()` for their check
+ * marks. Before it mounts — and in unit tests, which never build a dock —
+ * this falls back to the plain signal.
+ */
+type PanelVisibilityHandler = (key: keyof PanelVisibility, visible: boolean) => void;
+
+let panelVisibilityHandler: PanelVisibilityHandler | null = null;
+
+export function setPanelVisibilityHandler(handler: PanelVisibilityHandler | null): void {
+  panelVisibilityHandler = handler;
 }
 
-export const [panels, setPanels] = createSignal<PanelVisibility>(loadPanels());
-
 export function setPanelVisible(key: keyof PanelVisibility, visible: boolean): void {
-  const next = { ...panels(), [key]: visible };
-  setPanels(next);
-  try {
-    localStorage.setItem(PANELS_STORAGE_KEY, JSON.stringify(next));
-  } catch {
-    // Persistence is a convenience; private-mode storage failures are fine.
+  if (panelVisibilityHandler) {
+    panelVisibilityHandler(key, visible);
+    return;
   }
+  setPanels({ ...panels(), [key]: visible });
 }
 
 /** Vertex being dragged, with its live sketch-plane position. */

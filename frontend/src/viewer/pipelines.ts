@@ -238,8 +238,8 @@ export function createOverlayPipelines(
   };
 }
 
-/** Bytes of the graticule uniform: six vec4s, see `Graticule` in the WGSL. */
-export const GRATICULE_UNIFORM_SIZE = 96;
+/** Bytes of the graticule uniform: ten vec4s, see `Graticule` in the WGSL. */
+export const GRATICULE_UNIFORM_SIZE = 160;
 
 export interface GraticulePipeline {
   graticulePipeline: GPURenderPipeline;
@@ -247,13 +247,14 @@ export interface GraticulePipeline {
 }
 
 /**
- * The faceplate pass: one fullscreen triangle at the far plane.
+ * The ground-grid pass: one fullscreen triangle at the far plane.
  *
- * `depthCompare: "less-equal"` with a vertex at z = 1 is what puts the
- * graticule *behind* everything: the preview pass writes exactly 1.0 on a ray
- * miss, so the test passes on background and fails against every nearer
- * fragment the scene, the FEM surface or the depth prepass has written. Depth
- * is not written back, so the overlays that follow are unaffected.
+ * `depthCompare: "less-equal"` with a vertex at z = 1 is what puts the grid
+ * *behind* everything: the preview pass writes exactly 1.0 on a ray miss, so
+ * the test passes on background and fails against every nearer fragment the
+ * scene, the FEM surface or the depth prepass has written. Depth is not
+ * written back, so the overlays that follow are unaffected. The plane itself
+ * is raycast per fragment, which is why one triangle is the whole geometry.
  */
 export function createGraticulePipeline(
   device: GPUDevice,
@@ -271,7 +272,7 @@ export function createGraticulePipeline(
   );
   return {
     graticulePipeline: device.createRenderPipeline({
-      label: "Viewport graticule",
+      label: "Viewport ground grid",
       layout: pipelineLayout,
       vertex: { module, entryPoint: "vs_graticule" },
       fragment: {

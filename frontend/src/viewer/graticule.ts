@@ -1,19 +1,23 @@
 /**
- * The viewport graticule: what one division is worth, and where the detents are.
+ * The viewport's ground grid: how far apart its lines are, and where the
+ * detents on that spacing lie.
  *
- * The graticule is a *faceplate*, not scenery. It is a fixed screen-space rule
- * — eight square divisions down the viewport height — and the geometry moves
- * behind it, exactly as a trace moves behind a CRT's etched graticule
- * (`research/design-language.md` §16.3). That choice is what makes it honest
- * for free: there is no second coordinate system to keep registered with the
- * camera under orbit or pan. The whole truth claim lives in one number, the
- * *gain* — how much world a division is worth — and this file is that number.
+ * This used to be a *faceplate* — a fixed screen-space rule, eight divisions
+ * down the viewport, with the geometry moving behind it the way a trace moves
+ * behind a CRT's etched graticule. It was honest but it was inert: pinned to
+ * the frame, it never moved with the scene, so it said nothing about where
+ * anything was in space. What replaced it is the CAD convention instead: a
+ * square grid ruled on the ground plane (z = 0 — the world is Z-up), drawn in
+ * projection so it recedes, which is what actually tells you where the floor
+ * is and which way you are looking.
  *
- * Under an orthographic camera the gain is exact everywhere in the frame,
- * because world-per-pixel is constant and isotropic. Under a perspective
- * camera it is exact only on the plane through the orbit target, so the
- * readout is marked uncalibrated with the `>` prefix a Tektronix 2465 uses for
- * an uncalibrated scale factor.
+ * The number the readout states is now simply the grid's spacing, on the same
+ * 1-2-5 ladder an instrument's scale switch has, chosen so a cell is about one
+ * eighth of the frame height. It is a world distance, so it is exactly true
+ * whatever the camera does — the thing it can no longer promise is that you can
+ * *measure* with it on screen, because under perspective a cell shrinks with
+ * depth. That is what `calibrated` means now, and it is the same condition the
+ * Tektronix 2465 marks with a `>` prefix on an uncalibrated scale factor.
  *
  * Everything here is pure arithmetic over a camera — no DOM, no GPU — so the
  * ladder and the scale derivation are unit tested in `test/graticule.test.ts`.
@@ -23,13 +27,13 @@ import { FOV_SCALE, orthoHeightFor, type Projection } from "./math";
 import { VIEW_PRESETS } from "./display";
 
 /**
- * Divisions down the viewport height.
+ * Cells down the viewport height, at the framing the spacing is chosen for.
  *
- * Tektronix's vertical count (475A: "8 × 10 cm display"). The horizontal count
- * is whatever fits at the same *square* division, rather than a forced ten:
- * the app's viewport is not a 5:4 CRT, and stretching divisions to 10 × 8 on a
- * 16:10 pane would make H and V gains differ by 28% — graph paper that is not
- * square is not graph paper.
+ * Tektronix's vertical count (475A: "8 × 10 cm display"), kept because it is
+ * still the right density: eight cells is enough to judge a distance against
+ * and few enough that the far half of the plane has not turned to noise. It no
+ * longer fixes anything on screen — the grid is in the world now — it only
+ * decides which rung of the ladder the spacing lands on as you zoom.
  */
 export const DIVISIONS = 8;
 
@@ -38,13 +42,48 @@ export const DIVISIONS = 8;
  *
  * The repository declares its length unit in exactly one place: the STEP
  * writer (`cadjoint/meshing/export.py`) stamps `SI_UNIT($,.METRE.)` and states
- * "one mesh unit = 1 m". The graticule reads the scene through that
- * declaration rather than inventing a scale of its own — a grid whose units
- * are made up is decoration.
+ * "one mesh unit = 1 m". The grid reads the scene through that declaration
+ * rather than inventing a scale of its own — a grid whose units are made up is
+ * decoration.
  */
 export const MM_PER_UNIT = 1000;
 
-/** The 1-2-5 ladder's mantissas, per §16.3's "20 / 10 / 5 / 2 mm/div". */
+/**
+ * How firmly each part of the grid is printed on the paper.
+ *
+ * These are alphas, not tones: the three colours come from the token layer
+ * (`graticule-line`, `graticule-axis`), and what varies here is how much of
+ * each lands on the sheet. Composited over `--surface-viewport` they measure
+ * 1.36 : 1 for a minor line, 1.58 : 1 for a major one and 1.69 : 1 for a
+ * centre axis — deliberately *below* the 1.6–2.8 band structure is held to,
+ * because the floor is not structure. It is a spatial cue, and it has to stop
+ * existing the moment you attend to the geometry standing on it.
+ * `test/graticule.test.ts` measures the composited values.
+ */
+export const GRID_ALPHA = {
+  minor: 0.55,
+  major: 0.8,
+  axis: 0.7,
+  /**
+   * Multiplier applied while a sketch is being edited on a plane that is not
+   * the floor. The sketch's own plane is the reference then, and a floor grid
+   * arguing with it is one grid too many — but removing it entirely would
+   * take the orientation cue away at exactly the moment a 2D view needs it,
+   * so it steps back rather than leaving.
+   */
+  offPlane: 0.6,
+} as const;
+
+/** Minor lines between one major line and the next. */
+export const GRID_MAJOR_EVERY = 5;
+
+/**
+ * Where the floor starts and finishes fading, as multiples of the orbit
+ * distance, measured outward from the orbit target on the plane.
+ */
+export const GRID_FADE = { start: 1.6, end: 7 } as const;
+
+/** The 1-2-5 ladder's mantissas — the detent ladder §10.1 states. */
 const MANTISSAS = [1, 2, 5] as const;
 
 /** Every 1-2-5 rung in the decades around `mm`, ascending. */
@@ -111,22 +150,34 @@ export function distanceForGain(mm: number): number {
 }
 
 export interface Gain {
-  /** Millimetres per division. Exact under an orthographic camera. */
+  /** Millimetres between grid lines. Always a rung of the 1-2-5 ladder. */
   mm: number;
   /**
-   * False when the number is not a stateable one: off the 1-2-5 ladder, or
-   * — under perspective — not uniform over the frame. Drives the `>` prefix.
+   * Whether a *screen* measurement against the grid is to scale.
+   *
+   * The spacing itself is a world distance and is exact either way. Under
+   * perspective a cell shrinks with depth, so the grid cannot be used as a
+   * ruler on the image — which is the 2465's "uncalibrated scale factor"
+   * condition, and drives the `>` prefix.
    */
   calibrated: boolean;
 }
 
-/** The gain a camera is currently showing. */
+/**
+ * The grid spacing for a camera, in millimetres.
+ *
+ * Chosen so a cell is about one eighth of the framed height and then snapped
+ * to the nearest 1-2-5 rung, which is why the readout never has to hedge: the
+ * lines really are 10 mm apart, not 8.63.
+ */
 export function gainOf(distance: number, projection: Projection): Gain {
-  const mm = gainFor(orthoHeightFor(distance));
-  // A perspective frustum's world-per-pixel varies with depth, so one
-  // division is only worth `mm` on the plane through the orbit target. That
-  // is exactly the 2465's "uncalibrated scale factor" condition.
-  return { mm, calibrated: projection === "orthographic" && isDetented(mm) };
+  const mm = nearestDetent(gainFor(orthoHeightFor(distance)));
+  return { mm, calibrated: projection === "orthographic" };
+}
+
+/** The grid spacing for a camera, in world units — what the shader rules. */
+export function gridSpacing(distance: number): number {
+  return gainOf(distance, "orthographic").mm / MM_PER_UNIT;
 }
 
 export interface GainReadout {
@@ -139,13 +190,14 @@ export interface GainReadout {
 }
 
 /**
- * Format a gain for the readout.
+ * Format a spacing for the readout.
  *
  * Three significant figures — ASME Y14.5's "a dimension shall be expressed to
  * the same number of decimal places as its tolerance" has no tolerance to
  * quote here, so the rule becomes "state what the projection actually
- * resolves and no more". The unit switches to metres at a metre, the way an
- * instrument switches mV to V, so the field never carries five digits.
+ * resolves and no more". A ladder rung never needs more than two anyway. The
+ * unit switches to metres at a metre, the way an instrument switches mV to V,
+ * so the field never carries five digits.
  */
 export function formatGain(mm: number, calibrated: boolean): GainReadout {
   if (!Number.isFinite(mm) || mm <= 0) {
@@ -162,13 +214,15 @@ export function formatGain(mm: number, calibrated: boolean): GainReadout {
   };
 }
 
-/** Signed octant the camera sits in, e.g. `"+X+Y+Z"` or `"+Z"` for Front. */
+/** Signed octant the camera sits in, e.g. `"+X−Y+Z"` or `"−Y"` for Front. */
 export function octant(yaw: number, pitch: number): string {
   const cp = Math.cos(pitch);
+  // The same offset `cameraPosition` builds, in a Z-up world: azimuth about
+  // +Z measured from −Y, elevation toward +Z.
   const axes: [string, number][] = [
     ["X", cp * Math.sin(yaw)],
-    ["Y", Math.sin(pitch)],
-    ["Z", cp * Math.cos(yaw)],
+    ["Y", -cp * Math.cos(yaw)],
+    ["Z", Math.sin(pitch)],
   ];
   const parts = axes
     .filter(([, component]) => Math.abs(component) > 1e-3)
