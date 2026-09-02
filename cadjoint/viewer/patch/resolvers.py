@@ -144,21 +144,27 @@ def _located_constraint(source: str, line: int, index: int):
     return statements[index]
 
 
-def _located_study(source: str, study) -> StudyStatement:
-    """Resolve a study reference — payload index or name — to its statement."""
-    statements = locate_study_statements(source)
+def _located_declaration(source: str, reference, *, locate, noun: str):
+    """Resolve a declaration reference — payload index, name, or variable.
+
+    Studies, meshes and optimizations are all addressed the same way from
+    the viewer; *locate* is the statement locator for the kind and *noun*
+    names it in error messages.
+    """
+    statements = locate(source)
     if statements is None:
         raise PatchError("Source is not valid Python.")
-    if isinstance(study, bool) or not isinstance(study, (int, str)):
-        raise PatchError("A study is referenced by its name or its non-negative index.")
-    if isinstance(study, int):
-        if not 0 <= study < len(statements):
+    if isinstance(reference, bool) or not isinstance(reference, (int, str)):
+        raise PatchError(f"A {noun} is referenced by its name or its non-negative index.")
+    if isinstance(reference, int):
+        if not 0 <= reference < len(statements):
             raise PatchError(
-                f"Study index {study} is out of range; the program declares {len(statements)}."
+                f"{noun.capitalize()} index {reference} is out of range; "
+                f"the program declares {len(statements)}."
             )
-        return statements[study]
+        return statements[reference]
     matches = [
-        statement for statement in statements if study in (statement.name, statement.variable)
+        statement for statement in statements if reference in (statement.name, statement.variable)
     ]
     if len(matches) != 1:
         declared = ", ".join(
@@ -166,9 +172,14 @@ def _located_study(source: str, study) -> StudyStatement:
             for statement in statements
         )
         raise PatchError(
-            f"No single study named {study!r}; the program declares: {declared or 'none'}."
+            f"No single {noun} named {reference!r}; the program declares: {declared or 'none'}."
         )
     return matches[0]
+
+
+def _located_study(source: str, study) -> StudyStatement:
+    """Resolve a study reference — payload index or name — to its statement."""
+    return _located_declaration(source, study, locate=locate_study_statements, noun="study")
 
 
 def _reject_predicate_bc(element: ast.AST) -> None:
@@ -194,60 +205,14 @@ def _located_study_bc(located: StudyStatement, bc) -> tuple[ast.AST, Span]:
 
 def _located_mesh(source: str, mesh) -> MeshStatement:
     """Resolve a mesh reference — payload index, name, or variable."""
-    statements = locate_mesh_statements(source)
-    if statements is None:
-        raise PatchError("Source is not valid Python.")
-    if isinstance(mesh, bool) or not isinstance(mesh, (int, str)):
-        raise PatchError("A mesh is referenced by its name or its non-negative index.")
-    if isinstance(mesh, int):
-        if not 0 <= mesh < len(statements):
-            raise PatchError(
-                f"Mesh index {mesh} is out of range; the program declares {len(statements)}."
-            )
-        return statements[mesh]
-    matches = [
-        statement for statement in statements if mesh in (statement.name, statement.variable)
-    ]
-    if len(matches) != 1:
-        declared = ", ".join(
-            repr(statement.name or statement.variable or f"#{statement.index}")
-            for statement in statements
-        )
-        raise PatchError(
-            f"No single mesh named {mesh!r}; the program declares: {declared or 'none'}."
-        )
-    return matches[0]
+    return _located_declaration(source, mesh, locate=locate_mesh_statements, noun="mesh")
 
 
 def _located_optimization(source: str, optimization) -> OptimizationStatement:
     """Resolve an optimization reference — payload index, name, or variable."""
-    statements = locate_optimization_statements(source)
-    if statements is None:
-        raise PatchError("Source is not valid Python.")
-    if isinstance(optimization, bool) or not isinstance(optimization, (int, str)):
-        raise PatchError("An optimization is referenced by its name or its non-negative index.")
-    if isinstance(optimization, int):
-        if not 0 <= optimization < len(statements):
-            raise PatchError(
-                f"Optimization index {optimization} is out of range; the program declares "
-                f"{len(statements)}."
-            )
-        return statements[optimization]
-    matches = [
-        statement
-        for statement in statements
-        if optimization in (statement.name, statement.variable)
-    ]
-    if len(matches) != 1:
-        declared = ", ".join(
-            repr(statement.name or statement.variable or f"#{statement.index}")
-            for statement in statements
-        )
-        raise PatchError(
-            f"No single optimization named {optimization!r}; the program declares: "
-            f"{declared or 'none'}."
-        )
-    return matches[0]
+    return _located_declaration(
+        source, optimization, locate=locate_optimization_statements, noun="optimization"
+    )
 
 
 def _located_parameter_call(source: str, name: str) -> ast.Call:
