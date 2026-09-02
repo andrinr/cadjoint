@@ -668,6 +668,62 @@ test("the projection toggle works on its own", async ({ page }) => {
   expect(await projectionMode(page)).toContain("Orthographic");
 });
 
+test("the projection toggle sits inside the cube's square", async ({ page }) => {
+  // It used to hang under the widget, which read as orphaned. It belongs to
+  // the cube cluster — the corner opposite the axis triad — so its box is
+  // inside the stage's box, in the lower-right quarter.
+  const stage = (await page.locator(".cube-stage").boundingBox())!;
+  const toggle = (await page.getByTestId("projection-toggle").boundingBox())!;
+  expect(toggle.x).toBeGreaterThanOrEqual(stage.x + stage.width / 2);
+  expect(toggle.y).toBeGreaterThanOrEqual(stage.y + stage.height / 2);
+  expect(toggle.x + toggle.width).toBeLessThanOrEqual(stage.x + stage.width + 0.5);
+  expect(toggle.y + toggle.height).toBeLessThanOrEqual(stage.y + stage.height + 0.5);
+});
+
+test("the quarter-turn controls work from every standpoint", async ({ page }) => {
+  // Off the poles, left and right are a turntable and up and down pitch the
+  // camera a quarter turn toward its own screen-up.
+  await page.getByTestId("view-front").click();
+  expect(await viewReadout(page)).toContain("FRONT");
+  await page.getByTestId("cube-turn-right").click();
+  expect(await viewReadout(page)).toContain("RIGHT");
+  await page.getByTestId("cube-turn-left").click();
+  expect(await viewReadout(page)).toContain("FRONT");
+  await page.getByTestId("cube-turn-up").click();
+  expect(await viewReadout(page)).toContain("TOP");
+
+  // At the pole nothing is greyed out: the four controls reach the four
+  // faces the reader sees around the TOP label, and "up" carries the camera
+  // over the pole rather than refusing.
+  for (const control of ["up", "right", "down", "left"]) {
+    await expect(page.getByTestId(`cube-turn-${control}`)).not.toHaveClass(/spent/);
+  }
+  await page.getByTestId("cube-turn-up").click();
+  expect(await viewReadout(page)).toContain("BACK");
+  // (From BACK the TOP facet is edge-on and cannot be pressed; the up
+  // control is the way back to it, which is rather the point.)
+  await page.getByTestId("cube-turn-up").click();
+  expect(await viewReadout(page)).toContain("TOP");
+  await page.getByTestId("cube-turn-right").click();
+  expect(await viewReadout(page)).toContain("RIGHT");
+  await page.getByTestId("cube-turn-up").click();
+  expect(await viewReadout(page)).toContain("TOP");
+  await page.getByTestId("cube-turn-down").click();
+  expect(await viewReadout(page)).toContain("FRONT");
+
+  // From an isometric corner the turntable lands on the next corner round —
+  // still ISO, but a different octant — and a corner is where a session
+  // starts, so this is the press most readers make first.
+  await page.getByTestId("view-front-right-top").click();
+  const octant = await viewReadout(page);
+  expect(octant).toContain("ISO");
+  await page.getByTestId("cube-turn-right").click();
+  expect(await viewReadout(page)).toContain("ISO");
+  expect(await viewReadout(page)).not.toBe(octant);
+  // A turn is a direction, never a projection.
+  expect(await projectionMode(page)).toContain("Orthographic");
+});
+
 test("object and gizmo picking use the orthographic camera", async ({ page }) => {
   const program = [
     "from cadjoint.construction import Solid",

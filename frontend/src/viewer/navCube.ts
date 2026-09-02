@@ -26,7 +26,7 @@
  * claims to for all twenty-six standard views and a sweep of free ones.
  */
 
-import { VIEW_PRESETS, viewPresetName } from "./display";
+import { VIEW_PRESETS, anglesForDirection, viewPresetName } from "./display";
 
 /**
  * How much of each half-edge the chamfer cuts away.
@@ -321,26 +321,54 @@ export function frontFacet(basis: Basis): Facet | null {
   return best;
 }
 
-/** Which of the camera's two freedoms an arrow steps. */
+/** Which of the camera's two freedoms a turn control steps. */
 export type TurnAxis = "azimuth" | "elevation";
 
+/** Zero out floating-point dust so a polar direction is exactly polar. */
+const tidy = (v: Vec3): Vec3 => v.map((value) => (Math.abs(value) < 1e-9 ? 0 : value)) as unknown as Vec3;
+
 /**
- * Turn the camera a quarter turn, and why it is not a screen-axis rotation.
+ * True where the camera draws itself with the polar convention.
  *
- * FreeCAD's flank arrows rotate about the camera's own screen axes, so four
- * presses of "up" walk Front → Top → Back → Bottom → Front. That walk needs
- * the camera to pass over the pole and come out upside down on the far side,
- * and this camera cannot: its up vector is pinned to world +Z and its pitch is
- * clamped short of the poles (`cameraBasis` in `viewer/math.ts`,
- * `PITCH_LIMIT` in the pane's camera). Implemented as a screen-axis rotation
- * anyway, the up arrow reaches Top and then comes *back* to Front, because
- * "toward +Z" reverses once the camera is on the other side — a control that
- * silently changes direction under the user's finger.
+ * The same threshold as `cameraBasisFor` (and the renderer's `cameraBasis`):
+ * inside it the screen basis is built on +Y rather than on world up, so a
+ * yaw no longer turns anything the reader can see, and the turn controls have
+ * to reason about the screen the reader is looking at rather than the angle.
+ */
+const atPole = (pitch: number): boolean => Math.abs(Math.sin(pitch)) > 0.999;
+
+/**
+ * Turn the camera a quarter turn about one of its own screen axes.
  *
- * So the two axes are stepped for what they are. Azimuth wraps and does give
- * the full four-cycle: Front → Right → Back → Left → Front. Elevation clamps
- * at the poles, which is exactly the range the camera has, and `canStepView`
- * lets the widget grey the arrow out rather than swallow the press.
+ * The rule, in one sentence: **the control moves the camera a quarter turn
+ * toward the side of the screen it sits on, and from every standpoint it
+ * changes the view.** The two pairs are stepped for what they are.
+ *
+ * *Left and right* are a turntable — a quarter turn about world up, which is
+ * the axis that keeps the horizon level, so from an isometric corner the
+ * right control reaches the next corner round rather than dropping to the
+ * horizon. Azimuth has no ends, so four presses walk Front → Right → Back →
+ * Left → Front. At a pole the turntable is degenerate: world up *is* the view
+ * axis, a yaw is a spin the camera cannot show (its up vector is pinned, see
+ * `cameraBasisFor`), and a control that does nothing reads as broken. There
+ * the turn is taken about the screen's own vertical instead — the camera
+ * moves onto its screen-right axis — which lands on the face the reader can
+ * see on that side of the cube: from TOP, right reaches RIGHT; from BOTTOM,
+ * where world −X is on the screen's right, it reaches LEFT.
+ *
+ * *Up and down* are a quarter turn about the screen horizontal, the camera
+ * moving toward its own screen-up: the new direction *is* the old up vector.
+ * Off the poles that is pitch ± 90°, and when it would carry past a pole it
+ * keeps going onto the far side, upright — this camera has no roll, so it
+ * cannot come out inverted the way FreeCAD's does, and the walk is Front →
+ * Top → Back → Top → Front instead of the rolling camera's four-cycle. That
+ * is the honest walk for a camera whose up is pinned: "up" always means
+ * toward what is currently up on screen. At the poles screen-up is +Y by the
+ * same convention the cube and the scene are drawn with, so from TOP up
+ * reaches BACK and down reaches FRONT, exactly the faces the reader sees
+ * above and below the TOP label. Earlier versions clamped at the pole and
+ * greyed the control out as "spent"; a greyed control was read as one that
+ * did not work, and it is gone.
  */
 export function stepView(
   yaw: number,
@@ -348,21 +376,23 @@ export function stepView(
   axis: TurnAxis,
   turns: 1 | -1,
 ): { yaw: number; pitch: number } {
-  const quarter = (turns * Math.PI) / 2;
-  if (axis === "azimuth") return { yaw: yaw + quarter, pitch };
-  const limit = Math.PI / 2;
-  return { yaw, pitch: Math.max(-limit, Math.min(limit, pitch + quarter)) };
-}
-
-/** False when the step is clamped away and the arrow would do nothing. */
-export function canStepView(
-  yaw: number,
-  pitch: number,
-  axis: TurnAxis,
-  turns: 1 | -1,
-): boolean {
-  const next = stepView(yaw, pitch, axis, turns);
-  return next.yaw !== yaw || next.pitch !== pitch;
+  if (axis === "azimuth" && !atPole(pitch)) {
+    return { yaw: yaw + (turns * Math.PI) / 2, pitch };
+  }
+  const basis = cameraBasisFor(yaw, pitch);
+  const target = tidy(scale(axis === "azimuth" ? basis.right : basis.up, turns));
+  const angles = anglesForDirection(target[0], target[1], target[2]);
+  if (axis === "azimuth") return angles;
+  // Straight up or down has no azimuth, and `anglesForDirection` answers 0;
+  // keep the meridian the camera arrived on instead, as pitch ± 90° would.
+  if (target[0] === 0 && target[1] === 0) return { yaw, pitch: angles.pitch };
+  // Keep the yaw continuous on the way over: an elevation step stays on the
+  // camera's own meridian or lands on the antipodal one, and the principal
+  // value `anglesForDirection` returns may be a whole turn away from the yaw
+  // the camera is carrying. Add the wrapped difference rather than snapping.
+  const wrapped = angles.yaw - yaw;
+  const turn = Math.atan2(Math.sin(wrapped), Math.cos(wrapped));
+  return { yaw: yaw + turn, pitch: angles.pitch };
 }
 
 /** The world axis triad, as the orientation legend draws it. */

@@ -10,28 +10,31 @@
  * the interaction. This follows FreeCAD's navigation cube, which is where the
  * idiom comes from.
  *
- * Around it:
- *   · four flank arrows, each a quarter turn about one of the camera's own
- *     screen axes — up from Front reaches Top, and again reaches Back;
+ * Around it, one square:
+ *   · four quarter-turn controls on the flanks, each a quarter turn about one
+ *     of the camera's own screen axes — up from Front reaches Top, and again
+ *     reaches Back. Each is drawn as a quarter arc ending in an arrowhead: the
+ *     arc *is* ninety degrees of turn, and the head says which way. FreeCAD
+ *     draws plain triangles here, and a triangle reads as a nudge;
  *   · an axis triad at the lower left, in red/green/blue. That is the one
  *     place saturated hue is allowed in this chrome, and it is allowed because
  *     it is not chrome: X-red, Y-green, Z-blue is a reading of orientation
  *     that every CAD user already has, and drawing it achromatic would make it
  *     three identical grey lines;
- *   · a cube glyph that toggles the projection.
+ *   · the projection toggle at the lower right, the corner opposite the triad.
  *
  * Two things FreeCAD's cube has that this one does not, both deliberately.
  * There is no dot opening a view menu, because there is no view menu. And
- * there are no curved roll arrows, because this camera has no roll: its up
- * vector is pinned to world +Z (see `cameraBasis` in `viewer/math.ts`), so a
- * roll control would be a button that either does nothing or lies about what
- * the viewport is doing. A control with nothing behind it is worse than a gap.
+ * there are no roll arrows, because this camera has no roll: its up vector is
+ * pinned to world +Z (see `cameraBasis` in `viewer/math.ts`), so a roll
+ * control would be a button that either does nothing or lies about what the
+ * viewport is doing. A control with nothing behind it is worse than a gap.
  *
  * ── Direction is not projection ──────────────────────────────────────────
  * Nothing on the cube changes the projection. *Isometric* names a direction, a
  * 1:1:1 line through the scene; *orthographic* names a projection, parallel
- * rays. The corner facets choose the first; the glyph below chooses the
- * second. There is no ISO button, because the eight corners are the isometric
+ * rays. The corner facets choose the first; the glyph in the corner chooses
+ * the second. There is no ISO button, because the eight corners are the isometric
  * directions, stated eight ways instead of one.
  */
 
@@ -40,7 +43,6 @@ import {
   FACETS,
   TRIAD,
   cameraBasisFor,
-  canStepView,
   dot,
   facetVisible,
   frontFacet,
@@ -59,8 +61,14 @@ import { OrthographicIcon, PerspectiveIcon } from "./icons";
 const SCALE = 34;
 /** Half the viewBox. The body diagonal is √3 ≈ 1.73 cube units. */
 const EXTENT = 92;
-/** How far from the centre the four flank arrows sit. */
-const ARROW_RADIUS = 80;
+/** How far from the centre the four quarter-turn controls sit. */
+const TURN_RADIUS = 78;
+/** Radius of the quarter arc each turn control is drawn with. */
+const TURN_ARC = 12;
+/** Length of each arm of the arrowhead, measured along an axis. */
+const TURN_HEAD = 5;
+/** Half the side of a turn control's (invisible) hit square. */
+const TURN_HIT = 15;
 
 /** Pointer travel, in pixels, below which the gesture counts as a click. */
 const CLICK_SLOP = 4;
@@ -71,20 +79,68 @@ const path = (points: [number, number][]): string =>
   points.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(" ");
 
 /**
- * The four flank arrows, each a quarter turn in the direction it points.
+ * The four quarter-turn controls, one per flank.
  *
- * Left and right wrap all the way round — Front, Right, Back, Left, Front —
- * because azimuth has no ends. Up and down stop at the poles, because this
- * camera's elevation does; `canStepView` says when, and the arrow greys out
- * rather than swallowing the press. `navCube.ts` has the argument for why
- * these are not screen-axis rotations.
+ * Each turns the camera a quarter turn toward the side of the screen it sits
+ * on, from any standpoint — `stepView` in `navCube.ts` has the rule and the
+ * argument for what happens at the poles. None is ever disabled: a greyed
+ * control was read as a broken one.
+ *
+ * The glyph is drawn once, for the top flank, and the other three are that
+ * drawing placed by the transform here: down is up mirrored through the
+ * horizontal, right is up turned a quarter clockwise, left is right mirrored
+ * through the vertical. Mirrored pairs rather than four rotated copies,
+ * because four arcs all sweeping the same way around the cube read as a roll
+ * ring, and this camera has no roll. As pairs, each glyph says "turn toward
+ * this side" and its opposite says the reverse.
  */
-const ARROWS = [
-  { id: "up", axis: "elevation" as const, turns: 1 as const, angle: 0, label: "Turn up" },
-  { id: "right", axis: "azimuth" as const, turns: 1 as const, angle: 90, label: "Turn right" },
-  { id: "down", axis: "elevation" as const, turns: -1 as const, angle: 180, label: "Turn down" },
-  { id: "left", axis: "azimuth" as const, turns: -1 as const, angle: 270, label: "Turn left" },
+const TURNS = [
+  {
+    id: "up",
+    axis: "elevation" as const,
+    turns: 1 as const,
+    transform: `translate(0 ${-TURN_RADIUS})`,
+    label: "Turn up",
+  },
+  {
+    id: "right",
+    axis: "azimuth" as const,
+    turns: 1 as const,
+    transform: `translate(${TURN_RADIUS} 0) rotate(90)`,
+    label: "Turn right",
+  },
+  {
+    id: "down",
+    axis: "elevation" as const,
+    turns: -1 as const,
+    transform: `translate(0 ${TURN_RADIUS}) scale(1 -1)`,
+    label: "Turn down",
+  },
+  {
+    id: "left",
+    axis: "azimuth" as const,
+    turns: -1 as const,
+    transform: `translate(${-TURN_RADIUS} 0) scale(-1 1) rotate(90)`,
+    label: "Turn left",
+  },
 ];
+
+/**
+ * The turn glyph, drawn for the top flank: a quarter arc that comes in from
+ * the left, sweeps up through ninety degrees and ends in an open arrowhead
+ * pointing up — the direction the control turns toward. The arc runs from
+ * the bottom of its circle to the right of it, and the circle's centre is
+ * placed so the whole mark sits centred on the flank.
+ */
+const TURN_GLYPH = (() => {
+  const tip: [number, number] = [3, -TURN_ARC / 2];
+  const centre: [number, number] = [tip[0] - TURN_ARC, tip[1]];
+  const tail: [number, number] = [centre[0], centre[1] + TURN_ARC];
+  return [
+    `M ${tail[0]} ${tail[1]} A ${TURN_ARC} ${TURN_ARC} 0 0 0 ${tip[0]} ${tip[1]}`,
+    `M ${tip[0] - TURN_HEAD} ${tip[1] + TURN_HEAD} L ${tip[0]} ${tip[1]} L ${tip[0] + TURN_HEAD} ${tip[1] + TURN_HEAD}`,
+  ].join(" ");
+})();
 
 /** True while focus is in the code editor or another text surface. */
 function isTypingTarget(): boolean {
@@ -242,7 +298,6 @@ export function ViewCube(props: ViewCubeProps) {
 
   const turn = (axis: TurnAxis, turns: 1 | -1) => {
     if (travelled > CLICK_SLOP) return;
-    if (!canStepView(props.yaw, props.pitch, axis, turns)) return;
     const next = stepView(props.yaw, props.pitch, axis, turns);
     props.onOrbit(next.yaw, next.pitch);
   };
@@ -297,25 +352,27 @@ export function ViewCube(props: ViewCubeProps) {
       >
         <title>Drag to orbit. Click a face, bevel or corner to snap.</title>
 
-        {/* The quarter-turn arrows, outside the cube on the four flanks. */}
-        <For each={ARROWS}>
-          {(arrow) => (
-            <polygon
-              class="cube-arrow"
-              classList={{
-                spent: !canStepView(props.yaw, props.pitch, arrow.axis, arrow.turns),
-              }}
-              points={path([
-                [0, -ARROW_RADIUS - 12],
-                [-11, -ARROW_RADIUS + 4],
-                [11, -ARROW_RADIUS + 4],
-              ])}
-              transform={`rotate(${arrow.angle})`}
-              onClick={() => turn(arrow.axis, arrow.turns)}
-              data-testid={`cube-turn-${arrow.id}`}
+        {/* The quarter-turn controls, outside the cube on the four flanks.
+            The glyph is a hairline, so an invisible square under it is what
+            takes the press. */}
+        <For each={TURNS}>
+          {(control) => (
+            <g
+              class="cube-turn"
+              transform={control.transform}
+              onClick={() => turn(control.axis, control.turns)}
+              data-testid={`cube-turn-${control.id}`}
             >
-              <title>{arrow.label} — a quarter turn</title>
-            </polygon>
+              <title>{control.label} — a quarter turn</title>
+              <rect
+                class="cube-turn-hit"
+                x={-TURN_HIT}
+                y={-TURN_HIT}
+                width={TURN_HIT * 2}
+                height={TURN_HIT * 2}
+              />
+              <path class="cube-turn-glyph" d={TURN_GLYPH} />
+            </g>
           )}
         </For>
 
@@ -389,7 +446,12 @@ export function ViewCube(props: ViewCubeProps) {
       </svg>
 
       {/* The projection toggle: a glyph, not a facet, because it is not a
-          direction. FreeCAD puts its own cube glyph in the same corner. */}
+          direction. It sits in the stage's lower-right corner — the flanks
+          are the turn controls, the corners are free, the triad has the
+          lower-left — so the two camera readouts bracket the down control
+          and the widget stays one square, rather than a square with a button
+          dangling under it, which is where this used to be and where it read
+          as orphaned. FreeCAD puts its own cube glyph in the same corner. */}
       <button
         type="button"
         class="cube-projection"

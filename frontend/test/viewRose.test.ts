@@ -27,7 +27,6 @@ import {
   cameraBasisFor,
   cross,
   dot,
-  canStepView,
   facetVisible,
   frontFacet,
   project,
@@ -350,11 +349,13 @@ describe("the cube agrees with the camera", () => {
   });
 });
 
-describe("the quarter-turn arrows", () => {
+describe("the quarter-turn controls", () => {
   const at = (name: string) => ({
     yaw: VIEW_PRESETS[name].yaw,
     pitch: VIEW_PRESETS[name].pitch,
   });
+  const directionOf = (camera: { yaw: number; pitch: number }): Vec3 =>
+    cameraBasisFor(camera.yaw, camera.pitch).direction;
 
   it("walk Front → Right → Back → Left → Front, and keep going", () => {
     let camera = at("front");
@@ -362,33 +363,107 @@ describe("the quarter-turn arrows", () => {
       camera = stepView(camera.yaw, camera.pitch, "azimuth", 1);
       expect(matchViewPreset(camera.yaw, camera.pitch), expected).toBe(expected);
     }
-    // Azimuth has no ends, so the arrow is never spent.
-    expect(canStepView(camera.yaw, camera.pitch, "azimuth", 1)).toBe(true);
   });
 
-  it("raise and lower the elevation, and stop at the poles", () => {
+  it("carry the camera over the pole rather than stopping at it", () => {
+    // A rolling camera would walk Front → Top → Back → Bottom → Front. This
+    // one has no roll, so past the pole it comes out upright on the far side,
+    // and "up" always means toward whatever is up on screen — which at TOP
+    // is BACK, whichever way the camera arrived: Front → Top → Back → Top →
+    // Back. What matters is that every press changes the view; the old
+    // version clamped at Top and greyed the control out, which read as a
+    // control that did not work.
     let camera = at("front");
-    camera = stepView(camera.yaw, camera.pitch, "elevation", 1);
-    expect(matchViewPreset(camera.yaw, camera.pitch)).toBe("top");
-    // The camera has no roll, so it cannot tumble over the pole and come out
-    // upright on the far side; the arrow says it is spent instead of
-    // reversing direction under the user's finger.
-    expect(canStepView(camera.yaw, camera.pitch, "elevation", 1)).toBe(false);
-    expect(stepView(camera.yaw, camera.pitch, "elevation", 1)).toEqual(camera);
-    expect(canStepView(camera.yaw, camera.pitch, "elevation", -1)).toBe(true);
+    for (const expected of ["top", "back", "top", "back"]) {
+      camera = stepView(camera.yaw, camera.pitch, "elevation", 1);
+      expect(matchViewPreset(camera.yaw, camera.pitch), expected).toBe(expected);
+    }
+    // BOTTOM is drawn with the same +Y up, so below the floor "down" is
+    // toward FRONT: Front → Bottom → Front → Bottom.
+    camera = at("front");
+    for (const expected of ["bottom", "front", "bottom", "front"]) {
+      camera = stepView(camera.yaw, camera.pitch, "elevation", -1);
+      expect(matchViewPreset(camera.yaw, camera.pitch), expected).toBe(expected);
+    }
+    // And a free standpoint near the pole goes over it and lands just past
+    // it on the far side, still upright.
+    const over = stepView(0.3, 1.45, "elevation", 1);
+    expect(over.pitch).toBeCloseTo(Math.PI - 1.45 - Math.PI / 2, 9);
+    // Half a turn round, either way about: the meridian flipped.
+    expect(Math.abs(Math.cos(over.yaw - 0.3) + 1)).toBeLessThan(1e-9);
+  });
 
-    camera = stepView(camera.yaw, camera.pitch, "elevation", -1);
-    expect(matchViewPreset(camera.yaw, camera.pitch)).toBe("front");
-    camera = stepView(camera.yaw, camera.pitch, "elevation", -1);
-    expect(matchViewPreset(camera.yaw, camera.pitch)).toBe("bottom");
-    expect(canStepView(camera.yaw, camera.pitch, "elevation", -1)).toBe(false);
+  it("turn toward what is on screen at the poles", () => {
+    // Straight down, world up is the view axis and a yaw is an invisible
+    // spin. The cube draws TOP with +Y up and +X right, so the four controls
+    // reach the four faces the reader sees around the TOP label.
+    const top = at("top");
+    expect(matchViewPreset(...values(stepView(top.yaw, top.pitch, "elevation", 1)))).toBe("back");
+    expect(matchViewPreset(...values(stepView(top.yaw, top.pitch, "elevation", -1)))).toBe("front");
+    expect(matchViewPreset(...values(stepView(top.yaw, top.pitch, "azimuth", 1)))).toBe("right");
+    expect(matchViewPreset(...values(stepView(top.yaw, top.pitch, "azimuth", -1)))).toBe("left");
+    // From below, the screen's right is world −X: the control that sits on
+    // the right reaches the face on the right, which is LEFT.
+    const bottom = at("bottom");
+    expect(matchViewPreset(...values(stepView(bottom.yaw, bottom.pitch, "elevation", 1)))).toBe("back");
+    expect(matchViewPreset(...values(stepView(bottom.yaw, bottom.pitch, "elevation", -1)))).toBe("front");
+    expect(matchViewPreset(...values(stepView(bottom.yaw, bottom.pitch, "azimuth", 1)))).toBe("left");
+    expect(matchViewPreset(...values(stepView(bottom.yaw, bottom.pitch, "azimuth", -1)))).toBe("right");
+    // Whatever meridian the camera reached the pole on: TOP is TOP.
+    for (const yaw of [0, 0.7, Math.PI / 2, -2.4]) {
+      const turned = stepView(yaw, Math.PI / 2, "azimuth", 1);
+      expect(matchViewPreset(turned.yaw, turned.pitch), `yaw ${yaw}`).toBe("right");
+    }
+  });
+
+  it("always change the view, from every standpoint", () => {
+    // The whole point: no greyed-out control anywhere. Up and down move the
+    // camera onto its own screen-up axis, a full quarter turn. Left and right
+    // turn about world up, which near a pole barely moves the *direction* —
+    // but spins the screen a quarter turn, and the screen is what the reader
+    // sees. So what is measured is the drawn basis: some axis of it has to
+    // swing well clear of where it was.
+    const swung = (yaw: number, pitch: number, next: { yaw: number; pitch: number }) => {
+      const before = cameraBasisFor(yaw, pitch);
+      const after = cameraBasisFor(next.yaw, next.pitch);
+      return Math.min(
+        dot(before.direction, after.direction),
+        dot(before.right, after.right),
+        dot(before.up, after.up),
+      );
+    };
+    for (let yaw = -Math.PI; yaw < Math.PI; yaw += 0.29) {
+      for (const pitch of [-Math.PI / 2, -1.5, -1.45, -0.9, -0.3, 0, 0.3, 0.9, 1.45, 1.5, Math.PI / 2]) {
+        const label = `yaw ${yaw.toFixed(2)} pitch ${pitch.toFixed(2)}`;
+        const basis = cameraBasisFor(yaw, pitch);
+        for (const turns of [1, -1] as const) {
+          const up = directionOf(stepView(yaw, pitch, "elevation", turns));
+          for (const axis of [0, 1, 2]) {
+            expect(up[axis], `${label} up`).toBeCloseTo(turns * basis.up[axis], 9);
+          }
+          expect(swung(yaw, pitch, stepView(yaw, pitch, "azimuth", turns)), `${label} round`)
+            .toBeLessThan(0.75);
+        }
+      }
+    }
   });
 
   it("land on a standard view from an isometric standpoint", () => {
-    // A corner is 35.26° up and 45° round, so a quarter turn from it lands on
-    // the mirror corner rather than nowhere the readout can name.
+    // A corner is 35.26° up and 45° round, so a quarter turn round from it
+    // lands on the mirror corner rather than nowhere the readout can name.
     const turned = stepView(VIEW_PRESETS.iso.yaw, VIEW_PRESETS.iso.pitch, "azimuth", 1);
     expect(matchViewPreset(turned.yaw, turned.pitch)).toBe("back-right-top");
+  });
+
+  it("keep the yaw continuous across an elevation step", () => {
+    // Over the pole the meridian flips by half a turn, and the principal
+    // value of the new azimuth may be a full turn from the one the camera is
+    // carrying. The cube is drawn from the direction so a 2π jump is
+    // invisible there, but nothing downstream should have to know that.
+    const there = stepView(3.0, 0.9, "elevation", 1);
+    expect(Math.abs(there.yaw - 3.0)).toBeLessThan(Math.PI + 1e-9);
+    const same = stepView(-3.0, 0.2, "elevation", -1);
+    expect(same.yaw).toBeCloseTo(-3.0, 12);
   });
 
   it("are exact inverses on the azimuth", () => {
@@ -398,3 +473,8 @@ describe("the quarter-turn arrows", () => {
     expect(back.pitch).toBeCloseTo(0.3, 12);
   });
 });
+
+const values = (camera: { yaw: number; pitch: number }): [number, number] => [
+  camera.yaw,
+  camera.pitch,
+];

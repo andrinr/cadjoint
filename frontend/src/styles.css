@@ -1903,7 +1903,7 @@ input[type="checkbox"] {
 }
 
 /* One SVG carries the whole widget: the chamfered solid, the four quarter-turn
-   arrows and the axis triad. It is projected in TypeScript (viewer/navCube.ts)
+   controls and the axis triad. It is projected in TypeScript (viewer/navCube.ts)
    rather than by CSS 3D, so what is described here is only paint. */
 .cube-stage {
   width: 168px;
@@ -1967,28 +1967,31 @@ input[type="checkbox"] {
   fill: var(--viewport-ink);
 }
 
-/* A quarter turn about one of the camera's own screen axes. Hollow at rest so
-   the four of them frame the cube instead of competing with it. */
-.cube-arrow {
-  fill: var(--surface-float);
-  stroke: var(--rule-strong);
-  stroke-width: 1;
-  stroke-linejoin: round;
+/* A quarter turn about one of the camera's own screen axes: a quarter arc
+   ending in an arrowhead, drawn with the icon pen (§9) in the viewport's
+   secondary ink, and never disabled — every standpoint has four turns. The
+   glyph is a hairline, so the press lands on an invisible square beneath it. */
+.cube-turn {
   cursor: pointer;
-  transition: fill var(--dur-fast) var(--ease);
 }
 
-.cube-arrow:hover {
-  fill: var(--viewport-ink);
-  stroke: var(--viewport-ink);
+.cube-turn-hit {
+  fill: transparent;
+  stroke: none;
 }
 
-/* The camera is already at a pole: elevation has nowhere left to step, so the
-   arrow says so rather than swallowing the press. */
-.cube-arrow.spent {
-  opacity: 0.35;
-  cursor: default;
+.cube-turn-glyph {
+  fill: none;
+  stroke: var(--viewport-ink-2);
+  stroke-width: 1.25;
+  stroke-linecap: butt;
+  stroke-linejoin: miter;
   pointer-events: none;
+  transition: stroke var(--dur-fast) var(--ease);
+}
+
+.cube-turn:hover .cube-turn-glyph {
+  stroke: var(--viewport-ink);
 }
 
 /* @artwork — the axis triad is a reading of orientation, not chrome.
@@ -2018,7 +2021,13 @@ input[type="checkbox"] {
 .cube-axis-label.axis-z { fill: #1f5fd2; }
 /* @end-artwork */
 
+/* The projection toggle takes the stage's lower-right corner, opposite the
+   triad: the flanks belong to the turn controls and the corners are free, so
+   the widget stays one square instead of a square with a button under it. */
 .cube-projection {
+  position: absolute;
+  right: 0;
+  bottom: 0;
   display: grid;
   place-items: center;
   width: 28px;
