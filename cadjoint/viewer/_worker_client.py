@@ -33,7 +33,11 @@ from typing import Any
 from cadjoint.viewer._jobs import REGISTRY, attach_process
 from cadjoint.viewer._limits import OVERSIZED_SOURCE_ERROR, exceeds_source_limit
 
-COMPILE_TIMEOUT_SECONDS = 20
+# The edit round-trip budget. It used to be 20 s, which the gearbox end-cap's
+# first compile exceeds against a cold compilation cache; a compile that is
+# genuinely long is now visible and cancellable through the job registry, so
+# the budget errs on the side of finishing rather than killing real work.
+COMPILE_TIMEOUT_SECONDS = 90
 
 # Mesh extraction is a lazy background overlay, not the edit round-trip: dual
 # contouring plus feature-edge extraction over the whole scene, and on a cold
@@ -131,9 +135,9 @@ def warm_start(source: str | None = None) -> bool:
     ``CADJOINT_WARM_START`` override and the pytest default.
 
     Args:
-        source: Program to warm on; the playground's example scene (what the
-            editor opens with, and therefore what the first request will
-            almost certainly ask about) by default.
+        source: One program to warm on. By default the playground's example
+            scene first (what the editor opens with) and then every other
+            scene under the scenes directory.
 
     Returns:
         Whether a warm-up thread was started.
@@ -141,23 +145,38 @@ def warm_start(source: str | None = None) -> bool:
     if not _warm_start_enabled() or _WARM_STARTED.is_set():
         return False
     _WARM_STARTED.set()
+    sources: list[str]
     if source is None:
         from cadjoint.viewer._example_scene import EXAMPLE_SOURCE
 
-        source = EXAMPLE_SOURCE
+        # The example first — it is what the editor opens with — then every
+        # other shipped scene, so opening one from the browser is warm too.
+        sources = [EXAMPLE_SOURCE]
+        try:
+            from cadjoint.viewer._scenes import scenes_root
+
+            for path in sorted(scenes_root().glob("*.py")):
+                text = path.read_text()
+                if text != EXAMPLE_SOURCE:
+                    sources.append(text)
+        except Exception:  # noqa: BLE001 - no scenes directory is not an error
+            pass
+    else:
+        sources = [source]
 
     def prime() -> None:
-        # Both under the mesh budget, not their own: the point of the
-        # warm-up is the cold path, where even `compile` can outgrow the
-        # 20-second edit round-trip budget it is held to in a request.
-        for mode in ("compile", "mesh"):
-            try:
-                # Registered as `warmup` jobs so the process monitor can say
-                # why two workers are burning CPU right after launch.
-                with REGISTRY.track("warmup", source=source, fields={"mode": mode}) as job:
-                    REGISTRY.finish(job, _run_worker(source, mode, MESH_TIMEOUT_SECONDS))
-            except Exception:  # noqa: BLE001 - a cold cache is the only cost of failing
-                return
+        # All under the mesh budget, not their own: the point of the warm-up
+        # is the cold path, where even `compile` can outgrow the edit
+        # round-trip budget it is held to in a request.
+        for text in sources:
+            for mode in ("compile", "mesh"):
+                try:
+                    # Registered as `warmup` jobs so the process monitor can
+                    # say why workers are burning CPU right after launch.
+                    with REGISTRY.track("warmup", source=text, fields={"mode": mode}) as job:
+                        REGISTRY.finish(job, _run_worker(text, mode, MESH_TIMEOUT_SECONDS))
+                except Exception:  # noqa: BLE001 - a cold cache is the only cost of failing
+                    return
 
     threading.Thread(target=prime, name="cadjoint-compile-warmup", daemon=True).start()
     return True

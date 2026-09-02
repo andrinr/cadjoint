@@ -94,8 +94,20 @@ class TestWarmStart:
         assert started.wait(1.0), "no warm-up thread was started"
         started.thread.join(timeout=60)  # type: ignore[attr-defined]
 
-        assert [mode for _source, mode, _timeout in recorded] == ["compile", "mesh"]
-        assert {source for source, _mode, _timeout in recorded} == {EXAMPLE_SOURCE}
+        # The example scene is warmed first, then every other shipped scene,
+        # each as one compile and one mesh.
+        from cadjoint.viewer._scenes import scenes_root
+
+        others = [
+            path.read_text()
+            for path in sorted(scenes_root().glob("*.py"))
+            if path.read_text() != EXAMPLE_SOURCE
+        ]
+        assert [mode for _source, mode, _timeout in recorded] == ["compile", "mesh"] * (
+            1 + len(others)
+        )
+        assert [source for source, _mode, _timeout in recorded][:2] == [EXAMPLE_SOURCE] * 2
+        assert {source for source, _mode, _timeout in recorded} == {EXAMPLE_SOURCE, *others}
         # Both run under the mesh budget: the warm-up exists for the cold
         # path, where even a compile can outgrow the edit round-trip budget.
         assert {timeout for _s, _m, timeout in recorded} == {_worker_client.MESH_TIMEOUT_SECONDS}
