@@ -216,6 +216,80 @@ def test_a_bore_is_the_same_curve_wherever_the_lattice_falls(offset):
 
 
 # --------------------------------------------------------------------------
+# Fillets: sub-cell ones are the edge they round
+# --------------------------------------------------------------------------
+
+
+def _filleted_bore(smoothness: float):
+    """A plate with a round bore, the break-out rounded by ``smoothness``."""
+    return Difference(
+        Box(size=Vector([0.9, 0.7, 0.35])),
+        Cylinder(radius=0.32, height=1.0),
+        smoothness=smoothness,
+    )
+
+
+@pytest.mark.parametrize("radius", [0.02, 0.5 * CELL], ids=["bracket-sized", "half-cell"])
+def test_a_sub_cell_fillet_is_drawn_as_the_edge_it_rounds(radius):
+    """A fillet finer than a cell keeps its rim.
+
+    ``scenes/bracket.py`` rounds every junction — 0.05 at the web and 0.02
+    at the bores — and at the viewport's 0.094 cell none of that is
+    resolvable curvature: the dual-contour surface puts one vertex where the
+    fillet is.  Classifying it as a blend deleted the bore rims and the
+    web-to-plate line from the overlay, which is not what the part looks
+    like.  Below :data:`~cadjoint.viewer._edge_overlay._BLEND_AS_EDGE_CELLS`
+    the corner is drawn, and it is drawn *exactly*: the rim is still the
+    intersection of the plane and the cylinder, to the projection's floor.
+    """
+    brep, spacing = _extract_graph(_filleted_bore(radius))
+    assert [face for face in brep.faces if face.kind == "blend"] == []
+
+    points = _endpoints(_sharp_chords(brep, spacing))
+    on_bore = np.abs(np.hypot(points[:, 0], points[:, 1]) - 0.32) < 0.02
+    assert on_bore.sum() > 80, "the rounded bore lost its rim"
+    rim = points[on_bore]
+    assert np.abs(np.hypot(rim[:, 0], rim[:, 1]) - 0.32).max() < EXACT
+    assert np.abs(np.abs(rim[:, 2]) - 0.35).max() < EXACT
+
+
+@pytest.mark.parametrize("radius", [2.0 * CELL, 3.0 * CELL], ids=["two-cell", "three-cell"])
+def test_a_fillet_wider_than_a_cell_is_not_drawn(radius):
+    """Above the cut the fillet is real curvature, and gets no line.
+
+    The virtual sharp edge of a fillet this size sits a cell or more inside
+    the material.  Drawing it would put a line where the model has none —
+    the failure the threshold exists to bound on the other side.
+    """
+    brep, spacing = _extract_graph(_filleted_bore(radius))
+    assert [face for face in brep.faces if face.kind == "blend"] != []
+
+    points = _endpoints(_sharp_chords(brep, spacing))
+    on_bore = np.abs(np.hypot(points[:, 0], points[:, 1]) - 0.32) < CELL
+    assert on_bore.sum() == 0, "a line was drawn inside a resolvable fillet"
+
+
+def test_the_threshold_is_the_radius_the_user_typed():
+    """Why the constant needs no calibration factor.
+
+    ``smooth_min(a, b, k)`` is ``min(a, b) - h²/(16k)`` with
+    ``h = max(4k - |a - b|, 0)``, so where the two surfaces meet (``a = b``)
+    it pulls the result down by exactly ``k`` and nowhere by more.  The
+    blend test asks the owning patch for its value on the scene's own zero
+    set, so ``|f_patch|`` on a fillet runs from 0 at the band's edge to
+    ``k`` at its middle — which is what makes ``blend_tolerance`` readable
+    directly as "the largest radius still counted as an edge".
+    """
+    from cadjoint.sdf.boolean.smooth import smooth_min
+
+    for k in (0.02, 0.05, 0.3):
+        coincident = float(smooth_min(np.float64(0.0), np.float64(0.0), k))
+        assert coincident == pytest.approx(-k, rel=1e-6)
+        # And outside the band it is exactly the hard minimum.
+        assert float(smooth_min(np.float64(0.0), np.float64(5.0 * k), k)) == pytest.approx(0.0)
+
+
+# --------------------------------------------------------------------------
 # Grazing contacts
 # --------------------------------------------------------------------------
 

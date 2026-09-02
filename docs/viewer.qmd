@@ -219,9 +219,15 @@ a vertex on a CSG seam sits on the seam. **Feature edges** draws the graph's
 edges: each is the exact intersection curve of the two surfaces it separates,
 sampled at half a cell and projected onto both, so a bore rim is a circle whose
 radius is right to a millionth of a unit rather than a staircase, and it stays
-that circle wherever the grid cells happen to fall. Curves run into their corners and meet there
-exactly. Where a fillet rounds a corner away the graph says so and nothing is
-drawn: the model has no edge there. See
+that circle wherever the grid cells happen to fall. Curves run into their
+corners and meet there exactly.
+
+A rounded corner is still an edge if the rounding is finer than the overlay can
+show. The grid puts one vertex where a sub-cell fillet is, so its edge is drawn
+where the sharp corner would have been — which is what a bracket filleted at
+0.02 looks like on screen, and where its bore rims come from. Round a corner by
+more than a cell and it becomes curvature the viewport genuinely renders, and no
+line is drawn inside it. See
 [the B-rep architecture note](../research/brep-architecture.md) §8.1.
 
 Path tracing accumulates progressively: one jittered camera sample per pixel per

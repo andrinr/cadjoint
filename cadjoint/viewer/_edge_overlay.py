@@ -65,6 +65,31 @@ _PROJECTION_STEPS = 4
 # uniform in angle.
 _SHARP_SAMPLE_FRACTION = 0.5
 
+# Largest fillet radius, in cells, that is still drawn as a sharp edge.
+#
+# ``smooth_min(a, b, k)`` displaces the surface from the sharp corner by
+# exactly ``k`` at the midline of the blend band and by nothing at its
+# edges, so ``|f_patch|`` on a fillet runs from 0 up to ``k`` — which makes
+# the graph's ``blend_tolerance`` *directly* the radius above which a
+# rounded corner stops counting as an edge.  No other calibration is
+# needed; the tolerance is in the same units as the radius the user typed.
+#
+# One cell is the cut because that is where the overlay stops being able to
+# tell the difference.  A fillet finer than a cell cannot be *shown* as
+# curvature on a 64-cell grid — the dual-contour surface rounds it into one
+# vertex — so drawing its virtual sharp edge puts a line within a cell of
+# the surface, where the viewport reads it as the edge a CAD user expects.
+# Above a cell the fillet is a feature the viewport genuinely renders, and
+# a line buried inside it would be a line that is not on the model.
+#
+# Real parts sit well under the cut and read as edges: ``scenes/bracket.py``
+# blends at 0.05 and 0.02, ``scenes/starter.py`` at 0.03 and 0.005, against
+# a 0.094 cell.  The graph's own default (a thousandth of the grid diagonal,
+# 0.0104 here, about a ninth of a cell) is calibrated for *export*, where
+# any rounding at all must be honoured; it drew almost nothing on the
+# bracket, which is what this replaces.
+_BLEND_AS_EDGE_CELLS = 1.0
+
 # Largest ``|f|`` an edge may still carry and be drawn, as a fraction of the
 # grid spacing.  A genuine two-patch curve converges to ~1e-8; a pair of
 # patches that never actually meet (the parallel faces of a sub-cell slab,
@@ -350,6 +375,10 @@ def _extract_graph(scene: Any) -> tuple[BRep, np.ndarray]:
     edge curves, never a face's closed form, and fitting is a projection
     program plus a gradient program per face.
 
+    The blend tolerance is the overlay's own, not the graph's export-grade
+    default: a fillet finer than one cell is classified as the sharp corner
+    it rounds, and so gets drawn.  See :data:`_BLEND_AS_EDGE_CELLS`.
+
     Args:
         scene: Root SDF node.
 
@@ -368,7 +397,13 @@ def _extract_graph(scene: Any) -> tuple[BRep, np.ndarray]:
         # open-boundary warning would fire on every compile and say nothing
         # a viewer user can act on.  Clipping to the view is the point.
         warnings.filterwarnings("ignore", message="The isosurface crosses the extraction boundary")
-        brep = extract_brep(scene, grid, steps=_PROJECTION_STEPS, fit_surfaces=False)
+        brep = extract_brep(
+            scene,
+            grid,
+            steps=_PROJECTION_STEPS,
+            fit_surfaces=False,
+            blend_tolerance=_BLEND_AS_EDGE_CELLS * float(max(grid.spacing)),
+        )
     return brep, np.asarray(grid.spacing, dtype=np.float64)
 
 

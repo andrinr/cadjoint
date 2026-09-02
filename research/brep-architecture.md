@@ -708,15 +708,20 @@ Measured, `_mesh_edge_payload` on `scenes/starter.py`, wall clock:
 
 | `scenes/starter.py` | before (lattice links) | after (graph) |
 |---|---|---|
-| cold process — what the viewer pays, `mesh_source` forks per request | 16.9 s | **9.8 s** |
-| warm, second call in one process | 4.3 s | 5.5–6.0 s |
-| sharp segments | 453 | 889 |
+| cold process — what the viewer pays, `mesh_source` forks per request | 16.9 s | **8.6 s** |
+| warm, second call in one process | 4.3 s | 5.2–6.0 s |
+| sharp segments | 453 | 1006 |
 
 | `scenes/end_cap.py` | before | after |
 |---|---|---|
-| cold process | 215 s | **33.8 s** |
-| warm | 219 s | **32.3 s** |
-| sharp segments | 357 | 1043 |
+| cold process | 215 s | **32.5 s** |
+| warm | 219 s | **29.5 s** |
+| sharp segments | 357 | 1383 |
+
+Both columns are timed with `JAX_ENABLE_X64=1`, so the comparison is
+like-for-like; the shipped float32 default is faster still — starter 7.7 s
+cold, end-cap 27.1 s — and lands a handful of segments either way as the
+residual gate falls differently (starter 996, end-cap 1422).
 
 The cold number is the one the product pays, and the end-cap is where the
 difference shows: its cost was never compilation (before and after, warm
@@ -737,20 +742,62 @@ renders of the starter are in `research/design/light-chrome/edges-before-after*.
 the visible differences are the press-fit bush rims (drawn as circles, and not drawn
 at all before) and the curves that now run into their corners.
 
-**Blends: draw nothing.** Rendered three ways on the starter
-(`research/design/light-chrome/edges-blends.png`): nothing, the fillet's own
-boundary curves, and the virtual sharp edge the fillet replaced (which is
-just `blend_tolerance=inf`). The boundary curves are 48 edges totalling 3.7
-of arc length against 35.8 for the real edges — an average of 0.077, under a
-cell each — and they render as a scribble, not a curve; the battery's debris
-rule would reject them on their own metric. The virtual midline is a near-tie
-*on this scene only*, because the starter's fillets are sub-cell (0.03
-against a 0.094 cell) so the line it draws is within a third of a cell of the
-surface; at any manufacturable radius it is a line floating off the model,
-and a curve that is not on the model is not an edge. That is not a style
-choice — it is right for exactly one radius — so it gets no payload flag.
-The price is honest and visible: where a fillet is detected the curves stop,
-and the graph is saying the model has no edge there.
+**Blends: a fillet finer than a cell is the edge it rounds.** Rendered three
+ways on the starter (`research/design/light-chrome/edges-blends.png`): nothing,
+the fillet's own boundary curves, and the virtual sharp edge the fillet
+replaced. On a sub-cell fillet the boundary curves are out on their own
+numbers — on the starter, 61 blend-adjacent edges totalling 4.1 of arc length
+against 34.6 for the analytic edges, an average of 0.067, well under a cell
+each — and they render as a scribble, not a curve; the battery's debris rule
+would reject them on their own metric. That leaves the choice between nothing
+and the virtual sharp edge, and it is not a matter of taste: it is a question
+of *radius against cell*, and the graph already has the dial.
+
+`smooth_min(a, b, k)` is `min(a, b) - h²/(16k)` with `h = max(4k - |a-b|, 0)`,
+so it pulls the surface down from the sharp corner by exactly `k` where the two
+operands meet and by nothing at the band's edges. The blend test asks the
+owning patch for its value on the scene's own zero set, so `|f_patch|` across a
+fillet runs from 0 to `k` — which makes `blend_tolerance` **directly** the
+largest radius still counted as an edge, in the same units as the number the
+user typed. No calibration factor, and
+`tests/viewer/test_edge_overlay_brep.py::test_the_threshold_is_the_radius_the_user_typed`
+pins the identity.
+
+The overlay therefore sets `blend_tolerance` to **one cell**
+(`_BLEND_AS_EDGE_CELLS`), where its own resolution runs out: a fillet finer
+than a cell cannot be *shown* as curvature on a 64-cell grid — dual contouring
+rounds it into one vertex — so its virtual sharp edge lands within a cell of
+the surface and reads as the edge a CAD user is looking for. Above a cell the
+fillet is curvature the viewport genuinely renders, and a line buried inside it
+would be a line that is not on the model. The transition is sharp and measured,
+on a plate with a rounded bore:
+
+| fillet radius | blend faces | rim drawn | rim radius error |
+|---|---|---|---|
+| 0.02 (0.21 cell) | 0 | 86 points | 1.9 × 10⁻⁸ |
+| 0.047 (0.50 cell) | 0 | 86 points | 2.1 × 10⁻⁸ |
+| 0.188 (2.0 cells) | 2 | none | — |
+| 0.281 (3.0 cells) | 4 | none | — |
+
+The graph's own default — a thousandth of the grid diagonal, 0.0104 here, about
+a *ninth* of a cell — is calibrated for export, where any rounding at all must
+be honoured. Left in place it deleted most of `scenes/bracket.py`, which rounds
+every junction (`Union(..., smoothness=0.05)`, `Difference(..., 0.02)`), and
+the bore rims and the web-to-plate line were simply absent:
+
+| `scenes/bracket.py` | export default (0.11 cell) | overlay (1 cell) |
+|---|---|---|
+| faces / of which blend | 55 / 27 | 28 / **0** |
+| edges / drawn | 121 / 35 | 63 / **61** |
+| sharp segments | 749 | **1246** |
+
+The two undrawn edges at one cell are refused by the residual gate, which is
+the safety net doing its job. The same shift on the starter is 78 faces / 26
+blend and 81 of 163 edges drawn, against 57 / 0 and 103 of 114. Before and
+after in `research/design/light-chrome/edges-bracket.png`.
+
+This is a threshold, not a style choice, so it stays a named constant and gets
+no payload flag.
 
 ---
 
