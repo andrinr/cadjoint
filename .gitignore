@@ -40,3 +40,6 @@ frontend/test-results/
 frontend/playwright-report/
 frontend/.vite/
 _skipped.*
+
+# Tesseract runtime scratch: each in-process apply writes run_<uuid>/ into cwd.
+run_*/
