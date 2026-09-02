@@ -183,7 +183,10 @@ def starter_surface():
     with capture_sim_meshes(), capture_studies():
         exec(compile(_SCENE_PATH.read_text(), str(_SCENE_PATH), "exec"), namespace, namespace)
 
-    scene = namespace["scene"]
+    # The body the declared mesh discretizes (its ``domain=``), not the
+    # rendered scene: the starter also draws board-level context the physics
+    # never sees.
+    scene = namespace["thermal_body"]
     free0, fixed, _ = extract_parameters(scene)
     scene_fn = functionalize(scene)
 

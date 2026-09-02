@@ -28,6 +28,13 @@ from cadjoint.viewer._limits import OVERSIZED_SOURCE_ERROR, exceeds_source_limit
 
 COMPILE_TIMEOUT_SECONDS = 20
 
+# Mesh extraction is a lazy background overlay, not the edit round-trip: dual
+# contouring plus feature-edge extraction over the whole scene, and on a cold
+# compilation cache the first request pays XLA for every program involved
+# (measured on the starter: ~60 s cold, ~17 s warm). It gets its own budget
+# so a cold cache cannot make the overlay silently vanish.
+MESH_TIMEOUT_SECONDS = 90
+
 
 def _run_worker(
     source: str, mode: str, timeout: float, extra: dict[str, Any] | None = None
@@ -71,7 +78,7 @@ def compile_source(source: str, timeout: float = COMPILE_TIMEOUT_SECONDS) -> dic
     return _run_worker(source, "compile", timeout)
 
 
-def mesh_source(source: str, timeout: float = COMPILE_TIMEOUT_SECONDS) -> dict[str, Any]:
+def mesh_source(source: str, timeout: float = MESH_TIMEOUT_SECONDS) -> dict[str, Any]:
     """Extract only the dual-contour mesh edges, in a disposable child process.
 
     Mesh extraction dominates a full compile, so the viewer requests it lazily

@@ -269,7 +269,16 @@ def test_example_scene_reports_its_construction_for_the_viewer():
     assert EXAMPLE_SOURCE[start:end] == "[0.78, 0.0, 0.1]"
 
     materials = {material["name"]: material for material in result["materials"]}
-    assert set(materials) == {"aluminum", "copper", "steel"}
+    # The three simulated metals plus the board-level context palette.
+    assert set(materials) == {
+        "aluminum",
+        "copper",
+        "steel",
+        "fr4",
+        "silicon",
+        "black_oxide",
+        "electrolytic",
+    }
     assert materials["aluminum"]["metallic"] == pytest.approx(0.9)
     assert materials["copper"]["roughness"] == pytest.approx(0.18)
     assert materials["steel"]["metallic"] == pytest.approx(0.85)
@@ -1331,3 +1340,38 @@ def test_optimize_endpoint_streams_ndjson_over_http():
     assert events[-1]["parameters"]["radius"] == pytest.approx(
         events[-1]["trajectory"][-1]["parameters"]["radius"]
     )
+
+
+@pytest.mark.parametrize("path", ["/api/lint", "/api/complete", "/api/signature"])
+def test_intelligence_endpoints_require_the_session_token(path):
+    # The analyser endpoints read the same arbitrary source everything else
+    # does, so they sit behind the same CSRF gate.
+    with running_server() as base:
+        with pytest.raises(HTTPError) as error:
+            urlopen(post(base, path, {"source": "scene = None", "line": 1, "column": 0}))
+        assert error.value.code == 403
+
+
+def test_a_failed_compile_is_reported_again_by_the_linter():
+    # The routing table taps /compile so a traceback that named a line of the
+    # user's program comes back as the first lint diagnostic.
+    source = (
+        "from cadjoint.geometry import Vector\n"
+        "from cadjoint.sdf.primitives import Box\n"
+        "scene = Box(size=Vector([1.0, 1.0, 1.0]))\n"
+        "boom = 1 / 0\n"
+    )
+    with running_server() as base:
+        with urlopen(f"{base}/api/session") as response:
+            token = json.loads(response.read())["token"]
+        with pytest.raises(HTTPError) as error:
+            urlopen(post(base, "/compile", {"source": source}, token))
+        assert error.value.code == 422
+        with urlopen(post(base, "/api/lint", {"source": source}, token)) as response:
+            lint = json.loads(response.read())
+
+    assert lint["runtime"] is True
+    first = lint["diagnostics"][0]
+    assert first["source"] == "runtime"
+    assert first["from_line"] == 4
+    assert "ZeroDivisionError" in first["message"]

@@ -254,11 +254,13 @@ class TestStarterScene:
         # The study solves on the explicitly declared SimMesh (quality path).
         assert namespace["heat_study"].mesh is namespace["sink_mesh"]
         assert namespace["sink_mesh"].method == "tet10"
-        # No declared domain: the scene's free parameters are the design.
+        # The mesh declares its domain (the thermal body), so the design is
+        # that body's free parameters — not the board-level context the
+        # scene also draws.
         assert "fin_depth" in described["parameters"]
         assert set(namespace["sink_parameters"]) <= set(described["parameters"])
-        # Without the scene the parameter list degrades gracefully.
-        assert optimization.describe()["parameters"] == []
+        # A declared domain resolves without the scene, too.
+        assert optimization.describe()["parameters"] == described["parameters"]
 
         # Five steps: the tet10 objective is rougher across the first adam
         # step than the hex one (re-projected DC surface points), so descent
