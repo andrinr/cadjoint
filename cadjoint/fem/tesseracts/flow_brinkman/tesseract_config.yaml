@@ -1,0 +1,19 @@
+# Tesseract configuration file (tesseract-core 1.11 contract: a Tesseract
+# package is tesseract_api.py + tesseract_config.yaml + a requirements file
+# in one directory; `tesseract build <dir>` turns it into a Docker image).
+
+name: "cadjoint_flow_brinkman"
+version: "0.1.0"
+description: >-
+  Brinkman-penalised steady incompressible flow (D3Q19 BGK lattice
+  Boltzmann) on a fixed grid, with the design entering as a smooth solid
+  fraction rather than a mesh, and an implicit-function-theorem
+  vector_jacobian_product taken at the converged fixed point. Reports
+  pressure drop and a convective heat-transfer proxy.
+
+build_config:
+  # cadjoint.flow is pure JAX over a fixed-size array -- no PETSc, no gmsh,
+  # no meshing at all -- so everything it needs ships as a wheel on both
+  # linux-64 and linux-aarch64 and the default pip provider is enough.
+  # Decouple the interpreter from the base image's system Python.
+  python_version: "3.12"

@@ -58,7 +58,7 @@ CONFIG_NAME = "plugins.toml"
 
 #: The slots cadjoint itself resolves by kind.  A plugin may declare any
 #: kind; these are the ones the pipeline asks for.
-KINDS = ("mesher", "tetfill", "thermal_solver", "elastic_solver", "qef")
+KINDS = ("mesher", "tetfill", "thermal_solver", "elastic_solver", "qef", "flow_solver")
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _TESSERACTS = Path(__file__).resolve().parents[1] / "fem" / "tesseracts"
@@ -72,6 +72,7 @@ BUILTIN_PACKAGES: dict[str, tuple[str, Path]] = {
     "thermal_jaxfem": ("thermal_solver", _TESSERACTS / "thermal_jaxfem"),
     "elastic_jaxfem": ("elastic_solver", _TESSERACTS / "elastic_jaxfem"),
     "elastic_calculix": ("elastic_solver", _TESSERACTS / "elastic_calculix"),
+    "flow_brinkman": ("flow_solver", _TESSERACTS / "flow_brinkman"),
     "qef_native": ("qef", _REPO_ROOT / "native"),
 }
 
@@ -82,6 +83,7 @@ BUILTIN_DEFAULTS: dict[str, str] = {
     "tetfill": "tetfill",
     "thermal_solver": "thermal_jaxfem",
     "elastic_solver": "elastic_jaxfem",
+    "flow_solver": "flow_brinkman",
     "qef": "qef_native",
 }
 
