@@ -282,7 +282,7 @@ fn trace_pixel(frag_xy: vec2<f32>) -> TraceResult {
       // Fade faces that point at the viewer and keep grazing angles solid, so
       // silhouettes and creases stay legible while interiors turn translucent.
       let facing = 1.0 - abs(dot(normal, ray.direction));
-      let alpha = mix(0.42, 0.97, facing * facing);
+      let alpha = mix(0.62, 0.98, facing * facing);
       // On paper a face cannot fade toward the background: the ground is the
       // brightest thing on screen, so "transparent" and "absent" would be the
       // same pixel and an x-rayed solid disappears entirely (measured: sRGB
@@ -293,7 +293,7 @@ fn trace_pixel(frag_xy: vec2<f32>) -> TraceResult {
       // opposite direction: faint where you look through the part, strong
       // where the surface turns away.
       result.color = mix(
-        environment_radiance(ray.direction) * 0.80,
+        environment_radiance(ray.direction) * 0.42,
         result.color,
         mix(1.0, alpha, xray),
       );
