@@ -116,6 +116,18 @@ class SimulationResult:
         # not become the reported minimum, nor a division warning.
         return float(np.min(strength / np.maximum(stress, 1e-30)))
 
+    @property
+    def refinement(self) -> dict[str, Any] | None:
+        """What automatic grid refinement the tet mesher had to do, or None.
+
+        Tet meshes need a finer grid than hexes on thin features, so
+        :func:`~cadjoint.fem.tetmesh.sdf_to_tet_mesh` may have meshed this
+        result on a finer grid than the SimMesh declared (see that
+        function for the record's shape).  None for hex results and for
+        tet meshes that did not come through the ladder.
+        """
+        return getattr(self.mesh, "refinement", None)
+
     def nodal_scalar(self) -> np.ndarray:
         """The concrete per-node display field named by :attr:`field`.
 
@@ -170,13 +182,18 @@ class SimulationResult:
 
         Returns:
             ``{"name", "kind", "field", "mesh", "nodes", "elements",
-            "range", "fields", "mass", "safety_factor"}`` where ``mesh`` is
+            "range", "fields", "mass", "safety_factor", "refinement"}``
+            where ``mesh`` is
             the SimMesh name (or None), ``range`` is the ``[min, max]`` of
             the display field of :meth:`nodal_scalar`, ``fields`` maps each
             solved field to a ``{"min", "mean", "max"}`` summary
             (displacement summarized by magnitude, von Mises per cell), and
             ``mass`` (kg) / ``safety_factor`` are None when the scene's
-            materials do not make them computable.
+            materials do not make them computable.  ``refinement`` is None
+            unless the tet mesher had to re-dice the declared grid, in
+            which case it is ``{"declared", "used", "attempts"}`` — the
+            declared and actually-used cell counts and how many
+            extractions it took (:attr:`refinement` holds the full record).
         """
         scalar = self.nodal_scalar()
         fields: dict[str, dict[str, float]] = {}
@@ -199,6 +216,7 @@ class SimulationResult:
             "fields": fields,
             "mass": None if self.mass is None else round(float(self.mass), 9),
             "safety_factor": (None if self.safety_factor is None else round(self.safety_factor, 6)),
+            "refinement": _refinement_summary(self.refinement),
         }
 
     def to_vtk(self, path: str) -> None:
@@ -208,6 +226,26 @@ class SimulationResult:
         displacement + von Mises for elastic.
         """
         self.solution.vtk_export(path)
+
+
+def _refinement_summary(record: dict[str, Any] | None) -> dict[str, Any] | None:
+    """JSON-ready digest of a tet refinement record (lists, not tuples).
+
+    Args:
+        record: The mesh's ``refinement`` record, or None.
+
+    Returns:
+        None when nothing was refined, else ``{"declared", "used",
+        "attempts"}`` with the cell counts as lists so the payload
+        round-trips through JSON.
+    """
+    if not record or not record.get("refined"):
+        return None
+    return {
+        "declared": [int(count) for count in record["declared"]],
+        "used": [int(count) for count in record["used"]],
+        "attempts": len(record["attempts"]),
+    }
 
 
 def _summary(values: np.ndarray) -> dict[str, float]:

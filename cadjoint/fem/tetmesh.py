@@ -51,7 +51,9 @@ it without shipping jax-fem).
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import math
+from dataclasses import dataclass, replace
+from types import SimpleNamespace
 from typing import Any, Callable
 
 import numpy as np
@@ -68,10 +70,12 @@ from cadjoint.fem.elements import TET10_EDGES
 from cadjoint.fem.motion import project_points, recompute_tet_points, smooth_interior_delta
 from cadjoint.fem.quality import tet_aspect_ratios, tet_radius_ratios, tet_volumes
 from cadjoint.meshing import GridSpec, extract_mesh
+from cadjoint.meshing.diagnostics import self_intersections
 
 __all__ = [
     "TetMesh",
     "recompute_tet_points",
+    "refine_resolution",
     "sdf_to_tet_mesh",
     "smooth_interior_delta",
     "surface_to_tet_mesh",
@@ -154,6 +158,11 @@ class TetMesh:
             index pairs whose midpoints the appended midside nodes are
             (row ``k`` describes node ``num_corner_points + k``; rows are
             sorted pairs in lexicographic order).
+        refinement: What the automatic refinement ladder of
+            :func:`sdf_to_tet_mesh` had to do to produce this mesh, or
+            None when the mesh did not come through it (a raw surface, or
+            a chain/tesseract fill).  See
+            :func:`sdf_to_tet_mesh` for the record's shape.
     """
 
     points: np.ndarray
@@ -164,6 +173,7 @@ class TetMesh:
     max_step: float
     grid: GridSpec | None = None
     edge_parents: np.ndarray | None = None
+    refinement: dict[str, Any] | None = None
 
     @property
     def num_points(self) -> int:
@@ -258,10 +268,7 @@ def surface_to_tet_mesh(
             quiet=True,
         )
     except RuntimeError as error:
-        raise RuntimeError(
-            f"TetGen rejected the surface: {error}. DC surfaces can self-intersect at "
-            "coarse resolutions; re-extract on a finer grid or with sharp=False."
-        ) from error
+        raise RuntimeError(f"{_TETGEN_PREFIX}{error}. {_SINGLE_GRID_ADVICE}") from error
     nodes = np.asarray(nodes, dtype=np.float64)
     cells = np.asarray(cells, dtype=np.int32)
     count = vertices.shape[0]
@@ -306,6 +313,103 @@ def surface_to_tet_mesh(
     )
 
 
+#: Prefix every TetGen failure carries, whether it came from one grid or
+#: from the whole refinement ladder.  Callers match on it, so both paths
+#: keep it and neither repeats it.
+_TETGEN_PREFIX = "TetGen rejected the surface: "
+
+#: What :func:`surface_to_tet_mesh` advises when it has only the one grid
+#: it was handed.  :func:`sdf_to_tet_mesh` has already tried that advice by
+#: the time it fails, so it strips this sentence and gives its own.
+_SINGLE_GRID_ADVICE = (
+    "DC surfaces can self-intersect at coarse resolutions; re-extract on a "
+    "finer grid or with sharp=False."
+)
+
+#: Grid scale factors the refinement ladder in :func:`sdf_to_tet_mesh`
+#: walks after the declared resolution, in order.  1.5x is the smallest
+#: step that reliably moves a feature sitting on ~1.3 cells past two
+#: cells, and 2.25x (its square) is the second rung.
+_REFINEMENT_FACTORS = (1.5, 2.25)
+
+#: Non-adjacent triangle pairs the pre-TetGen diagnostic samples, as a
+#: multiple of the surface's triangle count and clamped to this ceiling.
+#: The check is a *sampled* one (see
+#: :func:`cadjoint.meshing.diagnostics.self_intersections`): a hit proves
+#: the surface is folded, a miss proves nothing.
+#:
+#: It does not buy speed.  Measured on the end cap's housing (2026-09-02),
+#: it costs 0.12-0.16 s per rung at 145k-200k pairs -- about 1% of the
+#: ~15 s the rung's extraction and projection cost, but *more* than the
+#: 0.06-0.16 s TetGen itself takes to reject a folded surface.  What it
+#: buys is the diagnosis: the rung is recorded as ``"self-intersecting"``
+#: with a fold count instead of as an opaque TetGen string, and the same
+#: number is what tells a caller that refining is the wrong answer.
+_DIAGNOSTIC_PAIRS_PER_TRIANGLE = 32
+_DIAGNOSTIC_PAIRS_CEILING = 200_000
+
+
+def refine_resolution(resolution: tuple[int, int, int], factor: float) -> tuple[int, int, int]:
+    """Scale a per-axis cell count by ``factor``, rounding each axis up.
+
+    Args:
+        resolution: Cells per axis.
+        factor: Scale factor; values below 1 shrink the grid.
+
+    Returns:
+        The scaled cell counts, each at least 1.
+    """
+    return tuple(max(1, int(math.ceil(count * factor))) for count in resolution)  # type: ignore[return-value]
+
+
+def _rescaled_grid(grid: GridSpec, cells: tuple[int, int, int]) -> GridSpec:
+    """The same sampled box as ``grid``, re-diced into ``cells`` cells per axis."""
+    extent = [span * count for span, count in zip(grid.spacing, grid.cells)]
+    spacing = tuple(float(span / count) for span, count in zip(extent, cells))
+    return GridSpec(origin=grid.origin, spacing=spacing, cells=tuple(int(c) for c in cells))
+
+
+def _bare_reason(message: str) -> str:
+    """A TetGen failure stripped of the wrapper the ladder re-adds itself.
+
+    Args:
+        message: The message :func:`surface_to_tet_mesh` raised.
+
+    Returns:
+        Just what TetGen objected to, without the shared prefix, without
+        the single-grid advice the ladder supersedes, and without the
+        trailing period the ladder's own sentence supplies.
+    """
+    reason = message.removeprefix(_TETGEN_PREFIX).strip()
+    return reason.removesuffix(_SINGLE_GRID_ADVICE).strip().rstrip(".")
+
+
+def _count_self_intersections(vertices: np.ndarray, faces: np.ndarray) -> dict[str, int]:
+    """Sampled self-intersection count of a surface, sized to the surface.
+
+    Wraps :func:`cadjoint.meshing.diagnostics.self_intersections` with a
+    pair budget proportional to the triangle count (see
+    :data:`_DIAGNOSTIC_PAIRS_PER_TRIANGLE`).
+
+    Args:
+        vertices: Surface vertex positions ``(V, 3)``.
+        faces: Triangle connectivity ``(F, 3)``.
+
+    Returns:
+        ``{"count": int, "tested": int}`` — intersecting pairs found, and
+        non-adjacent pairs actually tested.
+    """
+    budget = min(
+        _DIAGNOSTIC_PAIRS_CEILING,
+        max(4096, _DIAGNOSTIC_PAIRS_PER_TRIANGLE * int(faces.shape[0])),
+    )
+    # ``self_intersections`` only reads ``.vertices`` / ``.faces``, so the
+    # surface under test need not be a dual_contouring ``Mesh`` (here it
+    # is the *projected* surface, which is what TetGen actually sees).
+    report = self_intersections(SimpleNamespace(vertices=vertices, faces=faces), pairs=budget)
+    return {"count": int(report["count"]), "tested": int(report["tested"])}
+
+
 def sdf_to_tet_mesh(
     sdf: Callable[[Any], Any],
     grid: GridSpec,
@@ -313,6 +417,7 @@ def sdf_to_tet_mesh(
     sharp: bool = True,
     min_ratio: float = 1.5,
     min_dihedral: float = 10.0,
+    max_refinements: int = 2,
 ) -> TetMesh:
     """Extract the DC surface of ``sdf`` on ``grid`` and tet-mesh its inside.
 
@@ -325,31 +430,126 @@ def sdf_to_tet_mesh(
     re-projection at solve time would move the boundary of an
     already-meshed volume and collapse sliver tets.
 
+    **Automatic refinement.**  Tets need a finer grid than hexes on thin
+    features: the hex mesher only has to decide in/out per cell, while
+    TetGen needs the DC surface to be a valid PLC, and a wall thinner than
+    about two cells makes dual contouring fold that surface over itself.
+    So this function walks a ladder of grids over the same box — the
+    declared resolution, then ``x1.5`` and ``x2.25`` (rounded up per axis,
+    see :data:`_REFINEMENT_FACTORS`) — and at each rung tries exact
+    sharp-feature placement first and the more robust Tikhonov placement
+    second, exactly as a caller would by hand.  Before each TetGen call
+    the projected surface goes through the sampled self-intersection
+    diagnostic, so a rung it catches is recorded as folded, with a count,
+    rather than as an opaque TetGen string (it is a sampled check, and
+    cheap, but it is not a speed-up -- see
+    :data:`_DIAGNOSTIC_PAIRS_PER_TRIANGLE`).  The first rung that TetGen
+    accepts wins.
+
     Args:
         sdf: Signed distance field callable on ``(..., 3)`` points.
-        grid: DC sampling lattice (must fully contain the surface).
-        sharp: Use exact sharp-feature vertex placement for the surface
-            (``False`` falls back to Tikhonov QEF placement, which is
-            more robust against self-intersections at coarse grids).
+        grid: DC sampling lattice (must fully contain the surface); its
+            box is held fixed while the ladder re-dices it.
+        sharp: Try exact sharp-feature vertex placement at each rung
+            (``False`` uses only the Tikhonov QEF placement, which is more
+            robust against self-intersections at coarse grids).
         min_ratio: TetGen radius-edge quality bound.
         min_dihedral: TetGen minimum dihedral angle bound in degrees.
+        max_refinements: How many refinement rungs to try after the
+            declared resolution (0 restores the pre-refinement behaviour
+            of failing at the declared grid).
 
     Returns:
         The :class:`TetMesh`; its first ``num_surface`` points are the
         projected DC surface vertices, its ``base_points`` hold the raw
-        DC positions the projection restarts from.
+        DC positions the projection restarts from, its ``grid`` is the
+        rung that succeeded, and its
+        :attr:`~TetMesh.refinement` records the ladder::
+
+            {"declared": (26, 26, 13),      # the resolution asked for
+             "used": (39, 39, 20),          # the resolution that worked
+             "factor": 1.5,                 # scale of the winning rung
+             "refined": True,               # used != declared
+             "attempts": [                  # every rung/placement tried
+                 {"resolution": (26, 26, 13), "factor": 1.0, "sharp": True,
+                  "self_intersections": 3, "pairs_tested": 146432,
+                  "outcome": "self-intersecting"},
+                 ...
+                 {"resolution": (39, 39, 20), "factor": 1.5, "sharp": True,
+                  "self_intersections": 0, "pairs_tested": 331264,
+                  "outcome": "meshed"}]}
+
+        ``outcome`` is ``"meshed"``, ``"self-intersecting"`` (the
+        diagnostic fired, TetGen was not run) or ``"rejected"`` (TetGen
+        ran and refused; the attempt also carries ``"error"``).
+
+    Raises:
+        RuntimeError: If no rung of the ladder produces a mesh.  The
+            message names the declared and the finest attempted
+            resolution and the thinnest-feature heuristic.
     """
-    surface = extract_mesh(sdf, grid, sharp=sharp)
-    raw = np.asarray(surface.vertices, dtype=np.float64)
-    max_step = 0.5 * float(np.linalg.norm(grid.spacing))
-    projected = np.asarray(project_points(sdf, raw, max_step), dtype=np.float64)
-    return surface_to_tet_mesh(
-        projected,
-        np.asarray(surface.faces),
-        base_vertices=raw,
-        grid=grid,
-        min_ratio=min_ratio,
-        min_dihedral=min_dihedral,
+    declared = tuple(int(count) for count in grid.cells)
+    factors = (1.0, *_REFINEMENT_FACTORS[: max(0, int(max_refinements))])
+    placements = (True, False) if sharp else (False,)
+    attempts: list[dict[str, Any]] = []
+    last_error = ""
+    for factor in factors:
+        cells = declared if factor == 1.0 else refine_resolution(declared, factor)
+        level = grid if cells == tuple(grid.cells) else _rescaled_grid(grid, cells)
+        for placement in placements:
+            surface = extract_mesh(sdf, level, sharp=placement)
+            raw = np.asarray(surface.vertices, dtype=np.float64)
+            faces = np.asarray(surface.faces, dtype=np.int64).reshape((-1, 3))
+            max_step = 0.5 * float(np.linalg.norm(level.spacing))
+            projected = np.asarray(project_points(sdf, raw, max_step), dtype=np.float64)
+            folds = _count_self_intersections(projected, faces)
+            attempt: dict[str, Any] = {
+                "resolution": cells,
+                "factor": float(factor),
+                "sharp": bool(placement),
+                "self_intersections": folds["count"],
+                "pairs_tested": folds["tested"],
+            }
+            attempts.append(attempt)
+            if folds["count"] > 0:
+                attempt["outcome"] = "self-intersecting"
+                last_error = (
+                    f"the surface self-intersects ({folds['count']} folded triangle "
+                    f"pairs found in {folds['tested']} sampled)"
+                )
+                continue
+            try:
+                mesh = surface_to_tet_mesh(
+                    projected,
+                    faces,
+                    base_vertices=raw,
+                    grid=level,
+                    min_ratio=min_ratio,
+                    min_dihedral=min_dihedral,
+                )
+            except RuntimeError as error:
+                attempt["outcome"] = "rejected"
+                attempt["error"] = str(error)
+                last_error = _bare_reason(str(error))
+                continue
+            attempt["outcome"] = "meshed"
+            return replace(
+                mesh,
+                refinement={
+                    "declared": declared,
+                    "used": cells,
+                    "factor": float(factor),
+                    "refined": cells != declared,
+                    "attempts": attempts,
+                },
+            )
+    finest = attempts[-1]["resolution"] if attempts else declared
+    raise RuntimeError(
+        f"{_TETGEN_PREFIX}{last_error}. The surface stays self-intersecting "
+        f"up to {finest} (declared {declared}, refined "
+        f"{' and '.join(f'x{factor:g}' for factor in factors[1:]) or 'not at all'}); the "
+        "part likely has features thinner than two cells at the declared resolution — "
+        "raise the declared resolution or use method='hex'."
     )
 
 
@@ -418,4 +618,5 @@ def tet10_mesh(mesh: TetMesh) -> TetMesh:
         max_step=mesh.max_step,
         grid=mesh.grid,
         edge_parents=parents,
+        refinement=mesh.refinement,
     )
