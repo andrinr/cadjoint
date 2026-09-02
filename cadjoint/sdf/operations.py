@@ -14,11 +14,13 @@ from __future__ import annotations
 
 import math
 
+import jax
 import jax.numpy as jnp
 from jax import Array
 
 from cadjoint.fluent import Fluent
 from cadjoint.geometry.parameters import Scalar
+from cadjoint.sdf._lowering import is_scalar_lowering
 from cadjoint.sdf.transforms.base import Transform
 
 # The world plane each named mirror axis stands for: the coordinate plane
@@ -144,6 +146,29 @@ def _rotate_about(p: Array, origin: Array, axis: Array, angle: float) -> Array:
     """
     v = p - origin
     c, s = math.cos(angle), math.sin(angle)
+    parallel = axis * jnp.sum(v * axis, axis=-1, keepdims=True)
+    return origin + v * c + jnp.cross(axis, v) * s + parallel * (1.0 - c)
+
+
+def _rotate_about_traced(p: Array, origin: Array, axis: Array, angle: Array) -> Array:
+    """Rodrigues rotation with a *traced* angle, so instances can be batched.
+
+    :func:`_rotate_about` folds its sine and cosine at trace time, which is
+    right when each instance is emitted separately.  A vectorised pattern
+    instead maps one child evaluation over an array of angles, and an array
+    cannot be a Python float.
+
+    Args:
+        p: Points, shape ``(..., 3)``.
+        origin: A point on the axis, shape ``(3,)``.
+        axis: Unit axis direction, shape ``(3,)``.
+        angle: Rotation angle in radians, right-handed about ``axis``.
+
+    Returns:
+        The rotated points, shaped like ``p``.
+    """
+    v = p - origin
+    c, s = jnp.cos(angle), jnp.sin(angle)
     parallel = axis * jnp.sum(v * axis, axis=-1, keepdims=True)
     return origin + v * c + jnp.cross(axis, v) * s + parallel * (1.0 - c)
 
@@ -297,6 +322,10 @@ class LinearPattern(_Operation):
     # face references still land on this node's surface.
     inherits_faces = True
 
+    # ``count`` decides how many instances are *emitted*, so it has to be a
+    # Python int at trace time even when every other parameter is an argument.
+    static_params = ("count",)
+
     @staticmethod
     def _transform_point(p: Array, direction, spacing, count) -> Array:  # noqa: ARG004
         # Material is looked up on the base copy; all copies share it anyway.
@@ -304,13 +333,26 @@ class LinearPattern(_Operation):
 
     @staticmethod
     def sdf(child_sdf, p: Array, direction: Array, spacing: Array, count: Array) -> Array:
-        """Pure function for the linear pattern (count must be concrete)."""
+        """Pure function for the linear pattern (count must be concrete).
+
+        The child is traced **once**, over an array of instance offsets, so the
+        emitted program holds one copy of the pattern's geometry rather than
+        ``count`` of them.  Offset 0 is exactly zero, so copy 0 is still the
+        child evaluated at ``p`` itself.  Under
+        :func:`~cadjoint.sdf._lowering.scalar_lowering` the instances are
+        unrolled again, because a shader cannot carry the batch axis.
+        """
         num = int(count)
         axis = direction / jnp.linalg.norm(direction)
-        d = child_sdf(p)
-        for i in range(1, num):
-            d = jnp.minimum(d, child_sdf(p - axis * (spacing * i)))
-        return d
+        if num == 1:
+            return child_sdf(p)
+        if is_scalar_lowering():
+            d = child_sdf(p)
+            for i in range(1, num):
+                d = jnp.minimum(d, child_sdf(p - axis * (spacing * i)))
+            return d
+        offsets = axis * (spacing * jnp.arange(num, dtype=jnp.float32))[:, None]
+        return jnp.min(jax.vmap(lambda offset: child_sdf(p - offset))(offsets), axis=0)
 
     def __call__(self, p: Array) -> Array:
         return LinearPattern.sdf(
@@ -365,6 +407,10 @@ class PolarPattern(_Operation):
     # the child still lands on this node's surface.
     inherits_faces = True
 
+    # ``count`` decides how many instances are *emitted*, so it has to be a
+    # Python int at trace time even when every other parameter is an argument.
+    static_params = ("count",)
+
     @staticmethod
     def _transform_point(p: Array, count: Array, origin: Array, direction: Array) -> Array:  # noqa: ARG004
         # Material is looked up on the base copy; all copies share it anyway.
@@ -372,13 +418,31 @@ class PolarPattern(_Operation):
 
     @staticmethod
     def sdf(child_sdf, p: Array, count: Array, origin: Array, direction: Array) -> Array:
-        """Pure function for the polar pattern (count must be concrete)."""
+        """Pure function for the polar pattern (count must be concrete).
+
+        Copies 1..N-1 are traced **once**, over an array of instance angles, so
+        the emitted program holds two copies of the pattern's geometry (the
+        unrotated original and the batched rest) rather than ``count`` of them.
+        Copy 0 stays a separate, unrotated evaluation: ``origin + (p - origin)``
+        is only equal to ``p`` up to rounding, and copy 0 is the one the child's
+        face references are declared against.  Under
+        :func:`~cadjoint.sdf._lowering.scalar_lowering` every instance is
+        unrolled again, because a shader cannot carry the batch axis.
+        """
         num = int(count)
         d = child_sdf(p)
-        for i in range(1, num):
-            theta = 2.0 * math.pi * i / num
-            d = jnp.minimum(d, child_sdf(_rotate_about(p, origin, direction, -theta)))
-        return d
+        if num == 1:
+            return d
+        if is_scalar_lowering():
+            for i in range(1, num):
+                theta = 2.0 * math.pi * i / num
+                d = jnp.minimum(d, child_sdf(_rotate_about(p, origin, direction, -theta)))
+            return d
+        angles = -2.0 * math.pi * jnp.arange(1, num, dtype=jnp.float32) / num
+        rotated = jax.vmap(
+            lambda angle: child_sdf(_rotate_about_traced(p, origin, direction, angle))
+        )(angles)
+        return jnp.minimum(d, jnp.min(rotated, axis=0))
 
     def __call__(self, p: Array) -> Array:
         return PolarPattern.sdf(

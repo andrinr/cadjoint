@@ -374,7 +374,7 @@ sees.
 
 ### 6.4 Rust / porting hot loops — **not worth doing; there is nothing left**
 
-`cadjoint/meshing/native.py` already binds a rayon-parallel cdylib
+`cadjoint/meshing/native.py` already binds a rayon-parallel cdylib *(Retired 2026-09-02: the Rust core measured 5 ms faster over a 5,650 ms request and was removed; see `research/native-mesher.md`.)*
 (`native/src/{lib,core}.rs`, 1 082 lines, ctypes ABI) for crossing detection,
 manifold incidence, QEF placement and dual faces. Measured on the 65³ lattice of
 `starter@d42d800` (1 492 edges, 1 494 cells):
@@ -622,3 +622,298 @@ export CADJOINT_CACHE_DIR=/tmp/cadjoint-jax-cache      # or a fresh dir for a co
 .venv/bin/python bench_e2e.py mesh    # run once to populate the cache
 .venv/bin/python bench_e2e.py mesh    # quote this one
 ```
+
+---
+
+# 12. The compiled program is enormous — where the size came from, and what structured lowering recovered
+
+Status: **implemented and measured** (2026-09-02). Unlike §1–§11 above, this
+section changes `cadjoint/**`: `cadjoint/functionalize.py`,
+`cadjoint/sdf/primitives/polygon.py`, `cadjoint/sdf/primitives/loft.py`,
+`cadjoint/sdf/operations.py`, a new `cadjoint/sdf/_lowering.py`, and the WGSL
+backend.
+
+Same machine as §0. Every number below uses an isolated `CADJOINT_CACHE_DIR`;
+"cold" is an empty one, "warm" is the second run against a populated one. The
+**flat** column is the pre-change lowering, reproduced in-process by restoring
+the two behaviours that were removed (no node outlining, scalar/unrolled
+emission) — it reproduces the pre-change StableHLO byte for byte, which is how
+it was validated.
+
+## 12.1 The question
+
+> *"I think part of the performance problem is that the compiled code is
+> insanely big, can this somewhat be reduced? do we need another IR between
+> compiling to StableHLO?"*
+
+The compiled code **was** insanely big, and the diagnosis was right about the
+mechanism: cadjoint already has an IR — the SDF object graph — and the trace
+was **flattening** it. But the fix is not a second IR. It is to stop discarding
+the structure the first one already carries.
+
+## 12.2 Where the size came from
+
+Four separate flattenings, each measurable on its own:
+
+| # | What flattened | Why the program grew |
+|---|---|---|
+| 1 | **Profile vertices** | `_polygon_distance` looped in Python over N vertices, emitting ~20 operations per vertex. The starter's fin comb is 12 vertices; `research/complex-scene.md` measured mesh cost scaling with the *total* profile vertex count (168 verts → 112 s, 98 → 54 s). |
+| 2 | **Pattern instances** | `LinearPattern`/`PolarPattern` called `child_sdf` once per instance in a Python loop. `scenes/end_cap.py` has 8 ribs + 4 bolt holes + 3 port screws + 4 bolt heads + 2 pad taps = **21 copies** of geometry that is written once. |
+| 3 | **Shared subtrees** | `build_function` recursed per *occurrence*, so a node reachable from two parents was traced twice. The end cap's `dowel` is both a body and the child of a `Mirror`. |
+| 4 | **Parameter values** | `functionalize(sdf)(free, fixed)` closes over the values, so `jax.jit` folds every one of them in as a literal. Two designs differing in one slider lower to two different modules, compile separately, and miss each other in the persistent cache. |
+
+## 12.3 What was changed
+
+No new IR. Four changes to how the existing graph lowers itself.
+
+1. **Vectorised profile distance.** The vertex loop is stacked into one
+   `(N, 2)` array; the nearest-point search becomes one `min` and the even-odd
+   crossing test becomes a parity count. Both reductions are exact, so the two
+   forms agree **bit for bit** (§12.6). `LoftedPolygon` shares the same kernel.
+2. **Vectorised patterns.** `LinearPattern` maps its child over an array of
+   offsets; `PolarPattern` maps copies 1..N-1 over an array of angles and keeps
+   copy 0 as its own unrotated evaluation, because copy 0 is what the child's
+   face references are declared against.
+3. **Sharing and outlining.** Nodes are built once per *object* (the DFS counter
+   still advances per occurrence, so `extract_parameters`' path keys are
+   unchanged). A node that is evaluated more than once — a pattern's child, a
+   subtree with in-degree > 1 — is wrapped in `jax.jit`, which StableHLO keeps
+   as a `func.func` plus one `func.call` per use, and JAX prunes the parameter
+   entries the callee does not read.
+4. **Parameters as arguments.** `functionalize_parametric` /
+   `functionalize_scene_parametric` hand the dicts to the jitted function.
+   `count` is the one exception: it decides how much program is emitted, so
+   patterns declare `static_params = ("count",)` and it stays concrete.
+
+**The shader keeps the flat form**, under a `scalar_lowering()` context the WGSL
+backend holds while it traces: WGSL has no type wider than a `mat4`, so an
+`(N, 2)` vertex array or a batched instance axis is untranslatable there.
+Outlining is *not* mode-dependent, and the emitter already maps one `func.func`
+to one WGSL function — which is where the shader's own saving comes from.
+
+## 12.4 StableHLO: before and after
+
+`jax.jit(sdf).lower(p).as_text()` on the scene root, plus the same under
+`vmap` over 4 096 points and under `jax.grad` of a sum-of-squares over the free
+parameters — the three shapes the viewer, the mesher and the optimizer
+actually compile.
+
+### `scenes/starter.py` (35 free / 147 fixed parameters)
+
+| program | metric | flat | structured | change |
+|---|---|---:|---:|---:|
+| point query | HLO bytes | 114 220 | **58 662** | −49 % |
+| | HLO ops | 1 588 | **832** | −48 % |
+| | XLA compile, cold | 0.113 s | **0.049 s** | −57 % |
+| | first call, warm | 0.0002 s | 0.0002 s | — |
+| `vmap`, 4 096 pts | HLO bytes | 160 397 | **77 020** | −52 % |
+| | HLO ops | 1 978 | **992** | −50 % |
+| | XLA compile, cold | 0.207 s | **0.078 s** | −62 % |
+| `grad` over params | HLO bytes | 499 784 | **313 578** | −37 % |
+| | HLO ops | 4 844 | **2 620** | −46 % |
+| | XLA compile, cold | 0.799 s | **0.271 s** | −66 % |
+| WGSL | bytes | 264 694 | 264 694 | — |
+| | `let` statements | 6 793 | 6 793 | — |
+
+The starter has no patterns and no shared subtree, so its shader is untouched;
+its HLO halves purely from the vectorised comb profile.
+
+### `scenes/end_cap.py` (11 free / 421 fixed parameters, 21 pattern instances)
+
+| program | metric | flat | structured | change |
+|---|---|---:|---:|---:|
+| point query | HLO bytes | 774 291 | **244 063** | −68 % |
+| | HLO ops | 10 384 | **3 241** | −69 % |
+| | XLA compile, cold | 5.06 s | **0.168 s** | **30×** |
+| | first call, warm | 0.0006 s | 0.0004 s | — |
+| `vmap`, 4 096 pts | HLO bytes | 1 051 898 | **311 840** | −70 % |
+| | HLO ops | 12 626 | **3 798** | −70 % |
+| | XLA compile, cold | 7.94 s | **0.330 s** | **24×** |
+| `grad` over params | HLO bytes | 1 615 183 | **584 771** | −64 % |
+| | HLO ops | 18 090 | **5 771** | −68 % |
+| | XLA compile, cold | **25.38 s** | **0.675 s** | **38×** |
+| WGSL | bytes | 2 419 438 | **1 450 816** | −40 % |
+| | `let` statements | 58 593 | **35 630** | −39 % |
+| | functions emitted | 24 | 42 | (the shared ones) |
+
+That 25.4 s gradient compile is §4.1's *"a novel design costs 30 s of XLA
+compile, every time"*, and it is now 0.68 s.
+
+## 12.5 End to end, through the real compile worker
+
+Fresh subprocess per request, `cadjoint/viewer/_compile_worker.py` driven on
+stdin exactly as the viewer drives it. Three runs; cold is the first against an
+empty cache, warm is the median of the rest. (The machine was shared during
+these runs — the wall clocks carry a few seconds of noise; the HLO figures in
+§12.4 do not.)
+
+| scene | mode | flat cold | flat warm | structured cold | structured warm |
+|---|---|---:|---:|---:|---:|
+| starter | `compile` | 3.32 s | 1.24 s | 3.50 s | 1.24 s |
+| starter | `mesh` | 13.9 s | 5.9 s | 12.2 s | **4.77 s** |
+| end_cap | `compile` | 7.51 s | 4.48 s | 6.28 s | **3.21 s** |
+| end_cap | `mesh` | 106.7 s | 37.8–41.6 s | **42.4 s** | **15.2–16.8 s** |
+
+`end_cap` `mesh` is **2.5× faster warm and 2.5× faster cold**. The `compile`
+response payload for `end_cap` — the shader that crosses the wire to the
+browser — drops from 12.63 MB to 7.67 MB.
+
+## 12.6 Numerical invariants
+
+512 pseudorandom points in the scene's bounding box, structured vs flat
+lowering, float32 (eps ≈ 1.2 × 10⁻⁷):
+
+| tree | max abs Δ value | value scale | max abs Δ grad | grad scale | relative |
+|---|---:|---:|---:|---:|---:|
+| starter `sink` (the comb) | **0.0** | 1.44 | 1.53e−5 | 195.0 | 7.8e−8 |
+| starter `scene` | **0.0** | 1.12 | 4.77e−7 | 240.3 | 2.0e−9 |
+| end_cap `scene` | 1.64e−7 | 1.32 | 5.72e−6 | 153.0 | 3.7e−8 |
+
+The two polygon forms are **bit-identical**: `min` and a parity count are exact
+reductions of the sequential `minimum` and sign flips they replace. The end
+cap's 1.6e−7 is the polar pattern alone — the vectorised form computes
+`cos`/`sin` of a traced angle where the unrolled form folded a Python float, and
+`origin + (p − origin)` is `p` only to within a rounding step. Every relative
+difference is below 1e−7, i.e. at float32 rounding.
+
+Also asserted in `tests/sdf/primitives/test_polygon_lowering.py`,
+`tests/test_functionalize.py` and `tests/backends/test_wgsl_uniforms.py`.
+
+## 12.7 Parameters as arguments: the cache proof
+
+Three free parameters edited by a constant; each row is a **fresh process**
+sharing one `CADJOINT_CACHE_DIR`. `sha` is over the lowered StableHLO text.
+
+### `scenes/starter.py`
+
+| edit | form | StableHLO sha (16) | bytes | XLA compile | cache entries before → after |
+|---|---|---|---:|---:|---|
+| +0.00 | literal | `56054bd1a38858d9` | 58 662 | 0.083 s | 0 → 6 |
+| +0.05 | literal | `92412225b5465668` | 58 661 | 0.080 s | 6 → **8** |
+| +0.11 | literal | `67074d8bcb07a884` | 58 663 | 0.085 s | 8 → **10** |
+| +0.00 | parametric | `d867a2cb08270c1a` | 55 412 | 0.060 s | 0 → 6 |
+| +0.05 | parametric | `d867a2cb08270c1a` | 55 412 | **0.007 s** | 6 → **6** |
+| +0.11 | parametric | `d867a2cb08270c1a` | 55 412 | **0.007 s** | 6 → **6** |
+
+### `scenes/end_cap.py`
+
+| edit | form | StableHLO sha (16) | bytes | XLA compile | cache entries before → after |
+|---|---|---|---:|---:|---|
+| +0.00 | literal | `78e97e3604128452` | 244 042 | 0.304 s | 0 → 6 |
+| +0.05 | literal | `2163df79fca6e6d1` | 244 040 | 0.316 s | 6 → **8** |
+| +0.11 | literal | `4d9cb41cbace1f15` | 244 040 | 0.342 s | 8 → **10** |
+| +0.00 | parametric | `eb83c4f5381c14e7` | 232 387 | 0.219 s | 0 → 6 |
+| +0.05 | parametric | `eb83c4f5381c14e7` | 232 387 | **0.027 s** | 6 → **6** |
+| +0.11 | parametric | `eb83c4f5381c14e7` | 232 387 | **0.027 s** | 6 → **6** |
+
+The literal form writes two new cache entries per edit and never hits; the
+parametric form is byte-identical across all three values and hits from a cold
+process. One caveat: byte-identity needs matching **avals**, not just shapes —
+a weakly-typed Python float and a `float32` array lower differently. Values
+that come from `extract_parameters` / `apply_parameters` are always `float32`
+arrays, which is why the scenes above are stable.
+
+## 12.8 WGSL: the uniform contract (§8, ranked item 9 — done)
+
+`compile_scene_to_wgsl(scene, uniforms=True)` — equivalently
+`compile_scene_with_uniforms(scene)` — returns a `ShaderProgram` instead of a
+string. Literal inlining stays the default until the frontend adopts it; nothing
+in `frontend/` was touched.
+
+**Buffer layout.** One `vec4<f32>` slot per parameter — the only element type a
+WGSL uniform array carries without per-field alignment rules — so slot `i` sits
+at byte `16·i` and a 1-, 2- or 3-component parameter uses `.x` / `.xy` / `.xyz`
+of it. The module declares:
+
+```wgsl
+struct SdfParameters { values: array<vec4<f32>, N>, };
+@group(3) @binding(0) var<uniform> sdf_parameters: SdfParameters;
+```
+
+`@group(3)` is free: the preview shader, the path tracer, the overlay, the
+graticule and the simulation shader all bind at `@group(0)`. Both indices are
+arguments (`group=`, `binding=`) and are reported back on the program.
+
+**Names.** Exactly the names `extract_parameters` returns — a free parameter's
+declared name (`fin_depth`, `base_l`), a fixed one's `node.attribute` path
+(`extrudedpolygon_1.depth`). `ShaderParameter` carries
+`{name, offset, components, value, free}`; `ShaderProgram.buffer()` packs the
+current values into the `float32` array to upload, padding included.
+
+**Entry points are unchanged.** `sdf(p) -> f32`, `material_base(p) -> vec4<f32>`,
+`material_optics(p) -> vec4<f32>`, all three reading the same buffer. Internally
+each is a thin wrapper over an `*_impl` that takes the parameters as arguments.
+
+**What it costs.** Values can no longer be constant-folded, so the module grows:
+
+| scene | literal WGSL | uniform WGSL | parameters | buffer |
+|---|---:|---:|---:|---:|
+| starter | 264 694 B | 276 383 B (+4 %) | 143 | 2 288 B |
+| end_cap | 1 450 816 B | 2 031 352 B (+40 %) | 325 | 5 200 B |
+
+In exchange the source is **byte-identical across every parameter edit**
+(verified: literal sha changes, uniform sha does not), so a slider drag becomes
+a 2–5 kB buffer write and a redraw instead of a 1.6 s round trip, a multi-MB
+transfer and a full browser shader recompile. Both modules compile through
+wgpu-native/Naga.
+
+Two footnotes for whoever wires the frontend: a pattern's `count` keeps a slot
+it never reads (the instance count decides how much shader is emitted, so it
+cannot be edited without a recompile), and a parameter wider than four floats
+stays a literal rather than distorting the layout.
+
+## 12.9 Two fixes the shader backend needed on the way
+
+- **Callee ordering.** WGSL has no forward declarations, and outlining nests
+  helpers arbitrarily deep. `convert` now emits functions in topological order
+  rather than reversed declaration order.
+- **NaN constants.** XLA leaves a NaN behind in the untaken branch of the
+  guarded-`sqrt` idiom. It used to be folded away with the parameter values; as
+  arguments it survives to the emitter, which raised. It is now emitted as
+  `bitcast<f32>(0x7fc00000u)` — exact and portable — and a dead-code pass drops
+  the ones nothing reads.
+
+## 12.10 So: do we need another IR?
+
+**No.** Every measurement above came from lowering the *existing* graph better,
+and the two structures a second IR would have been built to provide already
+exist in the stack:
+
+- **Function-level sharing** is `func.func` + `func.call` in StableHLO, reached
+  from Python with a nested `jax.jit`, and the WGSL emitter already maps one to
+  one. This is what a "one function per primitive type" IR would have bought,
+  without a second lowering to maintain.
+- **Loop-level sharing** is `vmap` over an instance or vertex axis. XLA is a
+  tensor compiler; giving it a `(N, 2)` array is telling it the same thing a
+  loop-carrying IR would.
+
+A second IR would also have to be kept honest against `patch_fields`,
+`extract_parameters`' path keys, materials, face references and the constraint
+system — all of which read the object graph directly. That is the real cost, and
+nothing measured here justifies paying it.
+
+Two things do still argue for *more* structure, and neither needs a new IR:
+
+1. **Spatial culling by bounding box.** Everything above shrinks the program by
+   removing duplication; none of it removes *work*. A sphere trace still
+   evaluates all 42 leaves of the end cap at every step, and a `min` over a
+   bounding-box-rejected branch is a `select`, not a skipped branch. A
+   conservative bounding volume per node, emitted as an early-out, is the next
+   order-of-magnitude lever — and it is a property computed *on the existing
+   graph*, not a new representation of it.
+2. **A shader that is not a straight line.** The remaining 1.45 MB of end-cap
+   WGSL is three entry points each holding the whole tree, with the profiles
+   unrolled because WGSL cannot type an `(N, 2)` array. A hand-written WGSL
+   kernel per primitive type — reading its vertices from a storage buffer, with
+   the CSG tree as data — would collapse it to a few kilobytes. That is a
+   *second backend*, not a second IR: the graph it walks is the same one.
+
+## 12.11 Reproducing §12
+
+Scripts in the ephemeral scratch workspace
+`…/scratchpad/ir/`: `measure2.py <scene> [--wgsl]` (§12.4, `FLAT=1` for the
+before column), `runworker.py <scene> <mode>` (§12.5, same `FLAT` switch),
+`invariants.py` (§12.6), `parametric.py <scene> <edit>` (§12.7, `FORM=literal`
+for the control), `uniformcheck.py <scene>` and `shadercheck.py <scene>`
+(§12.8). Each takes `CADJOINT_CACHE_DIR` from the environment; every "warm"
+number is the second run against a populated one.

@@ -280,6 +280,28 @@ because the projection clamp is half the cell diagonal and a vertex can be
 dragged across a thin wall. Refining shrinks the clamp along with the cells,
 which is part of why the ladder works at all.
 
+## Program size {#program-size}
+
+Every stage above evaluates the scene's SDF under `jax.jit`, so the wall clock
+of a first mesh is mostly XLA compiling one program per stage — and how big
+those programs are is decided by `functionalize`, not by the mesher. Three
+things keep the tree from flattening as it is traced.
+
+- A sketch profile's vertices are stacked into one `(N, 2)` array and its edge
+  loop becomes two reductions, so a 168-vertex profile emits the same
+  operations as a 12-vertex one.
+- A pattern traces its child **once**, over an array of instance transforms, and
+  a node reachable from more than one parent is built once and outlined into its
+  own StableHLO function.
+- Passing the parameter dicts to the jitted function rather than closing over
+  them (`functionalize_parametric`) keeps values out of the program entirely, so
+  a re-dimensioned design reuses the executable the
+  [compilation cache](../research/performance.md) already holds.
+
+Measured on `scenes/end_cap.py` — eight gusset ribs, three polar bolt circles, a
+mirrored dowel — the gradient program dropped from 1.62 MB / 18 090 operations
+to 0.58 MB / 5 771, and its XLA compile from 25.4 s to 0.68 s.
+
 ## Known limitations
 
 One QEF vertex per cell cannot represent two surface sheets crossing one cell

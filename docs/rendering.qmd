@@ -155,6 +155,31 @@ scene_wgsl = compile_scene_to_wgsl(Sphere(radius=1.0))  # + materials
 snapshot, ready to embed in a WebGPU renderer. This is exactly what
 [the playground](viewer.qmd) does on every run.
 
+### How big the shader gets
+
+A shader is one straight-line function per entry point, so its size is decided
+by how much of the tree the trace unrolls. Two things keep that in check. A node
+evaluated more than once — a pattern's child, a subtree two booleans share — is
+lowered as its own StableHLO function, and the emitter turns each of those into
+one WGSL function called once per instance; a bearing housing with four polar
+patterns is 1.45 MB of WGSL rather than 2.42 MB. What is *not* shared is the
+vertex loop of a sketch profile: WGSL has no type wider than a `mat4`, so a
+profile's vertices stay individual `vec2`s and its contribution grows with the
+vertex count. (Everything else traces the profile as one `(N, 2)` array; see
+[the meshing notes](meshing.qmd#program-size).)
+
+Design parameters are inlined as float literals by default, so editing one
+rewrites the whole module and the browser recompiles it. `uniforms=True` returns
+a `ShaderProgram` instead: the same source for every parameter value, plus a
+`vec4`-per-parameter uniform layout to write the values into.
+
+```python
+program = compile_scene_to_wgsl(scene, uniforms=True)
+program.wgsl                 # identical across every value edit
+program.parameters[0].name   # the name extract_parameters uses
+program.buffer()             # float32 array to upload at @group(3) @binding(0)
+```
+
 ## Further reading
 
 - [Rendering notebook](../examples/rendering.ipynb) — composition, quality presets, and hot reload

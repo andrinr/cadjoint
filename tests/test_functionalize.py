@@ -126,3 +126,129 @@ def test_functionalized_material_preserves_forward_render_properties():
         "reflectivity",
     }
     assert jnp.isclose(compiled["reflectivity"], 0.7)
+
+
+# ── structured lowering ───────────────────────────────────────────────────────
+
+
+def _lowered_text(fn, *args):
+    import jax
+
+    return jax.jit(fn).lower(*args).as_text()
+
+
+def test_pattern_emits_one_copy_of_its_child():
+    """Eight instances must not become eight copies of the rib's arithmetic."""
+    import math
+
+    from cadjoint.sdf._lowering import scalar_lowering
+    from cadjoint.sdf.operations import PolarPattern
+    from cadjoint.sdf.primitives.polygon import ExtrudedPolygon
+
+    ring = [
+        jnp.array(
+            [0.4 + 0.1 * math.cos(2 * math.pi * i / 12), 0.1 * math.sin(2 * math.pi * i / 12)]
+        )
+        for i in range(12)
+    ]
+    pattern = PolarPattern(ExtrudedPolygon(ring, depth=0.2), count=8)
+    free, fixed, _ = extract_parameters(pattern)
+
+    structured = _lowered_text(functionalize(pattern)(free, fixed), jnp.zeros(3))
+    with scalar_lowering():
+        unrolled = _lowered_text(functionalize(pattern)(free, fixed), jnp.zeros(3))
+
+    # Even unrolled, the child is outlined into a helper called once per instance.
+    import collections
+    import re
+
+    callees = collections.Counter(re.findall(r"call @(\S+)\(", unrolled))
+    outlined = sum(n for name, n in callees.items() if name.startswith("eval_fn"))
+    assert outlined == 8
+    # Vectorising the instances and the vertex loop halves what is left.
+    assert len(structured) < 0.7 * len(unrolled)
+
+
+def test_pattern_agrees_with_the_unrolled_form():
+    from cadjoint.sdf._lowering import scalar_lowering
+    from cadjoint.sdf.operations import LinearPattern, PolarPattern
+
+    for pattern in (
+        PolarPattern(Box(size=jnp.array([0.2, 0.2, 1.0])), count=6),
+        LinearPattern(
+            Sphere(radius=0.3), direction=jnp.array([1.0, 0.0, 0.0]), count=5, spacing=0.4
+        ),
+    ):
+        free, fixed, _ = extract_parameters(pattern)
+        points = jnp.array([[0.3, 0.1, 0.2], [1.1, -0.4, 0.0], [0.0, 0.0, 0.0]])
+        vectorized = [functionalize(pattern)(free, fixed)(p) for p in points]
+        with scalar_lowering():
+            unrolled = [functionalize(pattern)(free, fixed)(p) for p in points]
+        for a, b in zip(vectorized, unrolled):
+            assert jnp.isclose(a, b, atol=1e-6)
+
+
+def test_a_shared_subtree_is_built_once():
+    """A tool cut from two bodies is one function, not two."""
+    from cadjoint.sdf.boolean import Difference, Union
+    from cadjoint.sdf.transforms.affine import Translate
+
+    tool = Sphere(radius=0.4)
+    shared = Union(
+        (
+            Difference((Box(size=jnp.array([1.0, 1.0, 1.0])), tool)),
+            Difference(
+                (Translate(Box(size=jnp.array([1.0, 1.0, 1.0])), jnp.array([2.0, 0.0, 0.0])), tool)
+            ),
+        ),
+    )
+    free, fixed, _ = extract_parameters(shared)
+    # Numerically unchanged: the point sits inside the first body, outside the tool.
+    value = functionalize(shared)(free, fixed)(jnp.array([0.45, 0.0, 0.0]))
+    assert bool(jnp.isfinite(value))
+    assert _lowered_text(functionalize(shared)(free, fixed), jnp.zeros(3)).count("func.func") >= 2
+
+
+def test_parametric_lowering_is_identical_across_value_edits():
+    """The whole point: an edit must not produce a different program."""
+    from cadjoint.functionalize import functionalize_parametric
+
+    radius = Scalar(1.0, free=True, name="radius")
+    offset = Vector([0.5, 0.0, 0.0], free=True, name="offset")
+    from cadjoint.sdf.transforms.affine import Translate
+
+    scene = Translate(Sphere(radius=radius), offset)
+    free, fixed, _ = extract_parameters(scene)
+
+    evaluate = functionalize_parametric(scene)
+    point = jnp.zeros(3)
+    first = _lowered_text(evaluate, free, fixed, point)
+    import jax
+
+    edited = jax.tree.map(lambda value: value * 2.25, free)
+    second = _lowered_text(evaluate, edited, fixed, point)
+    assert first == second
+
+    # …and the literal form, which bakes the values in, does not.
+    literal_first = _lowered_text(functionalize(scene)(free, fixed), point)
+    literal_second = _lowered_text(functionalize(scene)(edited, fixed), point)
+    assert literal_first != literal_second
+
+    assert jnp.isclose(
+        jax.jit(evaluate)(edited, fixed, point),
+        functionalize(scene)(edited, fixed)(point),
+        atol=1e-6,
+    )
+
+
+def test_pattern_count_stays_static_under_a_parametric_trace():
+    """``count`` decides how much program is emitted, so it cannot be an argument."""
+    import jax
+
+    from cadjoint.functionalize import functionalize_parametric
+    from cadjoint.sdf.operations import PolarPattern
+
+    pattern = PolarPattern(Box(size=jnp.array([0.2, 0.2, 1.0])), count=5)
+    free, fixed, _ = extract_parameters(pattern)
+    value = jax.jit(functionalize_parametric(pattern))(free, fixed, jnp.zeros(3))
+    assert jnp.isclose(value, functionalize(pattern)(free, fixed)(jnp.zeros(3)), atol=1e-6)

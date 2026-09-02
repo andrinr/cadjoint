@@ -17,16 +17,19 @@ import jax.numpy as jnp
 from jax import Array
 
 from cadjoint.geometry.parameters import Scalar, Vector2
+from cadjoint.sdf._lowering import is_scalar_lowering
 from cadjoint.sdf.primitives.base import Primitive
 
 
-def _polygon_distance(p: Array, vertices: list[Array]) -> Array:
-    """Polygon distance over a Python list of ``(2,)`` vertices.
+def _polygon_distance_scalar(p: Array, vertices: list[Array]) -> Array:
+    """Polygon distance over a Python list of ``(2,)`` vertices, unrolled.
 
     Keeping the vertices in a list rather than one ``(N, 2)`` array matters for
     shader compilation: every traced value stays a 2-vector, so the StableHLO →
     WGSL backend only ever sees ``vec2`` math instead of multi-dimensional
-    slices it cannot lower.
+    slices it cannot lower.  The cost is that the emitted program grows with
+    the vertex count — see :func:`_polygon_distance_stacked` for the form XLA
+    is given instead.
     """
     num = len(vertices)
     d = jnp.sum((p - vertices[0]) ** 2, axis=-1)
@@ -54,6 +57,75 @@ def _polygon_distance(p: Array, vertices: list[Array]) -> Array:
     positive = d > 1e-18
     safe = jnp.where(positive, d, 1.0)
     return s * jnp.where(positive, jnp.sqrt(safe), 0.0)
+
+
+def _polygon_distance_stacked(p: Array, stacked: Array) -> Array:
+    """Polygon distance over one ``(N, ..., 2)`` vertex array.
+
+    Same arithmetic as :func:`_polygon_distance_scalar`, with the per-edge loop
+    replaced by reductions over the leading vertex axis: the nearest-point
+    search becomes one ``min``, and the even-odd crossing test becomes a parity
+    count.  Both reductions are exact, so the two forms agree bit for bit while
+    this one emits a fixed number of operations for any vertex count.
+
+    Args:
+        p: Query point(s) in profile coordinates, shape ``(..., 2)``.
+        stacked: Ordered vertices, shape ``(N, 2)`` — or ``(N, ..., 2)`` when
+            the loop itself varies with the query, as it does in a loft.
+
+    Returns:
+        Signed distance, shape ``(...)``. Negative inside.
+    """
+    # Give the vertex loop as many singleton axes as the query has batch axes,
+    # so a (N, 2) loop broadcasts against a (..., 2) query the way the unrolled
+    # form's individual (2,) vertices did.
+    extra = p.ndim - (stacked.ndim - 1)
+    if extra > 0:
+        stacked = stacked.reshape(stacked.shape[:1] + (1,) * extra + stacked.shape[1:])
+
+    previous = jnp.roll(stacked, 1, axis=0)
+    e = previous - stacked
+    w = p - stacked
+    t = jnp.clip(jnp.sum(w * e, axis=-1) / jnp.sum(e * e, axis=-1), 0.0, 1.0)
+    b = w - e * t[..., None]
+    # ``d`` starts at the distance to vertex 0 in the unrolled form; that value
+    # is attained by edge 0 at t = 0, so the reduction alone already covers it.
+    d = jnp.min(jnp.sum(b * b, axis=-1), axis=0)
+
+    c1 = p[..., 1] >= stacked[..., 1]
+    c2 = p[..., 1] < previous[..., 1]
+    c3 = e[..., 0] * w[..., 1] > e[..., 1] * w[..., 0]
+    flips = (c1 == c2) & (c2 == c3)
+    # An odd number of flips is an odd number of boundary crossings: inside.
+    inside = jnp.sum(flips.astype(jnp.int32), axis=0) % 2 == 1
+    s = jnp.where(inside, -1.0, 1.0)
+
+    positive = d > 1e-18
+    safe = jnp.where(positive, d, 1.0)
+    return s * jnp.where(positive, jnp.sqrt(safe), 0.0)
+
+
+def _polygon_distance(p: Array, vertices: list[Array]) -> Array:
+    """Signed distance to a closed profile, in whichever form the consumer needs.
+
+    Under :func:`~cadjoint.sdf._lowering.scalar_lowering` — which the WGSL
+    backend holds for the whole of its trace — the vertices stay individual
+    2-vectors and the edge loop is unrolled.  Everywhere else they are stacked
+    into one array and the loop becomes two reductions, which is what keeps a
+    profile's contribution to the compiled program constant in its vertex
+    count.
+
+    Args:
+        p: Query point(s) in profile coordinates, shape ``(..., 2)``.
+        vertices: Ordered vertices, each ``(2,)`` (or broadcastable against
+            ``p``'s batch shape, as in a loft).
+
+    Returns:
+        Signed distance, shape ``(...)``. Negative inside.
+    """
+    if is_scalar_lowering():
+        return _polygon_distance_scalar(p, vertices)
+    return _polygon_distance_stacked(p, jnp.stack(jnp.broadcast_arrays(*vertices)))
 
 
 def polygon_sdf_2d(p: Array, vertices: Array) -> Array:
