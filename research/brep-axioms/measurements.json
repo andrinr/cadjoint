@@ -1,0 +1,1914 @@
+[
+ {
+  "case": "box",
+  "res": 32,
+  "offset": 0.0,
+  "F": "6/6",
+  "E": "12/12",
+  "V": "8/8",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 6
+  },
+  "edge_err_cells": 2.569253734795202e-07,
+  "coverage_min": 1.0,
+  "vertex_err_cells": 2.569253734795202e-07,
+  "spurious_v": 0,
+  "unmatched_e": 0,
+  "verdicts": {
+   "analytic": 12
+  },
+  "min_sin": 1.0,
+  "nan": 0,
+  "t_mesh": 1.1008009590000256,
+  "t_graph": 2.0188775410001654
+ },
+ {
+  "case": "boxes_overlap",
+  "res": 32,
+  "offset": 0.0,
+  "F": "12/12",
+  "E": "30/30",
+  "V": "20/20",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 12
+  },
+  "edge_err_cells": 9.48405397487459e-07,
+  "coverage_min": 1.0,
+  "vertex_err_cells": 9.484053984143487e-07,
+  "spurious_v": 0,
+  "unmatched_e": 0,
+  "verdicts": {
+   "analytic": 30
+  },
+  "min_sin": 1.0,
+  "nan": 0,
+  "t_mesh": 1.3959701250000762,
+  "t_graph": 3.4358403750002253
+ },
+ {
+  "case": "boxes_coplanar",
+  "res": 32,
+  "offset": 0.0,
+  "F": "12/10",
+  "E": "26/24",
+  "V": "16/16",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 12
+  },
+  "edge_err_cells": 6.141708502227232e-07,
+  "coverage_min": 1.0,
+  "vertex_err_cells": 6.141708502227232e-07,
+  "spurious_v": 0,
+  "unmatched_e": 2,
+  "verdicts": {
+   "analytic": 26
+  },
+  "min_sin": 0.0,
+  "nan": 0,
+  "t_mesh": 1.451771208000082,
+  "t_graph": 2.9702985419999095
+ },
+ {
+  "case": "boxes_coplanar",
+  "res": 32,
+  "offset": 0.37,
+  "F": "12/10",
+  "E": "26/24",
+  "V": "16/16",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 12
+  },
+  "edge_err_cells": 6.141708502227232e-07,
+  "coverage_min": 1.0,
+  "vertex_err_cells": 6.141708502227232e-07,
+  "spurious_v": 0,
+  "unmatched_e": 2,
+  "verdicts": {
+   "analytic": 26
+  },
+  "min_sin": 0.0,
+  "nan": 0,
+  "t_mesh": 1.4493911669997033,
+  "t_graph": 2.9075810409999576
+ },
+ {
+  "case": "boxes_coplanar",
+  "res": 32,
+  "offset": 0.71,
+  "F": "12/10",
+  "E": "26/24",
+  "V": "16/16",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 12
+  },
+  "edge_err_cells": 6.141708502227232e-07,
+  "coverage_min": 1.0,
+  "vertex_err_cells": 6.141708502227232e-07,
+  "spurious_v": 0,
+  "unmatched_e": 2,
+  "verdicts": {
+   "analytic": 26
+  },
+  "min_sin": 0.0,
+  "nan": 0,
+  "t_mesh": 1.4770324999999502,
+  "t_graph": 2.592275166000036
+ },
+ {
+  "case": "box_cyl_standing",
+  "res": 32,
+  "offset": 0.0,
+  "F": "8/8",
+  "E": "14/14",
+  "V": "8/8",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 7,
+   "cylinder": 1
+  },
+  "edge_err_cells": 5.354548590562454e-06,
+  "coverage_min": 1.0,
+  "vertex_err_cells": 5.745025981045399e-08,
+  "spurious_v": 0,
+  "unmatched_e": 0,
+  "verdicts": {
+   "analytic": 14
+  },
+  "min_sin": 0.9999999999999999,
+  "nan": 0,
+  "t_mesh": 1.8670967500002007,
+  "t_graph": 2.958550207999906
+ },
+ {
+  "case": "box_cyl_through",
+  "res": 32,
+  "offset": 0.0,
+  "F": "10/10",
+  "E": "16/16",
+  "V": "8/8",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 8,
+   "cylinder": 2
+  },
+  "edge_err_cells": 4.49890428133308e-06,
+  "coverage_min": 1.0,
+  "vertex_err_cells": 1.8871509733451484e-07,
+  "spurious_v": 0,
+  "unmatched_e": 0,
+  "verdicts": {
+   "analytic": 16
+  },
+  "min_sin": 0.999999999999999,
+  "nan": 0,
+  "t_mesh": 2.008145791000061,
+  "t_graph": 4.1374744589998045
+ },
+ {
+  "case": "plate_bore",
+  "res": 32,
+  "offset": 0.0,
+  "F": "7/7",
+  "E": "14/14",
+  "V": "8/8",
+  "chi": "0/0",
+  "kinds": {
+   "plane": 6,
+   "cylinder": 1
+  },
+  "edge_err_cells": 5.053455088374906e-06,
+  "coverage_min": 1.0,
+  "vertex_err_cells": 5.890797698192655e-07,
+  "spurious_v": 0,
+  "unmatched_e": 0,
+  "verdicts": {
+   "analytic": 14
+  },
+  "min_sin": 0.9999999999999999,
+  "nan": 0,
+  "t_mesh": 1.7454238339996664,
+  "t_graph": 3.074711333000323
+ },
+ {
+  "case": "sphere_box",
+  "res": 32,
+  "offset": 0.0,
+  "F": "7/7",
+  "E": "13/13",
+  "V": "8/8",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 6,
+   "sphere": 1
+  },
+  "edge_err_cells": 8.241571054714173e-06,
+  "coverage_min": 1.0,
+  "vertex_err_cells": 2.2980104031191045e-07,
+  "spurious_v": 0,
+  "unmatched_e": 0,
+  "verdicts": {
+   "analytic": 13
+  },
+  "min_sin": 0.9270248046288071,
+  "nan": 0,
+  "t_mesh": 1.5852987090001989,
+  "t_graph": 2.4300264580001567
+ },
+ {
+  "case": "steinmetz",
+  "res": 32,
+  "offset": 0.0,
+  "F": "7/7",
+  "E": "6/6",
+  "V": "0/0",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 4,
+   "cylinder": 3
+  },
+  "edge_err_cells": 6.436523956108826e-06,
+  "coverage_min": 1.0,
+  "vertex_err_cells": 0.0,
+  "spurious_v": 0,
+  "unmatched_e": 0,
+  "verdicts": {
+   "analytic": 6
+  },
+  "min_sin": 0.7453560820479355,
+  "nan": 0,
+  "t_mesh": 2.0992853339998874,
+  "t_graph": 4.093973333000122
+ },
+ {
+  "case": "steinmetz_equal",
+  "res": 32,
+  "offset": 0.0,
+  "F": "7/8",
+  "E": "6/8",
+  "V": "0/2",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 4,
+   "cylinder": 3
+  },
+  "edge_err_cells": 0.3559038504723117,
+  "coverage_min": 0.99609375,
+  "vertex_err_cells": Infinity,
+  "spurious_v": 0,
+  "unmatched_e": 0,
+  "verdicts": {
+   "analytic": 6
+  },
+  "min_sin": 0.12929982263070608,
+  "nan": 0,
+  "t_mesh": 2.12471587500022,
+  "t_graph": 4.021008624999922
+ },
+ {
+  "case": "steinmetz_equal",
+  "res": 32,
+  "offset": 0.37,
+  "F": "7/8",
+  "E": "6/8",
+  "V": "0/2",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 4,
+   "cylinder": 3
+  },
+  "edge_err_cells": 5.1317361462174486e-06,
+  "coverage_min": 1.0,
+  "vertex_err_cells": Infinity,
+  "spurious_v": 0,
+  "unmatched_e": 2,
+  "verdicts": {
+   "analytic": 6
+  },
+  "min_sin": 0.07281349048232753,
+  "nan": 0,
+  "t_mesh": 2.139999375000116,
+  "t_graph": 4.664763582999967
+ },
+ {
+  "case": "steinmetz_equal",
+  "res": 32,
+  "offset": 0.71,
+  "F": "7/8",
+  "E": "6/8",
+  "V": "0/2",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 4,
+   "cylinder": 3
+  },
+  "edge_err_cells": 5.103726620493873e-06,
+  "coverage_min": 1.0,
+  "vertex_err_cells": Infinity,
+  "spurious_v": 0,
+  "unmatched_e": 2,
+  "verdicts": {
+   "analytic": 6
+  },
+  "min_sin": 0.09478970386956258,
+  "nan": 0,
+  "t_mesh": 0.20739245799995842,
+  "t_graph": 3.3784637500002646
+ },
+ {
+  "case": "cyl_tangent",
+  "res": 32,
+  "offset": 0.0,
+  "F": "6/6",
+  "E": "8/5",
+  "V": "4/2",
+  "chi": "2/2",
+  "kinds": {
+   "cylinder": 2,
+   "plane": 4
+  },
+  "edge_err_cells": 0.2516042801641676,
+  "coverage_min": 1.0,
+  "vertex_err_cells": 0.2516042801641885,
+  "spurious_v": 0,
+  "unmatched_e": 0,
+  "verdicts": {
+   "analytic": 8
+  },
+  "min_sin": 0.09719633501274191,
+  "nan": 0,
+  "t_mesh": 1.9453149590003704,
+  "t_graph": 3.343642207999892
+ },
+ {
+  "case": "cyl_tangent",
+  "res": 32,
+  "offset": 0.37,
+  "F": "6/6",
+  "E": "8/5",
+  "V": "4/2",
+  "chi": "2/2",
+  "kinds": {
+   "cylinder": 2,
+   "plane": 4
+  },
+  "edge_err_cells": 0.7642835613317243,
+  "coverage_min": 1.0,
+  "vertex_err_cells": 0.5040449081450019,
+  "spurious_v": 4,
+  "unmatched_e": 0,
+  "verdicts": {
+   "analytic": 8
+  },
+  "min_sin": 0.07349535128752185,
+  "nan": 0,
+  "t_mesh": 1.9529794999998558,
+  "t_graph": 3.485091375000138
+ },
+ {
+  "case": "cyl_tangent",
+  "res": 32,
+  "offset": 0.71,
+  "F": "6/6",
+  "E": "8/5",
+  "V": "4/2",
+  "chi": "2/2",
+  "kinds": {
+   "cylinder": 2,
+   "plane": 4
+  },
+  "edge_err_cells": 0.4264372699920934,
+  "coverage_min": 1.0,
+  "vertex_err_cells": 0.21675113708948168,
+  "spurious_v": 0,
+  "unmatched_e": 0,
+  "verdicts": {
+   "analytic": 8
+  },
+  "min_sin": 0.08219837948829585,
+  "nan": 0,
+  "t_mesh": 2.001183290999961,
+  "t_graph": 3.6785651670002153
+ },
+ {
+  "case": "sphere_tangent_face",
+  "res": 32,
+  "offset": 0.0,
+  "F": "7/7",
+  "E": "13/13",
+  "V": "8/8",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 6,
+   "sphere": 1
+  },
+  "edge_err_cells": 6.024710156604713e-06,
+  "coverage_min": 1.0,
+  "vertex_err_cells": 2.2980104031191045e-07,
+  "spurious_v": 0,
+  "unmatched_e": 0,
+  "verdicts": {
+   "analytic": 13
+  },
+  "min_sin": 0.7777517727149122,
+  "nan": 0,
+  "t_mesh": 2.1995490829999653,
+  "t_graph": 3.2330823340003008
+ },
+ {
+  "case": "sphere_tangent_face",
+  "res": 32,
+  "offset": 0.37,
+  "F": "7/7",
+  "E": "13/13",
+  "V": "8/8",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 6,
+   "sphere": 1
+  },
+  "edge_err_cells": 6.180238553153904e-06,
+  "coverage_min": 1.0,
+  "vertex_err_cells": 2.2980104031191045e-07,
+  "spurious_v": 0,
+  "unmatched_e": 0,
+  "verdicts": {
+   "analytic": 13
+  },
+  "min_sin": 0.7777517848435118,
+  "nan": 0,
+  "t_mesh": 2.107460541999899,
+  "t_graph": 2.8953956250002193
+ },
+ {
+  "case": "sphere_tangent_face",
+  "res": 32,
+  "offset": 0.71,
+  "F": "7/7",
+  "E": "13/13",
+  "V": "8/8",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 6,
+   "sphere": 1
+  },
+  "edge_err_cells": 5.916108879828749e-06,
+  "coverage_min": 1.0,
+  "vertex_err_cells": 2.2980104031191045e-07,
+  "spurious_v": 0,
+  "unmatched_e": 0,
+  "verdicts": {
+   "analytic": 13
+  },
+  "min_sin": 0.7777517778797756,
+  "nan": 0,
+  "t_mesh": 2.2417460000001483,
+  "t_graph": 2.860228040999573
+ },
+ {
+  "case": "bracket_sharp",
+  "res": 32,
+  "offset": 0.0,
+  "F": "11/11",
+  "E": "24/24",
+  "V": "16/16",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 11
+  },
+  "edge_err_cells": 1.027801851452131e-06,
+  "coverage_min": 1.0,
+  "vertex_err_cells": 1.0278018514483927e-06,
+  "spurious_v": 0,
+  "unmatched_e": 0,
+  "verdicts": {
+   "analytic": 24
+  },
+  "min_sin": 1.0,
+  "nan": 0,
+  "t_mesh": 2.020366875000036,
+  "t_graph": 3.99722970799985
+ },
+ {
+  "case": "fillet_0.2cell",
+  "res": 32,
+  "offset": 0.0,
+  "F": "17/13",
+  "E": "37/26",
+  "V": "23/16",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 11,
+   "blend": 6
+  },
+  "edge_err_cells": 1.3036706217321272,
+  "coverage_min": 1.0,
+  "vertex_err_cells": 1.0278018514483927e-06,
+  "spurious_v": 11,
+  "unmatched_e": 0,
+  "verdicts": {
+   "analytic": 20,
+   "blend": 17
+  },
+  "min_sin": 1.0,
+  "nan": 0,
+  "t_mesh": 0.13996737500019663,
+  "t_graph": 3.131317833999674
+ },
+ {
+  "case": "fillet_0.2cell",
+  "res": 32,
+  "offset": 0.0,
+  "F": "11/13",
+  "E": "24/26",
+  "V": "16/16",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 11
+  },
+  "edge_err_cells": 0.12650593217598377,
+  "coverage_min": 1.0,
+  "vertex_err_cells": 1.0278018514483927e-06,
+  "spurious_v": 4,
+  "unmatched_e": 0,
+  "verdicts": {
+   "analytic": 24
+  },
+  "min_sin": 1.0,
+  "nan": 0,
+  "t_mesh": 1.2500004231696948e-07,
+  "t_graph": 2.843918333000147,
+  "blend_tolerance_cells": 1.0
+ },
+ {
+  "case": "fillet_0.5cell",
+  "res": 32,
+  "offset": 0.0,
+  "F": "14/13",
+  "E": "27/26",
+  "V": "17/16",
+  "chi": "None/2",
+  "kinds": {
+   "plane": 12,
+   "blend": 2
+  },
+  "edge_err_cells": 0.18347732479427356,
+  "coverage_min": 0.0,
+  "vertex_err_cells": 1.0278018514483927e-06,
+  "spurious_v": 5,
+  "unmatched_e": 6,
+  "verdicts": {
+   "analytic": 20,
+   "blend": 7
+  },
+  "min_sin": 1.0,
+  "nan": 0,
+  "t_mesh": 2.126545791999888,
+  "t_graph": 4.104495790999863
+ },
+ {
+  "case": "fillet_0.5cell",
+  "res": 32,
+  "offset": 0.0,
+  "F": "14/13",
+  "E": "31/26",
+  "V": "20/16",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 14
+  },
+  "edge_err_cells": 0.21522590912968279,
+  "coverage_min": 1.0,
+  "vertex_err_cells": 1.0278018514483927e-06,
+  "spurious_v": 8,
+  "unmatched_e": 0,
+  "verdicts": {
+   "analytic": 31
+  },
+  "min_sin": 1.0,
+  "nan": 0,
+  "t_mesh": 4.200001058052294e-08,
+  "t_graph": 4.206528208000236,
+  "blend_tolerance_cells": 1.0
+ },
+ {
+  "case": "fillet_0.5cell",
+  "res": 32,
+  "offset": 0.37,
+  "F": "13/13",
+  "E": "26/26",
+  "V": "16/16",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 11,
+   "blend": 2
+  },
+  "edge_err_cells": 1.0313081791848598e-06,
+  "coverage_min": 0.0,
+  "vertex_err_cells": 1.031308179162506e-06,
+  "spurious_v": 4,
+  "unmatched_e": 6,
+  "verdicts": {
+   "analytic": 20,
+   "blend": 6
+  },
+  "min_sin": 1.0,
+  "nan": 0,
+  "t_mesh": 2.25056720900011,
+  "t_graph": 3.653782875000161
+ },
+ {
+  "case": "fillet_0.5cell",
+  "res": 32,
+  "offset": 0.71,
+  "F": "14/13",
+  "E": "28/26",
+  "V": "18/16",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 11,
+   "blend": 3
+  },
+  "edge_err_cells": 0.9787205491334923,
+  "coverage_min": 0.0,
+  "vertex_err_cells": 1.031308179162506e-06,
+  "spurious_v": 6,
+  "unmatched_e": 7,
+  "verdicts": {
+   "analytic": 20,
+   "blend": 8
+  },
+  "min_sin": 1.0,
+  "nan": 0,
+  "t_mesh": 2.088746375000028,
+  "t_graph": 2.991218624999874
+ },
+ {
+  "case": "fillet_1cell",
+  "res": 32,
+  "offset": 0.0,
+  "F": "15/13",
+  "E": "33/28",
+  "V": "22/18",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 13,
+   "blend": 2
+  },
+  "edge_err_cells": 1.244735845874388,
+  "coverage_min": 0.0,
+  "vertex_err_cells": 1.0278018514483927e-06,
+  "spurious_v": 10,
+  "unmatched_e": 10,
+  "verdicts": {
+   "analytic": 21,
+   "blend": 12
+  },
+  "min_sin": 1.0,
+  "nan": 0,
+  "t_mesh": 2.147278875000211,
+  "t_graph": 3.8709348329998647
+ },
+ {
+  "case": "fillet_1cell",
+  "res": 32,
+  "offset": 0.0,
+  "F": "17/13",
+  "E": "40/28",
+  "V": "26/18",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 17
+  },
+  "edge_err_cells": 0.9675854433221645,
+  "coverage_min": 0.857421875,
+  "vertex_err_cells": 1.0278018514483927e-06,
+  "spurious_v": 14,
+  "unmatched_e": 0,
+  "verdicts": {
+   "analytic": 40
+  },
+  "min_sin": 1.0,
+  "nan": 0,
+  "t_mesh": 8.400002116104588e-08,
+  "t_graph": 3.520619416000045,
+  "blend_tolerance_cells": 1.0
+ },
+ {
+  "case": "fillet_2cell",
+  "res": 32,
+  "offset": 0.0,
+  "F": "18/15",
+  "E": "36/34",
+  "V": "22/22",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 16,
+   "blend": 2
+  },
+  "edge_err_cells": 1.178955835720504,
+  "coverage_min": 0.0,
+  "vertex_err_cells": 6.562691642573914,
+  "spurious_v": 12,
+  "unmatched_e": 12,
+  "verdicts": {
+   "analytic": 20,
+   "blend": 16
+  },
+  "min_sin": 1.0,
+  "nan": 0,
+  "t_mesh": 1.911071125000035,
+  "t_graph": 3.6807983329999843
+ },
+ {
+  "case": "fillet_2cell",
+  "res": 32,
+  "offset": 0.0,
+  "F": "27/15",
+  "E": "67/34",
+  "V": "44/22",
+  "chi": "None/2",
+  "kinds": {
+   "plane": 18,
+   "blend": 9
+  },
+  "edge_err_cells": 1.7833696514493262,
+  "coverage_min": 0.0,
+  "vertex_err_cells": 1.0278018514483927e-06,
+  "spurious_v": 32,
+  "unmatched_e": 40,
+  "verdicts": {
+   "analytic": 21,
+   "blend": 38,
+   "refused": 8
+  },
+  "min_sin": 1.0,
+  "nan": 0,
+  "t_mesh": 8.300003173644654e-08,
+  "t_graph": 3.6407601669998257,
+  "blend_tolerance_cells": 1.0
+ },
+ {
+  "case": "fillet_2cell",
+  "res": 32,
+  "offset": 0.37,
+  "F": "16/15",
+  "E": "33/34",
+  "V": "20/22",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 14,
+   "blend": 2
+  },
+  "edge_err_cells": 1.539930272978458,
+  "coverage_min": 0.0,
+  "vertex_err_cells": 6.177710343450017,
+  "spurious_v": 10,
+  "unmatched_e": 11,
+  "verdicts": {
+   "analytic": 20,
+   "blend": 13
+  },
+  "min_sin": 1.0,
+  "nan": 0,
+  "t_mesh": 2.019463000000087,
+  "t_graph": 4.016988958000184
+ },
+ {
+  "case": "fillet_2cell",
+  "res": 32,
+  "offset": 0.71,
+  "F": "25/15",
+  "E": "48/34",
+  "V": "29/22",
+  "chi": "None/2",
+  "kinds": {
+   "plane": 22,
+   "blend": 3
+  },
+  "edge_err_cells": 1.769626410875408,
+  "coverage_min": 0.0,
+  "vertex_err_cells": 4.079773955646604,
+  "spurious_v": 19,
+  "unmatched_e": 23,
+  "verdicts": {
+   "analytic": 20,
+   "blend": 28
+  },
+  "min_sin": 1.0,
+  "nan": 0,
+  "t_mesh": 1.7945284170000377,
+  "t_graph": 3.5098480829997243
+ },
+ {
+  "case": "fillet_4cell",
+  "res": 32,
+  "offset": 0.0,
+  "F": "26/2",
+  "E": "28/1",
+  "V": "4/0",
+  "chi": "2/2",
+  "kinds": {
+   "blend": 2,
+   "plane": 24
+  },
+  "edge_err_cells": 1.0225518178079052,
+  "coverage_min": 0.0,
+  "vertex_err_cells": 15.426175702781551,
+  "spurious_v": 4,
+  "unmatched_e": 22,
+  "verdicts": {
+   "blend": 28
+  },
+  "min_sin": NaN,
+  "nan": 0,
+  "t_mesh": 1.9731809579998298,
+  "t_graph": 1.7710769169998457
+ },
+ {
+  "case": "fillet_4cell",
+  "res": 32,
+  "offset": 0.0,
+  "F": "67/2",
+  "E": "182/1",
+  "V": "118/0",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 49,
+   "blend": 18
+  },
+  "edge_err_cells": 1.6672059229828522,
+  "coverage_min": 0.0,
+  "vertex_err_cells": 0.9243409140751141,
+  "spurious_v": 94,
+  "unmatched_e": 100,
+  "verdicts": {
+   "analytic": 93,
+   "refused": 15,
+   "blend": 74
+  },
+  "min_sin": 1.0,
+  "nan": 0,
+  "t_mesh": 4.200001058052294e-08,
+  "t_graph": 5.249351041999944,
+  "blend_tolerance_cells": 1.0
+ },
+ {
+  "case": "extruded_concave",
+  "res": 32,
+  "offset": 0.0,
+  "F": "8/8",
+  "E": "18/18",
+  "V": "12/12",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 8
+  },
+  "edge_err_cells": 4.281584614618041e-07,
+  "coverage_min": 1.0,
+  "vertex_err_cells": 4.281584614618041e-07,
+  "spurious_v": 0,
+  "unmatched_e": 0,
+  "verdicts": {
+   "analytic": 18
+  },
+  "min_sin": 1.0,
+  "nan": 0,
+  "t_mesh": 2.8887265419998585,
+  "t_graph": 4.296137667000039
+ },
+ {
+  "case": "oblique_cut",
+  "res": 32,
+  "offset": 0.0,
+  "F": "7/7",
+  "E": "15/15",
+  "V": "10/10",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 7
+  },
+  "edge_err_cells": 6.754997344593274e-07,
+  "coverage_min": 1.0,
+  "vertex_err_cells": 5.446331113024646e-07,
+  "spurious_v": 0,
+  "unmatched_e": 0,
+  "verdicts": {
+   "analytic": 15
+  },
+  "min_sin": 0.47942555198327147,
+  "nan": 0,
+  "t_mesh": 2.4322203749998152,
+  "t_graph": 3.7646593340000436
+ },
+ {
+  "case": "oblique_cut",
+  "res": 32,
+  "offset": 0.37,
+  "F": "7/7",
+  "E": "15/15",
+  "V": "10/10",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 7
+  },
+  "edge_err_cells": 6.51762311139204e-07,
+  "coverage_min": 1.0,
+  "vertex_err_cells": 4.499051956502062e-07,
+  "spurious_v": 0,
+  "unmatched_e": 0,
+  "verdicts": {
+   "analytic": 15
+  },
+  "min_sin": 0.47942555198327147,
+  "nan": 0,
+  "t_mesh": 2.3925340420000794,
+  "t_graph": 3.791949666999699
+ },
+ {
+  "case": "oblique_cut",
+  "res": 32,
+  "offset": 0.71,
+  "F": "7/7",
+  "E": "15/15",
+  "V": "10/10",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 7
+  },
+  "edge_err_cells": 8.135462962360154e-07,
+  "coverage_min": 1.0,
+  "vertex_err_cells": 4.499051956502062e-07,
+  "spurious_v": 0,
+  "unmatched_e": 0,
+  "verdicts": {
+   "analytic": 15
+  },
+  "min_sin": 0.47942555198327147,
+  "nan": 0,
+  "t_mesh": 2.3502512499999284,
+  "t_graph": 3.8246239160002915
+ },
+ {
+  "case": "box",
+  "res": 64,
+  "offset": 0.0,
+  "F": "6/6",
+  "E": "12/12",
+  "V": "8/8",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 6
+  },
+  "edge_err_cells": 5.138507469590404e-07,
+  "coverage_min": 1.0,
+  "vertex_err_cells": 5.138507469590404e-07,
+  "spurious_v": 0,
+  "unmatched_e": 0,
+  "verdicts": {
+   "analytic": 12
+  },
+  "min_sin": 1.0,
+  "nan": 0,
+  "t_mesh": 1.4649857499998689,
+  "t_graph": 2.3181962500002555
+ },
+ {
+  "case": "boxes_overlap",
+  "res": 64,
+  "offset": 0.0,
+  "F": "12/12",
+  "E": "30/30",
+  "V": "20/20",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 12
+  },
+  "edge_err_cells": 1.896810794974918e-06,
+  "coverage_min": 1.0,
+  "vertex_err_cells": 1.8968107968286974e-06,
+  "spurious_v": 0,
+  "unmatched_e": 0,
+  "verdicts": {
+   "analytic": 30
+  },
+  "min_sin": 1.0,
+  "nan": 0,
+  "t_mesh": 1.9342571670003963,
+  "t_graph": 4.586055874999602
+ },
+ {
+  "case": "boxes_coplanar",
+  "res": 64,
+  "offset": 0.0,
+  "F": "12/10",
+  "E": "26/24",
+  "V": "16/16",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 12
+  },
+  "edge_err_cells": 1.2283417004454464e-06,
+  "coverage_min": 1.0,
+  "vertex_err_cells": 1.2283417004454464e-06,
+  "spurious_v": 0,
+  "unmatched_e": 2,
+  "verdicts": {
+   "analytic": 26
+  },
+  "min_sin": 0.0,
+  "nan": 0,
+  "t_mesh": 1.9629792079999788,
+  "t_graph": 3.7870490000000245
+ },
+ {
+  "case": "boxes_coplanar",
+  "res": 64,
+  "offset": 0.37,
+  "F": "12/10",
+  "E": "26/24",
+  "V": "16/16",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 12
+  },
+  "edge_err_cells": 1.2283417004454464e-06,
+  "coverage_min": 1.0,
+  "vertex_err_cells": 1.2283417004454464e-06,
+  "spurious_v": 0,
+  "unmatched_e": 2,
+  "verdicts": {
+   "analytic": 26
+  },
+  "min_sin": 0.0,
+  "nan": 0,
+  "t_mesh": 1.9328724580000198,
+  "t_graph": 3.3925686669999777
+ },
+ {
+  "case": "boxes_coplanar",
+  "res": 64,
+  "offset": 0.71,
+  "F": "12/10",
+  "E": "26/24",
+  "V": "16/16",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 12
+  },
+  "edge_err_cells": 1.2283417004454464e-06,
+  "coverage_min": 1.0,
+  "vertex_err_cells": 1.2283417004454464e-06,
+  "spurious_v": 0,
+  "unmatched_e": 2,
+  "verdicts": {
+   "analytic": 26
+  },
+  "min_sin": 0.0,
+  "nan": 0,
+  "t_mesh": 2.017721290999816,
+  "t_graph": 3.129989625000235
+ },
+ {
+  "case": "box_cyl_standing",
+  "res": 64,
+  "offset": 0.0,
+  "F": "8/8",
+  "E": "14/14",
+  "V": "8/8",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 7,
+   "cylinder": 1
+  },
+  "edge_err_cells": 1.1999730997966473e-05,
+  "coverage_min": 1.0,
+  "vertex_err_cells": 1.1490051962090798e-07,
+  "spurious_v": 0,
+  "unmatched_e": 0,
+  "verdicts": {
+   "analytic": 14
+  },
+  "min_sin": 0.9999999999999998,
+  "nan": 0,
+  "t_mesh": 2.2842708749999474,
+  "t_graph": 3.74113483300016
+ },
+ {
+  "case": "box_cyl_through",
+  "res": 64,
+  "offset": 0.0,
+  "F": "10/10",
+  "E": "16/16",
+  "V": "8/8",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 8,
+   "cylinder": 2
+  },
+  "edge_err_cells": 9.654720628055981e-06,
+  "coverage_min": 1.0,
+  "vertex_err_cells": 3.774301946690297e-07,
+  "spurious_v": 0,
+  "unmatched_e": 0,
+  "verdicts": {
+   "analytic": 16
+  },
+  "min_sin": 0.999999999999999,
+  "nan": 0,
+  "t_mesh": 2.4809049999998933,
+  "t_graph": 4.84587779200001
+ },
+ {
+  "case": "plate_bore",
+  "res": 64,
+  "offset": 0.0,
+  "F": "7/7",
+  "E": "14/14",
+  "V": "8/8",
+  "chi": "0/0",
+  "kinds": {
+   "plane": 6,
+   "cylinder": 1
+  },
+  "edge_err_cells": 1.0490108452014699e-05,
+  "coverage_min": 1.0,
+  "vertex_err_cells": 1.178159539638531e-06,
+  "spurious_v": 0,
+  "unmatched_e": 0,
+  "verdicts": {
+   "analytic": 14
+  },
+  "min_sin": 0.9999999999999998,
+  "nan": 0,
+  "t_mesh": 2.424179207999714,
+  "t_graph": 3.640017292000266
+ },
+ {
+  "case": "sphere_box",
+  "res": 64,
+  "offset": 0.0,
+  "F": "7/7",
+  "E": "13/13",
+  "V": "8/8",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 6,
+   "sphere": 1
+  },
+  "edge_err_cells": 1.6820992495504318e-05,
+  "coverage_min": 1.0,
+  "vertex_err_cells": 4.596020806238209e-07,
+  "spurious_v": 0,
+  "unmatched_e": 0,
+  "verdicts": {
+   "analytic": 13
+  },
+  "min_sin": 0.9270247977760212,
+  "nan": 0,
+  "t_mesh": 2.120628707999913,
+  "t_graph": 3.0315135000000737
+ },
+ {
+  "case": "steinmetz",
+  "res": 64,
+  "offset": 0.0,
+  "F": "7/7",
+  "E": "6/6",
+  "V": "0/0",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 4,
+   "cylinder": 3
+  },
+  "edge_err_cells": 1.3129777656046137e-05,
+  "coverage_min": 1.0,
+  "vertex_err_cells": 0.0,
+  "spurious_v": 0,
+  "unmatched_e": 0,
+  "verdicts": {
+   "analytic": 6
+  },
+  "min_sin": 0.745356114792564,
+  "nan": 0,
+  "t_mesh": 2.10700474999976,
+  "t_graph": 4.959858208000242
+ },
+ {
+  "case": "steinmetz_equal",
+  "res": 64,
+  "offset": 0.0,
+  "F": "7/8",
+  "E": "6/8",
+  "V": "0/2",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 4,
+   "cylinder": 3
+  },
+  "edge_err_cells": 0.3550542711308,
+  "coverage_min": 0.99609375,
+  "vertex_err_cells": Infinity,
+  "spurious_v": 0,
+  "unmatched_e": 0,
+  "verdicts": {
+   "analytic": 6
+  },
+  "min_sin": 0.06450939460852992,
+  "nan": 0,
+  "t_mesh": 2.3289442089999284,
+  "t_graph": 5.02837958300006
+ },
+ {
+  "case": "steinmetz_equal",
+  "res": 64,
+  "offset": 0.37,
+  "F": "7/8",
+  "E": "6/8",
+  "V": "0/2",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 4,
+   "cylinder": 3
+  },
+  "edge_err_cells": 1.0485766365058802e-05,
+  "coverage_min": 0.99609375,
+  "vertex_err_cells": Infinity,
+  "spurious_v": 0,
+  "unmatched_e": 2,
+  "verdicts": {
+   "analytic": 6
+  },
+  "min_sin": 0.04990555714759998,
+  "nan": 0,
+  "t_mesh": 2.1475189999996473,
+  "t_graph": 5.51595345800024
+ },
+ {
+  "case": "steinmetz_equal",
+  "res": 64,
+  "offset": 0.71,
+  "F": "6/8",
+  "E": "5/8",
+  "V": "0/2",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 4,
+   "cylinder": 2
+  },
+  "edge_err_cells": 1.0478243690946745e-05,
+  "coverage_min": 0.99609375,
+  "vertex_err_cells": Infinity,
+  "spurious_v": 0,
+  "unmatched_e": 1,
+  "verdicts": {
+   "analytic": 5
+  },
+  "min_sin": 0.045993019957029334,
+  "nan": 0,
+  "t_mesh": 0.23168883300013476,
+  "t_graph": 4.039555916999689
+ },
+ {
+  "case": "cyl_tangent",
+  "res": 64,
+  "offset": 0.0,
+  "F": "6/6",
+  "E": "8/5",
+  "V": "4/2",
+  "chi": "2/2",
+  "kinds": {
+   "cylinder": 2,
+   "plane": 4
+  },
+  "edge_err_cells": 0.5026719582978115,
+  "coverage_min": 0.0859375,
+  "vertex_err_cells": 0.4138882121732666,
+  "spurious_v": 0,
+  "unmatched_e": 0,
+  "verdicts": {
+   "analytic": 8
+  },
+  "min_sin": 0.08861710076558733,
+  "nan": 0,
+  "t_mesh": 2.0553958750001584,
+  "t_graph": 3.795403707999867
+ },
+ {
+  "case": "cyl_tangent",
+  "res": 64,
+  "offset": 0.37,
+  "F": "6/6",
+  "E": "8/5",
+  "V": "4/2",
+  "chi": "2/2",
+  "kinds": {
+   "cylinder": 2,
+   "plane": 4
+  },
+  "edge_err_cells": 1.764290869129879,
+  "coverage_min": 0.04296875,
+  "vertex_err_cells": 1.5040878117485326,
+  "spurious_v": 4,
+  "unmatched_e": 0,
+  "verdicts": {
+   "analytic": 8
+  },
+  "min_sin": 0.12320147740834136,
+  "nan": 0,
+  "t_mesh": 2.0754302079999434,
+  "t_graph": 3.686492124999859
+ },
+ {
+  "case": "cyl_tangent",
+  "res": 64,
+  "offset": 0.71,
+  "F": "6/6",
+  "E": "8/5",
+  "V": "4/2",
+  "chi": "2/2",
+  "kinds": {
+   "cylinder": 2,
+   "plane": 4
+  },
+  "edge_err_cells": 1.425072645669275,
+  "coverage_min": 1.0,
+  "vertex_err_cells": 0.8442894431014655,
+  "spurious_v": 4,
+  "unmatched_e": 0,
+  "verdicts": {
+   "analytic": 8
+  },
+  "min_sin": 0.08149552037527674,
+  "nan": 0,
+  "t_mesh": 2.0295575420000205,
+  "t_graph": 3.8156335409998974
+ },
+ {
+  "case": "sphere_tangent_face",
+  "res": 64,
+  "offset": 0.0,
+  "F": "7/7",
+  "E": "13/13",
+  "V": "8/8",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 6,
+   "sphere": 1
+  },
+  "edge_err_cells": 1.2136320979113963e-05,
+  "coverage_min": 1.0,
+  "vertex_err_cells": 4.596020806238209e-07,
+  "spurious_v": 0,
+  "unmatched_e": 0,
+  "verdicts": {
+   "analytic": 13
+  },
+  "min_sin": 0.777751775515617,
+  "nan": 0,
+  "t_mesh": 2.104921416000252,
+  "t_graph": 3.071584208999866
+ },
+ {
+  "case": "sphere_tangent_face",
+  "res": 64,
+  "offset": 0.37,
+  "F": "7/7",
+  "E": "13/13",
+  "V": "8/8",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 6,
+   "sphere": 1
+  },
+  "edge_err_cells": 1.1987226896290963e-05,
+  "coverage_min": 1.0,
+  "vertex_err_cells": 4.596020806238209e-07,
+  "spurious_v": 0,
+  "unmatched_e": 0,
+  "verdicts": {
+   "analytic": 13
+  },
+  "min_sin": 0.7777517750046894,
+  "nan": 0,
+  "t_mesh": 2.147127458000341,
+  "t_graph": 3.2407598749996396
+ },
+ {
+  "case": "sphere_tangent_face",
+  "res": 64,
+  "offset": 0.71,
+  "F": "7/7",
+  "E": "13/13",
+  "V": "8/8",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 6,
+   "sphere": 1
+  },
+  "edge_err_cells": 1.2151228873071241e-05,
+  "coverage_min": 1.0,
+  "vertex_err_cells": 4.596020806238209e-07,
+  "spurious_v": 0,
+  "unmatched_e": 0,
+  "verdicts": {
+   "analytic": 13
+  },
+  "min_sin": 0.7777517752250518,
+  "nan": 0,
+  "t_mesh": 2.2524727080003686,
+  "t_graph": 3.439888208999946
+ },
+ {
+  "case": "bracket_sharp",
+  "res": 64,
+  "offset": 0.0,
+  "F": "11/11",
+  "E": "24/24",
+  "V": "16/16",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 11
+  },
+  "edge_err_cells": 2.055603702904262e-06,
+  "coverage_min": 1.0,
+  "vertex_err_cells": 2.0556037028967855e-06,
+  "spurious_v": 0,
+  "unmatched_e": 0,
+  "verdicts": {
+   "analytic": 24
+  },
+  "min_sin": 1.0,
+  "nan": 0,
+  "t_mesh": 1.9201417089998358,
+  "t_graph": 3.7324972500000513
+ },
+ {
+  "case": "fillet_0.2cell",
+  "res": 64,
+  "offset": 0.0,
+  "F": "15/13",
+  "E": "32/26",
+  "V": "20/16",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 11,
+   "blend": 4
+  },
+  "edge_err_cells": 1.1586094585985678,
+  "coverage_min": 0.0,
+  "vertex_err_cells": 2.0556037028967855e-06,
+  "spurious_v": 8,
+  "unmatched_e": 2,
+  "verdicts": {
+   "analytic": 20,
+   "blend": 12
+  },
+  "min_sin": 1.0,
+  "nan": 0,
+  "t_mesh": 1.883186083000055,
+  "t_graph": 3.360669458999837
+ },
+ {
+  "case": "fillet_0.2cell",
+  "res": 64,
+  "offset": 0.0,
+  "F": "11/13",
+  "E": "24/26",
+  "V": "16/16",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 11
+  },
+  "edge_err_cells": 0.1945596717927504,
+  "coverage_min": 1.0,
+  "vertex_err_cells": 2.0556037028967855e-06,
+  "spurious_v": 4,
+  "unmatched_e": 0,
+  "verdicts": {
+   "analytic": 24
+  },
+  "min_sin": 1.0,
+  "nan": 0,
+  "t_mesh": 8.300003173644654e-08,
+  "t_graph": 3.1429699999998775,
+  "blend_tolerance_cells": 1.0
+ },
+ {
+  "case": "fillet_0.5cell",
+  "res": 64,
+  "offset": 0.0,
+  "F": "13/13",
+  "E": "26/26",
+  "V": "16/16",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 11,
+   "blend": 2
+  },
+  "edge_err_cells": 0.2495120758753023,
+  "coverage_min": 0.0,
+  "vertex_err_cells": 2.0556037028967855e-06,
+  "spurious_v": 4,
+  "unmatched_e": 6,
+  "verdicts": {
+   "analytic": 20,
+   "blend": 6
+  },
+  "min_sin": 1.0,
+  "nan": 0,
+  "t_mesh": 1.9663450839998404,
+  "t_graph": 3.453405499999917
+ },
+ {
+  "case": "fillet_0.5cell",
+  "res": 64,
+  "offset": 0.0,
+  "F": "17/13",
+  "E": "40/26",
+  "V": "26/16",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 17
+  },
+  "edge_err_cells": 1.075415568311831,
+  "coverage_min": 0.89453125,
+  "vertex_err_cells": 2.0556037028967855e-06,
+  "spurious_v": 14,
+  "unmatched_e": 0,
+  "verdicts": {
+   "analytic": 40
+  },
+  "min_sin": 1.0,
+  "nan": 0,
+  "t_mesh": 4.099956640857272e-08,
+  "t_graph": 4.39743800000042,
+  "blend_tolerance_cells": 1.0
+ },
+ {
+  "case": "fillet_0.5cell",
+  "res": 64,
+  "offset": 0.37,
+  "F": "15/13",
+  "E": "31/26",
+  "V": "20/16",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 13,
+   "blend": 2
+  },
+  "edge_err_cells": 0.1260185286307517,
+  "coverage_min": 0.0,
+  "vertex_err_cells": 2.0556037028967855e-06,
+  "spurious_v": 8,
+  "unmatched_e": 11,
+  "verdicts": {
+   "analytic": 20,
+   "blend": 11
+  },
+  "min_sin": 1.0,
+  "nan": 0,
+  "t_mesh": 1.9053054589999192,
+  "t_graph": 4.1473421249997955
+ },
+ {
+  "case": "fillet_0.5cell",
+  "res": 64,
+  "offset": 0.71,
+  "F": "13/13",
+  "E": "26/26",
+  "V": "16/16",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 11,
+   "blend": 2
+  },
+  "edge_err_cells": 0.1758429519702415,
+  "coverage_min": 0.0,
+  "vertex_err_cells": 2.079548642039393e-06,
+  "spurious_v": 4,
+  "unmatched_e": 6,
+  "verdicts": {
+   "analytic": 20,
+   "blend": 6
+  },
+  "min_sin": 1.0,
+  "nan": 0,
+  "t_mesh": 2.0047445000000153,
+  "t_graph": 3.6292985840000256
+ },
+ {
+  "case": "fillet_1cell",
+  "res": 64,
+  "offset": 0.0,
+  "F": "16/13",
+  "E": "32/28",
+  "V": "20/18",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 14,
+   "blend": 2
+  },
+  "edge_err_cells": 1.3430607103557253,
+  "coverage_min": 0.0,
+  "vertex_err_cells": 2.0556037028967855e-06,
+  "spurious_v": 8,
+  "unmatched_e": 10,
+  "verdicts": {
+   "analytic": 21,
+   "blend": 11
+  },
+  "min_sin": 1.0,
+  "nan": 0,
+  "t_mesh": 2.012566291999974,
+  "t_graph": 3.5059981670001434
+ },
+ {
+  "case": "fillet_1cell",
+  "res": 64,
+  "offset": 0.0,
+  "F": "24/13",
+  "E": "59/28",
+  "V": "38/18",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 17,
+   "blend": 7
+  },
+  "edge_err_cells": 2.0177629898114913,
+  "coverage_min": 0.0,
+  "vertex_err_cells": 2.0556037028967855e-06,
+  "spurious_v": 26,
+  "unmatched_e": 31,
+  "verdicts": {
+   "analytic": 25,
+   "blend": 31,
+   "refused": 3
+  },
+  "min_sin": 1.0,
+  "nan": 0,
+  "t_mesh": 8.300003173644654e-08,
+  "t_graph": 3.6077434169997105,
+  "blend_tolerance_cells": 1.0
+ },
+ {
+  "case": "fillet_2cell",
+  "res": 64,
+  "offset": 0.0,
+  "F": "29/15",
+  "E": "56/34",
+  "V": "34/22",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 27,
+   "blend": 2
+  },
+  "edge_err_cells": 2.3523636334687668,
+  "coverage_min": 0.0,
+  "vertex_err_cells": 1.8655400663409418,
+  "spurious_v": 23,
+  "unmatched_e": 20,
+  "verdicts": {
+   "analytic": 25,
+   "blend": 31
+  },
+  "min_sin": 1.0,
+  "nan": 0,
+  "t_mesh": 1.9933226250000189,
+  "t_graph": 4.100834708000093
+ },
+ {
+  "case": "fillet_2cell",
+  "res": 64,
+  "offset": 0.0,
+  "F": "34/15",
+  "E": "88/34",
+  "V": "57/22",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 24,
+   "blend": 10
+  },
+  "edge_err_cells": 1.7017578802225088,
+  "coverage_min": 0.0,
+  "vertex_err_cells": 2.0556037028967855e-06,
+  "spurious_v": 41,
+  "unmatched_e": 44,
+  "verdicts": {
+   "analytic": 39,
+   "refused": 5,
+   "blend": 44
+  },
+  "min_sin": 1.0,
+  "nan": 0,
+  "t_mesh": 8.400002116104588e-08,
+  "t_graph": 4.561345665999852,
+  "blend_tolerance_cells": 1.0
+ },
+ {
+  "case": "fillet_2cell",
+  "res": 64,
+  "offset": 0.37,
+  "F": "40/15",
+  "E": "78/34",
+  "V": "43/22",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 37,
+   "blend": 3
+  },
+  "edge_err_cells": 1.024506513045504,
+  "coverage_min": 0.0,
+  "vertex_err_cells": 9.059084843871524,
+  "spurious_v": 31,
+  "unmatched_e": 26,
+  "verdicts": {
+   "analytic": 32,
+   "blend": 46
+  },
+  "min_sin": 1.0,
+  "nan": 0,
+  "t_mesh": 1.9392372909996993,
+  "t_graph": 3.847860917000162
+ },
+ {
+  "case": "fillet_2cell",
+  "res": 64,
+  "offset": 0.71,
+  "F": "26/15",
+  "E": "46/34",
+  "V": "24/22",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 24,
+   "blend": 2
+  },
+  "edge_err_cells": 0.8187078762162758,
+  "coverage_min": 0.0,
+  "vertex_err_cells": 10.08685073850158,
+  "spurious_v": 14,
+  "unmatched_e": 19,
+  "verdicts": {
+   "analytic": 20,
+   "blend": 26
+  },
+  "min_sin": 1.0,
+  "nan": 0,
+  "t_mesh": 0.15167233300007865,
+  "t_graph": 4.236214124999606
+ },
+ {
+  "case": "fillet_4cell",
+  "res": 64,
+  "offset": 0.0,
+  "F": "38/2",
+  "E": "42/1",
+  "V": "11/0",
+  "chi": "None/2",
+  "kinds": {
+   "blend": 3,
+   "plane": 35
+  },
+  "edge_err_cells": 1.004411453353852,
+  "coverage_min": 0.0,
+  "vertex_err_cells": 31.182471137848744,
+  "spurious_v": 11,
+  "unmatched_e": 40,
+  "verdicts": {
+   "blend": 41,
+   "analytic": 1
+  },
+  "min_sin": 1.0,
+  "nan": 0,
+  "t_mesh": 2.028943290999905,
+  "t_graph": 2.242180124999777
+ },
+ {
+  "case": "fillet_4cell",
+  "res": 64,
+  "offset": 0.0,
+  "F": "74/2",
+  "E": "208/1",
+  "V": "137/0",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 48,
+   "blend": 26
+  },
+  "edge_err_cells": 2.0369842061554695,
+  "coverage_min": 0.0,
+  "vertex_err_cells": 3.45944228948079,
+  "spurious_v": 127,
+  "unmatched_e": 170,
+  "verdicts": {
+   "analytic": 82,
+   "blend": 111,
+   "refused": 15
+  },
+  "min_sin": 1.0,
+  "nan": 0,
+  "t_mesh": 4.200001058052294e-08,
+  "t_graph": 5.584952749999957,
+  "blend_tolerance_cells": 1.0
+ },
+ {
+  "case": "extruded_concave",
+  "res": 64,
+  "offset": 0.0,
+  "F": "8/8",
+  "E": "18/18",
+  "V": "12/12",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 8
+  },
+  "edge_err_cells": 8.563169229236082e-07,
+  "coverage_min": 1.0,
+  "vertex_err_cells": 8.563169229236082e-07,
+  "spurious_v": 0,
+  "unmatched_e": 0,
+  "verdicts": {
+   "analytic": 18
+  },
+  "min_sin": 1.0,
+  "nan": 0,
+  "t_mesh": 2.810785499999838,
+  "t_graph": 4.84425258400006
+ },
+ {
+  "case": "oblique_cut",
+  "res": 64,
+  "offset": 0.0,
+  "F": "7/7",
+  "E": "15/15",
+  "V": "10/10",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 7
+  },
+  "edge_err_cells": 1.4462665578622767e-06,
+  "coverage_min": 1.0,
+  "vertex_err_cells": 8.998103913004124e-07,
+  "spurious_v": 0,
+  "unmatched_e": 0,
+  "verdicts": {
+   "analytic": 15
+  },
+  "min_sin": 0.47942555198327147,
+  "nan": 0,
+  "t_mesh": 2.591129957999783,
+  "t_graph": 4.139594583999951
+ },
+ {
+  "case": "oblique_cut",
+  "res": 64,
+  "offset": 0.37,
+  "F": "7/7",
+  "E": "15/15",
+  "V": "10/10",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 7
+  },
+  "edge_err_cells": 1.9436950116147934e-06,
+  "coverage_min": 1.0,
+  "vertex_err_cells": 1.956352792788632e-06,
+  "spurious_v": 0,
+  "unmatched_e": 0,
+  "verdicts": {
+   "analytic": 15
+  },
+  "min_sin": 0.47942555198327147,
+  "nan": 0,
+  "t_mesh": 2.4902355419999367,
+  "t_graph": 3.684110083000178
+ },
+ {
+  "case": "oblique_cut",
+  "res": 64,
+  "offset": 0.71,
+  "F": "7/7",
+  "E": "15/15",
+  "V": "10/10",
+  "chi": "2/2",
+  "kinds": {
+   "plane": 7
+  },
+  "edge_err_cells": 1.9436950116147934e-06,
+  "coverage_min": 1.0,
+  "vertex_err_cells": 1.956352792788632e-06,
+  "spurious_v": 0,
+  "unmatched_e": 0,
+  "verdicts": {
+   "analytic": 15
+  },
+  "min_sin": 0.47942555198327147,
+  "nan": 0,
+  "t_mesh": 2.5725419589998637,
+  "t_graph": 4.250511207999807
+ }
+]
