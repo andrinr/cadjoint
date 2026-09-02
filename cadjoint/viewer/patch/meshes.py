@@ -25,6 +25,7 @@ import ast
 
 from cadjoint.viewer.patch.edits import (
     _after_statement,
+    _delete_statement,
     _ensure_import,
     _module_names,
     _name_references,
@@ -136,10 +137,7 @@ def delete_mesh(source: str, mesh) -> str:
                 f"Mesh {located.name!r} is referenced by a study, so it cannot be deleted "
                 "from the viewer. Point the study at another mesh first."
             )
-    offsets = _line_offsets(source)
-    start = offsets[located.statement.lineno - 1]
-    end = offsets[min(located.statement.end_lineno or located.statement.lineno, len(offsets) - 1)]
-    return _validate(source[:start] + source[end:])
+    return _validate(_delete_statement(source, located.statement))
 
 
 def set_mesh_value(source: str, mesh, argument, value) -> str:

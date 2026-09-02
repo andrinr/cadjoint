@@ -87,7 +87,7 @@ def _union_operands(scene: ast.Assign | None) -> list[ast.AST]:
     """Positional arguments of a ``scene = Union(...)`` assignment."""
     if scene is None or not isinstance(scene.value, ast.Call):
         return []
-    if getattr(scene.value.func, "id", "") != "Union":
+    if _called_name(scene.value) != "Union":
         return []
     return list(scene.value.args)
 

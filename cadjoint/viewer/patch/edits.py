@@ -159,10 +159,6 @@ def _name_references(tree: ast.Module, name: str, exclude: ast.AST) -> list[ast.
     ]
 
 
-def _contains_node(outer: ast.AST, inner: ast.AST) -> bool:
-    return any(node is inner for node in ast.walk(outer))
-
-
 def _argument_span(source: str, offsets, node) -> tuple[int, int]:
     """Span of one call argument, including the comma that follows it."""
     span = _node_span(source, offsets, node)
@@ -172,3 +168,15 @@ def _argument_span(source: str, offsets, node) -> tuple[int, int]:
     while end < len(source) and source[end] in ", ":
         end += 1
     return start, end
+
+
+def _delete_statement(source: str, statement: ast.stmt) -> str:
+    """Remove a whole statement's lines from *source*.
+
+    The slice runs from the statement's first line to the start of the line
+    after its last, so the following statement keeps its own line.
+    """
+    offsets = _line_offsets(source)
+    start = offsets[statement.lineno - 1]
+    end = offsets[min(statement.end_lineno or statement.lineno, len(offsets) - 1)]
+    return source[:start] + source[end:]

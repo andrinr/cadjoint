@@ -50,3 +50,12 @@ def test_delete_still_refuses_a_use_outside_any_union():
 def test_registry_path_matches_the_direct_call():
     line = _line_of(SOURCE, "b = Solid.sphere")
     assert apply_operation(SOURCE, "delete_object", line=line) == delete_object(SOURCE, line)
+
+
+def test_delete_drops_an_operand_of_a_qualified_union():
+    source = SOURCE.replace(
+        "from cadjoint.sdf.boolean import Union", "from cadjoint.sdf import boolean"
+    ).replace("Union(", "boolean.Union(")
+    patched = delete_object(source, _line_of(source, "c = Solid.cylinder"))
+    assert "c = Solid.cylinder" not in patched
+    assert "scene = boolean.Union(body, smoothness=0.0)" in patched

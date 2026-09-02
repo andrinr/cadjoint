@@ -160,7 +160,7 @@ def _validate_plane_reference(raw: Any) -> tuple[dict[str, Any] | None, dict[str
     field = _PLANE_REFERENCE_FIELDS[kind]
     value = raw.get(field)
     if kind == "cap":
-        if value not in {"+", "-"}:
+        if not isinstance(value, str) or value not in {"+", "-"}:
             return _error("A cap reference needs `sign` as `+` or `-`."), {}
         reference["sign"] = value
     elif kind == "side":
@@ -365,7 +365,7 @@ def _validate_solve_sketch(request: dict[str, Any]) -> Checked:
         return _error("The patch request needs an integer `line`."), {}
     method = request.get("method", "newton")
     iterations = request.get("iterations", 8)
-    if method not in {"newton", "adam", "sgd"}:
+    if not isinstance(method, str) or method not in {"newton", "adam", "sgd"}:
         return _error("Solver `method` must be `newton`, `adam`, or `sgd`."), {}
     if not _integer(iterations) or not 1 <= iterations <= 512:
         return _error("Solver `iterations` must be an integer from 1 to 512."), {}
@@ -377,7 +377,7 @@ def _validate_solve_sketch(request: dict[str, Any]) -> Checked:
 
 def _validate_add_study(request: dict[str, Any]) -> Checked:
     kind = request.get("kind")
-    if kind not in {"thermal", "elastic"}:
+    if not isinstance(kind, str) or kind not in {"thermal", "elastic"}:
         return _error("Study `kind` must be `thermal` or `elastic`."), {}
     name = request.get("name")
     if name is not None and (not isinstance(name, str) or not name.strip()):
@@ -398,7 +398,12 @@ def _validate_add_study_bc(request: dict[str, Any]) -> Checked:
     if error is not None:
         return error, {}
     bc_type = request.get("bc_type")
-    if bc_type not in {"dirichlet", "heat_flux", "fixed", "traction"}:
+    if not isinstance(bc_type, str) or bc_type not in {
+        "dirichlet",
+        "heat_flux",
+        "fixed",
+        "traction",
+    }:
         return _error("`bc_type` must be one of: dirichlet, heat_flux, fixed, traction."), {}
     selection = request.get("selection")
     if not isinstance(selection, dict):
@@ -493,7 +498,7 @@ def _validate_set_mesh_value(request: dict[str, Any]) -> Checked:
             return _error("The patch request needs `value` as a `domain` name."), {}
         arguments["value"] = raw_value
     elif argument == "method":
-        if raw_value not in {"hex", "tet4", "tet10"}:
+        if not isinstance(raw_value, str) or raw_value not in {"hex", "tet4", "tet10"}:
             return _error("Mesh `method` must be one of: hex, tet4, tet10."), {}
         arguments["value"] = raw_value
     else:
@@ -523,7 +528,7 @@ def _validate_set_optimization_value(request: dict[str, Any]) -> Checked:
     if error is not None:
         return error, {}
     argument = request.get("argument")
-    if argument not in {"steps", "learning_rate"}:
+    if not isinstance(argument, str) or argument not in {"steps", "learning_rate"}:
         return _error("Optimization `argument` must be `steps` or `learning_rate`."), {}
     raw_value = request.get("value")
     if not _number(raw_value):

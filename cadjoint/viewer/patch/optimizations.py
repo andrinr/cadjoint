@@ -19,11 +19,15 @@ from __future__ import annotations
 
 import ast
 
-from cadjoint.viewer.patch.edits import _name_references, _rewrite_call_argument, _validate
+from cadjoint.viewer.patch.edits import (
+    _delete_statement,
+    _name_references,
+    _rewrite_call_argument,
+    _validate,
+)
 from cadjoint.viewer.patch.errors import PatchError
 from cadjoint.viewer.patch.format import _exact_number
 from cadjoint.viewer.patch.resolvers import _located_optimization
-from cadjoint.viewer.source_map.nodes import _line_offsets
 
 # Constructor field order, for resolving positionally written arguments;
 # `steps`/`learning_rate`/`method` are keyword-only in the constructor.
@@ -42,10 +46,7 @@ def delete_optimization(source: str, optimization) -> str:
                 f"`{located.variable}` is used elsewhere in the program, so it cannot be "
                 "deleted from the viewer. Remove those uses first."
             )
-    offsets = _line_offsets(source)
-    start = offsets[located.statement.lineno - 1]
-    end = offsets[min(located.statement.end_lineno or located.statement.lineno, len(offsets) - 1)]
-    return _validate(source[:start] + source[end:])
+    return _validate(_delete_statement(source, located.statement))
 
 
 def set_optimization_value(source: str, optimization, argument, value) -> str:

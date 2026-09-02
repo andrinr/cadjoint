@@ -30,6 +30,7 @@ import ast
 
 from cadjoint.viewer.patch.edits import (
     _after_statement,
+    _delete_statement,
     _ensure_import,
     _set_keyword_expression,
     _validate,
@@ -117,10 +118,7 @@ def delete_constraint(source: str, line: int, index: int) -> str:
     deletes exactly the statement it displays.
     """
     located = _located_constraint(source, line, index)
-    offsets = _line_offsets(source)
-    start = offsets[located.statement.lineno - 1]
-    end = offsets[min(located.statement.end_lineno or located.statement.lineno, len(offsets) - 1)]
-    return _validate(source[:start] + source[end:])
+    return _validate(_delete_statement(source, located.statement))
 
 
 def set_constraint_value(source: str, line: int, index: int, value) -> str:

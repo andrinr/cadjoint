@@ -34,6 +34,7 @@ import ast
 from cadjoint.viewer.patch.edits import (
     _after_statement,
     _argument_span,
+    _delete_statement,
     _ensure_import,
     _module_names,
     _name_references,
@@ -157,10 +158,7 @@ def delete_study(source: str, study) -> str:
                 f"`{located.variable}` is used elsewhere in the program, so it cannot be "
                 "deleted from the viewer. Remove those uses first."
             )
-    offsets = _line_offsets(source)
-    start = offsets[located.statement.lineno - 1]
-    end = offsets[min(located.statement.end_lineno or located.statement.lineno, len(offsets) - 1)]
-    return _validate(source[:start] + source[end:])
+    return _validate(_delete_statement(source, located.statement))
 
 
 def add_study_bc(source: str, study, bc_type: str, selection, value=None) -> str:
