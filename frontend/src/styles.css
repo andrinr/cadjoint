@@ -1,4 +1,4 @@
-/* Playground shell: dark CAD chrome around the editor and viewer panes.
+/* Playground shell: light paper chrome around the editor and viewer panes.
  *
  * ── Reading this file ───────────────────────────────────────────────────
  * Every value below comes from a token in the :root block, and the token
@@ -9,7 +9,12 @@
  *   - To restyle something, change a token. A literal in a rule is a bug.
  *   - Chrome tones stay quiet on purpose. The saturated colours belong to
  *     the data ramps in the viewport (src/simColors.ts); if the panels
- *     compete with them, the measurement stops reading.
+ *     compete with them, the measurement stops reading. The one accent is
+ *     the exception, and it is confined to one composition: a filled block
+ *     with near-black type on it.
+ *   - Structure is drawn, not enclosed. Chrome and viewport share one paper,
+ *     so a hairline is what separates two things and a shared left edge is
+ *     what groups them. There are no shadows and no radii in this file.
  *
  * The one exception is the "preview artwork" block near the material and
  * render-preset cards: those gradients are pictures of materials, not UI,
@@ -17,75 +22,97 @@
  */
 
 :root {
-  /* ── colour: surfaces, back to front ───────────────────────────────── */
-  /* The viewport is paper — the one light surface in the app, because it is
-     the ground a measurement is read against rather than chrome. Everything
-     drawn on it uses the --viewport-* ink below, never --ink. */
+  /* ── colour: the ground ────────────────────────────────────────────── */
+  /* One sheet. Chrome and the viewport carry the same paper, so the seam
+     between them measures 1.00:1 — there is no luminance step to read, and
+     the edge has to be *drawn*. That is the idea the whole file is built on:
+     structure comes from rules, not from boxes. Everything below is either a
+     lighter sheet laid on this one or ink printed on it. */
   --surface-viewport: #e6e6e9;
   --surface-viewport-94: rgba(230, 230, 233, 0.94);
   --surface-viewport-70: rgba(230, 230, 233, 0.7);
-  --surface-base: #0a0c0b;
-  --surface-bar: #0b0d0c;
-  --surface-bar-alt: #0d0f0e;
-  --surface-float: #0e110f;
-  --surface-panel: #111312;
-  --surface-raised: #171a17;
-  --surface-raised-hover: #1b1f1b;
+  --surface-base: #e6e6e9;
+  --surface-bar: #e6e6e9;
+  --surface-bar-alt: #edecee;
+  --surface-float: #f8f7f8;
+  --surface-panel: #f8f7f8;
+  --surface-raised: #f8f7f8;
+  /* Hover is a step *down*: on paper, pressure darkens. A light UI that
+     brightens on hover has nowhere to go once the sheet is already white. */
+  --surface-raised-hover: #edecee;
 
-  /* Translucent variants: floating chrome over the viewport. */
-  --surface-float-80: rgba(14, 17, 15, 0.82);
-  --surface-float-90: rgba(14, 17, 15, 0.91);
-  --surface-float-96: rgba(14, 17, 15, 0.96);
-  --surface-float-00: rgba(14, 17, 15, 0);
-  /* Neutral shade, for scroll shadows and scrims. */
-  --shade-none: rgba(0, 0, 0, 0);
-  --shade-soft: rgba(0, 0, 0, 0.28);
-  --shade-strong: rgba(0, 0, 0, 0.45);
-  --shade-scroll: rgba(0, 0, 0, 0.62);
-  --scrim: rgba(0, 0, 0, 0.6);
-  /* Wells recessed into a panel — a tint of the panel, not a new colour. */
-  --surface-inset: rgba(255, 255, 255, 0.025);
-  --surface-inset-hover: rgba(255, 255, 255, 0.05);
+  /* Chrome floating over the viewport. Opaque at rest — a panel that let the
+     field show through would put a colormap behind type (§14.7). */
+  --surface-float-80: rgba(248, 247, 248, 0.96);
+  --surface-float-90: rgba(248, 247, 248, 0.98);
+  --surface-float-96: rgba(248, 247, 248, 1);
+  --surface-float-00: rgba(248, 247, 248, 0);
+  /* Shade is a fade of ink, not of black: on paper, black scrims grey the
+     sheet instead of deepening it. */
+  --shade-none: rgba(24, 22, 26, 0);
+  --shade-soft: rgba(24, 22, 26, 0.1);
+  --shade-strong: rgba(24, 22, 26, 0.16);
+  --shade-scroll: rgba(24, 22, 26, 0.22);
+  --scrim: rgba(24, 22, 26, 0.42);
+  /* Wells recessed into a sheet — a tint of ink, not a new colour. */
+  --surface-inset: rgba(24, 22, 26, 0.035);
+  --surface-inset-hover: rgba(24, 22, 26, 0.07);
 
   /* ── colour: ink ───────────────────────────────────────────────────── */
   /* Three levels and no fourth. Text is never dimmed with `opacity`: an
-     opacity fade has no contrast ratio anyone can assert. */
-  --ink: #e9e8e2;
-  --ink-2: #b2b1a9;
-  --ink-3: #8f8e87;
-  --ink-on-accent: #10120d;
+     opacity fade has no contrast ratio anyone can assert. 14.4 / 7.5 / 5.1
+     on the darkest sheet, so even --ink-3 clears AA everywhere. */
+  --ink: #18161a;
+  --ink-2: #48464d;
+  --ink-3: #605e65;
+  /* The one ink printed on the accent rather than on paper: 7.02:1. */
+  --ink-on-accent: #0a0a0c;
 
-  /* ── colour: lines ─────────────────────────────────────────────────── */
-  --line: #383c36;
-  --line-strong: #4c5149;
-  /* Weaker than --line: separation *inside* a panel, not around it. */
-  --divider: rgba(255, 255, 255, 0.06);
+  /* ── colour: rules ─────────────────────────────────────────────────── */
+  /* One weight — 1px, always — and three contrasts. On a sheet the hierarchy
+     is how dark a line is, never how thick:
+       --rule         2.15:1 on paper, separation inside a panel
+       --rule-strong  3.81:1, between sections and at the viewport seam
+       --rule-heavy   9.85:1, the viewport frame and its corner marks
+     --rule sits under 3:1 on purpose: a resting hairline is structure, not
+     state. --rule-strong is the one that has to be found, because it is what
+     says "the viewport starts here" when no luminance step says it. */
+  --rule: #9f9da5;
+  --rule-strong: #747278;
+  --rule-heavy: #36343b;
+  /* Weaker than --rule: separation between rows of one list. */
+  --divider: rgba(24, 22, 26, 0.09);
 
-  /* ── colour: accents and status ────────────────────────────────────── */
-  --accent-model: #d9ff57;
-  --accent-sketch: #7fd6f5;
-  --accent-simulate: #ffb25c;
-  --accent-model-ink: #cbd99a;
-  --danger: #ff8167;
-  --danger-ink: #ffb3a1;
-  --info: #9adcf4;
-  --info-ink: #c9efff;
-  --ok: #9fe7bd;
+  /* ── colour: the accent ────────────────────────────────────────────── */
+  /* One hue, one job: a fill behind near-black type. 7.02:1 as a ground under
+     --ink-on-accent; 2.26:1 as ink on paper. Those are not two options, they
+     are a pass and a fail, so the accent is never text and never a hairline.
+     --accent-press is the pressed fill, and the only accent-coloured *mark*
+     the system allows (3.36:1 on paper). */
+  --accent: #f87318;
+  --accent-press: #c85d00;
+
+  /* ── colour: status ────────────────────────────────────────────────── */
+  /* Re-authored for paper: on a light ground a tone is darkened, not
+     brightened, to be read. 5.3 / 4.8 / 4.7 on the darkest sheet. */
+  --danger: #a8341c;
+  --danger-ink: #8a1f10;
+  --info: #0065b4;
+  --info-ink: #004a85;
+  --ok: #00734c;
 
   /* ── colour: viewport ink ──────────────────────────────────────────── */
-  /* Ink drawn inside the viewport rectangle, where the ground is paper and
-     the polarity is therefore inverted: dark ink with a light halo. Mirrors
-     the same names in src/tokens.ts; each clears AA on --surface-viewport. */
-  --viewport-ink: #17171b;
-  --viewport-ink-2: #4a4a53;
-  --viewport-mark: #1769a9;
-  --viewport-model: #5b6d15;
-  --viewport-sketch: #18707d;
-  --viewport-simulate: #8f5a16;
-  --viewport-mark-rgb: 23, 105, 169;
-  --viewport-model-rgb: 91, 109, 21;
-  --viewport-sketch-rgb: 24, 112, 125;
-  --viewport-simulate-rgb: 143, 90, 22;
+  /* Ink drawn inside the viewport rectangle. Now the same values chrome uses,
+     because chrome and viewport share a ground — but a separate list, because
+     it owes a separate rule: inside the rectangle nothing is coloured. The
+     field ramp is the only hue in there, which is what makes an annotation
+     unmistakably an annotation rather than a value. */
+  --viewport-ink: #18161a;
+  --viewport-ink-2: #605e65;
+  --viewport-mark: #48464d;
+  --viewport-mode: #605e65;
+  --viewport-mark-rgb: 72, 70, 77;
+  --viewport-mode-rgb: 96, 94, 101;
 
   /* ── colour: graticule ─────────────────────────────────────────────── */
   /* The instrument faceplate the scene is drawn over. Structure, never text,
@@ -96,11 +123,11 @@
   --graticule-axis: #9c9ca2;
   --graticule-frame: #8f8f95;
 
-  /* Accent alpha ladder. An accent appears at exactly six strengths, and
-     each step means something: a wash is a surface barely touched, a tint is
-     an active control's fill, a veil is a decorative hairline, an edge is an
-     active control's border, a mark is something that has to be found.
-     Before this ladder the lime alone appeared at twelve different alphas. */
+  /* Accent alpha ladder. The accent appears at exactly six strengths and each
+     step means something: a wash is a sheet barely touched, a tint is an
+     active row's fill, a veil is a decorative hairline, an edge is an active
+     control's border, a mark is something that has to be found. Solid is the
+     sixth and the important one — the filled block behind black type. */
   --alpha-wash: 0.06;
   --alpha-tint: 0.12;
   --alpha-tint-strong: 0.18;
@@ -108,15 +135,18 @@
   --alpha-edge: 0.55;
   --alpha-mark: 0.85;
 
-  /* rgb triples for the accents, so a rule can tint with an alpha. */
-  --accent-model-rgb: 217, 255, 87;
-  --accent-sketch-rgb: 127, 214, 245;
-  --accent-simulate-rgb: 255, 178, 92;
-  --danger-rgb: 255, 129, 103;
-  --info-rgb: 154, 220, 244;
-  --ok-rgb: 159, 231, 189;
+  /* rgb triples, so a rule can tint with an alpha. */
+  --accent-rgb: 248, 115, 24;
+  --ink-rgb: 24, 22, 26;
+  --danger-rgb: 168, 52, 28;
+  --info-rgb: 0, 101, 180;
+  --ok-rgb: 0, 115, 76;
 
   /* ── type ──────────────────────────────────────────────────────────── */
+  /* Mono is the house face. Every label, tab, menu item, readout and unit in
+     the chrome is monospaced, because the panel is a view of a program and
+     the furniture should say so; sans is kept for prose — hints, warnings,
+     descriptions — which is the only text here that is sentences. */
   --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 
@@ -137,9 +167,18 @@
   --leading-snug: 1.4;
   --leading-normal: 1.55;
 
-  --tracking-caps: 0.08em;
+  /* Tracking is a function of size, not a house style: 9px needs 0.16em to
+     keep its counters open and 15px would fall apart at the same value. One
+     global tracking token is the tell of a system that never measured its own
+     labels. */
+  --tracking-3xs: 0.16em;
+  --tracking-2xs: 0.13em;
+  --tracking-xs: 0.1em;
+  --tracking-sm: 0.08em;
+  --tracking-md: 0.06em;
+  --tracking-lg: 0.04em;
 
-  /* Composites for the three combinations that repeat everywhere. */
+  /* Composites for the combinations that repeat everywhere. */
   --type-kicker: var(--weight-semibold) var(--text-3xs) / var(--leading-flat)
     var(--font-mono);
   --type-mono: var(--weight-medium) var(--text-2xs) / var(--leading-tight)
@@ -157,11 +196,11 @@
   --space-7: 24px;
 
   /* ── shape ─────────────────────────────────────────────────────────── */
-  --radius-xs: 4px;
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-pill: 999px;
+  /* One radius, and it is zero. Named rather than deleted so the decision has
+     a place to live: everything here is a cell on a ruled sheet, and cells
+     are square. The one exception is the status dot, which is a circle
+     because roundness carries "this is a point, not a region". */
+  --radius: 0px;
 
   /* Every interactive box picks one of four heights; that is what keeps a
      label, its input and its icon on one baseline. */
@@ -172,10 +211,10 @@
   --control-xl: 36px;
 
   /* ── depth ─────────────────────────────────────────────────────────── */
-  --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 10px 28px rgba(0, 0, 0, 0.38);
-  --shadow-lg: 0 18px 44px rgba(0, 0, 0, 0.5);
-  --blur-float: blur(10px);
+  /* There is none, and that is a decision rather than an omission. Elevation
+     on this sheet is luminance plus a rule; a drop shadow on paper is a
+     picture of a card lying on a desk, which is a metaphor this instrument
+     does not want. Nothing in the file casts. */
 
   /* ── motion ────────────────────────────────────────────────────────── */
   --dur-fast: 90ms;
@@ -184,33 +223,23 @@
   --ease: cubic-bezier(0.2, 0, 0, 1);
   --ease-inout: cubic-bezier(0.4, 0, 0.2, 1);
 
-  color-scheme: dark;
+  color-scheme: light;
 }
 
-/* Per-mode accent, threaded through the mode switcher, tool rail and dock
-   section headers, plus a viewport-weight twin for the hint bar, the
-   viewport border and anything else drawn on paper — the chrome accents are
-   1.0-1.5:1 there. MODE_ACCENTS in src/tokens.ts is the source;
-   test/tokens.test.ts asserts the match. */
-.app[data-mode="model"] {
-  --mode-accent: var(--accent-model);
-  --mode-accent-rgb: var(--accent-model-rgb);
-  --viewport-accent: var(--viewport-model);
-  --viewport-accent-rgb: var(--viewport-model-rgb);
-}
-
-.app[data-mode="sketch"] {
-  --mode-accent: var(--accent-sketch);
-  --mode-accent-rgb: var(--accent-sketch-rgb);
-  --viewport-accent: var(--viewport-sketch);
-  --viewport-accent-rgb: var(--viewport-sketch-rgb);
-}
-
+/* Per-mode accent. All three modes name the same fill, because the mode is
+   read from *where* the filled cell sits in the switcher and from the word in
+   the hint bar, not from a hue (design-language.md §6). The three selectors
+   stay because MODE_ACCENTS in src/tokens.ts is still mode-shaped and
+   test/tokens.test.ts asserts each binding; --viewport-accent is its
+   achromatic twin for the mode cue drawn inside the viewport rectangle,
+   where no chrome hue is allowed to go. */
+.app[data-mode="model"],
+.app[data-mode="sketch"],
 .app[data-mode="simulate"] {
-  --mode-accent: var(--accent-simulate);
-  --mode-accent-rgb: var(--accent-simulate-rgb);
-  --viewport-accent: var(--viewport-simulate);
-  --viewport-accent-rgb: var(--viewport-simulate-rgb);
+  --mode-accent: var(--accent);
+  --mode-accent-rgb: var(--accent-rgb);
+  --viewport-accent: var(--viewport-mode);
+  --viewport-accent-rgb: var(--viewport-mode-rgb);
 }
 
 * {
@@ -231,12 +260,68 @@ strong {
   font-weight: var(--weight-semibold);
 }
 
+/* Mono is the default, not the exception. Every label, tab, menu item,
+   readout and unit in the chrome is monospaced, because the panel is a view
+   of a program and its furniture should look like one; --font-sans is opted
+   back in for prose — hints, warnings, descriptions, the shortcut sheet —
+   which is the only text in this app that is sentences. */
 body {
   background: var(--surface-base);
   color: var(--ink);
   font: var(--weight-regular) var(--text-sm) / var(--leading-normal)
-    var(--font-sans);
+    var(--font-mono);
   overflow: hidden;
+}
+
+/* Prose, and the only place sans is set. */
+.viewer-hint,
+.menu-dropdown small,
+.material-empty,
+.sim-empty,
+.opt-player-hint,
+.shortcut-groups li,
+.dialog p,
+.render-preset-card small,
+.render-preset-heading small,
+.rail-tip {
+  font-family: var(--font-sans);
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+/* Chrome furniture is tracked uppercase mono, and this is the one list that
+   says which strings are furniture: the labels a control wears, the tabs and
+   menu items you navigate by, the names of sections. It is deliberately not
+   `every button` — a button whose text is a *value* from the program (a mesh
+   name, a study name) stays as the program wrote it, because §4's rule is
+   that anything appearing in scene.py is quoted, not restyled. */
+button,
+select,
+.pane-hint,
+.status,
+.sim-row label,
+.sim-args label,
+.sim-builder-row label,
+.solver-controls label,
+.material-inspector > label,
+.material-inspector-head label,
+.save-as-form label,
+.switch span,
+.sim-bc-row strong,
+.sim-stats span {
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-xs);
+}
+
+/* …and the exceptions, which are the strings that exist in the source
+   program. A study called `sink-conduction` is not a label. */
+.sim-study-head strong,
+.sim-mesh-head strong,
+.tree-label,
+.pane-title,
+select option {
+  text-transform: none;
+  letter-spacing: var(--tracking-lg);
 }
 
 /* ── shared chrome behaviour ──────────────────────────────────────────── */
@@ -244,7 +329,7 @@ body {
 /* One focus ring for the whole app, drawn in the active mode's accent so
    keyboard focus is legible without adding a fifth accent colour. */
 :focus-visible {
-  outline: 2px solid var(--mode-accent, var(--accent-model));
+  outline: 2px solid var(--mode-accent, var(--accent));
   outline-offset: 1px;
 }
 
@@ -252,7 +337,7 @@ body {
    thumb that only reads once there is something to scroll. */
 * {
   scrollbar-width: thin;
-  scrollbar-color: var(--line-strong) transparent;
+  scrollbar-color: var(--rule-strong) transparent;
 }
 
 ::-webkit-scrollbar {
@@ -266,8 +351,7 @@ body {
 
 ::-webkit-scrollbar-thumb {
   border: 3px solid transparent;
-  border-radius: var(--radius-pill);
-  background: var(--line-strong);
+  background: var(--rule-strong);
   background-clip: content-box;
 }
 
@@ -315,7 +399,7 @@ body {
   align-items: stretch;
   gap: var(--space-1);
   padding: 0 var(--space-4);
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--rule);
   background: var(--surface-bar);
 }
 
@@ -329,11 +413,12 @@ body {
   margin: var(--space-1) 0;
   padding: 0 var(--space-4);
   border: 0;
-  border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--ink-3);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-semibold);
+  color: var(--ink-2);
+  font: var(--weight-semibold) var(--text-2xs) / var(--leading-flat)
+    var(--font-mono);
+  letter-spacing: var(--tracking-2xs);
+  text-transform: uppercase;
   transition:
     background-color var(--dur-fast) var(--ease),
     color var(--dur-fast) var(--ease);
@@ -341,8 +426,8 @@ body {
 
 .menu-title:hover,
 .menu-title.active {
-  background: var(--surface-raised);
-  color: var(--ink);
+  background: var(--accent);
+  color: var(--ink-on-accent);
 }
 
 .menu-dropdown {
@@ -355,10 +440,8 @@ body {
   gap: 1px;
   min-width: 208px;
   padding: var(--space-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
+  border: 1px solid var(--rule);
   background: var(--surface-panel);
-  box-shadow: var(--shadow-lg);
   animation: pop-in var(--dur-base) var(--ease);
   transform-origin: top left;
 }
@@ -373,7 +456,6 @@ body {
   height: var(--control-sm);
   padding: 0 var(--space-4);
   border: 0;
-  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--ink);
   font: inherit;
@@ -416,7 +498,7 @@ body {
 
 .menu-check {
   width: 13px;
-  color: var(--accent-model);
+  color: var(--ink);
   font-size: var(--text-2xs);
   font-style: normal;
 }
@@ -427,8 +509,9 @@ body {
   overflow: hidden;
   max-width: 32ch;
   color: var(--ink-3);
-  font: var(--weight-regular) var(--text-xs) / var(--leading-flat)
-    var(--font-mono);
+  font: var(--type-kicker);
+  letter-spacing: var(--tracking-3xs);
+  text-transform: uppercase;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -440,7 +523,7 @@ body {
   align-items: center;
   gap: var(--space-5);
   padding: 0 var(--space-5);
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--rule);
   background: var(--surface-bar-alt);
 }
 
@@ -448,10 +531,10 @@ body {
   display: flex;
   align-items: center;
   gap: var(--space-4);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-bold);
-  line-height: var(--leading-flat);
-  letter-spacing: 0.02em;
+  font: var(--weight-bold) var(--text-sm) / var(--leading-flat)
+    var(--font-mono);
+  letter-spacing: var(--tracking-sm);
+  text-transform: uppercase;
 }
 
 .brand .mark {
@@ -459,45 +542,41 @@ body {
   place-items: center;
   width: 26px;
   height: 26px;
-  border-radius: var(--radius-md);
-  background: var(--accent-model);
+  background: var(--accent);
   color: var(--ink-on-accent);
   font-size: var(--text-sm);
   font-weight: var(--weight-bold);
   line-height: var(--leading-flat);
-  transform: rotate(-4deg);
 }
 
 .spacer {
   flex: 1;
 }
 
-/* Mode switcher: a prominent segmented control next to the brand, the way
-   Blender and Fusion place their workspace picker. Each segment lights in
-   its own mode accent when active. */
+/* Mode switcher: three cells in pipeline order, and the mode is read from
+   which one is filled — geometry, then the constraints that drive it, then
+   the physics that scores it (§6). No gaps and no padding around the strip:
+   the cells share rules with each other, the way cells on a sheet do. */
 .mode-switcher {
   display: flex;
-  gap: var(--space-1);
   margin-left: var(--space-4);
-  padding: var(--space-1);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-  background: var(--surface-base);
+  border: 1px solid var(--rule-strong);
 }
 
 .mode-switcher button {
   display: inline-flex;
   align-items: center;
   gap: var(--space-3);
-  height: var(--control-md);
-  padding: 0 var(--space-5);
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
+  height: var(--control-xl);
+  padding: 0 var(--space-6);
+  border: 0;
+  border-left: 1px solid var(--rule);
   background: transparent;
-  color: var(--ink-3);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-semibold);
-  letter-spacing: 0.01em;
+  color: var(--ink-2);
+  font: var(--weight-semibold) var(--text-xs) / var(--leading-flat)
+    var(--font-mono);
+  letter-spacing: var(--tracking-xs);
+  text-transform: uppercase;
   transition:
     background-color var(--dur-base) var(--ease),
     border-color var(--dur-base) var(--ease),
@@ -510,35 +589,28 @@ body {
 }
 
 .mode-switcher button:hover:not(.active) {
-  border-color: transparent;
-  background: var(--surface-raised);
+  background: var(--surface-raised-hover);
   color: var(--ink);
 }
 
-.mode-switcher button[data-mode="model"] {
-  --seg-rgb: var(--accent-model-rgb);
-}
-
-.mode-switcher button[data-mode="sketch"] {
-  --seg-rgb: var(--accent-sketch-rgb);
-}
-
-.mode-switcher button[data-mode="simulate"] {
-  --seg-rgb: var(--accent-simulate-rgb);
+.mode-switcher button:first-child {
+  border-left: 0;
 }
 
 .mode-switcher button.active {
-  border-color: rgba(var(--seg-rgb), var(--alpha-edge));
-  background: rgba(var(--seg-rgb), var(--alpha-tint));
-  color: rgb(var(--seg-rgb));
+  background: var(--accent);
+  color: var(--ink-on-accent);
 }
 
+/* A control's edge is something you have to find, so it clears the 3:1 a
+   meaningful non-text mark owes (--rule-strong, 3.8:1 on paper). --rule is
+   one step weaker and belongs to *structure* — the hairlines that divide a
+   panel into cells, which nobody has to find because they are the grid. */
 button,
 select {
   height: var(--control-md);
   padding: 0 var(--space-5);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
+  border: 1px solid var(--rule-strong);
   background: var(--surface-raised);
   color: var(--ink);
   font: inherit;
@@ -554,7 +626,7 @@ select {
 
 button:hover:not(:disabled),
 select:hover {
-  border-color: var(--line-strong);
+  border-color: var(--rule-strong);
 }
 
 button:disabled {
@@ -562,24 +634,24 @@ button:disabled {
   cursor: default;
 }
 
-/* One "this control is on" treatment for the whole app: the mode accent as
-   a tint, a border, and the label — never a filled block, which would shout
-   over the viewport. */
-button.active {
-  border-color: rgba(var(--mode-accent-rgb, var(--accent-model-rgb)), var(--alpha-edge));
-  background: rgba(var(--mode-accent-rgb, var(--accent-model-rgb)), var(--alpha-tint));
-  color: var(--mode-accent, var(--accent-model));
-}
-
+/* One "this control is on" treatment for the whole app: the accent as a solid
+   fill with near-black type on it, and that is the only shape the accent is
+   allowed to take anywhere. As a fill it measures 7.02:1 under
+   --ink-on-accent; as a label on paper it measures 2.26:1 and fails, which is
+   what the previous tint-plus-accent-text version was doing in thirty places.
+   A filled cell is also how a mode is read off the switcher — the *position*
+   of the block is the signal, not its hue. */
+button.active,
 button.primary {
-  border-color: var(--accent-model);
-  background: var(--accent-model);
+  border-color: var(--accent-press);
+  background: var(--accent);
   color: var(--ink-on-accent);
 }
 
+button.active:hover:not(:disabled),
 button.primary:hover:not(:disabled) {
-  border-color: var(--accent-model);
-  filter: brightness(1.08);
+  border-color: var(--accent-press);
+  background: var(--accent-press);
 }
 
 /* ── form controls ────────────────────────────────────────────────────── */
@@ -593,8 +665,7 @@ input[type="text"] {
   height: var(--control-md);
   min-width: 0;
   padding: 0 var(--space-3);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
+  border: 1px solid var(--rule-strong);
   background: var(--surface-raised);
   color: var(--ink);
   font: var(--type-mono);
@@ -604,7 +675,7 @@ input[type="text"] {
 
 input[type="number"]:hover:not(:disabled),
 input[type="text"]:hover:not(:disabled) {
-  border-color: var(--line-strong);
+  border-color: var(--rule-strong);
 }
 
 input:disabled {
@@ -631,13 +702,13 @@ input[type="range"] {
   /* Chrome's UA sheet gives this a 0 2px margin, which pushed it past the
      right edge of every fixed-width column it sat in. */
   margin: 0;
-  accent-color: var(--mode-accent, var(--accent-model));
+  accent-color: var(--ink);
 }
 
 input[type="checkbox"] {
   width: 13px;
   height: 13px;
-  accent-color: var(--mode-accent, var(--accent-model));
+  accent-color: var(--ink);
 }
 
 /* Dense panel rows run one step shorter than the toolbar's controls. */
@@ -671,11 +742,8 @@ input[type="checkbox"] {
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-3);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
+  border: 1px solid var(--rule);
   background: var(--surface-float-80);
-  box-shadow: var(--shadow-sm);
-  backdrop-filter: var(--blur-float);
 }
 
 .tool-rail button {
@@ -690,15 +758,15 @@ input[type="checkbox"] {
 }
 
 .tool-rail button:hover:not(:disabled) {
-  border-color: var(--line);
+  border-color: var(--rule);
   color: var(--ink);
   background: var(--surface-raised-hover);
 }
 
 .tool-rail button.active {
-  border-color: rgba(var(--mode-accent-rgb, var(--accent-model-rgb)), var(--alpha-edge));
-  background: rgba(var(--mode-accent-rgb, var(--accent-model-rgb)), var(--alpha-tint));
-  color: var(--mode-accent, var(--accent-model));
+  border-color: var(--accent-press);
+  background: var(--accent);
+  color: var(--ink-on-accent);
 }
 
 .tool-rail button:disabled {
@@ -720,9 +788,9 @@ input[type="checkbox"] {
 }
 
 .rail-hint {
-  color: var(--mode-accent, var(--accent-model));
+  color: var(--ink-2);
   font: var(--type-kicker);
-  letter-spacing: var(--tracking-caps);
+  letter-spacing: var(--tracking-3xs);
   text-transform: uppercase;
 }
 
@@ -752,8 +820,10 @@ input[type="checkbox"] {
   border-bottom: var(--space-2) solid var(--ink-3);
 }
 
+/* The caret is a 4px mark on a filled cell, so it is drawn in the ink that
+   cell carries. The accent itself is 2.26:1 on paper and can never be a mark. */
 .tool-group-parent.active .tool-group-caret {
-  border-bottom-color: var(--mode-accent, var(--accent-model));
+  border-bottom-color: var(--ink-on-accent);
 }
 
 .tool-flyout {
@@ -764,11 +834,8 @@ input[type="checkbox"] {
   z-index: 11;
   gap: var(--space-2);
   padding: var(--space-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
+  border: 1px solid var(--rule);
   background: var(--surface-float-96);
-  backdrop-filter: var(--blur-float);
-  box-shadow: var(--shadow-md);
 }
 
 .tool-group.open .tool-flyout {
@@ -799,7 +866,7 @@ input[type="checkbox"] {
 .plane-picks-label {
   color: var(--ink-3);
   font: var(--type-kicker);
-  letter-spacing: var(--tracking-caps);
+  letter-spacing: var(--tracking-3xs);
   text-transform: uppercase;
   text-align: center;
 }
@@ -834,7 +901,7 @@ input[type="checkbox"] {
 }
 
 .sketch-panel header small b {
-  color: var(--ink-3);
+  color: var(--ink-on-accent);
   font: inherit;
 }
 
@@ -847,12 +914,10 @@ input[type="checkbox"] {
 
 .history-chips span {
   padding: var(--space-1) var(--space-3);
-  border: 1px solid
-    rgba(var(--mode-accent-rgb, var(--accent-model-rgb)), var(--alpha-veil));
-  border-radius: var(--radius-pill);
+  border: 1px solid var(--rule);
   color: var(--ink-2);
   background: rgba(
-    var(--mode-accent-rgb, var(--accent-model-rgb)),
+    var(--ink-rgb),
     var(--alpha-wash)
   );
   font: var(--type-kicker);
@@ -873,8 +938,7 @@ input[type="checkbox"] {
 
 .history-chips .chip-label.editable {
   cursor: pointer;
-  text-decoration: underline dotted
-    rgba(var(--mode-accent-rgb, var(--accent-model-rgb)), var(--alpha-edge));
+  text-decoration: underline dotted var(--accent-press);
   text-underline-offset: 2px;
 }
 
@@ -882,10 +946,8 @@ input[type="checkbox"] {
   width: 46px;
   height: auto;
   padding: 0 var(--space-1);
-  border: 1px solid
-    rgba(var(--mode-accent-rgb, var(--accent-model-rgb)), var(--alpha-edge));
-  border-radius: var(--radius-xs);
-  background: var(--shade-strong);
+  border: 1px solid var(--rule-strong);
+  background: var(--surface-raised);
   color: inherit;
   font: inherit;
 }
@@ -927,7 +989,6 @@ input[type="checkbox"] {
   height: var(--control-sm);
   min-width: 0;
   padding: 0 var(--space-3);
-  border-radius: var(--radius-sm);
   font-size: var(--text-2xs);
 }
 
@@ -955,7 +1016,7 @@ input[type="checkbox"] {
 .solver-controls label > span {
   color: var(--ink-3);
   font: var(--type-kicker);
-  letter-spacing: var(--tracking-caps);
+  letter-spacing: var(--tracking-3xs);
   text-transform: uppercase;
 }
 
@@ -966,14 +1027,12 @@ input[type="checkbox"] {
   height: var(--control-sm);
   min-width: 0;
   padding: 0 var(--space-3);
-  border-radius: var(--radius-sm);
   font-size: var(--text-2xs);
 }
 
 .solver-empty {
   margin: 0;
   padding: var(--space-4);
-  border-radius: var(--radius-sm);
   background: var(--surface-inset);
   color: var(--ink-3);
   font-size: var(--text-2xs);
@@ -985,7 +1044,6 @@ input[type="checkbox"] {
 .solver-chart {
   padding: var(--space-4) var(--space-4) var(--space-3);
   border: 1px solid rgba(var(--info-rgb), var(--alpha-tint-strong));
-  border-radius: var(--radius-md);
   background: var(--shade-soft);
 }
 
@@ -1001,7 +1059,7 @@ input[type="checkbox"] {
 .solver-chart footer {
   color: var(--ink-3);
   font: var(--type-kicker);
-  letter-spacing: var(--tracking-caps);
+  letter-spacing: var(--tracking-3xs);
   text-transform: uppercase;
 }
 
@@ -1100,11 +1158,14 @@ input[type="checkbox"] {
 
 .render-popover .render-panel {
   max-height: min(72vh, 640px);
-  border-top-color: var(--line);
+  border-top-color: var(--rule);
 }
 
-/* Collapsed sections: one shared launcher look (icon · label · count).
-   The accent top border is the dock's share of the mode identity. */
+/* Collapsed sections: one shared launcher look (number · icon · label ·
+   count). A dock section is a zone of the sheet, so its number is drawn the
+   way every other section number is — a filled cell with near-black type —
+   and it comes from the same counter, incremented in dock order whether the
+   section is open or shut. */
 .object-tree-launch,
 .material-launch,
 .sim-launch {
@@ -1113,25 +1174,41 @@ input[type="checkbox"] {
   gap: var(--space-4);
   width: 100%;
   height: var(--control-xl);
-  padding: 0 var(--space-5) 0 var(--space-4);
-  border: 1px solid var(--line);
-  /* The mode strip is the one edge of this button that meets the paper, so it
-     is drawn at viewport weight: the chrome lime measures 1.04:1 there. */
-  border-top: 2px solid rgba(var(--viewport-accent-rgb, var(--viewport-model-rgb)), var(--alpha-mark));
-  border-radius: var(--radius-lg);
+  padding: 0 var(--space-5) 0 0;
+  border: 1px solid var(--rule-strong);
   background: var(--surface-float-90);
-  box-shadow: var(--shadow-md);
-  backdrop-filter: var(--blur-float);
-  font-size: var(--text-md);
-  font-weight: var(--weight-semibold);
+  font: var(--weight-semibold) var(--text-xs) / var(--leading-flat)
+    var(--font-mono);
+  letter-spacing: var(--tracking-xs);
   text-align: left;
+}
+
+.object-tree-launch::before,
+.material-launch::before,
+.sim-launch::before,
+.object-tree-panel > header::before,
+.material-panel > header::before,
+.sim-panel > header::before,
+.sketch-panel > header::before,
+.render-panel > header::before {
+  flex: 0 0 auto;
+  align-self: stretch;
+  display: grid;
+  place-items: center;
+  min-width: 22px;
+  background: var(--accent);
+  color: var(--ink-on-accent);
+  font: var(--type-kicker);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--tracking-3xs);
+  counter-increment: cj-dock;
+  content: counter(cj-dock, decimal-leading-zero);
 }
 
 .object-tree-launch:hover,
 .material-launch:hover,
 .sim-launch:hover {
-  border-color: var(--line-strong);
-  border-top-color: var(--viewport-accent, var(--viewport-model));
+  background: var(--surface-raised-hover);
 }
 
 .object-tree-launch svg {
@@ -1147,9 +1224,8 @@ input[type="checkbox"] {
   min-width: 18px;
   margin-left: auto;
   padding: var(--space-1) var(--space-2);
-  border-radius: var(--radius-pill);
-  background: rgba(var(--mode-accent-rgb, var(--accent-model-rgb)), var(--alpha-tint));
-  color: var(--mode-accent, var(--accent-model));
+  background: var(--accent);
+  color: var(--ink-on-accent);
   font: var(--type-kicker);
   text-align: center;
 }
@@ -1162,18 +1238,109 @@ input[type="checkbox"] {
 .sketch-panel,
 .render-panel {
   width: 100%;
-  border: 1px solid var(--line);
-  border-top: 2px solid rgba(var(--mode-accent-rgb, var(--accent-model-rgb)), var(--alpha-edge));
-  border-radius: var(--radius-lg);
+  border: 1px solid var(--rule-strong);
   background: var(--surface-float-90);
-  box-shadow: var(--shadow-lg);
-  backdrop-filter: var(--blur-float);
   animation: panel-in var(--dur-slow) var(--ease);
 }
 
-/* One panel header, everywhere: an uppercase kicker in the mode accent over
-   the section's name. The components emit <small> first so the kicker is
-   always the top line — see ObjectTree/RenderPanel/MaterialPanel. */
+/* The panel's own header carries the zone number in the same cell the
+   launcher does, so opening a section does not renumber the dock. */
+.object-tree-panel > header,
+.material-panel > header,
+.sim-panel > header,
+.sketch-panel > header,
+.render-panel > header {
+  padding-left: 0;
+}
+
+/* The title stack takes the slack, so the head reads left to right —
+   number, kicker, name — instead of drifting to the right edge. */
+.object-tree-panel > header > span,
+.sim-panel header span,
+.sketch-panel header > span,
+.render-panel > header > span,
+.material-panel-title > span:not(.material-panel-icon) {
+  margin-right: auto;
+}
+
+/* ── numbered sections ─────────────────────────────────────────────────── */
+
+/* Sections in this UI are numbered the way the zones of a drawing are: a
+   filled cell carrying the number in near-black type, then the name in
+   tracked uppercase mono. That is the one place the accent appears inside a
+   panel, and it is a fill, which is the only thing the accent may be.
+ *
+ * The number comes from a CSS counter reset on the dock and incremented by
+ * every section head in DOM order. That is deliberate: a panel gets numbered
+ * sections without a line changing in the panel's own file, and the numbers
+ * cannot drift out of order because nothing hand-writes them. `ui/Section.tsx`
+ * is the primitive that emits the markup for anything newly written; every
+ * panel that predates it is picked up by the selectors below.
+ *
+ * The numbering restarts per panel because a panel is the zone: "03" means
+ * the third block of *this* readout, not the third in the app. */
+.dock {
+  counter-reset: cj-dock;
+}
+
+.dock > * {
+  counter-reset: cj-section;
+}
+
+.section-head::before,
+.sim-section-head::before {
+  flex: 0 0 auto;
+  align-self: center;
+  margin-right: var(--space-3);
+  padding: 0 var(--space-2);
+  background: var(--accent);
+  color: var(--ink-on-accent);
+  font: var(--type-kicker);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--tracking-3xs);
+  counter-increment: cj-section;
+  content: counter(cj-section, decimal-leading-zero);
+}
+
+.section-head {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin: 0;
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--rule-strong);
+}
+
+.section-head b,
+.render-settings h4,
+.shortcut-groups h4 {
+  margin-right: auto;
+  font: var(--weight-semibold) var(--text-2xs) / var(--leading-flat)
+    var(--font-mono);
+  letter-spacing: var(--tracking-2xs);
+  text-transform: uppercase;
+}
+
+/* The right-hung figure that closes a section rule: how many things the
+   section holds, or the unit its readouts are in. */
+.section-count {
+  flex: 0 0 auto;
+  color: var(--ink-3);
+  font: var(--type-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* One panel header, everywhere: the kicker, then the section's name. The
+   kicker used to be accent-coloured *text*, which measures 2.26:1 on paper;
+   it is now the same filled cell the section numbers use. The components
+   emit <small> first so the kicker is always the top line — see
+   ObjectTree/RenderPanel/MaterialPanel. */
 .object-tree-panel > header > span,
 .sim-panel header span,
 .sketch-panel header > span,
@@ -1181,21 +1348,30 @@ input[type="checkbox"] {
 .material-panel-title > span:not(.material-panel-icon) {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  align-items: flex-start;
+  gap: var(--space-2);
   min-width: 0;
-  font-size: var(--text-md);
-  font-weight: var(--weight-semibold);
-  line-height: var(--leading-tight);
+  font: var(--weight-semibold) var(--text-md) / var(--leading-tight)
+    var(--font-mono);
+  letter-spacing: var(--tracking-md);
+  text-transform: uppercase;
 }
 
 .object-tree-panel > header small,
+.object-tree-panel > header small *,
 .sketch-panel header small,
+.sketch-panel header small *,
 .material-panel-title small,
+.material-panel-title small *,
 .sim-panel header small,
-.render-panel header small {
-  color: rgba(var(--mode-accent-rgb, var(--accent-model-rgb)), var(--alpha-mark));
+.sim-panel header small *,
+.render-panel header small,
+.render-panel header small * {
+  padding: 0 var(--space-2);
+  background: var(--accent);
+  color: var(--ink-on-accent);
   font: var(--type-kicker);
-  letter-spacing: var(--tracking-caps);
+  letter-spacing: var(--tracking-3xs);
   text-transform: uppercase;
 }
 
@@ -1220,7 +1396,6 @@ input[type="checkbox"] {
   flex: 0 0 auto;
   padding: var(--space-4) var(--space-3) var(--space-3) var(--space-5);
   background: var(--surface-float-96);
-  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
 }
 
 .object-tree-close {
@@ -1242,13 +1417,22 @@ input[type="checkbox"] {
   overflow: auto;
 }
 
+/* Every child of a row sits on one 15px line box whatever size it is set in,
+   which is what puts a 9px count and an 11px name on the same baseline
+   instead of two baselines a pixel and a half apart. */
+.object-tree-row > *,
+.material-inspector-head > *,
+.render-preset-heading > *,
+.render-customize > * {
+  line-height: var(--text-lg);
+}
+
 .object-tree-row {
   display: flex;
   align-items: center;
   gap: var(--space-3);
   min-height: var(--control-sm);
   padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius-sm);
   color: var(--ink);
   font-size: var(--text-xs);
   cursor: pointer;
@@ -1262,12 +1446,17 @@ input[type="checkbox"] {
 }
 
 .object-tree-row.active {
-  background: rgba(var(--mode-accent-rgb, var(--accent-model-rgb)), var(--alpha-tint));
-  outline: 1px solid rgba(var(--mode-accent-rgb, var(--accent-model-rgb)), var(--alpha-edge));
+  background: var(--accent);
+  color: var(--ink-on-accent);
+}
+
+.object-tree-row.active .tree-detail,
+.object-tree-row.active .tree-material {
+  color: var(--ink-on-accent);
 }
 
 .object-tree-row.operator {
-  color: var(--accent-model-ink);
+  color: var(--ink);
   font: var(--type-kicker);
   line-height: var(--leading-tight);
 }
@@ -1280,7 +1469,6 @@ input[type="checkbox"] {
   height: 14px;
   padding: 0;
   border: 0;
-  border-radius: var(--radius-xs);
   background: none;
   color: var(--ink-3);
   font-size: var(--text-3xs);
@@ -1327,9 +1515,8 @@ input[type="checkbox"] {
   min-width: 16px;
   margin-left: auto;
   padding: var(--space-1) var(--space-2);
-  border-radius: var(--radius-pill);
-  background: rgba(var(--info-rgb), var(--alpha-tint));
-  color: var(--info);
+  background: var(--info);
+  color: var(--surface-float);
   font: var(--type-kicker);
   text-align: center;
 }
@@ -1343,13 +1530,8 @@ input[type="checkbox"] {
   max-width: 74px;
   margin-left: auto;
   padding: var(--space-1) var(--space-2);
-  border: 1px solid
-    rgba(var(--mode-accent-rgb, var(--accent-model-rgb)), var(--alpha-veil));
-  border-radius: var(--radius-pill);
-  background: rgba(
-    var(--mode-accent-rgb, var(--accent-model-rgb)),
-    var(--alpha-wash)
-  );
+  border: 1px solid var(--rule);
+  background: rgba(var(--ink-rgb), var(--alpha-wash));
   color: var(--ink-2);
   font: var(--type-kicker);
   overflow: hidden;
@@ -1373,7 +1555,6 @@ input[type="checkbox"] {
   gap: var(--space-2);
   padding: var(--space-3);
   background: var(--surface-float-96);
-  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
 }
 
 .material-panel-title {
@@ -1400,7 +1581,7 @@ input[type="checkbox"] {
   width: var(--control-md);
   height: var(--control-md);
   padding: 0;
-  color: var(--mode-accent, var(--accent-model));
+  color: var(--ink);
   font-size: var(--text-lg);
   line-height: var(--leading-flat);
 }
@@ -1433,7 +1614,6 @@ input[type="checkbox"] {
   min-width: 0;
   padding: var(--space-3) var(--space-2);
   border: 1px solid transparent;
-  border-radius: var(--radius-md);
   background: var(--surface-inset);
   cursor: grab;
   outline: none;
@@ -1445,17 +1625,14 @@ input[type="checkbox"] {
 
 .material-card:hover,
 .material-card:focus-visible {
-  border-color: var(--line-strong);
+  border-color: var(--rule-strong);
   background: var(--surface-inset-hover);
 }
 
 .material-card.active {
-  border-color: rgba(
-    var(--mode-accent-rgb, var(--accent-model-rgb)),
-    var(--alpha-edge)
-  );
+  border-color: var(--accent-press);
   background: rgba(
-    var(--mode-accent-rgb, var(--accent-model-rgb)),
+    var(--accent-rgb),
     var(--alpha-wash)
   );
 }
@@ -1485,7 +1662,6 @@ input[type="checkbox"] {
   width: 48px;
   height: 48px;
   margin: 0 auto var(--space-2);
-  border-radius: var(--radius-md);
   overflow: hidden;
   background:
     linear-gradient(145deg, rgba(255, 255, 255, 0.045), rgba(0, 0, 0, 0.28)),
@@ -1581,8 +1757,7 @@ input[type="checkbox"] {
   width: 28px;
   height: var(--control-xs);
   padding: var(--space-1);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
+  border: 1px solid var(--rule);
   background: var(--surface-raised);
 }
 
@@ -1610,7 +1785,7 @@ input[type="checkbox"] {
 
 .material-inspector input[type="range"] {
   width: 100%;
-  accent-color: var(--mode-accent, var(--accent-model));
+  accent-color: var(--ink);
 }
 
 .material-empty {
@@ -1668,25 +1843,27 @@ input[type="checkbox"] {
      of the paper ground: at 82% the face composited toward it and its ink-3
      label measured 3.63:1, and the chrome lime edge measured 1.04:1 against
      the paper it sits on. */
-  border: 1px solid rgba(var(--viewport-accent-rgb, var(--viewport-model-rgb)), var(--alpha-mark));
-  border-radius: var(--radius-xs);
+  border: 1px solid rgba(var(--viewport-accent-rgb, var(--viewport-mode-rgb)), var(--alpha-mark));
   background: var(--surface-float);
   color: var(--ink-3);
   font: var(--type-kicker);
-  letter-spacing: var(--tracking-caps);
+  letter-spacing: var(--tracking-3xs);
   /* Only faces turned toward the viewer are drawn, so a click always lands on
      the face you can actually see. */
   backface-visibility: hidden;
 }
 
 .cube-face:hover {
-  background: rgba(var(--mode-accent-rgb, var(--accent-model-rgb)), var(--alpha-tint-strong));
-  color: var(--ink);
+  background: var(--surface-raised-hover);
+  color: var(--viewport-ink);
 }
 
+/* The cube sits over the viewport, so its "on" state is drawn in viewport ink
+   rather than in the accent: no chrome hue crosses this edge (§14 zoning). */
 .cube-face.active {
-  border-color: var(--mode-accent, var(--accent-model));
-  color: var(--mode-accent, var(--accent-model));
+  border-color: var(--viewport-ink);
+  background: var(--viewport-ink);
+  color: var(--surface-viewport);
 }
 
 .cube-actions {
@@ -1700,7 +1877,6 @@ input[type="checkbox"] {
   width: 28px;
   height: var(--control-sm);
   padding: 0;
-  border-radius: var(--radius-sm);
   background: var(--surface-float);
   font: var(--type-kicker);
   letter-spacing: 0.06em;
@@ -1709,7 +1885,7 @@ input[type="checkbox"] {
 /* These two sit straight on the paper, so their active edge is drawn at
    viewport weight; the shared control accent measures 1.04:1 there. */
 .cube-actions button.active {
-  border-color: rgba(var(--viewport-accent-rgb, var(--viewport-model-rgb)), var(--alpha-mark));
+  border-color: rgba(var(--viewport-accent-rgb, var(--viewport-mode-rgb)), var(--alpha-mark));
 }
 
 .view-menu {
@@ -1724,10 +1900,8 @@ input[type="checkbox"] {
   margin: 0;
   padding: var(--space-2);
   list-style: none;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
+  border: 1px solid var(--rule);
   background: var(--surface-panel);
-  box-shadow: var(--shadow-lg);
   animation: pop-in var(--dur-base) var(--ease);
   transform-origin: top right;
 }
@@ -1736,7 +1910,6 @@ input[type="checkbox"] {
   width: 100%;
   height: var(--control-sm);
   border: 0;
-  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--ink);
   font-size: var(--text-sm);
@@ -1748,9 +1921,9 @@ input[type="checkbox"] {
 }
 
 .view-menu button.active {
-  background: transparent;
-  border-color: transparent;
-  color: var(--mode-accent, var(--accent-model));
+  background: var(--accent);
+  border-color: var(--accent-press);
+  color: var(--ink-on-accent);
 }
 
 /* Render settings (the eye-icon popover in the toolbar) ----------------- */
@@ -1765,9 +1938,9 @@ button.icon {
 /* The eye is active exactly while its popover is open; it glows in the
    current mode's accent rather than the default lime. */
 .toolbar button.icon.active {
-  border-color: rgba(var(--mode-accent-rgb, var(--accent-model-rgb)), var(--alpha-edge));
-  background: rgba(var(--mode-accent-rgb, var(--accent-model-rgb)), var(--alpha-tint));
-  color: var(--mode-accent, var(--accent-model));
+  border-color: var(--accent-press);
+  background: var(--accent);
+  color: var(--ink-on-accent);
 }
 
 /* Icon + label buttons lay their two children out rather than stacking the
@@ -1816,14 +1989,14 @@ button.icon {
   margin: 0;
   color: var(--ink-3);
   font: var(--weight-semibold) var(--text-3xs) / var(--leading-flat)
-    var(--font-sans);
-  letter-spacing: var(--tracking-caps);
+    var(--font-mono);
+  letter-spacing: var(--tracking-3xs);
   text-transform: uppercase;
 }
 
 .render-preset-heading {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
 }
@@ -1858,12 +2031,12 @@ button.icon {
 }
 
 .render-preset-card.selected {
-  border-color: var(--line-strong);
+  border-color: var(--rule-strong);
 }
 
 .render-preset-card.active {
-  border-color: rgba(var(--mode-accent-rgb, var(--accent-model-rgb)), var(--alpha-mark));
-  background: rgba(var(--mode-accent-rgb, var(--accent-model-rgb)), var(--alpha-wash));
+  border-color: var(--accent-press);
+  background: rgba(var(--accent-rgb), var(--alpha-wash));
 }
 
 .render-preset-card.active::after {
@@ -1873,9 +2046,7 @@ button.icon {
   width: var(--space-3);
   height: var(--space-3);
   border-radius: 50%;
-  background: var(--mode-accent, var(--accent-model));
-  box-shadow: 0 0 var(--space-4)
-    rgba(var(--mode-accent-rgb, var(--accent-model-rgb)), var(--alpha-mark));
+  background: var(--accent-press);
   content: "";
 }
 
@@ -1887,7 +2058,6 @@ button.icon {
   margin-bottom: 6px;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.055);
-  border-radius: 7px;
   background:
     linear-gradient(160deg, rgba(255, 255, 255, 0.055), transparent 52%),
     #0b0e0c;
@@ -1934,7 +2104,6 @@ button.icon {
 
 .render-preset-card[data-preset="wire"] .render-preset-preview i:first-child {
   border: 1px solid #78c6e7;
-  border-radius: 4px;
   background:
     linear-gradient(45deg, transparent 48%, rgba(120, 198, 231, 0.7) 50%, transparent 52%),
     linear-gradient(-45deg, transparent 48%, rgba(120, 198, 231, 0.7) 50%, transparent 52%);
@@ -1969,6 +2138,7 @@ button.icon {
 .render-customize {
   display: flex;
   align-items: center;
+  line-height: var(--text-lg);
   justify-content: space-between;
   gap: var(--space-4);
   height: var(--control-lg);
@@ -2002,7 +2172,7 @@ button.icon {
 
 .render-customize > i {
   flex: 0 0 auto;
-  color: var(--mode-accent, var(--accent-model));
+  color: var(--ink);
   font: var(--weight-regular) var(--text-lg) / var(--leading-flat)
     var(--font-mono);
 }
@@ -2034,15 +2204,13 @@ button.icon {
 .render-preset-actions button {
   height: var(--control-xs);
   padding: 0 var(--space-3);
-  border-radius: var(--radius-sm);
   font-size: var(--text-3xs);
 }
 
 .segmented {
   display: flex;
   padding: var(--space-1);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
+  border: 1px solid var(--rule);
   background: var(--surface-float);
 }
 
@@ -2052,7 +2220,6 @@ button.icon {
   height: var(--control-sm);
   padding: 0 var(--space-3);
   border: 0;
-  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--ink-3);
   font-size: var(--text-sm);
@@ -2067,8 +2234,8 @@ button.icon {
 }
 
 .segmented button.active {
-  background: rgba(var(--mode-accent-rgb, var(--accent-model-rgb)), var(--alpha-tint));
-  color: var(--mode-accent, var(--accent-model));
+  background: var(--accent);
+  color: var(--ink-on-accent);
 }
 
 .switch {
@@ -2076,7 +2243,6 @@ button.icon {
   align-items: flex-start;
   gap: var(--space-4);
   padding: var(--space-2);
-  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: background-color var(--dur-fast) var(--ease);
 }
@@ -2088,7 +2254,7 @@ button.icon {
 .switch input {
   flex: 0 0 auto;
   margin-top: var(--space-1);
-  accent-color: var(--mode-accent, var(--accent-model));
+  accent-color: var(--ink);
 }
 
 .switch span {
@@ -2128,10 +2294,8 @@ button.icon {
 
 .selection-chip {
   padding: var(--space-1) var(--space-4);
-  border: 1px solid
-    rgba(var(--mode-accent-rgb, var(--accent-model-rgb)), var(--alpha-edge));
-  border-radius: var(--radius-pill);
-  color: var(--mode-accent, var(--accent-model));
+  border: 1px solid var(--rule-strong);
+  color: var(--ink);
   font: var(--weight-semibold) var(--text-xs) / var(--leading-snug)
     var(--font-mono);
 }
@@ -2140,10 +2304,11 @@ button.icon {
   display: inline-flex;
   align-items: center;
   gap: var(--space-3);
-  max-width: 34ch;
+  max-width: 46ch;
   overflow: hidden;
-  color: var(--ink-3);
-  font-size: var(--text-sm);
+  color: var(--ink-2);
+  font: var(--type-mono);
+  letter-spacing: var(--tracking-lg);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2157,14 +2322,14 @@ button.icon {
   transition: background-color var(--dur-base) var(--ease);
 }
 
+/* Ready is a status, not the brand, so it takes the status tone — and the
+   accent could not carry an 8px dot anyway: it is 2.26:1 on paper. */
 .status.ready .dot {
-  background: var(--accent-model);
-  box-shadow: 0 0 var(--space-4) rgba(var(--accent-model-rgb), var(--alpha-mark));
+  background: var(--ok);
 }
 
 .status.error .dot {
   background: var(--danger);
-  box-shadow: 0 0 var(--space-4) rgba(var(--danger-rgb), var(--alpha-mark));
 }
 
 /* Panes --------------------------------------------------------------- */
@@ -2192,7 +2357,7 @@ button.icon {
 
 .pane-splitter:hover,
 .panes.resizing .pane-splitter {
-  background: rgba(var(--mode-accent-rgb, var(--accent-model-rgb)), var(--alpha-veil));
+  background: var(--accent);
 }
 
 .panes.editor-collapsed .pane-splitter {
@@ -2207,7 +2372,7 @@ button.icon {
   gap: var(--space-5);
   padding: var(--space-4) 0;
   overflow: hidden;
-  border-right: 1px solid var(--line);
+  border-right: 1px solid var(--rule);
   background: var(--surface-panel);
 }
 
@@ -2217,8 +2382,7 @@ button.icon {
   width: 28px;
   height: 28px;
   padding: 0;
-  border-radius: var(--radius-sm);
-  color: var(--mode-accent, var(--accent-model));
+  color: var(--ink);
   font-size: var(--text-md);
 }
 
@@ -2237,7 +2401,6 @@ button.icon {
   height: var(--control-xs);
   padding: 0;
   border-color: transparent;
-  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--ink-3);
   font-size: var(--text-md);
@@ -2260,7 +2423,7 @@ button.icon {
   /* The source is authoritative. Keep it above any viewer/tool popover that
      grows across the pane boundary on a narrow window. */
   z-index: 30;
-  border-right: 1px solid var(--line);
+  border-right: 1px solid var(--rule);
   background: var(--surface-panel);
 }
 
@@ -2271,14 +2434,14 @@ button.icon {
   gap: var(--space-4);
   height: 38px;
   padding: 0 var(--space-5);
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--rule);
 }
 
 .pane-title {
   min-width: 0;
   overflow: hidden;
-  color: var(--ink-3);
-  font: var(--weight-regular) var(--text-sm) / var(--leading-flat)
+  color: var(--ink);
+  font: var(--weight-semibold) var(--text-sm) / var(--leading-flat)
     var(--font-mono);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2292,7 +2455,8 @@ button.icon {
 
 .pane-hint {
   color: var(--ink-3);
-  font-size: var(--text-xs);
+  font: var(--type-kicker);
+  letter-spacing: var(--tracking-3xs);
   white-space: nowrap;
 }
 
@@ -2307,7 +2471,7 @@ button.icon {
   margin: 0;
   padding: var(--space-4) var(--space-5);
   overflow: auto;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--rule);
   background: var(--surface-bar);
   color: var(--danger-ink);
   font: var(--weight-regular) var(--text-sm) / var(--leading-normal)
@@ -2319,19 +2483,19 @@ button.icon {
   background: var(--surface-viewport);
 }
 
-/* Subtle mode cue on the viewport itself: a thin tinted border with a
-   slightly stronger strip along the top edge. Non-interactive; sits above
-   the canvas but under every overlay. */
+/* The drawing frame. Chrome and viewport share one paper, so the rectangle
+   has no luminance step to announce it and the frame is what says where the
+   field begins — which is why it takes --rule-heavy (9.85:1) rather than the
+   hairline a panel uses. Achromatic, because nothing coloured crosses this
+   edge; the mode is named in words in the hint bar instead of tinted here.
+   Non-interactive; above the canvas, under every overlay. */
 .viewer-pane::after {
   content: "";
   position: absolute;
   inset: 0;
   z-index: 6;
-  border: 1px solid rgba(var(--viewport-accent-rgb, var(--viewport-model-rgb)), var(--alpha-veil));
-  border-top: 2px solid
-    rgba(var(--viewport-accent-rgb, var(--viewport-model-rgb)), var(--alpha-mark));
+  border: 1px solid var(--rule-heavy);
   pointer-events: none;
-  transition: border-color var(--dur-slow) var(--ease);
 }
 
 .viewer-canvas {
@@ -2344,8 +2508,7 @@ button.icon {
 }
 
 .viewer-canvas.material-drop-active {
-  outline: 2px solid
-    rgba(var(--viewport-accent-rgb, var(--viewport-model-rgb)), var(--alpha-mark));
+  outline: 2px solid var(--viewport-ink);
   outline-offset: -7px;
 }
 
@@ -2371,7 +2534,7 @@ button.icon {
   color: var(--viewport-ink-2);
   font: var(--type-kicker);
   line-height: var(--text-sm);
-  letter-spacing: var(--tracking-caps);
+  letter-spacing: var(--tracking-3xs);
 }
 
 .graticule-gain > span:not(:first-child) {
@@ -2405,7 +2568,7 @@ button.icon {
   display: grid;
   grid-template-columns: 62px 136px;
   margin: 0;
-  border: 1px solid var(--graticule-frame);
+  border: 1px solid var(--rule-heavy);
   background: var(--surface-viewport);
   pointer-events: none;
 }
@@ -2422,22 +2585,24 @@ button.icon {
 /* Same two cells as the gain readout, on the same 12px line box: two labels
    of one instrument should not be two type variants. */
 .title-block dt {
-  border-right: 1px solid var(--graticule-frame);
+  border-right: 1px solid var(--rule);
   color: var(--viewport-ink-2);
   font: var(--type-kicker);
   line-height: var(--text-sm);
-  letter-spacing: var(--tracking-caps);
+  letter-spacing: var(--tracking-3xs);
 }
 
 .title-block dd {
   color: var(--viewport-ink);
   font: var(--type-mono);
+  font-variant-numeric: tabular-nums;
   line-height: var(--text-sm);
+  text-transform: uppercase;
 }
 
 .title-block dt:nth-of-type(n + 2),
 .title-block dd:nth-of-type(n + 2) {
-  border-top: 1px solid var(--graticule-frame);
+  border-top: 1px solid var(--rule);
 }
 
 /* The hint bar is left alone: the title block sits 40px up from the bottom
@@ -2461,27 +2626,23 @@ button.icon {
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
-  border: 1px solid
-    rgba(var(--mode-accent-rgb, var(--accent-model-rgb)), var(--alpha-veil));
-  border-radius: var(--radius-pill);
-  /* Opaque: over paper an 82% chip composites toward the ground and the
-     accent label loses its measured ratio. */
-  background: var(--surface-float-96);
-  color: var(--mode-accent, var(--accent-model));
+  border: 1px solid var(--rule-strong);
+  /* Opaque: over paper a translucent chip composites toward the ground and
+     its label loses its measured ratio. */
+  background: var(--surface-viewport);
+  color: var(--viewport-ink-2);
   font: var(--type-kicker);
-  letter-spacing: var(--tracking-caps);
+  letter-spacing: var(--tracking-3xs);
   text-transform: uppercase;
   pointer-events: none;
-  backdrop-filter: var(--blur-float);
   animation: fade-in var(--dur-base) var(--ease);
 }
 
 .viewer-compile-indicator i {
   width: var(--text-2xs);
   height: var(--text-2xs);
-  border: 1.5px solid
-    rgba(var(--mode-accent-rgb, var(--accent-model-rgb)), var(--alpha-veil));
-  border-top-color: var(--mode-accent, var(--accent-model));
+  border: 1.5px solid var(--rule);
+  border-top-color: var(--viewport-ink-2);
   border-radius: 50%;
   animation: viewer-spin 650ms linear infinite;
 }
@@ -2549,18 +2710,18 @@ button.icon {
 
 .constraint-fixed circle {
   fill: var(--surface-viewport-94);
-  stroke: var(--viewport-model);
+  stroke: var(--viewport-mode);
   stroke-width: 1.2;
 }
 
 .constraint-fixed rect {
-  fill: var(--viewport-model);
+  fill: var(--viewport-mode);
   stroke: none;
 }
 
 .constraint-fixed path {
   fill: none;
-  stroke: var(--viewport-model);
+  stroke: var(--viewport-mode);
   stroke-width: 1.4;
   stroke-linecap: round;
 }
@@ -2581,18 +2742,17 @@ button.icon {
   pointer-events: none;
 }
 
-/* Active editing mode, leading the hint bar: an accent-tinted pill. */
+/* Active editing mode, leading the hint bar: a stamped block. The word is the
+   mode signal — it survives greyscale, colour-blindness and a screenshot — so
+   it is set in reversed ink rather than tinted, which also keeps the last
+   chrome hue out of the viewport rectangle. Opaque, so geometry passing
+   behind it never shows through the type. */
 .viewer-hint .hint-mode {
   padding: var(--space-1) var(--space-3);
-  border: 1px solid rgba(var(--viewport-accent-rgb, var(--viewport-model-rgb)), var(--alpha-edge));
-  border-radius: var(--radius-pill);
-  /* Opaque paper, not an accent wash: the wash lifts the ground far enough
-     to take the tone to 4.3:1, and an opaque pill also knocks the geometry
-     out from under the text. */
-  background: var(--surface-viewport);
-  color: var(--viewport-accent, var(--viewport-model));
+  background: var(--viewport-ink);
+  color: var(--surface-viewport);
   font: var(--type-kicker);
-  letter-spacing: var(--tracking-caps);
+  letter-spacing: var(--tracking-3xs);
   text-transform: uppercase;
 }
 
@@ -2609,9 +2769,7 @@ button.icon {
   z-index: 12;
   padding: var(--space-5);
   border: 1px solid rgba(var(--danger-rgb), var(--alpha-edge));
-  border-radius: var(--radius-lg);
   background: var(--surface-float-96);
-  box-shadow: var(--shadow-md);
   color: var(--danger-ink);
   font-size: var(--text-sm);
   animation: rise-in var(--dur-slow) var(--ease);
@@ -2641,10 +2799,8 @@ button.icon {
   min-height: 0;
   width: min(880px, calc(100% - 48px));
   height: min(680px, calc(100% - 48px));
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-lg);
+  border: 1px solid var(--rule-strong);
   background: var(--surface-panel);
-  box-shadow: var(--shadow-lg);
   animation: rise-in var(--dur-slow) var(--ease);
 }
 
@@ -2654,7 +2810,7 @@ button.icon {
   justify-content: space-between;
   gap: var(--space-4);
   padding: var(--space-5) var(--space-5) var(--space-5) var(--space-6);
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--rule);
   font-size: var(--text-md);
   font-weight: var(--weight-semibold);
 }
@@ -2693,7 +2849,7 @@ button.icon {
 }
 
 .dialog-note code {
-  color: var(--accent-model-ink);
+  color: var(--ink);
   font-size: var(--text-2xs);
 }
 
@@ -2730,8 +2886,7 @@ button.icon {
 .save-as-form input[type="text"] {
   height: var(--control-md);
   padding: 0 var(--space-4);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
+  border: 1px solid var(--rule);
   background: var(--surface-raised);
   color: var(--ink);
   font: var(--weight-semibold) var(--text-sm) / var(--leading-flat)
@@ -2752,8 +2907,8 @@ button.icon {
   margin: 0 0 var(--space-3);
   color: var(--ink-3);
   font: var(--weight-semibold) var(--text-3xs) / var(--leading-flat)
-    var(--font-sans);
-  letter-spacing: var(--tracking-caps);
+    var(--font-mono);
+  letter-spacing: var(--tracking-3xs);
   text-transform: uppercase;
 }
 
@@ -2784,11 +2939,10 @@ button.icon {
 .shortcut-groups kbd {
   flex: 0 0 auto;
   padding: var(--space-1) var(--space-3);
-  border: 1px solid var(--line);
+  border: 1px solid var(--rule);
   border-bottom-width: 2px;
-  border-radius: var(--radius-xs);
   background: var(--surface-raised);
-  color: var(--accent-model-ink);
+  color: var(--ink);
   font: var(--type-mono-strong);
   white-space: nowrap;
 }
@@ -2826,10 +2980,11 @@ button.icon {
 .sim-row label {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: var(--space-2);
   min-width: 0;
-  color: var(--ink-2);
-  font-size: var(--text-xs);
+  color: var(--ink-3);
+  font: var(--type-kicker);
+  letter-spacing: var(--tracking-3xs);
 }
 .sim-row input[type="number"],
 .sim-row select {
@@ -2855,8 +3010,7 @@ button.icon {
   flex-direction: column;
   gap: var(--space-3);
   padding: var(--space-4);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
+  border: 1px solid var(--rule);
   background: var(--surface-inset);
 }
 .sim-study-head {
@@ -2879,18 +3033,19 @@ button.icon {
 .sim-kind {
   flex: 0 0 auto;
   padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius-pill);
   font: var(--type-kicker);
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
+/* Kind chips are filled cells, like every other taxonomy mark here: the ink
+   on them is near-black, never the chip's own hue at reading weight. */
 .sim-kind-thermal {
-  background: rgba(var(--accent-simulate-rgb), var(--alpha-tint-strong));
-  color: var(--accent-simulate);
+  background: var(--accent);
+  color: var(--ink-on-accent);
 }
 .sim-kind-elastic {
-  background: rgba(var(--info-rgb), var(--alpha-tint-strong));
-  color: var(--info);
+  background: var(--info);
+  color: var(--surface-float);
 }
 .sim-delete {
   flex: 0 0 auto;
@@ -2901,7 +3056,6 @@ button.icon {
   padding: 0;
   border-color: transparent;
   background: transparent;
-  border-radius: var(--radius-sm);
   color: var(--ink-3);
   font-size: var(--text-md);
   line-height: var(--leading-flat);
@@ -2944,7 +3098,6 @@ button.icon {
   gap: var(--space-3);
   min-width: 0;
   padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-md);
   background: var(--surface-inset);
   transition: background-color var(--dur-fast) var(--ease);
 }
@@ -2988,7 +3141,6 @@ button.icon {
 }
 .sim-add-bc {
   height: var(--control-sm);
-  border-radius: var(--radius-md);
   border-style: dashed;
   color: var(--ink-2);
   font-size: var(--text-xs);
@@ -3000,8 +3152,9 @@ button.icon {
   flex: 1;
   min-width: 0;
   height: var(--control-sm);
-  border-radius: var(--radius-md);
-  font-size: var(--text-xs);
+  font-size: var(--text-2xs);
+  letter-spacing: var(--tracking-lg);
+  white-space: nowrap;
 }
 /* The add-BC builder: type + selection pickers over per-kind numeric forms. */
 .sim-builder {
@@ -3009,8 +3162,7 @@ button.icon {
   flex-direction: column;
   gap: var(--space-3);
   padding: var(--space-3);
-  border: 1px dashed var(--line-strong);
-  border-radius: var(--radius-md);
+  border: 1px dashed var(--rule-strong);
   animation: rise-in var(--dur-base) var(--ease);
 }
 .sim-builder-row {
@@ -3035,7 +3187,6 @@ button.icon {
   height: var(--control-xs);
   min-width: 0;
   padding: 0;
-  border-radius: var(--radius-sm);
   font: var(--type-mono-strong);
 }
 /* A labelled numeric row: fixed label column, then the boxes. The shared
@@ -3047,10 +3198,16 @@ button.icon {
   min-width: 0;
   color: var(--ink-2);
   font-size: var(--text-2xs);
+  letter-spacing: var(--tracking-lg);
 }
+/* Mono is wider than the sans this column was measured for, so the label
+   cell grew to fit its longest string ("resolution") rather than truncating
+   it, and it drops the furniture tracking that a dense cell cannot afford. */
 .sim-builder-vector > span {
   flex: 0 0 auto;
-  width: 58px;
+  text-transform: none;
+  letter-spacing: normal;
+  width: 66px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -3068,7 +3225,6 @@ button.icon {
   flex: 1;
   min-width: 0;
   height: var(--control-sm);
-  border-radius: var(--radius-md);
   font-size: var(--text-xs);
 }
 .sim-vector {
@@ -3078,9 +3234,17 @@ button.icon {
 }
 .sim-run {
   height: var(--control-md);
-  border-radius: var(--radius-md);
+  border-color: var(--accent-press);
+  background: var(--accent);
+  color: var(--ink-on-accent);
   font-size: var(--text-sm);
   font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-sm);
+}
+
+.sim-run:hover:not(:disabled) {
+  border-color: var(--accent-press);
+  background: var(--accent-press);
 }
 .sim-legend {
   display: flex;
@@ -3093,7 +3257,6 @@ button.icon {
 .sim-ramp {
   height: var(--text-2xs);
   border: 1px solid var(--divider);
-  border-radius: var(--radius-xs);
 }
 .sim-legend-values {
   display: flex;
@@ -3123,7 +3286,7 @@ button.icon {
 .sim-slice input[type="range"] {
   flex: 1;
   min-width: 60px;
-  accent-color: var(--mode-accent, var(--accent-model));
+  accent-color: var(--ink);
 }
 .sim-slice-toggle {
   flex-direction: row !important;
@@ -3150,8 +3313,8 @@ button.icon {
 }
 
 .opt-kind {
-  background: rgba(var(--mode-accent-rgb, var(--accent-model-rgb)), var(--alpha-tint));
-  color: var(--mode-accent, var(--accent-model));
+  background: var(--accent);
+  color: var(--ink-on-accent);
 }
 
 .opt-objective {
@@ -3163,7 +3326,7 @@ button.icon {
 }
 
 .opt-objective code {
-  color: var(--mode-accent, var(--accent-model));
+  color: var(--ink);
   font: var(--type-mono-strong);
 }
 
@@ -3183,7 +3346,6 @@ button.icon {
   gap: var(--space-4);
   min-width: 0;
   padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius-sm);
   background: var(--surface-inset);
   font-size: var(--text-2xs);
 }
@@ -3222,14 +3384,13 @@ button.icon {
   display: block;
   width: 100%;
   height: 44px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
+  border: 1px solid var(--rule);
   background: var(--surface-inset);
 }
 
 .opt-spark polyline {
   fill: none;
-  stroke: var(--mode-accent, var(--accent-model));
+  stroke: var(--mode-accent, var(--accent));
   stroke-width: 1.6;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -3254,7 +3415,7 @@ button.icon {
 
 .opt-summary b {
   font: var(--type-mono-strong);
-  color: var(--mode-accent, var(--accent-model));
+  color: var(--ink);
 }
 
 .opt-player {
@@ -3270,14 +3431,13 @@ button.icon {
   width: var(--control-xs);
   height: var(--control-xs);
   padding: 0;
-  border-radius: var(--radius-sm);
   font-size: var(--text-2xs);
 }
 
 .opt-player input[type="range"] {
   flex: 1;
   min-width: 50px;
-  accent-color: var(--mode-accent, var(--accent-model));
+  accent-color: var(--ink);
 }
 
 .opt-frame-label {
@@ -3295,8 +3455,9 @@ button.icon {
   white-space: nowrap;
   font-size: var(--text-2xs);
   font-weight: var(--weight-semibold);
-  color: var(--mode-accent, var(--accent-model));
-  border-color: rgba(var(--mode-accent-rgb, var(--accent-model-rgb)), var(--alpha-edge));
+  color: var(--ink-on-accent);
+  background: var(--accent);
+  border-color: var(--accent);
 }
 
 .opt-player-hint {
@@ -3316,7 +3477,6 @@ button.icon {
 .opt-progress {
   position: relative;
   height: var(--space-3);
-  border-radius: var(--radius-pill);
   overflow: hidden;
   background: var(--surface-inset-hover);
 }
@@ -3324,8 +3484,7 @@ button.icon {
 .opt-progress i {
   display: block;
   height: 100%;
-  border-radius: var(--radius-pill);
-  background: var(--mode-accent, var(--accent-model));
+  background: var(--mode-accent, var(--accent));
   transition: width var(--dur-slow) var(--ease);
 }
 
@@ -3367,7 +3526,7 @@ button.icon {
 
 .opt-live-stats b {
   font: var(--type-mono-strong);
-  color: var(--mode-accent, var(--accent-model));
+  color: var(--ink);
 }
 
 /* ── Mesh inspector & results browsing (Simulate dock) ─────────────────── */
@@ -3382,10 +3541,12 @@ button.icon {
 
 .sim-section-head b {
   min-width: 0;
+  margin-right: auto;
   overflow: hidden;
-  font-size: var(--text-xs);
-  font-weight: var(--weight-semibold);
-  letter-spacing: 0.02em;
+  font: var(--weight-semibold) var(--text-2xs) / var(--leading-flat)
+    var(--font-mono);
+  letter-spacing: var(--tracking-2xs);
+  text-transform: uppercase;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -3394,7 +3555,6 @@ button.icon {
   flex: 0 0 auto;
   height: var(--control-xs);
   padding: 0 var(--space-4);
-  border-radius: var(--radius-sm);
   border-style: dashed;
   color: var(--ink-2);
   font-size: var(--text-2xs);
@@ -3430,8 +3590,7 @@ button.icon {
   display: block;
   width: 100%;
   height: 42px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
+  border: 1px solid var(--rule);
   background: var(--surface-inset);
 }
 
@@ -3457,7 +3616,7 @@ button.icon {
   color: var(--ink-3);
   font-weight: var(--weight-semibold);
   padding: var(--space-1) var(--space-2);
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--rule);
 }
 
 .sim-field-table td {
@@ -3477,7 +3636,7 @@ button.icon {
 .sim-deform input[type="range"] {
   flex: 1;
   min-width: 50px;
-  accent-color: var(--mode-accent, var(--accent-model));
+  accent-color: var(--ink);
 }
 
 /* ── BC visualization ──────────────────────────────────────────────────── */
@@ -3490,7 +3649,6 @@ button.icon {
   width: var(--space-3);
   height: var(--space-3);
   margin-right: var(--space-2);
-  border-radius: var(--space-1);
 }
 
 .sim-bc-legend {
@@ -3511,12 +3669,10 @@ button.icon {
   flex: 0 0 auto;
   width: var(--space-4);
   height: var(--space-4);
-  border-radius: var(--space-1);
 }
 
 .sim-pick {
   height: var(--control-xs);
-  border-radius: var(--radius-sm);
   font-size: var(--text-2xs);
 }
 
@@ -3524,8 +3680,8 @@ button.icon {
 .bc-pick-rect {
   position: absolute;
   z-index: 6;
-  border: 1px dashed rgba(var(--viewport-accent-rgb, var(--viewport-model-rgb)), var(--alpha-mark));
-  background: rgba(var(--viewport-accent-rgb, var(--viewport-model-rgb)), var(--alpha-tint));
+  border: 1px dashed rgba(var(--viewport-accent-rgb, var(--viewport-mode-rgb)), var(--alpha-mark));
+  background: rgba(var(--viewport-accent-rgb, var(--viewport-mode-rgb)), var(--alpha-tint));
   pointer-events: none;
 }
 
@@ -3538,19 +3694,18 @@ button.icon {
   flex-direction: column;
   gap: var(--space-1);
   padding: var(--space-2) var(--space-4);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
+  border: 1px solid var(--rule);
   background: var(--surface-float-96);
-  box-shadow: var(--shadow-md);
   pointer-events: none;
   font-size: var(--text-2xs);
   animation: fade-in var(--dur-fast) var(--ease);
 }
 
+/* Inside the viewport: viewport ink, never a chrome hue. */
 .sim-probe b {
   font: var(--type-mono-strong);
   font-size: var(--text-xs);
-  color: var(--mode-accent, var(--accent-model));
+  color: var(--viewport-ink);
 }
 
 .sim-probe span {
@@ -3577,8 +3732,7 @@ button.icon {
   display: flex;
   gap: var(--space-1);
   padding: var(--space-1);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
+  border: 1px solid var(--rule);
   background: var(--surface-float);
 }
 
@@ -3586,14 +3740,15 @@ button.icon {
   position: relative;
   flex: 1;
   min-width: 0;
+  letter-spacing: var(--tracking-lg);
   height: var(--control-sm);
   padding: 0 var(--space-2);
   border: none;
-  border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--ink-3);
-  font-size: var(--text-xs);
-  font-weight: var(--weight-semibold);
+  color: var(--ink-2);
+  font: var(--weight-semibold) var(--text-2xs) / var(--leading-flat)
+    var(--font-mono);
+  letter-spacing: var(--tracking-2xs);
   transition:
     background-color var(--dur-base) var(--ease),
     color var(--dur-base) var(--ease);
@@ -3604,8 +3759,8 @@ button.icon {
 }
 
 .sim-tabs button.active {
-  background: rgba(var(--mode-accent-rgb, var(--accent-model-rgb)), var(--alpha-tint));
-  color: var(--mode-accent, var(--accent-model));
+  background: var(--accent);
+  color: var(--ink-on-accent);
 }
 
 .sim-tab-badge {
@@ -3614,8 +3769,7 @@ button.icon {
   right: var(--space-1);
   width: var(--space-2);
   height: var(--space-2);
-  border-radius: var(--radius-pill);
-  background: var(--mode-accent, var(--accent-model));
+  background: var(--mode-accent, var(--accent));
 }
 
 .sim-help {
@@ -3630,7 +3784,6 @@ button.icon {
 
 .sim-probe-row {
   padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-sm);
   background: var(--surface-inset);
 }
 
@@ -3657,7 +3810,7 @@ button.icon {
 }
 
 .opt-spark .opt-cursor-point {
-  fill: var(--mode-accent, var(--accent-model));
+  fill: var(--mode-accent, var(--accent));
   stroke: var(--shade-strong);
   stroke-width: 1;
 }
@@ -3718,7 +3871,6 @@ button.icon {
   top: calc(var(--space-5) * -1);
   margin: calc(var(--space-5) * -1) calc(var(--space-5) * -1) 0;
   padding: var(--space-5) var(--space-5) var(--space-3);
-  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
 }
 
 .sim-panel > .sim-tabs {

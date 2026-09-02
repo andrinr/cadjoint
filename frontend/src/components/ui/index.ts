@@ -39,5 +39,11 @@ export {
   type StatProps,
   type StatRowProps,
 } from "./Card";
+export {
+  Section,
+  SectionHeading,
+  type SectionHeadingProps,
+  type SectionProps,
+} from "./Section";
 export { Segmented, type SegmentedOption, type SegmentedProps } from "./Segmented";
 export { SPARK_HEIGHT, SPARK_WIDTH, Sparkline, type SparklineProps } from "./Sparkline";

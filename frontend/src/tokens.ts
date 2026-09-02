@@ -6,21 +6,26 @@
  * - DATA lives in `simColors.ts` — the viridis field ramp, the magma quality
  *   ramp, the four BC hues, the proposal cyan, the element-edge tones. Those
  *   are saturated and bright because they carry measurements.
- * - CHROME lives here — surfaces, ink, hairlines, the three mode accents, and
- *   the handful of status tones. Chrome is deliberately quiet: the viewport is
- *   the subject and the panels frame it, so chrome never reaches the intensity
- *   the ramps use, and no chrome hue sits where a ramp's high end sits.
+ * - CHROME lives here — surfaces, ink, rules, the one accent, and the handful
+ *   of status tones. Chrome is deliberately quiet: the viewport is the subject
+ *   and the panels frame it, so chrome never reaches the intensity the ramps
+ *   use, and no chrome hue sits where a ramp's high end sits.
+ *
+ * The ground is paper. Chrome and viewport share one value (`#e6e6e9`), so the
+ * boundary between them is 1.00:1 — not a step in luminance but a rule. That
+ * is the whole structural idea: **structure comes from rules, not boxes.** One
+ * hairline weight, three contrasts, radius 0, no shadow.
  *
  * `test/tokens.test.ts` holds both halves to numbers (WCAG AA for text, ≥3:1
  * for meaningful non-text, chrome-vs-data separation) and asserts that
  * `styles.css` declares exactly these values, so the CSS and this file cannot
- * drift apart. Everything a component needs at runtime (the mode accents) is
- * read from here; everything the stylesheet needs is mirrored as a custom
- * property with the same name.
+ * drift apart. Everything a component needs at runtime is read from here;
+ * everything the stylesheet needs is mirrored as a custom property with the
+ * same name.
  *
- * Scales are deliberately short. Six type sizes, seven spacing steps, four
- * radii, four control heights: if a value is not on a scale it is a bug, not a
- * nuance.
+ * Scales are deliberately short. Six type sizes, five trackings, seven spacing
+ * steps, one radius, four control heights: if a value is not on a scale it is
+ * a bug, not a nuance.
  */
 
 import { contrastRatio, type Rgb } from "./simColors";
@@ -33,71 +38,93 @@ import { contrastRatio, type Rgb } from "./simColors";
  * repaint is a change here and nowhere else.
  */
 export const CHROME = {
-  // The viewport is paper. It is the one surface in the app that is light,
-  // and it is light because it is not chrome: it is the ground the field is
-  // measured against, and viridis' closest sample to it sits 19.2 ΔOKLab away
-  // (`VIEWPORT_BACKGROUND` in src/simColors.ts carries that argument). Chrome
-  // ink never lands here — VIEWPORT_INK below is what is drawn on it.
+  // The viewport is paper, and so is the chrome around it: one ground, one
+  // value, measured off `research/design/combined/1-all-light-simulate.png`
+  // where it covers 83% of the frame. `measurements.txt` records the seam as
+  // "dL 0.0000 · contrast 1.00:1" — the viewport is not a darker or lighter
+  // well, it is the same sheet, and what marks its edge is a rule.
   "surface-viewport": "#e6e6e9",
 
-  // Surfaces, darkest (furthest back) to lightest (nearest the pointer).
-  "surface-base": "#0a0c0b",
-  "surface-bar": "#0b0d0c",
-  "surface-bar-alt": "#0d0f0e",
-  "surface-float": "#0e110f",
-  "surface-panel": "#111312",
-  "surface-raised": "#171a17",
-  "surface-raised-hover": "#1b1f1b",
+  // Surfaces. Not a depth ladder — a paper ladder: the page is the ground and
+  // anything above it is a lighter sheet laid on top. Two steps, because the
+  // reference uses two (`#edecee` for sub-bars, `#f8f7f8` for the dock sheet
+  // and for floating chrome) and a third would be below a JND.
+  "surface-base": "#e6e6e9",
+  "surface-bar": "#e6e6e9",
+  "surface-bar-alt": "#edecee",
+  "surface-float": "#f8f7f8",
+  "surface-panel": "#f8f7f8",
+  "surface-raised": "#f8f7f8",
+  // On paper, hover is a step *down* in lightness: pressure darkens the sheet,
+  // it does not make it glow. A light UI that brightens on hover has nowhere
+  // left to go once the sheet is already white.
+  "surface-raised-hover": "#edecee",
 
   // Ink. Three levels, and nothing else: text is never faded with `opacity`,
-  // because an opacity fade has no assertable contrast ratio.
-  ink: "#e9e8e2",
-  "ink-2": "#b2b1a9",
-  "ink-3": "#8f8e87",
-  "ink-on-accent": "#10120d",
+  // because an opacity fade has no assertable contrast ratio. 14.4 / 7.5 / 5.1
+  // against the darkest ground, so even `ink-3` clears AA on every surface.
+  ink: "#18161a",
+  "ink-2": "#48464d",
+  "ink-3": "#605e65",
+  // The one ink that is drawn on the accent rather than on paper: 7.02:1 on
+  // `accent`, which is the number the whole accent rule turns on.
+  "ink-on-accent": "#0a0a0c",
 
-  // Lines. `line` is the structural hairline (panel edges, control borders),
-  // `divider` is the weaker in-panel separation, `line-strong` is hover.
+  // Rules. One weight — 1px, always — and three contrasts, because on a sheet
+  // the hierarchy is carried by how dark a line is, not by how thick it is:
   //
-  // Both sit below 3:1 against the surfaces they cross, and deliberately so:
-  // in this design a resting border is decoration, not the thing that says a
-  // control exists or what state it is in. That job belongs to the accent
-  // tokens below (9–17:1) plus the focus ring, which is why `line` is absent
-  // from MEANINGFUL_NON_TEXT. Pushing a hairline to 3:1 needs roughly
-  // #5c6159, which turns every panel into a drawn box.
-  line: "#383c36",
-  "line-strong": "#4c5149",
+  //   rule         2.15:1 on paper — separation *within* a panel
+  //   rule-strong  3.81:1          — between sections, and the viewport seam
+  //   rule-heavy   9.85:1          — the viewport frame and its corner marks
+  //
+  // `rule` is deliberately under 3:1 and is absent from MEANINGFUL_NON_TEXT: a
+  // resting hairline inside a panel is structure, not state. `rule-strong` is
+  // the one that has to be found — it is what says "the viewport starts here"
+  // when there is no luminance step to say it — so it clears the non-text bar.
+  rule: "#9f9da5",
+  "rule-strong": "#747278",
+  "rule-heavy": "#36343b",
 
-  // Mode accents. Model owns the brand lime, so the two are one token.
-  "accent-model": "#d9ff57",
-  "accent-sketch": "#7fd6f5",
-  "accent-simulate": "#ffb25c",
-  /** Lime at reading weight — text on a lime-tinted surface. */
-  "accent-model-ink": "#cbd99a",
+  // The accent. One hue, and it has exactly one job: **a fill behind near-black
+  // type.** It measures 7.02:1 as a ground under `ink-on-accent` and 2.26:1 as
+  // ink on paper, so the two uses are not a preference — one passes and one
+  // fails. Anywhere the old dark chrome would have drawn accent-coloured text
+  // or an accent hairline, this design draws a filled block instead.
+  //
+  // There is one accent and not three because the modes are a pipeline, not
+  // three worlds (design-language.md §6): which mode you are in is read from
+  // the position of the filled cell in the switcher and from the word in the
+  // hint bar, both of which survive greyscale and colour-blindness.
+  accent: "#f87318",
+  // Pressed and hovered accent fills, and the only tone allowed to draw an
+  // accent-coloured *mark*: 3.36:1 on paper, so it clears the non-text bar the
+  // accent itself cannot.
+  "accent-press": "#c85d00",
 
-  // Status and taxonomy. Four tones total; the kind chips reuse them rather
-  // than inventing hues of their own.
-  danger: "#ff8167",
-  "danger-ink": "#ffb3a1",
-  info: "#9adcf4",
-  "info-ink": "#c9efff",
-  ok: "#9fe7bd",
+  // Status and taxonomy, re-authored for paper: on a light ground a tone has
+  // to be darkened, not brightened, to be read. Four tones total; the kind
+  // chips reuse them rather than inventing hues of their own.
+  danger: "#a8341c",
+  "danger-ink": "#8a1f10",
+  info: "#0065b4",
+  "info-ink": "#004a85",
+  ok: "#00734c",
 
   // ── viewport ink ────────────────────────────────────────────────────────
   // Everything drawn *inside* the viewport rectangle by the DOM: dimension
-  // labels, the hint bar, the mode cue on the viewport border. On paper the
-  // polarity flips — annotations are dark ink with a light halo, not light
-  // ink with a dark one — so chrome's three ink levels cannot be reused here
-  // (`ink` measures 1.06:1 on `#e6e6e9`). Every tone here clears AA on paper
-  // — 14.4 / 7.0 / 4.6 / 4.6 / 4.6 / 4.6 — and the three mode tones are the
-  // mode accents at the weight paper needs: the lime, unchanged, measured
-  // 1.01:1 there and was simply not visible.
-  "viewport-ink": "#17171b",
-  "viewport-ink-2": "#4a4a53",
-  "viewport-mark": "#1769a9",
-  "viewport-model": "#5b6d15",
-  "viewport-sketch": "#18707d",
-  "viewport-simulate": "#8f5a16",
+  // labels, the hint bar, the mode cue on the viewport border. These are now
+  // the same values chrome uses, because chrome and viewport share a ground —
+  // but they stay a separate list because they owe a separate rule:
+  // **inside the rectangle, nothing is coloured.** The field ramp is the only
+  // hue in the viewport, which is what `measurements.txt` scores as
+  // "FIELD WINS", and an achromatic annotation cannot be mistaken for a value.
+  "viewport-ink": "#18161a",
+  "viewport-ink-2": "#605e65",
+  "viewport-mark": "#48464d",
+  // The mode cue drawn on the viewport border. One tone for all three modes:
+  // the mode is named in words beside it, and a hue here would be the one
+  // chrome signal crossing into the field's rectangle.
+  "viewport-mode": "#605e65",
 
   // ── graticule ───────────────────────────────────────────────────────────
   // The instrument faceplate drawn *under* the scene: eight square divisions,
@@ -105,9 +132,7 @@ export const CHROME = {
   // data, so these deliberately sit far below the 3:1 a meaningful mark owes
   // — they are measured against paper in `test/graticule.test.ts` and held
   // inside a 1.6–2.8:1 band. Above that the grid competes with the field;
-  // below it, it is invisible. Ordered weakest to strongest, which is §16.3's
-  // order (`#1e1d22` / `#332f38` / `#413e47` on the ground it was written
-  // for); on paper the polarity inverts and the tones darken instead.
+  // below it, it is invisible. Ordered weakest to strongest.
   "graticule-line": "#adadb3",
   "graticule-axis": "#9c9ca2",
   "graticule-frame": "#8f8f95",
@@ -115,14 +140,15 @@ export const CHROME = {
 
 export type ChromeToken = keyof typeof CHROME;
 
-/** Ink drawn directly on the viewport's paper ground; owes WCAG AA there. */
+/**
+ * Ink drawn directly on the viewport's paper ground; owes WCAG AA there, and
+ * owes being achromatic — see the note above `viewport-ink`.
+ */
 export const VIEWPORT_TONES: ChromeToken[] = [
   "viewport-ink",
   "viewport-ink-2",
   "viewport-mark",
-  "viewport-model",
-  "viewport-sketch",
-  "viewport-simulate",
+  "viewport-mode",
 ];
 
 /**
@@ -139,35 +165,57 @@ export const GRATICULE_TONES: ChromeToken[] = [
   "graticule-frame",
 ];
 
-/** Editing modes, in switcher and keyboard-cycling order. */
+/**
+ * Editing modes, in switcher and keyboard-cycling order.
+ *
+ * All three name the same accent, on purpose. Colour is not how this UI says
+ * which mode you are in — the filled cell's *position* in the switcher is, and
+ * the word in the hint bar is (design-language.md §6). The record keeps its
+ * mode-shaped signature so `editingMode.ts` and the CSS mode blocks are
+ * unchanged; what changed is that there is nothing left to tell apart.
+ */
 export const MODE_ACCENTS = {
-  model: CHROME["accent-model"],
-  sketch: CHROME["accent-sketch"],
-  simulate: CHROME["accent-simulate"],
+  model: CHROME.accent,
+  sketch: CHROME.accent,
+  simulate: CHROME.accent,
 } as const;
 
 /**
  * Chrome tones that carry meaning rather than decoration, so they owe ≥3:1
  * against the surface they sit on (WCAG non-text contrast).
+ *
+ * `accent` is absent, and that absence is the design: at 2.26:1 on paper it
+ * cannot be a mark, which is why it is only ever a *fill* — see ACCENT_FILL
+ * below, and the assertion in test/tokens.test.ts that holds both halves.
+ * `rule` is absent for the same kind of reason, stated above its declaration.
  */
 export const MEANINGFUL_NON_TEXT: ChromeToken[] = [
-  "accent-model",
-  "accent-sketch",
-  "accent-simulate",
+  "accent-press",
+  "rule-strong",
+  "rule-heavy",
   "danger",
   "info",
   "ok",
 ];
+
+/**
+ * The accent's only legal composition: `ink-on-accent` printed on `accent`.
+ *
+ * Stated as a pair rather than a tone because the accent has no meaning on its
+ * own — it is a ground, and the test asserts the pair clears AA (7.02:1) while
+ * the same hue used as ink on paper does not (2.26:1).
+ */
+export const ACCENT_FILL: { ground: ChromeToken; ink: ChromeToken } = {
+  ground: "accent",
+  ink: "ink-on-accent",
+};
 
 /** Chrome tones used as text, so they owe WCAG AA (4.5:1). */
 export const TEXT_TONES: ChromeToken[] = [
   "ink",
   "ink-2",
   "ink-3",
-  "accent-model",
-  "accent-model-ink",
-  "accent-sketch",
-  "accent-simulate",
+  "danger",
   "danger-ink",
   "info",
   "info-ink",
@@ -175,18 +223,22 @@ export const TEXT_TONES: ChromeToken[] = [
 ];
 
 /**
- * Chrome surfaces text and marks are drawn on, brightest last (worst case).
+ * Chrome surfaces text and marks are drawn on, darkest last (worst case).
  *
- * `surface-viewport` is deliberately absent: it is paper, chrome ink is never
- * drawn on it, and VIEWPORT_TONES is measured against it separately.
+ * On paper the worst case inverts: ink loses contrast on the *darkest* sheet,
+ * not the brightest, so the list ends where the assertions bite.
+ * `surface-viewport` is deliberately absent — it is the viewport's own ground
+ * and VIEWPORT_TONES is measured against it separately — even though it now
+ * carries the same value as `surface-base`.
  */
 export const TEXT_SURFACES: ChromeToken[] = [
-  "surface-base",
-  "surface-bar",
-  "surface-bar-alt",
   "surface-float",
   "surface-panel",
   "surface-raised",
+  "surface-bar-alt",
+  "surface-raised-hover",
+  "surface-bar",
+  "surface-base",
 ];
 
 // ── type ──────────────────────────────────────────────────────────────────
@@ -202,6 +254,23 @@ export const TYPE_SCALE = {
   "text-sm": 12,
   "text-md": 13,
   "text-lg": 15,
+} as const;
+
+/**
+ * Tracking, one value per size that is ever set in uppercase.
+ *
+ * Tracking is a function of size, not a house style: at 9px the counters need
+ * 0.16em to stay open and at 15px the same value would fall apart into
+ * letters. A single `--tracking-caps` is the tell of a system that has not
+ * measured its own labels, and it is what this replaces.
+ */
+export const TRACKING = {
+  "tracking-3xs": "0.16em",
+  "tracking-2xs": "0.13em",
+  "tracking-xs": "0.1em",
+  "tracking-sm": "0.08em",
+  "tracking-md": "0.06em",
+  "tracking-lg": "0.04em",
 } as const;
 
 export const WEIGHTS = {
@@ -231,11 +300,15 @@ export const SPACE = {
   "space-7": 24,
 } as const;
 
+/**
+ * One radius, and it is zero.
+ *
+ * Kept as a token rather than deleted so the decision has a name and one
+ * place to change. A rounded corner is a softness this instrument does not
+ * claim: everything here is a cell on a ruled sheet, and cells are square.
+ */
 export const RADII = {
-  "radius-xs": 4,
-  "radius-sm": 6,
-  "radius-md": 8,
-  "radius-lg": 12,
+  radius: 0,
 } as const;
 
 /**

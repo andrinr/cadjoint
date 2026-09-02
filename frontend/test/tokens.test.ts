@@ -29,6 +29,7 @@ import {
   type Rgb,
 } from "../src/simColors";
 import {
+  ACCENT_FILL,
   CHROME,
   CONTROL_HEIGHTS,
   DURATIONS,
@@ -40,6 +41,8 @@ import {
   SPACE,
   TEXT_SURFACES,
   TEXT_TONES,
+  TRACKING,
+  GRATICULE_TONES,
   VIEWPORT_TONES,
   TYPE_SCALE,
   WEIGHTS,
@@ -94,6 +97,9 @@ describe("styles.css mirrors src/tokens.ts", () => {
         expect(token(name), `--${name}`).toBe(`${value}px`);
       }
     }
+    for (const [name, value] of Object.entries(TRACKING)) {
+      expect(token(name), `--${name}`).toBe(value);
+    }
     for (const [name, value] of Object.entries(WEIGHTS)) {
       expect(token(name), `--${name}`).toBe(String(value));
     }
@@ -108,15 +114,21 @@ describe("styles.css mirrors src/tokens.ts", () => {
     }
   });
 
-  it("binds each editing mode to its accent token", () => {
-    for (const [mode, accent] of Object.entries(MODE_ACCENTS)) {
-      const block = css.match(
-        new RegExp(`\\.app\\[data-mode="${mode}"\\] \\{[\\s\\S]*?\\n\\}`),
+  it("binds every editing mode to the one accent token", () => {
+    // Was: three modes, three hues, one `--accent-<mode>` token each. The
+    // light direction has a single accent — mode is read from the position of
+    // the filled cell and from the word in the hint bar (§6) — so what is
+    // asserted now is that each mode selector still resolves `--mode-accent`,
+    // and that all three resolve it to the same fill.
+    for (const mode of Object.keys(MODE_ACCENTS)) {
+      const selector = css.match(
+        new RegExp(`\\.app\\[data-mode="${mode}"\\][,\\s][\\s\\S]*?\\n\\}`),
       );
-      expect(block, mode).not.toBeNull();
-      expect(block![0]).toContain(`--mode-accent: var(--accent-${mode})`);
-      expect(token(`accent-${mode}`), mode).toBe(accent);
+      expect(selector, mode).not.toBeNull();
+      expect(selector![0]).toContain("--mode-accent: var(--accent)");
     }
+    expect(new Set(Object.values(MODE_ACCENTS)).size).toBe(1);
+    expect(token("accent")).toBe(CHROME.accent);
   });
 
   it("is the same record editingMode.ts hands the rest of the app", () => {
@@ -147,6 +159,28 @@ describe("no design value escapes the token layer", () => {
     // Strictly ascending, so "one step up" is always unambiguous.
     expect([...sizes].sort((a, b) => a - b)).toEqual(sizes);
     expect(new Set(sizes).size).toBe(sizes.length);
+  });
+
+  it("names one radius, and it is zero", () => {
+    // Was implicit in a four-step radius scale. Radius 0 is the shape rule of
+    // this direction, so it is asserted rather than left to a convention.
+    expect(Object.values(RADII)).toEqual([0]);
+    expect(token("radius")).toBe("0px");
+  });
+
+  it("keeps tracking a function of size, not one global value", () => {
+    // Was a single --tracking-caps. A 9px label and a 15px title cannot share
+    // a tracking, so the scale is asserted to descend with size.
+    const values = Object.values(TRACKING).map((em) => parseFloat(em));
+    expect(values.length).toBeGreaterThanOrEqual(5);
+    expect([...values].sort((a, b) => b - a)).toEqual(values);
+    expect(ruleBody).not.toContain("--tracking-caps");
+  });
+
+  it("casts no shadow", () => {
+    // Elevation here is luminance plus a rule. A drop shadow on paper draws a
+    // card lying on a desk, which is a metaphor this instrument refuses.
+    expect([...ruleBody.matchAll(/box-shadow:[^;]*/g)].map((m) => m[0])).toEqual([]);
   });
 
   it("names one easing family and three durations", () => {
@@ -183,36 +217,41 @@ describe("chrome legibility", () => {
     expect(chromeContrast("ink-2", "ink-3")).toBeGreaterThan(1.4);
   });
 
-  it("keeps the on-accent ink readable on every mode accent", () => {
-    for (const mode of Object.keys(MODE_ACCENTS) as (keyof typeof MODE_ACCENTS)[]) {
-      expect(chromeContrast("ink-on-accent", `accent-${mode}` as ChromeToken), mode)
-        .toBeGreaterThanOrEqual(4.5);
-    }
+  it("makes the accent a fill and refuses to make it a mark", () => {
+    // Was: "the on-accent ink is readable on every mode accent" — three
+    // accents, one assertion each. There is one accent now, and the pair of
+    // numbers below is the whole reason it is used the way it is: as a ground
+    // it clears AAA, as ink on paper it fails even the 3:1 a non-text mark
+    // owes. The design is not preferring one; one passes and one fails.
+    expect(chromeContrast(ACCENT_FILL.ink, ACCENT_FILL.ground)).toBeGreaterThanOrEqual(7);
+    expect(chromeContrast("accent", "surface-viewport")).toBeLessThan(3);
+    expect(chromeContrast("accent", "surface-base")).toBeLessThan(3);
+    // The pressed tone is the escape hatch, and it is held to the mark bar.
+    expect(chromeContrast("accent-press", "surface-base")).toBeGreaterThanOrEqual(3);
   });
 
   it("clears WCAG AA for every viewport tone, on paper", () => {
-    // The viewport is the one light surface in the app, so it gets its own
-    // ink and its own assertion; chrome ink measures 1.06:1 here.
     for (const tone of VIEWPORT_TONES) {
       expect(chromeContrast(tone, "surface-viewport"), tone).toBeGreaterThanOrEqual(4.5);
     }
   });
 
-  it("keeps chrome ink off the paper viewport", () => {
-    // Not a style rule — a bound. If any of these ever became legible on
-    // paper it would mean the viewport had stopped being paper.
-    for (const tone of ["ink", "ink-2", "ink-3"] as ChromeToken[]) {
-      expect(chromeContrast(tone, "surface-viewport"), tone).toBeLessThan(3);
+  it("draws nothing coloured inside the viewport rectangle", () => {
+    // Replaces "keeps chrome ink off the paper viewport", which asserted that
+    // --ink measured under 3:1 on paper. That was true only because chrome was
+    // dark; with one paper ground for both, chrome ink is perfectly legible in
+    // there and the old bound is meaningless. What still has to hold is the
+    // §14 zoning rule, and it was always the real one: the *field* owns colour,
+    // so every DOM tone drawn inside the rectangle is achromatic and the ramp
+    // is the only hue a reader can see there.
+    for (const tone of [...VIEWPORT_TONES, ...GRATICULE_TONES]) {
+      const [r, g, b] = hexToRgb(CHROME[tone]);
+      expect(Math.max(r, g, b) - Math.min(r, g, b), `${tone} chroma`).toBeLessThan(0.04);
     }
-  });
-
-  it("keeps the mode accents distinguishable from each other", () => {
-    const accents = Object.values(MODE_ACCENTS).map(hexToRgb);
-    for (let a = 0; a < accents.length; a++) {
-      for (let b = a + 1; b < accents.length; b++) {
-        expect(distance(accents[a], accents[b])).toBeGreaterThan(0.3);
-      }
-    }
+    // …and the accent, which is the loudest thing in the chrome, is not on
+    // that list.
+    const [ar, ag, ab] = hexToRgb(CHROME.accent);
+    expect(Math.max(ar, ag, ab) - Math.min(ar, ag, ab)).toBeGreaterThan(0.5);
   });
 });
 
@@ -220,14 +259,7 @@ const distance = (a: Rgb, b: Rgb): number =>
   Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 
 describe("chrome stays clear of the data palette", () => {
-  const chromeAccents: ChromeToken[] = [
-    "accent-model",
-    "accent-sketch",
-    "accent-simulate",
-    "danger",
-    "info",
-    "ok",
-  ];
+  const chromeAccents: ChromeToken[] = ["accent", "danger", "info", "ok"];
 
   it("puts no chrome accent on either ramp's reserved high end", () => {
     for (const name of chromeAccents) {
@@ -253,18 +285,32 @@ describe("chrome stays clear of the data palette", () => {
     }
   });
 
-  it("keeps every chrome surface below the viewport's paper ground", () => {
-    // Panels frame the viewport; they are never the brighter thing. With a
-    // paper ground that stops being a contrast bound and becomes an ordering
-    // one — the chrome sits under the paper, and by a wide margin, so the
-    // frame reads as a frame and the field keeps the eye.
-    const paper = relativeLuminance(VIEWPORT_BACKGROUND);
+  it("puts the chrome on the same sheet as the viewport", () => {
+    // Was: "keeps every chrome surface below the viewport's paper ground" —
+    // chrome darker than paper by more than 10:1, which is what a dark shell
+    // around a light viewport means. The light direction removes the step
+    // entirely (measurements.txt: "dL 0.0000 · contrast 1.00:1"), so the
+    // assertion inverts: no chrome surface is *darker* than the viewport, the
+    // base sheet is the same value, and the seam is therefore something that
+    // has to be drawn rather than something you can see for free.
+    // simColors stores the paper as a 3-decimal triple, so compare against the
+    // token itself and hold the two to agreement separately.
+    const paper = relativeLuminance(hexToRgb(CHROME["surface-viewport"]));
+    expect(relativeLuminance(VIEWPORT_BACKGROUND)).toBeCloseTo(paper, 3);
     for (const surface of TEXT_SURFACES) {
-      expect(relativeLuminance(hexToRgb(CHROME[surface])), surface).toBeLessThan(paper);
+      expect(
+        relativeLuminance(hexToRgb(CHROME[surface])),
+        surface,
+      ).toBeGreaterThanOrEqual(paper);
       expect(
         contrastRatio(hexToRgb(CHROME[surface]), VIEWPORT_BACKGROUND),
         surface,
-      ).toBeGreaterThan(10);
+      ).toBeLessThan(1.25);
     }
+    expect(CHROME["surface-base"]).toBe(CHROME["surface-viewport"]);
+    // The rule that has to carry the seam instead clears the non-text bar
+    // against both sides of it.
+    expect(chromeContrast("rule-strong", "surface-base")).toBeGreaterThanOrEqual(3);
+    expect(chromeContrast("rule-strong", "surface-viewport")).toBeGreaterThanOrEqual(3);
   });
 });
