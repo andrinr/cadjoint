@@ -109,14 +109,17 @@ def apply_operation(source: str, operation: str, **kwargs) -> str:
 
     Args:
         source: The program text.
-        operation: One of ``set_vertex``, ``insert_vertex``, ``delete_vertex``.
-        **kwargs: Arguments for that operation (``line``, ``index``, ``xy``).
+        operation: A key of :data:`OPERATIONS` — the whole vocabulary the
+            server accepts, from ``set_vertex`` to ``set_optimization_value``.
+        **kwargs: That operation's own arguments, already checked by the
+            matching validator in :mod:`cadjoint.viewer._patch_requests`.
 
     Returns:
         The patched source.
 
     Raises:
-        PatchError: On an unknown operation or a failed edit.
+        PatchError: On an unknown operation, arguments the operation does
+            not take, or an edit the source will not support.
     """
     handler = OPERATIONS.get(operation)
     if handler is None:

@@ -29,6 +29,7 @@ from cadjoint.viewer.patch.edits import (
     _ensure_import,
     _module_names,
     _name_references,
+    _named_by_keyword,
     _rewrite_call_argument,
     _set_keyword_expression,
     _validate,
@@ -121,22 +122,11 @@ def delete_mesh(source: str, mesh) -> str:
                 f"`{located.variable}` is used elsewhere in the program, so it cannot be "
                 "deleted from the viewer. Remove those uses first."
             )
-    if located.name is not None:
-        referenced = any(
-            isinstance(node, ast.Call)
-            and any(
-                keyword.arg == "mesh"
-                and isinstance(keyword.value, ast.Constant)
-                and keyword.value.value == located.name
-                for keyword in node.keywords
-            )
-            for node in ast.walk(tree)
+    if located.name is not None and _named_by_keyword(tree, "mesh", located.name):
+        raise PatchError(
+            f"Mesh {located.name!r} is referenced by a study, so it cannot be deleted "
+            "from the viewer. Point the study at another mesh first."
         )
-        if referenced:
-            raise PatchError(
-                f"Mesh {located.name!r} is referenced by a study, so it cannot be deleted "
-                "from the viewer. Point the study at another mesh first."
-            )
     return _validate(_delete_statement(source, located.statement))
 
 

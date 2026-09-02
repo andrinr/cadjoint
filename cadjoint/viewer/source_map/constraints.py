@@ -24,6 +24,7 @@ from cadjoint.viewer.source_map.nodes import (
     _contains,
     _is_profile_call,
     _resolved_container,
+    parse_module,
 )
 
 CONSTRAINT_CLASS_KINDS = {
@@ -146,7 +147,7 @@ def locate_constraint_statements(source: str, line: int) -> list[ConstraintState
         cannot be located or is not bound to a single name.
     """
     try:
-        tree = ast.parse(source)
+        tree = parse_module(source)
     except SyntaxError:
         return None
     calls = [

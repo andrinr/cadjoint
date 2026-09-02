@@ -29,7 +29,7 @@ from cadjoint.viewer.patch.edits import (
     _validate,
 )
 from cadjoint.viewer.patch.errors import PatchError
-from cadjoint.viewer.patch.format import _format_coordinate, _format_value
+from cadjoint.viewer.patch.format import _format_keywords
 from cadjoint.viewer.patch.resolvers import CONSTRUCTION_CALLS, _profile_binding
 from cadjoint.viewer.patch.scene import _scene_assignment
 from cadjoint.viewer.source_map.nodes import _called_name, _line_offsets
@@ -65,11 +65,18 @@ def add_material(
         raise PatchError(f"`{variable}` is not an available Python material name.")
 
     statement = (
-        f"{variable} = Material(name={variable!r}, color={_format_value(color)}, "
-        f"roughness={_format_coordinate(roughness)}, "
-        f"metallic={_format_coordinate(metallic)}, "
-        f"opacity={_format_coordinate(opacity)}, ior={_format_coordinate(ior)}, "
-        f"reflectivity={_format_coordinate(reflectivity)})\n"
+        f"{variable} = Material(name={variable!r}, "
+        + _format_keywords(
+            {
+                "color": color,
+                "roughness": roughness,
+                "metallic": metallic,
+                "opacity": opacity,
+                "ior": ior,
+                "reflectivity": reflectivity,
+            }
+        )
+        + ")\n"
     )
     # Materials must be defined before any earlier object can reference them
     # after a drag assignment, so place new definitions directly after imports.

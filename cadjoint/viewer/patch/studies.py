@@ -38,6 +38,7 @@ from cadjoint.viewer.patch.edits import (
     _ensure_import,
     _module_names,
     _name_references,
+    _named_by_keyword,
     _rewrite_call_argument,
     _set_keyword_expression,
     _validate,
@@ -148,16 +149,29 @@ def add_study(source: str, kind: str, name: str | None = None) -> str:
 
 
 def delete_study(source: str, study) -> str:
-    """Remove one study declaration, identified by payload index or name."""
+    """Remove one study declaration, identified by payload index or name.
+
+    Refuses on both ways a study can still be needed: the variable it is
+    bound to being read somewhere else, and — the form an ``Optimization``
+    actually uses — its literal name appearing as another declaration's
+    ``study=`` argument. Deleting past either leaves a program that no
+    longer runs, which is exactly what the compile after the patch would
+    report and the user could not undo from the viewer.
+    """
     located = _located_study(source, study)
+    tree = ast.parse(source)
     if located.variable is not None:
-        tree = ast.parse(source)
         uses = _name_references(tree, located.variable, located.statement)
         if uses:
             raise PatchError(
                 f"`{located.variable}` is used elsewhere in the program, so it cannot be "
                 "deleted from the viewer. Remove those uses first."
             )
+    if located.name is not None and _named_by_keyword(tree, "study", located.name):
+        raise PatchError(
+            f"Study {located.name!r} is referenced by an optimization, so it cannot be "
+            "deleted from the viewer. Point the optimization at another study first."
+        )
     return _validate(_delete_statement(source, located.statement))
 
 

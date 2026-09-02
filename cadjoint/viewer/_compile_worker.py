@@ -9,7 +9,11 @@ progress lines to that same stdout before the final response object (see
 
 ``mode="compile"`` — the worker's namesake, implemented here — runs the
 program and builds the shaders, construction tree, and declaration entries
-the viewer opens with.  The other modes live beside it:
+the viewer opens with, then checks the whole payload against
+:mod:`cadjoint.viewer.schema.payloads` before sending it: the models are
+what the frontend's generated types are emitted from, so a payload that
+does not match them would be a type the browser was promised and did not
+get.  The other modes live beside it:
 :mod:`._edge_overlay` (``mesh``), :mod:`._worker_fem` (``simulate``,
 ``mesh_inspect``), and :mod:`._worker_optimize` (``optimize``).
 """
@@ -41,6 +45,7 @@ from cadjoint.viewer._source_map import (
     build_construction_relations,
     build_material_payload,
     capture_profiles,
+    describe_identities,
 )
 from cadjoint.viewer._webgpu import build_viewer_shader
 from cadjoint.viewer._worker_declarations import (
@@ -56,6 +61,7 @@ from cadjoint.viewer._worker_fem import (  # noqa: F401 - re-exported for caller
 )
 from cadjoint.viewer._worker_optimize import _optimize_source
 from cadjoint.viewer._worker_scene import _execute_scene
+from cadjoint.viewer.schema.payloads import validate_compile_payload
 
 
 def _mesh_source(source: str) -> dict[str, Any]:
@@ -117,26 +123,31 @@ def _compile_source(source: str) -> dict[str, Any]:
             for report in solver_reports
         ]
 
-    return {
-        "ok": True,
-        "sdf": scene_code,
-        "shader": preview_shader,
-        "scene_wgsl": scene_code,
-        "preview_shader": preview_shader,
-        "path_shader": path_shader,
-        "present_shader": WGSL_PRESENT_TEMPLATE,
-        "construction": construction,
-        "relations": relations,
-        "materials": materials,
-        "studies": studies_payload,
-        "sim_meshes": sim_meshes_payload,
-        "optimizations": optimizations_payload,
-        # The mesh-edge view is requested lazily via `mode: "mesh"` — computing
-        # it here used to dominate the compile round-trip.
-        "mesh_edges": None,
-        "solver_runs": solver_runs,
-        "output": captured.getvalue()[-8_000:],
-    }
+    return validate_compile_payload(
+        {
+            "ok": True,
+            "sdf": scene_code,
+            "shader": preview_shader,
+            "scene_wgsl": scene_code,
+            "preview_shader": preview_shader,
+            "path_shader": path_shader,
+            "present_shader": WGSL_PRESENT_TEMPLATE,
+            "construction": construction,
+            # Every stable id the text declares, so the viewer can name anything
+            # the payload reports only by line.
+            "identities": describe_identities(source),
+            "relations": relations,
+            "materials": materials,
+            "studies": studies_payload,
+            "sim_meshes": sim_meshes_payload,
+            "optimizations": optimizations_payload,
+            # The mesh-edge view is requested lazily via `mode: "mesh"` — computing
+            # it here used to dominate the compile round-trip.
+            "mesh_edges": None,
+            "solver_runs": solver_runs,
+            "output": captured.getvalue()[-8_000:],
+        }
+    )
 
 
 def main() -> None:

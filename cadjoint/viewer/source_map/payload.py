@@ -33,12 +33,14 @@ from cadjoint.viewer.source_map.features import (
     locate_feature_call,
     locate_plane_reference,
 )
+from cadjoint.viewer.source_map.identity import Identity, build_identities, identity_at
 from cadjoint.viewer.source_map.materials import _primitive_material, _profile_material
 from cadjoint.viewer.source_map.nodes import (
     Span,
     _called_name,
     _is_profile_call,
     _resolved_call,
+    parse_module,
 )
 
 
@@ -65,14 +67,27 @@ def build_construction_payload(
     line_counts = Counter(line for _, line in captured if line is not None)
     shared_lines = {line for line, count in line_counts.items() if count > 1}
 
+    identities = build_identities(source)
     payload = []
     for index, (obj, line) in enumerate(captured):
         traceable = line is not None and line not in shared_lines
         if hasattr(obj, "kind") and obj.kind in DIMENSIONS:
-            payload.append(_primitive_entry(obj, index, line, source, traceable))
+            payload.append(_primitive_entry(obj, index, line, source, traceable, identities))
         else:
-            payload.append(_profile_entry(obj, index, line, source, traceable))
+            payload.append(_profile_entry(obj, index, line, source, traceable, identities))
     return payload
+
+
+def _stable_id(identities: list[Identity], line: int | None, kinds: set[str]) -> str | None:
+    """The stable id of the one thing of *kinds* declared at *line*."""
+    identity = identity_at(identities, line, kinds)
+    return identity.id if identity is not None else None
+
+
+def _stable_token(identities: list[Identity], line: int | None, kinds: set[str]) -> str | None:
+    """The owner token — what a child's own id is keyed by — at *line*."""
+    identity = identity_at(identities, line, kinds)
+    return identity.token if identity is not None else None
 
 
 def build_construction_relations(
@@ -125,7 +140,7 @@ def build_construction_relations(
 def _plane_transform(source: str, line: int, origin) -> dict | None:
     """Locate the plane owning a profile, including named and default planes."""
     try:
-        tree = ast.parse(source)
+        tree = parse_module(source)
     except SyntaxError:
         return None
 
@@ -270,7 +285,7 @@ def _profile_constraints(profile, source: str, line: int | None, traceable: bool
 def _profile_operators(source: str, line: int) -> list[dict]:
     """Operators in source that consume the named profile."""
     try:
-        tree = ast.parse(source)
+        tree = parse_module(source)
     except SyntaxError:
         return []
     calls = [
@@ -310,7 +325,14 @@ def _profile_operators(source: str, line: int) -> list[dict]:
     return result
 
 
-def _face_entries(faces, node_id: str, owner: dict | None, prefix: str = "") -> list[dict]:
+def _face_entries(
+    faces,
+    node_id: str,
+    owner: dict | None,
+    prefix: str = "",
+    owner_token: str | None = None,
+    owner_id: str | None = None,
+) -> list[dict]:
     """Serialize one feature's faces, tagged with the owner that names them.
 
     A face is only *usable* as a reference when the source binds its feature to
@@ -327,13 +349,24 @@ def _face_entries(faces, node_id: str, owner: dict | None, prefix: str = "") -> 
             # it must never take the rest of the payload down with it.
             continue
         entry["id"] = f"{node_id}:{prefix}{face.key}"
+        entry["stableId"] = f"face:{owner_token}:{face.key}" if owner_token else None
+        # The owner's own id, beside the owner block rather than inside it:
+        # ``owner`` is a pinned shape, and the id is what a patch addresses.
+        entry["ownerStableId"] = owner_id
         entry["owner"] = owner
         entry["usable"] = bool(owner and owner.get("variable"))
         entries.append(entry)
     return entries
 
 
-def _profile_faces(profile, node_id: str, source: str, line: int | None, traceable: bool):
+def _profile_faces(
+    profile,
+    node_id: str,
+    source: str,
+    line: int | None,
+    traceable: bool,
+    identities: list[Identity],
+):
     """The analytic faces of every feature generated from this sketch.
 
     Features are registered on the profile in execution order and the operator
@@ -358,31 +391,51 @@ def _profile_faces(profile, node_id: str, source: str, line: int | None, traceab
     entries: list[dict] = []
     for index, feature in enumerate(features):
         owner = None
+        owner_token = None
+        owner_id = None
         if paired:
             call = locate_feature_call(source, operators[index]["line"])
             if call is not None:
                 owner = {"kind": call.kind, "line": call.line, "variable": call.variable}
+                owner_id = _stable_id(identities, call.line, {"feature"})
+                owner_token = _stable_token(identities, call.line, {"feature"})
         prefix = "" if len(features) == 1 else f"{index}:"
-        entries.extend(_face_entries(feature.faces, node_id, owner, prefix))
+        entries.extend(_face_entries(feature.faces, node_id, owner, prefix, owner_token, owner_id))
     return entries
 
 
-def _primitive_faces(primitive, node_id: str, source: str, line: int | None, traceable: bool):
+def _primitive_faces(
+    primitive,
+    node_id: str,
+    source: str,
+    line: int | None,
+    traceable: bool,
+    identities: list[Identity],
+):
     """The analytic faces of a construction primitive — a box's six, a cylinder's two."""
     call = (
         locate_feature_call(source, line, PRIMITIVE_CALL_KINDS)
         if traceable and line is not None
         else None
     )
+    owner_token = _stable_token(identities, line, {"primitive"}) if call is not None else None
+    owner_id = _stable_id(identities, line, {"primitive"}) if call is not None else None
     owner = (
         {"kind": call.kind, "line": call.line, "variable": call.variable}
         if call is not None
         else None
     )
-    return _face_entries(primitive.faces, node_id, owner)
+    return _face_entries(primitive.faces, node_id, owner, "", owner_token, owner_id)
 
 
-def _profile_entry(profile, index: int, line: int | None, source: str, traceable: bool) -> dict:
+def _profile_entry(
+    profile,
+    index: int,
+    line: int | None,
+    source: str,
+    traceable: bool,
+    identities: list[Identity],
+) -> dict:
     """Payload for a sketch profile: plane, closed edge loop, vertex handles."""
     call = locate_profile_call(source, line) if traceable else None
     spans: list[Span | None]
@@ -395,9 +448,12 @@ def _profile_entry(profile, index: int, line: int | None, source: str, traceable
     world = [[float(x) for x in point] for point in profile.world_vertices()]
     count = len(world)
     node_id = f"profile_{index}"
+    stable_id = _stable_id(identities, line, {"sketch"}) if traceable else None
+    token = _stable_token(identities, line, {"sketch"}) if traceable else None
     reference = locate_plane_reference(source, line) if traceable and line is not None else None
     return {
         "id": node_id,
+        "stableId": stable_id,
         "kind": "profile",
         "name": profile.name,
         "line": line,
@@ -408,6 +464,7 @@ def _profile_entry(profile, index: int, line: int | None, source: str, traceable
             "u": [float(x) for x in u],
             "v": [float(x) for x in v],
             "normal": [float(x) for x in normal],
+            "stableId": f"plane:{token}" if token else None,
             "reference": (
                 {
                     "constructor": reference.constructor,
@@ -419,9 +476,10 @@ def _profile_entry(profile, index: int, line: int | None, source: str, traceable
                 else None
             ),
         },
-        "faces": _profile_faces(profile, node_id, source, line, traceable),
+        "faces": _profile_faces(profile, node_id, source, line, traceable, identities),
         "vertices": [
             {
+                "stableId": f"vertex:{token}[{i}]" if token else None,
                 "name": vertex.name,
                 "free": bool(vertex.free),
                 "uv": [float(x) for x in vertex.value],
@@ -434,13 +492,29 @@ def _profile_entry(profile, index: int, line: int | None, source: str, traceable
             _plane_transform(source, line, profile.plane.origin.xyz) if traceable else None
         ),
         "spans": {},
-        "constraints": _profile_constraints(profile, source, line, traceable),
+        "constraints": _stamped_constraints(
+            _profile_constraints(profile, source, line, traceable), token
+        ),
         "operators": _profile_operators(source, line) if traceable else [],
         "material": _profile_material(source, line) if traceable else None,
     }
 
 
-def _primitive_entry(primitive, index: int, line: int | None, source: str, traceable: bool) -> dict:
+def _stamped_constraints(constraints: list[dict], token: str | None) -> list[dict]:
+    """Give each constraint entry the id that names it after this edit."""
+    for entry in constraints:
+        entry["stableId"] = f"constraint:{token}[{entry['index']}]" if token else None
+    return constraints
+
+
+def _primitive_entry(
+    primitive,
+    index: int,
+    line: int | None,
+    source: str,
+    traceable: bool,
+    identities: list[Identity],
+) -> dict:
     """Payload for a construction primitive: outline plus editable placement."""
     from cadjoint.construction.solid import DIMENSIONS
 
@@ -461,13 +535,14 @@ def _primitive_entry(primitive, index: int, line: int | None, source: str, trace
     node_id = f"{primitive.kind}_{index}"
     return {
         "id": node_id,
+        "stableId": _stable_id(identities, line, {"primitive"}) if traceable else None,
         "kind": primitive.kind,
         "name": primitive.name,
         "line": line,
         "editable": editable,
         "edges": primitive.world_edges(),
         "plane": None,
-        "faces": _primitive_faces(primitive, node_id, source, line, traceable),
+        "faces": _primitive_faces(primitive, node_id, source, line, traceable, identities),
         "vertices": [],
         "transform": {
             "position": [float(x) for x in primitive.position.xyz],

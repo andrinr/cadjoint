@@ -22,9 +22,11 @@ from cadjoint.viewer.source_map.nodes import (
     Span,
     _assignment_value,
     _called_name,
+    _is_construction_call,
     _is_profile_call,
     _line_offsets,
     _node_span,
+    parse_module,
 )
 
 # Generators that turn a sketch into a solid, in the order their faces are
@@ -64,7 +66,7 @@ def locate_feature_calls(source: str) -> list[FeatureCall] | None:
             primitive call, or None when the source cannot be parsed.
     """
     try:
-        tree = ast.parse(source)
+        tree = parse_module(source)
     except SyntaxError:
         return None
 
@@ -79,7 +81,7 @@ def locate_feature_calls(source: str) -> list[FeatureCall] | None:
             else None
         )
         for node in ast.walk(statement):
-            if _called_name(node) not in names:
+            if _called_name(node) not in names or not _is_construction_call(node):
                 continue
             # Only the call that *is* the assigned value binds the variable;
             # a nested one (inside a Union, say) has no name of its own.
@@ -178,7 +180,7 @@ def locate_plane_reference(source: str, line: int) -> PlaneReference | None:
             or the line does not hold exactly one profile call.
     """
     try:
-        tree = ast.parse(source)
+        tree = parse_module(source)
     except SyntaxError:
         return None
     profiles = [

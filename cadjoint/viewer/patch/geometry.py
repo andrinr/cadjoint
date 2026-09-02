@@ -35,7 +35,7 @@ from cadjoint.viewer.patch.edits import (
     _validate,
 )
 from cadjoint.viewer.patch.errors import PatchError
-from cadjoint.viewer.patch.format import _format_value
+from cadjoint.viewer.patch.format import _format_keywords, _format_value
 from cadjoint.viewer.patch.resolvers import CONSTRUCTION_CALLS
 from cadjoint.viewer.patch.scene import _all_union_operands, _scene_assignment, _union_operands
 from cadjoint.viewer.source_map import locate_call
@@ -139,7 +139,7 @@ def add_primitive(
             index += 1
         variable = f"{kind}{index}"
 
-    arguments = ", ".join(f"{key}={_format_value(value)}" for key, value in dimensions.items())
+    arguments = _format_keywords(dimensions)
     statement = (
         f"{variable} = Solid.{kind}({arguments}, position={_format_value(position)}, "
         f'name="{variable}")\n'

@@ -18,8 +18,36 @@ in an import cycle.
 from __future__ import annotations
 
 import ast
+from functools import lru_cache
 
 Span = tuple[int, int]
+
+
+@lru_cache(maxsize=8)
+def parse_module(source: str) -> ast.Module:
+    """Parse *source*, reusing the result across the locators.
+
+    Every locator in this package starts by parsing the program, and a
+    single viewer action runs a dozen of them over the same text: building
+    the identity table alone parses once per locator and once more per
+    sketch. Nothing in the package or in :mod:`cadjoint.viewer.patch`
+    mutates a tree — the edits are span surgery on the *text* — so one
+    parse can safely serve them all.
+
+    The cache is small on purpose: the playground works on one program at
+    a time, and a patch immediately invalidates its own entry by producing
+    different text.
+
+    Args:
+        source: The program text.
+
+    Returns:
+        The parsed module. Treat it as read-only; it is shared.
+
+    Raises:
+        SyntaxError: If the text does not parse. Failures are not cached.
+    """
+    return ast.parse(source)
 
 
 def _line_offsets(source: str) -> list[int]:
@@ -58,6 +86,25 @@ def _called_name(node: ast.AST) -> str | None:
     if isinstance(func, ast.Attribute):
         return func.attr
     return None
+
+
+def _call_namespace(node: ast.AST) -> str | None:
+    """Name the call is qualified by: ``Solid.box(...)`` answers ``"Solid"``."""
+    if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
+        return None
+    owner = node.func.value
+    return owner.id if isinstance(owner, ast.Name) else None
+
+
+# Namespaces whose methods share a name with a construction primitive but build
+# something else entirely — ``Nodes.sphere(...)`` selects mesh nodes, it does
+# not create a solid.
+NON_CONSTRUCTION_NAMESPACES = frozenset({"Nodes"})
+
+
+def _is_construction_call(node: ast.AST) -> bool:
+    """True when a call named like a primitive really does build geometry."""
+    return _call_namespace(node) not in NON_CONSTRUCTION_NAMESPACES
 
 
 def _is_profile_call(node: ast.AST) -> bool:

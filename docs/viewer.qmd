@@ -186,6 +186,64 @@ Each run follows the same path as the shader backend:
 The code icon shows the complete generated WGSL. Python tracebacks and WGSL
 compiler errors appear under the editor.
 
+## Code parity
+
+The source is the single truth: every viewer action is a rewrite of a span of
+the user's Python, and the payload the viewer draws is read back out of that
+same text. Three things hold that contract together.
+
+### Stable identities
+
+A payload entry used to be addressed by the line it sat on at the last compile.
+Any edit between the compile and the click — a blank line, an import, an
+`add_sketch` that inserts three lines — moved every line and silently aimed the
+next patch at the wrong statement.
+
+Every addressable thing now also carries a **stable id**, derived from its AST
+path and the name the program assigned it rather than from its position:
+
+| Id | Names |
+|---|---|
+| `assign:comb_profile` | The call that is the value of a module-level assignment — sketches, primitives, features, materials, studies, meshes, optimizations |
+| `call:extrude@comb_profile` | A feature call bound to no variable, keyed by the sketch it consumes |
+| `sketch:comb`, `box:block` | An unbound construction call carrying a literal `name=` |
+| `bc:sink-conduction[1]` | An ordinal inside its owner — also `constraint:<sketch>[i]`, `vertex:<sketch>[i]` |
+| `plane:comb_profile`, `face:sink:cap+` | A sketch's work plane; one analytic face of a feature |
+
+Ids survive every edit that does not touch their own statement. Only the
+`#<n>` fallback — an object with neither a variable nor a `name=` — is ordinal,
+and every statement the viewer itself writes is named.
+
+Every `/patch` request takes `id` wherever it used to take `line`, and the id
+wins: it is resolved against the text in that same request, so a stale line
+cannot survive the round trip. The old fields still work unchanged, and the
+compile payload carries both — `stableId` on every entry, plus an `identities`
+table mapping each id to the line it currently sits on.
+
+### A schema, and types generated from it
+
+The payload is defined once, as pydantic models in `cadjoint/viewer/schema/`.
+The compile worker validates every payload against them before answering, and
+`cadjoint/viewer/schema/payloads.d.ts` is generated from the same models — one
+interface per payload shape, and one per `/patch` operation, discriminated on
+`op`. Regenerate it with:
+
+```bash
+python -m cadjoint.viewer.schema.emit
+```
+
+A test regenerates and diffs, so the models and the checked-in types cannot
+drift apart.
+
+### The round-trip invariant
+
+`tests/viewer/test_parity_roundtrip.py` closes the loop for all 27 operations:
+for each generated request the patched text must still parse, patching twice
+from the same input must be byte-identical, the id and the legacy line must
+produce the same source, and compiling the result must show exactly the change
+that was asked for. Operations that describe a state rather than a step —
+every `set_*` — must additionally be idempotent.
+
 ## Editor intelligence
 
 The editor lints and completes as you type. Both analysers are *static* — they

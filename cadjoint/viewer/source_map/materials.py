@@ -17,7 +17,7 @@ from __future__ import annotations
 import ast
 
 from cadjoint.viewer.source_map.calls import locate_call
-from cadjoint.viewer.source_map.nodes import _called_name, _contains, _is_profile_call
+from cadjoint.viewer.source_map.nodes import _called_name, _contains, _is_profile_call, parse_module
 
 
 def build_material_payload(namespace: dict, source: str) -> list[dict]:
@@ -31,7 +31,7 @@ def build_material_payload(namespace: dict, source: str) -> list[dict]:
     from cadjoint.render.material import Material
 
     try:
-        tree = ast.parse(source)
+        tree = parse_module(source)
     except SyntaxError:
         return []
 
@@ -54,6 +54,9 @@ def build_material_payload(namespace: dict, source: str) -> list[dict]:
         result.append(
             {
                 "id": f"material_{len(result)}",
+                # Stable across every edit that leaves the assignment alone,
+                # unlike ``id``, which is a position in this payload.
+                "stableId": f"assign:{variable}",
                 "name": variable,
                 "line": statement.value.lineno,
                 "editable": call is not None,
@@ -92,7 +95,7 @@ def _material_name_from_call(call: ast.Call) -> str | None:
 def _primitive_material(source: str, line: int, kind: str) -> str | None:
     """Named material referenced by a primitive call at *line*."""
     try:
-        tree = ast.parse(source)
+        tree = parse_module(source)
     except SyntaxError:
         return None
     calls = [
@@ -108,7 +111,7 @@ def _primitive_material(source: str, line: int, kind: str) -> str | None:
 def _profile_material(source: str, line: int) -> str | None:
     """Named material on the generator consuming a profile at *line*."""
     try:
-        tree = ast.parse(source)
+        tree = parse_module(source)
     except SyntaxError:
         return None
     profiles = [

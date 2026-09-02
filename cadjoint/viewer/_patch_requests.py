@@ -20,6 +20,7 @@ from typing import Any
 
 from cadjoint.viewer._limits import OVERSIZED_SOURCE_ERROR, exceeds_source_limit
 from cadjoint.viewer._patch import OPERATIONS, PatchError, apply_operation
+from cadjoint.viewer.source_map.identity import Identity, identity_index
 
 # ``(error, arguments)``: a rejection to return, or the keyword arguments the
 # operation runs with.  ``error`` is None exactly when the request is good.
@@ -30,6 +31,152 @@ Validator = Callable[[dict[str, Any]], Checked]
 def _error(message: str) -> dict[str, Any]:
     """One rejected request, in the shape every endpoint answers with."""
     return {"ok": False, "error": message}
+
+
+# ── Stable identities ───────────────────────────────────────────────────────
+#
+# A request may address its target by the stable id the payload published
+# instead of by the line the payload happened to report.  An id is resolved
+# against the *current* text and then written into the legacy fields, so every
+# validator below keeps checking exactly what it always checked — and a
+# frontend that still sends lines keeps working unchanged.
+
+_UNRESOLVED_ID = "No statement in this program has the id {identifier!r}."
+_WRONG_ID_KIND = "The id {identifier!r} names a {kind}, which `{operation}` cannot address."
+_NO_ID = "The patch operation `{operation}` creates a new object, so it takes no `id`."
+_LOFT_IDS = "`add_loft` names its two sketches with `id_a` and `id_b`, not `id`."
+
+#: Identity kinds whose id resolves to a ``line`` and nothing else.
+_LINE_KINDS = frozenset({"sketch", "primitive", "feature", "material", "plane"})
+
+#: Identity kinds that name a top-level declaration a request refers to by
+#: name or index; the id supplies the index under this request key.
+_DECLARATION_KEYS = {"study": "study", "mesh": "mesh", "optimization": "optimization"}
+
+#: What each operation's ``id`` is allowed to name.  One entry per operation in
+#: :data:`PATCH_VALIDATORS`, so a mis-aimed id is reported as the mis-aim it is
+#: rather than as a missing field three checks later.  An empty set means the
+#: operation creates something and has no existing target to address.
+_ID_TARGETS: dict[str, frozenset[str]] = {
+    "set_vertex": frozenset({"sketch", "vertex"}),
+    "insert_vertex": frozenset({"sketch", "vertex"}),
+    "delete_vertex": frozenset({"sketch", "vertex"}),
+    "set_value": frozenset({"sketch", "primitive", "feature", "material", "plane"}),
+    "add_primitive": frozenset(),
+    "add_material": frozenset(),
+    "assign_material": frozenset({"sketch", "primitive", "feature"}),
+    "add_sketch": frozenset(),
+    "set_sketch_plane": frozenset({"sketch", "plane"}),
+    "add_extrusion": frozenset({"sketch"}),
+    "add_revolution": frozenset({"sketch"}),
+    "add_loft": frozenset(),
+    "add_constraint": frozenset({"sketch"}),
+    "delete_constraint": frozenset({"sketch", "constraint"}),
+    "set_constraint_value": frozenset({"sketch", "constraint"}),
+    "solve_sketch": frozenset({"sketch"}),
+    "delete_object": frozenset({"sketch", "primitive", "feature"}),
+    "add_study": frozenset(),
+    "delete_study": frozenset({"study"}),
+    "add_study_bc": frozenset({"study"}),
+    "delete_study_bc": frozenset({"study", "bc"}),
+    "set_study_value": frozenset({"study", "bc"}),
+    "add_mesh": frozenset(),
+    "delete_mesh": frozenset({"mesh"}),
+    "set_mesh_value": frozenset({"mesh"}),
+    "delete_optimization": frozenset({"optimization"}),
+    "set_optimization_value": frozenset({"optimization"}),
+}
+
+#: ``add_loft`` joins two sketches, and a face reference names a feature.
+_LOFT_TARGETS = frozenset({"sketch"})
+_OWNER_TARGETS = frozenset({"feature", "primitive"})
+
+
+def _derived_fields(identity: Identity, index: dict[str, Identity]) -> dict[str, Any] | None:
+    """The legacy request fields an id stands in for, or None for a kind it cannot fill."""
+    if identity.kind in _LINE_KINDS:
+        return {"line": identity.line}
+    if identity.kind == "vertex":
+        return {"line": identity.line, "index": identity.index}
+    if identity.kind == "constraint":
+        owner = index.get(identity.owner or "")
+        return {"line": owner.line, "index": identity.index} if owner is not None else None
+    if identity.kind == "bc":
+        owner = index.get(identity.owner or "")
+        return {"study": owner.index, "bc": identity.index} if owner is not None else None
+    key = _DECLARATION_KEYS.get(identity.kind)
+    return {key: identity.index} if key is not None else None
+
+
+def _resolve_identifier(
+    identifier: Any,
+    index: dict[str, Identity],
+    allowed: frozenset[str],
+    operation: str,
+    key: str = "id",
+) -> tuple[dict[str, Any] | None, dict[str, Any]]:
+    """``(error, fields)`` for one id, checked against the current source."""
+    if not isinstance(identifier, str) or not identifier.strip():
+        return _error(f"The patch request needs `{key}` as a non-empty string."), {}
+    identity = index.get(identifier)
+    if identity is None:
+        return _error(_UNRESOLVED_ID.format(identifier=identifier)), {}
+    if identity.kind not in allowed:
+        return _error(
+            _WRONG_ID_KIND.format(identifier=identifier, kind=identity.kind, operation=operation)
+        ), {}
+    fields = _derived_fields(identity, index)
+    if fields is None:
+        return _error(_UNRESOLVED_ID.format(identifier=identifier)), {}
+    return None, fields
+
+
+def _resolved_request(request: dict[str, Any], source: str, operation: str) -> Checked:
+    """Rewrite a request's stable ids into the line/index fields validators read.
+
+    ``id`` names the target of the operation; ``id_a``/``id_b`` the two
+    sketches a loft joins; a string ``reference.owner`` the feature whose face
+    a sketch plane is being planted on.  A request carrying none of those is
+    returned untouched, so the common path pays nothing.
+
+    Args:
+        request: The raw request object.
+        source: The program text the ids are resolved against.
+        operation: The requested operation, which decides what an id may name.
+
+    Returns:
+        ``(error, request)``: a rejection, or the request with the ids
+        replaced by the fields they stand for.
+    """
+    reference = request.get("reference")
+    owner_is_id = isinstance(reference, dict) and isinstance(reference.get("owner"), str)
+    keys = [key for key in ("id", "id_a", "id_b") if key in request]
+    if not keys and not owner_is_id:
+        return None, request
+
+    index = identity_index(source)
+    resolved = dict(request)
+    for key in keys:
+        allowed = _LOFT_TARGETS if key != "id" else _ID_TARGETS.get(operation, frozenset())
+        if not allowed:
+            return _error(
+                _LOFT_IDS if operation == "add_loft" else _NO_ID.format(operation=operation)
+            ), {}
+        error, fields = _resolve_identifier(request[key], index, allowed, operation, key)
+        if error is not None:
+            return error, {}
+        if key == "id":
+            resolved.update(fields)
+        else:
+            resolved["line_a" if key == "id_a" else "line_b"] = fields["line"]
+    if owner_is_id:
+        error, fields = _resolve_identifier(
+            reference["owner"], index, _OWNER_TARGETS, operation, "reference.owner"
+        )
+        if error is not None:
+            return error, {}
+        resolved["reference"] = {**reference, "owner": fields["line"]}
+    return None, resolved
 
 
 def _integer(value: Any) -> bool:
@@ -575,9 +722,16 @@ PATCH_VALIDATORS: dict[str, Validator] = {
 def patch_source(request: dict[str, Any]) -> dict[str, Any]:
     """Apply one viewer edit to the user's program text.
 
+    Every operation addresses its target either by the stable ``id`` the last
+    compile published for it, or by the ``line``/``index`` that payload
+    reported.  The id is the durable one: it is resolved against the text in
+    this very request, so an edit made in the editor since the compile cannot
+    send the patch to the wrong statement.
+
     Args:
-        request: ``{"source", "op", "line", "index"}`` plus ``"xy"`` for
-            operations that place a vertex.
+        request: ``{"source", "op"}`` plus the operation's own fields — an
+            ``"id"`` naming the target, or the legacy ``"line"``/``"index"``,
+            and e.g. ``"xy"`` for the operations that place a vertex.
 
     Returns:
         ``{"ok": True, "source": ...}`` or ``{"ok": False, "error": ...}``.
@@ -599,6 +753,10 @@ def patch_source(request: dict[str, Any]) -> dict[str, Any]:
             f"This server does not support the patch operation {operation!r}. "
             "If you updated cadjoint, restart the playground server."
         )
+
+    error, request = _resolved_request(request, source, operation)
+    if error is not None:
+        return error
 
     error, arguments = PATCH_VALIDATORS.get(operation, _validate_vertex)(request)
     if error is not None:

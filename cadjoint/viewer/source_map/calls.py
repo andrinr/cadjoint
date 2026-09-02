@@ -26,6 +26,7 @@ from cadjoint.viewer.source_map.nodes import (
     _line_offsets,
     _node_span,
     _resolved_container,
+    parse_module,
 )
 
 
@@ -70,7 +71,7 @@ def locate_call(source: str, line: int, names: set[str]) -> CallSite | None:
         call is ambiguous, absent, or unparseable.
     """
     try:
-        tree = ast.parse(source)
+        tree = parse_module(source)
     except SyntaxError:
         return None
 
@@ -131,7 +132,7 @@ def locate_profile_call(source: str, line: int) -> ProfileCall | None:
         or the source cannot be parsed.
     """
     try:
-        tree = ast.parse(source)
+        tree = parse_module(source)
     except SyntaxError:
         return None
 

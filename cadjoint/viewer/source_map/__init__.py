@@ -31,6 +31,8 @@ The package is layered, and imports only ever point *down* this list:
   that gives each constraint its viewer identity.
 - :mod:`.declarations` — top-level study / mesh / optimization declarations,
   located by stable source-order index.
+- :mod:`.identity` — the stable id every addressable thing is named by,
+  derived from the AST path and the assigned name rather than from a line.
 - :mod:`.materials` — the material browser payload and material lookups.
 - :mod:`.payload` — joins captured objects with located spans into the viewer
   JSON (the only module that knows what the viewer draws).
@@ -75,6 +77,15 @@ from cadjoint.viewer.source_map.features import (
     locate_feature_calls,
     locate_plane_reference,
 )
+from cadjoint.viewer.source_map.identity import (
+    IDENTITY_KINDS,
+    Identity,
+    build_identities,
+    describe_identities,
+    identity_at,
+    identity_for,
+    identity_index,
+)
 from cadjoint.viewer.source_map.materials import build_material_payload
 from cadjoint.viewer.source_map.nodes import Span
 from cadjoint.viewer.source_map.payload import (
@@ -84,6 +95,7 @@ from cadjoint.viewer.source_map.payload import (
 
 __all__ = [
     "CONSTRAINT_CLASS_KINDS",
+    "IDENTITY_KINDS",
     "FEATURE_CALL_KINDS",
     "MESH_CALL_NAME",
     "OPTIMIZATION_CALL_NAME",
@@ -94,6 +106,7 @@ __all__ = [
     "CallSite",
     "ConstraintStatement",
     "FeatureCall",
+    "Identity",
     "MeshStatement",
     "OptimizationStatement",
     "PlaneReference",
@@ -102,8 +115,13 @@ __all__ = [
     "StudyStatement",
     "build_construction_payload",
     "build_construction_relations",
+    "build_identities",
     "build_material_payload",
     "capture_profiles",
+    "describe_identities",
+    "identity_at",
+    "identity_for",
+    "identity_index",
     "locate_call",
     "locate_constraint_statements",
     "locate_feature_call",

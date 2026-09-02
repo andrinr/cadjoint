@@ -159,6 +159,27 @@ def _name_references(tree: ast.Module, name: str, exclude: ast.AST) -> list[ast.
     ]
 
 
+def _named_by_keyword(tree: ast.Module, keyword_name: str, name: str) -> bool:
+    """True when some call passes ``<keyword_name>=<name>`` as a string literal.
+
+    Declarations reference each other two ways: by the variable they are
+    bound to, which :func:`_name_references` finds, and by their literal
+    ``name=``, which nothing else would. A study named by an optimization's
+    ``study="sink"`` is as much in use as one passed by variable, and
+    deleting it leaves a program that no longer runs.
+    """
+    return any(
+        isinstance(node, ast.Call)
+        and any(
+            keyword.arg == keyword_name
+            and isinstance(keyword.value, ast.Constant)
+            and keyword.value.value == name
+            for keyword in node.keywords
+        )
+        for node in ast.walk(tree)
+    )
+
+
 def _argument_span(source: str, offsets, node) -> tuple[int, int]:
     """Span of one call argument, including the comma that follows it."""
     span = _node_span(source, offsets, node)

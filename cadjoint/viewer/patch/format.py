@@ -48,6 +48,16 @@ def _format_value(value) -> str:
     return "[" + ", ".join(_format_coordinate(component) for component in value) + "]"
 
 
+def _format_keywords(arguments: dict) -> str:
+    """``key=value, key=value`` for a whole call, compactly formatted.
+
+    Every operation that *writes a new call* — a material definition, a new
+    solid — was spelling this out one keyword at a time; the argument list
+    is one thing, so it is formatted in one place.
+    """
+    return ", ".join(f"{key}={_format_value(value)}" for key, value in arguments.items())
+
+
 def _exact_number(value) -> str:
     """Format a number so it round-trips exactly (viewer-typed values)."""
     return repr(float(value))

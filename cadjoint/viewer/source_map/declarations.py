@@ -25,6 +25,7 @@ from cadjoint.viewer.source_map.nodes import (
     _line_offsets,
     _node_span,
     _resolved_container,
+    parse_module,
 )
 
 STUDY_CALL_KINDS = {"ThermalStudy": "thermal", "ElasticStudy": "elastic"}
@@ -77,7 +78,7 @@ def locate_study_statements(source: str) -> list[StudyStatement] | None:
         be parsed.
     """
     try:
-        tree = ast.parse(source)
+        tree = parse_module(source)
     except SyntaxError:
         return None
     offsets = _line_offsets(source)
@@ -191,7 +192,7 @@ def locate_mesh_statements(source: str) -> list[MeshStatement] | None:
         be parsed.
     """
     try:
-        tree = ast.parse(source)
+        tree = parse_module(source)
     except SyntaxError:
         return None
     offsets = _line_offsets(source)
@@ -282,7 +283,7 @@ def locate_optimization_statements(source: str) -> list[OptimizationStatement] |
         source cannot be parsed.
     """
     try:
-        tree = ast.parse(source)
+        tree = parse_module(source)
     except SyntaxError:
         return None
     offsets = _line_offsets(source)
