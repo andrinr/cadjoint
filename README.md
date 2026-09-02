@@ -1,3 +1,8 @@
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/banner-readme-dark.png">
+  <img src="docs/assets/banner-readme.png" alt="cadjoint — differentiable code-first CAD">
+</picture>
+
 # cadjoint
 
 Differentiable code-first CAD: sketches, constraints, SDF geometry, meshing, and
@@ -6,7 +11,34 @@ FEM simulation composed into one function JAX can differentiate end to end.
 > [!WARNING]
 > The API is not stable. Expect breaking changes.
 
-[![The cadjoint playground in Model mode: scene.py on the left, the parametric heat sink rendered live on the right, and the declared cool-sink optimization in the side panel](examples/assets/playground-model.png)](https://andrinr.github.io/cadjoint/docs/viewer.html)
+[![The cadjoint playground in Model mode: scene.py docked on the left, the parametric heat sink on the world floor grid in the middle, and the object tree and material library in the right-hand column](docs/assets/screens/model-desk.png)](https://andrinr.github.io/cadjoint/docs/viewer.html)
+
+---
+
+## The chain
+
+One Python program declares the whole thing, and every arrow below is a
+derivative JAX can take:
+
+```
+sketch vertices ─► constraints ─► SDF ─► mesh ─► FEM solve ─► objective
+       └─────────────────────────── ∂J/∂θ ◄───────────────────────────┘
+```
+
+A sketch profile is a list of named `Vector2` parameters. Constraints are
+residuals on those parameters, solved by Riemannian gradient descent and Newton
+projection onto the constraint manifold. Extruding or revolving the profile
+produces an SDF that *shares* those parameter objects, so the solid and the
+sketch are the same variables. Dual contouring turns the field into a surface,
+TetGen fills it, jax-fem or CalculiX solves on it — and `jax.grad` reaches from
+the objective all the way back to a fin's tip coordinate.
+
+Nothing in that chain is a snapshot. A work plane taken from a face
+(`SketchPlane.on(body.cap("+"))`) is an *expression* over the parent feature's
+parameters, so the volume of a boss extruded from it differentiates with respect
+to its parent's depth — the thing a B-rep modeller cannot do, because there a
+face is stored geometry rather than a function of the feature that made it
+(`tests/construction/test_reference_planes.py`).
 
 ---
 
@@ -15,19 +47,30 @@ FEM simulation composed into one function JAX can differentiate end to end.
 - **SDF primitives** — sphere, box, capsule, cylinder, torus, and more
 - **Boolean ops** — union, intersection, subtraction with smooth blending
 - **Transforms** — translate, rotate, scale, mirror, repeat
-- **Forward raymarcher** — early-exit sphere tracing, reconstructed silhouettes, GGX materials, soft shadows, reflections, refraction, and anti-aliasing
+- **Sketch construction** — 2D profiles on work planes, extruded, revolved or
+  lofted into solids that share their parameters, so constraints and gradients
+  act on both
+- **Reference geometry** — sketch planes taken from a feature's own faces
+  (`solid.cap("+")`, `solid.side(i)`, `block.face("+x")`), offset planes, and
+  tangent planes Newton-projected onto a field, all differentiable through the
+  parent
+- **Constraint system** — distance, angle, coincident, horizontal, vertical,
+  parallel, perpendicular, equal-length, point-on-line and fixed (plus the
+  edge-pair forms), solved by Riemannian gradient descent and Newton projection
+  onto the constraint manifold
+- **Meshing** — dual contouring with sharp-feature QEF vertices (Rust core),
+  TetGen fill to TET4/TET10, or a deterministic voxelize-and-snap HEX8 path
+- **FEM** — thermal and linear-elastic studies with programmatic node selections,
+  solved by jax-fem or by CalculiX 2.23 over a subprocess
+- **Optimization** — declared in the scene, descended with optax, every step
+  projected back onto the sketch constraints
+- **Forward raymarcher** — early-exit sphere tracing, reconstructed silhouettes,
+  GGX materials, soft shadows, reflections, refraction, anti-aliasing
 - **Shader backend** — compile 3D SDFs through StableHLO to WGSL
-- **WebGPU viewers** — interactively inspect SDFs or progressively path-trace
-  materials in the browser playground
-- **Sketch construction** — 2D profiles on work planes, extruded or revolved into
-  solids that share their parameters, so constraints and gradients act on both
-- **Construction primitives** — boxes, spheres, and cylinders with editable
-  placement, mirroring the SDF primitives they generate
-- **Editable in the browser** — construction geometry renders as depth-tested
-  overlays you can click, drag, place, and transform with a gizmo; every edit
+- **Browser playground** — a docked, windowed WebGPU app where every edit
   rewrites the Python source that produced it
-- **Constraint system** — geometric constraints (distance, angle, coincident) with Riemannian gradient descent and Newton projection onto the constraint manifold
-- **JAX-native** — every scene is a pure function; `jit`, `grad`, and `vmap` work out of the box
+- **JAX-native** — every scene is a pure function; `jit`, `grad`, and `vmap` work
+  out of the box
 
 ---
 
@@ -60,13 +103,14 @@ the `cuda` extra.
 Optional extras — repeat the flag, one `--extra` per name:
 
 ```bash
-uv sync --extra viewer --extra fem --extra docs
+uv sync --extra viewer --extra fem --extra editor --extra docs
 ```
 
 | Extra | Pulls in |
 | --- | --- |
 | `cuda` | GPU JAX (Linux + NVIDIA only) |
 | `viewer` | Jupyter widget (`anywidget`) |
+| `editor` | playground editor intelligence (`jedi`, `ruff`) |
 | `fem` | jax-fem finite-element stack (basix, meshio, petsc4py) |
 | `tesseract` | tesseract-core + tesseract-jax solver plugin runtime |
 | `stepcheck` | OCCT kernel validation of STEP exports (dev) |
@@ -74,9 +118,9 @@ uv sync --extra viewer --extra fem --extra docs
 
 Avoid `--all-extras` on macOS — it includes `cuda`, which has no macOS wheels.
 
-## Interactive browser playground
+---
 
-Start a local server for the split-pane Python editor and live WebGPU preview:
+## The playground
 
 ```bash
 uv run cadjoint-viewer --open   # serves http://127.0.0.1:8765/ and opens your browser
@@ -95,34 +139,78 @@ dependencies are needed — the server is stdlib-only — but the preview needs 
 WebGPU-capable browser (recent Chrome, Edge, or Safari). Stop the server with
 `Ctrl+C`.
 
-Edit the example on the left and run it with `Ctrl+Enter` (or `Cmd+Enter`). The
-program must assign its final SDF to `scene`. Use **Path trace** for progressive
-multi-bounce lighting, GGX reflections, and glass transport; camera and scene
-changes reset accumulation automatically. The server only listens on localhost
-and compiles each edit in a timed child process, but the editor still executes
-Python on your machine—only run code you trust.
+Edit the program on the left and run it with `Ctrl+Enter` (or `Cmd+Enter`). It
+must assign its final SDF to `scene`. The server only listens on localhost and
+compiles each edit in a timed child process, but the editor still executes
+Python on your machine — only run code you trust.
 
-### Modelling in the viewer
+### Panels are windows
 
-Construction geometry — sketch profiles and primitives — is drawn over the
-rendered solid as a depth-tested wireframe (an edge behind the model is hidden
-by it) and can be edited directly:
+Every panel is a dockview window: drag its tab to split or stack, minimise it to
+a tray, float it out over the desk, close it and bring it back from the **Window**
+menu. The viewport is the one exception — it is furniture and has no close
+control. Arrangements survive a reload, and each mode remembers its own desk, so
+switching to Simulate and back restores what you left in Model.
+
+![The Objects window floated out of the dock and sitting over the viewport, with Materials and Optimize sharing a tab strip in the right-hand column](docs/assets/screens/windows-float-stack.png)
+
+*Objects floated out of the grid and left hovering over the viewport, with
+Materials and Optimize sharing one tab strip on the right. The WebGPU canvas is
+re-parented, not rebuilt, so the context survives every drag, dock and mode
+change (`frontend/e2e/windows.spec.ts`).*
+
+Three modes seed those defaults — **Model**, **Sketch**, **Simulate** — cycled
+with `M` (`Shift+M` backwards, `Esc` returns to Model). Selecting a sketch in the
+viewport enters Sketch mode on its own; the two side columns keep the same widths
+in all three modes so a mode change never moves the model out from under the
+pointer.
+
+### The viewport
+
+The chrome and the viewport are the same sheet of paper: the seam between them is
+a rule, not a step in luminance. Inside the rectangle nothing is coloured, so the
+only hue there is a measurement — the viridis field ramp, the magma quality ramp,
+the boundary-condition hues.
+
+- a **world-space floor grid** at z = 0, Z-up, with the spacing of the ruling
+  printed as a scale readout that follows the zoom (`GRID 1.00 m`, `GRID 500 mm`),
+  so the view is calibrated rather than decorative
+- a **title block** in the corner naming the scene, study, mesh, solver and
+  revision — the state you would otherwise hunt through panels for
+- a **construction overlay** — sketch profiles, vertex handles, constraint
+  dimensions and gizmos, depth-tested against the solid (an edge behind the model
+  is hidden by it) — toggled from
+  **Display options → Customize → Construction overlay**
+- **render presets** behind the same button: x-ray, studio, editor, with shading,
+  shadow and quality controls, and **path tracing** for progressive multi-bounce
+  lighting, GGX reflections and glass transport — camera and scene changes reset
+  the accumulation automatically
+
+![The same scene with the construction overlay switched off: the shaded solid on the floor grid with no handles, dimensions or gizmos](docs/assets/screens/construction-overlay-off.png)
+
+*Overlay off. The graticule stays — it is furniture, held deliberately below the
+contrast a meaningful mark owes (`frontend/test/graticule.test.ts`).*
+
+### Model mode: direct editing that rewrites the source
+
+Construction geometry is editable in place, and every edit is applied to the
+Python program, which stays the single source of truth — there is no hidden scene
+state to drift out of sync.
 
 | Action | Result |
 | --- | --- |
 | Click a vertex handle | Selects it and highlights the exact literal in the code |
 | Drag a handle | Rewrites that vertex's coordinates and rebuilds the solid |
-| **Polygon**, then click edges | Inserts a vertex per click until Esc |
+| **P**, then click edges | Inserts a vertex per click until Esc |
 | Select a handle, press Delete | Removes that vertex |
-| **Box** / **Sphere** / **Cylinder**, then click | Writes a `Solid.*` call and adds it to the scene |
-| Click a solid's outline | Selects it and shows the move/rotate gizmo |
+| **B** / **S** / **C**, then click | Writes a `Solid.*` call and adds it to the scene |
+| Click a solid's outline | Selects it and shows the move/rotate gizmo (**G** / **R**) |
 | Drag a gizmo arrow or ring | Rewrites `position=` or `rotation=` on that solid |
+| Drag a material swatch onto a solid | Rewrites its `material=` argument |
 | Drag empty space / Shift-drag / scroll | Orbit / pan / zoom |
 
-Every edit is applied to the Python source, which stays the single source of
-truth — there is no hidden scene state to drift out of sync. Geometry whose
-literals cannot be rewritten (built in a loop, or from a variable) still
-renders, but is read-only in the viewer.
+Geometry whose literals cannot be rewritten (built in a loop, or from a variable)
+still renders, but is read-only in the viewer.
 
 Solids created this way come from the construction layer, so they are ordinary
 parametric geometry as well as viewer objects:
@@ -138,19 +226,73 @@ scene = Union(
 ```
 
 `size`, `position`, and `rotation` become named free parameters shared with the
-SDF the factory returns, so constraints and `jax.grad` reach them exactly as
-they do for sketch vertices. `size` is half-extents and `rotation` is intrinsic
-X, Y, Z angles in radians, matching the underlying primitives.
+SDF the factory returns, so constraints and `jax.grad` reach them exactly as they
+do for sketch vertices. `size` is half-extents and `rotation` is intrinsic X, Y, Z
+angles in radians, matching the underlying primitives.
 
-![Simulate mode with the sink-mesh SimMesh generated into 2969 tet10 elements, shaded by element quality with the edges and quality histogram shown](examples/assets/playground-mesh.png)
+### Sketch mode: constraints on the geometry they hold
 
-*Simulate → Meshes: the declared `SimMesh` discretized into tet10 elements,
-shaded by element quality with a quality histogram beside it.*
+![Sketch mode with the fin comb selected: its constraint chips listed in the Sketch window and its dimensions drawn over the model in the viewport](docs/assets/screens/sketch-constraints.png)
 
-![The sink-conduction thermal study solved in the playground, sliced through X so the hot die interface and the temperature gradient into the fins are visible](examples/assets/playground-field.png)
+*The starter's fin comb, 16 points under 17 constraints. Numeric distances draw
+as dimensions in the viewport; relational constraints (horizontal, vertical,
+equal-length) are chips in the Sketch window. Fix a point, dimension a pair, or
+solve the system from the same panel — each writes the constraint back into
+`scene.py`.*
 
-*Simulate → Studies: the solved temperature field on the same mesh, clipped by
-the slice plane so the heat flux entering at the die interface is visible.*
+The solver is exposed, not hidden: pick the method and iteration count, run it,
+and the loss curve is drawn beside the chips. `satisfy_constraints(...)` appears
+in the source with the settings you chose.
+
+### Sketching on a face
+
+A work plane can be taken from a feature's own face rather than typed as a
+coordinate frame:
+
+```python
+body = extrude(profile, depth=fin_depth)
+boss = PolygonProfile(SQUARE, plane=SketchPlane.on(body.cap("+")))
+```
+
+`body.cap("+")` / `body.cap("-")` are the ends of a sweep, `body.side(i)` the
+wall swept by profile edge `i`, and `block.face("+x")` a primitive's face.
+`SketchPlane.offset(reference, distance)` pushes a plane along its normal (the
+distance may itself be a `Scalar` design variable), and `SketchPlane.tangent(...)`
+Newton-projects onto a field for everything with no analytic face — blends,
+fillets, the curved wall of a revolve. Picking a face in the viewport issues a
+`set_sketch_plane` patch, which rewrites the plane argument in place.
+
+### Simulate mode
+
+![Simulate → Meshes: the sink-mesh SimMesh discretized into 2957 TET10 elements, shaded by element quality with the aspect-ratio histogram beside it](docs/assets/screens/simulate-meshes.png)
+
+*Simulate → Meshes. The declared `SimMesh` inspected in place: 5 726 nodes,
+2 957 TET10 elements, aspect ratio 1.175 / 2.017 / 3.766 min/mean/max, with the
+quality histogram under it. Resolution, bounds, domain and method are editable —
+each edit is a patch back into `scene.py`.*
+
+![Simulate → Studies: the sink-conduction thermal study with its heat-flux and fixed-value boundary conditions listed as node selections, and a Solve button](docs/assets/screens/simulate-studies.png)
+
+*Simulate → Studies. Boundary conditions are programmatic node selections
+(`Nodes.halfspace(...) & Nodes.sphere(...)`), listed with the region they resolve
+to. Add one by picking a region in the viewport; the study is rewritten in the
+source.*
+
+![Simulate → Results: the solved temperature field on the sink, in viridis, with the legend, field min/mean/max and the mesh statistics](docs/assets/screens/simulate-results.png)
+
+*Simulate → Results. The solved temperature field on the same mesh, sliced so the
+flux entering at the die interface reads. The legend is a labelled bar: a ramp
+with no numbers beside it is decoration.*
+
+### Editor intelligence
+
+The playground server exposes `POST /api/lint`, `/api/complete` and
+`/api/signature` (`cadjoint/viewer/_intelligence.py`). Lint shells out to `ruff`;
+completion and signature help drive `jedi` in-process against the environment the
+server itself runs in, so completions know the real signatures of
+`extrude`, `SketchPlane.on`, `ThermalStudy` and everything else in `cadjoint`.
+Both dependencies are optional — install them with `--extra editor`; without
+them, the endpoints answer with an install hint and the editor simply goes quiet.
 
 ### Developing the playground UI
 
@@ -163,14 +305,19 @@ cd frontend
 npm install
 npm run dev        # Vite on :5173, proxying the API to the Python server
 npm run build      # refresh cadjoint/viewer/static (commit the result)
-npm test           # projection and picking unit tests
+npm test           # 25 unit suites: projection, picking, tokens, graticule, windows
 npm run e2e        # Playwright, drives the real server end to end
 ```
 
 Run `uv run cadjoint-viewer` alongside `npm run dev` so the dev server has an API
-to proxy to.
+to proxy to. The design system is specified in
+[`research/design-language.md`](research/design-language.md), and
+`frontend/src/tokens.ts` is its source of truth —
+`frontend/test/tokens.test.ts` asserts the CSS cannot drift from it.
 
-## Shader compilation and live viewer
+---
+
+## Shader compilation and the Jupyter viewer
 
 Compile an SDF to a standalone shader function:
 
@@ -200,15 +347,10 @@ SDFViewer(sphere)
 ```
 
 See the [rendering notebook](examples/rendering.ipynb) for composition and
-hot-reload examples.
-
-For a split-pane Python editor and live WebGPU preview in the browser, see
-[Interactive browser playground](#interactive-browser-playground) above.
-
-The [WebGPU viewer guide](https://andrinr.github.io/cadjoint/docs/viewer.html) includes
-a live interactive scene and covers the local playground, camera controls,
-generated shader inspection, and the Jupyter widget.
-
+hot-reload examples, and the
+[WebGPU viewer guide](https://andrinr.github.io/cadjoint/docs/viewer.html) for a
+live interactive scene, camera controls, generated-shader inspection and the
+widget.
 
 ## Forward rendering
 
@@ -226,14 +368,50 @@ image = render_scene(scene, RenderSettings.balanced((240, 320)))
 ```
 
 Use `RenderSettings.draft()`, `.balanced()`, or `.high_quality()` to choose an
-explicit performance/fidelity trade-off. See the [forward renderer guide](https://andrinr.github.io/cadjoint/docs/rendering.html)
+explicit performance/fidelity trade-off. See the
+[forward renderer guide](https://andrinr.github.io/cadjoint/docs/rendering.html)
 for mode and quality comparisons.
 
-## End-to-end optimization
+---
 
-The pipeline is differentiable from the first named dimension to the last
-solver residual, and `examples/fem_bracket_optimization.py` walks the whole
-chain on the parametric L-bracket from `scenes/bracket.py`:
+## The worked example: `scenes/starter.py`
+
+The scene the playground opens with is a parametric power-module heat sink, and
+it exercises the whole chain in one file:
+
+- a **fin comb** — one `PolygonProfile` of 16 named `Vector2` points, extruded
+  through a named `fin_depth`, held by 17 constraints that still leave twelve
+  real design freedoms
+- a **copper slug** revolved from a four-point section, and two steel bushings
+  whose spacing is a `DistanceConstraint`, blended into the comb at `k = 0.03`
+- **board-level context** — FR4 board, die, screw heads, capacitors — rendered so
+  the part reads as a module, and kept out of the physics by `domain=thermal_body`
+  on the mesh, so every mesh, solve and gradient is identical to the thermal body
+  alone
+- a **`SimMesh`** on a named lattice (`method="tet10"`)
+- a **`ThermalStudy`** whose die heat flux and ambient Dirichlet region are
+  programmatic node selections
+- an **`Optimization`** that descends that same study — peak temperature against a
+  material-volume regularizer — with `gradient_path="tesseract-dc"`
+
+Running `cool-sink` from the Optimize panel drives exactly that chain in the
+browser, streamed step by step, and writes its new parameter values straight back
+into the source.
+
+![Simulate → Optimize after a short cool-sink run: the convergence sparkline, the trajectory scrubber, and each parameter's before and after value](docs/assets/screens/optimize-replay.png)
+
+*Three Adam steps of `cool-sink`, peak temperature 1.613 → 1.604. The
+convergence sparkline, a scrubber that replays the geometry along the trajectory
+step by step, and each parameter's before → after value; the optimizer writes the
+new values straight back into `scene.py` on the left. A study-backed run also
+publishes the optimized design's solved field, so the result lands in
+Simulate → Results with its temperature attached.*
+
+## End-to-end optimization from the command line
+
+The pipeline is differentiable from the first named dimension to the last solver
+residual, and `examples/fem_bracket_optimization.py` walks the whole chain on the
+parametric L-bracket from `scenes/bracket.py`:
 
 **named CAD parameters** (`web_thickness`, `rib_height`, `plate_thickness`)
 → **bracket SDF** → **HEX8 mesh** (frozen topology, node positions recomputed
@@ -258,15 +436,7 @@ gradient against finite differences, descends for 30 steps, prints a summary
 table, and writes convergence CSV + figure and before/after VTK files to
 `examples/output/`.
 
-The same loop runs interactively in the playground:
-
-![The cool-sink optimization finished in the playground: convergence sparkline, trajectory scrubber, objective 1.618 to 1.601 over 4 steps, and the before/after parameter table](examples/assets/playground-optimize.png)
-
-*Simulate → Optimize: four Adam steps of `cool-sink`, minimizing peak
-temperature. The panel shows the convergence sparkline, a scrubber that replays
-the geometry along the trajectory, and each parameter's before → after value;
-the optimizer writes the new `fin_depth` straight back into `scene.py` on the
-left.*
+---
 
 ## Tesseracts: one differentiable function across four AD strategies
 
@@ -313,11 +483,10 @@ CAD parameters θ  ──►  constraints ──► SDF        (JAX autodiff)
 ```
 
 **This is what the playground runs.** The starter scene's `cool-sink`
-optimization declares `gradient_path="tesseract-dc"`, so pressing Run in the
-browser drives exactly this chain — roughly 8 s per step on the heat sink,
-streamed live, with the optimized parameters written back into the source.
-`gradient_path="direct"` runs the same objective fully in-process for
-comparison.
+optimization declares `gradient_path="tesseract-dc"`, so running it from the
+Optimize panel drives exactly this chain, streamed live, with the optimized
+parameters written back into the source. `gradient_path="direct"` runs the same
+objective fully in-process for comparison.
 
 A second, more general boundary also ships: the `mesher` Tesseract wraps the
 *whole* pipeline (samples → surface → mesh) and derives its VJP from the
@@ -420,44 +589,47 @@ the ccx sensitivity correction, container conformance and measured numbers),
 `research/native-mesher.md` (Rust core and its VJP), `research/tet-vs-hex.md`
 (the mesher-Tesseract validation matrix).
 
-## Tesseract Hackathon 2026 entry
+---
 
-cadjoint is an entry in the [Tesseract Hackathon 2026](https://si-tesseract.discourse.group)
-(**Track 01 — Inverse design & shape optimization**). The entry state is
-frozen on the branch
-[`tesseract-hackathon-2026`](https://github.com/andrinr/cadjoint/tree/tesseract-hackathon-2026),
-which is kept permanently; development continues on `main`.
+## Performance
 
-**The headline workflow** is the two-Tesseract differentiable chain built on
-a surface-interpolation VJP:
+Every playground request runs in a fresh subprocess, so JAX is pointed at a
+persistent on-disk compilation cache (`cadjoint/cache.py`,
+`CADJOINT_CACHE_DIR`); a later process reuses executables an earlier one
+compiled. Measured on the starter scene, worker end to end: `compile` 2.1 s →
+1.0 s, `mesh` with feature edges 12.2 s → 5.8 s.
 
-```
-CAD params θ ──► SDF lattice samples ──► ┌ mesher Tesseract ┐ ──► ┌ solver Tesseract ┐ ──► J
-   (JAX)              (JAX)              │  black-box mesh  │      │  FEM adjoint     │
-                                         └──────────────────┘      └──────────────────┘
-                     ∂J/∂θ  ◄──  one jax.grad call through both boundaries
-```
+[`research/performance.md`](research/performance.md) profiles every worker mode
+and ranks the remaining levers by evidence. The short version: the hot path holds
+no algorithm, library or language problem — the Rust core's whole discrete
+pipeline is 2–8 ms, the FEM linear solve 47 ms, TetGen 11 ms, JSON serialisation
+1–5 ms. What the seconds are is JAX re-tracing and re-dispatching the scene in
+eager mode, and XLA compiling shape-specific programs no two requests share.
 
-The mesher Tesseract wraps a *non-differentiable* meshing pipeline (dual-
-contoured surface → TetGen / hex voxelization). Its VJP never looks inside
-the mesher: a boundary vertex `v` lies on the zero set of the trilinearly
-interpolated lattice samples, so the implicit function theorem gives
-`∂v/∂fᵢ = −wᵢ(v)·∇f/|∇f|²` — **the interpolation weights at the frozen
-vertex locations are the VJP rows**, making any mesher differentiable from
-its inputs and outputs alone. Composed with the unmodified jax-fem solver
-Tesseract, one `jax.grad` call crosses both boundaries: the VJP matches
-autodiff of the same map to 1.4e-11, finite differences confirm the smooth
-parameters, and five gradient steps drop the bracket objective 36%, with
-the Tesseract's frozen-topology promise detecting when a step demands
-re-meshing. Validation matrix: `research/tet-vs-hex.md`; runnable demo:
-`tests/fem/test_tetmesh.py::TestTwoTesseractChain` (with `-s`).
+---
 
-Provenance: the geometry foundation (SDF kernel, constraints, viewer shell)
-predates the hackathon; every contribution above — the meshing pipeline,
-all Tesseracts, the CalculiX adjoint correction, the mesher VJP, and the
-end-to-end optimization — was written during the hackathon window
-(Aug 3–31, 2026), verifiable commit-by-commit on the frozen branch. Whole
-repo under Apache 2.0.
+## Research notes
+
+- [`research/design-language.md`](research/design-language.md) — the settled
+  design specification: the paper ground, the ink and rule ladders, why the
+  accent is only ever a fill, and the zoning rule that made panels dock
+- [`research/performance.md`](research/performance.md) — the measured profile of
+  every worker mode, with each speed-up avenue ranked
+- [`research/differentiable-meshing-pipeline.md`](research/differentiable-meshing-pipeline.md)
+  — architecture of `cadjoint/meshing`
+- [`research/native-mesher.md`](research/native-mesher.md) — the Rust
+  dual-contouring core, its JAX boundary and its VJP
+- [`research/fem-integration.md`](research/fem-integration.md) — the
+  `SolverBackend` ABI, adjoint mechanics, the ccx 2.23 sensitivity correction
+- [`research/tet-vs-hex.md`](research/tet-vs-hex.md) — the mesher-Tesseract
+  validation matrix
+- [`research/end-to-end-optimization.md`](research/end-to-end-optimization.md) —
+  the measured run record of the bracket showcase
+- [`research/path-tracing.md`](research/path-tracing.md) — the browser
+  path-tracing mode
+- [`research/constraints.md`](research/constraints.md) and
+  [`research/simulator-ecosystem.md`](research/simulator-ecosystem.md) — what is
+  next in each
 
 ## Tests
 
@@ -475,9 +647,22 @@ uv run quartodoc build   # generate API reference from docstrings
 quarto preview           # serve locally at localhost:4321
 ```
 
+## Tesseract Hackathon 2026
+
+cadjoint was an entry in the
+[Tesseract Hackathon 2026](https://si-tesseract.discourse.group) (Track 01 —
+inverse design & shape optimization). That state is frozen on the branch
+[`tesseract-hackathon-2026`](https://github.com/andrinr/cadjoint/tree/tesseract-hackathon-2026),
+which is kept permanently; development continues on `main`. The geometry
+foundation predates it; the meshing pipeline, every Tesseract, the CalculiX
+adjoint correction, the mesher VJP and the end-to-end optimization were written
+during the hackathon window (Aug 3–31, 2026), verifiable commit-by-commit on that
+branch.
+
 ---
 
-Inspired by [Fidget](https://www.mattkeeter.com/projects/fidget/) and [Inigo Quilez's distance functions](https://iquilezles.org/articles/distfunctions/).
+Inspired by [Fidget](https://www.mattkeeter.com/projects/fidget/) and
+[Inigo Quilez's distance functions](https://iquilezles.org/articles/distfunctions/).
 
 ## License
 
