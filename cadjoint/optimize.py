@@ -99,7 +99,13 @@ __all__ = ["Optimization", "OptimizationRun", "capture_optimizations"]
 METHODS = ("adam", "sgd")
 METRICS = ("mean", "max", "compliance")
 #: Study-form design->points derivative paths (see ``Optimization.gradient_path``).
+#: These spellings are the documented, user-facing ones and do not change.
 GRADIENT_PATHS = ("direct", "tesseract", "tesseract-dc")
+#: Accepted aliases -> canonical gradient path.  Both chain paths resolve
+#: every stage through :mod:`cadjoint.plugins`, so they can also be named
+#: for what they do rather than for the Tesseract that implements them
+#: today; the canonical names above stay the ones the docs use.
+GRADIENT_PATH_ALIASES = {"plugins": "tesseract", "plugins-dc": "tesseract-dc"}
 TRAJECTORY_LIMIT = 100
 
 _CAPTURED_OPTIMIZATIONS: ContextVar[list[Optimization] | None] = ContextVar(
@@ -387,8 +393,12 @@ class Optimization:
             TetGen is wrapped (tetfill tesseract, exact pass-through VJP
             on the vertices ``-Y`` preserves), so it meshes the same
             geometry the direct path does — tet ``SimMesh`` only.  Both
-            tesseract paths require the ``tesseract`` extra.  The final
-            reported result is always evaluated on the direct path.
+            chain paths resolve each stage through
+            :mod:`cadjoint.plugins`, so where the mesher and the solver
+            actually run is configuration (``plugins.toml``), and both
+            spellings accept the aliases ``"plugins"`` / ``"plugins-dc"``.
+            Both require the ``tesseract`` extra.  The final reported
+            result is always evaluated on the direct path.
         steps: Default number of optimizer steps (keyword-only).
         learning_rate: Optimizer step size (keyword-only).
         method: ``"adam"`` (default) or ``"sgd"`` (keyword-only).  Runs
@@ -495,9 +505,12 @@ class Optimization:
             or self.remesh_every < 0
         ):
             raise ValueError("remesh_every must be a non-negative integer (0: never remesh).")
-        if self.gradient_path not in GRADIENT_PATHS:
+        if self.gradient_path not in GRADIENT_PATHS and (
+            self.gradient_path not in GRADIENT_PATH_ALIASES
+        ):
             raise ValueError(
                 f"gradient_path must be one of: {', '.join(GRADIENT_PATHS)} "
+                f"(aliases: {', '.join(GRADIENT_PATH_ALIASES)}) "
                 f"(got {self.gradient_path!r})."
             )
 
@@ -821,7 +834,11 @@ class Optimization:
             return lambda p: jnp.asarray(inner(p))
 
         # GRADIENT-PATH SEAM.  This is the one place the design->points
-        # derivative path is chosen, per gradient_path:
+        # derivative path is chosen, per gradient_path.  Neither chain
+        # names a component here: they ask cadjoint.plugins for whatever
+        # fills the "mesher"/"tetfill"/"*_solver" kinds, which is what lets
+        # a solve move to a container or a cluster without touching this
+        # file.  Per gradient_path:
         # - "direct" (default): the frozen-topology path — node positions
         #   re-projected onto the true SDF (recompute_points /
         #   recompute_tet_points), validated on crease-heavy geometry.  Tet
@@ -841,8 +858,12 @@ class Optimization:
         #   -Y preserves) -> solver tesseract adjoint.  Same geometry as the
         #   direct path, black box confined to the one component that is
         #   genuinely one.
-        use_dc_chain = self.gradient_path == "tesseract-dc"
-        use_tesseract = self.gradient_path in ("tesseract", "tesseract-dc")
+        # Both chains resolve their stages through the plugin registry, so
+        # "tesseract"/"tesseract-dc" and their "plugins"/"plugins-dc"
+        # aliases select the same code; the alias only renames the switch.
+        path = GRADIENT_PATH_ALIASES.get(self.gradient_path, self.gradient_path)
+        use_dc_chain = path == "tesseract-dc"
+        use_tesseract = path in ("tesseract", "tesseract-dc")
         if use_dc_chain:
             from cadjoint.fem.tesseracts.chain import freeze_study_chain_dc
         elif use_tesseract:

@@ -19,8 +19,8 @@ website:
             href: docs/simulation.qmd
           - text: Optimization
             href: docs/optimization.qmd
-          - text: Tesseracts
-            href: docs/tesseracts.qmd
+          - text: Plugins
+            href: docs/plugins.qmd
           - text: "---"
           - text: Materials
             href: docs/materials.qmd

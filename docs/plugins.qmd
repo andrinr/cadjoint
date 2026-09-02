@@ -1,0 +1,397 @@
+---
+title: Plugins
+description: Every non-JAX component behind one interface, running wherever you point it.
+---
+
+Real engineering pipelines die at tool boundaries — a Fortran solver here, a
+Rust kernel there, a mesher nobody can differentiate — and the gradients die
+with them. cadjoint calls those components **plugins**: a mesher, a tet
+filler, a solver, each reached through two operations, `apply` and `vjp`,
+and each declaring what it takes, what it returns, and which of its inputs
+carry a derivative.
+
+A plugin is *implemented* as a
+[Tesseract](https://github.com/pasteurlabs/tesseract-core) — typed `apply`
+and `vector_jacobian_product` endpoints, lifted into a JAX primitive by
+[tesseract-jax](https://github.com/pasteurlabs/tesseract-jax) — but that is
+an implementation choice, not the interface. What cadjoint's own code sees
+is a **kind**: it asks for "whatever fills the `thermal_solver` slot" and
+never learns whether the answer is running in this process, in a container,
+or on a Kubernetes Service.
+
+```bash
+uv sync --extra tesseract
+```
+
+## What a plugin is
+
+| | |
+|---|---|
+| **name** | the registry key, e.g. `thermal_jaxfem` |
+| **kind** | the slot it fills: `mesher`, `tetfill`, `thermal_solver`, `elastic_solver`, `qef` |
+| **version** | what the running instance advertises, else what its `tesseract_config.yaml` declares |
+| **inputs / outputs** | the schema `tesseract-runtime` publishes — never restated in Python |
+| **capabilities** | derived from that schema: differentiable inputs and outputs, served endpoints, and named flags (`per_element_properties`, `body_force`, `frozen_topology`, `vjp`, …) |
+| **apply / vjp** | the component's own endpoints |
+| **as_jax()** | `tesseract_jax.apply_tesseract` bound to this plugin — the JAX primitive with its `custom_vjp` |
+| **probe()** | `/health`, the reported version, and a hash of the served schema |
+
+```python
+from cadjoint.plugins import get_plugin, plugin_for_kind
+
+solver = plugin_for_kind("thermal_solver")
+print(solver.name, solver.version)             # thermal_jaxfem 0.1.0
+print(sorted(solver.capabilities.differentiable_inputs))
+# ['cell_conductivity', 'conductivity', 'points', 'source']
+print(solver.capabilities.supports("per_element_properties"))   # True
+print(solver.probe())
+```
+
+`cadjoint.plugins` is deliberately thin. It does not encode arrays, speak
+HTTP, declare schemas, or implement an autodiff primitive — tesseract-core
+and tesseract-jax do all of that. What is cadjoint's is the *kind*
+vocabulary, the registry, and the configuration that maps a name to one
+`Tesseract.from_*` call. Anything not defined on a plugin is forwarded to
+the `Tesseract` itself, so `plugin.jacobian(...)`,
+`plugin.jacobian_vector_product(...)`, `plugin.abstract_eval(...)` and
+`plugin.server_logs()` work without a wrapper.
+
+## The plugins that ship
+
+| Name | Kind | Wraps | Boundary crossed |
+|---|---|---|---|
+| `mesher` | `mesher` | the whole black-box mesher: lattice field → surface → volume | the boundary everyone gives up on |
+| `tetfill` | `tetfill` | TetGen alone, surface in / volume out | a discrete algorithm with no derivative |
+| `thermal_jaxfem` | `thermal_solver` | jax-fem Poisson solve | AD strategy — JAX cannot trace PETSc assembly |
+| `elastic_jaxfem` | `elastic_solver` | jax-fem linear elasticity + von Mises | same |
+| `elastic_calculix` | `elastic_solver` | CalculiX 2.23 Fortran, over a subprocess | language, licence (GPL-2 isolated), AD strategy |
+| `qef_native` | `qef` | Rust dual-contouring kernels (batched QEF solves) | language and memory model — a cdylib over ctypes |
+
+Each solves its VJP differently. The jax-fem pair use an implicit adjoint —
+one transposed linear solve per cotangent — and produce gradients
+bit-identical to the in-process path. CalculiX uses its own native
+`*SENSITIVITY` discrete adjoint, plus a correction for a Jacobian-variation
+term missing from ccx 2.23, validated to 2e-4 of finite differences. The
+Rust kernel carries a hand-derived linear-solve VJP that matches JAX
+autodiff to ~4e-14. `tetfill`'s is the exact transpose of a gather (TetGen's
+`-Y` preserves input vertices verbatim); `mesher`'s is the
+surface-interpolation contract described in [the two mesher
+boundaries](#the-two-mesher-boundaries).
+
+Two plugins share the `elastic_solver` kind, so a default decides which one
+answers; `[defaults]` in `plugins.toml` changes it.
+
+## Where a plugin runs
+
+A `PluginSpec` is the *only* thing that knows about location, and each
+transport is exactly one tesseract-core constructor:
+
+| transport | the call it makes | when |
+|---|---|---|
+| `local` | `Tesseract.from_tesseract_api(api_path)` | default; same process, no Docker, no serialization |
+| `container` | `Tesseract.from_image(image)` then `serve()` | a built image, torn down when the plugin closes |
+| `remote` | `Tesseract.from_url(url)` | anything already serving: `tesseract serve`, `tesseract-runtime serve`, a Kubernetes Service |
+
+`options` in a spec is forwarded verbatim to that constructor — `timeout`,
+`environment`, `volumes`, `num_workers`, `gpus`, whatever the installed
+tesseract-core accepts. cadjoint adds no arguments of its own.
+
+### Where the runtime writes
+
+Every Tesseract endpoint call opens a `run_<uuid>/logs/` scratch directory
+under the runtime's output path. Unconfigured, that path is the **working
+directory** of whichever process runs the endpoint — which is why a
+`tesseract-runtime serve` started from a checkout fills it with `run_*`
+directories, and why an in-process client leaves an unmanaged `mkdtemp`
+behind. `PluginSpec` owns this:
+
+* the `local` transport passes `output_path=cadjoint.plugins.runtime_scratch()`
+  to `Tesseract.from_tesseract_api`;
+* `runtime_scratch()` is one directory per process under
+  `~/.cache/cadjoint/tesseract-runs` (override with
+  `$CADJOINT_TESSERACT_RUNS`), removed at exit — so a thousand-call
+  optimization does not outlive itself on disk;
+* a **server you start yourself** needs the same thing from the other side:
+  set `TESSERACT_OUTPUT_PATH` (or run it with a working directory outside
+  the repository).
+
+```bash
+TESSERACT_API_PATH=cadjoint/fem/tesseracts/mesher/tesseract_api.py \
+TESSERACT_OUTPUT_PATH="$HOME/.cache/cadjoint/tesseract-runs" \
+TESSERACT_NAME=cadjoint_mesher TESSERACT_VERSION=0.1.0 \
+tesseract-runtime serve --port 8000
+```
+
+There is no switch that turns the run logs off — the runtime's file backend
+writes them unconditionally — so redirecting them is the whole of the fix.
+`tests/plugins/test_scratch.py` runs a plugin from an empty temporary
+working directory and asserts nothing is left in it.
+
+## Configuring: `plugins.toml`
+
+Found at `$CADJOINT_PLUGINS` (a file, or a directory holding `plugins.toml`),
+else `~/.config/cadjoint/plugins.toml`. A `[plugins.<name>]` table for a name
+that already exists **replaces** its spec; a new name adds a plugin.
+
+```toml
+# Which plugin fills each slot when a caller asks by kind.
+[defaults]
+elastic_solver = "elastic_calculix"
+
+# The thermal solver moves to the cluster. Nothing in cadjoint changes.
+[plugins.thermal_jaxfem]
+kind = "thermal_solver"
+transport = "remote"
+url = "http://thermal.cadjoint.svc.cluster.local:8000"
+schema_hash = "sha256:251b6bd67db3f..."   # the staleness fence, see below
+options = { timeout = 600.0 }
+
+# CalculiX stays on this machine, but in its own container.
+[plugins.elastic_calculix]
+kind = "elastic_solver"
+transport = "container"
+image = "cadjoint_elastic_calculix:latest"
+options = { environment = { CADJOINT_CCX = "/python-env/bin/ccx" } }
+
+# A third-party solver, added rather than replacing anything.
+[plugins.acoustics]
+kind = "acoustic_solver"
+transport = "remote"
+url = "http://${ACOUSTICS_HOST}:8000"
+```
+
+`${VAR}` expands from the environment when the spec is built, and an unset
+variable is an error rather than an empty value. A distribution can also
+register plugins without a config file, through the `cadjoint.plugins` entry
+point group:
+
+```toml
+# in the third party's pyproject.toml
+[project.entry-points."cadjoint.plugins"]
+acoustics = "my_package.plugins:SPEC"       # a PluginSpec, a dict, or a callable
+```
+
+**Authentication.** tesseract-core 1.11's `Tesseract.from_url` takes a URL,
+an output path and a timeout — there is no header or credential argument,
+and cadjoint deliberately does not reach into its HTTP session to add one.
+Put authentication in front of the Service (an ingress, a sidecar, a mesh)
+or reach it through `kubectl port-forward`.
+
+## Writing one
+
+A plugin is a Tesseract package plus a spec. The package is a directory with
+`tesseract_api.py`, `tesseract_config.yaml` and a requirements or environment
+file — see any of `cadjoint/fem/tesseracts/*` for a worked example, and
+`tests/fem/test_tesseract_packaging.py` for what the SDK validates.
+
+The `tesseract_api.py` declares its schema; that declaration is what cadjoint
+reads back as `inputs`, `outputs` and `capabilities`:
+
+```python
+class InputSchema(BaseModel):
+    points: Differentiable[Array[(None, 3), Float64]]
+    cells: Array[(None, None), Int32]
+    conductivity: Differentiable[Array[(), Float64]]
+
+class OutputSchema(BaseModel):
+    temperature: Differentiable[Array[(None,), Float64]]
+
+def apply(inputs: InputSchema) -> OutputSchema: ...
+def abstract_eval(abstract_inputs): ...
+def vector_jacobian_product(inputs, vjp_inputs, vjp_outputs, cotangent_vector): ...
+```
+
+Then register it — permanently through `plugins.toml` or an entry point, or
+in one process:
+
+```python
+from cadjoint.plugins import PluginSpec, register_plugin
+
+register_plugin(
+    PluginSpec(
+        name="my_thermal",
+        kind="thermal_solver",
+        transport="local",
+        api_path="my_package/thermal/tesseract_api.py",
+    ),
+    default=True,
+)
+```
+
+To fill a **cadjoint** kind, the package must declare every input the frozen
+chain sends for that kind and the output it reads. The chain checks this up
+front and names the missing field, rather than letting a validation error
+surface from inside a traced call. `elastic_calculix` is the live example: it
+declares no `body_force`, so it cannot serve `elastic_solver` for the frozen
+chains (it is still a full backend for direct solves).
+
+## Building and serving
+
+`tesseract build` turns a package directory into a Docker image with no extra
+glue:
+
+```bash
+tesseract build native                                   # ~1 min
+tesseract build cadjoint/fem/tesseracts/mesher           # ~1 min
+tesseract build cadjoint/fem/tesseracts/elastic_calculix # ~1.5 min
+tesseract build cadjoint/fem/tesseracts/thermal_jaxfem   # ~3 min
+tesseract build cadjoint/fem/tesseracts/elastic_jaxfem   # ~3 min
+```
+
+| Image | Requirements provider | The non-obvious payload | Size |
+|---|---|---|---|
+| `cadjoint_mesher` | pip | cadjoint + TetGen + SciPy on a uv-installed CPython 3.12 | 1.36 GB |
+| `cadjoint_qef_native` | pip | the Rust cdylib, `cargo build --release --locked` inside the image, pinned via `CADJOINT_NATIVE_MESHER` | 1.39 GB |
+| `cadjoint_elastic_calculix` | conda | the ccx 2.23 Fortran binary from conda-forge at `/python-env/bin/ccx`, pinned via `CADJOINT_CCX` | 2.57 GB |
+| `cadjoint_thermal_jaxfem` | conda | the full jax-fem stack: PETSc/petsc4py 3.25.5, gmsh, fenics-basix, meshio | 5.51 GB |
+| `cadjoint_elastic_jaxfem` | conda | same | 5.51 GB |
+
+Two packages use pip, three use the SDK's conda provider — because petsc4py
+publishes no PyPI wheels at all and gmsh publishes manylinux wheels for
+x86-64 only, so the jax-fem stack is simply not pip-installable on Linux, and
+ccx is a Fortran binary no Python requirement can supply. In every case
+cadjoint itself is a local path dependency, which `tesseract build` stages
+into the build context automatically.
+
+For a long-lived server, `tesseract serve <image>` is the SDK's own command
+and is what a Kubernetes Deployment should run; point a `remote` spec at the
+Service in front of it. The SDK also serves several Tesseracts together
+(`tesseract serve a b c`), which is the natural shape when the mesher and the
+solver live on the same node. Locally, `tesseract-runtime serve
+--port <n>` with `TESSERACT_API_PATH` set will serve a package directly —
+that is what `tests/plugins/` uses, and setting `TESSERACT_NAME` /
+`TESSERACT_VERSION` is what makes the served instance advertise a version for
+`probe()` to check.
+
+## Staleness: `probe()`
+
+A long-lived remote is the case where "which component am I actually talking
+to?" stops being rhetorical. `Plugin.probe()` calls the runtime's `/health`,
+reads the version it advertises, and hashes the schema it publishes:
+
+```python
+from cadjoint.plugins import plugin_for_kind
+
+probe = plugin_for_kind("thermal_solver").probe()
+# PluginProbe(name='thermal_jaxfem', kind='thermal_solver', transport='remote',
+#             status='ok', version='0.1.0', schema_hash='sha256:251b6b…', …)
+```
+
+Put that `schema_hash` in the spec, and a redeployed cluster that changed the
+component's interface is refused **before** a run instead of failing inside
+a traced call. The hash covers the schema sections the runtime itself
+returns — field names, shapes, dtypes, `Differentiable` flags, requiredness —
+and is measured identical across the `local` and `remote` forms of the same
+package. It deliberately excludes the endpoint list: an in-process runtime
+serves a `test` endpoint that a served one does not.
+
+## The two mesher boundaries
+
+`mesher` and `tetfill` both make meshing differentiable, but they cut at
+different places, and the choice is a real trade-off.
+
+**`tetfill` wraps only TetGen.** The surface arrives already extracted, as
+`points` plus `triangles`, so it never sees the field at all. TetGen runs in
+PLC mode with `-Y`, which preserves input vertices verbatim as the leading
+output nodes; the VJP is then the exact transpose of a gather, read off the
+`parents` table. Because dual contouring stays upstream in JAX against the
+*true* SDF, the boundary keeps its creases sharp. It supports TET4 and TET10.
+
+**`mesher` wraps the whole pipeline.** It takes an implicit field sampled on
+a lattice and returns a volume mesh, doing DC extraction, Newton projection,
+and TetGen or voxelization inside. Its VJP never looks in: a boundary vertex
+`v` lies on the zero set of the trilinearly interpolated lattice samples, so
+the implicit function theorem gives
+
+$$\frac{\partial v}{\partial f_i} = -\,w_i(v)\,\frac{\nabla f}{|\nabla f|^2}$$
+
+— the interpolation weights at the frozen vertex locations *are* the VJP
+rows. That makes any mesher differentiable from its inputs and outputs alone,
+even one that does not preserve its input vertices. The price is that the
+boundary is pinned to the *interpolant's* zero set rather than the true
+field's, which smears sharp features; and only the Hadamard-meaningful normal
+component of boundary motion is carried. It supports TET4, HEX8, and TET10.
+
+So: reach for `tetfill` wherever TetGen's vertex-preserving mode applies, and
+`mesher` when the mesher is a genuine black box or you need the HEX8 path.
+The validation matrix for both is in [tet vs hex](../research/tet-vs-hex.md).
+
+## Where plugins are used
+
+`gradient_path` on an `Optimization` selects which frozen chain runs, and
+both chains resolve every stage through the registry:
+
+| `gradient_path` | plugin kinds it resolves |
+|---|---|
+| `"direct"` (default) | none — in-process JAX and jax-fem throughout |
+| `"tesseract"` (alias `"plugins"`) | `mesher` → `thermal_solver`/`elastic_solver` |
+| `"tesseract-dc"` (alias `"plugins-dc"`) | `tetfill` → `thermal_solver`/`elastic_solver` |
+
+The `"tesseract"` spellings are the documented ones and are not going away;
+the aliases exist because what the paths actually select is a plugin per
+stage. `SolverBackend` — `backend="jaxfem" | "tesseract" | "calculix"` —
+resolves the same way: `"tesseract"` takes the `thermal_solver` /
+`elastic_solver` kinds, and `"calculix"` names the `elastic_calculix` plugin.
+
+## Transport limits, honestly
+
+**Remote costs about ten milliseconds a step, on a small payload.**
+Measured 2026-09-02 on macOS/arm64, the `mesher` package at 1285 nodes /
+912 cells (a 74 KB field in, a 31 KB point array out), twelve
+`jax.value_and_grad` steps, `tesseract-runtime serve` on loopback:
+
+| | in-process | served over HTTP |
+|---|---|---|
+| 12 steps | 6.57 s / 7.05 s | 6.69 s / 7.14 s |
+| per step | 548 ms / 587 ms | 558 ms / 595 ms |
+| objective | 342.8520334386417 → 342.8408938752647 | identical, all 13 digits |
+
+So the wire adds **1.3–1.8%** here and changes no number at all. That is the
+best case: loopback, no scheduler, no TLS, no queueing, and a payload small
+enough that JSON+base64 encoding is not the cost. A real cluster adds network
+latency on *every* apply and *every* VJP — twice per optimizer step per
+stage — and a 12-step run with a mesher and a solver both remote pays that
+48 times. Bigger meshes shift the balance the other way: the encoded payload
+grows linearly while the solve grows faster, so the relative overhead falls.
+
+**Zero-size arrays cannot cross the HTTP boundary.** tesseract-core 1.11
+validates polymorphic array dimensions as `PositiveInt`, so an empty `(0, …)`
+input is rejected. Two consequences, both real today:
+
+* The mesher's **discovery mode** — empty `point_ids` and `cell_template`,
+  which is how the frozen topology is first obtained — must run in-process.
+  Pass the topology it returns to the served instance.
+* The frozen chains send `cell_conductivity` / `cell_youngs` / `body_force`
+  as **empty arrays** on the single-material path, so a `thermal_solver` or
+  `elastic_solver` cannot yet be moved to `remote` for a chain run. The
+  mesher stage can, and the backends' direct solves can. Sending the scalar
+  path as a length-1 sentinel instead would lift this; it would also change
+  the wire payload every existing caller sends, so it has not been done.
+
+**TetGen topology is platform-dependent.** The same field meshes to 182
+points on macOS/arm64 and 185 in the Linux container, so a frozen-topology
+promise made on the host does not transfer to a container or a cluster for
+TET4/TET10. HEX8 (voxelize + Newton-snap) is deterministic across both.
+
+## Why the boundary is load-bearing
+
+CalculiX cannot be traced, linked, or relicensed — it is GPL-2 Fortran that
+speaks input decks. The plugin boundary is what lets its native adjoint
+compose with JAX autodiff while staying a subprocess.
+
+The mesher VJP is a contract, not a computation. The surface-interpolation
+map is defined at the boundary from the inputs and outputs alone, which is
+what makes swapping TetGen, fTetWild, or gmsh behind it a zero-cost
+experiment.
+
+And solvers are genuinely interchangeable. The
+[simulator ecosystem survey](../research/simulator-ecosystem.md) ranks 31
+further candidates (jwave, JAX-Fluids, MJX, …) that drop into the same slot —
+now by writing a spec, not by writing an import.
+
+## Further reading
+
+- [FEM integration](../research/fem-integration.md) — the solver ABI, adjoint mechanics, the ccx sensitivity correction, and container conformance.
+- [Tet vs hex meshing](../research/tet-vs-hex.md) — the mesher validation matrix and the surface-interpolation VJP contract.
+- [Native (Rust) dual-contouring core](../research/native-mesher.md) — the Rust core and its VJP.
+- [Optimization](optimization.qmd) — how `gradient_path` selects which chain runs.

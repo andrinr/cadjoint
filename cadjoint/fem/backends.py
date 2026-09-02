@@ -22,15 +22,20 @@ dependency:
   plain arrays (:class:`ThermalBCs` / :class:`ElasticBCs` hold node index
   sets and values, resolved from user predicates by
   :mod:`cadjoint.fem.simulate`).  Anything expressible as arrays can also
-  cross a Tesseract schema, so third-party — even non-JAX — solvers can
-  plug in by shipping a tesseract with ``apply`` + ``vector_jacobian_product``
-  endpoints.
+  cross a plugin boundary, so third-party — even non-JAX — solvers can plug
+  in by shipping a Tesseract package with ``apply`` +
+  ``vector_jacobian_product`` endpoints and a spec saying where it runs
+  (see ``docs/plugins.qmd``).
 - **Default**: :class:`~cadjoint.fem.jaxfem.JaxFemBackend` runs jax-fem
   in-process (native JAX composition, no serialization boundary) — the
   performance baseline.
 - **Interop**: :class:`TesseractBackend` routes through
-  ``tesseract_jax.apply_tesseract`` and the packaged reference tesseract in
-  :mod:`cadjoint.fem.tesseracts`, proving the plugin contract.
+  :mod:`cadjoint.plugins` — it asks for whatever fills the
+  ``thermal_solver`` / ``elastic_solver`` kind and calls its
+  :meth:`~cadjoint.plugins.Plugin.as_jax` form, so the same backend serves
+  an in-process package, a container, or a cluster URL without a code
+  change.  The packaged reference components in
+  :mod:`cadjoint.fem.tesseracts` are what fills those kinds by default.
 
 Differentiability contract: ``thermal``/``elastic`` accept possibly-traced
 ``points`` and return JAX arrays whose VJP w.r.t. ``points`` (and scalar
@@ -239,15 +244,28 @@ def _membership_location(node_set: np.ndarray) -> Callable[..., Any]:
 
 
 class TesseractBackend:
-    """Backend routing through Tesseracts (interop ABI reference).
+    """Backend routing through plugins (interop ABI reference).
 
-    Executes the packaged jax-fem thermal and elastic tesseracts locally
-    (no Docker) via ``Tesseract.from_tesseract_api`` and composes them into
-    JAX autodiff with ``tesseract_jax.apply_tesseract``, which dispatches to
-    the tesseract's ``vector_jacobian_product`` endpoint under ``jax.grad``.
-    Third-party solvers plug in the same way: point ``api_path`` /
-    ``elastic_api_path`` at their ``tesseract_api.py`` (or adapt this class
-    to a served/containerized tesseract via ``Tesseract.from_image``).
+    Resolves the ``thermal_solver`` and ``elastic_solver`` plugin kinds
+    through :mod:`cadjoint.plugins` and composes them into JAX autodiff
+    with :meth:`~cadjoint.plugins.Plugin.as_jax`, which dispatches to the
+    component's ``vector_jacobian_product`` under ``jax.grad``.  Where that
+    component runs — in-process, in a container, behind a cluster URL — is
+    the registry's business, not this class's, so pointing a study's
+    elasticity at a Kubernetes Service is a ``plugins.toml`` edit.
+
+    The class name and the ``"tesseract"`` backend key are kept because
+    Tesseract is what implements every plugin shipped today, and because
+    ``backend="tesseract"`` is a documented, user-facing string.
+
+    Args:
+        api_path: Legacy escape hatch — a ``tesseract_api.py`` to run
+            in-process as the thermal solver, bypassing the registry.
+            Equivalent to registering a ``local`` spec for it.
+        elastic_api_path: The same for the elastic solver.
+        thermal: A plugin name (or a :class:`~cadjoint.plugins.Plugin`) to
+            use as the thermal solver instead of whatever fills the kind.
+        elastic: The same for the elastic solver.
     """
 
     name = "tesseract"
@@ -257,27 +275,60 @@ class TesseractBackend:
         api_path: str | Path | None = None,
         *,
         elastic_api_path: str | Path | None = None,
+        thermal: Any = None,
+        elastic: Any = None,
     ):
         try:
             from tesseract_core import Tesseract  # noqa: F401
         except ImportError as error:
             raise ImportError(_TESSERACT_EXTRA_MESSAGE) from error
-        _require_jax_fem()  # the packaged reference tesseracts run jax-fem in-process
-        tesseracts_dir = Path(__file__).parent / "tesseracts"
-        if api_path is None:
-            api_path = tesseracts_dir / "thermal_jaxfem" / "tesseract_api.py"
-        if elastic_api_path is None:
-            elastic_api_path = tesseracts_dir / "elastic_jaxfem" / "tesseract_api.py"
-        self._api_paths = {"thermal": Path(api_path), "elastic": Path(elastic_api_path)}
-        self._tesseracts: dict[str, Any] = {}
+        _require_jax_fem()  # the packaged reference plugins run jax-fem in-process
+        self._selection: dict[str, Any] = {"thermal": thermal, "elastic": elastic}
+        self._api_paths: dict[str, Path] = {}
+        if api_path is not None:
+            self._api_paths["thermal"] = Path(api_path)
+        if elastic_api_path is not None:
+            self._api_paths["elastic"] = Path(elastic_api_path)
+        self._plugins: dict[str, Any] = {}
 
-    def _tesseract_for(self, kind: str):
-        """Load the tesseract for ``kind`` lazily (kept warm per instance)."""
-        if kind not in self._tesseracts:
-            from tesseract_core import Tesseract
+    #: Solver stage -> the plugin kind that fills it.
+    _KINDS = {"thermal": "thermal_solver", "elastic": "elastic_solver"}
 
-            self._tesseracts[kind] = Tesseract.from_tesseract_api(str(self._api_paths[kind]))
-        return self._tesseracts[kind]
+    def _plugin_for(self, stage: str):
+        """Resolve the plugin for ``stage`` lazily (kept warm per instance).
+
+        Args:
+            stage: ``"thermal"`` or ``"elastic"``.
+
+        Returns:
+            The :class:`~cadjoint.plugins.Plugin` to call.
+        """
+        if stage not in self._plugins:
+            from cadjoint.plugins import PluginSpec, TesseractPlugin, get_plugin, plugin_for_kind
+
+            chosen = self._selection.get(stage)
+            path = self._api_paths.get(stage)
+            if chosen is not None and not isinstance(chosen, str):
+                plugin = chosen
+            elif isinstance(chosen, str):
+                plugin = get_plugin(chosen)
+            elif path is not None:
+                plugin = TesseractPlugin(
+                    PluginSpec(
+                        name=f"{stage}_api_path",
+                        kind=self._KINDS[stage],
+                        transport="local",
+                        api_path=path,
+                    )
+                )
+            else:
+                plugin = plugin_for_kind(self._KINDS[stage])
+            self._plugins[stage] = plugin
+        return self._plugins[stage]
+
+    def _tesseract_for(self, stage: str):
+        """The raw Tesseract client behind ``stage`` (legacy accessor)."""
+        return self._plugin_for(stage).client
 
     def thermal(self, points, cells, bcs, *, conductivity, source, base_points=None):
         """See :meth:`SolverBackend.thermal`.
@@ -291,7 +342,6 @@ class TesseractBackend:
         """
         del base_points
         import jax.numpy as jnp
-        from tesseract_jax import apply_tesseract
 
         if bcs.dirichlet_nodes:
             nodes = np.concatenate([np.asarray(n, dtype=np.int32) for n in bcs.dirichlet_nodes])
@@ -316,8 +366,7 @@ class TesseractBackend:
         cell_conductivity = _as_cell_array(conductivity, int(np.asarray(cells).shape[0]))
         scalar_conductivity = 0.0 if cell_conductivity.size else conductivity
         with _x64_scope():
-            outputs = apply_tesseract(
-                self._tesseract_for("thermal"),
+            outputs = self._plugin_for("thermal").as_jax()(
                 {
                     "points": jnp.asarray(points, dtype=jnp.float64),
                     "cells": np.asarray(cells, dtype=np.int32),
@@ -352,7 +401,6 @@ class TesseractBackend:
         """
         del base_points
         import jax.numpy as jnp
-        from tesseract_jax import apply_tesseract
 
         if bcs.fixed_nodes:
             fixed = np.unique(
@@ -381,8 +429,7 @@ class TesseractBackend:
         else:
             force = jnp.broadcast_to(jnp.asarray(body_force, dtype=jnp.float64), (num_cells, 3))
         with _x64_scope():
-            outputs = apply_tesseract(
-                self._tesseract_for("elastic"),
+            outputs = self._plugin_for("elastic").as_jax()(
                 {
                     "points": jnp.asarray(points, dtype=jnp.float64),
                     "cells": np.asarray(cells, dtype=np.int32),

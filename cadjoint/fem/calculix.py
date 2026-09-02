@@ -1130,12 +1130,15 @@ def _unpack_elastic_bcs(
 
 
 class CalculixBackend(TesseractBackend):
-    """Solver backend running CalculiX behind the packaged tesseract.
+    """Solver backend running CalculiX behind the ``elastic_calculix`` plugin.
 
-    Forward elastic solves route through
-    ``cadjoint/fem/tesseracts/elastic_calculix`` (subprocess ccx, local
-    ``Tesseract.from_tesseract_api``).  Differentiability is
-    objective-valued: the tesseract's ``strain_energy`` output carries an
+    Forward elastic solves route through the ``elastic_calculix`` plugin
+    (subprocess ccx), resolved by name from :mod:`cadjoint.plugins` rather
+    than by importing its ``tesseract_api``: pointing the same backend at a
+    containerized or cluster-hosted ccx is then a ``plugins.toml`` edit, and
+    the ``CADJOINT_CCX`` binary this constructor pins only matters for the
+    ``local`` transport that is its default.  Differentiability is
+    objective-valued: the plugin's ``strain_energy`` output carries an
     adjoint VJP w.r.t. ``points`` (ccx ``*SENSITIVITY`` + the volume-term
     correction); cotangents on the raw displacement field raise
     ``NotImplementedError`` because ccx has no general displacement
@@ -1144,6 +1147,10 @@ class CalculixBackend(TesseractBackend):
 
     name = "calculix"
 
+    #: The plugin this backend calls.  A name, not a path: the registry
+    #: decides where it runs.
+    plugin_name = "elastic_calculix"
+
     def __init__(self, ccx: str | os.PathLike | None = None):
         try:
             from tesseract_core import Tesseract  # noqa: F401
@@ -1151,10 +1158,10 @@ class CalculixBackend(TesseractBackend):
             raise ImportError(_TESSERACT_EXTRA_MESSAGE) from error
         require_ccx(ccx)  # fail fast with install instructions
         if ccx is not None:
-            os.environ["CADJOINT_CCX"] = str(ccx)  # the tesseract subprocess resolves via env
-        api = Path(__file__).parent / "tesseracts" / "elastic_calculix" / "tesseract_api.py"
-        self._api_paths = {"elastic": api}
-        self._tesseracts: dict[str, Any] = {}
+            os.environ["CADJOINT_CCX"] = str(ccx)  # the ccx subprocess resolves via env
+        self._selection = {"thermal": None, "elastic": self.plugin_name}
+        self._api_paths: dict[str, Path] = {}
+        self._plugins: dict[str, Any] = {}
 
     def thermal(self, points, cells, bcs, *, conductivity, source, base_points=None):
         """Unsupported: the CalculiX integration covers elastic solves only."""
@@ -1193,7 +1200,6 @@ class CalculixBackend(TesseractBackend):
                 saying so.
         """
         del base_points
-        from tesseract_jax import apply_tesseract
 
         if body_force is not None:
             raise NotImplementedError(
@@ -1202,9 +1208,8 @@ class CalculixBackend(TesseractBackend):
                 "body_force, or use the 'jaxfem' backend for self-weight studies."
             )
         with _x64_scope():
-            outputs = apply_tesseract(
-                self._tesseract_for("elastic"),
-                self._elastic_inputs(points, cells, bcs, youngs, poisson),
+            outputs = self._plugin_for("elastic").as_jax()(
+                self._elastic_inputs(points, cells, bcs, youngs, poisson)
             )
             return outputs["displacement"]
 
@@ -1219,17 +1224,15 @@ class CalculixBackend(TesseractBackend):
         :meth:`elastic` does.
         """
         del base_points
-        from tesseract_jax import apply_tesseract
 
         with _x64_scope():
-            outputs = apply_tesseract(
-                self._tesseract_for("elastic"),
-                self._elastic_inputs(points, cells, bcs, youngs, poisson),
+            outputs = self._plugin_for("elastic").as_jax()(
+                self._elastic_inputs(points, cells, bcs, youngs, poisson)
             )
             return outputs["strain_energy"]
 
     def _elastic_inputs(self, points, cells, bcs, youngs, poisson) -> dict[str, Any]:
-        """Pack BCs and materials into the flat tesseract schema.
+        """Pack BCs and materials into the plugin's flat array schema.
 
         A scalar modulus leaves ``cell_youngs``/``cell_poisson`` empty, so the
         wire payload of a single-material solve is exactly what it always was.

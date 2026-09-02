@@ -1,196 +1,27 @@
 ---
 title: Tesseracts
-description: Packaging every non-JAX stage so one jax.grad call crosses all of them.
+description: Moved — this chapter is now Plugins.
 ---
 
-Real engineering pipelines die at tool boundaries — a Fortran solver here, a
-Rust kernel there, a mesher nobody can differentiate — and the gradients die
-with them. cadjoint crosses those boundaries with
-[Tesseract](https://github.com/pasteurlabs/tesseract-core): each non-JAX
-component is packaged as a Tesseract exposing typed `apply` and
-`vector_jacobian_product` endpoints, and
-[tesseract-jax](https://github.com/pasteurlabs/tesseract-jax) lifts each one
-into a JAX primitive. The result is a single function from CAD parameters to
-engineering objective that `jax.grad` differentiates end to end, even though no
-two stages agree on how to compute a derivative.
+::: {.callout-note}
+## This chapter moved to [Plugins](plugins.qmd)
 
-Install the extra first:
+Tesseract is how cadjoint *implements* the components it calls — the mesher,
+the tet filler, the solvers — but it is not what the interface is. The
+chapter is now written around the interface, and everything that was here is
+there: the packages and what each one wraps, the two mesher boundaries and
+their VJP contracts, `tesseract build` and the image table, and how to serve
+one in a container or on a cluster.
 
-```bash
-uv sync --extra tesseract
-```
+Read **[Plugins](plugins.qmd)**.
+:::
 
-## The six packages
+Nothing about the Tesseract packages themselves changed. They still live in
+`cadjoint/fem/tesseracts/*` and `native/`, still ship `tesseract_api.py` +
+`tesseract_config.yaml` + a requirements file, and are still validated by
+`tests/fem/test_tesseract_packaging.py`. What changed is that cadjoint's own
+code now reaches them through `cadjoint.plugins` — by *kind* rather than by
+importing a module — so where each one runs is configuration.
 
-Every directory below is a complete Tesseract package — `tesseract_api.py`,
-`tesseract_config.yaml`, and a requirements or environment file.
-
-| Directory | Image | Wraps | Boundary crossed |
-|---|---|---|---|
-| `native/` | `cadjoint_qef_native` | Rust dual-contouring kernels (batched QEF solves, rayon-parallel) | Language and memory model — a cdylib over ctypes |
-| `cadjoint/fem/tesseracts/tetfill` | `cadjoint_tetfill` | TetGen alone, surface in / volume out | A discrete algorithm with no derivative |
-| `cadjoint/fem/tesseracts/mesher` | `cadjoint_mesher` | The whole black-box mesher: lattice field → surface → volume | The boundary everyone gives up on |
-| `cadjoint/fem/tesseracts/thermal_jaxfem` | `cadjoint_thermal_jaxfem` | jax-fem Poisson solve | AD strategy — JAX cannot trace PETSc assembly |
-| `cadjoint/fem/tesseracts/elastic_jaxfem` | `cadjoint_elastic_jaxfem` | jax-fem linear elasticity + von Mises | same |
-| `cadjoint/fem/tesseracts/elastic_calculix` | `cadjoint_elastic_calculix` | CalculiX 2.23 Fortran, over a subprocess | Language, licence (GPL-2 isolated), and AD strategy |
-
-Each solves its VJP differently. The jax-fem pair use an implicit adjoint — one
-transposed linear solve per cotangent — and produce gradients bit-identical to
-the in-process path. CalculiX uses its own native `*SENSITIVITY` discrete
-adjoint, plus a correction for a Jacobian-variation term missing from ccx 2.23,
-validated to 2e-4 of finite differences. The Rust kernel carries a hand-derived
-linear-solve VJP that matches JAX autodiff to ~4e-14.
-
-## Calling one
-
-The same client code runs a Tesseract in-process or in a container. In-process
-needs no Docker and costs roughly 0.14 s per apply/VJP roundtrip:
-
-```python
-import numpy as np
-from tesseract_core import Tesseract
-
-t = Tesseract.from_tesseract_api("native/tesseract_api.py")
-
-# One cell whose three crossings carry mutually orthogonal normals:
-# the QEF has a unique corner solution.
-points = np.array([[0.5, 0.0, 0.0], [0.0, 0.5, 0.0], [0.0, 0.0, 0.5]])
-normals = np.eye(3)
-edge_ids = np.full((1, 12), -1, dtype=np.int32)
-edge_ids[0, :3] = [0, 1, 2]
-
-inputs = {"points": points, "normals": normals,
-          "edge_ids": edge_ids, "regularization": 1e-3}
-
-vertices = np.asarray(t.apply(inputs)["vertices"])
-print(vertices)  # [[0.499 0.499 0.499]] — Tikhonov pulls just off the exact corner
-
-vjp = t.vector_jacobian_product(
-    inputs,
-    vjp_inputs=["points", "normals"],
-    vjp_outputs=["vertices"],
-    cotangent_vector={"vertices": np.ones_like(vertices)},
-)
-print(np.asarray(vjp["points"]).round(3))
-# [[0.998 0.001 0.001]
-#  [0.001 0.998 0.001]
-#  [0.001 0.001 0.998]]
-```
-
-`cadjoint/fem/tesseracts/chain.py` is the production loader: it caches
-`Tesseract.from_tesseract_api(...)` per process and is what
-`gradient_path="tesseract"` and `"tesseract-dc"` reach for.
-
-## The two mesher boundaries
-
-`mesher` and `tetfill` both make meshing differentiable, but they cut at
-different places, and the choice is a real trade-off.
-
-**`tetfill` wraps only TetGen.** The surface arrives already extracted, as
-`points` plus `triangles`, so it never sees the field at all. TetGen runs in PLC
-mode with `-Y`, which preserves input vertices verbatim as the leading output
-nodes; the VJP is then the exact transpose of a gather, read off the `parents`
-table. Because dual contouring stays upstream in JAX against the *true* SDF, the
-boundary keeps its creases sharp. It supports TET4 and TET10.
-
-**`mesher` wraps the whole pipeline.** It takes an implicit field sampled on a
-lattice and returns a volume mesh, doing DC extraction, Newton projection, and
-TetGen or voxelization inside. Its VJP never looks in: a boundary vertex `v`
-lies on the zero set of the trilinearly interpolated lattice samples, so the
-implicit function theorem gives
-
-$$\frac{\partial v}{\partial f_i} = -\,w_i(v)\,\frac{\nabla f}{|\nabla f|^2}$$
-
-— the interpolation weights at the frozen vertex locations *are* the VJP rows.
-That makes any mesher differentiable from its inputs and outputs alone, even one
-that does not preserve its input vertices. The price is that the boundary is
-pinned to the *interpolant's* zero set rather than the true field's, which
-smears sharp features; and only the Hadamard-meaningful normal component of
-boundary motion is carried. It supports TET4, HEX8, and TET10.
-
-So: reach for `tetfill` wherever TetGen's vertex-preserving mode applies, and
-`mesher` when the mesher is a genuine black box or you need the HEX8 path.
-The validation matrix for both is in
-[tet vs hex](../research/tet-vs-hex.md).
-
-## Why the boundary is load-bearing
-
-CalculiX cannot be traced, linked, or relicensed — it is GPL-2 Fortran that
-speaks input decks. The Tesseract boundary is what lets its native adjoint
-compose with JAX autodiff while staying a subprocess.
-
-The mesher VJP is a contract, not a computation. The surface-interpolation map
-is defined at the boundary from the inputs and outputs alone, which is what
-makes swapping TetGen, fTetWild, or gmsh behind it a zero-cost experiment.
-
-Solvers are plugins. `SolverBackend` routes `backend="jaxfem" | "tesseract" |
-"calculix"` through one ABI, and the
-[simulator ecosystem survey](../research/simulator-ecosystem.md) ranks 31
-further candidates (jwave, JAX-Fluids, MJX, …) that drop into the same slot.
-
-## Building and serving as containers
-
-`tesseract build` turns a package directory into a Docker image with no extra
-glue:
-
-```bash
-tesseract build native                                   # ~1 min
-tesseract build cadjoint/fem/tesseracts/mesher           # ~1 min
-tesseract build cadjoint/fem/tesseracts/elastic_calculix # ~1.5 min
-tesseract build cadjoint/fem/tesseracts/thermal_jaxfem   # ~3 min
-tesseract build cadjoint/fem/tesseracts/elastic_jaxfem   # ~3 min
-```
-
-Then call the image with the same client code:
-
-```python
-from tesseract_core import Tesseract
-
-with Tesseract.from_image("cadjoint_qef_native:latest") as t:
-    vertices = t.apply(inputs)["vertices"]
-```
-
-`tesseract serve <image>` plus `Tesseract.from_url(...)` works identically for a
-long-lived server.
-
-| Image | Requirements provider | The non-obvious payload | Size |
-|---|---|---|---|
-| `cadjoint_mesher` | pip | cadjoint + TetGen + SciPy on a uv-installed CPython 3.12 | 1.36 GB |
-| `cadjoint_qef_native` | pip | the Rust cdylib, `cargo build --release --locked` inside the image, pinned via `CADJOINT_NATIVE_MESHER` | 1.39 GB |
-| `cadjoint_elastic_calculix` | conda | the ccx 2.23 Fortran binary from conda-forge at `/python-env/bin/ccx`, pinned via `CADJOINT_CCX` | 2.57 GB |
-| `cadjoint_thermal_jaxfem` | conda | the full jax-fem stack: PETSc/petsc4py 3.25.5, gmsh, fenics-basix, meshio | 5.51 GB |
-| `cadjoint_elastic_jaxfem` | conda | same | 5.51 GB |
-
-Two packages use pip, three use the SDK's conda provider — because petsc4py
-publishes no PyPI wheels at all and gmsh publishes manylinux wheels for x86-64
-only, so the jax-fem stack is simply not pip-installable on Linux, and ccx is a
-Fortran binary no Python requirement can supply. In every case cadjoint itself
-is a local path dependency, which `tesseract build` stages into the build
-context automatically. `tetfill` ships as a package but is exercised in-process
-only; it has no container coverage in the test matrix.
-
-`tests/fem/test_tesseract_packaging.py` validates every package against the
-installed SDK schema without Docker, and round-trips the built images against
-the in-process path when Docker is present.
-
-## Two behaviours of served images
-
-Both are properties of tesseract-core 1.11 rather than of cadjoint.
-
-**Zero-size arrays cannot cross the HTTP boundary.** Polymorphic array
-dimensions validate as `PositiveInt`, so an empty `(0, …)` input is rejected.
-The mesher's discovery mode — empty `point_ids` and `cell_template`, which is
-how the frozen topology is first obtained — therefore has to run in-process.
-Pass the topology it returns to the served image.
-
-**TetGen topology is platform-dependent.** The same field meshes to 182 points
-on macOS/arm64 and 185 in the Linux container, so a frozen-topology promise made
-on the host does not transfer to the container for TET4/TET10. HEX8 (voxelize +
-Newton-snap) is deterministic across both.
-
-## Further reading
-
-- [FEM integration](../research/fem-integration.md) — the solver ABI, adjoint mechanics, the ccx sensitivity correction, and container conformance.
-- [Tet vs hex meshing](../research/tet-vs-hex.md) — the mesher-Tesseract validation matrix and the surface-interpolation VJP contract.
-- [Native (Rust) dual-contouring core](../research/native-mesher.md) — the Rust core and its VJP.
-- [Optimization](optimization.qmd) — how `gradient_path` selects which of these chains runs.
+`gradient_path="tesseract"` and `"tesseract-dc"` are unchanged and remain the
+documented spellings.
