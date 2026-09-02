@@ -15,7 +15,7 @@ design all rewrite literals in the program. There is no hidden scene graph to
 drift out of sync, and anything whose literals cannot be rewritten — geometry
 built in a loop, or from a variable — still renders, but is read-only.
 
-[![The playground in Model mode: the scene program on the left, the parametric heat sink rendered live on the right, and the declared cool-sink optimization in the side dock](../docs/assets/screens/model-desk.png)](../docs/assets/screens/model-desk.png)
+[![The playground in Model mode: the scene program on the left, the parametric heat sink rendered live on the right, and the declared cool-sink optimization in the side dock](assets/screens/model-desk.png)](assets/screens/model-desk.png)
 
 ## Start it
 
@@ -118,7 +118,7 @@ bounds, size, and the Hex / Tet4 / Tet10 method are editable inline; regeneratin
 reports node and element counts and shades the mesh by element quality with a
 histogram beside it.
 
-![The declared SimMesh discretized into tet10 elements, shaded by element quality with a quality histogram](../docs/assets/screens/simulate-meshes.png)
+![The declared SimMesh discretized into tet10 elements, shaded by element quality with a quality histogram](assets/screens/simulate-meshes.png)
 
 **Studies** holds the study declarations, their materials, and their boundary
 conditions — and this is where the viewport becomes a picker. Clicking the
@@ -128,7 +128,7 @@ the vertices inside it. The proposal is written into the program as a real
 selection expression, so a BC picked by hand is indistinguishable from one typed
 by hand, and it re-resolves against whatever the mesh becomes.
 
-![The solved temperature field, clipped by the slice plane so the flux entering at the die interface is visible](../docs/assets/screens/simulate-results.png)
+![The solved temperature field, clipped by the slice plane so the flux entering at the die interface is visible](assets/screens/simulate-results.png)
 
 **Optimize** runs the declared `Optimization` objects, streaming each step's
 objective and gradient norm as it arrives. When a run finishes it lands in a
@@ -137,7 +137,7 @@ that replays the geometry along the trajectory by substituting each step's
 parameter snapshot and ghost-compiling it. Only the adopted final source ever
 touches undo history.
 
-![The finished cool-sink optimization: convergence sparkline, trajectory scrubber, and each parameter's before and after value](../docs/assets/screens/optimize-replay.png)
+![The finished cool-sink optimization: convergence sparkline, trajectory scrubber, and each parameter's before and after value](assets/screens/optimize-replay.png)
 
 **Results** browses the solved surface — a field picker that swaps displayed
 scalars without re-solving, a deformed view for elastic results, per-vertex BC
@@ -239,7 +239,7 @@ on Windows and Apple-silicon macOS; Linux support remains
 
 <div class="cadjoint-webgpu-demo" data-cadjoint-webgpu-viewer>
   <canvas data-viewer-canvas aria-label="Interactive WebGPU rendering of the cadjoint orbital example"></canvas>
-  <img data-viewer-fallback src="../docs/assets/screens/model-desk.png" alt="The cadjoint playground with the scene program on the left and the heat sink rendered on the right">
+  <img data-viewer-fallback src="assets/screens/model-desk.png" alt="The cadjoint playground with the scene program on the left and the heat sink rendered on the right">
   <div class="cadjoint-webgpu-status" data-viewer-status aria-live="polite">Starting WebGPU…</div>
   <button class="cadjoint-webgpu-reset" data-viewer-reset type="button">Reset camera</button>
   <div class="cadjoint-webgpu-help">Drag to orbit · Scroll to zoom</div>

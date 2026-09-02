@@ -186,7 +186,7 @@ it degrades to plain gradient descent and reports `"gradient-descent"`.
 Study runs execute inside an x64 scope, promote parameters to float64, and
 restore the target's original parameter values on exit — including on failure.
 
-![The finished optimization in the playground: convergence sparkline, trajectory scrubber, and each parameter's before and after value](../docs/assets/screens/optimize-replay.png)
+![The finished optimization in the playground: convergence sparkline, trajectory scrubber, and each parameter's before and after value](assets/screens/optimize-replay.png)
 
 ## The full chain, measured
 
