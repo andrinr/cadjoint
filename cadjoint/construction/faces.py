@@ -10,12 +10,14 @@ allowed to define a plane.  Two things the construction tree knows instead:
    profile's own ``u``/``v`` as in-plane axes, and every polygon edge sweeps a
    planar side wall whose normal is ``edge_direction × plane.normal``.  A box
    knows its six faces; a revolve knows its axis.
-2. **Those planes are parametric.**  ``depth`` may be a ``Scalar``, so a face
-   declared on a cap is a *function* of the feature's parameters — a sketch
-   placed on it moves when the parent is re-dimensioned, and a gradient taken
-   through a child solid reaches the parent's ``depth``.  That is the thing a
-   B-rep cannot do: there the face is a stored surface, here it is an
-   expression.
+2. **Those planes are re-derived, not stored.**  ``depth`` may be a ``Scalar``,
+   so a face declared on a cap is computed from the feature's parameters every
+   time the program runs: a sketch placed on it moves when the parent is
+   re-dimensioned, which is what a B-rep's stored surface cannot do.  The link
+   is a *rebuild* link and not a differentiable one — the derived origin is
+   snapshotted into a fixed ``Parameter``, so ``jax.grad`` through a child
+   solid w.r.t. the parent's ``depth`` is zero.  See
+   ``research/complex-scene.md``.
 
 A :class:`Face` carries its plane (origin, normal **and** in-plane x axis — the
 sketch's "horizontal" is a choice, not an implementation accident), a
@@ -189,6 +191,135 @@ class Face:
         local = self.to_local(point)
         inside = polygon_sdf_2d(local, self.polygon()) <= limit
         return (jnp.abs(offset) <= limit) & inside
+
+    # ── derived geometry ─────────────────────────────────────────────────────
+
+    def center(self) -> Array:
+        """The centroid of the face's boundary loop, in world space.
+
+        The natural anchor for a feature placed "on the middle of this face" —
+        a boss, a bore, a bolt circle's axis — and, being an average of the
+        boundary, an expression in the parent's parameters like everything else
+        on the face.
+
+        Returns:
+            The centroid, shape ``(3,)``.
+        """
+        return jnp.mean(self.boundary, axis=0)
+
+    def point(self, at=(0.0, 0.0)) -> Array:
+        """A world point at face-local coordinates ``at``, measured from the origin.
+
+        Args:
+            at: ``(x, y)`` in the face's own frame — ``x`` along
+                :attr:`x_axis`, ``y`` along :attr:`y_axis`.
+
+        Returns:
+            The world point, shape ``(3,)``.
+        """
+        at = jnp.asarray(at)
+        return self.origin + at[..., 0] * self.x_axis + at[..., 1] * self.y_axis
+
+    def plane(self, x_axis=None, flip: bool = False, offset=0.0):
+        """This face as a sketch plane, optionally pushed along its normal.
+
+        Sugar for :meth:`~cadjoint.construction.sketch.SketchPlane.on` — and,
+        with an ``offset``, for
+        :meth:`~cadjoint.construction.sketch.SketchPlane.offset` — so a face
+        reference reads as one phrase where it is used.
+
+        Args:
+            x_axis: Override the sketch's in-plane horizontal.
+            flip: Face the plane the other way, keeping the same origin.
+            offset: Distance to push along the (possibly flipped) normal. May
+                be a ``Scalar`` parameter.
+
+        Returns:
+            The :class:`~cadjoint.construction.sketch.SketchPlane`.
+        """
+        from cadjoint.construction.sketch import SketchPlane
+
+        plane = SketchPlane.on(self, x_axis=x_axis, flip=flip)
+        if _statically_zero(offset):
+            return plane
+        return SketchPlane.offset(plane, offset)
+
+    def hole(self, radius, depth, at=(0.0, 0.0), *, through: float = 0.0, material=None):
+        """A cylindrical tool sunk into this face — **subtract** it to cut a hole.
+
+        Returns the tool rather than a modified solid, because in an implicit
+        modeller the cut *is* the boolean: keeping them separate is what lets
+        one tool be patterned, mirrored, or subtracted from several bodies at
+        once, and what keeps the hole visible in the feature tree.
+
+        The tool is a true :class:`~cadjoint.sdf.primitives.cylinder.Cylinder`
+        aligned with the face normal, not a polygonal approximation, so the
+        bore stays round at every render scale and its radius stays a live
+        design parameter.
+
+        Args:
+            radius: Bore radius; may be a ``Scalar`` parameter.
+            depth: How far the tool reaches below the face, along ``-normal``.
+                May be a ``Scalar``.
+            at: Where the axis meets the face, in face-local ``(x, y)``.
+            through: Extra length added *above* the face. Zero leaves the tool
+                exactly flush, which is what a blind hole wants; a small
+                positive value keeps a through-hole's mouth off the surface it
+                is cutting, where a perfectly coincident pair of surfaces
+                would otherwise leave the mesher to break the tie.
+            material: Optional render material for the tool.
+
+        Returns:
+            The tool as an SDF, placed in world space.
+
+        Example:
+            ```python
+            bore = flange.cap("+").hole(bore_radius, depth=0.4, through=0.02)
+            housing = Difference(flange, bore)
+            ```
+        """
+        from cadjoint.sdf.primitives import Cylinder
+
+        length = _scalar(depth) + _scalar(through)
+        tool = Cylinder(radius=radius, height=length / 2.0, material=material)
+        return self._sink(tool, depth, at, through)
+
+    def pocket(self, vertices, depth, at=(0.0, 0.0), *, through: float = 0.0, material=None):
+        """A prismatic tool sunk into this face — **subtract** it to cut a pocket.
+
+        The profile is read in the face's own frame, so a pocket is drawn in
+        the same coordinates the face's other features use.
+
+        Args:
+            vertices: The pocket outline as face-local ``(x, y)`` points — a
+                list, or a :class:`PolygonProfile`'s vertices.
+            depth: How far the tool reaches below the face, along ``-normal``.
+            at: Offset applied to the whole outline, in face-local ``(x, y)``.
+            through: Extra length added above the face; see :meth:`hole`.
+            material: Optional render material for the tool.
+
+        Returns:
+            The tool as an SDF, placed in world space.
+        """
+        from cadjoint.sdf.primitives.polygon import ExtrudedPolygon
+
+        length = _scalar(depth) + _scalar(through)
+        tool = ExtrudedPolygon(vertices, depth=length, material=material)
+        return self._sink(tool, depth, at, through)
+
+    def _sink(self, tool, depth, at, through):
+        """Place a centred local-frame tool so it spans this face's cut.
+
+        The tool arrives centred on its own origin and already the right
+        length; all that is left is to sit its centre halfway between the two
+        ends of the cut and turn its local z onto the face normal.
+        """
+        from cadjoint.construction.extrude import _place_on_plane
+        from cadjoint.construction.sketch import SketchPlane
+
+        middle = self.point(at) + (_scalar(through) - _scalar(depth)) / 2.0 * self.normal
+        plane = SketchPlane(origin=middle, normal=self.normal, x_axis=self.x_axis)
+        return _place_on_plane(tool, plane)
 
     # ── payload ──────────────────────────────────────────────────────────────
 

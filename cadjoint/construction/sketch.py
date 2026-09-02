@@ -27,8 +27,16 @@ alternate constructors say so directly:
 - :meth:`SketchPlane.midplane` — halfway between two faces.
 
 A derived plane recomputes itself from the parent's parameters, so re-running
-the program with a different ``depth`` moves it, and a gradient taken through
-a child solid reaches the parent's ``depth``.
+the program with a different ``depth`` moves it — which is what makes the
+feature tree rebuild correctly, and is the whole point of the reference.
+
+What it is *not* is a live edge in the compiled parameter graph. The derived
+origin is evaluated when the plane is constructed and stored as an ordinary
+fixed ``Parameter``, so ``extract_parameters`` on a child solid does not see
+the parent's ``depth`` and ``jax.grad`` through the child w.r.t. it is exactly
+zero. Re-run the program to move the child; do not expect an optimizer to
+discover the link. Making it live needs derived parameters, which the leaf-
+valued ``Parameter`` model does not have — see ``research/complex-scene.md``.
 
 In-plane rotation
 -----------------
@@ -43,6 +51,8 @@ plane.
 """
 
 from __future__ import annotations
+
+import math
 
 import jax
 import jax.numpy as jnp
@@ -73,6 +83,11 @@ def _maybe_float(value) -> float | None:
         return float(value)
     except _NOT_CONCRETE:
         return None
+
+
+def _scalar_value(value):
+    """The current number behind a ``Scalar`` parameter, or the number itself."""
+    return value.value if isinstance(value, Parameter) else value
 
 
 def _plane_frame(normal: Array, x_axis: Array | None = None) -> tuple[Array, Array]:
@@ -428,9 +443,23 @@ class PolygonProfile(Fluent):
             Either winding; the polygon must be simple (non-self-intersecting).
         plane: The sketch plane; defaults to the world XY plane.
         name: Prefix for auto-generated vertex parameter names.
+        free: Whether raw vertices become *free* parameters. True keeps the CAD
+            sketch semantics — a vertex is editable until constrained — and is
+            the default. The generated outlines (:meth:`circle`,
+            :meth:`regular`, :meth:`rounded_rect`) pass False: a computed
+            vertex is a consequence of the shape's dimensions, not a freedom
+            of its own, and freeing dozens of them would swamp the design
+            space. Existing ``Vector2`` parameters keep whatever they already
+            declare.
     """
 
-    def __init__(self, vertices, plane: SketchPlane | None = None, name: str = "profile"):
+    def __init__(
+        self,
+        vertices,
+        plane: SketchPlane | None = None,
+        name: str = "profile",
+        free: bool = True,
+    ):
         if len(vertices) < 3:
             raise ValueError(f"PolygonProfile needs at least 3 vertices, got {len(vertices)}")
         self.plane = plane if plane is not None else SketchPlane()
@@ -446,12 +475,151 @@ class PolygonProfile(Fluent):
                 wrapped.append(
                     Vector2(
                         value=jnp.asarray(v, dtype=jnp.float32),
-                        free=True,
+                        free=free,
                         name=f"{name}_v{i}",
                     )
                 )
         self.vertices = wrapped
         self.params = {f"v{i}": v for i, v in enumerate(wrapped)}
+
+    # ── generated outlines ───────────────────────────────────────────────────
+    #
+    # A profile is a polygon and nothing else, so every curve in this modeller
+    # is a polygon fine enough to read as one. Typing a bolt-circle flange out
+    # vertex by vertex is the ugly workaround these remove; they are ordinary
+    # constructors that happen to compute their vertex list.
+    #
+    # Generated vertices are PINNED (``free=False``) unless asked otherwise.
+    # Two reasons, both worth knowing before reaching for ``free=True``: an
+    # individual vertex of a circle is not a design freedom — dragging one
+    # makes the circle not-a-circle — and a free vertex is extracted as its own
+    # optimization variable, so a 48-segment bore would quietly add 96 of them.
+    # The shape's *dimensions* stay editable the ordinary way: edit the call.
+    #
+    # What these cannot do is keep the radius live. A generated vertex is a
+    # number computed once, not an expression in ``radius``, so ``jax.grad``
+    # of anything downstream w.r.t. a ``Scalar`` radius passed here is zero.
+    # For a circular feature that must stay differentiable, use the exact
+    # primitives — ``Solid.cylinder``, ``Face.hole``, or a ``revolve`` — whose
+    # radius is a shared ``Parameter``. See research/complex-scene.md.
+
+    @classmethod
+    def circle(cls, radius, center=(0.0, 0.0), segments: int = 32, **kwargs) -> PolygonProfile:
+        """A closed circular outline, approximated by ``segments`` edges.
+
+        Args:
+            radius: Circle radius, as a number (see the note above on why a
+                ``Scalar`` here does not stay live).
+            center: Circle centre in plane coordinates.
+            segments: Number of edges; 32 reads as round at typical scales.
+            **kwargs: Passed to :class:`PolygonProfile` — ``plane``, ``name``,
+                and ``free``.
+
+        Returns:
+            The profile, wound counter-clockwise.
+        """
+        return cls.regular(segments, radius, center=center, **kwargs)
+
+    @classmethod
+    def regular(
+        cls,
+        sides: int,
+        radius,
+        center=(0.0, 0.0),
+        start_angle: float = 0.0,
+        **kwargs,
+    ) -> PolygonProfile:
+        """A regular polygon inscribed in a circle of ``radius``.
+
+        Args:
+            sides: Number of sides; at least 3.
+            radius: Circumscribed radius — the distance to each *vertex*, not
+                to the flats.
+            center: Polygon centre in plane coordinates.
+            start_angle: Angle of the first vertex, in degrees from the plane's
+                x axis. Use it to put a flat, rather than a corner, where a
+                wrench or a mating part needs one.
+            **kwargs: Passed to :class:`PolygonProfile`.
+
+        Returns:
+            The profile, wound counter-clockwise.
+
+        Raises:
+            ValueError: If ``sides`` is less than 3.
+        """
+        sides = int(sides)
+        if sides < 3:
+            raise ValueError(f"A regular profile needs at least 3 sides, got {sides}")
+        radius = float(_scalar_value(radius))
+        origin = jnp.asarray(center, dtype=jnp.float32)
+        offset = math.radians(float(start_angle))
+        vertices = [
+            [
+                float(origin[0]) + radius * math.cos(offset + 2.0 * math.pi * i / sides),
+                float(origin[1]) + radius * math.sin(offset + 2.0 * math.pi * i / sides),
+            ]
+            for i in range(sides)
+        ]
+        kwargs.setdefault("free", False)
+        return cls(vertices, **kwargs)
+
+    @classmethod
+    def rounded_rect(
+        cls,
+        width,
+        height,
+        radius,
+        center=(0.0, 0.0),
+        segments: int = 6,
+        **kwargs,
+    ) -> PolygonProfile:
+        """A rectangle with rounded corners — the flange outline of most parts.
+
+        This is the honest way to get a rounded corner *in a profile*: the
+        corner is traced as polygon vertices before the solid exists, so the
+        round survives extrusion exactly and costs nothing at evaluation time.
+        It is unrelated to the smooth-boolean blends used as fillets *between*
+        solids, which round an intersection rather than an edge.
+
+        Args:
+            width: Full width along the plane's x axis.
+            height: Full height along the plane's y axis.
+            radius: Corner radius; clamped to half the shorter side.
+            center: Rectangle centre in plane coordinates.
+            segments: Edges per corner arc.
+            **kwargs: Passed to :class:`PolygonProfile`.
+
+        Returns:
+            The profile, wound counter-clockwise.
+
+        Raises:
+            ValueError: If ``width`` or ``height`` is not positive.
+        """
+        width = float(_scalar_value(width))
+        height = float(_scalar_value(height))
+        radius = float(_scalar_value(radius))
+        if width <= 0.0 or height <= 0.0:
+            raise ValueError(f"rounded_rect needs a positive size, got {width} x {height}")
+        radius = max(0.0, min(radius, min(width, height) / 2.0))
+        segments = max(1, int(segments))
+        cx, cy = (float(v) for v in jnp.asarray(center, dtype=jnp.float32))
+        half_w, half_h = width / 2.0 - radius, height / 2.0 - radius
+        # One arc per corner, walked counter-clockwise from the +x/+y corner.
+        corners = ((half_w, half_h, 0.0), (-half_w, half_h, 90.0), (-half_w, -half_h, 180.0))
+        corners += ((half_w, -half_h, 270.0),)
+        # A zero radius degenerates every arc to one repeated point, and a
+        # zero-length edge is a divide-by-zero in the polygon distance. Emit
+        # the plain rectangle instead of a corner's worth of duplicates.
+        steps = range(segments + 1) if radius > 0.0 else range(1)
+        vertices: list[list[float]] = []
+        for ox, oy, start in corners:
+            for step in steps:
+                angle = math.radians(start) + (math.pi / 2.0) * step / segments
+                vertices.append(
+                    [cx + ox + radius * math.cos(angle), cy + oy + radius * math.sin(angle)]
+                )
+        kwargs.setdefault("free", False)
+        return cls(vertices, **kwargs)
 
     def children(self) -> list[Fluent]:
         return [self.plane]
