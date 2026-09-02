@@ -270,9 +270,7 @@ block, where it has a 7.02:1 ground under it. Leadings 1 (single-line controls),
 - **One border weight**, 1px. A 2px border is not a stronger border, it is a
   different element: reserve 2px for the *active* indicator, where the doubling
   reads as state.
-- **Sections and dock zones are numbered**, by a CSS counter incremented in dock
-  order. Numbering is structure the markup does not have to carry, and panels
-  that a restyle could not reach get numbered without a line changing in them.
+- **Sections are not numbered.** A first cut stamped `01`/`02` counter blocks on every panel and section head; the user judged them decoration without a purpose, and they are gone. A section is introduced by its kicker chip — the one word that names its kind (`LIBRARY`, `SERVER`, `FEM`) on the accent fill — and its title in tracked mono; order is carried by position, as everywhere else in this language.
 
 Scales are deliberately short: six type sizes, six trackings, seven spacing
 steps, one radius, five control heights, three durations. **If a value is not on
