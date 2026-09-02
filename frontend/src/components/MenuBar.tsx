@@ -3,7 +3,8 @@
  *
  * Menus follow the native pattern — click (or ArrowDown) opens, arrows move,
  * Escape or a click elsewhere closes. Everything acts on the shared state
- * signals; file operations go through the server's `scenes` workspace.
+ * signals; file operations go through the server's `scenes` workspace, and
+ * Export… through `/api/export`.
  */
 
 import { For, Show, createSignal, onCleanup } from "solid-js";
@@ -25,6 +26,7 @@ import {
 import { EDITING_MODES } from "../editingMode";
 import { windowManager } from "../windows/manager";
 import type { WindowId } from "../windows/panels";
+import { ExportDialog } from "./ExportDialog";
 
 export interface MenuBarProps {
   canUndo: boolean;
@@ -38,7 +40,7 @@ export interface MenuBarProps {
 }
 
 type MenuId = "file" | "edit" | "window" | "help";
-type DialogId = "saveAs" | "help";
+type DialogId = "saveAs" | "export" | "help";
 
 const PANEL_ITEMS: { key: keyof PanelVisibility; label: string }[] = [
   { key: "editor", label: "Editor" },
@@ -160,6 +162,17 @@ export function MenuBar(props: MenuBarProps) {
     setDialog("saveAs");
   };
 
+  /**
+   * Export… is a dialog, not a window: it asks four things and produces one
+   * file, and a form that is answered and dismissed has no business in the
+   * dock. The work it starts is a job, so it is watched — and cancelled —
+   * from the chip and the Processes window like a solve.
+   */
+  const showExportDialog = () => {
+    setOpenMenu(null);
+    setDialog("export");
+  };
+
   const download = () => {
     setOpenMenu(null);
     const blob = new Blob([source()], { type: "text/x-python" });
@@ -263,6 +276,7 @@ export function MenuBar(props: MenuBarProps) {
               {item("Save", save, { testid: "menu-file-save" })}
               {item("Save As…", showSaveAsDialog, { testid: "menu-file-save-as" })}
               <hr />
+              {item("Export…", showExportDialog, { testid: "menu-file-export" })}
               {item("Download scene.py", download, { testid: "menu-file-download" })}
             </div>
           </Show>
@@ -479,6 +493,10 @@ export function MenuBar(props: MenuBarProps) {
             </form>
           </div>
         </div>
+      </Show>
+
+      <Show when={dialog() === "export"}>
+        <ExportDialog onClose={() => setDialog(null)} />
       </Show>
 
       <Show when={dialog() === "help"}>

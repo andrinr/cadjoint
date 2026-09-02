@@ -46,6 +46,8 @@ export type {
   ConstructionTransform,
   ConstructionVertex,
   DomainEntry,
+  ExportFormat,
+  ExportRequest,
   FaceAccessor,
   FaceOwner,
   IdentityEntry,

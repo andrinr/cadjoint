@@ -29,8 +29,14 @@ from cadjoint.enums import (
     BoundaryConditionType,
     ConstraintKind,
     ConstraintSolveMethod,
+    ExportFormat,
     OptimizationArgument,
     StudyKind,
+)
+from cadjoint.viewer._limits import (
+    EXPORT_DEFAULT_RESOLUTION,
+    EXPORT_MAX_RESOLUTION,
+    EXPORT_MIN_RESOLUTION,
 )
 
 Vector2 = Annotated[list[float], Field(min_length=2, max_length=2)]
@@ -417,6 +423,40 @@ class PatchResponse(BaseModel):
     ok: bool
     source: str | None = None
     error: str | None = None
+
+
+# ── Export ──────────────────────────────────────────────────────────────────
+
+
+class ExportRequest(BaseModel):
+    """What ``POST /api/export`` takes: which object, which format, how fine.
+
+    Unlike a patch request this one is the gate as well as the description:
+    :mod:`cadjoint.viewer._export` validates against it before a worker is
+    started, and the message of a failed field is what the dialog shows.
+    The response is the file itself, not JSON — see the module.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    source: str
+    """The program text the object is read from."""
+    format: ExportFormat
+    name: str = Field(default="scene", min_length=1)
+    """The SDF variable to export — or, for ``vtk``, the declared study."""
+    resolution: int = Field(
+        default=EXPORT_DEFAULT_RESOLUTION,
+        ge=EXPORT_MIN_RESOLUTION,
+        le=EXPORT_MAX_RESOLUTION,
+        strict=True,
+    )
+    """Lattice cells along the object's longest axis (geometry formats only)."""
+    binary: bool = True
+    """``stl`` only: the 80-byte-header binary format, or ASCII ``solid``."""
+    analytic: bool = True
+    """``step`` only: analytic surfaces from the derived B-rep, or planar facets."""
+    merge_planar: bool = True
+    """``obj`` only: merge coplanar quads into n-gons, or write every triangle."""
 
 
 def validate_patch_request(request: dict[str, Any]) -> BaseModel:

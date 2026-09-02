@@ -1,0 +1,95 @@
+/*
+ * File → Export…, the dialog's own layout.
+ *
+ * Nothing visual is invented: the backdrop, the compact dialog, its header
+ * and body, the note and error lines are the same `.dialog-*` primitives
+ * Save As and the shortcut sheet use, and every value below is a token. What
+ * this file adds is the form itself — four fields and a row of controls —
+ * drawn as the design language draws a form: tracked labels one size below
+ * their control, a number that is right-hung and tabular, and program
+ * strings (an object's name, a study's) left exactly as the program wrote
+ * them.
+ */
+
+.export-form {
+  display: grid;
+  gap: var(--space-5);
+}
+
+/* Two fields on one line when they are short: format beside its option,
+   the name beside the resolution. */
+.export-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: end;
+}
+
+.export-field {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-xs);
+}
+
+/* The controls share the shared chrome's edge: a control's edge is
+   something you must find, so it is `rule-strong`, not the panel hairline. */
+.export-field input[type="text"],
+.export-field input[type="number"],
+.export-field select {
+  width: 100%;
+  height: var(--control-md);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--rule-strong);
+  background: var(--surface-raised);
+  color: var(--ink);
+  font: var(--weight-semibold) var(--text-sm) / var(--leading-flat) var(--font-mono);
+}
+
+/* The name is a string the program wrote: quoted, never restyled. */
+.export-field input[type="text"] {
+  text-transform: none;
+  letter-spacing: var(--tracking-lg);
+}
+
+/* The resolution is a number the user reads: tabular and right-hung, with
+   its unit on the same baseline in the label's ink. */
+.export-field input[type="number"] {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.export-field .export-unit {
+  color: var(--ink-3);
+  font-size: var(--text-2xs);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* The one option a format has sits where a second field would, on the
+   control's baseline, so the row stays one row. */
+.export-option {
+  min-height: var(--control-md);
+  display: flex;
+  align-items: center;
+}
+
+.export-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+/* Progress is a sentence, not a bar: the job chip beside the mode switcher
+   already counts the seconds, and a second clock here would disagree with
+   it. */
+.export-progress {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: var(--text-xs);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}

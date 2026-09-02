@@ -67,6 +67,7 @@ _MODELS: tuple[type[BaseModel], ...] = (
     payloads.OptimizationPayload,
     payloads.MeshEdgePayload,
     requests.PatchResponse,
+    requests.ExportRequest,
     *requests.PATCH_REQUEST_MODELS.values(),
     requests.WorldPlaneReference,
     requests.CapPlaneReference,

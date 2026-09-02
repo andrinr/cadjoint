@@ -25,6 +25,12 @@ Serves the built frontend (``cadjoint/viewer/static``) and a small JSON API:
                          patched back into ``source`` exactly like
                          ``/patch``, plus a ``simulate`` block (the solved
                          optimized design) for study-backed runs
+- ``POST /api/export``   run the source again and write one SDF object of it
+                         (``name``, default ``scene``) as ``obj``, ``stl`` or
+                         ``step`` — or a declared study's solved fields as
+                         ``vtk`` — at ``resolution`` cells; the response is
+                         the file itself, as an attachment, with the job id
+                         in ``X-Cadjoint-Job``
 - ``POST /api/lint``     static-analyse the editor's Python with ruff and
                          return CodeMirror-shaped diagnostics (plus the last
                          compile traceback when it named a line of this text)
@@ -65,6 +71,8 @@ The parts underneath it:
   NDJSON streaming, static files
 - :mod:`cadjoint.viewer._worker_client` — the endpoints that run the editor's
   Python in a child process
+- :mod:`cadjoint.viewer._export` — ``/api/export``: which writer, which
+  content type, and the worker half that extracts and writes
 - :mod:`cadjoint.viewer._patch_requests` — ``/patch`` request validation
 - :mod:`cadjoint.viewer._intelligence` — the ruff and jedi endpoints
 - :mod:`cadjoint.viewer._scenes` — saved scene files
@@ -74,6 +82,7 @@ The parts underneath it:
 from __future__ import annotations
 
 import argparse
+import json
 import secrets
 import webbrowser
 from collections.abc import Callable, Iterable
@@ -83,6 +92,7 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from cadjoint.viewer._example_scene import EXAMPLE_SOURCE
+from cadjoint.viewer._export import EXPORT_TIMEOUT_SECONDS, export_source
 from cadjoint.viewer._http import STATIC_ROOT, PlaygroundBase, resolve_static
 from cadjoint.viewer._intelligence import (
     complete_source,
@@ -121,6 +131,7 @@ __all__ = [
     "COMPILE_TIMEOUT_SECONDS",
     "DEFAULT_PORT",
     "EXAMPLE_SOURCE",
+    "EXPORT_TIMEOUT_SECONDS",
     "JOB_KINDS",
     "MAX_SOURCE_BYTES",
     "MESH_INSPECT_TIMEOUT_SECONDS",
@@ -133,6 +144,7 @@ __all__ = [
     "compile_source",
     "complete_source",
     "create_server",
+    "export_source",
     "lint_source",
     "list_scenes",
     "load_scene",
@@ -190,9 +202,9 @@ def _post_routes() -> dict[str, Callable[[dict[str, Any]], dict[str, Any]]]:
 
 
 #: Request fields worth remembering on a job: which study, which optimization,
-#: how many steps.  Small scalars only — the source is kept as a hash, not a
+#: how many steps, which export format.  Small scalars only — the source is kept as a hash, not a
 #: copy, and nothing else about a request is the monitor's business.
-JOB_FIELD_KEYS = ("kind", "name", "steps", "cached")
+JOB_FIELD_KEYS = ("kind", "name", "steps", "cached", "format", "resolution")
 
 
 def _job_fields(payload: dict[str, Any]) -> dict[str, Any]:
@@ -260,6 +272,24 @@ def _tracked_stream(
             yield {"event": "done", **REGISTRY.finish(job, final)}
 
     return route
+
+
+def _export_route(payload: dict[str, Any]) -> dict[str, Any]:
+    """``/api/export`` as a tracked job whose result is a file, not JSON.
+
+    The same registration as :func:`_tracked`, with one difference: the
+    bytes are lifted out before the job is finished, so what the registry
+    records (and would store, if ``export`` were a result kind) is the
+    small summary — format, filename, size, report — and never the file.
+    The bytes ride back to the handler on the returned dict under ``data``.
+    """
+    with REGISTRY.track("export", source=payload.get("source"), fields=_job_fields(payload)) as job:
+        result = export_source(payload)
+        data = result.pop("data", None)
+        summary = REGISTRY.finish(job, result)
+        if data is not None and summary.get("ok"):
+            summary["data"] = data
+        return summary
 
 
 def _stream_routes() -> dict[str, Callable[[dict[str, Any]], Iterable[dict[str, Any]]]]:
@@ -332,6 +362,17 @@ def make_handler(token: str):
                 self._serve_job_command(path)
                 return
 
+            if path == "/api/export":
+                # The one endpoint whose answer is a file: the bytes go out
+                # as an attachment, and only a failure is JSON.
+                if not self._token_valid():
+                    return
+                payload = self._read_json()
+                if payload is None:
+                    return
+                self._serve_export(_export_route(payload))
+                return
+
             stream = _stream_routes().get(path)
             if stream is not None:
                 # Streamed: progress events per optimizer step, then `done`
@@ -356,6 +397,24 @@ def make_handler(token: str):
 
             result = handler(payload)
             self._send_json(_response_status(result), result)
+
+        def _serve_export(self, result: dict[str, Any]) -> None:
+            """Send an export's file as an attachment, or its failure as JSON."""
+            data = result.pop("data", None)
+            if not result.get("ok") or not isinstance(data, bytes):
+                self._send_json(_response_status(result), result)
+                return
+            self._send(
+                HTTPStatus.OK,
+                data,
+                result["content_type"],
+                Cache_Control="no-store",
+                Content_Disposition=f'attachment; filename="{result["filename"]}"',
+                X_Cadjoint_Job=str(result.get("job_id", "")),
+                X_Cadjoint_Export=json.dumps(
+                    {key: result.get(key) for key in ("format", "name", "size", "report")}
+                ),
+            )
 
         # ── the job registry: what is running, what ran, and its results ──
 

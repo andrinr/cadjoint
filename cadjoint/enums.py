@@ -51,6 +51,8 @@ __all__ = [
     "ConstraintKindLike",
     "ConstraintSolveMethod",
     "ConstraintSolveMethodLike",
+    "ExportFormat",
+    "ExportFormatLike",
     "FemBackend",
     "GradientPath",
     "GradientPathLike",
@@ -348,6 +350,28 @@ ConstraintKindLike = (
     ]
 )
 """A constraint kind, or the plain string spelling of one."""
+
+
+class ExportFormat(Option):
+    """The file formats the viewer's ``File → Export…`` can write.
+
+    The three geometry formats take an SDF object of the program (the
+    top-level ``scene`` by default); ``vtk`` takes a declared study instead
+    and writes its solved fields, so it only exists where a result does.
+    """
+
+    OBJ = "obj"
+    """Wavefront OBJ: coplanar quads merged into n-gons, curved regions as triangles."""
+    STL = "stl"
+    """STL triangles, binary by default (ASCII on request)."""
+    STEP = "step"
+    """STEP AP214: analytic planes and cylinders from the derived B-rep, faceted elsewhere."""
+    VTK = "vtk"
+    """A study's solved mesh and fields, for ParaView."""
+
+
+ExportFormatLike = ExportFormat | Literal["obj", "stl", "step", "vtk"]
+"""An export format, or the plain string spelling of one."""
 
 
 class FemBackend(Option):

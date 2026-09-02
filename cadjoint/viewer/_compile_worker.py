@@ -15,7 +15,8 @@ what the frontend's generated types are emitted from, so a payload that
 does not match them would be a type the browser was promised and did not
 get.  The other modes live beside it:
 :mod:`._edge_overlay` (``mesh``), :mod:`._worker_fem` (``simulate``,
-``mesh_inspect``), and :mod:`._worker_optimize` (``optimize``).
+``mesh_inspect``), :mod:`._worker_optimize` (``optimize``), and
+:mod:`._export` (``export``).
 """
 
 from __future__ import annotations
@@ -168,6 +169,10 @@ def main() -> None:
             result = _mesh_inspect_source(request)
         elif mode == "optimize":
             result = _optimize_source(request)
+        elif mode == "export":
+            from cadjoint.viewer._export import export_scene
+
+            result = export_scene(request)
         elif mode == "compile":
             result = _compile_source(source)
         else:

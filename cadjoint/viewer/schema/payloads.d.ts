@@ -336,6 +336,24 @@ export interface PatchResponse {
   error?: string | null;
 }
 
+/**
+ * What ``POST /api/export`` takes: which object, which format, how fine.
+ *
+ * Unlike a patch request this one is the gate as well as the description:
+ * :mod:`cadjoint.viewer._export` validates against it before a worker is
+ * started, and the message of a failed field is what the dialog shows.
+ * The response is the file itself, not JSON — see the module.
+ */
+export interface ExportRequest {
+  source: string;
+  format: ExportFormat;
+  name?: string;
+  resolution?: number;
+  binary?: boolean;
+  analytic?: boolean;
+  merge_planar?: boolean;
+}
+
 export interface SetVertexRequest {
   source: string;
   id?: string | null;
@@ -646,6 +664,15 @@ export type ConstraintKind = "fixed" | "distance" | "horizontal" | "vertical" | 
  * method for a design objective.
  */
 export type ConstraintSolveMethod = "newton" | "adam" | "sgd";
+
+/**
+ * The file formats the viewer's ``File → Export…`` can write.
+ *
+ * The three geometry formats take an SDF object of the program (the
+ * top-level ``scene`` by default); ``vtk`` takes a declared study instead
+ * and writes its solved fields, so it only exists where a result does.
+ */
+export type ExportFormat = "obj" | "stl" | "step" | "vtk";
 
 /**
  * The optimization keywords the viewer may retune.

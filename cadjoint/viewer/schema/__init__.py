@@ -46,6 +46,7 @@ from cadjoint.viewer.schema.payloads import (
 )
 from cadjoint.viewer.schema.requests import (
     PATCH_REQUEST_MODELS,
+    ExportRequest,
     PatchRequest,
     PatchResponse,
     validate_patch_request,
@@ -65,6 +66,7 @@ __all__ = [
     "ConstructionTransform",
     "ConstructionVertex",
     "DomainEntry",
+    "ExportRequest",
     "FaceOwner",
     "IdentityEntry",
     "MaterialDefinition",

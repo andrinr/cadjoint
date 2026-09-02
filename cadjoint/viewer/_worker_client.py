@@ -53,6 +53,7 @@ _MODE_NOUNS = {
     "mesh": "Meshing",
     "mesh_inspect": "Mesh inspection",
     "simulate": "Simulation",
+    "export": "Export",
     "lint": "Linting",
 }
 

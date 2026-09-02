@@ -22,7 +22,7 @@ import { RenderPanel, type RenderPanelProps } from "./RenderPanel";
 import { CodeIcon, DisplayIcon, PlayIcon, ResetIcon } from "./icons";
 
 /** The kinds worth a chip: work you start and then look away from. */
-const CHIP_KINDS = new Set<JobKind>(["simulate", "optimize", "mesh", "mesh_inspect"]);
+const CHIP_KINDS = new Set<JobKind>(["simulate", "optimize", "mesh", "mesh_inspect", "export"]);
 
 /** How long a failure keeps the dot after the job has gone. */
 const FAILURE_LINGER_MS = 6_000;
@@ -100,7 +100,7 @@ function JobChip() {
    * thing is noise — and a lint fires on a pause in typing, which would make
    * the chip blink several times a minute while you write code. What is left
    * is the work you start and then go and do something else during: a solve,
-   * an optimization, a mesh. The Processes window lists every job; this is the
+   * an optimization, a mesh, an export. The Processes window lists every job; this is the
    * one sentence, and it is about the ones worth interrupting for.
    */
   const jobs = () => {

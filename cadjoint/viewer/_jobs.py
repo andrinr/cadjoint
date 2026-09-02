@@ -48,7 +48,16 @@ except ImportError:  # pragma: no cover
     psutil = None  # type: ignore[assignment]
 
 #: The kinds of work the registry knows about.
-JOB_KINDS = ("compile", "mesh", "mesh_inspect", "simulate", "optimize", "lint", "warmup")
+JOB_KINDS = (
+    "compile",
+    "mesh",
+    "mesh_inspect",
+    "simulate",
+    "optimize",
+    "export",
+    "lint",
+    "warmup",
+)
 
 #: Kinds whose full response payload is worth keeping for re-fetching.  Lint
 #: is excluded: it is keystroke-cadence work that is cheaper to redo than to

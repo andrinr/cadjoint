@@ -14,6 +14,7 @@ import {
 import type {
   CompileResponse,
   CompleteResponse,
+  ExportRequest,
   LintResponse,
   MeshInspectResponse,
   MeshResponse,
@@ -227,6 +228,58 @@ export async function signature(
   column: number,
 ): Promise<SignatureResponse> {
   return post<SignatureResponse>("/api/signature", { source, line, column });
+}
+
+/** What the server says about the file beside the bytes (`X-Cadjoint-Export`). */
+export interface ExportReport {
+  format?: string;
+  name?: string;
+  size?: number;
+  report?: Record<string, unknown>;
+}
+
+/** What `exportFile` came back with: the file, or why there is none. */
+export type ExportOutcome =
+  | { ok: true; blob: Blob; filename: string; jobId: string | null; report: ExportReport | null }
+  | { ok: false; error: string; errorKind: string | null; jobId: string | null };
+
+/**
+ * Write one object of the program as a file: `POST /api/export`.
+ *
+ * The one endpoint whose answer is not JSON. A success is the file itself
+ * — its name in `Content-Disposition`, the job that produced it in
+ * `X-Cadjoint-Job`, a small report in `X-Cadjoint-Export` — and a failure
+ * is the ordinary `{ok: false, error}` body every other endpoint sends, so
+ * the two are told apart by the response's content type, not its status.
+ */
+export async function exportFile(body: ExportRequest): Promise<ExportOutcome> {
+  const response = await fetch("/api/export", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Cadjoint-Token": token },
+    body: JSON.stringify(body),
+  });
+  const jobId = response.headers.get("X-Cadjoint-Job") || null;
+  const type = response.headers.get("Content-Type") ?? "";
+  if (!response.ok || type.startsWith("application/json")) {
+    const failure = await readJson<{ error?: string; error_kind?: string }>(response);
+    return {
+      ok: false,
+      error: failure.error ?? `Export failed (${response.status}).`,
+      errorKind: failure.error_kind ?? null,
+      jobId,
+    };
+  }
+  const blob = await response.blob();
+  const disposition = response.headers.get("Content-Disposition");
+  const filename = /filename="([^"]+)"/.exec(disposition ?? "")?.[1] ?? `export.${body.format}`;
+  let report: ExportReport | null = null;
+  try {
+    const raw = response.headers.get("X-Cadjoint-Export");
+    report = raw ? (JSON.parse(raw) as ExportReport) : null;
+  } catch {
+    report = null;
+  }
+  return { ok: true, blob, filename, jobId, report };
 }
 
 /** List saved scene files in the server's `scenes` workspace. */

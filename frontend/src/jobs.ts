@@ -2,7 +2,7 @@
  * The client's half of the server's job registry.
  *
  * Every request that costs real time — compile, mesh, mesh inspection, solve,
- * optimization run, lint, the startup warm-up — is registered on the server as
+ * optimization run, export, lint, the startup warm-up — is registered on the server as
  * a *job* and keeps its result after the response is read. That turns three
  * things that used to be impossible into ordinary bookkeeping:
  *
@@ -33,6 +33,7 @@ export type JobKind =
   | "mesh_inspect"
   | "simulate"
   | "optimize"
+  | "export"
   | "lint"
   | "warmup";
 

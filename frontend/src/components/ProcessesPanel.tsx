@@ -64,7 +64,7 @@ const TICK_MS = 250;
  */
 function kindClass(kind: string): string {
   if (kind === "simulate" || kind === "optimize") return "sim-kind-thermal";
-  if (kind === "mesh" || kind === "mesh_inspect") return "sim-kind-mesh";
+  if (kind === "mesh" || kind === "mesh_inspect" || kind === "export") return "sim-kind-mesh";
   return "";
 }
 
