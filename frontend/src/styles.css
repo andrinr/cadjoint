@@ -42,7 +42,7 @@
   --surface-raised-hover: #edecee;
 
   /* Chrome floating over the viewport. Opaque at rest — a panel that let the
-     field show through would put a colormap behind type (§14.7). */
+     field show through would put a colormap behind type (§12.6). */
   --surface-float-80: rgba(248, 247, 248, 0.96);
   --surface-float-90: rgba(248, 247, 248, 0.98);
   --surface-float-96: rgba(248, 247, 248, 1);
@@ -1859,7 +1859,7 @@ input[type="checkbox"] {
 }
 
 /* The cube sits over the viewport, so its "on" state is drawn in viewport ink
-   rather than in the accent: no chrome hue crosses this edge (§14 zoning). */
+   rather than in the accent: no chrome hue crosses this edge (§3.7 zoning). */
 .cube-face.active {
   border-color: var(--viewport-ink);
   background: var(--viewport-ink);

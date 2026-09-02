@@ -241,7 +241,7 @@ describe("chrome legibility", () => {
     // --ink measured under 3:1 on paper. That was true only because chrome was
     // dark; with one paper ground for both, chrome ink is perfectly legible in
     // there and the old bound is meaningless. What still has to hold is the
-    // §14 zoning rule, and it was always the real one: the *field* owns colour,
+    // §3.7 zoning rule, and it was always the real one: the *field* owns colour,
     // so every DOM tone drawn inside the rectangle is achromatic and the ramp
     // is the only hue a reader can see there.
     for (const tone of [...VIEWPORT_TONES, ...GRATICULE_TONES]) {

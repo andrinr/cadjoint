@@ -1,7 +1,7 @@
 cadjoint banner — tokens and measurements
 =========================================
 Sources: light stack sampled from research/design/brutalist/5-light-dock.png;
-dark stack from research/design-language.md §14.8; plate internals from §16.3;
+dark stack: the superseded dark ladder, recorded in full below; plate internals from research/design-language.md §10.1;
 field image cropped from research/design/combined/6-dark-plate-object.png
 (the solved sink-conduction field, alpha-keyed off the plate ground). The README
 hero instead comes from a LIVE capture of the running playground — see capture.mjs.
@@ -15,7 +15,7 @@ LIGHT PAPER  (the chosen direction, 5-light-dock)
   ink-2         #48464d  0.399  0.012   7.46:1
   ink           #18161a  0.204  0.008   14.43:1
 
-DARK PAPER  (§14.8 ladder, hue 299°)
+DARK PAPER  (the superseded dark ladder, hue 299°)
   paper         #131216  0.185  0.008   1.00:1
   paper-lit     #19181d  0.212  0.010   1.06:1
   grid          #4c4a52  0.414  0.013   2.14:1
@@ -29,7 +29,7 @@ ACCENT — a fill behind near-black type, never ink
   #f87318 as ink on #e6e6e9 paper               2.26:1   FAILS — never used this way
   #f87318 as ink on #131216 paper               6.62:1   not used either
 
-PLATE INTERNALS  (design-language §16.3, unchanged)
+PLATE INTERNALS  (design-language.md §10.1, unchanged)
   plate ground               #050407   1.00:1 on plate
   graticule                  #1e1d22   1.22:1 on plate
   centre-axis subdivisions   #332f38   1.56:1 on plate

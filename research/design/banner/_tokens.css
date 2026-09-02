@@ -1,6 +1,6 @@
 /* cadjoint banner — tokens.
    Light stack sampled from research/design/brutalist/5-light-dock.png
-   Dark stack from design-language.md §14.8 (h 299°).
+   Dark stack: the superseded dark ladder (h 299°), values recorded in measurements.txt.
    Accent from the brutalist studies: #f87318, used ONLY as a fill behind
    near-black type (#0a0a0c on #f87318 = 7.02:1). Never as ink on paper
    (#f87318 on #e6e6e9 = 2.26:1, fails). */
@@ -31,7 +31,7 @@
 }
 
 .dark {
-  --paper:        #131216;   /* §14.8 surface-base */
+  --paper:        #131216;   /* dark ladder surface-base */
   --paper-lit:    #19181d;   /* surface-bar */
   --paper-white:  #222026;   /* surface-panel */
   --grid:         #4c4a52;   /* 2.14:1 on #131216 — same reading as the light grid */
@@ -89,7 +89,7 @@ body { font-family: var(--mono); -webkit-font-smoothing: antialiased; }
 
 .wm { font-weight: 700; letter-spacing: -0.045em; line-height: 0.82; color: var(--ink); }
 
-/* ── plate internals, per design-language §16.3 ───────────────────────── */
+/* ── plate internals, per design-language.md §10.1 (the graticule) ───────────────────────── */
 .plate .grat { position: absolute; inset: 0; width: 100%; height: 100%; }
 .plate .geom { position: absolute; object-fit: contain; }
 .plate .brk  { position: absolute; inset: 0; pointer-events: none; }
@@ -134,7 +134,7 @@ body { font-family: var(--mono); -webkit-font-smoothing: antialiased; }
 .plate.live img { object-fit: cover; }
 .plate.live .brk i { border-color: var(--ink-3) !important; }
 
-/* the corrected probe readout — an opaque plate, per §16.3 */
+/* the corrected probe readout — an opaque plate, per design-language.md §10.1 */
 .probe-plate {
   background: #050407; border: 1px solid #3a3840; color: #edecef;
   display: flex; align-items: center; justify-content: center;

@@ -260,7 +260,7 @@
   chrome max chroma: 0.185 (#f87318)   ·   viridis max chroma 0.194   ·   field wins ✓
   overall: every measured text run clears AA
 
-=== DARK (§14.8 PLATE-WELL, control) ===
+=== DARK (the superseded dark PLATE-WELL ladder, control) ===
 token          hex      L      C    Δprev   c/ink  c/ink-2 c/ink-3
   void         #050406 0.110 0.007      —   17.39  10.60   6.56
   base         #131216 0.185 0.008   7.47   15.85   9.66   5.98

@@ -1,5 +1,5 @@
 if (location.search.includes("dark")) document.querySelector(".canvas").classList.add("dark");
-// Graticule per design-language.md §16.3, generalised to the banner's frames:
+// Graticule per design-language.md §10.1, generalised to the banner's frames:
 // a constant 48px division (the page module is 80px; the instrument scale is its
 // own, finer one), laid out from the plate centre outward so the two centre axes
 // are always real axes. 1px #1e1d22, behind the geometry. The centre axes — and

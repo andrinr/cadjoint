@@ -39,7 +39,7 @@ import { contrastRatio, type Rgb } from "./simColors";
  */
 export const CHROME = {
   // The viewport is paper, and so is the chrome around it: one ground, one
-  // value, measured off `research/design/combined/1-all-light-simulate.png`
+  // value, measured off `research/design/combined/measurements.txt`
   // where it covers 83% of the frame. `measurements.txt` records the seam as
   // "dL 0.0000 · contrast 1.00:1" — the viewport is not a darker or lighter
   // well, it is the same sheet, and what marks its edge is a rule.
