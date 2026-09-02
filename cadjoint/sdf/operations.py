@@ -21,11 +21,131 @@ from cadjoint.fluent import Fluent
 from cadjoint.geometry.parameters import Scalar
 from cadjoint.sdf.transforms.base import Transform
 
-_MIRROR_SIGNS = {
-    "x": (-1.0, 1.0, 1.0),
-    "y": (1.0, -1.0, 1.0),
-    "z": (1.0, 1.0, -1.0),
+# The world plane each named mirror axis stands for: the coordinate plane
+# through the origin whose normal is that axis.
+_MIRROR_NORMALS = {
+    "x": (1.0, 0.0, 0.0),
+    "y": (0.0, 1.0, 0.0),
+    "z": (0.0, 0.0, 1.0),
 }
+
+# Below this squared length a direction carries no orientation; the guarded
+# norm keeps value and derivative finite where a bare norm would give 0/0.
+_MIN_SQUARED = 1e-12
+
+
+def _unit(vector: Array) -> Array:
+    """Normalize a 3-vector with a guarded norm, safe under tracing."""
+    return vector / jnp.sqrt(jnp.maximum(jnp.sum(vector * vector), _MIN_SQUARED))
+
+
+def _world_vector(value) -> Array:
+    """A world 3-vector from a raw array or from a ``Vector`` parameter."""
+    return jnp.asarray(getattr(value, "xyz", value), dtype=jnp.float32)
+
+
+def _reference_line(reference, attribute: str) -> tuple[Array, Array] | None:
+    """``(origin, unit direction)`` read off a geometric reference, or None.
+
+    Duck-typed on purpose: ``cadjoint.sdf`` must not import
+    ``cadjoint.construction`` — the dependency runs the other way — but the
+    references a user naturally reaches for all expose the same two
+    attributes. An :class:`~cadjoint.construction.faces.Axis` carries
+    ``origin``/``direction``; a :class:`~cadjoint.construction.faces.Face` and
+    a :class:`~cadjoint.construction.sketch.SketchPlane` carry
+    ``origin``/``normal``, the plane's ``origin`` being a ``Vector``
+    parameter rather than a bare array.
+
+    Args:
+        reference: The object to read.
+        attribute: ``"direction"`` for a line, ``"normal"`` for a plane.
+
+    Returns:
+        The pair, or None when ``reference`` does not carry both attributes.
+    """
+    origin = getattr(reference, "origin", None)
+    vector = getattr(reference, attribute, None)
+    if origin is None or vector is None:
+        return None
+    return _world_vector(origin), _unit(_world_vector(vector))
+
+
+def _mirror_plane(axis) -> tuple[Array, Array]:
+    """The ``(origin, unit normal)`` of a mirror plane named by ``axis``.
+
+    Args:
+        axis: ``'x'``, ``'y'`` or ``'z'`` for the coordinate plane with that
+            normal through the world origin, or any Face / SketchPlane.
+
+    Returns:
+        The plane's origin and unit normal.
+
+    Raises:
+        ValueError: If ``axis`` is neither a known axis name nor something
+            carrying an ``origin`` and a ``normal``.
+    """
+    if isinstance(axis, str):
+        if axis not in _MIRROR_NORMALS:
+            raise ValueError(f"Mirror axis must be 'x', 'y', or 'z', got {axis!r}")
+        return jnp.zeros(3, dtype=jnp.float32), jnp.asarray(_MIRROR_NORMALS[axis])
+    plane = _reference_line(axis, "normal")
+    if plane is None:
+        raise ValueError(
+            f"Mirror axis must be 'x', 'y', 'z', or a Face / SketchPlane, got {axis!r}"
+        )
+    return plane
+
+
+def _pattern_axis(axis) -> tuple[Array, Array]:
+    """The ``(origin, unit direction)`` of a polar pattern's axis of rotation.
+
+    Args:
+        axis: ``'z'`` for the local z axis through the origin — the historical
+            default — or an :class:`~cadjoint.construction.faces.Axis`, such as
+            the one a ``revolve`` declares.
+
+    Returns:
+        The axis's origin and unit direction.
+
+    Raises:
+        ValueError: If ``axis`` is another axis *name*, or is not a line.
+    """
+    if isinstance(axis, str):
+        if axis != "z":
+            raise ValueError(
+                f"PolarPattern only supports axis 'z', got {axis!r}. A name cannot say "
+                "WHERE the axis is, which is most of what a bolt circle means; pass an "
+                "Axis instead — a revolve's solid.axis, or "
+                "cadjoint.construction.Axis(origin, direction)."
+            )
+        return jnp.zeros(3, dtype=jnp.float32), jnp.asarray([0.0, 0.0, 1.0])
+    line = _reference_line(axis, "direction")
+    if line is None:
+        raise ValueError(f"PolarPattern axis must be 'z' or an Axis, got {axis!r}")
+    return line
+
+
+def _rotate_about(p: Array, origin: Array, axis: Array, angle: float) -> Array:
+    """Rotate points about an arbitrary world line, by Rodrigues' formula.
+
+    ``angle`` is a static Python float — every pattern angle is ``i·2π/count``
+    on a concrete count — so the sine and cosine fold at trace time and the
+    emitted graph is the same handful of multiplies the axis-aligned form used
+    to be.
+
+    Args:
+        p: Points, shape ``(..., 3)``.
+        origin: A point on the axis, shape ``(3,)``.
+        axis: Unit axis direction, shape ``(3,)``.
+        angle: Rotation angle in radians, right-handed about ``axis``.
+
+    Returns:
+        The rotated points, shaped like ``p``.
+    """
+    v = p - origin
+    c, s = math.cos(angle), math.sin(angle)
+    parallel = axis * jnp.sum(v * axis, axis=-1, keepdims=True)
+    return origin + v * c + jnp.cross(axis, v) * s + parallel * (1.0 - c)
 
 
 class _Operation(Transform):
@@ -104,33 +224,49 @@ class Offset(_Operation):
 
 
 class Mirror(_Operation):
-    """Mirror a shape across a coordinate plane by reflecting the query point.
+    """Mirror a shape across a plane by reflecting the query point.
 
     ``Mirror(shape, 'x')`` reflects across the x=0 plane (the yz plane): the
     result is the mirror image of the child, an exact SDF.
 
+    The three named axes are the coordinate planes *through the world origin*,
+    which is the one mirror plane a real part rarely has. Any
+    :class:`~cadjoint.construction.faces.Face` or
+    :class:`~cadjoint.construction.sketch.SketchPlane` is accepted instead, so
+    the symmetry plane can be a face of the part or a
+    :meth:`~cadjoint.construction.sketch.SketchPlane.midplane` between two of
+    them — and being built from the parent's parameters, it moves when the
+    part is re-dimensioned rather than stranding the mirrored copy.
+
     Args:
         sdf: Child shape (SDF node or plain callable).
-        axis: Axis whose coordinate is negated: 'x', 'y', or 'z'.
+        axis: The mirror plane. ``'x'``, ``'y'`` or ``'z'`` for the coordinate
+            plane with that normal through the origin, or a ``Face`` /
+            ``SketchPlane`` to mirror across it.
+
+    Example:
+        ```python
+        seam = SketchPlane.midplane(housing.cap("+"), housing.cap("-"))
+        both_halves = Union(lug, Mirror(lug, seam))
+        ```
     """
 
     def __init__(self, sdf, axis: str = "x"):
-        if axis not in _MIRROR_SIGNS:
-            raise ValueError(f"Mirror axis must be 'x', 'y', or 'z', got {axis!r}")
         self.sdf = sdf
-        self.params = {"sign": jnp.array(_MIRROR_SIGNS[axis])}
+        origin, normal = _mirror_plane(axis)
+        self.params = {"origin": origin, "normal": normal}
 
     @staticmethod
-    def _transform_point(p: Array, sign: Array) -> Array:
-        return p * sign
+    def _transform_point(p: Array, origin: Array, normal: Array) -> Array:
+        return p - 2.0 * jnp.sum((p - origin) * normal, axis=-1, keepdims=True) * normal
 
     @staticmethod
-    def sdf(child_sdf, p: Array, sign: Array) -> Array:
+    def sdf(child_sdf, p: Array, origin: Array, normal: Array) -> Array:
         """Pure function for the mirror operation."""
-        return child_sdf(Mirror._transform_point(p, sign))
+        return child_sdf(Mirror._transform_point(p, origin, normal))
 
     def __call__(self, p: Array) -> Array:
-        return Mirror.sdf(self.sdf, p, self.params["sign"].xyz)
+        return Mirror.sdf(self.sdf, p, self.params["origin"].xyz, self.params["normal"].xyz)
 
     def to_functional(self):
         return Mirror.sdf
@@ -156,6 +292,10 @@ class LinearPattern(_Operation):
             raise ValueError(f"LinearPattern count must be >= 1, got {count}")
         self.sdf = sdf
         self.params = {"direction": direction, "spacing": spacing, "count": count}
+
+    # Copy 0 is the original and is not displaced, so the child's analytic
+    # face references still land on this node's surface.
+    inherits_faces = True
 
     @staticmethod
     def _transform_point(p: Array, direction, spacing, count) -> Array:  # noqa: ARG004
@@ -186,49 +326,68 @@ class LinearPattern(_Operation):
 
 
 class PolarPattern(_Operation):
-    """Union of ``count`` copies rotated evenly around the z axis.
+    """Union of ``count`` copies rotated evenly around an axis.
 
-    Copy ``i`` is the child rotated by ``i * 2π/count`` about the local z
-    axis; evaluated as the minimum over all rotated child evaluations, so the
-    count must be a static Python int.
+    Copy ``i`` is the child rotated by ``i * 2π/count`` about the axis;
+    evaluated as the minimum over all rotated child evaluations, so the count
+    must be a static Python int. Copy 0 is the original, which is why the
+    child's analytic faces still land on the result.
+
+    The default axis is the local z axis through the origin. A bolt circle
+    rarely sits there, and no *letter* can be made to fit it either: a name
+    says which way an axis points but not where it is, and where it is happens
+    to be most of what a bolt circle means. So any other axis is given as a
+    line — an :class:`~cadjoint.construction.faces.Axis`, most usefully the one
+    a ``revolve`` already declares as ``solid.axis``.
 
     Args:
         sdf: Child shape (SDF node or plain callable).
         count: Number of copies (static Python int, >= 1).
-        axis: Rotation axis; only 'z' is supported.
+        axis: ``'z'`` for the local z axis through the origin, or an ``Axis``
+            to rotate about that line.
+
+    Example:
+        ```python
+        # Six screws on the bearing housing's own axis of revolution.
+        bolts = PolarPattern(screw, count=6, axis=housing.axis)
+        ```
     """
 
     def __init__(self, sdf, count: int, axis: str = "z"):
-        if axis != "z":
-            raise ValueError(f"PolarPattern only supports axis 'z', got {axis!r}")
+        origin, direction = _pattern_axis(axis)
         count = int(count)
         if count < 1:
             raise ValueError(f"PolarPattern count must be >= 1, got {count}")
         self.sdf = sdf
-        self.params = {"count": count}
+        self.params = {"count": count, "origin": origin, "direction": direction}
+
+    # A pattern does not move its base copy, so a face reference declared on
+    # the child still lands on this node's surface.
+    inherits_faces = True
 
     @staticmethod
-    def _transform_point(p: Array, count: Array) -> Array:  # noqa: ARG004
+    def _transform_point(p: Array, count: Array, origin: Array, direction: Array) -> Array:  # noqa: ARG004
         # Material is looked up on the base copy; all copies share it anyway.
         return p
 
     @staticmethod
-    def sdf(child_sdf, p: Array, count: Array) -> Array:
+    def sdf(child_sdf, p: Array, count: Array, origin: Array, direction: Array) -> Array:
         """Pure function for the polar pattern (count must be concrete)."""
         num = int(count)
         d = child_sdf(p)
         for i in range(1, num):
             theta = 2.0 * math.pi * i / num
-            c, s = math.cos(theta), math.sin(theta)
-            q = jnp.stack(
-                [p[..., 0] * c + p[..., 1] * s, p[..., 1] * c - p[..., 0] * s, p[..., 2]],
-                axis=-1,
-            )
-            d = jnp.minimum(d, child_sdf(q))
+            d = jnp.minimum(d, child_sdf(_rotate_about(p, origin, direction, -theta)))
         return d
 
     def __call__(self, p: Array) -> Array:
-        return PolarPattern.sdf(self.sdf, p, self.params["count"].value)
+        return PolarPattern.sdf(
+            self.sdf,
+            p,
+            self.params["count"].value,
+            self.params["origin"].xyz,
+            self.params["direction"].xyz,
+        )
 
     def to_functional(self):
         return PolarPattern.sdf
@@ -245,7 +404,14 @@ def offset(shape, distance: float | Scalar) -> Offset:
 
 
 def mirror(shape, axis: str = "x") -> Mirror:
-    """Mirror image of ``shape`` across the plane normal to ``axis``."""
+    """Mirror image of ``shape`` across a plane.
+
+    Args:
+        shape: The shape to reflect.
+        axis: ``'x'``, ``'y'`` or ``'z'`` for the coordinate plane with that
+            normal through the origin, or a ``Face`` / ``SketchPlane`` to
+            mirror across it.
+    """
     return Mirror(shape, axis)
 
 
@@ -255,5 +421,12 @@ def linear_pattern(shape, direction, count: int, spacing: float | Scalar) -> Lin
 
 
 def polar_pattern(shape, count: int, axis: str = "z") -> PolarPattern:
-    """``count`` copies of ``shape`` rotated evenly around the z axis."""
+    """``count`` copies of ``shape`` rotated evenly around an axis.
+
+    Args:
+        shape: The shape to copy.
+        count: Number of copies (static Python int, >= 1).
+        axis: ``'z'`` for the local z axis through the origin, or an ``Axis``
+            (such as a revolve's ``solid.axis``) to rotate about that line.
+    """
     return PolarPattern(shape, count, axis)
