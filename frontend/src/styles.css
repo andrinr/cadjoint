@@ -1347,6 +1347,14 @@ input[type="checkbox"] {
 
 /* Panel headers stick while their list scrolls under them, so the section
    you are reading always says what it is. */
+/* A panel header is a title block: the kicker is its first line, and the
+   controls beside it belong to that line. A control only as tall as its own
+   glyph cannot both share the block's centre and sit on its first line —
+   centred, the audit measured the park control 12.9px below the line it
+   reads with; baseline-aligned, its box left the block's centre by 12.1px.
+   So a header control takes the block's full height, which settles the
+   centres, and draws its glyph in the block's own first line box, which
+   settles the baselines. The shared rule is below, next to .material-help. */
 .object-tree-panel > header {
   position: sticky;
   top: 0;
@@ -1362,12 +1370,9 @@ input[type="checkbox"] {
 
 .object-tree-close {
   flex: 0 0 auto;
-  width: var(--control-md);
-  height: var(--control-md);
+  width: var(--control-sm);
   padding: 0;
   color: var(--ink-3);
-  font-size: var(--text-lg);
-  line-height: var(--leading-flat);
 }
 
 .object-tree-rows {
@@ -1412,8 +1417,13 @@ input[type="checkbox"] {
   color: var(--ink-on-accent);
 }
 
+/* Everything on a selected row is ink on the accent fill, the caret and the
+   kind mark included: left at --ink-3 the caret measured 2.27:1 on the
+   orange, the one place in the tree where a mark was unreadable. */
 .object-tree-row.active .tree-detail,
-.object-tree-row.active .tree-material {
+.object-tree-row.active .tree-material,
+.object-tree-row.active .tree-caret,
+.object-tree-row.active .tree-icon {
   color: var(--ink-on-accent);
 }
 
@@ -1525,7 +1535,6 @@ input[type="checkbox"] {
   align-items: center;
   gap: var(--space-4);
   min-width: 0;
-  height: var(--control-lg);
   padding: 0 var(--space-4);
   border-color: transparent;
   background: transparent;
@@ -1540,22 +1549,50 @@ input[type="checkbox"] {
 
 .material-add {
   flex: 0 0 auto;
-  width: var(--control-md);
-  height: var(--control-md);
+  width: var(--control-sm);
   padding: 0;
   color: var(--ink);
-  font-size: var(--text-lg);
-  line-height: var(--leading-flat);
 }
 
 .material-close {
   flex: 0 0 auto;
-  width: var(--control-md);
-  height: var(--control-md);
+  width: var(--control-sm);
   padding: 0;
   color: var(--ink-3);
-  font-size: var(--text-lg);
-  line-height: var(--leading-flat);
+}
+
+/* The control-on-the-title-line pattern (see the panel header note above):
+   the block's full height so the centres agree, the glyph in the kicker's own
+   9px line box so the baselines do, and the kicker's own size so three glyphs
+   do not add a variant to the type census. */
+.object-tree-close,
+.material-add,
+.material-close,
+.material-panel-title > b {
+  align-self: stretch;
+  display: grid;
+  align-content: start;
+  justify-items: center;
+  height: auto;
+  font-size: var(--text-3xs);
+  line-height: var(--text-3xs);
+}
+
+/* And they are marks, not panel buttons: a drawn edge around a glyph sitting
+   on the title's first line reads as an empty cell. The edge appears under
+   the pointer, the way the editor's and the study rows' own marks do. */
+.object-tree-close,
+.material-add,
+.material-close {
+  border-color: transparent;
+  background: transparent;
+}
+
+.object-tree-close:hover,
+.material-add:hover:not(:disabled),
+.material-close:hover {
+  color: var(--ink);
+  background: var(--surface-raised-hover);
 }
 
 .material-help {
@@ -2176,7 +2213,9 @@ button.icon {
 .render-customize > i {
   flex: 0 0 auto;
   color: var(--ink);
-  font: var(--weight-regular) var(--text-lg) / var(--leading-flat)
+  /* The row's own line box, and a glyph one size off its label — at --text-lg
+     the mark sat 2.5px below the words it belongs to. */
+  font: var(--weight-regular) var(--text-md) / var(--text-lg)
     var(--font-mono);
 }
 
@@ -3001,7 +3040,9 @@ button.icon {
   border-color: transparent;
   background: transparent;
   color: var(--ink-3);
-  font-size: var(--text-md);
+  /* One size off the row's name rather than two: a 13px glyph beside a 9px
+     kind chip put the study head's three cells 2.2px apart. */
+  font-size: var(--text-sm);
   line-height: var(--leading-flat);
 }
 .sim-delete:hover:not(:disabled) {
@@ -3077,6 +3118,20 @@ button.icon {
 .sim-bcs li .sim-vector input[type="number"] {
   width: 40px;
 }
+/* A boundary condition's cell is a stack — type over selection — so the
+   controls beside it follow the panel headers' rule: full height for the
+   centres, glyph on the stack's first line for the baselines. Centred, the
+   delete mark measured 21.4px below the line it deletes. */
+.sim-bcs li > .sim-delete,
+.sim-bcs li > small {
+  align-self: stretch;
+  display: grid;
+  align-content: start;
+  justify-items: center;
+  height: auto;
+  line-height: var(--text-lg);
+}
+
 .sim-bcs li > small {
   flex: 0 0 auto;
 }

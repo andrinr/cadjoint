@@ -53,8 +53,13 @@ const VIEWPORTS = [
 const STATES = [
   { id: "model", mode: "model" },
   { id: "model-menu-file", mode: "model", open: "menu-file", expect: "menu-file-save-as" },
-  { id: "model-object-tree", mode: "model", open: "object-tree-open", expect: "object-tree-panel", close: "object-tree-close" },
-  { id: "model-materials", mode: "model", open: "material-open", expect: "material-panel", close: "material-close" },
+  // Every panel is a window now, and the two states that used to toggle the
+  // object tree and the material browser open are simply the default desk:
+  // both are docked from the start. What `model` does not already show is a
+  // window that has left the grid, so those two ids are spent on the two
+  // arrangements the window system added — parked in the tray, and floating.
+  { id: "model-tray", mode: "model", click: ["object-tree-close", "material-close"], expect: "window-tray", reset: true },
+  { id: "model-floating", mode: "model", click: ["menu-window", "menu-window-float-objects"], expect: "object-tree-panel", reset: true },
   { id: "model-render-popover", mode: "model", open: "display-options", expect: "render-popover" },
   // The sketch panel only exists while a profile is selected, so these two
   // states pick one out of the object tree first.
@@ -238,6 +243,16 @@ function collectInPage(options) {
     if (cs.display === "none" || cs.visibility === "hidden" || cs.opacity === "0") continue;
     const rect = el.getBoundingClientRect();
     if (rect.width < 1 || rect.height < 1) continue;
+    // Visually hidden, the sr-only way: a one-pixel box clipped to nothing so
+    // that only assistive technology reads it. Its text is *meant* to be
+    // visually unreachable, so measuring it as clipped, overflowing or
+    // off-scale is a false positive — the dock library's aria-live announcer
+    // alone produced 42 of them across a run.
+    const clippedAway =
+      cs.clipPath === "inset(50%)" ||
+      /^rect\(0px[,)\s]/.test(cs.clip || "") ||
+      (rect.width <= 1 && rect.height <= 1 && (cs.overflow === "hidden" || cs.overflow === "clip"));
+    if (clippedAway) continue;
     const ownText = Array.from(el.childNodes).some(
       (n) => n.nodeType === 3 && n.textContent.trim().length > 0,
     );
@@ -513,10 +528,22 @@ function collectInPage(options) {
 
     // Baselines of the first text line in each child that carries text.
     const baselines = [];
+    /** Text inside an out-of-flow descendant is not the child's own line. */
+    const inFlowWithin = (node, root) => {
+      for (let n = node.parentElement; n && n !== root; n = n.parentElement) {
+        const p = getComputedStyle(n).position;
+        if (p === "absolute" || p === "fixed") return false;
+      }
+      return true;
+    };
     for (const kid of kids) {
       const walker = document.createTreeWalker(kid.el, NodeFilter.SHOW_TEXT);
       let textNode = walker.nextNode();
-      while (textNode && !textNode.textContent.trim()) textNode = walker.nextNode();
+      while (
+        textNode &&
+        (!textNode.textContent.trim() || !inFlowWithin(textNode, kid.el))
+      )
+        textNode = walker.nextNode();
       if (!textNode) continue;
       const range = document.createRange();
       range.selectNodeContents(textNode);
@@ -746,9 +773,9 @@ async function waitForReady(page, timeout) {
 
 async function enterState(page, state, settle) {
   if (state.selectProfile) {
-    await page.getByTestId("object-tree-open").click({ timeout: 8_000 });
+    // The object tree is docked in both the Model and Sketch desks, so the
+    // row is already on screen; nothing has to be opened to reach it.
     await page.locator("[data-testid^=tree-row-profile]").first().click({ timeout: 8_000 });
-    await page.getByTestId("object-tree-close").click({ timeout: 8_000 });
   }
   await page.getByTestId(`editmode-${state.mode}`).click();
   await page.waitForTimeout(150);
@@ -756,6 +783,10 @@ async function enterState(page, state, settle) {
     const tab = page.getByTestId(`sim-tab-${state.tab}`);
     await tab.waitFor({ state: "visible", timeout: 15_000 });
     await tab.click();
+  }
+  for (const testid of state.click ?? []) {
+    await page.getByTestId(testid).click({ timeout: 8_000 });
+    await page.waitForTimeout(120);
   }
   if (state.open) await page.getByTestId(state.open).click({ timeout: 8_000 });
   if (state.expect)
@@ -765,6 +796,19 @@ async function enterState(page, state, settle) {
 
 /** Put an overlay state back so the next state starts from a clean chrome. */
 async function leaveState(page, state) {
+  // A state that rearranged the dock cannot be undone by clicking its opener
+  // again: the Window menu's own Reset layout is the way back to the desk.
+  if (state.reset) {
+    try {
+      await page.keyboard.press("Escape");
+      await page.getByTestId("menu-window").click({ timeout: 5_000 });
+      await page.getByTestId("menu-window-reset").click({ timeout: 5_000 });
+      await page.waitForTimeout(250);
+    } catch {
+      /* nothing to restore; the next state re-enters its mode anyway */
+    }
+    return;
+  }
   if (!state.open) return;
   try {
     await page.getByTestId(state.close ?? state.open).click({ timeout: 5_000 });

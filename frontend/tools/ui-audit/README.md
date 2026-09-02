@@ -53,13 +53,17 @@ A default run takes about 30 seconds; `--solve` about 60.
 
 ### States walked
 
-`model`, `model-menu-file`, `model-object-tree`, `model-materials`,
+`model`, `model-menu-file`, `model-tray`, `model-floating`,
 `model-render-popover`, `sketch`, `sketch-solver`, `simulate-meshes`,
 `simulate-studies`, `simulate-optimize`, `simulate-results` — each at every
 viewport. The sketch states select a profile from the object tree first,
-because the sketch panel only exists while one is selected. With `--solve` the
-simulate states are visited first: leaving Simulate mode discards the solved
-result.
+because the sketch panel only exists while one is selected. Since every panel
+became a window, the object tree and the material browser are part of the
+default desk rather than states of their own; `model-tray` parks both in the
+tray and `model-floating` lifts one out of the grid, which are the two
+arrangements `model` does not already show. A state that rearranged the dock
+is undone through the Window menu's Reset layout. With `--solve` the simulate
+states are visited first: leaving Simulate mode discards the solved result.
 
 A state that cannot be reached is recorded under `skippedStates` rather than
 failing the run.
@@ -114,6 +118,8 @@ cleanup list.
   line of each child, compared as `rect.bottom − 0.21 × font-size` (Chrome's
   text rects sit on the font box, so that approximates the baseline).
   Threshold 1px for a row whose children share a font size, 2px otherwise.
+  Text inside an out-of-flow descendant is skipped: an open popover is not its
+  anchor's first line, the same exclusion the overflow checks make.
   Rows that mix font sizes under `align-items: center` are reported at low
   severity: their baselines are *supposed* to differ, and the finding only
   matters if the row reads badly.
@@ -161,6 +167,11 @@ surround.
   gizmos, the field legend painted in WebGPU, and text over a canvas or a
   gradient are skipped for contrast (`painted: false`), because there is no
   DOM colour to composite against.
+- **Visually hidden elements are skipped entirely** — a box clipped to
+  nothing (`clip-path: inset(50%)`, `clip: rect(0 …)`, or a 1px box with
+  `overflow: hidden`) is the sr-only pattern, and its text is *meant* to be
+  visually unreachable. Measuring it as clipped or overflowing is a false
+  positive; the dock library's `aria-live` announcer alone produced 42 of them.
 - **CodeMirror's internals are exempt from the layout checks** (`--include-
   editor` re-enables them): its scroller, gutters and lines clip by design and
   otherwise drown everything else. Its colours and type *are* censused, since

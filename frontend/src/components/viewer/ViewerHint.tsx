@@ -92,7 +92,7 @@ export function ViewerHint(props: ViewerHintProps) {
             : `${CONSTRAINT_TOOL_NAMES[tool() as EdgeConstraintTool]}: choose the first sketch edge`
           : tool() !== "select"
             ? `Click to place a ${tool()} · Esc to cancel`
-            : "Drag handles or the gizmo · Drag to orbit · Space, Shift or right-drag to pan · Del removes"}
+            : "Drag handles or the gizmo · Drag to orbit · Right-drag to pan"}
     </p>
   );
 }

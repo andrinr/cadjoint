@@ -321,8 +321,13 @@ export function createDock(container: HTMLElement, callbacks: DockCallbacks): Do
     float(id) {
       const panel = panelFor(id);
       if (!panel || panel.api.location.type === "floating") return;
+      // A window lifted off the sheet lands on the sheet's margin, never on
+      // the model. The default desks put the editor in a 460px left column,
+      // so a 380px window at x = 40 clears the viewport's own tool rail at
+      // every audited width; the previous 120 put its right edge on the rail
+      // and the float stole the clicks meant for the tools underneath.
       api.addFloatingGroup(panel, {
-        position: { top: 96, left: 120 },
+        position: { top: 96, left: 40 },
         width: 380,
         height: 420,
       });

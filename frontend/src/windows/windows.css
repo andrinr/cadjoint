@@ -37,7 +37,10 @@
 .win-theme {
   --dv-group-view-background-color: var(--surface-panel);
   --dv-tabs-and-actions-container-background-color: var(--surface-bar);
-  --dv-tabs-and-actions-container-height: 26px;
+  /* One hairline plus a --control-sm cell: the strip's *content* box is then
+     exactly a control, so the buttons in it are the same height as the menu
+     bar's rather than a pixel short of it. */
+  --dv-tabs-and-actions-container-height: calc(var(--control-sm) + 1px);
   --dv-tabs-and-actions-container-font-size: var(--text-2xs);
   --dv-tab-font-size: var(--text-2xs);
   --dv-tab-close-icon-size: var(--text-sm);
@@ -91,7 +94,7 @@
   --dv-floating-border: 1px solid var(--rule-heavy);
   --dv-floating-group-border: 1px solid var(--rule-heavy);
   --dv-floating-group-dragging-opacity: 0.9;
-  --dv-floating-titlebar-height: 16px;
+  --dv-floating-titlebar-height: var(--space-6);
   --dv-floating-titlebar-background-color: var(--surface-bar-alt);
   --dv-floating-titlebar-border-bottom: 1px solid var(--rule);
 
@@ -194,10 +197,17 @@
   align-items: stretch;
 }
 
+/* `height` is set explicitly because the shell gives every bare `button` the
+   30px `--control-md` box. That is right for a control on a panel and wrong
+   for one in a 26px tab bar: the button overflowed its own strip, which is
+   what put the strip's two halves 2.5px off a shared baseline and pushed the
+   tray's controls past the bottom of the window. Chrome furniture fills the
+   bar it is in and takes its line box from the bar's own type. */
 .win-head-button {
   display: grid;
   place-items: center;
   width: 24px;
+  height: 100%;
   padding: 0;
   border: 0;
   border-left: 1px solid var(--rule);
@@ -271,6 +281,18 @@
   background: var(--surface-viewport);
 }
 
+/* ── floating windows ─────────────────────────────────────────────────── */
+
+/* The frame of a floating window is drawn as an inset outline rather than a
+   border. The library sizes the group inside the container to the
+   container's *outer* width, so a border made its content sit 2px past its
+   own right edge; an outline paints the same hairline and costs no layout. */
+.win-theme .dv-resize-container {
+  border: 0;
+  outline: 1px solid var(--rule-heavy);
+  outline-offset: -1px;
+}
+
 /* ── the tray ─────────────────────────────────────────────────────────── */
 
 /* Parked windows. A strip along the foot of the workspace, in the same
@@ -279,32 +301,35 @@
   display: flex;
   align-items: stretch;
   gap: 0;
-  height: 22px;
+  height: calc(var(--control-xs) + 1px);
   border-top: 1px solid var(--rule);
   background: var(--surface-bar);
 }
 
-.win-tray-label {
+/* The label and the parked windows are one row of cells: same grid, same
+   line box, same size. A kicker a size smaller read as a second register in a
+   22px strip, and it put the two on different baselines. */
+.win-tray-label,
+.win-tray-item {
   display: grid;
   place-items: center;
-  padding: 0 var(--space-4);
-  border-right: 1px solid var(--rule);
-  color: var(--ink-3);
-  font: var(--weight-regular) var(--text-3xs) / var(--leading-flat) var(--font-mono);
-  letter-spacing: var(--tracking-2xs);
-  text-transform: uppercase;
-}
-
-.win-tray-item {
+  height: 100%;
   padding: 0 var(--space-4);
   border: 0;
   border-right: 1px solid var(--rule);
   border-radius: 0;
   background: transparent;
-  color: var(--ink-2);
   font: var(--weight-regular) var(--text-2xs) / var(--leading-flat) var(--font-mono);
   letter-spacing: var(--tracking-2xs);
   text-transform: uppercase;
+}
+
+.win-tray-label {
+  color: var(--ink-3);
+}
+
+.win-tray-item {
+  color: var(--ink-2);
   cursor: pointer;
 }
 
