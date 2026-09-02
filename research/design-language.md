@@ -579,7 +579,7 @@ contrast 1.00:1 · dE(OKLab) 0.00`, and the rule drawn on it sits at L 0.726 —
 was built and measured at 1.17:1: it buys a boundary nobody needed and costs the
 hot decile 1.37:1 instead of the shared-ground reading. The seam is drawn.
 
-### 12.3 The plate as an object — queued, not shipped
+### 12.3 The plate as an object — measured, not chosen
 
 With both chrome and viewport light, does the field stay the subject? In two
 halves:
@@ -601,7 +601,7 @@ well cut out of it**: it keeps the light system everywhere, restores the hot
 decile to **5.54:1**, gives an unambiguous boundary (`dL 0.8146`, 16.42:1), lifts
 the field's share of screen chroma to **11.35%**, and fixes the unsolved case for
 free. `frontend/src/tokens.ts` still ships the shared-paper viewport, so this is
-the decided next step and not the current state.
+a recorded alternative, not a plan: the user chose the shared-paper viewport after seeing it live, and the plate stays on file as the measured answer should unsolved geometry on paper ever need the lightness step back.
 
 ### 12.4 Why the accent is orange, and only a fill
 
