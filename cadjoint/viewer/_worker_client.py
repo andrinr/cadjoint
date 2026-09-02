@@ -47,6 +47,16 @@ COMPILE_TIMEOUT_SECONDS = 90
 MESH_TIMEOUT_SECONDS = 90
 
 
+#: How each worker mode names itself in a timeout message.
+_MODE_NOUNS = {
+    "compile": "Compilation",
+    "mesh": "Meshing",
+    "mesh_inspect": "Mesh inspection",
+    "simulate": "Simulation",
+    "lint": "Linting",
+}
+
+
 def _run_worker(
     source: str, mode: str, timeout: float, extra: dict[str, Any] | None = None
 ) -> dict[str, Any]:
@@ -75,7 +85,7 @@ def _run_worker(
         process.communicate()
         return {
             "ok": False,
-            "error": f"Compilation exceeded the {timeout:g}-second timeout.",
+            "error": f"{_MODE_NOUNS.get(mode, 'Compilation')} exceeded the {timeout:g}-second timeout.",
         }
 
     if process.returncode != 0:
@@ -193,7 +203,10 @@ def mesh_source(source: str, timeout: float = MESH_TIMEOUT_SECONDS) -> dict[str,
 
 # FEM solves cover meshing plus the assembled solve, which can far exceed the
 # ordinary compile budget.
-SIMULATE_TIMEOUT_SECONDS = 180
+# A novel design pays XLA for its FEM assembly before it solves — measured at
+# 31-77 s for a new node count — and a loaded machine stretches that; the job
+# is visible and cancellable, so the budget errs on the side of finishing.
+SIMULATE_TIMEOUT_SECONDS = 600
 SIMULATE_KINDS = ("study",)
 # Mesh inspection only builds the hex mesh (no solve), but big grids still
 # outgrow the compile budget.
