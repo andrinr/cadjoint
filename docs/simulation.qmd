@@ -71,7 +71,7 @@ metric is exactly 1.0. The tet10 mesh of the same bar spans radius ratios from
 0.146 to 0.941. That spread is what the histogram in the viewer's Meshes tab
 shows.
 
-![The declared SimMesh discretized into tet10 elements, shaded by element quality with the quality histogram beside it](../examples/assets/playground-mesh.png)
+![The declared SimMesh discretized into tet10 elements, shaded by element quality with the quality histogram beside it](../docs/assets/screens/simulate-meshes.png)
 
 ## Select nodes
 
@@ -303,7 +303,7 @@ raw fields; `nodal_scalar()` gives the per-node field the viewer colours by.
 they work under `jax.grad`, where the concrete accessors do not. `to_vtk(path)`
 writes the result out for ParaView.
 
-![The solved temperature field on the same mesh, clipped by the slice plane so the flux entering at the die interface is visible](../examples/assets/playground-field.png)
+![The solved temperature field on the same mesh, clipped by the slice plane so the flux entering at the die interface is visible](../docs/assets/screens/simulate-results.png)
 
 ## Backends
 
