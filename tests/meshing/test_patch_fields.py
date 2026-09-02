@@ -9,11 +9,14 @@ does.
 
 from __future__ import annotations
 
+import contextlib
+
 import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
 
+from cadjoint.geometry.parameters import Vector2
 from cadjoint.meshing import (
     GridSpec,
     exact_feature_mask,
@@ -50,6 +53,20 @@ HOUSE_DEPTH = 1.2
 
 def _house() -> ExtrudedPolygon:
     return ExtrudedPolygon([jnp.array(v) for v in HOUSE_VERTICES], depth=HOUSE_DEPTH)
+
+
+@contextlib.contextmanager
+def _vertices_set(polygon, values):
+    """Swap a polygon's profile vertices for ``values`` (tracers welcome)."""
+    names = [f"v{i}" for i in range(polygon.num_vertices)]
+    original = [polygon.params[name].value for name in names]
+    for index, name in enumerate(names):
+        polygon.params[name].value = values[index]
+    try:
+        yield
+    finally:
+        for name, value in zip(names, original):
+            polygon.params[name].value = value
 
 
 def _patch_id(fields, point) -> int:
@@ -216,6 +233,44 @@ class TestExtrudedPolygonPatchFields:
         verts = [jnp.array(v) for v in HOUSE_VERTICES]
         assert ExtrudedPolygon(verts, depth=1.0, draft=5.0).patch_fields() is None
         assert ExtrudedPolygon(verts, depth=1.0, twist=30.0).patch_fields() is None
+
+    def test_jacrev_through_a_traced_profile_matches_finite_differences(self):
+        """Patch fields rebuilt with the sketch vertices traced stay differentiable.
+
+        The B-rep handle solver re-reads ``patch_fields()`` with the profile's
+        parameters swapped for tracers (``cadjoint.brep.drag.patch_field_fn``).
+        The only discrete reading in the rebuild — the profile's shoelace
+        winding — is taken once at construction, so nothing inside needs a
+        concrete value and ``jax.jacrev`` goes straight through.
+        """
+        house = ExtrudedPolygon(
+            [Vector2(value=list(vertex)) for vertex in HOUSE_VERTICES], depth=HOUSE_DEPTH
+        )
+        point = jnp.asarray([0.7, 0.1, 0.2])
+
+        def walls(profile):
+            with _vertices_set(house, profile):
+                fields = house.patch_fields()
+            return jnp.stack([jnp.reshape(field(point), ()) for field in fields])
+
+        nominal = jnp.asarray(HOUSE_VERTICES)
+        analytic = np.asarray(jax.jacrev(walls)(nominal))
+        assert analytic.shape == (len(HOUSE_VERTICES) + 2, len(HOUSE_VERTICES), 2)
+        assert np.isfinite(analytic).all()
+        assert np.abs(analytic).max() > 0.1, "the walls must actually move with the profile"
+
+        # float32 pipeline: 1e-3 is the sweet spot between truncation and
+        # cancellation for these (almost linear) half-plane fields.
+        step = 1e-3
+        numeric = np.zeros_like(analytic)
+        for vertex in range(len(HOUSE_VERTICES)):
+            for axis in range(2):
+                shift = np.zeros((len(HOUSE_VERTICES), 2))
+                shift[vertex, axis] = step
+                plus = np.asarray(walls(nominal + jnp.asarray(shift)))
+                minus = np.asarray(walls(nominal - jnp.asarray(shift)))
+                numeric[:, vertex, axis] = (plus - minus) / (2.0 * step)
+        np.testing.assert_allclose(analytic, numeric, atol=2e-3, rtol=2e-3)
 
 
 class TestRevolvedPolygonPatchFields:

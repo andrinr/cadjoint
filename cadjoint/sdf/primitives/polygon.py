@@ -12,6 +12,7 @@ query point and the vertices.
 
 from __future__ import annotations
 
+import jax
 import jax.numpy as jnp
 from jax import Array
 
@@ -82,7 +83,25 @@ def _profile_vertex_values(params: dict) -> list[Array]:
     return [params[name].value for name in names]
 
 
-def _edge_half_plane_fields(verts: list[Array]):
+def _profile_orientation(verts) -> float | Array:
+    """Winding of a closed profile: ``+1.0`` counter-clockwise, ``-1.0`` clockwise.
+
+    Read concretely when the vertices are plain numbers, so the sign is a
+    Python float fixed at construction. Under a tracer — a profile built
+    inside a jitted derived plane — the sign is a traced ``where`` instead:
+    piecewise constant, so it contributes no gradient, but it lets the
+    construction trace rather than fail on a ``float()`` of a tracer.
+    """
+    points = jnp.stack([jnp.asarray(v, dtype=jnp.float32).reshape(2) for v in verts])
+    rolled = jnp.roll(points, -1, axis=0)
+    twice_area = jnp.sum(points[:, 0] * rolled[:, 1] - rolled[:, 0] * points[:, 1])
+    try:
+        return 1.0 if float(twice_area) >= 0.0 else -1.0
+    except jax.errors.ConcretizationTypeError:
+        return jnp.where(twice_area >= 0.0, 1.0, -1.0)
+
+
+def _edge_half_plane_fields(verts: list[Array], orientation: float | None = None):
     """Outward half-plane distance fields, one per profile edge.
 
     Edge ``k`` runs from vertex ``k`` to vertex ``(k+1) % N``; its field is
@@ -92,18 +111,25 @@ def _edge_half_plane_fields(verts: list[Array]):
     field still agrees with the exact distance on its own edge's patch, so
     ``argmin |f_k|`` identifies the owning edge there.
 
+    Every step here is a JAX expression of ``verts``, so the returned fields
+    stay differentiable in the profile vertices — provided ``orientation`` is
+    supplied, since reading the winding off traced vertices would need a
+    concrete value.
+
+    Args:
+        verts: Ordered ``(2,)`` profile vertices; may be tracers.
+        orientation: The profile's winding sign from
+            :func:`_profile_orientation`.  ``None`` reads it from ``verts``,
+            which requires them to be concrete.
+
     Returns:
         List of callables mapping profile points shaped ``(..., 2)`` to
         signed distances shaped ``(...)``.
     """
     num = len(verts)
-    # Shoelace winding: positive area means counterclockwise vertices, whose
-    # outward edge normal is the edge direction rotated by -90 degrees.
-    area = 0.0
-    for i in range(num):
-        a, b = verts[i], verts[(i + 1) % num]
-        area += float(a[0] * b[1] - b[0] * a[1])
-    orient = 1.0 if area >= 0.0 else -1.0
+    # Positive area means counterclockwise vertices, whose outward edge
+    # normal is the edge direction rotated by -90 degrees.
+    orient = _profile_orientation(verts) if orientation is None else orientation
 
     fields = []
     for i in range(num):
@@ -181,6 +207,11 @@ class ExtrudedPolygon(Primitive):
         self.num_vertices = len(vertices)
         self.params = {f"v{i}": v for i, v in enumerate(vertices)}
         self.params["depth"] = depth
+        # Read the winding once, here, from the nominal vertices: patch_fields
+        # may be rebuilt with the vertices traced, and the shoelace sign is a
+        # discrete reading no tracer can give.  ``params`` are still raw at
+        # this point (the base class wraps them after __init__ returns).
+        self._orientation = _profile_orientation([getattr(v, "value", v) for v in vertices])
         if isinstance(draft, Parameter) or not _statically_zero(draft):
             self.params["draft"] = draft
             # Drafted distances have gradient norm up to sec(draft) > 1.
@@ -255,7 +286,9 @@ class ExtrudedPolygon(Primitive):
         if "draft" in self.params or "twist" in self.params:
             return None
         depth = self.params["depth"].value
-        edge_fields = _edge_half_plane_fields(_profile_vertex_values(self.params))
+        edge_fields = _edge_half_plane_fields(
+            _profile_vertex_values(self.params), self._orientation
+        )
         walls = [(lambda p, f=field: f(p[..., :2])) for field in edge_fields]
         caps = [
             lambda p: -p[..., 2] - depth / 2.0,
@@ -288,6 +321,9 @@ class RevolvedPolygon(Primitive):
         self.num_vertices = len(vertices)
         self.params = {f"v{i}": v for i, v in enumerate(vertices)}
         self.params["offset"] = offset
+        # The winding, read once from the nominal vertices (see
+        # ExtrudedPolygon.__init__).
+        self._orientation = _profile_orientation([getattr(v, "value", v) for v in vertices])
 
     def material_at(self, _p):
         return self.material.as_dict()
@@ -326,7 +362,9 @@ class RevolvedPolygon(Primitive):
         are no separate cap fields.
         """
         offset = self.params["offset"].value
-        edge_fields = _edge_half_plane_fields(_profile_vertex_values(self.params))
+        edge_fields = _edge_half_plane_fields(
+            _profile_vertex_values(self.params), self._orientation
+        )
 
         def revolved(p: Array) -> Array:
             radial = jnp.sqrt(p[..., 0] ** 2 + p[..., 2] ** 2 + 1e-20) - offset
