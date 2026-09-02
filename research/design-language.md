@@ -724,7 +724,7 @@ The language is only real if something fails on it.
   tone clears 3:1; that the accent clears 7:1 as a ground and fails 3:1 as ink;
   that nothing drawn inside the viewport rectangle carries chroma; and that
   chrome and viewport sit on the same sheet.
-- **`frontend/test/graticule.test.ts`** holds the faceplate tones inside the
+- **`frontend/test/graticule.test.ts`** holds the floor-grid tones inside the
   1.6–2.8:1 furniture band — a band, not a floor.
 - **`frontend/tools/ui-audit/audit.mjs`** drives a real Chromium through every
   mode, tab and popover at several widths and measures the result from computed
