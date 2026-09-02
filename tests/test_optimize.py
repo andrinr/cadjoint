@@ -279,8 +279,11 @@ class TestStarterScene:
         assert summary["kind"] == "thermal"
         assert summary["nodes"] > 0 and summary["elements"] > 0
         # Every descent step projected back onto the sketch constraints:
-        # the final parameters still satisfy the whole declared system.
-        _, _, metadata = extract_parameters(scene)
+        # the final parameters still satisfy the whole declared system. The
+        # parameters are the thermal body's — the domain the study meshes —
+        # so the residuals are evaluated on that body, not on the rendered
+        # scene, which also carries board-level context solids.
+        _, _, metadata = extract_parameters(namespace["thermal_body"])
         final = {name: np.asarray(value) for name, value in run.parameters.items()}
         residuals = np.abs(np.asarray(constraint_residuals(final, metadata)))
         assert residuals.size > 0

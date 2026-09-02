@@ -54,7 +54,6 @@ from cadjoint.fem import Dirichlet, HeatFlux, Nodes, SimMesh, ThermalStudy
 from cadjoint.geometry import Scalar, Vector, Vector2
 from cadjoint.optimize import Optimization
 from cadjoint.render import Material
-from cadjoint.sdf import Box, Cylinder, Translate
 from cadjoint.sdf.boolean import Union
 
 # ── design parameters ────────────────────────────────────────────────────────
@@ -238,14 +237,23 @@ thermal_body = Union(sink, slug, bush_a, bush_b, smoothness=0.03)
 # Rendered so the part reads as a power module rather than a lone comb, and
 # kept OUT of the simulation via ``domain=thermal_body`` on the mesh below:
 # the flux enters through the slug bottom exactly as before, and every
-# mesh, solve and gradient is identical to the thermal body alone. Plain
-# primitives (no construction mirror) — context, not design intent.
-board = Translate(Box(size=[1.2, 0.78, 0.015], material=fr4), [0.0, 0.0, -0.245])
-die = Translate(Box(size=[0.17, 0.17, 0.025], material=silicon), [0.0, 0.0, -0.205])
-head_a = Translate(Cylinder(0.062, 0.03, material=black_oxide), [0.78, 0.0, 0.25])
-head_b = Translate(Cylinder(0.062, 0.03, material=black_oxide), [-0.78, 0.0, 0.25])
-cap_a = Translate(Cylinder(0.07, 0.09, material=electrolytic), [1.05, 0.38, -0.14])
-cap_b = Translate(Cylinder(0.07, 0.09, material=electrolytic), [1.05, -0.38, -0.14])
+# mesh, solve and gradient is identical to the thermal body alone. They are
+# construction solids so the object tree lists them and their materials
+# count as applied; nothing about them is free, so the optimizer ignores them.
+board = Solid.box(size=[1.2, 0.78, 0.015], position=[0.0, 0.0, -0.245], material=fr4, name="board")
+die = Solid.box(size=[0.17, 0.17, 0.025], position=[0.0, 0.0, -0.205], material=silicon, name="die")
+head_a = Solid.cylinder(
+    radius=0.062, height=0.03, position=[0.78, 0.0, 0.25], material=black_oxide, name="head_a"
+)
+head_b = Solid.cylinder(
+    radius=0.062, height=0.03, position=[-0.78, 0.0, 0.25], material=black_oxide, name="head_b"
+)
+cap_a = Solid.cylinder(
+    radius=0.07, height=0.09, position=[1.05, 0.38, -0.14], material=electrolytic, name="cap_a"
+)
+cap_b = Solid.cylinder(
+    radius=0.07, height=0.09, position=[1.05, -0.38, -0.14], material=electrolytic, name="cap_b"
+)
 
 # A 5 mm blend rather than a hard union: invisible at this scale, and the
 # feature-edge extractor's Newton steps converge in a third of the time on

@@ -206,7 +206,17 @@ def test_example_scene_reports_its_construction_for_the_viewer():
     nodes = {node["name"]: node for node in result["construction"] if node["kind"] != "profile"}
     # Extrude and revolve sketches sit alongside the two bushing cylinders.
     assert set(profiles) == {"fin comb", "slug section"}
-    assert set(nodes) == {"bush_a", "bush_b"}
+    # The two bushings plus the board-level context solids.
+    assert set(nodes) == {
+        "bush_a",
+        "bush_b",
+        "board",
+        "die",
+        "head_a",
+        "head_b",
+        "cap_a",
+        "cap_b",
+    }
 
     profile = profiles["fin comb"]
     assert profile["editable"] is True
