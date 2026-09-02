@@ -567,10 +567,10 @@ def tet10_from_tet4(
 
     Returns:
         ``(points10, cells10, edge_parents)`` where ``points10`` is
-        ``(N + E, 3)``, ``cells10`` is ``(T, 10)`` int32, and
-        ``edge_parents`` is ``(E, 2)`` — the corner indices whose midpoint
-        each appended node is (the hook for differentiable recomputation:
-        ``points10 = concat(corners, corners[parents].mean(1))``).
+            ``(N + E, 3)``, ``cells10`` is ``(T, 10)`` int32, and
+            ``edge_parents`` is ``(E, 2)`` — the corner indices whose midpoint
+            each appended node is (the hook for differentiable recomputation:
+            ``points10 = concat(corners, corners[parents].mean(1))``).
     """
     points = np.asarray(points, dtype=np.float64)
     cells = np.asarray(cells, dtype=np.int64)

@@ -279,9 +279,9 @@ def _distinct_groups(
 
     Returns:
         ``(assignment, values, counts)`` — the ``(C,)`` group index of each
-        element, the ``(G, K)`` representative property tuple of each group
-        (the first member's own values, never an invented average), and the
-        ``(G,)`` element count per group.
+            element, the ``(G, K)`` representative property tuple of each group
+            (the first member's own values, never an invented average), and the
+            ``(G,)`` element count per group.
     """
     keys = np.concatenate(
         [_relative_bins(table[:, k], tolerance) for k in range(table.shape[1])], 1

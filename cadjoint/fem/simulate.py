@@ -154,9 +154,9 @@ def _tet_face_patch(mesh: TetMesh, patch: Patch) -> tuple[np.ndarray, np.ndarray
 
     Returns:
         ``(nodes, faces)`` — the spanning node set (corners plus, on
-        TET10, the faces' midside nodes: jax-fem selects a face for a
-        surface map only when *all* its nodes are in the set) and the
-        ``(M, 3)`` corner triangles used for exact face targeting.
+            TET10, the faces' midside nodes: jax-fem selects a face for a
+            surface map only when *all* its nodes are in the set) and the
+            ``(M, 3)`` corner triangles used for exact face targeting.
     """
     if isinstance(patch, NodeSelection):
         faces = tet_faces_from_nodes(mesh, patch.resolve(mesh))

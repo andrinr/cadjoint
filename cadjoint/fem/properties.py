@@ -318,9 +318,9 @@ def quantize_to_materials(
 
     Returns:
         ``(assignment, error)`` — ``assignment`` is a ``(C,)`` int array of
-        indices into ``references``, and ``error`` is the ``(C,)`` maximum
-        relative property error the snap introduced (0 where an element landed
-        exactly on a reference material).
+            indices into ``references``, and ``error`` is the ``(C,)`` maximum
+            relative property error the snap introduced (0 where an element landed
+            exactly on a reference material).
 
     Raises:
         ValueError: If ``references`` is empty or a reference does not specify

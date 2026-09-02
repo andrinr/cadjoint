@@ -263,8 +263,12 @@ def project_fields(
     if not 1 <= len(fields) <= 3:
         raise ValueError(f"project takes 1 to 3 fields; got {len(fields)}.")
     seeds = jnp.asarray(np.asarray(points, dtype=np.float64).reshape(-1, 3), dtype=jnp.float32)
-    result = project(stacked_fields(fields), (), seeds, max_step=max_step, steps=steps)
-    return np.asarray(result, dtype=np.float64)
+    stacked = stacked_fields(fields)
+    # Compiled, for the reason :func:`project_batched` gives: this wrapper is
+    # forward-only, and op-by-op the iteration re-traces the whole field stack
+    # once per Newton step.
+    run = jax.jit(lambda seed: project(stacked, (), seed, max_step=max_step, steps=steps))
+    return np.asarray(run(seeds), dtype=np.float64)
 
 
 def field_residuals(fields: Sequence[Callable[[Array], Array]], points: Array) -> np.ndarray:
@@ -299,6 +303,31 @@ def transversal(fields: Sequence[Callable[[Array], Array]], points: Array) -> np
     probes = jnp.asarray(np.asarray(points, dtype=np.float64).reshape(-1, 3), dtype=jnp.float32)
     _values, _jacobian, gram = _system(stacked_fields(fields), (), probes)
     return np.asarray(_usable(gram))
+
+
+def _restrict(
+    fields: Sequence[Callable[[Array], Array]], members: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
+    """The field indices a batch actually gathers, and members renumbered onto them.
+
+    A batch names its fields by index into the scene's whole patch table, but
+    a given batch usually touches a fraction of it — and the cost of an eager
+    JAX program is per *call*, so evaluating a field no point gathers is pure
+    waste repeated once per Newton step.  Evaluate the used subset instead and
+    renumber ``members`` onto it; the gather is identical either way.
+
+    Args:
+        fields: The scene's whole patch-field table.
+        members: Indices into ``fields``, shaped ``(n, m)``.
+
+    Returns:
+        ``(used, renumbered)`` — the sorted distinct field indices, and
+            ``members`` expressed as positions within ``used``.
+    """
+    used, inverse = np.unique(np.asarray(members), return_inverse=True)
+    if used.size and (used.min() < 0 or used.max() >= len(fields)):
+        raise ValueError("members index outside the field table.")
+    return used, inverse.reshape(np.shape(members)).astype(np.int32)
 
 
 def project_batched(
@@ -344,9 +373,10 @@ def project_batched(
     if seeds.shape[0] == 0:
         return seeds
 
+    used, member_array = _restrict(fields, member_array)
     evaluators = [
-        jax.vmap(jax.value_and_grad(lambda p, f=field: jnp.asarray(f(p)).reshape(())))
-        for field in fields
+        jax.vmap(jax.value_and_grad(lambda p, f=fields[index]: jnp.asarray(f(p)).reshape(())))
+        for index in used
     ]
     start = jnp.asarray(seeds, dtype=jnp.float32)
     picker = jnp.arange(start.shape[0])[:, None]
@@ -358,17 +388,26 @@ def project_batched(
         jacobian = jnp.stack(gradients, axis=1)[picker, member_ids]
         return value, jacobian
 
-    x = start
-    for _ in range(steps):
-        value, jacobian = gathered(x)
-        gram = jnp.einsum("nij,nkj->nik", jacobian, jacobian)
-        usable = _usable(gram)
-        multipliers = _solve_masked(gram, value, usable)
-        x = x - jnp.einsum("nij,ni->nj", jacobian, multipliers)
-        displacement = x - start
-        length = jnp.sqrt(jnp.maximum(jnp.sum(displacement**2, axis=-1, keepdims=True), 1e-24))
-        x = start + displacement * jnp.minimum(1.0, max_step / length)
-    return np.asarray(x, dtype=np.float64)
+    # The whole unrolled iteration is *one* compiled program.  Op-by-op, JAX
+    # re-traces every ``vmap(value_and_grad(f))`` on every call, so a table of
+    # fifty patches over four steps is two hundred traces of which a hundred
+    # and fifty are redundant — and that tracing, not the arithmetic, is what
+    # the viewer's cold extraction is made of (measured on the playground
+    # starter: 5.7 s of the 19 s, down to 1.4 s here).
+    @jax.jit
+    def iterate(x: Array) -> Array:
+        for _ in range(steps):
+            value, jacobian = gathered(x)
+            gram = jnp.einsum("nij,nkj->nik", jacobian, jacobian)
+            usable = _usable(gram)
+            multipliers = _solve_masked(gram, value, usable)
+            x = x - jnp.einsum("nij,ni->nj", jacobian, multipliers)
+            displacement = x - start
+            length = jnp.sqrt(jnp.maximum(jnp.sum(displacement**2, axis=-1, keepdims=True), 1e-24))
+            x = start + displacement * jnp.minimum(1.0, max_step / length)
+        return x
+
+    return np.asarray(iterate(start), dtype=np.float64)
 
 
 def batched_residuals(
@@ -388,8 +427,14 @@ def batched_residuals(
     member_array = np.asarray(members, dtype=np.int32).reshape(probes.shape[0], -1)
     if probes.shape[0] == 0:
         return np.zeros(0)
-    x = jnp.asarray(probes, dtype=jnp.float32)
-    stacked = jnp.stack([jax.vmap(field)(x) for field in fields], axis=-1)
-    picker = jnp.arange(x.shape[0])[:, None]
-    selected = stacked[picker, jnp.asarray(member_array)]
-    return np.max(np.abs(np.asarray(selected, dtype=np.float64)), axis=-1)
+    used, member_array = _restrict(fields, member_array)
+    evaluators = [fields[index] for index in used]
+
+    @jax.jit
+    def worst(x: Array, member_ids: Array) -> Array:
+        stacked = jnp.stack([jax.vmap(field)(x) for field in evaluators], axis=-1)
+        picker = jnp.arange(x.shape[0])[:, None]
+        return jnp.max(jnp.abs(stacked[picker, member_ids]), axis=-1)
+
+    residual = worst(jnp.asarray(probes, dtype=jnp.float32), jnp.asarray(member_array))
+    return np.asarray(residual, dtype=np.float64)

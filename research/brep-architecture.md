@@ -483,6 +483,121 @@ remesher. This is the same conclusion §3.2 reached from the other direction
 (1142 of 1181 STEP faces are facets), and it is the prototype's most
 actionable result.
 
+### 5.4 The other route: hand the exact STEP to a CAD mesher
+
+`cadjoint/brep/mesh_gmsh.py`, `cadjoint/fem/tesseracts/tet_gmsh/`.
+
+§5.1–5.3 keep TetGen and change what it is fed. The alternative is to stop
+triangulating altogether: §3 already writes the part as *exact geometry*, and
+a CAD mesher can size elements by the model instead of by the lattice. Gmsh
+4.15.2 (HXT, `Mesh.ElementOrder = 2`) reads that file, and the whole question
+is whether the ownership survives the round trip — OCC renumbers every
+entity, and reports a cylinder's type as `Unknown`, so neither the tag nor
+the type identifies a face. What identifies it is the patch field: a nearest-
+quad vote proposes a face, and `|f_patch|` on the entity's own nodes confirms
+or refuses it.
+
+**The plate (box − cylinder), TET10, macOS/arm64:**
+
+| | DC path (`sdf_to_tet_mesh` + `tet10_mesh`) | Gmsh from the exact STEP |
+|---|---|---|
+| wall time | 2.08 s | **0.26 s** |
+| tets / nodes | 8529 / 14445 | 4735 / 8228 |
+| radius ratio, min | 0.0425 | **0.3191** |
+| radius ratio, mean | 0.7318 | **0.7613** |
+| volume (exact 0.994920) | 0.996481 | 0.997987 |
+| what set the element size | the (20,20,20) lattice | the part (`target_size = 0.10`) |
+
+The worst element is **7.5x better** and the mesh arrives in an eighth of the
+time. Inside that 0.26 s, Gmsh itself is 50 ms; the rest is writing the STEP
+(4 ms) and assigning ownership (0.20 s, one batched JAX call per patch).
+Neither column counts `extract_brep`, which only the Gmsh route needs — see
+the last paragraph of this section, which is where the honest total lives.
+
+**The bore is where the two orders differ.** `tet10_mesh` promotes a linear
+mesh, so a midside on the bore lands at the chord's midpoint. Gmsh's
+`setOrder(2)` puts it on the `CYLINDRICAL_SURFACE`, and re-solving it against
+its own patch keeps it there when the radius moves: measured, every bore
+midside sits at r = 0.25 to 1e-6, while its chord midpoint is up to 1.4e-3
+inside. `tests/brep/test_mesh_gmsh.py` asserts both.
+
+**Positions differentiate; topology does not.** Gmsh's decision — how many
+nodes, which cells, which entity owns which node — is discovered once and
+frozen. What moves under a design change is the positions, recomputed by
+`cadjoint.brep.project` at the arity ownership gives, midsides included.
+Central differences against `jax.grad`, plate at `target_size = 0.16`
+(2706 nodes, 29 distinct owner sets), x64:
+
+| objective | parameter | analytic | central FD (h = 1e-5) | rel. error |
+|---|---|---|---|---|
+| mesh volume | bore radius | −1.193067 | −1.193067 | 1.8e-12 |
+| mesh volume | plate half-thickness | +2.505492 | +2.505492 | 3.7e-13 |
+| mean bore-node radius | bore radius | +1.000000 | +1.000000 | 1.4e-11 |
+| mean bore-node radius | plate half-thickness | 0 | 0 | exact |
+
+The analytic derivatives are the discretised ones, and they should be: the
+exact −2πrh = −1.2566 belongs to the cylinder, while an inscribed polygon
+bore is what the mesh has. The claim being tested is that the adjoint matches
+*this* mesh's own volume, and it does to 1e-12.
+
+**Blends.** The starter's thermal body writes 23 planes and 148 facet faces,
+and Gmsh meshes the facets as discrete surfaces. Nodes on a surface no patch
+owns are solved against the *scene's* own zero set instead, and there are a
+lot of them:
+
+| target size | nodes | tets | blend nodes | blend surfaces | worst radius ratio, before → after re-solve |
+|---|---|---|---|---|---|
+| 0.16 | 4941 | 2406 | 410 (8.3%) | 22 | 0.2152 → **0.2171** |
+| 0.1167 (the grid's own) | 8896 | 4563 | 608 (6.8%) | 64 | 0.1859 → **0.1895** |
+
+A blend node moves up to 2.9e-2 in the re-solve, which is the STEP's chord
+error being repaired rather than a drift; a patch-owned node moves at most
+2.9e-3, which is the ownership bar. At the coarser size the 410 blend nodes
+spread over nine faces, plus 184 on curves whose bounding facets are too small
+for Gmsh to give them an interior node to vote with; those inherit nothing and
+fall to the scene, which is the conservative answer and is reported under face
+`-1` rather than folded into a face they only nearly belong to.
+
+**Two ways the ownership went wrong, both found by measuring the re-solve.**
+At the nominal design a patch-owned node should not move at all, so anything
+that does is a misassignment, and it showed up as quality loss:
+
+1. A surface entity was confirmed against the *median* residual over its
+   nodes. An entity straddling a blend's edge has most of its nodes hugging
+   the neighbouring plane and a few peeling away, so it passed as that plane
+   and the projection dragged the outliers onto the plane's unbounded
+   extension. Confirming on the **maximum** instead is the fix; worst radius
+   ratio 0.1982 → 0.2171.
+2. A curve node *inherited* the patches of the surfaces bounding it, with no
+   check at the node itself. Two adjacent facet surfaces can both point at
+   the same plane while the curve between them runs along the blend. Applying
+   the same bar at the node dropped the worst owned displacement from 1.7e-2
+   — nearly six times the 3.0e-3 bar — to 2.4e-3, and turned 44 more nodes
+   into blend nodes, which is what they were.
+
+**The end-cap, and what it is really evidence of.** `scenes/end_cap.py`'s
+housing at its declared `(26, 26, 13)` does not mesh on either route, and for
+one root cause. The DC path spends **520.4 s** walking its refinement ladder
+— (26,26,13), (39,39,20), (59,59,30), each ~55 s of extraction plus ~10 s of
+projection — and TetGen refuses all three as self-intersecting. The Gmsh
+route refuses it in **0.87 s** after the same extraction, because the graph's
+2247-face shell does not sew: OCCT reads it as one 12-face solid plus a free
+shell, and Gmsh's highest-dimension-only import would otherwise have meshed a
+0.1 m chip out of a 2 m casting, quickly and wrongly. Counting `ADVANCED_FACE`
+in the file against the surfaces that arrive is what makes that an error
+instead of a plausible mesh (`_check_import`). Gmsh does not rescue an
+invalid B-rep — it fails faster, and says why.
+
+**What this route does not remove.** `extract_brep` still runs, and it is the
+expensive step: 8.7 s on the plate, 18 s on the starter's thermal body, and
+53.5 s on the end-cap housing (that last figure is the DC ladder's own
+measurement of the same call, since both routes make it). The Gmsh route
+replaces the *meshing*, not the extraction, so on a cold graph it is not
+eight times faster end to end — it is faster only where the graph is already
+being built for the exporter and the drag handles, which is the whole premise
+of §6. It is also why the plate table quotes the two meshers against each
+other and says so.
+
 ---
 
 ## 6. What the three products actually share
@@ -550,6 +665,92 @@ because all three want the same thing out of it.
 A shared `extract_brep` cache keyed by `(scene identity, grid, parameter
 hash)` should sit next to `cadjoint/cache.py`. The extraction is
 deterministic, so caching is safe.
+
+### 8.1 Migration 1 of 3: the overlay — done, and what it cost
+
+`_mesh_edge_payload` now runs `extract_brep` on the viewer's own 64³ grid
+(one dual-contouring pass — `tests/viewer/test_edge_overlay_brep.py`
+counts the calls) and reads two things off the graph:
+
+- **wire** — the same dual-contour quad edges as before, drawn on
+  `BRep.points`. The wire layer stays the quad edges rather than the PLC
+  tessellation because the quads are already in hand: `brep.mesh.quads` is a
+  by-product of the pass the sharp layer needs anyway, while `brep_plc`
+  triangulates every face loop, roughly doubles the segment count for the
+  same picture, and needs the loops to be simple — which the extraction
+  reports as *not* holding on some scenes. Nothing to buy there.
+- **sharp** — every `BRepEdge` with `analytic` true and a residual under a
+  tenth of a cell, resampled at half the grid spacing and re-projected in
+  one batched call. A closed edge is divided *evenly*, so a rim is uniform
+  in angle rather than staircased across whatever cells it crossed.
+
+Three things came out of the migration rather than going into it.
+
+**`BRepEdge.vertices` is now populated** (`_link_edge_vertices`). It was
+documented and always `(-1, -1)`, because edges are chained before the
+triple points exist. The overlay needs it: a chain's seeds are mesh-edge
+*midpoints*, so a polyline stops half a cell short of its corner, and only
+the vertex says where the corner is. Appending it also makes the three
+edges meeting there share one endpoint exactly.
+
+**Corners must not be re-projected.** A corner is the 3-field solution;
+projecting it again onto the 2 patches of one incident edge pulls it a few
+thousandths off the third face, and the three chains stop touching. Pinned
+instead — this was worth three debris fragments on the artifact battery.
+
+**The kernel was tracing, not computing.** Op-by-op, JAX re-traces every
+`vmap(value_and_grad(f))` on every call, so a fifty-patch table over four
+Newton steps is two hundred traces of which a hundred and fifty are
+redundant. `project_batched`, `project_fields` and `batched_residuals` now
+compile the whole unrolled iteration. This is where the overlay's cost went.
+
+Measured, `_mesh_edge_payload` on `scenes/starter.py`, wall clock:
+
+| `scenes/starter.py` | before (lattice links) | after (graph) |
+|---|---|---|
+| cold process — what the viewer pays, `mesh_source` forks per request | 16.9 s | **9.8 s** |
+| warm, second call in one process | 4.3 s | 5.5–6.0 s |
+| sharp segments | 453 | 889 |
+
+| `scenes/end_cap.py` | before | after |
+|---|---|---|
+| cold process | 215 s | **33.8 s** |
+| warm | 219 s | **32.3 s** |
+| sharp segments | 357 | 1043 |
+
+The cold number is the one the product pays, and the end-cap is where the
+difference shows: its cost was never compilation (before and after, warm
+equals cold on it) but the *count* of programs, and the graph asks for a
+handful of big ones where the old path asked for a per-seam-group crowd.
+
+The starter's warm row is the one honest regression: ~1.3× slower, because
+the compiled programs are built per call and a second call in the same
+process recompiles them. Worth fixing with a cache keyed the way §8's
+`extract_brep` cache would be, and not worth fixing before that cache
+exists — nothing in the product calls this twice in one process.
+
+Quality, on the artifact battery (`tests/viewer/test_edge_artifacts.py`, all
+40 unedited): crossings 0 and debris 0 on all eleven configurations, as
+before, and **every** analytic curve's coverage — both by the link set and
+by a single connected chain — is now exactly `1.000`. Before-and-after
+renders of the starter are in `research/design/light-chrome/edges-before-after*.png`;
+the visible differences are the press-fit bush rims (drawn as circles, and not drawn
+at all before) and the curves that now run into their corners.
+
+**Blends: draw nothing.** Rendered three ways on the starter
+(`research/design/light-chrome/edges-blends.png`): nothing, the fillet's own
+boundary curves, and the virtual sharp edge the fillet replaced (which is
+just `blend_tolerance=inf`). The boundary curves are 48 edges totalling 3.7
+of arc length against 35.8 for the real edges — an average of 0.077, under a
+cell each — and they render as a scribble, not a curve; the battery's debris
+rule would reject them on their own metric. The virtual midline is a near-tie
+*on this scene only*, because the starter's fillets are sub-cell (0.03
+against a 0.094 cell) so the line it draws is within a third of a cell of the
+surface; at any manufacturable radius it is a line floating off the model,
+and a curve that is not on the model is not an edge. That is not a style
+choice — it is right for exactly one radius — so it gets no payload flag.
+The price is honest and visible: where a fillet is detected the curves stop,
+and the graph is saying the model has no edge there.
 
 ---
 
@@ -684,5 +885,17 @@ input (it needs §9.5 first), that blend B-splines are worth the machinery
 - §5.1 / §5.2 / §5.3 — `tests/brep/test_plc.py` plus
   `cadjoint.brep.plc_quality` against `cadjoint.fem.tetmesh.sdf_to_tet_mesh`
   on the same grid.
+- §5.4 — `tests/brep/test_mesh_gmsh.py` (needs the `gmsh` extra; the module
+  skips without it). Quality is `cadjoint.fem.quality.tet_radius_ratios` on
+  both meshes; the FD table is the two parametrised cases of
+  `TestTheDerivative`; the counts are `GmshMesh.stats` and
+  `GmshMesh.blend_nodes_by_face()`. The end-cap comparison is
+  `scenes/end_cap.py`'s `housing` on its own `cap_mesh` grid, run outside the
+  suite because the dual-contour side takes 520 s to fail.
+- §8.1 — `_mesh_edge_payload` timed directly on `scenes/starter.py` and
+  `scenes/end_cap.py`; the quality row is the metric table
+  `tests/viewer/test_edge_artifacts.py` prints under `-s`, and the blend
+  counts come from the graph's own `BRepFace.kind`.
 - Timings are wall clock in a warm process with a populated
-  `CADJOINT_CACHE_DIR`, second run quoted.
+  `CADJOINT_CACHE_DIR`, second run quoted; §8.1's cold row is a fresh
+  process, which is what `mesh_source` forks for every request.

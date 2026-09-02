@@ -70,8 +70,6 @@ def test_mesh_endpoint_reports_mesh_edges_for_the_viewer():
     mesh_edges = result["mesh_edges"]
     assert mesh_edges is not None
     assert mesh_edges["resolution"] >= 8
-    # Observability: which dual-contouring backend produced the edges.
-    assert isinstance(mesh_edges["native"], bool)
     for group in ("wire", "sharp"):
         assert len(mesh_edges[group]) > 0
         for segment in mesh_edges[group][:16]:

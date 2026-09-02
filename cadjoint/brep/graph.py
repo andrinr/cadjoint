@@ -41,7 +41,7 @@ from __future__ import annotations
 
 from collections import deque
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, NamedTuple
 
 import jax
@@ -644,9 +644,9 @@ def _quad_areas(vertices: np.ndarray, quads: np.ndarray) -> np.ndarray:
     return np.linalg.norm(0.5 * np.sum(np.cross(points, rolled), axis=1), axis=1)
 
 
-def _project_scene(scene: Any, points: np.ndarray, max_step: float) -> np.ndarray:
+def _project_scene(scene: Any, points: np.ndarray, max_step: float, steps: int) -> np.ndarray:
     """One-field projection of points onto the *scene's* zero set."""
-    return project_fields([scene], points, max_step=max_step)
+    return project_fields([scene], points, max_step=max_step, steps=steps)
 
 
 def _solve_owned_points(
@@ -654,6 +654,7 @@ def _solve_owned_points(
     owner_sets: list[tuple[int, ...]],
     seeds: np.ndarray,
     max_step: float,
+    steps: int,
 ) -> np.ndarray:
     """Re-solve seeds grouped by their owning patch set, one call per arity.
 
@@ -674,7 +675,9 @@ def _solve_owned_points(
     for _arity, rows in sorted(by_arity.items()):
         index = np.asarray(rows, dtype=np.int64)
         members = np.asarray([owner_sets[row] for row in rows], dtype=np.int32)
-        solved[index] = project_batched(field_table, members, solved[index], max_step=max_step)
+        solved[index] = project_batched(
+            field_table, members, solved[index], max_step=max_step, steps=steps
+        )
     return solved
 
 
@@ -686,6 +689,8 @@ def extract_brep(
     blend_tolerance: float | None = None,
     fit_tolerance: float | None = None,
     max_step: float | None = None,
+    steps: int = 8,
+    fit_surfaces: bool = True,
 ) -> BRep:
     """Derive a B-rep ownership graph from a scene and a sampling grid.
 
@@ -703,6 +708,19 @@ def extract_brep(
             cell diagonal.
         max_step: Displacement clamp for every projection; defaults to half
             the cell diagonal, the clamp the tet mesher uses.
+        steps: Newton iterations per projection.  Eight converges from a
+            cold seed anywhere in its cell; a caller whose seeds are already
+            within a fraction of a cell (the viewer overlay, which seeds
+            from mesh-edge midpoints) can halve this and halve the cost,
+            because the cost of an eager JAX program is per call and the
+            loop is unrolled.
+        fit_surfaces: Whether to fit and certify each analytic face's closed
+            form.  A caller that only wants the graph's topology and its
+            edge curves — the viewer overlay does — can turn this off and
+            skip one projection program plus a gradient program per face;
+            every face then carries a ``freeform`` surface and
+            :attr:`BRepFace.analytic` is ``False`` throughout, while
+            :attr:`BRepFace.kind` and every edge stay exactly as they were.
 
     Returns:
         The :class:`BRep`.
@@ -730,7 +748,7 @@ def extract_brep(
 
     # 1. Ownership of every quad, decided on the scene's own zero set so the
     #    blend test compares like with like.
-    centroids = _project_scene(scene, _quad_centroids(vertices, quads), max_step)
+    centroids = _project_scene(scene, _quad_centroids(vertices, quads), max_step, steps)
     owner, magnitude = _own_patch(decomposition, offsets, centroids)
     blend = magnitude > blend_tolerance
     # A blend quad keeps its leaf (fillets belong to a solid) but loses its
@@ -755,7 +773,7 @@ def extract_brep(
     cursor = 0
     for face_id, region in enumerate(regions):
         key = int(region_key[region[0]])
-        if key < 0:
+        if key < 0 or not fit_surfaces:
             continue
         # Corners as well as centroids: a one-quad sliver has a single
         # centroid, and a plane cannot be fitted through one point.
@@ -770,6 +788,7 @@ def extract_brep(
             np.concatenate(sample_members),
             np.concatenate(sample_blocks),
             max_step=max_step,
+            steps=steps,
         )
         # The solid's own outward normal at every sample, in one program:
         # it decides each fitted surface's ``sense`` (a subtracted cylinder's
@@ -788,7 +807,7 @@ def extract_brep(
         patch_index = -1 if is_blend else int(owner[region[0]])
         leaf_id = -1 - key if is_blend else patches[patch_index].leaf
         kind = "blend" if is_blend else patches[patch_index].kind
-        if is_blend:
+        if is_blend or not fit_surfaces:
             surface = AnalyticSurface(
                 "freeform",
                 centroids[region].mean(axis=0),
@@ -838,13 +857,16 @@ def extract_brep(
         owner_sets.append(tuple(patch_ids))
         owner_patches[index, : len(patch_ids)] = patch_ids
         owner_arity[index] = len(patch_ids)
-    points = _solve_owned_points(patches, owner_sets, vertices, max_step)
+    points = _solve_owned_points(patches, owner_sets, vertices, max_step, steps)
 
     # 4. Edges: the boundary chains between two faces.
-    edges, edge_of_pair = _build_edges(faces, patches, edge_users, quad_face, points, max_step)
+    edges, edge_of_pair, edge_ends = _build_edges(
+        faces, patches, edge_users, quad_face, points, max_step, steps
+    )
 
     # 5. Vertices: mesh vertices whose incident faces number three or more.
     vertices_out, ambiguous = _build_vertices(faces, vertex_faces, patches, points)
+    edges = _link_edge_vertices(edges, edge_ends, vertices_out)
 
     stats = {
         "quads": int(quads.shape[0]),
@@ -920,12 +942,20 @@ def _build_edges(
     quad_face: np.ndarray,
     points: np.ndarray,
     max_step: float,
-) -> tuple[list[BRepEdge], dict[tuple[int, int], list[int]]]:
+    steps: int,
+) -> tuple[list[BRepEdge], dict[tuple[int, int], list[int]], np.ndarray]:
     """Chain the mesh edges that separate two faces into B-rep edges.
 
     Every analytic chain's seeds are projected in one batched call, for the
     reason :func:`_solve_owned_points` gives: a body has a hundred-odd edges
     and a hundred-odd JAX programs is the whole cost.
+
+    Returns:
+        ``(edges, edge_of_pair, ends)`` — the edges, the edge indices per
+            face pair, and per edge the two mesh vertices its chain ended
+            on (``-1`` for a closed chain), which
+            :func:`_link_edge_vertices` turns into :class:`BRepVertex`
+            endpoints once the vertices exist.
     """
     pair_segments: dict[tuple[int, int], list[tuple[int, int]]] = {}
     for (a, b), owners in edge_users.items():
@@ -935,7 +965,7 @@ def _build_edges(
         left, right = sorted(incident)
         pair_segments.setdefault((left, right), []).append((a, b))
 
-    raw: list[tuple[tuple[int, int], tuple[int, int], np.ndarray, bool, bool]] = []
+    raw: list[tuple[tuple[int, int], tuple[int, int], np.ndarray, bool, bool, tuple[int, int]]] = []
     for (left, right), segments in sorted(pair_segments.items()):
         patch_a, patch_b = faces[left].patch, faces[right].patch
         analytic = patch_a >= 0 and patch_b >= 0
@@ -946,7 +976,8 @@ def _build_edges(
                 seeds = 0.5 * (points[nodes] + points[np.roll(nodes, -1)])
             else:
                 seeds = 0.5 * (points[nodes[:-1]] + points[nodes[1:]])
-            raw.append(((left, right), (patch_a, patch_b), seeds, closed, analytic))
+            ends = (-1, -1) if closed else (int(chain[0]), int(chain[-1]))
+            raw.append(((left, right), (patch_a, patch_b), seeds, closed, analytic, ends))
 
     field_table = [patch.field for patch in patches]
     blocks = [entry[2] for entry in raw if entry[4] and entry[2].shape[0]]
@@ -958,7 +989,9 @@ def _build_edges(
     if blocks:
         stacked = np.concatenate(blocks)
         stacked_members = np.concatenate(members)
-        solved = project_batched(field_table, stacked_members, stacked, max_step=max_step)
+        solved = project_batched(
+            field_table, stacked_members, stacked, max_step=max_step, steps=steps
+        )
         residual_all = batched_residuals(field_table, stacked_members, solved)
     else:
         solved = np.zeros((0, 3))
@@ -966,7 +999,7 @@ def _build_edges(
 
     edges: list[BRepEdge] = []
     cursor = 0
-    for face_pair, patch_pair, seeds, closed, analytic in raw:
+    for face_pair, patch_pair, seeds, closed, analytic, _ends in raw:
         if analytic and seeds.shape[0]:
             span = slice(cursor, cursor + seeds.shape[0])
             polyline = solved[span]
@@ -990,7 +1023,47 @@ def _build_edges(
     edge_of_pair: dict[tuple[int, int], list[int]] = {}
     for edge in edges:
         edge_of_pair.setdefault(edge.faces, []).append(edge.index)
-    return edges, edge_of_pair
+    ends = np.asarray([entry[5] for entry in raw], dtype=np.int64).reshape(len(raw), 2)
+    return edges, edge_of_pair, ends
+
+
+def _link_edge_vertices(
+    edges: list[BRepEdge], ends: np.ndarray, vertices: list[BRepVertex]
+) -> list[BRepEdge]:
+    """Name each open edge's triple-point endpoints, once the vertices exist.
+
+    An edge chain ends on a mesh vertex; that mesh vertex becomes a
+    :class:`BRepVertex` exactly when three or more faces meet there.  The
+    two passes run in that order, so the endpoints are attached here rather
+    than left at the ``(-1, -1)`` :func:`_build_edges` emits.
+
+    The link is what lets a consumer close the graph at its corners: an
+    edge's polyline is seeded from mesh-edge *midpoints*, so it stops half a
+    cell short of the corner, and only the vertex says where the corner
+    actually is.
+
+    Args:
+        edges: Edges as :func:`_build_edges` returned them.
+        ends: Per edge, the two mesh vertices its chain ended on, ``-1``
+            for a closed chain.
+        vertices: The solved triple points.
+
+    Returns:
+        The edges with :attr:`BRepEdge.vertices` filled in.
+    """
+    vertex_of_mesh = {vertex.mesh_vertex: vertex.index for vertex in vertices}
+    linked: list[BRepEdge] = []
+    for edge, (start, stop) in zip(edges, ends):
+        linked.append(
+            replace(
+                edge,
+                vertices=(
+                    vertex_of_mesh.get(int(start), -1),
+                    vertex_of_mesh.get(int(stop), -1),
+                ),
+            )
+        )
+    return linked
 
 
 def _build_vertices(

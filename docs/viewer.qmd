@@ -210,6 +210,20 @@ materials, **Wire** for construction geometry only — over independent switches
 for shadows, reflections, feature edges, and the dual-contour wireframe. Presets
 are stored in the browser and can be edited and saved.
 
+The two mesh overlays are one extraction, and neither of them is the lattice.
+Turning either on asks the server for a boundary representation of the scene on
+the viewport's own 64³ grid — faces are the regions one patch field owns, edges
+are where two of them meet — and both layers are read off it. The **wireframe**
+draws the dual-contour quads, on vertices re-solved by the projection kernel so
+a vertex on a CSG seam sits on the seam. **Feature edges** draws the graph's
+edges: each is the exact intersection curve of the two surfaces it separates,
+sampled at half a cell and projected onto both, so a bore rim is a circle whose
+radius is right to a millionth of a unit rather than a staircase, and it stays
+that circle wherever the grid cells happen to fall. Curves run into their corners and meet there
+exactly. Where a fillet rounds a corner away the graph says so and nothing is
+drawn: the model has no edge there. See
+[the B-rep architecture note](../research/brep-architecture.md) §8.1.
+
 Path tracing accumulates progressively: one jittered camera sample per pixel per
 frame, averaged in linear HDR, with cosine-weighted diffuse and
 importance-sampled GGX reflection, Schlick-Fresnel glass, finite-sun next-event

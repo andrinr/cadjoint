@@ -47,7 +47,6 @@ differentiate each real construction step.
 | Per-primitive patch fields (exact feature-edge signatures for known trees) | `cadjoint/meshing/patch_fields.py` | `tests/meshing/test_patch_fields.py` |
 | Simplification (half-edge collapse under QEF + SDF error bound, features pinned bitwise) | `cadjoint/meshing/simplify.py` | `tests/meshing/test_simplify.py` |
 | Export (planar-patch merge, OBJ n-gons, binary STL, STEP AP214 validated against OCCT) | `cadjoint/meshing/export.py` | `tests/meshing/test_export.py`, `tests/meshing/test_step_kernel.py` |
-| Native (Rust) kernels behind a Tesseract | `cadjoint/meshing/native.py`, `native/` | `tests/meshing/test_native_mesher.py` — see `research/native-mesher.md` |
 | CSG stress scenes + viewer edge view | — | `tests/meshing/test_scenes.py`, `tests/viewer/test_edge_artifacts.py` |
 
 Known structural limitation (strict xfail in `test_scenes.py`): when a CSG seam

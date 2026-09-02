@@ -225,7 +225,7 @@ mesh = extract_mesh(lambda q: jnp.sqrt(jnp.sum(q * q)) - 1.0, grid)
 save_stl(mesh, "sphere.stl")
 ```
 
-Full detail, including the exports and the Rust-accelerated kernels, in
+Full detail, including the exports, in
 [differentiable meshing](meshing.qmd).
 
 ## Simulation

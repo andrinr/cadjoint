@@ -684,7 +684,7 @@ installs that and pins `CADJOINT_CCX=/python-env/bin/ccx`.
 | Package | Provider | Build | Image | Fix forced by the build |
 | --- | --- | --- | --- | --- |
 | `mesher` | pip | 39 s | 1.36 GB | none — inherited config built as written |
-| `qef_native` | pip | 74 s | 1.39 GB | base image bookworm → trixie; `ca-certificates` |
+| `qef_native (retired 2026-09-02, see native-mesher.md)` | pip | 74 s | 1.39 GB | base image bookworm → trixie; `ca-certificates` |
 | `elastic_calculix` | conda | 87 s | 2.57 GB | apt `calculix-ccx` 2.20 → conda-forge `calculix` 2.23 |
 | `thermal_jaxfem` | conda | 181 s | 5.51 GB | pip `[fem]` → conda provider (gmsh/petsc4py) |
 | `elastic_jaxfem` | conda | 194 s | 5.51 GB | same |

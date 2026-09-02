@@ -58,8 +58,8 @@ face is stored geometry rather than a function of the feature that made it
   parallel, perpendicular, equal-length, point-on-line and fixed (plus the
   edge-pair forms), solved by Riemannian gradient descent and Newton projection
   onto the constraint manifold
-- **Meshing** — dual contouring with sharp-feature QEF vertices (Rust core),
-  TetGen fill to TET4/TET10, or a deterministic voxelize-and-snap HEX8 path
+- **Meshing** — dual contouring with sharp-feature QEF vertices, TetGen fill to
+  TET4/TET10, or a deterministic voxelize-and-snap HEX8 path
 - **FEM** — thermal and linear-elastic studies with programmatic node selections,
   solved by jax-fem or by CalculiX 2.23 over a subprocess
 - **Optimization** — declared in the scene, descended with optax, every step
@@ -458,7 +458,6 @@ no two stages agree on how to compute a derivative.
 | `cadjoint/fem/tesseracts/thermal_jaxfem` | jax-fem Poisson solve | AD strategy: JAX cannot trace the solver (PETSc assembly) | Implicit adjoint — one transposed linear solve per cotangent |
 | `cadjoint/fem/tesseracts/elastic_jaxfem` | jax-fem linear elasticity + von Mises | same | same; gradients bit-identical to the in-process path |
 | `cadjoint/fem/tesseracts/elastic_calculix` | **CalculiX 2.23, Fortran**, over a subprocess (text decks in, result files out) | Language, licence (GPL-2 isolated), and AD strategy | The solver's native `*SENSITIVITY` discrete adjoint, plus a correction we derived for a missing Jacobian-variation term in ccx 2.23 — validated to 2e-4 of finite differences |
-| `native/tesseract_api.py` | **Rust** dual-contouring kernels (batched QEF solves, rayon-parallel, 90–107× faster than the reference) | Language and memory model (cdylib over ctypes) | Hand-derived linear-solve VJP, matches JAX autodiff to ~4e-14 |
 | `cadjoint/fem/tesseracts/tetfill` | **TetGen** — the tet fill alone, with dual contouring left differentiable in JAX upstream | A discrete meshing algorithm, cut at the narrowest place it can be cut | **Pass-through gather**: TetGen's `-Y` preserves the input vertices bit-for-bit, so the VJP is the exact transpose of a gather (0.0 relative error for TET4, 1.25e-16 for TET10); Steiner nodes take zero cotangent, and interior relaxation carries their sensitivity onto the boundary |
 | `cadjoint/fem/tesseracts/mesher` | The **whole black-box mesher** — dual-contoured surface into a tetrahedral volume mesher whose internals nobody differentiates | The boundary everyone gives up on: a discrete, non-differentiable meshing algorithm | **Surface-interpolation VJP**: a boundary vertex lies on the zero set of the trilinearly interpolated SDF samples, so the implicit function theorem gives `∂v/∂fᵢ = −wᵢ(v)·∇f/|∇f|²` — the interpolation weights at the frozen vertex locations *are* the VJP rows. Any mesher becomes differentiable without touching its internals; only the Hadamard-meaningful normal motion is carried |
 
@@ -527,7 +526,6 @@ Each of the six directories above is a complete Tesseract package —
 
 ```bash
 uv sync --extra tesseract          # installs the tesseract-core SDK
-tesseract build native                                  # ~1 min
 tesseract build cadjoint/fem/tesseracts/mesher          # ~1 min
 tesseract build cadjoint/fem/tesseracts/elastic_calculix # ~1.5 min
 tesseract build cadjoint/fem/tesseracts/thermal_jaxfem  # ~3 min
@@ -540,11 +538,11 @@ that runs it in-process runs it in a container:
 ```python
 from tesseract_core import Tesseract
 
-with Tesseract.from_image("cadjoint_qef_native:latest") as t:
-    vertices = t.apply(inputs)["vertices"]
+with Tesseract.from_image("cadjoint_mesher:latest") as t:
+    points = t.apply(inputs)["points"]
     grads = t.vector_jacobian_product(
-        inputs, vjp_inputs=["points", "normals"],
-        vjp_outputs=["vertices"], cotangent_vector={"vertices": cotangent},
+        inputs, vjp_inputs=["field_values"],
+        vjp_outputs=["points"], cotangent_vector={"points": cotangent},
     )
 ```
 
@@ -554,12 +552,11 @@ a long-lived server. What each image contains, and what it costs:
 | Image | Requirements provider | The non-obvious payload | Size |
 | --- | --- | --- | --- |
 | `cadjoint_mesher` | pip | cadjoint + TetGen + SciPy on a uv-installed CPython 3.12 | 1.36 GB |
-| `cadjoint_qef_native` | pip | the Rust cdylib, `cargo build --release --locked` inside the image (toolchain installed and purged in one layer), pinned via `CADJOINT_NATIVE_MESHER` | 1.39 GB |
 | `cadjoint_elastic_calculix` | conda | **the ccx 2.23 Fortran binary** from conda-forge at `/python-env/bin/ccx`, pinned via `CADJOINT_CCX` | 2.57 GB |
 | `cadjoint_thermal_jaxfem` | conda | the full jax-fem stack: PETSc/petsc4py 3.25.5, gmsh, fenics-basix, meshio | 5.51 GB |
 | `cadjoint_elastic_jaxfem` | conda | same | 5.51 GB |
 
-Two packages use pip (`tesseract_requirements.txt`), three use the SDK's conda
+One package uses pip (`tesseract_requirements.txt`), three use the SDK's conda
 provider (`tesseract_environment.yaml`) — because petsc4py publishes *no* PyPI
 wheels at all and gmsh publishes manylinux wheels for x86-64 only, so the
 jax-fem stack is simply not pip-installable on Linux, and ccx is a Fortran
@@ -585,9 +582,8 @@ installed SDK schema without Docker, and round-trips the built images against
 the in-process path when Docker is present.
 
 Design notes: `research/fem-integration.md` (solver ABI, adjoint mechanics,
-the ccx sensitivity correction, container conformance and measured numbers),
-`research/native-mesher.md` (Rust core and its VJP), `research/tet-vs-hex.md`
-(the mesher-Tesseract validation matrix).
+the ccx sensitivity correction, container conformance and measured numbers)
+and `research/tet-vs-hex.md` (the mesher-Tesseract validation matrix).
 
 ---
 
@@ -601,8 +597,8 @@ compiled. Measured on the starter scene, worker end to end: `compile` 2.1 s →
 
 [`research/performance.md`](research/performance.md) profiles every worker mode
 and ranks the remaining levers by evidence. The short version: the hot path holds
-no algorithm, library or language problem — the Rust core's whole discrete
-pipeline is 2–8 ms, the FEM linear solve 47 ms, TetGen 11 ms, JSON serialisation
+no algorithm, library or language problem — the whole discrete dual-contouring
+pipeline is 3–8 ms, the FEM linear solve 47 ms, TetGen 11 ms, JSON serialisation
 1–5 ms. What the seconds are is JAX re-tracing and re-dispatching the scene in
 eager mode, and XLA compiling shape-specific programs no two requests share.
 
@@ -617,8 +613,8 @@ eager mode, and XLA compiling shape-specific programs no two requests share.
   every worker mode, with each speed-up avenue ranked
 - [`research/differentiable-meshing-pipeline.md`](research/differentiable-meshing-pipeline.md)
   — architecture of `cadjoint/meshing`
-- [`research/native-mesher.md`](research/native-mesher.md) — the Rust
-  dual-contouring core, its JAX boundary and its VJP
+- [`research/native-mesher.md`](research/native-mesher.md) — the retired Rust
+  dual-contouring core: what it measured, and why it was removed
 - [`research/fem-integration.md`](research/fem-integration.md) — the
   `SolverBackend` ABI, adjoint mechanics, the ccx 2.23 sensitivity correction
 - [`research/tet-vs-hex.md`](research/tet-vs-hex.md) — the mesher-Tesseract
