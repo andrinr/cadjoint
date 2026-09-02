@@ -45,17 +45,34 @@ def _loss(flat_fn, values: Array) -> Array:
 
 
 def _newton_projection(flat_fn, values: Array, steps: int) -> tuple[Array, list[float]]:
-    """Minimum-norm Newton corrections plus their residual loss history."""
+    """Minimum-norm Newton corrections plus their residual loss history.
+
+    The step is ``Δ = Jᵀ(JJᵀ)⁻¹ c(p)``, solved as a least-squares problem
+    rather than an exact inverse. The two agree to rounding whenever ``JJᵀ``
+    is invertible, and they differ in exactly the case that matters: a sketch
+    carrying a *redundant* constraint — one implied by the others, such as a
+    perpendicularity that a horizontal and a vertical already force — makes
+    ``J`` rank-deficient and ``JJᵀ`` singular. ``jnp.linalg.solve`` answers
+    that with NaN, which then propagates into every free parameter in the
+    program and turns the whole model into NaN geometry, silently.
+
+    Worse, it did so only *sometimes*: in float32 the redundancy is masked by
+    roundoff and the solve succeeds, while the float64 the FEM path enables
+    makes the singularity exact. A scene could therefore render correctly and
+    become NaN the moment it was meshed.
+
+    A redundant-but-consistent constraint set is a perfectly ordinary thing to
+    draw and every CAD sketcher tolerates it, so the least-squares step is
+    also the semantically right answer: it takes the minimum-norm correction
+    on the constraints that are actually independent.
+    """
     x = values
     losses = [float(_loss(flat_fn, x))]
     for _ in range(steps):
         residual = flat_fn(x)
         jacobian = jax.jacobian(flat_fn)(x)
-        delta = jacobian.T @ jnp.linalg.solve(
-            jacobian @ jacobian.T,
-            residual,
-        )
-        x = x - delta
+        correction = jnp.linalg.lstsq(jacobian @ jacobian.T, residual)[0]
+        x = x - jacobian.T @ correction
         losses.append(float(_loss(flat_fn, x)))
     return x, losses
 
