@@ -59,6 +59,30 @@ def _extend_scene_with(source: str, variable: str) -> str:
     return _validate(patched)
 
 
+def _union_assignments(tree: ast.Module) -> list[ast.Assign]:
+    """Every module-level ``name = Union(...)`` statement, the scene's included.
+
+    A scene commonly builds sub-assemblies first — ``thermal_body = Union(sink,
+    slug, ...)`` — and unions those into ``scene``; an object is deletable from
+    any of them, not only from the final one.
+    """
+    return [
+        node
+        for node in tree.body
+        if isinstance(node, ast.Assign)
+        and isinstance(node.value, ast.Call)
+        and _called_name(node.value) == "Union"
+    ]
+
+
+def _all_union_operands(tree: ast.Module) -> list[ast.AST]:
+    """Positional operands of every module-level ``Union(...)`` assignment."""
+    operands: list[ast.AST] = []
+    for assignment in _union_assignments(tree):
+        operands.extend(assignment.value.args)  # type: ignore[union-attr]
+    return operands
+
+
 def _union_operands(scene: ast.Assign | None) -> list[ast.AST]:
     """Positional arguments of a ``scene = Union(...)`` assignment."""
     if scene is None or not isinstance(scene.value, ast.Call):

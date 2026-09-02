@@ -63,14 +63,11 @@ export function Graticule(props: GraticuleProps) {
       <div
         class="graticule-gain"
         data-testid="graticule-gain"
-        title="Scroll to zoom freely; hold Alt to zoom in 1-2-5 detents. A > prefix means the scale is not on the ladder."
+        title="Floor grid spacing, on a 1-2-5 ladder. Scroll to zoom freely; hold Alt to zoom in detents. A > prefix means an on-screen measurement is not to scale."
       >
-        <span>H</span>
+        <span>GRID</span>
         <b>{gain().text}</b>
-        <i>{gain().unit}/div</i>
-        <span>V</span>
-        <b>{gain().text}</b>
-        <i>{gain().unit}/div</i>
+        <i>{gain().unit}</i>
         <span>VIEW</span>
         <b>{viewLabel(props.camera.yaw, props.camera.pitch)}</b>
         <i>· {octant(props.camera.yaw, props.camera.pitch)}</i>

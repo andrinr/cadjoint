@@ -37,7 +37,7 @@ from cadjoint.viewer.patch.edits import (
 from cadjoint.viewer.patch.errors import PatchError
 from cadjoint.viewer.patch.format import _format_value
 from cadjoint.viewer.patch.resolvers import CONSTRUCTION_CALLS
-from cadjoint.viewer.patch.scene import _scene_assignment, _union_operands
+from cadjoint.viewer.patch.scene import _all_union_operands, _scene_assignment, _union_operands
 from cadjoint.viewer.source_map import locate_call
 from cadjoint.viewer.source_map.nodes import _called_name, _line_offsets, _node_span
 
@@ -224,10 +224,12 @@ def delete_object(source: str, line: int) -> str:
     ):
         variable = statement.targets[0].id
         uses = _name_references(tree, variable, statement)
-        # Only a direct operand of the scene's Union can be dropped safely.
-        # Anywhere else — an argument to extrude(), say — removing it would
-        # silently change what the program builds.
-        operands = _union_operands(scene)
+        # Only a direct operand of a Union can be dropped safely — the scene's
+        # or a named sub-assembly's, since a scene often unions parts into a
+        # body and the body into the scene. Anywhere else — an argument to
+        # extrude(), say — removing it would silently change what the program
+        # builds.
+        operands = _all_union_operands(tree)
         if any(not any(operand is node for operand in operands) for node in uses):
             raise PatchError(
                 f"`{variable}` is used elsewhere in the program, so it cannot be deleted "
