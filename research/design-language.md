@@ -405,25 +405,27 @@ named prerequisite.
 
 ### 10.1 Shipped
 
-**The graticule, the gain readout and the title block.** The viewport carries a
-Tektronix faceplate: eight square divisions, minor ticks on the two centre axes
-*only* (the real 475A arrangement), four corner brackets, drawn behind the
-geometry so the part occludes them. The gain readout states real millimetres per
-division derived from the camera; the unit is not invented — the STEP exporter is
-the one place the repo declares a length and it stamps metres. Zoom steps a
-**1-2-5 detent ladder**, so one division is always an exact stateable number of
-millimetres, and **any uncalibrated readout is prefixed `>`**, exactly as a 2465
-does. The title block sits bottom-right per ASME Y14.100: SCENE / STUDY / MESH /
-SOLVER / REV, `—` where a field is empty.
+**The floor grid, the spacing readout and the title block.** The viewport rules
+the **z = 0 plane** — the floor every scene stands on, since the library and every
+scene are Z-up — with a minor line, a firmer major every fifth, and the two axes
+a step above that: **1.36 / 1.58 / 1.69:1** on paper, fading outward from the
+orbit target and again once a cell falls under a few pixels, so the far field
+dissolves rather than aliasing. It is a per-fragment raycast in a fullscreen WGSL
+pass at clip z = 1, depth-tested against the ray-miss depth: it sits behind the
+solid, under every overlay, and costs one triangle. In Sketch mode, when the
+active plane is not the floor, the whole grid steps back one level — the sketch's
+own plane becomes the reference, but the floor still says which way up the world
+is. There is no screen-space faceplate, no centre-axis ticks and no corner
+brackets: a grid that does not live in the scene says nothing about where anything
+is.
 
-It is a fullscreen WGSL pass at clip z = 1, not a canvas underneath: the
-swapchain is opaque, so anything below is invisible and anything above would draw
-a grid over a colour field, which is a lie. Depth-tested against the ray-miss
-depth, it sits behind geometry and under overlays for free.
-
-*Queued: the graticule is being replaced by a floor grid* — a scale that lives in
-the scene rather than on the faceplate, which reads correctly under orbit and
-gives a sketch plane something to sit on.
+The readout states the grid spacing in real millimetres — the unit is not
+invented; the STEP exporter is the one place the repo declares a length and it
+stamps metres — always on a **1-2-5 rung**, and prefixed `>` whenever an on-screen
+measurement is not to scale (perspective). Alt-wheel steps the rungs. The title
+block sits bottom-right per ASME Y14.100: SCENE / STUDY / MESH / SOLVER / REV,
+`—` where a field is empty. An empty or uncompiled viewport clears to paper and
+rules the floor; it never renders black.
 
 **The light viewport, and everything that assumed a black ground.** The
 environment radiance is flat, because under the default orthographic camera every
