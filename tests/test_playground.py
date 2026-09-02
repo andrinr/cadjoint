@@ -1375,3 +1375,56 @@ def test_a_failed_compile_is_reported_again_by_the_linter():
     assert first["source"] == "runtime"
     assert first["from_line"] == 4
     assert "ZeroDivisionError" in first["message"]
+
+
+# ── Job registration rides along with the endpoints it does not change ──────
+
+
+def test_every_timed_endpoint_answers_with_a_job_id_and_nothing_else_changed():
+    # Registration is additive: the compile response is the same object the
+    # worker produced, plus the id under which the server now remembers it.
+    source = "from cadjoint.sdf.primitives import Sphere\n\nscene = Sphere(0.5)\n"
+    with running_server() as base:
+        with urlopen(f"{base}/api/session") as response:
+            token = json.loads(response.read())["token"]
+        with urlopen(post(base, "/compile", {"source": source}, token)) as response:
+            served = json.loads(response.read())
+
+    direct = compile_source(source)
+    assert served["ok"] is True
+    assert set(served) == set(direct) | {"job_id"}
+    assert served["job_id"].startswith("job-")
+    assert served["sdf"] == direct["sdf"]
+
+
+def test_a_streamed_optimize_run_is_replayable_from_the_job_store():
+    # The trajectory a Results panel drew is not lost when the panel is: the
+    # progress events carry the job id while they stream, and the whole run
+    # is fetchable again from the store afterwards.
+    with running_server() as base:
+        with urlopen(f"{base}/api/session") as response:
+            token = json.loads(response.read())["token"]
+        request = post(
+            base, "/api/optimize", {"source": OPTIMIZE_SOURCE, "name": "fit-radius"}, token
+        )
+        with urlopen(request) as response:
+            events = [json.loads(line) for line in response if line.strip()]
+
+        job_id = events[0]["job_id"]
+        assert {event["job_id"] for event in events} == {job_id}
+
+        jobs = Request(f"{base}/api/jobs", headers={"X-Cadjoint-Token": token})
+        with urlopen(jobs) as response:
+            summary = json.loads(response.read())["jobs"][0]
+        assert summary["kind"] == "optimize"
+        assert summary["fields"] == {"name": "fit-radius"}
+        # The job's own progress mirrors the stream's last step.
+        assert summary["progress"]["step"] == events[-2]["step"]
+
+        stored = Request(f"{base}/api/jobs/{job_id}/result", headers={"X-Cadjoint-Token": token})
+        with urlopen(stored) as response:
+            replay = json.loads(response.read())
+
+    assert replay["ok"] is True
+    assert replay["trajectory"] == events[-1]["trajectory"]
+    assert replay["source"] == events[-1]["source"]

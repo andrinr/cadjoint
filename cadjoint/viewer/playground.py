@@ -34,6 +34,21 @@ Serves the built frontend (``cadjoint/viewer/static``) and a small JSON API:
 - ``GET  /api/scenes``   list saved scene files in ``./scenes``
 - ``POST /api/scenes/load``  read one saved scene file
 - ``POST /api/scenes/save``  write one scene file into ``./scenes``
+- ``GET  /api/jobs``     every registered job (newest first) plus live totals
+                         — running count, CPU, RSS, uptime, host capacity —
+                         cheap enough to poll at 1 Hz
+- ``GET  /api/jobs/<id>``        one job with its resource samples and, for an
+                         optimize run, its per-step progress
+- ``GET  /api/jobs/<id>/result`` the full response payload that job produced,
+                         byte-identical to the one its request received
+- ``POST /api/jobs/<id>/cancel`` kill a running job's worker subprocess
+- ``POST /api/jobs/clear``       drop every finished job
+
+Every request that costs real time is registered in
+:mod:`cadjoint.viewer._jobs` as it runs: results outlive the panel that asked
+for them, a process monitor can see what is burning the machine, and a run
+can be cancelled for real.  Registration adds ``job_id`` to every response
+(and to every streamed optimize event) and changes nothing else.
 
 Everything is loopback-only and token-gated. ``/compile`` and ``/api/mesh``
 execute the editor's Python on this machine — only run code you trust.
@@ -76,6 +91,7 @@ from cadjoint.viewer._intelligence import (
     signature_source,
     warm_up,
 )
+from cadjoint.viewer._jobs import JOB_KINDS, REGISTRY
 from cadjoint.viewer._limits import MAX_SOURCE_BYTES
 from cadjoint.viewer._patch_requests import patch_source
 from cadjoint.viewer._scenes import (
@@ -105,10 +121,12 @@ __all__ = [
     "COMPILE_TIMEOUT_SECONDS",
     "DEFAULT_PORT",
     "EXAMPLE_SOURCE",
+    "JOB_KINDS",
     "MAX_SOURCE_BYTES",
     "MESH_INSPECT_TIMEOUT_SECONDS",
     "OPTIMIZE_MAX_STEPS",
     "OPTIMIZE_TIMEOUT_SECONDS",
+    "REGISTRY",
     "SIMULATE_KINDS",
     "SIMULATE_TIMEOUT_SECONDS",
     "STATIC_ROOT",
@@ -148,16 +166,22 @@ def _post_routes() -> dict[str, Callable[[dict[str, Any]], dict[str, Any]]]:
         # `record_compile` is a tap, not a filter: it returns the worker's
         # result unchanged and only remembers a traceback that named a line
         # of this program, so `/api/lint` can show the failure in the gutter.
-        "/compile": lambda payload: record_compile(
-            payload.get("source"), compile_source(payload.get("source"))
+        "/compile": _tracked(
+            "compile",
+            lambda payload: record_compile(
+                payload.get("source"), compile_source(payload.get("source"))
+            ),
         ),
-        "/api/mesh": lambda payload: record_compile(
-            payload.get("source"), mesh_source(payload.get("source"))
+        "/api/mesh": _tracked(
+            "mesh",
+            lambda payload: record_compile(
+                payload.get("source"), mesh_source(payload.get("source"))
+            ),
         ),
-        "/api/simulate": simulate_source,
-        "/api/mesh_inspect": mesh_inspect_source,
+        "/api/simulate": _tracked("simulate", simulate_source),
+        "/api/mesh_inspect": _tracked("mesh_inspect", mesh_inspect_source),
         "/patch": patch_source,
-        "/api/lint": lint_source,
+        "/api/lint": _tracked("lint", lint_source),
         "/api/complete": complete_source,
         "/api/signature": signature_source,
         "/api/scenes/load": load_scene,
@@ -165,15 +189,91 @@ def _post_routes() -> dict[str, Callable[[dict[str, Any]], dict[str, Any]]]:
     }
 
 
+#: Request fields worth remembering on a job: which study, which optimization,
+#: how many steps.  Small scalars only — the source is kept as a hash, not a
+#: copy, and nothing else about a request is the monitor's business.
+JOB_FIELD_KEYS = ("kind", "name", "steps", "cached")
+
+
+def _job_fields(payload: dict[str, Any]) -> dict[str, Any]:
+    """The identifying fields of a request, for its job summary."""
+    return {
+        key: payload[key]
+        for key in JOB_FIELD_KEYS
+        if isinstance(payload.get(key), (str, int, float, bool))
+    }
+
+
+def _tracked(
+    kind: str, endpoint: Callable[[dict[str, Any]], dict[str, Any]]
+) -> Callable[[dict[str, Any]], dict[str, Any]]:
+    """Wrap a buffered endpoint so its work is registered as a job.
+
+    The contract does not change: the same payload comes back, with a
+    ``job_id`` added, and the same payload can be fetched again later from
+    ``GET /api/jobs/<id>/result``.  The job is bound to this thread for the
+    duration, which is how the worker subprocess it spawns becomes
+    cancellable and observable.
+
+    Args:
+        kind: One of :data:`cadjoint.viewer._jobs.JOB_KINDS`.
+        endpoint: The endpoint function, unchanged.
+
+    Returns:
+        A route with the endpoint's signature.
+    """
+
+    def route(payload: dict[str, Any]) -> dict[str, Any]:
+        with REGISTRY.track(kind, source=payload.get("source"), fields=_job_fields(payload)) as job:
+            return REGISTRY.finish(job, endpoint(payload))
+
+    return route
+
+
+def _tracked_stream(
+    kind: str, endpoint: Callable[[dict[str, Any]], Iterable[dict[str, Any]]]
+) -> Callable[[dict[str, Any]], Iterable[dict[str, Any]]]:
+    """Wrap a streaming endpoint so its work is registered as a job.
+
+    Every relayed event gains ``job_id``; progress events are mirrored onto
+    the job as they pass, so a monitor polling ``/api/jobs`` sees the same
+    descent the streaming client sees, and the finished run's whole payload
+    lands in the result store for replay.
+
+    Args:
+        kind: One of :data:`cadjoint.viewer._jobs.JOB_KINDS`.
+        endpoint: The event-stream endpoint, unchanged.
+
+    Returns:
+        A route with the endpoint's signature.
+    """
+
+    def route(payload: dict[str, Any]) -> Iterable[dict[str, Any]]:
+        with REGISTRY.track(kind, source=payload.get("source"), fields=_job_fields(payload)) as job:
+            final: dict[str, Any] | None = None
+            for event in endpoint(payload):
+                if event.get("event") == "progress":
+                    job.record_progress(event)
+                    yield {**event, "job_id": job.id}
+                else:
+                    final = {key: value for key, value in event.items() if key != "event"}
+            yield {"event": "done", **REGISTRY.finish(job, final)}
+
+    return route
+
+
 def _stream_routes() -> dict[str, Callable[[dict[str, Any]], Iterable[dict[str, Any]]]]:
     """POST endpoints whose response streams as chunked NDJSON, by path."""
-    return {"/api/optimize": optimize_source_events}
+    return {"/api/optimize": _tracked_stream("optimize", optimize_source_events)}
 
 
 def _response_status(result: dict[str, Any]) -> HTTPStatus:
     """The HTTP status one endpoint result deserves."""
     if result.get("ok"):
         return HTTPStatus.OK
+    if result.get("error_kind") == "cancelled":
+        # The request did not fail on its own terms: somebody stopped it.
+        return HTTPStatus.CONFLICT
     if result.get("error_kind") == "fem_unavailable":
         # A missing optional solver extra is "not implemented here", not a bad
         # request; the UI shows it as an install hint.
@@ -210,12 +310,27 @@ def make_handler(token: str):
                 self._send_json(HTTPStatus.OK, list_scenes())
                 return
 
+            if path == "/api/jobs" or path.startswith("/api/jobs/"):
+                if not self._token_valid():
+                    return
+                self._serve_job_read(path)
+                return
+
             self._serve_static(path)
 
         def do_POST(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
             if not self._host_allowed():
                 return
             path = urlsplit(self.path).path
+
+            if path == "/api/jobs/clear" or (
+                path.startswith("/api/jobs/") and path.endswith("/cancel")
+            ):
+                if not self._token_valid():
+                    return
+                self._drain_body()
+                self._serve_job_command(path)
+                return
 
             stream = _stream_routes().get(path)
             if stream is not None:
@@ -241,6 +356,69 @@ def make_handler(token: str):
 
             result = handler(payload)
             self._send_json(_response_status(result), result)
+
+        # ── the job registry: what is running, what ran, and its results ──
+
+        def _serve_job_read(self, path: str) -> None:
+            """Answer ``GET /api/jobs``, ``/api/jobs/<id>`` and ``.../result``."""
+            if path == "/api/jobs":
+                self._send_json(HTTPStatus.OK, REGISTRY.snapshot())
+                return
+            rest = path[len("/api/jobs/") :]
+            wants_result = rest.endswith("/result")
+            job_id = rest[: -len("/result")] if wants_result else rest
+            job = REGISTRY.get(job_id)
+            if job is None:
+                self._send_json(
+                    HTTPStatus.NOT_FOUND,
+                    {"ok": False, "error": f"No job {job_id!r}.", "job_id": job_id},
+                )
+                return
+            if not wants_result:
+                self._send_json(HTTPStatus.OK, {"ok": True, "job": job.detail()})
+                return
+            if job.status in ("queued", "running"):
+                self._send_json(
+                    HTTPStatus.CONFLICT,
+                    {"ok": False, "error": "Job is still running.", "job_id": job_id},
+                )
+                return
+            if job.result_json is None:
+                # Either the kind is not kept (lint) or the payload was evicted
+                # to stay inside the store's byte budget: the job is history,
+                # its result is not.
+                self._send_json(
+                    HTTPStatus.GONE,
+                    {"ok": False, "error": "No stored result for this job.", "job_id": job_id},
+                )
+                return
+            self._send_raw_json(HTTPStatus.OK, job.result_json)
+
+        def _serve_job_command(self, path: str) -> None:
+            """Answer ``POST /api/jobs/<id>/cancel`` and ``POST /api/jobs/clear``."""
+            if path == "/api/jobs/clear":
+                self._send_json(HTTPStatus.OK, REGISTRY.clear())
+                return
+            job_id = path[len("/api/jobs/") : -len("/cancel")]
+            job = REGISTRY.get(job_id)
+            if job is None:
+                self._send_json(
+                    HTTPStatus.NOT_FOUND,
+                    {"ok": False, "error": f"No job {job_id!r}.", "job_id": job_id},
+                )
+                return
+            if not job.cancel():
+                self._send_json(
+                    HTTPStatus.CONFLICT,
+                    {
+                        "ok": False,
+                        "error": f"Job is already {job.status}.",
+                        "job_id": job_id,
+                        "status": job.status,
+                    },
+                )
+                return
+            self._send_json(HTTPStatus.OK, {"ok": True, "job_id": job_id, "status": "cancelled"})
 
     return PlaygroundHandler
 

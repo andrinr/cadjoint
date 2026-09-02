@@ -115,6 +115,35 @@ class PlaygroundBase(BaseHTTPRequestHandler):
             Cache_Control="no-store",
         )
 
+    def _send_raw_json(self, status: HTTPStatus, body: str) -> None:
+        """Send an already-serialized JSON document.
+
+        The job store keeps results as the exact JSON text that was sent the
+        first time, so re-fetching one costs neither a parse nor a re-encode
+        and the bytes are identical to the original response.
+        """
+        self._send(
+            status,
+            body.encode("utf-8"),
+            "application/json; charset=utf-8",
+            Cache_Control="no-store",
+        )
+
+    def _drain_body(self) -> None:
+        """Read and discard a request body, keeping keep-alive framing aligned.
+
+        Used by the command endpoints that take no arguments (job cancel and
+        clear) but may still be sent an empty JSON object by a client.
+        """
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+        except ValueError:
+            length = -1
+        if 0 < length <= MAX_SOURCE_BYTES * 2:
+            self.rfile.read(length)
+        elif length != 0:
+            self.close_connection = True
+
     def _stream_ndjson(self, events) -> None:
         """Relay an event stream as chunked NDJSON, flushed per line.
 

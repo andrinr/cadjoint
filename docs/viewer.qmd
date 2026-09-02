@@ -225,6 +225,48 @@ the first popup you see is already warm.
 Both tools are optional extras (`pip install "cadjoint[editor]"`). Without them
 these endpoints answer with an install hint and the editor simply goes quiet.
 
+## Work that outlives the request
+
+Every request that costs real time — a compile, a mesh extraction, a mesh
+inspection, a simulation, an optimization run, a lint, and the startup
+warm-up — is registered as a **job** in the server process the moment it
+starts, and stays registered after it ends. Nothing about the endpoints
+changes: they answer exactly as before, with a `job_id` added.
+
+That id buys three things a plain request/response API cannot give you.
+
+**A result survives the panel that asked for it.** Switch modes, close the
+Results tab, come back an hour later: `GET /api/jobs/<id>/result` returns the
+identical payload the original request received, byte for byte, without
+re-running a nine-second solve. Each job also carries the sha256 of the
+program text it ran on, so the UI can tell a result that still describes the
+document from one the last edit invalidated.
+
+**You can see what is burning the machine.** While a job runs, its worker
+subprocess (and anything that worker spawns, such as a CalculiX solve) is
+sampled twice a second for CPU and resident memory. `GET /api/jobs` answers
+with every job newest-first plus live totals — how many are running, their
+combined CPU and RSS, the server's uptime, and the machine's core count and
+memory — cheaply enough to poll once a second. The startup warm-up appears
+as a `warmup` job, which is the answer to "why are two Python processes at
+100% the moment I open the playground?".
+
+**A run can actually be stopped.** `POST /api/jobs/<id>/cancel` kills the
+worker subprocess rather than merely abandoning it; the request that started
+the work ends immediately with `{"ok": false, "error": "cancelled"}` and the
+job is marked `cancelled`. `POST /api/jobs/clear` drops finished jobs.
+
+The registry is a fixed-size window, not a log: the last 50 jobs (at most 10
+of them lints, so a typing session cannot flush the expensive history), and
+64 MB of stored payloads. Past either bound the oldest finished entries go —
+payloads first, so a job's timings and samples outlive its result. Every
+listing reports both budgets and how much has been evicted.
+
+Sampling uses `psutil`, part of the `viewer` extra. Without it the server
+still registers everything and still cancels; it falls back to
+`resource.getrusage` totals over all child processes and says so in each
+payload's `sampling` field, which reads `"psutil"` or `"rusage"`.
+
 ## A live example
 
 ::: {.callout-note}

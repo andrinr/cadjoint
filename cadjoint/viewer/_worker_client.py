@@ -30,6 +30,7 @@ import sys
 import threading
 from typing import Any
 
+from cadjoint.viewer._jobs import REGISTRY, attach_process
 from cadjoint.viewer._limits import OVERSIZED_SOURCE_ERROR, exceeds_source_limit
 
 COMPILE_TIMEOUT_SECONDS = 20
@@ -51,28 +52,35 @@ def _run_worker(
     if exceeds_source_limit(source):
         return {"ok": False, "error": OVERSIZED_SOURCE_ERROR}
 
+    request = json.dumps({**(extra or {}), "source": source, "mode": mode})
+    process = subprocess.Popen(
+        [sys.executable, "-m", "cadjoint.viewer._compile_worker"],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    # Hand the child to the job registry before waiting on it: that is what
+    # makes a running request cancellable and its CPU/RSS observable.  Outside
+    # a tracked request this is a no-op.
+    attach_process(process)
     try:
-        completed = subprocess.run(
-            [sys.executable, "-m", "cadjoint.viewer._compile_worker"],
-            input=json.dumps({**(extra or {}), "source": source, "mode": mode}),
-            capture_output=True,
-            check=False,
-            text=True,
-            timeout=timeout,
-        )
+        stdout, stderr = process.communicate(request, timeout=timeout)
     except subprocess.TimeoutExpired:
+        process.kill()
+        process.communicate()
         return {
             "ok": False,
             "error": f"Compilation exceeded the {timeout:g}-second timeout.",
         }
 
-    if completed.returncode != 0:
-        detail = completed.stderr.strip() or "The compiler process exited unexpectedly."
+    if process.returncode != 0:
+        detail = stderr.strip() or "The compiler process exited unexpectedly."
         return {"ok": False, "error": detail[-8_000:]}
     try:
-        result = json.loads(completed.stdout)
+        result = json.loads(stdout)
     except json.JSONDecodeError:
-        detail = completed.stderr.strip() or completed.stdout.strip()
+        detail = stderr.strip() or stdout.strip()
         return {"ok": False, "error": f"Invalid compiler response:\n{detail[-8_000:]}"}
     if not isinstance(result, dict):
         return {"ok": False, "error": "Invalid compiler response."}
@@ -144,7 +152,10 @@ def warm_start(source: str | None = None) -> bool:
         # 20-second edit round-trip budget it is held to in a request.
         for mode in ("compile", "mesh"):
             try:
-                _run_worker(source, mode, MESH_TIMEOUT_SECONDS)
+                # Registered as `warmup` jobs so the process monitor can say
+                # why two workers are burning CPU right after launch.
+                with REGISTRY.track("warmup", source=source, fields={"mode": mode}) as job:
+                    REGISTRY.finish(job, _run_worker(source, mode, MESH_TIMEOUT_SECONDS))
             except Exception:  # noqa: BLE001 - a cold cache is the only cost of failing
                 return
 
@@ -287,6 +298,7 @@ def _stream_optimize_worker(source: str, extra: dict[str, Any], timeout: float):
         stderr=subprocess.PIPE,
         text=True,
     )
+    attach_process(process)
     stderr_text: list[str] = []
     drain = threading.Thread(target=lambda: stderr_text.append(process.stderr.read()), daemon=True)
     drain.start()

@@ -502,6 +502,7 @@ tesseract = [
 viewer = [
     { name = "anywidget", version = "0.9.21", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "anywidget", version = "0.11.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
+    { name = "psutil" },
 ]
 
 [package.dev-dependencies]
@@ -542,6 +543,7 @@ requires-dist = [
     { name = "optimistix", specifier = ">=0.0.10" },
     { name = "petsc4py", marker = "python_full_version >= '3.11' and extra == 'fem'" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=3.0.0" },
+    { name = "psutil", marker = "extra == 'viewer'", specifier = ">=5.9" },
     { name = "pyfiglet", marker = "python_full_version >= '3.11' and extra == 'fem'" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0.0" },
     { name = "quartodoc", marker = "extra == 'docs'", specifier = ">=0.7" },
