@@ -192,9 +192,45 @@ describe("the gain readout", () => {
 describe("the view readout", () => {
   it("names a standard view and reports FREE once orbited off it", () => {
     for (const [name, preset] of Object.entries(VIEW_PRESETS)) {
-      expect(viewLabel(preset.yaw, preset.pitch)).toBe(name.toUpperCase());
+      expect(viewLabel(preset.yaw, preset.pitch), name).toBe(
+        preset.label ?? name.toUpperCase(),
+      );
     }
     expect(viewLabel(VIEW_PRESETS.front.yaw + 0.4, 0)).toBe("FREE");
+  });
+
+  it("calls every corner ISO, and says which corner in the octant", () => {
+    // Isometric is a *direction*, and all eight octants have one. The readout
+    // does not invent eight names for the same standpoint; the octant beside
+    // it is what distinguishes them, exactly.
+    const corners = Object.entries(VIEW_PRESETS).filter(
+      ([, preset]) => preset.label === "ISO",
+    );
+    // Eight octants, plus the `iso` alias the session starts on.
+    expect(corners).toHaveLength(9);
+    const octants = new Set<string>();
+    for (const [name, preset] of corners) {
+      expect(viewLabel(preset.yaw, preset.pitch), name).toBe("ISO");
+      // A corner stands on all three axes at once.
+      const signs = octant(preset.yaw, preset.pitch);
+      expect(signs, name).toMatch(/^[+−]X[+−]Y[+−]Z$/);
+      octants.add(signs);
+    }
+    expect(octants.size).toBe(8);
+  });
+
+  it("names every edge view after the two faces it lies between", () => {
+    const edges = Object.entries(VIEW_PRESETS).filter(
+      ([name, preset]) => preset.label === undefined && name.includes("-"),
+    );
+    expect(edges).toHaveLength(12);
+    for (const [name, preset] of edges) {
+      expect(viewLabel(preset.yaw, preset.pitch), name).toBe(name.toUpperCase());
+      // 45° about one axis: two of the three components are non-zero.
+      expect(octant(preset.yaw, preset.pitch), name).toMatch(
+        /^[+−][XYZ][+−][XYZ]$/,
+      );
+    }
   });
 
   it("spells the octant the camera stands in, in a Z-up world", () => {

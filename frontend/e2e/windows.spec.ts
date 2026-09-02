@@ -44,14 +44,28 @@ async function dragTabTo(page: Page, tab: Locator, to: { x: number; y: number })
 
 const groupCount = (page: Page) => page.locator(".dv-groupview").count();
 
+/** The editor's whole document, read from CodeMirror rather than the DOM. */
+async function editorText(page: Page): Promise<string> {
+  return page.evaluate(() => {
+    type DocView = { view?: { state: { doc: { toString(): string } } } };
+    const content = document.querySelector("[data-testid=editor] .cm-content") as
+      | (HTMLElement & { cmView?: DocView; cmTile?: DocView })
+      | null;
+    const view = content?.cmView?.view ?? content?.cmTile?.view;
+    if (view) return view.state.doc.toString();
+    return content?.innerText ?? "";
+  });
+}
+
 test("the model desk opens docked, tabbed, and with a viewport that cannot be closed", async ({
   page,
 }) => {
   for (const id of ["viewport", "editor", "objects", "materials", "optimize"]) {
     await expect(page.getByTestId(`window-tab-${id}`)).toBeVisible();
   }
-  await expect(page.getByTestId("window-tab-simulate")).toHaveCount(0);
-  await expect(page.getByTestId("window-tab-sketch")).toHaveCount(0);
+  for (const id of ["studies", "meshes", "results", "sketch"]) {
+    await expect(page.getByTestId(`window-tab-${id}`)).toHaveCount(0);
+  }
 
   // Materials and Optimize share one tab strip out of the box.
   const stacked = page.locator(".dv-groupview:has([data-testid=window-tab-optimize]) .dv-tab");
@@ -106,7 +120,9 @@ test("a window can be dragged onto another's tab strip to stack them", async ({ 
 });
 
 test("a window minimises to the tray and comes back", async ({ page }) => {
-  await expect(page.getByTestId("window-tray")).toHaveCount(0);
+  // The tray is never empty now — Processes is parked in every desk — so
+  // what is asserted is which windows are in it, not whether it exists.
+  await expect(page.getByTestId("window-restore-objects")).toHaveCount(0);
 
   const group = page.locator(".dv-groupview:has([data-testid=window-tab-objects])");
   await group.getByTestId("window-minimise").click();
@@ -117,7 +133,7 @@ test("a window minimises to the tray and comes back", async ({ page }) => {
 
   await page.getByTestId("window-restore-objects").click();
   await expect(page.getByTestId("window-tab-objects")).toBeVisible();
-  await expect(page.getByTestId("window-tray")).toHaveCount(0);
+  await expect(page.getByTestId("window-restore-objects")).toHaveCount(0);
 });
 
 test("a window closes from its tab and the Window menu brings it back", async ({ page }) => {
@@ -148,7 +164,10 @@ test("each mode restores its own desk", async ({ page }) => {
   await expect(page.getByTestId("window-tab-materials")).toBeVisible();
 
   await page.getByTestId("editmode-simulate").click();
-  await expect(page.getByTestId("window-tab-simulate")).toBeVisible();
+  // Simulate is a desk, not a window: it arranges four ordinary windows.
+  for (const id of ["studies", "meshes", "optimize", "results"]) {
+    await expect(page.getByTestId(`window-tab-${id}`)).toBeVisible();
+  }
   await expect(page.getByTestId("mode-simulate")).toBeVisible();
   await expect(page.getByTestId("window-tab-materials")).toHaveCount(0);
 
@@ -206,7 +225,9 @@ test("a parked window is still parked after a reload", async ({ page }) => {
   await expect(page.getByTestId("window-restore-objects")).toBeVisible();
   await expect(page.getByTestId("window-tab-objects")).toHaveCount(0);
   await page.evaluate(() => window.__cadjointWindows!.resetLayout());
-  await expect(page.getByTestId("window-tray")).toHaveCount(0);
+  await expect(page.getByTestId("window-restore-objects")).toHaveCount(0);
+  // Reset restores the default desk, which parks Processes again.
+  await expect(page.getByTestId("window-restore-processes")).toBeVisible();
 });
 
 test("the viewer canvas survives everything the dock does to it", async ({ page }) => {
@@ -324,4 +345,390 @@ test("the Window menu floats a window, docks it again, and resets the layout", a
   await page.getByTestId("menu-window").click();
   await page.getByTestId("menu-window-reset").click();
   await expect(page.getByTestId("window-tab-editor")).toBeVisible();
+});
+
+/**
+ * The process monitor, and the persistence it exists to make possible.
+ *
+ * Before the job registry a result lived only in the panel that asked for
+ * it: leaving Simulate mode disposed that panel's Solid root and a nine-
+ * second solve went with it. These tests are the proof that it no longer
+ * does — and that the proof is not a cache trick, because the number of
+ * `/api/simulate` requests is counted, not assumed.
+ */
+
+/** Count POSTs to one endpoint for the life of the page. */
+function countPosts(page: Page, path: string): () => number {
+  let seen = 0;
+  page.on("request", (request) => {
+    if (request.method() === "POST" && request.url().includes(path)) seen += 1;
+  });
+  return () => seen;
+}
+
+test("the process monitor is parked in every desk and reports the server", async ({
+  page,
+}) => {
+  // Parked, not docked: a monitor that took a column of the desk before it
+  // was asked for would be in the way of the work it is monitoring.
+  await expect(page.getByTestId("window-restore-processes")).toHaveText("Processes");
+  await expect(page.getByTestId("window-tab-processes")).toHaveCount(0);
+
+  await page.getByTestId("window-restore-processes").click();
+  const panel = page.getByTestId("processes-panel");
+  await expect(panel).toBeVisible();
+
+  // Three numbered zones, in the order the sheet reads them.
+  await expect(page.getByTestId("processes-running")).toContainText("Running");
+  await expect(page.getByTestId("processes-history")).toContainText("History");
+  await expect(page.getByTestId("processes-load")).toContainText("Load");
+
+  // Loading the playground compiles the starter, so the history is not a
+  // hypothetical: it holds that compile, with what it cost.
+  const compiles = page.locator('[data-testid^="processes-open-"]', { hasText: "compile" });
+  await expect(compiles.first()).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId("processes-totals")).toContainText("uptime");
+  await expect(page.getByTestId("processes-budget")).toContainText("/50 jobs");
+
+  // Expanding a row is what fetches its samples; nothing else does.
+  const first = compiles.first();
+  const jobId = await first.getAttribute("data-testid");
+  const id = jobId!.replace("processes-open-", "");
+  await page.getByTestId(`processes-expand-${id}`).click();
+  await expect(page.getByTestId(`processes-detail-${id}`)).toContainText("pid");
+
+  // The Window menu closes it and opens it again — the tray is not the only
+  // way in, because a user who closed it needs a way back.
+  await page.getByTestId("menu-window").click();
+  await page.getByTestId("menu-window-processes").click();
+  await expect(panel).toHaveCount(0);
+  // A visibility checkbox leaves the menu open, like the panel items above
+  // it, so the way back is the same item rather than a second trip.
+  await expect(page.getByTestId("menu-window-processes")).toHaveAttribute(
+    "aria-checked",
+    "false",
+  );
+  await page.getByTestId("menu-window-processes").click();
+  await expect(panel).toBeVisible();
+  await page.keyboard.press("Escape");
+
+  // And it is parked in the Simulate desk too, not only in Model's.
+  await page.getByTestId("editmode-simulate").click();
+  await expect(page.getByTestId("simulate-panel")).toBeVisible();
+  await expect(page.getByTestId("window-restore-processes")).toBeVisible();
+});
+
+test("a solved field survives a mode switch and is fetched back by job id", async ({
+  page,
+}) => {
+  // A cold cache meshes and solves a design the server has never seen.
+  test.setTimeout(300_000);
+  const solves = countPosts(page, "/api/simulate");
+
+  await page.getByTestId("editmode-simulate").click();
+  await page.getByTestId("simulate-run-sink-conduction").click();
+  await expect(page.getByTestId("simulate-legend")).toBeVisible({ timeout: 240_000 });
+  await expect(page.getByTestId("simulate-legend")).toContainText("temperature");
+  expect(solves()).toBe(1);
+
+  // Leave Simulate. The panel's Solid root is disposed with the desk — this
+  // is exactly the moment the result used to be lost.
+  await page.getByTestId("editmode-model").click();
+  await expect(page.getByTestId("simulate-panel")).toHaveCount(0);
+
+  await page.getByTestId("editmode-simulate").click();
+  await expect(page.getByTestId("simulate-legend")).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByTestId("simulate-legend")).toContainText("temperature");
+  await expect(page.getByTestId("simulate-result-summary")).toContainText("nodes");
+  // The proof that it was fetched rather than re-solved: the study was
+  // posted once, and only once, for the whole round trip.
+  expect(solves()).toBe(1);
+
+  // The result is not marked stale, because the program has not changed.
+  await expect(page.getByTestId("simulate-stale")).toHaveCount(0);
+
+  // Now change the program. The result still describes the old text, so it
+  // stays on screen and says so — throwing it away would be worse.
+  await page.getByTestId("sim-tab-meshes").click();
+  await page.getByTestId("mesh-arg-sink-mesh-padding").fill("0.03");
+  await page.getByTestId("mesh-arg-sink-mesh-padding").blur();
+  await page.getByTestId("sim-tab-results").click();
+  await expect(page.getByTestId("simulate-stale")).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByTestId("simulate-legend")).toContainText("temperature");
+  expect(solves()).toBe(1);
+});
+
+test("a running optimization is cancelled from its own button and lands in the monitor", async ({
+  page,
+}) => {
+  test.setTimeout(180_000);
+  await page.getByTestId("window-tab-optimize").click();
+  await page.getByTestId("optimize-run-cool-sink").click();
+
+  // The Run button becomes the Cancel button as soon as the stream has
+  // named the job — which is the first thing the stream says.
+  const cancel = page.getByTestId("optimize-cancel-cool-sink");
+  await expect(cancel).toBeVisible();
+  await expect(cancel).toHaveText("Cancel", { timeout: 60_000 });
+  await cancel.click();
+
+  // The request that started the work ends by itself, and a cancellation is
+  // a decision rather than a failure: no error notice anywhere.
+  await expect(page.getByTestId("optimize-run-cool-sink")).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByTestId("optimize-error")).toHaveCount(0);
+  await expect(page.getByTestId("optimize-result-cool-sink")).toHaveCount(0);
+
+  // And the monitor records what happened to it.
+  await page.getByTestId("window-restore-processes").click();
+  await expect(page.getByTestId("processes-panel")).toBeVisible();
+  await expect(
+    page.locator('[data-testid^="processes-status-"]', { hasText: "cancelled" }).first(),
+  ).toBeVisible({ timeout: 20_000 });
+});
+
+test("an optimization trajectory outlives a mode switch and a reload", async ({ page }) => {
+  // One real study-backed run: the first step pays for the FEM freeze.
+  test.setTimeout(600_000);
+  await page.getByTestId("window-tab-optimize").click();
+  await page.getByTestId("optimize-steps-cool-sink").fill("2");
+  await page.getByTestId("optimize-steps-cool-sink").blur();
+  await expect(page.getByTestId("optimize-steps-cool-sink")).toHaveValue("2");
+
+  await page.getByTestId("optimize-run-cool-sink").click();
+  await expect(page.getByTestId("optimize-result-cool-sink")).toBeVisible({
+    timeout: 420_000,
+  });
+  const scrub = page.getByTestId("optimize-scrub");
+  await expect(scrub).toBeVisible();
+  const max = await scrub.getAttribute("max");
+
+  // A mode switch tears the Optimize window down and builds the Simulate
+  // desk; coming back must find the same run under the same cursor.
+  await page.getByTestId("editmode-simulate").click();
+  await expect(page.getByTestId("simulate-panel")).toBeVisible();
+  await page.getByTestId("editmode-model").click();
+  await page.getByTestId("window-tab-optimize").click();
+  await expect(page.getByTestId("optimize-scrub")).toHaveAttribute("max", max!);
+
+  // The scrubber still drives the replay: dragging it to the first frame
+  // ghost-compiles that step's parameters.
+  await page.getByTestId("optimize-scrub").fill("0");
+  await expect(page.getByTestId("optimize-frame-label")).toContainText("step");
+
+  // And a reload — which loses every signal in the page — restores the run
+  // from the server's job store, marked stale because reloading also puts
+  // the starter program back in the editor.
+  await page.reload();
+  await waitForDock(page);
+  await page.getByTestId("window-tab-optimize").click();
+  await expect(page.getByTestId("optimize-scrub")).toHaveAttribute("max", max!, {
+    timeout: 60_000,
+  });
+  await expect(page.getByTestId("optimize-stale-cool-sink")).toBeVisible();
+});
+
+/**
+ * The Simulate desk.
+ *
+ * Simulation used to be one window with a tab strip inside it, which meant
+ * four views the dock could not move, split, float or park independently.
+ * They are ordinary windows now, and "Simulate" is what arranges them.
+ */
+test("the Simulate desk arranges four windows that move like any other", async ({
+  page,
+}) => {
+  await page.getByTestId("editmode-simulate").click();
+
+  // Setup above, outcomes below: Studies over Results, with Meshes tabbed
+  // behind the first and Optimize behind the second.
+  const studiesGroup = page.locator(
+    ".dv-groupview:has([data-testid=window-tab-studies]) .dv-tab",
+  );
+  const resultsGroup = page.locator(
+    ".dv-groupview:has([data-testid=window-tab-results]) .dv-tab",
+  );
+  await expect(studiesGroup).toHaveCount(2);
+  await expect(resultsGroup).toHaveCount(2);
+  await expect(page.getByTestId("simulate-panel")).toBeVisible();
+  await expect(page.getByTestId("results-panel")).toBeVisible();
+
+  // The old tab strip's ids live on the dock's tabs, so the control that
+  // used to switch a tab is the control that raises the window.
+  await page.getByTestId("sim-tab-meshes").click();
+  await expect(page.getByTestId("meshes-panel")).toBeVisible();
+  await expect(page.getByTestId("simulate-panel")).toHaveCount(0);
+  await page.getByTestId("sim-tab-studies").click();
+  await expect(page.getByTestId("simulate-panel")).toBeVisible();
+
+  // And they are windows in every sense: close one and the Window menu has
+  // it back, which a tab inside a panel never offered.
+  await page.getByTestId("window-close-results").click();
+  await expect(page.getByTestId("results-panel")).toHaveCount(0);
+  await page.getByTestId("menu-window").click();
+  await page.getByTestId("menu-window-results").click();
+  await expect(page.getByTestId("results-panel")).toBeVisible();
+  await page.keyboard.press("Escape");
+
+  // Optimize is one window with two homes rather than two copies of a card
+  // list: the Model desk tabs it behind Materials, this desk behind Results.
+  await page.getByTestId("sim-tab-optimize").click();
+  await expect(page.getByTestId("optimize-panel")).toBeVisible();
+  await page.getByTestId("editmode-model").click();
+  await page.getByTestId("window-tab-optimize").click();
+  await expect(page.getByTestId("optimize-panel")).toBeVisible();
+});
+
+test("a running solve is cancelled from its own button and from the monitor", async ({
+  page,
+}) => {
+  test.setTimeout(300_000);
+
+  await page.getByTestId("editmode-simulate").click();
+  await expect(page.getByTestId("simulate-study-sink-conduction")).toBeVisible();
+
+  // Solve becomes Cancel in place, once the registry has named the job.
+  await page.getByTestId("simulate-run-sink-conduction").click();
+  const cancel = page.getByTestId("simulate-cancel-sink-conduction");
+  await expect(cancel).toBeVisible();
+  await expect(cancel).toHaveText("Cancel", { timeout: 60_000 });
+  await cancel.click();
+
+  // A cancellation is a decision, not a failure: the request ends by itself,
+  // the button comes back, and nothing anywhere reads as an error.
+  await expect(page.getByTestId("simulate-run-sink-conduction")).toBeVisible({
+    timeout: 120_000,
+  });
+  await expect(page.getByTestId("simulate-error")).toHaveCount(0);
+  await expect(page.getByTestId("results-error")).toHaveCount(0);
+
+  // The same kill from the other end: the monitor's own stop control.
+  await page.getByTestId("window-restore-processes").click();
+  await expect(page.getByTestId("processes-panel")).toBeVisible();
+  await page.getByTestId("simulate-run-sink-conduction").click();
+
+  const running = page.locator('[data-testid^="processes-cancel-"]');
+  await expect(running.first()).toBeVisible({ timeout: 60_000 });
+  await running.first().click();
+
+  await expect(page.getByTestId("simulate-run-sink-conduction")).toBeVisible({
+    timeout: 120_000,
+  });
+  await expect(page.getByTestId("simulate-error")).toHaveCount(0);
+  await expect(
+    page.locator('[data-testid^="processes-status-"]', { hasText: "cancelled" }).first(),
+  ).toBeVisible({ timeout: 20_000 });
+});
+
+/**
+ * The scene browser.
+ *
+ * What it must prove is that it describes the shipped scenes without running
+ * them: the counts and the docstring line come from the server's `ast` pass,
+ * and the picture — which is the one thing that does cost a compile — is
+ * queued rather than blocking the panel it sits in.
+ */
+test("the scene browser describes what is saved and opens one", async ({ page }) => {
+  test.setTimeout(180_000);
+
+  // File → Open… raises the window; it is parked in every desk.
+  await page.getByTestId("menu-file").click();
+  await page.getByTestId("menu-file-open").click();
+  await expect(page.getByTestId("scenes-panel")).toBeVisible();
+
+  for (const name of ["starter.py", "bracket.py", "end_cap.py"]) {
+    await expect(page.getByTestId(`scene-${name}`)).toBeVisible({ timeout: 30_000 });
+  }
+
+  // Read, not run: the summary is the docstring's first line and the counts
+  // are of declarations, and the end-cap declares no optimization.
+  await expect(page.getByTestId("scene-summary-end_cap.py")).toContainText(
+    "Gearbox output end-cap",
+  );
+  const counts = page.getByTestId("scene-counts-bracket.py");
+  await expect(counts).toContainText("free");
+  await expect(counts).toContainText("studies");
+  await expect(page.getByTestId("scene-materials-bracket.py")).toContainText("steel");
+  await expect(page.getByTestId("scene-meta-bracket.py")).toContainText("kB");
+
+  // One picture at a time: the frames exist immediately, at the thumbnail's
+  // aspect, and leave the queue one after another. A headless browser has no
+  // WebGPU, so "drawn" is not what is asserted — "not stuck in the queue" is.
+  const frame = page.getByTestId("scene-thumb-starter.py");
+  await expect(frame).toBeVisible();
+  await expect
+    .poll(async () => frame.getAttribute("data-state"), { timeout: 120_000 })
+    .not.toBe("queued");
+
+  // Opening one goes through the same path the menu uses.
+  await page.getByTestId("scene-open-bracket.py").click();
+  await expect(page.getByTestId("menu-scene-name")).toContainText("bracket.py");
+
+  // The browser opens *over* the editor rather than as a fourth column, so
+  // the editor's tab is one click away — and that is where the program the
+  // browser just loaded is.
+  await page.getByTestId("window-tab-editor").click();
+  await expect
+    .poll(async () => (await editorText(page)).includes("Parametric L-bracket"), {
+      timeout: 60_000,
+    })
+    .toBe(true);
+});
+
+/**
+ * A solve that fails has to say so where it was asked for.
+ *
+ * The failure this is written against: switching a mesh to TET10 made the
+ * solver refuse the surface, and the only sign in the UI was the previous
+ * result still on screen with a "stale" chip — which reads as "still
+ * thinking", not as "that run failed". The solver's own words went to the
+ * server log.
+ */
+test("a failed solve shows the solver's message in the Results window", async ({
+  page,
+}) => {
+  test.setTimeout(300_000);
+
+  const editorHas = (needle: string) =>
+    expect
+      .poll(async () => (await editorText(page)).includes(needle), { timeout: 60_000 })
+      .toBe(true);
+
+  await page.getByTestId("editmode-simulate").click();
+  await expect(page.getByTestId("simulate-study-sink-conduction")).toBeVisible();
+
+  // A boundary condition that selects nothing: a millimetre sphere fifty
+  // metres away from the part. The declaration is valid, the solve is not.
+  await page.getByTestId("simulate-add-bc-sink-conduction").click();
+  await page.getByTestId("simulate-builder-selection").selectOption("sphere");
+  for (const component of [0, 1, 2]) {
+    const field = page.getByTestId(`simulate-builder-center-${component}`);
+    await field.fill("50");
+    await field.blur();
+  }
+  await page.getByTestId("simulate-builder-radius").fill("0.001");
+  await page.getByTestId("simulate-builder-radius").blur();
+  await page.getByTestId("simulate-builder-add").click();
+  // The starter already declares a `Nodes.sphere(...)`, so wait for *this*
+  // one: the fifty-metre centre is what makes the selection empty.
+  await editorHas("Nodes.sphere([50.0, 50.0, 50.0]");
+
+  await page.getByTestId("simulate-run-sink-conduction").click();
+
+  // The whole message, in the window that would have shown the field.
+  const failure = page.getByTestId("results-failure");
+  await expect(failure).toBeVisible({ timeout: 240_000 });
+  await expect(failure).toContainText("matched no boundary nodes");
+  // And the job it came from, with the way to its row in the monitor.
+  await expect(failure).toContainText("job ");
+
+  // The button that started the work is idle again, not stuck on "solving".
+  await expect(page.getByTestId("simulate-run-sink-conduction")).toBeVisible();
+  await expect(page.getByTestId("simulate-run-sink-conduction")).toBeEnabled();
+
+  // "Show in Processes" opens the monitor on that job's row.
+  await page.getByTestId("results-error-job").click();
+  await expect(page.getByTestId("processes-panel")).toBeVisible();
+  await expect(page.locator('[data-testid^="processes-detail-"]').first()).toBeVisible({
+    timeout: 20_000,
+  });
 });

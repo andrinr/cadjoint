@@ -20,6 +20,7 @@ import type { EditingMode } from "../editingMode";
 import { EDITING_MODES } from "../editingMode";
 import {
   defaultWindowsForMode,
+  isParked,
   isPermanent,
   isWindowId,
   WINDOW_IDS,
@@ -42,11 +43,17 @@ export type WindowAction =
   | { kind: "toggle"; id: WindowId }
   | { kind: "reset"; mode: EditingMode };
 
-/** A mode's default statuses: its own windows open, everything else closed. */
+/**
+ * A mode's default statuses: its own windows open, everything else closed —
+ * except the windows marked `parked`, which every desk starts with in the
+ * tray, one click from where they belong.
+ */
 export function defaultModeWindows(mode: EditingMode): ModeWindows {
   const open = new Set<string>(defaultWindowsForMode(mode));
   const state = {} as ModeWindows;
-  for (const id of WINDOW_IDS) state[id] = open.has(id) ? "open" : "closed";
+  for (const id of WINDOW_IDS) {
+    state[id] = open.has(id) ? "open" : isParked(id) ? "minimised" : "closed";
+  }
   return state;
 }
 

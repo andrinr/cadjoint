@@ -30,6 +30,7 @@ import type { JSX } from "solid-js";
 import {
   FALLBACK_PLACEMENTS,
   isPermanent,
+  tabTestId,
   windowTitle,
   WINDOW_IDS,
   type OpenPlacement,
@@ -133,6 +134,11 @@ export function createDock(container: HTMLElement, callbacks: DockCallbacks): Do
       element.dataset.testid = `window-tab-${id}`;
       const label = document.createElement("span");
       label.className = "win-tab-label";
+      // The four simulation windows were a tab strip inside one panel until
+      // they became windows; the label keeps that strip's id so the control
+      // the audit tool and the e2e suite click still raises the window.
+      const alias = tabTestId(id);
+      if (alias) label.dataset.testid = alias;
       element.appendChild(label);
       let close: HTMLButtonElement | undefined;
       if (!isPermanent(id)) {

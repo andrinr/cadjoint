@@ -50,6 +50,7 @@ export function BcBuilder(props: BcBuilderProps) {
       label={label}
       value={draft()[key]}
       step="0.1"
+      testId={(component) => `simulate-builder-${key}-${component}`}
       onCommit={(component, value) => sim().setVector(key, component, value)}
     />
   );

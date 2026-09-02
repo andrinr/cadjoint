@@ -61,19 +61,27 @@ describe("default statuses", () => {
     const model = defaultModeWindows("model");
     expect(model.objects).toBe("open");
     expect(model.materials).toBe("open");
-    expect(model.simulate).toBe("closed");
+    expect(model.studies).toBe("closed");
+    expect(model.results).toBe("closed");
     expect(model.sketch).toBe("closed");
 
+    // Simulate is a desk, not a window: what it opens is the four simulation
+    // windows, and Optimize is the one shared by both desks.
     const simulate = defaultModeWindows("simulate");
-    expect(simulate.simulate).toBe("open");
+    expect(simulate.studies).toBe("open");
+    expect(simulate.meshes).toBe("open");
+    expect(simulate.results).toBe("open");
+    expect(simulate.optimize).toBe("open");
     expect(simulate.materials).toBe("closed");
   });
 
   it("gives every mode its own record", () => {
     const states = defaultWindowStates();
     expect(Object.keys(states).sort()).toEqual(["model", "simulate", "sketch"]);
+    // Optimize is one window with two homes: the Model desk tabs it behind
+    // Materials, the Simulate desk behind Results.
     expect(states.model.optimize).toBe("open");
-    expect(states.simulate.optimize).toBe("closed");
+    expect(states.sketch.optimize).toBe("closed");
   });
 });
 
@@ -89,7 +97,10 @@ describe("transitions", () => {
   it("parks an open window and restores it", () => {
     const parked = reduceModeWindows(model, { kind: "minimise", id: "objects" });
     expect(parked.objects).toBe("minimised");
-    expect(minimisedWindows(parked)).toEqual(["objects"]);
+    // Scenes and Processes are parked in every desk by default — a document
+    // browser and a monitor, both worth one click away and neither worth a
+    // column of the desk before it was asked for.
+    expect(minimisedWindows(parked)).toEqual(["objects", "scenes", "processes"]);
     expect(reduceModeWindows(parked, { kind: "restore", id: "objects" }).objects).toBe("open");
   });
 

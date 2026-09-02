@@ -9,7 +9,13 @@
  */
 
 import { orthoHeightFor, type CameraState, type Vec3 } from "../../viewer/math";
-import { distanceForGain, gainFor, stepDetent } from "../../viewer/graticule";
+import {
+  MAX_DISTANCE,
+  MIN_DISTANCE,
+  distanceForGain,
+  gainFor,
+  stepDetent,
+} from "../../viewer/graticule";
 
 /** Pitch clamp, radians: stops the orbit tumbling over the poles. */
 export const PITCH_LIMIT = 1.45;
@@ -59,9 +65,15 @@ export function panCamera(
   };
 }
 
-/** Closest and furthest the orbit camera may sit from its target. */
-export const MIN_DISTANCE = 0.4;
-export const MAX_DISTANCE = 60;
+/**
+ * Closest and furthest the orbit camera may sit from its target.
+ *
+ * Re-exported from `viewer/graticule`, where the detent ladder lives: the
+ * ladder and the range have to be reasoned about together (a rung outside the
+ * range is a detent the zoom cannot land on), and the renderer needs the range
+ * too, without reaching up into the components layer for it.
+ */
+export { MAX_DISTANCE, MIN_DISTANCE } from "../../viewer/graticule";
 
 const clampDistance = (distance: number): number =>
   Math.max(MIN_DISTANCE, Math.min(MAX_DISTANCE, distance));

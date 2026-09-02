@@ -277,11 +277,15 @@ body {
   overflow: hidden;
 }
 
-/* Prose, and the only place sans is set. */
+/* Prose, and the only place sans is set.
+   `.material-empty` used to be on this list and is not any more. It is the
+   line the material panel shows instead of `.material-help` when the library
+   is empty — the same one-line instruction, in the same slot under the same
+   header — and the two were set in two different families, which read as a
+   font bug the moment the library emptied. A one-line readout of a state is
+   not prose; the sentences below are. */
 .viewer-hint,
 .menu-dropdown small,
-.material-empty,
-.material-physical-empty,
 .opt-player-hint,
 .shortcut-groups li,
 .dialog p,
@@ -1170,27 +1174,20 @@ input[type="checkbox"] {
   border-top-color: var(--rule);
 }
 
-/* Section numbers. A dock section is a zone of the sheet, so its number is
-   drawn the way every other section number is — a filled cell with near-black
-   type — from one counter incremented in dock order. */
-.object-tree-panel > header::before,
-.material-panel > header::before,
-.sim-panel > header::before,
-.sketch-panel > header::before,
-.render-panel > header::before {
-  flex: 0 0 auto;
-  align-self: stretch;
-  display: grid;
-  place-items: center;
-  min-width: 22px;
-  background: var(--accent);
-  color: var(--ink-on-accent);
-  font: var(--type-kicker);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: var(--tracking-3xs);
-  counter-increment: cj-dock;
-  content: counter(cj-dock, decimal-leading-zero);
-}
+/* Panel and section headers used to open with a filled accent cell carrying a
+   number — 01, 02, 03 — from a CSS counter, on the reasoning that a panel is a
+   zone of a drawing and a drawing numbers its zones.
+ *
+ * They are gone. A drawing numbers its zones so that a *written* reference can
+ * point at one ("see zone 03"), and nothing in this app ever does: no label,
+ * no message and no document refers to a panel or a section by number. What
+ * was left was a counter counting itself — three of the loudest blocks on the
+ * screen, in the one colour the design reserves for state, carrying no state
+ * and naming nothing. The kicker chips beside them (LIBRARY, SERVER, FEM) do
+ * name something and stay.
+ *
+ * The counters themselves stay reset and incremented nowhere: with the two
+ * `::before` rules removed there is nothing left to increment. */
 
 /* Expanded sections: one shared panel shell with the mode-accent header
    strip along the top edge. */
@@ -1227,42 +1224,9 @@ input[type="checkbox"] {
 
 /* ── numbered sections ─────────────────────────────────────────────────── */
 
-/* Sections in this UI are numbered the way the zones of a drawing are: a
-   filled cell carrying the number in near-black type, then the name in
-   tracked uppercase mono. That is the one place the accent appears inside a
-   panel, and it is a fill, which is the only thing the accent may be.
- *
- * The number comes from a CSS counter reset on the dock and incremented by
- * every section head in DOM order. That is deliberate: a panel gets numbered
- * sections without a line changing in the panel's own file, and the numbers
- * cannot drift out of order because nothing hand-writes them. `ui/Section.tsx`
- * is the primitive that emits the markup for anything newly written; every
- * panel that predates it is picked up by the selectors below.
- *
- * The numbering restarts per panel because a panel is the zone: "03" means
- * the third block of *this* readout, not the third in the app. */
-.dock {
-  counter-reset: cj-dock;
-}
-
-.dock > * {
-  counter-reset: cj-section;
-}
-
-.section-head::before,
-.sim-section-head::before {
-  flex: 0 0 auto;
-  align-self: center;
-  margin-right: var(--space-3);
-  padding: 0 var(--space-2);
-  background: var(--accent);
-  color: var(--ink-on-accent);
-  font: var(--type-kicker);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: var(--tracking-3xs);
-  counter-increment: cj-section;
-  content: counter(cj-section, decimal-leading-zero);
-}
+/* A section is announced by its name in tracked uppercase mono and closed by
+   a rule, with whatever it counts hung right. See the note above the panel
+   headers for why the numbers that used to lead it are gone. */
 
 .section-head {
   display: flex;
@@ -1368,12 +1332,6 @@ input[type="checkbox"] {
   background: var(--surface-float-96);
 }
 
-.object-tree-close {
-  flex: 0 0 auto;
-  width: var(--control-sm);
-  padding: 0;
-  color: var(--ink-3);
-}
 
 .object-tree-rows {
   display: flex;
@@ -1554,20 +1512,18 @@ input[type="checkbox"] {
   color: var(--ink);
 }
 
-.material-close {
-  flex: 0 0 auto;
-  width: var(--control-sm);
-  padding: 0;
-  color: var(--ink-3);
-}
-
 /* The control-on-the-title-line pattern (see the panel header note above):
    the block's full height so the centres agree, the glyph in the kicker's own
-   9px line box so the baselines do, and the kicker's own size so three glyphs
-   do not add a variant to the type census. */
-.object-tree-close,
+   9px line box so the baselines do, and the kicker's own size so the glyph
+   does not add a variant to the type census.
+
+   There is exactly one control here now. The two panels used to carry their
+   own em-dash beside it, wired to park the window — which is the job of the
+   frame's own minimise button two centimetres to the right, so every panel
+   showed the reader two identical controls doing one thing. The frame's is
+   the one that stays: it is on every window, docked or floating, and it is
+   where a window's own chrome belongs. */
 .material-add,
-.material-close,
 .material-panel-title > b {
   align-self: stretch;
   display: grid;
@@ -1581,16 +1537,12 @@ input[type="checkbox"] {
 /* And they are marks, not panel buttons: a drawn edge around a glyph sitting
    on the title's first line reads as an empty cell. The edge appears under
    the pointer, the way the editor's and the study rows' own marks do. */
-.object-tree-close,
-.material-add,
-.material-close {
+.material-add {
   border-color: transparent;
   background: transparent;
 }
 
-.object-tree-close:hover,
-.material-add:hover:not(:disabled),
-.material-close:hover {
+.material-add:hover:not(:disabled) {
   color: var(--ink);
   background: var(--surface-raised-hover);
 }
@@ -1727,11 +1679,10 @@ input[type="checkbox"] {
   background: var(--shade-soft);
 }
 
-/* The inspector is two numbered sections, because a Material answers to two
-   readers: 01 is what the renderer uses and 02 is what the solver uses. The
-   number is drawn the way every other section number in this app is — a
-   filled cell with near-black type — so a reader who has learned it once in
-   the dock reads it here for free. */
+/* The inspector is two sections, because a Material answers to two readers:
+   Appearance is what the renderer uses and Physical is what the solver uses.
+   Each is announced the way every other section in this app is — its name in
+   tracked uppercase mono over a rule. */
 .material-section-head {
   display: flex;
   align-items: center;
@@ -1745,21 +1696,10 @@ input[type="checkbox"] {
   text-transform: uppercase;
 }
 
-.material-section-head i {
-  display: grid;
-  place-items: center;
-  min-width: 18px;
-  padding: var(--space-1) var(--space-2);
-  background: var(--accent);
-  color: var(--ink-on-accent);
-  font-style: normal;
-  font-variant-numeric: tabular-nums;
-}
-
-/* Stated physical properties: label · value · unit. Read-only, and printed
-   rather than controlled — these are the numbers a solved field depends on,
-   so they are shown exactly as the program declares them. Tabular figures,
-   because a column of magnitudes is meant to be compared down the column. */
+/* Physical properties: label · value · unit, one row per property whether the
+   program states it or not. Tabular figures, because a column of magnitudes
+   is meant to be compared down the column, and a fixed value column so the
+   digits line up whatever the row is doing. */
 .material-physical {
   display: grid;
   gap: var(--space-1);
@@ -1767,10 +1707,10 @@ input[type="checkbox"] {
 }
 
 .material-physical-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-4);
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: var(--space-1) var(--space-4);
   min-width: 0;
 }
 
@@ -1781,30 +1721,105 @@ input[type="checkbox"] {
   text-transform: uppercase;
 }
 
+/* The value column is sized for the widest thing that can honestly appear in
+   it: a Young's modulus is 117000000000, twelve digits, and a number box
+   cannot abbreviate. The unit gets what is left and elides — `W/(m*K)` is
+   recoverable from a truncated `W/(m…` in a way an elided magnitude is not. */
 .material-physical-row dd {
-  display: flex;
-  align-items: baseline;
+  display: grid;
+  grid-template-columns: 96px var(--control-sm) minmax(0, 52px);
+  align-items: center;
   gap: var(--space-2);
   margin: 0;
   white-space: nowrap;
 }
 
-.material-physical-row dd b {
-  color: var(--ink);
-  font: var(--type-mono-strong);
+/* Two-word properties wrap rather than being cut: "Thermal expansion" and
+   "Young's modulus" are the labels, and half a label is not one. */
+.material-physical-row dt {
+  white-space: normal;
+}
+
+.material-physical-row input[type="number"] {
+  height: var(--control-sm);
+  padding: 0 var(--space-2);
+  font-size: var(--text-2xs);
   font-variant-numeric: tabular-nums;
+  text-align: right;
 }
 
 .material-physical-row dd small {
   color: var(--ink-3);
   font: var(--type-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.material-physical-empty {
-  margin: 0;
+/* An expression, not a literal: the value is in the program and this row will
+   not pretend to own it. Sits in the box's own column, without the box. */
+.material-physical-row dd em {
   color: var(--ink-3);
-  font-size: var(--text-xs);
+  font: var(--type-mono);
+  font-style: normal;
+  text-align: right;
 }
+
+/* The two marks a row carries: "state it" fills the value column of an
+   unstated row, "×" clears a stated one. Both are marks rather than panel
+   buttons — a drawn edge on every row would rule the list into a grid — so
+   the edge arrives under the pointer, as it does on the library's own + . */
+.material-physical-state,
+.material-physical-clear {
+  height: var(--control-sm);
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+  color: var(--ink-3);
+}
+
+.material-physical-state {
+  grid-column: 1 / span 2;
+  justify-self: stretch;
+  border-color: var(--rule);
+  color: var(--ink-3);
+}
+
+.material-physical-state:hover:not(:disabled),
+.material-physical-clear:hover:not(:disabled) {
+  border-color: var(--rule-strong);
+  background: var(--surface-raised-hover);
+  color: var(--ink);
+}
+
+/* A row an optimization may move is a row whose number is not the reader's
+   last word on it. Marked on the label, where the reader is already looking
+   for what the row *is*. */
+.material-physical-row.free dt::after {
+  content: " free";
+  color: var(--ink-3);
+}
+
+/* The server's own refusal, under the row that caused it. Spans both columns
+   so a long sentence wraps against the panel rather than the value column. */
+.material-physical-error {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: var(--space-1) 0 var(--space-2);
+  border-top: 1px solid var(--rule);
+  color: var(--ink-2);
+  font-family: var(--font-sans);
+  font-size: var(--text-2xs);
+  text-transform: none;
+  letter-spacing: normal;
+  white-space: normal;
+}
+
+.material-physical-error button {
+  height: var(--control-sm);
+  margin-top: var(--space-2);
+  padding: 0 var(--space-3);
+}
+
 
 .material-inspector-head,
 .material-inspector label,
@@ -1874,7 +1889,7 @@ input[type="checkbox"] {
   font-size: var(--text-2xs);
 }
 
-/* ViewCube ------------------------------------------------------------- */
+/* The navigation cube ---------------------------------------------------- */
 
 .view-cube {
   position: absolute;
@@ -1884,86 +1899,140 @@ input[type="checkbox"] {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--space-4);
+  gap: var(--space-3);
 }
 
+/* One SVG carries the whole widget: the chamfered solid, the four quarter-turn
+   arrows and the axis triad. It is projected in TypeScript (viewer/navCube.ts)
+   rather than by CSS 3D, so what is described here is only paint. */
 .cube-stage {
-  width: 96px;
-  height: 96px;
-  display: grid;
-  place-items: center;
-  perspective: 340px;
+  width: 168px;
+  height: 168px;
   cursor: grab;
   touch-action: none;
+  overflow: visible;
 }
 
 .cube-stage:active {
   cursor: grabbing;
 }
 
-.cube {
-  position: relative;
-  width: 60px;
-  height: 60px;
-  transform-style: preserve-3d;
-  transition: transform var(--dur-fast) linear;
+/* Every facet is a click target, and the three ranks are drawn alike: the
+   cube has to read as one solid, not as a face with twenty ornaments around
+   it. What separates them is the hairline between them, which is also what
+   makes the chamfer legible as a chamfer. */
+.cube-facet {
+  fill: var(--surface-float);
+  stroke: var(--rule-strong);
+  stroke-width: 1;
+  stroke-linejoin: round;
+  cursor: pointer;
+  transition: fill var(--dur-fast) var(--ease);
 }
 
-.cube-face {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  width: 60px;
-  height: 60px;
-  padding: 0;
-  /* Opaque, and edged in the viewport's accent weight. Both are consequences
-     of the paper ground: at 82% the face composited toward it and its ink-3
-     label measured 3.63:1, and the chrome lime edge measured 1.04:1 against
-     the paper it sits on. */
-  border: 1px solid rgba(var(--viewport-accent-rgb, var(--viewport-mode-rgb)), var(--alpha-mark));
-  background: var(--surface-float);
-  color: var(--ink-3);
-  font: var(--type-kicker);
-  letter-spacing: var(--tracking-3xs);
-  /* Only faces turned toward the viewer are drawn, so a click always lands on
-     the face you can actually see. */
-  backface-visibility: hidden;
+/* A hovered facet steps one rung down in luminance — the same "raised" move
+   every other control on this ground makes, and the only feedback a facet
+   needs, because its shape already says which view it is. */
+.cube-facet:hover {
+  fill: var(--surface-raised-hover);
 }
 
-.cube-face:hover {
-  background: var(--surface-raised-hover);
-  color: var(--viewport-ink);
+/* The camera is standing on this view.
+   Drawn as a heavier outline rather than a fill. A filled facet is fine on a
+   face, which has a label to reverse out of it, and wrong on a corner or a
+   bevel, which have none: a solid black triangle in the middle of the cube
+   reads as a hole punched through it rather than as "you are here". Viewport
+   ink, not the accent — no chrome hue crosses into the viewport (§3.7). */
+.cube-facet.active,
+.cube-facet.active:hover {
+  fill: var(--surface-raised-hover);
+  stroke: var(--viewport-ink);
+  stroke-width: 2;
 }
 
-/* The cube sits over the viewport, so its "on" state is drawn in viewport ink
-   rather than in the accent: no chrome hue crosses this edge (§3.7 zoning). */
-.cube-face.active {
-  border-color: var(--viewport-ink);
-  background: var(--viewport-ink);
-  color: var(--surface-viewport);
+.cube-label {
+  fill: var(--ink-3);
+  font-family: var(--font-mono);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-md);
+  pointer-events: none;
+  user-select: none;
 }
 
-.cube-actions {
-  display: flex;
-  gap: var(--space-3);
+/* The facet the camera is standing on carries its name in full ink, matching
+   the heavier outline around it. It was reversed out in paper while the active
+   state was a solid black fill; against the light fill that replaced it, a
+   near-white label is an invisible one. */
+.cube-label.active {
+  fill: var(--viewport-ink);
 }
 
-.cube-actions button {
+/* A quarter turn about one of the camera's own screen axes. Hollow at rest so
+   the four of them frame the cube instead of competing with it. */
+.cube-arrow {
+  fill: var(--surface-float);
+  stroke: var(--rule-strong);
+  stroke-width: 1;
+  stroke-linejoin: round;
+  cursor: pointer;
+  transition: fill var(--dur-fast) var(--ease);
+}
+
+.cube-arrow:hover {
+  fill: var(--viewport-ink);
+  stroke: var(--viewport-ink);
+}
+
+/* The camera is already at a pole: elevation has nowhere left to step, so the
+   arrow says so rather than swallowing the press. */
+.cube-arrow.spent {
+  opacity: 0.35;
+  cursor: default;
+  pointer-events: none;
+}
+
+/* @artwork — the axis triad is a reading of orientation, not chrome.
+   X-red, Y-green, Z-blue is the convention every CAD and DCC application
+   shares, and it is the reason this is the one saturated hue allowed inside
+   the viewport rectangle: three achromatic hairlines would be three identical
+   lines, which is not a triad, it is a scribble. */
+.cube-axis {
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
+.cube-axis.axis-x { stroke: #d21f2b; }
+.cube-axis.axis-y { stroke: #1f8a2e; }
+.cube-axis.axis-z { stroke: #1f5fd2; }
+
+.cube-axis-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: var(--weight-semibold);
+  pointer-events: none;
+  user-select: none;
+}
+
+.cube-axis-label.axis-x { fill: #d21f2b; }
+.cube-axis-label.axis-y { fill: #1f8a2e; }
+.cube-axis-label.axis-z { fill: #1f5fd2; }
+/* @end-artwork */
+
+.cube-projection {
   display: grid;
   place-items: center;
   width: 28px;
   height: var(--control-sm);
   padding: 0;
   background: var(--surface-float);
-  font: var(--type-kicker);
-  letter-spacing: 0.06em;
 }
 
-/* These two sit straight on the paper, so their active edge is drawn at
-   viewport weight; the shared control accent measures 1.04:1 there. */
-.cube-actions button.active {
+/* This sits straight on the paper, so its active edge is drawn at viewport
+   weight; the shared control accent measures 1.04:1 there. */
+.cube-projection.active {
   border-color: rgba(var(--viewport-accent-rgb, var(--viewport-mode-rgb)), var(--alpha-mark));
+  background: var(--surface-float);
+  color: var(--ink);
 }
 
 /* Render settings (the eye-icon popover in the toolbar) ----------------- */
@@ -2051,6 +2120,47 @@ button.icon {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-3);
+}
+
+/* The distance-field views.
+   Above the preset editor rather than inside it: a preset says how the solid
+   is *drawn*, and these say whether the solid is what is drawn at all. The
+   slice controls borrow the Results tab's own row (.sim-slice) and legend
+   (.sim-legend) verbatim — the two are the same instrument reading two
+   different scalars over a plane, and giving them separate furniture would be
+   the app claiming a difference it does not have. */
+.render-sdf {
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--divider);
+}
+
+.render-sdf .sim-legend-values {
+  align-items: center;
+}
+
+/* @artwork — the two bars below are pictures of an encoding, not chrome.
+   A normal map's axes *are* pure red, green and blue: that is the convention
+   the numbers in the framebuffer mean, and a tokenised approximation of it
+   would be a legend that disagrees with the image it labels. Likewise the
+   depth bar runs full white to full black because those are the two ends of
+   the range the shader writes. */
+.sdf-axis-ramp {
+  background: linear-gradient(to right, #ff0000, #00ff00, #0000ff);
+}
+
+.sdf-depth-ramp {
+  background: linear-gradient(to right, #ffffff, #000000);
+}
+/* @end-artwork */
+
+/* "Return to the real surface" — a text button rather than a switch, because
+   it has one state worth naming and it is the value it returns to. */
+.render-sdf-zero {
+  height: var(--control-xs);
+  padding: 0 var(--space-3);
+  font: var(--type-mono);
+  letter-spacing: var(--tracking-sm);
 }
 
 .render-preset-card {
@@ -2374,6 +2484,128 @@ button.icon {
   background: var(--danger);
 }
 
+/* The running-work chip, beside the mode switcher ---------------------- */
+
+/* One control's height so the toolbar's baseline row survives it, and no
+   width at all when nothing is running: this is drawn only while there is
+   something to say, so it never teaches the eye to skip its own spot. The
+   whole thing is ink on paper apart from the dot — a chip that changed colour
+   would compete with the status line for the same job. */
+/* The border is the chip's, so the buttons inside it come out two pixels
+   short of a control unless the box is two pixels taller — and a button that
+   is 24px next to the panels' 26px reads as sloppy rather than deliberate. */
+.job-chip {
+  display: flex;
+  align-items: stretch;
+  height: calc(var(--control-sm) + 2px);
+  border: 1px solid var(--rule);
+  animation: pop-in var(--dur-base) var(--ease);
+}
+
+.job-chip-open,
+.job-chip-cancel {
+  height: 100%;
+  border-color: transparent;
+  background: transparent;
+  color: var(--ink-2);
+}
+
+/* Capped short enough that the status line to its right still fits its own
+   sentence on a 1280-wide window: the chip is transient and the adapter
+   readout is permanent, and neither may push the other into an ellipsis. The
+   name is what gives when the cap bites, which is the right thing to lose —
+   the kind and the clock are the sentence. */
+.job-chip-open {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  max-width: 28ch;
+  padding: 0 var(--space-3);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.job-chip-cancel {
+  width: var(--control-sm);
+  padding: 0;
+  border-left: 1px solid var(--rule);
+  font-size: var(--text-sm);
+}
+
+.job-chip-open:hover,
+.job-chip-cancel:hover {
+  background: var(--surface-raised-hover);
+  color: var(--ink);
+}
+
+/* The kind is furniture and is tracked uppercase with everything else; the
+   name is a string out of scene.py and is left exactly as the program wrote
+   it (§4). The clock is tabular so the digits do not shuffle as it counts. */
+.job-chip-open b {
+  color: var(--ink);
+  font: var(--type-mono-strong);
+  letter-spacing: var(--tracking-xs);
+  text-transform: uppercase;
+}
+
+.job-chip-open span {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink-2);
+  font: var(--type-mono);
+  text-overflow: ellipsis;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+/* Middots between the fields, the way the graticule's own readout separates
+   its cells: the chip is one sentence, not a row of chips. The first two
+   children are the dot and the leading word, which nothing precedes. */
+.job-chip-open > *:nth-child(n + 3)::before {
+  content: "·";
+  margin-right: var(--space-2);
+  color: var(--ink-3);
+}
+
+.job-chip-open time {
+  color: var(--ink);
+  font: var(--type-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The one coloured mark in the chip. It pulses while work is alive, which is
+   the whole point of it — a still dot says "there is a job", a beating one
+   says "it is still going". */
+.job-chip .dot {
+  flex: 0 0 auto;
+  width: var(--space-4);
+  height: var(--space-4);
+  border-radius: 50%;
+  background: var(--ok);
+  animation: job-pulse 1.4s var(--ease-inout) infinite;
+}
+
+.job-chip.failed .dot {
+  background: var(--danger);
+  animation: none;
+}
+
+@keyframes job-pulse {
+  50% {
+    opacity: 0.28;
+  }
+}
+
+/* A pulse reports progress rather than decorating, so under a reduced-motion
+   preference it stops where it is defined rather than being swept away by the
+   global transition rule — the dot stays, fully opaque, and still says which
+   state the work is in. */
+@media (prefers-reduced-motion: reduce) {
+  .job-chip .dot {
+    animation: none;
+  }
+}
+
 /* Panes --------------------------------------------------------------- */
 
 .editor-collapse {
@@ -2534,6 +2766,61 @@ button.icon {
   font: var(--type-mono);
   font-style: normal;
   line-height: var(--text-sm);
+}
+
+/* The contour readout, on the row under the gain: same instrument, second
+   scale. It appears with the slice rather than with the floor grid, because
+   what it states is a property of the slice — but the interval it states is
+   the floor grid's, which is the point. */
+.graticule-contour {
+  top: 32px;
+}
+
+/* A paper plate under a readout that is standing on data.
+   The gain and view fields are chrome, and chrome on this ground is dark ink
+   on paper — over a saturated slice or a black depth pass there is no paper
+   left and the type disappears into whatever the shader happened to draw. The
+   title block already solves this the same way, for the same reason. */
+.graticule-gain.plated {
+  padding: var(--space-1) var(--space-3);
+  background: var(--surface-viewport);
+  outline: 1px solid var(--rule);
+}
+
+.sdf-key {
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-viewport);
+  outline: 1px solid var(--rule);
+}
+
+/* The slice's key: the ramp itself, with the value at each end.
+   It answers "what am I looking at" without a trip to the panel, and it is
+   over the viewport rather than in one because both numbers on it are
+   functions of the camera. */
+.sdf-key {
+  position: absolute;
+  top: 58px;
+  left: 62px;
+  z-index: 5;
+  width: 200px;
+  pointer-events: none;
+}
+
+/* The fill is set inline from `sdfRamp.ts`, which is the ramp the shader
+   draws with; only the box is described here. */
+.sdf-key-ramp {
+  height: var(--text-2xs);
+  border: 1px solid var(--rule);
+}
+
+.sdf-key-values {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: var(--space-1);
+  color: var(--viewport-ink-2);
+  font: var(--type-kicker);
+  letter-spacing: var(--tracking-3xs);
 }
 
 /* The title block, ASME Y14.100's lower-right corner: five rows of what is on
@@ -2722,6 +3009,19 @@ button.icon {
   text-overflow: ellipsis;
   white-space: nowrap;
   pointer-events: none;
+}
+
+/* Same plate the readouts wear, for the same reason: while a distance-field
+   view is up the viewport is data end to end, and there is no paper left for
+   chrome to be dark ink on. The hint keeps its right alignment, so the plate
+   shrinks to the text rather than ruling a bar across the bottom of the
+   picture. */
+.viewer-pane.sdf-data .viewer-hint {
+  left: auto;
+  max-width: calc(100% - 74px);
+  padding: var(--space-1) var(--space-3);
+  background: var(--surface-viewport);
+  outline: 1px solid var(--rule);
 }
 
 /* Active editing mode, leading the hint bar: a stamped block. The word is the

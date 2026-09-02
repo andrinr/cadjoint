@@ -45,9 +45,12 @@ import {
 } from "./math";
 import {
   DEFAULT_DISPLAY,
+  DEFAULT_QUALITY,
   QUALITY_PRESETS,
+  SDF_VIEW_CODE,
   VIEW_PRESETS,
   displayFlags,
+  slicePosition,
   type DisplaySettings,
   type QualityPreset,
   type Shaders,
@@ -68,6 +71,7 @@ import {
   compileModule,
   createGraticulePipeline,
   createOverlayPipelines,
+  type DepthPair,
   createSimulationPipelines,
   sharedLayout,
 } from "./pipelines";
@@ -76,14 +80,23 @@ import { CHROME, hexToRgb } from "../tokens";
 
 export {
   DEFAULT_DISPLAY,
+  DEFAULT_QUALITY,
   DISPLAY,
   QUALITY_PRESETS,
+  SDF_SLICE_RANGE,
+  SDF_VIEW_CODE,
   VIEW_PRESETS,
   displayFlags,
+  isSliceView,
+  matchViewPreset,
+  sameView,
+  slicePosition,
   type DisplaySettings,
   type QualityPreset,
+  type SdfView,
   type ShadowMode,
   type Shaders,
+  type ViewPreset,
 } from "./display";
 
 /**
@@ -171,9 +184,9 @@ export class Renderer {
   private previewBindGroup: GPUBindGroup | null = null;
   private pathPipeline: GPURenderPipeline | null = null;
   private presentPipeline: GPURenderPipeline | null = null;
-  private edgePipeline: GPURenderPipeline | null = null;
-  private facePipeline: GPURenderPipeline | null = null;
-  private handlePipeline: GPURenderPipeline | null = null;
+  private edgePipeline: DepthPair | null = null;
+  private facePipeline: DepthPair | null = null;
+  private handlePipeline: DepthPair | null = null;
   private gizmoEdgePipeline: GPURenderPipeline | null = null;
   private gizmoArrowPipeline: GPURenderPipeline | null = null;
   private gizmoScalePipeline: GPURenderPipeline | null = null;
@@ -263,9 +276,17 @@ export class Renderer {
   private framePending = false;
   private initError = "";
 
-  camera: CameraState = { yaw: 0.75, pitch: 0.32, distance: 4.6, target: [0, 0, 0] };
+  // The session opens on the +X−Y+Z corner, at the exact 1:1:1 direction
+  // rather than near it: the readout says ISO because the camera is on an
+  // isometric direction, not because someone once typed angles that looked
+  // about right. `VIEW_PRESETS.iso` is the same pair of numbers.
+  camera: CameraState = {
+    ...VIEW_PRESETS.iso,
+    distance: 4.6,
+    target: [0, 0, 0],
+  };
   display: DisplaySettings = { ...DEFAULT_DISPLAY };
-  quality: QualityPreset = QUALITY_PRESETS.high;
+  quality: QualityPreset = QUALITY_PRESETS[DEFAULT_QUALITY];
   pathTracing = false;
   pathReady = false;
   interacting = false;
@@ -340,15 +361,30 @@ export class Renderer {
     };
   }
 
-  /** Point the camera along a standard axis; presets switch to orthographic. */
+  /**
+   * Point the camera at a standard view.
+   *
+   * Direction only. A preset used to also force the projection — orthographic
+   * for the axis views, perspective for "iso" — which quietly conflated two
+   * different things: *isometric* names a direction (a 1:1:1 line through the
+   * scene), *orthographic* names a projection (parallel rays). You can look
+   * down an isometric direction in either projection, and which one you are in
+   * is the toggle beside the cube, not a side effect of clicking a corner.
+   *
+   * And it does not take the zoom with it either. A version of this snapped
+   * the distance to the nearest rung of the floor grid's 1-2-5 ladder on every
+   * preset click, on the argument that a view should be framed in a round
+   * number of divisions. The argument is fine and the place is wrong: the
+   * session opens at 4.6 units, which is not on the ladder, so the very first
+   * press of FRONT zoomed out 16% before it turned — one press, two changes,
+   * and the second one unasked for. Detents belong to the control that sets
+   * the zoom (the wheel, in `zoomCamera`), not to the one that sets the
+   * direction.
+   */
   applyViewPreset(name: string): void {
     const preset = VIEW_PRESETS[name];
     if (!preset) return;
     this.camera = { ...this.camera, yaw: preset.yaw, pitch: preset.pitch };
-    this.display = {
-      ...this.display,
-      projection: name === "iso" ? "perspective" : "orthographic",
-    };
     this.invalidate();
   }
 
@@ -970,13 +1006,27 @@ export class Renderer {
   private writeUniforms(): void {
     const device = this.device!;
     const position = cameraPosition(this.camera);
+    // The six trailing scalars of the first five vec4s are the SDF views and
+    // the march budget; `Uniforms` in `cadjoint/viewer/_webgpu.py` documents
+    // the packing and why they ride here rather than in an eighth vec4.
+    const { sdfView, sdfAxis, sdfFraction, isoOffset } = this.display;
+    const sdfMode = SDF_VIEW_CODE[sdfView] ?? 0;
     const scene = new Float32Array([
-      this.canvas.width, this.canvas.height, 0, 0,
-      position[0], position[1], position[2], 0,
-      this.camera.target[0], this.camera.target[1], this.camera.target[2], 0,
+      this.canvas.width, this.canvas.height, sdfMode, sdfAxis,
+      position[0], position[1], position[2], slicePosition(sdfFraction),
+      this.camera.target[0], this.camera.target[1], this.camera.target[2], isoOffset,
       0.55, 0.35, 0.8, KEY_LIGHT_INTENSITY,
-      BACKGROUND_RADIANCE[0], BACKGROUND_RADIANCE[1], BACKGROUND_RADIANCE[2], 1,
-      this.sampleCount, this.quality.bounces, this.quality.shadowSamples, 0,
+      BACKGROUND_RADIANCE[0],
+      BACKGROUND_RADIANCE[1],
+      BACKGROUND_RADIANCE[2],
+      // The slice's contours are ruled at the floor grid's own spacing, so a
+      // contour interval is the same stated number the GRID readout is
+      // showing and the two annotations cannot disagree.
+      gridSpacing(this.camera.distance),
+      this.sampleCount,
+      this.quality.bounces,
+      this.quality.shadowSamples,
+      this.quality.marchSteps,
       this.display.projection === "orthographic" ? 1 : 0,
       orthoHeightFor(this.camera.distance),
       this.displayFlags(),
@@ -1122,8 +1172,24 @@ export class Renderer {
     }
   }
 
+  /**
+   * Whether construction geometry should read through the solid.
+   *
+   * The x-ray strength is the same number the shader fades the surface with,
+   * so the overlay's rule and the solid's translucency turn on together: while
+   * you can see into the part, you can see the sketch inside it. The floor
+   * grid is not in this population — it is the ground, not construction — so
+   * it always tests depth and is always occluded by the part standing on it.
+   */
+  private get seeThroughOverlays(): boolean {
+    return this.display.xray > 0;
+  }
+
   private drawOverlay(pass: GPURenderPassEncoder): void {
     if (!this.overlayBindGroup) return;
+    const depth = this.seeThroughOverlays
+      ? (pair: DepthPair) => pair.seen
+      : (pair: DepthPair) => pair.tested;
     const wantMeshWire = this.display.showMeshWireframe && this.meshWireCount > 0;
     const wantMeshSharp = this.display.showMeshEdges && this.meshSharpCount > 0;
     if (
@@ -1132,7 +1198,7 @@ export class Renderer {
       this.edgePipeline &&
       this.meshOverlayBindGroup
     ) {
-      pass.setPipeline(this.edgePipeline);
+      pass.setPipeline(depth(this.edgePipeline!));
       pass.setBindGroup(0, this.meshOverlayBindGroup);
       pass.setVertexBuffer(0, this.meshEdgeBuffer);
       if (wantMeshWire) pass.draw(6, this.meshWireCount, 0, 0);
@@ -1146,19 +1212,19 @@ export class Renderer {
     // Fill first, then its own outline: the wash does not write depth, so the
     // hairline lands on top of it rather than fighting it.
     if (this.faceFillVertices && this.faceFillBuffer && this.facePipeline) {
-      pass.setPipeline(this.facePipeline);
+      pass.setPipeline(depth(this.facePipeline!));
       pass.setBindGroup(0, this.overlayBindGroup);
       pass.setVertexBuffer(0, this.faceFillBuffer);
       pass.draw(this.faceFillVertices);
     }
     if (this.faceOutlineCount && this.faceOutlineBuffer && this.edgePipeline) {
-      pass.setPipeline(this.edgePipeline);
+      pass.setPipeline(depth(this.edgePipeline!));
       pass.setBindGroup(0, this.overlayBindGroup);
       pass.setVertexBuffer(0, this.faceOutlineBuffer);
       pass.draw(6, this.faceOutlineCount);
     }
     if (this.display.showSketches && this.edgeCount && this.edgeBuffer && this.edgePipeline) {
-      pass.setPipeline(this.edgePipeline);
+      pass.setPipeline(depth(this.edgePipeline!));
       pass.setBindGroup(0, this.overlayBindGroup);
       pass.setVertexBuffer(0, this.edgeBuffer);
       pass.draw(6, this.edgeCount);
@@ -1169,7 +1235,7 @@ export class Renderer {
       this.handleBuffer &&
       this.handlePipeline
     ) {
-      pass.setPipeline(this.handlePipeline);
+      pass.setPipeline(depth(this.handlePipeline!));
       pass.setBindGroup(0, this.overlayBindGroup);
       pass.setVertexBuffer(0, this.handleBuffer);
       pass.draw(6, this.handleCount);

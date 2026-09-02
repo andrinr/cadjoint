@@ -24,6 +24,20 @@ const PI: f32 = 3.141592653589793;
 // display.y  orthographic viewport height in world units
 // display.z  DISPLAY_* flag bits, packed as a float
 // display.w  x-ray strength, 0 disables
+//
+// The SDF views ride in the six scalars this struct already carried and never
+// used, rather than in an eighth vec4. The struct is a contract with two
+// writers — the playground renderer and the notebook widget in `widget.py` —
+// and the widget allocates exactly 112 bytes, so growing it would fault the
+// widget rather than merely ignore the new fields. Every one of these six is
+// written as 0 by the widget, and 0 is the inert value of each:
+//
+// resolution.z     SDF view: 0 solid, 1 signed slice, 2 gradient magnitude
+// resolution.w     slice plane axis: 0 X, 1 Y, 2 Z
+// camera_pos.w     slice plane coordinate, world units
+// camera_target.w  the level set traced: f = c rather than f = 0
+// bg_color.w       isoline spacing on the slice, world units; 0 draws none
+// path_settings.w  sphere-tracing step budget; 0 means the default
 struct Uniforms {
   resolution   : vec4<f32>,
   camera_pos   : vec4<f32>,
@@ -34,6 +48,40 @@ struct Uniforms {
   display      : vec4<f32>,
 };
 @group(0) @binding(0) var<uniform> u: Uniforms;
+
+const SDF_VIEW_SOLID: f32 = 0.0;
+const SDF_VIEW_SLICE: f32 = 1.0;
+const SDF_VIEW_GRADIENT: f32 = 2.0;
+const SDF_VIEW_NORMAL: f32 = 3.0;
+const SDF_VIEW_DEPTH: f32 = 4.0;
+
+/// True for the two views that replace the solid's shading rather than cutting
+/// a plane through the field.
+fn sdf_view_shades_surface(mode: f32) -> bool {
+  return mode == SDF_VIEW_NORMAL || mode == SDF_VIEW_DEPTH;
+}
+
+/// The default march, kept identical to what this shader used before the
+/// budget became a uniform, so a caller that writes 0 gets the old picture.
+const DEFAULT_TRACE_STEPS: i32 = 96;
+
+fn trace_steps() -> i32 {
+  return select(i32(u.path_settings.w), DEFAULT_TRACE_STEPS, u.path_settings.w < 1.0);
+}
+
+/**
+ * The field the whole shader traces, shades and shadows against.
+ *
+ * Every read of the scene goes through here rather than through `sdf`
+ * directly, so the isosurface offset is not a shell drawn over the real
+ * surface: the primary ray, the normal and both shadow marches all agree on
+ * where the surface is, and `f = c` lights and occludes like the solid it is.
+ * Subtracting a constant leaves the field's gradient untouched, so the march
+ * stays as conservative as it was.
+ */
+fn scene_field(p: vec3<f32>) -> f32 {
+  return sdf(p) - u.camera_target.w;
+}
 
 const DISPLAY_SHADOWS: u32 = 1u;
 const DISPLAY_REFLECTIONS: u32 = 2u;
@@ -61,16 +109,32 @@ __CADJOINT_CAMERA__
 fn sdf_normal(p: vec3<f32>) -> vec3<f32> {
   let e = 0.001;
   return safe_normalize(vec3<f32>(
-    sdf(p + vec3<f32>( e, 0.0, 0.0)) - sdf(p + vec3<f32>(-e, 0.0, 0.0)),
-    sdf(p + vec3<f32>(0.0,  e, 0.0)) - sdf(p + vec3<f32>(0.0, -e, 0.0)),
-    sdf(p + vec3<f32>(0.0, 0.0,  e)) - sdf(p + vec3<f32>(0.0, 0.0, -e)),
+    scene_field(p + vec3<f32>( e, 0.0, 0.0)) - scene_field(p + vec3<f32>(-e, 0.0, 0.0)),
+    scene_field(p + vec3<f32>(0.0,  e, 0.0)) - scene_field(p + vec3<f32>(0.0, -e, 0.0)),
+    scene_field(p + vec3<f32>(0.0, 0.0,  e)) - scene_field(p + vec3<f32>(0.0, 0.0, -e)),
   ));
+}
+
+// |∇f| by the same central differences, at a step scaled to what is on screen.
+//
+// This is the number that says whether the field is still a *distance*. An
+// exact SDF has |∇f| = 1 everywhere it is differentiable; a smooth union, an
+// offset or a scaled primitive breaks that, and where it is broken the
+// mesher's Hermite data and the seam projections are being fed a lie. Drawn
+// as a deviation from 1, the non-metric regions are exactly the coloured ones.
+fn sdf_gradient_magnitude(p: vec3<f32>, e: f32) -> f32 {
+  return length(vec3<f32>(
+    scene_field(p + vec3<f32>( e, 0.0, 0.0)) - scene_field(p + vec3<f32>(-e, 0.0, 0.0)),
+    scene_field(p + vec3<f32>(0.0,  e, 0.0)) - scene_field(p + vec3<f32>(0.0, -e, 0.0)),
+    scene_field(p + vec3<f32>(0.0, 0.0,  e)) - scene_field(p + vec3<f32>(0.0, 0.0, -e)),
+  )) / (2.0 * e);
 }
 
 fn trace(ro: vec3<f32>, rd: vec3<f32>) -> f32 {
   var t = 0.01;
-  for (var i = 0; i < 96; i++) {
-    let d = sdf(ro + rd * t);
+  let budget = trace_steps();
+  for (var i = 0; i < budget; i++) {
+    let d = scene_field(ro + rd * t);
     if (abs(d) < 0.001) { return t; }
     if (t > 100.0) { return -1.0; }
     t += max(abs(d) * 0.9, 0.0005);
@@ -82,8 +146,9 @@ fn trace(ro: vec3<f32>, rd: vec3<f32>) -> f32 {
 // edge a drafting view wants.
 fn hard_shadow(ro: vec3<f32>, rd: vec3<f32>) -> f32 {
   var t = 0.02;
-  for (var i = 0; i < 48; i++) {
-    let h = sdf(ro + rd * t);
+  let budget = trace_steps() / 2;
+  for (var i = 0; i < budget; i++) {
+    let h = scene_field(ro + rd * t);
     if (h < 0.001) { return 0.0; }
     t += max(h, 0.002);
     if (t > 30.0) { break; }
@@ -94,8 +159,9 @@ fn hard_shadow(ro: vec3<f32>, rd: vec3<f32>) -> f32 {
 fn soft_shadow(ro: vec3<f32>, rd: vec3<f32>, k: f32) -> f32 {
   var visibility = 1.0;
   var t = 0.02;
-  for (var i = 0; i < 32; i++) {
-    let h = sdf(ro + rd * t);
+  let budget = trace_steps() / 3;
+  for (var i = 0; i < budget; i++) {
+    let h = scene_field(ro + rd * t);
     if (h < 0.001) { return 0.0; }
     visibility = min(visibility, k * h / t);
     t += max(h * 0.9, 0.0005);
@@ -250,7 +316,184 @@ struct TraceResult {
   position : vec3<f32>,
   hit      : bool,
   occludes : bool,
+  /// Set on a pixel the slice owns: its colour is already display-encoded.
+  sdf_view : bool,
 };
+
+// ── the SDF views ──────────────────────────────────────────────────────────
+//
+// A diverging ramp centred on zero: violet inside the solid, ochre outside it,
+// the viewport's own paper at the crossing. Mirrored from
+// `frontend/src/viewer/sdfRamp.ts`, which carries the measurements that chose
+// the two hues and how far they sit from viridis and magma.
+//
+// These are *display* values, and everything else this shader produces is
+// linear radiance that then goes through ACES and gamma. The slice is data,
+// not light — a tone map applied to a ramp is a ramp you can no longer read a
+// value off — so `sdf_view_color` returns the display value directly and
+// `trace_pixel` marks the pixel so the tone map is skipped.
+const SDF_INSIDE: vec3<f32> = vec3<f32>(0.3924, 0.0015, 0.9925);
+const SDF_OUTSIDE: vec3<f32> = vec3<f32>(0.5398, 0.3384, 0.0033);
+const SDF_CENTRE: vec3<f32> = vec3<f32>(0.902, 0.902, 0.914);
+/// The achromatic ink both isoline families are drawn in.
+const SDF_ISOLINE: vec3<f32> = vec3<f32>(0.12, 0.12, 0.13);
+
+/// The ramp at a normalized signed value, t in [-1, 1]. See `sdfRamp.ts` for
+/// why the interpolation is in sqrt(|t|) rather than in |t|.
+fn sdf_ramp(t: f32) -> vec3<f32> {
+  let clamped = clamp(t, -1.0, 1.0);
+  let end = select(SDF_OUTSIDE, SDF_INSIDE, clamped < 0.0);
+  return mix(SDF_CENTRE, end, sqrt(abs(clamped)));
+}
+
+/**
+ * How dark this pixel's isoline ink is, 0…1.
+ *
+ * Screen-space derivatives turn "within half a line width of a multiple of
+ * `spacing`" into a line that is one pixel wide whatever the zoom — the same
+ * contract the floor grid holds itself to, which is why the spacing handed in
+ * is the floor grid's own. A contour that thickened as you zoomed out would
+ * stop being a contour and start being a band.
+ */
+fn sdf_isoline(value: f32, spacing: f32, width: f32) -> f32 {
+  if (spacing <= 0.0) { return 0.0; }
+  let scaled = value / spacing;
+  let gradient = max(fwidth(scaled), 1e-6);
+  let distance = abs(fract(scaled - 0.5) - 0.5) / gradient;
+  // Screen-space level of detail, and the whole far field depends on it.
+  //
+  // `gradient` is how many intervals this pixel spans, so its reciprocal is
+  // how many pixels one interval is worth. Out where the field runs fast —
+  // away from the part, or at a shallow grazing angle — that falls below a
+  // pixel, and a contour test sampled once per pixel then answers yes or no
+  // essentially at random: the plane turns to black-and-white speckle. There
+  // is no amount of anti-aliasing that fixes an interval finer than the
+  // sampling; the only correct answer is to stop drawing that tier. It fades
+  // out between two and six pixels per interval and the diverging ramp is
+  // left to carry the value on its own, which it does without aliasing
+  // because it is continuous.
+  let pixels_per_interval = 1.0 / gradient;
+  let lod = smoothstep(2.0, 6.0, pixels_per_interval);
+  return (1.0 - smoothstep(0.0, width, distance)) * lod;
+}
+
+/// The single, heavier contour at one stated value — the zero level set on a
+/// signed slice, |grad f| = 1 on a gradient slice.
+fn sdf_level_line(value: f32, width: f32) -> f32 {
+  let gradient = max(fwidth(value), 1e-6);
+  return 1.0 - smoothstep(0.0, width, abs(value) / gradient);
+}
+
+/**
+ * Linear camera depth, mapped bright-near to dark-far.
+ *
+ * The range is the *framed* depth rather than the clip planes: the near end
+ * is half a frame height in front of the orbit target and the far end half a
+ * frame behind it, so what fills the ramp is what fills the picture. Clip
+ * planes would spend almost the whole ramp on empty space either side of the
+ * part and leave the part itself a flat mid grey — the usual reason a z-pass
+ * is unreadable. It follows the zoom, like the grid gain and the slice's own
+ * contour interval, and the two ends are printed in the viewport readout.
+ */
+fn depth_tone(along_ray: f32) -> f32 {
+  let orbit = length(u.camera_pos.xyz - u.camera_target.xyz);
+  let frame = max(u.display.y, 1e-4);
+  let near = max(orbit - 0.5 * frame, 1e-3);
+  let far = orbit + 0.5 * frame;
+  return 1.0 - clamp((along_ray - near) / max(far - near, 1e-6), 0.0, 1.0);
+}
+
+struct SliceHit {
+  distance : f32,
+  hit      : bool,
+};
+
+/**
+ * Half-width of the cutting card, in world units.
+ *
+ * The plane is mathematically infinite; the thing drawn is not. A card of
+ * stated size leaves the rest of the viewport for the faded solid, so the
+ * slice sits *in* the scene and can be seen in relation to it — an infinite
+ * plane fills the frame and there is nothing left to relate it to.
+ *
+ * Mirrors `SDF_SLICE_RANGE` in `frontend/src/viewer/display.ts`, which is also
+ * the travel of the slice control, so the card sweeps a cube of its own size.
+ */
+const SDF_CARD_HALF: f32 = 2.0;
+
+/// Where the primary ray meets the cutting card. A ray running along the plane,
+/// arriving from behind the camera, or landing off the card's edge is a miss.
+fn slice_intersection(ro: vec3<f32>, rd: vec3<f32>) -> SliceHit {
+  let axis = i32(round(clamp(u.resolution.w, 0.0, 2.0)));
+  var normal = vec3<f32>(0.0, 0.0, 0.0);
+  normal[axis] = 1.0;
+  let denominator = dot(rd, normal);
+  if (abs(denominator) < 1e-5) { return SliceHit(0.0, false); }
+  let distance = (u.camera_pos.w - dot(ro, normal)) / denominator;
+  let point = ro + rd * distance;
+  var on_card = distance > 0.0;
+  for (var i = 0; i < 3; i++) {
+    if (i != axis && abs(point[i]) > SDF_CARD_HALF) { on_card = false; }
+  }
+  return SliceHit(distance, on_card);
+}
+
+/**
+ * The slice's colour at a world point.
+ *
+ * `mode` picks what is being drawn: the signed field itself, or |∇f|. Both are
+ * normalized against something the viewport already states rather than against
+ * a hidden constant — the field against half the framed height, so a full
+ * ramp side is exactly half a screen of distance at the current gain, and the
+ * gradient against ±0.5 about 1.0, so an exact SDF is the paper it is drawn on
+ * and every departure from a metric field is coloured.
+ */
+fn sdf_view_color(point: vec3<f32>, mode: f32) -> vec3<f32> {
+  let spacing = u.bg_color.w;
+  let gradient = mode == SDF_VIEW_GRADIENT;
+  // One scalar, two meanings, so the derivatives below are taken once and in
+  // straight-line code: the signed field, or its own gradient magnitude.
+  // Neither is clamped or folded — a negative distance is drawn exactly as a
+  // positive one is, in the other hue, so the interior of a part is a graded
+  // field running to its medial axis and not a flat fill.
+  let step = max(spacing * 0.02, 1e-4);
+  let value = select(scene_field(point), sdf_gradient_magnitude(point, step) - 1.0, gradient);
+
+  // The ramp saturates two major divisions out, which is also where the minor
+  // contours stop. One number governs both, so the hue and the line density
+  // are telling the reader the same thing.
+  let major = select(spacing, 0.1, gradient);
+  let minor = major * 0.2;
+  let scale = select(2.0 * spacing, 0.5, gradient);
+  var color = sdf_ramp(value / scale);
+
+  // Two tiers of contour.
+  //
+  // Uniform spacing at the grid rung is right out where the field is smooth
+  // and far too coarse where it is interesting: everything worth reading off
+  // a distance field happens within a division or two of the surface. So the
+  // minor tier is a fifth of the major — the floor grid's own subdivision, so
+  // a contour interval is always a stateable number — and it is faded out
+  // across the band it covers rather than stopped at its edge, which would
+  // draw a ring around nothing. The gradient view keeps one uniform family:
+  // its interesting region is a *value*, 1.0, not a neighbourhood of a
+  // surface, so a taper would have nothing to taper toward.
+  let taper = select(
+    1.0 - smoothstep(0.0, 2.0 * major, abs(value)),
+    0.0,
+    gradient,
+  );
+  color = mix(color, SDF_ISOLINE, sdf_isoline(value, minor, 0.75) * taper * 0.3);
+  color = mix(
+    color,
+    SDF_ISOLINE,
+    sdf_isoline(value, major, 0.9) * select(0.5, 0.35, gradient),
+  );
+  // And the one heavier line at the value that matters: the zero level set on
+  // a signed slice — which is the part's own section outline — or |∇f| = 1 on
+  // a gradient slice.
+  return mix(color, SDF_ISOLINE, sdf_level_line(value, select(1.5, 1.2, gradient)));
+}
 
 fn trace_pixel(frag_xy: vec2<f32>) -> TraceResult {
   let res = u.resolution.xy;
@@ -270,15 +513,30 @@ fn trace_pixel(frag_xy: vec2<f32>) -> TraceResult {
   result.position = ray.origin;
   result.hit = distance >= 0.0;
   result.occludes = result.hit;
+  result.sdf_view = false;
 
+  let view_mode = u.resolution.z;
   if (result.hit) {
     let position = ray.origin + ray.direction * distance;
     let normal = sdf_normal(position);
     result.color = shade_material(position, normal, ray.direction);
     result.position = position;
 
+    // The two surface views replace the shading outright. Both are data, not
+    // light, so they skip the tone map — see `resolve_color`.
+    if (view_mode == SDF_VIEW_NORMAL) {
+      // The standard encoding, n * 0.5 + 0.5, in *world* axes: +X red, +Y
+      // green, +Z blue, so a face pointing at the sky is the blue everyone
+      // expects a normal map to be.
+      result.color = normal * 0.5 + vec3<f32>(0.5);
+      result.sdf_view = true;
+    } else if (view_mode == SDF_VIEW_DEPTH) {
+      result.color = vec3<f32>(depth_tone(distance));
+      result.sdf_view = true;
+    }
+
     let xray = clamp(u.display.w, 0.0, 1.0);
-    if (xray > 0.0) {
+    if (xray > 0.0 && !sdf_view_shades_surface(view_mode)) {
       // Fade faces that point at the viewer and keep grazing angles solid, so
       // silhouettes and creases stay legible while interiors turn translucent.
       let facing = 1.0 - abs(dot(normal, ray.direction));
@@ -297,8 +555,80 @@ fn trace_pixel(frag_xy: vec2<f32>) -> TraceResult {
         result.color,
         mix(1.0, alpha, xray),
       );
-      // Construction geometry must stay visible through an x-rayed solid.
-      result.occludes = false;
+      // An x-rayed solid still *is* somewhere, and it still writes its depth.
+      //
+      // This used to clear `occludes`, which made the depth buffer say the ray
+      // missed — and the floor grid, which draws behind whatever the scene has
+      // written, then came through the part. On the default (X-Ray) preset the
+      // ground grid was visible straight through the heat sink, so the drawing
+      // read as a grid laid over the model rather than a model standing on the
+      // ground. Depth is the answer to "what is in front of what" and the
+      // solid may not lie about it to buy an overlay a see-through.
+      //
+      // Construction geometry gets its see-through from its own end instead:
+      // while the solid is x-rayed the overlay pipelines are built with
+      // `depthCompare: "always"` (`createOverlayPipelines` in
+      // `viewer/pipelines.ts`), which is what the gizmos have always used. The
+      // grid is not construction geometry — it is the ground the part stands
+      // on — so it keeps testing depth and is occluded by every silhouette.
+    }
+  }
+
+  // The slice, composited last so it can read the solid it stands in front of.
+  //
+  // Depth order is respected rather than assumed: the plane is drawn where it
+  // is nearer than the surface, and the solid occludes it where it is not, so
+  // the picture is a cut through the scene and not an overlay floating on it.
+  // Everywhere the solid survives it is stepped back toward the ground, which
+  // leaves the part legible as a silhouette without letting it compete with a
+  // ramp the reader is about to take a value off.
+  //
+  // The shape of this block is dictated by WGSL's uniformity analysis, and it
+  // is worth saying why. `sdf_view_color` takes screen-space derivatives — the
+  // isolines are one pixel wide at every zoom, which is a `fwidth` — and a
+  // derivative may only be taken where control flow is *uniform* across the
+  // quad. `u.resolution.z` comes out of a uniform buffer, so branching on it
+  // is uniform and the outer `if` is legal. Whether this pixel's ray reaches
+  // the plane before it reaches the solid is not: it varies pixel to pixel.
+  // So the colour is computed unconditionally inside the uniform branch and
+  // only *chosen* inside the non-uniform one. wgpu's naga accepts the naive
+  // nesting; Tint, which is what a browser actually compiles with, rejects it.
+  // Written as one uniform if/else chain, and deliberately without an early
+  // return: `view_mode` comes from a uniform buffer, so every arm here is
+  // reached under uniform control flow, which is what lets the slice arm take
+  // the screen-space derivatives its contours need. A `return` out of the
+  // middle of it would end that, whatever the condition was.
+  if (sdf_view_shades_surface(view_mode)) {
+    // Nothing was hit, so there is no normal and no depth to report. Both
+    // views state that rather than falling back on the lit background, which
+    // would read as a surface: an absent normal is the encoding's own zero
+    // vector, and an absent depth is past the far end of the ramp.
+    if (!result.hit) {
+      result.color = select(
+        vec3<f32>(0.5, 0.5, 0.5),
+        vec3<f32>(depth_tone(1e6)),
+        view_mode == SDF_VIEW_DEPTH,
+      );
+      result.sdf_view = true;
+    }
+  } else if (view_mode != SDF_VIEW_SOLID) {
+    result.color = mix(environment_radiance(ray.direction), result.color, 0.28);
+    let plane = slice_intersection(ray.origin, ray.direction);
+    let point = ray.origin + ray.direction * max(plane.distance, 0.0);
+    let slice_color = sdf_view_color(point, view_mode);
+    // On the card, the field wins outright — the solid does not occlude it,
+    // in front of the plane or behind it. That is what a section view is, and
+    // it is the only way the *interior* of a part is visible at all: a plane
+    // inside a solid is always behind that solid's own front surface, so depth
+    // ordering hid exactly the half of the field the view exists to show.
+    // Everywhere off the card the faded solid stays, which is what the card is
+    // read against.
+    if (plane.hit) {
+      result.color = slice_color;
+      result.position = point;
+      result.hit = true;
+      result.occludes = true;
+      result.sdf_view = true;
     }
   }
   return result;
@@ -308,9 +638,15 @@ fn display_color(color: vec3<f32>) -> vec4<f32> {
   return vec4<f32>(pow(aces_tone_map(color), vec3<f32>(1.0 / 2.2)), 1.0);
 }
 
+/// Tone-map light, pass data through. See `sdf_view_color`.
+fn resolve_color(result: TraceResult) -> vec4<f32> {
+  if (result.sdf_view) { return vec4<f32>(result.color, 1.0); }
+  return display_color(result.color);
+}
+
 @fragment
 fn fs_main(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
-  return display_color(trace_pixel(frag.xy).color);
+  return resolve_color(trace_pixel(frag.xy));
 }
 
 struct DepthFragment {
@@ -324,7 +660,7 @@ struct DepthFragment {
 fn fs_main_depth(@builtin(position) frag: vec4<f32>) -> DepthFragment {
   let result = trace_pixel(frag.xy);
   var fragment: DepthFragment;
-  fragment.color = display_color(result.color);
+  fragment.color = resolve_color(result);
   fragment.depth = 1.0;
   if (result.occludes) {
     let clip = view.view_proj * vec4<f32>(result.position, 1.0);

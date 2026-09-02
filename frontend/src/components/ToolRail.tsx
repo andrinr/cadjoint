@@ -66,8 +66,8 @@ import {
 } from "./icons";
 
 const SELECT_MODES: { key: SelectionMode; label: string; hint: string; icon: Component }[] = [
-  { key: "object", label: "Object", hint: "Select whole objects  (1)", icon: ObjectSelectIcon },
-  { key: "vertex", label: "Vertex", hint: "Select sketch vertices  (2)", icon: VertexSelectIcon },
+  { key: "object", label: "Object", hint: "Select whole objects  (O)", icon: ObjectSelectIcon },
+  { key: "vertex", label: "Vertex", hint: "Select sketch vertices  (V)", icon: VertexSelectIcon },
 ];
 
 interface ToolEntry {

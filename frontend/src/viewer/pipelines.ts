@@ -70,11 +70,31 @@ export async function compileModule(
   return module;
 }
 
+/**
+ * One construction overlay, in its two depth behaviours.
+ *
+ * `tested` is depth-tested against the scene, which is what an overlay over
+ * an opaque solid wants: an edge behind the part is hidden by the part. `seen`
+ * compares `always`, so the same geometry reads through the surface.
+ *
+ * The pair exists because the see-through used to come from the *other* end.
+ * The raymarch pass withheld its depth while the solid was x-rayed, which
+ * bought construction geometry its visibility and, in the same stroke, let the
+ * floor grid through the part — the grid draws behind whatever depth the scene
+ * wrote, and an x-rayed solid had written none. The solid states its depth
+ * honestly now (see `trace_scene` in `cadjoint/viewer/_webgpu.py`) and the
+ * overlays choose their own rule, which is the one the gizmos always used.
+ */
+export interface DepthPair {
+  tested: GPURenderPipeline;
+  seen: GPURenderPipeline;
+}
+
 export interface OverlayPipelines {
-  edgePipeline: GPURenderPipeline;
+  edgePipeline: DepthPair;
   /** Filled polygon of the face under the pointer. */
-  facePipeline: GPURenderPipeline;
-  handlePipeline: GPURenderPipeline;
+  facePipeline: DepthPair;
+  handlePipeline: DepthPair;
   gizmoEdgePipeline: GPURenderPipeline;
   gizmoArrowPipeline: GPURenderPipeline;
   gizmoScalePipeline: GPURenderPipeline;
@@ -100,83 +120,109 @@ export function createOverlayPipelines(
     depthWriteEnabled: true,
     depthCompare: "less-equal",
   };
-
-  const edgePipeline = device.createRenderPipeline({
-    label: "Overlay edges",
-    layout: pipelineLayout,
-    vertex: {
-      module,
-      entryPoint: "vs_edge",
-      buffers: [
-        {
-          arrayStride: EDGE_STRIDE,
-          stepMode: "instance",
-          attributes: [
-            { shaderLocation: 0, offset: 0, format: "float32x3" },
-            { shaderLocation: 1, offset: 12, format: "float32x3" },
-            { shaderLocation: 2, offset: 24, format: "float32x4" },
-          ],
-        },
-      ],
-    },
-    fragment: { module, entryPoint: "fs_edge", targets: [{ format, blend }] },
-    primitive: { topology: "triangle-list" },
-    depthStencil,
-  });
-
-  // The face highlight is the one overlay that is a surface. It must not
-  // write depth: the hairline outline drawn immediately after traces the same
-  // boundary, and a wash that wrote depth would z-fight with its own edge.
-  const facePipeline = device.createRenderPipeline({
-    label: "Overlay face highlight",
-    layout: pipelineLayout,
-    vertex: {
-      module,
-      entryPoint: "vs_face",
-      buffers: [
-        {
-          arrayStride: FACE_STRIDE,
-          stepMode: "vertex",
-          attributes: [
-            { shaderLocation: 0, offset: 0, format: "float32x3" },
-            { shaderLocation: 1, offset: 12, format: "float32x4" },
-          ],
-        },
-      ],
-    },
-    fragment: { module, entryPoint: "fs_face", targets: [{ format, blend }] },
-    primitive: { topology: "triangle-list" },
-    depthStencil: { format: DEPTH_FORMAT, depthWriteEnabled: false, depthCompare: "less-equal" },
-  });
-
-  const handlePipeline = device.createRenderPipeline({
-    label: "Overlay handles",
-    layout: pipelineLayout,
-    vertex: {
-      module,
-      entryPoint: "vs_handle",
-      buffers: [
-        {
-          arrayStride: HANDLE_STRIDE,
-          stepMode: "instance",
-          attributes: [
-            { shaderLocation: 0, offset: 0, format: "float32x3" },
-            { shaderLocation: 1, offset: 12, format: "float32x4" },
-            { shaderLocation: 2, offset: 28, format: "float32" },
-          ],
-        },
-      ],
-    },
-    fragment: { module, entryPoint: "fs_handle", targets: [{ format, blend }] },
-    primitive: { topology: "triangle-list" },
-    depthStencil,
-  });
-
   const alwaysVisibleDepth: GPUDepthStencilState = {
     format: DEPTH_FORMAT,
     depthWriteEnabled: false,
     depthCompare: "always",
   };
+
+  /**
+   * Build one overlay twice: depth-tested, and always visible.
+   *
+   * The two differ in three fields out of a dozen, and the dozen are what
+   * makes an overlay the overlay it is, so they are stated once and the depth
+   * state is the argument. `seen` never writes depth whatever the tested
+   * variant does — geometry drawn through a solid must not then occlude the
+   * geometry drawn after it.
+   */
+  const depthPair = (
+    descriptor: Omit<GPURenderPipelineDescriptor, "depthStencil">,
+    tested: GPUDepthStencilState,
+  ): DepthPair => ({
+    tested: device.createRenderPipeline({ ...descriptor, depthStencil: tested }),
+    seen: device.createRenderPipeline({
+      ...descriptor,
+      label: `${descriptor.label} (through the solid)`,
+      depthStencil: alwaysVisibleDepth,
+    }),
+  });
+
+  const edgePipeline = depthPair(
+    {
+      label: "Overlay edges",
+      layout: pipelineLayout,
+      vertex: {
+        module,
+        entryPoint: "vs_edge",
+        buffers: [
+          {
+            arrayStride: EDGE_STRIDE,
+            stepMode: "instance",
+            attributes: [
+              { shaderLocation: 0, offset: 0, format: "float32x3" },
+              { shaderLocation: 1, offset: 12, format: "float32x3" },
+              { shaderLocation: 2, offset: 24, format: "float32x4" },
+            ],
+          },
+        ],
+      },
+      fragment: { module, entryPoint: "fs_edge", targets: [{ format, blend }] },
+      primitive: { topology: "triangle-list" },
+    },
+    depthStencil,
+  );
+
+  // The face highlight is the one overlay that is a surface. It must not
+  // write depth: the hairline outline drawn immediately after traces the same
+  // boundary, and a wash that wrote depth would z-fight with its own edge.
+  const facePipeline = depthPair(
+    {
+      label: "Overlay face highlight",
+      layout: pipelineLayout,
+      vertex: {
+        module,
+        entryPoint: "vs_face",
+        buffers: [
+          {
+            arrayStride: FACE_STRIDE,
+            stepMode: "vertex",
+            attributes: [
+              { shaderLocation: 0, offset: 0, format: "float32x3" },
+              { shaderLocation: 1, offset: 12, format: "float32x4" },
+            ],
+          },
+        ],
+      },
+      fragment: { module, entryPoint: "fs_face", targets: [{ format, blend }] },
+      primitive: { topology: "triangle-list" },
+    },
+    { format: DEPTH_FORMAT, depthWriteEnabled: false, depthCompare: "less-equal" },
+  );
+
+  const handlePipeline = depthPair(
+    {
+      label: "Overlay handles",
+      layout: pipelineLayout,
+      vertex: {
+        module,
+        entryPoint: "vs_handle",
+        buffers: [
+          {
+            arrayStride: HANDLE_STRIDE,
+            stepMode: "instance",
+            attributes: [
+              { shaderLocation: 0, offset: 0, format: "float32x3" },
+              { shaderLocation: 1, offset: 12, format: "float32x4" },
+              { shaderLocation: 2, offset: 28, format: "float32" },
+            ],
+          },
+        ],
+      },
+      fragment: { module, entryPoint: "fs_handle", targets: [{ format, blend }] },
+      primitive: { topology: "triangle-list" },
+    },
+    depthStencil,
+  );
 
   const gizmoEdgePipeline = device.createRenderPipeline({
     label: "Always-visible rotation gizmo",

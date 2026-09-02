@@ -599,7 +599,12 @@ export function ViewerPane(props: ViewerPaneProps) {
   return (
     <section
       class="pane viewer-pane"
-      classList={{ "has-graticule": props.display.showGraticule }}
+      classList={{
+        "has-graticule": props.display.showGraticule,
+        // Every readout over the canvas needs a paper plate once the viewport
+        // is showing data rather than a lit scene.
+        "sdf-data": props.display.sdfView !== "solid",
+      }}
       aria-busy={busy()}
     >
       {props.overlay}
@@ -639,7 +644,13 @@ export function ViewerPane(props: ViewerPaneProps) {
         showValues={props.display.showConstraintValues}
         geometry={constraintOverlay()}
       />
-      <Graticule show={props.display.showGraticule} camera={graticuleCamera()} />
+      <Graticule
+        show={props.display.showGraticule}
+        camera={graticuleCamera()}
+        sdfView={props.display.sdfView}
+        sdfAxis={props.display.sdfAxis}
+        sdfFraction={props.display.sdfFraction}
+      />
       <ViewerOverlays pickRect={props.display.showOverlays ? pickRect() : null} />
       <ViewerHint pendingConstraint={pendingConstraint()} />
     </section>

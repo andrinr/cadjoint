@@ -126,7 +126,7 @@ export function StudiesTab(props: StudiesTabProps) {
                           <Show when={study.domain && study.domain.name === null}>
                             <option value="">{`(${study.domain!.type})`}</option>
                           </Show>
-                          <For each={sim().namedObjects()}>
+                          <For each={sim().domainOptions(study.domain?.name)}>
                             {(name) => <option value={name}>{name}</option>}
                           </For>
                         </select>
@@ -179,24 +179,45 @@ export function StudiesTab(props: StudiesTabProps) {
                   </Show>
                 </Show>
 
-                <button
-                  type="button"
-                  class="sim-run"
-                  disabled={
-                    sim().solving() !== null ||
-                    sim().unavailable() ||
-                    study.bcs.length === 0
+                {/* A solve is minutes of somebody's machine, so the button
+                    that started it is the button that stops it: once the
+                    registry has told us which job is running, Solve becomes
+                    Cancel in place. Before that it reads as working, because
+                    there is nothing to cancel yet. */}
+                <Show
+                  when={sim().solving() === study.name}
+                  fallback={
+                    <button
+                      type="button"
+                      class="sim-run"
+                      disabled={
+                        sim().solving() !== null ||
+                        sim().unavailable() ||
+                        study.bcs.length === 0
+                      }
+                      onClick={() => void sim().solve(study)}
+                      title={
+                        study.bcs.length > 0
+                          ? "Mesh the scene and run this study"
+                          : "Add at least one boundary condition first"
+                      }
+                      data-testid={`simulate-run-${study.name}`}
+                    >
+                      Solve
+                    </button>
                   }
-                  onClick={() => void sim().solve(study)}
-                  title={
-                    study.bcs.length > 0
-                      ? "Mesh the scene and run this study"
-                      : "Add at least one boundary condition first"
-                  }
-                  data-testid={`simulate-run-${study.name}`}
                 >
-                  {sim().solving() === study.name ? "Meshing + solving…" : "Solve"}
-                </button>
+                  <button
+                    type="button"
+                    class="sim-run"
+                    disabled={sim().solveJob() === null}
+                    onClick={() => void sim().cancelActive()}
+                    title="Stop this solve and free the worker"
+                    data-testid={`simulate-cancel-${study.name}`}
+                  >
+                    {sim().solveJob() ? "Cancel" : "Meshing + solving…"}
+                  </button>
+                </Show>
               </Card>
             )}
           </For>

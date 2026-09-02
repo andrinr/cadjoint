@@ -51,6 +51,23 @@ fn display_flag(flag: u32) -> bool {
   return (u32(max(u.display.z, 0.0)) & flag) != 0u;
 }
 
+/**
+ * The level set this tracer resolves, and how hard it is allowed to look.
+ *
+ * Both come from the same uniforms the preview shader reads (`_webgpu.py`
+ * documents the packing), because the preview and the accumulated trace are
+ * the same picture at two sample counts. Before this, the step budget was a
+ * constant here and a different constant there — 160 against 96 — so "Ultra"
+ * named two different marches on the two halves of one image.
+ */
+fn trace_steps() -> u32 {
+  return select(u32(u.path_settings.w), MAX_TRACE_STEPS, u.path_settings.w < 1.0);
+}
+
+fn scene_field(p: vec3<f32>) -> f32 {
+  return sdf(p) - u.camera_target.w;
+}
+
 fn pcg_hash(input: u32) -> u32 {
   let state = input * 747796405u + 2891336453u;
   let word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
@@ -78,7 +95,7 @@ fn refine_sign_crossing(
   var near_sdf = near_surface_distance;
   for (var refinement = 0u; refinement < 7u; refinement += 1u) {
     let middle = 0.5 * (near + far);
-    let middle_sdf = sdf(origin + direction * middle);
+    let middle_sdf = scene_field(origin + direction * middle);
     let same_side = (near_sdf < 0.0) == (middle_sdf < 0.0);
     if (same_side) {
       near = middle;
@@ -92,14 +109,15 @@ fn refine_sign_crossing(
 
 fn trace_scene(origin: vec3<f32>, direction: vec3<f32>) -> TraceHit {
   var distance = 0.0;
-  var surface_distance = sdf(origin);
-  for (var step = 0u; step < MAX_TRACE_STEPS; step += 1u) {
+  var surface_distance = scene_field(origin);
+  let budget = trace_steps();
+  for (var step = 0u; step < budget; step += 1u) {
     let advance = max(abs(surface_distance) * 0.9, HIT_EPSILON * 0.5);
     let next_distance = distance + advance;
     if (next_distance >= MAX_DISTANCE) {
       break;
     }
-    let next_surface_distance = sdf(origin + direction * next_distance);
+    let next_surface_distance = scene_field(origin + direction * next_distance);
     if (signs_differ(surface_distance, next_surface_distance)) {
       let refined_distance = refine_sign_crossing(
         origin,
@@ -118,17 +136,18 @@ fn trace_scene(origin: vec3<f32>, direction: vec3<f32>) -> TraceHit {
 
 fn visible_to_directional_light(origin: vec3<f32>, direction: vec3<f32>) -> f32 {
   var distance = 0.0;
-  var surface_distance = sdf(origin);
+  var surface_distance = scene_field(origin);
   if (surface_distance <= 0.0) {
     return 0.0;
   }
-  for (var step = 0u; step < 96u; step += 1u) {
+  let budget = trace_steps();
+  for (var step = 0u; step < budget; step += 1u) {
     let advance = max(surface_distance * 0.9, HIT_EPSILON * 0.5);
     let next_distance = distance + advance;
     if (next_distance >= 50.0) {
       break;
     }
-    let next_surface_distance = sdf(origin + direction * next_distance);
+    let next_surface_distance = scene_field(origin + direction * next_distance);
     if (next_surface_distance <= 0.0) {
       return 0.0;
     }
@@ -141,12 +160,12 @@ fn visible_to_directional_light(origin: vec3<f32>, direction: vec3<f32>) -> f32 
 fn sdf_normal(position: vec3<f32>) -> vec3<f32> {
   let e = 0.00075;
   return safe_normalize(vec3<f32>(
-    sdf(position + vec3<f32>( e, 0.0, 0.0)) -
-      sdf(position + vec3<f32>(-e, 0.0, 0.0)),
-    sdf(position + vec3<f32>(0.0,  e, 0.0)) -
-      sdf(position + vec3<f32>(0.0, -e, 0.0)),
-    sdf(position + vec3<f32>(0.0, 0.0,  e)) -
-      sdf(position + vec3<f32>(0.0, 0.0, -e)),
+    scene_field(position + vec3<f32>( e, 0.0, 0.0)) -
+      scene_field(position + vec3<f32>(-e, 0.0, 0.0)),
+    scene_field(position + vec3<f32>(0.0,  e, 0.0)) -
+      scene_field(position + vec3<f32>(0.0, -e, 0.0)),
+    scene_field(position + vec3<f32>(0.0, 0.0,  e)) -
+      scene_field(position + vec3<f32>(0.0, 0.0, -e)),
   ));
 }
 

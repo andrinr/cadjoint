@@ -2,10 +2,12 @@
  * The material inspector's physical half.
  *
  * Two things are worth asserting and neither is visible in a screenshot: that
- * a property the program does not state is *left out* rather than shown as
- * zero, and that an SI magnitude is printed in a form a reader can compare —
- * a Young's modulus and a thermal expansion are eleven orders of magnitude
- * apart and only one notation survives both.
+ * a property the program does not state is reported as *unstated* rather than
+ * as a zero — the inspector's whole offer on such a row is "start stating it",
+ * which needs the three states told apart — and that an SI magnitude is
+ * printed in a form a reader can compare, a Young's modulus and a thermal
+ * expansion being eleven orders of magnitude apart with only one notation
+ * surviving both.
  */
 
 import { describe, expect, it } from "vitest";
@@ -14,6 +16,7 @@ import {
   formatPhysical,
   hasPhysicalBlock,
   physicalRows,
+  statedRows,
 } from "../src/materialProperties";
 import type { MaterialDefinition } from "../src/types";
 
@@ -30,6 +33,7 @@ const UNITS = {
 function material(overrides: Partial<MaterialDefinition> = {}): MaterialDefinition {
   return {
     id: "material_0",
+    stableId: null,
     name: "aluminum",
     line: 56,
     editable: true,
@@ -70,17 +74,22 @@ describe("the rows the inspector draws", () => {
     expect(physicalRows(material())).toEqual([]);
   });
 
-  it("draws a section, and no rows, for a material that states none", () => {
-    const stated = material({
+  it("offers every property, unstated, for a material that states none", () => {
+    const declared = material({
       physical: Object.fromEntries(PHYSICAL_PROPERTIES.map(({ key }) => [key, null])),
       units: UNITS,
     });
-    expect(hasPhysicalBlock(stated)).toBe(true);
-    expect(physicalRows(stated)).toEqual([]);
+    expect(hasPhysicalBlock(declared)).toBe(true);
+    // Seven rows, all of them an offer rather than a reading. A row that is
+    // not drawn is an offer nobody can take.
+    expect(physicalRows(declared)).toHaveLength(PHYSICAL_PROPERTIES.length);
+    expect(physicalRows(declared).every((row) => row.state === "unstated")).toBe(true);
+    expect(physicalRows(declared).every((row) => row.value === null)).toBe(true);
+    expect(statedRows(declared)).toEqual([]);
   });
 
-  it("lists only the stated properties, in reading order, with their units", () => {
-    const stated = material({
+  it("reads the stated properties, in reading order, with their units", () => {
+    const declared = material({
       physical: {
         density: 2700,
         conductivity: 237,
@@ -91,13 +100,63 @@ describe("the rows the inspector draws", () => {
         yield_strength: null,
       },
       units: UNITS,
+      free: { density: true },
     });
-    expect(physicalRows(stated)).toEqual([
-      { key: "density", label: "Density", value: "2700", unit: "kg/m^3" },
-      { key: "conductivity", label: "Conductivity", value: "237", unit: "W/(m*K)" },
-      { key: "youngs_modulus", label: "Young's modulus", value: "6.9e10", unit: "Pa" },
+    expect(statedRows(declared)).toEqual([
+      {
+        key: "density",
+        label: "Density",
+        state: "stated",
+        value: 2700,
+        text: "2700",
+        unit: "kg/m^3",
+        free: true,
+      },
+      {
+        key: "conductivity",
+        label: "Conductivity",
+        state: "stated",
+        value: 237,
+        text: "237",
+        unit: "W/(m*K)",
+        free: false,
+      },
+      {
+        key: "youngs_modulus",
+        label: "Young's modulus",
+        state: "stated",
+        value: 6.9e10,
+        text: "6.9e10",
+        unit: "Pa",
+        free: false,
+      },
       // A dimensionless ratio prints no unit rather than the payload's "-".
-      { key: "poisson_ratio", label: "Poisson ratio", value: "0.33", unit: "" },
+      {
+        key: "poisson_ratio",
+        label: "Poisson ratio",
+        state: "stated",
+        value: 0.33,
+        text: "0.33",
+        unit: "",
+        free: false,
+      },
     ]);
+  });
+
+  it("tells an expression apart from an absence", () => {
+    // Both arrive as a null. A keyword whose value is `thickness * 2` has a
+    // span into the source and is not ours to overwrite; a keyword that is
+    // simply not there has no span, and is the row the inspector can offer to
+    // start. Reading both as "absent" would put a number box over an
+    // expression and silently flatten it on the first commit.
+    const declared = material({
+      physical: { density: null, conductivity: null },
+      units: UNITS,
+      spans: { density: [10, 20] },
+    });
+    const rows = new Map(physicalRows(declared).map((row) => [row.key, row]));
+    expect(rows.get("density")!.state).toBe("opaque");
+    expect(rows.get("conductivity")!.state).toBe("unstated");
+    expect(rows.get("density")!.text).toBe("—");
   });
 });

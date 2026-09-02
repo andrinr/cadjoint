@@ -2,6 +2,7 @@
 
 import {
   DEFAULT_DISPLAY,
+  DEFAULT_QUALITY,
   QUALITY_PRESETS,
   type DisplaySettings,
 } from "./viewer/renderer";
@@ -27,7 +28,16 @@ interface PresetStorage {
   setItem(key: string, value: string): void;
 }
 
-export const RENDER_PRESET_STORAGE_KEY = "cadjoint.render-presets.v2";
+/**
+ * Bumped with every change to the shape of a stored preset.
+ *
+ * v3 adds the SDF-view settings and moves every preset to the Ultra quality
+ * tier. A v2 entry validates as incomplete and is discarded rather than
+ * migrated: these are three named bundles of defaults, not user documents, and
+ * a reader that silently half-applies an old bundle is worse than one that
+ * starts from the shipped preset.
+ */
+export const RENDER_PRESET_STORAGE_KEY = "cadjoint.render-presets.v3";
 
 export const DEFAULT_RENDER_PRESETS: RenderPreset[] = [
   {
@@ -35,7 +45,7 @@ export const DEFAULT_RENDER_PRESETS: RenderPreset[] = [
     name: "X-Ray",
     hint: "Model & inspect",
     pathTracing: false,
-    quality: "high",
+    quality: DEFAULT_QUALITY,
     display: { ...DEFAULT_DISPLAY },
   },
   {
@@ -43,7 +53,7 @@ export const DEFAULT_RENDER_PRESETS: RenderPreset[] = [
     name: "Studio",
     hint: "Clean materials",
     pathTracing: true,
-    quality: "high",
+    quality: DEFAULT_QUALITY,
     display: {
       ...DEFAULT_DISPLAY,
       projection: "perspective",
@@ -62,7 +72,7 @@ export const DEFAULT_RENDER_PRESETS: RenderPreset[] = [
     name: "Wire",
     hint: "Construction only",
     pathTracing: false,
-    quality: "draft",
+    quality: DEFAULT_QUALITY,
     display: {
       ...DEFAULT_DISPLAY,
       projection: "orthographic",
@@ -108,7 +118,15 @@ function isDisplaySettings(value: unknown): value is DisplaySettings {
     typeof display.showConstraints === "boolean" &&
     typeof display.showFixedConstraints === "boolean" &&
     typeof display.showDistanceConstraints === "boolean" &&
-    typeof display.showConstraintValues === "boolean"
+    typeof display.showConstraintValues === "boolean" &&
+    (display.sdfView === "solid" ||
+      display.sdfView === "slice" ||
+      display.sdfView === "gradient") &&
+    (display.sdfAxis === 0 || display.sdfAxis === 1 || display.sdfAxis === 2) &&
+    typeof display.sdfFraction === "number" &&
+    Number.isFinite(display.sdfFraction) &&
+    typeof display.isoOffset === "number" &&
+    Number.isFinite(display.isoOffset)
   );
 }
 

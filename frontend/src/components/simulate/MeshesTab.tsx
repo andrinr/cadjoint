@@ -187,7 +187,7 @@ export function MeshesTab(props: MeshesTabProps) {
                           <Show when={domain().name === null}>
                             <option value="">{`(${domain().type})`}</option>
                           </Show>
-                          <For each={sim().namedObjects()}>
+                          <For each={sim().domainOptions(domain().name)}>
                             {(name) => <option value={name}>{name}</option>}
                           </For>
                         </select>

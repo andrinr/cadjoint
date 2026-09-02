@@ -1,0 +1,187 @@
+/**
+ * The scene browser's own layout.
+ *
+ * Almost nothing visual is invented here: the panel shell, the section head,
+ * the stat row and the chips are the same primitives every other window uses.
+ * What this file adds is the one thing the system had no shape for yet — a
+ * *document* card, which is a picture with a caption rather than a
+ * declaration with fields.
+ *
+ * The picture is the reason the card exists, so it leads; the name sits under
+ * it as a caption, the way a plate is captioned in a drawing sheet, and
+ * everything else is the same right-hung mono the rest of the instrument
+ * uses. No colours, radii, shadows, sizes or spacings are invented: every
+ * value is a token from styles.css, and the corners stay square.
+ */
+
+/*
+ * The section head's own spacing.
+ *
+ * `.section-head` closes with `gap: 0`, which is right when the right-hung
+ * figure is the last thing on the rule and wrong when a control follows it:
+ * the count ends up touching the button. One space between the cells, on the
+ * same baseline, in this panel only.
+ */
+.scenes-panel .section-head {
+  gap: var(--space-4);
+}
+
+/*
+ * The card list, and why both it and its rows refuse to shrink.
+ *
+ * `.section` is a flex column, so this list is a flex *item* of it and each
+ * card is a flex item of this list. Under the panel's own height constraint
+ * both would take their default `flex-shrink: 1` and compress below their
+ * content — which does not clip, it overlaps: the third card's open button
+ * ended up sitting on top of the second card's date. The list scrolls; the
+ * rows keep their size.
+ */
+.scene-cards {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.scene-card + .scene-card {
+  border-top: 1px solid var(--divider);
+}
+
+.scene-card {
+  flex: 0 0 auto;
+  padding: var(--space-4) 0;
+  min-width: 0;
+}
+
+/*
+ * The card the current document was loaded from is marked, not coloured.
+ *
+ * A rule at the head of the block, in the heaviest structural ink the system
+ * has. Not the accent: the accent in this design language is a fill behind
+ * type — a chip, a pressed control — and never a mark or a data line, and a
+ * 2px orange bar down the side of a card is exactly the mark it is not.
+ */
+.scene-card.current {
+  border-left: 2px solid var(--rule-heavy);
+  padding-left: var(--space-4);
+}
+
+/* Picture plus caption is one target: clicking anywhere in it opens the
+   scene, so it is a button shaped like the block rather than a link under it. */
+.scene-open {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-3);
+  width: 100%;
+  /* The shared `button` rule fixes every button to one control height.
+     That is right for a control and wrong for a picture: it squeezed the
+     thumbnail's box to a ten-pixel strip and the render with it. */
+  height: auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* A file name is a string from the filesystem, not a label, so it keeps its
+   own case — the same exemption `.sim-study-head strong` has for a study's
+   declared name. */
+.scene-open strong {
+  font: var(--type-mono);
+  color: var(--ink-2);
+  letter-spacing: var(--tracking-xs);
+  text-transform: none;
+}
+
+/* Hover darkens the caption and firms up the frame's rule — an ink change,
+   not a colour one. */
+.scene-open:hover .scene-frame {
+  border-color: var(--rule-strong);
+}
+
+.scene-open:hover strong {
+  color: var(--ink);
+}
+
+/* The frame is always drawn, at the thumbnail's aspect ratio, so the list
+   does not reflow as pictures arrive one at a time. */
+.scene-frame {
+  position: relative;
+  width: 100%;
+  /* The thumbnail's own 320x200. Stated here rather than inline so the box
+     is the same whether it holds a render, a queue label or a hatch, and
+     `flex: none` so the flex column above cannot shrink it away. */
+  aspect-ratio: 16 / 10;
+  flex: 0 0 auto;
+  overflow: hidden;
+  border: 1px solid var(--rule);
+  background: var(--surface-inset);
+}
+
+.scene-frame img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/*
+ * The placeholder: hatched, never blank.
+ *
+ * An empty rectangle reads as "still loading" forever. Diagonal hatching is
+ * what a drawing uses for a region that is not the part, and it says at a
+ * glance that this frame is not going to fill in — while a queued or drawing
+ * card carries the same hatch with the word for where it is in the queue.
+ */
+.scene-frame-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding: var(--space-4);
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 5px,
+    var(--divider) 5px,
+    var(--divider) 6px
+  );
+}
+
+.scene-frame-empty span {
+  font: var(--type-mono);
+  color: var(--ink-3);
+  text-align: center;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+.scene-summary {
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-xs);
+  line-height: var(--leading-snug);
+  color: var(--ink-2);
+}
+
+.scene-materials {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 0;
+}
+
+.scene-meta {
+  margin: var(--space-2) 0 0;
+  font: var(--type-mono);
+  color: var(--ink-3);
+}

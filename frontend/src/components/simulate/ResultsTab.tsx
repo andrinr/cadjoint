@@ -54,6 +54,15 @@ export function ResultsTab(props: ResultsTabProps) {
           <div class="sim-legend" data-testid="simulate-legend">
             <small>
               {current().name} · {sim().activeScalars()?.label ?? ""}
+              {/* A result that no longer describes the program says so and
+                  stays: throwing it away would be worse than showing it
+                  with a date on it. Quiet, and not a colour — a warning
+                  hue here would fight the field ramp underneath it. */}
+              <Show when={sim().stale()}>
+                <span class="sim-kind" data-testid="simulate-stale">
+                  stale · source changed
+                </span>
+              </Show>
             </small>
             <div class="sim-ramp" style={{ background: rampCss() }} />
             <div class="sim-legend-values">

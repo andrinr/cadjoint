@@ -12,6 +12,7 @@ import type { SimMeshPayload, StudyPayload } from "../src/types";
 
 const mesh: SimMeshPayload = {
   kind: "mesh",
+  stableId: null,
   index: 0,
   name: "coarse",
   resolution: [20, 14, 12],
@@ -26,6 +27,7 @@ const mesh: SimMeshPayload = {
 
 const study: StudyPayload = {
   index: 1,
+  stableId: null,
   name: "heat",
   kind: "thermal",
   resolution: null,

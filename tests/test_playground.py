@@ -2,8 +2,12 @@ from __future__ import annotations
 
 import ast
 import json
+import os
+import shutil
+import tempfile
 import threading
 from contextlib import contextmanager
+from pathlib import Path
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
@@ -14,6 +18,7 @@ from cadjoint.viewer._pathtracer import (
     WGSL_PRESENT_TEMPLATE,
     build_path_tracer_shader,
 )
+from cadjoint.viewer._scenes import SCENES_DIR_ENV
 from cadjoint.viewer._webgpu import build_viewer_shader, ensure_material_wgsl
 from cadjoint.viewer.playground import (
     EXAMPLE_SOURCE,
@@ -462,18 +467,41 @@ def test_resolve_static_refuses_paths_outside_the_static_root():
     assert resolve_static("/../_webgpu.py") is None
 
 
+#: The repository's own scenes, copied into every live server's workspace.
+SHIPPED_SCENES = Path(__file__).resolve().parents[1] / "scenes"
+
+
 @contextmanager
 def running_server():
-    server = create_server(0)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    try:
-        host, port = server.server_address
-        yield f"http://{host}:{port}"
-    finally:
-        server.shutdown()
-        server.server_close()
-        thread.join(timeout=2)
+    """A live playground on a free port, writing scenes to a temp directory.
+
+    The scenes root defaults to ``./scenes`` under the working directory,
+    which for a test run is the repository — so a request that saved a scene
+    used to leave a file in the checkout.  Each live server gets its own
+    temporary directory instead, seeded with copies of the shipped scenes so
+    the listing has something real in it.
+    """
+    with tempfile.TemporaryDirectory() as workspace:
+        root = Path(workspace) / "scenes"
+        root.mkdir()
+        for path in sorted(SHIPPED_SCENES.glob("*.py")):
+            shutil.copyfile(path, root / path.name)
+        previous = os.environ.get(SCENES_DIR_ENV)
+        os.environ[SCENES_DIR_ENV] = str(root)
+        server = create_server(0)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            host, port = server.server_address
+            yield f"http://{host}:{port}"
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=2)
+            if previous is None:
+                os.environ.pop(SCENES_DIR_ENV, None)
+            else:
+                os.environ[SCENES_DIR_ENV] = previous
 
 
 def post(base: str, path: str, payload: dict, token: str | None = None) -> Request:
@@ -578,12 +606,17 @@ def test_scene_files_round_trip_in_the_workspace(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
 
     # The directory is created lazily, so listing before any save is empty.
-    assert list_scenes() == {"ok": True, "files": []}
+    assert list_scenes() == {"ok": True, "files": [], "scenes": []}
 
     saved = save_scene({"name": "bracket.py", "source": "scene = None\n"})
     assert saved == {"ok": True, "name": "bracket.py"}
     assert (tmp_path / "scenes" / "bracket.py").read_text() == "scene = None\n"
-    assert list_scenes() == {"ok": True, "files": ["bracket.py"]}
+    # `files` is the bare-name contract the Open dialog reads; `scenes`
+    # describes the same files for the browser (see test_scenes_summary.py).
+    listing = list_scenes()
+    assert listing["ok"] is True
+    assert listing["files"] == ["bracket.py"]
+    assert [entry["name"] for entry in listing["scenes"]] == ["bracket.py"]
 
     loaded = load_scene({"name": "bracket.py"})
     assert loaded["ok"] is True
@@ -634,6 +667,9 @@ def test_scene_save_rejects_oversized_source(tmp_path, monkeypatch):
 
 
 def test_scene_endpoints_round_trip_over_http(tmp_path, monkeypatch):
+    # The live server writes into its own temporary workspace (seeded with
+    # the shipped scenes), never into the working directory; chdir here only
+    # proves that a refused traversal writes nothing beside it either.
     monkeypatch.chdir(tmp_path)
     with running_server() as base:
         with urlopen(f"{base}/api/session") as response:
@@ -645,7 +681,12 @@ def test_scene_endpoints_round_trip_over_http(tmp_path, monkeypatch):
             assert json.loads(response.read()) == {"ok": True, "name": "part.py"}
 
         with urlopen(f"{base}/api/scenes") as response:
-            assert json.loads(response.read()) == {"ok": True, "files": ["part.py"]}
+            listing = json.loads(response.read())
+        assert listing["ok"] is True
+        assert "part.py" in listing["files"]
+        described = {entry["name"]: entry for entry in listing["scenes"]}
+        assert described.keys() == set(listing["files"])
+        assert described["part.py"]["source_hash"] is not None
 
         with urlopen(post(base, "/api/scenes/load", {"name": "part.py"}, token)) as response:
             loaded = json.loads(response.read())

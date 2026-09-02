@@ -18,7 +18,13 @@ import { MaterialPanel } from "./components/MaterialPanel";
 import { MenuBar } from "./components/MenuBar";
 import { ObjectTree } from "./components/ObjectTree";
 import { OptimizePanel } from "./components/OptimizePanel";
-import { SimulatePanel } from "./components/SimulatePanel";
+import { ScenesPanel } from "./components/ScenesPanel";
+import {
+  MeshesWindow,
+  ResultsWindow,
+  StudiesWindow,
+} from "./components/simulate/SimWindows";
+import { createSimulateController } from "./components/simulate/controller";
 import { SketchPanel } from "./components/SketchPanel";
 import { ToolRail } from "./components/ToolRail";
 import { Toolbar } from "./components/Toolbar";
@@ -68,6 +74,21 @@ export function App() {
     display: render.display,
   });
   const ops = createPatchOperations(compile.applyPatch);
+  /**
+   * One simulation controller for four windows.
+   *
+   * Meshes, Studies and Results each get their own Solid root from the dock,
+   * so the state they share — the last solve, the field on screen, the BC
+   * builder, the job references that outlive a mode switch — cannot live in
+   * any one of them. It lives here, in the shell that outlives all of them,
+   * and each window registers itself with it while it is mounted.
+   */
+  const sim = createSimulateController({
+    renderer,
+    onPatch: compile.applyPatch,
+    onAdoptSource: compile.adoptSource,
+    onGhostCompile: compile.ghostCompile,
+  });
   const actions = createSourceActions({
     history,
     run: compile.run,
@@ -193,7 +214,6 @@ export function App() {
                   yaw={cameraAngles().yaw}
                   pitch={cameraAngles().pitch}
                   projection={render.display().projection}
-                  active={render.viewPreset()}
                   onPreset={render.applyPreset}
                   onProjection={(projection) => render.applyDisplay({ projection })}
                   onOrbit={(yaw, pitch) => {
@@ -226,6 +246,7 @@ export function App() {
             onSetValue={(line, argument, value) =>
               ops.setValue(line, "Material", argument, value)
             }
+            onAdoptSource={compile.adoptSource}
           />
         );
 
@@ -279,19 +300,21 @@ export function App() {
           />
         );
 
-      // The simulate slot keeps its wrapper and testid: the FEM panel may
-      // expand, collapse and drive the renderer freely inside it.
-      case "simulate":
-        return (
-          <div class="mode-simulate-slot" data-testid="mode-simulate">
-            <SimulatePanel
-              renderer={renderer}
-              onPatch={compile.applyPatch}
-              onAdoptSource={compile.adoptSource}
-              onGhostCompile={compile.ghostCompile}
-            />
-          </div>
-        );
+      // The three windows the Simulate desk arranges. Each is a view over
+      // the one controller above; none of them owns the simulation.
+      case "meshes":
+        return <MeshesWindow sim={sim} />;
+
+      case "studies":
+        return <StudiesWindow sim={sim} />;
+
+      case "results":
+        return <ResultsWindow sim={sim} />;
+
+      // The document browser: what is saved beside this one, and what is in
+      // each of them, without running any of them.
+      case "scenes":
+        return <ScenesPanel onOpen={actions.adoptScene} />;
     }
   };
 

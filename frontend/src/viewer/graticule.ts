@@ -24,7 +24,7 @@
  */
 
 import { FOV_SCALE, orthoHeightFor, type Projection } from "./math";
-import { VIEW_PRESETS } from "./display";
+import { sameView, VIEW_PRESETS } from "./display";
 
 /**
  * Cells down the viewport height, at the framing the spacing is chosen for.
@@ -82,6 +82,17 @@ export const GRID_MAJOR_EVERY = 5;
  * distance, measured outward from the orbit target on the plane.
  */
 export const GRID_FADE = { start: 1.6, end: 7 } as const;
+
+/**
+ * Closest and furthest the orbit camera may sit from its target.
+ *
+ * Here rather than beside the gestures that clamp against it, because the
+ * detent ladder is the other half of the same question: a rung outside this
+ * range is a spacing the zoom can never actually sit on, and both the wheel
+ * and the view presets have to refuse it rather than clamp off the ladder.
+ */
+export const MIN_DISTANCE = 0.4;
+export const MAX_DISTANCE = 60;
 
 /** The 1-2-5 ladder's mantissas — the detent ladder §10.1 states. */
 const MANTISSAS = [1, 2, 5] as const;
@@ -214,6 +225,29 @@ export function formatGain(mm: number, calibrated: boolean): GainReadout {
   };
 }
 
+/**
+ * A signed world distance, on the same scale rule as the gain readout.
+ *
+ * `formatGain` is for *spacings* — always positive, never zero, and an absent
+ * one is an error worth printing as an em dash. A coordinate is none of those
+ * things: zero is where the slice plane starts, and half its travel is
+ * negative. Same three significant figures, same switch to metres at a metre,
+ * same typographic minus as the octant field, so the two readouts still look
+ * like one instrument.
+ */
+export function formatDistance(mm: number): { value: string; unit: "mm" | "m" } {
+  if (!Number.isFinite(mm)) return { value: "—", unit: "mm" };
+  const metres = Math.abs(mm) >= 1000;
+  const magnitude = metres ? mm / 1000 : mm;
+  const rounded = Number(magnitude.toPrecision(3));
+  return {
+    // `toPrecision` on a metre value keeps the trailing zeros that say how far
+    // the number is resolved; below a metre they would be noise on an integer.
+    value: (metres ? magnitude.toPrecision(3) : String(rounded)).replace("-", "−"),
+    unit: metres ? "m" : "mm",
+  };
+}
+
 /** Signed octant the camera sits in, e.g. `"+X−Y+Z"` or `"−Y"` for Front. */
 export function octant(yaw: number, pitch: number): string {
   const cp = Math.cos(pitch);
@@ -235,20 +269,16 @@ export function octant(yaw: number, pitch: number): string {
  *
  * Derived from the angles rather than remembered from the last preset click,
  * so the readout cannot claim FRONT after the user has orbited away.
+ *
+ * A corner view reports ISO in all eight octants. That is the honest name: a
+ * 1:1:1 direction *is* an isometric direction, and which octant it points into
+ * is already stated, exactly, by the octant field beside it. What ISO never
+ * means here is a projection — the readout is describing where the camera
+ * stands, and orthographic-versus-perspective is a separate control.
  */
 export function viewLabel(yaw: number, pitch: number): string {
-  const wrapped = Math.atan2(Math.sin(yaw), Math.cos(yaw));
   for (const [name, preset] of Object.entries(VIEW_PRESETS)) {
-    const presetYaw = Math.atan2(Math.sin(preset.yaw), Math.cos(preset.yaw));
-    const yawDelta = Math.abs(
-      Math.atan2(Math.sin(wrapped - presetYaw), Math.cos(wrapped - presetYaw)),
-    );
-    // Looking straight up or down, yaw is a spin about the view axis and does
-    // not change which view it is.
-    const polar = Math.abs(Math.abs(preset.pitch) - Math.PI / 2) < 1e-6;
-    if (Math.abs(pitch - preset.pitch) < 0.01 && (polar || yawDelta < 0.01)) {
-      return name.toUpperCase();
-    }
+    if (sameView(yaw, pitch, preset)) return preset.label ?? name.toUpperCase();
   }
   return "FREE";
 }

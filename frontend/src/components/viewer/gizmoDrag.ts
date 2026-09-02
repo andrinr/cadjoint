@@ -178,7 +178,10 @@ export function createGizmoDrag(context: GizmoDragContext) {
     setGizmoDrag(null);
     context.renderer.gizmoAxis = null;
     const placement = node?.transform;
-    if (finished.moved && active && placement) {
+    // A transform whose call could not be located in the source has no line
+    // to rewrite; the payload says so with a null, and there is nothing to
+    // commit for it.
+    if (finished.moved && active && placement && placement.line !== null) {
       if (finished.mode === "translate") {
         await context.props.onSetValue(
           placement.line,

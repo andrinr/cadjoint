@@ -43,3 +43,4 @@ _skipped.*
 
 # Tesseract runtime scratch: each in-process apply writes run_<uuid>/ into cwd.
 run_*/
+ui-audit-out/

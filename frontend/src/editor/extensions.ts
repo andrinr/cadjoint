@@ -17,11 +17,19 @@
  * response is discarded when a newer one has already gone out.
  */
 
-import { autocompletion, type Completion, type CompletionResult } from "@codemirror/autocomplete";
+import {
+  autocompletion,
+  closeCompletion,
+  completionStatus,
+  type Completion,
+  type CompletionResult,
+} from "@codemirror/autocomplete";
 import { lintGutter, lintKeymap, linter, type Diagnostic } from "@codemirror/lint";
 import { StateEffect, StateField, type Extension } from "@codemirror/state";
 import {
   EditorView,
+  closeHoverTooltips,
+  hasHoverTooltips,
   keymap,
   showTooltip,
   type Tooltip,
@@ -212,6 +220,10 @@ const signaturePlugin = ViewPlugin.fromClass(
     }
 
     private async request(): Promise<void> {
+      // Nothing is asked for while the editor is not the thing being used.
+      // The tooltip answers a question about the caret, and a caret in an
+      // unfocused editor is not a question anyone is asking.
+      if (!this.view.hasFocus) return;
       const state = this.view.state;
       const head = state.selection.main.head;
       const { line, column } = positionOf(state.doc, head);
@@ -236,6 +248,62 @@ const signaturePlugin = ViewPlugin.fromClass(
     }
   },
 );
+
+// ── dismissal ───────────────────────────────────────────────────────────────
+
+/**
+ * Put every floating surface away when the editor stops being used.
+ *
+ * The three of them have three different lifetimes, and only one of them used
+ * to be right. The completion popup closes itself on blur (autocompletion's
+ * `closeOnBlur`, on by default). The lint hover already had a `mouseleave` on
+ * the editor's own element — but the editor's element is not the *pane*: the
+ * header, the hint and the console below it are all outside it, so a pointer
+ * moving down through them left the editor without ever leaving it, and the
+ * tooltip stayed. And the signature tooltip is not a hover at all: it is a
+ * `StateField`, shown because of where the caret is, so nothing about the
+ * pointer or the focus was ever going to close it. Clicking the viewport left
+ * a call signature floating over a pane nobody was typing in.
+ *
+ * So dismissal is stated once, for all three, on the two events that actually
+ * mean "not editing any more": focus leaving the editor, and the pointer
+ * leaving the whole pane.
+ */
+function dismissTooltips(view: EditorView): void {
+  const effects = [];
+  if (view.state.field(signatureField, false)) effects.push(setSignature.of(null));
+  if (hasHoverTooltips(view.state)) effects.push(closeHoverTooltips);
+  if (effects.length > 0) view.dispatch({ effects });
+  // Not an effect: the completion state lives behind its own transaction.
+  if (completionStatus(view.state) !== null) closeCompletion(view);
+}
+
+const dismissOnLeave = ViewPlugin.fromClass(
+  class {
+    private readonly pane: HTMLElement;
+    private readonly leave: () => void;
+
+    constructor(private readonly view: EditorView) {
+      // The pane, not the editor: see above. Falling back to the editor's own
+      // element keeps this working in a test harness that mounts it bare.
+      this.pane = view.dom.closest(".pane") ?? view.dom;
+      this.leave = () => dismissTooltips(this.view);
+      this.pane.addEventListener("pointerleave", this.leave);
+    }
+
+    destroy(): void {
+      this.pane.removeEventListener("pointerleave", this.leave);
+    }
+  },
+);
+
+/** Focus leaving the editor is the other end of the same rule. */
+const dismissOnBlur = EditorView.domEventHandlers({
+  blur(_event, view) {
+    dismissTooltips(view);
+    return false;
+  },
+});
 
 // ── paint ───────────────────────────────────────────────────────────────────
 
@@ -419,6 +487,8 @@ export function intelligenceExtensions(): Extension[] {
     autocompletion({ override: [completeSource] }),
     signatureField,
     signaturePlugin,
+    dismissOnLeave,
+    dismissOnBlur,
     intelligenceTheme,
   ];
 }

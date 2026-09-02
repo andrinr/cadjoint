@@ -29,6 +29,7 @@ import type {
   ToolMode,
 } from "./types";
 import { placeEdges } from "./viewer/gizmo";
+import { VIEW_PRESETS } from "./viewer/display";
 import type { PlayerState } from "./optimize";
 import type { PendingLoft } from "./loft";
 import {
@@ -288,8 +289,18 @@ export const [gizmoDrag, setGizmoDrag] = createSignal<GizmoDrag | null>(null);
 export const [gizmoMode, setGizmoMode] = createSignal<GizmoMode>("translate");
 export const [selectionMode, setSelectionMode] = createSignal<SelectionMode>("object");
 
-/** Camera angles mirrored into a signal so the ViewCube can track them. */
-export const [cameraAngles, setCameraAngles] = createSignal({ yaw: 0.75, pitch: 0.32 });
+/**
+ * Camera angles mirrored into a signal so the ViewCube can track them.
+ *
+ * Seeded from the same table the renderer's own camera is, rather than from a
+ * second copy of the numbers: they were two copies, and when the default view
+ * moved onto the true isometric corner this one stayed behind, so the rose lit
+ * nothing at rest while the cube — reading the renderer — was correct.
+ */
+export const [cameraAngles, setCameraAngles] = createSignal({
+  yaw: VIEW_PRESETS.iso.yaw,
+  pitch: VIEW_PRESETS.iso.pitch,
+});
 
 /** Find a construction node by id. */
 export function nodeById(id: string): ConstructionNode | undefined {

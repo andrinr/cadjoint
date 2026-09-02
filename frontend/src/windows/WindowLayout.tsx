@@ -23,6 +23,7 @@ import { createEffect, createSignal, For, on, onCleanup, onMount, Show } from "s
 import type { JSX } from "solid-js";
 import type { EditingMode } from "../editingMode";
 import { editingMode, setPanels, setPanelVisibilityHandler, type PanelVisibility } from "../state";
+import { ProcessesPanel } from "../components/ProcessesPanel";
 import { createDock, type Dock } from "./dock";
 import { publishWindowManager, type WindowManager } from "./manager";
 import {
@@ -254,7 +255,11 @@ export function WindowLayout(props: WindowLayoutProps) {
 
   onMount(() => {
     dock = createDock(host, {
-      renderWindow: props.renderWindow,
+      // The process monitor is the one window the shell does not have to
+      // wire up: it talks to `/api/jobs` and to the job store directly, so
+      // it is rendered here rather than threaded through the app's
+      // `renderWindow`, which is a map of *scene* panels.
+      renderWindow: (id) => (id === "processes" ? <ProcessesPanel /> : props.renderWindow(id)),
       onClosed: (id) => {
         if (rebuilding) return;
         putStatuses(reduceModeWindows(modeWindows(), { kind: "close", id }));

@@ -18,6 +18,7 @@
 
 import { createEffect, createSignal, type Accessor } from "solid-js";
 import * as api from "../api";
+import { pokeJobs } from "../jobs";
 import {
   busy,
   selection,
@@ -86,6 +87,10 @@ export function createCompileCycle(options: CompileCycleOptions): CompileCycle {
       return;
     }
     setBusy(true);
+    // A compile is the most common piece of real work in this app and the
+    // one most likely to be waited on, so tell the job poller it has
+    // something to watch; it stops by itself when the worker is done.
+    pokeJobs();
     setStatus({ kind: "", text: "JAX compiling…" });
     setConsoleText("");
     const text = source();

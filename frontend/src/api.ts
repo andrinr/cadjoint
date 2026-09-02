@@ -5,6 +5,7 @@
  * that response, so requiring the token on writes keeps them same-origin only.
  */
 
+import type { JobDetail, JobsSnapshot, JobStamped } from "./jobs";
 import {
   parseOptimizeStreamLine,
   splitStreamBuffer,
@@ -32,6 +33,26 @@ import type {
 
 let token = "";
 
+/**
+ * Resolves once the session token is in hand.
+ *
+ * Nothing that needs the token may run before `startSession` has answered,
+ * and some of it now does run early: a panel remounting after a reload asks
+ * the job registry for the result it was showing, and the process monitor
+ * starts polling, both while the app's own startup request is still in
+ * flight. Without this gate those requests are refused with a 403 and the
+ * restored result silently never arrives.
+ */
+let markSessionReady: () => void = () => {};
+const sessionReady = new Promise<void>((resolve) => {
+  markSessionReady = resolve;
+});
+
+/** Await the session token; every job endpoint below does. */
+export function whenSessionReady(): Promise<void> {
+  return sessionReady;
+}
+
 async function readJson<T>(response: Response): Promise<T> {
   const text = await response.text();
   try {
@@ -47,6 +68,7 @@ export async function startSession(): Promise<SessionResponse> {
   if (!response.ok) throw new Error(`Could not start a session (${response.status}).`);
   const session = await readJson<SessionResponse>(response);
   token = session.token;
+  markSessionReady();
   return session;
 }
 
@@ -60,8 +82,8 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 }
 
 /** Execute the program and compile its scene to WGSL. */
-export async function compile(source: string): Promise<CompileResponse> {
-  return post<CompileResponse>("/compile", { source });
+export async function compile(source: string): Promise<CompileResponse & JobStamped> {
+  return post<CompileResponse & JobStamped>("/compile", { source });
 }
 
 /**
@@ -82,8 +104,8 @@ export async function patch(
  * Split out of `/compile` because it dominates the compile round-trip; the
  * viewer only asks while a mesh overlay is actually displayed.
  */
-export async function mesh(source: string): Promise<MeshResponse> {
-  return post<MeshResponse>("/api/mesh", { source });
+export async function mesh(source: string): Promise<MeshResponse & JobStamped> {
+  return post<MeshResponse & JobStamped>("/api/mesh", { source });
 }
 
 /**
@@ -92,23 +114,25 @@ export async function mesh(source: string): Promise<MeshResponse> {
  * Errors come back in the body — including `error_kind: "fem_unavailable"`
  * when the optional jax-fem extra is missing — so callers can render them.
  */
-export async function simulate(body: SimulateRequest): Promise<SimulateResponse> {
-  return post<SimulateResponse>("/api/simulate", body);
+export async function simulate(
+  body: SimulateRequest,
+): Promise<SimulateResponse & JobStamped> {
+  return post<SimulateResponse & JobStamped>("/api/simulate", body);
 }
 
 /** Run a study declared in the program; the declaration owns mesh and BCs. */
 export async function simulateStudy(
   body: SimulateStudyRequest,
-): Promise<SimulateResponse> {
-  return post<SimulateResponse>("/api/simulate", body);
+): Promise<SimulateResponse & JobStamped> {
+  return post<SimulateResponse & JobStamped>("/api/simulate", body);
 }
 
 /** Build a declared SimMesh and return its quality report + surface. */
 export async function meshInspect(
   source: string,
   name: string,
-): Promise<MeshInspectResponse> {
-  return post<MeshInspectResponse>("/api/mesh_inspect", { source, name });
+): Promise<MeshInspectResponse & JobStamped> {
+  return post<MeshInspectResponse & JobStamped>("/api/mesh_inspect", { source, name });
 }
 
 /**
@@ -124,19 +148,20 @@ export async function meshInspect(
 export async function optimize(
   body: OptimizeRequest,
   onProgress?: (progress: OptimizeProgress) => void,
-): Promise<OptimizeResponse> {
+  onJob?: (jobId: string) => void,
+): Promise<OptimizeResponse & JobStamped> {
   const response = await fetch("/api/optimize", {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Cadjoint-Token": token },
     body: JSON.stringify(body),
   });
-  if (!response.body) return readJson<OptimizeResponse>(response);
+  if (!response.body) return readJson<OptimizeResponse & JobStamped>(response);
 
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
   let full = "";
-  let done: OptimizeResponse | null = null;
+  let done: (OptimizeResponse & JobStamped) | null = null;
   for (;;) {
     const { value, done: finished } = await reader.read();
     const chunk = decoder.decode(value ?? new Uint8Array(0), { stream: !finished });
@@ -146,6 +171,17 @@ export async function optimize(
     buffer = rest;
     if (finished && buffer.trim().length > 0) lines.push(buffer.trim());
     for (const line of lines) {
+      // Every event of a registered run carries its job id, from the first
+      // progress line onward — which is the only way a caller can learn the
+      // handle for cancelling a run that has not finished yet.
+      if (onJob) {
+        try {
+          const raw = JSON.parse(line) as { job_id?: unknown };
+          if (typeof raw?.job_id === "string") onJob(raw.job_id);
+        } catch {
+          // Not JSON, or not an object: the parser below reports it.
+        }
+      }
       const event = parseOptimizeStreamLine(line);
       if (event?.kind === "progress") {
         const { kind: _kind, ...progress } = event;
@@ -158,7 +194,7 @@ export async function optimize(
   }
   if (done) return done;
   try {
-    return JSON.parse(full) as OptimizeResponse;
+    return JSON.parse(full) as OptimizeResponse & JobStamped;
   } catch {
     throw new Error(`Server returned a non-JSON response (${response.status}).`);
   }
@@ -210,4 +246,91 @@ export async function saveScene(
   source: string,
 ): Promise<SceneSaveResponse> {
   return post<SceneSaveResponse>("/api/scenes/save", { name, source });
+}
+
+// ── the job registry ───────────────────────────────────────────────────────
+
+/**
+ * Every registered job, newest first, plus the live load totals.
+ *
+ * Cheap enough to poll at 1 Hz: the server answers it from memory and the
+ * payload carries no results, only summaries. See `jobs.ts` for the poller
+ * that calls this and the panels that read it.
+ */
+export async function listJobs(): Promise<JobsSnapshot> {
+  await sessionReady;
+  const response = await fetch("/api/jobs", { headers: { "X-Cadjoint-Token": token } });
+  if (!response.ok) throw new Error(`Could not list jobs (${response.status}).`);
+  return readJson<JobsSnapshot>(response);
+}
+
+/** One job with its resource samples and, for an optimize run, its steps. */
+export async function jobDetail(jobId: string): Promise<JobDetail | null> {
+  await sessionReady;
+  const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}`, {
+    headers: { "X-Cadjoint-Token": token },
+  });
+  if (!response.ok) return null;
+  const body = await readJson<{ ok: boolean; job?: JobDetail }>(response);
+  return body.job ?? null;
+}
+
+/** What `fetchJobResult` found: the payload, or why there is none. */
+export type JobResultOutcome<T> =
+  | { state: "ok"; payload: T }
+  /** Still queued or running — poll the job and ask again when it finishes. */
+  | { state: "pending" }
+  /** The job is gone, or its payload was evicted: the work must be redone. */
+  | { state: "gone" }
+  | { state: "error"; message: string };
+
+/**
+ * The payload a job produced, byte-identical to the response its request got.
+ *
+ * The three refusals are all ordinary states of a stored result rather than
+ * failures, so they are returned rather than thrown: 409 while the job is
+ * still running, 404 for an id this server has never had (a reload against a
+ * restarted playground), 410 for a job whose payload has been evicted.
+ */
+export async function fetchJobResult<T>(jobId: string): Promise<JobResultOutcome<T>> {
+  await sessionReady;
+  let response: Response;
+  try {
+    response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/result`, {
+      headers: { "X-Cadjoint-Token": token },
+    });
+  } catch (error) {
+    return { state: "error", message: error instanceof Error ? error.message : String(error) };
+  }
+  if (response.ok) return { state: "ok", payload: await readJson<T>(response) };
+  if (response.status === 409) return { state: "pending" };
+  if (response.status === 404 || response.status === 410) return { state: "gone" };
+  return { state: "error", message: `Could not read that result (${response.status}).` };
+}
+
+/**
+ * Kill a running job's worker process.
+ *
+ * The request that started the work ends on its own with
+ * `error: "cancelled"`; this only asks for the kill. A 409 means the job had
+ * already finished, which is not worth reporting to the user.
+ */
+export async function cancelJob(jobId: string): Promise<boolean> {
+  await sessionReady;
+  const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/cancel`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Cadjoint-Token": token },
+    body: "{}",
+  });
+  return response.ok;
+}
+
+/** Drop every finished job from the registry; running work is kept. */
+export async function clearJobs(): Promise<void> {
+  await sessionReady;
+  await fetch("/api/jobs/clear", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Cadjoint-Token": token },
+    body: "{}",
+  });
 }

@@ -8,6 +8,7 @@
  */
 
 import type { StudyBc, StudyBcType, StudyPayload, StudySelection } from "./types";
+import { byId } from "./identity";
 
 /** Compact numeric formatting for selection summaries: drop trailing zeros. */
 const num = (value: number): string => {
@@ -67,8 +68,17 @@ export function studyArguments(study: StudyPayload): { key: string; value: numbe
   if (typeof study.resolution === "number") {
     rows.push({ key: "resolution", value: study.resolution });
   }
-  for (const [key, value] of Object.entries(study.material)) rows.push({ key, value });
-  if (study.kind === "thermal") rows.push({ key: "source", value: study.source ?? 0 });
+  // A study's material map carries numbers for the properties stated in the
+  // declaration and the sentinel string "material" for the ones it defers to
+  // the assigned Material. Only the numbers are literals in the source, so
+  // only the numbers get an editable row; a deferred property is shown by the
+  // material chip on the card instead of by a field that would rewrite it.
+  for (const [key, value] of Object.entries(study.material ?? {})) {
+    if (typeof value === "number") rows.push({ key, value });
+  }
+  if (study.kind === "thermal") {
+    rows.push({ key: "source", value: typeof study.source === "number" ? study.source : 0 });
+  }
   return rows;
 }
 
@@ -123,6 +133,7 @@ export function draftSelection(draft: BcDraft): StudySelection {
 export function addBcRequest(study: StudyPayload, draft: BcDraft): Record<string, unknown> {
   const body: Record<string, unknown> = {
     op: "add_study_bc",
+    ...byId(study),
     study: study.index,
     bc_type: draft.bcType,
     selection: draftSelection(draft),
@@ -138,11 +149,11 @@ export function addStudyRequest(kind: "thermal" | "elastic"): Record<string, unk
 }
 
 export function deleteStudyRequest(study: StudyPayload): Record<string, unknown> {
-  return { op: "delete_study", study: study.index };
+  return { op: "delete_study", ...byId(study), study: study.index };
 }
 
 export function deleteBcRequest(study: StudyPayload, bc: number): Record<string, unknown> {
-  return { op: "delete_study_bc", study: study.index, bc };
+  return { op: "delete_study_bc", ...byId(study), study: study.index, bc };
 }
 
 export function setBcValueRequest(
@@ -150,7 +161,7 @@ export function setBcValueRequest(
   bc: number,
   value: number | number[],
 ): Record<string, unknown> {
-  return { op: "set_study_value", study: study.index, bc, value };
+  return { op: "set_study_value", ...byId(study), study: study.index, bc, value };
 }
 
 export function setArgumentRequest(
@@ -158,5 +169,5 @@ export function setArgumentRequest(
   argument: string,
   value: number,
 ): Record<string, unknown> {
-  return { op: "set_study_value", study: study.index, argument, value };
+  return { op: "set_study_value", ...byId(study), study: study.index, argument, value };
 }

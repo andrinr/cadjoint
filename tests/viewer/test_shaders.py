@@ -438,8 +438,27 @@ HIDE_SOLID = 8
 PERSPECTIVE = (0.0, 0.0, float(SHADOWS | REFLECTIONS), 0.0)
 
 
-def render_preview(device, scene_code, display=PERSPECTIVE, size=64, camera=(3.0, 2.0, 4.0)):
-    """Render one preview frame and return its red channel, one byte per pixel."""
+# The six scalars the SDF views ride in — see `Uniforms` in `_webgpu.py`.
+# (view, slice axis, plane coordinate, iso offset, contour spacing, march steps)
+SOLID_VIEW = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+
+
+def render_preview(
+    device,
+    scene_code,
+    display=PERSPECTIVE,
+    size=64,
+    camera=(3.0, 2.0, 4.0),
+    sdf=SOLID_VIEW,
+    read="color",
+):
+    """Render one preview frame and read one of its attachments back.
+
+    Args:
+        read: ``"color"`` for the red channel, one byte per pixel; ``"depth"``
+            for the depth attachment as floats in 0..1, which is what the
+            floor grid and the construction overlays are tested against.
+    """
     color = device.create_texture(
         size=(size, size, 1),
         format="rgba8unorm",
@@ -448,7 +467,7 @@ def render_preview(device, scene_code, display=PERSPECTIVE, size=64, camera=(3.0
     depth = device.create_texture(
         size=(size, size, 1),
         format="depth32float",
-        usage=wgpu.TextureUsage.RENDER_ATTACHMENT,
+        usage=wgpu.TextureUsage.RENDER_ATTACHMENT | wgpu.TextureUsage.COPY_SRC,
     )
     module = device.create_shader_module(code=build_viewer_shader(scene_code))
     bind_group_layout, pipeline_layout = shared_layout(device, [0, 2])
@@ -465,21 +484,22 @@ def render_preview(device, scene_code, display=PERSPECTIVE, size=64, camera=(3.0
     )
 
     # resolution | camera_pos | camera_target | light+intensity | bg | path | display
+    view_mode, slice_axis, slice_at, iso_offset, spacing, march = sdf
     scene_buffer = device.create_buffer_with_data(
         data=struct.pack(
             "28f",
             size,
             size,
-            0,
-            0,
+            view_mode,
+            slice_axis,
             camera[0],
             camera[1],
             camera[2],
+            slice_at,
             0,
             0,
             0,
-            0,
-            0,
+            iso_offset,
             0.55,
             0.8,
             0.35,
@@ -487,11 +507,11 @@ def render_preview(device, scene_code, display=PERSPECTIVE, size=64, camera=(3.0
             0.035,
             0.045,
             0.035,
-            1.0,
+            spacing,
             0,
             0,
             0,
-            0,
+            march,
             *display,
         ),
         usage=wgpu.BufferUsage.UNIFORM,
@@ -529,6 +549,14 @@ def render_preview(device, scene_code, display=PERSPECTIVE, size=64, camera=(3.0
     render_pass.draw(3)
     render_pass.end()
     device.queue.submit([encoder.finish()])
+
+    if read == "depth":
+        raw = device.queue.read_texture(
+            {"texture": depth, "aspect": wgpu.TextureAspect.depth_only},
+            {"offset": 0, "bytes_per_row": size * 4, "rows_per_image": size},
+            (size, size, 1),
+        )
+        return list(struct.unpack(f"{size * size}f", bytes(raw)))
 
     pixels = device.queue.read_texture(
         {"texture": color},
@@ -623,3 +651,114 @@ def test_present_pipeline_can_share_the_overlay_depth_attachment(device):
             "depth_compare": "always",
         },
     )
+
+
+# ── the distance-field views ────────────────────────────────────────────────
+
+# One entry per `SDF_VIEW_*` constant in `_webgpu.py`, with the extra scalars
+# each one reads. The contour spacing is the floor grid's rung, which is what
+# the renderer writes; 0.5 against a unit sphere at this framing puts several
+# major intervals across the card.
+# `display.y` is the framed world height. The depth view maps its ramp across
+# that, so it is the one view that needs a real one rather than the zero the
+# perspective fixture leaves it at.
+FRAMED = (0.0, 6.0, float(SHADOWS | REFLECTIONS), 0.0)
+
+SDF_VIEWS = [
+    ("slice", (1.0, 0.0, 0.0, 0.0, 0.5, 0.0), PERSPECTIVE),
+    ("gradient", (2.0, 2.0, 0.1, 0.0, 0.5, 0.0), PERSPECTIVE),
+    ("normals", (3.0, 0.0, 0.0, 0.0, 0.0, 0.0), PERSPECTIVE),
+    ("depth", (4.0, 0.0, 0.0, 0.0, 0.0, 0.0), FRAMED),
+]
+
+
+@pytest.mark.parametrize("label, sdf, display", SDF_VIEWS, ids=[name for name, _, _ in SDF_VIEWS])
+def test_distance_field_views_render(device, scene_code, label, sdf, display):
+    """Every view flag has to produce a real image, not a flat fill.
+
+    The branch is chosen by a uniform, so compiling the module proves nothing
+    about any individual view: a typo inside one arm compiles perfectly and
+    renders a blank card. Each one is drawn and read back instead.
+    """
+    channel = render_preview(device, scene_code, display=display, sdf=sdf)
+    assert len(set(channel)) > 4, f"{label} rendered a flat image"
+
+
+def test_the_slice_shows_the_interior_of_the_solid(device, scene_code):
+    """A plane through the middle of a solid must show its negative field.
+
+    This is the defect the view shipped with: the plane was composited by depth
+    against the raymarched surface, so inside a part — where the surface is
+    always nearer than the plane — the interior was never drawn at all. The
+    scene fixture is a sphere of radius 1 at the origin, so a cut at x = 0
+    passes through its middle, and the inside hue is the ramp's violet, which
+    is far redder than the ochre outside it.
+    """
+    through = render_preview(device, scene_code, sdf=(1.0, 0.0, 0.0, 0.0, 0.5, 0.0))
+    outside = render_preview(device, scene_code, sdf=(1.0, 0.0, 1.9, 0.0, 0.5, 0.0))
+    # Violet is 0.39 red where the surrounding ochre is 0.54: the interior
+    # shows up as a population of darker-red pixels the outside cut lacks.
+    interior = sum(1 for value in through if value < 120)
+    assert interior > 64, "a cut through the solid showed no interior field"
+    assert interior > sum(1 for value in outside if value < 120)
+
+
+def test_an_x_rayed_solid_still_writes_its_depth(device, scene_code):
+    """The floor grid must be occluded by the part, X-Ray preset included.
+
+    The complaint: "lets put that floor grid behind all objects" — on the
+    default preset the ground grid came straight through the heat sink, so the
+    drawing read as a grid laid over a model rather than a model standing on
+    the ground.
+
+    The cause was here. The grid is a fullscreen pass at z = 1 that depth-tests
+    ``less-equal`` against whatever the scene wrote, and an x-rayed solid used
+    to clear ``occludes`` — so ``fs_main_depth`` wrote 1.0, the depth buffer
+    said the ray had missed, and the grid drew through the part. Construction
+    geometry got its see-through from that, and it gets it from its own end
+    now (``depthCompare: "always"`` on the overlay pipelines while the solid is
+    x-rayed, which is what the gizmos have always used).
+
+    So: the same silhouette, at the same depths, x-rayed or not.
+    """
+    opaque = render_preview(device, scene_code, read="depth")
+    xrayed = render_preview(
+        device,
+        scene_code,
+        display=(0.0, 0.0, float(SHADOWS | REFLECTIONS), 1.0),
+        read="depth",
+    )
+    covered = [index for index, value in enumerate(opaque) if value < 1.0]
+    assert len(covered) > 64, "the fixture sphere covered almost none of the frame"
+    assert [
+        index for index, value in enumerate(xrayed) if value < 1.0
+    ] == covered, "an x-rayed solid reported a different silhouette to the depth buffer"
+    for index in covered:
+        assert xrayed[index] == pytest.approx(
+            opaque[index], abs=1e-6
+        ), "an x-rayed solid wrote a different depth than the solid it is"
+
+    # And the hidden-solid flag is the one case that legitimately writes no
+    # depth: there is nothing traced to be in front of anything.
+    hidden = render_preview(
+        device, scene_code, display=(0.0, 0.0, float(HIDE_SOLID), 0.0), read="depth"
+    )
+    assert all(value == 1.0 for value in hidden)
+
+
+def test_the_march_budget_changes_the_image(device, scene_code):
+    """`path_settings.w` has to reach the marcher, not just the struct."""
+    starved = render_preview(device, scene_code, sdf=(0.0, 0.0, 0.0, 0.0, 0.0, 2.0))
+    generous = render_preview(device, scene_code, sdf=(0.0, 0.0, 0.0, 0.0, 0.0, 192.0))
+    assert starved != generous, "the step budget made no difference to the frame"
+
+
+def test_the_isosurface_offset_moves_the_surface(device, scene_code):
+    """`f = c` must be traced, shaded and shadowed as a surface in its own right."""
+    surface = render_preview(device, scene_code)
+    dilated = render_preview(device, scene_code, sdf=(0.0, 0.0, 0.0, 0.35, 0.0, 0.0))
+    eroded = render_preview(device, scene_code, sdf=(0.0, 0.0, 0.0, -0.35, 0.0, 0.0))
+    assert surface != dilated
+    assert surface != eroded
+    # A dilated solid covers more of the frame than an eroded one.
+    assert_rendered(dilated, label="dilated solid")

@@ -15,8 +15,15 @@ import {
   type RenderPreset,
   type RenderPresetId,
 } from "../renderPresets";
-import type { DisplaySettings, ShadowMode } from "../viewer/renderer";
-import { QUALITY_PRESETS } from "../viewer/renderer";
+import type { DisplaySettings, SdfView, ShadowMode } from "../viewer/renderer";
+import {
+  QUALITY_PRESETS,
+  SDF_SLICE_RANGE,
+  isSliceView,
+  slicePosition,
+} from "../viewer/renderer";
+import { sdfRampCss } from "../viewer/sdfRamp";
+import { MM_PER_UNIT, formatDistance } from "../viewer/graticule";
 import { Segmented, ToggleSwitch, type SegmentedOption } from "./ui";
 
 const SHADOWS: SegmentedOption<ShadowMode>[] = [
@@ -49,6 +56,54 @@ const SHADING: SegmentedOption<boolean>[] = [
 const QUALITIES: SegmentedOption<string>[] = Object.entries(QUALITY_PRESETS).map(
   ([key, preset]) => ({ value: key, label: preset.label, testId: `quality-${key}` }),
 );
+
+/**
+ * The three ways of looking at the field.
+ *
+ * Solid is the raymarched surface; the other two cut the field open on a
+ * plane. They are not a quality setting or an effect — they answer a different
+ * question about the same scene, which is why they sit above the preset
+ * editor rather than inside it.
+ */
+const SDF_VIEWS: SegmentedOption<SdfView>[] = [
+  { value: "solid", label: "Solid", title: "The raymarched surface", testId: "sdf-solid" },
+  {
+    value: "slice",
+    label: "Slice",
+    title: "Signed distance on a plane through the scene",
+    testId: "sdf-slice",
+  },
+  {
+    value: "gradient",
+    label: "∇f",
+    title: "Gradient magnitude: where the field stops being a metric distance",
+    testId: "sdf-gradient",
+  },
+  {
+    value: "normal",
+    label: "N",
+    title: "World-space surface normals, n × 0.5 + 0.5",
+    testId: "sdf-normal",
+  },
+  {
+    value: "depth",
+    label: "Z",
+    title: "Linear camera depth across the framed volume",
+    testId: "sdf-depth",
+  },
+];
+
+const SLICE_AXES: SegmentedOption<0 | 1 | 2>[] = [
+  { value: 0, label: "X", testId: "sdf-axis-x" },
+  { value: 1, label: "Y", testId: "sdf-axis-y" },
+  { value: 2, label: "Z", testId: "sdf-axis-z" },
+];
+
+/** A world distance, spoken the way the graticule's readout speaks one. */
+const distanceLabel = (units: number): string => {
+  const { value, unit } = formatDistance(units * MM_PER_UNIT);
+  return `${value} ${unit}`;
+};
 
 const SWITCHES: { key: keyof DisplaySettings; label: string; hint: string }[] = [
   { key: "reflections", label: "Reflections", hint: "Environment reflections" },
@@ -148,6 +203,129 @@ export function RenderPanel(props: RenderPanelProps) {
             </span>
             <i>{editing() ? "−" : "+"}</i>
           </button>
+        </section>
+
+        <section class="render-sdf" data-testid="render-sdf">
+          <div class="render-preset-heading">
+            <h4>Distance field</h4>
+            <small>What the viewport draws</small>
+          </div>
+          <Segmented
+            options={SDF_VIEWS}
+            value={props.display.sdfView}
+            onSelect={(sdfView) => props.onChange({ sdfView })}
+          />
+
+          <Show when={isSliceView(props.display.sdfView)}>
+            <div class="sim-slice">
+              <Segmented
+                options={SLICE_AXES}
+                value={props.display.sdfAxis}
+                onSelect={(sdfAxis) => props.onChange({ sdfAxis })}
+              />
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.005"
+                value={props.display.sdfFraction}
+                onInput={(event) =>
+                  props.onChange({ sdfFraction: Number(event.currentTarget.value) })
+                }
+                aria-label="Slice position"
+                data-testid="sdf-fraction"
+              />
+            </div>
+            {/* The plane's coordinate, not its fraction: a fraction of a slab
+                the reader cannot see is not a number they can act on. */}
+            <div class="sim-legend-values">
+              <span>{["X", "Y", "Z"][props.display.sdfAxis]} ={" "}
+                {distanceLabel(slicePosition(props.display.sdfFraction))}
+              </span>
+              <span>± {distanceLabel(SDF_SLICE_RANGE)}</span>
+            </div>
+
+            <div class="sim-legend" data-testid="sdf-legend">
+              <small>
+                {props.display.sdfView === "gradient"
+                  ? "|∇f| — 1.0 is an exact distance field"
+                  : "f — signed distance, inside and out"}
+              </small>
+              <div class="sim-ramp" style={{ background: sdfRampCss() }} />
+              <div class="sim-legend-values">
+                <span>{props.display.sdfView === "gradient" ? "0.5" : "inside"}</span>
+                <span>{props.display.sdfView === "gradient" ? "1.0" : "0"}</span>
+                <span>{props.display.sdfView === "gradient" ? "1.5" : "outside"}</span>
+              </div>
+              {/* The intervals themselves are a function of the camera, so
+                  the numbers are printed over the viewport beside the GRID
+                  readout they are taken from; what belongs here is the rule. */}
+              <small>
+                {props.display.sdfView === "gradient"
+                  ? "Contours every 0.1, heaviest at 1.0"
+                  : `Contours at the grid spacing and a fifth of it, ${
+                      "densest within two intervals of the surface"
+                    }`}
+              </small>
+            </div>
+          </Show>
+
+          <Show when={props.display.sdfView === "normal"}>
+            <div class="sim-legend" data-testid="sdf-normal-legend">
+              <small>n × 0.5 + 0.5, in world axes</small>
+              <div class="sim-ramp sdf-axis-ramp" />
+              <div class="sim-legend-values">
+                <span>+X red</span>
+                <span>+Y green</span>
+                <span>+Z blue</span>
+              </div>
+            </div>
+          </Show>
+
+          <Show when={props.display.sdfView === "depth"}>
+            <div class="sim-legend" data-testid="sdf-depth-legend">
+              <small>Linear depth along the primary ray</small>
+              <div class="sim-ramp sdf-depth-ramp" />
+              <div class="sim-legend-values">
+                <span>near</span>
+                <span>far</span>
+              </div>
+              {/* The two ends follow the zoom, so their values are printed
+                  over the viewport where the camera is. */}
+              <small>Half a frame either side of the orbit target</small>
+            </div>
+          </Show>
+
+          {/* Applies to every view, because it is not a view: it moves the
+              surface the tracer resolves, so the solid, the slice's zero
+              contour and the shadows all follow it together. */}
+          <div class="sim-slice">
+            <span class="pane-hint">Offset</span>
+            <input
+              type="range"
+              min="-0.4"
+              max="0.4"
+              step="0.005"
+              value={props.display.isoOffset}
+              onInput={(event) =>
+                props.onChange({ isoOffset: Number(event.currentTarget.value) })
+              }
+              aria-label="Isosurface offset"
+              data-testid="sdf-offset"
+            />
+          </div>
+          <div class="sim-legend-values">
+            <span>f = {distanceLabel(props.display.isoOffset)}</span>
+            <button
+              type="button"
+              class="render-sdf-zero"
+              onClick={() => props.onChange({ isoOffset: 0 })}
+              disabled={props.display.isoOffset === 0}
+              data-testid="sdf-offset-zero"
+            >
+              f = 0
+            </button>
+          </div>
         </section>
 
         <Show when={editing()}>

@@ -1,76 +1,69 @@
-/** Shapes exchanged with the playground server. */
+/**
+ * Shapes exchanged with the playground server.
+ *
+ * The compile payload and the patch requests are **not** written here. They
+ * are generated from the pydantic models the compile worker validates every
+ * response against (`cadjoint/viewer/schema/payloads.d.ts`, emitted by
+ * `python -m cadjoint.viewer.schema.emit`, pinned by
+ * `tests/viewer/test_parity_schema.py`), and this module re-exports them
+ * under the names the app already uses. A hand-maintained copy of a
+ * generated contract is a copy that drifts, and it had: `line` was declared
+ * non-null on a transform that sends null, `faces` optional on a node that
+ * always sends it, `objective` non-null on an optimization that may omit it,
+ * a study's `material` typed as numbers when it can be the `"material"`
+ * sentinel, and three triplets typed as tuples when the wire sends plain
+ * lists. Re-exporting is what makes those disagreements impossible rather
+ * than merely fixed.
+ *
+ * What is still declared here is what the *frontend* owns: request bodies it
+ * builds, responses from endpoints outside the compile worker (simulate,
+ * optimize, lint, completion, scenes), and the two places where the app
+ * refines a payload type rather than restating it — `StudySelection`, which
+ * the generated model can only express as one flat bag of optional fields,
+ * and the narrow literal unions the UI switches on.
+ */
+
+import type {
+  ConstraintSolverRun,
+  ConstructionConstraint as ConstructionConstraintPayload,
+  ConstructionNode as ConstructionNodePayload,
+  ConstructionRelation,
+  MaterialDefinition,
+  MeshEdgePayload,
+  OptimizationPayload,
+  SimMeshPayload,
+  StudyBc as StudyBcPayload,
+  StudyPayload as StudyPayloadShape,
+  StudySelection as StudySelectionPayload,
+} from "../../cadjoint/viewer/schema/payloads";
+
+export type {
+  ConstraintSolverRun,
+  ConstructionFace,
+  ConstructionOperator,
+  ConstructionPlane,
+  ConstructionRelation,
+  ConstructionTransform,
+  ConstructionVertex,
+  DomainEntry,
+  FaceAccessor,
+  FaceOwner,
+  IdentityEntry,
+  MaterialDefinition,
+  MeshEdgePayload,
+  OptimizationPayload,
+  PatchOperation,
+  PatchRequest,
+  PatchResponse,
+  PlaneReference,
+  SimMeshPayload,
+  SketchPlaneReference,
+} from "../../cadjoint/viewer/schema/payloads";
 
 export interface SessionResponse {
   ok: boolean;
   token: string;
   example: string;
-}
-
-/** A sketch vertex, in both sketch-plane and world coordinates. */
-export interface ConstructionVertex {
-  name: string | null;
-  free: boolean;
-  uv: [number, number];
-  world: [number, number, number];
-  /** Character span of this vertex's literal, or null when not editable. */
-  span: [number, number] | null;
-}
-
-/**
- * How a sketch's plane is written in the source.
- *
- * `constructor` is the `SketchPlane` classmethod used (`on`, `tangent`,
- * `offset`, or `plain` for a stated origin/normal); `owner` is the variable
- * the face was read off, and `accessor`/`argument` the call that named it —
- * `body.cap('+')` reads back as `("body", "cap", "'+'")`.
- */
-export interface PlaneReference {
-  constructor: string | null;
-  owner: string | null;
-  accessor: string | null;
-  argument: string | null;
-}
-
-export interface ConstructionPlane {
-  origin: [number, number, number];
-  u: [number, number, number];
-  v: [number, number, number];
-  normal: [number, number, number];
-  /** Sketch profiles only: the plane expression already in the source. */
-  reference?: PlaneReference | null;
-}
-
-/**
- * One analytic face of a feature — a reference, not stored geometry.
- *
- * The construction tree knows a feature's flat faces exactly (an extrusion's
- * caps sit at `plane.origin ± depth/2 · normal`, each polygon edge sweeps a
- * planar wall), and knows them *parametrically*: re-dimension the parent and
- * the face moves. That is what makes a sketch placed on one follow its
- * parent, and it is why the viewer picks against these rather than against
- * the render mesh, which is only a picture of the surface.
- */
-export interface ConstructionFace {
-  /** `<nodeId>:<key>`, stable across rebuilds. */
-  id: string;
-  /** Identity within the owner: `cap+`, `side3`, `+x`. */
-  key: string;
-  kind: "cap" | "side" | "planar";
-  origin: [number, number, number];
-  /** Outward unit normal. */
-  normal: [number, number, number];
-  xAxis: [number, number, number];
-  yAxis: [number, number, number];
-  /** World-space boundary loop; both the extent test and the highlight. */
-  polygon: [number, number, number][];
-  /** Distance slack for the hit test, scaled to this face's own size. */
-  tolerance: number;
-  /** The accessor call that reproduces the face: `cap("+")`, `side(3)`. */
-  reference: { call: string; args: (string | number)[] };
-  /** The feature that declared it, and the variable naming it in source. */
-  owner: { kind: string; line: number; variable: string | null } | null;
-  /** False when the owner has no variable, so the face cannot be written. */
-  usable: boolean;
 }
 
 export type ConstraintKind =
@@ -83,126 +76,34 @@ export type ConstraintKind =
   | "parallel"
   | "perpendicular";
 
-export interface ConstructionConstraint {
-  kind: ConstraintKind;
-  vertices: number[];
-  /** Target for fixed/distance constraints; null for purely relational kinds. */
-  value: number | number[] | null;
-  /**
-   * Position in the profile's serialized constraint list — the stable identity
-   * used to delete or edit this constraint at the source level.
-   */
-  index?: number;
-}
+export type ConstructionKind = "profile" | "box" | "sphere" | "cylinder";
 
-/** A constraint relating whole construction objects rather than sketch points. */
-export interface ConstructionRelation {
-  kind: "fixed" | "distance";
-  nodes: string[];
-  value: number | number[];
+/**
+ * The generated construction row, with the kind the viewer switches on.
+ *
+ * Same refinement as the constraint above, for the same reason: the model
+ * leaves `kind` open because a new primitive must not need a schema change,
+ * and the gizmo, the object tree and the tool rail all branch on the closed
+ * set the app can actually draw.
+ */
+export interface ConstructionNode extends ConstructionNodePayload {
+  kind: ConstructionKind;
+  constraints: ConstructionConstraint[];
 }
 
 export type ConstraintSolverMethod = "newton" | "adam" | "sgd";
 
-/** Diagnostics captured from one source-level satisfy_constraints call. */
-export interface ConstraintSolverRun {
-  node: string | null;
-  method: ConstraintSolverMethod;
-  iterations: number;
-  losses: number[];
-}
-
-export interface ConstructionOperator {
-  kind: "extrude" | "revolve" | "loft";
-  line: number;
-}
-
-/** A named Python Material definition shown in the material browser. */
-export interface MaterialDefinition {
-  id: string;
-  /** Stable Python variable used when assigning the material to an object. */
-  name: string;
-  line: number;
-  editable: boolean;
-  color: [number, number, number];
-  roughness: number;
-  metallic: number;
-  opacity: number;
-  ior: number;
-  reflectivity: number;
-  /**
-   * Stated physical properties in SI, or null for each one the Material does
-   * not declare. Absent entirely on a server older than this payload.
-   */
-  physical?: Record<string, number | null>;
-  /** SI unit string per physical key, e.g. `density` → `kg/m^3`. */
-  units?: Record<string, string>;
-  /** Which parameters are free — the ones an optimization may drive. */
-  free?: Record<string, boolean>;
-  spans: Record<string, [number, number]>;
-}
-
-export type ConstructionKind = "profile" | "box" | "sphere" | "cylinder";
-
-/** Placement and size of a construction primitive. */
-export interface ConstructionTransform {
-  position: [number, number, number];
-  /** Intrinsic X, Y, Z angles in radians. */
-  rotation: [number, number, number];
-  dimensions: Record<string, number | number[]>;
-  /** Line of the call that owns the placement — a plane, for a sketch. */
-  line: number;
-  /** That call's name, e.g. `box` or `SketchPlane`. */
-  call: string;
-  /** Keyword holding the position: `position`, or `origin` for a plane. */
-  positionArgument: string;
-  /** False for sketches, whose orientation is a normal rather than angles. */
-  canRotate: boolean;
-}
-
 /**
- * One construction object from the executed program.
+ * The generated constraint row, with the kind the UI actually switches on.
  *
- * `edges` is a ready-made world-space wireframe, so the viewer draws sketches,
- * boxes, and spheres through one path without knowing their topology.
+ * The model types `kind` as a string because the FEM and sketch layers can
+ * grow constraint kinds without a schema change; the panels need the closed
+ * set to render a label per kind, so the refinement lives here rather than
+ * in the wire contract. Everything else — `index`, `stableId`, `value` — is
+ * inherited, which is the point.
  */
-export interface ConstructionNode {
-  id: string;
-  kind: ConstructionKind;
-  name: string | null;
-  /** 1-based line of the constructor call, null if unknown. */
-  line: number | null;
-  /** False when the literals cannot be safely rewritten. */
-  editable: boolean;
-  edges: [number, number, number][][];
-  /** Sketch profiles only. */
-  plane: ConstructionPlane | null;
-  /** Analytic faces this node's features declare; empty for curved ones. */
-  faces?: ConstructionFace[];
-  /** Sketch profiles only; primitives carry no per-vertex handles. */
-  vertices: ConstructionVertex[];
-  /** Primitives only. */
-  transform: ConstructionTransform | null;
-  /** Source spans of the primitive's keyword arguments. */
-  spans: Record<string, [number, number]>;
-  /** Constraints attached to sketch vertices. */
-  constraints: ConstructionConstraint[];
-  /** Construction-history operations consuming this sketch. */
-  operators: ConstructionOperator[];
-  /** Named material assigned to this primitive or the profile's extrusion. */
-  material: string | null;
-}
-
-/**
- * World-space line segments of the extracted dual-contour mesh.
- *
- * `sharp` edges sit across a significant dihedral angle (creases, corners,
- * CSG seams); `wire` is the rest of the wireframe.
- */
-export interface MeshEdgePayload {
-  wire: [number, number, number][][];
-  sharp: [number, number, number][][];
-  resolution: number;
+export interface ConstructionConstraint extends ConstructionConstraintPayload {
+  kind: ConstraintKind;
 }
 
 export interface CompileResponse {
@@ -223,78 +124,43 @@ export interface CompileResponse {
   output: string;
 }
 
-/** A serialized node selection, mirroring cadjoint.fem.selection describe(). */
-export type StudySelection =
-  | { kind: "box"; min_corner: number[]; max_corner: number[] }
-  | { kind: "sphere"; center: number[]; radius: number }
-  | { kind: "halfspace"; point: number[]; normal: number[] }
-  | { kind: "side"; side: string; tol: number | null }
-  | { kind: "predicate"; name: string }
-  | { kind: "and" | "or"; operands: StudySelection[] }
-  | { kind: "not"; operand: StudySelection };
+/**
+ * A serialized node selection, mirroring `cadjoint.fem.selection`.
+ *
+ * One pydantic model has to cover every leaf and every composite, so on the
+ * wire this is a flat bag of optional fields with `kind` saying which are
+ * meaningful. The app has to *narrow* it — evaluating a selection is a switch
+ * over exactly these seven shapes — so the wire type is intersected with the
+ * discriminated union rather than replaced by it: the app gets exhaustiveness,
+ * and anything assignable here is still assignable to the payload the server
+ * validates.
+ */
+export type StudySelection = StudySelectionPayload &
+  (
+    | { kind: "box"; min_corner: number[]; max_corner: number[] }
+    | { kind: "sphere"; center: number[]; radius: number }
+    | { kind: "halfspace"; point: number[]; normal: number[] }
+    | { kind: "side"; side: string; tol: number | null }
+    | { kind: "predicate"; name: string }
+    | { kind: "and" | "or"; operands: StudySelection[] }
+    | { kind: "not"; operand: StudySelection }
+  );
 
 export type StudyBcType = "dirichlet" | "heat_flux" | "fixed" | "traction";
 
-/** One boundary condition of a declared study. */
-export interface StudyBc {
+/** The generated BC row, narrowed to the kinds and selections the UI draws. */
+export interface StudyBc extends StudyBcPayload {
   type: StudyBcType;
   nodes: StudySelection;
-  value?: number;
-  flux?: number;
-  vector?: [number, number, number];
-  /** False only for predicate selections, which the viewer cannot edit. */
-  serializable: boolean;
-  span: [number, number] | null;
 }
 
-/** The domain object a mesh or study discretizes, reported by name. */
-export interface DomainEntry {
-  name: string | null;
-  type: string;
-}
-
-/** One ThermalStudy/ElasticStudy declared in the scene program. */
-export interface StudyPayload {
-  index: number;
-  name: string;
-  kind: "thermal" | "elastic";
-  /** Null when the study solves on a declared SimMesh. */
-  resolution: number | [number, number, number] | null;
-  bounds: [number, number, number] | null;
-  size: [number, number, number] | null;
-  /** Declared SimMesh this study solves on, by name; null for implicit. */
-  mesh: string | null;
-  domain: DomainEntry | null;
-  material: Record<string, number>;
-  source?: number;
-  line: number | null;
-  span: [number, number] | null;
-  /** False when the declaration cannot be aligned to source (loops etc.). */
-  editable: boolean;
-  /** Character span of the `mesh=` argument, when present in source. */
-  mesh_span?: [number, number] | null;
-  domain_span?: [number, number] | null;
+/** The generated study, carrying the narrowed BC rows. */
+export interface StudyPayload extends StudyPayloadShape {
   bcs: StudyBc[];
 }
 
 /** Element type a SimMesh extracts. */
 export type MeshMethod = "hex" | "tet4" | "tet10";
-
-/** One SimMesh declared in the scene program. */
-export interface SimMeshPayload {
-  kind: "mesh";
-  index: number;
-  name: string;
-  resolution: number | [number, number, number];
-  bounds: [number, number, number] | null;
-  size: [number, number, number] | null;
-  padding: number;
-  method?: MeshMethod;
-  domain: DomainEntry | null;
-  line: number | null;
-  span: [number, number] | null;
-  editable: boolean;
-}
 
 /** min/mean/max summary of a per-element quality metric. */
 export interface QualitySummary {
@@ -330,26 +196,6 @@ export interface MeshInspectResponse {
 }
 
 /** One Optimization(...) declared in the scene program. */
-export interface OptimizationPayload {
-  kind: "optimization";
-  index: number;
-  name: string;
-  steps: number;
-  learning_rate: number;
-  method: string;
-  /** Names of the free parameters the run drives. */
-  parameters: string[];
-  /** Name of the objective the declaration minimizes. */
-  objective: string;
-  /** Study-backed objectives: the study driven each step, and its metric. */
-  study?: string | null;
-  metric?: string | null;
-  remesh_every?: number | null;
-  line: number | null;
-  span: [number, number] | null;
-  editable: boolean;
-}
-
 /** One recorded optimizer step. */
 export interface OptimizeHistoryEntry {
   step: number;
@@ -401,55 +247,6 @@ export type BcProposal =
   | { kind: "sphere"; center: [number, number, number]; radius: number }
   | { kind: "box"; min: [number, number, number]; max: [number, number, number] };
 
-export type PatchOperation =
-  | "set_vertex"
-  | "insert_vertex"
-  | "delete_vertex"
-  | "set_value"
-  | "add_primitive"
-  | "add_material"
-  | "assign_material"
-  | "add_sketch"
-  | "add_extrusion"
-  | "add_revolution"
-  | "add_loft"
-  | "add_constraint"
-  | "delete_constraint"
-  | "set_constraint_value"
-  | "solve_sketch"
-  | "delete_object"
-  | "add_study"
-  | "delete_study"
-  | "add_study_bc"
-  | "delete_study_bc"
-  | "set_study_value"
-  | "add_mesh"
-  | "delete_mesh"
-  | "set_mesh_value"
-  | "set_optimization_value"
-  | "delete_optimization"
-  | "set_sketch_plane";
-
-/**
- * The plane a `set_sketch_plane` patch plants a sketch on.
- *
- * `owner` is the 1-based source line of the feature call that declared the
- * face, which is how the server finds the variable to write. `tangent` is the
- * fallback for a surface with no analytic face — it reads the plane off the
- * solid's own gradient at the picked point.
- */
-export type SketchPlaneReference =
-  | { kind: "cap"; owner: number; sign: "+" | "-" }
-  | { kind: "side"; owner: number; edge: number }
-  | { kind: "face"; owner: number; key: string }
-  | { kind: "tangent"; owner: number; near: [number, number, number] };
-
-export interface PatchResponse {
-  ok: boolean;
-  source?: string;
-  error?: string;
-}
-
 /** Lazy mesh-edge extraction, requested only while a mesh overlay is on. */
 export interface MeshResponse {
   ok: boolean;
@@ -457,9 +254,51 @@ export interface MeshResponse {
   error?: string;
 }
 
+/**
+ * What a scene's declarations add up to, counted by the server statically.
+ *
+ * `parameters` counts only the ones that carry a `name=` — an unnamed
+ * `Scalar(0.07)` inside a primitive is a literal, not a design freedom — and
+ * `free` is the subset an optimization is allowed to move.
+ */
+export interface SceneCounts {
+  parameters: number;
+  free: number;
+  studies: number;
+  meshes: number;
+  optimizations: number;
+  materials: number;
+}
+
+/**
+ * One described scene file, as `GET /api/scenes` lists it.
+ *
+ * Everything here is read with `ast`, never by running the program: a browser
+ * that executed every file in the directory to describe it would be running
+ * arbitrary code on a directory listing. `source_hash` is the same sha256 the
+ * job registry stamps on a request, which is what lets a rendered thumbnail
+ * be cached against the exact bytes it was drawn from.
+ */
+export interface SceneEntry {
+  name: string;
+  path: string;
+  bytes: number;
+  /** ISO-8601 UTC, or null when the file could not be stat'd. */
+  modified: string | null;
+  source_hash: string | null;
+  /** First paragraph of the module docstring, collapsed to one line. */
+  summary: string;
+  counts: SceneCounts;
+  materials: string[];
+  /** A syntax error, or a read failure: the file is still listed. */
+  error: string | null;
+}
+
 export interface SceneListResponse {
   ok: boolean;
   files?: string[];
+  /** The same files, described. Absent from an older server. */
+  scenes?: SceneEntry[];
   error?: string;
 }
 

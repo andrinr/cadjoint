@@ -11,7 +11,6 @@
 import { Dynamic } from "solid-js/web";
 import { For, Show, createMemo, createSignal, type Component } from "solid-js";
 import { hover, nodes, selection, setHover, setSelection } from "../state";
-import { windowManager } from "../windows/manager";
 import { buildSceneTree, visibleRows, type SceneTreeRow } from "../objectTree";
 import {
   BoxIcon,
@@ -79,16 +78,6 @@ export function ObjectTree() {
             <small>read-only</small>
             Object tree
           </span>
-          <button
-            type="button"
-            class="object-tree-close"
-            onClick={() => windowManager()?.minimise("objects")}
-            title="Park the object tree in the tray"
-            aria-label="Park the object tree in the tray"
-            data-testid="object-tree-close"
-          >
-            —
-          </button>
         </header>
         <div class="object-tree-rows" role="tree" aria-label="Scene composition">
           <For each={shown()}>

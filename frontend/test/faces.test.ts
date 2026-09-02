@@ -28,6 +28,8 @@ import type { ConstructionFace, ConstructionNode } from "../src/types";
 function face(overrides: Partial<ConstructionFace> = {}): ConstructionFace {
   const base: ConstructionFace = {
     id: "profile_0:cap-",
+    stableId: null,
+    ownerStableId: null,
     key: "cap-",
     kind: "cap",
     origin: [0, -0.6, 0],
@@ -52,6 +54,7 @@ function face(overrides: Partial<ConstructionFace> = {}): ConstructionFace {
 const nodeWith = (...faces: ConstructionFace[]): ConstructionNode =>
   ({
     id: "profile_0",
+    stableId: null,
     kind: "profile",
     name: "comb",
     line: 91,

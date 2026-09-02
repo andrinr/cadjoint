@@ -112,7 +112,7 @@ describe("round trips", () => {
   it("reads back what it wrote through storage", () => {
     const storage = memoryStorage();
     const workspace = emptyWorkspace();
-    workspace.layouts.simulate = layoutOf("viewport", "simulate");
+    workspace.layouts.simulate = layoutOf("viewport", "studies");
     writeWorkspace(storage, workspace);
     expect(storage.data.has(WORKSPACE_STORAGE_KEY)).toBe(true);
     expect(readWorkspace(storage).layouts.simulate).toBeDefined();

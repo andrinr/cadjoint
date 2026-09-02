@@ -58,13 +58,38 @@ const STATES = [
   // both are docked from the start. What `model` does not already show is a
   // window that has left the grid, so those two ids are spent on the two
   // arrangements the window system added — parked in the tray, and floating.
-  { id: "model-tray", mode: "model", click: ["object-tree-close", "material-close"], expect: "window-tray", reset: true },
+  // Parking a window is now the dock's own "—", not a panel's close button:
+  // `object-tree-close` and `material-close` belonged to the panels this
+  // release turned into windows, so this state clicked two ids that no longer
+  // exist and the tray went unmeasured. The minimise button is per *group*,
+  // so the id repeats down the desk; the first one is the editor's, which is
+  // the cheapest window to park and leaves the rest of the chrome intact.
+  { id: "model-tray", mode: "model", click: ["window-minimise"], expect: "window-tray", reset: true },
   { id: "model-floating", mode: "model", click: ["menu-window", "menu-window-float-objects"], expect: "object-tree-panel", reset: true },
   { id: "model-render-popover", mode: "model", open: "display-options", expect: "render-popover" },
   // The sketch panel only exists while a profile is selected, so these two
   // states pick one out of the object tree first.
   { id: "sketch", mode: "sketch", selectProfile: true, expect: "sketch-panel" },
   { id: "sketch-solver", mode: "sketch", selectProfile: true, open: "solver-toggle", expect: "solver-panel" },
+  // The two windows parked in every desk rather than docked in one: the
+  // document browser and the process monitor. Neither is in any mode's
+  // default arrangement, so neither would be measured without a state of
+  // its own — and both are dense, mono, right-hung panels, which is exactly
+  // the shape the alignment and overflow checks exist for.
+  {
+    id: "model-scenes",
+    mode: "model",
+    click: ["menu-file", "menu-file-open"],
+    expect: "scenes-panel",
+    reset: true,
+  },
+  {
+    id: "model-processes",
+    mode: "model",
+    click: ["window-restore-processes"],
+    expect: "processes-panel",
+    reset: true,
+  },
   { id: "simulate-meshes", mode: "simulate", tab: "meshes" },
   { id: "simulate-studies", mode: "simulate", tab: "studies" },
   { id: "simulate-optimize", mode: "simulate", tab: "optimize" },
@@ -785,7 +810,11 @@ async function enterState(page, state, settle) {
     await tab.click();
   }
   for (const testid of state.click ?? []) {
-    await page.getByTestId(testid).click({ timeout: 8_000 });
+    // `.first()` rather than the bare locator: the dock repeats its header
+    // controls once per group, so an id like `window-minimise` matches
+    // several elements and a strict locator refuses to click any of them.
+    // For the unique ids every other state uses this is the same element.
+    await page.getByTestId(testid).first().click({ timeout: 8_000 });
     await page.waitForTimeout(120);
   }
   if (state.open) await page.getByTestId(state.open).click({ timeout: 8_000 });

@@ -10,9 +10,20 @@
  * Each wrapper returns the queued promise from `applyPatch`, so callers that
  * need to sequence edits (place a sketch, then set its normal) can await it.
  * Nothing here touches the network directly.
+ *
+ * How an operation names its target
+ * ---------------------------------
+ * Every addressable request takes either `id` — the payload entry's stable
+ * id — or `line`, and the server resolves whichever it is given. A line is a
+ * position, and inserting a statement renumbers every position after it, so
+ * two edits queued back to back can disagree about what "line 91" meant. A
+ * stable id does not move. Both are sent (`addressing`): the id is the real
+ * address, the line is the fallback for an entry the identity table could not
+ * name, and neither call sites nor signatures had to change to get it —
+ * the shell already knows which node lives at the line it was handed.
  */
 
-import { nodeById, selection } from "../state";
+import { nodeById, nodes, selection } from "../state";
 import type { ConstraintKind, SketchPlaneReference } from "../types";
 
 export type VertexPatchOp = "set_vertex" | "insert_vertex" | "delete_vertex";
@@ -60,21 +71,27 @@ export interface PatchOperations {
 export function createPatchOperations(
   applyPatch: (body: Record<string, unknown>) => Promise<void>,
 ): PatchOperations {
+  /** Name the construction entry declared at *line*, by id and by line. */
+  const addressing = (line: number): { id?: string; line: number } => {
+    const stable = nodes().find((node) => node.line === line)?.stableId;
+    return stable ? { id: stable, line } : { line };
+  };
+
   const patch = (
     op: VertexPatchOp,
     line: number,
     index: number,
     xy?: [number, number],
-  ) => applyPatch({ op, line, index, xy });
+  ) => applyPatch({ op, ...addressing(line), index, xy });
 
   const setValue = (
     line: number,
     name: string,
     argument: string,
     value: number | number[],
-  ) => applyPatch({ op: "set_value", line, name, argument, value });
+  ) => applyPatch({ op: "set_value", ...addressing(line), name, argument, value });
 
-  const deleteObject = (line: number) => applyPatch({ op: "delete_object", line });
+  const deleteObject = (line: number) => applyPatch({ op: "delete_object", ...addressing(line) });
 
   const addPrimitive = (
     kind: string,
@@ -94,32 +111,32 @@ export function createPatchOperations(
     });
 
   const assignMaterial = (line: number, material: string) =>
-    applyPatch({ op: "assign_material", line, material });
+    applyPatch({ op: "assign_material", ...addressing(line), material });
 
   const addSketch = (origin: [number, number, number]) =>
     applyPatch({ op: "add_sketch", origin });
 
   const setSketchPlane = (line: number, reference: SketchPlaneReference) =>
-    applyPatch({ op: "set_sketch_plane", line, reference });
+    applyPatch({ op: "set_sketch_plane", ...addressing(line), reference });
 
   const addConstraint = (
     line: number,
     kind: ConstraintKind,
     indices: number[],
     value?: number | number[],
-  ) => applyPatch({ op: "add_constraint", line, kind, indices, value });
+  ) => applyPatch({ op: "add_constraint", ...addressing(line), kind, indices, value });
 
   const deleteConstraint = (line: number, index: number) =>
-    applyPatch({ op: "delete_constraint", line, index });
+    applyPatch({ op: "delete_constraint", ...addressing(line), index });
 
   const setConstraintValue = (line: number, index: number, value: number) =>
-    applyPatch({ op: "set_constraint_value", line, index, value });
+    applyPatch({ op: "set_constraint_value", ...addressing(line), index, value });
 
   const addExtrusion = (line: number) =>
-    applyPatch({ op: "add_extrusion", line, depth: 0.5 });
+    applyPatch({ op: "add_extrusion", ...addressing(line), depth: 0.5 });
 
   const addRevolution = (line: number) =>
-    applyPatch({ op: "add_revolution", line, offset: 0 });
+    applyPatch({ op: "add_revolution", ...addressing(line), offset: 0 });
 
   /** Extrude the selected sketch — shared by the rail and the sketch panel. */
   const extrudeSelection = () => {
@@ -139,13 +156,20 @@ export function createPatchOperations(
   };
 
   const addLoft = (lineA: number, lineB: number) =>
-    applyPatch({ op: "add_loft", line_a: lineA, line_b: lineB, height: 1.0 });
+    applyPatch({
+      op: "add_loft",
+      id_a: addressing(lineA).id,
+      id_b: addressing(lineB).id,
+      line_a: lineA,
+      line_b: lineB,
+      height: 1.0,
+    });
 
   const solveSketch = (
     line: number,
     method: "newton" | "adam" | "sgd",
     iterations: number,
-  ) => applyPatch({ op: "solve_sketch", line, method, iterations });
+  ) => applyPatch({ op: "solve_sketch", ...addressing(line), method, iterations });
 
   return {
     patch,

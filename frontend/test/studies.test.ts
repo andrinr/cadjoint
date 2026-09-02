@@ -17,6 +17,7 @@ import type { StudyPayload } from "../src/types";
 
 const study: StudyPayload = {
   index: 1,
+  stableId: null,
   name: "heat",
   kind: "thermal",
   resolution: 20,
@@ -84,14 +85,11 @@ describe("bc metadata", () => {
 
   it("extracts the editable value per BC type", () => {
     const nodes = { kind: "side", side: "+x", tol: null } as const;
-    expect(bcValue({ type: "dirichlet", nodes, value: 300, serializable: true, span: null }))
-      .toBe(300);
-    expect(bcValue({ type: "heat_flux", nodes, flux: 5, serializable: true, span: null }))
-      .toBe(5);
-    expect(
-      bcValue({ type: "traction", nodes, vector: [0, 0, -1], serializable: true, span: null }),
-    ).toEqual([0, 0, -1]);
-    expect(bcValue({ type: "fixed", nodes, serializable: true, span: null })).toBeNull();
+    const row = { nodes, serializable: true, span: null, stableId: null } as const;
+    expect(bcValue({ ...row, type: "dirichlet", value: 300 })).toBe(300);
+    expect(bcValue({ ...row, type: "heat_flux", flux: 5 })).toBe(5);
+    expect(bcValue({ ...row, type: "traction", vector: [0, 0, -1] })).toEqual([0, 0, -1]);
+    expect(bcValue({ ...row, type: "fixed" })).toBeNull();
   });
 
   it("lists a study's editable numeric arguments", () => {
