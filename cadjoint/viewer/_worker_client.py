@@ -210,7 +210,10 @@ SIMULATE_TIMEOUT_SECONDS = 600
 SIMULATE_KINDS = ("study",)
 # Mesh inspection only builds the hex mesh (no solve), but big grids still
 # outgrow the compile budget.
-MESH_INSPECT_TIMEOUT_SECONDS = 60
+# Mesh inspection meshes and then measures quality; a tet10 mesh of a large
+# part on a cold cache and a busy machine outgrew 60 s. Cancellable, so
+# generous.
+MESH_INSPECT_TIMEOUT_SECONDS = 300
 
 
 def simulate_source(
@@ -281,7 +284,11 @@ def mesh_inspect_source(
 # adjoint) per step, so the timeout covers a panel-sized study run and the
 # worker enforces a tighter measured per-run step cap for them
 # (``STUDY_OPTIMIZE_STEP_LIMIT`` in the compile worker).
-OPTIMIZE_TIMEOUT_SECONDS = 300
+# An optimisation streams its progress and can be cancelled from the process
+# window at any step, so its budget is a safety net against a hung worker,
+# not a target: two frozen-chain freezes cost about a minute each before the
+# first step, and a large part multiplies that.
+OPTIMIZE_TIMEOUT_SECONDS = 1800
 OPTIMIZE_MAX_STEPS = 200
 
 
