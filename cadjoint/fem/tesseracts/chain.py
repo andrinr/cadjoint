@@ -265,6 +265,37 @@ def _face_patch(mesh: Any, selection: Any) -> tuple[np.ndarray, np.ndarray | Non
     return np.unique(faces_from_nodes(mesh, indices).nodes).astype(np.int32), None
 
 
+def _scalar_property(study: Any, name: str) -> float:
+    """A study's material property as a scalar, or a clear refusal.
+
+    The frozen chain is handed a *functionalized* design field, not the scene
+    object, so it has no ``material_at`` to sample and cannot serve a study
+    that derives its properties from the scene's materials.  The solver
+    tesseracts themselves accept a per-element array (``cell_conductivity`` /
+    ``cell_youngs`` / ``cell_poisson``); it is only this chain's inputs that
+    cannot be built without the material field.
+
+    Args:
+        study: The study being frozen.
+        name: The property attribute, e.g. ``"conductivity"``.
+
+    Returns:
+        The property as a float.
+
+    Raises:
+        ValueError: If the study derives the property from its materials.
+    """
+    value = getattr(study, name)
+    if isinstance(value, str):
+        raise ValueError(
+            f"Study {study.name!r} derives {name!r} from the scene's materials, which the "
+            "frozen tesseract chain cannot sample: it is given a functionalized design "
+            f"field with no material_at. Set an explicit {name} on the study for the "
+            'chain paths, or run the study with gradient_path="direct".'
+        )
+    return float(value)
+
+
 def _solver_stage(study: Any, mesh: Any) -> tuple[str, str, str, dict]:
     """Resolve the study's BCs on ``mesh`` into solver-tesseract inputs.
 
@@ -307,8 +338,14 @@ def _solver_stage(study: Any, mesh: Any) -> tuple[str, str, str, dict]:
             "flux_values": np.asarray([value for _, value in fluxes], dtype=np.float64),
             "flux_faces": _concat(flux_faces, width=3),
             "flux_face_offsets": _offsets(flux_faces) if flux_faces else np.zeros(0, np.int32),
-            "conductivity": np.float64(study.conductivity),
+            "conductivity": np.float64(_scalar_property(study, "conductivity")),
             "source": np.float64(study.source),
+            # Per-element properties do not move with the mesh, so they are a
+            # pure pass-through here: an empty array selects the scalar above.
+            # Sent explicitly rather than left to the schema's default so the
+            # payload names every input the solver tesseract declares — the
+            # chain's frozen inputs should not depend on defaulting.
+            "cell_conductivity": np.zeros(0, dtype=np.float64),
         }
         return "thermal", "thermal_jaxfem", "temperature", inputs
 
@@ -330,8 +367,12 @@ def _solver_stage(study: Any, mesh: Any) -> tuple[str, str, str, dict]:
         "traction_face_offsets": _offsets(traction_faces)
         if traction_faces
         else np.zeros(0, np.int32),
-        "youngs": np.float64(study.youngs),
-        "poisson": np.float64(study.poisson),
+        "youngs": np.float64(_scalar_property(study, "youngs")),
+        "poisson": np.float64(_scalar_property(study, "poisson")),
+        # Pass-through, for the reason given in the thermal branch above.
+        "cell_youngs": np.zeros(0, dtype=np.float64),
+        "cell_poisson": np.zeros(0, dtype=np.float64),
+        "body_force": np.zeros((0, 3), dtype=np.float64),
     }
     return "elastic", "elastic_jaxfem", "displacement", inputs
 

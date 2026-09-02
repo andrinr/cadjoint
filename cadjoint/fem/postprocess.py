@@ -33,16 +33,25 @@ __all__ = [
 ]
 
 
-def _von_mises_from_gradient(u_grad: np.ndarray, youngs: float, poisson: float) -> np.ndarray:
+def _von_mises_from_gradient(u_grad: np.ndarray, youngs: Any, poisson: Any) -> np.ndarray:
     """Von Mises stress of per-cell displacement gradients ``(C, 3, 3)``.
 
     Small-strain isotropic linear elasticity: symmetrize, apply Hooke's
     law with the Lame constants of ``(youngs, poisson)``, and take
     ``sqrt(1.5 * s : s)`` of the deviator.
+
+    ``youngs`` and ``poisson`` are scalars for a single-material solve, or
+    per-cell ``(C,)`` arrays sampled from the scene's material field — the
+    Lame constants are reshaped to broadcast against ``(C, 3, 3)`` either
+    way, so stress recovery stays material-correct element by element.
     """
     strain = 0.5 * (u_grad + u_grad.transpose(0, 2, 1))
+    youngs = np.asarray(youngs, dtype=np.float64)
+    poisson = np.asarray(poisson, dtype=np.float64)
     lame_lambda = youngs * poisson / ((1 + poisson) * (1 - 2 * poisson))
     lame_mu = youngs / (2 * (1 + poisson))
+    lame_lambda = lame_lambda.reshape(lame_lambda.shape + (1, 1))
+    lame_mu = lame_mu.reshape(lame_mu.shape + (1, 1))
     trace = np.trace(strain, axis1=1, axis2=2)
     stress = lame_lambda * trace[:, None, None] * np.eye(3) + 2.0 * lame_mu * strain
     deviator = stress - np.trace(stress, axis1=1, axis2=2)[:, None, None] / 3.0 * np.eye(3)
@@ -54,8 +63,8 @@ def hex_von_mises(
     cells: np.ndarray,
     displacement: np.ndarray,
     *,
-    youngs: float,
-    poisson: float,
+    youngs: Any,
+    poisson: Any,
 ) -> np.ndarray:
     """Per-cell von Mises stress of a HEX8 solution at element centers.
 
@@ -67,8 +76,8 @@ def hex_von_mises(
         points: Node positions, ``(N, 3)``.
         cells: HEX8 connectivity, ``(C, 8)``.
         displacement: Per-node displacement, ``(N, 3)``.
-        youngs: Young's modulus.
-        poisson: Poisson ratio.
+        youngs: Young's modulus — scalar, or per cell.
+        poisson: Poisson ratio — scalar, or per cell.
 
     Returns:
         Von Mises stress per cell, shaped ``(C,)`` float64.
@@ -90,8 +99,8 @@ def tet_von_mises(
     cells: np.ndarray,
     displacement: np.ndarray,
     *,
-    youngs: float,
-    poisson: float,
+    youngs: Any,
+    poisson: Any,
 ) -> np.ndarray:
     """Per-cell von Mises stress of a TET4/TET10 solution at cell centroids.
 
@@ -106,8 +115,8 @@ def tet_von_mises(
         points: Node positions, ``(N, 3)``.
         cells: Connectivity, ``(T, 4)`` or ``(T, 10)``.
         displacement: Per-node displacement, ``(N, 3)``.
-        youngs: Young's modulus.
-        poisson: Poisson ratio.
+        youngs: Young's modulus — scalar, or per cell.
+        poisson: Poisson ratio — scalar, or per cell.
 
     Returns:
         Von Mises stress per cell, shaped ``(T,)`` float64.

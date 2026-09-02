@@ -29,9 +29,30 @@ corners all lie on the loaded patch), so ``traction_faces`` +
 triangles per patch (same prefix-offset encoding; empty = pure node
 membership, the HEX8 behavior).
 
-Differentiable inputs: ``points`` only — matching the direct backend,
-which bakes material constants and traction vectors into weak-form
-closures.  Dirichlet displacements are identically zero (clamps).
+Material heterogeneity and body loads: ``youngs`` / ``poisson`` are the
+single-material scalars, and three optional arrays extend them —
+``cell_youngs`` and ``cell_poisson`` carry one modulus per element
+(``(C,)``), and ``body_force`` a body force density in N/m^3 (``(C, 3)``;
+``density * gravity`` for self-weight).  All three default to **empty**,
+which is what every scalar-path caller sends and means "the scalars apply
+to the whole domain, no body force" — the payload and the solve are then
+byte-identical to what they were before per-element properties existed.
+A non-empty cell array supersedes its scalar (callers send ``0.0`` as the
+placeholder); a non-empty ``body_force`` adds the mass-map term so the
+strong form becomes ``div(sigma) + b = 0``.
+
+Differentiable inputs: ``points``, ``cell_youngs``, ``cell_poisson``,
+``body_force``.  The scalars ``youngs`` / ``poisson`` stay non-differentiable,
+matching the direct backend, which bakes homogeneous material constants (and
+the traction vectors) into weak-form closures where no adjoint reaches them.
+The per-element arrays are a different matter: on the heterogeneous path
+jax-fem receives the Lame constants and the body force through ``set_params``
+as internal variables, so ``d(displacement)/d(E_e)``, ``d/d(nu_e)`` and
+``d/d(b_e)`` fall out of the same adjoint solve that already serves
+``points`` — no extra assembly, and the ``points`` VJP is untouched.  An
+empty array never enters the traced closure, so its gradient is the
+correctly-shaped zero and the single-material path is unchanged.  Dirichlet
+displacements are identically zero (clamps).
 
 Runs locally without Docker via ``Tesseract.from_tesseract_api`` (used by
 ``cadjoint.fem.backends.TesseractBackend``), or containerized with
@@ -41,7 +62,7 @@ Runs locally without Docker via ``Tesseract.from_tesseract_api`` (used by
 from __future__ import annotations
 
 import numpy as np
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from tesseract_core.runtime import Array, Differentiable, Float64, Int32, ShapeDType
 
 _ELE_TYPES = {4: "TET4", 8: "HEX8", 10: "TET10"}
@@ -60,6 +81,21 @@ class InputSchema(BaseModel):
     traction_face_offsets: Array[(None,), Int32]
     youngs: Array[(), Float64]
     poisson: Array[(), Float64]
+    #: Optional per-element Young's modulus, ``(C,)``.  Empty (the default)
+    #: selects the scalar ``youngs`` for the whole domain.
+    cell_youngs: Differentiable[Array[(None,), Float64]] = Field(
+        default_factory=lambda: np.zeros(0, dtype=np.float64)
+    )
+    #: Optional per-element Poisson ratio, ``(C,)``.  Empty (the default)
+    #: selects the scalar ``poisson`` for the whole domain.
+    cell_poisson: Differentiable[Array[(None,), Float64]] = Field(
+        default_factory=lambda: np.zeros(0, dtype=np.float64)
+    )
+    #: Optional per-element body force density in N/m^3, ``(C, 3)``.  Empty
+    #: (the default) means no body force.
+    body_force: Differentiable[Array[(None, 3), Float64]] = Field(
+        default_factory=lambda: np.zeros((0, 3), dtype=np.float64)
+    )
 
 
 class OutputSchema(BaseModel):
@@ -74,8 +110,30 @@ def _split(flat: np.ndarray, offsets: np.ndarray) -> list[np.ndarray]:
     return [flat[start:stop] for start, stop in zip(offsets[:-1], offsets[1:])]
 
 
-def _solve(points, inputs, base_points):
-    """Run the jax-fem elastic solve; differentiable via its adjoint VJP."""
+def _material(scalar, cell_values):
+    """The modulus jax-fem should see: the ``(C,)`` array, else the scalar.
+
+    An empty ``cell_values`` is the schema default and means "single
+    material", so the scalar path is reproduced exactly (a python ``float``,
+    as the pre-existing calls passed).
+    """
+    array = np.asarray(cell_values)
+    return array if array.size else float(np.asarray(scalar))
+
+
+def _body_force(values):
+    """The body force jax-fem should see: the ``(C, 3)`` array, else ``None``."""
+    array = np.asarray(values)
+    return array if array.size else None
+
+
+def _solve(points, inputs, youngs, poisson, body_force, base_points):
+    """Run the jax-fem elastic solve; differentiable via its adjoint VJP.
+
+    ``youngs`` / ``poisson`` are scalars (single material) or ``(C,)``
+    per-element arrays, and ``body_force`` is ``None`` or a ``(C, 3)``
+    density; every jax-fem entry point below accepts all three forms.
+    """
     from cadjoint.fem.backends import ElasticBCs
     from cadjoint.fem.jaxfem import JaxFemBackend, tet_elastic_solve
 
@@ -103,26 +161,33 @@ def _solve(points, inputs, base_points):
             points,
             cells,
             bcs,
-            youngs=float(np.asarray(inputs.youngs)),
-            poisson=float(np.asarray(inputs.poisson)),
+            youngs=youngs,
+            poisson=poisson,
             base_points=base_points,
+            body_force=body_force,
         )
     return tet_elastic_solve(
         points,
         cells,
         bcs,
-        youngs=float(np.asarray(inputs.youngs)),
-        poisson=float(np.asarray(inputs.poisson)),
+        youngs=youngs,
+        poisson=poisson,
         ele_type=ele_type,
         base_points=base_points,
         traction_faces=faces,
+        body_force=body_force,
     )
 
 
 def apply(inputs: InputSchema) -> OutputSchema:
     """Forward solve (opaque to JAX tracing; runs concretely)."""
     displacement = _solve(
-        inputs.points, inputs, base_points=np.asarray(inputs.points, dtype=np.float64)
+        inputs.points,
+        inputs,
+        _material(inputs.youngs, inputs.cell_youngs),
+        _material(inputs.poisson, inputs.cell_poisson),
+        _body_force(inputs.body_force),
+        base_points=np.asarray(inputs.points, dtype=np.float64),
     )
     return OutputSchema(displacement=np.asarray(displacement))
 
@@ -144,25 +209,67 @@ def vector_jacobian_product(
     Composes jax.vjp over the solve closure; inside, jax-fem's ``ad_wrapper``
     (custom_vjp) solves the adjoint system, so no tracing of the forward
     solver is required.  The contract is identical across HEX8/TET4/TET10:
-    ``points`` is the one differentiable input.
+    ``points`` plus the per-element ``cell_youngs`` / ``cell_poisson`` /
+    ``body_force`` arrays, which the heterogeneous formulation carries as
+    internal variables.  An array left empty (the single-material default)
+    never enters the traced closure, so jax hands back its zero of shape
+    ``(0,)`` / ``(0, 3)``; the scalars ``youngs`` / ``poisson`` are not
+    differentiable and are still rejected here.
     """
     import jax
     import jax.numpy as jnp
 
     jax.config.update("jax_enable_x64", True)
     assert vjp_outputs == {"displacement"}, f"unexpected vjp_outputs: {vjp_outputs}"
-    unsupported = set(vjp_inputs) - {"points"}
+
+    base_points = np.asarray(inputs.points, dtype=np.float64)
+    cell_youngs = np.asarray(inputs.cell_youngs, dtype=np.float64)
+    cell_poisson = np.asarray(inputs.cell_poisson, dtype=np.float64)
+    force = np.asarray(inputs.body_force, dtype=np.float64)
+
+    # Which branch the forward took is decided by the *concrete* payload, so
+    # a traced parameter never has to be inspected for emptiness.
+    per_element_youngs = bool(cell_youngs.size)
+    per_element_poisson = bool(cell_poisson.size)
+    has_body_force = bool(force.size)
+
+    def fun(params: dict):
+        youngs = (
+            params.get("cell_youngs", cell_youngs)
+            if per_element_youngs
+            else float(np.asarray(inputs.youngs))
+        )
+        poisson = (
+            params.get("cell_poisson", cell_poisson)
+            if per_element_poisson
+            else float(np.asarray(inputs.poisson))
+        )
+        body_force = params.get("body_force", force) if has_body_force else None
+        return _solve(
+            params.get("points", inputs.points),
+            inputs,
+            youngs,
+            poisson,
+            body_force,
+            base_points=base_points,
+        )
+
+    params = {}
+    if "points" in vjp_inputs:
+        params["points"] = jnp.asarray(inputs.points, dtype=jnp.float64)
+    if "cell_youngs" in vjp_inputs:
+        params["cell_youngs"] = jnp.asarray(cell_youngs, dtype=jnp.float64)
+    if "cell_poisson" in vjp_inputs:
+        params["cell_poisson"] = jnp.asarray(cell_poisson, dtype=jnp.float64)
+    if "body_force" in vjp_inputs:
+        params["body_force"] = jnp.asarray(force, dtype=jnp.float64)
+    unsupported = set(vjp_inputs) - set(params)
     if unsupported:
         raise ValueError(
             f"Non-differentiable inputs requested in vjp: {sorted(unsupported)}; "
-            "the only differentiable input is points."
+            "differentiable inputs are points, cell_youngs, cell_poisson, body_force."
         )
 
-    base_points = np.asarray(inputs.points, dtype=np.float64)
-
-    def fun(points):
-        return _solve(points, inputs, base_points=base_points)
-
-    _, vjp_fun = jax.vjp(fun, jnp.asarray(inputs.points, dtype=jnp.float64))
-    (gradient,) = vjp_fun(jnp.asarray(cotangent_vector["displacement"], dtype=jnp.float64))
-    return {"points": np.asarray(gradient)}
+    _, vjp_fun = jax.vjp(fun, params)
+    (gradients,) = vjp_fun(jnp.asarray(cotangent_vector["displacement"], dtype=jnp.float64))
+    return {key: np.asarray(value) for key, value in gradients.items()}

@@ -177,6 +177,21 @@ def _tet_face_patch(mesh: TetMesh, patch: Patch) -> tuple[np.ndarray, np.ndarray
     return nodes.astype(np.int32), np.asarray(faces)
 
 
+def _property_value(value: Any) -> Any:
+    """Normalize a material property argument for the solver ABI.
+
+    A plain Python number becomes a ``float`` (the historical coercion, which
+    also rejects nonsense early); anything array-like — a per-element ``(C,)``
+    field sampled from the scene's materials, or a traced scalar — passes
+    through untouched so the backend can broadcast and differentiate it.
+    """
+    if isinstance(value, bool):
+        raise TypeError("Material properties must be numeric, got a bool.")
+    if isinstance(value, (int, float)):
+        return float(value)
+    return value
+
+
 def _require_direct_backend(backend: Any, what: str) -> None:
     """Tet meshes solve in-process via jax-fem only (no backend registry)."""
     if backend is None:
@@ -213,8 +228,9 @@ class ElasticResult:
     Attributes:
         displacement: Per-node displacement, shaped ``(N, 3)``.
         mesh: The mesh that was solved on.
-        youngs: Young's modulus used.
-        poisson: Poisson ratio used.
+        youngs: Young's modulus used — a scalar, or a per-element ``(C,)``
+            array when the study derived it from the scene's materials.
+        poisson: Poisson ratio used, scalar or per element like ``youngs``.
     """
 
     displacement: Any
@@ -253,7 +269,7 @@ class ElasticResult:
 def thermal_solve(
     mesh: SolveMesh,
     *,
-    conductivity: float,
+    conductivity: Any,
     dirichlet: list[tuple[Patch, float]],
     neumann: list[tuple[Patch, float]] | None = None,
     source: float = 0.0,
@@ -267,7 +283,11 @@ def thermal_solve(
             :class:`~cadjoint.fem.tetmesh.TetMesh` (solved with TET4/TET10
             elements on the direct jax-fem path; same BC semantics, with
             TET10 midside completion and exact flux-face targeting).
-        conductivity: Thermal conductivity ``k`` (constant).
+        conductivity: Thermal conductivity ``k`` — a scalar for a
+            single-material domain, or a per-element ``(C,)`` array sampled
+            from the scene's material field
+            (:func:`cadjoint.fem.properties.sample_cell_property`), which the
+            direct backend carries as a jax-fem internal variable.
         dirichlet: ``(patch, temperature)`` pairs; each patch is a
             :class:`~cadjoint.fem.Nodes` selection (applied to its node set
             directly) or a legacy face predicate for
@@ -304,7 +324,7 @@ def thermal_solve(
             mesh.points if points is None else points,
             mesh.cells,
             tet_bcs,
-            conductivity=float(conductivity),
+            conductivity=_property_value(conductivity),
             source=float(source),
             ele_type=mesh.ele_type,
             base_points=mesh.points,
@@ -325,7 +345,7 @@ def thermal_solve(
         solve_points,
         mesh.cells,
         bcs,
-        conductivity=float(conductivity),
+        conductivity=_property_value(conductivity),
         source=float(source),
         base_points=mesh.points,
     )
@@ -335,12 +355,13 @@ def thermal_solve(
 def elastic_solve(
     mesh: SolveMesh,
     *,
-    youngs: float,
-    poisson: float,
+    youngs: Any,
+    poisson: Any,
     dirichlet: list[Patch],
     tractions: list[tuple[Patch, Any]],
     backend: str | SolverBackend | None = None,
     points: Any = None,
+    body_force: Any = None,
 ) -> ElasticResult:
     """Solve small-strain linear elasticity on the mesh.
 
@@ -349,8 +370,9 @@ def elastic_solve(
             :class:`~cadjoint.fem.tetmesh.TetMesh` (solved with TET4/TET10
             elements on the direct jax-fem path; same BC semantics, with
             TET10 midside completion and exact traction-face targeting).
-        youngs: Young's modulus.
-        poisson: Poisson ratio.
+        youngs: Young's modulus — a scalar, or a per-element ``(C,)``
+            array sampled from the scene's material field.
+        poisson: Poisson ratio, scalar or per element like ``youngs``.
         dirichlet: Patches picking fully-clamped node sets (all displacement
             components fixed to zero) — :class:`~cadjoint.fem.Nodes`
             selections applied directly, or legacy face predicates.
@@ -359,6 +381,9 @@ def elastic_solve(
         backend: Backend name or instance (see :func:`thermal_solve`).
         points: Optional traced override of ``mesh.points`` (same shape) for
             differentiable frozen-topology solves.
+        body_force: Optional body force density in N/m^3, ``(3,)`` or
+            ``(C, 3)`` — ``density * gravity`` for self-weight.  Direct
+            backend only.
 
     Returns:
         An :class:`ElasticResult`; ``displacement`` is a JAX array with an
@@ -376,14 +401,18 @@ def elastic_solve(
             mesh.points if points is None else points,
             mesh.cells,
             tet_bcs,
-            youngs=float(youngs),
-            poisson=float(poisson),
+            youngs=_property_value(youngs),
+            poisson=_property_value(poisson),
             ele_type=mesh.ele_type,
             base_points=mesh.points,
             traction_faces=[faces for _, faces in traction_patches] if traction_patches else None,
+            body_force=body_force,
         )
         return ElasticResult(
-            displacement=displacement, mesh=mesh, youngs=float(youngs), poisson=float(poisson)
+            displacement=displacement,
+            mesh=mesh,
+            youngs=_property_value(youngs),
+            poisson=_property_value(poisson),
         )
     bcs = ElasticBCs(
         fixed_nodes=[_node_patch(mesh, patch) for patch in dirichlet],
@@ -392,14 +421,21 @@ def elastic_solve(
     )
     solver = get_backend(backend)
     solve_points = mesh.points if points is None else points
+    elastic_kwargs: dict[str, Any] = {}
+    if body_force is not None:
+        elastic_kwargs["body_force"] = body_force
     displacement = solver.elastic(
         solve_points,
         mesh.cells,
         bcs,
-        youngs=float(youngs),
-        poisson=float(poisson),
+        youngs=_property_value(youngs),
+        poisson=_property_value(poisson),
         base_points=mesh.points,
+        **elastic_kwargs,
     )
     return ElasticResult(
-        displacement=displacement, mesh=mesh, youngs=float(youngs), poisson=float(poisson)
+        displacement=displacement,
+        mesh=mesh,
+        youngs=_property_value(youngs),
+        poisson=_property_value(poisson),
     )

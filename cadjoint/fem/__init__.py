@@ -5,9 +5,10 @@ travel the same path, and so no mesh module depends on a solver:
 
 1. :mod:`~cadjoint.fem.elements` — reference-element topology tables.
 2. :mod:`~cadjoint.fem.quality`, :mod:`~cadjoint.fem.boundary`,
-   :mod:`~cadjoint.fem.motion` — the concerns both families share: element
-   metrics, boundary faces and their selection, and differentiable node
-   motion under frozen topology.
+   :mod:`~cadjoint.fem.motion`, :mod:`~cadjoint.fem.properties` — the
+   concerns both families share: element metrics, boundary faces and their
+   selection, differentiable node motion under frozen topology, and the
+   per-element physical properties sampled from the scene's material field.
 3. :mod:`~cadjoint.fem.hexmesh`, :mod:`~cadjoint.fem.tetmesh` — mesh
    construction only.
 4. :mod:`~cadjoint.fem.backends` (solver ABI + registry),
@@ -71,6 +72,7 @@ __all__ = [
 
 # Declarative study layer (code-first simulation, capture registry for the
 # compile worker).  Appended additively; no solver import happens here.
+from cadjoint.fem.properties import FROM_MATERIAL  # noqa: E402
 from cadjoint.fem.result import SimulationResult  # noqa: E402
 from cadjoint.fem.study import (  # noqa: E402
     Dirichlet,
@@ -83,6 +85,7 @@ from cadjoint.fem.study import (  # noqa: E402
 )
 
 __all__ += [
+    "FROM_MATERIAL",
     "Dirichlet",
     "ElasticStudy",
     "Fixed",

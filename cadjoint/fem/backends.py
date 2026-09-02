@@ -126,11 +126,17 @@ class SolverBackend(Protocol):
         cells: np.ndarray,
         bcs: ThermalBCs,
         *,
-        conductivity: float,
+        conductivity: Any,
         source: float,
         base_points: np.ndarray | None = None,
     ) -> Any:
         """Solve -div(k grad T) = q; returns per-node temperature ``(N,)``.
+
+        ``conductivity`` is either a scalar (one material for the whole
+        domain) or a per-element ``(C,)`` array sampled from the scene's
+        material field (:mod:`cadjoint.fem.properties`); a backend that
+        cannot represent a heterogeneous field says so rather than
+        silently averaging.
 
         ``base_points`` is a concrete snapshot of the node positions used
         for problem construction (BC bookkeeping) when ``points`` is a
@@ -144,11 +150,18 @@ class SolverBackend(Protocol):
         cells: np.ndarray,
         bcs: ElasticBCs,
         *,
-        youngs: float,
-        poisson: float,
+        youngs: Any,
+        poisson: Any,
         base_points: np.ndarray | None = None,
+        body_force: Any = None,
     ) -> Any:
-        """Solve small-strain linear elasticity; returns displacement ``(N, 3)``."""
+        """Solve small-strain linear elasticity; returns displacement ``(N, 3)``.
+
+        ``youngs`` and ``poisson`` are scalars or per-element ``(C,)`` arrays
+        (see :meth:`thermal`).  ``body_force`` optionally prescribes a body
+        force density in N/m^3 — ``density * gravity`` for self-weight —
+        shaped ``(3,)`` or ``(C, 3)``; ``None`` means no body force.
+        """
         ...
 
 
@@ -186,6 +199,31 @@ def _x64_scope() -> Iterator[None]:
         yield
     finally:
         jax.config.update("jax_enable_x64", previous)
+
+
+def _as_cell_array(value: Any, num_cells: int) -> np.ndarray:
+    """A per-element property as a ``(C,)`` array, or an empty one if scalar.
+
+    The wire form used by the packaged tesseracts: an empty array means "the
+    scalar input applies to the whole domain", which is what every existing
+    caller sends, so the scalar path stays the schema default.
+
+    A traced value comes back *as a JAX array*, never concretized — the
+    per-element properties are differentiable inputs of the tesseracts, so
+    concretizing here would sever the gradient before the call is even made
+    (and raise a tracer-conversion error under ``jax.grad``).  Only the
+    array's shape is inspected, which is static.
+    """
+    import jax.numpy as jnp
+
+    array = jnp.asarray(value)
+    if array.ndim == 0:
+        return jnp.zeros(0, dtype=jnp.float64)
+    if array.shape != (num_cells,):
+        raise ValueError(
+            f"Per-element property must be scalar or shaped ({num_cells},); got {array.shape}."
+        )
+    return array.astype(jnp.float64)
 
 
 def _membership_location(node_set: np.ndarray) -> Callable[..., Any]:
@@ -246,6 +284,10 @@ class TesseractBackend:
 
         ``base_points`` is unused: the tesseract runtime hands its endpoints
         concrete arrays, so construction-time concreteness is guaranteed.
+
+        A per-element ``conductivity`` crosses the boundary as the schema's
+        optional ``cell_conductivity`` array; a scalar leaves that array empty
+        so the wire payload is exactly what it always was.
         """
         del base_points
         import jax.numpy as jnp
@@ -271,6 +313,8 @@ class TesseractBackend:
         flux_offsets = np.concatenate(
             [[0], np.cumsum([len(n) for n in bcs.flux_nodes], dtype=np.int64)]
         ).astype(np.int32)
+        cell_conductivity = _as_cell_array(conductivity, int(np.asarray(cells).shape[0]))
+        scalar_conductivity = 0.0 if cell_conductivity.size else conductivity
         with _x64_scope():
             outputs = apply_tesseract(
                 self._tesseract_for("thermal"),
@@ -286,13 +330,14 @@ class TesseractBackend:
                     # pure node membership (empty offsets = disabled).
                     "flux_faces": np.zeros((0, 3), dtype=np.int32),
                     "flux_face_offsets": np.zeros(0, dtype=np.int32),
-                    "conductivity": jnp.asarray(conductivity, dtype=jnp.float64),
+                    "conductivity": jnp.asarray(scalar_conductivity, dtype=jnp.float64),
+                    "cell_conductivity": jnp.asarray(cell_conductivity, dtype=jnp.float64),
                     "source": jnp.asarray(source, dtype=jnp.float64),
                 },
             )
             return outputs["temperature"]
 
-    def elastic(self, points, cells, bcs, *, youngs, poisson, base_points=None):
+    def elastic(self, points, cells, bcs, *, youngs, poisson, base_points=None, body_force=None):
         """See :meth:`SolverBackend.elastic`.
 
         ``base_points`` is unused: the tesseract runtime hands its endpoints
@@ -300,6 +345,10 @@ class TesseractBackend:
         Clamped patches cross the boundary as one union node set (all
         components pinned to zero, so patch identity is irrelevant);
         traction patches keep their identity via prefix offsets.
+
+        Per-element moduli and a body force cross as the schema's optional
+        ``cell_youngs`` / ``cell_poisson`` / ``body_force`` arrays, all empty
+        for the scalar single-material path.
         """
         del base_points
         import jax.numpy as jnp
@@ -322,6 +371,15 @@ class TesseractBackend:
         offsets = np.concatenate(
             [[0], np.cumsum([len(n) for n in bcs.traction_nodes], dtype=np.int64)]
         ).astype(np.int32)
+        num_cells = int(np.asarray(cells).shape[0])
+        cell_youngs = _as_cell_array(youngs, num_cells)
+        cell_poisson = _as_cell_array(poisson, num_cells)
+        scalar_youngs = 0.0 if cell_youngs.size else youngs
+        scalar_poisson = 0.0 if cell_poisson.size else poisson
+        if body_force is None:
+            force = jnp.zeros((0, 3), dtype=jnp.float64)
+        else:
+            force = jnp.broadcast_to(jnp.asarray(body_force, dtype=jnp.float64), (num_cells, 3))
         with _x64_scope():
             outputs = apply_tesseract(
                 self._tesseract_for("elastic"),
@@ -336,8 +394,11 @@ class TesseractBackend:
                     # pure node membership (empty offsets = disabled).
                     "traction_faces": np.zeros((0, 3), dtype=np.int32),
                     "traction_face_offsets": np.zeros(0, dtype=np.int32),
-                    "youngs": np.asarray(youngs, dtype=np.float64),
-                    "poisson": np.asarray(poisson, dtype=np.float64),
+                    "youngs": np.asarray(scalar_youngs, dtype=np.float64),
+                    "poisson": np.asarray(scalar_poisson, dtype=np.float64),
+                    "cell_youngs": jnp.asarray(cell_youngs, dtype=jnp.float64),
+                    "cell_poisson": jnp.asarray(cell_poisson, dtype=jnp.float64),
+                    "body_force": force,
                 },
             )
             return outputs["displacement"]

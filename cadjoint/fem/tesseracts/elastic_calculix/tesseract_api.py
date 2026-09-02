@@ -19,14 +19,27 @@ consistent nodal loads fixed (it neglects the load-area derivative);
 restrict design freedom to unloaded boundary regions when that term
 matters.
 
+Heterogeneous materials cross as the optional ``cell_youngs`` /
+``cell_poisson`` per-element arrays (empty = "use the scalars").  A ccx
+deck names materials rather than carrying per-element arrays, so a
+continuously blended interface cannot be represented exactly; the deck
+writer groups, caps and (past the cap) snaps the field onto named
+materials, and warns about what that costs — see
+:func:`cadjoint.fem.calculix.write_elastic_deck`.
+
 GPL note: CalculiX is GPL-2 and stays behind the subprocess boundary.
 """
 
 from __future__ import annotations
 
 import numpy as np
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from tesseract_core.runtime import Array, Differentiable, Float64, Int32, ShapeDType
+
+
+def _empty(shape: tuple[int, ...]):
+    """Default factory for an optional (absent) array input."""
+    return lambda: np.zeros(shape, dtype=np.float64)
 
 
 class InputSchema(BaseModel):
@@ -35,6 +48,18 @@ class InputSchema(BaseModel):
     ``traction_faces``/``traction_face_offsets`` exist for schema parity
     with ``elastic_jaxfem`` (whose tet modes use them for exact face
     targeting); the ccx path is HEX8-only and requires them empty.
+
+    Materials: ``youngs``/``poisson`` are the single-material scalars.  A
+    heterogeneous domain instead fills the optional ``cell_youngs`` /
+    ``cell_poisson`` arrays with one value per element; both default to
+    empty, which means "use the scalars", so every existing caller sends
+    exactly the payload it always did (an HTTP caller, which cannot encode
+    a zero-size array, simply omits the fields).  Since a ccx deck names materials
+    and cannot carry a per-element array, a blended field is discretized
+    onto named materials by ``cadjoint.fem.calculix.write_elastic_deck``
+    (grouped by property, snapped onto reference materials past the group
+    cap), which warns with ``CalculixQuantizationWarning`` when the deck
+    cannot reproduce the requested field exactly.
     """
 
     points: Differentiable[Array[(None, 3), Float64]]
@@ -47,6 +72,8 @@ class InputSchema(BaseModel):
     traction_face_offsets: Array[(None,), Int32]
     youngs: Array[(), Float64]
     poisson: Array[(), Float64]
+    cell_youngs: Array[(None,), Float64] = Field(default_factory=_empty((0,)))
+    cell_poisson: Array[(None,), Float64] = Field(default_factory=_empty((0,)))
 
 
 class OutputSchema(BaseModel):
@@ -72,6 +99,8 @@ def _solve(inputs: InputSchema, *, sensitivities: bool):
             "traction_faces targeting is a tet feature of elastic_jaxfem; "
             "the CalculiX tesseract is HEX8-only and uses node sets."
         )
+    cell_youngs = np.asarray(inputs.cell_youngs, dtype=np.float64)
+    cell_poisson = np.asarray(inputs.cell_poisson, dtype=np.float64)
     return elastic_ccx_solve(
         np.asarray(inputs.points, dtype=np.float64),
         np.asarray(inputs.cells, dtype=np.int64),
@@ -81,8 +110,8 @@ def _solve(inputs: InputSchema, *, sensitivities: bool):
             inputs.traction_offsets,
             inputs.traction_vectors,
         ),
-        youngs=float(np.asarray(inputs.youngs)),
-        poisson=float(np.asarray(inputs.poisson)),
+        youngs=cell_youngs if cell_youngs.size else float(np.asarray(inputs.youngs)),
+        poisson=cell_poisson if cell_poisson.size else float(np.asarray(inputs.poisson)),
         sensitivities=sensitivities,
     )
 

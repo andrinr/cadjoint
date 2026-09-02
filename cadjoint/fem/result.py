@@ -7,9 +7,18 @@ name, the solved field arrays, and a reference back to the
 stored on the study as ``last_result`` so a program (or the viewer) can
 re-inspect a solve without repeating it.
 
+A result also carries what the scene's *materials* make computable: the
+domain's :attr:`~SimulationResult.mass` (whenever the materials state a
+density) and, for elastic results whose materials state a yield strength, the
+:attr:`~SimulationResult.safety_factor` — the smallest ratio of yield strength
+to von Mises stress over the elements, i.e. the factor by which the whole load
+case could be scaled before the first element yields.  Both are None when the
+scene never said enough to compute them; neither invents a value.
+
 Differentiability contract: the field arrays (``temperature``,
-``displacement``) and the objective helpers :meth:`SimulationResult.mean` /
-:meth:`SimulationResult.max` stay JAX-traced whenever the solve was traced
+``displacement``), the domain mass, and the objective helpers
+:meth:`SimulationResult.mean` / :meth:`SimulationResult.max` stay JAX-traced
+whenever the solve was traced
 (``points=recompute_points(...)``), so ``jax.grad`` flows through them
 exactly as through the underlying solver results.  Everything that needs
 concrete numbers — :meth:`SimulationResult.describe`,
@@ -44,6 +53,11 @@ class SimulationResult:
             :class:`~cadjoint.fem.simulate.ElasticResult`).
         sim_mesh: The :class:`~cadjoint.fem.simmesh.SimMesh` the study
             solved on (None when a raw ``HexMesh`` was passed to ``solve``).
+        mass: Mass of the solved domain in kg — ``sum(rho_e * V_e)`` over the
+            elements — or None when the scene's materials state no density.
+            Traced whenever the solve was, so it can be optimized against.
+        yield_strength: Per-element yield strength ``(C,)`` in Pa, or None
+            when the materials state none; drives :attr:`safety_factor`.
     """
 
     name: str
@@ -51,6 +65,8 @@ class SimulationResult:
     field: str
     solution: ThermalResult | ElasticResult
     sim_mesh: Any = None
+    mass: Any = None
+    yield_strength: Any = None
 
     # ── field access ────────────────────────────────────────────────────────
 
@@ -78,6 +94,27 @@ class SimulationResult:
         if self.kind != "elastic":
             raise AttributeError(f"{self.kind} result has no von Mises stress.")
         return self.solution.von_mises()
+
+    @property
+    def safety_factor(self) -> float | None:
+        """Smallest ``yield_strength / von_Mises`` over the elements, or None.
+
+        The factor the whole (linear) load case could be scaled by before the
+        first element reaches yield.  None unless this is an elastic result
+        whose materials state a yield strength.  Concrete results only, like
+        :meth:`von_mises`.
+
+        Returns:
+            The minimum safety factor as a float, or None when it is not
+            defined for this result.
+        """
+        if self.kind != "elastic" or self.yield_strength is None:
+            return None
+        stress = np.asarray(self.von_mises(), dtype=np.float64)
+        strength = np.asarray(self.yield_strength, dtype=np.float64)
+        # An unloaded element has zero stress and an infinite margin; it must
+        # not become the reported minimum, nor a division warning.
+        return float(np.min(strength / np.maximum(stress, 1e-30)))
 
     def nodal_scalar(self) -> np.ndarray:
         """The concrete per-node display field named by :attr:`field`.
@@ -133,11 +170,13 @@ class SimulationResult:
 
         Returns:
             ``{"name", "kind", "field", "mesh", "nodes", "elements",
-            "range", "fields"}`` where ``mesh`` is the SimMesh name (or
-            None), ``range`` is the ``[min, max]`` of the display field of
-            :meth:`nodal_scalar`, and ``fields`` maps each solved field to
-            a ``{"min", "mean", "max"}`` summary (displacement summarized
-            by magnitude, von Mises per cell).
+            "range", "fields", "mass", "safety_factor"}`` where ``mesh`` is
+            the SimMesh name (or None), ``range`` is the ``[min, max]`` of
+            the display field of :meth:`nodal_scalar`, ``fields`` maps each
+            solved field to a ``{"min", "mean", "max"}`` summary
+            (displacement summarized by magnitude, von Mises per cell), and
+            ``mass`` (kg) / ``safety_factor`` are None when the scene's
+            materials do not make them computable.
         """
         scalar = self.nodal_scalar()
         fields: dict[str, dict[str, float]] = {}
@@ -158,6 +197,8 @@ class SimulationResult:
             "elements": self.mesh.num_cells,
             "range": [round(float(scalar.min()), 6), round(float(scalar.max()), 6)],
             "fields": fields,
+            "mass": None if self.mass is None else round(float(self.mass), 9),
+            "safety_factor": (None if self.safety_factor is None else round(self.safety_factor, 6)),
         }
 
     def to_vtk(self, path: str) -> None:

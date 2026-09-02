@@ -22,6 +22,8 @@ website:
           - text: Tesseracts
             href: docs/tesseracts.qmd
           - text: "---"
+          - text: Materials
+            href: docs/materials.qmd
           - text: Forward Renderer
             href: docs/rendering.qmd
       - text: Playground
@@ -159,6 +161,15 @@ quartodoc:
         - fem.study.HeatFlux
         - fem.study.Fixed
         - fem.study.Traction
+    - title: Simulation — material properties
+      contents:
+        - fem.properties.sample_cell_property
+        - fem.properties.maybe_sample_cell_property
+        - fem.properties.sample_material_field
+        - fem.properties.cell_centroids
+        - fem.properties.cell_volumes
+        - fem.properties.total_mass
+        - fem.properties.quantize_to_materials
     - title: Simulation — backends
       contents:
         - fem.backends.SolverBackend
@@ -170,6 +181,20 @@ quartodoc:
         - optimize.Optimization
         - optimize.OptimizationRun
         - optimize.capture_optimizations
+    - title: Materials
+      contents:
+        - render.material.Material
+        - materials.aluminium_6061
+        - materials.copper_c11000
+        - materials.steel_1018
+        - materials.titanium_ti6al4v
+        - materials.fr4
+        - materials.silicon
+        - materials.thermal_pad
+        - materials.pla
+        - materials.catalogue
+        - sdf.measure.volume.volume
+        - sdf.measure.mass.material_mass
     - title: Render
       contents:
         - render.scene.Camera

@@ -30,16 +30,33 @@ Runs locally without Docker via ``Tesseract.from_tesseract_api`` (used by
 ``TesseractBackend``), or containerized with ``tesseract build`` for
 distribution.
 
-Differentiable inputs: ``points``, ``conductivity``, ``source``.  Dirichlet
-values are static (jax-fem bakes them into the DOF elimination, outside the
-adjoint's parameter path); flux values are static like the direct backend's
-(baked into weak-form closures).
+Material heterogeneity: ``conductivity`` is the single-material scalar, and
+the optional ``cell_conductivity`` array carries one conductivity per
+element (``(C,)``, W/(m K)) when the scene's material field is not uniform.
+An **empty** ``cell_conductivity`` — its default, and what every scalar-path
+caller sends — means "the scalar applies to the whole domain", so the wire
+payload and the solve are byte-identical to what they were before per-element
+properties existed.  When it is non-empty the scalar is ignored (callers send
+``0.0`` as a placeholder) and the per-element array is handed to jax-fem,
+which carries it at the quadrature points as an internal variable.
+
+Differentiable inputs: ``points``, ``conductivity``, ``cell_conductivity``,
+``source``.  ``cell_conductivity`` is differentiable for the same reason the
+scalar is: jax-fem receives it through ``set_params`` as an internal variable,
+so ``d(temperature)/d(k_e)`` comes straight out of the same adjoint solve —
+nothing extra is assembled and nothing about the existing inputs' VJP
+changes.  Whichever of the two is unused on a given call (the scalar when the
+array is non-empty, the array when it is empty) simply drops out of the traced
+closure and its gradient is the correctly-shaped zero.  Dirichlet values are
+static (jax-fem bakes them into the DOF elimination, outside the adjoint's
+parameter path); flux values are static like the direct backend's (baked into
+weak-form closures).
 """
 
 from __future__ import annotations
 
 import numpy as np
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from tesseract_core.runtime import Array, Differentiable, Float64, Int32, ShapeDType
 
 _ELE_TYPES = {4: "TET4", 8: "HEX8", 10: "TET10"}
@@ -59,6 +76,11 @@ class InputSchema(BaseModel):
     flux_face_offsets: Array[(None,), Int32]
     conductivity: Differentiable[Array[(), Float64]]
     source: Differentiable[Array[(), Float64]]
+    #: Optional per-element conductivity, ``(C,)``.  Empty (the default)
+    #: selects the scalar ``conductivity`` for the whole domain.
+    cell_conductivity: Differentiable[Array[(None,), Float64]] = Field(
+        default_factory=lambda: np.zeros(0, dtype=np.float64)
+    )
 
 
 class OutputSchema(BaseModel):
@@ -73,8 +95,22 @@ def _split(flat: np.ndarray, offsets: np.ndarray) -> list[np.ndarray]:
     return [flat[start:stop] for start, stop in zip(offsets[:-1], offsets[1:])]
 
 
+def _material(scalar, cell_values):
+    """The conductivity jax-fem should see: the ``(C,)`` array, else the scalar.
+
+    An empty ``cell_values`` is the schema default and means "single
+    material", so the scalar path is reproduced exactly.
+    """
+    array = np.asarray(cell_values)
+    return array if array.size else np.asarray(scalar)[()]
+
+
 def _solve(points, inputs, conductivity, source, base_points):
-    """Run the jax-fem thermal solve; differentiable via its adjoint VJP."""
+    """Run the jax-fem thermal solve; differentiable via its adjoint VJP.
+
+    ``conductivity`` is a scalar (single material) or a ``(C,)`` per-element
+    array; both jax-fem entry points accept either.
+    """
     from cadjoint.fem.backends import ThermalBCs
     from cadjoint.fem.jaxfem import JaxFemBackend, tet_thermal_solve
 
@@ -126,7 +162,7 @@ def apply(inputs: InputSchema) -> OutputSchema:
     temperature = _solve(
         inputs.points,
         inputs,
-        np.asarray(inputs.conductivity)[()],
+        _material(inputs.conductivity, inputs.cell_conductivity),
         np.asarray(inputs.source)[()],
         base_points=np.asarray(inputs.points, dtype=np.float64),
     )
@@ -150,18 +186,29 @@ def vector_jacobian_product(
     Composes jax.vjp over the solve closure; inside, jax-fem's ``ad_wrapper``
     (custom_vjp) solves the adjoint system, so no tracing of the forward
     solver is required.  The contract is identical across HEX8/TET4/TET10.
+
+    ``cell_conductivity`` joins the existing ``params`` dict unchanged: only
+    the entry the forward solve actually consumed carries a nonzero gradient
+    (an empty ``cell_conductivity``, or a scalar ``conductivity`` shadowed by
+    a non-empty array, never enters the closure, so jax returns its zero).
     """
     import jax
     import jax.numpy as jnp
 
     jax.config.update("jax_enable_x64", True)
     assert vjp_outputs == {"temperature"}, f"unexpected vjp_outputs: {vjp_outputs}"
+    cell_conductivity = np.asarray(inputs.cell_conductivity, dtype=np.float64)
+    scalar_conductivity = np.asarray(inputs.conductivity)[()]
 
     def fun(params: dict):
+        if cell_conductivity.size:
+            conductivity = params.get("cell_conductivity", cell_conductivity)
+        else:
+            conductivity = params.get("conductivity", scalar_conductivity)
         return _solve(
             params.get("points", inputs.points),
             inputs,
-            params.get("conductivity", np.asarray(inputs.conductivity)[()]),
+            conductivity,
             params.get("source", np.asarray(inputs.source)[()]),
             base_points=np.asarray(inputs.points, dtype=np.float64),
         )
@@ -171,13 +218,15 @@ def vector_jacobian_product(
         params["points"] = jnp.asarray(inputs.points, dtype=jnp.float64)
     if "conductivity" in vjp_inputs:
         params["conductivity"] = jnp.asarray(inputs.conductivity, dtype=jnp.float64)[()]
+    if "cell_conductivity" in vjp_inputs:
+        params["cell_conductivity"] = jnp.asarray(cell_conductivity, dtype=jnp.float64)
     if "source" in vjp_inputs:
         params["source"] = jnp.asarray(inputs.source, dtype=jnp.float64)[()]
     unsupported = set(vjp_inputs) - set(params)
     if unsupported:
         raise ValueError(
             f"Non-differentiable inputs requested in vjp: {sorted(unsupported)}; "
-            "differentiable inputs are points, conductivity, source."
+            "differentiable inputs are points, conductivity, cell_conductivity, source."
         )
 
     _, vjp_fun = jax.vjp(fun, params)

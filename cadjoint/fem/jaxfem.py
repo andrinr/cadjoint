@@ -48,6 +48,166 @@ __all__ = [
 ]
 
 
+def _cellwise(value: Any, shape: tuple[int, int]) -> Any:
+    """Broadcast a scalar or per-cell ``(C,)`` value to ``(num_cells, num_quads)``.
+
+    The one place a heterogeneous material property becomes a jax-fem
+    ``internal_vars`` entry.  A scalar takes the identical code path it always
+    did (``value * ones(shape)``), so single-material solves are unchanged;
+    a per-cell array is broadcast along the quadrature axis, making the
+    property piecewise constant per element.
+    """
+    import jax.numpy as jnp
+
+    array = jnp.asarray(value)
+    if array.ndim == 0:
+        return array * jnp.ones(shape)
+    if array.shape != (shape[0],):
+        raise ValueError(
+            f"Per-element property must be scalar or shaped ({shape[0]},); got {array.shape}."
+        )
+    return jnp.broadcast_to(array[:, None], shape)
+
+
+def _cellwise_vector(value: Any, shape: tuple[int, int]) -> Any:
+    """Broadcast a ``(3,)`` or ``(C, 3)`` vector to ``(num_cells, num_quads, 3)``."""
+    import jax.numpy as jnp
+
+    array = jnp.asarray(value)
+    if array.shape == (3,):
+        return jnp.broadcast_to(array, (*shape, 3))
+    if array.shape != (shape[0], 3):
+        raise ValueError(f"Body force must be shaped (3,) or ({shape[0]}, 3); got {array.shape}.")
+    return jnp.broadcast_to(array[:, None, :], (*shape, 3))
+
+
+def _lame(youngs: Any, poisson: Any) -> tuple[Any, Any]:
+    """Lame constants ``(lambda, mu)`` from ``(E, nu)``; elementwise on arrays."""
+    import jax.numpy as jnp
+
+    youngs = jnp.asarray(youngs)
+    poisson = jnp.asarray(poisson)
+    lame_lambda = youngs * poisson / ((1.0 + poisson) * (1.0 - 2.0 * poisson))
+    lame_mu = youngs / (2.0 * (1.0 + poisson))
+    return lame_lambda, lame_mu
+
+
+def _elastic_problem(
+    tractions: list[np.ndarray],
+    *,
+    youngs: Any,
+    poisson: Any,
+    body_force: Any = None,
+) -> tuple[Any, Any]:
+    """Build the elasticity ``Problem`` subclass and its ``ad_wrapper`` inputs.
+
+    Two shapes of problem come out of here, and which one you get is decided
+    purely by the arguments:
+
+    * **Homogeneous** — scalar ``youngs``/``poisson``, no body force.  The Lame
+      constants are baked into the tensor map's closure and the only parameter
+      is ``points``, exactly as before per-element properties existed.  This is
+      the path every single-material solve takes, byte for byte.
+    * **Heterogeneous** — per-element ``(C,)`` moduli and/or a body force.  The
+      constants move into ``internal_vars`` (so they are also differentiable
+      through jax-fem's adjoint), and a body force ``b`` adds the mass-map term
+      ``residual += integral(v * (-b))``, i.e. ``div(sigma) + b = 0``.
+
+    Args:
+        tractions: One constant traction vector per surface patch.
+        youngs: Young's modulus — scalar, or per element ``(C,)``.
+        poisson: Poisson ratio — scalar, or per element ``(C,)``.
+        body_force: Optional body force density in N/m^3, ``(3,)`` or ``(C, 3)``
+            (self-weight is ``density * gravity``).
+
+    Returns:
+        ``(problem_class, make_params)`` where ``make_params(points)`` builds
+        the argument ``ad_wrapper``'s forward is called with.
+    """
+    import jax.numpy as jnp
+    from jax_fem.problem import Problem
+
+    lame_lambda, lame_mu = _lame(youngs, poisson)
+    has_force = body_force is not None
+    heterogeneous = has_force or lame_lambda.ndim > 0 or lame_mu.ndim > 0
+
+    def surface_maps(_self):
+        # Weak form: residual += integral(v * surface_map); a traction t
+        # enters as -t so that sigma.n = t on the patch.
+        return [(lambda _u, _x, vector=vector: -jnp.asarray(vector)) for vector in tractions]
+
+    def hooke(u_grad, lmbda, shear):
+        strain = 0.5 * (u_grad + u_grad.T)
+        return lmbda * jnp.trace(strain) * jnp.eye(3) + 2.0 * shear * strain
+
+    if not heterogeneous:
+
+        class _Elastic(Problem):
+            def get_tensor_map(self):
+                def stress(u_grad):
+                    return hooke(u_grad, lame_lambda, lame_mu)
+
+                return stress
+
+            get_surface_maps = surface_maps
+
+            def set_params(self, params):
+                self.initialize_geometric_quantities([params])
+
+        return _Elastic, (lambda points: jnp.asarray(points))
+
+    class _Elastic(Problem):
+        def get_tensor_map(self):
+            if has_force:
+
+                def stress(u_grad, lmbda, shear, _force):
+                    return hooke(u_grad, lmbda, shear)
+            else:
+
+                def stress(u_grad, lmbda, shear):
+                    return hooke(u_grad, lmbda, shear)
+
+            return stress
+
+        get_surface_maps = surface_maps
+
+        def set_params(self, params):
+            if has_force:
+                params_points, lmbda, shear, force = params
+            else:
+                params_points, lmbda, shear = params
+            self.initialize_geometric_quantities([params_points])
+            fe = self.fes[0]
+            shape = (fe.num_cells, fe.num_quads)
+            self.internal_vars = [_cellwise(lmbda, shape), _cellwise(shear, shape)]
+            if has_force:
+                self.internal_vars.append(_cellwise_vector(force, shape))
+
+    if has_force:
+
+        def get_mass_map(_self):
+            # Weak form: residual += integral(v * mass_map); a body force b
+            # enters as -b so that div(sigma) + b = 0.
+            def mass_map(_u, _x, _lmbda, _shear, force):
+                return -force
+
+            return mass_map
+
+        _Elastic.get_mass_map = get_mass_map
+
+    if has_force:
+        force_array = jnp.asarray(body_force, dtype=jnp.float64)
+
+        def make_params(points):
+            return (jnp.asarray(points), lame_lambda, lame_mu, force_array)
+    else:
+
+        def make_params(points):
+            return (jnp.asarray(points), lame_lambda, lame_mu)
+
+    return _Elastic, make_params
+
+
 class JaxFemBackend:
     """Direct in-process jax-fem backend for HEX8 meshes (the default).
 
@@ -121,8 +281,8 @@ class JaxFemBackend:
                     # nodal lift: (C, 8) x (C, Q, 8, dim) -> (C, Q, dim).
                     lift_grad = jnp.einsum("cn,cqnd->cqd", lift_nodal[fe.cells], fe.shape_grads)
                     self.internal_vars = [
-                        kappa * jnp.ones(shape),
-                        source_value * jnp.ones(shape),
+                        _cellwise(kappa, shape),
+                        _cellwise(source_value, shape),
                         lift_grad,
                     ]
 
@@ -151,36 +311,27 @@ class JaxFemBackend:
             solution = forward((jnp.asarray(points), conductivity, source, lift))
             return solution[0][:, 0] + lift
 
-    def elastic(self, points, cells, bcs, *, youngs, poisson, base_points=None):
-        """See :meth:`~cadjoint.fem.backends.SolverBackend.elastic`."""
+    def elastic(self, points, cells, bcs, *, youngs, poisson, base_points=None, body_force=None):
+        """See :meth:`~cadjoint.fem.backends.SolverBackend.elastic`.
+
+        ``youngs`` and ``poisson`` may each be a scalar (the homogeneous path,
+        unchanged) or a per-element ``(C,)`` array sampled from the scene's
+        material field; ``body_force`` optionally adds a body force density in
+        N/m^3 (``density * gravity`` for self-weight), ``(3,)`` or ``(C, 3)``.
+        In the heterogeneous case the moduli travel through ``internal_vars``,
+        so the solve is differentiable w.r.t. them as well as w.r.t. ``points``
+        (see :func:`_elastic_problem`).
+        """
         _require_jax_fem()
         with _x64_scope():
             import jax.numpy as jnp
             from jax_fem.generate_mesh import Mesh
-            from jax_fem.problem import Problem
             from jax_fem.solver import ad_wrapper
 
-            lame_lambda = youngs * poisson / ((1.0 + poisson) * (1.0 - 2.0 * poisson))
-            lame_mu = youngs / (2.0 * (1.0 + poisson))
             tractions = [np.asarray(vector, dtype=np.float64) for vector in bcs.traction_vectors]
-
-            class _Elastic(Problem):
-                def get_tensor_map(self):
-                    def stress(u_grad):
-                        strain = 0.5 * (u_grad + u_grad.T)
-                        return lame_lambda * jnp.trace(strain) * jnp.eye(3) + 2.0 * lame_mu * strain
-
-                    return stress
-
-                def get_surface_maps(self):
-                    # Weak form: residual += integral(v * surface_map); a
-                    # traction t enters as -t so that sigma.n = t on the patch.
-                    return [
-                        (lambda _u, _x, vector=vector: -jnp.asarray(vector)) for vector in tractions
-                    ]
-
-                def set_params(self, params):
-                    self.initialize_geometric_quantities([params])
+            problem_class, make_params = _elastic_problem(
+                tractions, youngs=youngs, poisson=poisson, body_force=body_force
+            )
 
             if base_points is None:
                 base_points = points
@@ -193,7 +344,7 @@ class JaxFemBackend:
                 [component for _ in fixed_locations for component in range(3)],
                 [(lambda _point: 0.0) for _ in fixed_locations for _ in range(3)],
             ]
-            problem = _Elastic(
+            problem = problem_class(
                 mesh=mesh,
                 vec=3,
                 dim=3,
@@ -202,7 +353,7 @@ class JaxFemBackend:
                 location_fns=[_membership_location(nodes) for nodes in bcs.traction_nodes],
             )
             forward = ad_wrapper(problem)
-            return forward(jnp.asarray(points))[0]
+            return forward(make_params(jnp.asarray(points)))[0]
 
 
 def _tet_direct_linear_solver(A: Any, b: Any, _x0: Any, _options: dict) -> Any:
@@ -362,6 +513,7 @@ def tet_elastic_solve(
     ele_type: str = "TET4",
     base_points: np.ndarray | None = None,
     traction_faces: list[np.ndarray] | None = None,
+    body_force: Any = None,
 ) -> Any:
     """Small-strain linear elasticity on a tet mesh via jax-fem.
 
@@ -378,8 +530,8 @@ def tet_elastic_solve(
         bcs: Array-level boundary conditions (the backend ABI).  For
             ``TET10``, node sets must include midside nodes (a face
             carries a traction when *all* its nodes are in the set).
-        youngs: Young's modulus.
-        poisson: Poisson ratio.
+        youngs: Young's modulus — scalar, or per element ``(T,)``.
+        poisson: Poisson ratio — scalar, or per element ``(T,)``.
         ele_type: ``"TET4"`` or ``"TET10"``.
         base_points: Concrete positions for problem construction when
             ``points`` is traced (defaults to ``points``).
@@ -390,6 +542,8 @@ def tet_elastic_solve(
             interior-face double-count hole of pure node membership (see
             :func:`_restrict_surface_faces`).  Every corner must also be
             in the corresponding ``bcs.traction_nodes`` set.
+        body_force: Optional body force density in N/m^3, ``(3,)`` or
+            ``(T, 3)`` — ``density * gravity`` for self-weight.
 
     Returns:
         Per-node displacement, ``(N, 3)`` JAX array.
@@ -400,28 +554,12 @@ def tet_elastic_solve(
     with _x64_scope():
         import jax.numpy as jnp
         from jax_fem.generate_mesh import Mesh
-        from jax_fem.problem import Problem
         from jax_fem.solver import ad_wrapper
 
-        lame_lambda = youngs * poisson / ((1.0 + poisson) * (1.0 - 2.0 * poisson))
-        lame_mu = youngs / (2.0 * (1.0 + poisson))
         tractions = [np.asarray(vector, dtype=np.float64) for vector in bcs.traction_vectors]
-
-        class _Elastic(Problem):
-            def get_tensor_map(self):
-                def stress(u_grad):
-                    strain = 0.5 * (u_grad + u_grad.T)
-                    return lame_lambda * jnp.trace(strain) * jnp.eye(3) + 2.0 * lame_mu * strain
-
-                return stress
-
-            def get_surface_maps(self):
-                return [
-                    (lambda _u, _x, vector=vector: -jnp.asarray(vector)) for vector in tractions
-                ]
-
-            def set_params(self, params):
-                self.initialize_geometric_quantities([params])
+        problem_class, make_params = _elastic_problem(
+            tractions, youngs=youngs, poisson=poisson, body_force=body_force
+        )
 
         if base_points is None:
             base_points = points
@@ -432,7 +570,7 @@ def tet_elastic_solve(
             [component for _ in fixed_locations for component in range(3)],
             [(lambda _point: 0.0) for _ in fixed_locations for _ in range(3)],
         ]
-        problem = _Elastic(
+        problem = problem_class(
             mesh=mesh,
             vec=3,
             dim=3,
@@ -452,7 +590,7 @@ def tet_elastic_solve(
             solver_options=dict(_TET_SOLVER_OPTIONS),
             adjoint_solver_options=dict(_TET_SOLVER_OPTIONS),
         )
-        return forward(jnp.asarray(points))[0]
+        return forward(make_params(jnp.asarray(points)))[0]
 
 
 def tet_thermal_solve(
@@ -538,8 +676,8 @@ def tet_thermal_solve(
                 # nodal lift: (C, n) x (C, Q, n, dim) -> (C, Q, dim).
                 lift_grad = jnp.einsum("cn,cqnd->cqd", lift_nodal[fe.cells], fe.shape_grads)
                 self.internal_vars = [
-                    kappa * jnp.ones(shape),
-                    source_value * jnp.ones(shape),
+                    _cellwise(kappa, shape),
+                    _cellwise(source_value, shape),
                     lift_grad,
                 ]
 

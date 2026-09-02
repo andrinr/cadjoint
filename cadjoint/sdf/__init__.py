@@ -24,7 +24,7 @@ from cadjoint.sdf.boolean import (
     union,
     xor,
 )
-from cadjoint.sdf.measure import volume
+from cadjoint.sdf.measure import material_mass, volume
 from cadjoint.sdf.operations import (
     LinearPattern,
     Mirror,
@@ -61,6 +61,7 @@ __all__ = [
     "functionalize",
     # Measure
     "measure",
+    "material_mass",
     "volume",
     # Primitives
     "Primitive",
