@@ -77,26 +77,20 @@ def _mesh_source(source: str) -> dict[str, Any]:
 
 
 def _compile_source(source: str) -> dict[str, Any]:
-    namespace: dict[str, Any] = {
-        "__builtins__": __builtins__,
-        "__name__": "__cadjoint_playground__",
-    }
-    from cadjoint.fem.simmesh import capture_sim_meshes
-    from cadjoint.fem.study import capture_studies
-    from cadjoint.optimize import capture_optimizations
-
     captured = io.StringIO()
     with contextlib.redirect_stdout(captured), contextlib.redirect_stderr(captured):
-        with (
-            capture_constraint_solves() as solver_reports,
-            capture_profiles(PLAYGROUND_FILENAME) as profiles,
-            capture_sim_meshes() as sim_meshes,
-            capture_studies() as studies,
-            capture_optimizations() as optimizations,
-        ):
-            exec(compile(source, PLAYGROUND_FILENAME, "exec"), namespace, namespace)
-        if "scene" not in namespace:
-            raise ValueError("Your program must assign the SDF to a variable named `scene`.")
+        namespace = _execute_scene(
+            source,
+            capture=(
+                ("__solver_reports__", capture_constraint_solves),
+                ("__profiles__", lambda: capture_profiles(PLAYGROUND_FILENAME)),
+            ),
+        )
+        solver_reports = namespace["__solver_reports__"]
+        profiles = namespace["__profiles__"]
+        sim_meshes = namespace["__sim_meshes__"]
+        studies = namespace["__studies__"]
+        optimizations = namespace["__optimizations__"]
         scene_code = compile_scene_to_wgsl(namespace["scene"])
         preview_shader = build_viewer_shader(scene_code)
         path_shader = build_path_tracer_shader(scene_code)

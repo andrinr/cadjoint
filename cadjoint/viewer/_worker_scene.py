@@ -13,12 +13,16 @@ needs the optional solver extra reports when the import fails.
 
 from __future__ import annotations
 
+import contextlib
+from collections.abc import Callable
 from typing import Any
 
 from cadjoint.viewer._source_map import PLAYGROUND_FILENAME
 
 
-def _execute_scene(source: str) -> dict[str, Any]:
+def _execute_scene(
+    source: str, *, capture: tuple[tuple[str, Callable[[], Any]], ...] = ()
+) -> dict[str, Any]:
     """Run playground source and return its namespace (the scene lives inside).
 
     The exec always happens inside :func:`capture_sim_meshes` +
@@ -27,6 +31,13 @@ def _execute_scene(source: str) -> dict[str, Any]:
     can only resolve it through an active capture context, so every worker
     mode needs them, whether or not it looks at the captured lists
     afterwards.
+
+    Args:
+        source: The program text.
+        capture: Extra ``(namespace_key, context_factory)`` pairs entered, in
+            order, *outside* the three standard registries; whatever each
+            context yields lands in the namespace under its key. The compile
+            path uses this for constraint-solve reports and sketch profiles.
     """
     from cadjoint.fem.simmesh import capture_sim_meshes
     from cadjoint.fem.study import capture_studies
@@ -36,17 +47,18 @@ def _execute_scene(source: str) -> dict[str, Any]:
         "__builtins__": __builtins__,
         "__name__": "__cadjoint_playground__",
     }
-    with (
-        capture_sim_meshes() as sim_meshes,
-        capture_studies() as studies,
-        capture_optimizations() as optimizations,
-    ):
+    with contextlib.ExitStack() as stack:
+        extra = {key: stack.enter_context(factory()) for key, factory in capture}
+        sim_meshes = stack.enter_context(capture_sim_meshes())
+        studies = stack.enter_context(capture_studies())
+        optimizations = stack.enter_context(capture_optimizations())
         exec(compile(source, PLAYGROUND_FILENAME, "exec"), namespace, namespace)
     if "scene" not in namespace:
         raise ValueError("Your program must assign the SDF to a variable named `scene`.")
     namespace["__sim_meshes__"] = sim_meshes
     namespace["__studies__"] = studies
     namespace["__optimizations__"] = optimizations
+    namespace.update(extra)
     return namespace
 
 
