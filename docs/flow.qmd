@@ -1,0 +1,165 @@
+---
+title: Flow Solver (prototype)
+description: A differentiable steady flow solve with no mesh in the loop — Brinkman-penalised lattice Boltzmann on the scene's own field.
+---
+
+::: {.callout-important}
+## Prototype
+
+`cadjoint.flow` answers one question: can a flow solve join the gradient path on
+the same terms the thermal solve does — design parameters in, a scalar out, a
+reverse-mode derivative between them — with no mesh generation anywhere in the
+loop? It can, and this page shows how. What it is *not* yet is coupled to a
+study, sized for a GPU, or part of the playground. Its API will move. The
+measurements and the plan for coupling it are in
+[the research note](../research/flow-solver.md).
+:::
+
+## The idea
+
+Every solver on the [simulation page](simulation.qmd) needs a mesh, and a mesh
+is where differentiability is hardest won. A penalised flow needs none. The
+scene's SDF is sampled on a fixed lattice and squashed to a **solid fraction**
+`chi(x)` in `[0, 1]`; `chi` enters the momentum equation as a Brinkman drag
+`−alpha_max · chi · u`, so where the design is solid the fluid stops, and
+where it is not it flows. The design never becomes a mesh; it becomes a
+field, and the grid never moves. The chain from a sketch point to a pressure
+drop is one JAX expression:
+
+```
+sketch point → SDF → chi = profile(−f(x) / ε) → alpha = alpha_max · chi
+             → D3Q19 lattice-Boltzmann fixed point → pressure drop, heat proxy
+```
+
+The solve is a fixed point, and its gradient is taken by the implicit function
+theorem rather than by taping the pseudo-time march: one adjoint solve at the
+converged state, with memory independent of how many steps convergence took.
+On the starter sink that is 457 MB where the tape needs 21 GB, and the two
+agree to 5.6e-11 once the tape's own march has converged.
+
+## Set up a grid and a solid fraction
+
+`FlowGrid` is the lattice in world coordinates, with the duct running along
+`+Y`; `sample_solid_fraction` evaluates a scene SDF on it. The profile that
+squashes distance to occupancy has **compact support** on purpose: a sigmoid
+never reaches zero, and multiplied by `alpha_max` its tail plugs every open
+channel — the finding that mattered most while building this. The default is
+a C² quintic, which is also what keeps a finite-difference check second order.
+
+```python
+import jax
+jax.config.update("jax_enable_x64", True)
+
+from cadjoint import extract_parameters, functionalize
+from cadjoint.flow import FlowConfig, FlowGrid, SteadyOptions, sample_solid_fraction, solve
+from cadjoint.geometry import Vector
+from cadjoint.sdf.primitives import Box
+
+fin = Box(Vector([0.3, 0.4, 0.6], free=True, name="size"))
+free, fixed, _ = extract_parameters(fin)
+evaluate = functionalize(fin)
+
+grid = FlowGrid(shape=(16, 32, 16), origin=(-1.0, -2.0, -1.0), size=(2.0, 4.0, 2.0))
+chi = sample_solid_fraction(evaluate(free, fixed), grid)
+print(chi.shape, float(chi.max()), grid.suggested_epsilon())   # (16, 32, 16) 1.0 0.0625
+```
+
+## Solve
+
+`FlowConfig` holds the lattice-unit settings — inlet speed, Reynolds number,
+the drag at `chi = 1` — and derives the BGK relaxation rate from them. It
+refuses an `omega` above 1.95 at construction, because BGK loses stability as
+`omega` approaches 2 and the penalised solid brings that on sooner; a `NaN` an
+hour into a march is a much worse error message.
+
+```python
+config = FlowConfig(
+    shape=grid.shape, inlet_speed=0.02, reynolds=30.0,
+    steady=SteadyOptions(tol=1e-10, adjoint_solver="fixed_point",
+                         adjoint_tol=1e-10, adjoint_max_steps=4000),
+)
+print(round(config.omega, 4), round(config.mach, 3))   # 1.8797 0.035
+
+result = solve(chi, config, cell_volume=grid.cell_volume)
+print(float(result.pressure_drop), float(result.heat_transfer))
+```
+
+`FlowResult` carries the converged populations, density and velocity fields
+and the two scalars read off them: the inlet-to-outlet `pressure_drop`, and
+`heat_transfer`, the `∫ chi |u|` proxy that stands in for a convection
+coefficient until the coupling in the note's §8 lands. `convergence` returns
+the residual history if you want to see the march.
+
+## Differentiate
+
+Nothing in the chain contours, meshes, or decides membership, so `jax.grad`
+runs straight through it — the SDF, the profile, and the fixed point:
+
+```python
+def objective(free):
+    chi = sample_solid_fraction(evaluate(free, fixed), grid)
+    return solve(chi, config, cell_volume=grid.cell_volume).pressure_drop
+
+value, grad = jax.value_and_grad(objective)(free)
+print(float(value), grad["size"])
+# 0.0039086 [6.884e-04 2.700e-03 8.27e-07]
+```
+
+Widening the fin across the duct (`size[0]`) raises the pressure drop at
+6.9e-4 per unit; lengthening it along the flow (`size[1]`) costs four times
+as much again, and its height (`size[2]`) almost nothing, because the box
+already spans most of the duct's height. A central difference on `size[0]`
+with `h = 1e-3` gives 6.897e-4 — 0.2 % from the adjoint, which is the
+difference scheme's own truncation. On the starter sink's real sketch
+handles the note measures 3e-8.
+
+Two adjoint solvers are offered because they fail differently: `"gmres"` is
+fastest when it converges; `"fixed_point"` is Richardson iteration on the same
+system, so it converges exactly when the forward march does. Disagreement
+between them means one of the two solves had not converged — and note that
+the default `adjoint_max_steps` of 400 is not enough on this duct for either
+solver (with it, the example above reports 8.1e-4 rather than 6.9e-4), which
+is why the configuration raises it. Check a new configuration against a
+finite difference once before trusting it.
+
+## As a plugin
+
+The solver ships as `flow_brinkman`, a [plugin](plugins.qmd) of kind
+`flow_solver`. Its wire contract is unusually small — the solver plugins
+beside it ship a mesh; this one ships one array:
+
+```python
+from cadjoint.plugins import plugin_for_kind
+
+flow = plugin_for_kind("flow_solver")
+print(flow.name, sorted(flow.capabilities.differentiable_inputs))
+# flow_brinkman ['chi', 'inlet_velocity']
+```
+
+`apply` and `vector_jacobian_product` through the runtime are bit-identical to
+the in-process solve and gradient, because both sides run the same
+`custom_vjp`. It needs no conda and no new extra: `cadjoint.flow` is pure JAX
+over a fixed array.
+
+## What it costs, and what is next
+
+The CPU implementation runs at 12–16 million lattice updates a second — about
+2 % of the memory roofline, because `stream()` is nineteen `jnp.roll`s where a
+fused kernel makes one pass. Iterations to convergence grow linearly with the
+grid's linear size (about `119·N + 1400`), so a 128³ solve is 48 minutes on
+this CPU, four minutes on an A100 as written, and seconds with a fused stream.
+The adjoint's memory is the constraint nobody expects: GMRES holds `restart`
+Krylov vectors, 12.8 GB at 128³, where `"fixed_point"` needs three states.
+
+The objective a designer actually wants is junction temperature under real
+airflow, minimized against the pressure drop the fan has to pay — without the
+second term the optimizer walks straight into a solid block. The note's §8 sets
+out the cheap coupling (a heat-transfer coefficient from `|u|` into a Robin
+condition on the thermal study) and the full one (conjugate heat transfer on
+the same lattice), in that order.
+
+## Further reading
+
+- [A differentiable flow solver](../research/flow-solver.md) — XLB evaluated and rejected, the compact-profile finding, the stability ceiling, the adjoint measured against finite differences and against a tape, and the coupling plan.
+- [Plugins](plugins.qmd) — the `flow_solver` slot this fills.
+- [Simulation](simulation.qmd) — the thermal study it will eventually feed.

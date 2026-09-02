@@ -61,10 +61,16 @@ entry is a **factory**, not a singleton, so marking one scene's copper
 `free` cannot leak into another scene:
 
 ```python
-from cadjoint.materials import aluminium_6061, copper_c11000, fr4
+import jax.numpy as jnp
+from cadjoint.materials import aluminium_6061, copper_c11000
+from cadjoint.sdf.boolean import Union
+from cadjoint.sdf.primitives import Box, Cylinder
+from cadjoint.sdf.transforms import Translate
 
-sink = extrude(comb_profile, depth=fin_depth, material=aluminium_6061())
-slug = revolve(slug_profile, material=copper_c11000())
+sink = Box([0.6, 0.6, 0.2], material=aluminium_6061())
+slug = Translate(Cylinder(radius=0.2, height=0.4, material=copper_c11000()),
+                 offset=jnp.array([0.0, 0.0, 0.1]))
+scene = Union((sink, slug), smoothness=0.03)
 ```
 
 | Factory | Density (kg/m³) | k (W/(m·K)) | cₚ (J/(kg·K)) | E (GPa) | ν | α (1/K) | Yield (MPa) |
@@ -135,17 +141,28 @@ so it can regularize an optimization:
 ```python
 from cadjoint.sdf import material_mass, volume
 
-volume(scene)                       # m³, shape only
-material_mass(scene)                # kg, weighted by what each region is made of
+lattice = dict(bounds=(-0.7, -0.7, -0.3), size=(1.4, 1.4, 0.8), resolution=70)
+print(float(volume(scene, **lattice)))          # 0.609  m³, shape only
+print(float(material_mass(scene, **lattice)))   # 2074.6 kg, weighted by what each region is
 ```
 
 `material_mass` is the mass counterpart of `volume` and takes the same
-arguments. It also accepts an explicit sample lattice, which is the form a
-scene's own regularizer usually already has:
+arguments — a sampling box and a resolution, and the `epsilon` of the sigmoid
+that softens the boundary. It also accepts an explicit sample lattice, which is
+the form a scene's own regularizer usually already has:
 
 ```python
+import jax
+from cadjoint import extract_parameters, functionalize
+
+free, fixed, _ = extract_parameters(scene)
+sdf = functionalize(scene)(free, fixed)
+axis = jnp.linspace(-0.7, 0.7, 70)
+cells = jnp.stack(jnp.meshgrid(axis, axis, axis, indexing="ij"), -1).reshape(-1, 3)
+cell_volume = float(axis[1] - axis[0]) ** 3
+
 # a volume regularizer …
-cell_volume * jnp.sum(jax.nn.sigmoid(-sdf(cells) / 0.03))
+cell_volume * jnp.sum(jax.nn.sigmoid(-jax.vmap(sdf)(cells) / 0.03))
 # … and the same thing weighted by what each cell is made of
 material_mass(scene, cells, cell_volume, epsilon=0.03)
 ```
@@ -158,7 +175,9 @@ study reports it directly as `result.mass`.
 
 ## Inspecting a material
 
-`describe()` is the JSON-ready payload the viewer's material inspector reads:
+`describe()` is the JSON-ready payload the playground's Materials window
+reads — and edits, physical properties included, as
+[source rewrites](viewer.qmd#materials):
 
 ```python
 Material("al", color=[0.8, 0.8, 0.82], density=2700.0, conductivity=167.0).describe()

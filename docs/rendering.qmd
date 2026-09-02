@@ -174,14 +174,17 @@ a `ShaderProgram` instead: the same source for every parameter value, plus a
 `vec4`-per-parameter uniform layout to write the values into.
 
 ```python
-program = compile_scene_to_wgsl(scene, uniforms=True)
+from cadjoint.geometry import Scalar
+
+sphere = Sphere(radius=Scalar(1.0, free=True, name="radius"))
+program = compile_scene_to_wgsl(sphere, uniforms=True)
 program.wgsl                 # identical across every value edit
-program.parameters[0].name   # the name extract_parameters uses
+program.parameters[0].name   # 'radius' — the name extract_parameters uses
 program.buffer()             # float32 array to upload at @group(3) @binding(0)
 ```
 
 ## Further reading
 
 - [Rendering notebook](../examples/rendering.ipynb) — composition, quality presets, and hot reload
-- [The playground](viewer.qmd) — the interactive WebGPU viewport and its progressive path tracer
+- [The playground](viewer.qmd) — the interactive WebGPU viewport, its progressive path tracer, and its views of the field itself (signed slice, gradient magnitude, iso-offset, normals, depth)
 - [WebGPU SDF path tracing](../research/path-tracing.md) — design and deliberate boundaries of the browser path tracer

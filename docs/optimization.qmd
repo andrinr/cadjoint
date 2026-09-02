@@ -141,6 +141,12 @@ For the same reason the *final* reported number is always evaluated on a freshly
 extracted mesh, so it does not depend on whichever topology happened to be
 frozen last.
 
+Freezing the topology also fixes every array shape in the objective, so the
+frozen objective is compiled once per topology with `jax.jit` and each step
+pays the solve rather than a re-trace of the scene — on the starter scene an
+optimizer step fell from ~11 s to 0.5–0.8 s with the objective identical to
+13 digits ([performance notes](../research/performance.md)).
+
 ## Gradient paths
 
 `gradient_path` picks how far the derivative has to travel outside JAX.
@@ -159,7 +165,10 @@ real field is what preserves fin creases — and it is what the starter scene
 declares. Both Tesseract paths need the `tesseract` extra. Whichever path runs
 the descent, the final result is evaluated on the direct path.
 
-See [Tesseracts](tesseracts.qmd) for what each boundary costs and why it exists.
+The stages behind both paths are [plugins](plugins.qmd) resolved by kind —
+`mesher`, `tetfill`, `thermal_solver`, `elastic_solver` — so where each one runs
+is configuration, not code. That page says what each boundary costs and why it
+exists.
 
 ## Constraints come along
 
@@ -168,7 +177,21 @@ Every update is projected back onto the constraint manifold. When
 the optimizer chains a Newton projection onto the optimizer transform:
 
 ```python
-transform = optax.chain(optax.adam(learning_rate),
+import optax
+from cadjoint import extract_parameters
+from cadjoint.constraints import DistanceConstraint
+from cadjoint.constraints.solve import make_manifold_projection
+from cadjoint.geometry.parameters import Vector
+from cadjoint.sdf.primitives import Sphere
+from cadjoint.sdf.transforms import Translate
+
+p = Vector([2.0, 0.0, 0.0], free=True, name="p")
+anchor = Vector([0.0, 0.0, 0.0], free=False, name="anchor")
+DistanceConstraint(p, anchor, 2.0)
+scene = Translate(Sphere(radius=0.5), offset=p)
+free, fixed, metadata = extract_parameters(scene)
+
+transform = optax.chain(optax.adam(0.1),
                         make_manifold_projection(metadata, steps=2))
 ```
 
@@ -219,4 +242,4 @@ figure, and before/after VTK files land in `examples/output/`.
 
 - [End-to-end optimization](../research/end-to-end-optimization.md) — the measured bracket run record, box-bound rationale, and a known CalculiX deck fragility.
 - [Simulation](simulation.qmd) — declaring the study this minimizes.
-- [Tesseracts](tesseracts.qmd) — the boundaries `gradient_path` crosses.
+- [Plugins](plugins.qmd) — the boundaries `gradient_path` crosses, and where each stage runs.

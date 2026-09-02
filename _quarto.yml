@@ -15,8 +15,12 @@ website:
         menu:
           - text: Differentiable Meshing
             href: docs/meshing.qmd
+          - text: Derived B-rep
+            href: docs/brep.qmd
           - text: Simulation
             href: docs/simulation.qmd
+          - text: Flow Solver (prototype)
+            href: docs/flow.qmd
           - text: Optimization
             href: docs/optimization.qmd
           - text: Plugins
@@ -46,6 +50,10 @@ website:
         menu:
           - text: Differentiable meshing pipeline
             href: research/differentiable-meshing-pipeline.md
+          - text: Derived B-rep architecture
+            href: research/brep-architecture.md
+          - text: Where the seconds go (performance)
+            href: research/performance.md
           - text: Native (Rust) dual-contouring core (retired)
             href: research/native-mesher.md
           - text: FEM integration
@@ -60,6 +68,12 @@ website:
             href: research/simulator-ecosystem.md
           - text: Constraint system
             href: research/constraints.md
+          - text: Differentiable flow solver
+            href: research/flow-solver.md
+          - text: Modelling a gearbox end-cap
+            href: research/complex-scene.md
+          - text: The design language
+            href: research/design-language.md
       - text: API Reference
         href: reference/index.qmd
     right:
@@ -87,7 +101,13 @@ quartodoc:
     - title: Functionalize
       contents:
         - functionalize.functionalize
+        - functionalize.functionalize_parametric
         - functionalize.functionalize_scene
+        - functionalize.functionalize_scene_parametric
+    - title: Compilation cache
+      contents:
+        - cache.enable_compilation_cache
+        - cache.cache_directory
     - title: Shader compilation
       contents:
         - backends.wgsl.codegen.compile_sdf_to_wgsl
@@ -144,6 +164,45 @@ quartodoc:
         - meshing.diagnostics.surface_deviation
         - meshing.diagnostics.triangle_quality
         - meshing.diagnostics.self_intersections
+    - title: B-rep — graph
+      contents:
+        - brep.graph.extract_brep
+        - brep.graph.BRep
+        - brep.graph.BRepFace
+        - brep.graph.BRepEdge
+        - brep.graph.BRepVertex
+        - brep.graph.AnalyticSurface
+        - brep.graph.Patch
+    - title: B-rep — projection kernel
+      contents:
+        - brep.project.project
+        - brep.project.project_fields
+        - brep.project.stacked_fields
+        - brep.project.field_residuals
+        - brep.project.transversal
+    - title: B-rep — export, drag and meshing
+      contents:
+        - brep.step.save_brep_step
+        - brep.step.save_brep_obj
+        - brep.step.save_brep_stl
+        - brep.step.brep_loops
+        - brep.step.brep_triangles
+        - brep.step.brep_volume
+        - brep.step.simplify_loop
+        - brep.drag.drag_handle
+        - brep.drag.handle_position
+        - brep.drag.DragResult
+        - brep.plc.brep_plc
+        - brep.plc.plc_tet_mesh
+        - brep.plc.recompute_plc_points
+        - brep.plc.plc_quality
+        - brep.plc.PLC
+        - brep.mesh_gmsh.gmsh_available
+        - brep.mesh_gmsh.gmsh_tet_mesh
+        - brep.mesh_gmsh.tet_mesh_from_gmsh
+        - brep.mesh_gmsh.recompute_gmsh_points
+        - brep.mesh_gmsh.assign_ownership
+        - brep.mesh_gmsh.GmshMesh
     - title: Option sets
       contents:
         - enums.MeshMethod
@@ -166,6 +225,10 @@ quartodoc:
     - title: Simulation — meshes and studies
       contents:
         - fem.simmesh.SimMesh
+        - fem.hexmesh.HexMesh
+        - fem.hexmesh.sdf_to_hex_mesh
+        - fem.tetmesh.TetMesh
+        - fem.tetmesh.sdf_to_tet_mesh
         - fem.study.ThermalStudy
         - fem.study.ElasticStudy
         - fem.result.SimulationResult
@@ -197,6 +260,36 @@ quartodoc:
         - optimize.Optimization
         - optimize.OptimizationRun
         - optimize.capture_optimizations
+    - title: Plugins
+      contents:
+        - plugins.plugin.Plugin
+        - plugins.plugin.TesseractPlugin
+        - plugins.plugin.Capabilities
+        - plugins.plugin.PluginProbe
+        - plugins.plugin.PluginMismatch
+        - plugins.spec.PluginSpec
+        - plugins.spec.runtime_scratch
+        - plugins.registry.PluginRegistry
+        - plugins.registry.plugin_for_kind
+        - plugins.registry.get_plugin
+        - plugins.registry.register_plugin
+        - plugins.registry.available_plugins
+        - plugins.registry.build_registry
+        - plugins.registry.load_config
+    - title: Flow solver (prototype)
+      contents:
+        - flow.domain.FlowGrid
+        - flow.domain.sample_solid_fraction
+        - flow.domain.solid_fraction
+        - flow.solver.FlowConfig
+        - flow.solver.FlowResult
+        - flow.solver.solve
+        - flow.solver.convergence
+        - flow.solver.recommended_alpha_max
+        - flow.steady.SteadyOptions
+        - flow.steady.steady_populations
+        - flow.objectives.pressure_drop
+        - flow.objectives.heat_transfer_proxy
     - title: Materials
       contents:
         - render.material.Material
@@ -219,3 +312,15 @@ quartodoc:
         - render.raymarch.render.render_scene
         - render.raymarch.render.raymarch
         - render.raymarch.render.render_raymarched
+    - title: Viewer — payload schema
+      contents:
+        - viewer.schema.payloads.CompilePayload
+        - viewer.schema.payloads.ConstructionNode
+        - viewer.schema.payloads.ConstructionFace
+        - viewer.schema.payloads.MaterialDefinition
+        - viewer.schema.payloads.SimMeshPayload
+        - viewer.schema.payloads.StudyPayload
+        - viewer.schema.payloads.OptimizationPayload
+        - viewer.schema.payloads.MeshEdgePayload
+        - viewer.schema.requests.validate_patch_request
+        - viewer.schema.emit.typescript_source

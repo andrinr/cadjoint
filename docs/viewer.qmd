@@ -47,21 +47,43 @@ compiles each edit in a timed child process so a failed edit cannot take down
 the server — but it is not a sandbox. Only run code you trust.
 :::
 
-## Three modes
+## One desk, many windows
 
-The toolbar carries a segmented switcher, the way Blender scopes its tool set to
-a mode. `M` cycles it, `Esc` returns to Model. Each mode has its own accent
-colour, threaded through the tool rail, dock headers, and viewport border.
+Every panel is a **window**: the editor, the viewport, Objects, Materials,
+Sketch, Meshes, Studies, Results, Optimize, Scenes and Processes. A window can
+be moved, closed, minimised to a tray, tabbed with another, stacked, dragged to
+split the desk, floated over the page and docked back. The WebGPU canvas keeps
+its context through all of it — the viewport is repositioned, never re-parented
+— and the arrangement is persisted in the browser, with Window ▸ Reset layout to
+get the default back.
 
-| Mode | For | Tools |
+The toolbar's three-cell switcher — `M` cycles it, `Esc` returns to Model —
+picks a **desk**: a default arrangement of windows and the tool set the rail
+offers, the way Blender scopes its tools to a mode.
+
+| Desk | Opens by default | Tools on the rail |
 |---|---|---|
-| **Model** | Solids and transforms | Select, place box / sphere / cylinder, move and rotate gizmos, delete |
-| **Sketch** | 2D profiles and constraints | Everything in Model, plus polygon editing, modify, and constraint annotation |
-| **Simulate** | FEM setup and results | The four-tab Simulate panel; the viewport becomes a picker |
+| **Model** | Editor, viewport, Objects, Materials, Optimize | Select, place box / sphere / cylinder, sketch on a face, move and rotate gizmos, delete |
+| **Sketch** | Editor, viewport, Objects, Sketch | Everything in Model, plus polygon editing, modify, and constraint annotation |
+| **Simulate** | Editor, viewport, Studies with Meshes tabbed behind it, Results with Optimize tabbed behind | None — the viewport becomes a picker for boundary conditions |
 
-Rendering is deliberately *not* a mode. Presets, shading, shadows, and quality
-live in a popover behind the eye icon, which opens from any mode — how the scene
-is drawn is orthogonal to what you are editing.
+Simulate is not a second application. Meshes, Studies, Results and Optimize are
+ordinary windows on the same desk as everything else, and Window ▸ opens any of
+them from any desk; the desk only decides which are open when you arrive.
+Scenes and Processes are parked in the tray on every desk rather than docked on
+any, because a browser or a monitor that took a column before you asked for it
+would be in the way of the work. Selecting a sketch profile in the viewport
+auto-enters the Sketch desk once; `Esc` or the switcher leaves again.
+
+All three desks share one accent. Which one you are on is read from the
+position of the filled cell in the switcher, the word in the hint bar, and the
+tool set — not from a hue, because colour in this app is reserved for data.
+
+Rendering is deliberately *not* a desk. Presets, shading, shadows, quality and
+the views of the field live in a popover behind the eye icon, which opens from
+any desk — how the scene is drawn is orthogonal to what you are editing.
+
+[![Windows floated, tabbed and stacked over the Simulate desk](assets/screens/windows-float-stack.png)](assets/screens/windows-float-stack.png)
 
 ## Modelling
 
@@ -78,12 +100,35 @@ solid as a depth-tested wireframe, so an edge behind the model is hidden by it.
 | Click a solid's outline | Selects it and shows the gizmo |
 | Drag a gizmo arrow or ring | Rewrites `position=` or `rotation=` |
 | Drag empty space / Shift-drag / scroll | Orbit / pan / zoom |
-
 | Click a face of a solid | Highlights it; **New sketch on face** plants a sketch there |
 
-`1` and `2` switch between selecting whole objects and selecting sketch
+`O` and `V` switch between selecting whole objects and selecting sketch
 vertices; `G` and `R` switch the gizmo between move and rotate.
 `Ctrl/⌘ + Enter` runs the program, `Ctrl/⌘ + Z` undoes the last source change.
+
+### Finding your way around
+
+The world is **Z-up**, as every scene is, and the viewport defaults to
+orthographic projection — `5` toggles perspective. A **floor grid** on `z = 0`
+rules the ground with one honest 1-2-5 spacing readout that follows the zoom,
+and a title block names the scene and the view; an empty viewport rules the
+floor rather than rendering black.
+
+The **navigation cube** in the corner is a chamfered cube in the FreeCAD
+lineage: its six faces, twelve bevels and eight corners are the twenty-six
+standard views, each a real facet you can press, and the flank controls turn a
+quarter about the camera's own axes. Shift-click a facet for the view directly
+opposite — from above the floor there is never a BOTTOM to click, but its far
+side is one Shift away. `1`, `3` and `7` are front, right and top (with `Ctrl`
+for back, left and bottom), and `9` turns to the opposite side.
+
+One **construction-overlay switch** hides everything the app draws *about* the
+model rather than *of* it — construction edges, sketch handles, the gizmo,
+constraint marks and their dimension labels, the boundary-condition preview —
+for a presentation state that is the solid, the field and the floor and nothing
+else.
+
+[![The same scene with the construction overlay off: solid, field and floor only](assets/screens/construction-overlay-off.png)](assets/screens/construction-overlay-off.png)
 
 ### Sketching on a face
 
@@ -106,17 +151,24 @@ gradient of anything downstream still reaches the parent's `depth` — see
 A sketch can only sit on geometry the program builds before it; the server
 refuses the patch otherwise rather than writing a `NameError`.
 
-## Simulate
+## Simulating
 
-Simulate mode opens a four-tab panel over the same declarations a script would
-read. Every edit goes through the same source-patch round-trip as the sketch
-tools; solving posts the study's *name*, and the server re-derives everything
-from the declaration.
+Four windows — Meshes, Studies, Results and Optimize — work over the same
+declarations a script would read; the Simulate desk opens them, and Window ▸
+opens any of them anywhere else. Every edit goes through the same source-patch
+round-trip as the sketch tools; solving posts the study's *name*, and the
+server re-derives everything from the declaration. Every option they offer —
+mesh method, study kind, boundary-condition type, objective metric, gradient
+path — is one of the `cadjoint.enums` option sets, so the window's choices,
+the validator's rejections and the generated TypeScript unions are the same
+list.
 
 **Meshes** declares and regenerates `SimMesh` objects. Resolution, padding,
 bounds, size, and the Hex / Tet4 / Tet10 method are editable inline; regenerating
 reports node and element counts and shades the mesh by element quality with a
-histogram beside it.
+histogram beside it. A tet mesh that had to climb the
+[refinement ladder](meshing.qmd#the-refinement-ladder) says which grid it was
+actually built on.
 
 ![The declared SimMesh discretized into tet10 elements, shaded by element quality with a quality histogram](assets/screens/simulate-meshes.png)
 
@@ -126,7 +178,9 @@ surface proposes a `Nodes.sphere` selection sized from the mesh spacing;
 shift-dragging a rectangle proposes a `Nodes.box` from the world-space bounds of
 the vertices inside it. The proposal is written into the program as a real
 selection expression, so a BC picked by hand is indistinguishable from one typed
-by hand, and it re-resolves against whatever the mesh becomes.
+by hand, and it re-resolves against whatever the mesh becomes. A study with no
+`conductivity=` (or `youngs=` / `poisson=`) takes the property from the
+scene's [materials](materials.qmd), sampled per element at solve time.
 
 ![The solved temperature field, clipped by the slice plane so the flux entering at the die interface is visible](assets/screens/simulate-results.png)
 
@@ -135,13 +189,15 @@ objective and gradient norm as it arrives. When a run finishes it lands in a
 player: a convergence sparkline with a moving cursor, play/pause, and a scrubber
 that replays the geometry along the trajectory by substituting each step's
 parameter snapshot and ghost-compiling it. Only the adopted final source ever
-touches undo history.
+touches undo history. While it runs, a chip in the mode strip shows what is
+running and for how long, wherever on the desk you happen to be looking.
 
 ![The finished cool-sink optimization: convergence sparkline, trajectory scrubber, and each parameter's before and after value](assets/screens/optimize-replay.png)
 
 **Results** browses the solved surface — a field picker that swaps displayed
 scalars without re-solving, a deformed view for elastic results, per-vertex BC
-previews, and an axis-aligned slice plane.
+previews, and an axis-aligned slice plane. The field is drawn in the viridis
+ramp and nothing else in the app is, so colour on screen always means data.
 
 ## Materials
 
@@ -202,6 +258,33 @@ editable row. Only the cheap conversion is done: a bare, argument-free factory
 call, whose result the server can build and read without executing any of the
 user's own code.
 
+## Looking at the field
+
+The solid is one way to look at a signed distance field, and the render
+popover offers four more. All of them are branches inside the same generated
+shader, views of the one SDF the solid is traced from, so there is no second
+scene to fall out of step.
+
+| View | Shows |
+|---|---|
+| **Solid** | The raymarched surface everything else in the app assumes |
+| **Slice** | The signed value of the field on a plane, inside and outside, with isolines that tighten toward the boundary — the part's own section outline is the `f = 0` contour |
+| **∇f** | The gradient magnitude on the same plane: `|∇f| = 1` is a true distance, and anything else is where a blend, a scale or a twist has stopped it being one |
+| **N** | World-space normals on the surface |
+| **Z** | Linear camera depth |
+
+The slice plane takes any axis and sweeps a slab of ±2 units about the origin;
+the legend prints the plane's actual coordinate, and both slice views draw
+their isolines one pixel wide at every zoom. The slice is data, so it is
+composited after tone mapping in the achromatic ink the chrome uses, and the
+field values are read from the same shader `sdf()` the primary rays march.
+
+An **iso-offset** slider traces the solid at `f = c` instead of `f = 0`: a
+positive offset dilates the part, a negative one erodes it. It is applied to
+every `sdf()` read — primary rays, shadows, normals — so the offset surface
+shades and casts like a real surface rather than a shell drawn over the old
+one, which makes it a quick check of a wall thickness or a clearance.
+
 ## Rendering
 
 The eye icon opens the render popover. It carries three editable presets —
@@ -252,6 +335,26 @@ importance sampling becomes useful only once emissive area lights or an
 importance-sampled environment map are added. The scope decisions are recorded
 in [WebGPU SDF path tracing](../research/path-tracing.md).
 
+## Export
+
+**File ▸ Export…** writes one object of the program as a file, in the formats
+the library already exports: `STL` (binary or ASCII), `OBJ` (coplanar quads
+merged into n-gons), `STEP` and, once the program declares a study, `VTK`. The
+dialog asks for the format, the object — any module-level variable bound to an
+SDF, `scene` by default — and the lattice resolution in cells along the
+object's longest axis; the lattice is fitted to the object the same way a
+`SimMesh` without explicit bounds is. STEP is not a faceted mesh with a
+`.step` extension: it is written from the derived B-rep, so planes and
+cylinders are exact with their real edge curves and only blend faces are
+faceted (`analytic` off asks for the faceted writer instead). VTK takes a
+declared study rather than an object and writes its solved mesh and fields
+for ParaView, solving first if the program has not. The run is a job like a
+solve — the chip beside the mode switcher counts it and can cancel it, and
+the Processes window lists it — and the browser saves the file under the
+scene's name (`heatsink-scene.stl`). The endpoint is `POST /api/export`; a
+success is the file itself with `Content-Disposition` and the job id in
+`X-Cadjoint-Job`, a failure the usual JSON.
+
 ## Compilation path
 
 Each run follows the same path as the shader backend:
@@ -264,6 +367,22 @@ Each run follows the same path as the shader backend:
 
 The code icon shows the complete generated WGSL. Python tracebacks and WGSL
 compiler errors appear under the editor.
+
+Every request runs in a fresh child process, so nothing would survive between
+edits by default. Two things make the second edit cheaper than the first. The
+worker turns on JAX's **persistent compilation cache** under
+`~/.cache/cadjoint/jax` (`CADJOINT_CACHE_DIR` to move it,
+`CADJOINT_NO_COMPILATION_CACHE=1` to opt out), so a program compiled once is
+reused by every later process; and the scene is traced with its parameter
+values as *arguments* rather than literals, so a re-dimensioned design lowers
+to the same program and hits that cache. Measured on the starter scene, a
+compile fell from 2.1 s to 1.0 s and a mesh overlay from 12.2 s to 5.8 s
+warm. The server warms the cache for every shipped scene at start — those are
+the `warmup` jobs in the Processes window — so the first overlay you ask for
+does not pay the cold cliff. The FEM paths gain nothing from it: a jax-fem
+solve runs in PETSc, outside XLA. See
+[program size](meshing.qmd#program-size) and the
+[performance notes](../research/performance.md).
 
 ## Code parity
 
@@ -316,7 +435,7 @@ drift apart.
 
 ### The round-trip invariant
 
-`tests/viewer/test_parity_roundtrip.py` closes the loop for all 27 operations:
+`tests/viewer/test_parity_roundtrip.py` closes the loop for all 28 operations:
 for each generated request the patched text must still parse, patching twice
 from the same input must be byte-identical, the id and the legacy line must
 produce the same source, and compiling the result must show exactly the change
@@ -414,8 +533,8 @@ not.
 The panels do their half of the same bargain. The Simulate panel's Results
 tab, the mesh inspection and an optimization run each remember only the job
 id, the source hash and the request's name, and fetch the payload back when
-they mount again — so leaving Simulate mode and coming back no longer costs
-a second solve. A result whose hash no longer matches the editor is kept and
+they mount again — so closing the Results window, or leaving the Simulate
+desk, and coming back no longer costs a second solve. A result whose hash no longer matches the editor is kept and
 marked `stale · source changed` rather than discarded, and a result the
 server has evicted says so and offers the run again.
 
@@ -423,6 +542,30 @@ Sampling uses `psutil`, part of the `viewer` extra. Without it the server
 still registers everything and still cancels; it falls back to
 `resource.getrusage` totals over all child processes and says so in each
 payload's `sampling` field, which reads `"psutil"` or `"rusage"`.
+
+## Scenes
+
+**File ▸ Open…** raises the **Scenes** window, a browser over the `scenes/`
+directory under the server's working directory — the repository's own scene
+directory when you start from a checkout, or wherever `CADJOINT_SCENES_DIR`
+points. Each card carries a thumbnail, the first paragraph of the file's
+docstring, its size and modification time, and counts of what it declares:
+named and free design parameters, studies, meshes, optimizations, and the
+materials it defines.
+
+All of that is read with `ast`, never by executing the file. A browser that ran
+every program in a directory to describe it would be a browser that runs
+arbitrary code on a directory listing, which is not a trade the server makes
+anywhere else either. The thumbnails are the one thing that does cost a
+compile: they are rendered serially in the browser from each scene's own
+compiled shader and cached, so the directory is described instantly and drawn
+as it goes.
+
+Opening a scene replaces the editor's text (an unsaved buffer asks first);
+**File ▸ Save** and **Save As…** write back into the same directory, and the
+endpoints — `GET /api/scenes`, `POST /api/scenes/load`, `POST
+/api/scenes/save` — accept bare `*.py` names only. Path separators, traversal
+and hidden files are refused before anything touches the filesystem.
 
 ## A live example
 

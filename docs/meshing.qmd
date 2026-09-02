@@ -158,6 +158,12 @@ directly with an angle and plane tolerance. `save_step` writes a `CLOSED_SHELL`
 inside a `MANIFOLD_SOLID_BREP` and is validated against the OCCT kernel in
 `tests/meshing/test_step_kernel.py`.
 
+All three write the mesh as it is: a faceted solid, one triangle per cell
+crossing, a 28-gon standing in for a bore. For a STEP file in which a plane is
+a `PLANE` and a bore is one `CYLINDRICAL_SURFACE` — seven faces for a plate
+with a hole instead of three thousand — extract the
+[derived B-rep](brep.qmd) from the same field and write that instead.
+
 ## Checking a mesh
 
 `mesh_report` bundles the four diagnostics used throughout the test suite:
@@ -186,7 +192,9 @@ represent — a max absolute error of 0.0029 on a unit sphere at 26 cells.
 The same declared resolution buys you two different things. `method="hex"`
 only has to decide in/out per lattice cell, so a rib 1.3 cells thick still
 produces a legal (if staircased) HEX8 mesh. `method="tet4"` / `"tet10"` hand
-the dual-contour surface to TetGen as a piecewise linear complex, and a PLC
+the dual-contour surface to TetGen as a piecewise linear complex (a third
+route, Gmsh on the exact B-rep, sizes elements by the part rather than by the
+lattice — see [meshing from the graph](brep.qmd#meshing-from-the-graph)), and a PLC
 has to be *clean*: watertight, manifold, and free of self-intersections. One
 QEF vertex per cell cannot represent two surface sheets passing through one
 cell, so where a wall is thinner than about two cells the extracted quads
@@ -224,19 +232,33 @@ takes to reject a folded surface outright. What it earns is a rung recorded as
 
 Every mesh that came through the ladder carries a `refinement` record, and a
 `SimulationResult` re-exports it as `result.refinement` (with a digest under
-`describe()["refinement"]`, `None` when nothing was refined):
+`describe()["refinement"]`, `None` when nothing was refined). A plate with a
+blended rib two-thirds of a cell thick is enough to see it fire:
 
 ```python
-mesh = sim_mesh.build()
+import jax.numpy as jnp
+from cadjoint.fem import SimMesh
+from cadjoint.sdf.boolean import Union
+from cadjoint.sdf.primitives import Box
+from cadjoint.sdf.transforms import Translate
+
+plate = Box([1.0, 1.0, 0.1])
+rib = Translate(Box([0.12, 0.8, 0.4]), offset=jnp.array([0.0, 0.0, 0.4]))
+part = Union((plate, rib), smoothness=0.1)
+
+sim_mesh = SimMesh(name="ribbed", resolution=(10, 10, 6), method="tet4",
+                   bounds=(-1.1, -1.1, -0.2), size=(2.2, 2.2, 1.2))
+mesh = sim_mesh.build(part)
+
 record = mesh.refinement
 print(record["declared"], "->", record["used"], record["refined"])
-# (14, 14, 7) -> (21, 21, 11) True
+# (10, 10, 6) -> (15, 15, 9) True
 
 for attempt in record["attempts"]:
     print(attempt["resolution"], attempt["sharp"], attempt["outcome"])
-# (14, 14, 7)  True  self-intersecting
-# (14, 14, 7)  False self-intersecting
-# (21, 21, 11) True  meshed
+# (10, 10, 6)  True  self-intersecting
+# (10, 10, 6)  False self-intersecting
+# (15, 15, 9)  True  meshed
 ```
 
 `outcome` is one of `"meshed"`, `"self-intersecting"` (the diagnostic fired,
@@ -313,5 +335,6 @@ octree leaves (2:1 balancing, transition stitching) are also open.
 ## Further reading
 
 - [Differentiable meshing pipeline](../research/differentiable-meshing-pipeline.md) — design principles, the full stage/test map, and the benchmark policy.
-- [Native (Rust) dual-contouring core, retired](../research/native-mesher.md) — what the Rust port measured, and why 5 ms of a 4 s request was not worth a second implementation.
+- [Derived B-rep](brep.qmd) — faces, edges and vertices read off this mesh and re-solved against the field, for exact export, dragging, and meshing.
+- [Native (Rust) dual-contouring core, retired](../research/native-mesher.md) — what the Rust port measured, and why 5 ms of a 4 s request was not worth a second implementation. There is no Rust to build: the JAX/NumPy pipeline on this page is the only one.
 - [Simulation](simulation.qmd) — turning this surface into a volume mesh a solver can use.

@@ -17,11 +17,13 @@ Read **[Plugins](plugins.qmd)**.
 :::
 
 Nothing about the Tesseract packages themselves changed. They still live in
-`cadjoint/fem/tesseracts/*` and `native/`, still ship `tesseract_api.py` +
+`cadjoint/fem/tesseracts/*`, still ship `tesseract_api.py` +
 `tesseract_config.yaml` + a requirements file, and are still validated by
 `tests/fem/test_tesseract_packaging.py`. What changed is that cadjoint's own
 code now reaches them through `cadjoint.plugins` — by *kind* rather than by
-importing a module — so where each one runs is configuration.
+importing a module — so where each one runs is configuration. (The `native/`
+Rust package that once sat beside them is
+[retired](../research/native-mesher.md); there is nothing to build.)
 
 `gradient_path="tesseract"` and `"tesseract-dc"` are unchanged and remain the
 documented spellings.

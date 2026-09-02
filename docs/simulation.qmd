@@ -6,8 +6,8 @@ description: Declared meshes, declared studies, and node selections that survive
 `cadjoint.fem` turns an SDF into a finite-element answer. Both the
 discretization and the physics are *declared* — a `SimMesh` and a study are
 objects in the scene file, not calls buried in a script — because the same
-declarations are read by the viewer's Simulate panel, re-solved by the
-optimizer, and refrozen every time the geometry moves.
+declarations are read by the playground's Meshes and Studies windows, re-solved
+by the optimizer, and refrozen every time the geometry moves.
 
 Install the solver stack:
 
@@ -58,6 +58,16 @@ what is accepted rather than surfacing as a strange mesh.
 
 The tet methods need the `tetgen` package. On the same bar, `"tet10"` gives 947
 nodes across 448 elements against the hex mesh's 336 nodes and 180 elements.
+They also refine themselves: a surface TetGen refuses as self-intersecting is
+re-extracted on a finer grid over the same box before the build gives up, and
+the mesh records which rung it was built on — see
+[the refinement ladder](meshing.qmd#the-refinement-ladder).
+
+There is no fourth `method`. Tets sized by the part rather than by the lattice,
+with quadratic midside nodes on the true surface, come from Gmsh on the
+[derived B-rep](brep.qmd#meshing-from-the-graph); that route is reached through
+`cadjoint.brep.mesh_gmsh` and the `tet_mesher` plugin, and is not yet a
+`SimMesh` keyword.
 
 ## Judge it
 
@@ -74,8 +84,8 @@ print(sorted(q))  # ['aspect_ratio', 'scaled_jacobian']
 
 A voxelized hex mesh of an axis-aligned bar is perfect by construction — every
 metric is exactly 1.0. The tet10 mesh of the same bar spans radius ratios from
-0.146 to 0.941. That spread is what the histogram in the viewer's Meshes tab
-shows.
+0.146 to 0.941. That spread is what the histogram in the playground's Meshes
+window shows.
 
 ![The declared SimMesh discretized into tet10 elements, shaded by element quality with the quality histogram beside it](assets/screens/simulate-meshes.png)
 
@@ -187,26 +197,37 @@ Leave a property off the study (or pass the sentinel `"material"`) and it comes
 from the scene's own materials instead, sampled **per element** at solve time:
 
 ```python
+import jax.numpy as jnp
 from cadjoint.fem import Dirichlet, HeatFlux, Nodes, SimMesh, ThermalStudy
 from cadjoint.materials import aluminium_6061, copper_c11000
+from cadjoint.sdf.boolean import Union
+from cadjoint.sdf.primitives import Box
+from cadjoint.sdf.transforms import Translate
 
-sink = extrude(comb_profile, depth=fin_depth, material=aluminium_6061())
-slug = revolve(slug_profile, material=copper_c11000())
-scene = Union(sink, slug, smoothness=0.03)
+sink = Translate(Box([0.5, 0.15, 0.15], material=aluminium_6061()),
+                 offset=jnp.array([0.5, 0.0, 0.0]))
+slug = Translate(Box([0.5, 0.15, 0.15], material=copper_c11000()),
+                 offset=jnp.array([-0.5, 0.0, 0.0]))
+scene = Union((sink, slug), smoothness=0.03)
 
 study = ThermalStudy(                       # no conductivity= at all
-    name="sink-conduction",
-    bcs=[HeatFlux(die_face, 6.0), Dirichlet(fin_field, 0.0)],
-    mesh=sink_mesh,
+    name="two-metal-bar",
+    bcs=[HeatFlux(Nodes.side("-x"), 4.0), Dirichlet(Nodes.side("+x"), 0.0)],
+    mesh=SimMesh(name="bar-mesh", resolution=(22, 5, 5),
+                 bounds=(-1.1, -0.25, -0.25), size=(2.2, 0.5, 0.5)),
 )
 result = study.solve(scene)
+print(result.describe()["range"], result.mass)   # [0.0, 0.0335] 1062.4
 ```
 
 Every SDF answers `material_at(p)` and the smooth booleans blend the answers, so
 the scene is already a continuous *field* of properties. Sampling it at each
 element's centroid turns that field into the per-element array the solver wants:
-copper's 391 W/(m·K) inside the slug, aluminium's 167 outside, and a transition
-exactly as wide as the CSG blend joining them.
+copper's 391 W/(m·K) in the left half, aluminium's 167 in the right, and a
+transition exactly as wide as the CSG blend joining them. The 4 W/m² entering
+the copper end crosses the bar with a 0.034 K rise, and because both materials
+state a density the result reports the bar's 1062 kg as well (the scene is in
+metres, so it is a two-metre bar).
 
 Nothing about the old API changed. `conductivity=2.0` still means 2.0
 everywhere, on exactly the code path it always took — the per-element array only
@@ -329,6 +350,13 @@ and so on), but unlike the other option sets that enum is open at both ends:
 protocol in `cadjoint.fem.backends`, two methods wide. The survey in
 [simulator ecosystem](../research/simulator-ecosystem.md) ranks 31 further
 candidates for that slot.
+
+`"tesseract"` and `"calculix"` do not name a package; they name a *kind*.
+`"tesseract"` asks the [plugin registry](plugins.qmd) for whatever fills the
+`thermal_solver` or `elastic_solver` slot, and `"calculix"` for the
+`elastic_calculix` plugin — so a `plugins.toml` that points that kind at a
+container or a cluster URL moves the solve without a line of the study
+changing.
 
 Two constraints worth knowing. CalculiX is **elastic and HEX8 only**, and its
 differentiability is objective-valued: cotangents on the raw displacement field

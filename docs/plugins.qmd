@@ -66,6 +66,7 @@ the `Tesseract` itself, so `plugin.jacobian(...)`,
 | `elastic_jaxfem` | `elastic_solver` | jax-fem linear elasticity + von Mises | same |
 | `elastic_calculix` | `elastic_solver` | CalculiX 2.23 Fortran, over a subprocess | language, licence (GPL-2 isolated), AD strategy |
 | `tet_gmsh` | `tet_mesher` | Gmsh (HXT, order 2) on an exact STEP solid | licence (GPL-2-or-later isolated), a discrete topology decision |
+| `flow_brinkman` | `flow_solver` | the [prototype lattice-Boltzmann flow solver](flow.qmd), pure JAX | none yet — it exists to prove a solver with no mesh fits the same slot |
 
 Each solves its VJP differently. The jax-fem pair use an implicit adjoint —
 one transposed linear solve per cotangent — and produce gradients
@@ -75,7 +76,10 @@ term missing from ccx 2.23, validated to 2e-4 of finite differences.
 `tetfill`'s is the exact transpose of a gather (TetGen's
 `-Y` preserves input vertices verbatim); `mesher`'s is the
 surface-interpolation contract described in [the two mesher
-boundaries](#the-two-mesher-boundaries).
+boundaries](#the-two-mesher-boundaries). `flow_brinkman` differentiates its
+fixed point by the implicit function theorem inside a `custom_vjp`, and the
+same `custom_vjp` runs on both sides of the boundary, so its in-process and
+served gradients are bit-identical by construction.
 
 Two plugins share the `elastic_solver` kind, so a default decides which one
 answers; `[defaults]` in `plugins.toml` changes it.
@@ -191,6 +195,9 @@ The `tesseract_api.py` declares its schema; that declaration is what cadjoint
 reads back as `inputs`, `outputs` and `capabilities`:
 
 ```python
+from pydantic import BaseModel
+from tesseract_core.runtime import Array, Differentiable, Float64, Int32
+
 class InputSchema(BaseModel):
     points: Differentiable[Array[(None, 3), Float64]]
     cells: Array[(None, None), Int32]
@@ -238,6 +245,8 @@ tesseract build cadjoint/fem/tesseracts/mesher           # ~1 min
 tesseract build cadjoint/fem/tesseracts/elastic_calculix # ~1.5 min
 tesseract build cadjoint/fem/tesseracts/thermal_jaxfem   # ~3 min
 tesseract build cadjoint/fem/tesseracts/elastic_jaxfem   # ~3 min
+tesseract build cadjoint/fem/tesseracts/tet_gmsh         # Gmsh behind the GPL boundary
+tesseract build cadjoint/fem/tesseracts/flow_brinkman    # pure JAX, pip provider
 ```
 
 | Image | Requirements provider | The non-obvious payload | Size |
@@ -271,10 +280,10 @@ to?" stops being rhetorical. `Plugin.probe()` calls the runtime's `/health`,
 reads the version it advertises, and hashes the schema it publishes:
 
 ```python
-from cadjoint.plugins import plugin_for_kind
+from cadjoint.plugins import get_plugin
 
-probe = plugin_for_kind("thermal_solver").probe()
-# PluginProbe(name='thermal_jaxfem', kind='thermal_solver', transport='remote',
+probe = get_plugin("thermal_jaxfem").probe()
+# PluginProbe(name='thermal_jaxfem', kind='thermal_solver', transport='local',
 #             status='ok', version='0.1.0', schema_hash='sha256:251b6b…', …)
 ```
 
@@ -347,30 +356,14 @@ Installing `pip install 'cadjoint[gmsh]'` links it into your own process
 instead, which is a choice to make knowingly. `tetfill` remains the
 no-dependency fallback, and it stays the default.
 
-**The scene-program hook this is built for** is one field on `SimMesh`, and
-it is not wired up yet — the mesher is reachable today through
-`cadjoint.brep.mesh_gmsh.gmsh_tet_mesh` and the registry, not through a
-declared mesh:
-
-```python
-# Proposed, not shipped: `mesher="gmsh"` would route the tet10 build through
-# the tet_mesher slot. Omitted, the DC + tetfill path runs exactly as before.
-sink_mesh = SimMesh(
-    name="sink-mesh",
-    resolution=(18, 13, 11),
-    domain=thermal_body,
-    method="tet10",
-    mesher="gmsh",
-)
-```
-
-`SimMesh.build` reaches `sdf_to_tet_mesh(...)` then `tet10_mesh(...)` for
-`method="tet10"`; the hook replaces exactly those two calls with
-`extract_brep(...)`, `gmsh_tet_mesh(...)` and `tet_mesh_from_gmsh(...)`,
-which returns the same `TetMesh` in the same node layout — boundary corners,
-interior corners, midside block — so nothing downstream of `build` changes.
-The `resolution` keeps its meaning as the *extraction* grid and additionally
-sets the default target element size.
+**The scene-program hook this is built for** — a `mesher="gmsh"` keyword on
+`SimMesh` routing a `tet10` build through the `tet_mesher` slot — is proposed,
+not shipped. Today the route is reached by hand: `extract_brep(...)`,
+`gmsh_tet_mesh(...)` and `tet_mesh_from_gmsh(...)`, which returns the same
+`TetMesh` in the same node layout as `sdf_to_tet_mesh` followed by
+`tet10_mesh` — boundary corners, interior corners, midside block — so nothing
+downstream of a mesh would change when the hook lands. The worked example is on
+[the B-rep page](brep.qmd#meshing-from-the-graph).
 
 ## Where plugins are used
 

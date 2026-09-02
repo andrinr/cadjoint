@@ -40,8 +40,10 @@ uv sync --extra fem --extra tesseract --extra viewer
 |---|---|
 | `cuda` | GPU JAX (Linux + NVIDIA only) |
 | `fem` | the jax-fem finite-element stack (basix, meshio, petsc4py, gmsh) |
-| `tesseract` | tesseract-core + tesseract-jax, for the cross-boundary gradient paths |
-| `viewer` | the Jupyter widget (`anywidget`) |
+| `tesseract` | tesseract-core + tesseract-jax, which every [plugin](plugins.qmd) is implemented with |
+| `gmsh` | Gmsh in your own process, for the [B-rep tet mesher](brep.qmd#meshing-from-the-graph) — GPL, hence an extra of its own |
+| `viewer` | the Jupyter widget (`anywidget`) and the playground's process monitor (`psutil`) |
+| `editor` | `ruff` and `jedi`, for the playground's lint, completion and signature help |
 | `stepcheck` | OCCT kernel validation of STEP exports (dev) |
 | `docs` | the Quarto API reference (`quartodoc`) |
 
@@ -71,6 +73,38 @@ from cadjoint.sdf import Sphere, Translate
 p = Vector(jnp.array([2.0, 0.0, 0.0]), free=True, name="p")
 scene = Translate(Sphere(radius=0.3), offset=p)
 ```
+
+### Parameters as arguments
+
+`functionalize(scene)(free, fixed)` closes over the parameter values, so
+`jax.jit` of it folds every value into the program as a literal: two designs
+that differ in one slider lower to two different programs and compile twice.
+`functionalize_parametric` takes the parameter dicts as arguments instead, so
+the lowered program is byte-identical for every value and one executable serves
+them all. Pair it with the persistent compilation cache and a re-dimensioned
+design costs no compile at all, even in a fresh process.
+
+```python
+import jax
+from cadjoint import extract_parameters
+from cadjoint.cache import enable_compilation_cache
+from cadjoint.functionalize import functionalize_parametric
+
+enable_compilation_cache()      # ~/.cache/cadjoint/jax, or $CADJOINT_CACHE_DIR
+free, fixed, _ = extract_parameters(scene)
+evaluate = jax.jit(functionalize_parametric(scene))
+
+evaluate(free, fixed, jnp.zeros(3))                                 # compiles once
+evaluate({"p": jnp.array([1.0, 0.0, 0.0])}, fixed, jnp.zeros(3))    # reuses it
+```
+
+The cache is what the playground's compile worker turns on for every request;
+`CADJOINT_NO_COMPILATION_CACHE=1` opts out. The programs it stores are
+structured rather than flattened — a sketch profile is one `(N, 2)` array, a
+pattern traces its child once, a shared subtree is emitted once — which is
+what keeps them small enough to compile in under a second; see
+[program size](meshing.qmd#program-size) and the
+[performance notes](../research/performance.md).
 
 ## Constraints reduce the freedom
 
@@ -106,10 +140,11 @@ fully-determined system.
 
 ## Faces are references, not geometry
 
-cadjoint has no B-rep faces. The only surface it produces is the dual-contoured
-mesh, and that mesh is a *rendering* of the field, not its definition — basing a
-work plane on it would mean basing a design decision on whatever resolution the
-mesher happened to run at.
+cadjoint stores no B-rep. The surfaces it produces — the dual-contoured mesh,
+and the [B-rep it derives from the field](brep.qmd) — are *readings* of the
+field at one resolution, not its definition, and basing a work plane on either
+would mean basing a design decision on whatever grid the extraction happened to
+run at.
 
 The construction tree knows better than the mesh does. `extrude` spans
 `±depth/2` around its sketch plane, so it knows exactly where its caps are and
@@ -226,7 +261,9 @@ save_stl(mesh, "sphere.stl")
 ```
 
 Full detail, including the exports, in
-[differentiable meshing](meshing.qmd).
+[differentiable meshing](meshing.qmd). For exact surfaces rather than facets —
+a STEP file in which a bore is one cylinder, a corner you can drag — see the
+[derived B-rep](brep.qmd).
 
 ## Simulation
 
@@ -273,8 +310,9 @@ with the gradient running back through the solve, the mesh, and the SDF to the
 `size` parameter.
 
 Constraint projection is automatic, topology stays frozen between re-meshes, and
-`gradient_path` chooses how much of the chain crosses a Tesseract boundary. See
-[optimization](optimization.qmd) and [tesseracts](tesseracts.qmd).
+`gradient_path` chooses which stages of the chain run as [plugins](plugins.qmd)
+— a mesher, a tet filler or a solver behind a Tesseract, in this process or on a
+cluster. See [optimization](optimization.qmd).
 
 ## Rendering
 
@@ -301,3 +339,5 @@ Rendered pixels are deliberately not an inverse-rendering API. See the
 - [Sketch construction](../examples/sketch_construction.ipynb) — profiles, extrude, revolve
 - [Constraints](../examples/constraints.ipynb) — solving fully-determined systems
 - [Constrained optimization](../examples/constrained_optimization.ipynb) — the full workflow with trajectory visualization
+- [Derived B-rep](brep.qmd) — exact faces, edges and corners read off the field
+- [The playground](viewer.qmd) — all of it in one browser window
