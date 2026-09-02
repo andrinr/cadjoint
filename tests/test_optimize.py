@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from pathlib import Path
 
 import jax.numpy as jnp
@@ -546,3 +547,143 @@ class TestStudyFormRun:
         summary = run.result.describe()
         assert summary["kind"] == "elastic"
         assert set(summary["fields"]) == {"displacement", "von_mises"}
+
+
+def _tet_bar_study(name: str = "compiled-bar"):
+    """A tet SimMesh + thermal study on the bar — the frozen-chain paths.
+
+    ``gradient_path="tesseract-dc"`` fills a dual-contour surface, so it
+    needs a tet mesh; the resolution is the smallest that still meshes.
+    """
+    from cadjoint.fem import Dirichlet, Nodes, SimMesh, ThermalStudy
+
+    sim_mesh = SimMesh(
+        name=f"{name}-mesh",
+        resolution=(10, 8, 8),
+        bounds=(-1.2, -0.9, -0.9),
+        size=(2.4, 1.8, 1.8),
+        domain=_bar_scene(),
+        method="tet4",
+    )
+    return ThermalStudy(
+        name=name,
+        conductivity=1.0,
+        bcs=[Dirichlet(Nodes.side("-x"), 0.0), Dirichlet(Nodes.side("+x"), 100.0)],
+        mesh=sim_mesh,
+    )
+
+
+def _counting_differentiator(monkeypatch, *, compile_anyway: bool = True) -> list[int]:
+    """Patch ``_differentiator`` to count executions of the objective body.
+
+    Under ``jax.jit`` the body runs once per *trace*; eagerly it runs once
+    per *call*.  The returned single-element list is that counter.  With
+    ``compile_anyway=False`` the jit is suppressed, which is exactly the
+    pre-compilation behaviour and gives the eager reference values.
+    """
+    import cadjoint.optimize as optimize_module
+
+    original = optimize_module._differentiator
+    calls = [0]
+
+    def counting(objective, *, compiled):
+        def counted(params):
+            calls[0] += 1
+            return objective(params)
+
+        return original(counted, compiled=compiled and compile_anyway)
+
+    monkeypatch.setattr(optimize_module, "_differentiator", counting)
+    return calls
+
+
+class TestFrozenObjectiveIsCompiled:
+    """The frozen study objective runs as one compiled program per topology.
+
+    A frozen topology holds the objective fixed between refreezes, so the
+    traced program is reused by every step in between — the change these
+    tests guard is that the descent stops re-dispatching the whole chain
+    op-by-op once per step.
+    """
+
+    def test_compiled_and_eager_gradients_agree_exactly(self):
+        import jax
+        import numpy as np
+
+        from cadjoint.optimize import _differentiator
+
+        def objective(params):
+            return jnp.sum(jnp.sin(params["a"]) * params["b"] ** 2)
+
+        params = {"a": jnp.asarray([0.3, -1.2, 2.0]), "b": jnp.asarray([1.5, 0.25, -0.75])}
+        eager_value, eager_grads = _differentiator(objective, compiled=False)(params)
+        value, grads = _differentiator(objective, compiled=True)(params)
+        assert float(value) == pytest.approx(float(eager_value), rel=1e-12)
+        for name, gradient in grads.items():
+            np.testing.assert_allclose(
+                np.asarray(gradient), np.asarray(eager_grads[name]), rtol=1e-12
+            )
+        assert isinstance(_differentiator(objective, compiled=True), jax.stages.Wrapped)
+
+    def test_a_frozen_chain_traces_once_and_keeps_its_constants_static(self, monkeypatch):
+        """One trace per frozen topology, and no NaN placeholder on the way.
+
+        The ``RuntimeWarning`` guard is the second half of the contract.
+        ``tesseract_jax`` treats a non-tracer input as static; a bare
+        ``jax.jit`` turns the chain's NumPy constants into tracers, and the
+        VJP then fills a derivative slot for each with
+        ``np.full(shape, nan, dtype)`` — a NaN cast into the mesher's 0-d
+        ``int32`` ``element`` code.  ``_differentiator`` folds constants at
+        trace time to keep them static, and this is what says so.
+        """
+        pytest.importorskip("jax_fem", reason="study-backed runs need the fem extra")
+        pytest.importorskip("tetgen", reason="the DC chain fills a tet mesh")
+        pytest.importorskip("tesseract_jax", reason="the frozen chains are tesseracts")
+        traces = _counting_differentiator(monkeypatch)
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", RuntimeWarning)
+            run = Optimization(
+                "compiled-descent",
+                study=_tet_bar_study("traced-bar"),
+                metric="mean",
+                gradient_path="tesseract-dc",
+                remesh_every=0,
+                steps=3,
+                learning_rate=0.01,
+            ).run(scene=_bar_scene())
+        assert len(run.history) == 3
+        # One trace for the one frozen topology, not one per step.
+        assert traces[0] == 1
+
+    def test_compiled_descent_reproduces_the_eager_objectives(self, monkeypatch):
+        pytest.importorskip("jax_fem", reason="study-backed runs need the fem extra")
+        pytest.importorskip("tetgen", reason="the DC chain fills a tet mesh")
+        pytest.importorskip("tesseract_jax", reason="the frozen chains are tesseracts")
+
+        def descend() -> list[float]:
+            return [
+                record["objective"]
+                for record in Optimization(
+                    "compiled-parity",
+                    study=_tet_bar_study("parity-bar"),
+                    metric="mean",
+                    gradient_path="tesseract-dc",
+                    remesh_every=0,
+                    steps=3,
+                    learning_rate=0.01,
+                )
+                .run(scene=_bar_scene())
+                .history
+            ]
+
+        eager_calls = _counting_differentiator(monkeypatch, compile_anyway=False)
+        eager = descend()
+        assert eager_calls[0] == 3  # eagerly the body runs once per step
+        monkeypatch.undo()
+        compiled = descend()
+        # XLA fuses and reorders float arithmetic, so the agreement is to
+        # significant digits, not to the last bit: measured 5.7e-8 relative
+        # here, and 1e-13 on the starter's own optimization.  The descent's
+        # per-step drop on this bar is 1.8e-5 relative, 300x larger, so the
+        # compiled and eager runs describe the same descent.
+        assert compiled == pytest.approx(eager, rel=1e-6)

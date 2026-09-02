@@ -212,6 +212,50 @@ def _unresolvable_bc(study: Any, mesh: Any) -> str | None:
     return None
 
 
+def _differentiator(objective: Any, *, compiled: bool) -> Any:
+    """``value_and_grad`` of one frozen objective, compiled where it can be.
+
+    A frozen topology holds the objective fixed for ``remesh_every`` steps and
+    the parameter leaves keep their shapes and dtypes across a descent, so one
+    traced program serves every step until the next refreeze; running it
+    op-by-op instead re-dispatches the whole chain per step (measured on the
+    starter: ~11 s per step eager against ~0.5 s jitted).
+
+    Only the frozen-chain gradient paths (``gradient_path="tesseract"`` and
+    ``"tesseract-dc"``) are traceable end to end.  The ``"direct"`` path
+    rebuilds a jax-fem problem inside the objective, and that construction
+    resolves boundary conditions with ``np.argwhere`` over the recomputed node
+    positions — a concrete-value read that a tracer cannot satisfy — so it
+    stays eager.
+
+    The compiled form folds its constants at trace time
+    (:func:`jax.ensure_compile_time_eval`), which is not a micro-optimization
+    but a correctness requirement of the tesseract boundary.  A frozen chain
+    hands its tesseracts NumPy constants — the mesher's ``element`` code, the
+    quality thresholds, the study's conductivity — and ``tesseract_jax``
+    classifies an input as *static* exactly when it is not a tracer
+    (``primitive.py``: ``is_static_mask``).  Under a bare ``jax.jit`` the
+    ``jnp.asarray`` that coerces those constants emits an equation instead of
+    a value, so they arrive traced, and the VJP then has to invent a
+    derivative slot for each one: it writes ``np.full(shape, np.nan, dtype)``,
+    which for the 0-d ``int32`` ``element`` is a NaN cast to an integer
+    (a ``RuntimeWarning``, and an arbitrary element code if anything ever
+    read it).  Folding constants keeps every one of them static, exactly as
+    the eager path had them, while operations on the design parameters still
+    trace normally.
+    """
+    import jax
+
+    if not compiled:
+        return jax.value_and_grad(objective)
+
+    def folded(params):
+        with jax.ensure_compile_time_eval():
+            return objective(params)
+
+    return jax.jit(jax.value_and_grad(folded))
+
+
 def _compliance(study: Any, result: Any, mesh: Any, points: Any) -> Any:
     """Classical compliance: the work of the study's tractions, ``f . u``.
 
@@ -736,7 +780,6 @@ class Optimization:
         chain.  x64 is enabled for the duration (the FEM adjoints require
         float64) and the caller's setting restored afterwards.
         """
-        import jax
         import jax.numpy as jnp
 
         from cadjoint.extraction import apply_parameters, extract_parameters
@@ -893,11 +936,17 @@ class Optimization:
             state = init(params)
             try:
                 frozen = refreeze(params, 0, None)
-                value_and_grad = jax.value_and_grad(frozen[1])
+                value_and_grad = _differentiator(frozen[1], compiled=use_tesseract)
                 for step in range(count):
                     if step > 0 and self.remesh_every > 0 and step % self.remesh_every == 0:
+                        previous = frozen
                         frozen = refreeze(params, step, frozen)
-                        value_and_grad = jax.value_and_grad(frozen[1])
+                        # Re-wrap only when refreeze returned a NEW topology:
+                        # each `jax.jit` carries its own trace cache, and
+                        # re-wrapping an unchanged objective would discard it
+                        # and re-trace the next step for nothing.
+                        if frozen is not previous:
+                            value_and_grad = _differentiator(frozen[1], compiled=use_tesseract)
                     value, grads = value_and_grad(params)
                     self._record_step(step, value, grads, params, history, trajectory, callback)
                     params, state = step_fn(params, grads, state)

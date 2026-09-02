@@ -98,6 +98,7 @@ from cadjoint.viewer._worker_client import (
     optimize_source,
     optimize_source_events,
     simulate_source,
+    warm_start,
 )
 
 __all__ = [
@@ -130,6 +131,7 @@ __all__ = [
     "scenes_root",
     "signature_source",
     "simulate_source",
+    "warm_start",
 ]
 
 DEFAULT_PORT = 8765
@@ -251,6 +253,11 @@ def create_server(port: int = DEFAULT_PORT) -> ThreadingHTTPServer:
     # Jedi's first analysis costs a few hundred milliseconds; pay it on a
     # background thread now so the editor's first completion is already warm.
     warm_up()
+    # Same idea one order of magnitude up: one background `compile` and one
+    # `mesh` of the scene the editor opens with, so the first real request
+    # meets a warm XLA cache instead of paying 45-53 s for a cold one.
+    # Both are daemon threads and neither delays `serve_forever`.
+    warm_start()
     return server
 
 

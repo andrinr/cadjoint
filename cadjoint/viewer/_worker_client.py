@@ -15,13 +15,19 @@ progress lines while it descends, so it is tailed line by line
 Request validation here is only what has to happen before a worker is
 started — the kind/name/step shapes.  ``/patch`` never reaches this module:
 it is pure text surgery (see :mod:`cadjoint.viewer._patch_requests`).
+
+:func:`warm_start` is the one call that is not somebody's request: the
+server fires it at startup so the *first* real request meets a warm
+compilation cache instead of paying XLA for the whole scene.
 """
 
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
+import threading
 from typing import Any
 
 from cadjoint.viewer._limits import OVERSIZED_SOURCE_ERROR, exceeds_source_limit
@@ -76,6 +82,74 @@ def _run_worker(
 def compile_source(source: str, timeout: float = COMPILE_TIMEOUT_SECONDS) -> dict[str, Any]:
     """Compile playground source in a disposable child process."""
     return _run_worker(source, "compile", timeout)
+
+
+#: Environment override for :func:`warm_start`: ``0``/``false``/``no``/``off``
+#: turns the background warm-up off, anything else turns it on.
+WARM_START_ENV = "CADJOINT_WARM_START"
+
+_WARM_STARTED = threading.Event()
+
+
+def _warm_start_enabled() -> bool:
+    """Whether a server may warm the compilation cache at startup.
+
+    Off under pytest unless asked for explicitly: ``create_server`` is called
+    by the live-server tests, and every one of them would otherwise spawn two
+    full worker processes it never reads.
+    """
+    setting = os.environ.get(WARM_START_ENV)
+    if setting is not None:
+        return setting.strip().lower() not in ("", "0", "false", "no", "off")
+    return "PYTEST_CURRENT_TEST" not in os.environ and "pytest" not in sys.modules
+
+
+def warm_start(source: str | None = None) -> bool:
+    """Fill the compilation cache for *source* in the background, once.
+
+    The first ``compile`` and the first ``mesh`` of a fresh install pay XLA
+    for every program the scene contains — measured on the starter, ``mesh``
+    costs 45-53 s against an empty cache and 12 s against a warm one.  The
+    cache is on disk and persistent (:mod:`cadjoint.cache`), so that cost is
+    paid once by *somebody*; issuing the two requests on a daemon thread at
+    startup means it is not paid by the user's first overlay, while the
+    browser is still fetching the frontend.
+
+    Runs at most once per process and never blocks the caller: it returns as
+    soon as the thread is started, and returns ``False`` when the warm-up is
+    disabled or has already run.  Both requests go through the ordinary
+    disposable-worker path, so a scene that fails to compile costs nothing
+    but a logged-nowhere failure.  See :func:`_warm_start_enabled` for the
+    ``CADJOINT_WARM_START`` override and the pytest default.
+
+    Args:
+        source: Program to warm on; the playground's example scene (what the
+            editor opens with, and therefore what the first request will
+            almost certainly ask about) by default.
+
+    Returns:
+        Whether a warm-up thread was started.
+    """
+    if not _warm_start_enabled() or _WARM_STARTED.is_set():
+        return False
+    _WARM_STARTED.set()
+    if source is None:
+        from cadjoint.viewer._example_scene import EXAMPLE_SOURCE
+
+        source = EXAMPLE_SOURCE
+
+    def prime() -> None:
+        # Both under the mesh budget, not their own: the point of the
+        # warm-up is the cold path, where even `compile` can outgrow the
+        # 20-second edit round-trip budget it is held to in a request.
+        for mode in ("compile", "mesh"):
+            try:
+                _run_worker(source, mode, MESH_TIMEOUT_SECONDS)
+            except Exception:  # noqa: BLE001 - a cold cache is the only cost of failing
+                return
+
+    threading.Thread(target=prime, name="cadjoint-compile-warmup", daemon=True).start()
+    return True
 
 
 def mesh_source(source: str, timeout: float = MESH_TIMEOUT_SECONDS) -> dict[str, Any]:

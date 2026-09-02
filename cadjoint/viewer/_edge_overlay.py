@@ -46,6 +46,54 @@ def _world_frame_leaves(node: Any) -> list[Any]:
     return [node]
 
 
+def _carries_construction(node: Any) -> bool:
+    """Whether *node*'s subtree carries a construction-layer face set."""
+    from cadjoint.construction.faces import FaceSet
+
+    if isinstance(getattr(node, "faces", None), FaceSet):
+        return True
+    children = getattr(node, "children", None)
+    return callable(children) and any(_carries_construction(child) for child in children())
+
+
+def _design_leaves(leaves: list[Any]) -> np.ndarray | None:
+    """Which world-frame leaves the construction tree owns, or ``None``.
+
+    **The design-subtree rule.**  Sharp feature edges are the design's own
+    creases and CSG seams.  Context primitives dropped in around it — a
+    board, a die, screw heads, decoupling caps — are scenery: the user is
+    not authoring their edges, and drawing feature curves on them clutters
+    the overlay with geometry the physics never sees.
+
+    No new flag is needed, because the scene already draws the line.  Every
+    construction generator attaches a :class:`FaceSet` to the SDF it returns
+    — ``extrude``, ``revolve`` and ``loft`` through ``attach_faces``, and the
+    ``Solid.*`` primitive mirrors through the same call — so a leaf belongs
+    to the design exactly when its subtree carries one.  A leaf assembled by
+    hand out of raw SDF primitives carries nothing, and is scenery.
+
+    Returns ``None`` when *no* leaf carries a mirror: a scene written
+    directly as an SDF expression is all design, and restricting it to
+    nothing would delete its sharp layer entirely.
+
+    **Exactly two things are restricted**, both of them the sharp layer's:
+    which cells are feature cells (``geometric_mask`` and ``junctions``) and
+    which seam rows may grow links.  Everything else stays whole-scene.  In
+    particular the *seam projection* still runs over every operand set,
+    because the wire layer draws the same vertex array and a seam left
+    unsnapped wobbles off its curve — measured on the starter, restricting
+    the projection too moved 89 of 6104 wire endpoints by up to 1.4 cells,
+    to save 0.2 s.  Ownership is likewise computed against every leaf, so a
+    vertex on scenery is classified as scenery rather than handed to
+    whichever design operand happens to be nearest.
+
+    The net effect: scenery keeps its full mesh wireframe, snapped exactly
+    as before, and grows no sharp links.
+    """
+    marked = np.array([_carries_construction(leaf) for leaf in leaves], dtype=bool)
+    return np.flatnonzero(marked) if marked.any() else None
+
+
 def _project_to_seam(fields: list[Any], points: np.ndarray, max_step: float) -> np.ndarray:
     """Newton-project points onto the common zero set of two or more fields.
 
@@ -88,6 +136,155 @@ def _project_to_seam(fields: list[Any], points: np.ndarray, max_step: float) -> 
         x = x - step
     x = jnp.where(transversal[:, None], x, start)
     return np.asarray(x, dtype=np.float64)
+
+
+def _seam_residual(fields: list[Any], points: np.ndarray) -> np.ndarray:
+    """How far *points* still are from every field's zero set (the max |f|).
+
+    The acceptance test for a projected seam group: a genuine seam vertex
+    lands on every operand's zero set, a near-miss between disjoint
+    surfaces keeps a residual of order the gap.
+    """
+    import jax
+    import jax.numpy as jnp
+
+    probes = jnp.asarray(points, dtype=jnp.float32)
+    return np.max(
+        np.stack(
+            [
+                np.abs(
+                    np.asarray(
+                        jax.vmap(lambda p, f=field: jnp.asarray(f(p)))(probes), dtype=np.float64
+                    )
+                )
+                for field in fields
+            ]
+        ),
+        axis=0,
+    )
+
+
+def _project_seam_groups_reference(
+    leaves: list[Any],
+    groups: list[tuple[np.ndarray, tuple[int, ...]]],
+    vertices: np.ndarray,
+    max_step: float,
+) -> list[tuple[np.ndarray, np.ndarray]]:
+    """One :func:`_project_to_seam` program per group — the plain reading.
+
+    This is what :func:`_project_seam_groups` replaces and the oracle it is
+    tested against: same inputs, same ``(projected, residual)`` per group,
+    one JAX program per group instead of one for all of them.
+    """
+    results: list[tuple[np.ndarray, np.ndarray]] = []
+    for rows, operands in groups:
+        fields = [leaves[index] for index in operands]
+        projected = _project_to_seam(fields, vertices[rows], max_step)
+        results.append((projected, _seam_residual(fields, projected)))
+    return results
+
+
+def _project_seam_groups(
+    leaves: list[Any],
+    groups: list[tuple[np.ndarray, tuple[int, ...]]],
+    vertices: np.ndarray,
+    max_step: float,
+) -> list[tuple[np.ndarray, np.ndarray]]:
+    """Project every seam group at once, in one all-leaf program.
+
+    :func:`_project_to_seam` is exact but pays a fixed cost per call —
+    building the ``vmap(value_and_grad)`` evaluators and dispatching four
+    Newton iterations op-by-op — that is independent of how many points it
+    projects; measured, one point costs as much as three hundred.  A scene
+    with context geometry produces a seam group per operand *set*, so the
+    per-call cost is what the whole mesh overlay is made of (measured on
+    the starter: 15 groups, 108 points, 5.6 s).
+
+    So evaluate every world-frame leaf at every seam point instead, in one
+    program, and let each point pick its own operands out of the result by
+    gather.  Groups shorter than the widest are padded with a repeat of
+    their first operand and masked to zero, which is exact rather than
+    approximate: a zero Jacobian row makes the padded Gram row and column
+    zero, the regularizer puts ``eps`` on its diagonal, and the solve
+    returns a zero multiplier there, so the Newton step is the one the
+    unpadded system would have taken.  The two places the padding *is*
+    visible are handled explicitly — the rank test's smallest eigenvalue
+    (a padded row contributes a spurious zero, so those rows are lifted
+    above the block's spectrum first) and the ``1e-2 * trace / count``
+    threshold, which uses each point's own operand count.
+
+    Returns one ``(projected, residual)`` pair per group, in the order the
+    groups were given.
+    """
+    import jax
+    import jax.numpy as jnp
+
+    # Only the operands some group actually meets: a scene's other leaves
+    # would be evaluated at every seam point for nothing.
+    used = sorted({index for _rows, operands in groups for index in operands})
+    slot = {index: position for position, index in enumerate(used)}
+    evaluators = [
+        jax.vmap(jax.value_and_grad(lambda p, f=leaves[index]: jnp.asarray(f(p)))) for index in used
+    ]
+    width = max(len(operands) for _rows, operands in groups)
+    member_blocks, valid_blocks, point_blocks = [], [], []
+    for rows, operands in groups:
+        slots = [slot[index] for index in operands]
+        padded = slots + [slots[0]] * (width - len(slots))
+        member_blocks.append(np.tile(np.asarray(padded, dtype=np.int32), (rows.size, 1)))
+        mask = np.zeros(width, dtype=np.float32)
+        mask[: len(operands)] = 1.0
+        valid_blocks.append(np.tile(mask, (rows.size, 1)))
+        point_blocks.append(vertices[rows])
+    members = jnp.asarray(np.concatenate(member_blocks))
+    valid = jnp.asarray(np.concatenate(valid_blocks))
+    counts = jnp.sum(valid, axis=1)
+    start = jnp.asarray(np.concatenate(point_blocks), dtype=jnp.float32)
+    picker = jnp.arange(start.shape[0])[:, None]
+
+    def system(x):
+        values, gradients = zip(*(evaluate(x) for evaluate in evaluators))
+        jacobian = jnp.stack(gradients, axis=1)[picker, members] * valid[..., None]
+        gram = jnp.einsum("sij,skj->sik", jacobian, jacobian)
+        return jnp.stack(values, axis=-1)[picker, members] * valid, jacobian, gram
+
+    identity = jnp.eye(width, dtype=start.dtype)
+    _, _, gram0 = system(start)
+    trace = jnp.trace(gram0, axis1=-2, axis2=-1)
+    # A padded row is exactly zero, so it would contribute the smallest
+    # eigenvalue and fail every point with a short operand set.  Lift the
+    # padded diagonal above the real block's spectrum (bounded by its
+    # trace) so the minimum is the real block's own.
+    lifted = gram0 + ((trace[:, None] + 1.0) * (1.0 - valid))[..., None] * identity
+    transversal = jnp.linalg.eigvalsh(lifted)[..., 0] > 1e-2 * trace / counts
+
+    x = start
+    for _ in range(4):
+        residual, jacobian, gram = system(x)
+        # Regularize at a float32-meaningful scale; smaller epsilons
+        # underflow against unit-gradient Gram entries.
+        trace = jnp.trace(gram, axis1=-2, axis2=-1)
+        gram = gram + (1e-4 * trace + 1e-12)[..., None, None] * identity
+        multipliers = jnp.linalg.solve(gram, residual[..., None])[..., 0]
+        step = jnp.einsum("sij,si->sj", jacobian, multipliers)
+        length = jnp.linalg.norm(step, axis=-1, keepdims=True)
+        step = step * jnp.minimum(1.0, max_step / jnp.maximum(length, 1e-9))
+        x = x - step
+    x = jnp.where(transversal[:, None], x, start)
+
+    values, _gradients = zip(*(evaluate(x) for evaluate in evaluators))
+    # Padded slots are masked to zero and |f| >= 0, so they never win the max.
+    residual = jnp.max(jnp.abs(jnp.stack(values, axis=-1)[picker, members]) * valid, axis=1)
+    projected = np.asarray(x, dtype=np.float64)
+    residuals = np.asarray(residual, dtype=np.float64)
+
+    results: list[tuple[np.ndarray, np.ndarray]] = []
+    offset = 0
+    for rows, _operands in groups:
+        stop = offset + rows.size
+        results.append((projected[offset:stop], residuals[offset:stop]))
+        offset = stop
+    return results
 
 
 def _mesh_edge_payload(scene: Any) -> dict[str, Any] | None:
@@ -228,6 +425,19 @@ def _mesh_edge_payload(scene: Any) -> dict[str, Any] | None:
                 ]
             )
             owners = np.argmin(magnitudes, axis=0)
+            # The sharp layer is the DESIGN's feature curves: a dual vertex
+            # belongs to the design when the operand owning it does (see
+            # _design_leaves for the rule and why it needs no new flag).
+            # Ownership is decided against the whole scene either way, so a
+            # vertex on a context primitive is recognised as context rather
+            # than mis-assigned to whichever design operand is nearest.
+            design = _design_leaves(leaves)
+            if design is None:
+                designed = np.ones(owners.shape, dtype=bool)
+            else:
+                designed = np.isin(owners, design)
+                geometric_mask &= designed
+                junctions &= designed
             mismatched = quad_edge_list[
                 owners[quad_edge_list[:, 0]] != owners[quad_edge_list[:, 1]]
             ]
@@ -260,37 +470,38 @@ def _mesh_edge_payload(scene: Any) -> dict[str, Any] | None:
                 for row, operand_set in incident.items():
                     by_operands.setdefault(frozenset(operand_set), []).append(row)
                 max_step = 2.0 * max(_MESH_EDGE_SIZE) / _MESH_EDGE_RESOLUTION  # ~2 cells
-                for operand_set, rows in by_operands.items():
-                    selected = np.asarray(sorted(rows), dtype=np.int64)
-                    fields = [leaves[index] for index in sorted(operand_set)]
-                    projected = _project_to_seam(fields, vertices[selected], max_step)
-                    residual = np.max(
-                        np.stack(
-                            [
-                                np.abs(
-                                    np.asarray(
-                                        jax.vmap(lambda p, f=field: jnp.asarray(f(p)))(
-                                            jnp.asarray(projected, dtype=jnp.float32)
-                                        ),
-                                        dtype=np.float64,
-                                    )
-                                )
-                                for field in fields
-                            ]
-                        ),
-                        axis=0,
-                    )
+                pending = [
+                    (np.asarray(sorted(rows), dtype=np.int64), tuple(sorted(operand_set)))
+                    for operand_set, rows in by_operands.items()
+                ]
+                # One program for every group at once: the projection's cost
+                # is per call, not per point (see _project_seam_groups).  The
+                # groups partition the seam rows, so reading every group's
+                # start position before any of them is written is the same
+                # computation as projecting them one at a time.
+                for (selected, operand_set), (projected, residual) in zip(
+                    pending, _project_seam_groups(leaves, pending, vertices, max_step)
+                ):
                     genuine = residual < 0.1 * max(grid.spacing)
                     selected = selected[genuine]
                     if selected.size == 0:
                         continue
+                    # Every accepted group moves its vertices, scenery
+                    # included: the wire layer draws these same vertices, and
+                    # a seam it did not snap wobbles off the curve by up to a
+                    # cell and a half.  Only the SHARP layer is the design's
+                    # (see _design_leaves), so the design filter lands here,
+                    # on which rows may grow links, and not on the projection.
                     vertices[selected] = projected[genuine]
                     structural[selected] = True
+                    selected = selected[designed[selected]]
+                    if selected.size == 0:
+                        continue
                     group_mask = np.zeros_like(geometric_mask)
                     group_mask[selected] = True
                     groups.append(group_mask)
                     if len(operand_set) == 2:
-                        seam_groups.append((selected, tuple(sorted(operand_set))))
+                        seam_groups.append((selected, operand_set))
             geometric_only = geometric_mask & ~structural
             for owner in np.unique(owners[geometric_only]):
                 groups.append(geometric_only & (owners == owner))
