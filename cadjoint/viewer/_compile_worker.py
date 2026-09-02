@@ -24,6 +24,7 @@ import traceback
 from typing import Any
 
 from cadjoint.backends.wgsl import compile_scene_to_wgsl
+from cadjoint.cache import enable_compilation_cache
 from cadjoint.constraints.solve import capture_constraint_solves
 from cadjoint.viewer._edge_overlay import (  # noqa: F401 - re-exported for callers
     _MESH_EDGE_RESOLUTION,
@@ -145,6 +146,9 @@ def _compile_source(source: str) -> dict[str, Any]:
 
 
 def main() -> None:
+    # Every request runs in a fresh process, so without this each edit
+    # recompiles the same XLA programs from scratch (see cadjoint.cache).
+    enable_compilation_cache()
     try:
         request = json.load(sys.stdin)
         source = request.get("source")
