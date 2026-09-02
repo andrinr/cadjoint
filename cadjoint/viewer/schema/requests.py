@@ -25,6 +25,14 @@ from typing import Annotated, Any, Literal, Union
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from cadjoint.enums import (
+    BoundaryConditionType,
+    ConstraintKind,
+    ConstraintSolveMethod,
+    OptimizationArgument,
+    StudyKind,
+)
+
 Vector2 = Annotated[list[float], Field(min_length=2, max_length=2)]
 Vector3 = Annotated[list[float], Field(min_length=3, max_length=3)]
 Value = float | list[float]
@@ -239,16 +247,11 @@ class DeleteObjectRequest(Targeted):
 
 
 # ── Constraints ─────────────────────────────────────────────────────────────
-
-ConstraintKind = Literal[
-    "fixed",
-    "distance",
-    "horizontal",
-    "vertical",
-    "coincident",
-    "parallel",
-    "perpendicular",
-]
+#
+# The option sets a request may name — constraint kinds, study kinds, boundary
+# condition types, solver methods — are the enums in :mod:`cadjoint.enums`,
+# the same ones the validators check against.  Their JSON schema carries the
+# member list into ``payloads.d.ts`` as a named string union.
 
 
 class AddConstraintRequest(Targeted):
@@ -273,7 +276,7 @@ class SetConstraintValueRequest(Targeted):
 
 class SolveSketchRequest(Targeted):
     op: Literal["solve_sketch"]
-    method: Literal["newton", "adam", "sgd"] = "newton"
+    method: ConstraintSolveMethod = ConstraintSolveMethod.NEWTON
     iterations: int = Field(default=8, ge=1, le=512)
 
 
@@ -289,7 +292,7 @@ class StudyTargeted(PatchBase):
 
 class AddStudyRequest(PatchBase):
     op: Literal["add_study"]
-    kind: Literal["thermal", "elastic"]
+    kind: StudyKind
     name: str | None = None
 
 
@@ -299,7 +302,7 @@ class DeleteStudyRequest(StudyTargeted):
 
 class AddStudyBcRequest(StudyTargeted):
     op: Literal["add_study_bc"]
-    bc_type: Literal["dirichlet", "heat_flux", "fixed", "traction"]
+    bc_type: BoundaryConditionType
     selection: dict[str, Any]
     """A serialized node selection, as ``StudySelection`` describes it."""
     value: Value | None = None
@@ -361,7 +364,7 @@ class DeleteOptimizationRequest(OptimizationTargeted):
 
 class SetOptimizationValueRequest(OptimizationTargeted):
     op: Literal["set_optimization_value"]
-    argument: Literal["steps", "learning_rate"]
+    argument: OptimizationArgument
     value: float
 
 

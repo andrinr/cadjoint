@@ -46,6 +46,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+from cadjoint.enums import PluginKind, PluginTransport, values
 from cadjoint.plugins.plugin import Plugin, TesseractPlugin
 from cadjoint.plugins.spec import PluginConfigError, PluginSpec
 
@@ -56,35 +57,36 @@ CONFIG_ENV = "CADJOINT_PLUGINS"
 #: The file name looked for in a config directory.
 CONFIG_NAME = "plugins.toml"
 
-#: The slots cadjoint itself resolves by kind.  A plugin may declare any
-#: kind; these are the ones the pipeline asks for.
-KINDS = ("mesher", "tetfill", "thermal_solver", "elastic_solver", "qef", "flow_solver")
+#: The slots cadjoint itself resolves by kind, as
+#: :class:`cadjoint.enums.PluginKind` declares them.  A plugin may declare
+#: any kind — ``PluginSpec.kind`` is a plain string — so this is the list of
+#: slots the pipeline asks for, not a closed set of what may register.
+KINDS = values(PluginKind)
 
-_REPO_ROOT = Path(__file__).resolve().parents[2]
 _TESSERACTS = Path(__file__).resolve().parents[1] / "fem" / "tesseracts"
 
 #: name -> (kind, package directory) for the packages shipped in this repo.
-#: The ``native`` QEF core lives outside the Python package, so it registers
-#: only when the checkout it belongs to is present.
 BUILTIN_PACKAGES: dict[str, tuple[str, Path]] = {
-    "mesher": ("mesher", _TESSERACTS / "mesher"),
-    "tetfill": ("tetfill", _TESSERACTS / "tetfill"),
-    "thermal_jaxfem": ("thermal_solver", _TESSERACTS / "thermal_jaxfem"),
-    "elastic_jaxfem": ("elastic_solver", _TESSERACTS / "elastic_jaxfem"),
-    "elastic_calculix": ("elastic_solver", _TESSERACTS / "elastic_calculix"),
-    "flow_brinkman": ("flow_solver", _TESSERACTS / "flow_brinkman"),
-    "qef_native": ("qef", _REPO_ROOT / "native"),
+    "mesher": (PluginKind.MESHER.value, _TESSERACTS / "mesher"),
+    "tetfill": (PluginKind.TETFILL.value, _TESSERACTS / "tetfill"),
+    "thermal_jaxfem": (PluginKind.THERMAL_SOLVER.value, _TESSERACTS / "thermal_jaxfem"),
+    "elastic_jaxfem": (PluginKind.ELASTIC_SOLVER.value, _TESSERACTS / "elastic_jaxfem"),
+    "elastic_calculix": (PluginKind.ELASTIC_SOLVER.value, _TESSERACTS / "elastic_calculix"),
+    "flow_brinkman": (PluginKind.FLOW_SOLVER.value, _TESSERACTS / "flow_brinkman"),
+    "tet_gmsh": (PluginKind.TET_MESHER.value, _TESSERACTS / "tet_gmsh"),
 }
 
 #: Which plugin fills each kind unless the config says otherwise.  The two
 #: elastic solvers share a kind, so this is where that choice is made.
 BUILTIN_DEFAULTS: dict[str, str] = {
-    "mesher": "mesher",
-    "tetfill": "tetfill",
-    "thermal_solver": "thermal_jaxfem",
-    "elastic_solver": "elastic_jaxfem",
-    "flow_solver": "flow_brinkman",
-    "qef": "qef_native",
+    PluginKind.MESHER.value: "mesher",
+    PluginKind.TETFILL.value: "tetfill",
+    PluginKind.THERMAL_SOLVER.value: "thermal_jaxfem",
+    PluginKind.ELASTIC_SOLVER.value: "elastic_jaxfem",
+    PluginKind.FLOW_SOLVER.value: "flow_brinkman",
+    # The only tet_mesher there is; the built-in tetfill stays the
+    # no-dependency fallback under its own kind.
+    PluginKind.TET_MESHER.value: "tet_gmsh",
 }
 
 _VERSION_LINE = re.compile(r"^version:\s*['\"]?([^'\"\s]+)['\"]?\s*$", re.MULTILINE)
@@ -215,7 +217,7 @@ def builtin_specs() -> dict[str, PluginSpec]:
             specs[name] = PluginSpec(
                 name=name,
                 kind=kind,
-                transport="local",
+                transport=PluginTransport.LOCAL,
                 api_path=api,
                 version=_declared_version(package),
             )

@@ -18,6 +18,16 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+from cadjoint.enums import (
+    BoundaryConditionType,
+    ConstraintKind,
+    ConstraintSolveMethod,
+    MeshMethod,
+    StudyKind,
+    either,
+    listed,
+    values,
+)
 from cadjoint.viewer._limits import OVERSIZED_SOURCE_ERROR, exceeds_source_limit
 from cadjoint.viewer._patch import OPERATIONS, PatchError, apply_operation
 from cadjoint.viewer.patch.materials import (
@@ -36,6 +46,15 @@ Validator = Callable[[dict[str, Any]], Checked]
 def _error(message: str) -> dict[str, Any]:
     """One rejected request, in the shape every endpoint answers with."""
     return {"ok": False, "error": message}
+
+
+# Every allowed set below is read off the enum that defines it
+# (:mod:`cadjoint.enums`), so a member added there reaches the rejection
+# message, the request model and the generated TypeScript at once.
+_STUDY_KINDS = values(StudyKind)
+_BC_TYPES = values(BoundaryConditionType)
+_MESH_METHODS = values(MeshMethod)
+_SOLVE_METHODS = values(ConstraintSolveMethod)
 
 
 # ── Stable identities ───────────────────────────────────────────────────────
@@ -495,13 +514,13 @@ def _validate_placed_vertex(request: dict[str, Any]) -> Checked:
 # ── Constraints ─────────────────────────────────────────────────────────────
 
 # Constraint kinds and how many sketch points each one takes.
-_VALUED_CONSTRAINTS = {"fixed": 1, "distance": 2}
+_VALUED_CONSTRAINTS = {ConstraintKind.FIXED: 1, ConstraintKind.DISTANCE: 2}
 _RELATIONAL_CONSTRAINTS = {
-    "horizontal": 2,
-    "vertical": 2,
-    "coincident": 2,
-    "parallel": 4,
-    "perpendicular": 4,
+    ConstraintKind.HORIZONTAL: 2,
+    ConstraintKind.VERTICAL: 2,
+    ConstraintKind.COINCIDENT: 2,
+    ConstraintKind.PARALLEL: 4,
+    ConstraintKind.PERPENDICULAR: 4,
 }
 
 
@@ -555,10 +574,10 @@ def _validate_solve_sketch(request: dict[str, Any]) -> Checked:
     line = request.get("line")
     if not _integer(line):
         return _error("The patch request needs an integer `line`."), {}
-    method = request.get("method", "newton")
+    method = request.get("method", ConstraintSolveMethod.NEWTON)
     iterations = request.get("iterations", 8)
-    if not isinstance(method, str) or method not in {"newton", "adam", "sgd"}:
-        return _error("Solver `method` must be `newton`, `adam`, or `sgd`."), {}
+    if not isinstance(method, str) or method not in _SOLVE_METHODS:
+        return _error(f"Solver `method` must be {either(ConstraintSolveMethod)}."), {}
     if not _integer(iterations) or not 1 <= iterations <= 512:
         return _error("Solver `iterations` must be an integer from 1 to 512."), {}
     return None, {"line": line, "method": method, "iterations": iterations}
@@ -569,8 +588,8 @@ def _validate_solve_sketch(request: dict[str, Any]) -> Checked:
 
 def _validate_add_study(request: dict[str, Any]) -> Checked:
     kind = request.get("kind")
-    if not isinstance(kind, str) or kind not in {"thermal", "elastic"}:
-        return _error("Study `kind` must be `thermal` or `elastic`."), {}
+    if not isinstance(kind, str) or kind not in _STUDY_KINDS:
+        return _error(f"Study `kind` must be {either(StudyKind)}."), {}
     name = request.get("name")
     if name is not None and (not isinstance(name, str) or not name.strip()):
         return _error("Study `name` must be a non-empty string."), {}
@@ -590,22 +609,17 @@ def _validate_add_study_bc(request: dict[str, Any]) -> Checked:
     if error is not None:
         return error, {}
     bc_type = request.get("bc_type")
-    if not isinstance(bc_type, str) or bc_type not in {
-        "dirichlet",
-        "heat_flux",
-        "fixed",
-        "traction",
-    }:
-        return _error("`bc_type` must be one of: dirichlet, heat_flux, fixed, traction."), {}
+    if not isinstance(bc_type, str) or bc_type not in _BC_TYPES:
+        return _error(f"`bc_type` must be one of: {listed(BoundaryConditionType)}."), {}
     selection = request.get("selection")
     if not isinstance(selection, dict):
         return _error("The patch request needs `selection` as a description object."), {}
     arguments.update(bc_type=bc_type, selection=selection)
     raw_value = request.get("value")
-    if bc_type == "fixed":
+    if bc_type == BoundaryConditionType.FIXED:
         if raw_value is not None:
             return _error("A `fixed` boundary condition takes no value."), {}
-    elif bc_type == "traction":
+    elif bc_type == BoundaryConditionType.TRACTION:
         vector = _numbers(raw_value, 3)
         if vector is None:
             return _error("A `traction` boundary condition needs `value` as three numbers."), {}
@@ -690,8 +704,8 @@ def _validate_set_mesh_value(request: dict[str, Any]) -> Checked:
             return _error("The patch request needs `value` as a `domain` name."), {}
         arguments["value"] = raw_value
     elif argument == "method":
-        if not isinstance(raw_value, str) or raw_value not in {"hex", "tet4", "tet10"}:
-            return _error("Mesh `method` must be one of: hex, tet4, tet10."), {}
+        if not isinstance(raw_value, str) or raw_value not in _MESH_METHODS:
+            return _error(f"Mesh `method` must be one of: {listed(MeshMethod)}."), {}
         arguments["value"] = raw_value
     else:
         value = _scalar_or_numbers(raw_value)

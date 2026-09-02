@@ -3,7 +3,7 @@
 from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
-from typing import Any, Literal
+from typing import Any
 
 import jax
 import jax.numpy as jnp
@@ -18,10 +18,10 @@ from cadjoint.constraints.residual import (
     pack_param_dict,
     unpack_param_vector,
 )
+from cadjoint.enums import ConstraintSolveMethod, ConstraintSolveMethodLike, listed, parse
 from cadjoint.fluent import Fluent
 from cadjoint.geometry.parameters import Parameter
 
-ConstraintSolveMethod = Literal["newton", "adam", "sgd"]
 _CAPTURED_SOLVES: ContextVar[list[dict[str, Any]] | None] = ContextVar(
     "cadjoint_captured_constraint_solves",
     default=None,
@@ -81,10 +81,10 @@ def _gradient_projection(
     flat_fn,
     values: Array,
     steps: int,
-    method: Literal["adam", "sgd"],
+    method: ConstraintSolveMethod,
 ) -> tuple[Array, list[float]]:
     """Minimize squared constraint residuals with an Optax optimizer."""
-    optimizer = optax.adam(0.05) if method == "adam" else optax.sgd(0.15)
+    optimizer = optax.adam(0.05) if method == ConstraintSolveMethod.ADAM else optax.sgd(0.15)
     state = optimizer.init(values)
     x = values
     losses = [float(_loss(flat_fn, x))]
@@ -194,7 +194,7 @@ def satisfy_constraints(
     root: Fluent,
     *,
     steps: int = 8,
-    method: ConstraintSolveMethod = "newton",
+    method: ConstraintSolveMethodLike = ConstraintSolveMethod.NEWTON,
 ) -> dict[str, Array]:
     """Project a construction/SDF tree onto its attached constraints in place.
 
@@ -208,8 +208,10 @@ def satisfy_constraints(
     Args:
         root: Construction or SDF tree whose attached constraints are solved.
         steps: Number of optimizer updates.
-        method: ``"newton"`` for minimum-norm manifold projection, or
-            ``"adam"``/``"sgd"`` for Optax residual minimization.
+        method: A :class:`~cadjoint.enums.ConstraintSolveMethod` or its
+            plain string spelling — ``"newton"`` for minimum-norm manifold
+            projection, or ``"adam"``/``"sgd"`` for Optax residual
+            minimization.
 
     Returns:
         The solved free-parameter mapping, after applying it to ``root``.
@@ -218,15 +220,16 @@ def satisfy_constraints(
 
     if not isinstance(steps, int) or isinstance(steps, bool) or steps < 1:
         raise ValueError("steps must be a positive integer")
-    if method not in {"newton", "adam", "sgd"}:
-        raise ValueError("method must be one of: newton, adam, sgd")
+    method = parse(
+        ConstraintSolveMethod, method, f"method must be one of: {listed(ConstraintSolveMethod)}"
+    )
 
     free, _, metadata = extract_parameters(root)
     constraints = _collect_constraints(metadata)
     if constraints:
         flat_fn = build_residual_fn(constraints, metadata)
         initial = pack_param_dict(free, metadata)
-        if method == "newton":
+        if method == ConstraintSolveMethod.NEWTON:
             values, losses = _newton_projection(flat_fn, initial, steps)
         else:
             values, losses = _gradient_projection(flat_fn, initial, steps, method)

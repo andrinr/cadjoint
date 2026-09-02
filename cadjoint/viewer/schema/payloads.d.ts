@@ -467,7 +467,7 @@ export interface AddConstraintRequest {
   id?: string | null;
   line?: number | null;
   op: "add_constraint";
-  kind: "fixed" | "distance" | "horizontal" | "vertical" | "coincident" | "parallel" | "perpendicular";
+  kind: ConstraintKind;
   indices: number[];
   value?: number | number[] | null;
 }
@@ -494,7 +494,7 @@ export interface SolveSketchRequest {
   id?: string | null;
   line?: number | null;
   op: "solve_sketch";
-  method?: "newton" | "adam" | "sgd";
+  method?: ConstraintSolveMethod;
   iterations?: number;
 }
 
@@ -508,7 +508,7 @@ export interface DeleteObjectRequest {
 export interface AddStudyRequest {
   source: string;
   op: "add_study";
-  kind: "thermal" | "elastic";
+  kind: StudyKind;
   name?: string | null;
 }
 
@@ -524,7 +524,7 @@ export interface AddStudyBcRequest {
   id?: string | null;
   study?: string | number | null;
   op: "add_study_bc";
-  bc_type: "dirichlet" | "heat_flux" | "fixed" | "traction";
+  bc_type: BoundaryConditionType;
   selection: Record<string, unknown>;
   value?: number | number[] | null;
 }
@@ -582,7 +582,7 @@ export interface SetOptimizationValueRequest {
   id?: string | null;
   optimization?: string | number | null;
   op: "set_optimization_value";
-  argument: "steps" | "learning_rate";
+  argument: OptimizationArgument;
   value: number;
 }
 
@@ -620,6 +620,43 @@ export interface TangentPlaneReference {
   kind: "tangent";
   near: [number, number, number];
 }
+
+/**
+ * The boundary conditions a study accepts, as the wire spells them.
+ *
+ * The thermal kinds come first, then the elastic ones; the viewer offers
+ * them in this order and the ``describe()`` payload's ``type`` field is
+ * exactly these values.
+ */
+export type BoundaryConditionType = "dirichlet" | "heat_flux" | "fixed" | "traction";
+
+/**
+ * The sketch constraints the viewer can add.
+ *
+ * The two valued kinds come first (they take a numeric target), then the
+ * relational ones.
+ */
+export type ConstraintKind = "fixed" | "distance" | "horizontal" | "vertical" | "coincident" | "parallel" | "perpendicular";
+
+/**
+ * How a sketch's constraints are satisfied.
+ *
+ * Distinct from ``OptimizerMethod``: the constraint solver's default is a
+ * minimum-norm Newton projection, which has no meaning as a descent
+ * method for a design objective.
+ */
+export type ConstraintSolveMethod = "newton" | "adam" | "sgd";
+
+/**
+ * The optimization keywords the viewer may retune.
+ *
+ * Everything else in an ``Optimization`` constructor is the objective
+ * itself, which is code, not a control.
+ */
+export type OptimizationArgument = "steps" | "learning_rate";
+
+/** The physics a declared study solves. */
+export type StudyKind = "thermal" | "elastic";
 
 /** Every accepted `/patch` request, discriminated on `op`. */
 export type PatchRequest =

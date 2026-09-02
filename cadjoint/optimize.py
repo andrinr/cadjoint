@@ -94,18 +94,37 @@ from typing import Any, Callable
 
 import numpy as np
 
+from cadjoint.enums import (
+    GradientPath,
+    GradientPathLike,
+    ObjectiveMetric,
+    ObjectiveMetricLike,
+    OptimizerMethod,
+    OptimizerMethodLike,
+    StudyKind,
+    parse,
+    values,
+)
+
 __all__ = ["Optimization", "OptimizationRun", "capture_optimizations"]
 
-METHODS = ("adam", "sgd")
-METRICS = ("mean", "max", "compliance")
+#: The accepted spellings of each option set, in declaration order; the
+#: option sets themselves are :class:`~cadjoint.enums.OptimizerMethod`,
+#: :class:`~cadjoint.enums.ObjectiveMetric` and
+#: :class:`~cadjoint.enums.GradientPath`.
+METHODS = values(OptimizerMethod)
+METRICS = values(ObjectiveMetric)
 #: Study-form design->points derivative paths (see ``Optimization.gradient_path``).
 #: These spellings are the documented, user-facing ones and do not change.
-GRADIENT_PATHS = ("direct", "tesseract", "tesseract-dc")
+GRADIENT_PATHS = values(GradientPath)
 #: Accepted aliases -> canonical gradient path.  Both chain paths resolve
 #: every stage through :mod:`cadjoint.plugins`, so they can also be named
 #: for what they do rather than for the Tesseract that implements them
 #: today; the canonical names above stay the ones the docs use.
-GRADIENT_PATH_ALIASES = {"plugins": "tesseract", "plugins-dc": "tesseract-dc"}
+GRADIENT_PATH_ALIASES = {
+    "plugins": GradientPath.TESSERACT,
+    "plugins-dc": GradientPath.TESSERACT_DC,
+}
 TRAJECTORY_LIMIT = 100
 
 _CAPTURED_OPTIMIZATIONS: ContextVar[list[Optimization] | None] = ContextVar(
@@ -367,10 +386,12 @@ class Optimization:
             :class:`~cadjoint.fem.study.ElasticStudy` (or its name) whose
             solved field the run minimizes (study form; mutually exclusive
             with ``objective``/``of``).
-        metric: Study-form objective — ``"mean"`` or ``"max"`` of the
-            result's objective scalar (temperature / displacement
-            magnitude), or ``"compliance"`` (traction work, twice the
-            strain energy; elastic studies only).
+        metric: Study-form objective — a
+            :class:`~cadjoint.enums.ObjectiveMetric` or its plain string
+            spelling: ``"mean"`` or ``"max"`` of the result's objective
+            scalar (temperature / displacement magnitude), or
+            ``"compliance"`` (traction work, twice the strain energy;
+            elastic studies only).
         regularizer: Optional callable ``(params: dict) -> scalar`` added
             to the study metric as ``regularizer_weight * regularizer``,
             e.g. a smoothed material volume (study form, keyword-only).
@@ -379,7 +400,10 @@ class Optimization:
             the current design every this many steps (0: never; default
             6).  In between, only node positions move — differentiably.
         gradient_path: Study form: how the design->points derivative is
-            carried per step (keyword-only).  ``"direct"`` (default) is
+            carried per step (keyword-only) — a
+            :class:`~cadjoint.enums.GradientPath` or its plain string
+            spelling, normalised (aliases resolved) on construction.
+            ``"direct"`` (default) is
             the validated frozen-topology path — node positions Newton
             re-projected onto the true SDF, solved in-process.
             ``"tesseract"`` runs the packaged two-tesseract chain instead
@@ -401,23 +425,25 @@ class Optimization:
             result is always evaluated on the direct path.
         steps: Default number of optimizer steps (keyword-only).
         learning_rate: Optimizer step size (keyword-only).
-        method: ``"adam"`` (default) or ``"sgd"`` (keyword-only).  Runs
-            through optax; plain gradient descent when optax is missing.
+        method: A :class:`~cadjoint.enums.OptimizerMethod` or its plain
+            string spelling — ``"adam"`` (default) or ``"sgd"``
+            (keyword-only).  Runs through optax; plain gradient descent
+            when optax is missing.
     """
 
     name: str
     objective: Callable[[dict[str, Any]], Any] | None = None
     of: Any = None
     study: Any = None
-    metric: str | None = None
+    metric: ObjectiveMetricLike | None = None
     _: KW_ONLY
     regularizer: Callable[[dict[str, Any]], Any] | None = None
     regularizer_weight: float = 0.0
     remesh_every: int | None = None
-    gradient_path: str = "direct"
+    gradient_path: GradientPathLike = GradientPath.DIRECT
     steps: int = 30
     learning_rate: float = 0.05
-    method: str = "adam"
+    method: OptimizerMethodLike = OptimizerMethod.ADAM
 
     def __post_init__(self):
         if not isinstance(self.name, str) or not self.name.strip():
@@ -432,8 +458,9 @@ class Optimization:
         if isinstance(rate, bool) or not isinstance(rate, (int, float)) or not rate > 0.0:
             raise ValueError("learning_rate must be a positive number.")
         self.learning_rate = float(rate)
-        if self.method not in METHODS:
-            raise ValueError(f"method must be one of: {', '.join(METHODS)}.")
+        self.method = parse(
+            OptimizerMethod, self.method, f"method must be one of: {', '.join(METHODS)}."
+        )
         _register(self)
 
     def _validate_objective_form(self) -> None:
@@ -459,7 +486,10 @@ class Optimization:
                 ("regularizer", self.regularizer),
                 ("remesh_every", self.remesh_every),
                 ("regularizer_weight", self.regularizer_weight or None),
-                ("gradient_path", None if self.gradient_path == "direct" else self.gradient_path),
+                (
+                    "gradient_path",
+                    None if self.gradient_path == GradientPath.DIRECT else self.gradient_path,
+                ),
             )
             if value is not None
         ]
@@ -476,9 +506,15 @@ class Optimization:
                 "either a Python objective over a scene object or a study metric."
             )
         self.study = _resolve_study(self.study)
-        if self.metric not in METRICS:
-            raise ValueError(f"metric must be one of: {', '.join(METRICS)} (got {self.metric!r}).")
-        if self.metric == "compliance" and self._study_kind() != "elastic":
+        self.metric = parse(
+            ObjectiveMetric,
+            self.metric,
+            f"metric must be one of: {', '.join(METRICS)} (got {self.metric!r}).",
+        )
+        if (
+            self.metric == ObjectiveMetric.COMPLIANCE
+            and self._study_kind() is not StudyKind.ELASTIC
+        ):
             raise ValueError(
                 f"metric='compliance' needs an elastic study; {self.study.name!r} "
                 f"is {self._study_kind()}."
@@ -505,19 +541,20 @@ class Optimization:
             or self.remesh_every < 0
         ):
             raise ValueError("remesh_every must be a non-negative integer (0: never remesh).")
-        if self.gradient_path not in GRADIENT_PATHS and (
-            self.gradient_path not in GRADIENT_PATH_ALIASES
-        ):
-            raise ValueError(
-                f"gradient_path must be one of: {', '.join(GRADIENT_PATHS)} "
-                f"(aliases: {', '.join(GRADIENT_PATH_ALIASES)}) "
-                f"(got {self.gradient_path!r})."
-            )
+        # Aliases resolve here, so the rest of the run sees one canonical
+        # member per path rather than two spellings of it.
+        self.gradient_path = parse(
+            GradientPath,
+            GRADIENT_PATH_ALIASES.get(self.gradient_path, self.gradient_path),
+            f"gradient_path must be one of: {', '.join(GRADIENT_PATHS)} "
+            f"(aliases: {', '.join(GRADIENT_PATH_ALIASES)}) "
+            f"(got {self.gradient_path!r}).",
+        )
 
-    def _study_kind(self) -> str:
+    def _study_kind(self) -> StudyKind:
         from cadjoint.fem.study import ThermalStudy
 
-        return "thermal" if isinstance(self.study, ThermalStudy) else "elastic"
+        return StudyKind.THERMAL if isinstance(self.study, ThermalStudy) else StudyKind.ELASTIC
 
     def _study_target(self, scene: Any = None) -> Any:
         """The object whose free parameters a study-backed run optimizes.
@@ -564,11 +601,11 @@ class Optimization:
             "name": self.name,
             "steps": self.steps,
             "learning_rate": self.learning_rate,
-            "method": self.method,
+            "method": str(self.method),
             "parameters": parameters,
             "objective": objective,
             "study": self.study.name if self.study is not None else None,
-            "metric": self.metric,
+            "metric": None if self.metric is None else str(self.metric),
             "remesh_every": self.remesh_every,
             "regularizer": (
                 getattr(self.regularizer, "__name__", type(self.regularizer).__name__)
@@ -616,7 +653,7 @@ class Optimization:
 
         transform = (
             optax.adam(self.learning_rate)
-            if self.method == "adam"
+            if self.method == OptimizerMethod.ADAM
             else optax.sgd(self.learning_rate)
         )
         if constrained:
@@ -628,7 +665,7 @@ class Optimization:
             updates, state = transform.update(grads, state, params)
             return optax.apply_updates(params, updates), state
 
-        return self.method, transform.init, apply
+        return str(self.method), transform.init, apply
 
     def run(self, steps: int | None = None, callback=None, *, scene: Any = None) -> OptimizationRun:
         """Minimize the objective over the target's free parameters.
@@ -777,9 +814,9 @@ class Optimization:
 
     def _metric_value(self, result: Any, mesh: Any, points: Any) -> Any:
         """The study metric as a (possibly traced) JAX scalar."""
-        if self.metric == "compliance":
+        if self.metric == ObjectiveMetric.COMPLIANCE:
             return _compliance(self.study, result, mesh, points)
-        return result.mean() if self.metric == "mean" else result.max()
+        return result.mean() if self.metric == ObjectiveMetric.MEAN else result.max()
 
     def _run_study(self, count: int, callback, scene: Any) -> OptimizationRun:
         """The study-form descent loop: frozen-topology solves per step.
@@ -861,9 +898,9 @@ class Optimization:
         # Both chains resolve their stages through the plugin registry, so
         # "tesseract"/"tesseract-dc" and their "plugins"/"plugins-dc"
         # aliases select the same code; the alias only renames the switch.
-        path = GRADIENT_PATH_ALIASES.get(self.gradient_path, self.gradient_path)
-        use_dc_chain = path == "tesseract-dc"
-        use_tesseract = path in ("tesseract", "tesseract-dc")
+        path = self.gradient_path
+        use_dc_chain = path == GradientPath.TESSERACT_DC
+        use_tesseract = path in (GradientPath.TESSERACT, GradientPath.TESSERACT_DC)
         if use_dc_chain:
             from cadjoint.fem.tesseracts.chain import freeze_study_chain_dc
         elif use_tesseract:

@@ -15,14 +15,15 @@ its two reference forms: the assignment variable, or its ``name`` as a
 
 ``_MESH_FIELDS`` is the constructor's field order, used to find positionally
 written arguments; ``method`` is written as a string literal and validated
-against ``_MESH_METHODS``.  Add an operation here when it edits a mesh
-declaration.
+against :class:`cadjoint.enums.MeshMethod`.  Add an operation here when it
+edits a mesh declaration.
 """
 
 from __future__ import annotations
 
 import ast
 
+from cadjoint.enums import MeshMethod, listed, values
 from cadjoint.viewer.patch.edits import (
     _after_statement,
     _delete_statement,
@@ -45,7 +46,8 @@ from cadjoint.viewer.source_map.nodes import _line_offsets
 # `name` is excluded from editing.
 _MESH_FIELDS = ("name", "resolution", "domain", "bounds", "size", "padding")
 _MESH_NUMERIC_ARGUMENTS = ("resolution", "bounds", "size", "padding")
-_MESH_METHODS = ("hex", "tet4", "tet10")
+#: The accepted spellings of :class:`cadjoint.enums.MeshMethod`.
+_MESH_METHODS = values(MeshMethod)
 
 
 def add_mesh(source: str, name: str | None = None) -> str:
@@ -158,8 +160,10 @@ def set_mesh_value(source: str, mesh, argument, value) -> str:
         )
     if argument == "method":
         if value not in _MESH_METHODS:
-            raise PatchError(f"Mesh `method` must be one of: {', '.join(_MESH_METHODS)}.")
-        return _set_keyword_expression(source, located.call, "method", repr(value))
+            raise PatchError(f"Mesh `method` must be one of: {listed(MeshMethod)}.")
+        # ``str`` first: a MeshMethod member reprs as the member, not the
+        # literal the program should carry.
+        return _set_keyword_expression(source, located.call, "method", repr(str(value)))
     if not isinstance(argument, str) or argument not in _MESH_NUMERIC_ARGUMENTS:
         allowed = ", ".join((*_MESH_NUMERIC_ARGUMENTS, "domain", "method"))
         raise PatchError(f"A mesh's editable arguments are: {allowed}.")

@@ -33,6 +33,7 @@ from typing import Any, Callable
 
 import numpy as np
 
+from cadjoint.enums import Side, SideLike, parse, values
 from cadjoint.fem.hexmesh import HexMesh
 
 __all__ = [
@@ -42,7 +43,9 @@ __all__ = [
     "selection_from_description",
 ]
 
-_SIDES = ("+x", "-x", "+y", "-y", "+z", "-z")
+#: The accepted side spellings, in declaration order.  The option set
+#: itself is :class:`cadjoint.enums.Side`.
+_SIDES = values(Side)
 
 
 def _triplet(value: Any, label: str) -> tuple[float, float, float]:
@@ -171,7 +174,7 @@ class _Halfspace(NodeSelection):
 
 @dataclass(frozen=True)
 class _Side(NodeSelection):
-    side: str
+    side: Side
     tol: float | None = None
 
     def _geometric(self, points: np.ndarray, mesh: HexMesh) -> np.ndarray:
@@ -184,7 +187,7 @@ class _Side(NodeSelection):
         return coords >= extreme - tol if positive else coords <= extreme + tol
 
     def describe(self) -> dict[str, Any]:
-        return {"kind": "side", "side": self.side, "tol": self.tol}
+        return {"kind": "side", "side": str(self.side), "tol": self.tol}
 
 
 def _default_side_tol(mesh: HexMesh) -> float:
@@ -300,7 +303,7 @@ class Nodes:
         return _Halfspace(_triplet(point, "point"), direction)
 
     @staticmethod
-    def side(side: str, tol: float | None = None) -> NodeSelection:
+    def side(side: SideLike, tol: float | None = None) -> NodeSelection:
         """Nodes on the axis-extreme boundary plane of the mesh.
 
         ``Nodes.side("+x")`` selects boundary nodes whose x coordinate is
@@ -308,14 +311,14 @@ class Nodes:
         this is the end face; for curved geometry it is the extreme cap.
 
         Args:
-            side: One of ``"+x"``, ``"-x"``, ``"+y"``, ``"-y"``, ``"+z"``,
-                ``"-z"``.
+            side: A :class:`~cadjoint.enums.Side`, or its plain string
+                spelling: one of ``"+x"``, ``"-x"``, ``"+y"``, ``"-y"``,
+                ``"+z"``, ``"-z"``.
             tol: Capture distance from the extreme plane.  ``None`` (the
                 default) resolves per mesh to half the smallest cell
                 spacing.
         """
-        if side not in _SIDES:
-            raise ValueError(f"side must be one of {_SIDES}, got {side!r}.")
+        side = parse(Side, side, f"side must be one of {_SIDES}, got {side!r}.")
         if tol is not None:
             tol = float(tol)
             if not np.isfinite(tol) or tol < 0.0:

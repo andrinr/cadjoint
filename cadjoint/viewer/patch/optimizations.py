@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import ast
 
+from cadjoint.enums import OptimizationArgument, values
 from cadjoint.viewer.patch.edits import (
     _delete_statement,
     _name_references,
@@ -32,7 +33,8 @@ from cadjoint.viewer.patch.resolvers import _located_optimization
 # Constructor field order, for resolving positionally written arguments;
 # `steps`/`learning_rate`/`method` are keyword-only in the constructor.
 _OPTIMIZATION_FIELDS = ("name", "objective", "of")
-_OPTIMIZATION_ARGUMENTS = ("steps", "learning_rate")
+#: The accepted spellings of :class:`cadjoint.enums.OptimizationArgument`.
+_OPTIMIZATION_ARGUMENTS = values(OptimizationArgument)
 
 
 def delete_optimization(source: str, optimization) -> str:
@@ -72,7 +74,7 @@ def set_optimization_value(source: str, optimization, argument, value) -> str:
     if not isinstance(argument, str) or argument not in _OPTIMIZATION_ARGUMENTS:
         allowed = ", ".join(_OPTIMIZATION_ARGUMENTS)
         raise PatchError(f"An optimization's editable arguments are: {allowed}.")
-    if argument == "steps":
+    if argument == OptimizationArgument.STEPS:
         if (
             not isinstance(value, (int, float))
             or isinstance(value, bool)

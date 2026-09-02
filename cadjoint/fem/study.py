@@ -63,6 +63,7 @@ from typing import Any
 
 import numpy as np
 
+from cadjoint.enums import BoundaryConditionType, StudyKind
 from cadjoint.fem.boundary import faces_from_nodes, tet_faces_from_nodes
 from cadjoint.fem.hexmesh import HexMesh
 from cadjoint.fem.properties import FROM_MATERIAL
@@ -147,7 +148,11 @@ class Dirichlet:
 
     def describe(self) -> dict[str, Any]:
         """JSON-ready description."""
-        return {"type": "dirichlet", "nodes": self.nodes.describe(), "value": self.value}
+        return {
+            "type": BoundaryConditionType.DIRICHLET.value,
+            "nodes": self.nodes.describe(),
+            "value": self.value,
+        }
 
 
 @dataclass(frozen=True)
@@ -166,7 +171,11 @@ class HeatFlux:
 
     def describe(self) -> dict[str, Any]:
         """JSON-ready description."""
-        return {"type": "heat_flux", "nodes": self.nodes.describe(), "flux": float(self.flux)}
+        return {
+            "type": BoundaryConditionType.HEAT_FLUX.value,
+            "nodes": self.nodes.describe(),
+            "flux": float(self.flux),
+        }
 
 
 @dataclass(frozen=True)
@@ -180,7 +189,7 @@ class Fixed:
 
     def describe(self) -> dict[str, Any]:
         """JSON-ready description."""
-        return {"type": "fixed", "nodes": self.nodes.describe()}
+        return {"type": BoundaryConditionType.FIXED.value, "nodes": self.nodes.describe()}
 
 
 @dataclass(frozen=True)
@@ -197,7 +206,7 @@ class Traction:
     def describe(self) -> dict[str, Any]:
         """JSON-ready description."""
         return {
-            "type": "traction",
+            "type": BoundaryConditionType.TRACTION.value,
             "nodes": self.nodes.describe(),
             "vector": list(self.vector),
         }
@@ -488,7 +497,7 @@ class ThermalStudy:
         """JSON-ready payload: everything the viewer needs to display it."""
         return {
             "name": self.name,
-            "kind": "thermal",
+            "kind": StudyKind.THERMAL.value,
             **_mesh_payload(self),
             "material": {"conductivity": self.conductivity},
             "source": float(self.source),
@@ -553,7 +562,7 @@ class ThermalStudy:
         )
         result = SimulationResult(
             name=self.name,
-            kind="thermal",
+            kind=StudyKind.THERMAL.value,
             field="temperature",
             solution=solution,
             sim_mesh=sim_mesh,
@@ -619,7 +628,7 @@ class ElasticStudy:
         """JSON-ready payload: everything the viewer needs to display it."""
         return {
             "name": self.name,
-            "kind": "elastic",
+            "kind": StudyKind.ELASTIC.value,
             **_mesh_payload(self),
             "material": {"youngs": self.youngs, "poisson": self.poisson},
             "gravity": list(self.gravity) if self.gravity is not None else None,
@@ -688,7 +697,7 @@ class ElasticStudy:
         )
         result = SimulationResult(
             name=self.name,
-            kind="elastic",
+            kind=StudyKind.ELASTIC.value,
             field="von_mises",
             solution=solution,
             sim_mesh=sim_mesh,

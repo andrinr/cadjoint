@@ -47,6 +47,22 @@ tesseract = [
     "tesseract-core[runtime]; python_version >= '3.11'",
     "tesseract-jax; python_version >= '3.11'",
 ]
+# The Gmsh tet mesher (cadjoint.brep.mesh_gmsh, and the cadjoint_tet_gmsh
+# Tesseract): HXT second-order tets straight from the exact STEP the
+# ownership graph writes, instead of TetGen on a dual-contour quad soup.
+#
+# GPL-2.0-or-later, and an extra for that reason and no other. cadjoint is
+# Apache-2.0; nothing under cadjoint/ imports gmsh at module scope, the
+# built-in tetfill Tesseract stays the no-dependency fallback, and the
+# supported production route is the cadjoint_tet_gmsh image, where the
+# licence boundary is a process boundary. Installing this extra links Gmsh
+# into your own process -- your call to make, knowingly.
+#
+# It overlaps the fem extra, which already pulls gmsh in because jax-fem
+# imports it. That is not a reason to drop it: this extra is what the tet
+# mesher declares it needs, and a caller who wants it should not have to
+# install a solver stack to get it (or discover the dependency by accident).
+gmsh = ["gmsh; python_version >= '3.11'"]
 # Dev-only STEP validation: tests/meshing/test_step_kernel.py round-trips
 # save_step output through the OCCT kernel (importorskip'd when absent).
 # cadquery-ocp ships wheels for CPython 3.10-3.14 only, so the marker keeps

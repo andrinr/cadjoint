@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import ast
 
+from cadjoint.enums import ConstraintSolveMethod, either, values
 from cadjoint.viewer.patch.edits import (
     _after_statement,
     _delete_statement,
@@ -164,8 +165,8 @@ def solve_sketch(
     iterations: int = 8,
 ) -> str:
     """Add or update an in-program solve step for a sketch's constraints."""
-    if method not in {"newton", "adam", "sgd"}:
-        raise PatchError("Solver method must be `newton`, `adam`, or `sgd`.")
+    if method not in values(ConstraintSolveMethod):
+        raise PatchError(f"Solver method must be {either(ConstraintSolveMethod)}.")
     if (
         not isinstance(iterations, int)
         or isinstance(iterations, bool)

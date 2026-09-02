@@ -1,0 +1,19 @@
+# Python requirements for the cadjoint_tet_gmsh Tesseract.
+#
+# The relative path is the docs-supported local-dependency form: lines
+# starting with "." / "/" / "file://" are staged into the build context by
+# `tesseract build` (tesseract_core.sdk.engine.parse_requirements) and pip-
+# installed inside the image. It resolves to the cadjoint repository root
+# (core install: jax, numpy, optax, optimistix, imageio).
+../../../..
+
+# The forward is Gmsh, whose Python SDK wheel bundles the whole kernel
+# (OCCT included) and has manylinux x86-64 / aarch64 and macOS arm64
+# builds. It is GPL-2.0-or-later, which is exactly why it lives in this
+# image and not in cadjoint's own dependencies: the Apache-2.0 library
+# never links it, and the boundary is the container.
+gmsh
+
+# The ownership match runs on the caller's side, but cadjoint.brep imports
+# scipy's KD-tree lazily and the schema round-trip touches it.
+scipy

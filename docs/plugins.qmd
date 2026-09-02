@@ -28,7 +28,7 @@ uv sync --extra tesseract
 | | |
 |---|---|
 | **name** | the registry key, e.g. `thermal_jaxfem` |
-| **kind** | the slot it fills: `mesher`, `tetfill`, `thermal_solver`, `elastic_solver`, `qef` |
+| **kind** | the slot it fills. The ones cadjoint asks for are `PluginKind`: `mesher`, `tetfill`, `tet_mesher`, `thermal_solver`, `elastic_solver`, `flow_solver`. The field stays a plain string, so a plugin may declare a kind cadjoint has never heard of |
 | **version** | what the running instance advertises, else what its `tesseract_config.yaml` declares |
 | **inputs / outputs** | the schema `tesseract-runtime` publishes — never restated in Python |
 | **capabilities** | derived from that schema: differentiable inputs and outputs, served endpoints, and named flags (`per_element_properties`, `body_force`, `frozen_topology`, `vjp`, …) |
@@ -65,15 +65,14 @@ the `Tesseract` itself, so `plugin.jacobian(...)`,
 | `thermal_jaxfem` | `thermal_solver` | jax-fem Poisson solve | AD strategy — JAX cannot trace PETSc assembly |
 | `elastic_jaxfem` | `elastic_solver` | jax-fem linear elasticity + von Mises | same |
 | `elastic_calculix` | `elastic_solver` | CalculiX 2.23 Fortran, over a subprocess | language, licence (GPL-2 isolated), AD strategy |
-| `qef_native` | `qef` | Rust dual-contouring kernels (batched QEF solves) | language and memory model — a cdylib over ctypes |
+| `tet_gmsh` | `tet_mesher` | Gmsh (HXT, order 2) on an exact STEP solid | licence (GPL-2-or-later isolated), a discrete topology decision |
 
 Each solves its VJP differently. The jax-fem pair use an implicit adjoint —
 one transposed linear solve per cotangent — and produce gradients
 bit-identical to the in-process path. CalculiX uses its own native
 `*SENSITIVITY` discrete adjoint, plus a correction for a Jacobian-variation
-term missing from ccx 2.23, validated to 2e-4 of finite differences. The
-Rust kernel carries a hand-derived linear-solve VJP that matches JAX
-autodiff to ~4e-14. `tetfill`'s is the exact transpose of a gather (TetGen's
+term missing from ccx 2.23, validated to 2e-4 of finite differences.
+`tetfill`'s is the exact transpose of a gather (TetGen's
 `-Y` preserves input vertices verbatim); `mesher`'s is the
 surface-interpolation contract described in [the two mesher
 boundaries](#the-two-mesher-boundaries).
@@ -86,11 +85,15 @@ answers; `[defaults]` in `plugins.toml` changes it.
 A `PluginSpec` is the *only* thing that knows about location, and each
 transport is exactly one tesseract-core constructor:
 
-| transport | the call it makes | when |
-|---|---|---|
-| `local` | `Tesseract.from_tesseract_api(api_path)` | default; same process, no Docker, no serialization |
-| `container` | `Tesseract.from_image(image)` then `serve()` | a built image, torn down when the plugin closes |
-| `remote` | `Tesseract.from_url(url)` | anything already serving: `tesseract serve`, `tesseract-runtime serve`, a Kubernetes Service |
+| transport | `PluginTransport` | the call it makes | when |
+|---|---|---|---|
+| `local` | `PluginTransport.LOCAL` | `Tesseract.from_tesseract_api(api_path)` | default; same process, no Docker, no serialization |
+| `container` | `PluginTransport.CONTAINER` | `Tesseract.from_image(image)` then `serve()` | a built image, torn down when the plugin closes |
+| `remote` | `PluginTransport.REMOTE` | `Tesseract.from_url(url)` | anything already serving: `tesseract serve`, `tesseract-runtime serve`, a Kubernetes Service |
+
+Unlike `kind`, `transport` is a closed set: it is normalised to a
+`cadjoint.enums.PluginTransport` when the spec is built, and anything else is
+refused with the three names listed.
 
 `options` in a spec is forwarded verbatim to that constructor — `timeout`,
 `environment`, `volumes`, `num_workers`, `gpus`, whatever the installed
@@ -231,7 +234,6 @@ chains (it is still a full backend for direct solves).
 glue:
 
 ```bash
-tesseract build native                                   # ~1 min
 tesseract build cadjoint/fem/tesseracts/mesher           # ~1 min
 tesseract build cadjoint/fem/tesseracts/elastic_calculix # ~1.5 min
 tesseract build cadjoint/fem/tesseracts/thermal_jaxfem   # ~3 min
@@ -241,12 +243,11 @@ tesseract build cadjoint/fem/tesseracts/elastic_jaxfem   # ~3 min
 | Image | Requirements provider | The non-obvious payload | Size |
 |---|---|---|---|
 | `cadjoint_mesher` | pip | cadjoint + TetGen + SciPy on a uv-installed CPython 3.12 | 1.36 GB |
-| `cadjoint_qef_native` | pip | the Rust cdylib, `cargo build --release --locked` inside the image, pinned via `CADJOINT_NATIVE_MESHER` | 1.39 GB |
 | `cadjoint_elastic_calculix` | conda | the ccx 2.23 Fortran binary from conda-forge at `/python-env/bin/ccx`, pinned via `CADJOINT_CCX` | 2.57 GB |
 | `cadjoint_thermal_jaxfem` | conda | the full jax-fem stack: PETSc/petsc4py 3.25.5, gmsh, fenics-basix, meshio | 5.51 GB |
 | `cadjoint_elastic_jaxfem` | conda | same | 5.51 GB |
 
-Two packages use pip, three use the SDK's conda provider — because petsc4py
+One package uses pip, three use the SDK's conda provider — because petsc4py
 publishes no PyPI wheels at all and gmsh publishes manylinux wheels for
 x86-64 only, so the jax-fem stack is simply not pip-installable on Linux, and
 ccx is a Fortran binary no Python requirement can supply. In every case
@@ -315,6 +316,61 @@ component of boundary motion is carried. It supports TET4, HEX8, and TET10.
 So: reach for `tetfill` wherever TetGen's vertex-preserving mode applies, and
 `mesher` when the mesher is a genuine black box or you need the HEX8 path.
 The validation matrix for both is in [tet vs hex](../research/tet-vs-hex.md).
+
+**`tet_gmsh` cuts somewhere else again: at the geometry.** It takes an exact
+STEP solid — the file
+[`cadjoint.brep.step`](../research/brep-architecture.md) writes from the
+ownership graph, where a plane is a `PLANE` and a bore is one
+`CYLINDRICAL_SURFACE` — and returns a TET10 mesh sized by the *part* instead
+of by a lattice. Second-order midside nodes come back on the CAD surface, not
+at the chord midpoint a straight-sided promotion gives. What it does *not*
+decide is where the nodes go: for every node it also reports the CAD entity
+that owns it, and `cadjoint.brep.mesh_gmsh.assign_ownership` matches that
+entity back to a B-rep face, so every position is re-solved by the same 1-, 2-
+or 3-field Newton projection as everything else in `cadjoint.brep.project`.
+The topology is frozen at discovery and only positions move, which makes the
+`vector_jacobian_product` w.r.t. `node_positions` an exact pass-through
+rather than an approximation. On the plate, mesher against mesher, this is
+0.26 s to the DC path's 2.08 s with the worst radius ratio 7.5x better —
+though both figures exclude `extract_brep`, which only this route needs and
+which costs more than either. The measurements, and that caveat in full, are
+in [the B-rep architecture note](../research/brep-architecture.md).
+
+Gmsh is **GPL-2.0-or-later** and cadjoint is Apache-2.0, so it is not a core
+dependency and nothing under `cadjoint/` imports it at module scope. (The
+`fem` extra does already pull it in, because jax-fem imports it — the `gmsh`
+extra exists so the mesher can declare what it needs without dragging a solver
+stack along.) The supported route is the `cadjoint_tet_gmsh` image, where the
+licence boundary is a process boundary — the same arrangement
+`elastic_calculix` uses.
+Installing `pip install 'cadjoint[gmsh]'` links it into your own process
+instead, which is a choice to make knowingly. `tetfill` remains the
+no-dependency fallback, and it stays the default.
+
+**The scene-program hook this is built for** is one field on `SimMesh`, and
+it is not wired up yet — the mesher is reachable today through
+`cadjoint.brep.mesh_gmsh.gmsh_tet_mesh` and the registry, not through a
+declared mesh:
+
+```python
+# Proposed, not shipped: `mesher="gmsh"` would route the tet10 build through
+# the tet_mesher slot. Omitted, the DC + tetfill path runs exactly as before.
+sink_mesh = SimMesh(
+    name="sink-mesh",
+    resolution=(18, 13, 11),
+    domain=thermal_body,
+    method="tet10",
+    mesher="gmsh",
+)
+```
+
+`SimMesh.build` reaches `sdf_to_tet_mesh(...)` then `tet10_mesh(...)` for
+`method="tet10"`; the hook replaces exactly those two calls with
+`extract_brep(...)`, `gmsh_tet_mesh(...)` and `tet_mesh_from_gmsh(...)`,
+which returns the same `TetMesh` in the same node layout — boundary corners,
+interior corners, midside block — so nothing downstream of `build` changes.
+The `resolution` keeps its meaning as the *extraction* grid and additionally
+sets the default target element size.
 
 ## Where plugins are used
 
@@ -393,5 +449,5 @@ now by writing a spec, not by writing an import.
 
 - [FEM integration](../research/fem-integration.md) — the solver ABI, adjoint mechanics, the ccx sensitivity correction, and container conformance.
 - [Tet vs hex meshing](../research/tet-vs-hex.md) — the mesher validation matrix and the surface-interpolation VJP contract.
-- [Native (Rust) dual-contouring core](../research/native-mesher.md) — the Rust core and its VJP.
+- [Native (Rust) dual-contouring core, retired](../research/native-mesher.md) — why a 2 ms in-process kernel is the wrong shape for a plugin.
 - [Optimization](optimization.qmd) — how `gradient_path` selects which chain runs.

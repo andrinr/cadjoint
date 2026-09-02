@@ -491,6 +491,9 @@ fem = [
     { name = "pyfiglet", marker = "python_full_version >= '3.11'" },
     { name = "scipy", version = "1.17.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
 ]
+gmsh = [
+    { name = "gmsh", marker = "python_full_version >= '3.11'" },
+]
 stepcheck = [
     { name = "cadquery-ocp", marker = "python_full_version >= '3.10' and python_full_version < '3.15'" },
 ]
@@ -530,6 +533,7 @@ requires-dist = [
     { name = "cadquery-ocp", marker = "python_full_version >= '3.10' and python_full_version < '3.15' and extra == 'stepcheck'" },
     { name = "fenics-basix", marker = "python_full_version >= '3.11' and extra == 'fem'" },
     { name = "gmsh", marker = "python_full_version >= '3.11' and extra == 'fem'" },
+    { name = "gmsh", marker = "python_full_version >= '3.11' and extra == 'gmsh'" },
     { name = "griffe", marker = "extra == 'docs'", specifier = "<1.0" },
     { name = "imageio", specifier = ">=2.37.2" },
     { name = "jax", specifier = ">=0.4.20" },
@@ -552,7 +556,7 @@ requires-dist = [
     { name = "tesseract-core", extras = ["runtime"], marker = "python_full_version >= '3.11' and extra == 'tesseract'" },
     { name = "tesseract-jax", marker = "python_full_version >= '3.11' and extra == 'tesseract'" },
 ]
-provides-extras = ["cuda", "fem", "tesseract", "stepcheck", "viewer", "editor", "dev", "docs"]
+provides-extras = ["cuda", "fem", "tesseract", "gmsh", "stepcheck", "viewer", "editor", "dev", "docs"]
 
 [package.metadata.requires-dev]
 dev = [

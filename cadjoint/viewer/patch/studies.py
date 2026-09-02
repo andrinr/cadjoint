@@ -31,6 +31,13 @@ from __future__ import annotations
 
 import ast
 
+from cadjoint.enums import (
+    BoundaryConditionType,
+    BoundaryConditionTypeLike,
+    StudyKind,
+    StudyKindLike,
+    either,
+)
 from cadjoint.viewer.patch.edits import (
     _after_statement,
     _argument_span,
@@ -63,17 +70,23 @@ from cadjoint.viewer.source_map.nodes import (
     _node_span,
 )
 
-_STUDY_CLASSES = {"thermal": "ThermalStudy", "elastic": "ElasticStudy"}
-_STUDY_DEFAULTS = {"thermal": "conductivity=1.0", "elastic": "youngs=200.0, poisson=0.3"}
+# Keyed by the option sets in :mod:`cadjoint.enums`, so the accepted kinds
+# and BC types are stated once for the whole program.  A plain string still
+# indexes these tables: a StrEnum member hashes and compares as its value.
+_STUDY_CLASSES = {StudyKind.THERMAL: "ThermalStudy", StudyKind.ELASTIC: "ElasticStudy"}
+_STUDY_DEFAULTS = {
+    StudyKind.THERMAL: "conductivity=1.0",
+    StudyKind.ELASTIC: "youngs=200.0, poisson=0.3",
+}
 _STUDY_BC_CLASSES = {
-    "dirichlet": ("Dirichlet", "value"),
-    "heat_flux": ("HeatFlux", "flux"),
-    "fixed": ("Fixed", None),
-    "traction": ("Traction", "vector"),
+    BoundaryConditionType.DIRICHLET: ("Dirichlet", "value"),
+    BoundaryConditionType.HEAT_FLUX: ("HeatFlux", "flux"),
+    BoundaryConditionType.FIXED: ("Fixed", None),
+    BoundaryConditionType.TRACTION: ("Traction", "vector"),
 }
 _STUDY_KIND_BC_TYPES = {
-    "thermal": ("dirichlet", "heat_flux"),
-    "elastic": ("fixed", "traction"),
+    StudyKind.THERMAL: (BoundaryConditionType.DIRICHLET, BoundaryConditionType.HEAT_FLUX),
+    StudyKind.ELASTIC: (BoundaryConditionType.FIXED, BoundaryConditionType.TRACTION),
 }
 _BC_CLASS_VALUE_KEYWORDS = {
     "Dirichlet": "value",
@@ -84,12 +97,12 @@ _BC_CLASS_VALUE_KEYWORDS = {
 # Constructor field order per kind, for resolving positionally written
 # arguments; `name` and `bcs` are excluded from numeric-kwarg editing.
 _STUDY_FIELDS = {
-    "thermal": ("name", "resolution", "conductivity", "bcs", "source", "bounds", "size"),
-    "elastic": ("name", "resolution", "youngs", "poisson", "bcs", "bounds", "size"),
+    StudyKind.THERMAL: ("name", "resolution", "conductivity", "bcs", "source", "bounds", "size"),
+    StudyKind.ELASTIC: ("name", "resolution", "youngs", "poisson", "bcs", "bounds", "size"),
 }
 
 
-def add_study(source: str, kind: str, name: str | None = None) -> str:
+def add_study(source: str, kind: StudyKindLike, name: str | None = None) -> str:
     """Declare a new simulation study at the end of the scene program.
 
     Appends a ``ThermalStudy``/``ElasticStudy`` constructor after the last
@@ -99,7 +112,8 @@ def add_study(source: str, kind: str, name: str | None = None) -> str:
 
     Args:
         source: The program text.
-        kind: ``thermal`` or ``elastic``.
+        kind: A :class:`~cadjoint.enums.StudyKind` or its spelling —
+            ``thermal`` or ``elastic``.
         name: Optional study display name; the generated variable name is
             used when omitted.
 
@@ -112,7 +126,7 @@ def add_study(source: str, kind: str, name: str | None = None) -> str:
     """
     symbol = _STUDY_CLASSES.get(kind)
     if symbol is None:
-        raise PatchError("Study `kind` must be `thermal` or `elastic`.")
+        raise PatchError(f"Study `kind` must be {either(StudyKind)}.")
     try:
         tree = ast.parse(source)
     except SyntaxError as error:
@@ -175,7 +189,9 @@ def delete_study(source: str, study) -> str:
     return _validate(_delete_statement(source, located.statement))
 
 
-def add_study_bc(source: str, study, bc_type: str, selection, value=None) -> str:
+def add_study_bc(
+    source: str, study, bc_type: BoundaryConditionTypeLike, selection, value=None
+) -> str:
     """Append a boundary condition to a study's literal ``bcs`` list.
 
     Writes literal source such as
@@ -187,7 +203,9 @@ def add_study_bc(source: str, study, bc_type: str, selection, value=None) -> str
     Args:
         source: The program text.
         study: Study reference — payload index or name.
-        bc_type: ``dirichlet``, ``heat_flux``, ``fixed``, or ``traction``.
+        bc_type: A :class:`~cadjoint.enums.BoundaryConditionType` or its
+            spelling — ``dirichlet``, ``heat_flux``, ``fixed``, or
+            ``traction``.
         selection: Serializable node-selection description dict.
         value: Scalar for ``dirichlet``/``heat_flux``, 3-vector for
             ``traction``; ``fixed`` takes none.
@@ -216,7 +234,7 @@ def add_study_bc(source: str, study, bc_type: str, selection, value=None) -> str
             raise PatchError("A `fixed` boundary condition takes no value.")
         bc_source = f"{symbol}({nodes_source})"
     else:
-        if bc_type == "traction":
+        if bc_type == BoundaryConditionType.TRACTION:
             if not (isinstance(value, (list, tuple)) and len(value) == 3):
                 raise PatchError("A `traction` boundary condition needs `value` as three numbers.")
         elif not isinstance(value, (int, float)) or isinstance(value, bool):

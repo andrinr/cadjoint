@@ -46,7 +46,9 @@ PACKAGES = {
     "thermal_jaxfem": (_TESSERACTS / "thermal_jaxfem", "cadjoint_thermal_jaxfem"),
     "elastic_jaxfem": (_TESSERACTS / "elastic_jaxfem", "cadjoint_elastic_jaxfem"),
     "elastic_calculix": (_TESSERACTS / "elastic_calculix", "cadjoint_elastic_calculix"),
-    "native": (_ROOT / "native", "cadjoint_qef_native"),
+    "tetfill": (_TESSERACTS / "tetfill", "cadjoint_tetfill"),
+    "flow_brinkman": (_TESSERACTS / "flow_brinkman", "cadjoint_flow_brinkman"),
+    "tet_gmsh": (_TESSERACTS / "tet_gmsh", "cadjoint_tet_gmsh"),
 }
 
 # The tag `tesseract build` derives from tesseract_config.yaml's version field.
@@ -127,12 +129,12 @@ def test_local_cadjoint_dependency_resolves(name):
         )
 
 
-def test_ccx_and_native_artifacts_are_declared():
-    """The two non-Python artifacts are wired into their images.
+def test_ccx_artifact_is_declared():
+    """The one non-Python artifact is wired into its image.
 
-    ccx is a Fortran binary and the QEF core is a Rust cdylib; neither can be a
-    pip/conda Python requirement alone, so each package must both produce the
-    artifact at build time and tell cadjoint where it landed.
+    ccx is a Fortran binary, not a pip/conda Python requirement, so the
+    package must both install it at build time and tell cadjoint where it
+    landed.
     """
     import yaml
 
@@ -141,13 +143,6 @@ def test_ccx_and_native_artifacts_are_declared():
     ccx_env = yaml.safe_load((ccx_dir / "tesseract_environment.yaml").read_text())
     assert "calculix" in ccx_env["dependencies"], "the ccx solver must be installed by conda"
     assert ccx_config.env["CADJOINT_CCX"] == "/python-env/bin/ccx"
-
-    native_dir, _ = PACKAGES["native"]
-    native_config = get_config(native_dir)
-    steps = "\n".join(native_config.build_config.custom_build_steps or ())
-    assert "cargo build --release" in steps, "the cdylib must be compiled inside the image"
-    library = native_config.env["CADJOINT_NATIVE_MESHER"]
-    assert library.endswith(".so") and library in steps
 
 
 # ---------------------------------------------------------------------------
@@ -212,52 +207,6 @@ def test_built_image_serves(name):
         assert {"apply", "vector_jacobian_product", "abstract_eval"} <= set(
             served.available_endpoints
         )
-
-
-def test_native_container_matches_in_process():
-    """Container round trip of the Rust QEF core, against the local cdylib."""
-    from tesseract_core import Tesseract
-
-    src_dir, image = PACKAGES["native"]
-    _require_image(image)
-    pytest.importorskip("cadjoint.meshing.native")
-    from cadjoint.meshing.native import native_available
-
-    if not native_available():
-        pytest.skip("the native cdylib is not built locally (cargo build --release)")
-
-    rng = np.random.default_rng(7)
-    cells, per_cell = 8, 4
-    edges = cells * per_cell
-    normals = rng.standard_normal((edges, 3))
-    normals /= np.linalg.norm(normals, axis=1, keepdims=True)
-    edge_ids = np.full((cells, 12), -1, np.int32)
-    edge_ids[:, :per_cell] = np.arange(edges, dtype=np.int32).reshape(cells, per_cell)
-    inputs = {
-        "points": rng.uniform(-1.0, 1.0, size=(edges, 3)),
-        "normals": normals,
-        "edge_ids": edge_ids,
-        "regularization": np.float64(0.05),
-    }
-    cotangent = {"vertices": rng.standard_normal((cells, 3))}
-
-    def roundtrip(tesseract):
-        vertices = np.asarray(tesseract.apply(inputs)["vertices"])
-        vjp = tesseract.vector_jacobian_product(
-            inputs,
-            vjp_inputs=["points", "normals"],
-            vjp_outputs=["vertices"],
-            cotangent_vector=cotangent,
-        )
-        return vertices, np.asarray(vjp["points"]), np.asarray(vjp["normals"])
-
-    local = roundtrip(Tesseract.from_tesseract_api(str(src_dir / "tesseract_api.py")))
-    with Tesseract.from_image(f"{image}:latest") as served:
-        remote = roundtrip(served)
-
-    # The same double-precision Rust core on both sides: bit-identical.
-    for expected, actual in zip(local, remote):
-        np.testing.assert_array_equal(expected, actual)
 
 
 def test_mesher_container_matches_in_process():

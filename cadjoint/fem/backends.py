@@ -65,6 +65,8 @@ from typing import Any, Callable, Protocol, runtime_checkable
 
 import numpy as np
 
+from cadjoint.enums import FemBackend, PluginKind, PluginTransport, StudyKind, StudyKindLike
+
 _FEM_EXTRA_MESSAGE = (
     "jax-fem is not installed. Install the 'fem' extra: pip install cadjoint[fem] "
     "(plus its runtime dependencies: fenics-basix, meshio, gmsh, petsc4py, pyfiglet, scipy)."
@@ -268,7 +270,7 @@ class TesseractBackend:
         elastic: The same for the elastic solver.
     """
 
-    name = "tesseract"
+    name = FemBackend.TESSERACT.value
 
     def __init__(
         self,
@@ -283,22 +285,30 @@ class TesseractBackend:
         except ImportError as error:
             raise ImportError(_TESSERACT_EXTRA_MESSAGE) from error
         _require_jax_fem()  # the packaged reference plugins run jax-fem in-process
-        self._selection: dict[str, Any] = {"thermal": thermal, "elastic": elastic}
+        self._selection: dict[str, Any] = {
+            StudyKind.THERMAL: thermal,
+            StudyKind.ELASTIC: elastic,
+        }
         self._api_paths: dict[str, Path] = {}
         if api_path is not None:
-            self._api_paths["thermal"] = Path(api_path)
+            self._api_paths[StudyKind.THERMAL] = Path(api_path)
         if elastic_api_path is not None:
-            self._api_paths["elastic"] = Path(elastic_api_path)
+            self._api_paths[StudyKind.ELASTIC] = Path(elastic_api_path)
         self._plugins: dict[str, Any] = {}
 
-    #: Solver stage -> the plugin kind that fills it.
-    _KINDS = {"thermal": "thermal_solver", "elastic": "elastic_solver"}
+    #: Solver stage (a :class:`~cadjoint.enums.StudyKind`) -> the
+    #: :class:`~cadjoint.enums.PluginKind` that fills it.
+    _KINDS = {
+        StudyKind.THERMAL: PluginKind.THERMAL_SOLVER.value,
+        StudyKind.ELASTIC: PluginKind.ELASTIC_SOLVER.value,
+    }
 
-    def _plugin_for(self, stage: str):
+    def _plugin_for(self, stage: StudyKindLike):
         """Resolve the plugin for ``stage`` lazily (kept warm per instance).
 
         Args:
-            stage: ``"thermal"`` or ``"elastic"``.
+            stage: A :class:`~cadjoint.enums.StudyKind`, or its plain
+                string spelling — ``"thermal"`` or ``"elastic"``.
 
         Returns:
             The :class:`~cadjoint.plugins.Plugin` to call.
@@ -317,7 +327,7 @@ class TesseractBackend:
                     PluginSpec(
                         name=f"{stage}_api_path",
                         kind=self._KINDS[stage],
-                        transport="local",
+                        transport=PluginTransport.LOCAL,
                         api_path=path,
                     )
                 )
@@ -326,7 +336,7 @@ class TesseractBackend:
             self._plugins[stage] = plugin
         return self._plugins[stage]
 
-    def _tesseract_for(self, stage: str):
+    def _tesseract_for(self, stage: StudyKindLike):
         """The raw Tesseract client behind ``stage`` (legacy accessor)."""
         return self._plugin_for(stage).client
 
@@ -366,7 +376,7 @@ class TesseractBackend:
         cell_conductivity = _as_cell_array(conductivity, int(np.asarray(cells).shape[0]))
         scalar_conductivity = 0.0 if cell_conductivity.size else conductivity
         with _x64_scope():
-            outputs = self._plugin_for("thermal").as_jax()(
+            outputs = self._plugin_for(StudyKind.THERMAL).as_jax()(
                 {
                     "points": jnp.asarray(points, dtype=jnp.float64),
                     "cells": np.asarray(cells, dtype=np.int32),
@@ -429,7 +439,7 @@ class TesseractBackend:
         else:
             force = jnp.broadcast_to(jnp.asarray(body_force, dtype=jnp.float64), (num_cells, 3))
         with _x64_scope():
-            outputs = self._plugin_for("elastic").as_jax()(
+            outputs = self._plugin_for(StudyKind.ELASTIC).as_jax()(
                 {
                     "points": jnp.asarray(points, dtype=jnp.float64),
                     "cells": np.asarray(cells, dtype=np.int32),
@@ -470,10 +480,13 @@ def _calculix_backend() -> SolverBackend:
     return CalculixBackend()
 
 
+#: The built-in backends, keyed by their :class:`~cadjoint.enums.FemBackend`
+#: name.  The registry is open — :func:`register_backend` adds to it — so the
+#: enum names what cadjoint ships, not what the registry may hold.
 _REGISTRY: dict[str, Callable[[], SolverBackend]] = {
-    "jaxfem": _jaxfem_backend,
-    "tesseract": TesseractBackend,
-    "calculix": _calculix_backend,
+    FemBackend.JAXFEM.value: _jaxfem_backend,
+    FemBackend.TESSERACT.value: TesseractBackend,
+    FemBackend.CALCULIX.value: _calculix_backend,
 }
 
 
@@ -515,7 +528,7 @@ def get_backend(backend: str | SolverBackend | None = None) -> SolverBackend:
         KeyError: If the name is not registered.
     """
     if backend is None:
-        backend = "jaxfem"
+        backend = FemBackend.JAXFEM.value
     if isinstance(backend, str):
         try:
             factory = _REGISTRY[backend]

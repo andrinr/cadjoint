@@ -51,6 +51,7 @@ from typing import Any
 
 import numpy as np
 
+from cadjoint.enums import MeshMethod, MeshMethodLike, parse, values
 from cadjoint.fem.hexmesh import GridSpec, HexMesh, sdf_to_hex_mesh
 from cadjoint.fem.quality import (
     aspect_ratios,
@@ -62,8 +63,10 @@ from cadjoint.fem.tetmesh import TetMesh, sdf_to_tet_mesh, tet10_mesh
 
 __all__ = ["SimMesh", "capture_sim_meshes"]
 
-#: Supported meshing methods (the viewer round-trips these literals).
-_METHODS = ("hex", "tet4", "tet10")
+#: Supported meshing methods (the viewer round-trips these literals).  The
+#: option set itself lives in :class:`cadjoint.enums.MeshMethod`; this is the
+#: tuple of its spellings, in declaration order.
+_METHODS = values(MeshMethod)
 
 # Same default meshing volume as the implicit study path and the viewer's
 # simulate mode; also the region the automatic domain-bounds scan samples.
@@ -172,10 +175,11 @@ class SimMesh:
         size: Extent of the meshing box; None exactly when ``bounds`` is.
         padding: Extra margin per side used only by the automatic bounds
             scan.
-        method: Meshing method — ``"hex"`` (voxelize+snap HEX8, the fast
-            default), ``"tet4"`` (DC surface -> TetGen TET4), or
+        method: Meshing method — a :class:`~cadjoint.enums.MeshMethod`
+            or its plain string spelling: ``"hex"`` (voxelize+snap HEX8,
+            the fast default), ``"tet4"`` (DC surface -> TetGen TET4), or
             ``"tet10"`` (the TET4 mesh promoted to quadratic tets — the
-            quality path).
+            quality path).  Normalised to the enum on construction.
     """
 
     name: str
@@ -184,7 +188,7 @@ class SimMesh:
     bounds: Any = None
     size: Any = None
     padding: float = 0.1
-    method: str = "hex"
+    method: MeshMethodLike = MeshMethod.HEX
 
     _cache: tuple[Any, tuple, HexMesh | TetMesh] | None = field(
         default=None, init=False, repr=False, compare=False
@@ -193,8 +197,11 @@ class SimMesh:
     def __post_init__(self):
         if not isinstance(self.name, str) or not self.name.strip():
             raise ValueError("SimMesh needs a non-empty name.")
-        if self.method not in _METHODS:
-            raise ValueError(f"method must be one of {list(_METHODS)}, got {self.method!r}.")
+        self.method = parse(
+            MeshMethod,
+            self.method,
+            f"method must be one of {list(_METHODS)}, got {self.method!r}.",
+        )
         _resolution_counts(self.resolution)
         if (self.bounds is None) != (self.size is None):
             raise ValueError("bounds and size must be given together (or both omitted).")
@@ -225,7 +232,7 @@ class SimMesh:
         return {
             "kind": "mesh",
             "name": self.name,
-            "method": self.method,
+            "method": str(self.method),
             "resolution": self.resolution
             if isinstance(self.resolution, int)
             else list(self.resolution),
@@ -291,12 +298,12 @@ class SimMesh:
             The extracted :class:`~cadjoint.fem.hexmesh.HexMesh`
             (``method="hex"``) or :class:`~cadjoint.fem.tetmesh.TetMesh`
             (``method="tet4"``/``"tet10"``; requires ``tetgen``).  Tet
-            extraction tries exact sharp-feature DC placement first and
-            falls back to the more robust Tikhonov placement when TetGen
-            rejects the sharp surface (self-intersections happen at
-            unlucky resolutions on crease-heavy geometry); if both fail,
-            the TetGen error propagates — the fix is a different
-            resolution.  The tet grid must fully contain the zero surface
+            extraction runs :func:`~cadjoint.fem.tetmesh.sdf_to_tet_mesh`'s
+            refinement ladder, which tries exact sharp-feature DC placement
+            and the more robust Tikhonov placement at every rung and
+            records what it tried on ``mesh.refinement``; when no rung
+            works the TetGen error propagates, naming both ends of the
+            ladder.  The tet grid must fully contain the zero surface
             (unlike voxelization, DC needs the closed boundary).
         """
         field_fn = self._field(sdf)
@@ -304,15 +311,14 @@ class SimMesh:
         cached = self._cache
         if not rebuild and cached is not None and cached[0] is field_fn and cached[1] == parameters:
             return cached[2]
-        if self.method == "hex":
+        if self.method == MeshMethod.HEX:
             mesh: HexMesh | TetMesh = sdf_to_hex_mesh(field_fn, self.grid(sdf))
         else:
-            grid = self.grid(sdf)
-            try:
-                mesh = sdf_to_tet_mesh(field_fn, grid, sharp=True)
-            except RuntimeError:
-                mesh = sdf_to_tet_mesh(field_fn, grid, sharp=False)
-            if self.method == "tet10":
+            # No sharp=True/sharp=False retry here: the ladder inside
+            # sdf_to_tet_mesh already tries both placements at every rung,
+            # so wrapping it in one would walk the whole ladder twice.
+            mesh = sdf_to_tet_mesh(field_fn, self.grid(sdf))
+            if self.method == MeshMethod.TET10:
                 mesh = tet10_mesh(mesh)
         self._cache = (field_fn, parameters, mesh)
         return mesh
@@ -363,7 +369,7 @@ class SimMesh:
         grid = mesh.grid
         return {
             "name": self.name,
-            "method": self.method,
+            "method": str(self.method),
             "nodes": mesh.num_points,
             "elements": mesh.num_cells,
             "bounds": {

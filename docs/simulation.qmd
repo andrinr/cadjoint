@@ -44,11 +44,17 @@ dual-contouring extraction grid.
 
 Three `method` values:
 
-| `method` | Element | How it is built |
-|---|---|---|
-| `"hex"` (default) | HEX8 | Voxelize the lattice, Newton-snap boundary nodes onto the SDF. Fast, lattice-aligned, deterministic across platforms. |
-| `"tet4"` | TET4 | Dual-contour the surface, fill it with TetGen. Boundary-conforming. |
-| `"tet10"` | TET10 | The TET4 mesh promoted to straight-sided quadratic tets. Accurate boundary, slower. |
+| `method` | `MeshMethod` | Element | How it is built |
+|---|---|---|---|
+| `"hex"` (default) | `MeshMethod.HEX` | HEX8 | Voxelize the lattice, Newton-snap boundary nodes onto the SDF. Fast, lattice-aligned, deterministic across platforms. |
+| `"tet4"` | `MeshMethod.TET4` | TET4 | Dual-contour the surface, fill it with TetGen. Boundary-conforming. |
+| `"tet10"` | `MeshMethod.TET10` | TET10 | The TET4 mesh promoted to straight-sided quadratic tets. Accurate boundary, slower. |
+
+Both spellings are the same declaration: `method="tet10"` and
+`method=MeshMethod.TET10` (`from cadjoint.enums import MeshMethod`) build the
+same mesh and the same payload, because a `MeshMethod` *is* a `str`. The enum
+is where the option set is defined, so a typo is rejected with the list of
+what is accepted rather than surfacing as a strange mesh.
 
 The tet methods need the `tetgen` package. On the same bar, `"tet10"` gives 947
 nodes across 448 elements against the hex mesh's 336 nodes and 180 elements.
@@ -81,7 +87,7 @@ whatever mesh they are handed, so they survive re-meshing and a change of shape.
 
 | Factory | Selects |
 |---|---|
-| `Nodes.side("+x")` | One face of the bounding box, within a per-mesh tolerance |
+| `Nodes.side("+x")` | One face of the bounding box, within a per-mesh tolerance (`"+x"`…`"-z"`, or a `Side` member) |
 | `Nodes.box(min_corner, max_corner)` | Inside an axis-aligned box |
 | `Nodes.sphere(center, radius)` | Inside a ball |
 | `Nodes.halfspace(point, normal)` | Where `dot(x - point, normal) >= 0` |
@@ -315,9 +321,12 @@ writes the result out for ParaView.
 | `"tesseract"` | the same jax-fem solve behind a Tesseract | `fem` + `tesseract` extras | the Tesseract's `vector_jacobian_product` endpoint — bit-identical to the in-process path |
 | `"calculix"` | the CalculiX 2.23 Fortran binary as a subprocess | `tesseract` extra and a `ccx` binary | ccx's own `*SENSITIVITY` discrete adjoint, plus a correction for a term missing in 2.23 |
 
-`available_backends()` lists them and `register_backend(name, factory)` adds
-your own; the ABI is the `SolverBackend` protocol in `cadjoint.fem.backends`,
-two methods wide. The survey in
+The three built-in names are `cadjoint.enums.FemBackend` (`FemBackend.JAXFEM`
+and so on), but unlike the other option sets that enum is open at both ends:
+`available_backends()` lists what is registered and
+`register_backend(name, factory)` adds your own under any name, so
+`backend=` keeps taking a plain string. The ABI is the `SolverBackend`
+protocol in `cadjoint.fem.backends`, two methods wide. The survey in
 [simulator ecosystem](../research/simulator-ecosystem.md) ranks 31 further
 candidates for that slot.
 

@@ -29,7 +29,7 @@ _REPO = Path(__file__).resolve().parents[2]
 
 class TestBuiltinDiscovery:
     def test_every_shipped_package_is_registered_as_a_local_plugin(self):
-        """The five FEM packages plus the Rust QEF core, all in-process."""
+        """Every Tesseract package in this repository, all in-process."""
         specs = builtin_specs()
         assert set(specs) == set(BUILTIN_PACKAGES)
         for name, spec in specs.items():

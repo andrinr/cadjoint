@@ -96,11 +96,15 @@ are rejected alongside `study`.
 
 `metric` reduces the solved field to one number.
 
-| `metric` | Means |
-|---|---|
-| `"mean"` | The mean of the field — temperature, or displacement magnitude |
-| `"max"` | Its maximum |
-| `"compliance"` | The work of the applied loads, `f·u` (twice the strain energy) |
+| `metric` | `ObjectiveMetric` | Means |
+|---|---|---|
+| `"mean"` | `ObjectiveMetric.MEAN` | The mean of the field — temperature, or displacement magnitude |
+| `"max"` | `ObjectiveMetric.MAX` | Its maximum |
+| `"compliance"` | `ObjectiveMetric.COMPLIANCE` | The work of the applied loads, `f·u` (twice the strain energy) |
+
+Every fixed option on `Optimization` has an enum in `cadjoint.enums` —
+`ObjectiveMetric`, `GradientPath`, `OptimizerMethod` (`"adam"` / `"sgd"`) —
+and the member and the string are interchangeable everywhere.
 
 `"compliance"` requires an elastic study with at least one `Traction` boundary
 condition; without loads there is no work to compute, and the declaration is
@@ -141,11 +145,14 @@ frozen last.
 
 `gradient_path` picks how far the derivative has to travel outside JAX.
 
-| Value | Chain |
-|---|---|
-| `"direct"` (default) | Everything in-process. Node positions re-projected onto the true SDF, solved by the chosen backend. |
-| `"tesseract"` | Lattice samples → `mesher` Tesseract → solver Tesseract. Meshes the trilinear interpolant, so the gradient carries only normal boundary motion. |
-| `"tesseract-dc"` | Dual contouring stays in JAX on the true SDF; only TetGen is wrapped, by the `tetfill` Tesseract with its exact pass-through VJP. Tet meshes only. |
+| Value | `GradientPath` | Chain |
+|---|---|---|
+| `"direct"` (default) | `GradientPath.DIRECT` | Everything in-process. Node positions re-projected onto the true SDF, solved by the chosen backend. |
+| `"tesseract"` | `GradientPath.TESSERACT` | Lattice samples → `mesher` Tesseract → solver Tesseract. Meshes the trilinear interpolant, so the gradient carries only normal boundary motion. |
+| `"tesseract-dc"` | `GradientPath.TESSERACT_DC` | Dual contouring stays in JAX on the true SDF; only TetGen is wrapped, by the `tetfill` Tesseract with its exact pass-through VJP. Tet meshes only. |
+
+The aliases `"plugins"` and `"plugins-dc"` name the same two chain paths and
+resolve to the canonical member on construction.
 
 `"tesseract-dc"` is the sharp path — keeping dual contouring in JAX against the
 real field is what preserves fin creases — and it is what the starter scene

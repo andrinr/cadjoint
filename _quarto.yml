@@ -46,7 +46,7 @@ website:
         menu:
           - text: Differentiable meshing pipeline
             href: research/differentiable-meshing-pipeline.md
-          - text: Native (Rust) dual-contouring core
+          - text: Native (Rust) dual-contouring core (retired)
             href: research/native-mesher.md
           - text: FEM integration
             href: research/fem-integration.md
@@ -129,14 +129,11 @@ quartodoc:
         - meshing.dual_contouring.qef_vertices
         - meshing.dual_contouring.sharp_qef_vertices
         - meshing.dual_contouring.dual_faces
-    - title: Meshing — adaptive, simplify, native
+    - title: Meshing — adaptive and simplify
       contents:
         - meshing.adaptive.surface_cells
         - meshing.adaptive.sparse_crossing_edges
         - meshing.simplify.simplify_mesh
-        - meshing.native.native_available
-        - meshing.native.extract_mesh_native
-        - meshing.native.qef_vertices_native
     - title: Meshing — export and diagnostics
       contents:
         - meshing.export.save_obj
@@ -147,6 +144,25 @@ quartodoc:
         - meshing.diagnostics.surface_deviation
         - meshing.diagnostics.triangle_quality
         - meshing.diagnostics.self_intersections
+    - title: Option sets
+      contents:
+        - enums.MeshMethod
+        - enums.StudyKind
+        - enums.BoundaryConditionType
+        - enums.Side
+        - enums.ObjectiveMetric
+        - enums.OptimizerMethod
+        - enums.OptimizationArgument
+        - enums.GradientPath
+        - enums.ConstraintKind
+        - enums.ConstraintSolveMethod
+        - enums.FemBackend
+        - enums.PluginKind
+        - enums.PluginTransport
+        - enums.values
+        - enums.listed
+        - enums.either
+        - enums.parse
     - title: Simulation — meshes and studies
       contents:
         - fem.simmesh.SimMesh

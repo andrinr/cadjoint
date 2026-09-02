@@ -42,11 +42,18 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
+from cadjoint.enums import PluginTransport, PluginTransportLike, values
+
 #: The transports a spec can name, and the constructor each resolves to.
-TRANSPORTS = ("local", "container", "remote")
+#: The option set itself is :class:`cadjoint.enums.PluginTransport`.
+TRANSPORTS = values(PluginTransport)
 
 #: Which field each transport requires.
-_TARGET = {"local": "api_path", "container": "image", "remote": "url"}
+_TARGET = {
+    PluginTransport.LOCAL: "api_path",
+    PluginTransport.CONTAINER: "image",
+    PluginTransport.REMOTE: "url",
+}
 
 _TESSERACT_EXTRA_MESSAGE = (
     "tesseract-core / tesseract-jax are not installed. "
@@ -147,8 +154,12 @@ class PluginSpec:
 
     Attributes:
         name: The registry key, e.g. ``"thermal_jaxfem"``.
-        kind: The slot it fills, e.g. ``"thermal_solver"``.
-        transport: One of :data:`TRANSPORTS`.
+        kind: The slot it fills, e.g. ``"thermal_solver"``.  A plain
+            string, not an enum: a third-party plugin may declare a kind
+            cadjoint has never heard of (the ones it asks for itself are
+            :class:`cadjoint.enums.PluginKind`).
+        transport: A :class:`~cadjoint.enums.PluginTransport` or its plain
+            string spelling; normalised to the enum on construction.
         api_path: ``local`` — the package's ``tesseract_api.py``.
         image: ``container`` — the Docker image reference.
         url: ``remote`` — the base URL of a served Tesseract.
@@ -164,7 +175,7 @@ class PluginSpec:
 
     name: str
     kind: str
-    transport: str = "local"
+    transport: PluginTransportLike = PluginTransport.LOCAL
     api_path: Path | None = None
     image: str | None = None
     url: str | None = None
@@ -178,6 +189,8 @@ class PluginSpec:
                 f"plugin {self.name!r}: transport must be one of {', '.join(TRANSPORTS)} "
                 f"(got {self.transport!r})."
             )
+        # A spec is frozen, so the normalisation goes in the hard way.
+        object.__setattr__(self, "transport", PluginTransport(self.transport))
         required = _TARGET[self.transport]
         if getattr(self, required) is None:
             raise PluginConfigError(
@@ -213,7 +226,7 @@ class PluginSpec:
         return cls(
             name=name,
             kind=str(data["kind"]),
-            transport=str(data.get("transport", "local")),
+            transport=str(data.get("transport", PluginTransport.LOCAL)),
             api_path=Path(text["api_path"]).expanduser() if "api_path" in text else None,
             image=text.get("image"),
             url=text.get("url"),
@@ -224,7 +237,7 @@ class PluginSpec:
 
     def to_mapping(self) -> dict[str, Any]:
         """The spec as a ``plugins.toml`` table."""
-        table: dict[str, Any] = {"kind": self.kind, "transport": self.transport}
+        table: dict[str, Any] = {"kind": self.kind, "transport": str(self.transport)}
         for key in (*_TARGET.values(), "version", "schema_hash"):
             value = getattr(self, key)
             if value is not None:
@@ -254,7 +267,7 @@ class PluginSpec:
             raise ImportError(_TESSERACT_EXTRA_MESSAGE) from error
 
         options = dict(self.options)
-        if self.transport == "local":
+        if self.transport == PluginTransport.LOCAL:
             path = Path(self.api_path)  # type: ignore[arg-type]
             if not path.is_file():
                 raise PluginConfigError(
@@ -264,7 +277,7 @@ class PluginSpec:
             # working directory (and out of an unmanaged mkdtemp).
             options.setdefault("output_path", runtime_scratch())
             return Tesseract.from_tesseract_api(str(path), **options), False
-        if self.transport == "container":
+        if self.transport == PluginTransport.CONTAINER:
             tesseract = Tesseract.from_image(self.image, **options)
             tesseract.serve()
             return tesseract, True
