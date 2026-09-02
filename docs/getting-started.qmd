@@ -104,6 +104,112 @@ sketch stays constrained through a descent. The
 [constraints notebook](../examples/constraints.ipynb) works through a
 fully-determined system.
 
+## Faces are references, not geometry
+
+cadjoint has no B-rep faces. The only surface it produces is the dual-contoured
+mesh, and that mesh is a *rendering* of the field, not its definition — basing a
+work plane on it would mean basing a design decision on whatever resolution the
+mesher happened to run at.
+
+The construction tree knows better than the mesh does. `extrude` spans
+`±depth/2` around its sketch plane, so it knows exactly where its caps are and
+which plane each profile edge swept; a box knows its six faces; a revolve knows
+its axis. Those are `Face` objects, and every generated solid carries them.
+
+```python
+from cadjoint.construction import PolygonProfile, SketchPlane, Solid, extrude
+from cadjoint.geometry import Scalar
+
+depth = Scalar(0.8, free=True, name="depth")
+plate = PolygonProfile([[-1, -1], [1, -1], [1, 1], [-1, 1]], name="plate")
+body = extrude(plate, depth=depth)
+
+body.faces.keys()        # ['cap+', 'cap-', 'side0', 'side1', 'side2', 'side3']
+body.cap("+").origin     # [0, 0, 0.4]  — depth/2 along the sketch normal
+body.side(0).normal      # [0, -1, 0]   — the plane edge 0 swept
+
+Solid.box(size=[1, 1, 1], position=[0, 0, 0], name="block").face("+z")
+```
+
+A `Face` knows its plane — origin, normal, **and** the in-plane x axis, so a
+sketch's "horizontal" is a decision rather than an accident of how the normal
+happened to be decomposed — plus the polygon that bounds it and a
+`contains(point)` test that says whether a world point lands on it.
+
+### The plane is an expression, not a snapshot
+
+`depth` above is a free `Scalar`, so `body.cap("+")` is not a stored plane at
+z = 0.4. It is the expression `origin + (depth/2)·normal`. Sketch on it and the
+sketch follows:
+
+```python
+boss = PolygonProfile(
+    [[-0.4, -0.4], [0.4, -0.4], [0.4, 0.4], [-0.4, 0.4]],
+    plane=SketchPlane.on(body.cap("+")),
+    name="boss",
+)
+```
+
+Because it is an expression, the whole chain is differentiable:
+
+```python
+import jax
+import jax.numpy as jnp
+
+def stack(depth):
+    body = extrude(PolygonProfile([[-1, -1], [1, -1], [1, 1], [-1, 1]], name="p"), depth=depth)
+    top = PolygonProfile([[-0.4, -0.4], [0.4, -0.4], [0.4, 0.4], [-0.4, 0.4]],
+                         plane=SketchPlane.on(body.cap("+")), name="b")
+    return extrude(top, depth=0.5)
+
+probe = jnp.array([0.0, 0.0, 1.0])
+jax.grad(lambda d: stack(d)(probe))(1.0)   # -0.5, exactly
+```
+
+`-0.5` is exact rather than estimated: the cap rides at half the depth, so the
+boss standing on it does too, and a probe above the boss closes in at that rate.
+
+**This is the thing a traditional CAD kernel cannot do.** There a face is stored
+geometry that a rebuild replaces, and a downstream sketch is re-attached to it by
+a topological-naming heuristic — which is why renaming or reordering a feature
+can detach the sketch entirely. Here the face is a function of the parent's
+parameters. The reference cannot go stale, and it carries a derivative, so an
+optimizer moving `depth` moves everything referenced off it in the same step.
+
+### Curved surfaces: the field is the reference
+
+Blends, fillets and revolved walls have no analytic face to name. The field
+still knows the answer — project the point onto the zero set, and the gradient
+there *is* the surface normal:
+
+```python
+from cadjoint.sdf import Sphere
+
+dome = Sphere(radius=1.0)
+pad = SketchPlane.tangent(dome, near=[0.0, 0.0, 0.9])   # plane at the north pole
+```
+
+The projection is a Newton iteration in JAX
+(`cadjoint.fem.motion.project_points`), so a tangent plane is differentiable
+with respect to the scene's parameters just like an analytic one. Grow the
+sphere and the pad rides out with it.
+
+### The constructors
+
+| Constructor | The plane it gives you |
+|---|---|
+| `SketchPlane(origin, normal, x_axis=None)` | Stated in world coordinates. `x_axis` pins the sketch's horizontal; omit it for the derivation from the normal alone. |
+| `SketchPlane.on(face, x_axis=None, flip=False)` | The face's own plane, inheriting the face's x axis — the profile's `u` for a cap, the swept edge direction for a side wall. |
+| `SketchPlane.offset(face_or_plane, distance)` | Pushed along the normal. `distance` may be a `Scalar`, so the clearance is a design variable. |
+| `SketchPlane.tangent(solid, near, x_axis=None)` | Tangent to the field at the surface point nearest `near`. Horizontal defaults to the world axis most nearly in-plane. |
+| `SketchPlane.midplane(face_a, face_b)` | Halfway between two faces. |
+
+Orientation is captured when a solid is generated, exactly as it always was;
+`origin` is the differentiable half. A drafted or twisted extrusion declares no
+analytic faces at all — draft tapers the walls off their swept planes and twist
+curves them — so those are `tangent` territory, and the API says so by offering
+nothing else.
+
 ## Meshing
 
 `cadjoint.meshing` dual-contours the field into a surface. It is written

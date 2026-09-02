@@ -42,6 +42,7 @@ from cadjoint.viewer.patch import (  # noqa: F401
     set_optimization_value,
     set_parameter_value,
     set_parameter_values,
+    set_sketch_plane,
     set_study_value,
     set_value,
     set_vertex,

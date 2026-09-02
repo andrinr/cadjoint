@@ -28,11 +28,13 @@ import ast
 from cadjoint.viewer.patch.edits import _statement_containing
 from cadjoint.viewer.patch.errors import PatchError
 from cadjoint.viewer.source_map import (
+    FeatureCall,
     MeshStatement,
     OptimizationStatement,
     Span,
     StudyStatement,
     locate_constraint_statements,
+    locate_feature_call,
     locate_mesh_statements,
     locate_optimization_statements,
     locate_profile_call,
@@ -78,6 +80,56 @@ def _profile_binding(source: str, line: int):
     ):
         raise PatchError("Name the sketch before adding constraints or operators from the viewer.")
     return tree, call, statement, statement.targets[0].id
+
+
+def _located_sketch_call(source: str, line: int) -> tuple[ast.Module, ast.Call, ast.stmt]:
+    """The one ``PolygonProfile(...)`` call at *line*, with its statement.
+
+    Unlike :func:`_profile_binding` this does not insist the sketch is bound to
+    a variable: rewriting a sketch's own plane changes an argument of the call
+    itself, so an anonymous sketch is a perfectly good target.
+    """
+    try:
+        tree = ast.parse(source)
+    except SyntaxError as error:
+        raise PatchError(f"Source is not valid Python: {error}") from error
+    calls = [
+        node
+        for node in ast.walk(tree)
+        if _called_name(node) == "PolygonProfile"
+        and node.lineno <= line <= (node.end_lineno or node.lineno)
+    ]
+    if len(calls) != 1:
+        raise PatchError(f"No single PolygonProfile() call found at line {line}.")
+    statement = _statement_containing(tree, calls[0])
+    if statement is None:  # pragma: no cover - a call always sits in a statement
+        raise PatchError(f"The sketch at line {line} is not a top-level statement.")
+    return tree, calls[0], statement
+
+
+def _located_feature(source: str, line: int) -> FeatureCall:
+    """The named feature whose face a plane reference points at.
+
+    Args:
+        source: The program text.
+        line: 1-based line of the feature call, as the payload reports it.
+
+    Returns:
+        The located :class:`~cadjoint.viewer.source_map.FeatureCall`.
+
+    Raises:
+        PatchError: If the line holds no single feature call, or the feature is
+            not bound to a variable — in which case there is no name to write.
+    """
+    call = locate_feature_call(source, line)
+    if call is None:
+        raise PatchError(f"No single extrude/revolve/loft or primitive call found at line {line}.")
+    if call.variable is None:
+        raise PatchError(
+            f"The {call.kind} at line {line} is not assigned to a variable, so its faces "
+            "cannot be referenced. Name it first."
+        )
+    return call
 
 
 def _located_constraint(source: str, line: int, index: int):

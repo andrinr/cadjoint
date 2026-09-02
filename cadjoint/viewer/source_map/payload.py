@@ -6,7 +6,11 @@ character spans recovered by the locator modules — into one dict per object.
 Every entry carries a world-space ``edges`` wireframe so the viewer can draw
 any shape without knowing its topology; sketch profiles add their plane,
 per-vertex handles, constraints and operators, primitives add their placement
-and the spans that make it editable.
+and the spans that make it editable.  Both add ``faces``: the node's *analytic*
+faces, straight off the construction tree rather than off the render mesh, each
+with its plane, its world-space boundary polygon, and the accessor call that
+names it in source.  That list is what turns a raymarch hit into a work-plane
+reference.
 
 Add code here when it decides *what the viewer sees*.  The rule the entries
 enforce is that a payload field is only marked editable when the matching
@@ -23,6 +27,11 @@ from cadjoint.viewer.source_map.calls import locate_call, locate_profile_call
 from cadjoint.viewer.source_map.constraints import (
     CONSTRAINT_CLASS_KINDS,
     locate_constraint_statements,
+)
+from cadjoint.viewer.source_map.features import (
+    PRIMITIVE_CALL_KINDS,
+    locate_feature_call,
+    locate_plane_reference,
 )
 from cadjoint.viewer.source_map.materials import _primitive_material, _profile_material
 from cadjoint.viewer.source_map.nodes import (
@@ -301,6 +310,78 @@ def _profile_operators(source: str, line: int) -> list[dict]:
     return result
 
 
+def _face_entries(faces, node_id: str, owner: dict | None, prefix: str = "") -> list[dict]:
+    """Serialize one feature's faces, tagged with the owner that names them.
+
+    A face is only *usable* as a reference when the source binds its feature to
+    a plain variable: ``SketchPlane.on(body.cap("+"))`` needs ``body`` to
+    exist. Faces of an unnamed feature still carry their geometry — the viewer
+    can highlight them — they simply cannot be written back.
+    """
+    entries = []
+    for face in faces:
+        try:
+            entry = face.describe()
+        except (TypeError, ValueError):  # pragma: no cover - defensive
+            # A face whose geometry is not concrete cannot be drawn; skipping
+            # it must never take the rest of the payload down with it.
+            continue
+        entry["id"] = f"{node_id}:{prefix}{face.key}"
+        entry["owner"] = owner
+        entry["usable"] = bool(owner and owner.get("variable"))
+        entries.append(entry)
+    return entries
+
+
+def _profile_faces(profile, node_id: str, source: str, line: int | None, traceable: bool):
+    """The analytic faces of every feature generated from this sketch.
+
+    Features are registered on the profile in execution order and the operator
+    statements are read back in source order; at module level those agree, so
+    zipping them pairs each feature with the call that made it. When the two
+    disagree — a feature built in a loop, an operator the runtime never ran —
+    the faces are still listed, just without an owner, which marks them
+    unusable rather than mis-attributing them.
+    """
+    features = list(getattr(profile, "features", None) or [])
+    if not features:
+        return []
+    operators = (
+        sorted(_profile_operators(source, line), key=lambda item: item["line"])
+        if (traceable and line is not None)
+        else []
+    )
+    paired = len(operators) == len(features) and all(
+        operator["kind"] == feature.kind for operator, feature in zip(operators, features)
+    )
+
+    entries: list[dict] = []
+    for index, feature in enumerate(features):
+        owner = None
+        if paired:
+            call = locate_feature_call(source, operators[index]["line"])
+            if call is not None:
+                owner = {"kind": call.kind, "line": call.line, "variable": call.variable}
+        prefix = "" if len(features) == 1 else f"{index}:"
+        entries.extend(_face_entries(feature.faces, node_id, owner, prefix))
+    return entries
+
+
+def _primitive_faces(primitive, node_id: str, source: str, line: int | None, traceable: bool):
+    """The analytic faces of a construction primitive — a box's six, a cylinder's two."""
+    call = (
+        locate_feature_call(source, line, PRIMITIVE_CALL_KINDS)
+        if traceable and line is not None
+        else None
+    )
+    owner = (
+        {"kind": call.kind, "line": call.line, "variable": call.variable}
+        if call is not None
+        else None
+    )
+    return _face_entries(primitive.faces, node_id, owner)
+
+
 def _profile_entry(profile, index: int, line: int | None, source: str, traceable: bool) -> dict:
     """Payload for a sketch profile: plane, closed edge loop, vertex handles."""
     call = locate_profile_call(source, line) if traceable else None
@@ -313,8 +394,10 @@ def _profile_entry(profile, index: int, line: int | None, source: str, traceable
     u, v, normal = profile.plane.frame()
     world = [[float(x) for x in point] for point in profile.world_vertices()]
     count = len(world)
+    node_id = f"profile_{index}"
+    reference = locate_plane_reference(source, line) if traceable and line is not None else None
     return {
-        "id": f"profile_{index}",
+        "id": node_id,
         "kind": "profile",
         "name": profile.name,
         "line": line,
@@ -325,7 +408,18 @@ def _profile_entry(profile, index: int, line: int | None, source: str, traceable
             "u": [float(x) for x in u],
             "v": [float(x) for x in v],
             "normal": [float(x) for x in normal],
+            "reference": (
+                {
+                    "constructor": reference.constructor,
+                    "owner": reference.owner,
+                    "accessor": reference.accessor,
+                    "argument": reference.argument,
+                }
+                if reference is not None and reference.constructor is not None
+                else None
+            ),
         },
+        "faces": _profile_faces(profile, node_id, source, line, traceable),
         "vertices": [
             {
                 "name": vertex.name,
@@ -364,14 +458,16 @@ def _primitive_entry(primitive, index: int, line: int | None, source: str, trace
         )
         for key in DIMENSIONS[primitive.kind]
     }
+    node_id = f"{primitive.kind}_{index}"
     return {
-        "id": f"{primitive.kind}_{index}",
+        "id": node_id,
         "kind": primitive.kind,
         "name": primitive.name,
         "line": line,
         "editable": editable,
         "edges": primitive.world_edges(),
         "plane": None,
+        "faces": _primitive_faces(primitive, node_id, source, line, traceable),
         "vertices": [],
         "transform": {
             "position": [float(x) for x in primitive.position.xyz],

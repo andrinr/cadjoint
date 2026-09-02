@@ -15,6 +15,13 @@ already feeds an operator, pick a free ``<profile>_body`` variable, extend the
 scene first (so the AST spans stay valid), then insert the statement and its
 import above the scene assignment.
 
+:func:`set_sketch_plane` is the third kind: it re-plants an existing sketch on
+a *reference* — a face of a feature the program already built, or the tangent
+plane of a solid at a picked point — by rewriting the sketch's ``plane=``
+argument to ``SketchPlane.on(body.cap("+"))`` and friends.  The reference is
+written as source, never as coordinates, which is the whole point: the plane
+then follows the parent's parameters instead of freezing a snapshot of them.
+
 Add an operation here when it edits a sketch or turns one into geometry.
 Constraint statements attached to a sketch live in
 :mod:`cadjoint.viewer.patch.constraints`.
@@ -24,10 +31,20 @@ from __future__ import annotations
 
 import ast
 
-from cadjoint.viewer.patch.edits import _ensure_import, _module_names, _validate
+from cadjoint.viewer.patch.edits import (
+    _ensure_import,
+    _module_names,
+    _set_keyword_expression,
+    _validate,
+)
 from cadjoint.viewer.patch.errors import PatchError
 from cadjoint.viewer.patch.format import _format_coordinate, _format_value, _format_vertex
-from cadjoint.viewer.patch.resolvers import _profile_binding, _require_call
+from cadjoint.viewer.patch.resolvers import (
+    _located_feature,
+    _located_sketch_call,
+    _profile_binding,
+    _require_call,
+)
 from cadjoint.viewer.patch.scene import _extend_scene_with, _scene_assignment
 from cadjoint.viewer.source_map.calls import _vertices_argument
 from cadjoint.viewer.source_map.nodes import _called_name, _line_offsets, _resolved_container
@@ -288,4 +305,87 @@ def add_loft(source: str, line_a: int, line_b: int, height: float = 1.0) -> str:
     statement = f"{body} = loft({profile_a}, {profile_b}, height={_format_coordinate(height)})\n"
     patched = patched[:insert] + statement + patched[insert:]
     patched = _ensure_import(patched, ast.parse(patched), "cadjoint.construction", "loft")
+    return _validate(patched)
+
+
+# How each reference kind names its face, and what its argument literal is.
+_FACE_ACCESSORS = {
+    "cap": ("cap", lambda reference: repr(str(reference["sign"]))),
+    "side": ("side", lambda reference: str(int(reference["edge"]))),
+    "face": ("face", lambda reference: repr(str(reference["key"]))),
+}
+
+
+def set_sketch_plane(
+    source: str,
+    line: int,
+    reference: dict,
+    x_axis=None,
+    flip: bool = False,
+    offset: float | None = None,
+) -> str:
+    """Re-plant a sketch on a face, a tangent plane, or a world plane.
+
+    The sketch's ``plane=`` argument is rewritten (or added) to the constructor
+    that names the reference, so the plane stays an *expression* over the
+    parent's parameters: re-dimension the parent and the sketch follows, and a
+    gradient taken through the child reaches the parent.
+
+    Args:
+        source: The program text.
+        line: 1-based line of the ``PolygonProfile(...)`` call to re-plant.
+        reference: The plane to sit on. ``{"kind": "cap", "owner": <line>,
+            "sign": "+"}`` and ``{"kind": "side", "owner": <line>, "edge": 2}``
+            name a feature's analytic faces; ``{"kind": "face", "owner":
+            <line>, "key": "+x"}`` names a primitive's; ``{"kind": "tangent",
+            "owner": <line>, "near": [x, y, z]}`` reads the plane off the
+            solid's own gradient at a picked point; ``{"kind": "world",
+            "origin": [...], "normal": [...]}`` goes back to a stated plane.
+        x_axis: Optional three numbers pinning the sketch's in-plane
+            horizontal.
+        flip: Face the plane the other way (face references only).
+        offset: Optional distance to push the plane along its normal.
+
+    Returns:
+        The patched source.
+
+    Raises:
+        PatchError: If the sketch or the referenced feature cannot be located,
+            the feature has no variable to name, or the feature is defined
+            after the sketch that would use it.
+    """
+    _, call, statement = _located_sketch_call(source, line)
+    kind = reference.get("kind")
+    if kind == "world":
+        expression = (
+            f"SketchPlane(origin={_format_value(reference['origin'])}, "
+            f"normal={_format_value(reference['normal'])}"
+        )
+        expression += f", x_axis={_format_value(x_axis)})" if x_axis is not None else ")"
+    else:
+        located = _located_feature(source, reference["owner"])
+        if located.statement_line >= statement.lineno:
+            raise PatchError(
+                f"`{located.variable}` is defined at line {located.statement_line}, at or after "
+                f"the sketch at line {statement.lineno}; a sketch can only sit on geometry "
+                "built before it."
+            )
+        if kind == "tangent":
+            near = _format_value(reference["near"])
+            expression = f"SketchPlane.tangent({located.variable}, near={near}"
+            expression += f", x_axis={_format_value(x_axis)})" if x_axis is not None else ")"
+        else:
+            accessor, render = _FACE_ACCESSORS[kind]
+            face = f"{located.variable}.{accessor}({render(reference)})"
+            expression = f"SketchPlane.on({face}"
+            if x_axis is not None:
+                expression += f", x_axis={_format_value(x_axis)}"
+            if flip:
+                expression += ", flip=True"
+            expression += ")"
+    if offset:
+        expression = f"SketchPlane.offset({expression}, {_format_coordinate(offset)})"
+
+    patched = _set_keyword_expression(source, call, "plane", expression)
+    patched = _ensure_import(patched, ast.parse(patched), "cadjoint.construction", "SketchPlane")
     return _validate(patched)

@@ -31,7 +31,8 @@ The package is layered, and imports only ever point *down* this list:
 - :mod:`.resolvers` — every ``_located_*``: a viewer reference (line, index,
   name) to the source construct it names.
 - The operation modules, one per domain, which use all of the above:
-  :mod:`.sketch` (vertices, extrude/revolve/loft), :mod:`.geometry` (solids:
+  :mod:`.sketch` (vertices, the sketch's work plane, extrude/revolve/loft),
+  :mod:`.geometry` (solids:
   placement, creation, deletion), :mod:`.materials`, :mod:`.constraints`
   (constraint statements and the solve step), :mod:`.studies`, :mod:`.meshes`,
   :mod:`.optimizations`, and :mod:`.parameters` (optimizer writeback).
@@ -61,6 +62,7 @@ from cadjoint.viewer.patch.sketch import (
     add_sketch,
     delete_vertex,
     insert_vertex,
+    set_sketch_plane,
     set_vertex,
 )
 from cadjoint.viewer.patch.studies import (
@@ -80,6 +82,7 @@ OPERATIONS = {
     "add_material": add_material,
     "assign_material": assign_material,
     "add_sketch": add_sketch,
+    "set_sketch_plane": set_sketch_plane,
     "add_extrusion": add_extrusion,
     "add_revolution": add_revolution,
     "add_loft": add_loft,
@@ -153,6 +156,7 @@ __all__ = [
     "set_optimization_value",
     "set_parameter_value",
     "set_parameter_values",
+    "set_sketch_plane",
     "set_study_value",
     "set_value",
     "set_vertex",

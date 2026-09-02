@@ -128,6 +128,83 @@ def _validate_assign_material(request: dict[str, Any]) -> Checked:
     return None, {"line": line, "material": material}
 
 
+# Each reference kind and the extra field it carries beside ``owner``.
+_PLANE_REFERENCE_FIELDS = {"cap": "sign", "side": "edge", "face": "key", "tangent": "near"}
+
+
+def _validate_plane_reference(raw: Any) -> tuple[dict[str, Any] | None, dict[str, Any]]:
+    """Check the reference a sketch's plane is being planted on.
+
+    A face reference names a feature by the line the payload reported for it,
+    plus the one field that picks the face out of that feature.  ``world`` is
+    the way back: an explicit origin and normal, no reference at all.
+    """
+    if not isinstance(raw, dict):
+        return _error("The patch request needs `reference` as an object."), {}
+    kind = raw.get("kind")
+    if kind == "world":
+        origin = _numbers(raw.get("origin"), 3)
+        normal = _numbers(raw.get("normal"), 3)
+        if origin is None or normal is None:
+            return _error("A `world` plane needs `origin` and `normal` as three numbers."), {}
+        if not any(abs(component) > 1e-9 for component in normal):
+            return _error("A sketch-plane normal must not be zero."), {}
+        return None, {"kind": "world", "origin": origin, "normal": normal}
+    if kind not in _PLANE_REFERENCE_FIELDS:
+        allowed = ", ".join(sorted({*_PLANE_REFERENCE_FIELDS, "world"}))
+        return _error(f"Plane `reference.kind` must be one of: {allowed}."), {}
+    owner = raw.get("owner")
+    if not _integer(owner):
+        return _error("The plane reference needs an integer `owner` line."), {}
+    reference: dict[str, Any] = {"kind": kind, "owner": owner}
+    field = _PLANE_REFERENCE_FIELDS[kind]
+    value = raw.get(field)
+    if kind == "cap":
+        if value not in {"+", "-"}:
+            return _error("A cap reference needs `sign` as `+` or `-`."), {}
+        reference["sign"] = value
+    elif kind == "side":
+        if not _integer(value) or value < 0:
+            return _error("A side reference needs a non-negative `edge` index."), {}
+        reference["edge"] = value
+    elif kind == "face":
+        if not isinstance(value, str) or not value.strip():
+            return _error("A face reference needs a non-empty `key`."), {}
+        reference["key"] = value
+    else:
+        near = _numbers(value, 3)
+        if near is None:
+            return _error("A tangent reference needs `near` as three numbers."), {}
+        reference["near"] = near
+    return None, reference
+
+
+def _validate_set_sketch_plane(request: dict[str, Any]) -> Checked:
+    line = request.get("line")
+    if not _integer(line):
+        return _error("The patch request needs an integer `line`."), {}
+    error, reference = _validate_plane_reference(request.get("reference"))
+    if error is not None:
+        return error, {}
+    arguments: dict[str, Any] = {"line": line, "reference": reference}
+    x_axis = request.get("x_axis")
+    if x_axis is not None:
+        vector = _numbers(x_axis, 3)
+        if vector is None or not any(abs(component) > 1e-9 for component in vector):
+            return _error("`x_axis` must be three numbers and must not be zero."), {}
+        arguments["x_axis"] = vector
+    flip = request.get("flip", False)
+    if not isinstance(flip, bool):
+        return _error("The patch request needs `flip` as a boolean."), {}
+    arguments["flip"] = flip
+    offset = request.get("offset")
+    if offset is not None:
+        if not _number(offset):
+            return _error("The patch request needs a numeric `offset`."), {}
+        arguments["offset"] = float(offset)
+    return None, arguments
+
+
 def _validate_add_extrusion(request: dict[str, Any]) -> Checked:
     line = request.get("line")
     depth = request.get("depth", 0.5)
@@ -468,6 +545,7 @@ PATCH_VALIDATORS: dict[str, Validator] = {
     "add_material": _validate_add_material,
     "assign_material": _validate_assign_material,
     "add_sketch": _validate_add_sketch,
+    "set_sketch_plane": _validate_set_sketch_plane,
     "add_extrusion": _validate_add_extrusion,
     "add_revolution": _validate_add_revolution,
     "add_loft": _validate_add_loft,

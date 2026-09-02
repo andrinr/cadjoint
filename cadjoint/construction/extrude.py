@@ -4,6 +4,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from cadjoint.construction.faces import (
+    Feature,
+    attach_faces,
+    extrusion_faces,
+    register_feature,
+)
 from cadjoint.construction.sketch import PolygonProfile, SketchPlane
 from cadjoint.geometry.parameters import Scalar
 
@@ -23,7 +29,11 @@ def _place_on_plane(sdf: SDF, plane: SketchPlane) -> SDF:
     if plane.is_identity():
         return sdf
     axis, angle = plane.axis_angle()
-    placed = sdf if angle == 0.0 else Rotate(sdf, axis=axis, angle=angle)
+    # A traced angle is not comparable, so a plane derived under jit/grad
+    # always gets its Rotate — the identity shortcut is a concrete-scene
+    # optimization, not part of the placement's meaning.
+    identity = isinstance(angle, float) and angle == 0.0
+    placed = sdf if identity else Rotate(sdf, axis=axis, angle=angle)
     return Translate(placed, offset=plane.origin)
 
 
@@ -51,12 +61,18 @@ def extrude(
             makes the field non-1-Lipschitz.
 
     Returns:
-        SDF solid sharing parameter references with the construction tree.
+        SDF solid sharing parameter references with the construction tree, with
+            its analytic faces bound on: ``solid.cap("+")`` and ``solid.cap("-")``
+            for the two ends, ``solid.side(i)`` for the wall swept by profile edge
+            ``i``, and ``solid.faces`` for all of them. A drafted or twisted
+            extrusion declares none — see
+            :func:`cadjoint.construction.faces.extrusion_faces`.
 
     Example:
         ```python
         profile = PolygonProfile([[0, 0], [2, 0], [2, 1], [0, 1]])
         solid = extrude(profile, depth=0.5)
+        boss = PolygonProfile(SQUARE, plane=SketchPlane.on(solid.cap("+")))
         ```
     """
     from cadjoint.sdf.primitives.polygon import ExtrudedPolygon
@@ -64,4 +80,8 @@ def extrude(
     base = ExtrudedPolygon(
         profile.vertices, depth=depth, material=material, draft=draft, twist=twist
     )
-    return _place_on_plane(base, profile.plane)
+    solid = _place_on_plane(base, profile.plane)
+    faces = extrusion_faces(profile, depth, draft=draft, twist=twist)
+    attach_faces(solid, faces)
+    register_feature(profile, Feature("extrude", faces, solid=solid))
+    return solid

@@ -25,6 +25,8 @@ The package is layered, and imports only ever point *down* this list:
 - :mod:`.capture` — runtime capture of construction lines (independent leaf).
 - :mod:`.calls` — line-addressed locators for one construction call
   (``locate_call``, ``locate_profile_call``).
+- :mod:`.features` — the calls that generate features, the variables they bind,
+  and the plane reference a sketch was drawn on.
 - :mod:`.constraints` — the profile's constraint statements and the ordinal
   that gives each constraint its viewer identity.
 - :mod:`.declarations` — top-level study / mesh / optimization declarations,
@@ -63,6 +65,16 @@ from cadjoint.viewer.source_map.declarations import (
     locate_optimization_statements,
     locate_study_statements,
 )
+from cadjoint.viewer.source_map.features import (
+    FEATURE_CALL_KINDS,
+    PLANE_CONSTRUCTORS,
+    PRIMITIVE_CALL_KINDS,
+    FeatureCall,
+    PlaneReference,
+    locate_feature_call,
+    locate_feature_calls,
+    locate_plane_reference,
+)
 from cadjoint.viewer.source_map.materials import build_material_payload
 from cadjoint.viewer.source_map.nodes import Span
 from cadjoint.viewer.source_map.payload import (
@@ -72,14 +84,19 @@ from cadjoint.viewer.source_map.payload import (
 
 __all__ = [
     "CONSTRAINT_CLASS_KINDS",
+    "FEATURE_CALL_KINDS",
     "MESH_CALL_NAME",
     "OPTIMIZATION_CALL_NAME",
+    "PLANE_CONSTRUCTORS",
     "PLAYGROUND_FILENAME",
+    "PRIMITIVE_CALL_KINDS",
     "STUDY_CALL_KINDS",
     "CallSite",
     "ConstraintStatement",
+    "FeatureCall",
     "MeshStatement",
     "OptimizationStatement",
+    "PlaneReference",
     "ProfileCall",
     "Span",
     "StudyStatement",
@@ -89,8 +106,11 @@ __all__ = [
     "capture_profiles",
     "locate_call",
     "locate_constraint_statements",
+    "locate_feature_call",
+    "locate_feature_calls",
     "locate_mesh_statements",
     "locate_optimization_statements",
+    "locate_plane_reference",
     "locate_profile_call",
     "locate_study_statements",
 ]

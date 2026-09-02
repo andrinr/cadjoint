@@ -25,6 +25,7 @@ from typing import Callable
 import jax.numpy as jnp
 from jax import Array
 
+from cadjoint.construction.faces import FaceSet, attach_faces, primitive_faces
 from cadjoint.fluent import Fluent
 from cadjoint.geometry.parameters import Scalar, Vector
 
@@ -150,6 +151,25 @@ class ConstructionPrimitive(Fluent):
     def rotation_values(self) -> tuple[float, float, float]:
         return tuple(float(angle.value) for angle in self.rotation)
 
+    # ── faces ────────────────────────────────────────────────────────────────
+
+    @property
+    def faces(self) -> FaceSet:
+        """The primitive's analytic faces, in its own rotated frame.
+
+        A box declares six (``+x``, ``-x``, ``+y``, …), a cylinder its two
+        circular caps (``cap+``, ``cap-``), a sphere none — it has no planar
+        face, so :meth:`~cadjoint.construction.sketch.SketchPlane.tangent` is
+        the reference to use on it.
+        """
+        if getattr(self, "_faces", None) is None:
+            self._faces = primitive_faces(self)
+        return self._faces
+
+    def face(self, key: str):
+        """The face with this key — ``"+x"``, ``"cap-"``."""
+        return self.faces.face(key)
+
     def sdf(self):
         """Build the placed SDF, sharing this mirror's parameter objects."""
         from cadjoint.sdf.primitives import Box, Cylinder, Sphere
@@ -171,7 +191,7 @@ class ConstructionPrimitive(Fluent):
         for axis, angle in zip("xyz", self.rotation):
             if float(angle.value) != 0.0:
                 solid = Rotate(solid, axis=axis, angle=angle)
-        return Translate(solid, offset=self.position)
+        return attach_faces(Translate(solid, offset=self.position), self.faces)
 
     # ── outline ──────────────────────────────────────────────────────────────
 
@@ -245,6 +265,12 @@ class Solid:
 
     The viewer picks up the mirror separately and draws its outline, which is
     what makes the result selectable and draggable.
+
+    Each returned SDF also carries its analytic faces, so a box is a work-plane
+    reference the moment it exists::
+
+        deck = Solid.box(size=[1, 1, 0.2], position=[0, 0, 0], name="deck")
+        top = SketchPlane.on(deck.face("+z"))
     """
 
     box = staticmethod(_make("box"))
