@@ -94,6 +94,9 @@ _BC_CLASS_VALUE_KEYWORDS = {
     "Fixed": None,
     "Traction": "vector",
 }
+#: Meshing intent a study may only state when it meshes itself; on a study
+#: with ``mesh=`` these live on the SimMesh, and the constructor refuses both.
+_MESH_OWNED_ARGUMENTS = frozenset({"resolution", "bounds", "size"})
 # Constructor field order per kind, for resolving positionally written
 # arguments; `name` and `bcs` are excluded from numeric-kwarg editing.
 _STUDY_FIELDS = {
@@ -268,15 +271,22 @@ def add_study_bc(
 
 
 def delete_study_bc(source: str, study, bc) -> str:
-    """Remove one boundary condition from a study's literal ``bcs`` list."""
+    """Remove one boundary condition from a study's literal ``bcs`` list.
+
+    The only element of the list leaves ``bcs=[]`` behind — the list itself
+    is rewritten, so a multi-line list does not keep a stray comma.
+    """
     located = _located_study(source, study)
     _located_study_bc(located, bc)
     spans = located.bc_spans
+    if len(spans) == 1:
+        start, end = located.bcs_span  # type: ignore[misc]
+        return _validate(source[:start] + "[]" + source[end:])
     start, end = spans[bc]
     if bc < len(spans) - 1:
         # Swallow the separator up to the next element.
         end = spans[bc + 1][0]
-    elif bc > 0:
+    else:
         # Last element: swallow the separator after the previous one.
         start = spans[bc - 1][1]
     return _validate(source[:start] + source[end:])
@@ -376,6 +386,25 @@ def _set_study_domain(source: str, located: StudyStatement, value) -> str:
     return _validate(_set_keyword_expression(source, located.call, "domain", expression))
 
 
+def _checked_box_pair(call: ast.Call, fields: tuple[str, ...], argument: str, noun: str) -> None:
+    """``bounds`` and ``size`` describe one box, and the runtime wants both or neither.
+
+    Adding one to a declaration that states neither would be a program that
+    fails on its next compile; the pair has to be written together, which
+    the viewer cannot do in one request.
+    """
+    partner = {"bounds": "size", "size": "bounds"}.get(argument)
+    if partner is None:
+        return
+    stated = {keyword.arg for keyword in call.keywords if keyword.arg is not None}
+    stated.update(fields[: len(call.args)])
+    if partner not in stated:
+        raise PatchError(
+            f"`bounds` and `size` are stated together or not at all; this {noun} states "
+            f"neither, so add both in the code first."
+        )
+
+
 def _set_study_argument(source: str, located: StudyStatement, argument, value) -> str:
     """Rewrite one study keyword in place (or add it when absent)."""
     if argument == "mesh":
@@ -388,6 +417,15 @@ def _set_study_argument(source: str, located: StudyStatement, argument, value) -
         raise PatchError(
             f"A {located.kind} study's editable arguments are: {allowed}, mesh, domain."
         )
+    if argument in _MESH_OWNED_ARGUMENTS and any(
+        keyword.arg == "mesh" for keyword in located.call.keywords
+    ):
+        # The runtime refuses a study that states both, so the edit is
+        # refused here rather than written into a program that will not run.
+        raise PatchError(
+            f"This study solves on a SimMesh; set the mesh's `{argument}` instead (set_mesh_value)."
+        )
+    _checked_box_pair(located.call, fields, argument, "study")
     expression = _format_study_argument(argument, value)
     return _rewrite_call_argument(source, located.call, fields, argument, expression, "study")
 

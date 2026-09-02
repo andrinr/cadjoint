@@ -11,9 +11,15 @@ constructor.
 
 The operator half — ``extrude``, ``revolve``, ``loft`` — turns a named sketch
 into a solid.  All three follow the same shape: refuse when the profile
-already feeds an operator, pick a free ``<profile>_body`` variable, extend the
-scene first (so the AST spans stay valid), then insert the statement and its
-import above the scene assignment.
+already feeds *any* operator (one sketch, one solid), pick a free
+``<profile>_body`` variable, extend the scene first (so the AST spans stay
+valid), then insert the statement and its import above the scene assignment.
+
+Structural vertex edits keep the sketch's constraints honest
+(:func:`_renumbered_constraints`): a deleted vertex takes the constraints
+that referenced it with it, and every ``profile.vertices[i]`` written after
+the edited position is renumbered so it still names the point it was written
+for.
 
 :func:`set_sketch_plane` is the third kind: it re-plants an existing sketch on
 a *reference* — a face of a feature the program already built, or the tangent
@@ -46,8 +52,98 @@ from cadjoint.viewer.patch.resolvers import (
     _require_call,
 )
 from cadjoint.viewer.patch.scene import _extend_scene_with, _scene_assignment
+from cadjoint.viewer.source_map import locate_constraint_statements
 from cadjoint.viewer.source_map.calls import _vertices_argument
-from cadjoint.viewer.source_map.nodes import _called_name, _line_offsets, _resolved_container
+from cadjoint.viewer.source_map.features import FEATURE_CALL_KINDS
+from cadjoint.viewer.source_map.nodes import (
+    _assignment_value,
+    _call_namespace,
+    _called_name,
+    _line_offsets,
+    _node_span,
+    _resolved_container,
+)
+
+
+def _bound_profile(source: str, line: int) -> str | None:
+    """The variable the sketch at *line* is bound to, or None for an anonymous one."""
+    try:
+        return _profile_binding(source, line)[3]
+    except PatchError:
+        return None
+
+
+def _vertex_subscripts(call: ast.Call, profile: str) -> list[ast.Constant]:
+    """Every ``<profile>.vertices[<int>]`` index literal inside a constraint call."""
+    found: list[ast.Constant] = []
+    for node in ast.walk(call):
+        if (
+            isinstance(node, ast.Subscript)
+            and isinstance(node.value, ast.Attribute)
+            and node.value.attr == "vertices"
+            and isinstance(node.value.value, ast.Name)
+            and node.value.value.id == profile
+            and isinstance(node.slice, ast.Constant)
+            and isinstance(node.slice.value, int)
+            and not isinstance(node.slice.value, bool)
+        ):
+            found.append(node.slice)
+    return found
+
+
+def _constraint_edits(
+    source: str, line: int, removed: int | None, inserted: int | None
+) -> list[tuple[int, int, str]]:
+    """Span edits that keep the sketch's constraints pointing at their vertices.
+
+    A constraint names a vertex either by the parameter it is bound to, which
+    nothing here moves, or by its position — ``profile.vertices[3]`` — which
+    every insertion or deletion before it shifts by one.  Deleting a vertex
+    also deletes every constraint that referenced it: a relation on a point
+    that no longer exists is not a relation the program can keep.  The edits
+    are computed against *source* as it is, so the caller applies them in one
+    pass with its own edit to the vertex list.
+    """
+    profile = _bound_profile(source, line)
+    if profile is None:
+        return []
+    statements = locate_constraint_statements(source, line) or []
+    offsets = _line_offsets(source)
+    edits: list[tuple[int, int, str]] = []
+    for located in statements:
+        if removed is not None and removed in located.vertices:
+            start = offsets[located.statement.lineno - 1]
+            last = located.statement.end_lineno or located.statement.lineno
+            edits.append((start, offsets[min(last, len(offsets) - 1)], ""))
+            continue
+        for index in _vertex_subscripts(located.call, profile):
+            shifted = index.value
+            if removed is not None and shifted > removed:
+                shifted -= 1
+            if inserted is not None and shifted >= inserted:
+                shifted += 1
+            if shifted != index.value:
+                start, end = _node_span(source, offsets, index)
+                edits.append((start, end, str(shifted)))
+    return edits
+
+
+def _applied(source: str, edits: list[tuple[int, int, str]]) -> str:
+    """*source* with every ``(start, end, text)`` replacement made, back to front."""
+    for start, end, text in sorted(edits, reverse=True):
+        source = source[:start] + text + source[end:]
+    return source
+
+
+def _consuming_features(tree: ast.Module, profile: str) -> list[ast.Call]:
+    """Every ``extrude``/``revolve``/``loft`` call that takes *profile* as an operand."""
+    return [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and _called_name(node) in FEATURE_CALL_KINDS
+        and any(isinstance(argument, ast.Name) and argument.id == profile for argument in node.args)
+    ]
 
 
 def set_vertex(source: str, line: int, index: int, xy) -> str:
@@ -105,9 +201,11 @@ def insert_vertex(source: str, line: int, index: int, xy) -> str:
     list_spans = call.list_element_spans
     if index < count:
         start, _ = list_spans[index]
-        return _validate(source[:start] + f"{literal}, " + source[start:])
-    _, end = list_spans[-1]
-    return _validate(source[:end] + f", {literal}" + source[end:])
+        edit = (start, start, f"{literal}, ")
+    else:
+        _, end = list_spans[-1]
+        edit = (end, end, f", {literal}")
+    return _validate(_applied(source, [edit, *_constraint_edits(source, line, None, index)]))
 
 
 def delete_vertex(source: str, line: int, index: int) -> str:
@@ -143,7 +241,8 @@ def delete_vertex(source: str, line: int, index: int) -> str:
     else:
         # Last element: swallow the separator after the previous one.
         start = list_spans[index - 1][1]
-    return _validate(source[:start] + source[end:])
+    edit = (start, end, "")
+    return _validate(_applied(source, [edit, *_constraint_edits(source, line, index, None)]))
 
 
 def add_sketch(source: str, origin, name: str | None = None) -> str:
@@ -178,17 +277,8 @@ def add_sketch(source: str, origin, name: str | None = None) -> str:
 def add_extrusion(source: str, line: int, depth: float = 0.5) -> str:
     """Extrude a named sketch and add the generated solid to ``scene``."""
     tree, _, _, profile = _profile_binding(source, line)
-    already = [
-        node
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call)
-        and _called_name(node) == "extrude"
-        and node.args
-        and isinstance(node.args[0], ast.Name)
-        and node.args[0].id == profile
-    ]
-    if already:
-        raise PatchError(f"`{profile}` already has an extrusion.")
+    if _consuming_features(tree, profile):
+        raise PatchError(f"`{profile}` already has an operator.")
 
     taken = _module_names(tree)
     body = f"{profile}_body"
@@ -211,17 +301,8 @@ def add_extrusion(source: str, line: int, depth: float = 0.5) -> str:
 def add_revolution(source: str, line: int, offset: float = 0.0) -> str:
     """Revolve a named sketch and add the generated solid to ``scene``."""
     tree, _, _, profile = _profile_binding(source, line)
-    already = [
-        node
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call)
-        and _called_name(node) in {"extrude", "revolve"}
-        and node.args
-        and isinstance(node.args[0], ast.Name)
-        and node.args[0].id == profile
-    ]
-    if already:
-        raise PatchError(f"`{profile}` already has an extrusion or revolution.")
+    if _consuming_features(tree, profile):
+        raise PatchError(f"`{profile}` already has an operator.")
 
     taken = _module_names(tree)
     body = f"{profile}_body"
@@ -266,16 +347,7 @@ def add_loft(source: str, line_a: int, line_b: int, height: float = 1.0) -> str:
         raise PatchError("Loft needs two different sketches.")
 
     for profile in (profile_a, profile_b):
-        already = [
-            node
-            for node in ast.walk(tree)
-            if isinstance(node, ast.Call)
-            and _called_name(node) in {"extrude", "revolve", "loft"}
-            and any(
-                isinstance(argument, ast.Name) and argument.id == profile for argument in node.args
-            )
-        ]
-        if already:
+        if _consuming_features(tree, profile):
             raise PatchError(f"`{profile}` already has an operator.")
 
     counts: dict[str, int] = {}
@@ -315,6 +387,93 @@ _FACE_ACCESSORS = {
     "face": ("face", lambda reference: repr(str(reference["key"]))),
 }
 
+#: The analytic faces each kind of solid declares, as the runtime's
+#: ``FaceSet`` builds them: a box its six axis faces, a cylinder its two
+#: caps, an extrusion or loft two caps and one side per sketch edge.  A
+#: sphere and a revolve declare none — only a tangent plane can sit on them.
+_BOX_FACE_KEYS = frozenset({"+x", "-x", "+y", "-y", "+z", "-z"})
+_CAP_KEYS = frozenset({"cap+", "cap-"})
+
+
+def _feature_call_node(tree: ast.Module, located) -> ast.Call | None:
+    """The AST call behind a located feature, for reading its operands."""
+    return next(
+        (
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and _called_name(node) == located.kind
+            and node.lineno == located.line
+        ),
+        None,
+    )
+
+
+def _side_count(tree: ast.Module, call: ast.Call) -> int | None:
+    """How many sides an extrusion or loft has: its sketch's vertex count.
+
+    None when the sketch is generated (``PolygonProfile.circle(...)``) or
+    otherwise not a literal list, in which case the count is not knowable
+    without running the program and the edge index is written as asked.
+    """
+    if not call.args or not isinstance(call.args[0], ast.Name):
+        return None
+    profile = call.args[0]
+    value = _assignment_value(tree, profile.id, profile.lineno)
+    if not (isinstance(value, ast.Call) and _called_name(value) == "PolygonProfile"):
+        return None
+    if _call_namespace(value) is not None:
+        return None
+    container = _resolved_container(_vertices_argument(value), tree)
+    return len(container.elts) if container is not None else None
+
+
+def _checked_face(tree: ast.Module, located, reference: dict) -> None:
+    """Refuse a face the referenced solid does not declare.
+
+    The reference is written as source and only resolved on the next
+    compile, so a cap on a revolve or ``+z`` on an extrusion would be a
+    program that fails to run.  The vocabulary is decided statically from
+    the solid's kind, and the side count from its sketch when that is
+    literal.
+    """
+    kind = reference["kind"]
+    solid = located.kind
+    if kind == "cap":
+        if solid not in FEATURE_CALL_KINDS - {"revolve"} and solid != "cylinder":
+            raise PatchError(f"A {solid} declares no cap faces; `{located.variable}` has no `cap`.")
+        return
+    call = _feature_call_node(tree, located)
+    if kind == "side":
+        if solid not in FEATURE_CALL_KINDS - {"revolve"}:
+            raise PatchError(
+                f"A {solid} declares no side faces; `{located.variable}` has no `side`."
+            )
+        count = _side_count(tree, call) if call is not None else None
+        if count is not None and not 0 <= int(reference["edge"]) < count:
+            raise PatchError(
+                f"`{located.variable}` has {count} sides, so `edge` must be from 0 to {count - 1}."
+            )
+        return
+    if kind == "face":
+        key = str(reference["key"])
+        if solid == "box":
+            declared: set[str] | None = set(_BOX_FACE_KEYS)
+        elif solid == "cylinder":
+            declared = set(_CAP_KEYS)
+        elif solid in FEATURE_CALL_KINDS - {"revolve"}:
+            count = _side_count(tree, call) if call is not None else None
+            declared = None if count is None else _CAP_KEYS | {f"side{i}" for i in range(count)}
+            if declared is None and (key in _CAP_KEYS or key.startswith("side")):
+                return
+        else:
+            declared = set()
+        if declared is not None and key not in declared:
+            listed = ", ".join(sorted(declared)) or "none"
+            raise PatchError(
+                f"A {solid} has no face {key!r}; `{located.variable}` declares: {listed}."
+            )
+
 
 def set_sketch_plane(
     source: str,
@@ -351,10 +510,11 @@ def set_sketch_plane(
 
     Raises:
         PatchError: If the sketch or the referenced feature cannot be located,
-            the feature has no variable to name, or the feature is defined
-            after the sketch that would use it.
+            the feature has no variable to name, the feature is defined
+            after the sketch that would use it, or the face named is one
+            that kind of solid does not declare.
     """
-    _, call, statement = _located_sketch_call(source, line)
+    tree, call, statement = _located_sketch_call(source, line)
     kind = reference.get("kind")
     if kind == "world":
         expression = (
@@ -370,6 +530,8 @@ def set_sketch_plane(
                 f"the sketch at line {statement.lineno}; a sketch can only sit on geometry "
                 "built before it."
             )
+        if kind != "tangent":
+            _checked_face(tree, located, reference)
         if kind == "tangent":
             near = _format_value(reference["near"])
             expression = f"SketchPlane.tangent({located.variable}, near={near}"

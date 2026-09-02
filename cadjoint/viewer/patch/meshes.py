@@ -39,8 +39,9 @@ from cadjoint.viewer.patch.errors import PatchError
 from cadjoint.viewer.patch.format import _exact_number, _format_study_argument
 from cadjoint.viewer.patch.resolvers import _located_mesh
 from cadjoint.viewer.patch.scene import _domain_expression, _scene_assignment
+from cadjoint.viewer.patch.studies import _checked_box_pair
 from cadjoint.viewer.source_map import locate_mesh_statements, locate_study_statements
-from cadjoint.viewer.source_map.nodes import _line_offsets
+from cadjoint.viewer.source_map.nodes import _line_offsets, _node_span
 
 # Constructor field order, for resolving positionally written arguments;
 # `name` is excluded from editing.
@@ -154,10 +155,18 @@ def set_mesh_value(source: str, mesh, argument, value) -> str:
     """
     located = _located_mesh(source, mesh)
     if argument == "domain":
+        # A domain is a *name*, not a literal: the existing keyword's span is
+        # replaced whatever expression it holds, the way a study's is.
         expression = _domain_expression(source, value, located.statement.lineno, "mesh")
-        return _rewrite_call_argument(
-            source, located.call, _MESH_FIELDS, "domain", expression, "mesh"
+        existing = next(
+            (keyword.value for keyword in located.call.keywords if keyword.arg == "domain"),
+            located.call.args[2] if len(located.call.args) > 2 else None,
         )
+        if existing is None:
+            return _set_keyword_expression(source, located.call, "domain", expression)
+        offsets = _line_offsets(source)
+        start, end = _node_span(source, offsets, existing)
+        return _validate(source[:start] + expression + source[end:])
     if argument == "method":
         if value not in _MESH_METHODS:
             raise PatchError(f"Mesh `method` must be one of: {listed(MeshMethod)}.")
@@ -172,5 +181,6 @@ def set_mesh_value(source: str, mesh, argument, value) -> str:
             raise PatchError("`padding` must be a non-negative number.")
         expression = _exact_number(value)
     else:
+        _checked_box_pair(located.call, _MESH_FIELDS, argument, "mesh")
         expression = _format_study_argument(argument, value)
     return _rewrite_call_argument(source, located.call, _MESH_FIELDS, argument, expression, "mesh")

@@ -191,6 +191,31 @@ def _argument_span(source: str, offsets, node) -> tuple[int, int]:
     return start, end
 
 
+def _operand_span(source: str, offsets, node, siblings: list[ast.AST]) -> tuple[int, int]:
+    """Span of one positional operand and the separator that goes with it.
+
+    A middle operand takes the comma *after* it, so the next one slides into
+    its place; the last positional operand takes the comma *before* it, so
+    ``Union(a, b)`` loses ``b`` as ``Union(a)`` rather than ``Union(a, )``.
+    *siblings* are the call's positional arguments, in order.
+    """
+    span = _node_span(source, offsets, node)
+    if span is None:  # pragma: no cover - defensive
+        raise PatchError("Could not locate the argument to remove.")
+    start, end = span
+    position = next(index for index, sibling in enumerate(siblings) if sibling is node)
+    if position < len(siblings) - 1:
+        following = _node_span(source, offsets, siblings[position + 1])
+        return start, following[0] if following is not None else end
+    if position > 0:
+        previous = _node_span(source, offsets, siblings[position - 1])
+        if previous is not None:
+            return previous[1], end
+    while end < len(source) and source[end] in ", ":
+        end += 1
+    return start, end
+
+
 def _delete_statement(source: str, statement: ast.stmt) -> str:
     """Remove a whole statement's lines from *source*.
 

@@ -11,8 +11,10 @@ Two placement rules:
   declared anywhere, and the name has to be bound before that object's
   statement runs;
 - assigning to a sketch does not touch the sketch — a profile carries no
-  material, so the keyword is written on the single ``extrude(...)`` that
-  consumes it, and the operation refuses when there is not exactly one.
+  material, so the keyword is written on the single operator (``extrude``,
+  ``revolve`` or ``loft``) that consumes it, and the operation refuses when
+  there is not exactly one; a feature addressed directly takes the keyword
+  itself.
 
 :func:`set_material_property` is the third operation, and the only one that
 edits a material's *own* arguments.  A material carries optical properties
@@ -53,9 +55,11 @@ from cadjoint.viewer.patch.errors import PatchError
 from cadjoint.viewer.patch.format import _exact_number, _format_keywords
 from cadjoint.viewer.patch.resolvers import CONSTRUCTION_CALLS, _profile_binding
 from cadjoint.viewer.patch.scene import _scene_assignment
+from cadjoint.viewer.source_map.features import FEATURE_CALL_KINDS
 from cadjoint.viewer.source_map.nodes import (
     _called_name,
     _editable_value_node,
+    _is_construction_call,
     _line_offsets,
     _node_span,
 )
@@ -142,28 +146,32 @@ def assign_material(source: str, line: int, material: str) -> str:
         node
         for node in ast.walk(tree)
         if isinstance(node, ast.Call)
-        and _called_name(node) in CONSTRUCTION_CALLS
+        and _called_name(node) in CONSTRUCTION_CALLS | FEATURE_CALL_KINDS
+        and _is_construction_call(node)
         and node.lineno <= line <= (node.end_lineno or node.lineno)
     ]
     if len(calls) != 1:
         raise PatchError(f"No single construction call found at line {line}.")
     call = calls[0]
     if _called_name(call) == "PolygonProfile":
+        # A profile carries no material: the keyword goes on the one solid
+        # generated from it, whichever operator that is.
         _, _, _, profile = _profile_binding(source, line)
-        extrusions = [
+        features = [
             node
             for node in ast.walk(tree)
             if isinstance(node, ast.Call)
-            and _called_name(node) == "extrude"
-            and node.args
-            and isinstance(node.args[0], ast.Name)
-            and node.args[0].id == profile
-        ]
-        if len(extrusions) != 1:
-            raise PatchError(
-                f"`{profile}` needs one named extrusion before a material can be assigned."
+            and _called_name(node) in FEATURE_CALL_KINDS
+            and any(
+                isinstance(argument, ast.Name) and argument.id == profile for argument in node.args
             )
-        call = extrusions[0]
+        ]
+        if len(features) != 1:
+            raise PatchError(
+                f"`{profile}` needs one operator (extrude, revolve or loft) before a material "
+                "can be assigned."
+            )
+        call = features[0]
     return _set_keyword_expression(source, call, "material", material)
 
 
@@ -420,6 +428,15 @@ def _removed_keyword(source: str, keyword: ast.keyword) -> str:
     head = start
     while head > line_start and source[head - 1] in " \t":
         head -= 1
+    if head == line_start and line_start > 0:
+        # The keyword opened its own line as the call's last argument (the
+        # way ``_added_keyword`` wraps one): the line break and the comma
+        # before it were part of the same edit, and go back out with it.
+        probe = line_start - 1
+        while probe > 0 and source[probe - 1] in " \t":
+            probe -= 1
+        if probe > 0 and source[probe - 1] == ",":
+            return source[: probe - 1] + source[end:]
     if head > line_start and source[head - 1] == ",":
         head -= 1
     return source[:head] + source[end:]

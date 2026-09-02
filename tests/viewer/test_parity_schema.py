@@ -137,16 +137,25 @@ class TestTheRequestModels:
             validate_patch_request({**request_body, "source": SMALL})
         assert patch_source({**request_body, "source": SMALL})["ok"] is False
 
-    def test_the_models_are_stricter_than_the_server_about_stray_fields(self):
-        """The one place the two descriptions deliberately differ.
+    def test_the_server_and_the_models_agree_about_stray_fields(self):
+        """A field no model names is refused by both descriptions.
 
-        The server reads the fields it needs and ignores the rest, so a
-        browser running newer assets keeps working against an older server.
-        The models forbid extras, so a *typo* in new frontend code is caught
-        at compile time rather than silently dropped at runtime.
+        The server used to read the fields it needed and ignore the rest, so
+        a browser running newer assets kept *working* against an older
+        server — by silently dropping whatever the new field asked for and
+        applying half an edit.  That is the same skew the unknown-operation
+        check already refuses, and it is refused the same way now, with the
+        same advice; the models forbid extras so a typo in new frontend
+        code is caught at compile time as well.
         """
         stray = {"source": SMALL, "op": "set_vertex", "line": 4, "index": 0, "xy": [1.0, 2.0]}
-        assert patch_source({**stray, "xyz": 1})["ok"] is True
+        assert patch_source({**stray, "xyz": 1}) == {
+            "ok": False,
+            "error": (
+                "The patch operation `set_vertex` does not take `xyz`. "
+                "If you updated cadjoint, restart the playground server."
+            ),
+        }
         with pytest.raises(ValidationError):
             validate_patch_request({**stray, "xyz": 1})
 

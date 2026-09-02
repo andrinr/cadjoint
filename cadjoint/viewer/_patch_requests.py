@@ -15,6 +15,7 @@ the checks inside one validator run in the order a caller would hit them.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Callable
 from typing import Any
 
@@ -30,11 +31,13 @@ from cadjoint.enums import (
 )
 from cadjoint.viewer._limits import OVERSIZED_SOURCE_ERROR, exceeds_source_limit
 from cadjoint.viewer._patch import OPERATIONS, PatchError, apply_operation
+from cadjoint.viewer.patch.geometry import EDITABLE_CALLS, PRIMITIVE_DIMENSIONS
 from cadjoint.viewer.patch.materials import (
     EDITABLE_PROPERTIES,
     PROPERTY_BOUNDS,
     property_range_error,
 )
+from cadjoint.viewer.schema.requests import PATCH_REQUEST_MODELS
 from cadjoint.viewer.source_map.identity import Identity, identity_index
 
 # ``(error, arguments)``: a rejection to return, or the keyword arguments the
@@ -210,17 +213,30 @@ def _integer(value: Any) -> bool:
 
 
 def _number(value: Any) -> bool:
-    """True for a plain number — a ``bool`` does not count as one here."""
-    return isinstance(value, (int, float)) and not isinstance(value, bool)
+    """True for a plain finite number — a ``bool`` does not count as one here.
+
+    ``NaN`` and the infinities are refused too: Python's JSON decoder lets
+    them through, and written into the program they are the bare names
+    ``nan``/``inf``, which the next compile cannot resolve.
+    """
+    return (
+        isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and math.isfinite(float(value))
+    )
 
 
 def _numbers(value: Any, count: int | None = None) -> list[float] | None:
-    """Validate a list of plain numbers, optionally of a fixed length."""
+    """Validate a non-empty list of plain finite numbers, optionally of a fixed length.
+
+    An empty list is never a value any operation can write — ``size=[]``
+    is a solid with no size — so it is refused like a non-number.
+    """
     if not isinstance(value, (list, tuple)):
         return None
     if count is not None and len(value) != count:
         return None
-    if not all(isinstance(item, (int, float)) and not isinstance(item, bool) for item in value):
+    if not value or not all(_number(item) for item in value):
         return None
     return [float(item) for item in value]
 
@@ -246,24 +262,38 @@ def _validate_add_sketch(request: dict[str, Any]) -> Checked:
 
 
 def _validate_add_primitive(request: dict[str, Any]) -> Checked:
+    """A new solid: which kind, where, and exactly the dimensions that kind takes.
+
+    ``Solid.<kind>`` is written verbatim, so a kind the runtime has no
+    factory for — or a dimension it does not take — would be a program
+    that fails on its next compile; both are refused here instead.
+    """
     kind = request.get("kind")
-    if not isinstance(kind, str):
-        return _error("The patch request needs a string `kind`."), {}
+    if not isinstance(kind, str) or kind not in PRIMITIVE_DIMENSIONS:
+        allowed = ", ".join(sorted(PRIMITIVE_DIMENSIONS))
+        return _error(f"Primitive `kind` must be one of: {allowed}."), {}
     position = _numbers(request.get("position"), 3)
     if position is None:
         return _error("The patch request needs `position` as three numbers."), {}
     raw = request.get("dimensions")
     if not isinstance(raw, dict):
         return _error("The patch request needs a `dimensions` object."), {}
+    expected = PRIMITIVE_DIMENSIONS[kind]
+    if set(raw) != set(expected):
+        listed_keys = ", ".join(f"`{key}`" for key in expected)
+        return _error(f"A `{kind}` takes exactly these dimensions: {listed_keys}."), {}
     dimensions: dict[str, Any] = {}
-    for key, value in raw.items():
-        if _number(value):
+    for key, size in expected.items():
+        value = raw[key]
+        if size == 1:
+            if not _number(value) or float(value) <= 0.0:
+                return _error(f"Dimension `{key}` must be a positive number."), {}
             dimensions[key] = float(value)
-            continue
-        vector = _numbers(value)
-        if vector is None:
-            return _error(f"Dimension `{key}` must be a number or numbers."), {}
-        dimensions[key] = vector
+        else:
+            vector = _numbers(value, size)
+            if vector is None or any(component <= 0.0 for component in vector):
+                return _error(f"Dimension `{key}` must be {size} positive numbers."), {}
+            dimensions[key] = vector
     return None, {"kind": kind, "position": position, "dimensions": dimensions}
 
 
@@ -455,12 +485,22 @@ def _validate_delete_object(request: dict[str, Any]) -> Checked:
 
 
 def _validate_set_value(request: dict[str, Any]) -> Checked:
+    """One keyword of one construction call.
+
+    ``name`` must be a call this operation knows the arguments of — the
+    operation itself refuses an ``argument`` that call does not take, and
+    checks the value's shape against it, since a keyword written verbatim
+    reaches the constructor unchecked.
+    """
     arguments: dict[str, Any] = {}
     for key in ("name", "argument"):
         value = request.get(key)
         if not isinstance(value, str):
             return _error(f"The patch request needs a string `{key}`."), {}
         arguments[key] = value
+    if arguments["name"] not in EDITABLE_CALLS:
+        allowed = ", ".join(sorted(EDITABLE_CALLS))
+        return _error(f"`set_value` edits one of these calls: {allowed}."), {}
     line = request.get("line")
     if not _integer(line):
         return _error("The patch request needs an integer `line`."), {}
@@ -530,7 +570,9 @@ def _validate_add_constraint(request: dict[str, Any]) -> Checked:
     indices = request.get("indices")
     if not _integer(line):
         return _error("The patch request needs an integer `line`."), {}
-    if kind not in _VALUED_CONSTRAINTS and kind not in _RELATIONAL_CONSTRAINTS:
+    if not isinstance(kind, str) or (
+        kind not in _VALUED_CONSTRAINTS and kind not in _RELATIONAL_CONSTRAINTS
+    ):
         allowed = ", ".join(sorted({**_VALUED_CONSTRAINTS, **_RELATIONAL_CONSTRAINTS}))
         return _error(f"Constraint `kind` must be one of: {allowed}."), {}
     arity = _VALUED_CONSTRAINTS.get(kind) or _RELATIONAL_CONSTRAINTS[kind]
@@ -541,10 +583,16 @@ def _validate_add_constraint(request: dict[str, Any]) -> Checked:
     ):
         return _error(f"`{kind}` takes exactly {arity} integer `indices`."), {}
     value = None
-    if kind in _VALUED_CONSTRAINTS:
-        value = _scalar_or_numbers(request.get("value"))
+    if kind == ConstraintKind.FIXED:
+        # A sketch vertex is a point in its plane, so its pin is a point too.
+        value = _numbers(request.get("value"), 2)
         if value is None:
-            return _error("The constraint needs a numeric `value`."), {}
+            return _error("A `fixed` constraint needs `value` as two numbers."), {}
+    elif kind == ConstraintKind.DISTANCE:
+        raw = request.get("value")
+        if not _number(raw) or float(raw) < 0.0:
+            return _error("A `distance` constraint needs `value` as a non-negative number."), {}
+        value = float(raw)
     return None, {"line": line, "kind": kind, "indices": indices, "value": value}
 
 
@@ -814,9 +862,21 @@ def patch_source(request: dict[str, Any]) -> dict[str, Any]:
             "If you updated cadjoint, restart the playground server."
         )
 
-    error, request = _resolved_request(request, source, operation)
+    error, resolved = _resolved_request(request, source, operation)
     if error is not None:
         return error
+    unknown = sorted(set(request) - set(PATCH_REQUEST_MODELS[operation].model_fields))
+    if unknown:
+        # The request models describe the wire; a field none of them names is
+        # a request this server cannot honour in full.  Dropping it silently
+        # would apply half an edit, so it is refused the way an unknown
+        # operation is — and for the same likely reason.
+        listed_fields = ", ".join(f"`{field}`" for field in unknown)
+        return _error(
+            f"The patch operation `{operation}` does not take {listed_fields}. "
+            "If you updated cadjoint, restart the playground server."
+        )
+    request = resolved
 
     error, arguments = PATCH_VALIDATORS.get(operation, _validate_vertex)(request)
     if error is not None:

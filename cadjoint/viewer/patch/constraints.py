@@ -40,12 +40,52 @@ from cadjoint.viewer.patch.errors import PatchError
 from cadjoint.viewer.patch.format import _format_value
 from cadjoint.viewer.patch.resolvers import _located_constraint, _profile_binding
 from cadjoint.viewer.source_map import locate_constraint_statements
+from cadjoint.viewer.source_map.calls import _vertices_argument
 from cadjoint.viewer.source_map.nodes import (
     _called_name,
     _editable_value_node,
     _line_offsets,
     _node_span,
+    _resolved_container,
 )
+
+
+def _checked_indices(tree: ast.Module, call: ast.Call, indices: list[int]) -> None:
+    """Refuse a vertex index the sketch does not have, or an edge with no length.
+
+    ``profile.vertices[i]`` is written verbatim, so an index past the end is
+    an ``IndexError`` on the next compile; and a relation between a point and
+    itself — an edge from vertex 2 to vertex 2 — has no direction to relate.
+    """
+    if any(not isinstance(index, int) or isinstance(index, bool) or index < 0 for index in indices):
+        raise PatchError("Constraint `indices` must be non-negative integers.")
+    container = _resolved_container(_vertices_argument(call), tree)
+    if container is not None:
+        count = len(container.elts)
+        out = [index for index in indices if index >= count]
+        if out:
+            raise PatchError(
+                f"Vertex index {out[0]} is out of range; the sketch has {count} vertices."
+            )
+    for first, second in zip(indices[0::2], indices[1::2]):
+        if first == second:
+            raise PatchError(f"A constraint edge needs two different vertices, not {first} twice.")
+
+
+def _checked_constraint_value(kind: str, value) -> str:
+    """The literal for a ``fixed`` point or a ``distance`` length."""
+    if kind == "fixed":
+        if not (
+            isinstance(value, (list, tuple))
+            and len(value) == 2
+            and all(isinstance(item, (int, float)) and not isinstance(item, bool) for item in value)
+        ):
+            raise PatchError("A `fixed` constraint needs `value` as two numbers.")
+        return _format_value(value)
+    if not isinstance(value, (int, float)) or isinstance(value, bool) or float(value) < 0.0:
+        raise PatchError("A `distance` constraint needs `value` as a non-negative number.")
+    return _format_value(value)
+
 
 _RELATIONAL_CONSTRAINT_SYMBOLS = {
     "horizontal": "HorizontalConstraint",
@@ -69,24 +109,33 @@ def add_constraint(
     (``horizontal``, ``vertical``, ``coincident`` on two vertices, ``parallel``
     and ``perpendicular`` on two edges given as four vertices) take none.
     """
-    _, _, statement, profile = _profile_binding(source, line)
+    tree, call, statement, profile = _profile_binding(source, line)
+    if not isinstance(indices, (list, tuple)):
+        raise PatchError("Constraint `indices` must be non-negative integers.")
+    indices = list(indices)
 
     def vertex(index: int) -> str:
         return f"{profile}.vertices[{index}]"
 
     if kind == "fixed" and len(indices) == 1:
-        constraint = f"FixedConstraint({vertex(indices[0])}, {_format_value(value)})\n"
+        _checked_indices(tree, call, indices)
+        constraint = (
+            f"FixedConstraint({vertex(indices[0])}, {_checked_constraint_value(kind, value)})\n"
+        )
         symbol = "FixedConstraint"
     elif kind == "distance" and len(indices) == 2:
+        _checked_indices(tree, call, indices)
         constraint = (
             f"DistanceConstraint({vertex(indices[0])}, {vertex(indices[1])}, "
-            f"{_format_value(value)})\n"
+            f"{_checked_constraint_value(kind, value)})\n"
         )
         symbol = "DistanceConstraint"
     elif kind in {"horizontal", "vertical", "coincident"} and len(indices) == 2:
+        _checked_indices(tree, call, indices)
         symbol = _RELATIONAL_CONSTRAINT_SYMBOLS[kind]
         constraint = f"{symbol}({vertex(indices[0])}, {vertex(indices[1])})\n"
     elif kind in {"parallel", "perpendicular"} and len(indices) == 4:
+        _checked_indices(tree, call, indices)
         symbol = _RELATIONAL_CONSTRAINT_SYMBOLS[kind]
         constraint = f"{symbol}({', '.join(vertex(index) for index in indices)})\n"
     else:
@@ -138,6 +187,10 @@ def set_constraint_value(source: str, line: int, index: int, value) -> str:
         raise PatchError("Only `fixed` and `distance` constraints carry an editable value.")
     if target is None:
         raise PatchError("The constraint statement has no value argument to rewrite.")
+    # The same shapes ``add_constraint`` writes: a point for a pin, a length
+    # for a distance — checked before the literal is located, so a refusal
+    # never depends on where the value happens to live.
+    _checked_constraint_value(located.kind, value)
     tree = ast.parse(source)
     literal = _editable_value_node(target, tree)
     if literal is None:
