@@ -89,16 +89,22 @@ nitrile = Material(name="nitrile", color=[0.12, 0.12, 0.14], roughness=0.85, met
 # ── 1. mounting flange: a generated outline ──────────────────────────────────
 # A cast flange has rounded corners, and a profile here is a polygon and
 # nothing else — so the rounding is traced as vertices before the solid
-# exists. `rounded_rect` does that; writing its 20 vertices by hand is the
+# exists. `rounded_rect` does that; writing its 16 vertices by hand is the
 # workaround it removes. Generated vertices are PINNED: a corner of a fillet
 # is a consequence of the radius, not a freedom of its own.
+#
+# Segment counts throughout this file are a BUDGET, not a preference. The
+# polygon distance unrolls one op chain per vertex, so the viewer's edge
+# overlay costs roughly linearly in the total vertex count over the whole
+# scene: 168 vertices took 112 s and blew the 90 s budget, 116 take 60 s.
+# Every circle here is the coarsest count that still reads as round.
 # The plane sits at half the nominal thickness so the flange's mounting face
 # lands on z = 0 and every height in this file reads as "above the mounting
 # face" (the convention scenes/bracket.py uses for its base plate). An
 # extrusion straddles its plane, so without this the whole stack would sit
 # half a flange low.
 flange_profile = PolygonProfile.rounded_rect(
-    2.0, 2.0, 0.36, segments=4, plane=SketchPlane(origin=[0.0, 0.0, 0.09]), name="flange"
+    2.0, 2.0, 0.36, segments=3, plane=SketchPlane(origin=[0.0, 0.0, 0.09]), name="flange"
 )
 flange = extrude(flange_profile, depth=flange_thickness, material=aluminum)
 
@@ -110,7 +116,7 @@ flange = extrude(flange_profile, depth=flange_thickness, material=aluminum)
 # the boss sits ON the flange instead of straddling it.
 boss_profile = PolygonProfile.circle(
     radius=0.62,
-    segments=40,
+    segments=24,
     plane=flange.cap("+").plane(offset=boss_height.value / 2.0),
     name="bearing boss",
 )
@@ -120,7 +126,7 @@ boss = extrude(boss_profile, depth=boss_height, material=aluminum)
 # The raised land the shaft seal presses into.
 land_profile = PolygonProfile.circle(
     radius=0.50,
-    segments=32,
+    segments=20,
     plane=boss.cap("+").plane(offset=0.06),
     name="seal land",
 )
@@ -220,8 +226,8 @@ port_angle = math.radians(22.5)
 port_direction = [math.cos(port_angle), math.sin(port_angle), 0.0]
 port_center = [0.62 * math.cos(port_angle), 0.62 * math.sin(port_angle), 0.40]
 port_plane = SketchPlane(origin=port_center, normal=port_direction)
-port_root = PolygonProfile.circle(radius=0.22, segments=16, plane=port_plane, name="port root")
-port_face = PolygonProfile.circle(radius=0.34, segments=16, plane=port_plane, name="port face")
+port_root = PolygonProfile.circle(radius=0.22, segments=12, plane=port_plane, name="port root")
+port_face = PolygonProfile.circle(radius=0.34, segments=12, plane=port_plane, name="port face")
 port = loft(port_root, port_face, height=port_length, material=aluminum)
 
 # ── 8. locating dowels: one boss, mirrored across the flange's own midplane ──
@@ -232,7 +238,7 @@ port = loft(port_root, port_face, height=port_length, material=aluminum)
 dowel_profile = PolygonProfile.circle(
     radius=0.075,
     center=(0.0, 0.80),
-    segments=20,
+    segments=14,
     plane=flange.cap("+").plane(offset=0.055),
     name="dowel",
 )
@@ -266,12 +272,14 @@ pad_taps = LinearPattern(pad_tap, direction=[1.0, 0.0, 0.0], count=2, spacing=0.
 # ── 10. the housing ──────────────────────────────────────────────────────────
 # The smoothness on the union is a deliberate fillet: it rounds where the ribs
 # and boss meet the flange, which is what a casting does and what a sharp
-# `min` would not. The smaller one on the difference breaks the edges of the
-# bores. This is what an implicit modeller offers instead of selecting an edge
+# `min` would not. It is 0.022 against a rib 0.11 thick — a fifth of the
+# thickness, which reads as a cast radius; at 0.04 the blend ate most of the
+# rib and the gussets rendered as soft swellings instead of ribs. The smaller
+# one on the difference breaks the edges of the bores. This is what an implicit modeller offers instead of selecting an edge
 # and asking for a radius — see research/complex-scene.md on what it can and
 # cannot do.
 housing_body = Union(
-    flange, boss, seal_land, retainer_pad, ribs, port, dowel, dowel_under, smoothness=0.04
+    flange, boss, seal_land, retainer_pad, ribs, port, dowel, dowel_under, smoothness=0.022
 )
 housing = Difference(
     housing_body, bore, seat_cut, bolt_holes, port_bore, port_screws, pad_taps, smoothness=0.012

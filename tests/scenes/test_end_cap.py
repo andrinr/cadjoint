@@ -105,12 +105,9 @@ class TestTheGeometryIsWhatItClaims:
             return self._inside(cap, [radius * math.cos(angle), radius * math.sin(angle), height])
 
         assert all(at(2 * math.pi * i / 8) for i in range(8)), "a rib copy is missing"
-        # Half-pitch between the ribs is open metal-free air -- except at
-        # index 0, which is the 22.5 degrees the lubrication port occupies.
-        assert not any(
-            at(2 * math.pi * (i + 0.5) / 8) for i in range(1, 8)
-        ), "the pattern has no gaps"
-        assert at(math.radians(22.5)), "the port should fill its own gap"
+        # And the half-pitch between every pair of them is open air, which is
+        # what says the ribs are eight discrete gussets rather than one skirt.
+        assert not any(at(2 * math.pi * (i + 0.5) / 8) for i in range(8)), "the pattern has no gaps"
 
     def test_the_bolt_circle_is_drilled_four_times(self, cap):
         radius = float(cap.bolt_circle.value)
