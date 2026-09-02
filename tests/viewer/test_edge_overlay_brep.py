@@ -19,17 +19,30 @@ unit and a millionth is the point.
 
 from __future__ import annotations
 
+import jax.numpy as jnp
 import numpy as np
 import pytest
 
+from cadjoint.brep.project import trace_curves
 from cadjoint.geometry.parameters import Vector
-from cadjoint.sdf import Box, Cylinder, Difference, Translate
+from cadjoint.sdf import Box, Cylinder, Difference, Translate, Union
 from cadjoint.viewer._edge_overlay import (
+    _DEBRIS_CELLS,
+    _MAX_CHORD_TURN,
+    _MAX_EDGE_TURN,
     _MESH_EDGE_RESOLUTION,
     _MESH_EDGE_SIZE,
+    _between_corners,
+    _corners_on_curve,
+    _Drawable,
     _extract_graph,
+    _in_curve_order,
     _mesh_edge_payload,
+    _prune_debris,
+    _resample,
     _sharp_chords,
+    _sharp_polylines,
+    _worst_turn,
 )
 
 CELL = max(_MESH_EDGE_SIZE) / _MESH_EDGE_RESOLUTION
@@ -294,7 +307,7 @@ def test_the_threshold_is_the_radius_the_user_typed():
 # --------------------------------------------------------------------------
 
 
-def _fake_edge(index: int, corners: tuple[int, int], closed: bool = False):
+def _fake_edge(index: int, closed: bool = False):
     """A :class:`~cadjoint.brep.BRepEdge` carrying only what pruning reads."""
     from cadjoint.brep import BRepEdge
 
@@ -303,16 +316,17 @@ def _fake_edge(index: int, corners: tuple[int, int], closed: bool = False):
         faces=(0, 1),
         patches=(0, 1),
         polyline=np.zeros((0, 3)),
-        vertices=corners,
+        vertices=(-1, -1),
         closed=closed,
         analytic=True,
         residual=0.0,
     )
 
 
-def _run(length: float, count: int = 2) -> np.ndarray:
-    """``count`` samples spanning ``length`` along x."""
-    return np.stack([np.linspace(0.0, length, count), np.zeros(count), np.zeros(count)], axis=1)
+def _segment(start, end, count: int = 2) -> np.ndarray:
+    """``count`` points from ``start`` to ``end``."""
+    start, end = np.asarray(start, dtype=np.float64), np.asarray(end, dtype=np.float64)
+    return start[None, :] + np.linspace(0.0, 1.0, count)[:, None] * (end - start)[None, :]
 
 
 def test_short_open_complexes_go_and_anchored_or_closed_ones_stay():
@@ -321,25 +335,32 @@ def test_short_open_complexes_go_and_anchored_or_closed_ones_stay():
     Where two solids skim each other the graph finds genuine edges that last
     a couple of cells and end nowhere; drawn, they are ticks beside the
     geometry rather than edges.  A real curve is long, closed, or wired into
-    a bigger complex through its corners — so the test is on the complex.
+    a bigger complex — so the test is on the connected complex, and
+    connectivity is judged on the *drawn* endpoints, at the precision the
+    payload ships, because that is what the viewer joins up.
     """
-    from cadjoint.viewer._edge_overlay import _DEBRIS_CELLS, _prune_debris
-
-    limit = _DEBRIS_CELLS * CELL
-    long_open = (_fake_edge(0, (-1, -1)), _run(4.0 * CELL))
-    short_orphan = (_fake_edge(1, (-1, -1)), _run(1.0 * CELL))
-    short_loop = (_fake_edge(2, (-1, -1), closed=True), _run(1.0 * CELL))
-    # Two short edges that meet at corner 7 and dead-end: still debris.
-    short_pair = [(_fake_edge(3, (7, -1)), _run(CELL)), (_fake_edge(4, (7, -1)), _run(CELL))]
-    # A short edge anchored into the long complex through shared corners.
+    long_open = _Drawable(_fake_edge(0), _segment((0, 0, 0), (4.0 * CELL, 0, 0)))
+    short_orphan = _Drawable(_fake_edge(1), _segment((0, 1, 0), (CELL, 1, 0)))
+    short_loop = _Drawable(
+        _fake_edge(2, closed=True),
+        _segment((0, 2, 0), (CELL, 2, 0), count=4),
+    )
+    # Two short edges meeting at one point and dead-ending: still debris.
+    shared = (0.0, 3.0, 0.0)
+    short_pair = [
+        _Drawable(_fake_edge(3), _segment(shared, (CELL, 3, 0))),
+        _Drawable(_fake_edge(4), _segment(shared, (-CELL, 3, 0))),
+    ]
+    # A short edge anchored between two long ones through shared endpoints.
+    left, right = (0.0, 4.0, 0.0), (0.4 * CELL, 4.0, 0.0)
     anchored = [
-        (_fake_edge(5, (2, 3)), _run(4.0 * CELL)),
-        (_fake_edge(6, (3, 4)), _run(0.4 * CELL)),
-        (_fake_edge(7, (4, 2)), _run(4.0 * CELL)),
+        _Drawable(_fake_edge(5), _segment((-4.0 * CELL, 4, 0), left)),
+        _Drawable(_fake_edge(6), _segment(left, right)),
+        _Drawable(_fake_edge(7), _segment(right, (4.4 * CELL, 4, 0))),
     ]
 
     entries = [long_open, short_orphan, short_loop, *short_pair, *anchored]
-    kept = {edge.index for edge, _samples in _prune_debris(entries, limit)}
+    kept = {item.edge.index for item in _prune_debris(entries, _DEBRIS_CELLS * CELL)}
     assert kept == {0, 2, 5, 6, 7}, f"kept {sorted(kept)}"
 
 
@@ -385,3 +406,313 @@ def test_the_wire_and_sharp_layers_share_their_vertices():
     for point_set, label in ((wire, "wire"), (sharp, "sharp")):
         near = np.linalg.norm(point_set - corner[None, :], axis=1).min()
         assert near < 1e-3, f"{label} layer misses the corner by {near:.4f}"
+
+
+# --------------------------------------------------------------------------
+# Every drawn edge is a curve
+# --------------------------------------------------------------------------
+
+
+def _filleted_step(smoothness: float = 0.03):
+    """A fin standing on a plate, welded by a sub-cell fillet.
+
+    The shape of every junction the starter and the bracket are made of: two
+    boxes smooth-unioned, so the graph classifies the fillet band as the
+    sharp corner it rounds and then has to find that corner's curve inside a
+    band where patch ownership is a coin flip.  The four seams around the
+    fin's root are exact straight lines of known length.
+    """
+    return Union(
+        Box(size=Vector([0.8, 0.6, 0.1])),
+        Translate(Box(size=Vector([0.15, 0.45, 0.35])), offset=Vector([0.0, 0.0, 0.3])),
+        smoothness=smoothness,
+    )
+
+
+def _drawn(scene):
+    """Every drawn edge as an ordered polyline, plus the graph behind it."""
+    brep, spacing = _extract_graph(scene)
+    return brep, _sharp_polylines(brep, spacing)
+
+
+@pytest.mark.parametrize("scene_name", ["filleted-step", "bored-plate"])
+def test_no_drawn_edge_folds_back_on_itself(scene_name):
+    """The defect that made the fin roots look like flags.
+
+    The graph chains an edge's seeds in the order its walk over the mesh
+    boundary between two face regions visited them, and that boundary
+    staircases across the curve — so the order is not the curve's, and a
+    polyline drawn in it doubles back.  Every joint of every drawn edge is
+    bounded here: a genuine curve is sampled at
+    :data:`~cadjoint.viewer._edge_overlay._MAX_CHORD_TURN` per chord, so
+    anything near a reversal is not a curve at all.
+    """
+    scene = (
+        _filleted_step()
+        if scene_name == "filleted-step"
+        else Difference(
+            Box(size=Vector([0.9, 0.7, 0.25])),
+            Cylinder(radius=0.32, height=1.0),
+            smoothness=0.02,
+        )
+    )
+    _brep, drawn = _drawn(scene)
+    assert drawn, "nothing drawn at all"
+    worst = [
+        (edge.index, round(_worst_turn(points, edge.closed), 1))
+        for edge, points in drawn
+        if _worst_turn(points, edge.closed) > _MAX_EDGE_TURN
+    ]
+    assert not worst, f"edges that fold (index, degrees): {worst}"
+
+
+def test_a_straight_seam_is_drawn_at_its_own_length():
+    """A straight edge must not take a detour to get to its end.
+
+    Turning alone does not catch a *smooth* wander — an ownership island
+    between two planes of different solids draws a gentle arc, and two
+    planes meet in a line, so any arc is wrong.  Length against the chord
+    catches exactly that: for a straight seam the polyline is the chord.
+    """
+    brep, drawn = _drawn(_filleted_step())
+    for edge, points in drawn:
+        if edge.closed:
+            continue
+        if {brep.patches[index].kind for index in edge.patches} != {"plane"}:
+            continue
+        chord = float(np.linalg.norm(points[-1] - points[0]))
+        if chord < 2.0 * CELL:
+            continue
+        length = float(np.linalg.norm(np.diff(points, axis=0), axis=1).sum())
+        assert (
+            length <= 1.05 * chord
+        ), f"edge {edge.index} is {length / chord:.3f} times its own chord"
+
+
+def test_the_chain_order_is_replaced_by_the_curve_order():
+    """The reordering, on the exact numbers that exposed it.
+
+    Seven points on one straight line, delivered folded — this is
+    ``scenes/bracket.py``'s web-to-rib seam as the graph hands it over.
+    """
+    folded = np.array(
+        [
+            [-0.0845, -0.62, 0.9],
+            [-0.1132, -0.62, 0.9],
+            [-0.1059, -0.62, 0.9],
+            [0.0, -0.62, 0.9],
+            [0.1059, -0.62, 0.9],
+            [0.1132, -0.62, 0.9],
+            [0.0845, -0.62, 0.9],
+        ]
+    )
+    assert _worst_turn(folded, False) == pytest.approx(180.0, abs=1e-6)
+    ordered = _in_curve_order(folded, False)
+    assert _worst_turn(ordered, False) < 1e-6
+    assert sorted(ordered[:, 0]) == pytest.approx(sorted(folded[:, 0]))
+    assert list(ordered[:, 0]) == pytest.approx(sorted(folded[:, 0]))
+
+
+def test_an_edge_is_cut_to_its_corners():
+    """Samples that run past a triple point must not fold the ends back.
+
+    The seeds keep coming after the third face has taken over, so a corner
+    appended to an end that is *inside* the sample range makes a spike out
+    of an otherwise straight edge.
+    """
+    samples = np.array([[x, 0.0, 0.0] for x in (-0.11, -0.05, 0.0, 0.05, 0.11)])
+    corners = np.array([[-0.07, 0.0, 0.0], [0.07, 0.0, 0.0]])
+    points, pins = _between_corners(samples, corners, False)
+    assert pins == (True, True)
+    assert points[0] == pytest.approx(corners[0])
+    assert points[-1] == pytest.approx(corners[1])
+    assert np.abs(points[:, 0]).max() <= 0.07 + 1e-9, "kept a sample beyond the corner"
+    assert _worst_turn(points, False) < 1e-6
+
+
+def test_a_corner_that_is_not_on_the_edge_is_refused():
+    """A triple point is solved against *its own* three patches.
+
+    When those are not this edge's two it can sit a full cell off the line
+    every other sample is on, and appending it kinks the edge by 87 degrees.
+    Only corners that satisfy this edge's own pair may be used.
+    """
+    scene = _filleted_step()
+    brep, spacing = _extract_graph(scene)
+    limit = 1e-5 * float(spacing.max())
+    drawable = [edge for edge in brep.edges if edge.analytic and edge.residual <= limit]
+    usable = _corners_on_curve(brep, drawable, limit)
+    from cadjoint.brep.project import batched_residuals
+
+    fields = [patch.field for patch in brep.patches]
+    for edge in drawable:
+        for point in usable.get(edge.index, []):
+            residual = batched_residuals(
+                fields,
+                np.asarray([edge.patches], dtype=np.int32),
+                np.asarray([point], dtype=np.float64),
+            )
+            assert float(residual[0]) <= limit
+
+
+# --------------------------------------------------------------------------
+# Small rims are circles, not octagons
+# --------------------------------------------------------------------------
+
+
+def test_a_rim_narrower_than_a_cell_still_gets_a_circle():
+    """Arc length alone under-samples a rim whose radius is about a cell.
+
+    A screw head of radius 0.07 has a circumference of 0.44 — nine half-cell
+    chords, which draws as an octagon.  The turning budget puts a floor on
+    the count that does not depend on the radius.
+    """
+    scene = Union(
+        Box(size=Vector([0.8, 0.6, 0.2])),
+        Translate(Cylinder(radius=0.07, height=0.12), offset=Vector([0.0, 0.0, 0.28])),
+        smoothness=0.0,
+    )
+    _brep, drawn = _drawn(scene)
+    loops = [(edge, points) for edge, points in drawn if edge.closed]
+    assert loops, "the head lost its rim entirely"
+    for _edge, points in loops:
+        radius = float(np.linalg.norm(points - points.mean(axis=0), axis=1).mean())
+        if radius > 2.0 * CELL:
+            continue
+        assert (
+            points.shape[0] >= 360.0 / _MAX_CHORD_TURN
+        ), f"rim of radius {radius:.3f} drawn with only {points.shape[0]} chords"
+        # The controller re-takes any step that overshoots by more than
+        # twice the budget, so twice is the guarantee it actually makes.
+        assert _worst_turn(points, True) <= 2.0 * _MAX_CHORD_TURN
+
+
+def test_the_turning_budget_does_not_inflate_a_straight_edge():
+    """A straight run is sampled by arc length alone, as before."""
+    straight = np.array([[x, 0.0, 0.0] for x in np.linspace(0.0, 1.0, 5)])
+    samples = _resample(straight, False, 0.5 * CELL)
+    assert samples is not None
+    assert samples.shape[0] == pytest.approx(1.0 / (0.5 * CELL), abs=1.5)
+
+
+# --------------------------------------------------------------------------
+# The tracer, on fields whose intersection is known exactly
+# --------------------------------------------------------------------------
+
+
+def _plane_z():
+    return lambda p: p[2]
+
+
+def _cylinder_about_z(radius: float):
+    return lambda p: jnp.sqrt(p[0] ** 2 + p[1] ** 2) - radius
+
+
+def _sphere_at(centre, radius: float):
+    return lambda p: jnp.linalg.norm(p - jnp.asarray(centre)) - radius
+
+
+def test_a_traced_curve_is_the_exact_circle_and_closes():
+    """A plane through a cylinder: the trace must come back to its seed.
+
+    Nothing about this involves a lattice — the tracer is given two fields
+    and one point on their intersection, and it follows the tangent from
+    there.
+    """
+    radius = 0.3
+    curves = trace_curves(
+        [_plane_z(), _cylinder_about_z(radius)],
+        np.array([[0, 1]], dtype=np.int32),
+        np.array([[radius, 0.0, 0.0]]),
+        targets=np.array([[radius, 0.0, 0.0]]),
+        closed=np.array([True]),
+        max_step=0.5 * CELL,
+        min_step=CELL / 32.0,
+        max_turn=_MAX_CHORD_TURN,
+        tangent_floor=0.1,
+        tolerance=1e-5,
+    )
+    (points,) = curves
+    assert points is not None, "the trace did not come back"
+    assert points.shape[0] >= 360.0 / _MAX_CHORD_TURN
+    assert np.abs(np.hypot(points[:, 0], points[:, 1]) - radius).max() < 1e-5
+    assert np.abs(points[:, 2]).max() < 1e-5
+    # It really went all the way round exactly once.
+    angle = np.unwrap(np.arctan2(points[:, 1], points[:, 0]))
+    assert abs(abs(angle[-1] - angle[0]) - 2 * np.pi) < 0.35
+
+
+def test_a_traced_line_runs_from_one_corner_to_the_other():
+    """Two crossing planes: the trace is the chord, to the tolerance."""
+    start, stop = np.array([-0.4, 0.0, 0.0]), np.array([0.55, 0.0, 0.0])
+    curves = trace_curves(
+        [_plane_z(), lambda p: p[1]],
+        np.array([[0, 1]], dtype=np.int32),
+        start[None, :],
+        targets=stop[None, :],
+        closed=np.array([False]),
+        max_step=0.5 * CELL,
+        min_step=CELL / 32.0,
+        max_turn=_MAX_CHORD_TURN,
+        tangent_floor=0.1,
+        tolerance=1e-5,
+    )
+    (points,) = curves
+    assert points is not None
+    assert points[0] == pytest.approx(start)
+    assert points[-1] == pytest.approx(stop)
+    length = float(np.linalg.norm(np.diff(points, axis=0), axis=1).sum())
+    assert length == pytest.approx(float(np.linalg.norm(stop - start)), rel=1e-6)
+    assert _worst_turn(points, False) < 1e-4
+
+
+def test_tangent_surfaces_are_reported_as_no_edge():
+    """Where the normals are parallel there is no curve, and none is invented.
+
+    A sphere resting on a plane touches at one point; ``∇f_a × ∇f_b``
+    vanishes there.  That is the blend case, and the honest answer is that
+    the edge is not defined — not a polyline squeezed out of a singular
+    system.
+    """
+    curves = trace_curves(
+        [_plane_z(), _sphere_at((0.0, 0.0, 0.25), 0.25)],
+        np.array([[0, 1]], dtype=np.int32),
+        np.array([[0.0, 0.0, 0.0]]),
+        targets=np.array([[0.0, 0.0, 0.0]]),
+        closed=np.array([True]),
+        max_step=0.5 * CELL,
+        min_step=CELL / 32.0,
+        max_turn=_MAX_CHORD_TURN,
+        tangent_floor=0.1,
+        tolerance=1e-5,
+    )
+    assert curves == [None]
+
+
+def test_the_step_shrinks_on_a_tight_curve_and_not_on_a_straight_one():
+    """The step is set by curvature, so sampling is scale-free.
+
+    A rim ten times smaller gets the same number of chords, and a straight
+    edge is never subdivided for turning it does not do.
+    """
+    counts = []
+    for radius in (0.6, 0.06):
+        (points,) = trace_curves(
+            [_plane_z(), _cylinder_about_z(radius)],
+            np.array([[0, 1]], dtype=np.int32),
+            np.array([[radius, 0.0, 0.0]]),
+            targets=np.array([[radius, 0.0, 0.0]]),
+            closed=np.array([True]),
+            max_step=0.5 * CELL,
+            min_step=CELL / 64.0,
+            max_turn=_MAX_CHORD_TURN,
+            tangent_floor=0.1,
+            tolerance=1e-5,
+        )
+        assert points is not None
+        counts.append(points.shape[0])
+    small_rim = counts[1]
+    assert small_rim >= 360.0 / _MAX_CHORD_TURN
+    # The big rim is limited by arc length instead, so it gets more points,
+    # never fewer: turning is a floor on the count, not a ceiling.
+    assert counts[0] >= small_rim

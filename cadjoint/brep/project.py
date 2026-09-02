@@ -57,6 +57,7 @@ __all__ = [
     "project_batched",
     "project_fields",
     "stacked_fields",
+    "trace_curves",
     "transversal",
 ]
 
@@ -438,3 +439,184 @@ def batched_residuals(
 
     residual = worst(jnp.asarray(probes, dtype=jnp.float32), jnp.asarray(member_array))
     return np.asarray(residual, dtype=np.float64)
+
+
+def trace_curves(
+    fields: Sequence[Callable[[Array], Array]],
+    members: np.ndarray,
+    starts: np.ndarray,
+    *,
+    targets: np.ndarray,
+    closed: np.ndarray,
+    max_step: float,
+    min_step: float,
+    max_turn: float,
+    tangent_floor: float,
+    tolerance: float,
+    max_points: int = 512,
+) -> list[np.ndarray | None]:
+    """Trace each curve where two patch zero sets cross, instead of sampling it.
+
+    **The tangent is known in closed form.** Where ``f_a = f_b = 0`` the curve
+    runs along ``∇f_a × ∇f_b``, so a point on it can be *continued*: step
+    along that tangent (the predictor), then pull back onto both zero sets
+    with the same Gauss-Newton corrector :func:`project_batched` uses.  The
+    lattice is then only asked where a curve *starts* and which two patches
+    it belongs to — never where its points are or what order they come in,
+    which is what a set of scattered mesh-edge midpoints cannot say
+    reliably.
+
+    **The step is set by curvature, not by the grid.**  After each step the
+    tangent has turned by some angle; the controller drives that towards
+    ``max_turn`` and re-takes any step that turns by more than twice it, so
+    ``2 · max_turn`` is the guarantee every accepted chord carries.  A
+    straight edge runs at ``max_step`` and a rim of radius ``r`` settles at
+    ``r · max_turn``, so a circle gets the same number of chords whether it
+    is ten cells across or one.
+
+    **A vanishing cross product means there is no edge.**  Parallel normals
+    are tangent surfaces or a blend, where the two zero sets do not cross
+    transversally and the "curve" is not defined; those are reported as
+    ``None`` rather than pushed through, which is the honest answer and the
+    same rank test :func:`_usable` applies one arity down.
+
+    Every curve advances together, one batched program per step, for the
+    reason :func:`project_batched` documents: the cost of an eager JAX
+    program is per call, not per point.
+
+    A step is re-taken, at half the length, when the tangent turns by more
+    than twice ``max_turn`` or when the corrector has to pull the predicted
+    point back by more than half the step — the latter meaning it landed on
+    a different branch of the same pair's intersection rather than
+    continuing this one.
+
+    Args:
+        fields: The scene's whole patch-field table.
+        members: The two field indices per curve, shaped ``(n, 2)``.
+        starts: A point on each curve, shaped ``(n, 3)``.
+        targets: Where each open curve ends, shaped ``(n, 3)``; ignored
+            wherever ``closed`` is set.
+        closed: Whether each curve closes on itself, shaped ``(n,)``.
+        max_step: Longest predictor step, in world units.
+        min_step: Shortest predictor step; the trace gives up below it.
+        max_turn: Target direction change per chord, in degrees.
+        tangent_floor: Smallest ``|∇f_a × ∇f_b| / (|∇f_a| |∇f_b|)`` — the
+            sine of the angle between the two normals — that still counts
+            as a transversal crossing.
+        tolerance: Largest ``|f|`` a traced point may keep.
+        max_points: Cap on the points in any one curve.
+
+    Returns:
+        One polyline per curve, ordered along it and shaped ``(k, 3)``, or
+            ``None`` where the curve is not traceable.
+    """
+    seeds = np.asarray(starts, dtype=np.float64).reshape(-1, 3)
+    count = seeds.shape[0]
+    if count == 0:
+        return []
+    member_array = np.asarray(members, dtype=np.int32).reshape(count, 2)
+    ends = np.asarray(targets, dtype=np.float64).reshape(count, 3)
+    is_closed = np.asarray(closed, dtype=bool).reshape(count)
+
+    used, member_ids = _restrict(fields, member_array)
+    evaluators = [
+        jax.vmap(jax.value_and_grad(lambda p, f=fields[index]: jnp.asarray(f(p)).reshape(())))
+        for index in used
+    ]
+    picker = jnp.arange(count)[:, None]
+    ids = jnp.asarray(member_ids)
+
+    def system(x: Array) -> tuple[Array, Array]:
+        values, gradients = zip(*(evaluate(x) for evaluate in evaluators))
+        return (
+            jnp.stack(values, axis=-1)[picker, ids],
+            jnp.stack(gradients, axis=1)[picker, ids],
+        )
+
+    @jax.jit
+    def advance(points: Array, step: Array) -> tuple[Array, Array, Array, Array]:
+        _values, jacobian = system(points)
+        cross = jnp.cross(jacobian[:, 0], jacobian[:, 1])
+        length = jnp.linalg.norm(cross, axis=-1)
+        scale = jnp.linalg.norm(jacobian[:, 0], axis=-1) * jnp.linalg.norm(jacobian[:, 1], axis=-1)
+        transversal = length > tangent_floor * jnp.maximum(scale, 1e-12)
+        tangent = cross / jnp.maximum(length, 1e-12)[:, None]
+        start = points + step[:, None] * tangent
+        x = start
+        for _ in range(4):
+            value, jac = system(x)
+            gram = jnp.einsum("nij,nkj->nik", jac, jac)
+            multipliers = _solve_masked(gram, value, _usable(gram))
+            x = x - jnp.einsum("nij,ni->nj", jac, multipliers)
+            drift = x - start
+            span = jnp.sqrt(jnp.maximum(jnp.sum(drift**2, axis=-1, keepdims=True), 1e-24))
+            x = start + drift * jnp.minimum(1.0, jnp.abs(step)[:, None] / span)
+        value, _jac = system(x)
+        # How far the corrector had to pull the predicted point back.  A
+        # correction of order the step itself means the corrector landed on
+        # a *different* branch of the same pair's intersection rather than
+        # continuing this one — the branch-jump guard of [AG90].
+        drift = jnp.linalg.norm(x - start, axis=-1)
+        return x, tangent, transversal, jnp.max(jnp.abs(value), axis=-1), drift
+
+    turn_limit = np.radians(max_turn)
+    current = jnp.asarray(seeds, dtype=jnp.float32)
+    step = np.full(count, max_step, dtype=np.float64)
+
+    # Which way to set off: along the tangent for a loop, towards the far
+    # end for an open curve.
+    _initial, tangent0, transversal0, _residual0, _drift0 = advance(
+        current, jnp.zeros(count, jnp.float32)
+    )
+    tangent = np.asarray(tangent0, dtype=np.float64)
+    heading = np.einsum("ij,ij->i", tangent, ends - seeds)
+    sign = np.where(is_closed | (heading >= 0.0), 1.0, -1.0)
+
+    alive = np.array(transversal0, dtype=bool)
+    traced: list[list[np.ndarray]] = [[point] for point in seeds]
+    failed = ~alive
+    for _iteration in range(2 * max_points):
+        if not alive.any():
+            break
+        moved, tangent_new, transversal, residual, drift = advance(
+            current, jnp.asarray(sign * step, dtype=jnp.float32)
+        )
+        points = np.asarray(moved, dtype=np.float64)
+        directions = np.asarray(tangent_new, dtype=np.float64)
+        cosine = np.clip(np.einsum("ij,ij->i", directions, tangent), -1.0, 1.0)
+        turned = np.arccos(cosine)
+
+        # Overshot a bend, or the corrector pulled the point back so far
+        # that it landed on another branch of the same pair: halve the step
+        # and take it again.
+        overshot = (turned > 2.0 * turn_limit) | (np.asarray(drift) > 0.5 * step)
+        retry = alive & overshot & (step > min_step)
+        step = np.where(retry, np.maximum(0.5 * step, min_step), step)
+        accept = alive & ~retry
+        if accept.any():
+            for row in np.flatnonzero(accept):
+                traced[row].append(points[row])
+            current = jnp.where(
+                jnp.asarray(accept)[:, None], jnp.asarray(points, jnp.float32), current
+            )
+            tangent = np.where(accept[:, None], directions, tangent)
+            # Drive the turn towards the budget for the next step.
+            gain = np.clip(turn_limit / np.maximum(turned, 1e-6), 0.5, 2.0)
+            step = np.where(accept, np.clip(step * gain, min_step, max_step), step)
+
+        lengths = np.asarray([len(rows) for rows in traced])
+        home = np.linalg.norm(points - seeds, axis=1)
+        away = np.linalg.norm(points - ends, axis=1)
+        looped = accept & is_closed & (lengths >= 6) & (home <= np.abs(step))
+        arrived = accept & ~is_closed & (away <= np.abs(step))
+        broken = accept & (~np.asarray(transversal) | (np.asarray(residual) > tolerance))
+        overrun = alive & (lengths >= max_points)
+        for row in np.flatnonzero(arrived):
+            traced[row].append(ends[row])
+        failed |= broken | overrun
+        alive &= ~(looped | arrived | broken | overrun)
+
+    return [
+        None if bad or len(rows) < 2 else np.asarray(rows, dtype=np.float64)
+        for rows, bad in zip(traced, failed)
+    ]

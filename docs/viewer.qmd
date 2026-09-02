@@ -299,11 +299,15 @@ the viewport's own 64³ grid — faces are the regions one patch field owns, edg
 are where two of them meet — and both layers are read off it. The **wireframe**
 draws the dual-contour quads, on vertices re-solved by the projection kernel so
 a vertex on a CSG seam sits on the seam. **Feature edges** draws the graph's
-edges: each is the exact intersection curve of the two surfaces it separates,
-sampled at half a cell and projected onto both, so a bore rim is a circle whose
-radius is right to a millionth of a unit rather than a staircase, and it stays
-that circle wherever the grid cells happen to fall. Curves run into their
-corners and meet there exactly.
+edges, and it *traces* them rather than sampling them: where two surfaces
+cross, the direction of their intersection is the cross product of the two
+normals, so each edge is followed from one corner to the next, stepping along
+that direction and correcting back onto both surfaces. The grid is asked only
+where an edge starts. A bore rim is therefore a circle whose radius is right to
+a millionth of a unit, it stays that circle wherever the cells happen to fall,
+and the step shortens where the curve bends — so a rim narrower than one cell
+is still round, not an octagon. Curves run into their corners and meet there
+exactly.
 
 A rounded corner is still an edge if the rounding is finer than the overlay can
 show. The grid puts one vertex where a sub-cell fillet is, so its edge is drawn

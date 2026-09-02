@@ -679,24 +679,25 @@ counts the calls) and reads two things off the graph:
   triangulates every face loop, roughly doubles the segment count for the
   same picture, and needs the loops to be simple — which the extraction
   reports as *not* holding on some scenes. Nothing to buy there.
-- **sharp** — every `BRepEdge` with `analytic` true and a residual under a
-  tenth of a cell, resampled at half the grid spacing and re-projected in
-  one batched call. A closed edge is divided *evenly*, so a rim is uniform
-  in angle rather than staircased across whatever cells it crossed.
+- **sharp** — every `BRepEdge` the graph can certify, **traced** rather
+  than sampled: see §8.2. The lattice says where an edge starts and which
+  two patches it belongs to; nothing else about it comes from the grid.
 
 Three things came out of the migration rather than going into it.
 
 **`BRepEdge.vertices` is now populated** (`_link_edge_vertices`). It was
 documented and always `(-1, -1)`, because edges are chained before the
-triple points exist. The overlay needs it: a chain's seeds are mesh-edge
-*midpoints*, so a polyline stops half a cell short of its corner, and only
-the vertex says where the corner is. Appending it also makes the three
-edges meeting there share one endpoint exactly.
+triple points exist. This turned out to be the load-bearing addition: a
+triple point is where a trace starts and where it stops (§8.2), and it is
+what makes the edges meeting at a corner share one endpoint exactly instead
+of three near-misses.
 
-**Corners must not be re-projected.** A corner is the 3-field solution;
-projecting it again onto the 2 patches of one incident edge pulls it a few
-thousandths off the third face, and the three chains stop touching. Pinned
-instead — this was worth three debris fragments on the artifact battery.
+**A corner must not be re-projected onto a subset of its own patches.** It
+is the 3-field solution; projecting it again onto the 2 patches of one
+incident edge pulls it a few thousandths off the third face and the chains
+stop touching. It is pinned in the sampled fallback and is an exact
+endpoint in a trace — worth three debris fragments on the artifact
+battery.
 
 **The kernel was tracing, not computing.** Op-by-op, JAX re-traces every
 `vmap(value_and_grad(f))` on every call, so a fifty-patch table over four
@@ -741,6 +742,113 @@ by a single connected chain — is now exactly `1.000`. Before-and-after
 renders of the starter are in `research/design/light-chrome/edges-before-after*.png`;
 the visible differences are the press-fit bush rims (drawn as circles, and not drawn
 at all before) and the curves that now run into their corners.
+
+### 8.2 Tracing the edge instead of chaining the lattice
+
+The first version of the sharp layer took each edge's seeds — the graph's
+projected midpoints of the mesh boundary between two face regions — put them
+in the order the boundary walk visited them, and drew that. It looked right
+at low zoom and was wrong: at the starter's fin roots and bushings the
+polylines drew spikes and flags, and small rims drew as octagons.
+
+**The order was the bug, not the positions.** One bracket edge arrives as
+
+```
+x = -0.084, -0.113, -0.106, 0, 0.106, 0.113, 0.084     (y, z constant)
+```
+
+— seven points *all exactly on one straight line*, to 4·10⁻⁸, delivered as a
+fold. The chain walk is not at fault either: its mesh path is a clean
+unbranched path. The boundary it follows simply staircases across the curve,
+so projecting its midpoints onto the curve is many-to-one in a way that
+scrambles the parameter. No amount of re-ordering heuristics fixes this
+reliably: the seeds' spacing ranges over an order of magnitude on one edge
+(0.007 to 0.085), which is enough to defeat nearest-neighbour chaining, and
+the seeds run *past* the triple points the edge is supposed to end at.
+
+**So the curve is traced.** Where `f_a = f_b = 0` the tangent is
+`∇f_a × ∇f_b` in closed form, so a point on the edge can be continued:
+predictor along the tangent, corrector back onto both zero sets with the
+same Gauss-Newton step the projection kernel already runs. That is
+`cadjoint.brep.project.trace_curves`, and §9.1 is where it was already
+recommended. The lattice is asked only for a seed and a patch pair.
+
+Three properties fall out rather than being engineered:
+
+- **Order is monotone by construction.** There is nothing left to sort.
+- **Sampling is scale-free.** The step is driven towards a fixed turning
+  budget per chord (15°) and any step that overshoots by more than twice it
+  is re-taken, so a straight edge runs at half a cell and a rim of radius
+  `r` settles at `r · 15°`. A screw-head rim of radius 0.07 — nine half-cell
+  chords, an octagon — now gets 24. That is the whole of the small-loop fix.
+- **Tangency answers itself.** `|∇f_a × ∇f_b|` *is* the sine of the angle
+  between the two normals, so where the surfaces touch instead of crossing
+  it vanishes, and the trace reports "no edge" rather than pushing a
+  singular system. That is exactly the blend case.
+
+Seeds come from the graph's triple points, so a traced edge starts and ends
+on the corners it shares with its neighbours and the layer stays connected
+chains. A corner has to earn that: it is solved against *its own* three
+patches, and where those are not this edge's two it can sit a full cell off
+the line (`_corners_on_curve` measures each against this edge's pair —
+without it, one bracket edge kinks by 87° at each end). An edge with no
+certified corner has no end to stop at, so it keeps the old sampled path as
+a fallback; on the three scenes the tracer takes 64 of 101 edges on the
+starter, 43 of 61 on the bracket and 234 of 316 on the end-cap, and the
+fallback covers most of the rest.
+
+Two gates remain, and the populations they separate are not close:
+
+| | genuine edges | everything else |
+|---|---|---|
+| seed residual `|f|` | under 10⁻⁷ | 10⁻⁵ and up (nothing in between, on any scene) |
+| sharpest joint drawn | 13–16° | 180° |
+
+The residual gate sits in that empty band (`1e-5` of a cell). It is the only
+thing that catches an ownership island *between two planes of different
+solids*, which draws a smooth arc that no turning test can fault — two
+planes meet in a line, so any arc is wrong, and its residual of 8.6·10⁻⁴ is
+the only local evidence. The turning gate (45°, three times the sampling law)
+is the last word on anything the fallback produced.
+
+Measured after the change, worst case over every drawn edge:
+
+| | starter | bracket | end-cap |
+|---|---|---|---|
+| sharpest joint | 26.6° | 16.3° | 32.3° |
+| straight edge, length ÷ chord | 1.0000 | 1.0000 | 1.0000 |
+| sharp segments | 964 | 1210 | 1165 |
+
+Before/after at 2× in `research/design/light-chrome/edges-starter-detail.png`
+(a fin root) and `edges-starter-rims.png` (a screw-head rim).
+
+`research/brep-edge-tracing.md` maps the literature onto this tracer and
+recommends four things beyond it. One is in:
+
+- **Branch-jump guard** — *adopted*. The corrector now also re-takes a step
+  at half length when it has to pull the predicted point back by more than
+  half the step, which is the signature of landing on a different branch of
+  the same pair rather than continuing this one. It fires on none of the
+  three scenes, so it costs nothing and is there as a guard.
+- **Watch-field termination** — *not adopted*, and it is the one worth doing
+  next. Today a trace needs a *certified corner* to know where to stop, so
+  an edge without one falls back to the sampled path (the tracer takes 64 of
+  101 edges on the starter, 43 of 61 on the bracket, 234 of 316 on the
+  end-cap). Watching the other patches of the two leaves for a sign change
+  would end an edge and solve its vertex in one arity-3 step, keyed by patch
+  triple, and would raise those fractions. It is a redesign of termination
+  rather than a guard, and it changes which edges are traced, so it wants
+  its own verification pass against the artifact battery.
+- **Levenberg–Marquardt below sin θ ≈ 0.3** — *not adopted*. It buys
+  robustness in the near-tangent band, which is precisely where this overlay
+  deliberately answers "no edge" (`_TANGENT_FLOOR`, 0.1). Worth it for
+  export, where a near-tangent seam still has to be written out; not for a
+  layer whose policy there is to draw nothing.
+- **Per-point ownership check** — *not adopted*. Testing `owner_pair(x) =
+  {a, b}` at every corrected point means evaluating the whole patch table
+  per step, which is the cost the batching exists to avoid. The residual
+  gate and the turning gate already catch what it would catch on these
+  scenes; if a case appears that they miss, this is the answer to it.
 
 **Blends: a fillet finer than a cell is the edge it rounds.** Rendered three
 ways on the starter (`research/design/light-chrome/edges-blends.png`): nothing,
