@@ -2,9 +2,8 @@ cadjoint banner — tokens and measurements
 =========================================
 Sources: light stack sampled from research/design/brutalist/5-light-dock.png;
 dark stack: the superseded dark ladder, recorded in full below; plate internals from research/design-language.md §10.1;
-field image cropped from research/design/combined/6-dark-plate-object.png
-(the solved sink-conduction field, alpha-keyed off the plate ground). The README
-hero instead comes from a LIVE capture of the running playground — see capture.mjs.
+every hero is a LIVE capture of the running playground with the construction
+overlay off — see capture.mjs. No mockup pixels remain in any banner.
 
 LIGHT PAPER  (the chosen direction, 5-light-dock)
   role          hex        L      C       on paper
@@ -44,42 +43,53 @@ GEOMETRY
   five subdivisions per division on the two centre axes only, arms 5px / 9px on every fifth.
   26px / 2px corner brackets. Page cell grid 80px. Radius 0 everywhere. No shadows.
 
-FACTS PRINTED IN THE BANNERS  (all checked against the repo, 25d1477)
+FACTS PRINTED IN THE BANNERS  (checked against the repo at capture time, 7ba1097)
   LICENCE       Apache 2.0            LICENSE at the repo root
   SCENE         starter.py            scenes/starter.py — scenes are Python, there is no .cj format
   STUDY         sink-conduction       ThermalStudy(name=...) in starter.py
   MESH          sink-mesh · tet10     SimMesh(name=..., method="tet10")
   SOLVER        jax-fem               tet meshes solve on the direct jax-fem path only
-  REV           25d1477               git rev-parse --short HEAD
-  FIELD RANGE   0 .. 1.134            the Results legend of a real solve of starter.py
-  PROBE         MAX 1.134             the peak of that field; drawn as a CSS plate over
-                                      the source render's mocked-up readout
+  REV           7ba1097               git rev-parse --short HEAD at capture time
+  FIELD RANGE   0 .. 1.134            the Results legend of the captured solve
   OBJECTIVE     cool-sink · max temperature · 12 steps   Optimization(...) in starter.py
-  GRATICULE     H/V 1.00 m/div · ISO +X−Y+Z              the app's own readout at 1x zoom
+  GRID / VIEW   500 mm · ISO +X−Y+Z   the app's own readout in the capture, on detent
+
+THE HERO
+  A live capture: playground -> Run -> Simulate -> Solve -> Results, construction
+  overlay off (toggle-construction-overlay), slice X at 0.55, zoom 5 detents in.
+  The slice is a real inspection mode and the only honest way to show the interior
+  of a field whose hot region is an internal boundary — without it the part reads
+  as a near-black solid, because that is what the surface temperature is.
+  The captured viewport is light paper in BOTH themes: a screenshot does not
+  invert, so the readouts drawn over it are fixed to the light ink stack, and the
+  plate's edge is stated by a 1px #605e65 rule rather than by luminance.
 
 MEASURED ON THE RENDERS
-  a-dock                2560x1280  max chroma 0.198 · accent 1.23% of px · chrome outside plate/legend/accent: max chroma 0.013, px over 0.03 = 0
-  a-dock-dark           2560x1280  max chroma 0.198 · accent 1.23% of px · chrome outside plate/legend/accent: max chroma 0.013, px over 0.03 = 0
-  b-bleed               2560x1280  max chroma 0.194 · accent 0.20% of px · chrome outside plate/legend/accent: max chroma 0.013, px over 0.03 = 0
-  b-bleed-dark          2560x1280  max chroma 0.194 · accent 0.20% of px · chrome outside plate/legend/accent: max chroma 0.013, px over 0.03 = 0
-  c-field               2560x1280  max chroma 0.195 · accent 1.16% of px · the plate is the whole frame; no chrome outside it
-  readme                3200x800  max chroma 0.197 · accent 1.55% of px · chrome outside plate/legend/accent: max chroma 0.013, px over 0.03 = 0
-  readme-dark           3200x800  max chroma 0.197 · accent 1.55% of px · chrome outside plate/legend/accent: max chroma 0.013, px over 0.03 = 0
-  readme-live-dry       3200x800  max chroma 0.200 · accent 1.55% of px · chrome outside plate/legend/accent: max chroma 0.013, px over 0.03 = 0
-  readme-live-dry-dark  3200x800  max chroma 0.200 · accent 1.55% of px · chrome outside plate/legend/accent: max chroma 0.013, px over 0.03 = 0
+  a-dock             2560x1280  max chroma 0.194 · accent 1.23% of px · chrome outside plate/legend/accent: max chroma 0.013, px over 0.03 = 0
+  a-dock-dark        2560x1280  max chroma 0.194 · accent 1.23% of px · chrome outside plate/legend/accent: max chroma 0.013, px over 0.03 = 0
+  b-bleed            2560x1280  max chroma 0.194 · accent 0.20% of px · chrome outside plate/legend/accent: max chroma 0.013, px over 0.03 = 0
+  b-bleed-dark       2560x1280  max chroma 0.194 · accent 0.20% of px · chrome outside plate/legend/accent: max chroma 0.013, px over 0.03 = 0
+  readme-live        3200x800  max chroma 0.194 · accent 1.55% of px · chrome outside plate/legend/accent: max chroma 0.013, px over 0.03 = 0
+  readme-live-dark   3200x800  max chroma 0.194 · accent 1.55% of px · chrome outside plate/legend/accent: max chroma 0.013, px over 0.03 = 0
 
-  viridis peaks at chroma 0.194-0.198 in every render; the accent sits at 0.185;
+  viridis peaks at chroma 0.19-0.20 in every render; the accent sits at 0.185;
   all remaining chrome is at or below 0.016. The field is the most saturated thing
   in the image, the single accent block is second, and nothing else is a colour.
 
 FILES
-  a-dock.png / a-dock-dark.png        DOCK    social preview 1280x640 @2x  (shipped)
-  b-bleed.png / b-bleed-dark.png      BLEED   social preview 1280x640 @2x  (poster alternative)
-  c-field.png                         FIELD   social preview 1280x640 @2x  (dark-native)
-  readme.png / readme-dark.png        README header, mockup hero — superseded
-  readme-live-dry.png / -dark.png     README header, LIVE hero — dry run, export held
-  assets/geom-field.png               the solved sink, keyed off its plate ground
-  assets/hero-capture.png             the live viewport capture (regenerate with capture.mjs)
-  assets/hero-capture-context.png     the whole window at capture time, for sanity
-  capture.mjs                         live capture: node capture.mjs --port N [--zoom 5]
-  render.mjs, plate.js, _tokens.css   banner sources ( ?dark on any file renders dark )
+  a-dock.png / a-dock-dark.png       DOCK   social preview 1280x640 @2x  (shipped)
+  b-bleed.png / b-bleed-dark.png     BLEED  social preview 1280x640 @2x  (poster alternative)
+  readme-live.png / -dark.png        README header 1600x400 @2x          (shipped)
+  assets/hero-capture.png            the raw live capture (canvas region)
+  assets/hero-capture-context.png    the whole window at capture time, for sanity
+  assets/hero-social.png             1:1 crop of it, for DOCK
+  assets/hero-readme.png             3:2 crop, for the README header
+  assets/hero-bleed.png              5:1 crop, for BLEED's full-bleed band
+  capture.mjs   node capture.mjs --port N [--zoom 5] [--slice 0.55] [--orbit dx,dy]
+                (run `npm run build` in frontend/ first — it serves whatever bundle
+                 is in cadjoint/viewer/static/, and it prints that bundle's mtime)
+  render.mjs, plate.js, _tokens.css  banner sources ( ?dark on any file renders dark )
+
+EXPORTS
+  docs/assets/banner-social.png       docs/assets/banner-social-dark.png
+  docs/assets/banner-readme.png       docs/assets/banner-readme-dark.png

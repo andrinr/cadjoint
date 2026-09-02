@@ -15,22 +15,22 @@
 </style>
 <body><div class="canvas">
 
-  <!-- the dark plate as an object: 6 x 6 cells, registered to the page grid -->
-  <div class="plate" data-grat data-div="48" style="left:80px; top:80px; width:480px; height:480px;">
-    <img class="geom" src="assets/geom-field.png" alt="" data-probe="MAX 1.134"
-         style="left:28px; top:84px; width:376px; height:294px;">
+  <!-- the plate: a live capture of the running playground, 6 x 6 cells,
+       registered to the page grid and framed by the banner (the app no longer
+       draws its own corner brackets). Refresh with: node capture.mjs --port N -->
+  <div class="plate live" style="left:80px; top:80px; width:480px; height:480px;">
+    <img src="assets/hero-social.png" alt="">
     <div class="brk"><i class="a"></i><i class="b"></i><i class="c"></i><i class="d"></i></div>
-    <div class="gain" style="left:46px; top:24px;">
-      <div><b>H</b><span>1.00 m/div</span></div>
-      <div><b>V</b><span>1.00 m/div</span></div>
+    <div class="gain live" style="left:46px; top:24px;">
+      <div><b>GRID</b><span>500 mm</span></div>
       <div><b>VIEW</b><span>ISO · +X−Y+Z</span></div>
     </div>
-    <div class="tblock" style="right:14px; bottom:14px; width:198px;">
+    <div class="tblock live" style="left:52px; bottom:16px; width:198px;">
       <div><b>SCENE</b><span>starter.py</span></div>
       <div><b>STUDY</b><span>sink-conduction</span></div>
       <div><b>MESH</b><span>sink-mesh · tet10</span></div>
       <div><b>SOLVER</b><span>jax-fem</span></div>
-      <div><b>REV</b><span>25d1477</span></div>
+      <div><b>REV</b><span>7ba1097</span></div>
     </div>
   </div>
 

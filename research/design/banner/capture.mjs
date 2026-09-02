@@ -108,16 +108,36 @@ if (await solve.first().isVisible().catch(() => false)) {
 await clickIfThere(page.locator("[data-testid=sim-tabs] button", { hasText: /results/i }), "Results tab");
 await page.waitForTimeout(2500);
 
-// overlays off: the construction/sketch overlay is chrome, not data.
+// optional slice: a real inspection mode, and the only honest way to show the
+// interior of a field whose hot region is an internal boundary.
+const slice = arg("slice", "");
+if (slice) {
+  const en = testid("simulate-slice-enabled");
+  if (await en.first().isVisible().catch(() => false)) {
+    const inp = (await en.first().evaluate((el) => el.tagName)) === "INPUT"
+      ? en.first() : en.first().locator("input").first();
+    if (!(await inp.isChecked().catch(() => false))) await inp.check();
+    const fr = testid("simulate-slice-fraction");
+    if (await fr.first().isVisible().catch(() => false)) await fr.first().fill(slice);
+    await page.waitForTimeout(1500);
+    console.log("slice on at", slice);
+  } else console.log("!! simulate-slice-enabled not found");
+}
+
+// overlays off: the construction overlay is chrome, not data.
 await clickIfThere(testid("display-options"), "display options");
 await page.waitForTimeout(400);
-console.log("render popover controls:", (await page.locator("[data-testid=render-popover] label").allTextContents()).join(" | "));
-for (const rx of [/construction/i, /overlay/i, /sketch/i, /gizmo/i]) {
-  const box = page.locator("label", { hasText: rx }).locator("input[type=checkbox]");
-  if (await box.first().isVisible().catch(() => false)
-      && await box.first().isChecked().catch(() => false)) {
-    await box.first().uncheck(); console.log("unchecked", rx);
-  }
+await clickIfThere(testid("render-customize"), "customize disclosure");
+await page.waitForTimeout(400);
+const ov = testid("toggle-construction-overlay");
+if (await ov.first().isVisible().catch(() => false)) {
+  const input = (await ov.first().evaluate((el) => el.tagName)) === "INPUT"
+    ? ov.first() : ov.first().locator("input").first();
+  if (await input.isChecked().catch(() => true)) await input.uncheck();
+  else console.log("construction overlay already off");
+  console.log("construction overlay OFF");
+} else {
+  console.log("!! toggle-construction-overlay not found — overlay may still be on");
 }
 await page.keyboard.press("Escape");
 await page.waitForTimeout(1200);
@@ -128,6 +148,20 @@ await canvas.waitFor();
 const zoom = +arg("zoom", 5);
 {
   const b = await canvas.boundingBox();
+  // orbit: "dx,dy" in css px, dragged from the viewport centre
+  const orbit = (arg("orbit", "0,0")).split(",").map(Number);
+  if (orbit[0] || orbit[1]) {
+    await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
+    await page.mouse.down();
+    for (let i = 1; i <= 12; i++) {
+      await page.mouse.move(b.x + b.width / 2 + (orbit[0] * i) / 12,
+                            b.y + b.height / 2 + (orbit[1] * i) / 12);
+      await page.waitForTimeout(40);
+    }
+    await page.mouse.up();
+    await page.waitForTimeout(900);
+    console.log("orbited", orbit.join(","));
+  }
   await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
   for (let i = 0; i < Math.abs(zoom); i++) {
     await page.mouse.wheel(0, zoom > 0 ? -260 : 260);

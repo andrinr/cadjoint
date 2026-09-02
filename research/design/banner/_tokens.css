@@ -141,3 +141,23 @@ body { font-family: var(--mono); -webkit-font-smoothing: antialiased; }
   letter-spacing: 0.08em; font-variant-numeric: tabular-nums;
   font-family: var(--mono); line-height: 1;
 }
+
+/* Readouts drawn over a live capture. The captured viewport is light paper in
+   both themes — a screenshot does not invert — so these inks are fixed to the
+   light stack rather than following the page theme. */
+.gain.live b        { color: #605e65; }   /*  5.13:1 on #e6e6e9 */
+.gain.live span     { color: #18161a; }   /* 14.43:1 */
+.tblock.live        { border-top-color: #9f9da5; }
+.tblock.live div    { border-bottom-color: #9f9da5; }
+.tblock.live b      { color: #605e65; }
+.tblock.live span   { color: #18161a; }
+.plate.live .brk i  { border-color: #605e65 !important; }
+
+/* The capture's own ground is the paper, so the plate's edge cannot be stated by
+   luminance. State it as a rule instead — an image window, not a border. */
+.plate.live { outline-color: #605e65; }
+
+/* The title block sits over the viewport, so it is opaque — no text on a
+   backdrop that is a function of the data (§14.7). */
+.tblock.live { background: #f8f7f8; border: 1px solid #9f9da5; padding: 0 8px; }
+.tblock.live div:last-child { border-bottom: 0; }
