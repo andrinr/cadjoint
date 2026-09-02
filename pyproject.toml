@@ -47,6 +47,14 @@ tesseract = [
 # uv's universal resolution working for the project's full >=3.9 range.
 stepcheck = ["cadquery-ocp; python_version >= '3.10' and python_version < '3.15'"]
 viewer = ["anywidget>=0.9.21"]
+# The playground editor's intelligence: `/api/lint` shells out to the ruff
+# binary, and `/api/complete` / `/api/signature` drive jedi in-process. Both
+# are optional — without them those endpoints answer with an install hint and
+# the editor simply goes quiet.
+editor = [
+    "jedi>=0.19.0",
+    "ruff>=0.8.0",
+]
 dev = [
     "pytest>=7.0.0",
     "pre-commit>=3.0.0",
@@ -70,6 +78,7 @@ include = ["cadjoint*"]
 dev = [
     "pytest>=7.0.0",
     "ruff>=0.8.0",
+    "jedi>=0.19.0",
     "pre-commit>=3.0.0",
     "matplotlib>=3.7.0",
     "scikit-image>=0.21.0",

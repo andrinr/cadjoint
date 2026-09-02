@@ -25,14 +25,22 @@ Serves the built frontend (``cadjoint/viewer/static``) and a small JSON API:
                          patched back into ``source`` exactly like
                          ``/patch``, plus a ``simulate`` block (the solved
                          optimized design) for study-backed runs
+- ``POST /api/lint``     static-analyse the editor's Python with ruff and
+                         return CodeMirror-shaped diagnostics (plus the last
+                         compile traceback when it named a line of this text)
+- ``POST /api/complete`` jedi completions at a caret, resolved against the
+                         installed ``cadjoint`` so they know its real types
+- ``POST /api/signature`` the signature of the call the caret sits inside
 - ``GET  /api/scenes``   list saved scene files in ``./scenes``
 - ``POST /api/scenes/load``  read one saved scene file
 - ``POST /api/scenes/save``  write one scene file into ``./scenes``
 
 Everything is loopback-only and token-gated. ``/compile`` and ``/api/mesh``
 execute the editor's Python on this machine — only run code you trust.
-``/patch`` is pure text surgery and never executes anything. Scene files are
-confined to the ``scenes`` directory under the server's working directory.
+``/patch`` is pure text surgery and never executes anything, and neither do
+``/api/lint``, ``/api/complete`` and ``/api/signature`` — ruff and jedi read
+the program without importing it. Scene files are confined to the ``scenes``
+directory under the server's working directory.
 
 This module is the server's front door: the routing table below says which
 URL runs which endpoint, and it re-exports the API those endpoints live in.
@@ -43,6 +51,7 @@ The parts underneath it:
 - :mod:`cadjoint.viewer._worker_client` — the endpoints that run the editor's
   Python in a child process
 - :mod:`cadjoint.viewer._patch_requests` — ``/patch`` request validation
+- :mod:`cadjoint.viewer._intelligence` — the ruff and jedi endpoints
 - :mod:`cadjoint.viewer._scenes` — saved scene files
 - :mod:`cadjoint.viewer._example_scene` — the starter program
 """
@@ -60,6 +69,13 @@ from urllib.parse import urlsplit
 
 from cadjoint.viewer._example_scene import EXAMPLE_SOURCE
 from cadjoint.viewer._http import STATIC_ROOT, PlaygroundBase, resolve_static
+from cadjoint.viewer._intelligence import (
+    complete_source,
+    lint_source,
+    record_compile,
+    signature_source,
+    warm_up,
+)
 from cadjoint.viewer._limits import MAX_SOURCE_BYTES
 from cadjoint.viewer._patch_requests import patch_source
 from cadjoint.viewer._scenes import (
@@ -96,7 +112,9 @@ __all__ = [
     "SIMULATE_TIMEOUT_SECONDS",
     "STATIC_ROOT",
     "compile_source",
+    "complete_source",
     "create_server",
+    "lint_source",
     "list_scenes",
     "load_scene",
     "main",
@@ -110,6 +128,7 @@ __all__ = [
     "sanitize_scene_name",
     "save_scene",
     "scenes_root",
+    "signature_source",
     "simulate_source",
 ]
 
@@ -124,11 +143,21 @@ def _post_routes() -> dict[str, Callable[[dict[str, Any]], dict[str, Any]]]:
     test does) is honoured by a running server.
     """
     return {
-        "/compile": lambda payload: compile_source(payload.get("source")),
-        "/api/mesh": lambda payload: mesh_source(payload.get("source")),
+        # `record_compile` is a tap, not a filter: it returns the worker's
+        # result unchanged and only remembers a traceback that named a line
+        # of this program, so `/api/lint` can show the failure in the gutter.
+        "/compile": lambda payload: record_compile(
+            payload.get("source"), compile_source(payload.get("source"))
+        ),
+        "/api/mesh": lambda payload: record_compile(
+            payload.get("source"), mesh_source(payload.get("source"))
+        ),
         "/api/simulate": simulate_source,
         "/api/mesh_inspect": mesh_inspect_source,
         "/patch": patch_source,
+        "/api/lint": lint_source,
+        "/api/complete": complete_source,
+        "/api/signature": signature_source,
         "/api/scenes/load": load_scene,
         "/api/scenes/save": save_scene,
     }
@@ -219,6 +248,9 @@ def create_server(port: int = DEFAULT_PORT) -> ThreadingHTTPServer:
     token = secrets.token_urlsafe(32)
     server = ThreadingHTTPServer(("127.0.0.1", port), make_handler(token))
     server.daemon_threads = True
+    # Jedi's first analysis costs a few hundred milliseconds; pay it on a
+    # background thread now so the editor's first completion is already warm.
+    warm_up()
     return server
 
 
