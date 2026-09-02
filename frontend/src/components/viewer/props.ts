@@ -9,6 +9,7 @@
  */
 
 import type { JSX } from "solid-js";
+import type { FaceTarget } from "../../faces";
 import type { ConstraintKind } from "../../types";
 import type { DisplaySettings } from "../../viewer/renderer";
 import type { Renderer } from "../../viewer/renderer";
@@ -41,6 +42,15 @@ export interface ViewerPaneProps {
   ) => Promise<void>;
   /** Insert a standalone sketch at a world-space origin. */
   onAddSketch: (origin: [number, number, number]) => Promise<void>;
+  /**
+   * Plant a sketch on the picked face.
+   *
+   * `sketchLine` names an existing sketch to re-plant; null means "make one
+   * first". The target is resolved to a `/patch` reference *after* any
+   * insertion, because inserting a sketch moves the line numbers a reference
+   * is written in terms of.
+   */
+  onSketchOnFace: (target: FaceTarget, sketchLine: number | null) => Promise<void>;
   /** Attach a source-level constraint to sketch vertices. */
   onAddConstraint: (
     line: number,

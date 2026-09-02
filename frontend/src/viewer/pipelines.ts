@@ -16,6 +16,7 @@
 
 import {
   EDGE_STRIDE,
+  FACE_STRIDE,
   GIZMO_STRIDE,
   HANDLE_STRIDE,
 } from "./overlayGeometry";
@@ -71,6 +72,8 @@ export async function compileModule(
 
 export interface OverlayPipelines {
   edgePipeline: GPURenderPipeline;
+  /** Filled polygon of the face under the pointer. */
+  facePipeline: GPURenderPipeline;
   handlePipeline: GPURenderPipeline;
   gizmoEdgePipeline: GPURenderPipeline;
   gizmoArrowPipeline: GPURenderPipeline;
@@ -119,6 +122,31 @@ export function createOverlayPipelines(
     fragment: { module, entryPoint: "fs_edge", targets: [{ format, blend }] },
     primitive: { topology: "triangle-list" },
     depthStencil,
+  });
+
+  // The face highlight is the one overlay that is a surface. It must not
+  // write depth: the hairline outline drawn immediately after traces the same
+  // boundary, and a wash that wrote depth would z-fight with its own edge.
+  const facePipeline = device.createRenderPipeline({
+    label: "Overlay face highlight",
+    layout: pipelineLayout,
+    vertex: {
+      module,
+      entryPoint: "vs_face",
+      buffers: [
+        {
+          arrayStride: FACE_STRIDE,
+          stepMode: "vertex",
+          attributes: [
+            { shaderLocation: 0, offset: 0, format: "float32x3" },
+            { shaderLocation: 1, offset: 12, format: "float32x4" },
+          ],
+        },
+      ],
+    },
+    fragment: { module, entryPoint: "fs_face", targets: [{ format, blend }] },
+    primitive: { topology: "triangle-list" },
+    depthStencil: { format: DEPTH_FORMAT, depthWriteEnabled: false, depthCompare: "less-equal" },
   });
 
   const handlePipeline = device.createRenderPipeline({
@@ -223,6 +251,7 @@ export function createOverlayPipelines(
 
   return {
     edgePipeline,
+    facePipeline,
     handlePipeline,
     gizmoEdgePipeline,
     gizmoArrowPipeline,

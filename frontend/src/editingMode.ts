@@ -60,6 +60,9 @@ export function groupVisibleInMode(group: RailGroupId, mode: EditingMode): boole
 /** Create-cluster children are themselves mode-filtered. */
 export const CREATE_TOOL_MODES: Record<string, EditingMode[]> = {
   sketch: ["model", "sketch"],
+  // Available in both, and it means something different in each: in Model it
+  // starts a new sketch on the face, in Sketch it re-plants the open one.
+  face: ["model", "sketch"],
   polygon: ["model", "sketch"],
   box: ["model"],
   sphere: ["model"],

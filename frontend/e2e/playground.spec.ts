@@ -1407,3 +1407,39 @@ test("the construction overlay can be switched off for a presentation frame", as
   await toggle.check();
   await expect(page.locator(".constraint-distance").first()).toBeVisible();
 });
+
+/** The comb's near cap (y = −0.6), on the base deck between two fins. */
+const CAP_POINT: Vec3 = [0.3, -0.6, 0.09];
+
+test("a face pick plants a sketch on the comb's cap", async ({ page }) => {
+  const editorHas = (needle: string) =>
+    expect
+      .poll(async () => (await editorText(page)).includes(needle), { timeout: 45_000 })
+      .toBe(true);
+
+  await railTool(page, "create", "tool-face");
+  await expect(page.getByTestId("viewer-hint")).toContainText("Sketch on face");
+
+  const metrics = await canvasMetrics(page);
+  const cap = projectToCss(CAP_POINT, metrics);
+
+  // Hovering resolves the analytic face client-side: the hint names the exact
+  // accessor the click will write, which is also the readout that says the
+  // GPU highlight has something to draw.
+  await page.mouse.move(metrics.left + cap.x, metrics.top + cap.y);
+  await expect(page.getByTestId("viewer-hint")).toContainText("sink.cap('-')", {
+    timeout: 15_000,
+  });
+  await expect(page.getByTestId("viewer-hint")).toContainText("starts a new sketch");
+
+  // Clicking creates the sketch and re-plants it on that face in one action.
+  await page.mouse.click(metrics.left + cap.x, metrics.top + cap.y);
+  await editorHas("SketchPlane.on(sink.cap('-'))");
+  await waitForCompile(page);
+
+  // And the program the two patches produced still runs.
+  await page.getByTestId("run").click();
+  await waitForCompile(page);
+  await expect(page.getByTestId("status")).not.toContainText("failed");
+  expect(await editorText(page)).toContain("SketchPlane.on(sink.cap('-'))");
+});

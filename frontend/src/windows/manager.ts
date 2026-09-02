@@ -40,9 +40,9 @@ export const [windowManager, setWindowManager] = createSignal<WindowManager | nu
 /**
  * The same object on `window`, for the end-to-end tests and the console.
  *
- * The Window menu is a real menu with real buttons and the tests drive those;
- * this exists for the operations a menu does not have a button for yet
- * (`resetLayout`, `float`) so a test does not have to reach into `dockview`.
+ * Every operation now has a real button in the Window menu and the tests
+ * drive those; this stays as the console handle, and as the way a test can
+ * put the dock into a starting arrangement without clicking its way there.
  */
 declare global {
   interface Window {

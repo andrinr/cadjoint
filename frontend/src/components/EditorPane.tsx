@@ -19,6 +19,7 @@ import {
   type DecorationSet,
 } from "@codemirror/view";
 import { createEffect, onCleanup, onMount } from "solid-js";
+import { intelligenceExtensions } from "../editor/extensions";
 import { consoleText, sceneName, setDirty, setSource, source } from "../state";
 
 /** Highlight the character span of the selected sketch vertex. */
@@ -50,26 +51,29 @@ const highlightField = StateField.define<DecorationSet>({
  * rather than pulling in the default light-leaning theme.
  *
  * Every colour is a design token (src/tokens.ts, mirrored into styles.css), so
- * the source pane and the panels around it are painted from one system. The
- * mapping is deliberate rather than decorative: keywords take the model
- * accent because they are the language's own vocabulary, literals take the
- * sketch and simulate accents because they are the values the tools edit, and
- * comments drop to the muted ink every de-emphasised label in the app uses.
+ * the source pane and the panels around it are painted from one system, and
+ * every one of them clears WCAG AA on --surface-panel.
  *
- * The two greys that used to sit here (#6d746a comments, #5d615a gutter) were
- * measured at 3.87:1 and 2.95:1 against the pane — both below AA — so they are
- * gone; --ink-3 clears 4.5:1 on --surface-panel.
+ * The mapping is deliberate rather than decorative. There is one accent in
+ * this design and its only legal use is a fill behind near-black type, so
+ * syntax cannot be painted with it: what is left is the status family, and it
+ * is spent on the distinction the reader actually needs while editing a scene
+ * — is this the language, or is it a value? Keywords take --info because they
+ * are the language's own vocabulary, literals take --ok and --warn because
+ * they are the numbers and strings the viewport tools rewrite, names that
+ * denote a type take --danger, and comments drop to the muted ink every
+ * de-emphasised label in the app uses.
  */
 const highlightStyle = HighlightStyle.define([
   { tag: tags.comment, color: "var(--ink-3)", fontStyle: "italic" },
-  { tag: tags.keyword, color: "var(--accent-model)" },
-  { tag: [tags.controlKeyword, tags.moduleKeyword], color: "var(--accent-model-ink)" },
-  { tag: [tags.string, tags.special(tags.string)], color: "var(--accent-simulate)" },
-  { tag: [tags.number, tags.bool, tags.null], color: "var(--accent-sketch)" },
+  { tag: tags.keyword, color: "var(--info)" },
+  { tag: [tags.controlKeyword, tags.moduleKeyword], color: "var(--info-ink)" },
+  { tag: [tags.string, tags.special(tags.string)], color: "var(--ok)" },
+  { tag: [tags.number, tags.bool, tags.null], color: "var(--warn)" },
   { tag: [tags.className, tags.typeName, tags.namespace], color: "var(--danger)" },
   { tag: tags.function(tags.variableName), color: "var(--ink)" },
   { tag: tags.definition(tags.variableName), color: "var(--ink)" },
-  { tag: tags.propertyName, color: "var(--accent-model-ink)" },
+  { tag: tags.propertyName, color: "var(--ink-2)" },
   { tag: [tags.operator, tags.punctuation, tags.separator], color: "var(--ink-2)" },
   { tag: tags.self, color: "var(--danger)", fontStyle: "italic" },
 ]);
@@ -82,7 +86,7 @@ const theme = EditorView.theme(
       backgroundColor: "var(--surface-panel)",
     },
     ".cm-scroller": { fontFamily: "var(--font-mono)", lineHeight: "var(--leading-normal)" },
-    ".cm-content": { caretColor: "var(--mode-accent, var(--accent-model))" },
+    ".cm-content": { caretColor: "var(--mode-accent, var(--accent))" },
     ".cm-gutters": {
       backgroundColor: "var(--surface-panel)",
       border: "none",
@@ -91,13 +95,15 @@ const theme = EditorView.theme(
     ".cm-activeLine": { backgroundColor: "var(--surface-inset)" },
     ".cm-activeLineGutter": { backgroundColor: "transparent" },
     ".cm-vertex-highlight": {
-      backgroundColor: "rgba(var(--mode-accent-rgb, var(--accent-model-rgb)), 0.28)",
-      outline: "1px solid rgba(var(--mode-accent-rgb, var(--accent-model-rgb)), 0.75)",
-      borderRadius: "var(--radius-xs)",
+      backgroundColor: "rgba(var(--mode-accent-rgb, var(--accent-rgb)), var(--alpha-veil))",
+      outline: "1px solid rgba(var(--mode-accent-rgb, var(--accent-rgb)), var(--alpha-mark))",
+      borderRadius: "var(--radius)",
     },
     "&.cm-focused": { outline: "none" },
   },
-  { dark: true },
+  // The pane is paper, like everything else in this build; CodeMirror uses
+  // this only to decide which of its own defaults to reach for.
+  { dark: false },
 );
 
 export interface EditorPaneProps {
@@ -120,6 +126,9 @@ export function EditorPane(props: EditorPaneProps) {
       syntaxHighlighting(highlightStyle),
       highlightField,
       theme,
+      // ruff diagnostics, jedi completion, and signature help — all three
+      // read the program without running it (src/editor/extensions.ts).
+      ...intelligenceExtensions(),
       keymap.of([
         {
           key: "Mod-Enter",

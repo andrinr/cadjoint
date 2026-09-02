@@ -88,8 +88,8 @@ export const CHROME = {
   // The accent. One hue, and it has exactly one job: **a fill behind near-black
   // type.** It measures 7.02:1 as a ground under `ink-on-accent` and 2.26:1 as
   // ink on paper, so the two uses are not a preference — one passes and one
-  // fails. Anywhere the old dark chrome would have drawn accent-coloured text
-  // or an accent hairline, this design draws a filled block instead.
+  // fails. Where another design would draw accent-coloured text or an accent
+  // hairline, this one draws a filled block instead.
   //
   // There is one accent and not three because the modes are a pipeline, not
   // three worlds (design-language.md §6): which mode you are in is read from
@@ -106,6 +106,15 @@ export const CHROME = {
   // chips reuse them rather than inventing hues of their own.
   danger: "#a8341c",
   "danger-ink": "#8a1f10",
+  // The editor's warning severity, and the only tone added for it. Derived
+  // from the accent family rather than invented: `accent` is the family's
+  // fill (2.26:1 on paper, unusable as a mark), `accent-press` is the same
+  // hue darkened until it just clears the non-text bar (3.36:1), and `warn`
+  // carries that one step further and shifts toward amber so it cannot be
+  // read as `danger`'s red. It measures **4.76:1 on paper** — comfortably
+  // past the 3:1 a non-text mark owes, and past AA as well, which is what
+  // lets the same tone label a diagnostic and underline it.
+  warn: "#8a5a00",
   info: "#0065b4",
   "info-ink": "#004a85",
   ok: "#00734c",
@@ -128,14 +137,13 @@ export const CHROME = {
 
   // ── graticule ───────────────────────────────────────────────────────────
   // The instrument faceplate drawn *under* the scene: eight square divisions,
-  // minor ticks on the two centre axes, four corner brackets. Furniture, not
-  // data, so these deliberately sit far below the 3:1 a meaningful mark owes
-  // — they are measured against paper in `test/graticule.test.ts` and held
-  // inside a 1.6–2.8:1 band. Above that the grid competes with the field;
-  // below it, it is invisible. Ordered weakest to strongest.
+  // and minor ticks on the two centre axes. Furniture, not data, so these
+  // deliberately sit far below the 3:1 a meaningful mark owes — they are
+  // measured against paper in `test/graticule.test.ts` and held inside a
+  // 1.6–2.8:1 band. Above that the grid competes with the field; below it, it
+  // is invisible. Ordered weakest to strongest.
   "graticule-line": "#adadb3",
   "graticule-axis": "#9c9ca2",
-  "graticule-frame": "#8f8f95",
 } as const;
 
 export type ChromeToken = keyof typeof CHROME;
@@ -159,11 +167,7 @@ export const VIEWPORT_TONES: ChromeToken[] = [
  * competes with the part. `test/graticule.test.ts` holds them to a band
  * instead of a floor.
  */
-export const GRATICULE_TONES: ChromeToken[] = [
-  "graticule-line",
-  "graticule-axis",
-  "graticule-frame",
-];
+export const GRATICULE_TONES: ChromeToken[] = ["graticule-line", "graticule-axis"];
 
 /**
  * Editing modes, in switcher and keyboard-cycling order.
@@ -191,6 +195,7 @@ export const MODE_ACCENTS = {
  */
 export const MEANINGFUL_NON_TEXT: ChromeToken[] = [
   "accent-press",
+  "warn",
   "rule-strong",
   "rule-heavy",
   "danger",
@@ -220,6 +225,7 @@ export const TEXT_TONES: ChromeToken[] = [
   "info",
   "info-ink",
   "ok",
+  "warn",
 ];
 
 /**

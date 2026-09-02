@@ -12,14 +12,23 @@
  * attribute offsets in `pipelines.ts` have to move with it.
  */
 
-import type { ConstructionNode, GizmoMode, MeshEdgePayload, Selection } from "../types";
+import type {
+  ConstructionFace,
+  ConstructionNode,
+  GizmoMode,
+  MeshEdgePayload,
+  Selection,
+} from "../types";
 import { AXIS_COLORS, gizmoEdges, type AxisIndex } from "./gizmo";
 import type { Vec3 } from "./math";
+import { triangulate } from "./triangulate";
 
 /** Bytes per instance: position pair + rgba (+ an active flag for gizmos). */
 export const EDGE_STRIDE = 40;
 export const HANDLE_STRIDE = 32;
 export const GIZMO_STRIDE = 44;
+/** Bytes per *vertex* of the face highlight: position + rgba. */
+export const FACE_STRIDE = 28;
 
 export type Rgba = readonly [number, number, number, number];
 
@@ -27,10 +36,9 @@ export type Rgba = readonly [number, number, number, number];
  * Construction-overlay ink, tuned for the paper viewport.
  *
  * Every value here is *darker* than the ground: on `#e6e6e9` an overlay reads
- * by weight, not by glow, so the whole set is the same hues the dark viewport
- * used, dropped to the lightest step that still clears ~3:1 against paper.
- * Measured against paper (`#e6e6e9`) and against the lightest facet the SDF
- * shading produces (`#c8c8cb`):
+ * by weight, not by glow, so each tone is the lightest step of its hue that
+ * still clears ~3:1 against paper. Measured against paper (`#e6e6e9`) and
+ * against the lightest facet the SDF shading produces (`#c8c8cb`):
  *
  *   edge           #6a7f1a   3.62 / 2.70      edgeSelected   #915b16  4.54 / 3.39
  *   edgeHover      #809821   2.62 / 1.96      handle         #db3c1c  3.61 / 2.69
@@ -52,6 +60,17 @@ export const COLORS: Record<string, Rgba> = {
   edgeHover: [0.502, 0.596, 0.129, 1.0],
   meshWire: [0.353, 0.353, 0.376, 0.3],
   meshSharp: [0.122, 0.525, 0.588, 0.95],
+  // The face under the pointer, in --viewport-ink (#18161a) at two strengths.
+  // Achromatic on purpose and not negotiable: inside the viewport rectangle
+  // the field ramp owns colour, so an annotation that picked up a hue would
+  // be readable as a value. What separates the highlight from everything else
+  // is that it is a *surface* — nothing else in the overlay is filled.
+  faceOutline: [0.094, 0.086, 0.102, 0.9],
+  faceFill: [0.094, 0.086, 0.102, 0.12],
+  // A face the source cannot name still highlights, at half the weight, so
+  // "I see it, and I cannot write it" is one look rather than silence.
+  faceOutlineLocked: [0.094, 0.086, 0.102, 0.45],
+  faceFillLocked: [0.094, 0.086, 0.102, 0.05],
 };
 
 /**
@@ -104,6 +123,50 @@ export function packConstructionOverlay(
   }
 
   return { edges, handles };
+}
+
+/**
+ * Flatten a highlighted face into a filled surface and a hairline outline.
+ *
+ * The fill is ear-clipped in the face's own 2D frame and mapped straight back
+ * to the boundary's world points, so a concave face — the starter's fin comb
+ * is one — fills its notches correctly instead of printing a fan across them.
+ * The outline reuses the edge instance format, so the hairline is drawn by
+ * the same pipeline, at the same pixel width, as every other overlay line.
+ */
+export function packFaceHighlight(face: ConstructionFace | null): {
+  fill: number[];
+  outline: number[];
+} {
+  const fill: number[] = [];
+  const outline: number[] = [];
+  if (!face || face.polygon.length < 3) return { fill, outline };
+  const fillColor = face.usable ? COLORS.faceFill : COLORS.faceFillLocked;
+  const outlineColor = face.usable ? COLORS.faceOutline : COLORS.faceOutlineLocked;
+
+  const local = face.polygon.map((point): [number, number] => {
+    const delta: Vec3 = [
+      point[0] - face.origin[0],
+      point[1] - face.origin[1],
+      point[2] - face.origin[2],
+    ];
+    return [
+      delta[0] * face.xAxis[0] + delta[1] * face.xAxis[1] + delta[2] * face.xAxis[2],
+      delta[0] * face.yAxis[0] + delta[1] * face.yAxis[1] + delta[2] * face.yAxis[2],
+    ];
+  });
+  for (const index of triangulate(local)) {
+    const point = face.polygon[index];
+    fill.push(point[0], point[1], point[2], ...fillColor);
+  }
+
+  const count = face.polygon.length;
+  for (let index = 0; index < count; index++) {
+    const start = face.polygon[index];
+    const end = face.polygon[(index + 1) % count];
+    outline.push(start[0], start[1], start[2], end[0], end[1], end[2], ...outlineColor);
+  }
+  return { fill, outline };
 }
 
 /**

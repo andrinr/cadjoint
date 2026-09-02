@@ -302,3 +302,26 @@ test("the viewer canvas survives everything the dock does to it", async ({ page 
   expect(sizeAfter).not.toBe(sizeBefore);
   await expect(page.getByTestId("viewer-canvas")).toBeVisible();
 });
+
+test("the Window menu floats a window, docks it again, and resets the layout", async ({
+  page,
+}) => {
+  const float = () => page.getByTestId("menu-window-float-objects");
+  await page.getByTestId("menu-window").click();
+  await expect(float()).toHaveAttribute("aria-checked", "false");
+  await float().click();
+  await expect(page.locator(".dv-groupview-floating")).toHaveCount(1);
+
+  // The same item is the way back: it is a checkbox, not a one-way door.
+  await page.getByTestId("menu-window").click();
+  await expect(float()).toHaveAttribute("aria-checked", "true");
+  await float().click();
+  await expect(page.locator(".dv-groupview-floating")).toHaveCount(0);
+
+  // Reset Layout throws the mode's arrangement away and rebuilds its default.
+  await page.getByTestId("window-close-editor").click();
+  await expect(page.getByTestId("window-tab-editor")).toHaveCount(0);
+  await page.getByTestId("menu-window").click();
+  await page.getByTestId("menu-window-reset").click();
+  await expect(page.getByTestId("window-tab-editor")).toBeVisible();
+});

@@ -16,11 +16,61 @@ export interface ConstructionVertex {
   span: [number, number] | null;
 }
 
+/**
+ * How a sketch's plane is written in the source.
+ *
+ * `constructor` is the `SketchPlane` classmethod used (`on`, `tangent`,
+ * `offset`, or `plain` for a stated origin/normal); `owner` is the variable
+ * the face was read off, and `accessor`/`argument` the call that named it —
+ * `body.cap('+')` reads back as `("body", "cap", "'+'")`.
+ */
+export interface PlaneReference {
+  constructor: string | null;
+  owner: string | null;
+  accessor: string | null;
+  argument: string | null;
+}
+
 export interface ConstructionPlane {
   origin: [number, number, number];
   u: [number, number, number];
   v: [number, number, number];
   normal: [number, number, number];
+  /** Sketch profiles only: the plane expression already in the source. */
+  reference?: PlaneReference | null;
+}
+
+/**
+ * One analytic face of a feature — a reference, not stored geometry.
+ *
+ * The construction tree knows a feature's flat faces exactly (an extrusion's
+ * caps sit at `plane.origin ± depth/2 · normal`, each polygon edge sweeps a
+ * planar wall), and knows them *parametrically*: re-dimension the parent and
+ * the face moves. That is what makes a sketch placed on one follow its
+ * parent, and it is why the viewer picks against these rather than against
+ * the render mesh, which is only a picture of the surface.
+ */
+export interface ConstructionFace {
+  /** `<nodeId>:<key>`, stable across rebuilds. */
+  id: string;
+  /** Identity within the owner: `cap+`, `side3`, `+x`. */
+  key: string;
+  kind: "cap" | "side" | "planar";
+  origin: [number, number, number];
+  /** Outward unit normal. */
+  normal: [number, number, number];
+  xAxis: [number, number, number];
+  yAxis: [number, number, number];
+  /** World-space boundary loop; both the extent test and the highlight. */
+  polygon: [number, number, number][];
+  /** Distance slack for the hit test, scaled to this face's own size. */
+  tolerance: number;
+  /** The accessor call that reproduces the face: `cap("+")`, `side(3)`. */
+  reference: { call: string; args: (string | number)[] };
+  /** The feature that declared it, and the variable naming it in source. */
+  owner: { kind: string; line: number; variable: string | null } | null;
+  /** False when the owner has no variable, so the face cannot be written. */
+  usable: boolean;
 }
 
 export type ConstraintKind =
@@ -80,6 +130,15 @@ export interface MaterialDefinition {
   opacity: number;
   ior: number;
   reflectivity: number;
+  /**
+   * Stated physical properties in SI, or null for each one the Material does
+   * not declare. Absent entirely on a server older than this payload.
+   */
+  physical?: Record<string, number | null>;
+  /** SI unit string per physical key, e.g. `density` → `kg/m^3`. */
+  units?: Record<string, string>;
+  /** Which parameters are free — the ones an optimization may drive. */
+  free?: Record<string, boolean>;
   spans: Record<string, [number, number]>;
 }
 
@@ -118,6 +177,8 @@ export interface ConstructionNode {
   edges: [number, number, number][][];
   /** Sketch profiles only. */
   plane: ConstructionPlane | null;
+  /** Analytic faces this node's features declare; empty for curved ones. */
+  faces?: ConstructionFace[];
   /** Sketch profiles only; primitives carry no per-vertex handles. */
   vertices: ConstructionVertex[];
   /** Primitives only. */
@@ -366,7 +427,22 @@ export type PatchOperation =
   | "delete_mesh"
   | "set_mesh_value"
   | "set_optimization_value"
-  | "delete_optimization";
+  | "delete_optimization"
+  | "set_sketch_plane";
+
+/**
+ * The plane a `set_sketch_plane` patch plants a sketch on.
+ *
+ * `owner` is the 1-based source line of the feature call that declared the
+ * face, which is how the server finds the variable to write. `tangent` is the
+ * fallback for a surface with no analytic face — it reads the plane off the
+ * solid's own gradient at the picked point.
+ */
+export type SketchPlaneReference =
+  | { kind: "cap"; owner: number; sign: "+" | "-" }
+  | { kind: "side"; owner: number; edge: number }
+  | { kind: "face"; owner: number; key: string }
+  | { kind: "tangent"; owner: number; near: [number, number, number] };
 
 export interface PatchResponse {
   ok: boolean;
@@ -419,7 +495,8 @@ export type ToolMode =
   | "perpendicular"
   | "box"
   | "sphere"
-  | "cylinder";
+  | "cylinder"
+  | "face";
 
 /** How a gizmo drag transforms the selected construction object. */
 export type GizmoMode = "translate" | "rotate" | "scale";
@@ -530,3 +607,105 @@ export interface SimulateResponse {
 
 /** What a click in the viewport picks. */
 export type SelectionMode = "object" | "vertex";
+
+// ── editor intelligence ─────────────────────────────────────────────────────
+//
+// Three endpoints read the editor's Python without running it: `/api/lint`
+// (ruff, plus the last compile traceback), `/api/complete` and
+// `/api/signature` (jedi). They share one coordinate convention, which is
+// also CodeMirror's: **lines are 1-based, columns are 0-based**, so a
+// position becomes an offset with `doc.line(from_line).from + from_col`.
+
+export type LintSeverity = "error" | "warning" | "info";
+
+/** Where a ruff autofix came from, i.e. how far it may be trusted. */
+export type FixApplicability = "safe" | "unsafe" | "display";
+
+/** One replacement of a ruff autofix, in the shared line/column convention. */
+export interface LintFixEdit {
+  from_line: number;
+  from_col: number;
+  to_line: number;
+  to_col: number;
+  content: string;
+}
+
+/** A ruff autofix: a label plus the edits that apply it in one go. */
+export interface LintFix {
+  message: string;
+  applicability: FixApplicability;
+  edits: LintFixEdit[];
+}
+
+/**
+ * One diagnostic.
+ *
+ * `source` is `"ruff"` for static analysis and `"runtime"` for the traceback
+ * of the last failed `/compile` of this exact text — the latter names the
+ * line that actually blew up, which no static analyser can produce.
+ */
+export interface LintDiagnostic {
+  from_line: number;
+  from_col: number;
+  to_line: number;
+  to_col: number;
+  severity: LintSeverity;
+  message: string;
+  code: string;
+  source: "ruff" | "runtime";
+  /** Rule documentation, rendered as a "learn more" link. */
+  url: string | null;
+  fix: LintFix | null;
+}
+
+export interface LintResponse {
+  ok: boolean;
+  /** True when a remembered traceback contributed one of the diagnostics. */
+  runtime?: boolean;
+  diagnostics?: LintDiagnostic[];
+  error?: string;
+}
+
+/** One jedi completion, already shaped like CodeMirror's `Completion`. */
+export interface CompletionItem {
+  label: string;
+  /** CodeMirror completion type: `function`, `class`, `property`, … */
+  type: string;
+  /** Jedi's own kind, shown beside the label. */
+  detail: string;
+  /** Signature and docstring; present only for the head of the list. */
+  info: string | null;
+  apply: string;
+}
+
+export interface CompleteResponse {
+  ok: boolean;
+  /** Caret line the completions were computed at (1-based). */
+  from_line?: number;
+  /** Where the already-typed prefix starts (0-based). */
+  from_column?: number;
+  truncated?: boolean;
+  completions?: CompletionItem[];
+  error?: string;
+}
+
+export interface SignatureParameter {
+  name: string;
+  label: string;
+}
+
+/** One call signature the caret sits inside. */
+export interface SignatureInfo {
+  name: string;
+  label: string;
+  /** Index of the argument being typed, or null between calls. */
+  active_parameter: number | null;
+  parameters: SignatureParameter[];
+  documentation: string | null;
+}
+
+export interface SignatureResponse {
+  ok: boolean;
+  signatures?: SignatureInfo[];
+  error?: string;
+}

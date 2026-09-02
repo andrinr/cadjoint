@@ -1,14 +1,23 @@
 /**
  * Source-backed material browser.
  *
- * Cards preview the physical parameters declared in Python. Editing a control
- * patches that Material(...) call; dragging a card onto the viewport assigns
- * its Python variable to the object under the pointer.
+ * Cards preview the appearance declared in Python. Editing a control patches
+ * that Material(...) call; dragging a card onto the viewport assigns its
+ * Python variable to the object under the pointer.
+ *
+ * The inspector is two numbered sections because a Material answers to two
+ * readers. **01 Appearance** is what the renderer uses — colour, roughness,
+ * metallic, opacity — and every control there writes back to the source.
+ * **02 Physical** is what the *solver* uses — density, conductivity, the
+ * elastic constants — stated in SI with the unit printed beside the number,
+ * and read-only for now: these are the numbers a study's result depends on,
+ * so they are shown exactly as declared rather than nudged with a slider.
  */
 
 import { For, Show, createEffect, createMemo, createSignal } from "solid-js";
 import { busy, materials, nodes } from "../state";
 import { windowManager } from "../windows/manager";
+import { hasPhysicalBlock, physicalRows } from "../materialProperties";
 import type { MaterialDefinition } from "../types";
 
 export const MATERIAL_DRAG_TYPE = "application/x-cadjoint-material";
@@ -172,6 +181,10 @@ export function MaterialPanel(props: MaterialPanelProps) {
                   />
                 </label>
               </div>
+              <div class="material-section-head">
+                <i aria-hidden="true">01</i>
+                <span>Appearance</span>
+              </div>
               <label>
                 <span>
                   Roughness <b>{material().roughness.toFixed(2)}</b>
@@ -223,6 +236,37 @@ export function MaterialPanel(props: MaterialPanelProps) {
                   data-testid="material-opacity"
                 />
               </label>
+
+              <Show when={hasPhysicalBlock(material())}>
+                <div class="material-section-head">
+                  <i aria-hidden="true">02</i>
+                  <span>Physical</span>
+                </div>
+                <Show
+                  when={physicalRows(material()).length > 0}
+                  fallback={
+                    <p class="material-physical-empty" data-testid="material-physical-empty">
+                      — states no physical properties
+                    </p>
+                  }
+                >
+                  <dl class="material-physical" data-testid="material-physical">
+                    <For each={physicalRows(material())}>
+                      {(row) => (
+                        <div class="material-physical-row" data-testid={`material-physical-${row.key}`}>
+                          <dt>{row.label}</dt>
+                          <dd>
+                            <b>{row.value}</b>
+                            <Show when={row.unit}>
+                              <small>{row.unit}</small>
+                            </Show>
+                          </dd>
+                        </div>
+                      )}
+                    </For>
+                  </dl>
+                </Show>
+              </Show>
             </section>
           )}
         </Show>

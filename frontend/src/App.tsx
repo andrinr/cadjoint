@@ -31,6 +31,7 @@ import { createShellShortcuts } from "./shell/shellShortcuts";
 import { createSourceActions, createSourceHistory } from "./shell/sourceHistory";
 import { WindowLayout } from "./windows/WindowLayout";
 import type { WindowId } from "./windows/panels";
+import { referenceFor, type FaceTarget } from "./faces";
 import {
   cameraAngles,
   editingMode,
@@ -38,6 +39,8 @@ import {
   reactToSelectionForMode,
   setCameraAngles,
   nodeById,
+  nodes,
+  profiles,
   selection,
   setConsoleText,
   setPanelVisible,
@@ -119,6 +122,33 @@ export function App() {
   });
 
   /**
+   * Plant a sketch on a picked face.
+   *
+   * Two patches when there is no sketch yet, and the order matters: the new
+   * sketch is created first, then the face reference is derived from the
+   * *recompiled* tree. Inserting a statement renumbers every line after it,
+   * and a reference names its owner by line — resolving before the insert
+   * would write a plane that points at whatever moved into that slot.
+   */
+  const sketchOnFace = async (target: FaceTarget, sketchLine: number | null) => {
+    let line = sketchLine;
+    if (line === null) {
+      await ops.addSketch([0, 0, 0]);
+      const created = profiles();
+      const newest = created[created.length - 1];
+      if (!newest || newest.line === null) return;
+      line = newest.line;
+      setSelection({ nodeId: newest.id, vertexIndex: null });
+    }
+    const reference = referenceFor(nodes(), target);
+    if (!reference) {
+      setStatus({ kind: "error", text: "That surface has no reference the source can name." });
+      return;
+    }
+    await ops.setSketchPlane(line, reference);
+  };
+
+  /**
    * One window's contents.
    *
    * Each of these is mounted into its own Solid root by the dock, so a window
@@ -137,6 +167,7 @@ export function App() {
             onSetValue={ops.setValue}
             onAddPrimitive={ops.addPrimitive}
             onAddSketch={ops.addSketch}
+            onSketchOnFace={sketchOnFace}
             onAddConstraint={ops.addConstraint}
             onAddLoft={ops.addLoft}
             onDeleteObject={ops.deleteObject}

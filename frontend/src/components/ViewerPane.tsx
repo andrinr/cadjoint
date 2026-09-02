@@ -24,6 +24,8 @@ import {
   cameraAngles,
   busy,
   bcPickArmed,
+  faceHover,
+  setFaceHover,
   selectionMode,
   setCameraAngles,
   setBcProposal,
@@ -151,6 +153,17 @@ export function ViewerPane(props: ViewerPaneProps) {
       canvas.style.cursor = "move";
       return;
     }
+    // The face tool resolves an analytic face rather than a pixel: the hover
+    // has to answer "which face" before a click can, and the highlight the
+    // renderer draws is that same answer.
+    if (tool() === "face") {
+      const pick = tools.resolveFace(x, y);
+      if (pick?.face.id !== faceHover()?.face.id) setFaceHover(pick);
+      canvas.style.cursor = pick ? "crosshair" : "cell";
+      setHover(null);
+      renderer.gizmoAxis = null;
+      return;
+    }
     if (isVertexConstraintTool(tool())) {
       const hit = pickVertex(displayProfiles(), x, y, pickView());
       const next = hit ? { nodeId: hit.nodeId, vertexIndex: hit.vertexIndex } : null;
@@ -220,6 +233,11 @@ export function ViewerPane(props: ViewerPaneProps) {
 
     if (tool() === "sketch" && event.button === 0) {
       void tools.handlePlaceSketch(x, y);
+      return;
+    }
+
+    if (tool() === "face" && event.button === 0) {
+      void tools.handleSketchOnFace(x, y);
       return;
     }
 
@@ -510,6 +528,17 @@ export function ViewerPane(props: ViewerPaneProps) {
 
   createEffect(() => {
     renderer.setMeshEdges(meshEdges());
+  });
+
+  // The highlight is a readout of the hover, and it never outlives the tool
+  // that armed it: leaving the face tool clears both.
+  createEffect(() => {
+    if (tool() !== "face") {
+      if (faceHover() !== null) setFaceHover(null);
+      renderer.setFaceHighlight(null);
+      return;
+    }
+    renderer.setFaceHighlight(faceHover()?.face ?? null);
   });
 
   /**

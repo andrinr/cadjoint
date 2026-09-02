@@ -12,6 +12,8 @@ import {
 } from "./optimize";
 import type {
   CompileResponse,
+  CompleteResponse,
+  LintResponse,
   MeshInspectResponse,
   MeshResponse,
   OptimizeRequest,
@@ -24,6 +26,7 @@ import type {
   SessionResponse,
   SimulateRequest,
   SimulateResponse,
+  SignatureResponse,
   SimulateStudyRequest,
 } from "./types";
 
@@ -159,6 +162,35 @@ export async function optimize(
   } catch {
     throw new Error(`Server returned a non-JSON response (${response.status}).`);
   }
+}
+
+/**
+ * Static-analyse the program: ruff, plus the last compile traceback.
+ *
+ * The whole document goes over the wire, so callers must debounce — the
+ * editor drives this from `linter()`'s idle delay, never from a keystroke.
+ * Lines are 1-based and columns 0-based; see `LintDiagnostic`.
+ */
+export async function lint(source: string): Promise<LintResponse> {
+  return post<LintResponse>("/api/lint", { source });
+}
+
+/** Completions at a caret (1-based `line`, 0-based `column`). */
+export async function complete(
+  source: string,
+  line: number,
+  column: number,
+): Promise<CompleteResponse> {
+  return post<CompleteResponse>("/api/complete", { source, line, column });
+}
+
+/** The signature of the call the caret sits inside, if it sits inside one. */
+export async function signature(
+  source: string,
+  line: number,
+  column: number,
+): Promise<SignatureResponse> {
+  return post<SignatureResponse>("/api/signature", { source, line, column });
 }
 
 /** List saved scene files in the server's `scenes` workspace. */

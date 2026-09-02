@@ -79,6 +79,25 @@ export function PolygonIcon(props: IconProps) {
   );
 }
 
+/**
+ * Sketch on a face: a plane seen at an angle, with a profile drawn on it.
+ *
+ * The face is the parallelogram — the same read as the box's top facet, so
+ * the two icons agree about what "a flat face" looks like — and the open
+ * polyline with a node at each end is the same mark PolygonIcon uses for a
+ * sketch. The tool is the composition of those two, and so is its glyph.
+ */
+export function FaceSketchIcon(props: IconProps) {
+  return (
+    <svg {...base(props.size ?? REFERENCE_SIZE)}>
+      <path d="M3.5 13.5l8-4.8 9 3.2-8 4.8z" />
+      <path d="M8.6 13.1l3.4-2 3.9 1.4" />
+      <Dot cx={8.6} cy={13.1} />
+      <Dot cx={15.9} cy={12.5} />
+    </svg>
+  );
+}
+
 export function PointAddIcon(props: IconProps) {
   return (
     <svg {...base(props.size ?? REFERENCE_SIZE)}>

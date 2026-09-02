@@ -288,3 +288,30 @@ fn fs_handle(input: HandleVertex) -> @location(0) vec4<f32> {
   let shade = mix(input.color.rgb, input.color.rgb * 0.35, rim);
   return vec4<f32>(shade, input.color.a * edge);
 }
+
+// ── face highlight ──────────────────────────────────────────────────────────
+//
+// The one overlay drawn as an actual surface rather than as an expanded quad:
+// the polygon of the face under the pointer, triangulated on the CPU, filled
+// with a faint achromatic wash. It carries the same camera nudge as the edges,
+// so it wins the depth test against the face it is painted on, and it does not
+// write depth — the hairline outline drawn straight after it has to land on
+// top, not z-fight with the wash it belongs to.
+
+struct FaceVertex {
+  @builtin(position) position : vec4<f32>,
+  @location(0)       color    : vec4<f32>,
+};
+
+@vertex
+fn vs_face(@location(0) point: vec3<f32>, @location(1) color: vec4<f32>) -> FaceVertex {
+  var out: FaceVertex;
+  out.position = project(point);
+  out.color = color;
+  return out;
+}
+
+@fragment
+fn fs_face(input: FaceVertex) -> @location(0) vec4<f32> {
+  return input.color;
+}

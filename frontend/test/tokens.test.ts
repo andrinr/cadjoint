@@ -217,6 +217,21 @@ describe("chrome legibility", () => {
     expect(chromeContrast("ink-2", "ink-3")).toBeGreaterThan(1.4);
   });
 
+  it("keeps the editor's warning tone a mark of its own", () => {
+    // The gutter shows three severities side by side, so `warn` owes more
+    // than a contrast ratio: it has to be findable against the sheet, and
+    // separable from the two tones it sits between. Against `danger` that
+    // separation is hue (both are dark, so luminance says almost nothing);
+    // against `ink-3` it is chroma, since the info marker is achromatic.
+    expect(chromeContrast("warn", "surface-viewport")).toBeGreaterThanOrEqual(3);
+    expect(chromeContrast("warn", "surface-panel")).toBeGreaterThanOrEqual(3);
+    expect(distance(hexToRgb(CHROME.warn), hexToRgb(CHROME.danger))).toBeGreaterThan(0.2);
+    const [r, g, b] = hexToRgb(CHROME.warn);
+    expect(Math.max(r, g, b) - Math.min(r, g, b)).toBeGreaterThan(0.4);
+    const [ir, ig, ib] = hexToRgb(CHROME["ink-3"]);
+    expect(Math.max(ir, ig, ib) - Math.min(ir, ig, ib)).toBeLessThan(0.04);
+  });
+
   it("makes the accent a fill and refuses to make it a mark", () => {
     // Was: "the on-accent ink is readable on every mode accent" — three
     // accents, one assertion each. There is one accent now, and the pair of
@@ -259,7 +274,7 @@ const distance = (a: Rgb, b: Rgb): number =>
   Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 
 describe("chrome stays clear of the data palette", () => {
-  const chromeAccents: ChromeToken[] = ["accent", "danger", "info", "ok"];
+  const chromeAccents: ChromeToken[] = ["accent", "danger", "info", "ok", "warn"];
 
   it("puts no chrome accent on either ramp's reserved high end", () => {
     for (const name of chromeAccents) {

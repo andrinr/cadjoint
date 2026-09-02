@@ -97,6 +97,10 @@
      brightened, to be read. 5.3 / 4.8 / 4.7 on the darkest sheet. */
   --danger: #a8341c;
   --danger-ink: #8a1f10;
+  /* The editor's warning severity: the accent family darkened past the point
+     where it can be a mark and shifted to amber so it is not danger's red.
+     4.76:1 on paper — a mark and a label at the same time. */
+  --warn: #8a5a00;
   --info: #0065b4;
   --info-ink: #004a85;
   --ok: #00734c;
@@ -115,13 +119,13 @@
   --viewport-mode-rgb: 96, 94, 101;
 
   /* ── colour: graticule ─────────────────────────────────────────────── */
-  /* The instrument faceplate the scene is drawn over. Structure, never text,
-     so these sit below the 3:1 a meaningful mark owes — 1.8 / 2.2 / 2.6 : 1
-     on paper, weakest to strongest. The shader reads them through tokens.ts;
-     they are declared here so the token layer stays one list. */
+  /* The instrument faceplate the scene is drawn over: the ruled grid and the
+     two centre axes. Structure, never text, so both sit below the 3:1 a
+     meaningful mark owes — 1.8 and 2.2 : 1 on paper, weaker first. The shader
+     reads them through tokens.ts; they are declared here so the token layer
+     stays one list. */
   --graticule-line: #adadb3;
   --graticule-axis: #9c9ca2;
-  --graticule-frame: #8f8f95;
 
   /* Accent alpha ladder. The accent appears at exactly six strengths and each
      step means something: a wash is a sheet barely touched, a tint is an
@@ -277,13 +281,12 @@ body {
 .viewer-hint,
 .menu-dropdown small,
 .material-empty,
-.sim-empty,
+.material-physical-empty,
 .opt-player-hint,
 .shortcut-groups li,
 .dialog p,
 .render-preset-card small,
-.render-preset-heading small,
-.rail-tip {
+.render-preset-heading small {
   font-family: var(--font-sans);
   text-transform: none;
   letter-spacing: normal;
@@ -307,7 +310,6 @@ select,
 .material-inspector-head label,
 .save-as-form label,
 .switch span,
-.sim-bc-row strong,
 .sim-stats span {
   text-transform: uppercase;
   letter-spacing: var(--tracking-xs);
@@ -316,7 +318,6 @@ select,
 /* …and the exceptions, which are the strings that exist in the source
    program. A study called `sink-conduction` is not a label. */
 .sim-study-head strong,
-.sim-mesh-head strong,
 .tree-label,
 .pane-title,
 select option {
@@ -394,7 +395,15 @@ select option {
 
 /* Menu bar ------------------------------------------------------------- */
 
+/* The bar sits above the dock, and it has to: a floating window can be
+   dragged anywhere, including over the menus, and the Window menu item that
+   docks it again is the one control that must never end up underneath it.
+   dockview parks a floating group at z 999, so the chrome's top layers are
+   stated above it — menus 1000, dialogs 1100 — rather than reaching into the
+   library's own stacking, which its drag overlays depend on. */
 .menu-bar {
+  position: relative;
+  z-index: 1000;
   display: flex;
   align-items: stretch;
   gap: var(--space-1);
@@ -1161,31 +1170,9 @@ input[type="checkbox"] {
   border-top-color: var(--rule);
 }
 
-/* Collapsed sections: one shared launcher look (number · icon · label ·
-   count). A dock section is a zone of the sheet, so its number is drawn the
-   way every other section number is — a filled cell with near-black type —
-   and it comes from the same counter, incremented in dock order whether the
-   section is open or shut. */
-.object-tree-launch,
-.material-launch,
-.sim-launch {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  width: 100%;
-  height: var(--control-xl);
-  padding: 0 var(--space-5) 0 0;
-  border: 1px solid var(--rule-strong);
-  background: var(--surface-float-90);
-  font: var(--weight-semibold) var(--text-xs) / var(--leading-flat)
-    var(--font-mono);
-  letter-spacing: var(--tracking-xs);
-  text-align: left;
-}
-
-.object-tree-launch::before,
-.material-launch::before,
-.sim-launch::before,
+/* Section numbers. A dock section is a zone of the sheet, so its number is
+   drawn the way every other section number is — a filled cell with near-black
+   type — from one counter incremented in dock order. */
 .object-tree-panel > header::before,
 .material-panel > header::before,
 .sim-panel > header::before,
@@ -1203,31 +1190,6 @@ input[type="checkbox"] {
   letter-spacing: var(--tracking-3xs);
   counter-increment: cj-dock;
   content: counter(cj-dock, decimal-leading-zero);
-}
-
-.object-tree-launch:hover,
-.material-launch:hover,
-.sim-launch:hover {
-  background: var(--surface-raised-hover);
-}
-
-.object-tree-launch svg {
-  flex: 0 0 auto;
-  width: 15px;
-  height: 15px;
-  color: var(--ink-3);
-}
-
-.object-tree-launch b,
-.material-launch b {
-  flex: 0 0 auto;
-  min-width: 18px;
-  margin-left: auto;
-  padding: var(--space-1) var(--space-2);
-  background: var(--accent);
-  color: var(--ink-on-accent);
-  font: var(--type-kicker);
-  text-align: center;
 }
 
 /* Expanded sections: one shared panel shell with the mode-accent header
@@ -1728,6 +1690,85 @@ input[type="checkbox"] {
   background: var(--shade-soft);
 }
 
+/* The inspector is two numbered sections, because a Material answers to two
+   readers: 01 is what the renderer uses and 02 is what the solver uses. The
+   number is drawn the way every other section number in this app is — a
+   filled cell with near-black type — so a reader who has learned it once in
+   the dock reads it here for free. */
+.material-section-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--divider);
+  color: var(--ink-2);
+  font: var(--type-kicker);
+  letter-spacing: var(--tracking-3xs);
+  text-transform: uppercase;
+}
+
+.material-section-head i {
+  display: grid;
+  place-items: center;
+  min-width: 18px;
+  padding: var(--space-1) var(--space-2);
+  background: var(--accent);
+  color: var(--ink-on-accent);
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Stated physical properties: label · value · unit. Read-only, and printed
+   rather than controlled — these are the numbers a solved field depends on,
+   so they are shown exactly as the program declares them. Tabular figures,
+   because a column of magnitudes is meant to be compared down the column. */
+.material-physical {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+}
+
+.material-physical-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.material-physical-row dt {
+  color: var(--ink-2);
+  font: var(--type-mono);
+  letter-spacing: var(--tracking-2xs);
+  text-transform: uppercase;
+}
+
+.material-physical-row dd {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0;
+  white-space: nowrap;
+}
+
+.material-physical-row dd b {
+  color: var(--ink);
+  font: var(--type-mono-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.material-physical-row dd small {
+  color: var(--ink-3);
+  font: var(--type-mono);
+}
+
+.material-physical-empty {
+  margin: 0;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+}
+
 .material-inspector-head,
 .material-inspector label,
 .material-inspector label > span {
@@ -1886,44 +1927,6 @@ input[type="checkbox"] {
    viewport weight; the shared control accent measures 1.04:1 there. */
 .cube-actions button.active {
   border-color: rgba(var(--viewport-accent-rgb, var(--viewport-mode-rgb)), var(--alpha-mark));
-}
-
-.view-menu {
-  position: absolute;
-  top: calc(100% + var(--space-3));
-  right: 0;
-  z-index: 20;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  min-width: 118px;
-  margin: 0;
-  padding: var(--space-2);
-  list-style: none;
-  border: 1px solid var(--rule);
-  background: var(--surface-panel);
-  animation: pop-in var(--dur-base) var(--ease);
-  transform-origin: top right;
-}
-
-.view-menu button {
-  width: 100%;
-  height: var(--control-sm);
-  border: 0;
-  background: transparent;
-  color: var(--ink);
-  font-size: var(--text-sm);
-  text-align: left;
-}
-
-.view-menu button:hover {
-  background: var(--surface-raised-hover);
-}
-
-.view-menu button.active {
-  background: var(--accent);
-  border-color: var(--accent-press);
-  color: var(--ink-on-accent);
 }
 
 /* Render settings (the eye-icon popover in the toolbar) ----------------- */
@@ -2334,66 +2337,6 @@ button.icon {
 
 /* Panes --------------------------------------------------------------- */
 
-.panes {
-  display: grid;
-  /* Overridden inline by the splitter; this is the pre-mount fallback. */
-  grid-template-columns: minmax(320px, 42%) 6px 1fr;
-  min-height: 0;
-  transition: grid-template-columns var(--dur-slow) var(--ease);
-}
-
-.panes.resizing {
-  transition: none;
-}
-
-.pane-splitter {
-  position: relative;
-  z-index: 31;
-  margin-left: -1px;
-  cursor: col-resize;
-  touch-action: none;
-  transition: background-color var(--dur-fast) var(--ease);
-}
-
-.pane-splitter:hover,
-.panes.resizing .pane-splitter {
-  background: var(--accent);
-}
-
-.panes.editor-collapsed .pane-splitter {
-  cursor: default;
-  pointer-events: none;
-}
-
-.editor-rail {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-5);
-  padding: var(--space-4) 0;
-  overflow: hidden;
-  border-right: 1px solid var(--rule);
-  background: var(--surface-panel);
-}
-
-.editor-rail button {
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  color: var(--ink);
-  font-size: var(--text-md);
-}
-
-.editor-rail-label {
-  color: var(--ink-3);
-  font: var(--weight-regular) var(--text-2xs) / var(--leading-flat)
-    var(--font-mono);
-  letter-spacing: 0.14em;
-  writing-mode: vertical-rl;
-}
-
 .editor-collapse {
   display: grid;
   place-items: center;
@@ -2784,7 +2727,8 @@ button.icon {
 .dialog-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 100;
+  /* Above the menus, which are above a floating dock group. */
+  z-index: 1100;
   display: grid;
   place-items: center;
   background: var(--scrim);
@@ -3921,7 +3865,6 @@ button.icon {
 @media (prefers-reduced-motion: reduce) {
   .menu-dropdown,
   .render-popover,
-  .view-menu,
   .tool-group.open .tool-flyout,
   .object-tree-panel,
   .material-panel,

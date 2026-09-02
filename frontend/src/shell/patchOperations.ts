@@ -13,7 +13,7 @@
  */
 
 import { nodeById, selection } from "../state";
-import type { ConstraintKind } from "../types";
+import type { ConstraintKind, SketchPlaneReference } from "../types";
 
 export type VertexPatchOp = "set_vertex" | "insert_vertex" | "delete_vertex";
 
@@ -34,6 +34,8 @@ export interface PatchOperations {
   addMaterial: () => Promise<void>;
   assignMaterial: (line: number, material: string) => Promise<void>;
   addSketch: (origin: [number, number, number]) => Promise<void>;
+  /** Re-plant an existing sketch on a face, or on a tangent plane. */
+  setSketchPlane: (line: number, reference: SketchPlaneReference) => Promise<void>;
   addConstraint: (
     line: number,
     kind: ConstraintKind,
@@ -97,6 +99,9 @@ export function createPatchOperations(
   const addSketch = (origin: [number, number, number]) =>
     applyPatch({ op: "add_sketch", origin });
 
+  const setSketchPlane = (line: number, reference: SketchPlaneReference) =>
+    applyPatch({ op: "set_sketch_plane", line, reference });
+
   const addConstraint = (
     line: number,
     kind: ConstraintKind,
@@ -150,6 +155,7 @@ export function createPatchOperations(
     addMaterial,
     assignMaterial,
     addSketch,
+    setSketchPlane,
     addConstraint,
     deleteConstraint,
     setConstraintValue,

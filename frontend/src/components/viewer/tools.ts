@@ -16,6 +16,7 @@
 import type { Accessor, Setter } from "solid-js";
 import {
   displayProfiles,
+  editingMode,
   nodeById,
   nodes,
   pendingLoft,
@@ -26,6 +27,7 @@ import {
   setSelectionMode,
   setStatus,
   setTool,
+  setFaceHover,
   sketchPlane,
 } from "../../state";
 import {
@@ -36,10 +38,10 @@ import {
 } from "../../constraints";
 import { loftPickError } from "../../loft";
 import {
-  pickSurfacePoint,
   quickPlaneEmission,
   type SketchPlaneEmission,
 } from "../../sketchPlanes";
+import { pickFace, resolveSurfaceHit, type FacePick, type FaceTarget } from "../../faces";
 import { add, intersectPlane, rayFromPixel, scale } from "../../viewer/math";
 import { nearestInsertIndex, pickEdge, pickNode, pickVertex } from "../../viewer/hittest";
 import type { PickView } from "../../viewer/hittest";
@@ -106,7 +108,7 @@ export function createViewerTools(context: ViewerToolContext) {
     const choice = sketchPlane();
     let emission: SketchPlaneEmission;
     if (choice === "face") {
-      const hit = pickSurfacePoint(nodes(), ray);
+      const hit = resolveSurfaceHit(nodes(), ray);
       if (!hit) {
         setStatus({ kind: "error", text: "On face: click a solid's surface." });
         return;
@@ -131,6 +133,62 @@ export function createViewerTools(context: ViewerToolContext) {
     setTool("select");
     setSelectionMode("object");
     if (newest) setSelection({ nodeId: newest.id, vertexIndex: null });
+  };
+
+  /**
+   * Resolve the face under a pixel, in two steps.
+   *
+   * Where the surface is (`resolveSurfaceHit`) and which declared face that
+   * is (`pickFace`) are asked separately, because "the pointer is over the
+   * part but over no analytic face" is a real and common answer — a revolve's
+   * curved wall, a blended union — and it is the answer that makes a click
+   * fall back to a tangent plane instead of snapping to a face nearby.
+   */
+  const resolveFace = (x: number, y: number): FacePick | null => {
+    const ray = rayFromPixel(x, y, context.pickView());
+    const hit = resolveSurfaceHit(nodes(), ray);
+    return hit ? pickFace(nodes(), hit.point, hit.normal) : null;
+  };
+
+  /**
+   * Plant a sketch on the face (or the curved surface) under the pointer.
+   *
+   * Which sketch is the question a CAD user actually asks here, and the
+   * answer is the one already open: in Sketch mode with a profile selected,
+   * that profile is re-planted; otherwise a new sketch is created and planted
+   * in one action. A face whose feature has no name in the source highlights
+   * but refuses — the reference would have nothing to write.
+   */
+  const handleSketchOnFace = async (x: number, y: number) => {
+    const ray = rayFromPixel(x, y, context.pickView());
+    const hit = resolveSurfaceHit(nodes(), ray);
+    if (!hit) {
+      setStatus({ kind: "error", text: "Sketch on face: click a solid's surface." });
+      return;
+    }
+    const pick = pickFace(nodes(), hit.point, hit.normal);
+    if (pick && !pick.face.usable) {
+      setStatus({
+        kind: "error",
+        text: "That face belongs to a feature with no name in the source; assign it to a variable first.",
+      });
+      return;
+    }
+    const target: FaceTarget = {
+      faceId: pick ? pick.face.id : null,
+      nodeId: pick ? pick.nodeId : hit.nodeId,
+      near: hit.point,
+    };
+    const active = selection();
+    const node = active ? nodeById(active.nodeId) : null;
+    const existing =
+      editingMode() === "sketch" && node?.kind === "profile" && node.line !== null
+        ? node.line
+        : null;
+    setFaceHover(null);
+    setTool("select");
+    setSelectionMode("object");
+    await context.props.onSketchOnFace(target, existing);
   };
 
   /**
@@ -271,6 +329,8 @@ export function createViewerTools(context: ViewerToolContext) {
   return {
     handlePlacePrimitive,
     handlePlaceSketch,
+    resolveFace,
+    handleSketchOnFace,
     handleVertexConstraint,
     handleEdgeConstraint,
     handleLoftPick,

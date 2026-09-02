@@ -7,7 +7,18 @@
  * belongs in this chain; nothing else here decides anything.
  */
 
-import { bcPickArmed, editingMode, pendingLoft, simView, sketchPlane, tool } from "../../state";
+import {
+  bcPickArmed,
+  editingMode,
+  faceHover,
+  nodeById,
+  pendingLoft,
+  selection,
+  simView,
+  sketchPlane,
+  tool,
+} from "../../state";
+import { faceLabel } from "../../faces";
 import {
   CONSTRAINT_TOOL_NAMES,
   isEdgeConstraintTool,
@@ -20,6 +31,32 @@ import type { PendingConstraint } from "./gestures";
 export interface ViewerHintProps {
   /** The half-finished two-click constraint pick, if there is one. */
   pendingConstraint: PendingConstraint | null;
+}
+
+/**
+ * What clicking right now would plant, and where.
+ *
+ * Three states, and they are the three answers the face picker can give: a
+ * face it can write, a face it can see but not name, and no face at all —
+ * which is a curved surface, and becomes a tangent plane rather than a
+ * refusal. The sentence also says *which* sketch, because that is the
+ * question a CAD user asks before clicking.
+ */
+function faceSentence(): string {
+  const active = selection();
+  const node = active ? nodeById(active.nodeId) : null;
+  const onto =
+    editingMode() === "sketch" && node?.kind === "profile" && node.line !== null
+      ? `re-plants ${node.name ?? "the selected sketch"}`
+      : "starts a new sketch";
+  const pick = faceHover();
+  if (!pick) {
+    return `Sketch on face: hover a flat face · a curved surface ${onto} on a tangent plane · Esc to cancel`;
+  }
+  if (!pick.face.usable) {
+    return `Sketch on face: ${faceLabel(pick.face)} has no name in the source — assign its feature to a variable first`;
+  }
+  return `Sketch on face: click ${faceLabel(pick.face)} — ${onto} there · Esc to cancel`;
 }
 
 export function ViewerHint(props: ViewerHintProps) {
@@ -41,6 +78,8 @@ export function ViewerHint(props: ViewerHintProps) {
         ? sketchPlane() === "face"
           ? "Sketch: click a solid's face to place it there · Esc to cancel"
           : `Sketch: click to place on the ${sketchPlane().toUpperCase()} plane · Esc to cancel`
+        : tool() === "face"
+        ? faceSentence()
         : tool() === "polygon"
         ? "Point: click sketch edges to add vertices · Esc to finish"
         : isVertexConstraintTool(tool())

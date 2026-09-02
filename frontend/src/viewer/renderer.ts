@@ -25,6 +25,7 @@ import {
   type SliceState,
 } from "../simulation";
 import type {
+  ConstructionFace,
   ConstructionNode,
   GizmoMode,
   MeshEdgePayload,
@@ -53,9 +54,11 @@ import {
 } from "./display";
 import {
   EDGE_STRIDE,
+  FACE_STRIDE,
   GIZMO_STRIDE,
   HANDLE_STRIDE,
   packConstructionOverlay,
+  packFaceHighlight,
   packGizmoInstances,
   packMeshEdgeInstances,
 } from "./overlayGeometry";
@@ -108,10 +111,10 @@ const BACKGROUND_RADIANCE: readonly [number, number, number] = [0.9684, 0.9684, 
 /**
  * Key-light intensity for the PBR and path-traced modes.
  *
- * A dark ground let the key run hot — the geometry was the only bright thing
- * on screen. Against paper the same 3.0 pushed every lit face into the tone
- * map's shoulder, where it converged with the background; 1.5 keeps the lit
- * faces below the ground and lets the shading, not the exposure, carry form.
+ * The part is lit against paper, so the key cannot run hot: at 3.0 every lit
+ * face landed in the tone map's shoulder and converged with the background.
+ * 1.5 keeps the lit faces below the ground and lets the shading, not the
+ * exposure, carry the form.
  */
 const KEY_LIGHT_INTENSITY = 1.5;
 
@@ -169,6 +172,7 @@ export class Renderer {
   private pathPipeline: GPURenderPipeline | null = null;
   private presentPipeline: GPURenderPipeline | null = null;
   private edgePipeline: GPURenderPipeline | null = null;
+  private facePipeline: GPURenderPipeline | null = null;
   private handlePipeline: GPURenderPipeline | null = null;
   private gizmoEdgePipeline: GPURenderPipeline | null = null;
   private gizmoArrowPipeline: GPURenderPipeline | null = null;
@@ -206,6 +210,16 @@ export class Renderer {
   private gizmoCapacity = 0;
   private gizmoCount = 0;
   private visibleGizmoMode: GizmoMode = "translate";
+  // The face under the pointer while face picking is armed: a filled wash
+  // (its own triangle pipeline, since nothing else in the overlay is a
+  // surface) plus a hairline outline drawn through the edge pipeline.
+  private faceHighlight: ConstructionFace | null = null;
+  private faceFillBuffer: GPUBuffer | null = null;
+  private faceFillCapacity = 0;
+  private faceFillVertices = 0;
+  private faceOutlineBuffer: GPUBuffer | null = null;
+  private faceOutlineCapacity = 0;
+  private faceOutlineCount = 0;
   private meshEdgeBuffer: GPUBuffer | null = null;
   private meshEdgeCapacity = 0;
   private meshWireCount = 0;
@@ -426,6 +440,7 @@ export class Renderer {
       this.meshOverlayBuffer,
     );
     this.edgePipeline = overlay.edgePipeline;
+    this.facePipeline = overlay.facePipeline;
     this.handlePipeline = overlay.handlePipeline;
     this.gizmoEdgePipeline = overlay.gizmoEdgePipeline;
     this.gizmoArrowPipeline = overlay.gizmoArrowPipeline;
@@ -692,6 +707,20 @@ export class Renderer {
     this.scheduleRender();
   }
 
+  /**
+   * Highlight one analytic face, or clear the highlight.
+   *
+   * Takes the face itself rather than a polygon: the fill has to be
+   * triangulated in the face's own frame, and `usable` decides the weight —
+   * a face the source cannot name is still shown, at half strength.
+   */
+  setFaceHighlight(face: ConstructionFace | null): void {
+    if (this.faceHighlight === face) return;
+    this.faceHighlight = face;
+    this.uploadOverlay();
+    this.scheduleRender();
+  }
+
   private uploadOverlay(): void {
     if (!this.device) return;
     const { edges, handles } = packConstructionOverlay(
@@ -714,7 +743,26 @@ export class Renderer {
     }
 
     const meshSegments = packMeshEdgeInstances(this.meshEdges);
+    const highlight = packFaceHighlight(this.faceHighlight);
 
+    this.faceFillVertices = highlight.fill.length / (FACE_STRIDE / 4);
+    this.faceOutlineCount = highlight.outline.length / (EDGE_STRIDE / 4);
+    this.faceFillBuffer = this.writeInstances(
+      this.faceFillBuffer,
+      new Float32Array(highlight.fill),
+      FACE_STRIDE,
+      (capacity) => (this.faceFillCapacity = capacity),
+      this.faceFillCapacity,
+      "face highlight fill",
+    );
+    this.faceOutlineBuffer = this.writeInstances(
+      this.faceOutlineBuffer,
+      new Float32Array(highlight.outline),
+      EDGE_STRIDE,
+      (capacity) => (this.faceOutlineCapacity = capacity),
+      this.faceOutlineCapacity,
+      "face highlight outline",
+    );
     this.edgeCount = edges.length / (EDGE_STRIDE / 4);
     this.handleCount = handles.length / (HANDLE_STRIDE / 4);
     this.gizmoCount = gizmo.length / (GIZMO_STRIDE / 4);
@@ -1095,6 +1143,20 @@ export class Renderer {
     // the model. One switch turns the lot off for a presentation frame; the
     // mesh edges above belong to the mesh and keep their own.
     if (!this.display.showOverlays) return;
+    // Fill first, then its own outline: the wash does not write depth, so the
+    // hairline lands on top of it rather than fighting it.
+    if (this.faceFillVertices && this.faceFillBuffer && this.facePipeline) {
+      pass.setPipeline(this.facePipeline);
+      pass.setBindGroup(0, this.overlayBindGroup);
+      pass.setVertexBuffer(0, this.faceFillBuffer);
+      pass.draw(this.faceFillVertices);
+    }
+    if (this.faceOutlineCount && this.faceOutlineBuffer && this.edgePipeline) {
+      pass.setPipeline(this.edgePipeline);
+      pass.setBindGroup(0, this.overlayBindGroup);
+      pass.setVertexBuffer(0, this.faceOutlineBuffer);
+      pass.draw(6, this.faceOutlineCount);
+    }
     if (this.display.showSketches && this.edgeCount && this.edgeBuffer && this.edgePipeline) {
       pass.setPipeline(this.edgePipeline);
       pass.setBindGroup(0, this.overlayBindGroup);
@@ -1280,6 +1342,8 @@ export class Renderer {
     this.destroyAccumulation();
     this.depthTexture?.destroy();
     this.edgeBuffer?.destroy();
+    this.faceFillBuffer?.destroy();
+    this.faceOutlineBuffer?.destroy();
     this.handleBuffer?.destroy();
     this.gizmoBuffer?.destroy();
     this.simVertexBuffer?.destroy();

@@ -23,6 +23,7 @@ import {
   type PanelVisibility,
 } from "../state";
 import { EDITING_MODES } from "../editingMode";
+import { windowManager } from "../windows/manager";
 
 export interface MenuBarProps {
   canUndo: boolean;
@@ -330,6 +331,49 @@ export function MenuBar(props: MenuBarProps) {
                   </button>
                 )}
               </For>
+              {/* Float and dock, and the way back from both. The dock owns
+                  the arrangement and publishes this manager on mount, so the
+                  section simply is not there before it exists — which is also
+                  the case in a unit test, where no dock is ever built. */}
+              <Show when={windowManager()}>
+                {(manager) => (
+                  <>
+                    <hr />
+                    <For each={manager().windows}>
+                      {(window) => (
+                        <button
+                          type="button"
+                          role="menuitemcheckbox"
+                          aria-checked={manager().isFloating(window.id)}
+                          disabled={manager().status(window.id) === "closed"}
+                          onClick={() => {
+                            // Unlike the visibility checks above, this one
+                            // closes the menu: the window it moves lands over
+                            // the dropdown, and a menu underneath a floating
+                            // panel is a menu you cannot click.
+                            setOpenMenu(null);
+                            if (manager().isFloating(window.id)) manager().dock(window.id);
+                            else manager().float(window.id);
+                          }}
+                          onKeyDown={onMenuKeyDown}
+                          data-testid={`menu-window-float-${window.id}`}
+                        >
+                          <i class="menu-check">
+                            {manager().isFloating(window.id) ? "✓" : ""}
+                          </i>
+                          <span>Float {window.title}</span>
+                        </button>
+                      )}
+                    </For>
+                    <hr />
+                    {item(
+                      "Reset layout",
+                      () => (setOpenMenu(null), manager().resetLayout()),
+                      { testid: "menu-window-reset" },
+                    )}
+                  </>
+                )}
+              </Show>
             </div>
           </Show>
         </div>

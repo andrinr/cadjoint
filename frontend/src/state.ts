@@ -39,6 +39,7 @@ import {
   type EditingMode,
 } from "./editingMode";
 import { DEFAULT_SKETCH_PLANE, type SketchPlaneChoice } from "./sketchPlanes";
+import type { FacePick } from "./faces";
 
 export const [source, setSource] = createSignal("");
 export const [nodes, setNodes] = createSignal<ConstructionNode[]>([]);
@@ -139,6 +140,17 @@ export interface SimProbe {
 
 export const [simProbe, setSimProbe] = createSignal<SimProbe | null>(null);
 export const [meshEdges, setMeshEdges] = createSignal<MeshEdgePayload | null>(null);
+
+/**
+ * The analytic face under the pointer while the face tool is armed.
+ *
+ * Written by the viewer's hover resolution and read by two things that must
+ * agree: the GPU highlight, and the hint bar's readout of what a click would
+ * do. Null whenever the pointer is not over a face the construction tree
+ * declared — which is also the state that makes a click fall back to a
+ * tangent plane.
+ */
+export const [faceHover, setFaceHover] = createSignal<FacePick | null>(null);
 export const [selection, setSelection] = createSignal<Selection | null>(null);
 export const [hover, setHover] = createSignal<Selection | null>(null);
 export const [tool, setTool] = createSignal<ToolMode>("select");
