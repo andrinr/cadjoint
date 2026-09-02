@@ -20,6 +20,11 @@ from typing import Any
 
 from cadjoint.viewer._limits import OVERSIZED_SOURCE_ERROR, exceeds_source_limit
 from cadjoint.viewer._patch import OPERATIONS, PatchError, apply_operation
+from cadjoint.viewer.patch.materials import (
+    EDITABLE_PROPERTIES,
+    PROPERTY_BOUNDS,
+    property_range_error,
+)
 from cadjoint.viewer.source_map.identity import Identity, identity_index
 
 # ``(error, arguments)``: a rejection to return, or the keyword arguments the
@@ -65,6 +70,7 @@ _ID_TARGETS: dict[str, frozenset[str]] = {
     "add_primitive": frozenset(),
     "add_material": frozenset(),
     "assign_material": frozenset({"sketch", "primitive", "feature"}),
+    "set_material_property": frozenset({"material"}),
     "add_sketch": frozenset(),
     "set_sketch_plane": frozenset({"sketch", "plane"}),
     "add_extrusion": frozenset({"sketch"}),
@@ -263,6 +269,45 @@ def _validate_add_material(request: dict[str, Any]) -> Checked:
             return _error(f"The patch request needs `{key}` from {low:g} to {high:g}."), {}
         properties[key] = float(raw)
     return None, {"color": color, **properties}
+
+
+def _validate_set_material_property(request: dict[str, Any]) -> Checked:
+    """One property of one material: which material, which property, what value.
+
+    The material is named the way declarations are — by the payload's index or
+    by a name — with a stable ``id`` resolving to the definition's ``line``
+    instead.  ``value`` is a number inside that property's bracket, or ``null``
+    to take the keyword back out of the call.
+    """
+    arguments: dict[str, Any] = {}
+    line = request.get("line")
+    material = request.get("material")
+    if line is not None:
+        if not _integer(line):
+            return _error("The patch request needs an integer `line`."), {}
+        arguments["line"] = line
+    elif (_integer(material) and material >= 0) or (isinstance(material, str) and material.strip()):
+        arguments["material"] = material
+    else:
+        return _error("The patch request needs `material` as a name or a non-negative index."), {}
+    name = request.get("property")
+    if not isinstance(name, str) or name not in EDITABLE_PROPERTIES:
+        allowed = ", ".join(EDITABLE_PROPERTIES)
+        return _error(f"Material `property` must be one of: {allowed}."), {}
+    arguments["property"] = name
+    raw_value = request.get("value")
+    if raw_value is None:
+        arguments["value"] = None
+    else:
+        low, high = PROPERTY_BOUNDS[name]
+        if not _number(raw_value) or not low <= float(raw_value) <= high:
+            return _error(property_range_error(name)), {}
+        arguments["value"] = float(raw_value)
+    expand = request.get("expand", False)
+    if not isinstance(expand, bool):
+        return _error("The patch request needs `expand` as a boolean."), {}
+    arguments["expand"] = expand
+    return None, arguments
 
 
 def _validate_assign_material(request: dict[str, Any]) -> Checked:
@@ -696,6 +741,7 @@ PATCH_VALIDATORS: dict[str, Validator] = {
     "add_primitive": _validate_add_primitive,
     "add_material": _validate_add_material,
     "assign_material": _validate_assign_material,
+    "set_material_property": _validate_set_material_property,
     "add_sketch": _validate_add_sketch,
     "set_sketch_plane": _validate_set_sketch_plane,
     "add_extrusion": _validate_add_extrusion,

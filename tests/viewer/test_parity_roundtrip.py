@@ -6,7 +6,7 @@ added that boundary condition. Until now nothing checked the two halves
 against each other: the patch tests read the source text, the payload tests
 read a payload, and no test made a patch and then looked.
 
-This module closes that loop for all 27 operations. For each generated
+This module closes that loop for all 28 operations. For each generated
 request it asserts, in order:
 
 1. the patched text is still valid Python;
@@ -313,6 +313,57 @@ def _cases() -> list[Case]:
             legacy={"op": "assign_material", "line": block.line, "material": "brass"},
             expect=lambda before, after: node(after, "assign:block")["material"] == "brass"
             or _fail("the material was not assigned"),
+            idempotent=True,
+        )
+    )
+    density = round(abs(number()) * 2000 + 4000, 3)
+    cases.append(
+        Case(
+            name="set_material_property[add]",
+            request={
+                "op": "set_material_property",
+                "id": "assign:steel",
+                "property": "density",
+                "value": density,
+            },
+            legacy={
+                "op": "set_material_property",
+                "material": "steel",
+                "property": "density",
+                "value": density,
+            },
+            # ``steel`` states no physics, so this *adds* the keyword — the
+            # case the optical properties never exercise.
+            expect=lambda before, after, value=density: (
+                named(before["materials"], "assign:steel")["physical"]["density"] is None
+                and _approx(named(after["materials"], "assign:steel")["physical"]["density"], value)
+                and "density" in named(after["materials"], "assign:steel")["spans"]
+            )
+            or _fail("the density the payload reports is not the one asked for"),
+            idempotent=True,
+        )
+    )
+    cases.append(
+        Case(
+            name="set_material_property[remove]",
+            request={
+                "op": "set_material_property",
+                "id": "assign:brass",
+                "property": "roughness",
+                "value": None,
+            },
+            legacy={
+                "op": "set_material_property",
+                "material": "brass",
+                "property": "roughness",
+                "value": None,
+            },
+            expect=lambda before, after: (
+                "roughness" in named(before["materials"], "assign:brass")["spans"]
+                and "roughness" not in named(after["materials"], "assign:brass")["spans"]
+            )
+            or _fail("the property was not removed"),
+            # Removing what is already gone is the state the caller asked for.
             idempotent=True,
         )
     )

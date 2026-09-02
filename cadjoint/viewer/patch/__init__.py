@@ -50,7 +50,11 @@ from cadjoint.viewer.patch.constraints import (
 )
 from cadjoint.viewer.patch.errors import PatchError
 from cadjoint.viewer.patch.geometry import add_primitive, delete_object, set_value
-from cadjoint.viewer.patch.materials import add_material, assign_material
+from cadjoint.viewer.patch.materials import (
+    add_material,
+    assign_material,
+    set_material_property,
+)
 from cadjoint.viewer.patch.meshes import add_mesh, delete_mesh, set_mesh_value
 from cadjoint.viewer.patch.optimizations import delete_optimization, set_optimization_value
 from cadjoint.viewer.patch.parameters import set_parameter_value, set_parameter_values
@@ -81,6 +85,7 @@ OPERATIONS = {
     "add_primitive": add_primitive,
     "add_material": add_material,
     "assign_material": assign_material,
+    "set_material_property": set_material_property,
     "add_sketch": add_sketch,
     "set_sketch_plane": set_sketch_plane,
     "add_extrusion": add_extrusion,
@@ -155,6 +160,7 @@ __all__ = [
     "delete_vertex",
     "insert_vertex",
     "set_constraint_value",
+    "set_material_property",
     "set_mesh_value",
     "set_optimization_value",
     "set_parameter_value",

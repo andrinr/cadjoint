@@ -107,6 +107,42 @@ class AssignMaterialRequest(Targeted):
     """A Python identifier: the variable the material is bound to."""
 
 
+MaterialProperty = Literal[
+    "roughness",
+    "metallic",
+    "opacity",
+    "ior",
+    "reflectivity",
+    "density",
+    "conductivity",
+    "specific_heat",
+    "youngs_modulus",
+    "poisson_ratio",
+    "thermal_expansion",
+    "yield_strength",
+]
+"""Every property one request may set: the scalar optical ones, and all seven
+physical ones in SI. ``color`` is a vector and keeps its own editor."""
+
+
+class SetMaterialPropertyRequest(Targeted):
+    """Set, add, or remove one property keyword on a ``Material(...)`` call.
+
+    Optical properties are always stated, so a number rewrites a literal.
+    Physical ones usually are not, so a number the call does not carry is
+    added as a new keyword; ``value: null`` removes it again.
+    """
+
+    op: Literal["set_material_property"]
+    material: str | int | None = None
+    """The material's name, or its index in the material payload."""
+    property: MaterialProperty
+    value: float | None = None
+    """SI, inside the bracket ``Material`` enforces; null removes the keyword."""
+    expand: bool = False
+    """Convert a catalogue-built material to a literal first, if it is cheap."""
+
+
 class AddSketchRequest(PatchBase):
     op: Literal["add_sketch"]
     origin: Vector3
@@ -340,6 +376,7 @@ PATCH_REQUEST_MODELS: dict[str, type[BaseModel]] = {
     "add_primitive": AddPrimitiveRequest,
     "add_material": AddMaterialRequest,
     "assign_material": AssignMaterialRequest,
+    "set_material_property": SetMaterialPropertyRequest,
     "add_sketch": AddSketchRequest,
     "set_sketch_plane": SetSketchPlaneRequest,
     "add_extrusion": AddExtrusionRequest,

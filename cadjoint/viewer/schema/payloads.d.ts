@@ -400,6 +400,24 @@ export interface AssignMaterialRequest {
   material: string;
 }
 
+/**
+ * Set, add, or remove one property keyword on a ``Material(...)`` call.
+ *
+ * Optical properties are always stated, so a number rewrites a literal.
+ * Physical ones usually are not, so a number the call does not carry is
+ * added as a new keyword; ``value: null`` removes it again.
+ */
+export interface SetMaterialPropertyRequest {
+  source: string;
+  id?: string | null;
+  line?: number | null;
+  op: "set_material_property";
+  material?: string | number | null;
+  property: "roughness" | "metallic" | "opacity" | "ior" | "reflectivity" | "density" | "conductivity" | "specific_heat" | "youngs_modulus" | "poisson_ratio" | "thermal_expansion" | "yield_strength";
+  value?: number | null;
+  expand?: boolean;
+}
+
 export interface AddSketchRequest {
   source: string;
   op: "add_sketch";
@@ -612,6 +630,7 @@ export type PatchRequest =
   | AddPrimitiveRequest
   | AddMaterialRequest
   | AssignMaterialRequest
+  | SetMaterialPropertyRequest
   | AddSketchRequest
   | SetSketchPlaneRequest
   | AddExtrusionRequest

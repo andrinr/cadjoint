@@ -143,6 +143,65 @@ touches undo history.
 scalars without re-solving, a deformed view for elastic results, per-vertex BC
 previews, and an axis-aligned slice plane.
 
+## Materials
+
+A `Material` carries two families of property in one object: the optical ones
+the renderer shades with (`color`, `roughness`, `metallic`, `opacity`, `ior`,
+`reflectivity`) and the physical ones the simulation solves with, in SI —
+`density`, `conductivity`, `specific_heat`, `youngs_modulus`, `poisson_ratio`,
+`thermal_expansion`, `yield_strength`. Optical properties always have a value;
+physical ones default to *unspecified*, so a scene that only cares about looks
+never has to invent a Young's modulus.
+
+Both families are editable from the inspector through one operation,
+`set_material_property`, which names the material by its stable id, its payload
+index, or its name, and carries the property and a number:
+
+```json
+{"op": "set_material_property", "id": "assign:copper",
+ "property": "youngs_modulus", "value": 1.185e11}
+```
+
+The physical half is why the operation exists rather than reusing `set_value`.
+An unspecified property has no keyword in the call and therefore **no span** in
+the payload, so there is nothing for the inspector to drag — the material
+payload publishes `physical` (the value, or `null`), `units`, `free`, and a
+`spans` entry only for the properties actually stated. A row with no span is a
+row the inspector offers to *state*: the same request with a number adds the
+keyword to the call. Sending `"value": null` takes it back out, returning a
+physical property to unspecified and an optical one to its default.
+
+Values are checked against the same brackets `Material` enforces when
+`free=True`, so a number the viewer accepts is one the optimizer accepts, and a
+rejection names the unit it was measured in — `` `density` must be a number
+from 1 to 25000 kg/m^3. ``
+
+| Property | Range | Unit |
+| --- | --- | --- |
+| `density` | 1 – 25000 | kg/m^3 |
+| `conductivity` | 0.001 – 3000 | W/(m·K) |
+| `specific_heat` | 1 – 10000 | J/(kg·K) |
+| `youngs_modulus` | 1000 – 1e12 | Pa |
+| `poisson_ratio` | 0 – 0.499 | — |
+| `thermal_expansion` | 0 – 0.001 | 1/K |
+| `yield_strength` | 1000 – 1e11 | Pa |
+| `roughness`, `metallic`, `opacity`, `reflectivity` | 0 – 1 | — |
+| `ior` | 1 – 3 | — |
+
+The edit is span surgery like every other: the keyword is written on the line
+of the argument it follows, so no line number moves — unless that would push
+the line past 100 columns, in which case the keyword wraps onto its own line
+and the file grows by exactly one.
+
+A material built by a [catalogue](materials.qmd) factory — `alu =
+aluminium_6061()` — has no property keyword to edit, and the operation says so
+rather than guessing. Sending the same request again with `"expand": true`
+rewrites the binding as the literal `Material(...)` the factory builds, one
+keyword per line, and then applies the edit; from there every property is an
+editable row. Only the cheap conversion is done: a bare, argument-free factory
+call, whose result the server can build and read without executing any of the
+user's own code.
+
 ## Rendering
 
 The eye icon opens the render popover. It carries three editable presets —
@@ -319,6 +378,26 @@ of them lints, so a typing session cannot flush the expensive history), and
 64 MB of stored payloads. Past either bound the oldest finished entries go —
 payloads first, so a job's timings and samples outlive its result. Every
 listing reports both budgets and how much has been evicted.
+
+In the UI this is the **Processes** window. It is parked in the tray of
+every desk rather than docked — a monitor that took a column of the desk
+before you asked for it would be in the way of the work it monitors — and it
+opens from the tray or from Window ▸ Processes. It has three zones: `01
+RUNNING`, one row per job with its elapsed time, CPU, memory and a cancel
+control (an optimization also shows its step and objective); `02 HISTORY`,
+what finished, newest first, where clicking a solve, mesh inspection or
+optimization re-opens that result in the panel that draws it; and `03 LOAD`,
+the totals, a minute of worker CPU, and how much of the store's budget is
+used. It polls once a second while it is open, and not at all while it is
+not.
+
+The panels do their half of the same bargain. The Simulate panel's Results
+tab, the mesh inspection and an optimization run each remember only the job
+id, the source hash and the request's name, and fetch the payload back when
+they mount again — so leaving Simulate mode and coming back no longer costs
+a second solve. A result whose hash no longer matches the editor is kept and
+marked `stale · source changed` rather than discarded, and a result the
+server has evicted says so and offers the run again.
 
 Sampling uses `psutil`, part of the `viewer` extra. Without it the server
 still registers everything and still cancels; it falls back to

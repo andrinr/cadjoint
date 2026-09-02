@@ -10,6 +10,14 @@ and the reverse lookups that tell a primitive or profile entry which named
 material it currently carries (a profile answers through the ``extrude`` /
 ``revolve`` / ``loft`` call that consumes it, since the material lives on the
 generator, not the sketch).
+
+The payload's ``spans`` are what the inspector edits live, and they are keyed
+by the *stated* arguments of the call — so a physical property the material
+does not specify has a ``null`` in ``physical`` and no entry in ``spans`` at
+all.  That absence is the signal: a row with a span is a number to drag, a row
+without one is a property to *state*, which
+:func:`~cadjoint.viewer.patch.materials.set_material_property` does by adding
+the keyword.
 """
 
 from __future__ import annotations
@@ -67,7 +75,8 @@ def build_material_payload(namespace: dict, source: str) -> list[dict]:
                 "ior": float(params["ior"].value),
                 "reflectivity": float(params["reflectivity"].value),
                 # Physical properties (SI) with their units and free flags,
-                # for the inspector; absent values are null.
+                # for the inspector; absent values are null, and an absent
+                # value has no ``spans`` entry either.
                 **{
                     key: value
                     for key, value in material.describe().items()

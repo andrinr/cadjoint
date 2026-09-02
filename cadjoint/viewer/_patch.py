@@ -38,6 +38,7 @@ from cadjoint.viewer.patch import (  # noqa: F401
     delete_vertex,
     insert_vertex,
     set_constraint_value,
+    set_material_property,
     set_mesh_value,
     set_optimization_value,
     set_parameter_value,
