@@ -18,6 +18,12 @@ from cadjoint.fluent import Fluent
 if TYPE_CHECKING:
     from cadjoint.geometry.parameters import Parameter
 
+# The face-reference names a construction feature binds onto the SDF it
+# generated. Kept here as data so the SDF layer can forward them without
+# importing anything from cadjoint.construction — the dependency runs the
+# other way, and must keep running the other way.
+_FACE_REFERENCES = frozenset({"faces", "face", "cap", "side", "axis"})
+
 
 class SDF(Fluent):
     """Abstract base class for Signed Distance Functions.
@@ -75,7 +81,64 @@ class SDF(Fluent):
     # Twist) so the renderer uses ao=1 instead of the unreliable gradient norm.
     is_exact: bool = True
 
+    # Set to True on nodes that leave their FIRST child's surface where it was,
+    # so that child's analytic face references still land on this node's own
+    # surface. See __getattr__ below; the flag is opt-in because most nodes
+    # move the surface and a forwarded face would then quietly be wrong.
+    inherits_faces: bool = False
+
     params: dict[str, Parameter]
+
+    def __getattr__(self, name: str):
+        """Forward a base child's face references through face-preserving nodes.
+
+        :func:`cadjoint.construction.faces.attach_faces` binds ``faces``,
+        ``face``, ``cap``, ``side`` and ``axis`` onto the SDF a generator
+        returns, so ``extrude(profile, depth).cap("+")`` is a plain instance
+        attribute and never reaches this method. What *did* reach it before
+        was every downstream node: ``Difference(body, hole).cap("+")`` raised
+        ``AttributeError``, so the moment a body had a hole in it, it stopped
+        being something you could sketch on — which is most of feature-based
+        CAD.
+
+        Booleans and patterns do not move the base body's surface: cutting a
+        hole in a plate leaves the plate's top face in the same plane, and
+        copy 0 of a pattern *is* the original. Those nodes set
+        :attr:`inherits_faces` and forward, so a face reference survives the
+        rest of the feature tree. Nodes that displace the surface — every
+        affine transform, ``Shell``, ``Offset`` — deliberately do not: their
+        child's face plane is no longer on their own surface, and returning
+        it would be a silent lie rather than a loud ``AttributeError``.
+
+        The forwarded face keeps the *plane* exact — that is what a downstream
+        sketch, mirror or pattern actually consumes. Its boundary polygon is
+        the uncut outline, so a face a tool has since carved into reports the
+        area it had before the cut; :meth:`Face.contains` is correspondingly
+        optimistic there. This mirrors how a B-rep modeller keeps a face's
+        identity across the features applied to it.
+
+        Args:
+            name: The attribute Python failed to find by normal lookup.
+
+        Returns:
+            The base child's attribute, for the five face-reference names on a
+                node that declares :attr:`inherits_faces`.
+
+        Raises:
+            AttributeError: For every other name, and when no base child
+                carries the reference — with the node's own type in the
+                message, so the failure still reads as this node's.
+        """
+        # type(self) — not self — so a node still inside __init__ (no children
+        # yet) cannot recurse back into this lookup.
+        if name in _FACE_REFERENCES and type(self).inherits_faces:
+            children = self.children()
+            if children:
+                try:
+                    return getattr(children[0], name)
+                except AttributeError:
+                    pass
+        raise AttributeError(f"{type(self).__name__!r} object has no attribute {name!r}")
 
     def __init_subclass__(cls, **kwargs):
         """Automatically wrap __init__ to call _cast_params after initialization."""

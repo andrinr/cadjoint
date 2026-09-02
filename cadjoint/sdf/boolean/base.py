@@ -20,5 +20,13 @@ class BooleanOp(SDF):
     - self.params: Dictionary of Parameter objects
     """
 
+    # A boolean leaves its base operand's surface where it was — cutting a
+    # hole in a plate does not move the plate's top face — so the base's
+    # analytic face references still land on the result and are forwarded by
+    # SDF.__getattr__. Two caveats live in that method's docstring: the
+    # boundary polygon is the *uncut* outline, and a smoothness > 0 blend
+    # rounds the surface near the seam while leaving it exact away from it.
+    inherits_faces = True
+
     def children(self) -> list:
         return list(self.sdfs)
