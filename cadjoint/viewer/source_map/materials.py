@@ -63,6 +63,13 @@ def build_material_payload(namespace: dict, source: str) -> list[dict]:
                 "opacity": float(params["opacity"].value),
                 "ior": float(params["ior"].value),
                 "reflectivity": float(params["reflectivity"].value),
+                # Physical properties (SI) with their units and free flags,
+                # for the inspector; absent values are null.
+                **{
+                    key: value
+                    for key, value in material.describe().items()
+                    if key in ("physical", "units", "free")
+                },
                 "spans": (
                     {name: list(span) for name, span in call.arguments.items()}
                     if call is not None

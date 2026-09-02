@@ -65,9 +65,51 @@ fin_depth = Scalar(1.2, free=True, name="fin_depth")
 base_width = Scalar(1.8, name="base_width")
 bushing_spacing = Scalar(1.56, name="bushing_spacing")
 
-aluminum = Material(name="aluminum", color=[0.8, 0.82, 0.85], roughness=0.3, metallic=0.9)
-copper = Material(name="copper", color=[0.9, 0.45, 0.22], roughness=0.18, metallic=0.95)
-steel = Material(name="steel", color=[0.55, 0.57, 0.6], roughness=0.4, metallic=0.85)
+# Materials carry their physics as well as their look (SI: kg/m³, W/(m·K),
+# J/(kg·K), Pa, 1/K). The scene below is drawn at unit scale rather than in
+# metres, so the thermal study states its conductivity explicitly instead of
+# taking it from the materials; the properties still feed mass, elastic
+# studies and the safety factor, and become the default the moment a scene
+# is authored in metres.
+aluminum = Material(
+    name="aluminum",
+    color=[0.8, 0.82, 0.85],
+    roughness=0.3,
+    metallic=0.9,
+    density=2700.0,
+    conductivity=167.0,
+    specific_heat=896.0,
+    youngs_modulus=68.9e9,
+    poisson_ratio=0.33,
+    thermal_expansion=23.6e-6,
+    yield_strength=276e6,
+)
+copper = Material(
+    name="copper",
+    color=[0.9, 0.45, 0.22],
+    roughness=0.18,
+    metallic=0.95,
+    density=8940.0,
+    conductivity=391.0,
+    specific_heat=385.0,
+    youngs_modulus=117e9,
+    poisson_ratio=0.34,
+    thermal_expansion=17.0e-6,
+    yield_strength=69e6,
+)
+steel = Material(
+    name="steel",
+    color=[0.55, 0.57, 0.6],
+    roughness=0.4,
+    metallic=0.85,
+    density=7870.0,
+    conductivity=51.9,
+    specific_heat=486.0,
+    youngs_modulus=205e9,
+    poisson_ratio=0.29,
+    thermal_expansion=11.5e-6,
+    yield_strength=370e6,
+)
 # Board-level context: rendered for orientation, excluded from the thermal
 # domain below (see ``thermal_body``), so the physics never sees them.
 fr4 = Material(name="fr4", color=[0.10, 0.36, 0.22], roughness=0.85, metallic=0.0)
