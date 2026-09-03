@@ -43,13 +43,13 @@ GEOMETRY
   five subdivisions per division on the two centre axes only, arms 5px / 9px on every fifth.
   26px / 2px corner brackets. Page cell grid 80px. Radius 0 everywhere. No shadows.
 
-FACTS PRINTED IN THE BANNERS  (checked against the repo at capture time, 7ba1097)
+FACTS PRINTED IN THE BANNERS  (checked against the repo at capture time, fd5a098)
   LICENCE       Apache 2.0            LICENSE at the repo root
   SCENE         starter.py            scenes/starter.py — scenes are Python, there is no .cj format
   STUDY         sink-conduction       ThermalStudy(name=...) in starter.py
   MESH          sink-mesh · tet10     SimMesh(name=..., method="tet10")
   SOLVER        jax-fem               tet meshes solve on the direct jax-fem path only
-  REV           7ba1097               git rev-parse --short HEAD at capture time
+  REV           fd5a098               git rev-parse --short HEAD at capture time
   FIELD RANGE   0 .. 1.134            the Results legend of the captured solve
   OBJECTIVE     cool-sink · max temperature · 12 steps   Optimization(...) in starter.py
   GRID / VIEW   500 mm · ISO +X−Y+Z   the app's own readout in the capture, on detent
@@ -57,6 +57,11 @@ FACTS PRINTED IN THE BANNERS  (checked against the repo at capture time, 7ba1097
 THE HERO
   A live capture: playground -> Run -> Simulate -> Solve -> Results, construction
   overlay off (toggle-construction-overlay), slice X at 0.55, zoom 5 detents in.
+  Re-cut 2026-09-02 at fd5a098 from the windowed bundle (Studies / Results are
+  dockview windows; capture.mjs reaches them by their sim-tab-* tab ids). The
+  server was run with a private CADJOINT_CACHE_DIR so a second playground on
+  the machine could not contend for the cache lock (the warning it raises
+  lands in the editor's stderr pane and would have been in the picture).
   The slice is a real inspection mode and the only honest way to show the interior
   of a field whose hot region is an internal boundary — without it the part reads
   as a near-black solid, because that is what the surface temperature is.
@@ -64,7 +69,8 @@ THE HERO
   invert, so the readouts drawn over it are fixed to the light ink stack, and the
   plate's edge is stated by a 1px #605e65 rule rather than by luminance.
 
-MEASURED ON THE RENDERS
+MEASURED ON THE RENDERS  (measured on the 7ba1097 renders; the fd5a098 re-cut changes
+  only the plate's pixels — same app, same field, same legend range 0..1.134 — and was not re-measured)
   a-dock             2560x1280  max chroma 0.194 · accent 1.23% of px · chrome outside plate/legend/accent: max chroma 0.013, px over 0.03 = 0
   a-dock-dark        2560x1280  max chroma 0.194 · accent 1.23% of px · chrome outside plate/legend/accent: max chroma 0.013, px over 0.03 = 0
   b-bleed            2560x1280  max chroma 0.194 · accent 0.20% of px · chrome outside plate/legend/accent: max chroma 0.013, px over 0.03 = 0
@@ -80,10 +86,13 @@ FILES
   a-dock.png / a-dock-dark.png       DOCK   social preview 1280x640 @2x  (shipped)
   b-bleed.png / b-bleed-dark.png     BLEED  social preview 1280x640 @2x  (poster alternative)
   readme-live.png / -dark.png        README header 1600x400 @2x          (shipped)
-  assets/hero-capture.png            the raw live capture (canvas region)
+  assets/hero-capture.png            the raw live capture (canvas region; 1440x1616 at fd5a098 —
+                                     the windowed desk's viewport is taller than the old one's)
   assets/hero-capture-context.png    the whole window at capture time, for sanity
   assets/hero-social.png             1:1 crop of it, for DOCK
   assets/hero-readme.png             3:2 crop, for the README header
+                                     (all three crops are cut centred on the part, at (725, 606)
+                                      of the raw capture — the canvas centre is empty floor)
   assets/hero-bleed.png              5:1 crop, for BLEED's full-bleed band
   capture.mjs   node capture.mjs --port N [--zoom 5] [--slice 0.55] [--orbit dx,dy]
                 (run `npm run build` in frontend/ first — it serves whatever bundle

@@ -9,7 +9,8 @@
  *   research/design/banner/assets/hero-capture.png
  *
  * IMPORTANT: the server hands out whatever bundle is in cadjoint/viewer/static/.
- * Run `npm run build` in frontend/ first, or you will capture a stale UI.
+ * Make sure that bundle is the one you mean (`npm run build` in frontend/, or
+ * the committed one), or you will capture a stale UI.
  *
  * Flags: --port N (required-ish, default 8792) · --out PATH · --width/--height
  *        --keep (leave the browser open) · --timeout MS
@@ -56,6 +57,22 @@ for (let i = 0; i < 120; i++) {
 }
 console.log("server up at", URL);
 
+// The server warms its compilation cache for every shipped scene at launch, in
+// worker subprocesses of its own. Driving it while those run puts two workers
+// on one cache lock, and the lock timeout JAX then warns about lands in the
+// editor's stderr pane — in the picture. So: wait until the job registry says
+// nothing is running before touching the page.
+{
+  const token = (await (await fetch(URL + "api/session")).json()).token;
+  for (let i = 0; i < 240; i++) {
+    const jobs = await (await fetch(URL + "api/jobs", { headers: { "X-Cadjoint-Token": token } })).json().catch(() => null);
+    const running = jobs?.totals?.running ?? 0;
+    if (i % 6 === 0) console.log("warm-up: running jobs", running);
+    if (jobs && running === 0 && i > 2) break;
+    await wait(5000);
+  }
+}
+
 const browser = await chromium.launch({
   headless: !flag("keep"),
   args: ["--enable-unsafe-webgpu", "--enable-gpu", "--use-angle=metal",
@@ -84,17 +101,24 @@ console.log("scene compiled");
 await clickIfThere(testid("run"), "Run");
 await page.waitForTimeout(4000);
 
-// "M cycles modes" — the keyboard is the stable contract; the switcher markup is not.
+// The mode strip's own button; "M cycles modes" stays the fallback. (The canvas
+// is not clicked for focus any more: its top-left corner is under the tool rail.)
 const mode = () => page.evaluate(() => document.querySelector("[data-mode]")?.getAttribute("data-mode"));
-await testid("viewer-canvas").click({ position: { x: 8, y: 8 } });
-for (let i = 0; i < 6 && (await mode()) !== "simulate"; i++) {
-  await page.keyboard.press("m"); await page.waitForTimeout(500);
+if (!(await clickIfThere(testid("editmode-simulate"), "Simulate mode"))) {
+  await testid("viewer-canvas").click({ position: { x: 200, y: 8 } });
+  for (let i = 0; i < 6 && (await mode()) !== "simulate"; i++) {
+    await page.keyboard.press("m"); await page.waitForTimeout(500);
+  }
 }
 console.log("mode:", await mode());
 await page.waitForTimeout(1200);
 
-// Studies -> Solve. The study name comes from scenes/starter.py.
-await clickIfThere(page.locator("[data-testid=sim-tabs] button", { hasText: /studies/i }), "Studies tab");
+// Studies -> Solve. The study name comes from scenes/starter.py. Studies,
+// Results and the rest are dockview windows now; their tab labels carry the
+// old sim-tab-* ids (frontend/src/windows/panels.ts), and the old tab strip
+// is kept as a fallback for an older bundle.
+const simTab = (name) => page.locator(`[data-testid=sim-tab-${name}], [data-testid=sim-tabs] button:has-text("${name}")`);
+await clickIfThere(simTab("studies"), "Studies tab");
 await page.waitForTimeout(600);
 const solve = testid("simulate-run-sink-conduction");
 if (await solve.first().isVisible().catch(() => false)) {
@@ -105,14 +129,22 @@ if (await solve.first().isVisible().catch(() => false)) {
 } else {
   console.log("!! no simulate-run-sink-conduction button — capturing whatever is on screen");
 }
-await clickIfThere(page.locator("[data-testid=sim-tabs] button", { hasText: /results/i }), "Results tab");
+await clickIfThere(simTab("results"), "Results tab");
 await page.waitForTimeout(2500);
+// Results shares its column with Studies in the Simulate desk and is the short
+// one; park the setup group in the tray so the view controls are on screen.
+{
+  const setup = page.locator(".dv-groupview:has([data-testid=window-tab-studies])");
+  if (await clickIfThere(setup.getByTestId("window-minimise"), "park Studies/Meshes")) await page.waitForTimeout(800);
+  await clickIfThere(simTab("results"), "Results tab");
+}
 
 // optional slice: a real inspection mode, and the only honest way to show the
 // interior of a field whose hot region is an internal boundary.
 const slice = arg("slice", "");
 if (slice) {
   const en = testid("simulate-slice-enabled");
+  await en.first().scrollIntoViewIfNeeded().catch(() => {});
   if (await en.first().isVisible().catch(() => false)) {
     const inp = (await en.first().evaluate((el) => el.tagName)) === "INPUT"
       ? en.first() : en.first().locator("input").first();
