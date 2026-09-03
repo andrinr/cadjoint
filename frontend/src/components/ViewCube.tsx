@@ -47,10 +47,8 @@ import {
   facetVisible,
   frontFacet,
   project,
-  stepView,
   type Basis,
   type Facet,
-  type TurnAxis,
 } from "../viewer/navCube";
 import { VIEW_PRESETS, sameView } from "../viewer/display";
 import type { Projection } from "../viewer/math";
@@ -60,95 +58,21 @@ import { OrthographicIcon, PerspectiveIcon } from "./icons";
 
 /** SVG units per cube unit. The cube's half-edge is 1. */
 const SCALE = 34;
-/** Half the viewBox. The body diagonal is √3 ≈ 1.73 cube units. */
-const EXTENT = 92;
 /**
- * How far from the centre the four quarter-turn controls sit.
- *
- * Close enough to read as part of the widget rather than as four marks
- * floating around it. The cube reaches `SCALE` (34) at a face and about 59
- * at a corner, but the controls sit on the flanks, where the silhouette is
- * the face and its chamfer — so 66 clears the cube with room to spare while
- * a control's hit square (half-side `TURN_HIT`) still stops short of it.
+ * Half the viewBox. The body diagonal is √3 ≈ 1.73 cube units, so the cube
+ * reaches about 59; the rest is the room the projection triad and the label
+ * need. It used to be 92 to clear four quarter-turn controls on the flanks,
+ * which are gone — a face, bevel or corner is a click, and the view keys
+ * reach what the silhouette hides.
  */
-const TURN_RADIUS = 66;
-/** Radius of the quarter arc each turn control is drawn with. */
-const TURN_ARC = 12;
-/** Length of each arm of the arrowhead, measured along an axis. */
-const TURN_HEAD = 5;
-/** Half the side of a turn control's (invisible) hit square. */
-const TURN_HIT = 15;
-
-/** Pointer travel, in pixels, below which the gesture counts as a click. */
+const EXTENT = 70;
+/** Pixels of pointer travel that still counts as a click, not a drag. */
 const CLICK_SLOP = 4;
+/** Radians of orbit per pixel dragged on the cube itself. */
 const ORBIT_SPEED = 0.011;
 
 const path = (points: [number, number][]): string =>
   points.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(" ");
-
-/**
- * The four quarter-turn controls, one per flank.
- *
- * Each turns the camera a quarter turn toward the side of the screen it sits
- * on, from any standpoint — `stepView` in `navCube.ts` has the rule and the
- * argument for what happens at the poles. None is ever disabled: a greyed
- * control was read as a broken one.
- *
- * The glyph is drawn once, for the top flank, and the other three are that
- * drawing placed by the transform here: down is up mirrored through the
- * horizontal, right is up turned a quarter clockwise, left is right mirrored
- * through the vertical. Mirrored pairs rather than four rotated copies,
- * because four arcs all sweeping the same way around the cube read as a roll
- * ring, and this camera has no roll. As pairs, each glyph says "turn toward
- * this side" and its opposite says the reverse.
- */
-const TURNS = [
-  {
-    id: "up",
-    axis: "elevation" as const,
-    turns: 1 as const,
-    transform: `translate(0 ${-TURN_RADIUS})`,
-    label: "Turn up",
-  },
-  {
-    id: "right",
-    axis: "azimuth" as const,
-    turns: 1 as const,
-    transform: `translate(${TURN_RADIUS} 0) rotate(90)`,
-    label: "Turn right",
-  },
-  {
-    id: "down",
-    axis: "elevation" as const,
-    turns: -1 as const,
-    transform: `translate(0 ${TURN_RADIUS}) scale(1 -1)`,
-    label: "Turn down",
-  },
-  {
-    id: "left",
-    axis: "azimuth" as const,
-    turns: -1 as const,
-    transform: `translate(${-TURN_RADIUS} 0) scale(-1 1) rotate(90)`,
-    label: "Turn left",
-  },
-];
-
-/**
- * The turn glyph, drawn for the top flank: a quarter arc that comes in from
- * the left, sweeps up through ninety degrees and ends in an open arrowhead
- * pointing up — the direction the control turns toward. The arc runs from
- * the bottom of its circle to the right of it, and the circle's centre is
- * placed so the whole mark sits centred on the flank.
- */
-const TURN_GLYPH = (() => {
-  const tip: [number, number] = [3, -TURN_ARC / 2];
-  const centre: [number, number] = [tip[0] - TURN_ARC, tip[1]];
-  const tail: [number, number] = [centre[0], centre[1] + TURN_ARC];
-  return [
-    `M ${tail[0]} ${tail[1]} A ${TURN_ARC} ${TURN_ARC} 0 0 0 ${tip[0]} ${tip[1]}`,
-    `M ${tip[0] - TURN_HEAD} ${tip[1] + TURN_HEAD} L ${tip[0]} ${tip[1]} L ${tip[0] + TURN_HEAD} ${tip[1] + TURN_HEAD}`,
-  ].join(" ");
-})();
 
 /** True while focus is in the code editor or another text surface. */
 function isTypingTarget(): boolean {
@@ -304,11 +228,6 @@ export function ViewCube(props: ViewCubeProps) {
       props.projection === "orthographic" ? "perspective" : "orthographic",
     );
 
-  const turn = (axis: TurnAxis, turns: 1 | -1) => {
-    if (travelled > CLICK_SLOP) return;
-    const next = stepView(props.yaw, props.pitch, axis, turns);
-    props.onOrbit(next.yaw, next.pitch);
-  };
 
   /**
    * The view keys, claimed at the window.
@@ -359,30 +278,6 @@ export function ViewCube(props: ViewCubeProps) {
         aria-label="View cube"
       >
         <title>Drag to orbit. Click a face, bevel or corner to snap.</title>
-
-        {/* The quarter-turn controls, outside the cube on the four flanks.
-            The glyph is a hairline, so an invisible square under it is what
-            takes the press. */}
-        <For each={TURNS}>
-          {(control) => (
-            <g
-              class="cube-turn"
-              transform={control.transform}
-              onClick={() => turn(control.axis, control.turns)}
-              data-testid={`cube-turn-${control.id}`}
-            >
-              <title>{control.label} — a quarter turn</title>
-              <rect
-                class="cube-turn-hit"
-                x={-TURN_HIT}
-                y={-TURN_HIT}
-                width={TURN_HIT * 2}
-                height={TURN_HIT * 2}
-              />
-              <path class="cube-turn-glyph" d={TURN_GLYPH} />
-            </g>
-          )}
-        </For>
 
         {/* The solid itself, back facets already culled. */}
         <For each={visible()}>

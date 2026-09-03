@@ -162,10 +162,17 @@ async function editorText(page: Page): Promise<string> {
 }
 
 async function waitForCompile(page: Page) {
-  // "Run" is enabled before the first compile starts, so wait on the status
-  // leaving the compiling state instead.
-  await expect(page.getByTestId("status")).not.toContainText("compiling", { timeout: 60_000 });
-  await expect(page.getByTestId("run")).toBeEnabled({ timeout: 60_000 });
+  // The settle signal is the toolbar's busy seam. It is present for exactly
+  // as long as the app is behind its own source — from the edit, through the
+  // debounce window and the request, until the shaders are installed — which
+  // the status line no longer is: while work is in flight the status says
+  // nothing at all, so that the one indicator for running work is the
+  // toolbar's chip. A settled status is therefore a second, independent
+  // signal, and "Starting…" is the placeholder to wait past on a cold load.
+  await expect(page.getByTestId("status")).not.toHaveText(/^(|Starting…)$/, {
+    timeout: 60_000,
+  });
+  await expect(page.getByTestId("toolbar-busy")).toHaveCount(0, { timeout: 60_000 });
 }
 
 test.beforeEach(async ({ page }) => {
@@ -389,19 +396,28 @@ test("sketch constraints are drawn over the viewport", async ({ page }) => {
   await expect(page.getByTestId("constraint-distance-overlay")).toHaveCount(0);
 });
 
-test("compilation uses a non-blocking viewport progress indicator", async ({ page }) => {
+test("one indicator says the app is compiling, and the viewport carries none", async ({
+  page,
+}) => {
   await page.getByTestId("run").click();
-  await expect(page.getByTestId("viewer-compiling")).toBeVisible();
-  await expect(page.getByTestId("viewer-compiling")).toHaveCSS(
-    "pointer-events",
-    "none",
-  );
+
+  // The one indicator: the toolbar's seam, and the chip beside it that names
+  // the work and can stop it. Both are chrome — the viewport keeps its whole
+  // area, and the pointer never turns into a wait cursor over it.
+  await expect(page.getByTestId("toolbar-busy")).toBeVisible();
+  await expect(page.getByTestId("job-chip")).toContainText("compile");
+  await expect(page.getByTestId("viewer-compiling")).toHaveCount(0);
   expect(
     await page
       .getByTestId("viewer-canvas")
       .evaluate((canvas) => getComputedStyle(canvas).cursor),
   ).not.toBe("progress");
+
+  // And the status line does not say it a second time while it is running.
+  await expect(page.getByTestId("status")).toHaveText("");
+
   await waitForCompile(page);
+  await expect(page.getByTestId("toolbar-busy")).toHaveCount(0);
   await expect(page.getByTestId("viewer-compiling")).toHaveCount(0);
 });
 
@@ -678,50 +694,6 @@ test("the projection toggle sits inside the cube's square", async ({ page }) => 
   expect(toggle.y).toBeGreaterThanOrEqual(stage.y + stage.height / 2);
   expect(toggle.x + toggle.width).toBeLessThanOrEqual(stage.x + stage.width + 0.5);
   expect(toggle.y + toggle.height).toBeLessThanOrEqual(stage.y + stage.height + 0.5);
-});
-
-test("the quarter-turn controls work from every standpoint", async ({ page }) => {
-  // Off the poles, left and right are a turntable and up and down pitch the
-  // camera a quarter turn toward its own screen-up.
-  await page.getByTestId("view-front").click();
-  expect(await viewReadout(page)).toContain("FRONT");
-  await page.getByTestId("cube-turn-right").click();
-  expect(await viewReadout(page)).toContain("RIGHT");
-  await page.getByTestId("cube-turn-left").click();
-  expect(await viewReadout(page)).toContain("FRONT");
-  await page.getByTestId("cube-turn-up").click();
-  expect(await viewReadout(page)).toContain("TOP");
-
-  // At the pole nothing is greyed out: the four controls reach the four
-  // faces the reader sees around the TOP label, and "up" carries the camera
-  // over the pole rather than refusing.
-  for (const control of ["up", "right", "down", "left"]) {
-    await expect(page.getByTestId(`cube-turn-${control}`)).not.toHaveClass(/spent/);
-  }
-  await page.getByTestId("cube-turn-up").click();
-  expect(await viewReadout(page)).toContain("BACK");
-  // (From BACK the TOP facet is edge-on and cannot be pressed; the up
-  // control is the way back to it, which is rather the point.)
-  await page.getByTestId("cube-turn-up").click();
-  expect(await viewReadout(page)).toContain("TOP");
-  await page.getByTestId("cube-turn-right").click();
-  expect(await viewReadout(page)).toContain("RIGHT");
-  await page.getByTestId("cube-turn-up").click();
-  expect(await viewReadout(page)).toContain("TOP");
-  await page.getByTestId("cube-turn-down").click();
-  expect(await viewReadout(page)).toContain("FRONT");
-
-  // From an isometric corner the turntable lands on the next corner round —
-  // still ISO, but a different octant — and a corner is where a session
-  // starts, so this is the press most readers make first.
-  await page.getByTestId("view-front-right-top").click();
-  const octant = await viewReadout(page);
-  expect(octant).toContain("ISO");
-  await page.getByTestId("cube-turn-right").click();
-  expect(await viewReadout(page)).toContain("ISO");
-  expect(await viewReadout(page)).not.toBe(octant);
-  // A turn is a direction, never a projection.
-  expect(await projectionMode(page)).toContain("Orthographic");
 });
 
 test("object and gizmo picking use the orthographic camera", async ({ page }) => {
