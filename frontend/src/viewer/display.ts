@@ -13,11 +13,24 @@
  */
 
 import type { Projection } from "./math";
+import type { ShaderProgramPayload } from "./shaderProgram";
 
 export interface Shaders {
   preview: string;
   path: string;
   present: string;
+  /**
+   * The parameter buffer these two scene shaders read, when they were built
+   * in the uniform form.
+   *
+   * `null` (or absent) is the literal form, where every design parameter is
+   * a constant in the source and any edit is a different module. With a
+   * program the source is byte-identical across parameter values, which is
+   * what lets `setShaders` recognise a values-only edit and answer it with a
+   * `writeBuffer` instead of a recompile. A type-only import: this stays
+   * plain data with no WebGPU in it.
+   */
+  program?: ShaderProgramPayload | null;
 }
 
 export interface QualityPreset {

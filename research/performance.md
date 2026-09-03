@@ -917,3 +917,353 @@ before column), `runworker.py <scene> <mode>` (§12.5, same `FLAT` switch),
 for the control), `uniformcheck.py <scene>` and `shadercheck.py <scene>`
 (§12.8). Each takes `CADJOINT_CACHE_DIR` from the environment; every "warm"
 number is the second run against a populated one.
+
+# 13. The shader: what a parameter edit costs the GPU, and why folding decides it
+
+Status: shipped (2026-09-03). §12.8 built the uniform form and left it unused;
+this section is the frontend adopting it, the 21× regression that adoption
+exposed, and what the evidence said to do about it.
+
+**Machine**: the same Apple Silicon host as §0. **Adapter**: `apple metal-3`
+through Chromium's WebGPU (`--use-angle=metal`). **Frames**: 1200 × 800, median
+of 8 after 2 warm-up frames, two repetitions, the second quoted. Every
+`createShaderModule` / `getCompilationInfo` / `createRenderPipelineAsync` is
+timed with `performance.now()` in the page.
+
+**Pixel check**: every frame table below was taken with a coverage and
+mean-luminance probe on the same rendered image. Unless a row says otherwise
+its probe is identical to the literal row's to every digit — that is what
+makes the frame times comparable at all.
+
+## 13.1 Before: the literal form, as the viewer shipped it
+
+Each scene compiled through the real worker (`mode: "compile"`), warm cache.
+
+| scene | worker wall | payload | preview WGSL | path WGSL |
+|---|---:|---:|---:|---:|
+| `starter` | 1.85 s | 1.71 MB | 312 088 B | 302 680 B |
+| `end_cap` | 4.92 s | 8.64 MB | 1 671 539 B | 1 662 131 B |
+| `motor_shield` | 12.01 s | 23.83 MB | 4 567 621 B | 4 558 213 B |
+
+Browser-side, per compile — and this is paid **on every edit**, because in the
+literal form every design parameter is a float constant in the source:
+
+| scene | modules (create + info) | pipelines (4) |
+|---|---:|---:|
+| `starter` | 4.1 ms | 3.8 ms |
+| `end_cap` | 27.3 ms | 18.8 ms |
+| `motor_shield` | 648.4 ms | 745.2 ms |
+
+Frame time by display mode, Ultra:
+
+| scene | default | pbr | slice | gradient | normal | depth | path/sample |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| `starter` | 0.9 | 0.9 | 1.3 | 1.3 | 0.9 | 0.9 | 6.1 |
+| `end_cap` | 3.8 | 4.6 | 5.3 | 5.3 | 4.4 | 3.7 | 41.9 |
+| `motor_shield` | 15.7 | 15.9 | 19.4 | 26.1 | 24.9 | 21.2 | 258.9 |
+
+So a slider drag on `motor_shield` was a 12 s round trip followed by 1.4 s of
+browser compilation, per edit. That is what the uniform form was built to
+remove.
+
+## 13.2 The regression: the uniform form was correct and 21× slower
+
+Switching the worker to `compile_scene_to_wgsl(scene, uniforms=True)` — every
+parameter in a `@group(3)` buffer, source byte-identical across edits — worked,
+drew the identical image, and cost this:
+
+| scene | literal | every parameter buffered | ratio |
+|---|---:|---:|---:|
+| `starter` (143 params) | 0.9 ms | 1.1 ms | 1.2× |
+| `end_cap` (330 params) | 3.8 ms | 105.8 ms | **28×** |
+| `motor_shield` (889 params) | 15.7 ms | 605.4 ms | **39×** |
+
+The ratio is wildly non-linear in the parameter count, which rules out any
+per-parameter cost and points at a cliff.
+
+### 13.2.1 Four candidate causes, tested rather than assumed
+
+All four variants below are built from the **same** all-uniform module for
+`end_cap`, by textual substitution, so structure is held constant and only the
+spelling of a parameter read changes. All four draw the identical image
+(coverage 0.036617, mean luma 225.5668, matching the literal build exactly).
+
+| variant | what it is | uniform reads | default frame |
+|---|---|---:|---:|
+| A | the literal build (control) | 0 | 4.0 ms |
+| B | all-uniform module, reads replaced by their literal values | 3 | **3.4 ms** |
+| C | all-uniform module, reads hoisted to one `let` per function | 671 | 108.1 ms |
+| D | all-uniform module, as emitted | 4 560 | 105.6 ms |
+| E | only the 11 **free** parameters left as reads | 255 | **3.3 ms** |
+| F | only **one** parameter left as a read | 10 | 3.5 ms |
+
+Read across, this settles it:
+
+- **Not the number of loads.** C cuts them 6.8× and changes nothing (108.1
+  against 105.6 — within noise, and on the wrong side of it).
+- **Not the shape of the emitted code.** B has D's exact function list,
+  argument counts and expression tree; substituting the values back recovers
+  the full speed, and then some.
+- **Not the driver deoptimising on a hot-loop uniform read.** B, E and F all
+  read the same buffer in the same loop and are all fast.
+- **Not a benchmark artefact.** Same harness, same warm-up, same frame count,
+  same pixels, both directions of the substitution.
+
+**It is constant folding, and nothing else.** `scenes/end_cap.py` is 1.7 MB of
+WGSL *because* it is mostly foldable: 21 pattern instances, unrolled, each
+carrying its own transform algebra that collapses to a few instructions once
+the transform is a constant and runs in full when it is not. The module size
+is not the cost; the module size is the *evidence* of how much the compiler
+normally deletes.
+
+B being slightly faster than A is the same fact seen from the other side: the
+uniform form's outlining happens to give Metal a marginally better program to
+fold than the literal lowering does.
+
+### 13.2.2 Two corollaries worth recording
+
+The reserved NaN slot cannot be substituted away. Every constant spelling of a
+NaN — `bitcast<f32>(0x7fc00000u)` included — is const-evaluated and rejected
+("value nan cannot be represented as 'f32'"), which is why §12.8 put one in the
+buffer. Variant B keeps exactly that one read.
+
+Hoisting is not a hidden win either. 31.6 % of the emitted bindings are
+invocation-invariant (they depend only on parameters, never on the point) and
+sit inside the marched `sdf` call being recomputed at every step — 13 323 of
+`sdf_impl`'s 25 221 for `motor_shield`. Lifting them out is textbook LICM, but
+the *frontier* — the invariant values that point-dependent code actually reads,
+and so the values that would have to stay live across the march loop — is 2 712
+for `motor_shield` and 919 for `end_cap`. An Apple GPU thread has on the order
+of a hundred registers before occupancy collapses. Hoisting would trade ALU for
+spill traffic, which is the wrong direction, and variant C is the small-scale
+measurement that says so.
+
+## 13.3 What shipped: only the free parameters get a slot
+
+`compile_scene_with_uniforms(..., scope="free")` is now the default, and the
+worker's default. A free parameter — declared, named, optimizable, and the only
+kind a handle drags or an optimizer moves — gets a `vec4` slot. A fixed one — a
+node attribute, a material property, a bare float literal — stays a constant in
+the source and still costs a recompile when it changes.
+
+The ratio is what makes this work: `end_cap` has 11 free parameters against
+319 fixed, `motor_shield` 41 against 848. The default leaves 95–97 % of the
+scene's numbers foldable.
+
+| scene | free / all | buffer | preview WGSL vs literal |
+|---|---:|---:|---:|
+| `starter` | 35 / 143 | 576 B | +2.5 % |
+| `end_cap` | 11 / 330 | 192 B | +0.3 % |
+| `motor_shield` | 41 / 889 | 672 B | +0.2 % |
+
+### After: frame time by display mode, Ultra
+
+| scene | form | default | pbr | slice | gradient | normal | depth | path/sample |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| `starter` | literal | 0.9 | 0.9 | 1.3 | 1.3 | 0.9 | 0.9 | 6.1 |
+| `starter` | **free (shipped)** | 1.1 | 1.1 | 1.5 | 1.5 | 1.1 | 1.0 | 8.3 |
+| `end_cap` | literal | 3.8 | 4.6 | 5.3 | 5.3 | 4.4 | 3.7 | 41.9 |
+| `end_cap` | **free (shipped)** | **3.3** | **3.4** | **4.7** | **4.7** | **3.3** | **2.8** | **37.2** |
+| `motor_shield` | literal | 15.7 | 15.9 | 19.4 | 26.1 | 24.9 | 21.2 | 258.9 |
+| `motor_shield` | **free (shipped)** | 35.8 | 36.3 | 51.3 | 51.1 | 35.9 | 35.2 | — |
+
+`end_cap` is *faster* than the literal build it replaces. `starter` is 0.2 ms
+slower, which is a fifth of a frame at 1200 × 800 and inside the run-to-run
+spread of the harness. `motor_shield` is 2.3× slower and that is a real cost,
+recorded in §13.6 rather than explained away: 41 live parameters, most of them
+sketch-profile vertices feeding polygon SDFs whose per-edge algebra is exactly
+what folding used to delete.
+
+Against what it buys — the alternative on `motor_shield` is not 15.7 ms, it is
+15.7 ms *plus a 12 s round trip and 1.4 s of browser compilation for every
+edit* — 35.8 ms is the right trade. It is also the only form in which the drag
+exists at all.
+
+### The drag
+
+A pointer move during a drag is now `queue.writeBuffer` of ≤ 672 bytes and a
+redraw. Measured end to end through the real app, server and GPU
+(`frontend/e2e/shader.spec.ts`), 60 consecutive dragged frames:
+
+| counter | before drag | after 60 frames |
+|---|---:|---:|
+| pipelines built | 8 | **8** |
+| shader modules compiled | 5 | **5** |
+| parameter uploads | 0 | **60** |
+
+**Zero pipeline rebuilds per drag**, one buffer write per frame, and the image
+demonstrably follows the buffer (the test reads the canvas back at two
+different values and requires them to differ, so a renderer that ignored the
+overrides could not pass).
+
+## 13.4 Sparseness: conservative bounds and a real branch
+
+`cadjoint/backends/wgsl/_culling.py` traces the same tree as
+`functionalize_scene`, node for node, with one addition: before a boolean
+evaluates an operand it compares the distance to that operand's bounding box
+against the value it already holds, and skips the operand when it provably
+cannot change the answer. `lax.cond` lowers to `stablehlo.case`, which the
+emitter turns into a real `if`, so the skipped branch costs nothing.
+
+Bounds are computed in `cadjoint/sdf/_lowering.py` from the *traced* parameter
+values, so they follow a parameter edit rather than being baked at compile
+time — `test_the_bound_follows_a_parameter_edit` pins that, and it is what
+keeps culling correct in the uniform form. A pattern is bounded per instance,
+a smooth union is grown by its blend band `4k`, and a node that cannot promise
+the bound (a drafted extrusion, say) reports `None` and is never skipped.
+
+**It is not an approximation.** Each skip is taken only where the exact value
+is what the running result already is: a smooth union's band term is *exactly*
+zero when `d >= m + K`, and the box distance is a lower bound on `d`, so
+`box(p) >= m + K` suffices. The module docstring carries the algebra per node
+family, and `CULL_MARGIN = 1e-4` covers float rounding in the box distance
+three orders above its magnitude.
+
+| verification | scope | result |
+|---|---|---|
+| culled field vs flat field | every node family, 20 k points each | ≤ 1e-6 |
+| culled field vs flat field | every shipped scene, 100 k points each | ≤ 1e-6 |
+| box distance ≤ node distance outside the box | every node family, 40 k points | holds at the root, which inherits every child's error |
+
+### Where it helps, and where it does not
+
+| scene | mode | culling off | culling on | speed-up |
+|---|---|---:|---:|---:|
+| `starter` | default | 1.1 | 1.1 | 1.0× |
+| `starter` | slice | 2.3 | 1.5 | 1.5× |
+| `end_cap` | default | 6.9 | 3.3 | **2.1×** |
+| `end_cap` | slice | 32.2 | 4.7 | **6.9×** |
+| `end_cap` | path/sample | 61.3 | 37.2 | 1.6× |
+| `motor_shield` | default | 110.5 | 35.8 | **3.1×** |
+| `motor_shield` | slice | 166.2 | 51.3 | **3.2×** |
+
+It does nothing for `starter` in the default view and everything for the two
+large parts, which is the expected shape: culling removes work proportional to
+how much of the tree is far from the ray, and a four-leaf scene has none to
+remove. The slice views gain most, because a slice plane marches through empty
+space where nearly every leaf is skippable.
+
+The cost is source size — the branch is emitted per operand — at +9 % preview
+WGSL for `end_cap` and +13 % for `motor_shield`, and it is worth it several
+times over.
+
+Intersections and XORs are not culled: a lower bound on an operand cannot show
+that a *maximum* is unchanged. Their operands are still culled inside, where
+they are unions.
+
+## 13.5 Caching, both sides
+
+### Browser: modules by source
+
+`ShaderModuleCache` (`frontend/src/viewer/shaderProgram.ts`) keys compiled
+`GPUShaderModule`s by their own source, LRU, capacity 8 — bounded because the
+keys *are* the sources and a scene's shaders are megabytes of string. Above it
+sits the renderer's own short-circuit: when a payload's sources are identical
+to the installed ones it never asks for a module at all.
+
+A four-step scripted session (compile → free-parameter edit → topology edit →
+undo), measured through the real app:
+
+| step | pipelines built | module hits | module misses |
+|---|---:|---:|---:|
+| initial compile | 8 | 1 | 5 |
+| free-parameter edit | **8** | 1 | 5 |
+| topology edit | 12 | 2 | 7 |
+| undo (back to the first source) | 16 | **5** | **7** |
+
+**Hit rate 41.7 %** over the session. The two rows that matter: a
+free-parameter edit adds *nothing* to either counter, and the undo installs
+three modules while compiling none of them.
+
+### Worker: what the persistent XLA cache actually holds
+
+Fresh process per request, private cache directory, counting files gained:
+
+| step | wall | cache entries | shader hash |
+|---|---:|---:|---|
+| 1. cold cache | 4.41 s | 0 → 482 (+482) | `3b7c86d03fed` |
+| 2. same source again | 2.05 s | 482 → 482 (+0) | `3b7c86d03fed` |
+| 3. free-parameter edit | 2.04 s | 482 → 482 (+0) | `3b7c86d03fed` |
+| 4. fixed-parameter edit | 2.03 s | 482 → 482 (+0) | `d2e3a26046ab` |
+| 5. topology edit (new leaf) | 2.09 s | 482 → 482 (+0) | `60fdc6203c7f` |
+| 6. back to the original | 2.05 s | 482 → 482 (+0) | `3b7c86d03fed` |
+
+Two findings.
+
+**A free-parameter edit produces a byte-identical shader** (rows 1–3 share a
+hash), which is the whole contract, confirmed end to end through the worker
+rather than in a unit test. A fixed-parameter edit does not, by design.
+
+**The persistent XLA cache misses nothing on a topology edit, because it is
+not involved.** `compile` mode traces to StableHLO and emits text; it never
+asks XLA for an executable, so a new leaf adds no cache entry and costs the
+same 2.0 s as a no-op. The 482 entries are laid down once by the *constraint
+solver*, and they scale with sketch content rather than with the CSG tree:
+
+| scene | wall | entries |
+|---|---:|---:|
+| two spheres, no sketch | 0.57 s | 36 |
+| one unconstrained sketch | 1.08 s | 156 |
+| `starter` (constrained sketches) | 3.80 s | 482 |
+
+So the 2.0 s warm floor of a `compile` request is Python-side tracing and WGSL
+emission, not compilation. Cutting it is §6.1 and §6.5's problem, not this
+section's.
+
+### Outlined `func.func` bodies across scenes
+
+**They are not reused, and nothing in the current design could reuse them.**
+An outlined body is produced by a nested `jax.jit` inside
+`functionalize_scene`, closed over that scene's parameter dicts and named by
+its DFS index (`sdf_impl__sdf_eval_122`). Two scenes sharing a subtree get two
+separately traced, separately named, separately emitted copies, and one scene
+edited twice gets new names as soon as the DFS numbering shifts.
+
+Reuse would need three things that do not exist: a **content hash** of a
+subtree's shape and static attributes to name bodies by, in place of the
+positional index; a **parameter-passing convention** so a shared body takes
+its values as arguments rather than closing over one scene's dicts — which is
+exactly the machinery `_uniform_bindings` had to defeat to stay under WGSL's
+255-argument limit, so it would have to be a struct or a buffer slice; and a
+**cross-request store** for the emitted WGSL, since the worker is a fresh
+process per request. That is a real project, and §12.10's conclusion stands:
+nothing measured here justifies it ahead of the two levers that are already
+paying — culling, and not compiling at all.
+
+## 13.6 What is left undone
+
+- **`motor_shield` in the free form is 2.3× the literal frame time**
+  (35.8 ms against 15.7 ms). Intrinsic to having 41 live parameters, most of
+  them sketch vertices feeding polygon SDFs. The two obvious attacks are both
+  measured and both rejected above: buffering fewer parameters is what the
+  free scope already does, and hoisting the invariants would spill (§13.2.2).
+  The remaining route is §12.10's second backend — a hand-written WGSL kernel
+  per primitive type reading its vertices from a storage buffer — which would
+  make profile vertices data rather than code and collapse the whole question.
+- **Path-trace timings for `motor_shield` in the uniform forms are missing.**
+  The harness returned 0.1 ms, which is not a measurement; at 4.6 MB the path
+  pipeline appears not to survive the run. The literal figure (258.9 ms) is
+  sound. Worth a look, but the path tracer is not the interactive path.
+- **`scope="all"` is kept and tested but must never ship.** It exists because
+  it is the control the 31× is measured against and the form that stresses the
+  emitter's argument-binding pass to WGSL's 255-parameter limit.
+- **The gizmo's own drag does not yet drive the buffer.** The mechanism is in
+  place and tested (`Renderer.setParameterOverrides`, 60 frames, zero
+  rebuilds), but wiring the transform gizmo to it needs a link from a
+  construction node's transform to the free parameter backing it, and the
+  construction payload does not carry one. A gizmo drag on a node whose
+  placement *is* a free parameter already takes the values-only path on
+  commit; what is missing is the frame-rate preview for it.
+
+## 13.7 Reproducing §13
+
+Scripts in the ephemeral scratch workspace, `shader-` prefixed:
+`shader-compile.py <scene> <label>` (worker walls, payload sizes, shader
+sources; honours `CADJOINT_SHADER_FORM`, `CADJOINT_SHADER_SCOPE` and
+`CADJOINT_SHADER_CULL`), `shader-bench.mjs <label.json>...` (module,
+pipeline and per-mode frame timings in Chromium with the pixel probe),
+`shader-variants.py <label> <mode> <out>` (§13.2.1's A–F), `shader-invariant.py`
+(§13.2.2's invariant and frontier counts), `shader-xlacache.py` and
+`shader-xlaorigin.py` (§13.5). The e2e counters come from
+`npx playwright test e2e/shader.spec.ts --reporter=json`, whose attachments
+carry the tables in §13.3 and §13.5 verbatim.

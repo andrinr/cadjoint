@@ -111,6 +111,7 @@ export function createThumbnailer(): Thumbnailer {
       preview: compiled.preview_shader,
       path: compiled.path_shader,
       present: compiled.present_shader,
+      program: compiled.program ?? null,
     });
     // Nothing *about* the model is drawn, so the construction tree is only
     // handed over to keep the renderer's own bookkeeping consistent.

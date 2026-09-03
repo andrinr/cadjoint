@@ -22,8 +22,10 @@ get.  The other modes live beside it:
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import io
 import json
+import os
 import sys
 import traceback
 from typing import Any
@@ -83,6 +85,44 @@ def _mesh_source(source: str) -> dict[str, Any]:
     }
 
 
+def _shader_options() -> tuple[bool, bool, str]:
+    """``(uniforms, culling, scope)`` — the switches, and where they come from.
+
+    The defaults are what the viewer ships; the environment overrides exist
+    only so a benchmark can measure the forms against each other without a
+    code edit, and nothing in the product sets them.
+
+    * ``CADJOINT_SHADER_FORM=literal`` folds the parameters back into the
+      source, which is the form the frontend used before it learned to read
+      a buffer.
+    * ``CADJOINT_SHADER_CULL=0`` emits the flat field that
+      :mod:`cadjoint.backends.wgsl._culling` is tested against.
+    * ``CADJOINT_SHADER_SCOPE=all`` puts every parameter in the buffer
+      rather than only the free ones.  This is 31x slower per frame on
+      ``scenes/end_cap.py`` and exists to be measured, not to be used —
+      see :func:`cadjoint.backends.wgsl.compile_scene_with_uniforms`.
+    """
+    uniforms = os.environ.get("CADJOINT_SHADER_FORM", "uniform").lower() != "literal"
+    culling = os.environ.get("CADJOINT_SHADER_CULL", "1") != "0"
+    scope = os.environ.get("CADJOINT_SHADER_SCOPE", "free").lower()
+    return uniforms, culling, scope
+
+
+def _scene_shader(scene) -> tuple[str, dict | None]:
+    """The scene's WGSL, and the uniform contract that goes with it.
+
+    Returns:
+        ``(source, program)`` — ``program`` is ``None`` in the literal form,
+            where the parameters are baked into ``source`` and any edit is a
+            different module.
+    """
+    uniforms, culling, scope = _shader_options()
+    compiled = compile_scene_to_wgsl(scene, uniforms=uniforms, culling=culling, scope=scope)
+    if uniforms:
+        return compiled.wgsl, compiled.as_dict()
+    return compiled, None
+
+
 def _compile_source(source: str) -> dict[str, Any]:
     captured = io.StringIO()
     with contextlib.redirect_stdout(captured), contextlib.redirect_stderr(captured):
@@ -98,9 +138,12 @@ def _compile_source(source: str) -> dict[str, Any]:
         sim_meshes = namespace["__sim_meshes__"]
         studies = namespace["__studies__"]
         optimizations = namespace["__optimizations__"]
-        scene_code = compile_scene_to_wgsl(namespace["scene"])
+        scene_code, program = _scene_shader(namespace["scene"])
         preview_shader = build_viewer_shader(scene_code)
         path_shader = build_path_tracer_shader(scene_code)
+        shader_hash = hashlib.sha256(
+            preview_shader.encode() + b"\0" + path_shader.encode()
+        ).hexdigest()
         construction = build_construction_payload(profiles, source)
         relations = build_construction_relations(profiles)
         materials = build_material_payload(namespace, source)
@@ -133,6 +176,8 @@ def _compile_source(source: str) -> dict[str, Any]:
             "preview_shader": preview_shader,
             "path_shader": path_shader,
             "present_shader": WGSL_PRESENT_TEMPLATE,
+            "program": program,
+            "shader_hash": shader_hash,
             "construction": construction,
             # Every stable id the text declares, so the viewer can name anything
             # the payload reports only by line.
@@ -145,10 +190,27 @@ def _compile_source(source: str) -> dict[str, Any]:
             # The mesh-edge view is requested lazily via `mode: "mesh"` — computing
             # it here used to dominate the compile round-trip.
             "mesh_edges": None,
+            # Which private kinds this worker process can reach, so the
+            # title block can say EDGES LATTICE / GEOMETRY FROZEN rather
+            # than the frontend guessing (:mod:`cadjoint.tier`).
+            "tier": _tier_flags(),
             "solver_runs": solver_runs,
             "output": captured.getvalue()[-8_000:],
         }
     )
+
+
+def _tier_flags() -> dict[str, bool] | None:
+    """``{kind: available}`` for the private kinds, or ``None`` if unreadable.
+
+    Never raises: a status report that fails must not fail a compile.
+    """
+    try:
+        from cadjoint import tier
+
+        return tier.status().flags()
+    except Exception:  # noqa: BLE001 - the payload field is optional
+        return None
 
 
 def main() -> None:

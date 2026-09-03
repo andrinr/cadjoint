@@ -35,6 +35,7 @@ import type {
   StudyBc as StudyBcPayload,
   StudyPayload as StudyPayloadShape,
   StudySelection as StudySelectionPayload,
+  ShaderProgram,
 } from "../../cadjoint/viewer/schema/payloads";
 
 export type {
@@ -58,6 +59,8 @@ export type {
   PatchRequest,
   PatchResponse,
   PlaneReference,
+  ShaderParameter,
+  ShaderProgram,
   SimMeshPayload,
   SketchPlaneReference,
 } from "../../cadjoint/viewer/schema/payloads";
@@ -120,6 +123,15 @@ export interface CompileResponse {
   solver_runs: ConstraintSolverRun[];
   materials: MaterialDefinition[];
   mesh_edges: MeshEdgePayload | null;
+  /**
+   * The uniform contract for the two scene shaders, when the worker built
+   * them in the uniform form (its default).
+   *
+   * Absent or null means the literal form, where the parameters are
+   * constants in the source and every edit is a fresh module. The renderer
+   * uses this to tell a parameter edit from a topology edit.
+   */
+  program?: ShaderProgram | null;
   studies?: StudyPayload[];
   sim_meshes?: SimMeshPayload[];
   optimizations?: OptimizationPayload[];

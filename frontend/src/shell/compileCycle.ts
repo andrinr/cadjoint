@@ -133,6 +133,10 @@ export function createCompileCycle(options: CompileCycleOptions): CompileCycle {
         preview: result.preview_shader,
         path: result.path_shader,
         present: result.present_shader,
+        // The uniform contract, when the worker emitted one: with it the
+        // renderer can tell a parameter edit from a topology edit and skip
+        // the shader module and pipelines entirely for the former.
+        program: result.program ?? null,
       });
     } catch (error) {
       setStatus({ kind: "error", text: "Compile failed" });
@@ -211,6 +215,7 @@ export function createCompileCycle(options: CompileCycleOptions): CompileCycle {
         preview: result.preview_shader,
         path: result.path_shader,
         present: result.present_shader,
+        program: result.program ?? null,
       });
       return true;
     } catch {

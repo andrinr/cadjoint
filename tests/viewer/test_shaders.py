@@ -262,6 +262,43 @@ def shared_layout(device, bindings):
     return bind_group_layout, pipeline_layout
 
 
+def parameter_pipeline_layout(device, scene_layout, program):
+    """The scene layout plus the program's parameter block, mirroring the renderer.
+
+    WebGPU wants every group up to the highest one spelled out, so the groups
+    between the scene's own (0) and the parameters' (3) are declared empty.
+    An empty layout binds nothing and needs no bind group set against it.
+
+    Returns:
+        ``(parameter bind group layout, pipeline layout)``.
+    """
+    parameter_layout = device.create_bind_group_layout(
+        entries=[
+            {
+                "binding": program.binding,
+                "visibility": wgpu.ShaderStage.VERTEX | wgpu.ShaderStage.FRAGMENT,
+                "buffer": {"type": wgpu.BufferBindingType.uniform},
+            }
+        ]
+    )
+    layouts = [scene_layout]
+    while len(layouts) < program.group:
+        layouts.append(device.create_bind_group_layout(entries=[]))
+    layouts.append(parameter_layout)
+    return parameter_layout, device.create_pipeline_layout(bind_group_layouts=layouts)
+
+
+def parameter_bind_group(device, layout, program):
+    """The program's current values, packed and bound."""
+    buffer = device.create_buffer_with_data(
+        data=program.buffer().tobytes(), usage=wgpu.BufferUsage.UNIFORM
+    )
+    return device.create_bind_group(
+        layout=layout,
+        entries=[{"binding": program.binding, "resource": {"buffer": buffer}}],
+    )
+
+
 def test_preview_and_overlay_draw_in_one_pass(device, scene_code):
     """Record the frame the viewer actually submits.
 
@@ -451,6 +488,7 @@ def render_preview(
     camera=(3.0, 2.0, 4.0),
     sdf=SOLID_VIEW,
     read="color",
+    program=None,
 ):
     """Render one preview frame and read one of its attachments back.
 
@@ -458,6 +496,11 @@ def render_preview(
         read: ``"color"`` for the red channel, one byte per pixel; ``"depth"``
             for the depth attachment as floats in 0..1, which is what the
             floor grid and the construction overlays are tested against.
+        program: The :class:`~cadjoint.backends.wgsl.ShaderProgram` the scene
+            was compiled to, when it was built in the uniform form. Its
+            buffer is filled from the program's own values and bound at the
+            group the program names, exactly as ``renderer.ts`` does. ``None``
+            is the literal form, which binds nothing extra.
     """
     color = device.create_texture(
         size=(size, size, 1),
@@ -471,6 +514,11 @@ def render_preview(
     )
     module = device.create_shader_module(code=build_viewer_shader(scene_code))
     bind_group_layout, pipeline_layout = shared_layout(device, [0, 2])
+    parameter_layout = None
+    if program is not None:
+        parameter_layout, pipeline_layout = parameter_pipeline_layout(
+            device, bind_group_layout, program
+        )
     pipeline = device.create_render_pipeline(
         layout=pipeline_layout,
         vertex={"module": module, "entry_point": "vs_main"},
@@ -546,6 +594,10 @@ def render_preview(
     )
     render_pass.set_pipeline(pipeline)
     render_pass.set_bind_group(0, bind_group)
+    if parameter_layout is not None:
+        render_pass.set_bind_group(
+            program.group, parameter_bind_group(device, parameter_layout, program)
+        )
     render_pass.draw(3)
     render_pass.end()
     device.queue.submit([encoder.finish()])
@@ -762,3 +814,96 @@ def test_the_isosurface_offset_moves_the_surface(device, scene_code):
     assert surface != eroded
     # A dilated solid covers more of the frame than an eroded one.
     assert_rendered(dilated, label="dilated solid")
+
+
+# ── The two shader forms draw the same image ─────────────────────────────────
+# The viewer compiles a scene one of two ways. In the *literal* form every
+# design parameter is a float constant in the WGSL; in the *uniform* form the
+# free ones are read from a `@group(3)` buffer, which is what lets a handle
+# drag be a buffer write instead of a recompile. That is only a legitimate
+# choice if the two draw the same picture, so this renders both and compares
+# them pixel by pixel. See `compile_scene_with_uniforms` for why only the
+# *free* parameters move into the buffer.
+
+
+@pytest.fixture(scope="module")
+def parametric_scene():
+    """A scene with free parameters, so the uniform form has slots to fill."""
+    from cadjoint.geometry.parameters import Scalar, Vector
+    from cadjoint.sdf.transforms.affine import Translate
+
+    radius = Scalar(0.8, free=True, name="radius")
+    offset = Vector([0.9, 0.2, 0.0], free=True, name="offset")
+    return Union(
+        (Sphere(radius), Translate(Sphere(0.55), offset)),
+        smoothness=0.12,
+    )
+
+
+#: The two forms are the same arithmetic in a different order, so a handful of
+#: units of last-place difference on a 0-255 channel is expected; a moved
+#: surface is not, and shows up as whole-silhouette disagreement.
+PIXEL_TOLERANCE = 2
+
+
+def _max_deviation(a, b):
+    assert len(a) == len(b)
+    return max(abs(int(x) - int(y)) for x, y in zip(a, b))
+
+
+@pytest.mark.parametrize(
+    ("label", "display"),
+    [
+        ("perspective", PERSPECTIVE),
+        ("flat shading", (0.0, 0.0, float(FLAT), 0.0)),
+        ("x-ray", (0.0, 0.0, float(SHADOWS | REFLECTIONS), 1.0)),
+    ],
+)
+def test_both_shader_forms_render_the_same_pixels(device, parametric_scene, label, display):
+    from cadjoint.backends.wgsl import compile_scene_with_uniforms
+
+    literal = compile_scene_to_wgsl(parametric_scene)
+    program = compile_scene_with_uniforms(parametric_scene)
+
+    from_literal = render_preview(device, literal, display=display)
+    from_uniform = render_preview(device, program.wgsl, display=display, program=program)
+
+    assert_rendered(from_literal, label=f"{label} literal")
+    assert_rendered(from_uniform, label=f"{label} uniform")
+    deviation = _max_deviation(from_literal, from_uniform)
+    assert (
+        deviation <= PIXEL_TOLERANCE
+    ), f"{label}: the uniform form moved a pixel by {deviation} levels"
+
+
+def test_both_shader_forms_agree_on_depth(parametric_scene, device):
+    """Colour can agree while the surface sits somewhere else; depth cannot."""
+    from cadjoint.backends.wgsl import compile_scene_with_uniforms
+
+    program = compile_scene_with_uniforms(parametric_scene)
+    literal = render_preview(device, compile_scene_to_wgsl(parametric_scene), read="depth")
+    uniform = render_preview(device, program.wgsl, read="depth", program=program)
+
+    assert max(abs(a - b) for a, b in zip(literal, uniform)) <= 1e-5
+
+
+def test_the_uniform_form_follows_its_buffer(device, parametric_scene):
+    """The buffer has to be what the image depends on, not a decoration.
+
+    Without this the parity tests above would still pass on a shader that
+    ignored the buffer and used stale constants.
+    """
+    from cadjoint.backends.wgsl import compile_scene_with_uniforms
+    from cadjoint.extraction import apply_parameters, extract_parameters
+
+    program = compile_scene_with_uniforms(parametric_scene)
+    before = render_preview(device, program.wgsl, program=program)
+
+    free, _, _ = extract_parameters(parametric_scene)
+    apply_parameters(parametric_scene, {"radius": free["radius"] * 0.5})
+    moved = compile_scene_with_uniforms(parametric_scene)
+    apply_parameters(parametric_scene, {"radius": free["radius"]})
+
+    assert moved.wgsl == program.wgsl, "only the values were meant to change"
+    after = render_preview(device, moved.wgsl, program=moved)
+    assert before != after, "halving the radius did not change the image"

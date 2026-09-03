@@ -55,7 +55,16 @@ import {
   reportViewerError,
   setStatus,
 } from "./state";
-import { Renderer } from "./viewer/renderer";
+import { Renderer, type ShaderStats } from "./viewer/renderer";
+
+declare global {
+  interface Window {
+    __cadjointShaders?: () => ShaderStats;
+    __cadjointSetParameters?: (
+      overrides: Record<string, readonly number[]> | null,
+    ) => boolean;
+  }
+}
 
 export function App() {
   const [wgslOpen, setWgslOpen] = createSignal(false);
@@ -65,6 +74,15 @@ export function App() {
     onStatus: (kind, text) => setStatus({ kind, text }),
     onError: (message) => reportViewerError(message),
   });
+  // The shader path's counters, for the end-to-end tests and the console:
+  // "a drag rebuilds no pipelines" is a negative claim, and only a counter
+  // can check one. `__cadjointSetParameters` drives the same frame-rate
+  // path a handle drag uses, which is the thing that claim is about.
+  if (typeof window !== "undefined") {
+    window.__cadjointShaders = () => renderer.shaderStats;
+    window.__cadjointSetParameters = (overrides) =>
+      renderer.setParameterOverrides(overrides);
+  }
 
   const render = createRenderState(renderer);
   const history = createSourceHistory();

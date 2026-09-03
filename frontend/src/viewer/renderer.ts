@@ -68,14 +68,34 @@ import {
 import {
   DEPTH_FORMAT,
   GRATICULE_UNIFORM_SIZE,
-  compileModule,
   createGraticulePipeline,
   createOverlayPipelines,
   type DepthPair,
   createSimulationPipelines,
   sharedLayout,
 } from "./pipelines";
+import {
+  PARAMETER_SLOT_BYTES,
+  ShaderModuleCache,
+  packParameters,
+  sameLayout,
+  type ShaderProgramPayload,
+} from "./shaderProgram";
 import { GRID_ALPHA, GRID_FADE, GRID_MAJOR_EVERY, gridSpacing } from "./graticule";
+
+/** What the shader path has done this session. See `Renderer.shaderStats`. */
+export interface ShaderStats {
+  /** Render pipelines created since construction. */
+  pipelineBuilds: number;
+  /** Parameter uploads that stood in for a pipeline rebuild. */
+  parameterUploads: number;
+  /** Whether the installed scene reads its parameters from a buffer. */
+  hasParameterBuffer: boolean;
+  /** Shader modules served from cache. */
+  hits: number;
+  /** Shader modules that had to be compiled. */
+  misses: number;
+}
 import { CHROME, hexToRgb } from "../tokens";
 
 export {
@@ -183,6 +203,41 @@ export class Renderer {
   private previewDepthPipeline: GPURenderPipeline | null = null;
   private previewBindGroup: GPUBindGroup | null = null;
   private pathPipeline: GPURenderPipeline | null = null;
+
+  // ── The scene's parameters, and what they save ────────────────────────
+  // A scene shader built in the uniform form reads its design parameters
+  // out of a `@group(3)` buffer instead of carrying them as constants, so
+  // the source does not change when a value does. Everything here exists
+  // to notice that and answer a parameter edit with a `writeBuffer`
+  // rather than a shader module and four pipelines.
+  /** Compiled modules held by source, so an undo lands on a hit. */
+  private shaderModules = new ShaderModuleCache();
+  /** The sources currently installed, or null before the first compile. */
+  private installedShaders: Shaders | null = null;
+  /** The scene's uniform contract; null in the literal form. */
+  private program: ShaderProgramPayload | null = null;
+  private parameterBuffer: GPUBuffer | null = null;
+  private parameterBufferBytes = 0;
+  private parameterLayout: GPUBindGroupLayout | null = null;
+  private previewParameterGroup: GPUBindGroup | null = null;
+  private pathParameterGroup: GPUBindGroup | null = null;
+  /**
+   * Values layered over the program's own, keyed by parameter name.
+   *
+   * A handle or gizmo drag writes these at frame rate while the server
+   * patch that makes them permanent is still in flight; the compile that
+   * lands afterwards clears them by installing the same numbers.
+   */
+  private parameterOverrides: Record<string, readonly number[]> | null = null;
+  /**
+   * Render pipelines created since the renderer was constructed.
+   *
+   * Public because it is the thing the drag test asserts about: a drag
+   * that only moves parameter values must not advance this at all.
+   */
+  pipelineBuilds = 0;
+  /** Parameter uploads that stood in for a pipeline rebuild. */
+  parameterUploads = 0;
   private presentPipeline: GPURenderPipeline | null = null;
   private edgePipeline: DepthPair | null = null;
   private facePipeline: DepthPair | null = null;
@@ -639,19 +694,50 @@ export class Renderer {
    * The preview pipeline lands first so the viewer updates immediately; the
    * path-trace pipelines follow. A revision guard drops results from a compile
    * that has since been superseded.
+   *
+   * The cheap case comes first. In the uniform form the two scene shaders are
+   * byte-identical for every value of every design parameter, so a compile
+   * whose sources match the installed ones can only differ in its numbers:
+   * it is answered by writing the parameter buffer and redrawing, with no
+   * `createShaderModule` and no pipeline at all. That is the whole point of
+   * the form — a slider drag on `scenes/motor_shield.py` was 440 ms of module
+   * compilation and 520 ms of pipeline creation per edit before it.
    */
   async setShaders(shaders: Shaders): Promise<void> {
     if (!this.device) {
       this.callbacks.onError?.(this.initError || "WGSL compiled, but WebGPU is unavailable.");
       return;
     }
+    const program = shaders.program ?? null;
+    if (this.isValuesOnlyEdit(shaders, program)) {
+      // Newest values win: an older rebuild still in flight reads `program`
+      // rather than the payload it started from, so it cannot resurrect them.
+      this.program = program;
+      this.parameterOverrides = null;
+      this.uploadParameters();
+      this.parameterUploads += 1;
+      this.destroyAccumulation();
+      this.invalidate();
+      return;
+    }
+
     const revision = ++this.shaderRevision;
     this.pathReady = false;
+    this.program = program;
+    this.parameterOverrides = null;
+    this.ensureParameterBuffer();
 
-    const previewModule = await compileModule(this.device, shaders.preview, "Preview WGSL");
+    const previewModule = await this.shaderModules.get(
+      this.device,
+      shaders.preview,
+      "Preview WGSL",
+    );
     const preview = sharedLayout(this.device, "Preview bindings", [0, 2]);
+    const previewLayout = this.device.createPipelineLayout({
+      bindGroupLayouts: this.sceneBindGroupLayouts(preview.bindGroupLayout),
+    });
     const previewDescriptor = (writeMask: number): GPURenderPipelineDescriptor => ({
-      layout: preview.pipelineLayout,
+      layout: previewLayout,
       vertex: { module: previewModule, entryPoint: "vs_main" },
       fragment: {
         module: previewModule,
@@ -669,6 +755,7 @@ export class Renderer {
       this.device.createRenderPipelineAsync(previewDescriptor(GPUColorWrite.ALL)),
       this.device.createRenderPipelineAsync(previewDescriptor(0)),
     ]);
+    this.pipelineBuilds += 2;
     if (revision !== this.shaderRevision) return;
 
     this.previewPipeline = colorPipeline;
@@ -680,12 +767,14 @@ export class Renderer {
         { binding: 2, resource: { buffer: this.viewBuffer } },
       ],
     });
+    this.previewParameterGroup = this.parameterBindGroup(this.parameterLayout);
+    this.uploadParameters();
     this.destroyAccumulation();
     this.invalidate();
 
     const [pathModule, presentModule] = await Promise.all([
-      compileModule(this.device, shaders.path, "Path tracer WGSL"),
-      compileModule(this.device, shaders.present, "Present WGSL"),
+      this.shaderModules.get(this.device, shaders.path, "Path tracer WGSL"),
+      this.shaderModules.get(this.device, shaders.present, "Present WGSL"),
     ]);
     const [pathPipeline, presentPipeline] = await Promise.all([
       this.device.createRenderPipelineAsync({
@@ -716,11 +805,177 @@ export class Renderer {
         },
       }),
     ]);
+    this.pipelineBuilds += 2;
     if (revision !== this.shaderRevision) return;
     this.pathPipeline = pathPipeline;
     this.presentPipeline = presentPipeline;
+    // The path pipeline derives its own layout, so its parameter bind group
+    // has to come from that layout rather than the preview's: an automatic
+    // layout is exclusive to the pipeline that produced it.
+    this.pathParameterGroup = this.program
+      ? this.parameterBindGroup(pathPipeline.getBindGroupLayout(this.program.group))
+      : null;
+    this.installedShaders = { ...shaders };
     this.pathReady = true;
     this.invalidate();
+  }
+
+  /**
+   * Whether this compile changed only parameter values.
+   *
+   * True when all three sources are the ones already installed *and* the
+   * uniform contract has the same slots in the same places — the layout is
+   * part of the source's meaning, so a program that repacked its buffer is
+   * a different shader even if the text somehow matched. In the literal
+   * form both programs are null, `sameLayout` agrees, and identical sources
+   * mean nothing changed at all: the upload is a no-op and correct.
+   */
+  private isValuesOnlyEdit(
+    shaders: Shaders,
+    program: ShaderProgramPayload | null,
+  ): boolean {
+    const installed = this.installedShaders;
+    return Boolean(
+      installed &&
+        this.previewPipeline &&
+        this.pathPipeline &&
+        shaders.preview === installed.preview &&
+        shaders.path === installed.path &&
+        shaders.present === installed.present &&
+        sameLayout(program, this.program),
+    );
+  }
+
+  /**
+   * The bind group layouts of a scene pipeline, group by group.
+   *
+   * Group 0 is the camera and view uniforms every scene shader has always
+   * had. A uniform-form shader adds its parameter block at the group the
+   * payload names — 3 today — and WebGPU needs the groups in between
+   * spelled out, so they are declared empty. An empty layout binds nothing
+   * and needs no bind group set against it.
+   */
+  private sceneBindGroupLayouts(scene: GPUBindGroupLayout): GPUBindGroupLayout[] {
+    const layouts = [scene];
+    this.parameterLayout = null;
+    if (!this.device || !this.program) return layouts;
+    this.parameterLayout = this.device.createBindGroupLayout({
+      label: "SDF parameter bindings",
+      entries: [
+        {
+          binding: this.program.binding,
+          visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
+          buffer: { type: "uniform" },
+        },
+      ],
+    });
+    while (layouts.length < this.program.group) {
+      layouts.push(this.device.createBindGroupLayout({ entries: [] }));
+    }
+    layouts.push(this.parameterLayout);
+    return layouts;
+  }
+
+  /** The parameter buffer bound against one layout, or null without a program. */
+  private parameterBindGroup(layout: GPUBindGroupLayout | null): GPUBindGroup | null {
+    if (!this.device || !this.program || !this.parameterBuffer || !layout) return null;
+    return this.device.createBindGroup({
+      label: "SDF parameters",
+      layout,
+      entries: [{ binding: this.program.binding, resource: { buffer: this.parameterBuffer } }],
+    });
+  }
+
+  /**
+   * Size the parameter buffer to the current program.
+   *
+   * Only ever called on a full rebuild: destroying the buffer invalidates
+   * every bind group holding it, and the rebuild makes new ones straight
+   * after. A values-only edit is guarded by `sameLayout`, so it never
+   * reaches here and its bind groups stay valid.
+   */
+  private ensureParameterBuffer(): void {
+    if (!this.device) return;
+    const size = this.program
+      ? Math.max(this.program.buffer_bytes, PARAMETER_SLOT_BYTES)
+      : 0;
+    if (size === this.parameterBufferBytes) return;
+    this.parameterBuffer?.destroy();
+    this.parameterBufferBytes = size;
+    this.parameterBuffer = size
+      ? this.device.createBuffer({
+          label: "SDF parameters",
+          size,
+          usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        })
+      : null;
+  }
+
+  /** Write the current parameter values, drag overrides included. */
+  private uploadParameters(): void {
+    if (!this.device || !this.program || !this.parameterBuffer) return;
+    const packed = packParameters(this.program, this.parameterOverrides ?? undefined);
+    this.device.queue.writeBuffer(this.parameterBuffer, 0, packed.buffer as ArrayBuffer);
+  }
+
+  /**
+   * Show these parameter values now, without a compile.
+   *
+   * What a handle or gizmo drag calls on every pointer move: the shader
+   * already reads its parameters from a buffer, so moving one is a few
+   * hundred bytes and a redraw. The server patch follows at its own pace
+   * and lands as an ordinary compile, which clears the overrides by
+   * installing the same numbers.
+   *
+   * @param overrides Values by parameter name; null drops back to the
+   *   program's own.
+   * @returns False in the literal form, where there is no buffer to write
+   *   and the caller must wait for the round trip.
+   */
+  setParameterOverrides(
+    overrides: Readonly<Record<string, readonly number[]>> | null,
+  ): boolean {
+    if (!this.program || !this.parameterBuffer) return false;
+    this.parameterOverrides = overrides ? { ...overrides } : null;
+    this.uploadParameters();
+    // Counted with the compile-path uploads, because they are the same
+    // event seen from two sides: a value reached the GPU without a shader
+    // being built. A drag's worth of these is what the e2e test measures.
+    this.parameterUploads += 1;
+    this.destroyAccumulation();
+    this.invalidate();
+    return true;
+  }
+
+  /** Whether the installed scene reads its parameters from a buffer. */
+  get hasParameterBuffer(): boolean {
+    return this.program !== null && this.parameterBuffer !== null;
+  }
+
+  /** Shader module cache counters, for tests and the performance study. */
+  get shaderCacheStats(): { hits: number; misses: number; size: number } {
+    return {
+      hits: this.shaderModules.hits,
+      misses: this.shaderModules.misses,
+      size: this.shaderModules.size,
+    };
+  }
+
+  /**
+   * What the shader path has done this session, for the e2e tests.
+   *
+   * Published on `window` by the app (`__cadjointShaders`) because the
+   * claim worth testing is a negative one — a handle drag rebuilds *no*
+   * pipelines — and a negative is only checkable against a counter.
+   */
+  get shaderStats(): ShaderStats {
+    return {
+      pipelineBuilds: this.pipelineBuilds,
+      parameterUploads: this.parameterUploads,
+      hasParameterBuffer: this.hasParameterBuffer,
+      hits: this.shaderModules.hits,
+      misses: this.shaderModules.misses,
+    };
   }
 
   /** Replace the construction geometry drawn on top of the scene. */
@@ -1336,6 +1591,9 @@ export class Renderer {
       });
       tracePass.setPipeline(this.pathPipeline!);
       tracePass.setBindGroup(0, this.pathBindGroups[this.readIndex]);
+      if (this.pathParameterGroup) {
+        tracePass.setBindGroup(this.program!.group, this.pathParameterGroup);
+      }
       tracePass.draw(3);
       tracePass.end();
 
@@ -1357,6 +1615,9 @@ export class Renderer {
       if (wantDepth && this.previewDepthPipeline) {
         presentPass.setPipeline(this.previewDepthPipeline);
         presentPass.setBindGroup(0, this.previewBindGroup);
+        if (this.previewParameterGroup) {
+          presentPass.setBindGroup(this.program!.group, this.previewParameterGroup);
+        }
         presentPass.draw(3);
       }
       this.drawGraticule(presentPass);
@@ -1372,6 +1633,9 @@ export class Renderer {
       });
       previewPass.setPipeline(this.previewPipeline);
       previewPass.setBindGroup(0, this.previewBindGroup);
+      if (this.previewParameterGroup) {
+        previewPass.setBindGroup(this.program!.group, this.previewParameterGroup);
+      }
       previewPass.draw(3);
       this.drawSimulation(previewPass);
       // After every pass that writes depth, before every pass that does not:
