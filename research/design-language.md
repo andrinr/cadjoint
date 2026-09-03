@@ -753,14 +753,15 @@ Checks worth adding as the queued devices land:
 | the mirror | `frontend/src/styles.css` |
 | the assertions | `frontend/test/tokens.test.ts`, `frontend/test/graticule.test.ts` |
 | the linter | `frontend/tools/ui-audit/` |
-| the chosen direction, as one panel | `research/design/brutalist/5-light-dock.png` |
-| the same at 511 elements | `research/design/brutalist/8-light-dense.png` |
-| its measurements | `research/design/brutalist/measurements.txt` |
-| the system across the whole UI, with the plate as an object | `research/design/combined/6-dark-plate-object.png` |
-| the all-light measurements | `research/design/combined/measurements.txt`, `measurements.json` |
-| the light chrome as shipped, every mode and popover | `research/design/light-chrome/` |
-| the light viewport, twelve states | `research/design/light-viewport/` |
-| the graticule, readout and title block in the app | `research/design/graticule/` |
-| the docking and window states | `research/design/windows/` |
+| the app as shipped, in screenshots | `docs/assets/screens/` |
 | the banner and the live README capture | `research/design/banner/` |
+| evidence for a specific claim, where one was needed | `research/design/light-chrome/`, `research/design/scenes/` |
 | the refactor, before and after | `research/refactor/` |
+
+The exploration that chose this language — the dark and light variants, the
+brutalist and combined panels, the graticule and window studies, and their
+measurement dumps — is deleted.  It was the argument for the design, not the
+design, and every number it settled is quoted where it is used: the tokens
+carry their own measurements in `frontend/src/tokens.ts`, and the linter in
+`frontend/tools/ui-audit/` re-derives the rest from the running app, which is
+a check the pictures could never be.
