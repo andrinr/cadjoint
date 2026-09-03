@@ -1267,3 +1267,632 @@ pipeline and per-mode frame timings in Chromium with the pixel probe),
 `shader-xlaorigin.py` (§13.5). The e2e counters come from
 `npx playwright test e2e/shader.spec.ts --reporter=json`, whose attachments
 carry the tables in §13.3 and §13.5 verbatim.
+
+## 13.8 The march, as settings — three controls, each with its price
+
+Status: shipped (2026-09-03). §13.3 made the *scene's* parameters editable
+without a recompile. This does the same for the *renderer's*: the step budget,
+hit refinement and bounds culling are now controls in the Render panel, and
+none of them touches the source, triggers a compile or is lost by one.
+
+**How they reach the shader.** Two ride in the viewer's uniform block — the
+budget in `path_settings.w`, refinement as a new bit (32) in the `display.z`
+bitfield — so they are part of the per-frame write that already happens.
+Culling cannot: its skip tests are inside the *generated* scene module, which
+reads no uniform but its own parameter buffer, so the cull margin takes a
+reserved slot there beside the NaN. Toggling it is a `writeBuffer` of a few
+hundred bytes, exactly like a handle drag.
+
+**Method.** Same harness and machine as §13, 1200 × 800, median of 21 frames
+after 2 warm-up, on the shipped `scope="free"` shaders. Every row renders the
+setting off and on and diffs the two frames pixel for pixel, because a control
+that changes no pixel and a control that changes half the frame are both
+bugs. **Pixel columns are exact and reproduced identically across runs; the
+timing column on `motor_shield` is not** — a 4.6 MB shader throttles, and its
+ratios there moved by ±40 % between runs. Read `starter` and `end_cap` for
+cost, all three for effect.
+
+### The step budget (`path_settings.w`, 16…512, default: the quality tier)
+
+| scene | change | frame | pixels changed | worst level |
+|---|---|---:|---:|---:|
+| `starter` | 192 → 64 | ×1.00 | 0.00 % | 0 |
+| `starter` | 192 → 384 | ×1.00 | 0.00 % | 0 |
+| `end_cap` | 192 → 96 | ×0.97 | 0.00 % | **187** |
+| `end_cap` | 192 → 64 | ×0.96 | 0.02 % | **188** |
+| `end_cap` | 192 → 384 | ×1.00 | 0.00 % | 0 |
+| `motor_shield` | 192 → 96 | (noise) | 0.02 % | 85 |
+| `motor_shield` | 192 → 64 | (noise) | 0.11 % | 175 |
+| `motor_shield` | 192 → 384 | (noise) | 0.00 % | **16** |
+
+**It is a cap, not a cost.** Nearly every ray converges and returns long
+before the budget, so raising it is close to free — 192 → 384 is inside the
+noise on every scene — and lowering it does not reliably buy time either. What
+lowering it does is drop the rays that *needed* the steps, and those are
+whole-pixel failures: a "worst level" of 187 on a 0–255 channel is a pixel
+that went from surface to background. `end_cap` at 96 changes too few pixels
+to round above 0.00 % and still breaks them completely.
+
+Two consequences worth naming. `starter` is converged by 64, so the Draft tier
+costs it nothing. `motor_shield` is *not* converged at 192 — a handful of
+pixels still move at 384 — so the Ultra tier is a floor for that part, not a
+ceiling. This is why the control exists at all, and why the panel calls it a
+cap rather than a quality slider.
+
+### Hit refinement (`DISPLAY_REFINE_HIT`, default off)
+
+The march stops at the first sample inside `SURFACE_EPS`, and takes its `t`.
+On a ray meeting the surface squarely that is accurate to the band; on a
+grazing one the step is `0.9|f|` and |f| falls slowly along a tangent, so the
+march creeps and stops up to a whole epsilon short. `refine_hit` re-solves for
+the crossing by clamped secant iteration from the two samples the march
+already holds — the first correction needs no field evaluation at all, and
+`REFINE_STEPS` (4) further ones cost one each, only on pixels that hit.
+
+| scene | mode | frame | pixels changed | worst level |
+|---|---|---:|---:|---:|
+| `starter` | default | ×1.00 | 0.10 % | 133 |
+| `starter` | pbr | ×1.00–1.10 | 0.12 % | 87 |
+| `starter` | normal | ×1.00 | 0.44 % | 87 |
+| `starter` | depth | ×1.00–1.10 | 0.17 % | **1** |
+| `end_cap` | default | ×1.21 | 0.38 % | 137 |
+| `end_cap` | pbr | ×1.17 | 0.57 % | 95 |
+| `end_cap` | normal | ×1.17 | 0.85 % | 119 |
+| `end_cap` | depth | ×1.25 | 0.12 % | **1** |
+| `motor_shield` | default | (noise) | 1.04 % | 128 |
+| `motor_shield` | normal | (noise) | 2.11 % | 255 |
+| `motor_shield` | depth | (noise) | 0.38 % | **1** |
+
+0.1–2.1 % of the frame moves, which is the silhouette band and nothing else —
+and the depth view is the proof of mechanism: there the change is *one level
+everywhere it hits*, which is the sub-epsilon correction showing up as
+exactly what it is. The normal view gains most (0.44–2.11 %), which follows:
+a normal is sampled at the hit, so a hit that is short samples the gradient
+off the surface.
+
+Cost is 0 % on `starter` and 17–25 % on `end_cap`. It defaults **off** because
+the default has to be the image the viewer has always drawn, not because it is
+the worse image.
+
+The clamp is what makes it safe to ship: every secant step is confined to the
+bracket the march established, widened by one epsilon, so refinement can move
+a hit by at most an epsilon and can never create, destroy or relocate one.
+Silhouettes are identical with it on and off; only their sub-pixel coverage
+changes.
+
+### Bounds culling (a reserved slot in the parameter buffer, default on)
+
+| scene | mode | culling off | pixels changed |
+|---|---|---:|---:|
+| `starter` | default | ×1.00 | **0.00 %** |
+| `starter` | pbr | ×1.20 | **0.00 %** |
+| `starter` | slice | ×1.13 | **0.00 %** |
+| `end_cap` | default | **×2.18** | **0.00 %** |
+| `end_cap` | pbr | **×2.10** | **0.00 %** |
+| `end_cap` | slice | **×2.43** | **0.00 %** |
+| `motor_shield` | default | ×1.70 | **0.00 %** |
+| `motor_shield` | pbr | ×2.03 | **0.00 %** |
+| `motor_shield` | slice | **×2.45** | **0.00 %** |
+
+This is the table §13.4 could only assert from a benchmark build, now
+measured as a live toggle on one shader: **2.0× to 2.45× the frame, and not
+one pixel different.** A four-leaf scene has nothing to skip, which is why
+`starter` is flat. The slice views gain most, as they did before — a slice
+plane marches through empty space where nearly every leaf is skippable.
+
+**Making it a toggle cost nothing.** The margin every skip test is compared
+against became a traced argument rather than a folded constant, which by
+§13.2's own lesson is exactly the kind of change that can cost 31×. It does
+not: `end_cap` default was 2.9 ms with the constant margin and 2.8 ms with the
+uniform one, `motor_shield` 41.7 against 41.1 — within noise on every scene.
+The reason is that the threshold it is added to (`max(result + band, 0)`) is
+already a runtime value, so nothing was folding there to lose.
+
+The "off" position is `margin = +∞`, which makes every test false. That is a
+stronger statement than a large finite margin: for a scene of unknown extent
+only infinity guarantees *no* box test can pass. Verified against the flat
+field at 2.4e-7 over 100 k points on both shipped scenes.
+
+### What was refused, and why
+
+- **Over-relaxation (ω > 1).** No lane to put it in, and no measurement. The
+  march already runs *under*-relaxed at 0.9. Over-relaxation is fast and
+  tunnels through thin walls, and a tunnelled wall looks like a modelling
+  error rather than a render setting — the brief required the failure mode to
+  be visible, and I have no way to make it so. Not exposed.
+- **The surface epsilon** (`SURFACE_EPS`, 0.001) and **the far distance**
+  (`MAX_TRACE_DISTANCE`, 100). Both are real knobs and both want a float lane;
+  there is none (below). They are named constants now rather than literals
+  buried in `trace`, which is the part of exposing them that was free.
+- **A live frame-time readout beside the step slider.** It is the honest way
+  to "show the effect", and it belongs in the renderer's draw loop, which
+  another agent held for the duration. Proposed, not built.
+
+### The widget contract: the struct is full
+
+`Uniforms` is 7 × `vec4<f32>` = 112 bytes, and `cadjoint/viewer/widget.py`
+allocates exactly that. **All 28 floats now carry meaning** — the six that
+were spare in §12 were taken by the SDF views. So:
+
+- The step budget needed no room: `path_settings.w` already held it.
+- Refinement needed no room either: `display.z` is a bitfield with 5 of its
+  bits used, and an f32 represents integers exactly to 2²⁴, so bits are the
+  one thing still free. It took bit 32; 19 more are available.
+- Culling could not have used the block at all — its tests are in the
+  generated module — so it took a reserved slot in the parameter buffer,
+  which is sized per scene and had room by construction.
+
+**`path_settings.x/y/z` are read only by the path tracer** (sample index,
+bounces, shadow rays) and are dead in the preview shader — but the two share
+one buffer and both can be live in a single frame (the preview depth prepass
+runs during path tracing), so they are **not** reusable. That is the last
+apparent slack in the struct, and it is not slack.
+
+**The proposal, if another float lane is ever needed**: grow `Uniforms` to
+8 × `vec4` = 128 bytes and change `widget.py`'s allocation in the same commit.
+The widget writes zeros to everything it does not understand, and every field
+in the block is designed so 0 is its inert value, so an eighth vec4 costs the
+widget one number and nothing else. What must not happen is the struct
+growing while the widget's 112 stays — that faults the widget rather than
+ignoring the new fields, which is why the two literals should be one named
+constant when they next move.
+
+### Reproducing §13.8
+
+`shader-refine.mjs <label.json>...` in the scratch workspace renders every row
+above off and on, times both and diffs the frames; `shader-compile.py` builds
+its inputs through the real worker. The pixel columns are deterministic and
+should reproduce exactly; the `motor_shield` timings should not be trusted to
+better than ±40 %.
+
+## 13.9 The capped section, the lighting rig, and what a tier actually buys
+
+Status: shipped (2026-09-03). Three of the five things asked for in the render
+settings, measured the same way §13.8 measured the march controls: every row
+renders the setting off and on, times both, and diffs the frames.
+
+**Method.** Apple Metal through Chromium, `scenes/starter.py` and
+`scenes/end_cap.py` through the real compile worker, median of 9 frames after
+2 warm-up. Screenshots at 2× in `research/design/light-chrome/`.
+
+### A capped section, not a clipped one
+
+`slice` and `∇f` draw the *field* on a card at the plane. That is a data view,
+and it was never what "each object that we slice through gets a surface on the
+slice plane instead of just being hollow there" was asking for. Clipping a
+solid — refusing to draw in front of a plane — lets the ray carry on and hit
+the **inside of the far shell**, which is exactly the hollow the complaint
+names.
+
+The capped version is one operation:
+
+```wgsl
+fn traced_field(p: vec3<f32>) -> f32 {
+  let field = scene_field(p);
+  if (!display_flag(DISPLAY_SECTION)) { return field; }
+  return max(field, section_halfspace(p));
+}
+```
+
+`max` is intersection, and intersecting the solid with a half-space *is* a
+section. Three things fall out of it rather than having to be built:
+
+- **The cap is a real surface** — the ray stops on the plane, because that is
+  where the field reaches zero.
+- **The cap has the right normal** — `sdf_normal` central-differences this
+  same function, so on the cap it returns the plane's own normal. No special
+  case anywhere.
+- **The cap has the right material** — `material_base` is still evaluated at
+  the hit position, which lies inside the solid that was cut, so the cut face
+  arrives in the colour of the thing it cuts. In `section-capped-x.png` the
+  copper slug and the two steel bushings are visible *in section*, in their
+  own materials, inside the aluminium.
+
+The march stays correct: both operands are proper distance fields, and the
+`max` of two of those never overestimates the distance to their intersection,
+which is the only property sphere tracing needs.
+
+| scene | mode | frame off | frame on |
+|---|---|---:|---:|
+| `starter` | flat, hard shadows | 1.7 ms | 0.9 ms |
+| `starter` | section on X | — | 0.9 ms |
+| `starter` | section on Y | — | 0.9 ms |
+
+**It is free, and slightly better than free**: less geometry survives the cut,
+so fewer rays hit anything and the march returns sooner.
+
+**Data and geometry compose rather than exclude.** The section cuts the solid;
+the field card draws on the same plane and covers the cut where the card
+reaches. They share one plane so a reader places it once, and the panel says
+which is on top. Critically, the *data path* is untouched: `sdf_view_color`
+and `sdf_gradient_magnitude` still read `scene_field`, not `traced_field`, so
+a |∇f| view of a sectioned scene still reports the scene's own metric error
+and not the plane's gradient. `test_the_section_leaves_the_data_path_on_the_true_field`
+pins the routing function by function.
+
+**Which half goes is a function of the camera, and that is deliberate.** The
+design language forbids a *measurable* ground that moves with the eye. A
+cutaway is not a scale: its purpose is to open the solid toward the reader,
+and keeping the near half shows the outside of the far shell — the very
+failure the mode exists to fix. So the half the camera is in is the half
+removed, and orbiting through the plane swaps them, as it does in every
+drafting package.
+
+**The cut face is darkened to 0.72 and that is the weakest part of this.**
+Drafting hatches a section because the cut is a fiction — not a surface the
+part has — and a reader must be able to tell it from one that is. A hatch
+cannot be drawn here: it is a screen-space pattern, and this shader is also
+what the path tracer converges to and what the thumbnailer renders at other
+sizes, so a fixed pitch would alias in one and vanish in the other. A flat
+multiplier says the same thing at every scale, but it says it *quietly* —
+in `section-capped-x.png` the large cut face reads as a plausible real face.
+Recommend evaluating a hatch as its own piece of work, with the resolution
+independence solved rather than assumed.
+
+### Lighting: a key that no longer stands alone
+
+One directional light left a whole hemisphere of normals on a flat ambient, so
+orbiting to the far side of a part gave a dark unreadable slab. The rig now
+is a key (shadow-casting, as before), two fills at ±120° about world up, and a
+sky/ground hemisphere ambient in place of the constant. **Every lamp is
+white**: the key used to be `vec3(1.0, 0.92, 0.82)`, which tinted every face of
+every part and competed with both material colour and the viridis fields.
+
+The second fill is pushed *below* the horizon. A textbook three-point rig
+keeps every lamp above the subject, because a photographer's subject is not
+inspected from underneath. A part is.
+
+Model pixels only — the background is excluded, and a rig is judged by its
+darkest face, not its average. "Dark" is luma < 60 of 255.
+
+| orbit | mean luma before → after | dark fraction before → after |
+|---|---|---|
+| front-right (key side) | 69.4 → **136.7** | 17.9 % → **0.3 %** |
+| back-left (away from key) | 69.7 → **140.5** | 16.3 % → **0.3 %** |
+| back-low | 61.4 → **124.7** | 29.8 % → **0.6 %** |
+| underside | 49.8 → **116.9** | 56.5 % → **0.1 %** |
+
+The two worst views were the back-low and the underside, and they are now
+within 12 % of the best. Nothing is washed out: the ground is 229 and the
+model's mean sits at 117–141, well clear of it, with the silhouette contour
+still closing the edge. Frame cost is unmeasurable — two dot products and a
+mix, no extra marches, because the fills cast nothing (a fill that threw its
+own shadow would put a second contradictory shadow under the part, and the
+extra marches are the whole reason the key is the only one that gets them).
+
+Before and after at all four orbits: `lighting-before-*.png`,
+`lighting-after-*.png`.
+
+### "The marching steps in ultra seem excessive" — they are not what costs
+
+The step budget was measured against the pixel budget on `end_cap`, at the
+three tiers' own resolutions:
+
+| resolution | 64 steps | 96 | 192 | 384 |
+|---|---:|---:|---:|---:|
+| 715 × 447 (Draft, 319 k px) | 1.9 ms | 1.9 | 1.9 | 1.9 |
+| 1200 × 750 (High, 900 k px) | 2.5 ms | 2.6 | 2.7 | 2.8 |
+| 1600 × 1000 (Ultra, 1600 k px) | 4.1 ms | 3.9 | 3.9 | 3.9 |
+
+**Read the rows: six times the step budget is inside the noise at every
+resolution. Read the column: the tier is 1.9 → 2.7 → 3.9 ms, and that is the
+whole of the difference between Draft and Ultra.** Ultra costs 2.05× Draft,
+and 100 % of it is the pixel budget. The march cap contributes nothing
+measurable to any of it.
+
+So the budget was not lowered. Three things changed instead:
+
+1. **The ladder is gone.** 64/96/192 became one number, 192, for every tier.
+   A ladder that buys no time and costs image quality is all cost: Draft's 64
+   steps punched holes in `end_cap`'s silhouette (§13.8: 0.02 % of pixels
+   changed, worst level 188 — whole pixels lost) for zero saving.
+   `DisplaySettings.marchSteps` still overrides it, which
+   `scenes/motor_shield.py` needs since it is not converged at 192.
+2. **"Quality" is now "Resolution"**, and prints what the tier actually
+   contains — `1.60 MP · the whole of what a tier costs`, or the bounce and
+   shadow-ray counts when path tracing is on.
+3. **The march control says what it is.** "A cap, not a cost. Nearly every ray
+   converges long before it, so raising it is close to free; lowering it drops
+   the rays that needed the steps and erodes the silhouette."
+
+The panel was misrepresenting the number, which is what made it look
+excessive. The number was right.
+
+### Panel organisation
+
+The settings are now grouped by what they *are* rather than by when they were
+added: **what is drawn** (shading, shadows, effects, annotations, the distance
+field views and the section), **how well it is drawn** (Resolution, Marching),
+and **Diagnostics — cost, not appearance** (bounds culling, which changes no
+pixel on any shipped scene and 2.0–2.4× the frame). Every control that has a
+measured cost prints it in its own subtitle. No new CSS classes and no new
+colours: the group headings reuse `render-preset-heading`, the numeric rows
+reuse `sim-slice` and `sim-legend-values`, the switches reuse `ToggleSwitch`.
+
+### Not done: the per-object palette
+
+Deliberately not attempted rather than asserted. A stable per-object colour
+needs the *shader* to know which leaf owns a point, and to name that leaf by
+its stable id. The material system already selects per-leaf through the CSG
+tree, so the selection machinery exists — but the id it would have to hash is
+in the construction payload, not in the SDF graph, which knows only a DFS
+index. Hashing the DFS index is precisely the draw-order-derived colour the
+brief rules out: it is not stable across the edits the mode exists to help
+with. Doing it properly means carrying stable ids into `functionalize_scene`
+and emitting a fourth entry point beside `material_base` / `material_optics`.
+That is a codegen change of the same size as §12.8's, and it wants its own
+measurement pass.
+
+---
+
+# 14. The constraint solve — 94 XLA programs for two Newton steps, and where they actually came from
+
+Status: **implemented and measured** (2026-09-03). Changes `cadjoint/constraints/solve.py`
+only. Same machine as §0; jax 0.8.2, CPU backend. Every number is a fresh
+subprocess with a private, empty `CADJOINT_CACHE_DIR` unless the row says warm.
+"XLA programs" counts calls to `jax._src.compiler.compile_or_get_cached`, which
+is one per executable JAX asks the backend for, cache hit or miss.
+
+## 14.1 The question
+
+> *"Can we improve this by approximating the jacobian maybe? maybe in favor of
+> more steps? we can also expose these constraints options maybe."*
+
+§13.5 had found that the persistent cache's 482 entries for `starter` "are the
+constraint solver's and scale with sketch content". The four candidate levers,
+in the order they were expected to matter, were: roll the step loop into
+`lax.scan`; exploit the Jacobian's block sparsity or go matrix-free; batch
+identical constraints under `vmap`; approximate the Jacobian (Broyden / chord).
+
+**The ordering was wrong, and so was the diagnosis of lever 1.** The cost was
+not the Jacobian at all. It was that *the entire solve ran eagerly*: a Python
+`for` loop calling `jax.jacobian` and `float(loss)` op by op, so JAX compiled
+one program per primitive — `jit_pad`, `jit_subtract`, `jit_concatenate` — and
+the 482 entries are that dust, not 482 Jacobians.
+
+## 14.2 Baseline: what the solve owned
+
+Executing the scene program (the constraint solve is the last statement of
+every one), cold cache. The **no-op** column reruns the same scene with
+`satisfy_constraints` replaced by a parameter read, which is the honest
+attribution: everything else the scene does is unchanged.
+
+| scene | DOF | constraints | wall | XLA programs | of which the solve | wall, no-op solve |
+|---|---:|---:|---:|---:|---:|---:|
+| two spheres, no sketch (control) | 2 | 0 | 0.014 s | 5 | 1 | 0.013 s |
+| `scenes/starter.py` | 71 | 19 | 1.475 s | 155 | **94 (61 %)** | 0.484 s |
+| `scenes/motor_shield.py` | 77 | 33 | 3.879 s | 411 | **92 (22 %)** | 2.774 s |
+
+**The solve was 0.98 s of `starter`'s 1.48 s (66 %) and 1.09 s of
+`motor_shield`'s 3.88 s (28 %).** Warm (populated cache, second subprocess) it
+was still 0.32 s and 0.35 s — because the residue is Python-side eager
+dispatch, which no disk cache touches.
+
+Note the control: a scene with no sketch compiles 5 programs total. The whole
+482-entry cloud is sketch content, exactly as §13.5 said, and 94 of `starter`'s
+155 were the eight lines of `_newton_projection`.
+
+## 14.3 Lever 1 — `lax.scan`. The premise was false; the fix was elsewhere
+
+The expectation was that a Python `for _ in range(steps)` with
+`jax.jacobian` *inside* it compiles one Jacobian program per step. It does
+not. Eager dispatch caches per **primitive op**, so every step after the first
+hits the same `jit_dot`, `jit_pad`, `jit_concatenate` entries:
+
+| `steps` | 1 | 2 | 4 | 8 | 16 |
+|---|---:|---:|---:|---:|---:|
+| solve XLA programs | 94 | 94 | 94 | 94 | 94 |
+| solve wall | 0.996 s | 1.116 s | 1.162 s | 1.385 s | 1.804 s |
+
+Flat in programs, linear in wall clock at ~50 ms of Python dispatch per step.
+
+What *does* pay is putting the loop inside **one** `jax.jit`. Measured on the
+real residual of each scene, `steps=2`:
+
+| variant | `starter` programs | `starter` compile | `motor_shield` programs | `motor_shield` compile |
+|---|---:|---:|---:|---:|
+| eager (as shipped) | 85 | 0.725 s | 83 | 0.822 s |
+| jit, loop unrolled in Python | 2 | 0.101 s | 2 | 0.163 s |
+| **jit + `lax.scan`** | **1** | **0.088 s** | **1** | **0.139 s** |
+
+And the scan is what makes the step count free, which is the trade the
+question asked about. At `steps=16` on `starter` the unrolled jit costs
+0.367 s to compile and the scanned one costs **0.081 s** — the same as at
+`steps=2`, because `lax.scan` traces its body once whatever `length` is.
+
+## 14.4 Lever 2 — matrix-free. Measured, and it loses
+
+Conjugate gradient on `J Jᵀ λ = c` through `jvp`/`vjp` products, damped
+(`λ = 1e-10 I`), 20 CG iterations, never forming `J`:
+
+| problem | jit + scan (dense `lstsq`) | matrix-free CG |
+|---|---:|---:|
+| `starter` (J is 22 × 71) | 0.088 s | 0.122 s |
+| `motor_shield` (37 × 77) | 0.139 s | 0.184 s |
+| synthetic, 128 points / 171 constraints | 0.971 s | 2.012 s |
+
+It loses at every size, and it loses *worse* as the problem grows. The reason
+is the thing lever 2 was aimed at: **`J`'s density was never the cost.** A
+22 × 71 dense least-squares is nothing. The cost is the *residual*, which is a
+Python loop concatenating one traced sub-expression per constraint — and the
+matrix-free body embeds a jvp and a vjp of that whole unrolled residual inside
+20 CG iterations, so it compiles a multiple of what the dense route compiles.
+Rejected, and it would also have had to answer for its own conditioning in the
+rank-deficient case that §14.7 protects.
+
+## 14.5 Lever 3 — batching identical constraints. The real *scaling* lever, not yet needed
+
+`build_residual_fn` traces every constraint separately: sixteen horizontal
+constraints are sixteen copies of `p1[1] - p2[1]` in the jaxpr. Holding the
+solver fixed at jit + scan and varying only the residual — the shipped
+per-constraint loop against a hand-written gathered/batched equivalent of the
+same system:
+
+| points | constraints | looped compile | batched compile | looped StableHLO | batched StableHLO |
+|---:|---:|---:|---:|---:|---:|
+| 8 | 11 | 0.065 s | 0.058 s | 50 kB | 51 kB |
+| 32 | 43 | 0.179 s | 0.056 s | 171 kB | 52 kB |
+| 128 | 171 | 0.782 s | 0.087 s | 666 kB | 54 kB |
+| 512 | 683 | **5.391 s** | **0.066 s** | 2.68 MB | 63 kB |
+
+**82× at 512 constraints, and the batched program is flat.** This is the lever
+that scales, and it is the right next one — but it is worth ~0.12 s at the
+sizes real scenes have today (19 and 33 constraints), against a change that
+touches the `compute_residual` contract of all twelve constraint types. It is
+written down here rather than built. The design that would do it generically:
+group constraints by `(type, parameter arity, parameter shapes, and equality of
+every non-`Parameter` dataclass field)`, gather each group's parameter slices
+into stacked arrays, and `vmap` one group member's `compute_residual` over
+them. The equal-constants clause is what makes it safe without per-type code,
+and it is satisfied by exactly the types that dominate a sketch — Horizontal,
+Vertical, Coincident, Parallel/Perpendicular, ParallelEdges/PerpendicularEdges
+carry no constants at all. Distance, Fixed and Angle fall back to the loop
+unless their targets happen to agree. **Costs**: residual ordering changes, so
+geometry moves at solver tolerance rather than staying bit-identical.
+
+## 14.6 Lever 4 — approximating the Jacobian. It buys nothing here
+
+A chord/quasi-Newton step (factor `J` once at the initial point, reuse it for
+every subsequent correction), scanned and jitted like the others:
+
+| variant | `starter` programs | compile | `motor_shield` programs | compile |
+|---|---:|---:|---:|---:|
+| jit + scan, exact `J` per step | 1 | 0.088 s | 1 | 0.139 s |
+| jit + scan, `J` frozen at step 0 | 1 | 0.077 s | 1 | 0.135 s |
+
+**7 ms and 4 ms**, inside the noise, and it is the weakest lever for exactly
+the reason predicted: an approximate Jacobian saves *evaluations*, and this
+workload's cost is *compilation*, which the first Jacobian pays in full either
+way. It also costs convergence — the chord method is linearly rather than
+quadratically convergent, so a sketch far off-manifold needs more steps to
+reach the same residual. Rejected: it trades a real property for a
+measurement-noise gain.
+
+**So the answer to "approximate the Jacobian in favour of more steps?" is: no,
+and you no longer have to.** Steps became free by construction; the exact
+Jacobian is what should be spent on them.
+
+## 14.7 What shipped
+
+`_newton_projection` and `_gradient_projection` are one `jax.jit` around a
+`lax.scan` over their step body. The arithmetic is untouched: the same
+residual, the same `jax.jacobian`, the same `jnp.linalg.lstsq(J Jᵀ, c)` —
+which is load-bearing and is *why* the dense route was kept, since it is the
+one that answers a rank-deficient `J Jᵀ` with a minimum-norm correction
+instead of NaN. Two smaller things came with it: the loss history returns
+through one `np.asarray` instead of iterating the device array (which was
+compiling an `unstack` program of its own), and `project_to_manifold` calls
+the scanned kernel directly so it does not sync the host every step inside an
+optimizer loop.
+
+Cold cache, fresh subprocess, whole scene program:
+
+| scene | wall, before → after | XLA programs, before → after | the solve's own wall | the solve's own programs |
+|---|---|---|---|---|
+| two spheres (control) | 0.014 → 0.013 s | 5 → 5 | 0.002 → 0.002 s | 1 → 1 |
+| `starter` | **1.475 → 0.770 s** | **155 → 76** | **0.978 → 0.278 s** | **94 → 15** |
+| `motor_shield` | **3.879 → 3.065 s** | **411 → 333** | **1.087 → 0.321 s** | **92 → 14** |
+
+Warm cache: `starter` 0.453 → 0.291 s and its solve 0.320 → 0.158 s;
+`motor_shield` 1.156 → 0.952 s and its solve 0.347 → 0.177 s.
+
+The solve is now **one** program. The 14–15 still attributed to it are
+`pack_param_dict` / `unpack_param_vector` / `apply_parameters` dispatching
+eagerly — `jit_concatenate`, `jit_dynamic_slice`, `jit_squeeze` — and those
+same op-level entries are compiled by the rest of the scene anyway, so jitting
+them would move cost rather than remove it. Measured directly: the scanned
+kernel is 1 program and 0.073 s; packing is 9 and 0.026 s; unpacking is 5 and
+0.023 s.
+
+And the step count is now free:
+
+| `steps` | 2 | 8 | 16 | 64 |
+|---|---:|---:|---:|---:|
+| solve XLA programs | 15 | 15 | 15 | 15 |
+| solve compile | 0.122 s | 0.119 s | 0.121 s | 0.121 s |
+| solve wall | 0.268 s | 0.265 s | 0.266 s | 0.268 s |
+
+**`steps=64` and `steps=2` are the same number to three decimal places.**
+Before the change, going from 1 step to 16 cost 0.81 s more.
+
+### Geometry
+
+**Bit-identical.** SHA-256 over the solved free-parameter arrays of both
+scenes, before and after: `starter` `79340fde…`, `motor_shield` `86dedf5e…`,
+unchanged. Nothing else was expected — the change is where the loop lives, not
+what it computes — and the matrix-free route, which *would* have moved the
+answer, was rejected on its own merits above.
+
+### Tests
+
+`tests/constraints/test_compiled_programs.py` pins the shape: a Newton solve
+compiles exactly **one** program, at `steps` of 1, 2 and 32; an Adam solve
+likewise at 4 and 64; a whole `satisfy_constraints` call stays at one program
+with its eager ops warm; and — as a proxy that survives jax changing its log
+format — the residual function is *traced* the same number of times at
+`steps=2` and `steps=16`, which a Python loop cannot do. Counting uses the
+public `jax.log_compiles()` context and a log handler, not a private hook.
+
+`tests/constraints/test_redundant.py` gains structural rank deficiency next to
+the geometric redundancy it already covered: a literally duplicated relation
+(two identical rows in `J`) and a degenerate one (`Horizontal(p, p)` — a row
+that is identically zero), each in float32 *and* float64, each asserted finite
+*and* still enforced, and one asserting that stating a relation twice gives
+the same sketch as stating it once. Swapping `lstsq` back to
+`jnp.linalg.solve` fails 12 of the file's 14 tests.
+
+## 14.8 Which options to expose — and which not to
+
+The step count is the one that changed character. Before, `steps=8` cost 0.3 s
+more than `steps=2` on `starter`; now it costs nothing, so
+`satisfy_constraints(scene, steps=…)` — already in the scene language, already
+in `satisfy_constraints`' signature — is a knob a user can turn freely, and
+raising the default is a question of convergence rather than of budget. Both
+shipped scenes reach machine-zero residual in 2 steps (`starter` 0.0,
+`motor_shield` 5.5e-18), so nothing argues for moving the default today.
+
+`method` (`"newton"` / `"adam"` / `"sgd"`) is already exposed and all three
+paths are now scanned, so the Optax paths — the ones users are *expected* to
+give 48 steps — got the same treatment.
+
+**Nothing new should be exposed.** Specifically not:
+
+- **A solver method for matrix-free or quasi-Newton.** Neither survived §14.4
+  or §14.6. Exposing a method that is never the right choice is a knob whose
+  effect has been measured to be negative.
+- **A Newton tolerance.** The Newton path has no convergence loop — it is a
+  fixed count of projections — and adding one would mean `lax.while_loop`,
+  which reintroduces data-dependent iteration into a program the whole point
+  of this section was to make one fixed shape. No measurement asks for it.
+  `solve_constraints` (the Levenberg-Marquardt path) already has `tol` and
+  `max_steps` and keeps them.
+- **`lstsq`'s `rcond`.** It decides which singular values count as zero, i.e.
+  how much redundancy is tolerated before the correction is truncated. That is
+  a real dial with a real effect, and no scene has yet needed a value other
+  than the default. Exposing it would be shipping a way to reintroduce §14.7's
+  NaN.
+
+For the patch vocabulary in `research/editing-operations.md`: `steps` is the
+only constraint-solver control worth a GUI, it is an integer ≥ 1, and its
+effect is monotone and now free. **No payload change is proposed here** — the
+viewer already carries `satisfy_constraints`' diagnostics through
+`capture_constraint_solves`, whose report (`method`, `iterations`, `losses`)
+is unchanged in shape and length; a step slider would need only that existing
+`losses` array, which is `steps + 1` long as before.
+
+## 14.9 Reproducing §14
+
+Scripts in the ephemeral scratch workspace, `solve-` prefixed:
+
+| script | produces |
+|---|---|
+| `solve-count.py <scene>` | §14.2, §14.7 — per-scene wall/program split, `NOOP_CONSTRAINTS=1` for the attribution column |
+| `solve-anatomy.py <scene>` | §14.1 — constraint census and the per-phase program count inside one solve |
+| `solve-proto.py <scene>` | §14.3, §14.4, §14.6 — the five-variant shootout on the real residual (`STEPS`, `ONLY`, `CG` env) |
+| `solve-scale.py` | §14.4 — the synthetic size sweep (`NPTS`, `STEPS`) |
+| `solve-batch.py` | §14.5 — looped vs hand-batched residual under a fixed solver |
+| `solve-geom.py <scene>` | §14.7 — the solved-parameter hash |
+| `solve-two-spheres.py` | the no-sketch control scene |
+
+Programs are counted by wrapping `jax._src.compiler.compile_or_get_cached`;
+the tests use the public `jax.log_compiles()` instead, and the two agree.

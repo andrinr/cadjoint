@@ -110,3 +110,75 @@ def test_a_free_parameter_outside_the_sketch_is_left_finite():
         plate = extrude(PolygonProfile(square, name="plate"), depth=depth)
         satisfy_constraints(solid | plate, steps=3)
         assert np.isfinite(float(depth.value))
+
+
+# ── rank deficiency, stated exactly rather than by implication ──────────────
+#
+# The gusset above is *redundant*: the extra statement is implied by the
+# others, so ``J`` loses rank through the geometry.  The two cases below make
+# the deficiency structural instead — a literally duplicated row, and a row
+# that is identically zero — so ``J Jᵀ`` is singular by construction in every
+# dtype, with no roundoff to hide behind.  Both must give a finite,
+# minimum-norm correction rather than NaN, in float32 and float64 alike.
+
+
+def _duplicated(tag: str):
+    """The same relation stated twice: two identical rows in ``J``."""
+    left = Vector2(value=[0.0, 0.30], free=True, name=f"{tag}_left")
+    right = Vector2(value=[0.8, 0.05], free=True, name=f"{tag}_right")
+    profile = PolygonProfile([left, right, [0.4, 0.9]], name=tag)
+    FixedConstraint(left, [0.0, 0.0])
+    HorizontalConstraint(left, right)
+    HorizontalConstraint(left, right)  # the duplicate
+    return profile, (left, right)
+
+
+def _degenerate(tag: str):
+    """A relation between a point and itself: a row of ``J`` that is all zero."""
+    lone = Vector2(value=[0.0, 0.30], free=True, name=f"{tag}_lone")
+    mate = Vector2(value=[0.8, 0.05], free=True, name=f"{tag}_mate")
+    profile = PolygonProfile([lone, mate, [0.4, 0.9]], name=tag)
+    FixedConstraint(lone, [0.0, 0.0])
+    HorizontalConstraint(lone, mate)
+    HorizontalConstraint(lone, lone)  # residual and gradient both identically 0
+    return profile, (lone, mate)
+
+
+@pytest.mark.parametrize("x64", [False, True])
+@pytest.mark.parametrize("build", [_duplicated, _degenerate], ids=["duplicated", "degenerate"])
+def test_a_rank_deficient_system_stays_finite(build, x64):
+    with _x64(x64):
+        profile, points = build(f"rank_{build.__name__}_{int(x64)}")
+        satisfy_constraints(profile, steps=3)
+        assert np.isfinite(_values(points)).all()
+
+
+@pytest.mark.parametrize("x64", [False, True])
+def test_a_duplicated_relation_is_still_enforced(x64):
+    """Rank deficiency must not be survived by declining to solve."""
+    with _x64(x64):
+        profile, (left, right) = _duplicated(f"dup_solve_{int(x64)}")
+        satisfy_constraints(profile, steps=3)
+        left_v, right_v = np.asarray(left.value), np.asarray(right.value)
+        assert np.isfinite(left_v).all() and np.isfinite(right_v).all()
+        assert left_v[1] == pytest.approx(right_v[1], abs=1e-4)
+        np.testing.assert_allclose(left_v, [0.0, 0.0], atol=1e-4)
+
+
+@pytest.mark.parametrize("x64", [False, True])
+def test_a_duplicated_relation_gives_the_same_answer_as_one_copy(x64):
+    """Stating a relation twice must not move the sketch."""
+    with _x64(x64):
+        once_left = Vector2(value=[0.0, 0.30], free=True, name=f"once_l{int(x64)}")
+        once_right = Vector2(value=[0.8, 0.05], free=True, name=f"once_r{int(x64)}")
+        once = PolygonProfile([once_left, once_right, [0.4, 0.9]], name=f"once{int(x64)}")
+        FixedConstraint(once_left, [0.0, 0.0])
+        HorizontalConstraint(once_left, once_right)
+        satisfy_constraints(once, steps=3)
+
+        twice, twice_points = _duplicated(f"twice{int(x64)}")
+        satisfy_constraints(twice, steps=3)
+
+        np.testing.assert_allclose(
+            _values((once_left, once_right)), _values(twice_points), atol=1e-5
+        )
