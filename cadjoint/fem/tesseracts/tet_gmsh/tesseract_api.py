@@ -1,4 +1,4 @@
-"""Gmsh tet meshing of an exact B-rep — the narrow cut, and the GPL boundary.
+"""Gmsh tet meshing of a solid — the narrow cut, and the GPL boundary.
 
 Two things put this behind the Tesseract ABI, and only one of them is
 technical.
@@ -12,27 +12,25 @@ over the ABI — the same reason the ccx package exists.  Nothing in
 package stays the no-dependency fallback.
 
 **The narrow cut.**  Exactly as in ``tetfill``, the wrapper goes around the
-part that is genuinely opaque and no further.  Gmsh's job is to look at an
-exact STEP solid and decide *a topology*: how many nodes, which
-tetrahedra, and which CAD entity owns each node.  That decision is a black
-box.  What is **not** a black box is where the nodes go — every position is
-the solution of a 1-, 2- or 3-field Newton projection in
-:mod:`cadjoint.brep.project`, differentiable by the implicit-function
-theorem, and it runs on the caller's side in
-:func:`cadjoint.brep.mesh_gmsh.recompute_gmsh_points`.  So this package
-never sees a patch field, a scene or a parameter; it sees a STEP file.
+part that is genuinely opaque and no further.  Gmsh's job is to look at a
+solid — the dual-contour surface as STL, or an exact STEP — and decide *a
+topology*: how many nodes, which tetrahedra, and which CAD entity owns each
+node.  That decision is a black box.  What is **not** a black box is where
+the nodes go: which patches own a node is a residual test against the
+scene's public patch decomposition
+(:func:`cadjoint.fem.gmsh.assign_ownership`), and moving the nodes under a
+design change is the ``node_map`` plugin kind, whose implicit-function
+adjoint carries the derivative.  Both run on the caller's side.  So this
+package never sees a patch field, a scene or a parameter; it sees a file.
 
 That is why ``bounding_surfaces`` is in the output schema.  It is the one
-piece of Gmsh's answer the caller cannot recompute: for every node, the OCC
+piece of Gmsh's answer the caller cannot recompute: for every node, the
 surface tags whose closure it lies on.  A node on one surface solves one
 field, a node on the curve between two solves two, a node where three meet
-solves three — the arity falls straight out of that list, and
-:func:`cadjoint.brep.mesh_gmsh.assign_ownership` turns the tags into patch
-indices by matching each surface back to a
-:class:`~cadjoint.brep.graph.BRepFace`.  Tags themselves are *not* stable
-(the STEP reader numbers them in its own order, and Gmsh reports a
-cylindrical surface's type as ``Unknown``), so they are used only to group
-nodes, never to identify geometry.
+solves three — the arity falls straight out of that list.  Tags themselves
+are *not* stable (the reader numbers them in its own order, and Gmsh
+reports a cylindrical surface's type as ``Unknown``), so they are used only
+to group nodes, never to identify geometry.
 
 Contract
 --------
@@ -69,15 +67,19 @@ from tesseract_core.runtime import Array, Differentiable, Float64, Int32, ShapeD
 
 
 class InputSchema(BaseModel):
-    """An exact STEP solid plus the meshing options and the topology promise.
+    """A solid plus the meshing options and the topology promise.
 
-    ``step`` is the file's own text — :func:`cadjoint.brep.step.save_brep_step`
-    writes pure ASCII — because a STEP file is what a mesher can be handed
-    across a process boundary and a :class:`~cadjoint.brep.graph.BRep`,
-    whose patch fields are live Python callables, is not.
+    ``geometry`` is the file's own text, ASCII: the dual-contour surface as
+    STL (:func:`cadjoint.fem.gmsh.surface_stl`, the public route) or an
+    exact STEP solid (any CAD file, or the private tier's analytic writer).
+    A file is what a mesher can be handed across a process boundary; a
+    scene, whose patch fields are live Python callables, is not.
     """
 
-    step: str
+    geometry: str
+    # "stl" — classify the triangle soup into smooth regions and
+    # reparametrise them (Gmsh t13) — or "step".
+    geometry_format: str = "stl"
     # Uniform target element size, in the STEP file's own units.
     target_size: Array[(), Float64]
     # 1 = TET4, 2 = TET10 (the reason this package exists: Gmsh puts a
@@ -127,10 +129,11 @@ def _discover(inputs: InputSchema) -> dict:
     Raises:
         ImportError: If gmsh is not installed in this environment.
     """
-    from cadjoint.brep.mesh_gmsh import gmsh_topology
+    from cadjoint.fem.gmsh import gmsh_topology
 
     return gmsh_topology(
-        inputs.step,
+        inputs.geometry,
+        geometry_format=str(inputs.geometry_format),
         target_size=float(np.asarray(inputs.target_size)),
         order=int(np.asarray(inputs.order)),
         algorithm=int(np.asarray(inputs.algorithm)),
@@ -191,7 +194,7 @@ def _mesh(inputs: InputSchema) -> dict:
 
 
 def apply(inputs: InputSchema) -> OutputSchema:
-    """Mesh the STEP solid, or re-serve a frozen topology (runs concretely).
+    """Mesh the solid, or re-serve a frozen topology (runs concretely).
 
     Raises:
         ValueError: If a promised node count does not match what Gmsh found
@@ -222,7 +225,7 @@ def abstract_eval(abstract_inputs):
         raise ValueError(
             "Traced tet_gmsh calls need the frozen topology: pass node_ids=arange(P) and "
             "the cell_template, entity_dim_template, bounding_template and "
-            "edge_parent_template from a prior concrete apply on the same STEP solid."
+            "edge_parent_template from a prior concrete apply on the same solid."
         )
     return {
         "nodes": ShapeDType(shape=(num_nodes, 3), dtype="float64"),

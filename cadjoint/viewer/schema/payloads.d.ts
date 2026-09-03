@@ -25,6 +25,8 @@ export interface CompilePayload {
   preview_shader: string;
   path_shader: string;
   present_shader: string;
+  program?: ShaderProgram | null;
+  shader_hash?: string;
   construction: ConstructionNode[];
   identities: IdentityEntry[];
   relations: ConstructionRelation[];
@@ -33,6 +35,7 @@ export interface CompilePayload {
   sim_meshes: SimMeshPayload[];
   optimizations: OptimizationPayload[];
   mesh_edges: MeshEdgePayload | null;
+  tier?: Record<string, boolean> | null;
   solver_runs: ConstraintSolverRun[];
   output: string;
 }
@@ -291,6 +294,8 @@ export interface SimMeshPayload {
   size?: number[] | null;
   padding: number;
   method?: "hex" | "tet4" | "tet10" | null;
+  mesher?: "tetgen" | "gmsh" | null;
+  frozen_geometry?: boolean;
   domain?: DomainEntry | null;
   line: number | null;
   span: [number, number] | null;
@@ -327,6 +332,7 @@ export interface MeshEdgePayload {
   wire: [number, number, number][][];
   sharp: [number, number, number][][];
   resolution: number;
+  edges?: "graph" | "lattice";
 }
 
 /** What ``/patch`` answers with: the patched program, or why not. */
@@ -681,6 +687,37 @@ export type ExportFormat = "obj" | "stl" | "step" | "vtk";
  * itself, which is code, not a control.
  */
 export type OptimizationArgument = "steps" | "learning_rate";
+
+/**
+ * One design parameter's slot in the shader's uniform buffer.
+ *
+ * The shader source is byte-identical for every value of every parameter,
+ * so an edit that moves only values is a buffer write rather than a
+ * recompile.  ``offset`` is a byte offset into a buffer of 16-byte slots;
+ * ``components`` says how many of the slot's four floats are read.
+ */
+export interface ShaderParameter {
+  name: string;
+  offset: number;
+  components: number;
+  value: (number | null)[];
+  free: boolean;
+}
+
+/**
+ * The parameter buffer the scene's shaders read, and where it binds.
+ *
+ * Present only when the worker emitted the uniform form of the shader
+ * (the default); ``None`` means the parameters are literals in the source
+ * and every edit needs a fresh module.
+ */
+export interface ShaderProgram {
+  group: number;
+  binding: number;
+  buffer_bytes: number;
+  nan_offset?: number;
+  parameters: ShaderParameter[];
+}
 
 /** The physics a declared study solves. */
 export type StudyKind = "thermal" | "elastic";

@@ -1,11 +1,13 @@
-"""Which Tesseract plays which cadjoint kind, and where it runs.
+"""Which component plays which cadjoint kind, and where it runs.
 
 This is the part that is genuinely cadjoint's: a name -> spec table, a
 kind -> name default, and three places a spec can come from, later ones
 winning:
 
-1. **Built-in packages** — the Tesseract packages in this repository
-   (:data:`BUILTIN_PACKAGES`), as ``local`` specs.
+1. **Built-ins** — the Tesseract packages in this repository
+   (:data:`BUILTIN_PACKAGES`), as ``local`` specs, and — while the derived
+   B-rep still lives in this tree — the in-process providers of the private
+   tier's kinds (:data:`BUILTIN_PYTHON`), as ``python`` specs.
 2. **Entry points** — the ``cadjoint.plugins`` group.  A distribution
    registers a component by exposing a :class:`~cadjoint.plugins.PluginSpec`,
    a mapping in the ``plugins.toml`` table form, or a callable returning
@@ -47,7 +49,7 @@ from pathlib import Path
 from typing import Any
 
 from cadjoint.enums import PluginKind, PluginTransport, values
-from cadjoint.plugins.plugin import Plugin, TesseractPlugin
+from cadjoint.plugins.plugin import Plugin, PythonPlugin, TesseractPlugin
 from cadjoint.plugins.spec import PluginConfigError, PluginSpec
 
 #: The entry-point group third-party distributions register under.
@@ -76,6 +78,23 @@ BUILTIN_PACKAGES: dict[str, tuple[str, Path]] = {
     "tet_gmsh": (PluginKind.TET_MESHER.value, _TESSERACTS / "tet_gmsh"),
 }
 
+#: The module that holds the in-tree providers of the private tier's kinds.
+#: Temporary (design memo ``research/two-tier.md`` D12): once the derived
+#: B-rep moves to ``diff-brep`` the module is gone, ``find_spec`` says so,
+#: and these specs vanish without a line here changing — the private
+#: distribution then registers the same kinds through the entry-point group.
+_BREP_PLUGINS_MODULE = "cadjoint.brep.plugins"
+
+#: name -> (kind, ``module:attribute``) for the in-process providers shipped
+#: in this tree, registered as ``python`` specs while ``cadjoint.brep`` exists.
+BUILTIN_PYTHON: dict[str, tuple[str, str]] = {
+    "brep_node_map": (PluginKind.NODE_MAP.value, f"{_BREP_PLUGINS_MODULE}:node_map"),
+    "brep_feature_edges": (PluginKind.FEATURE_EDGES.value, f"{_BREP_PLUGINS_MODULE}:feature_edges"),
+    "brep_extract": (PluginKind.BREP.value, f"{_BREP_PLUGINS_MODULE}:brep"),
+    "brep_step_export": (PluginKind.STEP_EXPORT.value, f"{_BREP_PLUGINS_MODULE}:step_export"),
+    "brep_drag": (PluginKind.DRAG.value, f"{_BREP_PLUGINS_MODULE}:drag"),
+}
+
 #: Which plugin fills each kind unless the config says otherwise.  The two
 #: elastic solvers share a kind, so this is where that choice is made.
 BUILTIN_DEFAULTS: dict[str, str] = {
@@ -87,6 +106,7 @@ BUILTIN_DEFAULTS: dict[str, str] = {
     # The only tet_mesher there is; the built-in tetfill stays the
     # no-dependency fallback under its own kind.
     PluginKind.TET_MESHER.value: "tet_gmsh",
+    **{kind: name for name, (kind, _object) in BUILTIN_PYTHON.items()},
 }
 
 _VERSION_LINE = re.compile(r"^version:\s*['\"]?([^'\"\s]+)['\"]?\s*$", re.MULTILINE)
@@ -208,8 +228,23 @@ def _declared_version(package: Path) -> str | None:
     return match.group(1) if match else None
 
 
+def _brep_in_tree() -> bool:
+    """Whether the temporary in-tree providers' module exists (no import)."""
+    import importlib.util
+
+    try:
+        return importlib.util.find_spec(_BREP_PLUGINS_MODULE) is not None
+    except (ImportError, ValueError):
+        return False
+
+
 def builtin_specs() -> dict[str, PluginSpec]:
-    """Local specs for every Tesseract package present in this checkout."""
+    """Specs for every component shipped in this checkout.
+
+    ``local`` specs for the Tesseract packages present, and ``python``
+    specs for the in-tree providers of the private tier's kinds while
+    their module is still here (see :data:`BUILTIN_PYTHON`).
+    """
     specs = {}
     for name, (kind, package) in BUILTIN_PACKAGES.items():
         api = package / "tesseract_api.py"
@@ -220,6 +255,11 @@ def builtin_specs() -> dict[str, PluginSpec]:
                 transport=PluginTransport.LOCAL,
                 api_path=api,
                 version=_declared_version(package),
+            )
+    if _brep_in_tree():
+        for name, (kind, target) in BUILTIN_PYTHON.items():
+            specs[name] = PluginSpec(
+                name=name, kind=kind, transport=PluginTransport.PYTHON, object=target
             )
     return specs
 
@@ -360,6 +400,35 @@ class PluginRegistry:
         if existing is not None:
             existing.close()  # type: ignore[attr-defined]
 
+    def unregister(self, name: str) -> PluginSpec | None:
+        """Remove a spec (and its default, and any open instance).
+
+        Returns:
+            The removed spec, or ``None`` if nothing was registered under
+            ``name``.
+        """
+        with self._lock:
+            spec = self._specs.pop(name, None)
+            existing = self._instances.pop(name, None)
+            for kind, default in list(self._defaults.items()):
+                if default == name:
+                    del self._defaults[kind]
+        if existing is not None:
+            existing.close()  # type: ignore[attr-defined]
+        return spec
+
+    def without(self, kinds: Any) -> PluginRegistry:
+        """A copy of this registry with every plugin of ``kinds`` left out.
+
+        What :func:`cadjoint.tier.absent` installs so the public tier's
+        degraded behaviour can be exercised with the private providers still
+        present in the process.
+        """
+        excluded = {str(kind) for kind in kinds}
+        specs = {name: spec for name, spec in self._specs.items() if spec.kind not in excluded}
+        defaults = {kind: name for kind, name in self._defaults.items() if kind not in excluded}
+        return PluginRegistry(specs, defaults, source=self.source)
+
     def set_default(self, kind: str, name: str) -> None:
         """Point ``kind`` at the plugin registered as ``name``.
 
@@ -374,7 +443,11 @@ class PluginRegistry:
         with self._lock:
             instance = self._instances.get(name)
             if instance is None:
-                instance = TesseractPlugin(self.spec(name))
+                spec = self.spec(name)
+                if spec.transport == PluginTransport.PYTHON:
+                    instance = PythonPlugin(spec)
+                else:
+                    instance = TesseractPlugin(spec)
                 self._instances[name] = instance
             return instance
 

@@ -192,9 +192,9 @@ represent — a max absolute error of 0.0029 on a unit sphere at 26 cells.
 The same declared resolution buys you two different things. `method="hex"`
 only has to decide in/out per lattice cell, so a rib 1.3 cells thick still
 produces a legal (if staircased) HEX8 mesh. `method="tet4"` / `"tet10"` hand
-the dual-contour surface to TetGen as a piecewise linear complex (a third
-route, Gmsh on the exact B-rep, sizes elements by the part rather than by the
-lattice — see [meshing from the graph](brep.qmd#meshing-from-the-graph)), and a PLC
+the dual-contour surface to TetGen as a piecewise linear complex (a second
+route, [`mesher="gmsh"`](#the-gmsh-route), hands the same surface to Gmsh
+and sizes elements by the part rather than by the lattice), and a PLC
 has to be *clean*: watertight, manifold, and free of self-intersections. One
 QEF vertex per cell cannot represent two surface sheets passing through one
 cell, so where a wall is thinner than about two cells the extracted quads
@@ -301,6 +301,63 @@ grid that projection can *create* folds — the same end-cap surface at
 because the projection clamp is half the cell diagonal and a vertex can be
 dragged across a thin wall. Refining shrinks the clamp along with the cells,
 which is part of why the ladder works at all.
+
+## The Gmsh route {#the-gmsh-route}
+
+`mesher` picks who fills a `tet4`/`tet10` mesh. The default, `"tetgen"`, is
+everything above: the lattice sizes the elements and every node follows the
+design through `recompute_tet_points`.
+
+```python
+mesh = SimMesh(name="body", resolution=48, method="tet10", mesher="gmsh")
+```
+
+`mesher="gmsh"` takes the *same* dual-contour surface, writes it as an STL,
+and hands it to Gmsh through the `tet_mesher` plugin. Gmsh's
+`classifySurfaces` + `createGeometry` split the triangle soup into one
+reparametrised surface per smooth region — so what it meshes is a dozen faces
+of a part rather than three thousand facets — HXT fills the volume, and
+`setOrder(2)` puts the midside nodes on those surfaces rather than at chord
+midpoints. Three things change:
+
+* **Element size is the part's, not the lattice's.** The lattice is only how
+  the surface was extracted; `target_size` (the grid's smallest spacing by
+  default) is what sizes the tets, and the refinement ladder does not run.
+* **Quality is an order up.** The plate measures a worst radius ratio of
+  0.293 against the DC/TetGen path's 0.04, with the median at 0.74.
+* **Every node is tagged with the patches that own it.** `assign_ownership`
+  evaluates `|f_p|` on each Gmsh surface entity's nodes for every patch of
+  the scene's decomposition and keeps the ones that clear the bar; the mesh
+  carries the resulting `OwnedNodes` record.
+
+```python
+built = mesh.build(scene)
+built.mesher                      # 'gmsh'
+built.owned.arity_counts()        # {0: 1105, 1: 1494, 2: 194, 3: 8}
+built.stats["blend_surfaces"]     # 0 — a hard CSG solid has no blend faces
+```
+
+Gmsh is **GPL-2.0-or-later**, so it is an optional extra
+(`pip install 'cadjoint[gmsh]'`) or, in production, the `cadjoint_tet_gmsh`
+image where the licence boundary is a process boundary. Nothing under
+`cadjoint/` imports it at module scope. See [plugins](plugins.qmd).
+
+### Frozen geometry
+
+A Gmsh mesh's *topology* is decided once and held. Its *positions* follow the
+design through the `node_map` plugin kind — a per-arity Newton projection
+onto each node's owning patches with the implicit-function adjoint, midsides
+re-solved on their own surfaces, interior nodes following by Laplacian
+relaxation — and that kind is the private tier's (`cadjoint.tier`).
+
+Without it the mesh is **frozen geometry**: it builds, solves, inspects and
+exports exactly as any other `TetMesh`, `SimMesh.inspect()` reports
+`frozen_geometry: true`, and an `Optimization` over a study on it is refused
+*at declaration* with one sentence naming the way out. The refusal is
+deliberate: the public tier could slide every boundary node onto the scene's
+zero set with a one-field projection and call that a gradient, but it would
+take crease nodes off their creases and put midsides back on chords,
+silently. `mesher="tetgen"` — the default — is differentiable throughout.
 
 ## Program size {#program-size}
 

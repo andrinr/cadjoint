@@ -1,4 +1,10 @@
-"""Tet10 from the exact B-rep via Gmsh: ownership, curvature, derivatives.
+"""Tet10 from the exact B-rep via Gmsh: the private half of the route.
+
+The mesher, the residual ownership tag and the static ``TetMesh`` handover
+are public and tested in ``tests/fem/test_gmsh.py``
+(``research/two-tier.md`` §1.2, D1).  What is left here is what the private
+tier owns: the *analytic STEP* as the mesher's input, and the map from
+design parameters to node positions.
 
 Three claims are worth a test and the rest is plumbing.
 
@@ -21,7 +27,8 @@ of every bore midside and compares it to what the chord would have given.
 move, so a finite difference of the mesh volume against the bore radius has
 to match ``jax.grad`` of the same thing — through
 :func:`~cadjoint.brep.mesh_gmsh.parameterised_points`, which rebuilds the
-patch fields under traced parameters.
+patch fields under traced parameters.  That map is the ``node_map`` plugin
+kind: without it a Gmsh mesh is frozen geometry.
 
 The blends are the fourth case, and they are the starter's: a smooth union
 has faces no patch owns, they leave the STEP as facets, and their nodes are
@@ -37,18 +44,17 @@ import pytest
 
 from cadjoint.brep import extract_brep
 from cadjoint.brep.mesh_gmsh import (
-    TET_MESHER_KIND,
     GmshMesh,
     gmsh_available,
     gmsh_tet_mesh,
     gmsh_topology,
-    gmsh_version,
+    node_positions,
     parameterised_points,
     recompute_gmsh_points,
     tet_mesh_from_gmsh,
 )
 from cadjoint.fem.quality import tet_radius_ratios, tet_volumes
-from tests.brep.conftest import BORE_RADIUS, PLATE_GRID, PLATE_SIZE, plate_volume
+from tests.brep.conftest import BORE_RADIUS, PLATE_GRID, PLATE_SIZE
 
 pytestmark = pytest.mark.skipif(
     not gmsh_available(), reason="the optional 'gmsh' extra is not installed"
@@ -92,51 +98,6 @@ def thermal_mesh(thermal_brep) -> GmshMesh:
 # ── the mesh itself ──────────────────────────────────────────────────────
 
 
-def test_the_wheel_reports_a_version():
-    assert gmsh_version().split(".")[0].isdigit()
-
-
-class TestThePlateMeshes:
-    """A hard CSG solid, exact all the way through, and no blend anywhere."""
-
-    def test_it_is_a_tet10_mesh_of_positive_volume(self, plate_mesh):
-        assert plate_mesh.order == 2
-        assert plate_mesh.cells.shape[1] == 10
-        volumes = tet_volumes(plate_mesh.points, plate_mesh.cells)
-        assert (volumes > 0).all(), "cells should come back positively oriented"
-        # Straight-sided volume of a mesh whose bore is an inscribed polygon
-        # is under the analytic one, and by no more than the chord deficit.
-        assert volumes.sum() == pytest.approx(plate_volume(), rel=0.02)
-
-    def test_the_bounding_box_is_the_plate_in_metres(self, plate_mesh):
-        # SI_UNIT(.METRE.) in, and OCCT's reader defaults to millimetres:
-        # without Geometry.OCCTargetUnit the solid comes back 1000x.
-        low = plate_mesh.points.min(axis=0)
-        high = plate_mesh.points.max(axis=0)
-        assert low == pytest.approx([-s for s in PLATE_SIZE], abs=1e-6)
-        assert high == pytest.approx(list(PLATE_SIZE), abs=1e-6)
-
-    def test_nothing_on_the_plate_is_a_blend(self, plate_mesh):
-        assert not plate_mesh.blend_mask.any()
-        assert plate_mesh.stats["blend_surfaces"] == 0
-
-    def test_the_node_layout_is_the_one_tetmesh_documents(self, plate_mesh):
-        corners = np.unique(plate_mesh.cells[:, :4])
-        assert corners.max() == plate_mesh.num_corner_points - 1
-        assert plate_mesh.num_surface <= plate_mesh.num_corner_points
-        # Boundary corners lead, interior corners follow, midsides trail.
-        assert (plate_mesh.entity_dim[: plate_mesh.num_surface] < 3).all()
-        interior = plate_mesh.entity_dim[plate_mesh.num_surface : plate_mesh.num_corner_points]
-        assert (interior == 3).all()
-
-    def test_the_quality_beats_the_dual_contour_route(self, plate_mesh):
-        ratios = tet_radius_ratios(plate_mesh.points, plate_mesh.cells)
-        # The DC path measures 0.04 on this plate; a kernel mesher has no
-        # lattice to graze a feature with, so the bar is an order up.
-        assert ratios.min() > 0.15
-        assert float(np.median(ratios)) > 0.7
-
-
 class TestEveryNodeIsOwned:
     """Arity is codimension: the entity a node sits on says how many fields."""
 
@@ -163,8 +124,13 @@ class TestEveryNodeIsOwned:
         assert rows.size == 2, "the STEP writes 8 box corners + 2 circle seams"
         radius = np.linalg.norm(plate_mesh.points[rows, :2], axis=1)
         assert radius == pytest.approx(BORE_RADIUS, abs=1e-6)
-        kinds = {plate_brep.faces[int(index)].kind for index in plate_mesh.owner_face[rows]}
-        assert kinds <= {"plane", "cylinder"}
+        # A seam is where a cap meets the bore, so its two patches are one
+        # plane and the cylinder — read off the graph's patch table, which
+        # is what the ownership indices number.
+        kind_of = {face.patch: face.kind for face in plate_brep.faces}
+        for row in rows:
+            kinds = {kind_of[int(patch)] for patch in plate_mesh.owner_patches[row] if patch >= 0}
+            assert kinds == {"plane", "cylinder"}
 
     def test_the_owner_row_carries_exactly_that_many_patches(self, plate_mesh):
         filled = (plate_mesh.owner_patches >= 0).sum(axis=1)
@@ -196,11 +162,14 @@ class TestEveryNodeIsOwned:
             worst = np.abs(residuals[np.flatnonzero(live), owners[live]]).max()
             assert worst < 1e-4, f"slot {slot} residual {worst}"
 
-    def test_the_face_a_node_is_matched_to_is_a_real_face(self, plate_brep, plate_mesh):
-        matched = plate_mesh.owner_face[plate_mesh.entity_dim < 3]
-        assert (matched >= 0).all()
-        assert matched.max() < len(plate_brep.faces)
-        kinds = {plate_brep.faces[int(index)].kind for index in np.unique(matched)}
+    def test_every_boundary_node_names_a_real_patch_of_the_graph(self, plate_brep, plate_mesh):
+        """Ownership is a residual test now, not a vote on the quad table."""
+        boundary = plate_mesh.entity_dim < 3
+        assert (plate_mesh.owner_arity[boundary] > 0).all(), "an exact solid has no blends"
+        named = plate_mesh.owner_patches[boundary]
+        assert named.max() < len(plate_brep.patches)
+        kind_of = {face.patch: face.kind for face in plate_brep.faces}
+        kinds = {kind_of[int(patch)] for patch in np.unique(named) if patch >= 0}
         assert kinds == {"plane", "cylinder"}
 
 
@@ -210,8 +179,7 @@ class TestTheMidsidesAreOnTheGeometry:
     def _bore_edges(self, brep, mesh):
         """Midside rows whose two parents both sit on the cylinder patch."""
         cylinder = next(face for face in brep.faces if face.kind == "cylinder")
-        on_bore = np.zeros(mesh.points.shape[0], dtype=bool)
-        on_bore[mesh.owner_face == cylinder.index] = True
+        on_bore = (mesh.owner_patches == cylinder.patch).any(axis=1)
         parents = mesh.edge_parents
         both = on_bore[parents[:, 0]] & on_bore[parents[:, 1]]
         return np.flatnonzero(both) + mesh.num_corner_points, parents[both]
@@ -227,30 +195,6 @@ class TestTheMidsidesAreOnTheGeometry:
         assert bowed.any(), "some bore edges must span an arc"
         assert radius[bowed] == pytest.approx(BORE_RADIUS, abs=1e-6)
         assert (radius[bowed] - chord[bowed]).max() > 1e-3, "the chord deficit is real"
-
-    def test_the_midside_block_is_in_meshio_order(self, plate_mesh):
-        # Gmsh's tet10 swaps the last two midsides against meshio's; a wrong
-        # remap puts a midside nowhere near its own corner pair.  Every
-        # midside must lie within a chord of the midpoint of its parents.
-        from cadjoint.fem.elements import TET10_EDGES
-
-        cells = plate_mesh.cells
-        corners = plate_mesh.points[cells[:, :4]]
-        midpoints = corners[:, TET10_EDGES].mean(axis=2)
-        actual = plate_mesh.points[cells[:, 4:]]
-        offsets = np.linalg.norm(actual - midpoints, axis=-1)
-        edges = np.linalg.norm(
-            corners[:, TET10_EDGES[:, 1]] - corners[:, TET10_EDGES[:, 0]], axis=-1
-        )
-        assert (offsets < 0.2 * edges).all(), "a midside is near the midpoint of its own edge"
-
-    def test_edge_parents_matches_the_connectivity(self, plate_mesh):
-        from cadjoint.fem.elements import TET10_EDGES
-
-        cells = plate_mesh.cells
-        pairs = np.sort(cells[:, :4][:, TET10_EDGES], axis=2)
-        rows = cells[:, 4:] - plate_mesh.num_corner_points
-        assert (plate_mesh.edge_parents[rows] == pairs).all()
 
 
 # ── differentiable positions over the frozen topology ────────────────────
@@ -280,13 +224,53 @@ class TestPositionsRecompute:
         assert not np.allclose(solved[~boundary], plate_mesh.points[~boundary], atol=1e-9)
 
     def test_handing_over_to_the_fem_layer_keeps_the_mesh_valid(self, plate_brep, plate_mesh):
-        mesh = tet_mesh_from_gmsh(plate_brep, plate_mesh)
+        mesh = tet_mesh_from_gmsh(plate_mesh, grid=plate_brep.grid)
         assert mesh.order == 2
         assert mesh.ele_type == "TET10"
         assert mesh.num_corner_points == plate_mesh.num_corner_points
         assert mesh.boundary_tris.shape[1] == 3
         assert (tet_volumes(mesh.points, mesh.cells) > 0).all()
         assert mesh.edge_parents is not None
+
+
+class TestTheNodeMapKind:
+    """The seam: the same solve, reached the way public code reaches it."""
+
+    def test_the_kind_resolves_to_this_module_and_answers_identically(self, plate, plate_mesh):
+        import jax.numpy as jnp
+
+        from cadjoint import tier
+        from cadjoint.enums import PluginKind
+        from cadjoint.extraction import extract_parameters
+
+        component = tier.require(PluginKind.NODE_MAP.value).component
+        free, _fixed, _metadata = extract_parameters(plate)
+        params = {name: jnp.asarray(value) for name, value in free.items()}
+        through_the_seam = np.asarray(component.positions(plate, params, plate_mesh.owned))
+        directly = np.asarray(node_positions(plate, params, plate_mesh.owned))
+        assert np.array_equal(through_the_seam, directly)
+
+    def test_the_nominal_solve_lands_on_the_seeds(self, plate, plate_mesh):
+        """The record's postcondition, asserted where the map can see it."""
+        import jax.numpy as jnp
+
+        from cadjoint.extraction import extract_parameters
+
+        free, _fixed, _metadata = extract_parameters(plate)
+        params = {name: jnp.asarray(value) for name, value in free.items()}
+        solved = np.asarray(node_positions(plate, params, plate_mesh.owned))
+        owned = plate_mesh.owned.owned
+        moved = np.linalg.norm(solved[owned] - plate_mesh.owned.seeds[owned], axis=1)
+        assert moved.max() <= plate_mesh.owned.bar
+
+    def test_a_patch_index_outside_the_table_is_refused(self, plate, plate_mesh):
+        import dataclasses
+
+        patches = plate_mesh.owned.patches.copy()
+        patches[np.flatnonzero(plate_mesh.owned.arity > 0)[0], 0] = 9999
+        broken = dataclasses.replace(plate_mesh.owned, patches=patches)
+        with pytest.raises(ValueError, match="patch"):
+            node_positions(plate, {}, broken)
 
 
 class TestTheDerivative:
@@ -356,7 +340,7 @@ class TestTheDerivative:
 
         scene, brep, mesh = parametric
         cylinder = next(face for face in brep.faces if face.kind == "cylinder")
-        rows = jnp.asarray(np.flatnonzero(mesh.owner_face == cylinder.index))
+        rows = jnp.asarray(np.flatnonzero((mesh.owner_patches == cylinder.patch).any(axis=1)))
         with _x64():
             baseline, _fixed, _metadata = extract_parameters(scene)
             nominal = {key: jnp.asarray(value, jnp.float64) for key, value in baseline.items()}
@@ -384,13 +368,15 @@ class TestBlendsAreOwnedByTheScene:
         assert (thermal_mesh.owner_arity[thermal_mesh.blend_mask] == 0).all()
         assert (thermal_mesh.owner_patches[thermal_mesh.blend_mask] == -1).all()
 
-    def test_blend_nodes_are_spread_over_several_faces(self, thermal_brep, thermal_mesh):
-        counts = thermal_mesh.blend_nodes_by_face()
-        assert len(counts) > 1
-        blends = {
-            index for index in counts if index >= 0 and thermal_brep.faces[index].kind == "blend"
-        }
-        assert blends, "the starter's smooth unions must produce blend faces"
+    def test_blend_nodes_come_from_more_than_one_surface(self, thermal_brep, thermal_mesh):
+        """The starter's smooth unions produce several blend faces, not one."""
+        assert thermal_mesh.stats["blend_surfaces"] > 1
+        assert {face.kind for face in thermal_brep.faces} & {"blend"}
+        # And they are spread through the part rather than clustered on one
+        # entity: the blend nodes span most of the body's bounding box.
+        rows = np.flatnonzero(thermal_mesh.blend_mask)
+        spread = np.ptp(thermal_mesh.points[rows], axis=0)
+        assert (spread > 0.3 * np.ptp(thermal_mesh.points, axis=0)).all()
 
     def test_re_solving_blends_without_a_scene_is_refused(self, thermal_brep, thermal_mesh):
         with pytest.raises(ValueError, match="blend faces"):
@@ -455,112 +441,39 @@ class TestBlendsAreOwnedByTheScene:
         assert float(np.median(moved)) < 1e-6
 
 
-# ── the plugin ───────────────────────────────────────────────────────────
+# ── the analytic STEP as the mesher's input ──────────────────────────────
 
 
-class TestThePluginSlot:
-    """``tet_mesher`` is a registry kind, and ``tet_gmsh`` is what fills it."""
+class TestTheAnalyticStepIsTheInput:
+    """The private tier's improvement of the public route: a better file.
 
-    def test_the_served_plugin_answers_exactly_as_the_import_does(self, plate_brep, plate_mesh):
-        # The licence argument only holds if the ABI route is the *same*
-        # route: if going through the Tesseract changed the answer, the
-        # container would not be an isolation of this code but a fork of it.
-        pytest.importorskip("tesseract_core")
-        served = gmsh_tet_mesh(plate_brep, target_size=TARGET_SIZE, order=2, plugin="tet_gmsh")
-        assert np.array_equal(served.points, plate_mesh.points)
-        assert np.array_equal(served.cells, plate_mesh.cells)
-        assert np.array_equal(served.owner_patches, plate_mesh.owner_patches)
-        assert np.array_equal(served.owner_arity, plate_mesh.owner_arity)
-        assert served.num_surface == plate_mesh.num_surface
+    The mesher and its contract are the same
+    (:func:`cadjoint.fem.gmsh.gmsh_tet_mesh`); what the graph adds is a
+    solid whose faces are the part's faces exactly, so no snap is needed
+    and the midsides land on the true cylinder rather than within the bar
+    of it.
+    """
 
-    def test_the_slot_resolves_by_kind_and_declares_what_it_can_do(self):
-        pytest.importorskip("tesseract_core")
-        from cadjoint.plugins import plugin_for_kind
+    def test_the_step_route_needs_no_snap(self, plate_mesh):
+        assert plate_mesh.stats["geometry_format"] == "step"
+        assert plate_mesh.stats["snapped_nodes"] == 0
+        assert plate_mesh.stats["blend_surfaces"] == 0
 
-        plugin = plugin_for_kind(TET_MESHER_KIND)
-        assert plugin.name == "tet_gmsh"
-        capabilities = plugin.capabilities
-        assert capabilities.differentiable_inputs == frozenset({"node_positions"})
-        assert capabilities.differentiable_outputs == frozenset({"nodes"})
-        assert capabilities.supports("vjp")
-        assert capabilities.supports("frozen_topology")
-        assert plugin.probe().status == "ok"
-
-    def test_the_kind_is_the_one_the_registry_knows(self):
-        from cadjoint.plugins.registry import BUILTIN_DEFAULTS, BUILTIN_PACKAGES, KINDS
-
-        assert TET_MESHER_KIND in KINDS
-        assert BUILTIN_PACKAGES["tet_gmsh"][0] == TET_MESHER_KIND
-        assert BUILTIN_DEFAULTS[TET_MESHER_KIND] == "tet_gmsh"
-
-    def test_the_package_is_a_complete_tesseract(self):
-        from cadjoint.plugins.registry import BUILTIN_PACKAGES
-
-        package = BUILTIN_PACKAGES["tet_gmsh"][1]
-        for name in ("tesseract_api.py", "tesseract_config.yaml", "tesseract_requirements.txt"):
-            assert (package / name).is_file(), name
-
-    def test_the_vjp_is_a_pass_through(self):
-        # The whole differentiable contract in one assertion: the frozen
-        # call returns node_positions unchanged, so its transpose is the
-        # identity on the cotangent, exactly and with no tolerance.
-        from cadjoint.fem.tesseracts.tet_gmsh import tesseract_api
-
-        cells = np.array([[0, 1, 2, 3]], np.int32)
-        positions = np.array([[0.0, 0.0, 0.0], [1.0, 0, 0], [0, 1.0, 0], [0, 0, 1.0]])
-        inputs = tesseract_api.InputSchema(
-            step="",
-            target_size=np.float64(1.0),
-            order=np.int32(1),
-            algorithm=np.int32(10),
-            node_positions=positions,
-            node_ids=np.arange(4, dtype=np.int32),
-            cell_template=cells,
-            entity_dim_template=np.zeros(4, np.int32),
-            bounding_template=np.zeros((4, 1), np.int32),
-            edge_parent_template=np.zeros((0, 2), np.int32),
-        )
-        served = tesseract_api.apply(inputs)
-        assert np.asarray(served.nodes) == pytest.approx(positions)
-        assert np.asarray(served.cells) == pytest.approx(cells)
-
-        cotangent = np.arange(12, dtype=np.float64).reshape(4, 3)
-        back = tesseract_api.vector_jacobian_product(
-            inputs, {"node_positions"}, {"nodes"}, {"nodes": cotangent}
-        )
-        assert (back["node_positions"] == cotangent).all()
-
-    def test_a_discovery_call_carries_no_derivative(self):
-        from cadjoint.fem.tesseracts.tet_gmsh import tesseract_api
-
-        inputs = tesseract_api.InputSchema(
-            step="",
-            target_size=np.float64(1.0),
-            order=np.int32(2),
-            algorithm=np.int32(10),
-            node_positions=np.zeros((0, 3)),
-            node_ids=np.zeros(0, np.int32),
-            cell_template=np.zeros((0, 0), np.int32),
-            entity_dim_template=np.zeros(0, np.int32),
-            bounding_template=np.zeros((0, 0), np.int32),
-            edge_parent_template=np.zeros((0, 2), np.int32),
-        )
-        with pytest.raises(ValueError, match="frozen call"):
-            tesseract_api.vector_jacobian_product(
-                inputs, {"node_positions"}, {"nodes"}, {"nodes": np.zeros((0, 3))}
-            )
-        with pytest.raises(ValueError, match="frozen topology"):
-            tesseract_api.abstract_eval(inputs)
+    def test_the_step_plan_travels_in_the_stats(self, plate_mesh):
+        faces = plate_mesh.stats["step_faces"]
+        assert faces["plane"] == 6 and faces["cylinder"] == 1
+        assert faces["facet"] == 0, "a hard CSG solid is exact all the way through"
+        assert plate_mesh.stats["step_seconds"] > 0.0
 
     def test_the_topology_endpoint_is_the_whole_black_box(self, plate_brep, tmp_path):
-        # gmsh_topology takes STEP text and nothing else -- which is what
+        # gmsh_topology takes a file's text and nothing else -- which is what
         # makes the container boundary possible, and what the GPL boundary
         # needs it to be.
         from cadjoint.brep import save_brep_step
 
         path = tmp_path / "plate.step"
         save_brep_step(plate_brep, path)
-        found = gmsh_topology(path.read_text(), target_size=0.3, order=1)
+        found = gmsh_topology(path.read_text(), geometry_format="step", target_size=0.3, order=1)
         assert found["cells"].shape[1] == 4
         assert found["edge_parents"] is None
         assert found["points"].shape[0] == found["entity_dim"].shape[0]
@@ -572,4 +485,4 @@ class TestThePluginSlot:
         path = tmp_path / "plate.step"
         save_brep_step(plate_brep, path)
         with pytest.raises(ValueError, match="order must be"):
-            gmsh_topology(path.read_text(), target_size=0.3, order=3)
+            gmsh_topology(path.read_text(), geometry_format="step", target_size=0.3, order=3)

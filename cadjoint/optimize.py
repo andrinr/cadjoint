@@ -550,6 +550,30 @@ class Optimization:
             f"(aliases: {', '.join(GRADIENT_PATH_ALIASES)}) "
             f"(got {self.gradient_path!r}).",
         )
+        self._refuse_frozen_geometry()
+
+    def _refuse_frozen_geometry(self) -> None:
+        """Refuse a study whose mesh's nodes cannot follow the design.
+
+        A Gmsh mesh's node positions are the ``node_map`` plugin kind's,
+        which is the private tier's (``research/two-tier.md`` §2.5).
+        Without it the mesh is frozen geometry, and the refusal is here —
+        at declaration — rather than inside the traced objective, where a
+        design derivative would silently be zero or, worse, be faked by
+        an arity-1 projection that slides crease nodes off their creases.
+
+        Raises:
+            cadjoint.tier.TierUnavailable: When the study's mesh is
+                Gmsh-meshed and no ``node_map`` plugin fills the kind.
+        """
+        from cadjoint import tier
+        from cadjoint.enums import PluginKind
+        from cadjoint.fem.simmesh import SimMesh
+
+        mesh = getattr(self.study, "mesh", None)
+        if not isinstance(mesh, SimMesh) or not mesh.frozen_geometry:
+            return
+        raise tier.TierUnavailable(PluginKind.NODE_MAP.value, "not registered")
 
     def _study_kind(self) -> StudyKind:
         from cadjoint.fem.study import ThermalStudy
@@ -906,7 +930,20 @@ class Optimization:
         elif use_tesseract:
             from cadjoint.fem.tesseracts.chain import freeze_study_chain
 
-        def recompute(field: Any, mesh: Any) -> Any:
+        def recompute(params: Any, field: Any, mesh: Any) -> Any:
+            # A Gmsh mesh carries an ``OwnedNodes`` record instead of a
+            # lattice: its nodes are re-solved against the patches that own
+            # them, which is the ``node_map`` kind (the private tier's).
+            # ``_refuse_frozen_geometry`` has already refused the case where
+            # the kind is unfilled, so this ``require`` cannot fail here for
+            # a reason the user has not already been told.
+            owned = getattr(mesh, "owned", None)
+            if owned is not None:
+                from cadjoint import tier
+                from cadjoint.enums import PluginKind
+
+                node_map = tier.require(PluginKind.NODE_MAP.value).component
+                return node_map.positions(target, params, owned, smooth_passes=2)
             if isinstance(mesh, TetMesh):
                 return recompute_tet_points(field, mesh, smooth_passes=2)
             return recompute_points(field, mesh)
@@ -922,7 +959,7 @@ class Optimization:
                         samples = field_at(params)(jnp.asarray(chain.lattice))
                         value = chain.metric_value(samples, self.metric)
                 else:
-                    points = recompute(field_at(params), mesh)
+                    points = recompute(params, field_at(params), mesh)
                     result = study.solve(mesh=mesh, points=points)
                     value = jnp.asarray(self._metric_value(result, mesh, points))
                 if regularizer is not None:
@@ -1037,7 +1074,7 @@ class Optimization:
                         "optimization cannot move it."
                     )
                     final_mesh = frozen[0]
-                    final_points = recompute(final_field, final_mesh)
+                    final_points = recompute(held, final_field, final_mesh)
                     result = study.solve(mesh=final_mesh, points=final_points)
                 final_value = jnp.asarray(self._metric_value(result, final_mesh, final_points))
                 if regularizer is not None:

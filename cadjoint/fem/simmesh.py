@@ -51,7 +51,15 @@ from typing import Any
 
 import numpy as np
 
-from cadjoint.enums import MeshMethod, MeshMethodLike, parse, values
+from cadjoint.enums import (
+    MeshMethod,
+    MeshMethodLike,
+    PluginKind,
+    TetMesher,
+    TetMesherLike,
+    parse,
+    values,
+)
 from cadjoint.fem.hexmesh import GridSpec, HexMesh, sdf_to_hex_mesh
 from cadjoint.fem.quality import (
     aspect_ratios,
@@ -67,6 +75,10 @@ __all__ = ["SimMesh", "capture_sim_meshes"]
 #: option set itself lives in :class:`cadjoint.enums.MeshMethod`; this is the
 #: tuple of its spellings, in declaration order.
 _METHODS = values(MeshMethod)
+
+#: Supported volume meshers for the tet methods (the viewer round-trips
+#: these literals); the option set is :class:`cadjoint.enums.TetMesher`.
+_MESHERS = values(TetMesher)
 
 # Same default meshing volume as the implicit study path and the viewer's
 # simulate mode; also the region the automatic domain-bounds scan samples.
@@ -180,6 +192,20 @@ class SimMesh:
             the fast default), ``"tet4"`` (DC surface -> TetGen TET4), or
             ``"tet10"`` (the TET4 mesh promoted to quadratic tets — the
             quality path).  Normalised to the enum on construction.
+        mesher: Which volume mesher fills a ``tet4``/``tet10`` mesh — a
+            :class:`~cadjoint.enums.TetMesher` or its string spelling.
+            ``"tetgen"`` (the default) is TetGen on the dual-contour
+            surface, sized by the lattice, and every node follows the
+            design through
+            :func:`~cadjoint.fem.motion.recompute_tet_points`.  ``"gmsh"``
+            is :func:`cadjoint.fem.gmsh.sdf_gmsh_tet_mesh` — the same
+            surface handed to Gmsh's HXT as an STL, sized by the *part*,
+            with second-order midsides on a reparametrised surface and
+            every node tagged with the patches that own it.  A Gmsh mesh's
+            nodes follow the design only through the ``node_map`` plugin
+            kind, which is the private tier's: without it the mesh is
+            frozen geometry and :attr:`frozen_geometry` says so.  Ignored
+            for ``method="hex"``.
     """
 
     name: str
@@ -189,6 +215,7 @@ class SimMesh:
     size: Any = None
     padding: float = 0.1
     method: MeshMethodLike = MeshMethod.HEX
+    mesher: TetMesherLike = TetMesher.TETGEN
 
     _cache: tuple[Any, tuple, HexMesh | TetMesh] | None = field(
         default=None, init=False, repr=False, compare=False
@@ -202,6 +229,16 @@ class SimMesh:
             self.method,
             f"method must be one of {list(_METHODS)}, got {self.method!r}.",
         )
+        self.mesher = parse(
+            TetMesher,
+            self.mesher,
+            f"mesher must be one of {list(_MESHERS)}, got {self.mesher!r}.",
+        )
+        if self.method == MeshMethod.HEX and self.mesher != TetMesher.TETGEN:
+            raise ValueError(
+                f"mesher={str(self.mesher)!r} applies to the tet methods; SimMesh "
+                f"{self.name!r} declares method='hex'."
+            )
         _resolution_counts(self.resolution)
         if (self.bounds is None) != (self.size is None):
             raise ValueError("bounds and size must be given together (or both omitted).")
@@ -233,6 +270,8 @@ class SimMesh:
             "kind": "mesh",
             "name": self.name,
             "method": str(self.method),
+            "mesher": str(self.mesher),
+            "frozen_geometry": self.frozen_geometry,
             "resolution": self.resolution
             if isinstance(self.resolution, int)
             else list(self.resolution),
@@ -256,9 +295,31 @@ class SimMesh:
             raise TypeError("build() expects an SDF object or a callable field.")
         return sdf
 
+    @property
+    def frozen_geometry(self) -> bool:
+        """Whether this mesh's nodes cannot follow the design in this process.
+
+        True for a Gmsh mesh while the ``node_map`` kind is unfilled: the
+        topology *and* the positions are frozen at the design the mesh was
+        built at.  The viewer shows
+        :data:`cadjoint.tier.GEOMETRY_FROZEN_NOTE` where it shows the
+        refinement rung for a TetGen mesh, and ``Optimization`` refuses at
+        validation with :func:`cadjoint.tier.message`.
+
+        A TetGen mesh is never frozen — it follows the design through the
+        public :func:`~cadjoint.fem.motion.recompute_tet_points` — and
+        neither is a hex mesh.
+        """
+        from cadjoint import tier
+
+        if self.method == MeshMethod.HEX or self.mesher != TetMesher.GMSH:
+            return False
+        return not tier.available(PluginKind.NODE_MAP.value)
+
     def _parameters(self) -> tuple:
         return (
             self.method,
+            self.mesher,
             _resolution_counts(self.resolution),
             self.bounds,
             self.size,
@@ -313,6 +374,17 @@ class SimMesh:
             return cached[2]
         if self.method == MeshMethod.HEX:
             mesh: HexMesh | TetMesh = sdf_to_hex_mesh(field_fn, self.grid(sdf))
+        elif self.mesher == TetMesher.GMSH:
+            # Gmsh sizes the elements by the part rather than by the
+            # lattice and puts order-2 midsides on the reparametrised
+            # surface; the lattice is only how the surface was extracted.
+            from cadjoint.fem.gmsh import sdf_gmsh_tet_mesh, tet_mesh_from_gmsh
+
+            grid = self.grid(sdf)
+            built = sdf_gmsh_tet_mesh(
+                field_fn, grid, order=1 if self.method == MeshMethod.TET4 else 2
+            )
+            mesh = tet_mesh_from_gmsh(built, grid=grid)
         else:
             # No sharp=True/sharp=False retry here: the ladder inside
             # sdf_to_tet_mesh already tries both placements at every rung,
@@ -370,6 +442,8 @@ class SimMesh:
         return {
             "name": self.name,
             "method": str(self.method),
+            "mesher": str(self.mesher),
+            "frozen_geometry": self.frozen_geometry,
             "nodes": mesh.num_points,
             "elements": mesh.num_cells,
             "bounds": {

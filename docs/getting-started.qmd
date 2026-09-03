@@ -263,7 +263,39 @@ save_stl(mesh, "sphere.stl")
 Full detail, including the exports, in
 [differentiable meshing](meshing.qmd). For exact surfaces rather than facets —
 a STEP file in which a bore is one cylinder, a corner you can drag — see the
-[derived B-rep](brep.qmd).
+[derived B-rep](brep.qmd), which is the private tier's (below).
+
+### Two tiers
+
+cadjoint is the public tier and it is complete on its own: the language, dual
+contouring, the lattice feature classifier, faceted STEP/OBJ/STL, TetGen and
+Gmsh tet meshes, every solver, the optimizer and the playground. Everything on
+this page runs with nothing else installed.
+
+A second, private distribution — `diff-brep` — fills five plugin kinds
+(`node_map`, `feature_edges`, `brep`, `step_export`, `drag`) with the parts
+that solve against the patch fields *with a derivative*: the derived B-rep and
+its edge tracer, analytic STEP, the drag inverse problem, and the map from
+design parameters to the node positions of a Gmsh mesh. It is discovered
+through the ordinary `cadjoint.plugins` entry-point group; the word
+`diff_brep` never appears in this repository.
+
+Without it nothing breaks and one thing is refused. Feature edges come from the
+lattice classifier instead of the traced curves, STEP export is faceted instead
+of analytic, and a Gmsh-meshed study cannot be optimized — its mesh is *frozen
+geometry*, and `Optimization` says so at declaration rather than handing back a
+gradient that is quietly wrong. `mesher="tetgen"`, the default, is
+differentiable either way.
+
+```python
+from cadjoint import tier
+
+tier.status().flags()    # {'node_map': False, 'feature_edges': False, ...}
+tier.report()            # versions and status, for a bug report
+```
+
+See [plugins](plugins.qmd#one-contract-two-transports) for the contracts and
+[meshing](meshing.qmd#the-gmsh-route) for what a frozen mesh can still do.
 
 ## Simulation
 

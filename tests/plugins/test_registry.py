@@ -14,6 +14,7 @@ import pytest
 from cadjoint.plugins import (
     BUILTIN_DEFAULTS,
     BUILTIN_PACKAGES,
+    BUILTIN_PYTHON,
     ENTRY_POINT_GROUP,
     PluginConfigError,
     PluginRegistry,
@@ -31,16 +32,33 @@ class TestBuiltinDiscovery:
     def test_every_shipped_package_is_registered_as_a_local_plugin(self):
         """Every Tesseract package in this repository, all in-process."""
         specs = builtin_specs()
-        assert set(specs) == set(BUILTIN_PACKAGES)
-        for name, spec in specs.items():
+        for name in BUILTIN_PACKAGES:
+            spec = specs[name]
             assert spec.transport == "local"
             assert spec.api_path is not None and spec.api_path.is_file()
             assert spec.kind == BUILTIN_PACKAGES[name][0]
 
+    def test_the_in_tree_providers_are_registered_as_python_plugins(self):
+        """While ``cadjoint.brep`` is here it fills the private tier's kinds.
+
+        Temporary (``research/two-tier.md`` D12): the module goes to
+        diff-brep, ``find_spec`` stops finding it, and these specs vanish
+        without a line of the registry changing.
+        """
+        specs = builtin_specs()
+        assert set(specs) == set(BUILTIN_PACKAGES) | set(BUILTIN_PYTHON)
+        for name, (kind, target) in BUILTIN_PYTHON.items():
+            spec = specs[name]
+            assert spec.transport == "python"
+            assert spec.kind == kind
+            assert spec.object == target
+            assert spec.api_path is None
+
     def test_versions_come_from_the_packages_not_from_python(self):
         """``tesseract_config.yaml`` is the single source of a version."""
         specs = builtin_specs()
-        assert {spec.version for spec in specs.values()} == {"0.1.0"}
+        packaged = [specs[name] for name in BUILTIN_PACKAGES]
+        assert {spec.version for spec in packaged} == {"0.1.0"}
 
     def test_two_solvers_share_the_elastic_kind_and_a_default_picks_one(self):
         """jax-fem and CalculiX both fill ``elastic_solver``; jax-fem wins."""

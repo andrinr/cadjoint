@@ -73,6 +73,8 @@ __all__ = [
     "SideLike",
     "StudyKind",
     "StudyKindLike",
+    "TetMesher",
+    "TetMesherLike",
     "either",
     "listed",
     "parse",
@@ -180,6 +182,29 @@ class MeshMethod(Option):
 
 MeshMethodLike = MeshMethod | Literal["hex", "tet4", "tet10"]
 """A mesh method, or the plain string spelling of one."""
+
+
+class TetMesher(Option):
+    """Which volume mesher fills a ``SimMesh`` declared ``tet4``/``tet10``.
+
+    Both take the same dual-contour surface; they differ in who sizes the
+    elements and in whether the mesh follows the design.
+    """
+
+    TETGEN = "tetgen"
+    """TetGen on the dual-contour surface (the default): the lattice sizes
+    the elements and every node follows the design through
+    :func:`cadjoint.fem.motion.recompute_tet_points`."""
+    GMSH = "gmsh"
+    """Gmsh (HXT, second order) on the same surface, reached through the
+    ``tet_mesher`` plugin: the part sizes the elements, each node is tagged
+    with the patches that own it, and the design derivative is the
+    ``node_map`` plugin's — the private tier's; without it the mesh is
+    frozen geometry (see :mod:`cadjoint.tier`)."""
+
+
+TetMesherLike = TetMesher | Literal["tetgen", "gmsh"]
+"""A tet mesher, or the plain string spelling of one."""
 
 
 class StudyKind(Option):
@@ -413,6 +438,21 @@ class PluginKind(Option):
     """A small-strain elasticity solver."""
     FLOW_SOLVER = "flow_solver"
     """A Brinkman-penalised flow solver."""
+    NODE_MAP = "node_map"
+    """Design parameters to the node positions of a Gmsh mesh, with the
+    implicit-function adjoint (:class:`cadjoint.plugins.contracts.NodeMap`)."""
+    FEATURE_EDGES = "feature_edges"
+    """The exact feature curves of a scene, for the viewer's sharp layer
+    (:class:`cadjoint.plugins.contracts.FeatureEdges`)."""
+    BREP = "brep"
+    """The derived boundary representation, as an opaque in-process object
+    (:class:`cadjoint.plugins.contracts.BRepExtractor`)."""
+    STEP_EXPORT = "step_export"
+    """Analytic STEP from the derived B-rep
+    (:class:`cadjoint.plugins.contracts.StepExporter`)."""
+    DRAG = "drag"
+    """The drag inverse problem on a B-rep handle
+    (:class:`cadjoint.plugins.contracts.Drag`)."""
 
 
 PluginKindLike = PluginKind | str
@@ -428,7 +468,10 @@ class PluginTransport(Option):
     """In a container image, served on demand."""
     REMOTE = "remote"
     """Behind a URL someone else operates."""
+    PYTHON = "python"
+    """An importable object in this process satisfying one of the contracts
+    in :mod:`cadjoint.plugins.contracts` — no Tesseract runtime at all."""
 
 
-PluginTransportLike = PluginTransport | Literal["local", "container", "remote"]
+PluginTransportLike = PluginTransport | Literal["local", "container", "remote", "python"]
 """A plugin transport, or the plain string spelling of one."""

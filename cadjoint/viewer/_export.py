@@ -2,9 +2,9 @@
 
 The playground already extracts every scene it shows — dual contouring for
 the mesh overlay, the derived B-rep for its sharp edges, a hex or tet mesh
-for a study — and :mod:`cadjoint.meshing.export`, :mod:`cadjoint.brep.step`
-and :meth:`cadjoint.fem.result.SimulationResult.to_vtk` can each already
-write what those passes produce.  This module is the seam between them: a
+for a study — and :mod:`cadjoint.meshing.export`, the ``step_export``
+plugin kind and :meth:`cadjoint.fem.result.SimulationResult.to_vtk` can
+each already write what those passes produce.  This module is the seam between them: a
 request names an object and a :class:`~cadjoint.enums.ExportFormat`, the
 worker extracts and writes it, and the response is the file.
 
@@ -21,23 +21,27 @@ travels under:
 - **In the worker** (:func:`export_scene`): execute the program, resolve
   the named object, extract on a lattice sized to the object, and write.
 
-**Which STEP writer.**  Two exist.  :func:`cadjoint.meshing.export.save_step`
-facets a dual-contour mesh — it recovers flat regions by merging coplanar
+**Which STEP writer.**  Two exist, and one of them is the private tier's.
+:func:`cadjoint.meshing.export.save_step` — public, always available —
+facets a dual-contour mesh: it recovers flat regions by merging coplanar
 quads under an angle threshold and writes a ``PLANE`` per region, with
-every curved surface left as triangles.  :func:`cadjoint.brep.step.save_brep_step`
-starts from the ownership graph instead: a face there *is* one patch's
-zero set, so a plane is exact with its boundary loops (holes included)
-collapsed onto the real intersection curves, a full cylindrical band is a
-``CYLINDRICAL_SURFACE`` with ``CIRCLE`` edges, and only what the graph
-cannot certify (blend faces) is faceted.  The graph writer's output reads
-back into OCCT as one valid closed solid with the analytic volume
-(``tests/brep/test_step_kernel.py``); the mesh writer's is approximate by
-construction.  The export takes the graph path, on the same
-:func:`~cadjoint.brep.extract_brep` pass the viewer's edge overlay runs on
-every scene, and falls back to the faceted writer when the graph cannot be
-derived for an object — so a STEP file is always produced, and the report
-says which path produced it.  ``analytic=False`` asks for the faceted
-writer outright, which is the comparison baseline the tests use.
+every curved surface left as triangles.  The ``step_export`` plugin kind
+starts from the derived B-rep's ownership graph instead: a face there *is*
+one patch's zero set, so a plane is exact with its boundary loops (holes
+included) collapsed onto the real intersection curves, a full cylindrical
+band is a ``CYLINDRICAL_SURFACE`` with ``CIRCLE`` edges, and only what the
+graph cannot certify (blend faces) is faceted.  That writer's output reads
+back into OCCT as one valid closed solid with the analytic volume; the
+faceted writer's is approximate by construction.
+
+The export asks for the ``step_export`` kind and takes the faceted writer
+when the kind is unfilled (no ``diff-brep``) or when the graph cannot be
+derived for an object — so a STEP file is **always** produced, and
+``report["path"]`` says which writer produced it (``"brep"`` or
+``"mesh"``), with ``report["tier"]`` carrying :func:`cadjoint.tier.message`
+when the analytic writer was asked for and the private tier is absent.
+``analytic=False`` asks for the faceted writer outright, which is the
+comparison baseline the tests use.
 """
 
 from __future__ import annotations
@@ -50,7 +54,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from cadjoint.enums import ExportFormat, listed
+from cadjoint.enums import ExportFormat, PluginKind, listed
 from cadjoint.viewer._limits import OVERSIZED_SOURCE_ERROR, exceeds_source_limit
 from cadjoint.viewer.schema.requests import ExportRequest
 
@@ -259,20 +263,24 @@ def _write_geometry(obj: Any, request: ExportRequest, path: Path) -> dict[str, A
     }
 
     if request.format is ExportFormat.STEP and request.analytic:
-        # The graph path: exact planes and cylinders, faceted where the graph
-        # cannot certify a face.  See the module docstring for why this
-        # writer and not the mesh one.
-        from cadjoint.brep import extract_brep, save_brep_step
+        # The analytic path: exact planes and cylinders, faceted where the
+        # graph cannot certify a face.  It is the private tier's, so it is
+        # asked for by kind and the faceted writer below is the fallback —
+        # see the module docstring.
+        from cadjoint import tier
 
-        try:
-            brep = extract_brep(obj, grid)
-            written = save_brep_step(brep, path)
-        except Exception as error:  # noqa: BLE001 - the faceted writer is the fallback
-            report["fallback"] = f"{type(error).__name__}: {error}"[:500]
+        exporter = tier.component(PluginKind.STEP_EXPORT.value)
+        if exporter is None:
+            report["tier"] = tier.message(PluginKind.STEP_EXPORT.value)
         else:
-            report["path"] = "brep"
-            report["faces"] = written.get("faces", {})
-            return report
+            try:
+                written = exporter.step_export(obj, grid, path)
+            except Exception as error:  # noqa: BLE001 - the faceted writer is the fallback
+                report["fallback"] = f"{type(error).__name__}: {error}"[:500]
+            else:
+                report["path"] = "brep"
+                report["faces"] = written.get("faces", {})
+                return report
 
     with warnings.catch_warnings():
         # The lattice is fitted to the object with a margin, so the open

@@ -1,9 +1,10 @@
-"""Where a plugin runs: a name for one ``Tesseract.from_*`` call.
+"""Where a plugin runs: a name for one ``Tesseract.from_*`` call, or an import.
 
-A :class:`PluginSpec` is configuration, not a client.  Each transport is
-exactly one tesseract-core constructor, and ``options`` is forwarded to it
-verbatim — this module opens no sockets, encodes nothing, and knows nothing
-about HTTP:
+A :class:`PluginSpec` is configuration, not a client.  Each Tesseract
+transport is exactly one tesseract-core constructor, and ``options`` is
+forwarded to it verbatim — this module opens no sockets, encodes nothing,
+and knows nothing about HTTP.  The ``python`` transport is one
+``importlib`` lookup and needs no tesseract-core at all:
 
 ===========  ============================================================
 transport    the call it makes
@@ -11,6 +12,7 @@ transport    the call it makes
 ``local``    ``Tesseract.from_tesseract_api(api_path, **options)``
 ``container`` ``Tesseract.from_image(image, **options)`` then ``serve()``
 ``remote``   ``Tesseract.from_url(url, **options)``
+``python``   ``getattr(import_module(module), attribute)`` for ``object = "module:attribute"``
 ===========  ============================================================
 
 The Kubernetes case is ``remote`` pointed at a Service; ``tesseract serve``
@@ -53,6 +55,7 @@ _TARGET = {
     PluginTransport.LOCAL: "api_path",
     PluginTransport.CONTAINER: "image",
     PluginTransport.REMOTE: "url",
+    PluginTransport.PYTHON: "object",
 }
 
 _TESSERACT_EXTRA_MESSAGE = (
@@ -163,9 +166,14 @@ class PluginSpec:
         api_path: ``local`` — the package's ``tesseract_api.py``.
         image: ``container`` — the Docker image reference.
         url: ``remote`` — the base URL of a served Tesseract.
+        object: ``python`` — ``"module:attribute"`` naming an importable
+            object that satisfies the kind's contract
+            (:mod:`cadjoint.plugins.contracts`).  A dotted attribute path
+            (``"pkg.mod:NAMESPACE.component"``) is followed.
         options: Keyword arguments passed straight to the constructor
             (``timeout``, ``environment``, ``volumes``, ``num_workers``, …
-            — whatever the installed tesseract-core accepts).
+            — whatever the installed tesseract-core accepts).  Unused by
+            the ``python`` transport.
         version: The version the package's ``tesseract_config.yaml``
             declares.  Advisory; the authority is :meth:`Plugin.probe`.
         schema_hash: The expected ``sha256:...`` of the served schema.  When
@@ -179,6 +187,7 @@ class PluginSpec:
     api_path: Path | None = None
     image: str | None = None
     url: str | None = None
+    object: str | None = None
     options: Mapping[str, Any] = field(default_factory=dict)
     version: str | None = None
     schema_hash: str | None = None
@@ -221,7 +230,9 @@ class PluginSpec:
         if not data.get("kind"):
             raise PluginConfigError(f"plugin {name!r}: 'kind' is required.")
         text = {
-            key: expand(str(data[key])) for key in ("api_path", "image", "url") if data.get(key)
+            key: expand(str(data[key]))
+            for key in ("api_path", "image", "url", "object")
+            if data.get(key)
         }
         return cls(
             name=name,
@@ -230,6 +241,7 @@ class PluginSpec:
             api_path=Path(text["api_path"]).expanduser() if "api_path" in text else None,
             image=text.get("image"),
             url=text.get("url"),
+            object=text.get("object"),
             options=dict(data.get("options") or {}),
             version=str(data["version"]) if data.get("version") else None,
             schema_hash=str(data["schema_hash"]) if data.get("schema_hash") else None,
@@ -251,16 +263,21 @@ class PluginSpec:
         return replace(self, **changes)
 
     def open(self) -> tuple[Any, bool]:
-        """Make the ``Tesseract.from_*`` call this spec names.
+        """Make the ``Tesseract.from_*`` call this spec names, or the import.
 
         Returns:
-            ``(tesseract, spawned)`` — the ``tesseract_core.Tesseract`` and
-            whether this call started a container the caller must tear down.
+            ``(component, spawned)`` — the ``tesseract_core.Tesseract`` (or,
+            for the ``python`` transport, the imported object) and whether
+            this call started a container the caller must tear down.
 
         Raises:
-            ImportError: Without the ``tesseract`` extra.
-            PluginConfigError: If a ``local`` spec's ``api_path`` is absent.
+            ImportError: Without the ``tesseract`` extra (Tesseract
+                transports), or when a ``python`` spec's module is absent.
+            PluginConfigError: If a ``local`` spec's ``api_path`` is absent,
+                or a ``python`` spec's ``object`` is malformed or missing.
         """
+        if self.transport == PluginTransport.PYTHON:
+            return self._import_object(), False
         try:
             from tesseract_core import Tesseract
         except ImportError as error:  # pragma: no cover - needs an extra-less env
@@ -282,3 +299,28 @@ class PluginSpec:
             tesseract.serve()
             return tesseract, True
         return Tesseract.from_url(self.url, **options), False
+
+    def _import_object(self) -> Any:
+        """Resolve ``object = "module:attribute"`` to the object itself."""
+        import importlib
+
+        target = str(self.object)
+        module_name, separator, attribute = target.partition(":")
+        if not separator or not module_name or not attribute:
+            raise PluginConfigError(
+                f"plugin {self.name!r}: object must be 'module:attribute' (got {target!r})."
+            )
+        try:
+            component: Any = importlib.import_module(module_name)
+        except ImportError as error:
+            raise ImportError(
+                f"plugin {self.name!r}: cannot import {module_name!r} for object {target!r}: {error}"
+            ) from error
+        for part in attribute.split("."):
+            try:
+                component = getattr(component, part)
+            except AttributeError:
+                raise PluginConfigError(
+                    f"plugin {self.name!r}: {module_name!r} has no attribute {attribute!r}."
+                ) from None
+        return component

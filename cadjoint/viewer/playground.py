@@ -37,6 +37,9 @@ Serves the built frontend (``cadjoint/viewer/static``) and a small JSON API:
 - ``POST /api/complete`` jedi completions at a caret, resolved against the
                          installed ``cadjoint`` so they know its real types
 - ``POST /api/signature`` the signature of the call the caret sits inside
+- ``GET  /api/capabilities`` which private plugin kinds are filled in this
+  process (:func:`cadjoint.tier.status`) — what the Processes window shows
+  when the derived B-rep's features are degraded
 - ``GET  /api/scenes``   list saved scene files in ``./scenes``
 - ``POST /api/scenes/load``  read one saved scene file
 - ``POST /api/scenes/save``  write one scene file into ``./scenes``
@@ -338,6 +341,15 @@ def make_handler(token: str):
 
             if path == "/api/scenes":
                 self._send_json(HTTPStatus.OK, list_scenes())
+                return
+
+            if path == "/api/capabilities":
+                # Which private plugin kinds this server can reach, so the
+                # Processes window can say what is degraded and why
+                # (:func:`cadjoint.tier.status`).
+                from cadjoint import tier
+
+                self._send_json(HTTPStatus.OK, {"ok": True, **tier.status().as_dict()})
                 return
 
             if path == "/api/jobs" or path.startswith("/api/jobs/"):

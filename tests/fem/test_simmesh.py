@@ -93,6 +93,10 @@ class TestDescribe:
             "kind": "mesh",
             "name": "bar-mesh",
             "method": "hex",
+            # Which volume mesher fills a tet mesh, and whether its nodes can
+            # follow the design in this process (research/two-tier.md §2.5).
+            "mesher": "tetgen",
+            "frozen_geometry": False,
             "resolution": [22, 5, 5],
             "bounds": list(_BOUNDS),
             "size": list(_SIZE),

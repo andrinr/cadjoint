@@ -28,12 +28,12 @@ uv sync --extra tesseract
 | | |
 |---|---|
 | **name** | the registry key, e.g. `thermal_jaxfem` |
-| **kind** | the slot it fills. The ones cadjoint asks for are `PluginKind`: `mesher`, `tetfill`, `tet_mesher`, `thermal_solver`, `elastic_solver`, `flow_solver`. The field stays a plain string, so a plugin may declare a kind cadjoint has never heard of |
+| **kind** | the slot it fills. The ones cadjoint asks for are `PluginKind`: `mesher`, `tetfill`, `tet_mesher`, `thermal_solver`, `elastic_solver`, `flow_solver`, and the five [in-process kinds](#one-contract-two-transports) `node_map`, `feature_edges`, `brep`, `step_export`, `drag`. The field stays a plain string, so a plugin may declare a kind cadjoint has never heard of |
 | **version** | what the running instance advertises, else what its `tesseract_config.yaml` declares |
-| **inputs / outputs** | the schema `tesseract-runtime` publishes — never restated in Python |
+| **inputs / outputs** | the schema `tesseract-runtime` publishes — never restated in Python. For a `python` plugin, the annotations of its contract's `Protocol` |
 | **capabilities** | derived from that schema: differentiable inputs and outputs, served endpoints, and named flags (`per_element_properties`, `body_force`, `frozen_topology`, `vjp`, …) |
 | **apply / vjp** | the component's own endpoints |
-| **as_jax()** | `tesseract_jax.apply_tesseract` bound to this plugin — the JAX primitive with its `custom_vjp` |
+| **as_jax()** | `tesseract_jax.apply_tesseract` bound to this plugin — the JAX primitive with its `custom_vjp`. For a `python` plugin, the object's own method, with whatever `custom_vjp` it carries |
 | **probe()** | `/health`, the reported version, and a hash of the served schema |
 
 ```python
@@ -65,7 +65,7 @@ the `Tesseract` itself, so `plugin.jacobian(...)`,
 | `thermal_jaxfem` | `thermal_solver` | jax-fem Poisson solve | AD strategy — JAX cannot trace PETSc assembly |
 | `elastic_jaxfem` | `elastic_solver` | jax-fem linear elasticity + von Mises | same |
 | `elastic_calculix` | `elastic_solver` | CalculiX 2.23 Fortran, over a subprocess | language, licence (GPL-2 isolated), AD strategy |
-| `tet_gmsh` | `tet_mesher` | Gmsh (HXT, order 2) on an exact STEP solid | licence (GPL-2-or-later isolated), a discrete topology decision |
+| `tet_gmsh` | `tet_mesher` | Gmsh (HXT, order 2) on a solid — the dual-contour surface as STL, or an exact STEP | licence (GPL-2-or-later isolated), a discrete topology decision |
 | `flow_brinkman` | `flow_solver` | the [prototype lattice-Boltzmann flow solver](flow.qmd), pure JAX | none yet — it exists to prove a solver with no mesh fits the same slot |
 
 Each solves its VJP differently. The jax-fem pair use an implicit adjoint —
@@ -94,10 +94,12 @@ transport is exactly one tesseract-core constructor:
 | `local` | `PluginTransport.LOCAL` | `Tesseract.from_tesseract_api(api_path)` | default; same process, no Docker, no serialization |
 | `container` | `PluginTransport.CONTAINER` | `Tesseract.from_image(image)` then `serve()` | a built image, torn down when the plugin closes |
 | `remote` | `PluginTransport.REMOTE` | `Tesseract.from_url(url)` | anything already serving: `tesseract serve`, `tesseract-runtime serve`, a Kubernetes Service |
+| `python` | `PluginTransport.PYTHON` | `getattr(import_module(module), attribute)` for `object = "module:attribute"` | a component called inside a trace or once per compile, where a round trip costs more than the work — see [one contract, two transports](#one-contract-two-transports) |
 
 Unlike `kind`, `transport` is a closed set: it is normalised to a
 `cadjoint.enums.PluginTransport` when the spec is built, and anything else is
-refused with the three names listed.
+refused with the four names listed. `local` still means "a Tesseract in this
+process"; `python` needs no tesseract-core at all.
 
 `options` in a spec is forwarded verbatim to that constructor — `timeout`,
 `environment`, `volumes`, `num_workers`, `gpus`, whatever the installed
@@ -326,24 +328,40 @@ So: reach for `tetfill` wherever TetGen's vertex-preserving mode applies, and
 `mesher` when the mesher is a genuine black box or you need the HEX8 path.
 The validation matrix for both is in [tet vs hex](../research/tet-vs-hex.md).
 
-**`tet_gmsh` cuts somewhere else again: at the geometry.** It takes an exact
-STEP solid — the file
-[`cadjoint.brep.step`](../research/brep-architecture.md) writes from the
-ownership graph, where a plane is a `PLANE` and a bore is one
-`CYLINDRICAL_SURFACE` — and returns a TET10 mesh sized by the *part* instead
-of by a lattice. Second-order midside nodes come back on the CAD surface, not
-at the chord midpoint a straight-sided promotion gives. What it does *not*
-decide is where the nodes go: for every node it also reports the CAD entity
-that owns it, and `cadjoint.brep.mesh_gmsh.assign_ownership` matches that
-entity back to a B-rep face, so every position is re-solved by the same 1-, 2-
-or 3-field Newton projection as everything else in `cadjoint.brep.project`.
-The topology is frozen at discovery and only positions move, which makes the
-`vector_jacobian_product` w.r.t. `node_positions` an exact pass-through
-rather than an approximation. On the plate, mesher against mesher, this is
-0.26 s to the DC path's 2.08 s with the worst radius ratio 7.5x better —
-though both figures exclude `extract_brep`, which only this route needs and
-which costs more than either. The measurements, and that caveat in full, are
-in [the B-rep architecture note](../research/brep-architecture.md).
+**`tet_gmsh` cuts somewhere else again: at the geometry.** It takes a
+*solid* — `geometry` plus `geometry_format` — and returns a TET10 mesh sized
+by the **part** instead of by a lattice. The public input is the
+dual-contour surface written as an STL, which Gmsh's `classifySurfaces` +
+`createGeometry` splits into one reparametrised surface per smooth region
+along the lattice's own feature cells; on the plate that is three thousand
+facets in and a dozen CAD surfaces out. An exact STEP takes the same road
+with `geometry_format="step"` — the same mesher, the same contract, a finer
+input.
+
+What it does *not* decide is which patch owns a node. That is
+`cadjoint.fem.gmsh.assign_ownership`, on the caller's side, and it is a
+residual test and nothing else: for every Gmsh surface entity `|f_p|` is
+evaluated on its nodes for every patch of the scene's public decomposition,
+and a patch whose *worst* node clears the bar owns the surface. Arity falls
+out of the entity — one field on a surface, two on a curve, three at a
+corner. The result is the `OwnedNodes` record above.
+
+Because an STL's nodes lie on facets, a curved face sags by `h²/8r` — 3.5e-3
+on a 0.25 bore at a 0.083 cell, above a bar of 2.7e-3, so the bore would
+read as a blend. Every boundary node is therefore first Newton-projected
+onto the scene with the public arity-1 `project_points`, clamped at the bar,
+and the projected position is kept only where it confirms *more* patches
+than the facet position did. Measured on the plate at `target_size=0.16`:
+264 of 1 700 boundary nodes move, 265 blend nodes and 2 blend surfaces
+become 0 and 0, and the worst radius ratio is unchanged at 0.293 (0.308 from
+an analytic STEP of the same part). It buys ownership, not position — the
+bore's nodes and midsides land within 2.4e-3 of `r = 0.25`, under the bar
+but not on the cylinder.
+
+Putting them *on* it, and moving them when the design moves, is the
+`node_map` kind's job. The topology is frozen at discovery and only
+positions move, which is what makes the `vector_jacobian_product` w.r.t.
+`node_positions` an exact pass-through rather than an approximation.
 
 Gmsh is **GPL-2.0-or-later** and cadjoint is Apache-2.0, so it is not a core
 dependency and nothing under `cadjoint/` imports it at module scope. (The
@@ -356,14 +374,95 @@ Installing `pip install 'cadjoint[gmsh]'` links it into your own process
 instead, which is a choice to make knowingly. `tetfill` remains the
 no-dependency fallback, and it stays the default.
 
-**The scene-program hook this is built for** — a `mesher="gmsh"` keyword on
-`SimMesh` routing a `tet10` build through the `tet_mesher` slot — is proposed,
-not shipped. Today the route is reached by hand: `extract_brep(...)`,
-`gmsh_tet_mesh(...)` and `tet_mesh_from_gmsh(...)`, which returns the same
+**The scene-program hook is `SimMesh(method="tet10", mesher="gmsh")`**,
+which routes the build through the `tet_mesher` slot and returns the same
 `TetMesh` in the same node layout as `sdf_to_tet_mesh` followed by
 `tet10_mesh` — boundary corners, interior corners, midside block — so nothing
-downstream of a mesh would change when the hook lands. The worked example is on
-[the B-rep page](brep.qmd#meshing-from-the-graph).
+downstream of a mesh changes. See [meshing](meshing.qmd#the-gmsh-route). The
+one thing that does change is the derivative: a Gmsh mesh's nodes follow the
+design through the `node_map` kind, and without it the mesh is *frozen
+geometry* — it meshes, solves, inspects and exports, and `Optimization`
+refuses at declaration.
+
+## One contract, two transports
+
+A Tesseract is the right contract for a **coarse** component: arrays in,
+arrays out, one `apply` and one `vector_jacobian_product` per optimizer
+step. The measurements above put a served round trip at ~10 ms, which is
+1.3–1.8% of a 548 ms step — nothing.
+
+It is the wrong contract for a component called *inside a trace* or *once
+per compile*. An in-process Tesseract apply/VJP round trip costs ~0.14 s; a
+two-field Newton projection of 300 points is 0.4 ms, one step of a curve
+tracer is sub-millisecond and hundreds run per overlay, and a
+`vmap` of a kernel cannot contain a round trip at all. A Tesseract also
+gives you a VJP but not the `jvp` and batching semantics of the component's
+own `custom_vjp`, and tesseract-core 1.11 refuses zero-size arrays over
+HTTP.
+
+So a component declares **one** interface and the registry binds it to
+either transport. The interface is a typed `Protocol` in
+`cadjoint.plugins.contracts`, with frozen-dataclass payloads; the Tesseract
+form of the same component is a thin `tesseract_api.py` over the same
+object, which is exactly how `tet_gmsh` is written.
+
+### The five in-process kinds
+
+These are the capabilities the private tier — `diff-brep`, everything that
+solves against the patch fields *with a derivative* — fills. Public cadjoint
+never writes `import diff_brep`: it asks the registry for a kind and calls
+the object it gets back through the Protocol.
+
+| kind | Protocol | in | out |
+|---|---|---|---|
+| `node_map` | `NodeMap.positions` | scene, parameters, an `OwnedNodes` record | `(P, 3)` positions, **differentiable** in the parameters |
+| `feature_edges` | `FeatureEdges.feature_edges` | scene, grid | an `EdgeSet` of polylines (NumPy, no derivative) |
+| `brep` | `BRepExtractor.extract` | scene, grid | the derived B-rep, opaque, never leaves the process |
+| `step_export` | `StepExporter.step_export` | scene, grid, path | a file, and the writer's report |
+| `drag` | `Drag.drag` | scene, B-rep, handle, target | a `DragOutcome` |
+
+`node_map` is the centrepiece and the reason the transport exists: it runs
+inside the jitted objective `Optimization` builds, so its `custom_vjp` has
+to be a primitive of the caller's own program. Its input is
+`OwnedNodes` — per node a seed position, the global patch indices that own
+it, the arity, the Gmsh entity dimension, the midside block and the bar
+ownership was decided at — which the **public**
+`cadjoint.fem.gmsh.assign_ownership` produces from a residual test against
+the scene's own patch fields, no graph involved.
+
+```toml
+# what a distribution filling these kinds registers
+[project.entry-points."cadjoint.plugins"]
+node_map      = "diff_brep.plugins:NODE_MAP"     # PluginSpec(transport="python", object=...)
+feature_edges = "diff_brep.plugins:FEATURE_EDGES"
+```
+
+`cadjoint.plugins.contracts.CONTRACT_VERSION` bumps whenever a Protocol or
+payload changes shape, and every component carries a `contract_version`, so
+a stale build is refused with a sentence rather than failing inside a trace.
+
+### When a kind is unfilled
+
+`cadjoint.tier` is the one module that answers "is it installed" and writes
+the one refusal message.
+
+```python
+from cadjoint import tier
+
+tier.status().flags()      # {'node_map': False, 'feature_edges': False, ...}
+tier.available("brep")     # False
+tier.component("step_export")            # None — the caller degrades
+tier.require("node_map")                 # raises TierUnavailable(<one sentence>)
+tier.report()                            # versions + status, for a bug report
+```
+
+Nothing in the public app breaks: it compiles, meshes with TetGen or Gmsh,
+solves, inspects, exports VTK and faceted STEP, and draws feature edges from
+the lattice classifier. What it refuses is a design derivative through a
+Gmsh mesh, which `Optimization` reports at declaration rather than
+discovering inside the trace. The compile payload carries a `tier` field and
+`GET /api/capabilities` returns `tier.status()`, so the viewer says which
+layer it is drawing rather than leaving you to guess from an empty one.
 
 ## Where plugins are used
 

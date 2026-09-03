@@ -310,6 +310,11 @@ class SimMeshPayload(Open):
     size: list[float] | None = None
     padding: float
     method: Literal["hex", "tet4", "tet10"] | None = None
+    # Which volume mesher fills a tet mesh, and whether its nodes can follow
+    # the design in this process: a Gmsh mesh is frozen geometry without the
+    # ``node_map`` plugin kind (:mod:`cadjoint.tier`).
+    mesher: Literal["tetgen", "gmsh"] | None = None
+    frozen_geometry: bool = False
     domain: DomainEntry | None = None
     line: int | None
     span: Span | None
@@ -344,6 +349,49 @@ class MeshEdgePayload(Strict):
     wire: list[list[Vector3]]
     sharp: list[list[Vector3]]
     resolution: int
+    # Which layer produced ``sharp``: the derived B-rep's exact curves
+    # (``"graph"``, the private tier), or the lattice feature classifier
+    # (``"lattice"``, public cadjoint alone).  See :mod:`cadjoint.tier`.
+    edges: Literal["graph", "lattice"] = "graph"
+
+
+class ShaderParameter(Strict):
+    """One design parameter's slot in the shader's uniform buffer.
+
+    The shader source is byte-identical for every value of every parameter,
+    so an edit that moves only values is a buffer write rather than a
+    recompile.  ``offset`` is a byte offset into a buffer of 16-byte slots;
+    ``components`` says how many of the slot's four floats are read.
+    """
+
+    name: str
+    offset: int
+    components: int
+    # ``null`` for a component that is not finite — a material property the
+    # scene never set.  JSON cannot carry a NaN that a strict parser will
+    # read back, so the client turns the null into one when it packs the
+    # buffer; see ``ShaderParameter.as_dict`` in the WGSL backend.
+    value: list[float | None]
+    free: bool
+
+
+class ShaderProgram(Strict):
+    """The parameter buffer the scene's shaders read, and where it binds.
+
+    Present only when the worker emitted the uniform form of the shader
+    (the default); ``None`` means the parameters are literals in the source
+    and every edit needs a fresh module.
+    """
+
+    group: int
+    binding: int
+    buffer_bytes: int
+    # Byte offset of a reserved slot the module reads wherever it needs a
+    # NaN.  WGSL has no NaN literal a compiler will accept — Chromium's Tint
+    # const-evaluates the bit-pattern bitcast and rejects the module — so the
+    # value has to arrive through the buffer.  The client writes a NaN here.
+    nan_offset: int = 0
+    parameters: list[ShaderParameter]
 
 
 # ── The response itself ─────────────────────────────────────────────────────
@@ -364,6 +412,13 @@ class CompilePayload(Strict):
     preview_shader: str
     path_shader: str
     present_shader: str
+    # The uniform contract for the two scene shaders above, when they were
+    # built in the uniform form: the frontend binds this buffer and, on an
+    # edit whose sources are unchanged, uploads it instead of recompiling.
+    program: ShaderProgram | None = None
+    # sha256 of the two scene shaders, so the browser can key its module
+    # cache without hashing megabytes of source itself.
+    shader_hash: str = ""
     construction: list[ConstructionNode]
     identities: list[IdentityEntry]
     relations: list[ConstructionRelation]
@@ -372,6 +427,10 @@ class CompilePayload(Strict):
     sim_meshes: list[SimMeshPayload]
     optimizations: list[OptimizationPayload]
     mesh_edges: MeshEdgePayload | None
+    # Per private plugin kind, whether it is filled in the worker's process
+    # (:func:`cadjoint.tier.status`).  Optional with a default, so a client
+    # built before the seam sees no change.
+    tier: dict[str, bool] | None = None
     solver_runs: list[ConstraintSolverRun]
     output: str
 

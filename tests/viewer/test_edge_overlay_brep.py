@@ -12,9 +12,12 @@ the layer is now the graph's own edges:
 * the answer does not move when the **lattice** does — the same body at
   three sub-cell offsets gives the same topology and the same exact curves.
 
-Everything here reads :func:`~cadjoint.viewer._edge_overlay._sharp_chords`
-rather than the payload, because the payload rounds to a thousandth of a
-unit and a millionth is the point.
+Everything here reads :mod:`cadjoint.brep.edges` — the ``feature_edges``
+component itself — rather than the payload, because the payload rounds to a
+thousandth of a unit and a millionth is the point.  These are the private
+tier's tests (``research/two-tier.md`` §1.1); the public fallback's are in
+:mod:`tests.viewer.test_edge_artifacts` and
+:mod:`tests.plugins.test_degradation`.
 """
 
 from __future__ import annotations
@@ -23,29 +26,49 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from cadjoint.brep.project import trace_curves
-from cadjoint.geometry.parameters import Vector
-from cadjoint.sdf import Box, Cylinder, Difference, Translate, Union
-from cadjoint.viewer._edge_overlay import (
+from cadjoint.brep.edges import (
     _DEBRIS_CELLS,
     _MAX_CHORD_TURN,
     _MAX_EDGE_TURN,
-    _MESH_EDGE_RESOLUTION,
-    _MESH_EDGE_SIZE,
     _between_corners,
     _corners_on_curve,
     _Drawable,
     _extract_graph,
     _in_curve_order,
-    _mesh_edge_payload,
     _prune_debris,
     _resample,
-    _sharp_chords,
     _sharp_polylines,
     _worst_turn,
 )
+from cadjoint.brep.project import trace_curves
+from cadjoint.geometry.parameters import Vector
+from cadjoint.sdf import Box, Cylinder, Difference, Translate, Union
+from cadjoint.viewer._edge_overlay import (
+    _MESH_EDGE_RESOLUTION,
+    _MESH_EDGE_SIZE,
+    _mesh_edge_payload,
+    _overlay_grid,
+)
 
 CELL = max(_MESH_EDGE_SIZE) / _MESH_EDGE_RESOLUTION
+
+
+def _sharp_chords(brep, spacing) -> np.ndarray:
+    """The drawn edges as chord pairs — what the payload's sharp layer is.
+
+    Lived in the overlay before the split; here it is one line over
+    :func:`~cadjoint.brep.edges._sharp_polylines`, which is what the
+    ``feature_edges`` component's :class:`~cadjoint.plugins.EdgeSet` ships.
+    """
+    chords = []
+    for edge, points, _kind in _sharp_polylines(brep, spacing):
+        following = np.roll(points, -1, axis=0) if edge.closed else points[1:]
+        leading = points if edge.closed else points[:-1]
+        chords.append(np.stack([leading, following], axis=1))
+    if not chords:
+        return np.empty((0, 2, 3), dtype=np.float64)
+    return np.concatenate(chords)
+
 
 #: How far a drawn point may be from the exact analytic curve it claims to
 #: be on.  The projection runs in float32, so its residual floor is ~1e-8
@@ -56,7 +79,7 @@ EXACT = 1e-6
 
 def _chords(scene) -> np.ndarray:
     """The sharp layer for a scene, unrounded."""
-    brep, spacing = _extract_graph(scene)
+    brep, spacing = _extract_graph(scene, _overlay_grid())
     return _sharp_chords(brep, spacing)
 
 
@@ -157,7 +180,7 @@ def test_every_drawn_point_solves_its_own_two_patch_system(bored_plate):
     scene, _chords_unused = bored_plate
     from cadjoint.brep.project import batched_residuals
 
-    brep, spacing = _extract_graph(scene)
+    brep, spacing = _extract_graph(scene, _overlay_grid())
     fields = [patch.field for patch in brep.patches]
     worst = 0.0
     for edge in brep.edges:
@@ -255,7 +278,7 @@ def test_a_sub_cell_fillet_is_drawn_as_the_edge_it_rounds(radius):
     the corner is drawn, and it is drawn *exactly*: the rim is still the
     intersection of the plane and the cylinder, to the projection's floor.
     """
-    brep, spacing = _extract_graph(_filleted_bore(radius))
+    brep, spacing = _extract_graph(_filleted_bore(radius), _overlay_grid())
     assert [face for face in brep.faces if face.kind == "blend"] == []
 
     points = _endpoints(_sharp_chords(brep, spacing))
@@ -274,7 +297,7 @@ def test_a_fillet_wider_than_a_cell_is_not_drawn(radius):
     the material.  Drawing it would put a line where the model has none —
     the failure the threshold exists to bound on the other side.
     """
-    brep, spacing = _extract_graph(_filleted_bore(radius))
+    brep, spacing = _extract_graph(_filleted_bore(radius), _overlay_grid())
     assert [face for face in brep.faces if face.kind == "blend"] != []
 
     points = _endpoints(_sharp_chords(brep, spacing))
@@ -309,7 +332,7 @@ def test_the_threshold_is_the_radius_the_user_typed():
 
 def _fake_edge(index: int, closed: bool = False):
     """A :class:`~cadjoint.brep.BRepEdge` carrying only what pruning reads."""
-    from cadjoint.brep import BRepEdge
+    from cadjoint.brep.graph import BRepEdge
 
     return BRepEdge(
         index=index,
@@ -431,7 +454,7 @@ def _filleted_step(smoothness: float = 0.03):
 
 def _drawn(scene):
     """Every drawn edge as an ordered polyline, plus the graph behind it."""
-    brep, spacing = _extract_graph(scene)
+    brep, spacing = _extract_graph(scene, _overlay_grid())
     return brep, _sharp_polylines(brep, spacing)
 
 
@@ -460,7 +483,7 @@ def test_no_drawn_edge_folds_back_on_itself(scene_name):
     assert drawn, "nothing drawn at all"
     worst = [
         (edge.index, round(_worst_turn(points, edge.closed), 1))
-        for edge, points in drawn
+        for edge, points, _kind in drawn
         if _worst_turn(points, edge.closed) > _MAX_EDGE_TURN
     ]
     assert not worst, f"edges that fold (index, degrees): {worst}"
@@ -475,7 +498,7 @@ def test_a_straight_seam_is_drawn_at_its_own_length():
     catches exactly that: for a straight seam the polyline is the chord.
     """
     brep, drawn = _drawn(_filleted_step())
-    for edge, points in drawn:
+    for edge, points, _kind in drawn:
         if edge.closed:
             continue
         if {brep.patches[index].kind for index in edge.patches} != {"plane"}:
@@ -538,7 +561,7 @@ def test_a_corner_that_is_not_on_the_edge_is_refused():
     Only corners that satisfy this edge's own pair may be used.
     """
     scene = _filleted_step()
-    brep, spacing = _extract_graph(scene)
+    brep, spacing = _extract_graph(scene, _overlay_grid())
     limit = 1e-5 * float(spacing.max())
     drawable = [edge for edge in brep.edges if edge.analytic and edge.residual <= limit]
     usable = _corners_on_curve(brep, drawable, limit)
@@ -573,7 +596,7 @@ def test_a_rim_narrower_than_a_cell_still_gets_a_circle():
         smoothness=0.0,
     )
     _brep, drawn = _drawn(scene)
-    loops = [(edge, points) for edge, points in drawn if edge.closed]
+    loops = [(edge, points) for edge, points, _kind in drawn if edge.closed]
     assert loops, "the head lost its rim entirely"
     for _edge, points in loops:
         radius = float(np.linalg.norm(points - points.mean(axis=0), axis=1).mean())

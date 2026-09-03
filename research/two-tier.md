@@ -779,3 +779,53 @@ throwaway `cadjoint/brep/plugins.py` that step 4 deletes. Recommend yes.
 | D10 | seam first in cadjoint, then fill diff-brep | yes |
 | D11 | diff-brep's `main` starts from `git filter-repo` history | yes |
 | D12 | temporary in-tree specs while the seam is verified | yes |
+
+---
+
+## 7. Status
+
+**2026-09-03 — migration step 1 (the seam) is built inside `cadjoint`.**
+Nothing has moved yet: `cadjoint/brep/` is still here, `diff-brep` is still
+empty, and no commit has been pushed to it. What landed is everything the
+seam needs so that the move is a deletion rather than a redesign.
+
+| memo | landed as |
+|---|---|
+| 2.1 D5 — one contract, two transports | `PluginTransport.PYTHON`, `PythonPlugin` (`plugins/plugin.py`), `PluginSpec.object` + `_import_object` (`plugins/spec.py`), `BUILTIN_PYTHON` and `PluginRegistry.without/unregister` (`plugins/registry.py`) |
+| 2.4 — the contracts | `cadjoint/plugins/contracts.py`: `NodeMap`, `FeatureEdges`, `BRepExtractor`, `StepExporter`, `Drag`, the `OwnedNodes`, `EdgeSet` and `DragOutcome` payloads, `CONTRACT_VERSION = 1`, `Differentiable[...]` and `contract_signature` |
+| 2.3 — one refusal | `cadjoint/tier.py`: `KINDS`, `status`, `available`, `require`, `component`, `message`, `report`, `absent` |
+| 1.1, 1.2, D1, D4, D7 | `cadjoint/fem/gmsh.py` (public: the mesher, `dc_surface_stl`, residual `assign_ownership`, `owned_nodes`, `GmshMesh`, static `tet_mesh_from_gmsh`, `sdf_gmsh_tet_mesh`); `cadjoint/brep/mesh_gmsh.py` keeps only the node map (`node_positions`, `recompute_gmsh_points`, `parameterised_points`) and the analytic-STEP-fed `gmsh_tet_mesh`; `SimMesh(mesher="gmsh")` |
+| D12 — temporary in-tree specs | `cadjoint/brep/plugins.py` (five objects), registered as `python` specs while `cadjoint.brep.plugins` is importable |
+| 1.3 — the twelve edges | overlay ×5 → `cadjoint/brep/edges.py` behind the `feature_edges` kind; `_export.py` → the `step_export` kind; `tesseract_api.py` → `cadjoint.fem.gmsh`; `docs/plugins.qmd`, `docs/meshing.qmd`, `docs/getting-started.qmd` reworded |
+| 2.5, D6 — graceful degradation | `SimMesh.frozen_geometry`, `Optimization._refuse_frozen_geometry`, the `tier` compile field, `GET /api/capabilities`, `MeshEdgePayload.edges` |
+
+**Numbers measured on the way (D4, the STL route).** Plate at
+`target_size=0.16`, `PLATE_GRID` 20³, snap on: 2 801 nodes / 1 435 cells,
+12 CAD surfaces from 3 079 facets, worst radius ratio **0.293** (median
+0.742), 264 of 1 700 boundary nodes snapped, **0 blend nodes and 0 blend
+surfaces** (265 and 2 without the snap), arity `{0: 1105, 1: 1494, 2: 194,
+3: 8}`. The analytic STEP of the same part: 2 707 nodes, worst ratio
+**0.308**, arity `{0: 1075, 1: 1428, 2: 196, 3: 8}`. Bore-owned nodes land
+within **2.41e-3** of `r = 0.25` against a bar of 2.66e-3, median 1e-8.
+Starter thermal body: 4 820 nodes, worst ratio 0.171 snapped / 0.175
+unsnapped / 0.215 from the analytic STEP; the snap moves 963 nodes and
+changes no tag (713 blend nodes either way).
+
+Two corrections to §1.2's expectations: the ownership counts from
+residual-only tagging are *near* the vote's but not equal to it
+(`docs/brep.qmd` records `{0: 1098, 1: 1424, 2: 196, 3: 8}` over 2 726
+nodes; the same route now gives 2 707 nodes and `{0: 1075, 1: 1428,
+2: 196, 3: 8}`), so the step-1b acceptance test is "the same shape, no
+blends" rather than an equality; and the STL route needs the **snap** of
+1.2's own residual bar to be usable at all, which the memo did not
+anticipate — without it the plate's bore reads as a blend.
+
+**What is not done and belongs to later steps.** `docs/brep.qmd`, the
+`B-rep — *` sections of `_quarto.yml`, `docs/simulation.qmd:66-70`,
+`docs/viewer.qmd`, the README, and `tests/meshing/test_patch_fields.py`'s
+docstring mention still name `cadjoint.brep` (memo §5 step 5, and other
+agents own some of those files today). `tests/viewer/test_edge_overlay_brep.py`
+still imports `cadjoint.brep.edges` directly — it *is* the private tier's
+test file and moves with the code in step 2. `cadjoint.plugins.contracts`
+is not yet promoted alongside `cadjoint.meshing.step_scaffold` (step 1a's
+other half, the underscore names in `meshing/export.py`).

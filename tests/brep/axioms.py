@@ -30,6 +30,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import numpy as np
+
 from cadjoint.geometry import Scalar, Vector, Vector2
 from cadjoint.meshing.edge_detection import GridSpec
 
@@ -1387,6 +1388,7 @@ def snap_census(item: Case, seeds: int = 30000, seed: int = 0, reach: float = 2e
     """
     import jax
     import jax.numpy as jnp
+
     from cadjoint.brep.project import project_fields
 
     rng = np.random.default_rng(seed)

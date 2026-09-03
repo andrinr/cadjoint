@@ -14,6 +14,6 @@
 # never links it, and the boundary is the container.
 gmsh
 
-# The ownership match runs on the caller's side, but cadjoint.brep imports
-# scipy's KD-tree lazily and the schema round-trip touches it.
+# The ownership tag runs on the caller's side, but the schema round-trip
+# touches cadjoint's lazily-imported scipy paths.
 scipy
