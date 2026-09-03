@@ -1959,8 +1959,10 @@ input[type="checkbox"] {
    controls and the axis triad. It is projected in TypeScript (viewer/navCube.ts)
    rather than by CSS 3D, so what is described here is only paint. */
 .cube-stage {
-  width: 168px;
-  height: 168px;
+  /* Smaller than it was: the cube is a control, not an ornament, and at 168
+     it took a corner of the viewport away from the model it describes. */
+  width: 124px;
+  height: 124px;
   cursor: grab;
   touch-action: none;
   overflow: visible;
@@ -2057,7 +2059,7 @@ input[type="checkbox"] {
 .cube-projection {
   position: absolute;
   right: 0;
-  bottom: 0;
+  top: 0;
   display: grid;
   place-items: center;
   width: 28px;

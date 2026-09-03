@@ -7,7 +7,13 @@
  * payload shapes to patch-request shapes with no state of its own.
  */
 
-import type { StudyBc, StudyBcType, StudyPayload, StudySelection } from "./types";
+import type {
+  StudyBc,
+  StudyBcType,
+  StudyPayload,
+  StudyPayloadKind,
+  StudySelection,
+} from "./types";
 import { byId } from "./identity";
 
 /** Compact numeric formatting for selection summaries: drop trailing zeros. */
@@ -49,9 +55,25 @@ export const BC_LABELS: Record<StudyBcType, string> = {
   traction: "Traction",
 };
 
-/** BC types that make sense for a study kind. */
-export function bcTypesFor(kind: "thermal" | "elastic"): StudyBcType[] {
-  return kind === "thermal" ? ["dirichlet", "heat_flux"] : ["fixed", "traction"];
+/**
+ * BC types that make sense for a study kind.
+ *
+ * A flow study's conditions — inlet, outlet, walls, a heat source — are
+ * declared in the scene and have no patch operations behind them, so the
+ * panel has nothing to offer for one and says so by offering nothing. That
+ * is why the kind is wider here than `StudyKind`: the payload reports what a
+ * program *contains*, the enum names what the GUI can *author*, and flow is
+ * currently the first that is one without the other.
+ */
+export function bcTypesFor(kind: StudyPayloadKind): StudyBcType[] {
+  if (kind === "thermal") return ["dirichlet", "heat_flux"];
+  if (kind === "elastic") return ["fixed", "traction"];
+  return [];
+}
+
+/** Whether the GUI can add and edit this kind of study's conditions. */
+export function isEditableStudyKind(kind: StudyPayloadKind): kind is "thermal" | "elastic" {
+  return kind === "thermal" || kind === "elastic";
 }
 
 /** The scalar/vector a BC row edits, or null for `fixed` (no value). */
@@ -100,7 +122,7 @@ export interface BcDraft {
   vector: [number, number, number];
 }
 
-export function defaultDraft(kind: "thermal" | "elastic"): BcDraft {
+export function defaultDraft(kind: StudyPayloadKind): BcDraft {
   return {
     bcType: kind === "thermal" ? "dirichlet" : "fixed",
     selectionKind: "side",

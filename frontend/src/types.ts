@@ -395,6 +395,16 @@ export interface SimulationMeshPayload {
 }
 
 /** `probe` only meshes and returns the face-group catalog; the rest solve. */
+/**
+ * What a study in the payload can be.
+ *
+ * Wider than `StudyKind` in `cadjoint/enums.py` on purpose: the enum names
+ * the kinds the GUI can author, this names the kinds a program may contain.
+ * A flow study is declared in the scene and has no patch vocabulary, so it
+ * is reported and read but never built here.
+ */
+export type StudyPayloadKind = "thermal" | "elastic" | "flow";
+
 export type SimulationKind = "probe" | "thermal" | "elastic";
 
 /** One boundary condition, targeting a face group by id. */
@@ -422,7 +432,7 @@ export interface SimulateStudyRequest {
 /** JSON summary of a solved study (SimulationResult.describe()). */
 export interface SimulationResultSummary {
   name: string;
-  kind: "thermal" | "elastic";
+  kind: StudyPayloadKind;
   /** The display field carried by the response mesh scalars. */
   field: string;
   /** SimMesh name the study solved on, or null for an implicit mesh. */

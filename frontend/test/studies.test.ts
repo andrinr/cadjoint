@@ -9,6 +9,7 @@ import {
   deleteStudyRequest,
   describeSelection,
   draftSelection,
+  isEditableStudyKind,
   setArgumentRequest,
   setBcValueRequest,
   studyArguments,
@@ -174,5 +175,24 @@ describe("patch request builders", () => {
 
     const fixed = { ...defaultDraft("elastic"), bcType: "fixed" as const };
     expect("value" in addBcRequest(elastic, fixed)).toBe(false);
+  });
+});
+
+describe("a flow study is reported but not authored", () => {
+  // `StudyPayload.kind` is wider than the `StudyKind` enum on purpose: the
+  // payload reports what a program contains, the enum names what the GUI can
+  // build. A flow study is declared in the scene and has no patch operations
+  // behind it, so the panel must read one without offering to edit it — and
+  // must not throw when it meets one, which is what happened before this.
+  it("offers no boundary-condition types to add", () => {
+    expect(bcTypesFor("flow")).toEqual([]);
+    expect(bcTypesFor("thermal")).toEqual(["dirichlet", "heat_flux"]);
+    expect(bcTypesFor("elastic")).toEqual(["fixed", "traction"]);
+  });
+
+  it("is not an editable kind, and the two that are still are", () => {
+    expect(isEditableStudyKind("flow")).toBe(false);
+    expect(isEditableStudyKind("thermal")).toBe(true);
+    expect(isEditableStudyKind("elastic")).toBe(true);
   });
 });

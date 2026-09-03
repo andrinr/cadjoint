@@ -315,8 +315,11 @@ export function ViewCube(props: ViewCubeProps) {
           )}
         </For>
 
-        {/* The world axes, at the lower left, turning with the cube. */}
-        <g class="cube-triad" transform={`translate(${-EXTENT + 22} ${EXTENT - 22})`}>
+        {/* The world axes, above the cube on the left, turning with it. The
+            two readouts sit over the cube rather than under it: they are how
+            you read the view, and the eye meets them on the way to the cube
+            instead of after leaving it. */}
+        <g class="cube-triad" transform={`translate(${-EXTENT + 20} ${-EXTENT + 20})`}>
           <For each={TRIAD}>
             {(entry) => {
               const tip = (): [number, number] => {
@@ -349,12 +352,10 @@ export function ViewCube(props: ViewCubeProps) {
       </svg>
 
       {/* The projection toggle: a glyph, not a facet, because it is not a
-          direction. It sits in the stage's lower-right corner — the flanks
-          are the turn controls, the corners are free, the triad has the
-          lower-left — so the two camera readouts bracket the down control
-          and the widget stays one square, rather than a square with a button
-          dangling under it, which is where this used to be and where it read
-          as orphaned. FreeCAD puts its own cube glyph in the same corner. */}
+          direction. It sits at the stage's top right, opposite the triad, so
+          the two things that describe the camera share a line above the cube
+          and the widget reads as one block. It was at the bottom, where a
+          button under a square reads as orphaned. */}
       <button
         type="button"
         class="cube-projection"
