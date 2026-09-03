@@ -31,9 +31,9 @@ residuals on those parameters, solved by Riemannian gradient descent and Newton
 projection onto the constraint manifold. Extruding or revolving the profile
 produces an SDF that *shares* those parameter objects, so the solid and the
 sketch are the same variables. Dual contouring turns the field into a surface,
-TetGen fills it (or Gmsh meshes the exact B-rep), jax-fem or CalculiX solves on
-it — and `jax.grad` reaches from the objective all the way back to a fin's tip
-coordinate.
+TetGen fills it (or Gmsh meshes it to second-order tets), jax-fem or CalculiX
+solves on it — and `jax.grad` reaches from the objective all the way back to a
+fin's tip coordinate.
 
 Nothing in that chain is a snapshot. A work plane taken from a face
 (`SketchPlane.on(body.cap("+"))`) is an *expression* over the parent feature's
@@ -42,15 +42,16 @@ to its parent's depth — the thing a B-rep modeller cannot do, because there a
 face is stored geometry rather than a function of the feature that made it
 (`tests/construction/test_reference_planes.py`).
 
-The B-rep itself is not stored either. Every hard primitive is a `min`/`max`
-over smooth *patch fields* with exact surface ownership, so a face is the part
-of one patch's zero set that survived the booleans, an edge is where two patch
-zero sets meet, and a vertex is where three do. `cadjoint/brep/` derives that
-graph from the field — found by dual contouring, positioned by one Newton
-projection kernel with an implicit-function-theorem adjoint — which is what
-gives the viewer's feature edges, the STEP export, the draggable B-rep and the
-Gmsh simulation mesh one shared, differentiable core
-(`research/brep-architecture.md`).
+The boundary representation is not stored either, and cadjoint does not need
+one: every hard primitive is a `min`/`max` over smooth *patch fields* with exact
+surface ownership, so a face is the part of one patch's zero set that survived
+the booleans, an edge is where two patch zero sets meet, and a vertex is where
+three do. Deriving that graph from the field — and re-solving it under a design
+change with an implicit-function-theorem adjoint — is the **private tier**, a
+separate distribution cadjoint discovers through its plugin registry and names
+in exactly one module, `cadjoint.tier`. Without it everything on this page
+runs; five things read from the public side instead, and each says so
+(`research/two-tier.md`).
 
 ---
 
@@ -71,15 +72,17 @@ Gmsh simulation mesh one shared, differentiable core
   parallel, perpendicular, equal-length, point-on-line and fixed (plus the
   edge-pair forms), solved by Riemannian gradient descent and Newton projection
   onto the constraint manifold
-- **Derived B-rep** — faces, edges and vertices computed from patch ownership
-  rather than stored, exact intersection curves, analytic STEP faces
+- **A seam for the private tier** — five typed in-process plugin kinds
+  (`node_map`, `feature_edges`, `brep`, `step_export`, `drag`) that a separate
+  distribution fills; `cadjoint.tier` reports what is there and refuses, in one
+  sentence, what is not
 - **Materials with physics** — density, conductivity, specific heat, Young's
   modulus, Poisson ratio, thermal expansion and yield strength in SI, through
   the same parameter containers as colour; a sourced catalogue in
   `cadjoint.materials`
 - **Meshing** — dual contouring with sharp-feature QEF vertices, TetGen fill to
-  TET4/TET10 behind an automatic refinement ladder, second-order tets from the
-  exact B-rep through Gmsh, or a deterministic voxelize-and-snap HEX8 path
+  TET4/TET10 behind an automatic refinement ladder, second-order tets through
+  Gmsh sized by the part, or a deterministic voxelize-and-snap HEX8 path
 - **FEM** — thermal and linear-elastic studies with programmatic node selections
   and properties sampled from the materials, solved by jax-fem or by CalculiX
   2.23 over a subprocess
@@ -257,11 +260,12 @@ diagnostic that says where a field has stopped being a metric distance.*
 
 ![Feature edges drawn over the heat sink: every crease, corner and CSG seam as an exact curve, with the solid drawn translucent behind them](docs/assets/screens/feature-edges.png)
 
-*Feature edges. They come from the B-rep graph, not from lattice feature cells:
-each edge is the exact intersection curve of its two patches, so a bore rim is
-a circle wherever the grid falls and curves meet at their corners. The overlay
-on the gearbox end-cap went from 215 s to 32.5 s cold when it moved to the graph
-(`research/brep-architecture.md`).*
+*Feature edges, drawn by the private tier's `feature_edges` plugin kind: each
+edge is the exact intersection curve of its two patches, so a bore rim is a
+circle wherever the grid falls and curves meet at their corners. With no
+provider installed the overlay is still drawn — from the lattice feature
+classifier, which is public — and the compile payload says which layer produced
+it (`research/two-tier.md`).*
 
 ### Model mode: direct editing that rewrites the source
 
@@ -435,16 +439,15 @@ command-line optimization below descends.
 **File → Export…** is a small form: the format, what to export, how fine, the
 one option the format has, and Export. **STL** (binary or ASCII) and **OBJ**
 (planar faces merged or not) carry the dual-contoured surface of one object at
-the resolution you choose; **STEP** carries the derived B-rep, analytic where
-the graph can certify it — planes trimmed by their own loops, cylindrical bands
-with circle edges, everything else faceted so the shell always closes — and a
-box with a bore exports as seven exact faces, valid in OCCT with the volume to
-1e-7. **VTK** writes a declared study's solved fields. The run is a job like
-any other (`POST /api/export`), so the chip beside the mode switcher counts the
+the resolution you choose; **STEP** goes to the `step_export` plugin kind when
+one is registered — analytic surfaces, so a box with a bore exports as seven
+exact faces, valid in OCCT with the volume to 1e-7 — and falls back to the
+faceted writer otherwise, with the reason in the report rather than an error.
+**VTK** writes a declared study's solved fields. The run is a job like any
+other (`POST /api/export`), so the chip beside the mode switcher counts the
 seconds and can cancel it, and the download is named after the scene and the
-object (`heatsink-scene.stl`). The same writers are the Python API:
-`cadjoint.brep.step.save_brep_step`, and `cadjoint.meshing.export.save_obj`,
-`save_stl` and `save_step` for the mesh formats.
+object (`heatsink-scene.stl`). The public writers are the Python API:
+`cadjoint.meshing.export.save_obj`, `save_stl` and `save_step`.
 
 ### Editor intelligence
 
@@ -838,9 +841,9 @@ second IR, and §12.10 argues why one would not buy more than this.
   accent is only ever a fill, and the zoning rule that made panels dock
 - [`research/performance.md`](research/performance.md) — the measured profile of
   every worker mode, each speed-up avenue ranked, and the structured lowering
-- [`research/brep-architecture.md`](research/brep-architecture.md) — the
-  derived B-rep: one projection kernel, three arities, one adjoint, and what it
-  measured for STEP export, dragging and meshing
+- [`research/two-tier.md`](research/two-tier.md) — where the line between the
+  public and private tiers falls, the one contract with two transports, and the
+  decisions D1–D12 the split rests on
 - [`research/differentiable-meshing-pipeline.md`](research/differentiable-meshing-pipeline.md)
   — architecture of `cadjoint/meshing`
 - [`research/native-mesher.md`](research/native-mesher.md) — the retired Rust

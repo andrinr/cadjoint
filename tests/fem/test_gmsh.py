@@ -31,8 +31,10 @@ bar of ``r = 0.25``, which is exactly the node map's precondition.
 a study solves on it, with no private tier anywhere in the call.
 
 The derivative — what moves these nodes when the design moves — is the
-``node_map`` plugin kind and is tested in ``tests/brep/test_mesh_gmsh.py``
-while its provider is still in this tree.
+``node_map`` plugin kind, which nothing in this repository provides.  It is
+tested where it lives, in the private ``diff-brep`` distribution; what is
+tested *here* is that a Gmsh mesh without it is honest frozen geometry
+(``tests/plugins/test_degradation.py``).
 """
 
 from __future__ import annotations
@@ -40,6 +42,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from cadjoint import tier
 from cadjoint.fem.gmsh import (
     CLASSIFY_ANGLE,
     TET_MESHER_KIND,
@@ -58,7 +61,11 @@ from cadjoint.fem.gmsh import (
     tet_mesh_from_gmsh,
 )
 from cadjoint.fem.quality import tet_radius_ratios, tet_volumes
-from tests.brep.conftest import BORE_RADIUS, PLATE_GRID, PLATE_SIZE, plate_scene, plate_volume
+from cadjoint.geometry import Scalar, Vector
+from cadjoint.meshing.edge_detection import GridSpec
+from cadjoint.sdf.boolean import Difference
+from cadjoint.sdf.primitives import Box, Cylinder
+from cadjoint.sdf.transforms import Translate
 
 pytestmark = pytest.mark.skipif(
     not gmsh_available(), reason="the optional 'gmsh' extra is not installed"
@@ -67,6 +74,36 @@ pytestmark = pytest.mark.skipif(
 #: Coarse enough that the whole module costs about a second of Gmsh, fine
 #: enough that the bore still carries several elements around its rim.
 TARGET_SIZE = 0.16
+
+#: Half-extents of the test plate and the radius of the bore through it.
+#: The plate is the case where every count is known in advance — six planes,
+#: one cylinder, twelve straight edges, two rim circles, eight corners — which
+#: is what makes the ownership assertions below assertions rather than
+#: measurements.
+PLATE_SIZE = (0.6, 0.6, 0.4)
+BORE_RADIUS = 0.25
+
+#: Spacing 0.083 from -0.83 puts no lattice plane on a plate face, so the
+#: dual-contour pass never has to place a vertex on a bit-exact zero.
+PLATE_GRID = GridSpec.from_bounds((-0.83, -0.83, -0.63), (1.66, 1.66, 1.26), 20)
+
+
+def plate_scene():
+    """A plate with a through bore: a hard Difference with sharp edges."""
+    box = Box(size=Vector(list(PLATE_SIZE)))
+    bore = Translate(
+        Cylinder(radius=Scalar(BORE_RADIUS), height=Scalar(0.9)),
+        Vector([0.0, 0.0, 0.0]),
+    )
+    return Difference((box, bore), smoothness=0.0)
+
+
+def plate_volume() -> float:
+    """The plate's exact volume, box minus cylinder."""
+    return float(
+        8.0 * PLATE_SIZE[0] * PLATE_SIZE[1] * PLATE_SIZE[2]
+        - np.pi * BORE_RADIUS**2 * 2.0 * PLATE_SIZE[2]
+    )
 
 
 @pytest.fixture(scope="module")
@@ -456,8 +493,11 @@ class TestSimMeshTakesTheMesherAsAKeyword:
         report = declared.inspect(plate)
         assert report["mesher"] == "gmsh"
         assert report["nodes"] > 0 and report["elements"] > 0
-        # The node map is filled in this tree, so nothing is frozen here.
-        assert report["frozen_geometry"] is False
+        # Public cadjoint alone has no `node_map` provider, so the mesh says
+        # its geometry is frozen: the nodes are right, but they cannot follow
+        # a design parameter without the private tier. `tests/plugins/
+        # test_degradation.py` covers the filled half against stub providers.
+        assert report["frozen_geometry"] is not tier.available("node_map")
 
 
 class TestAStudySolvesOnAGmshMesh:
@@ -534,13 +574,20 @@ class TestThePluginSlot:
             assert (package / name).is_file(), name
 
     def test_the_package_needs_no_private_module(self):
-        """§3.5: the GPL image must never contain the private tier."""
+        """The GPL image must never contain the private tier.
+
+        Gmsh is GPL-2.0-or-later and ``diff-brep`` is proprietary, so the
+        one thing that must stay true by construction is that they never
+        share a process: the ``cadjoint_tet_gmsh`` image is built from this
+        package alone, and this package names nothing private
+        (``research/two-tier.md`` §3.5).
+        """
         from cadjoint.plugins.registry import BUILTIN_PACKAGES
 
         package = BUILTIN_PACKAGES["tet_gmsh"][1]
         for name in ("tesseract_api.py", "tesseract_requirements.txt"):
             text = (package / name).read_text()
-            assert "cadjoint.brep" not in text and "diff_brep" not in text, name
+            assert "diff_brep" not in text and "diff-brep" not in text, name
 
     def test_the_slot_resolves_by_kind_and_declares_what_it_can_do(self):
         pytest.importorskip("tesseract_core")

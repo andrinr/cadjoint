@@ -159,10 +159,11 @@ inside a `MANIFOLD_SOLID_BREP` and is validated against the OCCT kernel in
 `tests/meshing/test_step_kernel.py`.
 
 All three write the mesh as it is: a faceted solid, one triangle per cell
-crossing, a 28-gon standing in for a bore. For a STEP file in which a plane is
-a `PLANE` and a bore is one `CYLINDRICAL_SURFACE` — seven faces for a plate
-with a hole instead of three thousand — extract the
-[derived B-rep](brep.qmd) from the same field and write that instead.
+crossing, a 28-gon standing in for a bore. A STEP file in which a plane is a
+`PLANE` and a bore is one `CYLINDRICAL_SURFACE` — seven faces for a plate with
+a hole instead of three thousand — is the `step_export` [plugin
+kind](plugins.qmd#the-five-in-process-kinds), which the private tier fills; without it
+the writers on this page are what an export uses, and the report says so.
 
 ## Checking a mesh
 
@@ -392,6 +393,6 @@ octree leaves (2:1 balancing, transition stitching) are also open.
 ## Further reading
 
 - [Differentiable meshing pipeline](../research/differentiable-meshing-pipeline.md) — design principles, the full stage/test map, and the benchmark policy.
-- [Derived B-rep](brep.qmd) — faces, edges and vertices read off this mesh and re-solved against the field, for exact export, dragging, and meshing.
+- [Plugins](plugins.qmd#the-five-in-process-kinds) — the five in-process kinds the private tier fills, which read this mesh and re-solve it against the field for exact export, dragging and meshing.
 - [Native (Rust) dual-contouring core, retired](../research/native-mesher.md) — what the Rust port measured, and why 5 ms of a 4 s request was not worth a second implementation. There is no Rust to build: the JAX/NumPy pipeline on this page is the only one.
 - [Simulation](simulation.qmd) — turning this surface into a volume mesh a solver can use.

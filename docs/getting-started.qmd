@@ -41,7 +41,7 @@ uv sync --extra fem --extra tesseract --extra viewer
 | `cuda` | GPU JAX (Linux + NVIDIA only) |
 | `fem` | the jax-fem finite-element stack (basix, meshio, petsc4py, gmsh) |
 | `tesseract` | tesseract-core + tesseract-jax, which every [plugin](plugins.qmd) is implemented with |
-| `gmsh` | Gmsh in your own process, for the [B-rep tet mesher](brep.qmd#meshing-from-the-graph) — GPL, hence an extra of its own |
+| `gmsh` | Gmsh in your own process, for the [tet10 mesher](simulation.qmd) — GPL, hence an extra of its own |
 | `viewer` | the Jupyter widget (`anywidget`) and the playground's process monitor (`psutil`) |
 | `editor` | `ruff` and `jedi`, for the playground's lint, completion and signature help |
 | `stepcheck` | OCCT kernel validation of STEP exports (dev) |
@@ -140,11 +140,11 @@ fully-determined system.
 
 ## Faces are references, not geometry
 
-cadjoint stores no B-rep. The surfaces it produces — the dual-contoured mesh,
-and the [B-rep it derives from the field](brep.qmd) — are *readings* of the
-field at one resolution, not its definition, and basing a work plane on either
-would mean basing a design decision on whatever grid the extraction happened to
-run at.
+cadjoint stores no boundary representation. The surfaces it produces — the
+dual-contoured mesh, and the graph the private tier derives from the field —
+are *readings* of the field at one resolution, not its definition, and basing
+a work plane on either would mean basing a design decision on whatever grid the
+extraction happened to run at.
 
 The construction tree knows better than the mesh does. `extrude` spans
 `±depth/2` around its sketch plane, so it knows exactly where its caps are and
@@ -261,9 +261,9 @@ save_stl(mesh, "sphere.stl")
 ```
 
 Full detail, including the exports, in
-[differentiable meshing](meshing.qmd). For exact surfaces rather than facets —
-a STEP file in which a bore is one cylinder, a corner you can drag — see the
-[derived B-rep](brep.qmd), which is the private tier's (below).
+[differentiable meshing](meshing.qmd). Exact surfaces rather than facets — a
+STEP file in which a bore is one cylinder, a corner you can drag — are the
+private tier's, below.
 
 ### Two tiers
 
@@ -371,5 +371,6 @@ Rendered pixels are deliberately not an inverse-rendering API. See the
 - [Sketch construction](../examples/sketch_construction.ipynb) — profiles, extrude, revolve
 - [Constraints](../examples/constraints.ipynb) — solving fully-determined systems
 - [Constrained optimization](../examples/constrained_optimization.ipynb) — the full workflow with trajectory visualization
-- [Derived B-rep](brep.qmd) — exact faces, edges and corners read off the field
+- [Plugins](plugins.qmd) — the registry, the two transports, and what the
+  private tier adds
 - [The playground](viewer.qmd) — all of it in one browser window

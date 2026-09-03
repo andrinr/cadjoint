@@ -172,3 +172,31 @@ def served_mesher():
         yield server
     finally:
         server.stop()
+
+
+@pytest.fixture
+def stub_tier():
+    """Fill the private tier's five kinds with the stand-in provider.
+
+    Nothing in this repository provides them — cadjoint runs, always, in the
+    state where ``diff-brep`` is not installed — so a test that needs to see
+    the *filled* half of the matrix registers ``tests/plugins/stubs.py``
+    under each kind.  It is addressed by dotted path, so the registry takes
+    exactly the import path an installed diff-brep takes through its entry
+    points; only the arithmetic behind the contract is missing.
+    """
+    from cadjoint.enums import PluginTransport
+    from cadjoint.plugins import PluginSpec, register_plugin
+    from tests.plugins.stubs import TARGETS
+
+    for kind, target in TARGETS.items():
+        register_plugin(
+            PluginSpec(
+                name=f"stub_{kind}",
+                kind=kind,
+                transport=PluginTransport.PYTHON,
+                object=target,
+            ),
+            default=True,
+        )
+    return TARGETS

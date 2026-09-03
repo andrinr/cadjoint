@@ -820,12 +820,42 @@ blends" rather than an equality; and the STL route needs the **snap** of
 1.2's own residual bar to be usable at all, which the memo did not
 anticipate — without it the plate's bore reads as a blend.
 
-**What is not done and belongs to later steps.** `docs/brep.qmd`, the
-`B-rep — *` sections of `_quarto.yml`, `docs/simulation.qmd:66-70`,
-`docs/viewer.qmd`, the README, and `tests/meshing/test_patch_fields.py`'s
-docstring mention still name `cadjoint.brep` (memo §5 step 5, and other
-agents own some of those files today). `tests/viewer/test_edge_overlay_brep.py`
-still imports `cadjoint.brep.edges` directly — it *is* the private tier's
-test file and moves with the code in step 2. `cadjoint.plugins.contracts`
-is not yet promoted alongside `cadjoint.meshing.step_scaffold` (step 1a's
-other half, the underscore names in `meshing/export.py`).
+**2026-09-03 — steps 2 and 4 are done: the split is real.**
+`https://github.com/andrinr/diff-brep` is private, holds the filtered
+history, and `main` carries the ported tier under the licence D8 decided.
+`cadjoint/brep/`, `tests/brep/`, `tests/viewer/test_edge_overlay_brep.py`,
+`research/brep-{architecture,edge-tracing,axioms}.md`,
+`research/brep-axioms/` and `docs/brep.qmd` are gone from this repository,
+and with them the D12 temporary specs (`BUILTIN_PYTHON`,
+`_BREP_PLUGINS_MODULE`, `_brep_in_tree`). `builtin_specs()` now returns the
+Tesseract packages and nothing else, and no kind of `cadjoint.tier.KINDS`
+has a `BUILTIN_DEFAULTS` entry: a provider is discovered, never bundled.
+
+What the split cost the public suite is two assertions and one import edge,
+and all three were about the *implementation* rather than the seam. The
+tests that read the filled half of the matrix — feature edges labelled
+`graph`, STEP export taking the `brep` path, `frozen_geometry` going false,
+the compile payload's flags — now register `tests/plugins/stubs.py`, five
+objects that satisfy the Protocols and compute nothing. That is a better
+test than the one it replaces: what a provider *puts* in a STEP file is
+diff-brep's business, and what this repository has to get right is that it
+asks the kind and degrades cleanly when nothing answers.
+
+Two things this memo did not anticipate. `tests/fem/test_gmsh.py` imported
+its plate fixtures from `tests/brep/conftest.py`, so the public Gmsh suite
+had a private dependency that §1.3's table missed; the constants and the two
+helpers are inlined there now. And `tests/viewer/test_export.py` asserted
+six analytic `ADVANCED_FACE` entities on the default STEP path — the public
+default is the faceted writer with `report["tier"]`, which is what it
+asserts today.
+
+**What is left.** `docs/simulation.qmd:68-69` still names
+`cadjoint.brep.mesh_gmsh` and calls the Gmsh route "not yet a public
+keyword"; both are stale (it is `cadjoint.fem.gmsh` and
+`SimMesh(mesher="gmsh")` is public), and the file belongs to another agent
+today. `research/complex-scene-2.md:19` cites `research/brep-axioms.md`,
+which now lives in diff-brep. `cadjoint.plugins.contracts` is not yet
+promoted alongside `cadjoint.meshing.step_scaffold` (step 1a's other half,
+the underscore names in `meshing/export.py`), which diff-brep imports
+through a `pyright: ignore`. Steps 5 (the docs split proper, a public
+`docs/tier.qmd`) and 6 (release mechanics, `v0.2.0`) are open.

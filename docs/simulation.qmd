@@ -63,11 +63,12 @@ re-extracted on a finer grid over the same box before the build gives up, and
 the mesh records which rung it was built on — see
 [the refinement ladder](meshing.qmd#the-refinement-ladder).
 
-There is no fourth `method`. Tets sized by the part rather than by the lattice,
-with quadratic midside nodes on the true surface, come from Gmsh on the
-[derived B-rep](brep.qmd#meshing-from-the-graph); that route is reached through
-`cadjoint.brep.mesh_gmsh` and the `tet_mesher` plugin, and is not yet a
-`SimMesh` keyword.
+There is no fourth `method`, but there is a second mesher. Tets sized by the
+part rather than by the lattice come from Gmsh: `SimMesh(mesher="gmsh")` in
+[the meshing guide](meshing.qmd#the-gmsh-route). Its midside nodes sit on the
+true surface, and whether they *follow* the design parameters depends on the
+`node_map` plugin — without it the mesh reports frozen geometry, which
+[Two tiers](getting-started.qmd#two-tiers) explains.
 
 ## Judge it
 

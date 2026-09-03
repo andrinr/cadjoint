@@ -441,6 +441,36 @@ feature_edges = "diff_brep.plugins:FEATURE_EDGES"
 payload changes shape, and every component carries a `contract_version`, so
 a stale build is refused with a sentence rather than failing inside a trace.
 
+Installing a provider is all it takes — the entry points do the registration,
+and nothing in cadjoint changes:
+
+```bash
+uv pip install "diff-brep @ git+ssh://git@github.com/andrinr/diff-brep@main"
+```
+
+A `plugins.toml` is needed only to *override* what discovery found — to point
+one kind somewhere else, or to turn one off without uninstalling:
+
+```toml
+# ~/.config/cadjoint/plugins.toml
+
+# The node map is a Tesseract on the cluster for a fully remote chain; every
+# other kind stays the in-process object the entry point registered.
+[plugins.node_map]
+kind      = "node_map"
+transport = "remote"
+url       = "http://node-map.cadjoint.svc.cluster.local:8000"
+
+# A second provider, chosen by name rather than by what happens to be installed.
+[defaults]
+feature_edges = "my_edges"
+
+[plugins.my_edges]
+kind      = "feature_edges"
+transport = "python"
+object    = "my_package.edges:COMPONENT"
+```
+
 ### When a kind is unfilled
 
 `cadjoint.tier` is the one module that answers "is it installed" and writes

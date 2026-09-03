@@ -5,9 +5,10 @@ kind -> name default, and three places a spec can come from, later ones
 winning:
 
 1. **Built-ins** — the Tesseract packages in this repository
-   (:data:`BUILTIN_PACKAGES`), as ``local`` specs, and — while the derived
-   B-rep still lives in this tree — the in-process providers of the private
-   tier's kinds (:data:`BUILTIN_PYTHON`), as ``python`` specs.
+   (:data:`BUILTIN_PACKAGES`), as ``local`` specs.  Nothing shipped here
+   fills the private tier's five in-process kinds; the ``diff-brep``
+   distribution registers those through the entry-point group below, and
+   :mod:`cadjoint.tier` says so in one sentence when it is absent.
 2. **Entry points** — the ``cadjoint.plugins`` group.  A distribution
    registers a component by exposing a :class:`~cadjoint.plugins.PluginSpec`,
    a mapping in the ``plugins.toml`` table form, or a callable returning
@@ -78,25 +79,13 @@ BUILTIN_PACKAGES: dict[str, tuple[str, Path]] = {
     "tet_gmsh": (PluginKind.TET_MESHER.value, _TESSERACTS / "tet_gmsh"),
 }
 
-#: The module that holds the in-tree providers of the private tier's kinds.
-#: Temporary (design memo ``research/two-tier.md`` D12): once the derived
-#: B-rep moves to ``diff-brep`` the module is gone, ``find_spec`` says so,
-#: and these specs vanish without a line here changing — the private
-#: distribution then registers the same kinds through the entry-point group.
-_BREP_PLUGINS_MODULE = "cadjoint.brep.plugins"
-
-#: name -> (kind, ``module:attribute``) for the in-process providers shipped
-#: in this tree, registered as ``python`` specs while ``cadjoint.brep`` exists.
-BUILTIN_PYTHON: dict[str, tuple[str, str]] = {
-    "brep_node_map": (PluginKind.NODE_MAP.value, f"{_BREP_PLUGINS_MODULE}:node_map"),
-    "brep_feature_edges": (PluginKind.FEATURE_EDGES.value, f"{_BREP_PLUGINS_MODULE}:feature_edges"),
-    "brep_extract": (PluginKind.BREP.value, f"{_BREP_PLUGINS_MODULE}:brep"),
-    "brep_step_export": (PluginKind.STEP_EXPORT.value, f"{_BREP_PLUGINS_MODULE}:step_export"),
-    "brep_drag": (PluginKind.DRAG.value, f"{_BREP_PLUGINS_MODULE}:drag"),
-}
-
 #: Which plugin fills each kind unless the config says otherwise.  The two
 #: elastic solvers share a kind, so this is where that choice is made.
+#:
+#: The five in-process kinds of the private tier are deliberately absent:
+#: nothing in this repository provides them, ``diff-brep`` registers exactly
+#: one plugin for each through the entry-point group, and a kind with a
+#: single plugin and no default resolves to it.
 BUILTIN_DEFAULTS: dict[str, str] = {
     PluginKind.MESHER.value: "mesher",
     PluginKind.TETFILL.value: "tetfill",
@@ -106,7 +95,6 @@ BUILTIN_DEFAULTS: dict[str, str] = {
     # The only tet_mesher there is; the built-in tetfill stays the
     # no-dependency fallback under its own kind.
     PluginKind.TET_MESHER.value: "tet_gmsh",
-    **{kind: name for name, (kind, _object) in BUILTIN_PYTHON.items()},
 }
 
 _VERSION_LINE = re.compile(r"^version:\s*['\"]?([^'\"\s]+)['\"]?\s*$", re.MULTILINE)
@@ -228,22 +216,12 @@ def _declared_version(package: Path) -> str | None:
     return match.group(1) if match else None
 
 
-def _brep_in_tree() -> bool:
-    """Whether the temporary in-tree providers' module exists (no import)."""
-    import importlib.util
-
-    try:
-        return importlib.util.find_spec(_BREP_PLUGINS_MODULE) is not None
-    except (ImportError, ValueError):
-        return False
-
-
 def builtin_specs() -> dict[str, PluginSpec]:
     """Specs for every component shipped in this checkout.
 
-    ``local`` specs for the Tesseract packages present, and ``python``
-    specs for the in-tree providers of the private tier's kinds while
-    their module is still here (see :data:`BUILTIN_PYTHON`).
+    ``local`` specs for the Tesseract packages present, and nothing else.
+    The private tier's in-process kinds arrive through the entry-point
+    group, never from here.
     """
     specs = {}
     for name, (kind, package) in BUILTIN_PACKAGES.items():
@@ -255,11 +233,6 @@ def builtin_specs() -> dict[str, PluginSpec]:
                 transport=PluginTransport.LOCAL,
                 api_path=api,
                 version=_declared_version(package),
-            )
-    if _brep_in_tree():
-        for name, (kind, target) in BUILTIN_PYTHON.items():
-            specs[name] = PluginSpec(
-                name=name, kind=kind, transport=PluginTransport.PYTHON, object=target
             )
     return specs
 

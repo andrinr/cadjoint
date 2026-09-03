@@ -314,8 +314,9 @@ show. The grid puts one vertex where a sub-cell fillet is, so its edge is drawn
 where the sharp corner would have been — which is what a bracket filleted at
 0.02 looks like on screen, and where its bore rims come from. Round a corner by
 more than a cell and it becomes curvature the viewport genuinely renders, and no
-line is drawn inside it. See
-[the B-rep architecture note](../research/brep-architecture.md) §8.1.
+line is drawn inside it. That behaviour belongs to the `feature_edges`
+[plugin kind](plugins.qmd#the-five-in-process-kinds); without a provider the overlay
+falls back to the lattice classifier and the compile payload says `lattice`.
 
 Path tracing accumulates progressively: one jittered camera sample per pixel per
 frame, averaged in linear HDR, with cosine-weighted diffuse and

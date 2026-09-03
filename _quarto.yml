@@ -15,8 +15,6 @@ website:
         menu:
           - text: Differentiable Meshing
             href: docs/meshing.qmd
-          - text: Derived B-rep
-            href: docs/brep.qmd
           - text: Simulation
             href: docs/simulation.qmd
           - text: Flow Solver (prototype)
@@ -50,8 +48,6 @@ website:
         menu:
           - text: Differentiable meshing pipeline
             href: research/differentiable-meshing-pipeline.md
-          - text: Derived B-rep architecture
-            href: research/brep-architecture.md
           - text: Where the seconds go (performance)
             href: research/performance.md
           - text: Native (Rust) dual-contouring core (retired)
@@ -164,45 +160,36 @@ quartodoc:
         - meshing.diagnostics.surface_deviation
         - meshing.diagnostics.triangle_quality
         - meshing.diagnostics.self_intersections
-    - title: B-rep — graph
+    - title: Gmsh tet10
       contents:
-        - brep.graph.extract_brep
-        - brep.graph.BRep
-        - brep.graph.BRepFace
-        - brep.graph.BRepEdge
-        - brep.graph.BRepVertex
-        - brep.graph.AnalyticSurface
-        - brep.graph.Patch
-    - title: B-rep — projection kernel
+        - fem.gmsh.gmsh_available
+        - fem.gmsh.gmsh_version
+        - fem.gmsh.dc_surface_stl
+        - fem.gmsh.gmsh_tet_mesh
+        - fem.gmsh.sdf_gmsh_tet_mesh
+        - fem.gmsh.tet_mesh_from_gmsh
+        - fem.gmsh.assign_ownership
+        - fem.gmsh.owned_nodes
+        - fem.gmsh.patch_table
+        - fem.gmsh.GmshMesh
+    - title: The private tier
       contents:
-        - brep.project.project
-        - brep.project.project_fields
-        - brep.project.stacked_fields
-        - brep.project.field_residuals
-        - brep.project.transversal
-    - title: B-rep — export, drag and meshing
-      contents:
-        - brep.step.save_brep_step
-        - brep.step.save_brep_obj
-        - brep.step.save_brep_stl
-        - brep.step.brep_loops
-        - brep.step.brep_triangles
-        - brep.step.brep_volume
-        - brep.step.simplify_loop
-        - brep.drag.drag_handle
-        - brep.drag.handle_position
-        - brep.drag.DragResult
-        - brep.plc.brep_plc
-        - brep.plc.plc_tet_mesh
-        - brep.plc.recompute_plc_points
-        - brep.plc.plc_quality
-        - brep.plc.PLC
-        - brep.mesh_gmsh.gmsh_available
-        - brep.mesh_gmsh.gmsh_tet_mesh
-        - brep.mesh_gmsh.tet_mesh_from_gmsh
-        - brep.mesh_gmsh.recompute_gmsh_points
-        - brep.mesh_gmsh.assign_ownership
-        - brep.mesh_gmsh.GmshMesh
+        - tier.status
+        - tier.available
+        - tier.require
+        - tier.component
+        - tier.message
+        - tier.report
+        - tier.absent
+        - tier.TierUnavailable
+        - plugins.contracts.NodeMap
+        - plugins.contracts.FeatureEdges
+        - plugins.contracts.BRepExtractor
+        - plugins.contracts.StepExporter
+        - plugins.contracts.Drag
+        - plugins.contracts.OwnedNodes
+        - plugins.contracts.EdgeSet
+        - plugins.contracts.DragOutcome
     - title: Option sets
       contents:
         - enums.MeshMethod

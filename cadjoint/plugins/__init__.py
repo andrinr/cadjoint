@@ -80,7 +80,6 @@ from cadjoint.plugins.plugin import (
 from cadjoint.plugins.registry import (
     BUILTIN_DEFAULTS,
     BUILTIN_PACKAGES,
-    BUILTIN_PYTHON,
     CONFIG_ENV,
     CONFIG_NAME,
     ENTRY_POINT_GROUP,
@@ -112,7 +111,6 @@ from cadjoint.plugins.spec import (
 __all__ = [
     "BUILTIN_DEFAULTS",
     "BUILTIN_PACKAGES",
-    "BUILTIN_PYTHON",
     "CONFIG_ENV",
     "CONFIG_NAME",
     "CONTRACT_VERSION",

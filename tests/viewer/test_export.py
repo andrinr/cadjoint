@@ -185,15 +185,31 @@ class TestWorker:
         assert len(merged_faces) < len(plain_faces) == plain["report"]["triangles"]
         assert any(len(face.split()) > 4 for face in merged_faces)
 
-    def test_step_takes_the_brep_path_and_writes_exact_planes(self, tmp_path):
-        result, path = _export(tmp_path, BOX_SOURCE, format="step")
-        assert result["ok"] is True, result
-        assert result["report"]["path"] == "brep"
-        assert result["report"]["faces"]["plane"] == 6
-        assert result["report"]["faces"]["facet"] == 0
+    def test_step_falls_back_to_the_faceted_writer_and_says_so(self, tmp_path):
+        """Asking for analytic STEP without the private tier still writes a file.
+
+        The analytic writer — one ``PLANE`` per face instead of thousands of
+        facets — is the ``step_export`` plugin kind, which nothing in this
+        repository fills.  The export never fails for want of it: it writes
+        the faceted STEP and puts the reason in ``report["tier"]``, so a user
+        gets a usable file and one sentence saying what a better one would
+        need.  The filled half of this is in
+        ``tests/plugins/test_degradation.py``.
+
+        ``tier.absent`` is what makes this true of the *repository* rather
+        than of the machine: a developer with diff-brep installed alongside
+        would otherwise take the analytic path and never run this.
+        """
+        from cadjoint import tier
+        from cadjoint.enums import PluginKind
+
+        with tier.absent():
+            result, path = _export(tmp_path, BOX_SOURCE, format="step")
+            assert result["ok"] is True, result
+            assert result["report"]["path"] == "mesh"
+            assert result["report"]["tier"] == tier.message(PluginKind.STEP_EXPORT.value)
         text = path.read_text()
         assert text.startswith("ISO-10303-21;")
-        assert text.count("ADVANCED_FACE(") == 6
         assert "MANIFOLD_SOLID_BREP(" in text
 
     def test_step_facets_through_the_mesh_writer_when_asked(self, tmp_path):

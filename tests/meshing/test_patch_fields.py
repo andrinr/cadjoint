@@ -237,8 +237,8 @@ class TestExtrudedPolygonPatchFields:
     def test_jacrev_through_a_traced_profile_matches_finite_differences(self):
         """Patch fields rebuilt with the sketch vertices traced stay differentiable.
 
-        The B-rep handle solver re-reads ``patch_fields()`` with the profile's
-        parameters swapped for tracers (``cadjoint.brep.drag.patch_field_fn``).
+        The private tier's handle solver (the ``drag`` plugin kind) re-reads
+        ``patch_fields()`` with the profile's parameters swapped for tracers.
         The only discrete reading in the rebuild — the profile's shoelace
         winding — is taken once at construction, so nothing inside needs a
         concrete value and ``jax.jacrev`` goes straight through.

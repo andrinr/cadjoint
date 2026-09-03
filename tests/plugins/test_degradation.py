@@ -1,12 +1,14 @@
 """The public tier alone: what still works, what degrades, what refuses.
 
-cadjoint's CI never installs ``diff-brep``, so *this* is the state the
-public repository actually ships in — and the only way to test it while the
-providers are still in-tree is to take them out of the registry.
-:func:`cadjoint.tier.absent` does exactly that: it installs a copy of the
-process registry with the five private kinds removed, which is
-indistinguishable, to every caller, from a machine that never had the
-private distribution.
+Nothing in this repository fills the five private kinds, so *this* is the
+state the public repository ships in and the state its CI runs in: an
+unmodified checkout is already degraded.  Two fixtures give the file both
+halves of the matrix anyway.  ``stub_tier`` registers
+``tests/plugins/stubs.py`` — five objects that satisfy the Protocols and
+compute nothing — to see what a filled kind changes; and
+:func:`cadjoint.tier.absent` installs a copy of the process registry with
+those kinds removed, so the degraded assertions hold even on a developer's
+machine that *does* have diff-brep installed alongside.
 
 The matrix this file pins (``research/two-tier.md`` §2.5):
 
@@ -66,9 +68,23 @@ def plate():
 class TestTheFixtureBlanksTheRegistry:
     """``tier.absent`` has to be the real thing, or nothing below means much."""
 
-    def test_every_private_kind_is_filled_here_and_absent_inside(self):
-        before = tier.status()
-        assert before.installed, "the in-tree providers should fill all five kinds"
+    def test_no_provider_is_shipped_so_the_default_state_is_absent(self):
+        """This is the whole point of the split, asserted once.
+
+        Nothing in this repository fills the five kinds, so an unmodified
+        checkout is already the degraded state — ``tier.absent()`` is what
+        the rest of this file uses to reach it deliberately even when a
+        developer *has* installed diff-brep alongside.
+        """
+        status = tier.status()
+        assert not status.installed
+        assert not any(status.flags().values())
+        for kind in tier.KINDS:
+            assert status[kind].reason == "not registered"
+
+    def test_the_switch_still_blanks_a_registry_that_has_a_provider(self, stub_tier):
+        """With a provider registered, ``absent`` takes it out and puts it back."""
+        assert tier.status().installed, "the stand-in should fill all five kinds"
         with tier.absent():
             inside = tier.status()
             assert not inside.installed
@@ -126,11 +142,19 @@ class TestFeatureEdgesFallBackToTheLattice:
         assert degraded["sharp"], "the lattice classifier still finds the creases"
         assert degraded["wire"], "and the wire layer is the public DC pass"
 
-    def test_the_graph_layer_is_what_fills_it_when_the_kind_is_there(self):
+    def test_the_graph_layer_is_what_fills_it_when_the_kind_is_there(self, stub_tier):
+        """A registered ``feature_edges`` provider is what the overlay draws.
+
+        The stand-in returns one segment, which is not geometry anyone would
+        want — what is being pinned is that the overlay *asks the kind* and
+        labels the answer ``"graph"``, so an installed diff-brep is reached
+        without the viewer knowing its name.
+        """
         from cadjoint.viewer._edge_overlay import _mesh_edge_payload
 
-        scene = plate()
-        assert _mesh_edge_payload(scene)["edges"] == "graph"
+        payload = _mesh_edge_payload(plate())
+        assert payload["edges"] == "graph"
+        assert payload["sharp"], "the kind's curves are what the sharp layer carries"
 
     def test_the_lattice_layer_is_geometry_not_an_empty_list(self):
         """A silently empty sharp layer would look like a working fallback."""
@@ -167,23 +191,29 @@ class TestStepExportFallsBackToFaceted:
         )
 
     def test_without_the_tier_the_file_is_faceted_and_the_report_says_why(self, tmp_path):
-        with tier.absent():
-            result = self._export(tmp_path)
+        result = self._export(tmp_path)
         assert result["ok"] is True, result
         assert result["report"]["path"] == "mesh"
         assert result["report"]["tier"] == tier.message(PluginKind.STEP_EXPORT.value)
         assert (tmp_path / "out.step").read_text().startswith("ISO-10303-21;")
 
-    def test_with_the_tier_the_analytic_writer_takes_it_and_says_nothing(self, tmp_path):
+    def test_with_the_tier_the_kind_takes_it_and_the_report_says_nothing(self, tmp_path, stub_tier):
+        """A registered ``step_export`` provider writes the file instead.
+
+        The exporter hands the kind the scene and a path and reports which
+        writer produced the file.  What the private writer *puts* in it —
+        analytic ``PLANE`` and ``CYLINDRICAL_SURFACE`` entities rather than
+        thousands of facets — is diff-brep's own test; this is the handover.
+        """
         result = self._export(tmp_path)
         assert result["ok"] is True, result
         assert result["report"]["path"] == "brep"
         assert "tier" not in result["report"]
+        assert (tmp_path / "out.step").read_text().startswith("ISO-10303-21;")
 
     def test_the_faceted_request_never_mentions_the_tier(self, tmp_path):
         """``analytic=False`` asks for the public writer; nothing is missing."""
-        with tier.absent():
-            result = self._export(tmp_path, analytic=False)
+        result = self._export(tmp_path, analytic=False)
         assert result["report"]["path"] == "mesh"
         assert "tier" not in result["report"]
 
@@ -195,6 +225,11 @@ class TestTheCompilePayloadCarriesTheTier:
     """The viewer is told, rather than left to guess from an empty layer."""
 
     def test_the_flags_are_one_boolean_per_kind(self):
+        from cadjoint.viewer._compile_worker import _tier_flags
+
+        assert _tier_flags() == dict.fromkeys(tier.KINDS, False)
+
+    def test_the_flags_go_true_when_a_provider_is_registered(self, stub_tier):
         from cadjoint.viewer._compile_worker import _tier_flags
 
         assert _tier_flags() == dict.fromkeys(tier.KINDS, True)
@@ -271,13 +306,17 @@ class TestAGmshMeshIsFrozenGeometry:
 
     def test_inspection_reports_the_frozen_geometry(self, gmsh_mesh):
         declared, _built = gmsh_mesh
-        with tier.absent():
-            report = declared.inspect(plate())
-            assert report["mesher"] == "gmsh"
-            assert report["frozen_geometry"] is True
-            assert declared.describe()["frozen_geometry"] is True
-        # With the node map filled it is not frozen at all.
+        report = declared.inspect(plate())
+        assert report["mesher"] == "gmsh"
+        assert report["frozen_geometry"] is True
+        assert declared.describe()["frozen_geometry"] is True
+
+    def test_the_node_map_kind_is_what_unfreezes_it(self, gmsh_mesh, stub_tier):
+        """``frozen_geometry`` reads the registry, not the mesher."""
+        declared, _built = gmsh_mesh
         assert declared.frozen_geometry is False
+        with tier.absent():
+            assert declared.frozen_geometry is True
 
     def test_vtk_export_works_on_a_frozen_mesh(self, gmsh_mesh, tmp_path):
         import meshio
@@ -299,11 +338,23 @@ class TestAGmshMeshIsFrozenGeometry:
             conductivity=1.0,
             bcs=[Dirichlet(Nodes.side("-x"), 0.0), Dirichlet(Nodes.side("+x"), 100.0)],
         )
-        with tier.absent(), pytest.raises(tier.TierUnavailable) as caught:
+        with pytest.raises(tier.TierUnavailable) as caught:
             Optimization(name="nope", study=study, metric="max")
         message = str(caught.value)
         assert "frozen geometry" in message
         assert "mesher='tetgen'" in message
         assert "install diff-brep" in message
-        # And with the kind filled the same declaration is accepted.
+
+    def test_the_same_declaration_is_accepted_once_the_kind_is_filled(self, gmsh_mesh, stub_tier):
+        """The refusal is about the missing kind, not about Gmsh."""
+        from cadjoint.fem import Dirichlet, Nodes, ThermalStudy
+        from cadjoint.optimize import Optimization
+
+        declared, _built = gmsh_mesh
+        study = ThermalStudy(
+            name="thawed",
+            mesh=declared,
+            conductivity=1.0,
+            bcs=[Dirichlet(Nodes.side("-x"), 0.0), Dirichlet(Nodes.side("+x"), 100.0)],
+        )
         Optimization(name="fine", study=study, metric="max")

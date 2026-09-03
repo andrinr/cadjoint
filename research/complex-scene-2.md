@@ -16,7 +16,8 @@ totally-enclosed electric motor, cast in aluminium, with a helical coolant
 passage cast into the wall of its bearing tower. It was chosen over the
 gearbox end-cap because every job it does lands on a *harder* corner than the
 last part did, and because several of them land on the B-rep extraction's
-known failure classes (`research/brep-axioms.md`) **on purpose**.
+known failure classes **on purpose** (the axiom battery, moved to the
+private `diff-brep` repository — see `research/two-tier.md`).
 
 | job | feature | what it tests |
 | --- | --- | --- |

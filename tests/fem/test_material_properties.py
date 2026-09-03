@@ -38,6 +38,7 @@ from cadjoint.fem.properties import (
     total_mass,
 )
 from cadjoint.fem.selection import Nodes
+from cadjoint.fem.simmesh import SimMesh
 from cadjoint.fem.simulate import elastic_solve, thermal_solve
 from cadjoint.fem.study import Dirichlet, ElasticStudy, Fixed, ThermalStudy, Traction
 from cadjoint.materials import aluminium_6061, copper_c11000, steel_1018
@@ -265,6 +266,104 @@ class TestStudyIntegration:
     def test_a_bad_number_is_still_rejected(self):
         with pytest.raises(ValueError, match="out of range"):
             self._study(conductivity=-1.0)
+
+
+class TestTheGeometryAStudyFallsBackOn:
+    """Where ``material_at`` is sampled from when ``solve`` is given no SDF.
+
+    A ``FROM_MATERIAL`` study needs geometry to sample.  Handing it to
+    ``solve(scene)`` is the obvious route; declaring ``domain=`` — on the
+    study's SimMesh, or on a study that declares no SimMesh — is the
+    documented alternative, and the error message offers it by name.  It did
+    not work along the route :class:`~cadjoint.optimize.Optimization` takes:
+    the optimiser builds the mesh once to freeze its topology and then calls
+    ``study.solve(mesh=hex_mesh, points=...)``, so the study saw a bare
+    ``HexMesh``, found no SimMesh attached to it, and refused — telling the
+    author to do the thing the scene had already done.
+    """
+
+    _BCS = (Dirichlet(_HOT_END, 1.0), Dirichlet(_COLD_END, 0.0))
+
+    def _sim_mesh(self, **kwargs):
+        return SimMesh(
+            name="bar-fallback-mesh",
+            resolution=(26, 4, 4),
+            bounds=(-1.3, -0.2, -0.2),
+            size=(3.9, 0.6, 0.6),
+            **kwargs,
+        )
+
+    def _on_mesh(self, **kwargs):
+        return ThermalStudy("bar", bcs=list(self._BCS), mesh=self._sim_mesh(**kwargs))
+
+    def _bare(self, **kwargs):
+        return ThermalStudy("bar", bcs=list(self._BCS), resolution=(26, 4, 4), **kwargs)
+
+    @staticmethod
+    def _temperatures(result):
+        return np.asarray(result.solution.temperature)
+
+    def test_a_prebuilt_mesh_still_finds_the_simmeshs_domain(self, bar_mesh):
+        """The optimiser's call shape: a bare HexMesh and no SDF argument."""
+        scene = _two_material_bar()
+        fell_back = self._on_mesh(domain=scene).solve(mesh=bar_mesh)
+        handed = self._on_mesh().solve(scene, mesh=bar_mesh)
+        assert np.abs(self._temperatures(fell_back) - self._temperatures(handed)).max() < 1e-12
+
+    def test_the_studys_own_domain_is_the_last_resort(self, bar_mesh):
+        """A study that declares no SimMesh keeps its ``domain=`` for this."""
+        scene = _two_material_bar()
+        fell_back = self._bare(domain=scene).solve(mesh=bar_mesh)
+        handed = self._bare().solve(scene, mesh=bar_mesh)
+        assert np.abs(self._temperatures(fell_back) - self._temperatures(handed)).max() < 1e-12
+
+    def test_an_explicit_sdf_still_wins_over_the_fallbacks(self, bar_mesh):
+        """The argument beats what was declared, so a study can be re-aimed."""
+        declared = _two_material_bar(hot=_STIFF, cold=_SOFT)
+        swapped = _two_material_bar(hot=_SOFT, cold=_STIFF)
+        aimed = self._on_mesh(domain=declared).solve(swapped, mesh=bar_mesh)
+        plain = self._on_mesh().solve(swapped, mesh=bar_mesh)
+        assert np.abs(self._temperatures(aimed) - self._temperatures(plain)).max() < 1e-12
+        # And that is genuinely a different answer from the declared domain's.
+        assert (
+            np.abs(
+                self._temperatures(aimed)
+                - self._temperatures(self._on_mesh(domain=declared).solve(mesh=bar_mesh))
+            ).max()
+            > 1e-6
+        )
+
+    def test_a_material_less_callable_falls_through_to_the_declared_domain(self, bar_mesh):
+        """The optimiser's *other* call shape: `solve(functionalized_field)`.
+
+        After the loop, `Optimization` writes the final parameters back onto
+        the scene object and re-solves with the functionalized field — a bare
+        callable that has no `material_at`. It is the same geometry, so the
+        declared domain is the right place to read the materials from.
+        """
+        from cadjoint import extract_parameters, functionalize
+
+        scene = _two_material_bar()
+        free, fixed, _ = extract_parameters(scene)
+        field = functionalize(scene)(free, fixed)
+        assert not hasattr(field, "material_at")
+
+        fell_back = self._on_mesh(domain=scene).solve(field, mesh=bar_mesh)
+        handed = self._on_mesh().solve(scene, mesh=bar_mesh)
+        assert np.abs(self._temperatures(fell_back) - self._temperatures(handed)).max() < 1e-12
+
+    def test_a_material_less_callable_with_nothing_to_fall_back_on_still_says_so(self, bar_mesh):
+        from cadjoint import extract_parameters, functionalize
+
+        scene = _two_material_bar()
+        free, fixed, _ = extract_parameters(scene)
+        field = functionalize(scene)(free, fixed)
+        with pytest.raises(TypeError, match="material_at"):
+            self._on_mesh().solve(field, mesh=bar_mesh)
+
+    def test_a_study_that_names_no_geometry_still_says_so(self, bar_mesh):
+        with pytest.raises(ValueError, match="no SDF to sample"):
+            self._on_mesh().solve(mesh=bar_mesh)
 
 
 class TestElasticStudyIntegration:

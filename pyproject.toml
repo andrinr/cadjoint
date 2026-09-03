@@ -47,9 +47,9 @@ tesseract = [
     "tesseract-core[runtime]; python_version >= '3.11'",
     "tesseract-jax; python_version >= '3.11'",
 ]
-# The Gmsh tet mesher (cadjoint.brep.mesh_gmsh, and the cadjoint_tet_gmsh
-# Tesseract): HXT second-order tets straight from the exact STEP the
-# ownership graph writes, instead of TetGen on a dual-contour quad soup.
+# The Gmsh tet mesher (cadjoint.fem.gmsh, and the cadjoint_tet_gmsh
+# Tesseract): HXT second-order tets sized by the part, from the dual-contour
+# surface as STL, instead of TetGen on a dual-contour quad soup.
 #
 # GPL-2.0-or-later, and an extra for that reason and no other. cadjoint is
 # Apache-2.0; nothing under cadjoint/ imports gmsh at module scope, the

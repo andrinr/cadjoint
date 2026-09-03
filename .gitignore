@@ -45,10 +45,5 @@ _skipped.*
 run_*/
 ui-audit-out/
 
-# The B-rep axiom battery regenerates its per-case renders (`python -m tests.brep.axioms`);
-# only the contact sheet and the measurements are tracked.
-research/brep-axioms/*.png
-!research/brep-axioms/gallery.png
-
 # Benchmark warm-cache directory written by the shader benchmarks.
 cadjoint.cache/

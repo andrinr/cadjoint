@@ -313,23 +313,31 @@ class TestPlugins:
             PluginSpec(name="p", kind="mesher", transport="carrier-pigeon")
 
         assert str(error.value) == (
-            "plugin 'p': transport must be one of local, container, remote (got 'carrier-pigeon')."
+            "plugin 'p': transport must be one of local, container, remote, python "
+            "(got 'carrier-pigeon')."
         )
 
     def test_kinds_are_the_slots_the_pipeline_asks_for(self):
         """Derived from the registry, not restated: a slot the built-ins
         stop filling has to leave the enum with them.
         """
+        from cadjoint import tier
         from cadjoint.plugins.registry import BUILTIN_DEFAULTS, BUILTIN_PACKAGES, KINDS
 
         assert KINDS == values(PluginKind)
-        # Every shipped package fills a slot the enum names, every slot the
-        # enum names has a shipped package, and the defaults choose among
-        # them.  A retired slot (`qef`) or a new one (`tet_mesher`) fails
-        # here the moment the packages and the enum disagree.
-        assert {kind for kind, _ in BUILTIN_PACKAGES.values()} == set(KINDS)
+        shipped = {kind for kind, _ in BUILTIN_PACKAGES.values()}
+        # Every shipped package fills a slot the enum names, and the defaults
+        # choose among the packages.  A retired slot (`qef`) or a new one
+        # (`tet_mesher`) fails here the moment the two disagree.
+        assert shipped <= set(KINDS)
         assert set(BUILTIN_DEFAULTS) <= set(KINDS)
         assert set(BUILTIN_DEFAULTS.values()) <= set(BUILTIN_PACKAGES)
+        # The slots with no shipped package are exactly the private tier's:
+        # they are discovered from an installed distribution, never bundled
+        # (``research/two-tier.md`` §2.3).  A new public kind that forgets its
+        # package lands here rather than silently resolving to nothing.
+        assert set(KINDS) - shipped == set(tier.KINDS)
+        assert set(BUILTIN_DEFAULTS).isdisjoint(tier.KINDS)
 
     def test_a_plugin_may_declare_a_kind_cadjoint_never_heard_of(self, tmp_path):
         """``PluginSpec.kind`` is open on purpose: it comes from config."""

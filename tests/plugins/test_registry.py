@@ -14,7 +14,6 @@ import pytest
 from cadjoint.plugins import (
     BUILTIN_DEFAULTS,
     BUILTIN_PACKAGES,
-    BUILTIN_PYTHON,
     ENTRY_POINT_GROUP,
     PluginConfigError,
     PluginRegistry,
@@ -38,21 +37,21 @@ class TestBuiltinDiscovery:
             assert spec.api_path is not None and spec.api_path.is_file()
             assert spec.kind == BUILTIN_PACKAGES[name][0]
 
-    def test_the_in_tree_providers_are_registered_as_python_plugins(self):
-        """While ``cadjoint.brep`` is here it fills the private tier's kinds.
+    def test_the_shipped_packages_are_all_there_is(self):
+        """Nothing in this checkout provides the private tier's kinds.
 
-        Temporary (``research/two-tier.md`` D12): the module goes to
-        diff-brep, ``find_spec`` stops finding it, and these specs vanish
-        without a line of the registry changing.
+        The five in-process kinds are discovered, never bundled: an
+        installed ``diff-brep`` registers them through the
+        ``cadjoint.plugins`` entry-point group, and with it absent the
+        registry simply has no plugin of those kinds
+        (``research/two-tier.md`` §5 step 4).
         """
+        import cadjoint.tier as tier
+
         specs = builtin_specs()
-        assert set(specs) == set(BUILTIN_PACKAGES) | set(BUILTIN_PYTHON)
-        for name, (kind, target) in BUILTIN_PYTHON.items():
-            spec = specs[name]
-            assert spec.transport == "python"
-            assert spec.kind == kind
-            assert spec.object == target
-            assert spec.api_path is None
+        assert set(specs) == set(BUILTIN_PACKAGES)
+        assert {spec.kind for spec in specs.values()}.isdisjoint(tier.KINDS)
+        assert set(BUILTIN_DEFAULTS).isdisjoint(tier.KINDS)
 
     def test_versions_come_from_the_packages_not_from_python(self):
         """``tesseract_config.yaml`` is the single source of a version."""

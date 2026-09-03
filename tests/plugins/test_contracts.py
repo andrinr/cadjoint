@@ -5,12 +5,13 @@
 from the public side alone — no ``import diff_brep`` anywhere, ever.  Three
 claims are worth a test.
 
-**Every kind has a contract, and the in-tree provider satisfies it.**  While
-``cadjoint.brep`` is still here it fills all five kinds through the
-``python`` transport (``research/two-tier.md`` D12), which makes it the
-stand-in for diff-brep: if :class:`~cadjoint.plugins.PythonPlugin` can bind
-it, resolve the contract's method and report its capabilities, then the
-seam is the interface and not the implementation.
+**Every kind has a contract, and a provider that satisfies it is bound.**
+Nothing in this repository fills these five kinds, so the provider here is
+``tests/plugins/stubs.py``, which computes nothing: if
+:class:`~cadjoint.plugins.PythonPlugin` can import it, resolve the
+contract's method and report its capabilities, then the seam is the
+interface and not the implementation, and an installed diff-brep is bound
+by exactly the same path.
 
 **The payloads round-trip.**  :class:`~cadjoint.plugins.OwnedNodes` is the
 one record that crosses in both directions — public
@@ -33,7 +34,6 @@ import pytest
 from cadjoint import tier
 from cadjoint.enums import PluginKind, PluginTransport
 from cadjoint.plugins import (
-    BUILTIN_PYTHON,
     CONTRACT_VERSION,
     EdgeSet,
     OwnedNodes,
@@ -107,8 +107,16 @@ class TestEveryKindIsUnderContract:
         assert contracts.payload_types(PluginKind.TET_MESHER.value) == ({}, {})
 
 
-class TestTheInTreeProviderSatisfiesEveryContract:
-    """``cadjoint.brep`` stands in for diff-brep until the split (D12)."""
+@pytest.mark.usefixtures("stub_tier")
+class TestAProviderSatisfiesEveryContract:
+    """The seam is the interface, not the implementation.
+
+    Nothing in this repository fills these kinds — that is the whole point
+    of the split — so the provider here is a stand-in that computes nothing.
+    If the registry can import it, bind the contract's method and report its
+    capabilities, then an installed ``diff-brep`` is bound the same way, and
+    the only thing this repository has to get right is the interface.
+    """
 
     @pytest.mark.parametrize("kind", tier.KINDS)
     def test_the_registered_object_satisfies_the_protocol(self, kind):
@@ -143,8 +151,21 @@ class TestTheInTreeProviderSatisfiesEveryContract:
         with pytest.raises(ValueError, match="carries no derivative"):
             edges.vjp({}, ["scene"], ["result"], {"result": None})
 
-    def test_the_registry_files_them_under_the_kinds_the_tier_asks_for(self):
-        assert {kind for kind, _target in BUILTIN_PYTHON.values()} == set(tier.KINDS)
+    def test_the_registry_files_them_under_the_kinds_the_tier_asks_for(self, stub_tier):
+        assert set(stub_tier) == set(tier.KINDS)
+        for kind in tier.KINDS:
+            assert plugin_for_kind(kind).spec.kind == kind
+
+    def test_nothing_in_this_repository_fills_them_on_its_own(self):
+        """Without a provider registered, all five kinds are simply absent.
+
+        The registry ships ``local`` specs for the Tesseract packages in
+        this checkout and nothing else; the private tier is discovered, never
+        bundled (``research/two-tier.md`` §5 step 4).
+        """
+        from cadjoint.plugins import builtin_specs
+
+        assert {spec.kind for spec in builtin_specs().values()}.isdisjoint(tier.KINDS)
 
 
 class TestTheImportIsChecked:
@@ -187,7 +208,7 @@ class TestTheImportIsChecked:
             name="bad",
             kind=PluginKind.BREP.value,
             transport=PluginTransport.PYTHON,
-            object="cadjoint.brep.plugins",
+            object="tests.plugins.stubs",
         )
         with pytest.raises(PluginConfigError, match="module:attribute"):
             assert PythonPlugin(spec).component

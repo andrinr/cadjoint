@@ -5,7 +5,8 @@ with a helical coolant passage cast into the wall of its bearing tower. It
 was chosen over the gearbox end-cap (``scenes/end_cap.py``) because every job
 it does lands on a *harder* corner of the modelling language than the last
 part did, and several of them land on the B-rep extraction's known failure
-classes on purpose (``research/brep-axioms.md``):
+classes on purpose (the axiom battery, now in the private diff-brep
+    repository; see ``research/two-tier.md``):
 
   * **cool the bearing.** A helical channel — a ``twist``-ed extrusion of a
     small circle drawn off the tower axis — fed and drained by two bores that
@@ -486,7 +487,7 @@ drain_bore = Solid.cylinder(
 # projects a nearby point onto the zero set and takes the field's gradient
 # there. That makes the pad's placement differentiable in the tower's own
 # parameters, and it makes the pad a plane meeting a cylinder tangentially:
-# a fourth deliberate visit to `research/brep-axioms.md`.
+# a fourth deliberate visit to the axiom battery's failure classes.
 _plate_angle = math.radians(337.5)
 plate_plane = SketchPlane.tangent(
     tower, near=[1.0 * math.cos(_plate_angle), 1.0 * math.sin(_plate_angle), 0.62]
