@@ -23,6 +23,7 @@ compilation cache instead of paying XLA for the whole scene.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import subprocess
@@ -59,9 +60,26 @@ _MODE_NOUNS = {
 
 
 def _run_worker(
-    source: str, mode: str, timeout: float, extra: dict[str, Any] | None = None
+    source: str,
+    mode: str,
+    timeout: float,
+    extra: dict[str, Any] | None = None,
+    *,
+    nice: int = 0,
 ) -> dict[str, Any]:
-    """Run one compile-worker request in a disposable child process."""
+    """Run one compile-worker request in a disposable child process.
+
+    Args:
+        source: The program to run.
+        mode: The worker mode (``compile``, ``mesh``, ...).
+        timeout: Seconds before the child is killed.
+        extra: Additional request fields.
+        nice: Scheduling penalty for the child, 0 for a request the user is
+            waiting on.  Speculative work passes a positive value so a real
+            request wins the core: a warm-up and a compile otherwise arrive
+            as two processes each asking for a full core, and the user waits
+            behind work nobody asked for.
+    """
     if not isinstance(source, str):
         return {"ok": False, "error": "Source must be a string."}
     if exceeds_source_limit(source):
@@ -74,6 +92,7 @@ def _run_worker(
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
+        preexec_fn=(lambda: os.nice(nice)) if nice and os.name == "posix" else None,  # noqa: PLW1509
     )
     # Hand the child to the job registry before waiting on it: that is what
     # makes a running request cancellable and its CPU/RSS observable.  Outside
@@ -113,6 +132,15 @@ WARM_START_ENV = "CADJOINT_WARM_START"
 
 _WARM_STARTED = threading.Event()
 
+#: Programs already warmed in this process, by source hash, so opening the
+#: same scene twice costs nothing the second time.
+_WARMED: set[str] = set()
+_WARM_LOCK = threading.Lock()
+
+#: How far below a request the warm-up runs.  Speculative work should never
+#: take a core from work the user is waiting on.
+_WARM_NICE = 10
+
 
 def _warm_start_enabled() -> bool:
     """Whether a server may warm the compilation cache at startup.
@@ -145,49 +173,73 @@ def warm_start(source: str | None = None) -> bool:
     but a logged-nowhere failure.  See :func:`_warm_start_enabled` for the
     ``CADJOINT_WARM_START`` override and the pytest default.
 
+    Only the scene named is warmed, and each distinct program at most once
+    per process.  It used to warm every file under the scenes directory on
+    the theory that opening one from the browser should be warm too; that
+    was cheap while the scenes were small and became a real cost the moment
+    a deliberately enormous one landed there, because the warm-up is a
+    serial queue of full worker processes and the user's own first compile
+    waits behind it.  Scenes other than the one the editor opens with are
+    warmed when they are actually opened (:func:`warm_scene`).
+
     Args:
-        source: One program to warm on. By default the playground's example
-            scene first (what the editor opens with) and then every other
-            scene under the scenes directory.
+        source: The program to warm on. Defaults to the playground's example
+            scene, which is what the editor opens with.
 
     Returns:
         Whether a warm-up thread was started.
     """
-    if not _warm_start_enabled() or _WARM_STARTED.is_set():
-        return False
-    _WARM_STARTED.set()
-    sources: list[str]
     if source is None:
         from cadjoint.viewer._example_scene import EXAMPLE_SOURCE
 
-        # The example first — it is what the editor opens with — then every
-        # other shipped scene, so opening one from the browser is warm too.
-        sources = [EXAMPLE_SOURCE]
-        try:
-            from cadjoint.viewer._scenes import scenes_root
+        source = EXAMPLE_SOURCE
+    return _warm(source)
 
-            for path in sorted(scenes_root().glob("*.py")):
-                text = path.read_text()
-                if text != EXAMPLE_SOURCE:
-                    sources.append(text)
-        except Exception:  # noqa: BLE001 - no scenes directory is not an error
-            pass
-    else:
-        sources = [source]
+
+def warm_scene(source: str) -> bool:
+    """Warm the cache for a scene the user has just opened.
+
+    The startup warm-up covers the editor's opening scene only, so opening
+    any other one meets a cold cache for whatever it does not share.  This
+    is the same background priming, addressed at the program in front of
+    the user, and it is a no-op for one already warmed in this process.
+
+    Args:
+        source: The program that was opened.
+
+    Returns:
+        Whether a warm-up thread was started.
+    """
+    return _warm(source)
+
+
+def _warm(source: str) -> bool:
+    """Prime one program on a daemon thread, at most once per process."""
+    if not _warm_start_enabled():
+        return False
+    key = hashlib.sha256(source.encode()).hexdigest()
+    with _WARM_LOCK:
+        if key in _WARMED:
+            return False
+        _WARMED.add(key)
+    _WARM_STARTED.set()
 
     def prime() -> None:
         # All under the mesh budget, not their own: the point of the warm-up
         # is the cold path, where even `compile` can outgrow the edit
         # round-trip budget it is held to in a request.
-        for text in sources:
-            for mode in ("compile", "mesh"):
-                try:
-                    # Registered as `warmup` jobs so the process monitor can
-                    # say why workers are burning CPU right after launch.
-                    with REGISTRY.track("warmup", source=text, fields={"mode": mode}) as job:
-                        REGISTRY.finish(job, _run_worker(text, mode, MESH_TIMEOUT_SECONDS))
-                except Exception:  # noqa: BLE001 - a cold cache is the only cost of failing
-                    return
+        for mode in ("compile", "mesh"):
+            try:
+                # Registered as `warmup` jobs so the process monitor can
+                # say why workers are burning CPU right after launch, and
+                # niced so a request the user is waiting on wins the core.
+                with REGISTRY.track("warmup", source=source, fields={"mode": mode}) as job:
+                    REGISTRY.finish(
+                        job,
+                        _run_worker(source, mode, MESH_TIMEOUT_SECONDS, nice=_WARM_NICE),
+                    )
+            except Exception:  # noqa: BLE001 - a cold cache is the only cost of failing
+                return
 
     threading.Thread(target=prime, name="cadjoint-compile-warmup", daemon=True).start()
     return True

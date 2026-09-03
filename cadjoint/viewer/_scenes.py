@@ -322,6 +322,14 @@ def load_scene(request: dict[str, Any]) -> dict[str, Any]:
         source = path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
         return {"ok": False, "error": f"Could not read {name!r}."}
+    # Prime the cache for what the user just opened.  The startup warm-up
+    # covers the editor's opening scene only, so this is where every other
+    # one earns its warm cache: at the moment it is actually wanted, rather
+    # than by warming the whole directory at launch.  Imported here because
+    # the worker client reads this module.
+    from cadjoint.viewer._worker_client import warm_scene
+
+    warm_scene(source)
     return {"ok": True, "name": name, "source": source}
 
 

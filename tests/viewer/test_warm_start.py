@@ -4,9 +4,10 @@
 editor opens with, on a daemon thread, so the first real request meets a
 warm on-disk XLA cache instead of paying 45-53 s for a cold one.  What
 these tests pin down is everything around that: that it never blocks the
-caller, that it runs at most once, that it asks for exactly those two
-modes on exactly that source, and that a test run does not silently spawn
-two worker processes per server it creates.
+caller, that it runs at most once *per program*, that it asks for exactly
+those two modes on exactly that source and no other scene, that it yields
+the core to a request the user is waiting on, and that a test run does not
+silently spawn two worker processes per server it creates.
 """
 
 from __future__ import annotations
@@ -24,6 +25,7 @@ from cadjoint.viewer._worker_client import WARM_START_ENV, _warm_start_enabled, 
 def unwarmed(monkeypatch):
     """A process that has not warmed yet, and forgets it afterwards."""
     monkeypatch.setattr(_worker_client, "_WARM_STARTED", threading.Event())
+    monkeypatch.setattr(_worker_client, "_WARMED", set())
 
 
 @pytest.fixture
@@ -31,7 +33,7 @@ def recorded(monkeypatch):
     """Record ``_run_worker`` calls instead of spawning worker processes."""
     calls: list[tuple[str, str, float]] = []
 
-    def fake(source, mode, timeout, extra=None):
+    def fake(source, mode, timeout, extra=None, *, nice=0):
         calls.append((source, mode, timeout))
         return {"ok": True}
 
@@ -94,20 +96,12 @@ class TestWarmStart:
         assert started.wait(1.0), "no warm-up thread was started"
         started.thread.join(timeout=60)  # type: ignore[attr-defined]
 
-        # The example scene is warmed first, then every other shipped scene,
-        # each as one compile and one mesh.
-        from cadjoint.viewer._scenes import scenes_root
-
-        others = [
-            path.read_text()
-            for path in sorted(scenes_root().glob("*.py"))
-            if path.read_text() != EXAMPLE_SOURCE
-        ]
-        assert [mode for _source, mode, _timeout in recorded] == ["compile", "mesh"] * (
-            1 + len(others)
-        )
-        assert [source for source, _mode, _timeout in recorded][:2] == [EXAMPLE_SOURCE] * 2
-        assert {source for source, _mode, _timeout in recorded} == {EXAMPLE_SOURCE, *others}
+        # Only the scene the editor opens with, as one compile and one mesh.
+        # Warming the whole scenes directory here is what made a user's first
+        # compile queue behind work nobody asked for; the others are warmed
+        # when they are opened.
+        assert [mode for _source, mode, _timeout in recorded] == ["compile", "mesh"]
+        assert [source for source, _mode, _timeout in recorded] == [EXAMPLE_SOURCE] * 2
         # Both run under the mesh budget: the warm-up exists for the cold
         # path, where even a compile can outgrow the edit round-trip budget.
         assert {timeout for _s, _m, timeout in recorded} == {_worker_client.MESH_TIMEOUT_SECONDS}
@@ -141,3 +135,75 @@ class TestWarmStart:
             assert warm_start() is True
         finally:
             release.set()
+
+
+class TestItYieldsToTheUser:
+    """The warm-up is speculative, so it must never take a core from a request."""
+
+    def test_the_warm_up_child_runs_niced(self, unwarmed, monkeypatch):
+        monkeypatch.setenv(WARM_START_ENV, "1")
+        seen: list[int] = []
+
+        def record(source, mode, timeout, extra=None, *, nice=0):
+            seen.append(nice)
+            return {"ok": True}
+
+        monkeypatch.setattr(_worker_client, "_run_worker", record)
+        threads: list[threading.Thread] = []
+        real_thread = threading.Thread
+        monkeypatch.setattr(
+            _worker_client.threading,
+            "Thread",
+            lambda *a, **k: threads.append(real_thread(*a, **k)) or threads[-1],
+        )
+        assert warm_start("scene = None") is True
+        for thread in threads:
+            thread.join(timeout=60)
+        assert seen == [_worker_client._WARM_NICE] * 2
+        assert _worker_client._WARM_NICE > 0, "a warm-up must rank below a request"
+
+    def test_a_request_is_not_niced(self, monkeypatch):
+        """The same launcher runs a user's compile at ordinary priority."""
+        import inspect
+
+        signature = inspect.signature(_worker_client._run_worker)
+        assert signature.parameters["nice"].default == 0
+
+
+class TestEachSceneWarmsWhenItIsOpened:
+    """Scenes other than the editor's own are warmed on open, not at launch."""
+
+    def test_opening_a_scene_warms_it_once(self, unwarmed, recorded, monkeypatch, tmp_path):
+        monkeypatch.setenv(WARM_START_ENV, "1")
+        (tmp_path / "widget.py").write_text("scene = None  # widget\n")
+        monkeypatch.setenv("CADJOINT_SCENES_DIR", str(tmp_path))
+        threads: list[threading.Thread] = []
+        real_thread = threading.Thread
+        monkeypatch.setattr(
+            _worker_client.threading,
+            "Thread",
+            lambda *a, **k: threads.append(real_thread(*a, **k)) or threads[-1],
+        )
+        from cadjoint.viewer._scenes import load_scene
+
+        assert load_scene({"name": "widget.py"})["ok"]
+        assert load_scene({"name": "widget.py"})["ok"], "a second open must not warm again"
+        for thread in threads:
+            thread.join(timeout=60)
+        assert [source for source, _mode, _timeout in recorded] == ["scene = None  # widget\n"] * 2
+
+    def test_warming_is_per_program_not_per_process(self, unwarmed, recorded, monkeypatch):
+        monkeypatch.setenv(WARM_START_ENV, "1")
+        threads: list[threading.Thread] = []
+        real_thread = threading.Thread
+        monkeypatch.setattr(
+            _worker_client.threading,
+            "Thread",
+            lambda *a, **k: threads.append(real_thread(*a, **k)) or threads[-1],
+        )
+        assert _worker_client.warm_scene("scene = 1") is True
+        assert _worker_client.warm_scene("scene = 1") is False
+        assert _worker_client.warm_scene("scene = 2") is True
+        for thread in threads:
+            thread.join(timeout=60)
+        assert {source for source, _mode, _timeout in recorded} == {"scene = 1", "scene = 2"}
