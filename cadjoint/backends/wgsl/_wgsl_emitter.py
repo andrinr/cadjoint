@@ -123,11 +123,27 @@ _WGSL_BASE = {
 }
 
 
+#: Why a 64-bit value reaches a shader at all.  WGSL has no 64-bit numeric
+#: type, so this is never a matter of adding a row to the table above: the
+#: value has to arrive narrower.  In practice it arrives wide for one reason,
+#: and the message says so because the traceback alone sends the reader into
+#: the emitter, which is the one place the cause is *not*.
+_X64_HINT = (
+    " — WGSL has no 64-bit numeric type. This usually means JAX x64 is enabled"
+    " process-wide (`jax.config.update('jax_enable_x64', True)`), which makes"
+    " every array float64. Enable it for the solve that needs it and restore"
+    " it afterwards, the way `cadjoint.fem.backends` does, rather than at"
+    " import: a scene that turns it on cannot be opened in the viewer."
+)
+
+
 def _wgsl_base(dtype) -> str:
     try:
         return _WGSL_BASE[np.dtype(dtype).type]
     except KeyError as exc:
-        raise ValueError(f"WGSL does not support dtype {np.dtype(dtype)}") from exc
+        resolved = np.dtype(dtype)
+        hint = _X64_HINT if resolved.itemsize >= 8 and resolved.kind in "fc" else ""
+        raise ValueError(f"WGSL does not support dtype {resolved}{hint}") from exc
 
 
 def wgsl_type(shape, dtype) -> str:

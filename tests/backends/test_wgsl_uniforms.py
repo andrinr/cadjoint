@@ -198,9 +198,9 @@ def test_shipped_scenes_stay_inside_the_wgsl_parameter_limit(stem):
     """The scenes that broke this, at their real size."""
     program = compile_scene_with_uniforms(_shipped_scene(stem), scope="all")
     worst = max(_function_parameter_counts(program.wgsl).values())
-    assert (
-        worst <= MAX_WGSL_FUNCTION_PARAMETERS
-    ), f"{stem}: {len(program.parameters)} parameters produced a {worst}-parameter function"
+    assert worst <= MAX_WGSL_FUNCTION_PARAMETERS, (
+        f"{stem}: {len(program.parameters)} parameters produced a {worst}-parameter function"
+    )
 
 
 def test_the_payload_form_of_a_program_is_strict_json():
@@ -337,3 +337,43 @@ def test_the_free_scope_reads_only_its_own_slots():
     assert max(indices) <= last
     assert program.nan_offset == len(program.parameters) * PARAMETER_SLOT_BYTES
     assert program.cull_margin_offset == last * PARAMETER_SLOT_BYTES
+
+
+class TestASixtyFourBitValueIsRefusedWithItsCause:
+    """WGSL has no 64-bit numeric type, and the reason one arrives is knowable.
+
+    A scene that enables JAX x64 process-wide makes every array float64, and
+    the emitter is the first thing to notice — but it is the one place the
+    cause is *not*, so a bare "unsupported dtype" sends the reader looking in
+    the wrong file. `scenes/duct_sink.py` did exactly this and could not be
+    opened in the viewer at all.
+    """
+
+    def test_a_float64_names_x64_as_the_likely_cause(self):
+        import numpy as np
+        import pytest
+
+        from cadjoint.backends.wgsl._wgsl_emitter import _wgsl_base
+
+        with pytest.raises(ValueError, match="jax_enable_x64") as caught:
+            _wgsl_base(np.float64)
+        assert "no 64-bit numeric type" in str(caught.value)
+
+    def test_a_narrow_dtype_is_refused_without_the_guess(self):
+        """The hint is for width, not for every dtype the table lacks."""
+        import numpy as np
+        import pytest
+
+        from cadjoint.backends.wgsl._wgsl_emitter import _wgsl_base
+
+        with pytest.raises(ValueError) as caught:
+            _wgsl_base(np.int8)
+        assert "jax_enable_x64" not in str(caught.value)
+
+    def test_the_supported_dtypes_still_resolve(self):
+        import numpy as np
+
+        from cadjoint.backends.wgsl._wgsl_emitter import _wgsl_base
+
+        assert _wgsl_base(np.float32) == "f32"
+        assert _wgsl_base(np.int32) == "i32"
