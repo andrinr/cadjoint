@@ -34,6 +34,7 @@ import {
   type Vec3,
 } from "../src/viewer/navCube";
 import { octant } from "../src/viewer/graticule";
+import { PITCH_LIMIT } from "../src/components/viewer/camera";
 
 /** The camera offset the app builds from a yaw/pitch, in a Z-up world. */
 const offsetOf = (yaw: number, pitch: number): [number, number, number] => [
@@ -478,3 +479,61 @@ const values = (camera: { yaw: number; pitch: number }): [number, number] => [
   camera.yaw,
   camera.pitch,
 ];
+
+describe("the quarter turns at the top and bottom of the orbit", () => {
+  // The orbit clamps pitch at PITCH_LIMIT, so that angle — not a pole the
+  // camera can never reach — is where a yaw stops turning anything visible.
+  // The old test for this asked |sin pitch| > 0.999, which a drag cannot
+  // satisfy, so every hand-orbited near-top view took the wrong branch and
+  // its sideways control span in place.
+  const NEAR_TOP = PITCH_LIMIT;
+  const NEAR_BOTTOM = -PITCH_LIMIT;
+
+  const viewDirection = (yaw: number, pitch: number): [number, number, number] => {
+    const cp = Math.cos(pitch);
+    return [-cp * Math.sin(yaw), cp * Math.cos(yaw), -Math.sin(pitch)];
+  };
+  const angleBetween = (a: number[], b: number[]) =>
+    Math.acos(Math.max(-1, Math.min(1, a[0] * b[0] + a[1] * b[1] + a[2] * b[2])));
+
+  it.each([
+    ["azimuth", 1],
+    ["azimuth", -1],
+    ["elevation", 1],
+    ["elevation", -1],
+  ] as const)("moves the view a quarter turn from the clamped top (%s %d)", (axis, turns) => {
+    for (const yaw of [0, 0.7, Math.PI, -2.4]) {
+      const next = stepView(yaw, NEAR_TOP, axis, turns);
+      const swept = angleBetween(
+        viewDirection(yaw, NEAR_TOP),
+        viewDirection(next.yaw, next.pitch),
+      );
+      // A quarter turn, give or take the clamp's own few degrees.
+      expect(swept).toBeGreaterThan(1.0);
+    }
+  });
+
+  it.each([
+    ["azimuth", 1],
+    ["azimuth", -1],
+    ["elevation", 1],
+    ["elevation", -1],
+  ] as const)("moves the view a quarter turn from the clamped bottom (%s %d)", (axis, turns) => {
+    for (const yaw of [0, 1.9, -0.3]) {
+      const next = stepView(yaw, NEAR_BOTTOM, axis, turns);
+      const swept = angleBetween(
+        viewDirection(yaw, NEAR_BOTTOM),
+        viewDirection(next.yaw, next.pitch),
+      );
+      expect(swept).toBeGreaterThan(1.0);
+    }
+  });
+
+  it("still moves from the exact pole a preset sets", () => {
+    for (const pitch of [Math.PI / 2, -Math.PI / 2]) {
+      const next = stepView(0.4, pitch, "azimuth", 1);
+      const swept = angleBetween(viewDirection(0.4, pitch), viewDirection(next.yaw, next.pitch));
+      expect(swept).toBeGreaterThan(1.0);
+    }
+  });
+});

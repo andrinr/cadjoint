@@ -55,14 +55,23 @@ import {
 import { VIEW_PRESETS, sameView } from "../viewer/display";
 import type { Projection } from "../viewer/math";
 import { VIEW_KEYS } from "../shortcuts";
+import { PITCH_LIMIT } from "./viewer/camera";
 import { OrthographicIcon, PerspectiveIcon } from "./icons";
 
 /** SVG units per cube unit. The cube's half-edge is 1. */
 const SCALE = 34;
 /** Half the viewBox. The body diagonal is √3 ≈ 1.73 cube units. */
 const EXTENT = 92;
-/** How far from the centre the four quarter-turn controls sit. */
-const TURN_RADIUS = 78;
+/**
+ * How far from the centre the four quarter-turn controls sit.
+ *
+ * Close enough to read as part of the widget rather than as four marks
+ * floating around it. The cube reaches `SCALE` (34) at a face and about 59
+ * at a corner, but the controls sit on the flanks, where the silhouette is
+ * the face and its chamfer — so 66 clears the cube with room to spare while
+ * a control's hit square (half-side `TURN_HIT`) still stops short of it.
+ */
+const TURN_RADIUS = 66;
 /** Radius of the quarter arc each turn control is drawn with. */
 const TURN_ARC = 12;
 /** Length of each arm of the arrowhead, measured along an axis. */
@@ -73,7 +82,6 @@ const TURN_HIT = 15;
 /** Pointer travel, in pixels, below which the gesture counts as a click. */
 const CLICK_SLOP = 4;
 const ORBIT_SPEED = 0.011;
-const PITCH_LIMIT = 1.45;
 
 const path = (points: [number, number][]): string =>
   points.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(" ");

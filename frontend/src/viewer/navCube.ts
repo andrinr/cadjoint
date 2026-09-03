@@ -27,6 +27,7 @@
  */
 
 import { VIEW_PRESETS, anglesForDirection, viewPresetName } from "./display";
+import { PITCH_LIMIT } from "../components/viewer/camera";
 
 /**
  * How much of each half-edge the chamfer cuts away.
@@ -328,14 +329,24 @@ export type TurnAxis = "azimuth" | "elevation";
 const tidy = (v: Vec3): Vec3 => v.map((value) => (Math.abs(value) < 1e-9 ? 0 : value)) as unknown as Vec3;
 
 /**
- * True where the camera draws itself with the polar convention.
+ * Where a yaw stops turning anything the reader can see.
  *
- * The same threshold as `cameraBasisFor` (and the renderer's `cameraBasis`):
- * inside it the screen basis is built on +Y rather than on world up, so a
- * yaw no longer turns anything the reader can see, and the turn controls have
- * to reason about the screen the reader is looking at rather than the angle.
+ * Two thresholds used to disagree and the gap was a bug. `cameraBasisFor`
+ * switches its reference axis at |sin pitch| > 0.999 — under three degrees
+ * from the pole — but dragging cannot get there: the orbit clamps at
+ * `PITCH_LIMIT`, seven degrees short, so every hand-orbited near-top view
+ * failed this test and its sideways control did a plain yaw, which at that
+ * elevation is indistinguishable from spinning in place. Only a preset,
+ * which sets the angle exactly, could satisfy the old threshold.
+ *
+ * So the clamp *is* the pole for the turn controls: at the limit of what a
+ * drag can reach, the reader is looking down the axis and the control has to
+ * reason about their screen rather than their yaw.
  */
-const atPole = (pitch: number): boolean => Math.abs(Math.sin(pitch)) > 0.999;
+const atPole = (pitch: number): boolean => Math.abs(pitch) >= PITCH_LIMIT - POLE_SLOP;
+
+/** Rounding room, so a pitch that *is* the clamp counts as the clamp. */
+const POLE_SLOP = 1e-6;
 
 /**
  * Turn the camera a quarter turn about one of its own screen axes.
