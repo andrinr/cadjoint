@@ -1,8 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
+  DEPTH_FAR,
+  DEPTH_NEAR,
+  MAX_TRACE_DISTANCE,
   cameraBasis,
   cameraPosition,
+  depthRange,
   intersectPlane,
+  orthoDepthRange,
+  orthoHeightFor,
   planeToWorld,
   projectPoint,
   rayFromPixel,
@@ -338,5 +344,197 @@ describe("plane coordinates", () => {
     const world = planeToWorld(xy, origin, u, v);
     expect(world[1]).toBeCloseTo(hit![1], 5);
     expect(world[2]).toBeCloseTo(hit![2], 5);
+  });
+});
+
+describe("the orthographic depth slab", () => {
+  // The bug this covers: `viewProjection` used the perspective near plane in
+  // both projections. Measured from the camera *position*, which is right when
+  // the eye is a point and wrong when it is not — an orthographic camera still
+  // sits at `distance` in front of its target, so everything nearer the camera
+  // plane than 0.05 was clipped: the whole half of the scene on the camera's
+  // own side of the target.
+  const clipDepth = (view: View, world: Vec3): number => {
+    const clip = transform(viewProjection(view), world);
+    return clip[2] / clip[3];
+  };
+
+  const orbit = (distance: number): View => {
+    const { forward } = cameraBasis(POSITION, TARGET);
+    return {
+      position: [
+        TARGET[0] - forward[0] * distance,
+        TARGET[1] - forward[1] * distance,
+        TARGET[2] - forward[2] * distance,
+      ],
+      target: TARGET,
+      width: WIDTH,
+      height: HEIGHT,
+      projection: "orthographic",
+      orthoHeight: orthoHeightFor(distance),
+    };
+  };
+
+  /** A point `ahead` units in front of the orbit target, along the view axis. */
+  const inFront = (view: View, ahead: number): Vec3 => {
+    const { forward } = cameraBasis(view.position, view.target);
+    return [
+      view.target[0] - forward[0] * ahead,
+      view.target[1] - forward[1] * ahead,
+      view.target[2] - forward[2] * ahead,
+    ];
+  };
+
+  it("hangs the slab about the orbit target, not the camera", () => {
+    for (const distance of [0.4, 1, 4.6, 20, 60]) {
+      const { near, far } = orthoDepthRange(distance);
+      expect(near).toBeLessThan(0);
+      expect(far - near).toBeCloseTo(DEPTH_FAR, 9);
+      // The target is dead centre, so the depth budget is spent evenly on the
+      // half of the world in front of it and the half behind.
+      expect((distance - near) / (far - near)).toBeCloseTo(0.5, 9);
+    }
+  });
+
+  it("keeps geometry between the camera and the target inside the frustum", () => {
+    for (const distance of [0.4, 1, 4.6, 20, 60]) {
+      const view = orbit(distance);
+      // The whole way from the target up to the camera plane, and a frame
+      // beyond it — the case that regressed. Capped at the marcher's reach,
+      // which is where the slab honestly ends: nothing further in front of the
+      // target than that can be drawn, because no primary ray gets there.
+      const ahead0 = distance * 0.5;
+      const ahead1 = distance;
+      const ahead2 = Math.min(distance + orthoHeightFor(distance), MAX_TRACE_DISTANCE);
+      for (const ahead of [ahead0, ahead1, ahead2]) {
+        const depth = clipDepth(view, inFront(view, ahead));
+        expect(depth, `d=${distance} ahead=${ahead}`).toBeGreaterThanOrEqual(-1e-6);
+        expect(depth, `d=${distance} ahead=${ahead}`).toBeLessThanOrEqual(1);
+      }
+    }
+  });
+
+  it("clipped that geometry before, which is what the report was", () => {
+    // The old constants, restated, so the regression cannot come back quietly
+    // as "it always did that".
+    for (const distance of [0.4, 4.6, 60]) {
+      const view = orbit(distance);
+      const front = inFront(view, distance + 0.1);
+      const clip = transform(viewProjection(view, DEPTH_NEAR, DEPTH_FAR), front);
+      expect(clip[2] / clip[3], `d=${distance}`).toBeLessThan(0);
+    }
+  });
+
+  it("still holds every hit the marcher can produce, on either side", () => {
+    for (const distance of [0.4, 4.6, 60]) {
+      const view = orbit(distance);
+      const { forward } = cameraBasis(view.position, view.target);
+      // A primary ray starts on the camera plane and gives up at
+      // MAX_TRACE_DISTANCE, so this is the whole range a hit can be written at.
+      for (const along of [0, MAX_TRACE_DISTANCE * 0.5, MAX_TRACE_DISTANCE]) {
+        const world: Vec3 = [
+          view.position[0] + forward[0] * along,
+          view.position[1] + forward[1] * along,
+          view.position[2] + forward[2] * along,
+        ];
+        const depth = clipDepth(view, world);
+        expect(depth, `d=${distance} t=${along}`).toBeGreaterThanOrEqual(0);
+        expect(depth, `d=${distance} t=${along}`).toBeLessThanOrEqual(1);
+      }
+    }
+  });
+
+  it("stays monotonic and linear in depth, so the depth view still reads", () => {
+    const view = orbit(4.6);
+    const { forward } = cameraBasis(view.position, view.target);
+    const at = (along: number) =>
+      clipDepth(view, [
+        view.position[0] + forward[0] * along,
+        view.position[1] + forward[1] * along,
+        view.position[2] + forward[2] * along,
+      ]);
+    let previous = -Infinity;
+    for (const along of [-90, -10, 0, 4.6, 10, 100]) {
+      const depth = at(along);
+      expect(depth).toBeGreaterThan(previous);
+      previous = depth;
+    }
+    // Equal steps in world depth are equal steps in buffer depth: an
+    // orthographic depth buffer has no 1/z crowding, so its precision is
+    // uniform across the slab rather than piled up against the near plane.
+    expect(at(10) - at(0)).toBeCloseTo(at(20) - at(10), 6);
+  });
+
+  it("leaves the perspective range exactly where it was", () => {
+    const { near, far } = depthRange(VIEW);
+    expect(near).toBe(DEPTH_NEAR);
+    expect(far).toBe(DEPTH_FAR);
+    expect(DEPTH_FAR).toBe(2 * MAX_TRACE_DISTANCE);
+  });
+});
+
+describe("picking across the orthographic camera plane", () => {
+  const ORBIT_DISTANCE = Math.hypot(...subtract(TARGET, POSITION));
+  const ortho: View = {
+    ...VIEW,
+    projection: "orthographic",
+    orthoHeight: orthoHeightFor(ORBIT_DISTANCE),
+  };
+
+  it("still hits a plane that lies in front of the camera plane", () => {
+    // A sketch plane through the target, seen from a camera that is not looking
+    // at it edge-on: half the frame's rays reach it *behind* their own origin,
+    // and rejecting those was how clicks stopped landing on the near half.
+    const ray = rayFromPixel(400, 250, ortho);
+    const behind: Vec3 = [
+      ray.origin[0] + ray.direction[0] * -2,
+      ray.origin[1] + ray.direction[1] * -2,
+      ray.origin[2] + ray.direction[2] * -2,
+    ];
+    const hit = intersectPlane(ray, behind, ray.direction);
+    expect(hit).not.toBeNull();
+    for (let axis = 0; axis < 3; axis++) {
+      expect(hit![axis]).toBeCloseTo(behind[axis], 6);
+    }
+  });
+
+  it("stops at the near plane rather than picking the whole line", () => {
+    const ray = rayFromPixel(400, 250, ortho);
+    expect(ray.tMin).toBeCloseTo(orthoDepthRange(ORBIT_DISTANCE).near, 6);
+    const tooFarBack: Vec3 = [
+      ray.origin[0] + ray.direction[0] * (ray.tMin! - 1),
+      ray.origin[1] + ray.direction[1] * (ray.tMin! - 1),
+      ray.origin[2] + ray.direction[2] * (ray.tMin! - 1),
+    ];
+    expect(intersectPlane(ray, tooFarBack, ray.direction)).toBeNull();
+  });
+
+  it("keeps the perspective ray refusing everything behind the eye", () => {
+    const ray = rayFromPixel(400, 250, VIEW);
+    expect(ray.tMin).toBe(0);
+    const behind: Vec3 = [
+      ray.origin[0] - ray.direction[0],
+      ray.origin[1] - ray.direction[1],
+      ray.origin[2] - ray.direction[2],
+    ];
+    expect(intersectPlane(ray, behind, ray.direction)).toBeNull();
+  });
+
+  it("reports a point behind the orthographic camera plane as visible", () => {
+    const { forward } = cameraBasis(ortho.position, ortho.target);
+    const front: Vec3 = [
+      ortho.position[0] - forward[0] * 3,
+      ortho.position[1] - forward[1] * 3,
+      ortho.position[2] - forward[2] * 3,
+    ];
+    const projected = projectPoint(front, ortho);
+    expect(projected.visible).toBe(true);
+    expect(Number.isFinite(projected.x)).toBe(true);
+    // ...and it lands where the parallel projection says it does: a point on
+    // the view axis is at the centre of the frame whatever its depth.
+    expect(projected.x).toBeCloseTo(WIDTH / 2, 4);
+    expect(projected.y).toBeCloseTo(HEIGHT / 2, 4);
+    // Perspective still refuses it — there the eye really is in the way.
+    expect(projectPoint(front, VIEW).visible).toBe(false);
   });
 });

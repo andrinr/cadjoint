@@ -13,6 +13,7 @@
  *    too strong and it competes with the field it exists to sit behind.
  */
 
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   DIVISIONS,
@@ -23,12 +24,19 @@ import {
   gainOf,
   GRID_ALPHA,
   GRID_FADE,
+  GRID_FLOOR_PREFERENCE,
   GRID_MAJOR_EVERY,
+  GRID_PLANES,
+  GRID_PLANE_BAND,
+  GRID_PLANE_NORMALS,
+  gridPlane,
+  gridPlaneWeights,
   gridSpacing,
   isDetented,
   nearestDetent,
   octant,
   stepDetent,
+  viewDirection,
   viewLabel,
   worldHeightFor,
 } from "../src/viewer/graticule";
@@ -350,5 +358,162 @@ describe("the graticule tones stay furniture", () => {
     for (const tone of GRATICULE_TONES) {
       expect(contrastRatio(hexToRgb(CHROME[tone]), PAPER), tone).toBeLessThan(ink);
     }
+  });
+});
+
+describe("which world plane the grid is ruled on", () => {
+  const preset = (name: string) => VIEW_PRESETS[name];
+  const planeOf = (name: string) => gridPlane(preset(name).yaw, preset(name).pitch);
+
+  it("keeps the floor wherever the floor is worth drawing", () => {
+    // The two views the floor was always right for...
+    expect(planeOf("top")).toBe("XY");
+    expect(planeOf("bottom")).toBe("XY");
+    // ...the corner views, including the one the session opens on, where all
+    // three planes are equally oblique and an unbiased choice would flicker...
+    expect(gridPlane(VIEW_PRESETS.iso.yaw, VIEW_PRESETS.iso.pitch)).toBe("XY");
+    for (const name of [
+      "front-left-top",
+      "front-right-bottom",
+      "back-left-top",
+      "back-right-bottom",
+    ]) {
+      expect(planeOf(name), name).toBe("XY");
+    }
+    // ...and the edge views that are tilted off the ground at all.
+    expect(planeOf("front-top")).toBe("XY");
+    expect(planeOf("right-bottom")).toBe("XY");
+  });
+
+  it("gives the four side views the wall they are facing", () => {
+    // The report: from Front, Back, Left or Right the floor is exactly edge-on
+    // and rules as a single line, so there is no grid in precisely the views
+    // someone squares a measurement up in.
+    expect(planeOf("front")).toBe("XZ");
+    expect(planeOf("back")).toBe("XZ");
+    expect(planeOf("left")).toBe("YZ");
+    expect(planeOf("right")).toBe("YZ");
+  });
+
+  it("takes the wall the camera faces, not just any wall", () => {
+    // A vertical edge view looks into a corner: the two walls are equally
+    // oblique and the choice between them is a coin toss, so the only thing
+    // that must hold is that the ground — the one plane that is useless here —
+    // is not what gets drawn.
+    for (const name of ["front-right", "back-left", "front-left", "back-right"]) {
+      expect(planeOf(name), name).not.toBe("XY");
+    }
+  });
+
+  it("names exactly one plane, and one of the three", () => {
+    for (let yaw = 0; yaw < Math.PI * 2; yaw += 0.05) {
+      for (let pitch = -Math.PI / 2; pitch <= Math.PI / 2; pitch += 0.05) {
+        expect(GRID_PLANES).toContain(gridPlane(yaw, pitch));
+      }
+    }
+  });
+
+  it("hands the floor over at 26.6° in an axis view and 19.5° at the worst azimuth", () => {
+    // Where the crossover lands is the whole content of GRID_FLOOR_PREFERENCE:
+    // 2 · |f·z| against |f·n|, so tan(pitch) = 1/2 straight on and 1/(2√2) into
+    // a corner. Pinned because moving it moves which views keep the ground.
+    const above = 0.02;
+    expect(gridPlane(0, Math.atan(0.5) + above)).toBe("XY");
+    expect(gridPlane(0, Math.atan(0.5) - above)).toBe("XZ");
+    const corner = Math.atan(1 / (2 * Math.SQRT2));
+    expect(gridPlane(Math.PI / 4, corner + above)).toBe("XY");
+    expect(gridPlane(Math.PI / 4, corner - above)).not.toBe("XY");
+  });
+
+  it("dissolves between planes rather than jumping", () => {
+    // The alternative — swapping only on a snapped preset — leaves a camera at
+    // pitch 0 and yaw 20° with an edge-on floor and no grid at all, so the swap
+    // has to be geometric, and a geometric swap can land anywhere. It is
+    // therefore a crossfade: inside the band both planes are up, the weights
+    // always sum to one, and no frame is fainter than its neighbour.
+    const crossover = Math.atan(0.5);
+    const inside = gridPlaneWeights(viewDirection(0, crossover));
+    expect(inside[0]).toBeCloseTo(0.5, 6);
+    expect(inside[1]).toBeCloseTo(0.5, 6);
+    expect(inside[2]).toBeCloseTo(0, 6);
+    for (let pitch = -Math.PI / 2; pitch <= Math.PI / 2; pitch += 0.017) {
+      for (const yaw of [0, 0.4, Math.PI / 4, 1.9]) {
+        const weights = gridPlaneWeights(viewDirection(yaw, pitch));
+        expect(weights.reduce((sum, weight) => sum + weight, 0)).toBeCloseTo(1, 6);
+        for (const weight of weights) expect(weight).toBeGreaterThanOrEqual(0);
+      }
+    }
+  });
+
+  it("is on one plane alone everywhere except a few degrees of crossover", () => {
+    let blended = 0;
+    let samples = 0;
+    for (let yaw = 0; yaw < Math.PI * 2; yaw += 0.01) {
+      for (let pitch = -Math.PI / 2; pitch <= Math.PI / 2; pitch += 0.01) {
+        const weights = gridPlaneWeights(viewDirection(yaw, pitch));
+        samples++;
+        if (Math.max(...weights) < 0.999) blended++;
+      }
+    }
+    // "A grid whose plane is ambiguous is worse than none" — so the ambiguous
+    // set has to be small enough to be a transition rather than a state.
+    expect(blended / samples).toBeLessThan(0.1);
+  });
+
+  it("changes the plane, not the ladder the rest of the viewport is ruled at", () => {
+    // The floor grid is a reference: the slice contours in renderer.ts and the
+    // depth ramp's endpoints are stated at its spacing, and the graticule's own
+    // detent ladder is that spacing. Moving the grid to a wall must not move
+    // any of that, or three readouts start disagreeing about one number.
+    for (const distance of [0.4, 1, 4.6, 20, 60]) {
+      const onFloor = gridSpacing(distance);
+      expect(gridSpacing(distance)).toBe(onFloor);
+      expect(isDetented(onFloor * MM_PER_UNIT)).toBe(true);
+    }
+  });
+});
+
+describe("the grid shader and the readout agree", () => {
+  // One draws the grid and the other names it. The rule lives twice — once in
+  // WGSL because it decides which plane a fragment raycasts, once here because
+  // the readout has to state that plane in type — so the two numbers that
+  // decide it are compared rather than trusted.
+  const wgsl = readFileSync(
+    new URL("../src/viewer/graticule.wgsl", import.meta.url),
+    "utf8",
+  );
+
+  const constant = (name: string): number => {
+    const match = wgsl.match(new RegExp(`const ${name}\\s*:\\s*f32\\s*=\\s*([-0-9.eE]+)`));
+    expect(match, `${name} in graticule.wgsl`).not.toBeNull();
+    return Number(match![1]);
+  };
+
+  it("uses the same floor preference on both sides", () => {
+    expect(constant("FLOOR_PREFERENCE")).toBe(GRID_FLOOR_PREFERENCE);
+  });
+
+  it("uses the same crossover band on both sides", () => {
+    expect(constant("PLANE_BAND")).toBe(GRID_PLANE_BAND);
+  });
+
+  it("scores the planes in the order the readout names them", () => {
+    // `score = vec3(face.z * FLOOR_PREFERENCE, face.y, face.x)` — XY, XZ, YZ,
+    // each keyed on the axis it is normal to.
+    expect(wgsl).toContain("vec3<f32>(face.z * FLOOR_PREFERENCE, face.y, face.x)");
+    expect(GRID_PLANES).toEqual(["XY", "XZ", "YZ"]);
+    expect(GRID_PLANE_NORMALS).toEqual([
+      [0, 0, 1],
+      [0, 1, 0],
+      [1, 0, 0],
+    ]);
+  });
+
+  it("keeps drawing the near half of an orthographic ground plane", () => {
+    // The other half of the report: the fragment rejected every plane point
+    // whose ray parameter was negative. Under perspective that is the sky.
+    // Under orthographic there is no eye, so it was the near third of the
+    // floor, cut off along a hard horizontal line across the viewport.
+    expect(wgsl).toContain("orthographic || along > 0.0");
   });
 });

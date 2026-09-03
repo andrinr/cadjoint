@@ -7,9 +7,12 @@
  * behind a CRT's etched graticule. It was honest but it was inert: pinned to
  * the frame, it never moved with the scene, so it said nothing about where
  * anything was in space. What replaced it is the CAD convention instead: a
- * square grid ruled on the ground plane (z = 0 — the world is Z-up), drawn in
- * projection so it recedes, which is what actually tells you where the floor
- * is and which way you are looking.
+ * square grid ruled on a world coordinate plane — the ground, z = 0, wherever
+ * the ground is worth ruling, since the world is Z-up — drawn in projection so
+ * it recedes, which is what actually tells you where the floor is and which way
+ * you are looking. In the shallow views, where the floor is edge-on and rules
+ * as a single line, the grid moves to the wall the camera faces instead; see
+ * `GRID_FLOOR_PREFERENCE`.
  *
  * The number the readout states is now simply the grid's spacing, on the same
  * 1-2-5 ladder an instrument's scale switch has, chosen so a cell is about one
@@ -23,7 +26,7 @@
  * ladder and the scale derivation are unit tested in `test/graticule.test.ts`.
  */
 
-import { FOV_SCALE, orthoHeightFor, type Projection } from "./math";
+import { FOV_SCALE, orthoHeightFor, type Projection, type Vec3 } from "./math";
 import { sameView, VIEW_PRESETS } from "./display";
 
 /**
@@ -82,6 +85,113 @@ export const GRID_MAJOR_EVERY = 5;
  * distance, measured outward from the orbit target on the plane.
  */
 export const GRID_FADE = { start: 1.6, end: 7 } as const;
+
+/**
+ * The world coordinate plane a grid is ruled on, named the way a CAD user
+ * names one: by the two axes that span it.
+ */
+export type GridPlane = "XY" | "XZ" | "YZ";
+
+/** The three, in the order `gridPlaneWeights` returns them. */
+export const GRID_PLANES: readonly GridPlane[] = ["XY", "XZ", "YZ"];
+
+/** The normal of each, in the same order. `XY` is the floor. */
+export const GRID_PLANE_NORMALS: readonly Vec3[] = [
+  [0, 0, 1],
+  [0, 1, 0],
+  [1, 0, 0],
+];
+
+/**
+ * How much the floor is preferred over a wall, as a multiple of face-on-ness.
+ *
+ * On z = 0 the grid is right in Top and Bottom and useless in Front, Back,
+ * Left and Right, where it is exactly edge-on and draws as a single line —
+ * which is precisely the set of views someone reaches for when they want to
+ * measure something square. So the grid moves to the world plane the camera
+ * most nearly faces, scored by |forward · n|.
+ *
+ * Plain argmax would be wrong, because the floor is not just one of three
+ * planes: it is the model's ground, the plane a sketch defaults to, and the
+ * thing the slice contours and the graticule ladder are ruled against. At the
+ * ISO view all three planes are equally oblique (|f · n| = 1/√3 each) and an
+ * unbiased argmax would flip between them on the first pixel of orbit, at the
+ * app's own default standpoint. Two is the smallest whole preference that
+ * settles it with room to spare: the floor holds down to a pitch of 26.6° in
+ * an axis view and 19.5° at the worst azimuth, so every corner and edge view
+ * keeps the ground and only the shallow views — the ones with no floor worth
+ * drawing — hand it over.
+ */
+export const GRID_FLOOR_PREFERENCE = 2;
+
+/**
+ * Half-width of the crossover, in score units.
+ *
+ * The alternative is to swap only when the camera snaps to a preset, and it is
+ * wrong: a camera at pitch 0 and yaw 20° is on no preset at all, so it would
+ * keep an edge-on floor and show no grid in exactly the situation the swap
+ * exists for. Swapping on the geometry instead means the swap can land
+ * anywhere, so it has to dissolve rather than jump. 0.06 is about three
+ * degrees of orbit either side of the crossover — long enough not to strobe on
+ * a slow drag, short enough that "which plane is this" is never a question you
+ * have time to ask, and the readout answers it anyway.
+ */
+export const GRID_PLANE_BAND = 0.06;
+
+/** Unit view direction for an orbit, matching `cameraPosition` in `math.ts`. */
+export function viewDirection(yaw: number, pitch: number): Vec3 {
+  const cp = Math.cos(pitch);
+  return [-cp * Math.sin(yaw), cp * Math.cos(yaw), -Math.sin(pitch)];
+}
+
+/**
+ * How strongly each of the three world planes is drawn, in `GRID_PLANES` order.
+ *
+ * The weights sum to one, and outside the crossover bands exactly one of them
+ * is one — so the grid is on a single, named plane almost everywhere, and the
+ * few degrees where two are up are a dissolve between them rather than two
+ * grids arguing. Kept in step with `plane_weights` in `graticule.wgsl`, which
+ * is the same arithmetic on the GPU; `test/graticule.test.ts` pins the
+ * behaviour both sides have to show.
+ */
+export function gridPlaneWeights(forward: Vec3): [number, number, number] {
+  const scores: [number, number, number] = [
+    Math.abs(forward[2]) * GRID_FLOOR_PREFERENCE,
+    Math.abs(forward[1]),
+    Math.abs(forward[0]),
+  ];
+  const raw = scores.map((score, index) => {
+    const rival = Math.max(...scores.filter((_, other) => other !== index));
+    return smoothstep(-GRID_PLANE_BAND, GRID_PLANE_BAND, score - rival);
+  });
+  const total = raw.reduce((sum, weight) => sum + weight, 0);
+  if (!(total > 1e-6)) return [1, 0, 0];
+  return raw.map((weight) => weight / total) as [number, number, number];
+}
+
+/** The classic Hermite step, matching WGSL's `smoothstep`. */
+function smoothstep(edge0: number, edge1: number, x: number): number {
+  const t = Math.min(1, Math.max(0, (x - edge0) / (edge1 - edge0)));
+  return t * t * (3 - 2 * t);
+}
+
+/**
+ * The plane the grid is on, for the readout.
+ *
+ * The dominant one, which is what the picture reads as: inside a crossover the
+ * two weights are within a hair of each other and either name is as true as
+ * the other, so the field names the leader rather than hedging. A grid whose
+ * plane is not stated is worse than no grid, which is the whole reason this is
+ * printed at all.
+ */
+export function gridPlane(yaw: number, pitch: number): GridPlane {
+  const weights = gridPlaneWeights(viewDirection(yaw, pitch));
+  let best = 0;
+  for (let index = 1; index < weights.length; index++) {
+    if (weights[index] > weights[best]) best = index;
+  }
+  return GRID_PLANES[best];
+}
 
 /**
  * Closest and furthest the orbit camera may sit from its target.

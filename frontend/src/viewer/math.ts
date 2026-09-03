@@ -22,6 +22,18 @@ export const FOV_SCALE = 1.5;
 export const DEPTH_NEAR = 0.05;
 export const DEPTH_FAR = 200;
 
+/**
+ * How far a primary ray travels before the marcher gives up, in world units.
+ *
+ * Mirrors `MAX_TRACE_DISTANCE` in `cadjoint/viewer/_webgpu.py`, and it is the
+ * only hard bound the viewer has on where a fragment can be: past it a ray
+ * reports a miss, so nothing the scene pass can draw is further than this from
+ * the ray's origin. `DEPTH_FAR` is twice it — the perspective camera's own
+ * margin over the same bound — and `orthoDepthRange` spends that margin
+ * differently.
+ */
+export const MAX_TRACE_DISTANCE = 100;
+
 export type Projection = "perspective" | "orthographic";
 
 /**
@@ -53,6 +65,48 @@ export const orthoHeightFor = (distance: number): number => FOV_SCALE * distance
 /** Viewport height in world units for an orthographic view. */
 function viewOrthoHeight(view: View): number {
   return view.orthoHeight ?? orthoHeightFor(length(subtract(view.target, view.position)));
+}
+
+/** Near and far clip planes, as distances along the view axis from the camera. */
+export interface DepthRange {
+  near: number;
+  far: number;
+}
+
+/**
+ * The depth slab an orthographic view brackets.
+ *
+ * A perspective near plane is a real object: the eye is a point, nothing can be
+ * drawn behind it, and `DEPTH_NEAR` is only "close enough to the eye not to
+ * matter". An orthographic camera has no eye. It sits at `distance` in front of
+ * the orbit target because that is where the orbit put it, not because anything
+ * is projected through it, and the half of the world on the camera's own side
+ * of that plane is exactly as visible as the other half. Measuring the near
+ * plane from the camera therefore throws that half away: at the default framing
+ * everything more than 4.55 units in front of the target was clipped, and
+ * zoomed in to `MIN_DISTANCE` the budget was 0.35 units — a third of the frame.
+ *
+ * So the slab is hung about the *orbit target* instead, half a slab either
+ * side, and its half-depth is `MAX_TRACE_DISTANCE`: the distance at which a
+ * primary ray gives up, and hence the furthest anything the scene pass can draw
+ * ever is from the camera plane, in either direction. Nothing that could be on
+ * screen falls outside it. The slab is `2 × MAX_TRACE_DISTANCE = DEPTH_FAR`
+ * deep — exactly the perspective range, so the depth buffer is no coarser than
+ * it already was, and being linear in distance rather than in 1/distance it is
+ * uniformly finer than the perspective one it replaces.
+ *
+ * `near` comes out negative for every reachable orbit distance, which is legal
+ * and ordinary in a parallel projection: it is the statement that the camera
+ * plane is inside the scene rather than in front of it.
+ */
+export function orthoDepthRange(distance: number): DepthRange {
+  return { near: distance - MAX_TRACE_DISTANCE, far: distance + MAX_TRACE_DISTANCE };
+}
+
+/** The clip planes a view is drawn with, in the projection it is drawn in. */
+export function depthRange(view: View): DepthRange {
+  if (!isOrthographic(view)) return { near: DEPTH_NEAR, far: DEPTH_FAR };
+  return orthoDepthRange(length(subtract(view.target, view.position)));
 }
 
 export interface CameraState {
@@ -140,12 +194,19 @@ export function cameraBasis(position: Vec3, target: Vec3): Basis {
  *
  * Maps world space to WebGPU clip space (z from 0 at the near plane to w at the
  * far plane) such that the resulting screen positions match the shader's rays.
+ *
+ * The clip planes default to `depthRange(view)`, which is the perspective pair
+ * under perspective and a slab about the orbit target under orthographic — the
+ * two projections need different answers and only the view knows which it is.
  */
 export function viewProjection(
   view: View,
-  near = DEPTH_NEAR,
-  far = DEPTH_FAR,
+  nearPlane?: number,
+  farPlane?: number,
 ): Float32Array<ArrayBuffer> {
+  const range = depthRange(view);
+  const near = nearPlane ?? range.near;
+  const far = farPlane ?? range.far;
   const { position } = view;
   const { forward, right, up } = cameraBasis(position, view.target);
   const aspect = view.width / view.height;
@@ -189,7 +250,12 @@ export function projectPoint(world: Vec3, view: View): Projected {
   const { forward, right, up } = cameraBasis(view.position, view.target);
   const delta = subtract(world, view.position);
   const viewDepth = dot(delta, forward);
-  if (viewDepth <= 1e-6) {
+  // Behind the camera plane is off screen only when there is a camera *point*
+  // to be behind. A parallel projection has none: the pixel a point lands in
+  // does not depend on its depth at all, so the sign of that depth cannot make
+  // it invisible, and rejecting it here is how hit testing stopped being able
+  // to click the near half of an orthographic scene.
+  if (!isOrthographic(view) && viewDepth <= 1e-6) {
     return { x: NaN, y: NaN, viewDepth, visible: false };
   }
   const aspect = view.width / view.height;
@@ -209,6 +275,16 @@ export function projectPoint(world: Vec3, view: View): Projected {
 export interface Ray {
   origin: Vec3;
   direction: Vec3;
+  /**
+   * Smallest ray parameter that is still on screen.
+   *
+   * Zero under perspective: the origin is the eye and nothing behind it is
+   * drawn. Negative under orthographic, where the origin is a station on the
+   * camera plane rather than an eye and the ray is visible on both sides of it
+   * — as far back as the near plane, which is where this comes from. Absent
+   * means zero, so a hand-built ray behaves the way one always did.
+   */
+  tMin?: number;
 }
 
 /** Camera ray through a framebuffer pixel coordinate. */
@@ -220,19 +296,28 @@ export function rayFromPixel(x: number, y: number, view: View): Ray {
   if (isOrthographic(view)) {
     const height = viewOrthoHeight(view);
     const offset = add(scale(right, u * height), scale(up, v * height));
-    return { origin: add(view.position, offset), direction: forward };
+    // The origin stays on the camera plane — callers place things along the
+    // ray from it — and the near plane travels with the ray instead, as the
+    // parameter at which it enters the slab `viewProjection` brackets.
+    return {
+      origin: add(view.position, offset),
+      direction: forward,
+      tMin: depthRange(view).near,
+    };
   }
   const direction = normalize(
     add(forward, scale(add(scale(right, u), scale(up, v)), FOV_SCALE)),
   );
-  return { origin: view.position, direction };
+  return { origin: view.position, direction, tMin: 0 };
 }
 
 /**
  * Intersect a ray with an infinite plane.
  *
- * Returns null when the ray is parallel to the plane or would hit it behind the
- * ray origin — both mean "the click missed the sketch".
+ * Returns null when the ray is parallel to the plane or would hit it outside
+ * the visible part of the ray — both mean "the click missed the sketch". The
+ * visible part starts at `ray.tMin`, which is the origin under perspective and
+ * the near plane, behind the origin, under orthographic.
  */
 export function intersectPlane(
   ray: Ray,
@@ -242,7 +327,7 @@ export function intersectPlane(
   const denominator = dot(ray.direction, planeNormal);
   if (Math.abs(denominator) < 1e-6) return null;
   const t = dot(subtract(planeOrigin, ray.origin), planeNormal) / denominator;
-  if (t <= 0) return null;
+  if (t <= (ray.tMin ?? 0)) return null;
   return add(ray.origin, scale(ray.direction, t));
 }
 
