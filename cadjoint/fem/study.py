@@ -80,6 +80,7 @@ __all__ = [
     "ThermalStudy",
     "Traction",
     "capture_studies",
+    "register_study",
 ]
 
 # Same domain convention as the viewer's simulate path (compile worker).
@@ -108,10 +109,26 @@ def capture_studies() -> Iterator[list[ThermalStudy | ElasticStudy]]:
         _CAPTURED_STUDIES.reset(token)
 
 
-def _register(study: Any) -> None:
+def register_study(study: Any) -> None:
+    """Add a study to the active :func:`capture_studies` context, if any.
+
+    The registration hook the study classes call from ``__post_init__``.
+    Public because studies live in more than one package:
+    :class:`cadjoint.flow.FlowStudy` is declared in a scene exactly like the
+    two here and lands in the same captured list, but it discretises no mesh
+    and does not belong in this module.  Outside a capture context this does
+    nothing, which is what makes a study usable from a plain script.
+
+    Args:
+        study: Any object with a ``name`` and a ``describe()``.
+    """
     captured = _CAPTURED_STUDIES.get()
     if captured is not None:
         captured.append(study)
+
+
+#: Private spelling kept for the two study classes below.
+_register = register_study
 
 
 def _triplet(value: Any, label: str) -> tuple[float, float, float]:
@@ -146,6 +163,11 @@ class Dirichlet:
     def __post_init__(self):
         _expect_selection(self.nodes, "Dirichlet")
 
+    @property
+    def serializable(self) -> bool:
+        """Whether :meth:`describe` round-trips (false for predicates)."""
+        return self.nodes.serializable
+
     def describe(self) -> dict[str, Any]:
         """JSON-ready description."""
         return {
@@ -169,6 +191,11 @@ class HeatFlux:
     def __post_init__(self):
         _expect_selection(self.nodes, "HeatFlux")
 
+    @property
+    def serializable(self) -> bool:
+        """Whether :meth:`describe` round-trips (false for predicates)."""
+        return self.nodes.serializable
+
     def describe(self) -> dict[str, Any]:
         """JSON-ready description."""
         return {
@@ -187,6 +214,11 @@ class Fixed:
     def __post_init__(self):
         _expect_selection(self.nodes, "Fixed")
 
+    @property
+    def serializable(self) -> bool:
+        """Whether :meth:`describe` round-trips (false for predicates)."""
+        return self.nodes.serializable
+
     def describe(self) -> dict[str, Any]:
         """JSON-ready description."""
         return {"type": BoundaryConditionType.FIXED.value, "nodes": self.nodes.describe()}
@@ -202,6 +234,11 @@ class Traction:
     def __post_init__(self):
         _expect_selection(self.nodes, "Traction")
         object.__setattr__(self, "vector", _triplet(self.vector, "vector"))
+
+    @property
+    def serializable(self) -> bool:
+        """Whether :meth:`describe` round-trips (false for predicates)."""
+        return self.nodes.serializable
 
     def describe(self) -> dict[str, Any]:
         """JSON-ready description."""

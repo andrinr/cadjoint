@@ -44,6 +44,8 @@ import jax
 import jax.numpy as jnp
 from jax import lax
 
+from cadjoint.flow.precision import double_precision
+
 
 @dataclass(frozen=True)
 class SteadyOptions:
@@ -253,16 +255,24 @@ def _steady_bwd(step_fn: Callable, options: SteadyOptions, residuals: tuple, g: 
     ``A^T`` (the state pullback) and ``dT/dtheta^T`` (the parameter
     pullback); the first drives the linear solve and the second turns its
     answer into the parameter gradient.
+
+    Runs under :func:`~cadjoint.flow.precision.double_precision` in its own
+    right.  ``jax.grad`` calls this *after* the traced forward pass has
+    returned, so a scope the caller wrapped around the forward solve has
+    already exited; the ``jax.vjp`` below re-traces a lattice step, and with
+    x64 off its new arrays would be canonicalised to float32 and meet the
+    float64 converged state.
     """
     theta, f_star = residuals
-    _, pullback = jax.vjp(lambda params, state: step_fn(state, params), theta, f_star)
+    with double_precision():
+        _, pullback = jax.vjp(lambda params, state: step_fn(state, params), theta, f_star)
 
-    def operator(v: jax.Array) -> jax.Array:
-        return v - pullback(v)[1]
+        def operator(v: jax.Array) -> jax.Array:
+            return v - pullback(v)[1]
 
-    adjoint = _solve_adjoint(operator, g, options)
-    theta_bar = pullback(adjoint)[0]
-    return theta_bar, jnp.zeros_like(f_star)
+        adjoint = _solve_adjoint(operator, g, options)
+        theta_bar = pullback(adjoint)[0]
+        return theta_bar, jnp.zeros_like(f_star)
 
 
 steady_populations.defvjp(_steady_fwd, _steady_bwd)

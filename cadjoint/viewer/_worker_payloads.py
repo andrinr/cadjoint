@@ -177,9 +177,9 @@ def _study_payload(study: Any, result: Any, sdf: Any) -> dict[str, Any]:
     """
     scalar = np.asarray(result.nodal_scalar(), dtype=np.float64)
     described = study.describe()
-    described["bcs"] = [
-        {**bc.describe(), "serializable": bc.nodes.serializable} for bc in study.bcs
-    ]
+    # Asked of the condition, not of a selection it is assumed to carry:
+    # see :func:`cadjoint.viewer._worker_declarations._study_entries`.
+    described["bcs"] = [{**bc.describe(), "serializable": bc.serializable} for bc in study.bcs]
     render_payload = _render_surface_payload(result.mesh, scalar)
     render_payload["edges"] = [int(index) for index in _element_edge_pairs(result.mesh).reshape(-1)]
     _result_field_payload(result, render_payload)

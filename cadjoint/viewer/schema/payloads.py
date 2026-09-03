@@ -295,16 +295,26 @@ class StudySelection(Open):
 
 
 class StudyBc(Open):
-    """One boundary condition of a declared study."""
+    """One boundary condition of a declared study.
+
+    ``nodes`` is optional because not every condition is placed by selecting
+    nodes: a flow study's inlet, outlet and duct walls are planes of the
+    lattice, and carry an inlet velocity or a wall temperature instead.
+    ``serializable`` still says whether the condition round-trips, but it is
+    now the condition's own answer rather than its selection's.
+    """
 
     type: str
-    nodes: StudySelection
+    nodes: StudySelection | None = None
     stableId: str | None
     serializable: bool
     span: Span | None
     value: float | None = None
     flux: float | None = None
     vector: Vector3 | None = None
+    velocity: Vector3 | None = None
+    temperature: float | None = None
+    power: float | None = None
 
 
 class DomainEntry(Open):
@@ -315,12 +325,22 @@ class DomainEntry(Open):
 
 
 class StudyPayload(Open):
-    """One ``ThermalStudy``/``ElasticStudy`` declared in the scene program."""
+    """One study declared in the scene program.
+
+    ``kind`` is wider than :class:`~cadjoint.enums.StudyKind`, deliberately.
+    ``StudyKind`` is the vocabulary of studies the viewer can *create and
+    edit* through the patch endpoints, and it still holds two members; this
+    is the vocabulary it can *display*, which now also holds ``flow`` --
+    a :class:`cadjoint.flow.FlowStudy`, declared in a scene like the others
+    but discretising a fixed lattice rather than a mesh, so it has a
+    ``resolution`` and no ``mesh``. Widening the enum instead would make the
+    patch endpoint advertise a study kind it cannot write.
+    """
 
     index: int
     stableId: str | None
     name: str
-    kind: Literal["thermal", "elastic"]
+    kind: Literal["thermal", "elastic", "flow"]
     resolution: int | list[int] | None = None
     bounds: list[float] | None = None
     size: list[float] | None = None

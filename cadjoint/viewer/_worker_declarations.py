@@ -65,6 +65,14 @@ def _study_entries(studies: list[Any], source: str) -> list[dict[str, Any]]:
     per-BC ``serializable`` flag (false only for predicate selections) with
     the BC argument's character ``span``.
 
+    A boundary condition is asked whether *it* serializes, rather than being
+    assumed to carry a node selection that can be asked.  Mesh-study
+    conditions do carry one and delegate to it; a flow study's ``Inlet``,
+    ``Outlet`` and ``Walls`` are planes of a duct rather than selections and
+    answer for themselves.  ``describe()`` is the only shape every condition
+    shares, so ``serializable`` -- which is a statement *about* ``describe()``
+    -- belongs beside it.
+
     Studies are matched to source statements positionally: top-level
     declarations execute in source order, so the alignment holds exactly when
     the counts and kinds agree.  Anything else (studies built in loops, from
@@ -101,7 +109,7 @@ def _study_entries(studies: list[Any], source: str) -> list[dict[str, Any]]:
                     {
                         **bc.describe(),
                         "stableId": bc_ids.get(position),
-                        "serializable": bc.nodes.serializable,
+                        "serializable": bc.serializable,
                         "span": list(bc_spans[position]) if bc_spans else None,
                     }
                     for position, bc in enumerate(study.bcs)

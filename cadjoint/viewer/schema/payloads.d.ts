@@ -240,12 +240,23 @@ export interface MaterialDefinition {
   [key: string]: unknown;
 }
 
-/** One ``ThermalStudy``/``ElasticStudy`` declared in the scene program. */
+/**
+ * One study declared in the scene program.
+ *
+ * ``kind`` is wider than :class:`~cadjoint.enums.StudyKind`, deliberately.
+ * ``StudyKind`` is the vocabulary of studies the viewer can *create and
+ * edit* through the patch endpoints, and it still holds two members; this
+ * is the vocabulary it can *display*, which now also holds ``flow`` --
+ * a :class:`cadjoint.flow.FlowStudy`, declared in a scene like the others
+ * but discretising a fixed lattice rather than a mesh, so it has a
+ * ``resolution`` and no ``mesh``. Widening the enum instead would make the
+ * patch endpoint advertise a study kind it cannot write.
+ */
 export interface StudyPayload {
   index: number;
   stableId: string | null;
   name: string;
-  kind: "thermal" | "elastic";
+  kind: "thermal" | "elastic" | "flow";
   resolution?: number | number[] | null;
   bounds?: number[] | null;
   size?: number[] | null;
@@ -262,16 +273,27 @@ export interface StudyPayload {
   [key: string]: unknown;
 }
 
-/** One boundary condition of a declared study. */
+/**
+ * One boundary condition of a declared study.
+ *
+ * ``nodes`` is optional because not every condition is placed by selecting
+ * nodes: a flow study's inlet, outlet and duct walls are planes of the
+ * lattice, and carry an inlet velocity or a wall temperature instead.
+ * ``serializable`` still says whether the condition round-trips, but it is
+ * now the condition's own answer rather than its selection's.
+ */
 export interface StudyBc {
   type: string;
-  nodes: StudySelection;
+  nodes?: StudySelection | null;
   stableId: string | null;
   serializable: boolean;
   span: [number, number] | null;
   value?: number | null;
   flux?: number | null;
   vector?: [number, number, number] | null;
+  velocity?: [number, number, number] | null;
+  temperature?: number | null;
+  power?: number | null;
   /** Fields the object's own describe() may add. */
   [key: string]: unknown;
 }

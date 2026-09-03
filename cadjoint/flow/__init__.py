@@ -26,15 +26,43 @@ memory independent of how many pseudo-time steps convergence took.
     >>> result = solve(chi, FlowConfig(shape=grid.shape))   # doctest: +SKIP
     >>> result.pressure_drop                                # doctest: +SKIP
 
+Since the coupling landed, the package also carries the *thermal* half:
+:mod:`~cadjoint.flow.energy` solves the steady energy equation on the same
+lattice -- conduction in the metal and advection-diffusion in the air as
+one equation with a variable coefficient -- and
+:class:`~cadjoint.flow.FlowStudy` declares the pair in a scene the way
+``ThermalStudy`` declares a conduction solve:
+
+    >>> from cadjoint.fem import Nodes
+    >>> from cadjoint.flow import FlowStudy, HeatSource, Inlet, Outlet, Walls
+    >>> study = FlowStudy(                                  # doctest: +SKIP
+    ...     name="sink-cooling",
+    ...     resolution=(16, 32, 16),
+    ...     bcs=[Inlet(velocity=0.02), Outlet(), Walls(),
+    ...          HeatSource(Nodes.sphere([0, 0, -0.2], 0.2), power=1.0)],
+    ... )
+    >>> study.solve(sdf).peak_temperature                    # doctest: +SKIP
+
 Packaged for the plugin registry as the ``flow_solver`` kind by
-``cadjoint/fem/tesseracts/flow_brinkman``.  What it is not yet: coupled to
-the thermal study.  ``research/flow-solver.md`` sets out what that would
-take and what it would cost.
+``cadjoint/fem/tesseracts/flow_brinkman``.  ``research/flow-solver.md``
+carries the verification numbers, and what is still not true.
 """
 
 from __future__ import annotations
 
 from cadjoint.flow.domain import PROFILES, FlowGrid, sample_solid_fraction, solid_fraction
+from cadjoint.flow.energy import (
+    AIR_PRANDTL,
+    SCHEMES,
+    EnergyConfig,
+    bulk_outlet_temperature,
+    conductivity,
+    energy_imbalance,
+    mean_temperature,
+    peak_temperature,
+    solve_temperature,
+    thermal_resistance,
+)
 from cadjoint.flow.lattice import CS2, OPP, C, Q, W, omega_from_viscosity, viscosity_from_omega
 from cadjoint.flow.lbm import (
     bounce_back_mask,
@@ -46,6 +74,7 @@ from cadjoint.flow.lbm import (
     stream,
 )
 from cadjoint.flow.objectives import fields, heat_transfer_proxy, pressure, pressure_drop
+from cadjoint.flow.regions import REGION_KINDS, region_mask
 from cadjoint.flow.solver import (
     DEFAULT_ALPHA_MAX,
     OMEGA_CEILING,
@@ -63,41 +92,75 @@ from cadjoint.flow.steady import (
     steady_populations,
     unrolled_populations,
 )
+from cadjoint.flow.study import (
+    BC_KINDS,
+    FLOW_STUDY_KIND,
+    FORCED_CONVECTION_RICHARDSON,
+    FlowStudy,
+    FlowStudyResult,
+    HeatSource,
+    HeldTemperature,
+    Inlet,
+    Outlet,
+    Walls,
+)
 
 __all__ = [
+    "AIR_PRANDTL",
+    "BC_KINDS",
     "C",
-    "DEFAULT_ALPHA_MAX",
     "CS2",
-    "OMEGA_CEILING",
-    "OPP",
-    "PROFILES",
-    "Q",
-    "W",
+    "DEFAULT_ALPHA_MAX",
+    "EnergyConfig",
+    "FLOW_STUDY_KIND",
+    "FORCED_CONVECTION_RICHARDSON",
     "FlowConfig",
     "FlowGrid",
     "FlowResult",
+    "FlowStudy",
+    "FlowStudyResult",
+    "HeatSource",
+    "HeldTemperature",
+    "Inlet",
+    "OMEGA_CEILING",
+    "OPP",
+    "Outlet",
+    "PROFILES",
+    "Q",
+    "REGION_KINDS",
+    "SCHEMES",
     "SteadyOptions",
+    "W",
+    "Walls",
     "bounce_back_mask",
+    "bulk_outlet_temperature",
+    "conductivity",
     "convergence",
     "duct_walls",
+    "energy_imbalance",
     "equilibrium",
     "fields",
     "heat_transfer_proxy",
     "initial_populations",
     "iterate_to_steady",
     "macroscopic",
+    "mean_temperature",
     "omega_from_viscosity",
+    "peak_temperature",
     "pressure",
     "pressure_drop",
     "recommended_alpha_max",
+    "region_mask",
     "residual_history",
     "sample_solid_fraction",
     "solid_fraction",
     "solve",
+    "solve_temperature",
     "steady_populations",
     "step",
     "step_for",
     "stream",
+    "thermal_resistance",
     "unrolled_populations",
     "viscosity_from_omega",
 ]
