@@ -125,7 +125,7 @@ def _expect_selection(nodes: Any, bc_kind: str) -> NodeSelection:
     if not isinstance(nodes, NodeSelection):
         raise ValueError(
             f"{bc_kind} takes a node selection, got {type(nodes).__name__}. "
-            "Build one via Nodes.box/sphere/halfspace/side/predicate "
+            "Build one via Nodes.box/sphere/halfspace/cylinder/side/predicate "
             "(from cadjoint.fem import Nodes)."
         )
     return nodes
@@ -246,11 +246,55 @@ def _property_argument(value: Any, label: str, check: Any) -> Any:
     return number
 
 
-def _material_source(sdf: Any, sim_mesh: SimMesh | None) -> Any:
-    """The object whose ``material_at`` defines the property field for a solve."""
+def _material_source(sdf: Any, sim_mesh: SimMesh | None, study: Any = None) -> Any:
+    """The object whose ``material_at`` defines the property field for a solve.
+
+    Tried in order: the SDF handed to ``solve``; the domain of the SimMesh
+    that was actually built; the domain of the study's *declared* SimMesh;
+    the study's own ``domain=``.  A candidate that cannot answer
+    ``material_at`` is skipped rather than returned; if none of them can, the
+    ``solve`` argument comes back unchanged so that
+    :func:`~cadjoint.fem.properties.sample_cell_property` still raises its own
+    error naming what it was handed.
+
+    Two of those rungs exist for :class:`~cadjoint.optimize.Optimization`,
+    which calls a study twice and in neither case the obvious way.
+
+    * *During* the loop it builds the mesh once to freeze its topology and
+      calls ``solve(mesh=hex_mesh, points=...)``, so ``_solve_mesh`` returns
+      no SimMesh at all.  Without the fallback a ``FROM_MATERIAL`` study whose
+      SimMesh names a ``domain`` solves on its own but fails inside an
+      optimisation with "got no SDF to sample: … give the study's SimMesh a
+      ``domain=``" — advice the scene had already taken.
+    * *After* the loop it re-meshes at the final design and calls
+      ``solve(final_field)`` with the **functionalized** field, a bare
+      callable with no materials on it.  Falling through to the declared
+      domain is right rather than merely tolerable: the optimiser has just
+      written the final parameters back onto that object with
+      ``apply_parameters``, so it is the same geometry the callable
+      describes, and it still knows what it is made of.
+
+    Args:
+        sdf: The ``solve(sdf)`` argument, or ``None``.
+        sim_mesh: The SimMesh ``_solve_mesh`` built, or ``None`` when the
+            caller passed an already-extracted mesh.
+        study: The study itself, for its declared mesh and domain.
+
+    Returns:
+        The first candidate that carries materials; failing that, whatever
+        was handed in, so the error comes from the sampler.
+    """
+    declared = (
+        getattr(sim_mesh, "domain", None),
+        getattr(getattr(study, "mesh", None), "domain", None),
+        getattr(study, "domain", None),
+    )
+    for candidate in (sdf, *declared):
+        if candidate is not None and hasattr(candidate, "material_at"):
+            return candidate
     if sdf is not None:
         return sdf
-    return sim_mesh.domain if sim_mesh is not None else None
+    return next((candidate for candidate in declared if candidate is not None), None)
 
 
 def _resolve_property(
@@ -541,7 +585,7 @@ class ThermalStudy:
             raise ValueError("A thermal study needs at least one Dirichlet BC to solve.")
         sim_mesh, hex_mesh = _solve_mesh(self, sdf, mesh)
         _check_resolvable(self.bcs, hex_mesh)
-        source_sdf = _material_source(sdf, sim_mesh)
+        source_sdf = _material_source(sdf, sim_mesh, self)
         solve_points = hex_mesh.points if points is None else points
         conductivity = _resolve_property(
             self.conductivity,
@@ -672,7 +716,7 @@ class ElasticStudy:
             raise ValueError("An elastic study needs at least one Fixed BC to solve.")
         sim_mesh, hex_mesh = _solve_mesh(self, sdf, mesh)
         _check_resolvable(self.bcs, hex_mesh)
-        source_sdf = _material_source(sdf, sim_mesh)
+        source_sdf = _material_source(sdf, sim_mesh, self)
         solve_points = hex_mesh.points if points is None else points
         resolved = {
             key: _resolve_property(

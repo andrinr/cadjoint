@@ -77,6 +77,36 @@ def _unit(vector: Array) -> Array:
     return vector / jnp.sqrt(jnp.maximum(jnp.sum(vector * vector), _MIN_SQUARED))
 
 
+def _surface_normal(field, point: Array, step: float) -> Array:
+    """Outward unit normal of a field's zero set at a point ON that zero set.
+
+    ``jax.grad`` is the obvious answer and the wrong one exactly here. Every
+    field in this library is assembled from ``jnp.maximum``, ``jnp.minimum``
+    and ``jnp.where``, and the surface is precisely where those change branch;
+    autodiff is entitled to return any subgradient, and for a polygon
+    extrusion it returns one that points *inward* and is not unit length. (The
+    28-gon bearing tower in ``scenes/motor_shield.py`` handed back
+    ``-0.94 * n``, which silently flipped a pad's sketch frame.)
+
+    A central difference straddles the branch: both samples are off the
+    surface, where the field is smooth and its gradient is the real one. It is
+    still an expression in the shape's parameters, so the plane keeps tracking
+    them.
+
+    Args:
+        field: Scalar field on ``(3,)`` points.
+        point: A point on (or very near) the zero set.
+        step: Half-width of the difference, in world units. It has to clear
+            the branch but stay on one face; a thousandth of a part is right.
+
+    Returns:
+        The unit normal, pointing out of the solid.
+    """
+    offsets = jnp.eye(3, dtype=jnp.float32) * step
+    difference = jnp.stack([field(point + o) - field(point - o) for o in offsets])
+    return _unit(difference)
+
+
 def _maybe_float(value) -> float | None:
     """The Python value of a scalar, or None when it is a tracer."""
     try:
@@ -264,15 +294,27 @@ class SketchPlane(Fluent):
         return plane
 
     @classmethod
-    def tangent(cls, solid, near, x_axis=None, *, max_step: float = 1.0, steps: int = 8):
+    def tangent(
+        cls,
+        solid,
+        near,
+        x_axis=None,
+        *,
+        max_step: float = 1.0,
+        steps: int = 8,
+        normal_step: float = 1e-3,
+    ):
         """The tangent plane of an SDF at the surface point nearest ``near``.
 
         This is the reference for everything with no analytic face: blends,
         fillets, the curved wall of a revolve. ``near`` is Newton-projected
         onto the zero set with
         :func:`cadjoint.fem.motion.project_points`, and the plane's normal is
-        the field's gradient there — both differentiable, so the plane tracks
-        the scene's parameters rather than a snapshot of them.
+        read off the field by a central difference across the surface — both
+        differentiable, so the plane tracks the scene's parameters rather than
+        a snapshot of them. The difference is used in place of ``jax.grad``
+        because the surface is exactly where a CSG field changes branch; see
+        :func:`_surface_normal`.
 
         Args:
             solid: Any callable scalar field on ``(3,)`` points — an SDF
@@ -283,6 +325,9 @@ class SketchPlane(Fluent):
                 axis most nearly inside the tangent plane.
             max_step: Cap on how far the projection may move ``near``.
             steps: Newton iterations.
+            normal_step: Half-width of the central difference that reads the
+                normal. Raise it on a field that is noisy at the surface,
+                lower it where two faces meet within a thousandth.
 
         Returns:
             The tangent plane at the projected point.
@@ -291,7 +336,7 @@ class SketchPlane(Fluent):
 
         field = lambda point: jnp.asarray(solid(point)).reshape(())  # noqa: E731
         point = project_points(field, jnp.asarray(near)[None], max_step, steps=steps)[0]
-        normal = _unit(jax.grad(field)(point))
+        normal = _surface_normal(field, point, normal_step)
         plane = cls(
             origin=point,
             normal=normal,
@@ -429,6 +474,16 @@ def _normalized(normal: Vector) -> Vector:
         )
 
 
+_unnamed_profiles = 0
+
+
+def _default_profile_name() -> str:
+    """``profile``, ``profile_2``, ... for profiles declared without a name."""
+    global _unnamed_profiles
+    _unnamed_profiles += 1
+    return "profile" if _unnamed_profiles == 1 else f"profile_{_unnamed_profiles}"
+
+
 class PolygonProfile(Fluent):
     """Closed polygon profile in a sketch plane — a construction-tree node.
 
@@ -463,6 +518,10 @@ class PolygonProfile(Fluent):
         if len(vertices) < 3:
             raise ValueError(f"PolygonProfile needs at least 3 vertices, got {len(vertices)}")
         self.plane = plane if plane is not None else SketchPlane()
+        if name == "profile":
+            # Free vertices are named after the profile, and two free parameters
+            # may not share a name: a second unnamed profile gets a numbered one.
+            name = _default_profile_name()
         self.name = name
 
         wrapped: list[Vector2] = []

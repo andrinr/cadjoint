@@ -48,7 +48,7 @@ class Union(BooleanOp):
         return Union.sdf(self.sdfs, p, self.params["smoothness"].value)
 
     def material_at(self, p: Array) -> dict:
-        from cadjoint.render.material import Material
+        from cadjoint.sdf.boolean.base import blend_materials
 
         k = jnp.maximum(self.params["smoothness"].value * 4.0, 1e-10)
         result_m = self.sdfs[0].material_at(p)
@@ -57,7 +57,7 @@ class Union(BooleanOp):
             d = child(p)
             m = child.material_at(p)
             t = jnp.clip(0.5 + 0.5 * (d - result_d) / k, 0.0, 1.0)
-            result_m = Material.blend(result_m, m, t)
+            result_m = blend_materials(result_m, m, t)
             result_d = smooth_min(result_d, d, self.params["smoothness"].value)
         return result_m
 

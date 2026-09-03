@@ -101,6 +101,7 @@ whatever mesh they are handed, so they survive re-meshing and a change of shape.
 | `Nodes.box(min_corner, max_corner)` | Inside an axis-aligned box |
 | `Nodes.sphere(center, radius)` | Inside a ball |
 | `Nodes.halfspace(point, normal)` | Where `dot(x - point, normal) >= 0` |
+| `Nodes.cylinder(center, axis, radius, inner=0, half_length=None)` | Within `radius` of the line through `center` along `axis`; `inner` hollows it into an annulus, `half_length` bounds it axially |
 | `Nodes.predicate(fn)` | A vectorized `(N, 3) -> (N,)` boolean callable |
 
 Three operators combine them: `&` (intersection), `|` (union), and `~`

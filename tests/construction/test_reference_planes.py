@@ -182,6 +182,47 @@ class TestTangent:
         direction = jnp.array([0.9, 0.05, 0.0]) / jnp.linalg.norm(jnp.array([0.9, 0.05, 0.0]))
         assert gradient == pytest.approx(float(direction[0]), abs=1e-3)
 
+    def test_the_normal_points_out_of_a_faceted_wall(self):
+        """A CSG field changes branch on its own surface; `jax.grad` there lies.
+
+        A polygon extrusion's field is a `maximum` of a 2D polygon distance
+        and a cap distance, and on the wall the first of those is exactly
+        zero. Autodiff is free to return any subgradient of that, and it
+        returns one pointing *into* the solid with length 0.94 — which used
+        to flip the sketch frame of any pad placed on a cylinder wall.
+        """
+        import math
+
+        profile = PolygonProfile.circle(radius=1.0, segments=28, name="wall")
+        wall = extrude(profile, depth=0.8)
+        angle = math.radians(337.5)  # between two vertices, on a facet
+        near = [math.cos(angle), math.sin(angle), 0.1]
+        plane = SketchPlane.tangent(wall, near=near)
+
+        normal = jnp.asarray(plane.normal.xyz)
+        assert float(jnp.linalg.norm(normal)) == pytest.approx(1.0, abs=1e-5)
+        outward = jnp.asarray([math.cos(angle), math.sin(angle), 0.0])
+        assert float(normal @ outward) > math.cos(math.pi / 28)
+
+        # The projection lands on the facet, between apothem and circumradius.
+        origin = jnp.asarray(plane.origin.xyz)
+        assert math.cos(math.pi / 28) <= float(jnp.linalg.norm(origin[:2])) <= 1.0 + 1e-6
+
+    def test_a_pad_on_a_faceted_wall_straddles_it(self):
+        """The end the flipped normal broke: a boss half in, half out of a wall."""
+        import math
+
+        profile = PolygonProfile.circle(radius=1.0, segments=28, name="wall2")
+        wall = extrude(profile, depth=0.8)
+        angle = math.radians(337.5)
+        plane = SketchPlane.tangent(wall, near=[math.cos(angle), math.sin(angle), 0.1])
+        pad = extrude(PolygonProfile(SMALL, plane=plane, name="wallpad"), depth=0.2)
+        origin = jnp.asarray(plane.origin.xyz)
+        normal = jnp.asarray(plane.normal.xyz)
+        assert float(pad(origin + 0.08 * normal)) < 0.0  # proud of the wall
+        assert float(pad(origin - 0.08 * normal)) < 0.0  # and sunk into it
+        assert float(pad(origin + 0.20 * normal)) > 0.0
+
     def test_a_tangent_plane_carries_a_sketch(self):
         plane = SketchPlane.tangent(Sphere(radius=1.0), near=[0.0, 0.0, 0.9])
         pad = extrude(PolygonProfile(SMALL, plane=plane, name="pad"), depth=0.2)

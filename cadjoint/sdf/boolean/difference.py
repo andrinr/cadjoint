@@ -50,14 +50,26 @@ class Difference(BooleanOp):
         return Difference.sdf(self.sdfs, p, self.params["smoothness"].value)
 
     def material_at(self, p: Array) -> dict:
-        from cadjoint.render.material import Material
+        """The body's material, tinted by each tool near the surface that tool cut.
+
+        Folds over *every* tool, the way :meth:`Union.material_at` folds over
+        every operand: this used to read ``self.sdfs[0]`` and ``self.sdfs[1]``
+        only, so a part cut by more than one tool — which is every part —
+        took its material from the first cut and ignored the rest.
+        """
+        from cadjoint.sdf.boolean.base import blend_materials
 
         k = jnp.maximum(self.params["smoothness"].value * 4.0, 1e-10)
-        d1, d2 = self.sdfs[0](p), self.sdfs[1](p)
-        m1, m2 = self.sdfs[0].material_at(p), self.sdfs[1].material_at(p)
-        # Difference is max(d1, -d2): blend toward m2 where -d2 dominates (cut surface)
-        t = jnp.clip(0.5 + 0.5 * (d1 + d2) / k, 0.0, 1.0)
-        return Material.blend(m1, m2, t)
+        result_m = self.sdfs[0].material_at(p)
+        result_d = self.sdfs[0](p)
+        for tool in self.sdfs[1:]:
+            d = tool(p)
+            # Difference is max(d1, -d2): blend toward the tool where -d
+            # dominates, i.e. on the surface that tool cut.
+            t = jnp.clip(0.5 + 0.5 * (result_d + d) / k, 0.0, 1.0)
+            result_m = blend_materials(result_m, tool.material_at(p), t)
+            result_d = jnp.maximum(result_d, -d)
+        return result_m
 
     def to_functional(self):
         """Return pure function for compilation."""

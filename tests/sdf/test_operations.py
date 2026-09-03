@@ -221,3 +221,83 @@ class TestGradients:
         upper = float(loss({"radius": jnp.asarray(free["radius"]) + eps}))
         lower = float(loss({"radius": jnp.asarray(free["radius"]) - eps}))
         np.testing.assert_allclose(gradient, (upper - lower) / (2 * eps), rtol=1e-2)
+
+
+class TestSuppressedInstances:
+    """``skip`` leaves a station of a pattern empty without breaking the pattern.
+
+    A ring of ribs or a row of holes is a pattern right up until something else
+    has to occupy one of its stations. The suppressed copies keep the angles
+    and offsets they would have had, so a gap stays a gap.
+    """
+
+    @staticmethod
+    def unit_seed():
+        return Translate(Sphere(0.25), offset=jnp.array([1.0, 0.0, 0.0]))
+
+    @staticmethod
+    def occupied(shape, x, y):
+        return float(shape(jnp.asarray([x, y, 0.0], dtype=jnp.float32))) < 0.0
+
+    def test_polar_pattern_omits_only_the_named_instances(self):
+        seed = self.unit_seed()
+        thinned = PolarPattern(seed, count=8, skip=(3, 5))
+        for index in range(8):
+            angle = 2.0 * math.pi * index / 8
+            here = self.occupied(thinned, math.cos(angle), math.sin(angle))
+            assert here is (index not in (3, 5)), index
+
+    def test_the_kept_instances_do_not_move_up(self):
+        """Suppression leaves a gap; it does not respace the ring."""
+        seed = self.unit_seed()
+        full = PolarPattern(seed, count=8)
+        thinned = PolarPattern(seed, count=8, skip=(3,))
+        for index in (0, 1, 2, 4, 5, 6, 7):
+            angle = 2.0 * math.pi * index / 8
+            point = jnp.asarray([math.cos(angle), math.sin(angle), 0.0], dtype=jnp.float32)
+            assert float(thinned(point)) == pytest.approx(float(full(point)), abs=1e-6)
+
+    def test_linear_pattern_omits_only_the_named_instances(self):
+        seed = self.unit_seed()
+        row = LinearPattern(seed, direction=[1.0, 0.0, 0.0], count=5, spacing=0.5, skip=(2,))
+        assert [self.occupied(row, 1.0 + 0.5 * i, 0.0) for i in range(5)] == [
+            True,
+            True,
+            False,
+            True,
+            True,
+        ]
+
+    def test_the_suppressed_set_is_readable_back(self):
+        seed = self.unit_seed()
+        assert PolarPattern(seed, count=8, skip=(5, 3, 3)).skip == (3, 5)
+        assert PolarPattern(seed, count=8).skip == ()
+        assert LinearPattern(seed, [1.0, 0.0, 0.0], 5, 0.5, skip=[2]).skip == (2,)
+
+    def test_suppression_survives_functionalize(self):
+        seed = self.unit_seed()
+        thinned = PolarPattern(seed, count=8, skip=(3, 5))
+        free, fixed, _ = extract_parameters(thinned)
+        sdf = functionalize(thinned)(free, fixed)
+        for index in range(8):
+            angle = 2.0 * math.pi * index / 8
+            point = jnp.asarray([math.cos(angle), math.sin(angle), 0.0], dtype=jnp.float32)
+            assert (float(sdf(point)) < 0.0) is (index not in (3, 5)), index
+
+    @pytest.mark.parametrize(
+        ("skip", "message"),
+        [
+            ((0,), "cannot skip instance 0"),
+            ((8,), "outside 1 .. 7"),
+            ((-1,), "outside 1 .. 7"),
+        ],
+    )
+    def test_an_unusable_index_is_refused(self, skip, message):
+        with pytest.raises(ValueError, match=message):
+            PolarPattern(self.unit_seed(), count=8, skip=skip)
+
+    def test_a_count_the_mask_cannot_address_is_refused(self):
+        with pytest.raises(ValueError, match="only up to count 24"):
+            PolarPattern(self.unit_seed(), count=40, skip=(2,))
+        # Without suppression the count is not capped.
+        assert PolarPattern(self.unit_seed(), count=40).skip == ()

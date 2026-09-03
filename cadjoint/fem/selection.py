@@ -124,7 +124,7 @@ def _expect_selection(value: Any) -> NodeSelection:
     if not isinstance(value, NodeSelection):
         raise TypeError(
             f"Expected a NodeSelection to combine with, got {type(value).__name__}. "
-            "Build one via Nodes.box/sphere/halfspace/side/predicate."
+            "Build one via Nodes.box/sphere/halfspace/cylinder/side/predicate."
         )
     return value
 
@@ -170,6 +170,35 @@ class _Halfspace(NodeSelection):
 
     def describe(self) -> dict[str, Any]:
         return {"kind": "halfspace", "point": list(self.point), "normal": list(self.normal)}
+
+
+@dataclass(frozen=True)
+class _Cylinder(NodeSelection):
+    center: tuple[float, float, float]
+    axis: tuple[float, float, float]
+    radius: float
+    inner: float
+    half_length: float | None
+
+    def _geometric(self, points: np.ndarray, _mesh: HexMesh) -> np.ndarray:
+        direction = np.asarray(self.axis) / np.linalg.norm(self.axis)
+        offsets = points - np.asarray(self.center)
+        axial = offsets @ direction
+        radial_sq = np.einsum("nd,nd->n", offsets, offsets) - axial**2
+        inside = (radial_sq <= self.radius**2) & (radial_sq >= self.inner**2)
+        if self.half_length is not None:
+            inside &= np.abs(axial) <= self.half_length
+        return inside
+
+    def describe(self) -> dict[str, Any]:
+        return {
+            "kind": "cylinder",
+            "center": list(self.center),
+            "axis": list(self.axis),
+            "radius": self.radius,
+            "inner": self.inner,
+            "half_length": self.half_length,
+        }
 
 
 @dataclass(frozen=True)
@@ -303,6 +332,43 @@ class Nodes:
         return _Halfspace(_triplet(point, "point"), direction)
 
     @staticmethod
+    def cylinder(
+        center: Any, axis: Any, radius: Any, *, inner: Any = 0.0, half_length: Any = None
+    ) -> NodeSelection:
+        """Nodes inside a (possibly hollow, possibly finite) cylinder about a line.
+
+        The natural selector for anything on a part's own axis of revolution
+        — a bearing seat wall, a bore, a cooling jacket — where a box picks
+        up the corners and a sphere the wrong height.
+
+        Args:
+            center: A point on the axis, three finite numbers.
+            axis: Axis direction (need not be unit length, must be nonzero).
+            radius: Positive finite outer radius.
+            inner: Inner radius of an annulus, ``0`` (the default) for a full
+                cylinder; must be finite, non-negative and below ``radius``.
+            half_length: Half the axial extent about ``center``, or ``None``
+                (the default) for an infinite cylinder.
+        """
+        direction = _triplet(axis, "axis")
+        if not any(component != 0.0 for component in direction):
+            raise ValueError("axis must be nonzero.")
+        outer = float(radius)
+        if not np.isfinite(outer) or outer <= 0.0:
+            raise ValueError(f"radius must be positive and finite, got {radius!r}.")
+        hollow = float(inner)
+        if not np.isfinite(hollow) or hollow < 0.0 or hollow >= outer:
+            raise ValueError(
+                f"inner must be finite, non-negative and below radius {outer}, got {inner!r}."
+            )
+        extent = None
+        if half_length is not None:
+            extent = float(half_length)
+            if not np.isfinite(extent) or extent <= 0.0:
+                raise ValueError(f"half_length must be positive and finite, got {half_length!r}.")
+        return _Cylinder(_triplet(center, "center"), direction, outer, hollow, extent)
+
+    @staticmethod
     def side(side: SideLike, tol: float | None = None) -> NodeSelection:
         """Nodes on the axis-extreme boundary plane of the mesh.
 
@@ -363,6 +429,14 @@ def selection_from_description(payload: dict[str, Any]) -> NodeSelection:
         return Nodes.sphere(payload["center"], payload["radius"])
     if kind == "halfspace":
         return Nodes.halfspace(payload["point"], payload["normal"])
+    if kind == "cylinder":
+        return Nodes.cylinder(
+            payload["center"],
+            payload["axis"],
+            payload["radius"],
+            inner=payload.get("inner", 0.0),
+            half_length=payload.get("half_length"),
+        )
     if kind == "side":
         return Nodes.side(payload["side"], payload.get("tol"))
     if kind in ("and", "or"):

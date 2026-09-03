@@ -41,10 +41,16 @@ class Xor(BooleanOp):
         return Xor.sdf(self.sdfs, p)
 
     def material_at(self, p: Array) -> dict:
-        from cadjoint.render.material import Material
+        """An even mix of both children, with the same unspecified-property rule.
+
+        Uses :func:`~cadjoint.sdf.boolean.base.blend_materials` rather than a
+        plain lerp: at a fixed weight of 0.5 a plain lerp erases *every*
+        property the other child leaves unspecified, everywhere.
+        """
+        from cadjoint.sdf.boolean.base import blend_materials
 
         m1, m2 = self.sdfs[0].material_at(p), self.sdfs[1].material_at(p)
-        return Material.blend(m1, m2, jnp.array(0.5))
+        return blend_materials(m1, m2, jnp.array(0.5))
 
     def to_functional(self):
         """Return pure function for compilation."""

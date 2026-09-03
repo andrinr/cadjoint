@@ -50,13 +50,18 @@ class Intersection(BooleanOp):
         return Intersection.sdf(self.sdfs, p, self.params["smoothness"].value)
 
     def material_at(self, p: Array) -> dict:
-        from cadjoint.render.material import Material
+        """Blended across every operand, not just the first two."""
+        from cadjoint.sdf.boolean.base import blend_materials
 
         k = jnp.maximum(self.params["smoothness"].value * 4.0, 1e-10)
-        d1, d2 = self.sdfs[0](p), self.sdfs[1](p)
-        m1, m2 = self.sdfs[0].material_at(p), self.sdfs[1].material_at(p)
-        t = jnp.clip(0.5 + 0.5 * (d1 - d2) / k, 0.0, 1.0)
-        return Material.blend(m1, m2, t)
+        result_m = self.sdfs[0].material_at(p)
+        result_d = self.sdfs[0](p)
+        for child in self.sdfs[1:]:
+            d = child(p)
+            t = jnp.clip(0.5 + 0.5 * (result_d - d) / k, 0.0, 1.0)
+            result_m = blend_materials(result_m, child.material_at(p), t)
+            result_d = jnp.maximum(result_d, d)
+        return result_m
 
     def to_functional(self):
         """Return pure function for compilation."""
