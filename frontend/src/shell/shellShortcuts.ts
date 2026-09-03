@@ -4,8 +4,8 @@
  * Two rules, both about staying out of the way: Ctrl/Cmd+Z is undo/redo
  * everywhere *except* inside a text field, where CodeMirror's own history is
  * the right one; and Escape closes the WGSL dialog in the capture phase, so
- * the viewer's global Escape (clear selection, reset mode) does not also fire
- * underneath it.
+ * the viewer's global Escape — which cancels one thing per press, down the
+ * ladder in `components/viewer/escape.ts` — does not also fire underneath it.
  *
  * Tool and mode keys are not here — they belong to the viewport and live in
  * `shortcuts.ts` with the Help dialog's table.

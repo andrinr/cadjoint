@@ -173,7 +173,10 @@ export function pickFaceSurface(
     const denominator = dot(ray.direction, face.normal);
     if (Math.abs(denominator) < 1e-9) continue;
     const t = dot(subtract(face.origin, ray.origin), face.normal) / denominator;
-    if (t <= 1e-6 || (best !== null && t >= best.t)) continue;
+    // `ray.tMin` rather than zero: an orthographic ray's origin is a station on
+    // the camera plane, not an eye, and the face nearest the viewer is often
+    // behind it. The frontmost hit is still the smallest `t`, whatever its sign.
+    if (t <= (ray.tMin ?? 1e-6) || (best !== null && t >= best.t)) continue;
     const point = add(ray.origin, scale(ray.direction, t));
     const tolerance = faceTolerance(face);
     if (polygonDistance(toFacePlane(face, point), facePolygon2d(face)) > tolerance) continue;

@@ -79,6 +79,7 @@ export interface ConstructionNode {
   vertices: ConstructionVertex[];
   transform: ConstructionTransform | null;
   spans: Record<string, [number, number]>;
+  statementSpan?: [number, number] | null;
   constraints: ConstructionConstraint[];
   operators: ConstructionOperator[];
   material: string | null;
@@ -150,6 +151,7 @@ export interface ConstructionVertex {
   uv: [number, number];
   world: [number, number, number];
   span: [number, number] | null;
+  binding?: ParameterBinding | null;
 }
 
 /** One constraint attached to a sketch's vertex parameters. */
@@ -183,6 +185,30 @@ export interface ConstructionTransform {
   call: string;
   positionArgument: string;
   canRotate: boolean;
+  bindings?: Record<string, ParameterBinding[]>;
+}
+
+/**
+ * The free design parameter behind a value a drag can move.
+ *
+ * The scene's shaders read every *free* parameter out of the uniform buffer
+ * described by :class:`ShaderProgram`, so a drag that knows the slot behind
+ * the value it is moving can answer a pointer move with a buffer write
+ * instead of a source rewrite and a recompile. This is the join between the
+ * two halves: ``name`` is the same name :class:`ShaderParameter` carries.
+ *
+ * ``index`` names the component of the payload value this parameter drives,
+ * for the one case where several parameters cover one value — a primitive's
+ * ``rotation`` is three separate angle scalars. ``None`` means the parameter
+ * covers the whole value.
+ *
+ * A value with no binding is a fixed literal in the source: absent here,
+ * never guessed, and dragged through the ordinary recompile.
+ */
+export interface ParameterBinding {
+  name: string;
+  components: number;
+  index?: number | null;
 }
 
 /** Diagnostics captured from one source-level constraint solve. */
@@ -716,6 +742,7 @@ export interface ShaderProgram {
   binding: number;
   buffer_bytes: number;
   nan_offset?: number;
+  cull_margin_offset?: number | null;
   parameters: ShaderParameter[];
 }
 

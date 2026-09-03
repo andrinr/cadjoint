@@ -131,6 +131,29 @@ class ConstructionFace(Open):
     usable: bool
 
 
+class ParameterBinding(Strict):
+    """The free design parameter behind a value a drag can move.
+
+    The scene's shaders read every *free* parameter out of the uniform buffer
+    described by :class:`ShaderProgram`, so a drag that knows the slot behind
+    the value it is moving can answer a pointer move with a buffer write
+    instead of a source rewrite and a recompile. This is the join between the
+    two halves: ``name`` is the same name :class:`ShaderParameter` carries.
+
+    ``index`` names the component of the payload value this parameter drives,
+    for the one case where several parameters cover one value — a primitive's
+    ``rotation`` is three separate angle scalars. ``None`` means the parameter
+    covers the whole value.
+
+    A value with no binding is a fixed literal in the source: absent here,
+    never guessed, and dragged through the ordinary recompile.
+    """
+
+    name: str
+    components: int
+    index: int | None = None
+
+
 class ConstructionVertex(Strict):
     """A sketch vertex, in both sketch-plane and world coordinates."""
 
@@ -140,6 +163,8 @@ class ConstructionVertex(Strict):
     uv: Vector2
     world: Vector3
     span: Span | None
+    # The uniform slot the whole point lives in, when it is a free parameter.
+    binding: ParameterBinding | None = None
 
 
 class ConstructionConstraint(Strict):
@@ -177,6 +202,12 @@ class ConstructionTransform(Strict):
     call: str
     positionArgument: str
     canRotate: bool
+    # Free-parameter slots behind the draggable arguments, keyed by the
+    # argument a drag writes back: ``position``, ``rotation``, and the kind's
+    # dimension keywords. An argument appears only when *every* component of
+    # it is bound, so a drag never half-applies; a sketch plane's transform
+    # binds nothing at all.
+    bindings: dict[str, list[ParameterBinding]] = Field(default_factory=dict)
 
 
 class ConstructionNode(Strict):
@@ -194,6 +225,12 @@ class ConstructionNode(Strict):
     vertices: list[ConstructionVertex]
     transform: ConstructionTransform | None
     spans: dict[str, Span]
+    # Character span of the whole statement that declares this object —
+    # ``board = Solid.box(...)``, all of it. Separate from ``spans``, which
+    # maps *argument* names to their literals: an editor revealing "where is
+    # this object" wants the declaration, and a consumer walking ``spans`` as
+    # the set of editable arguments must not trip over it.
+    statementSpan: Span | None = None
     constraints: list[ConstructionConstraint]
     operators: list[ConstructionOperator]
     material: str | None
@@ -391,6 +428,17 @@ class ShaderProgram(Strict):
     # const-evaluates the bit-pattern bitcast and rejects the module — so the
     # value has to arrive through the buffer.  The client writes a NaN here.
     nan_offset: int = 0
+    # Byte offset of a reserved slot holding the bounding-box cull margin.
+    # Every skip test in the generated module is
+    # `box_distance(p, bounds) >= threshold + margin`, so writing an infinite
+    # margin here makes every test false and the module computes the flat
+    # field.  That is how culling is a render toggle rather than a recompile:
+    # the tests live inside the *generated* shader, which reads no other
+    # uniform.  The client writes 1e-4 for on, +Infinity for off.
+    # `None`, not 0, when no such slot was reserved: 0 names a real
+    # parameter's slot, so a program that merely forgot to set this would
+    # overwrite that parameter with the margin.
+    cull_margin_offset: int | None = None
     parameters: list[ShaderParameter]
 
 

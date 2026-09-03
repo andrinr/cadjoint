@@ -41,7 +41,9 @@ from cadjoint.viewer.source_map.nodes import (
     _is_profile_call,
     _resolved_call,
     parse_module,
+    statement_span,
 )
+from cadjoint.viewer.source_map.parameters import transform_bindings, vertex_binding
 
 
 def build_construction_payload(
@@ -169,6 +171,9 @@ def _plane_transform(source: str, line: int, origin) -> dict | None:
             "call": "SketchPlane",
             "positionArgument": "origin",
             "canRotate": False,
+            # A plane's origin is a literal in the source, never a parameter:
+            # moving a sketch is always a recompile.
+            "bindings": {},
         }
 
     if plane_argument is not None:
@@ -186,6 +191,7 @@ def _plane_transform(source: str, line: int, origin) -> dict | None:
         "call": "PolygonProfile",
         "positionArgument": "planeOrigin",
         "canRotate": False,
+        "bindings": {},
     }
 
 
@@ -485,6 +491,7 @@ def _profile_entry(
                 "uv": [float(x) for x in vertex.value],
                 "world": world[i],
                 "span": list(spans[i]) if spans[i] is not None else None,
+                "binding": vertex_binding(vertex),
             }
             for i, vertex in enumerate(profile.vertices)
         ],
@@ -492,6 +499,10 @@ def _profile_entry(
             _plane_transform(source, line, profile.plane.origin.xyz) if traceable else None
         ),
         "spans": {},
+        # Where the sketch is *declared*, so selecting it can reveal the
+        # statement rather than nothing: a profile publishes no argument
+        # spans at all, which used to leave the editor with nowhere to go.
+        "statementSpan": statement_span(source, line),
         "constraints": _stamped_constraints(
             _profile_constraints(profile, source, line, traceable), token
         ),
@@ -552,10 +563,12 @@ def _primitive_entry(
             "call": primitive.kind,
             "positionArgument": "position",
             "canRotate": True,
+            "bindings": transform_bindings(primitive),
         }
         if editable
         else None,
         "spans": {name: list(span) for name, span in arguments.items()},
+        "statementSpan": statement_span(source, line),
         "constraints": [],
         "operators": [],
         "material": (_primitive_material(source, line, primitive.kind) if traceable else None),

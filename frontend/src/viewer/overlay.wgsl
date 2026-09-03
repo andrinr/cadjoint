@@ -250,6 +250,9 @@ struct HandleVertex {
   @location(0) local          : vec2<f32>,
   @location(1) color          : vec4<f32>,
   @location(2) emphasis       : f32,
+  // 1 = a free design parameter, drawn filled; 0 = a source constant, drawn
+  // as a ring. Same disc, same colour, same radius — only the middle differs.
+  @location(3) fill           : f32,
 };
 
 @vertex
@@ -258,6 +261,7 @@ fn vs_handle(
   @location(0) center   : vec3<f32>,
   @location(1) color    : vec4<f32>,
   @location(2) emphasis : f32,
+  @location(3) fill     : f32,
 ) -> HandleVertex {
   var corners = array<vec2<f32>, 6>(
     vec2<f32>(-1.0, -1.0), vec2<f32>(1.0, -1.0), vec2<f32>(1.0, 1.0),
@@ -273,6 +277,7 @@ fn vs_handle(
   out.local = corner;
   out.color = color;
   out.emphasis = emphasis;
+  out.fill = fill;
   return out;
 }
 
@@ -286,7 +291,13 @@ fn fs_handle(input: HandleVertex) -> @location(0) vec4<f32> {
   let edge = smoothstep(1.0, 0.82, radius);
   let rim = smoothstep(0.62, 0.92, radius);
   let shade = mix(input.color.rgb, input.color.rgb * 0.35, rim);
-  return vec4<f32>(shade, input.color.a * edge);
+  // A point the shader holds as a constant keeps the ring and loses the
+  // middle: the annulus is the rim the filled disc already draws, so the two
+  // states are one shape at two weights rather than two marks. The band is
+  // wide enough (0.42 of the radius) to survive at handle size.
+  let hollow = smoothstep(0.46, 0.62, radius);
+  let coverage = mix(hollow, 1.0, input.fill);
+  return vec4<f32>(shade, input.color.a * edge * coverage);
 }
 
 // ── face highlight ──────────────────────────────────────────────────────────

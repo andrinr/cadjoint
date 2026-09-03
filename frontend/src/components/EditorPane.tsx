@@ -20,6 +20,7 @@ import {
 } from "@codemirror/view";
 import { createEffect, onCleanup, onMount } from "solid-js";
 import { intelligenceExtensions } from "../editor/extensions";
+import type { FocusSpan } from "../editorFocus";
 import { consoleText, sceneName, setDirty, setSource, source } from "../state";
 
 /** Highlight the character span of the selected sketch vertex. */
@@ -107,8 +108,8 @@ const theme = EditorView.theme(
 );
 
 export interface EditorPaneProps {
-  /** Character span to highlight, or null to clear. */
-  highlight: { from: number; to: number } | null;
+  /** Character span to reveal and highlight, or null to clear. */
+  highlight: FocusSpan | null;
   onRun: () => void;
   /** Collapse the pane to its slim rail (same state as Window → Editor). */
   onCollapse?: () => void;
@@ -170,15 +171,37 @@ export function EditorPane(props: EditorPaneProps) {
     });
   });
 
+  /**
+   * Reveal and highlight whatever the viewport selected.
+   *
+   * Two judgements beyond "scroll there":
+   *
+   * - **A statement is revealed, not painted.** A precise span is the exact
+   *   literal and is tinted whole; a declaration can run twenty-two lines —
+   *   the starter's fin comb does — and tinting all of it puts a block over a
+   *   fifth of the file. So a statement tints its first line only, which is
+   *   the line that names the object, and the reveal still lands on it.
+   * - **It never fights a cursor.** If the editor has focus the user is
+   *   typing in it, and yanking the viewport out from under them is worse
+   *   than not moving: the highlight still updates, the scroll does not.
+   */
   createEffect(() => {
     const span = props.highlight;
     if (!view) return;
     const limit = view.state.doc.length;
     const valid = span && span.from >= 0 && span.to <= limit && span.from < span.to;
+    const mark =
+      valid && span
+        ? span.precise
+          ? span
+          : { from: span.from, to: Math.min(span.to, view.state.doc.lineAt(span.from).to) }
+        : null;
     view.dispatch({
       effects: [
-        setHighlight.of(valid ? span : null),
-        ...(valid ? [EditorView.scrollIntoView(span.from, { y: "center" })] : []),
+        setHighlight.of(mark),
+        ...(valid && span && !view.hasFocus
+          ? [EditorView.scrollIntoView(span.from, { y: "center" })]
+          : []),
       ],
     });
   });

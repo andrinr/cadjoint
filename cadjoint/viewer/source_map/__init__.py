@@ -34,6 +34,9 @@ The package is layered, and imports only ever point *down* this list:
 - :mod:`.identity` — the stable id every addressable thing is named by,
   derived from the AST path and the assigned name rather than from a line.
 - :mod:`.materials` — the material browser payload and material lookups.
+- :mod:`.parameters` — which named free parameter backs each value a handle
+  can drag, so the frontend can move it through the shader's uniform buffer
+  instead of through a source rewrite.
 - :mod:`.payload` — joins captured objects with located spans into the viewer
   JSON (the only module that knows what the viewer draws).
 
@@ -87,7 +90,7 @@ from cadjoint.viewer.source_map.identity import (
     identity_index,
 )
 from cadjoint.viewer.source_map.materials import build_material_payload
-from cadjoint.viewer.source_map.nodes import Span
+from cadjoint.viewer.source_map.nodes import Span, statement_span
 from cadjoint.viewer.source_map.payload import (
     build_construction_payload,
     build_construction_relations,
@@ -131,4 +134,5 @@ __all__ = [
     "locate_plane_reference",
     "locate_profile_call",
     "locate_study_statements",
+    "statement_span",
 ]

@@ -214,6 +214,8 @@ export function createOverlayPipelines(
               { shaderLocation: 0, offset: 0, format: "float32x3" },
               { shaderLocation: 1, offset: 12, format: "float32x4" },
               { shaderLocation: 2, offset: 28, format: "float32" },
+              // 1 when the point is a free design parameter — a filled disc.
+              { shaderLocation: 3, offset: 32, format: "float32" },
             ],
           },
         ],

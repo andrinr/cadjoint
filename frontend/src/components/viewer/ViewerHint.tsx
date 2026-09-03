@@ -26,11 +26,19 @@ import {
   type EdgeConstraintTool,
   type VertexConstraintTool,
 } from "../../constraints";
+import type { BindingState } from "../../viewer/dragBinding";
 import type { PendingConstraint } from "./gestures";
 
 export interface ViewerHintProps {
   /** The half-finished two-click constraint pick, if there is one. */
   pendingConstraint: PendingConstraint | null;
+  /**
+   * The sketch handle under the pointer, and whether dragging it is live.
+   *
+   * Null whenever nothing is hovered or the construction overlay is off —
+   * the sentence describes a mark, so it goes away with the mark.
+   */
+  handle: { name: string | null; state: BindingState } | null;
 }
 
 /**
@@ -59,6 +67,22 @@ function faceSentence(): string {
   return `Sketch on face: click ${faceLabel(pick.face)} — ${onto} there · Esc to cancel`;
 }
 
+/**
+ * What dragging the hovered handle will cost.
+ *
+ * The one line that says out loud what the filled and hollow handles mean, at
+ * the moment it matters — pointing at one — rather than as a standing legend.
+ * A free parameter has a slot in the shader's uniform buffer, so the solid
+ * follows the pointer; anything else is a literal in the program text, and
+ * the solid only catches up when the rewritten source recompiles.
+ */
+function handleSentence(handle: { name: string | null; state: BindingState }): string {
+  const label = handle.name ?? "This point";
+  return handle.state === "free"
+    ? `${label} · free parameter: the solid follows the drag`
+    : `${label} · fixed value: the solid follows on release, after a recompile`;
+}
+
 export function ViewerHint(props: ViewerHintProps) {
   return (
     <p class="viewer-hint" data-testid="viewer-hint">
@@ -70,8 +94,8 @@ export function ViewerHint(props: ViewerHintProps) {
         ? bcPickArmed()
           ? "Pick BC: click the mesh → sphere · Shift-drag → box · confirm in the builder"
           : simView()
-            ? "Click the mesh to probe values · pick BC regions from the study builder · Esc returns to model"
-            : "Simulation setup · M cycles modes · Esc returns to model"
+            ? "Click the mesh to probe values · pick BC regions from the study builder · Esc steps back to model"
+            : "Simulation setup · M cycles modes · Esc steps back to model"
         : pendingLoft()
         ? "Loft: click the second sketch in the viewport · Esc to cancel"
         : tool() === "sketch"
@@ -92,7 +116,9 @@ export function ViewerHint(props: ViewerHintProps) {
             : `${CONSTRAINT_TOOL_NAMES[tool() as EdgeConstraintTool]}: choose the first sketch edge`
           : tool() !== "select"
             ? `Click to place a ${tool()} · Esc to cancel`
-            : "Drag handles or the gizmo · Drag to orbit · Right-drag to pan"}
+            : props.handle
+              ? handleSentence(props.handle)
+              : "Drag handles or the gizmo · Drag to orbit · Right-drag to pan"}
     </p>
   );
 }

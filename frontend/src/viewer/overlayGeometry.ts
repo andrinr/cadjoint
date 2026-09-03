@@ -19,13 +19,16 @@ import type {
   MeshEdgePayload,
   Selection,
 } from "../types";
+import { vertexState } from "./dragBinding";
+import type { ShaderProgramPayload } from "./shaderProgram";
 import { AXIS_COLORS, gizmoEdges, type AxisIndex } from "./gizmo";
 import type { Vec3 } from "./math";
 import { triangulate } from "./triangulate";
 
 /** Bytes per instance: position pair + rgba (+ an active flag for gizmos). */
 export const EDGE_STRIDE = 40;
-export const HANDLE_STRIDE = 32;
+/** Handle: centre + rgba + emphasis + fill. */
+export const HANDLE_STRIDE = 36;
 export const GIZMO_STRIDE = 44;
 /** Bytes per *vertex* of the face highlight: position + rgba. */
 export const FACE_STRIDE = 28;
@@ -83,6 +86,7 @@ export function packConstructionOverlay(
   profiles: readonly ConstructionNode[],
   selection: Selection | null,
   hover: Selection | null,
+  program: ShaderProgramPayload | null = null,
 ): { edges: number[]; handles: number[] } {
   const edges: number[] = [];
   const handles: number[] = [];
@@ -112,12 +116,19 @@ export function packConstructionOverlay(
             ? COLORS.handleHover
             : COLORS.handle;
       const position = node.vertices[index].world;
+      // Filled means the drag is live: the point is a free design parameter,
+      // so moving it is a write into the shader's uniform buffer. A ring is a
+      // point the shader holds as a constant, and dragging it costs a
+      // recompile — the same disc, hollowed, because it is the same handle in
+      // a weaker state rather than a different kind of thing.
+      const live = vertexState(node.vertices[index], program) === "free";
       handles.push(
         position[0],
         position[1],
         position[2],
         ...handleColor,
         isSelected || isHovered ? 1 : 0,
+        live ? 1 : 0,
       );
     }
   }

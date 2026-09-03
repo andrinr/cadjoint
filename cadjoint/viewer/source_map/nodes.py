@@ -222,3 +222,52 @@ def _is_number(node: ast.AST) -> bool:
 
 def _contains(outer: ast.AST, inner: ast.AST) -> bool:
     return any(node is inner for node in ast.walk(outer))
+
+
+def statement_span(source: str, line: int | None) -> Span | None:
+    """Character span of the statement that declares whatever sits on *line*.
+
+    The viewer addresses an object by the line its constructor call starts on,
+    which is enough to patch it but not enough to *show* it: pointing an editor
+    at ``Solid.box(`` reveals a call, and pointing it at the position literal —
+    which is what the payload used to offer — reveals three numbers. What a
+    reader wants when they select an object is the statement that declares it,
+    ``board = Solid.box(...)``, however many lines it runs to.
+
+    Innermost wins. A construction call inside a function or a comprehension
+    resolves to the smallest statement containing it rather than to the
+    enclosing ``def``, so the reveal lands on the line that built the object
+    even when the program is not a flat script.
+
+    Args:
+        source: The program text.
+        line: 1-based line of the constructor call, or ``None`` for an object
+            the capture could not place.
+
+    Returns:
+        ``(start, end)`` character offsets of the statement, or ``None`` when
+        the line is unknown or the text does not parse.
+    """
+    if line is None:
+        return None
+    try:
+        tree = parse_module(source)
+    except SyntaxError:
+        return None
+    offsets = _line_offsets(source)
+    best: ast.stmt | None = None
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.stmt):
+            continue
+        end = getattr(node, "end_lineno", None)
+        if end is None or not (node.lineno <= line <= end):
+            continue
+        # Innermost: the latest-starting statement that still contains the
+        # line, so a nested one beats the block it lives in.
+        if (
+            best is None
+            or node.lineno > best.lineno
+            or (node.lineno == best.lineno and (best.end_lineno or 0) > end)
+        ):
+            best = node
+    return _node_span(source, offsets, best) if best is not None else None

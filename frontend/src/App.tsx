@@ -37,6 +37,7 @@ import { createShellShortcuts } from "./shell/shellShortcuts";
 import { createSourceActions, createSourceHistory } from "./shell/sourceHistory";
 import { WindowLayout } from "./windows/WindowLayout";
 import type { WindowId } from "./windows/panels";
+import { focusSpan } from "./editorFocus";
 import { referenceFor, type FaceTarget } from "./faces";
 import {
   cameraAngles,
@@ -55,7 +56,18 @@ import {
   reportViewerError,
   setStatus,
 } from "./state";
+import { transformState, vertexState, type BindingState } from "./viewer/dragBinding";
 import { Renderer, type ShaderStats } from "./viewer/renderer";
+
+/** One draggable value, and whether dragging it writes a buffer or a module. */
+export interface HandleBinding {
+  nodeId: string;
+  /** The sketch vertex's index, or the gizmo argument's name. */
+  handle: string;
+  /** The parameter the source names for it, if it names one. */
+  parameter: string | null;
+  state: BindingState;
+}
 
 declare global {
   interface Window {
@@ -63,6 +75,7 @@ declare global {
     __cadjointSetParameters?: (
       overrides: Record<string, readonly number[]> | null,
     ) => boolean;
+    __cadjointBindings?: () => HandleBinding[];
   }
 }
 
@@ -82,6 +95,32 @@ export function App() {
     window.__cadjointShaders = () => renderer.shaderStats;
     window.__cadjointSetParameters = (overrides) =>
       renderer.setParameterOverrides(overrides);
+    // The same classification the overlay draws each handle with, published
+    // so a test can assert the mark and the path agree: a filled handle that
+    // recompiled, or a hollow one that did not, is the mark lying.
+    window.__cadjointBindings = () =>
+      nodes().flatMap((node) => {
+        const program = renderer.parameterProgram;
+        const vertices = node.vertices.map((vertex, index) => ({
+          nodeId: node.id,
+          handle: `vertex[${index}]`,
+          parameter: vertex.binding?.name ?? null,
+          state: vertexState(vertex, program),
+        }));
+        const transform = node.transform;
+        const args = transform
+          ? ["position", "rotation", ...Object.keys(transform.dimensions)]
+          : [];
+        return [
+          ...vertices,
+          ...args.map((argument) => ({
+            nodeId: node.id,
+            handle: `gizmo ${argument}`,
+            parameter: transform?.bindings?.[argument]?.[0]?.name ?? null,
+            state: transformState(transform, argument, program),
+          })),
+        ];
+      });
   }
 
   const render = createRenderState(renderer);
@@ -134,18 +173,11 @@ export function App() {
   });
 
   /** Character span of the selected vertex's literal, for the editor. */
+  // A vertex reveals its own literal; a whole object reveals the statement
+  // that declares it. The rule itself lives in `editorFocus.ts`.
   const highlight = createMemo(() => {
     const active = selection();
-    if (!active) return null;
-    const node = nodeById(active.nodeId);
-    if (!node) return null;
-    if (active.vertexIndex === null) {
-      // A whole primitive highlights its position literal instead.
-      const span = node.spans.position;
-      return span ? { from: span[0], to: span[1] } : null;
-    }
-    const span = node.vertices[active.vertexIndex]?.span;
-    return span ? { from: span[0], to: span[1] } : null;
+    return active ? focusSpan(nodeById(active.nodeId), active.vertexIndex) : null;
   });
 
   onMount(async () => {

@@ -50,6 +50,7 @@ import {
   SDF_VIEW_CODE,
   VIEW_PRESETS,
   displayFlags,
+  effectiveMarchSteps,
   slicePosition,
   type DisplaySettings,
   type QualityPreset,
@@ -75,6 +76,8 @@ import {
   sharedLayout,
 } from "./pipelines";
 import {
+  CULL_MARGIN_OFF,
+  CULL_MARGIN_ON,
   PARAMETER_SLOT_BYTES,
   ShaderModuleCache,
   packParameters,
@@ -104,9 +107,12 @@ export {
   DISPLAY,
   QUALITY_PRESETS,
   SDF_SLICE_RANGE,
+  MARCH_STEPS_MAX,
+  MARCH_STEPS_MIN,
   SDF_VIEW_CODE,
   VIEW_PRESETS,
   displayFlags,
+  effectiveMarchSteps,
   isSliceView,
   matchViewPreset,
   sameView,
@@ -218,7 +224,6 @@ export class Renderer {
   private program: ShaderProgramPayload | null = null;
   private parameterBuffer: GPUBuffer | null = null;
   private parameterBufferBytes = 0;
-  private parameterLayout: GPUBindGroupLayout | null = null;
   private previewParameterGroup: GPUBindGroup | null = null;
   private pathParameterGroup: GPUBindGroup | null = null;
   /**
@@ -238,6 +243,8 @@ export class Renderer {
   pipelineBuilds = 0;
   /** Parameter uploads that stood in for a pipeline rebuild. */
   parameterUploads = 0;
+  /** `display.cullBounds` as of the last parameter upload. */
+  private uploadedCullBounds = DEFAULT_DISPLAY.cullBounds;
   private presentPipeline: GPURenderPipeline | null = null;
   private edgePipeline: DepthPair | null = null;
   private facePipeline: DepthPair | null = null;
@@ -715,6 +722,10 @@ export class Renderer {
       this.program = program;
       this.parameterOverrides = null;
       this.uploadParameters();
+      // Which handles are live is a property of the program, so the marks
+      // are repacked whenever it is installed — including here, where
+      // nothing else about the scene changed.
+      this.uploadOverlay();
       this.parameterUploads += 1;
       this.destroyAccumulation();
       this.invalidate();
@@ -722,10 +733,18 @@ export class Renderer {
     }
 
     const revision = ++this.shaderRevision;
+    // Nothing about the installed scene changes yet, and that is the whole
+    // rule this method obeys. Everything below the first `await` takes real
+    // time — twelve to twenty-five seconds of module and pipeline building
+    // for `scenes/motor_shield.py` — and every frame drawn in that window
+    // still draws the *previous* scene. It can only do that if the previous
+    // scene is whole. Installing the new program and its buffer up here left
+    // the cached bind groups holding a buffer that had just been destroyed
+    // while the draw asked the *new* program for the index to bind them at,
+    // which is exactly the "Buffer with 'SDF parameters' label has been
+    // destroyed" the big scene reported. The replacement is one synchronous
+    // block, after the pipelines exist and after the revision guard.
     this.pathReady = false;
-    this.program = program;
-    this.parameterOverrides = null;
-    this.ensureParameterBuffer();
 
     const previewModule = await this.shaderModules.get(
       this.device,
@@ -733,8 +752,13 @@ export class Renderer {
       "Preview WGSL",
     );
     const preview = sharedLayout(this.device, "Preview bindings", [0, 2]);
+    const parameterLayout = this.parameterLayoutFor(program);
     const previewLayout = this.device.createPipelineLayout({
-      bindGroupLayouts: this.sceneBindGroupLayouts(preview.bindGroupLayout),
+      bindGroupLayouts: this.sceneBindGroupLayouts(
+        preview.bindGroupLayout,
+        program,
+        parameterLayout,
+      ),
     });
     const previewDescriptor = (writeMask: number): GPURenderPipelineDescriptor => ({
       layout: previewLayout,
@@ -758,6 +782,14 @@ export class Renderer {
     this.pipelineBuilds += 2;
     if (revision !== this.shaderRevision) return;
 
+    // ── the swap ─────────────────────────────────────────────────────────
+    // Synchronous, and in this order: the program and its buffer, then every
+    // bind group that holds them. No `await` may appear between here and the
+    // last assignment, because a frame drawn halfway through would mix the
+    // two scenes.
+    this.program = program;
+    this.parameterOverrides = null;
+    this.adoptParameterBuffer();
     this.previewPipeline = colorPipeline;
     this.previewDepthPipeline = depthOnlyPipeline;
     this.previewBindGroup = this.device.createBindGroup({
@@ -767,8 +799,15 @@ export class Renderer {
         { binding: 2, resource: { buffer: this.viewBuffer } },
       ],
     });
-    this.previewParameterGroup = this.parameterBindGroup(this.parameterLayout);
+    this.previewParameterGroup = this.parameterBindGroup(parameterLayout);
+    // The path pipeline is still the outgoing one and is not rebuilt until
+    // below; its group belongs to the buffer that just went out of use.
+    // `pathReady` is false, so nothing draws it — dropping it says so.
+    this.pathParameterGroup = null;
     this.uploadParameters();
+    // Which handles are live is a property of the program, so the marks are
+    // repacked with it.
+    this.uploadOverlay();
     this.destroyAccumulation();
     this.invalidate();
 
@@ -847,6 +886,27 @@ export class Renderer {
   }
 
   /**
+   * The parameter block's layout for a program that is not installed yet.
+   *
+   * Takes the program rather than reading `this.program`, because it is
+   * called while the *previous* program is still the installed one: nothing
+   * about a scene is swapped in until its pipelines exist.
+   */
+  private parameterLayoutFor(program: ShaderProgramPayload | null): GPUBindGroupLayout | null {
+    if (!this.device || !program) return null;
+    return this.device.createBindGroupLayout({
+      label: "SDF parameter bindings",
+      entries: [
+        {
+          binding: program.binding,
+          visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
+          buffer: { type: "uniform" },
+        },
+      ],
+    });
+  }
+
+  /**
    * The bind group layouts of a scene pipeline, group by group.
    *
    * Group 0 is the camera and view uniforms every scene shader has always
@@ -855,24 +915,17 @@ export class Renderer {
    * spelled out, so they are declared empty. An empty layout binds nothing
    * and needs no bind group set against it.
    */
-  private sceneBindGroupLayouts(scene: GPUBindGroupLayout): GPUBindGroupLayout[] {
+  private sceneBindGroupLayouts(
+    scene: GPUBindGroupLayout,
+    program: ShaderProgramPayload | null,
+    parameterLayout: GPUBindGroupLayout | null,
+  ): GPUBindGroupLayout[] {
     const layouts = [scene];
-    this.parameterLayout = null;
-    if (!this.device || !this.program) return layouts;
-    this.parameterLayout = this.device.createBindGroupLayout({
-      label: "SDF parameter bindings",
-      entries: [
-        {
-          binding: this.program.binding,
-          visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
-          buffer: { type: "uniform" },
-        },
-      ],
-    });
-    while (layouts.length < this.program.group) {
+    if (!this.device || !program || !parameterLayout) return layouts;
+    while (layouts.length < program.group) {
       layouts.push(this.device.createBindGroupLayout({ entries: [] }));
     }
-    layouts.push(this.parameterLayout);
+    layouts.push(parameterLayout);
     return layouts;
   }
 
@@ -887,20 +940,27 @@ export class Renderer {
   }
 
   /**
-   * Size the parameter buffer to the current program.
+   * Give the freshly installed program a buffer of its own size.
    *
-   * Only ever called on a full rebuild: destroying the buffer invalidates
-   * every bind group holding it, and the rebuild makes new ones straight
-   * after. A values-only edit is guarded by `sameLayout`, so it never
-   * reaches here and its bind groups stay valid.
+   * Called from inside the swap, so every bind group that held the outgoing
+   * buffer is rebuilt in the same synchronous step. A buffer whose size has
+   * not changed is kept and simply rewritten, which is why a values-only
+   * edit never needs this at all.
+   *
+   * The outgoing buffer is deliberately **not** destroyed. It is tiny — the
+   * largest shipped scene, `scenes/motor_shield.py`, buffers 41 parameters
+   * into 672 bytes — so `destroy()` reclaims nothing worth having, and it is
+   * live ammunition: one reference left anywhere, in a cached bind group or
+   * a frame already queued, and the next draw fails validation with no stack
+   * and no way back. That is the bug this replaced. Letting the collector
+   * take it cannot fail.
    */
-  private ensureParameterBuffer(): void {
+  private adoptParameterBuffer(): void {
     if (!this.device) return;
     const size = this.program
       ? Math.max(this.program.buffer_bytes, PARAMETER_SLOT_BYTES)
       : 0;
     if (size === this.parameterBufferBytes) return;
-    this.parameterBuffer?.destroy();
     this.parameterBufferBytes = size;
     this.parameterBuffer = size
       ? this.device.createBuffer({
@@ -911,11 +971,34 @@ export class Renderer {
       : null;
   }
 
-  /** Write the current parameter values, drag overrides included. */
+  /**
+   * Write the current parameter values, drag overrides and cull margin
+   * included.
+   */
   private uploadParameters(): void {
     if (!this.device || !this.program || !this.parameterBuffer) return;
-    const packed = packParameters(this.program, this.parameterOverrides ?? undefined);
+    this.uploadedCullBounds = this.display.cullBounds;
+    const packed = packParameters(
+      this.program,
+      this.parameterOverrides ?? undefined,
+      this.display.cullBounds ? CULL_MARGIN_ON : CULL_MARGIN_OFF,
+    );
     this.device.queue.writeBuffer(this.parameterBuffer, 0, packed.buffer as ArrayBuffer);
+  }
+
+  /**
+   * Re-upload when the cull toggle has moved since the last write.
+   *
+   * The margin lives in the scene's parameter buffer rather than the viewer's
+   * own uniform block — the skip tests are inside the generated shader, which
+   * reads nothing else — so it is the one render setting `writeUniforms` does
+   * not carry. Checked per frame and written only on a change, because the
+   * buffer is the drag's hot path and re-packing it every frame for a switch
+   * nobody touched would be a cost with no reason.
+   */
+  private syncCullMargin(): void {
+    if (!this.program || this.uploadedCullBounds === this.display.cullBounds) return;
+    this.uploadParameters();
   }
 
   /**
@@ -945,6 +1028,31 @@ export class Renderer {
     this.destroyAccumulation();
     this.invalidate();
     return true;
+  }
+
+  /**
+   * The installed scene's uniform contract, or null in the literal form.
+   *
+   * Read by the drag path, which has to know whether the parameter a handle
+   * names actually has a slot before it promises a live drag, and by the
+   * overlay, which draws the handles that do differently from the ones that
+   * do not.
+   */
+  get parameterProgram(): ShaderProgramPayload | null {
+    return this.program;
+  }
+
+  /**
+   * Drop a live drag preview that no compile came along to replace.
+   *
+   * The ordinary end of a drag is a patch, a recompile, and the same numbers
+   * arriving through the payload — which clears the overrides on its way in.
+   * A patch the server refuses ends without any of that, and the overrides
+   * would keep drawing a solid the program does not describe. Called once
+   * the commit has settled, so it is a no-op in every case but that one.
+   */
+  dropStaleParameterOverrides(): void {
+    if (this.parameterOverrides) this.setParameterOverrides(null);
   }
 
   /** Whether the installed scene reads its parameters from a buffer. */
@@ -1018,6 +1126,7 @@ export class Renderer {
       this.profiles,
       this.selection,
       this.hover,
+      this.program,
     );
 
     // Transform controls have their own buffer and pass.
@@ -1260,6 +1369,7 @@ export class Renderer {
 
   private writeUniforms(): void {
     const device = this.device!;
+    this.syncCullMargin();
     const position = cameraPosition(this.camera);
     // The six trailing scalars of the first five vec4s are the SDF views and
     // the march budget; `Uniforms` in `cadjoint/viewer/_webgpu.py` documents
@@ -1281,7 +1391,10 @@ export class Renderer {
       this.sampleCount,
       this.quality.bounces,
       this.quality.shadowSamples,
-      this.quality.marchSteps,
+      // The tier's budget unless the display settings override it; both are
+      // rendering choices that ride in the uniform, so changing either is a
+      // buffer write and a redraw rather than a recompile.
+      effectiveMarchSteps(this.display, this.quality),
       this.display.projection === "orthographic" ? 1 : 0,
       orthoHeightFor(this.camera.distance),
       this.displayFlags(),

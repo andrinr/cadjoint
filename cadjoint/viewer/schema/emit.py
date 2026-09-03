@@ -57,6 +57,7 @@ _MODELS: tuple[type[BaseModel], ...] = (
     payloads.ConstructionRelation,
     payloads.ConstructionOperator,
     payloads.ConstructionTransform,
+    payloads.ParameterBinding,
     payloads.ConstraintSolverRun,
     payloads.MaterialDefinition,
     payloads.StudyPayload,

@@ -50,6 +50,7 @@ from cadjoint.viewer.source_map import (  # noqa: F401
     locate_plane_reference,
     locate_profile_call,
     locate_study_statements,
+    statement_span,
 )
 from cadjoint.viewer.source_map.calls import _vertices_argument  # noqa: F401
 from cadjoint.viewer.source_map.capture import _caller_line  # noqa: F401

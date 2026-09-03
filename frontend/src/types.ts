@@ -57,6 +57,7 @@ export type {
   OptimizationPayload,
   PatchOperation,
   PatchRequest,
+  ParameterBinding,
   PatchResponse,
   PlaneReference,
   ShaderParameter,

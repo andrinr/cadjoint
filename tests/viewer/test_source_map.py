@@ -275,6 +275,171 @@ class TestConstructionPayload:
         ]
 
 
+BOUND = """from cadjoint.construction import PolygonProfile, Solid, extrude
+from cadjoint.geometry import Scalar, Vector, Vector2
+from cadjoint.sdf.boolean import Union
+
+tip = Vector2(value=[1.0, 1.5], free=True, name="tip")
+root = Vector2(value=[1.0, 0.0], name="root")
+profile = PolygonProfile([[0.0, 0.0], root, tip], name="tri")
+slab = extrude(profile, depth=Scalar(0.6, free=True, name="depth"))
+seat = Vector([1.0, 0.0, 0.0], free=True, name="seat")
+peg = Solid.cylinder(radius=Scalar(0.2), height=0.3, position=seat, name="peg")
+scene = Union(slab, peg)
+"""
+
+
+class TestParameterBindings:
+    """Which draggable values name a free parameter the shader can be told about.
+
+    The binding is half of the join that lets a drag write the uniform buffer
+    instead of recompiling; the other half is the shader's slot table, which
+    the client checks the name against. What is pinned here is the half this
+    package owns: a binding appears when, and only when, the source really
+    does put a named free parameter behind the value.
+    """
+
+    def test_a_free_named_vertex_binds_to_its_parameter(self):
+        captured, _ = run(BOUND)
+        profile = build_construction_payload(captured, BOUND)[0]
+        assert profile["vertices"][2]["binding"] == {
+            "name": "tip",
+            "components": 2,
+            "index": None,
+        }
+
+    def test_a_pinned_vertex_binds_to_nothing(self):
+        captured, _ = run(BOUND)
+        profile = build_construction_payload(captured, BOUND)[0]
+        # ``root`` is a ``Vector2`` the author declared and left pinned, so it
+        # is a constant in the generated shader; promising a slot for it would
+        # be a lie. A bare literal, by contrast, is wrapped as a free
+        # ``{sketch}_v{i}`` and does get one.
+        assert profile["vertices"][1]["binding"] is None
+        assert profile["vertices"][0]["binding"] == {
+            "name": "tri_v0",
+            "components": 2,
+            "index": None,
+        }
+
+    def test_a_primitive_position_binds_to_the_vector_it_was_given(self):
+        captured, _ = run(BOUND)
+        peg = next(
+            entry for entry in build_construction_payload(captured, BOUND) if entry["name"] == "peg"
+        )
+        assert peg["transform"]["bindings"]["position"] == [
+            {"name": "seat", "components": 3, "index": None}
+        ]
+
+    def test_an_unwrapped_dimension_binds_and_a_pinned_one_does_not(self):
+        captured, _ = run(BOUND)
+        peg = next(
+            entry for entry in build_construction_payload(captured, BOUND) if entry["name"] == "peg"
+        )
+        bindings = peg["transform"]["bindings"]
+        # A raw number becomes a named free parameter of the primitive; a
+        # ``Scalar`` the author pinned is adopted as it stands.
+        assert bindings["height"] == [{"name": "peg_height", "components": 1, "index": None}]
+        assert "radius" not in bindings
+
+    def test_rotation_binds_component_by_component(self):
+        captured, _ = run(BOUND)
+        peg = next(
+            entry for entry in build_construction_payload(captured, BOUND) if entry["name"] == "peg"
+        )
+        assert peg["transform"]["bindings"]["rotation"] == [
+            {"name": "peg_rx", "components": 1, "index": 0},
+            {"name": "peg_ry", "components": 1, "index": 1},
+            {"name": "peg_rz", "components": 1, "index": 2},
+        ]
+
+    def test_a_partly_free_value_binds_nothing(self):
+        source = (
+            "from cadjoint.construction import Solid\n"
+            "from cadjoint.geometry import Scalar\n"
+            "scene = Solid.cylinder(\n"
+            "    radius=0.2, height=0.3, rotation=[Scalar(0.1), 0.2, 0.3], name='pin'\n"
+            ")\n"
+        )
+        captured, _ = run(source)
+        entry = build_construction_payload(captured, source)[0]
+        # One pinned angle out of three: writing the other two live would draw
+        # an orientation the source does not have, so the whole argument falls
+        # back to the recompile.
+        assert "rotation" not in entry["transform"]["bindings"]
+
+    def test_a_sketch_plane_transform_binds_nothing(self):
+        captured, _ = run(BOUND)
+        profile = build_construction_payload(captured, BOUND)[0]
+        assert profile["transform"]["bindings"] == {}
+
+
+class TestStatementSpans:
+    """Where the editor is sent when the viewport selects something.
+
+    The payload used to offer only *argument* spans, so selecting a primitive
+    revealed its position literal — three numbers — and selecting a sketch
+    revealed nothing at all, because a profile publishes no argument spans.
+    Every node now carries the span of the statement that declares it.
+    """
+
+    def test_a_sketch_declaration_is_published(self):
+        captured, _ = run(SIMPLE)
+        profile = build_construction_payload(captured, SIMPLE)[0]
+        start, end = profile["statementSpan"]
+        assert SIMPLE[start:end].startswith("profile = PolygonProfile(")
+
+    def test_a_primitive_declaration_is_published(self):
+        source = (
+            "from cadjoint.construction import Solid\n"
+            "block = Solid.box(size=[1, 1, 1], position=[0, 0, 0], name='block')\n"
+            "scene = block\n"
+        )
+        captured, _ = run(source)
+        entry = build_construction_payload(captured, source)[0]
+        start, end = entry["statementSpan"]
+        assert (
+            source[start:end]
+            == "block = Solid.box(size=[1, 1, 1], position=[0, 0, 0], name='block')"
+        )
+
+    def test_a_multiline_declaration_spans_all_of_it(self):
+        captured, _ = run(MULTILINE)
+        profile = build_construction_payload(captured, MULTILINE)[0]
+        start, end = profile["statementSpan"]
+        text = MULTILINE[start:end]
+        assert text.startswith("quad = PolygonProfile(")
+        assert text.rstrip().endswith(")")
+        assert text.count("\n") >= 3
+
+    def test_a_feature_call_resolves_to_its_own_statement(self):
+        from cadjoint.viewer._source_map import statement_span
+
+        # `extrude(...)` is a statement of its own, and the locator has to
+        # find it by line the same way it finds a declaration.
+        start, end = statement_span(SIMPLE, 3)
+        assert SIMPLE[start:end] == "scene = extrude(profile, depth=0.6)"
+
+    def test_the_innermost_statement_wins(self):
+        source = (
+            "from cadjoint.construction import PolygonProfile\n"
+            "def build():\n"
+            "    inner = PolygonProfile([[0, 0], [1, 0], [0, 1]], name='inner')\n"
+            "    return inner\n"
+        )
+        from cadjoint.viewer._source_map import statement_span
+
+        start, end = statement_span(source, 3)
+        # The assignment, not the `def` that contains it.
+        assert source[start:end].startswith("inner = PolygonProfile(")
+
+    def test_an_unplaceable_object_has_no_statement(self):
+        from cadjoint.viewer._source_map import statement_span
+
+        assert statement_span(SIMPLE, None) is None
+        assert statement_span("def broken(:\n", 1) is None
+
+
 MESHES = """from cadjoint.fem import Dirichlet, Nodes, SimMesh, ThermalStudy
 from cadjoint.sdf.primitives import Box
 

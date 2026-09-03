@@ -21,6 +21,7 @@ import {
   editingMode,
   meshEdges,
   drag,
+  gizmoDrag,
   cameraAngles,
   busy,
   bcPickArmed,
@@ -35,6 +36,7 @@ import {
   relations,
   selection,
   setDrag,
+  setGizmoDrag,
   setHover,
   setGizmoMode,
   setSelection,
@@ -44,6 +46,7 @@ import {
   tool,
 } from "../state";
 import { rectAabbProposal } from "../bcPick";
+import { overridesFor, vertexState } from "../viewer/dragBinding";
 import { intersectPlane, rayFromPixel, worldToPlane } from "../viewer/math";
 import { GRID_ALPHA } from "../viewer/graticule";
 import { pickEdge, pickNode, pickVertex, type PickView } from "../viewer/hittest";
@@ -140,6 +143,24 @@ export function ViewerPane(props: ViewerPaneProps) {
       displayProfiles(),
       relations(),
     );
+  });
+
+  /**
+   * The sketch handle under the pointer, classified.
+   *
+   * Feeds the one line in the hint bar that says what dragging it will cost,
+   * and it is the same classification the overlay draws the handle with — one
+   * function, so the sentence cannot disagree with the mark. Gated on the
+   * construction overlay, because a sentence about an invisible handle is
+   * about nothing.
+   */
+  const hoveredHandle = createMemo(() => {
+    if (!props.display.showOverlays || !props.display.showSketches) return null;
+    const at = hover();
+    if (!at || at.vertexIndex === null) return null;
+    const vertex = nodeById(at.nodeId)?.vertices[at.vertexIndex];
+    if (!vertex) return null;
+    return { name: vertex.name, state: vertexState(vertex, renderer.parameterProgram) };
   });
 
   /**
@@ -329,6 +350,25 @@ export function ViewerPane(props: ViewerPaneProps) {
   const onPointerMove = (event: PointerEvent) => {
     const [x, y] = toPixels(event);
 
+    // A release can go missing, and when it does the viewport is left
+    // dragging something with no button held.
+    //
+    // Selecting a sketch point auto-enters sketch mode, the dock rearranges
+    // its panels for that mode, and the canvas holding the pointer capture is
+    // re-parented mid-gesture — so the `pointerup` lands on a detached node
+    // and `finishGesture` never runs. Measured: a plain click on a handle
+    // delivers `pointerdown` and no `pointerup` at all, after which the
+    // cursor stays `grabbing`, every further move keeps calling `setDrag`,
+    // and the point follows the mouse untouched until the next press, which
+    // then commits it to the source. `buttons === 0` says the user is not
+    // holding anything, so whatever we thought was in flight is over: drop
+    // it and go back to hovering.
+    if (event.buttons === 0 && gestureInFlight()) {
+      cancelGesture();
+      updateHover(x, y);
+      return;
+    }
+
     if (gesture.kind === "none") {
       updateHover(x, y);
       return;
@@ -368,6 +408,17 @@ export function ViewerPane(props: ViewerPaneProps) {
       if (!xy) return;
       gesture.moved = true;
       setDrag({ nodeId: gesture.nodeId, vertexIndex: gesture.vertexIndex, xy });
+      // A vertex that is a free design parameter has a slot in the shader's
+      // uniform buffer, so the *solid* can follow the pointer too: a few
+      // hundred bytes and a redraw, no patch and no recompile until release.
+      // A vertex the source states as a literal has no slot, and only its
+      // wireframe moves until the release recompiles — which is what the
+      // hollow handle in the overlay is saying.
+      const vertex = nodeById(gesture.nodeId)?.vertices[gesture.vertexIndex];
+      const overrides = vertex
+        ? overridesFor(vertex.binding ? [vertex.binding] : null, xy, renderer.parameterProgram)
+        : null;
+      if (overrides) renderer.setParameterOverrides(overrides);
       return;
     }
 
@@ -433,7 +484,16 @@ export function ViewerPane(props: ViewerPaneProps) {
       const profile = nodeById(finished.nodeId);
       setDrag(null);
       if (finished.moved && active && profile?.line != null) {
+        // The source is still the truth: the patch goes out exactly as it
+        // always did, and the compile it triggers clears any live override
+        // by installing the same numbers through the ordinary path.
         await props.onPatch("set_vertex", profile.line, finished.vertexIndex, active.xy);
+        // A patch the server refused recompiles nothing, and a live preview
+        // with nothing behind it is worse than no preview.
+        renderer.dropStaleParameterOverrides();
+      } else if (finished.moved) {
+        // Nothing will recompile, so nothing would clear a live preview.
+        renderer.setParameterOverrides(null);
       }
       return;
     }
@@ -473,9 +533,55 @@ export function ViewerPane(props: ViewerPaneProps) {
     await props.onAssignMaterial(node.line, material);
   };
 
+  /**
+   * Whether the pointer state machine thinks a *command* gesture is running.
+   *
+   * Orbit, pan and a pending sim tap move the camera or wait to become one;
+   * they carry no half-written edit, so they are not commands here.
+   */
+  const gestureInFlight = (): boolean =>
+    gesture.kind === "drag" || gesture.kind === "gizmo" || gesture.kind === "bcrect";
+
+  /**
+   * Whether an *uncommitted preview* is on screen.
+   *
+   * This, not `gestureInFlight`, is what Escape's first rung asks about: the
+   * question is "is there a change on screen that the source has not got",
+   * and that is exactly what these three signals hold. A press that lands
+   * between pointer-down and the first move has nothing to take back and
+   * should fall through to the next rung instead of eating the keystroke.
+   */
+  const previewActive = (): boolean =>
+    drag() !== null || gizmoDrag() !== null || pickRect() !== null;
+
+  /**
+   * Abandon the gesture in flight, leaving nothing of it behind.
+   *
+   * The wireframe preview and the live parameter overrides are two views of
+   * the same uncommitted value, so both go: dropping only the preview would
+   * leave the *solid* showing a drag the source never received, which is
+   * exactly the state a cancel is supposed to make impossible. Clearing
+   * `gesture` also means the pointer-up that follows commits nothing.
+   */
+  const cancelGesture = () => {
+    if (!gestureInFlight() && !previewActive()) return;
+    gesture = { kind: "none" };
+    setDrag(null);
+    setGizmoDrag(null);
+    setPickRect(null);
+    renderer.gizmoAxis = null;
+    renderer.interacting = false;
+    renderer.setParameterOverrides(null);
+    renderer.setConstruction(displayProfiles(), selection(), hover());
+    renderer.invalidate();
+  };
+
   const keyboard = createViewerKeyboard({
     props,
     clearPendingConstraint: () => setPendingConstraint(null),
+    pendingConstraintActive: () => pendingConstraint() !== null,
+    gestureActive: previewActive,
+    cancelGesture,
     setPanHeld: (held) => {
       panHeld = held;
       canvas.style.cursor = panHeld ? "move" : "default";
@@ -652,7 +758,7 @@ export function ViewerPane(props: ViewerPaneProps) {
         sdfFraction={props.display.sdfFraction}
       />
       <ViewerOverlays pickRect={props.display.showOverlays ? pickRect() : null} />
-      <ViewerHint pendingConstraint={pendingConstraint()} />
+      <ViewerHint pendingConstraint={pendingConstraint()} handle={hoveredHandle()} />
     </section>
   );
 }
