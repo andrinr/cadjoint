@@ -2,8 +2,12 @@ from __future__ import annotations
 
 import ast
 import json
+import os
+import shutil
+import tempfile
 import threading
 from contextlib import contextmanager
+from pathlib import Path
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
@@ -14,6 +18,7 @@ from cadjoint.viewer._pathtracer import (
     WGSL_PRESENT_TEMPLATE,
     build_path_tracer_shader,
 )
+from cadjoint.viewer._scenes import SCENES_DIR_ENV
 from cadjoint.viewer._webgpu import build_viewer_shader, ensure_material_wgsl
 from cadjoint.viewer.playground import (
     EXAMPLE_SOURCE,
@@ -70,8 +75,6 @@ def test_mesh_endpoint_reports_mesh_edges_for_the_viewer():
     mesh_edges = result["mesh_edges"]
     assert mesh_edges is not None
     assert mesh_edges["resolution"] >= 8
-    # Observability: which dual-contouring backend produced the edges.
-    assert isinstance(mesh_edges["native"], bool)
     for group in ("wire", "sharp"):
         assert len(mesh_edges[group]) > 0
         for segment in mesh_edges[group][:16]:
@@ -206,7 +209,17 @@ def test_example_scene_reports_its_construction_for_the_viewer():
     nodes = {node["name"]: node for node in result["construction"] if node["kind"] != "profile"}
     # Extrude and revolve sketches sit alongside the two bushing cylinders.
     assert set(profiles) == {"fin comb", "slug section"}
-    assert set(nodes) == {"bush_a", "bush_b"}
+    # The two bushings plus the board-level context solids.
+    assert set(nodes) == {
+        "bush_a",
+        "bush_b",
+        "board",
+        "die",
+        "head_a",
+        "head_b",
+        "cap_a",
+        "cap_b",
+    }
 
     profile = profiles["fin comb"]
     assert profile["editable"] is True
@@ -269,7 +282,16 @@ def test_example_scene_reports_its_construction_for_the_viewer():
     assert EXAMPLE_SOURCE[start:end] == "[0.78, 0.0, 0.1]"
 
     materials = {material["name"]: material for material in result["materials"]}
-    assert set(materials) == {"aluminum", "copper", "steel"}
+    # The three simulated metals plus the board-level context palette.
+    assert set(materials) == {
+        "aluminum",
+        "copper",
+        "steel",
+        "fr4",
+        "silicon",
+        "black_oxide",
+        "electrolytic",
+    }
     assert materials["aluminum"]["metallic"] == pytest.approx(0.9)
     assert materials["copper"]["roughness"] == pytest.approx(0.18)
     assert materials["steel"]["metallic"] == pytest.approx(0.85)
@@ -445,18 +467,41 @@ def test_resolve_static_refuses_paths_outside_the_static_root():
     assert resolve_static("/../_webgpu.py") is None
 
 
+#: The repository's own scenes, copied into every live server's workspace.
+SHIPPED_SCENES = Path(__file__).resolve().parents[1] / "scenes"
+
+
 @contextmanager
 def running_server():
-    server = create_server(0)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    try:
-        host, port = server.server_address
-        yield f"http://{host}:{port}"
-    finally:
-        server.shutdown()
-        server.server_close()
-        thread.join(timeout=2)
+    """A live playground on a free port, writing scenes to a temp directory.
+
+    The scenes root defaults to ``./scenes`` under the working directory,
+    which for a test run is the repository — so a request that saved a scene
+    used to leave a file in the checkout.  Each live server gets its own
+    temporary directory instead, seeded with copies of the shipped scenes so
+    the listing has something real in it.
+    """
+    with tempfile.TemporaryDirectory() as workspace:
+        root = Path(workspace) / "scenes"
+        root.mkdir()
+        for path in sorted(SHIPPED_SCENES.glob("*.py")):
+            shutil.copyfile(path, root / path.name)
+        previous = os.environ.get(SCENES_DIR_ENV)
+        os.environ[SCENES_DIR_ENV] = str(root)
+        server = create_server(0)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            host, port = server.server_address
+            yield f"http://{host}:{port}"
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=2)
+            if previous is None:
+                os.environ.pop(SCENES_DIR_ENV, None)
+            else:
+                os.environ[SCENES_DIR_ENV] = previous
 
 
 def post(base: str, path: str, payload: dict, token: str | None = None) -> Request:
@@ -561,12 +606,17 @@ def test_scene_files_round_trip_in_the_workspace(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
 
     # The directory is created lazily, so listing before any save is empty.
-    assert list_scenes() == {"ok": True, "files": []}
+    assert list_scenes() == {"ok": True, "files": [], "scenes": []}
 
     saved = save_scene({"name": "bracket.py", "source": "scene = None\n"})
     assert saved == {"ok": True, "name": "bracket.py"}
     assert (tmp_path / "scenes" / "bracket.py").read_text() == "scene = None\n"
-    assert list_scenes() == {"ok": True, "files": ["bracket.py"]}
+    # `files` is the bare-name contract the Open dialog reads; `scenes`
+    # describes the same files for the browser (see test_scenes_summary.py).
+    listing = list_scenes()
+    assert listing["ok"] is True
+    assert listing["files"] == ["bracket.py"]
+    assert [entry["name"] for entry in listing["scenes"]] == ["bracket.py"]
 
     loaded = load_scene({"name": "bracket.py"})
     assert loaded["ok"] is True
@@ -617,6 +667,9 @@ def test_scene_save_rejects_oversized_source(tmp_path, monkeypatch):
 
 
 def test_scene_endpoints_round_trip_over_http(tmp_path, monkeypatch):
+    # The live server writes into its own temporary workspace (seeded with
+    # the shipped scenes), never into the working directory; chdir here only
+    # proves that a refused traversal writes nothing beside it either.
     monkeypatch.chdir(tmp_path)
     with running_server() as base:
         with urlopen(f"{base}/api/session") as response:
@@ -628,7 +681,12 @@ def test_scene_endpoints_round_trip_over_http(tmp_path, monkeypatch):
             assert json.loads(response.read()) == {"ok": True, "name": "part.py"}
 
         with urlopen(f"{base}/api/scenes") as response:
-            assert json.loads(response.read()) == {"ok": True, "files": ["part.py"]}
+            listing = json.loads(response.read())
+        assert listing["ok"] is True
+        assert "part.py" in listing["files"]
+        described = {entry["name"]: entry for entry in listing["scenes"]}
+        assert described.keys() == set(listing["files"])
+        assert described["part.py"]["source_hash"] is not None
 
         with urlopen(post(base, "/api/scenes/load", {"name": "part.py"}, token)) as response:
             loaded = json.loads(response.read())
@@ -1331,3 +1389,91 @@ def test_optimize_endpoint_streams_ndjson_over_http():
     assert events[-1]["parameters"]["radius"] == pytest.approx(
         events[-1]["trajectory"][-1]["parameters"]["radius"]
     )
+
+
+@pytest.mark.parametrize("path", ["/api/lint", "/api/complete", "/api/signature"])
+def test_intelligence_endpoints_require_the_session_token(path):
+    # The analyser endpoints read the same arbitrary source everything else
+    # does, so they sit behind the same CSRF gate.
+    with running_server() as base:
+        with pytest.raises(HTTPError) as error:
+            urlopen(post(base, path, {"source": "scene = None", "line": 1, "column": 0}))
+        assert error.value.code == 403
+
+
+def test_a_failed_compile_is_reported_again_by_the_linter():
+    # The routing table taps /compile so a traceback that named a line of the
+    # user's program comes back as the first lint diagnostic.
+    source = (
+        "from cadjoint.geometry import Vector\n"
+        "from cadjoint.sdf.primitives import Box\n"
+        "scene = Box(size=Vector([1.0, 1.0, 1.0]))\n"
+        "boom = 1 / 0\n"
+    )
+    with running_server() as base:
+        with urlopen(f"{base}/api/session") as response:
+            token = json.loads(response.read())["token"]
+        with pytest.raises(HTTPError) as error:
+            urlopen(post(base, "/compile", {"source": source}, token))
+        assert error.value.code == 422
+        with urlopen(post(base, "/api/lint", {"source": source}, token)) as response:
+            lint = json.loads(response.read())
+
+    assert lint["runtime"] is True
+    first = lint["diagnostics"][0]
+    assert first["source"] == "runtime"
+    assert first["from_line"] == 4
+    assert "ZeroDivisionError" in first["message"]
+
+
+# ── Job registration rides along with the endpoints it does not change ──────
+
+
+def test_every_timed_endpoint_answers_with_a_job_id_and_nothing_else_changed():
+    # Registration is additive: the compile response is the same object the
+    # worker produced, plus the id under which the server now remembers it.
+    source = "from cadjoint.sdf.primitives import Sphere\n\nscene = Sphere(0.5)\n"
+    with running_server() as base:
+        with urlopen(f"{base}/api/session") as response:
+            token = json.loads(response.read())["token"]
+        with urlopen(post(base, "/compile", {"source": source}, token)) as response:
+            served = json.loads(response.read())
+
+    direct = compile_source(source)
+    assert served["ok"] is True
+    assert set(served) == set(direct) | {"job_id"}
+    assert served["job_id"].startswith("job-")
+    assert served["sdf"] == direct["sdf"]
+
+
+def test_a_streamed_optimize_run_is_replayable_from_the_job_store():
+    # The trajectory a Results panel drew is not lost when the panel is: the
+    # progress events carry the job id while they stream, and the whole run
+    # is fetchable again from the store afterwards.
+    with running_server() as base:
+        with urlopen(f"{base}/api/session") as response:
+            token = json.loads(response.read())["token"]
+        request = post(
+            base, "/api/optimize", {"source": OPTIMIZE_SOURCE, "name": "fit-radius"}, token
+        )
+        with urlopen(request) as response:
+            events = [json.loads(line) for line in response if line.strip()]
+
+        job_id = events[0]["job_id"]
+        assert {event["job_id"] for event in events} == {job_id}
+
+        jobs = Request(f"{base}/api/jobs", headers={"X-Cadjoint-Token": token})
+        with urlopen(jobs) as response:
+            summary = json.loads(response.read())["jobs"][0]
+        assert summary["kind"] == "optimize"
+        assert summary["fields"] == {"name": "fit-radius"}
+        # The job's own progress mirrors the stream's last step.
+        assert summary["progress"]["step"] == events[-2]["step"]
+
+        stored = Request(f"{base}/api/jobs/{job_id}/result", headers={"X-Cadjoint-Token": token})
+        with urlopen(stored) as response:
+            replay = json.loads(response.read())
+
+    assert replay["ok"] is True
+    assert replay["trajectory"] == events[-1]["trajectory"]
+    assert replay["source"] == events[-1]["source"]

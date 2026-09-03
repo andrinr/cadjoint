@@ -6,12 +6,14 @@ import type { ConstructionNode } from "../src/types";
 function node(overrides: Partial<ConstructionNode>): ConstructionNode {
   return {
     id: "node_0",
+    stableId: null,
     kind: "box",
     name: null,
     line: 1,
     editable: true,
     edges: [],
     plane: null,
+    faces: [],
     vertices: [],
     transform: null,
     spans: {},
@@ -23,6 +25,7 @@ function node(overrides: Partial<ConstructionNode>): ConstructionNode {
 }
 
 const vertex = {
+  stableId: null,
   name: null,
   free: true,
   uv: [0, 0] as [number, number],
@@ -86,8 +89,8 @@ describe("buildSceneTree", () => {
         kind: "profile",
         material: "clay",
         constraints: [
-          { kind: "fixed", vertices: [0], value: [0, 0] },
-          { kind: "distance", vertices: [0, 1], value: 2 },
+          { kind: "fixed", vertices: [0], value: [0, 0], index: 0, stableId: null },
+          { kind: "distance", vertices: [0, 1], value: 2, index: 1, stableId: null },
         ],
       }),
     ]);

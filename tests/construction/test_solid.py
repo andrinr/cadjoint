@@ -142,3 +142,56 @@ class TestOutline:
         solid = primitive.sdf()
         for start, _ in primitive.world_edges():
             assert abs(float(solid(jnp.array(start)))) < 1e-5
+
+
+class TestDefaultNames:
+    """Two unnamed primitives of one kind must not collide in extraction."""
+
+    def test_unnamed_primitives_of_one_kind_extract_together(self):
+        from cadjoint import extract_parameters
+        from cadjoint.sdf.boolean import Union
+
+        first = Solid.cylinder(radius=0.3, height=0.5, position=[0.0, 0.0, 0.0])
+        second = Solid.cylinder(radius=0.2, height=0.5, position=[1.0, 0.0, 0.0])
+        free, _, _ = extract_parameters(Union(first, second))
+        positions = [name for name in free if name.endswith("_position")]
+        assert len(positions) == 2
+        assert len(set(positions)) == 2
+
+    def test_a_given_name_is_kept_verbatim(self):
+        solid = Solid.box(size=[1.0, 1.0, 1.0], name="deck")
+        from cadjoint import extract_parameters
+
+        free, _, _ = extract_parameters(solid)
+        assert "deck_position" in free
+
+
+class TestPinnedRotation:
+    def test_a_scalar_rotation_is_adopted_not_rewrapped(self):
+        from cadjoint import extract_parameters
+        from cadjoint.geometry import Scalar
+
+        tilt = Scalar(0.5, free=False, name="tilt")
+        solid = Solid.cylinder(radius=0.1, height=1.0, rotation=[tilt, 0.1, 0.0], name="bore")
+        free, fixed, _ = extract_parameters(solid)
+        assert "bore_rx" not in free
+        assert "bore_ry" in free  # a plain number stays a free angle
+        pinned = [float(v) for k, v in fixed.items() if k.endswith(".angle")]
+        assert pinned == [pytest.approx(0.5)]
+
+    def test_a_scalar_rotation_still_places_the_solid(self):
+        import jax.numpy as jnp
+
+        from cadjoint.geometry import Scalar
+
+        # A unit-radius cylinder along z, turned onto y: the point (0, 0.9, 0)
+        # is now inside and (0, 0, 0.9) is outside.
+        tipped = Solid.cylinder(
+            radius=0.3, height=1.0, rotation=[Scalar(math.pi / 2, free=False), 0.0, 0.0]
+        )
+        assert float(tipped(jnp.array([0.0, 0.9, 0.0]))) < 0.0
+        assert float(tipped(jnp.array([0.0, 0.0, 0.9]))) > 0.0
+
+    def test_rotation_length_is_checked(self):
+        with pytest.raises(ValueError, match="three angles"):
+            Solid.cylinder(radius=0.1, height=1.0, rotation=[0.0, 0.0])

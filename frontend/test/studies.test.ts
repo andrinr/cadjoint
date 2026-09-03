@@ -9,6 +9,7 @@ import {
   deleteStudyRequest,
   describeSelection,
   draftSelection,
+  isEditableStudyKind,
   setArgumentRequest,
   setBcValueRequest,
   studyArguments,
@@ -17,6 +18,7 @@ import type { StudyPayload } from "../src/types";
 
 const study: StudyPayload = {
   index: 1,
+  stableId: null,
   name: "heat",
   kind: "thermal",
   resolution: 20,
@@ -84,14 +86,11 @@ describe("bc metadata", () => {
 
   it("extracts the editable value per BC type", () => {
     const nodes = { kind: "side", side: "+x", tol: null } as const;
-    expect(bcValue({ type: "dirichlet", nodes, value: 300, serializable: true, span: null }))
-      .toBe(300);
-    expect(bcValue({ type: "heat_flux", nodes, flux: 5, serializable: true, span: null }))
-      .toBe(5);
-    expect(
-      bcValue({ type: "traction", nodes, vector: [0, 0, -1], serializable: true, span: null }),
-    ).toEqual([0, 0, -1]);
-    expect(bcValue({ type: "fixed", nodes, serializable: true, span: null })).toBeNull();
+    const row = { nodes, serializable: true, span: null, stableId: null } as const;
+    expect(bcValue({ ...row, type: "dirichlet", value: 300 })).toBe(300);
+    expect(bcValue({ ...row, type: "heat_flux", flux: 5 })).toBe(5);
+    expect(bcValue({ ...row, type: "traction", vector: [0, 0, -1] })).toEqual([0, 0, -1]);
+    expect(bcValue({ ...row, type: "fixed" })).toBeNull();
   });
 
   it("lists a study's editable numeric arguments", () => {
@@ -176,5 +175,24 @@ describe("patch request builders", () => {
 
     const fixed = { ...defaultDraft("elastic"), bcType: "fixed" as const };
     expect("value" in addBcRequest(elastic, fixed)).toBe(false);
+  });
+});
+
+describe("a flow study is reported but not authored", () => {
+  // `StudyPayload.kind` is wider than the `StudyKind` enum on purpose: the
+  // payload reports what a program contains, the enum names what the GUI can
+  // build. A flow study is declared in the scene and has no patch operations
+  // behind it, so the panel must read one without offering to edit it — and
+  // must not throw when it meets one, which is what happened before this.
+  it("offers no boundary-condition types to add", () => {
+    expect(bcTypesFor("flow")).toEqual([]);
+    expect(bcTypesFor("thermal")).toEqual(["dirichlet", "heat_flux"]);
+    expect(bcTypesFor("elastic")).toEqual(["fixed", "traction"]);
+  });
+
+  it("is not an editable kind, and the two that are still are", () => {
+    expect(isEditableStudyKind("flow")).toBe(false);
+    expect(isEditableStudyKind("thermal")).toBe(true);
+    expect(isEditableStudyKind("elastic")).toBe(true);
   });
 });

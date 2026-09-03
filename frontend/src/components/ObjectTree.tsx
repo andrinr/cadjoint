@@ -30,7 +30,6 @@ const KIND_ICONS: Record<SceneTreeRow["kind"], Component | null> = {
 };
 
 export function ObjectTree() {
-  const [expanded, setExpanded] = createSignal(false);
   const [collapsed, setCollapsed] = createSignal<ReadonlySet<string>>(new Set());
   const rows = createMemo(() => buildSceneTree(nodes()));
   const shown = createMemo(() => visibleRows(rows(), collapsed()));
@@ -71,38 +70,14 @@ export function ObjectTree() {
   };
 
   return (
-    <Show
-      when={expanded()}
-      fallback={
-        <button
-          type="button"
-          class="object-tree-launch"
-          onClick={() => setExpanded(true)}
-          title="Open the object tree"
-          data-testid="object-tree-open"
-        >
-          <ObjectSelectIcon />
-          Objects
-          <b>{nodes().length}</b>
-        </button>
-      }
-    >
-      <aside class="object-tree-panel" data-testid="object-tree-panel">
+    <aside class="object-tree-panel" data-testid="object-tree-panel">
         <header>
+          {/* Kicker first, title second — the same order every dock panel
+              header uses, so the eyebrow line is always the top line. */}
           <span>
-            Object tree
             <small>read-only</small>
+            Object tree
           </span>
-          <button
-            type="button"
-            class="object-tree-close"
-            onClick={() => setExpanded(false)}
-            title="Collapse the object tree"
-            aria-label="Collapse the object tree"
-            data-testid="object-tree-close"
-          >
-            ×
-          </button>
         </header>
         <div class="object-tree-rows" role="tree" aria-label="Scene composition">
           <For each={shown()}>
@@ -176,7 +151,6 @@ export function ObjectTree() {
             )}
           </For>
         </div>
-      </aside>
-    </Show>
+    </aside>
   );
 }

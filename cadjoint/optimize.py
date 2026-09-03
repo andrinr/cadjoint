@@ -94,12 +94,37 @@ from typing import Any, Callable
 
 import numpy as np
 
+from cadjoint.enums import (
+    GradientPath,
+    GradientPathLike,
+    ObjectiveMetric,
+    ObjectiveMetricLike,
+    OptimizerMethod,
+    OptimizerMethodLike,
+    StudyKind,
+    parse,
+    values,
+)
+
 __all__ = ["Optimization", "OptimizationRun", "capture_optimizations"]
 
-METHODS = ("adam", "sgd")
-METRICS = ("mean", "max", "compliance")
+#: The accepted spellings of each option set, in declaration order; the
+#: option sets themselves are :class:`~cadjoint.enums.OptimizerMethod`,
+#: :class:`~cadjoint.enums.ObjectiveMetric` and
+#: :class:`~cadjoint.enums.GradientPath`.
+METHODS = values(OptimizerMethod)
+METRICS = values(ObjectiveMetric)
 #: Study-form design->points derivative paths (see ``Optimization.gradient_path``).
-GRADIENT_PATHS = ("direct", "tesseract", "tesseract-dc")
+#: These spellings are the documented, user-facing ones and do not change.
+GRADIENT_PATHS = values(GradientPath)
+#: Accepted aliases -> canonical gradient path.  Both chain paths resolve
+#: every stage through :mod:`cadjoint.plugins`, so they can also be named
+#: for what they do rather than for the Tesseract that implements them
+#: today; the canonical names above stay the ones the docs use.
+GRADIENT_PATH_ALIASES = {
+    "plugins": GradientPath.TESSERACT,
+    "plugins-dc": GradientPath.TESSERACT_DC,
+}
 TRAJECTORY_LIMIT = 100
 
 _CAPTURED_OPTIMIZATIONS: ContextVar[list[Optimization] | None] = ContextVar(
@@ -212,6 +237,50 @@ def _unresolvable_bc(study: Any, mesh: Any) -> str | None:
     return None
 
 
+def _differentiator(objective: Any, *, compiled: bool) -> Any:
+    """``value_and_grad`` of one frozen objective, compiled where it can be.
+
+    A frozen topology holds the objective fixed for ``remesh_every`` steps and
+    the parameter leaves keep their shapes and dtypes across a descent, so one
+    traced program serves every step until the next refreeze; running it
+    op-by-op instead re-dispatches the whole chain per step (measured on the
+    starter: ~11 s per step eager against ~0.5 s jitted).
+
+    Only the frozen-chain gradient paths (``gradient_path="tesseract"`` and
+    ``"tesseract-dc"``) are traceable end to end.  The ``"direct"`` path
+    rebuilds a jax-fem problem inside the objective, and that construction
+    resolves boundary conditions with ``np.argwhere`` over the recomputed node
+    positions — a concrete-value read that a tracer cannot satisfy — so it
+    stays eager.
+
+    The compiled form folds its constants at trace time
+    (:func:`jax.ensure_compile_time_eval`), which is not a micro-optimization
+    but a correctness requirement of the tesseract boundary.  A frozen chain
+    hands its tesseracts NumPy constants — the mesher's ``element`` code, the
+    quality thresholds, the study's conductivity — and ``tesseract_jax``
+    classifies an input as *static* exactly when it is not a tracer
+    (``primitive.py``: ``is_static_mask``).  Under a bare ``jax.jit`` the
+    ``jnp.asarray`` that coerces those constants emits an equation instead of
+    a value, so they arrive traced, and the VJP then has to invent a
+    derivative slot for each one: it writes ``np.full(shape, np.nan, dtype)``,
+    which for the 0-d ``int32`` ``element`` is a NaN cast to an integer
+    (a ``RuntimeWarning``, and an arbitrary element code if anything ever
+    read it).  Folding constants keeps every one of them static, exactly as
+    the eager path had them, while operations on the design parameters still
+    trace normally.
+    """
+    import jax
+
+    if not compiled:
+        return jax.value_and_grad(objective)
+
+    def folded(params):
+        with jax.ensure_compile_time_eval():
+            return objective(params)
+
+    return jax.jit(jax.value_and_grad(folded))
+
+
 def _compliance(study: Any, result: Any, mesh: Any, points: Any) -> Any:
     """Classical compliance: the work of the study's tractions, ``f . u``.
 
@@ -317,10 +386,12 @@ class Optimization:
             :class:`~cadjoint.fem.study.ElasticStudy` (or its name) whose
             solved field the run minimizes (study form; mutually exclusive
             with ``objective``/``of``).
-        metric: Study-form objective — ``"mean"`` or ``"max"`` of the
-            result's objective scalar (temperature / displacement
-            magnitude), or ``"compliance"`` (traction work, twice the
-            strain energy; elastic studies only).
+        metric: Study-form objective — a
+            :class:`~cadjoint.enums.ObjectiveMetric` or its plain string
+            spelling: ``"mean"`` or ``"max"`` of the result's objective
+            scalar (temperature / displacement magnitude), or
+            ``"compliance"`` (traction work, twice the strain energy;
+            elastic studies only).
         regularizer: Optional callable ``(params: dict) -> scalar`` added
             to the study metric as ``regularizer_weight * regularizer``,
             e.g. a smoothed material volume (study form, keyword-only).
@@ -329,7 +400,10 @@ class Optimization:
             the current design every this many steps (0: never; default
             6).  In between, only node positions move — differentiably.
         gradient_path: Study form: how the design->points derivative is
-            carried per step (keyword-only).  ``"direct"`` (default) is
+            carried per step (keyword-only) — a
+            :class:`~cadjoint.enums.GradientPath` or its plain string
+            spelling, normalised (aliases resolved) on construction.
+            ``"direct"`` (default) is
             the validated frozen-topology path — node positions Newton
             re-projected onto the true SDF, solved in-process.
             ``"tesseract"`` runs the packaged two-tesseract chain instead
@@ -343,27 +417,33 @@ class Optimization:
             TetGen is wrapped (tetfill tesseract, exact pass-through VJP
             on the vertices ``-Y`` preserves), so it meshes the same
             geometry the direct path does — tet ``SimMesh`` only.  Both
-            tesseract paths require the ``tesseract`` extra.  The final
-            reported result is always evaluated on the direct path.
+            chain paths resolve each stage through
+            :mod:`cadjoint.plugins`, so where the mesher and the solver
+            actually run is configuration (``plugins.toml``), and both
+            spellings accept the aliases ``"plugins"`` / ``"plugins-dc"``.
+            Both require the ``tesseract`` extra.  The final reported
+            result is always evaluated on the direct path.
         steps: Default number of optimizer steps (keyword-only).
         learning_rate: Optimizer step size (keyword-only).
-        method: ``"adam"`` (default) or ``"sgd"`` (keyword-only).  Runs
-            through optax; plain gradient descent when optax is missing.
+        method: A :class:`~cadjoint.enums.OptimizerMethod` or its plain
+            string spelling — ``"adam"`` (default) or ``"sgd"``
+            (keyword-only).  Runs through optax; plain gradient descent
+            when optax is missing.
     """
 
     name: str
     objective: Callable[[dict[str, Any]], Any] | None = None
     of: Any = None
     study: Any = None
-    metric: str | None = None
+    metric: ObjectiveMetricLike | None = None
     _: KW_ONLY
     regularizer: Callable[[dict[str, Any]], Any] | None = None
     regularizer_weight: float = 0.0
     remesh_every: int | None = None
-    gradient_path: str = "direct"
+    gradient_path: GradientPathLike = GradientPath.DIRECT
     steps: int = 30
     learning_rate: float = 0.05
-    method: str = "adam"
+    method: OptimizerMethodLike = OptimizerMethod.ADAM
 
     def __post_init__(self):
         if not isinstance(self.name, str) or not self.name.strip():
@@ -378,8 +458,9 @@ class Optimization:
         if isinstance(rate, bool) or not isinstance(rate, (int, float)) or not rate > 0.0:
             raise ValueError("learning_rate must be a positive number.")
         self.learning_rate = float(rate)
-        if self.method not in METHODS:
-            raise ValueError(f"method must be one of: {', '.join(METHODS)}.")
+        self.method = parse(
+            OptimizerMethod, self.method, f"method must be one of: {', '.join(METHODS)}."
+        )
         _register(self)
 
     def _validate_objective_form(self) -> None:
@@ -405,7 +486,10 @@ class Optimization:
                 ("regularizer", self.regularizer),
                 ("remesh_every", self.remesh_every),
                 ("regularizer_weight", self.regularizer_weight or None),
-                ("gradient_path", None if self.gradient_path == "direct" else self.gradient_path),
+                (
+                    "gradient_path",
+                    None if self.gradient_path == GradientPath.DIRECT else self.gradient_path,
+                ),
             )
             if value is not None
         ]
@@ -422,9 +506,15 @@ class Optimization:
                 "either a Python objective over a scene object or a study metric."
             )
         self.study = _resolve_study(self.study)
-        if self.metric not in METRICS:
-            raise ValueError(f"metric must be one of: {', '.join(METRICS)} (got {self.metric!r}).")
-        if self.metric == "compliance" and self._study_kind() != "elastic":
+        self.metric = parse(
+            ObjectiveMetric,
+            self.metric,
+            f"metric must be one of: {', '.join(METRICS)} (got {self.metric!r}).",
+        )
+        if (
+            self.metric == ObjectiveMetric.COMPLIANCE
+            and self._study_kind() is not StudyKind.ELASTIC
+        ):
             raise ValueError(
                 f"metric='compliance' needs an elastic study; {self.study.name!r} "
                 f"is {self._study_kind()}."
@@ -451,16 +541,46 @@ class Optimization:
             or self.remesh_every < 0
         ):
             raise ValueError("remesh_every must be a non-negative integer (0: never remesh).")
-        if self.gradient_path not in GRADIENT_PATHS:
-            raise ValueError(
-                f"gradient_path must be one of: {', '.join(GRADIENT_PATHS)} "
-                f"(got {self.gradient_path!r})."
-            )
+        # Aliases resolve here, so the rest of the run sees one canonical
+        # member per path rather than two spellings of it.
+        self.gradient_path = parse(
+            GradientPath,
+            GRADIENT_PATH_ALIASES.get(self.gradient_path, self.gradient_path),
+            f"gradient_path must be one of: {', '.join(GRADIENT_PATHS)} "
+            f"(aliases: {', '.join(GRADIENT_PATH_ALIASES)}) "
+            f"(got {self.gradient_path!r}).",
+        )
+        self._refuse_frozen_geometry()
 
-    def _study_kind(self) -> str:
+    def _refuse_frozen_geometry(self) -> None:
+        """Refuse a study whose mesh's nodes cannot follow the design.
+
+        A Gmsh mesh's node positions come from the ``node_map`` plugin kind,
+        which nothing in this repository fills.  Unfilled, the mesh is
+        frozen geometry: the nodes are right, but they cannot follow a
+        design parameter, so a gradient through them would be silently
+        wrong.  The refusal is here — at declaration — rather than inside
+        the traced objective, where a design derivative would silently be
+        zero or, worse, be faked by
+        an arity-1 projection that slides crease nodes off their creases.
+
+        Raises:
+            cadjoint.tier.TierUnavailable: When the study's mesh is
+                Gmsh-meshed and no ``node_map`` plugin fills the kind.
+        """
+        from cadjoint import tier
+        from cadjoint.enums import PluginKind
+        from cadjoint.fem.simmesh import SimMesh
+
+        mesh = getattr(self.study, "mesh", None)
+        if not isinstance(mesh, SimMesh) or not mesh.frozen_geometry:
+            return
+        raise tier.TierUnavailable(PluginKind.NODE_MAP.value, "not registered")
+
+    def _study_kind(self) -> StudyKind:
         from cadjoint.fem.study import ThermalStudy
 
-        return "thermal" if isinstance(self.study, ThermalStudy) else "elastic"
+        return StudyKind.THERMAL if isinstance(self.study, ThermalStudy) else StudyKind.ELASTIC
 
     def _study_target(self, scene: Any = None) -> Any:
         """The object whose free parameters a study-backed run optimizes.
@@ -507,11 +627,11 @@ class Optimization:
             "name": self.name,
             "steps": self.steps,
             "learning_rate": self.learning_rate,
-            "method": self.method,
+            "method": str(self.method),
             "parameters": parameters,
             "objective": objective,
             "study": self.study.name if self.study is not None else None,
-            "metric": self.metric,
+            "metric": None if self.metric is None else str(self.metric),
             "remesh_every": self.remesh_every,
             "regularizer": (
                 getattr(self.regularizer, "__name__", type(self.regularizer).__name__)
@@ -559,7 +679,7 @@ class Optimization:
 
         transform = (
             optax.adam(self.learning_rate)
-            if self.method == "adam"
+            if self.method == OptimizerMethod.ADAM
             else optax.sgd(self.learning_rate)
         )
         if constrained:
@@ -571,7 +691,7 @@ class Optimization:
             updates, state = transform.update(grads, state, params)
             return optax.apply_updates(params, updates), state
 
-        return self.method, transform.init, apply
+        return str(self.method), transform.init, apply
 
     def run(self, steps: int | None = None, callback=None, *, scene: Any = None) -> OptimizationRun:
         """Minimize the objective over the target's free parameters.
@@ -720,9 +840,9 @@ class Optimization:
 
     def _metric_value(self, result: Any, mesh: Any, points: Any) -> Any:
         """The study metric as a (possibly traced) JAX scalar."""
-        if self.metric == "compliance":
+        if self.metric == ObjectiveMetric.COMPLIANCE:
             return _compliance(self.study, result, mesh, points)
-        return result.mean() if self.metric == "mean" else result.max()
+        return result.mean() if self.metric == ObjectiveMetric.MEAN else result.max()
 
     def _run_study(self, count: int, callback, scene: Any) -> OptimizationRun:
         """The study-form descent loop: frozen-topology solves per step.
@@ -736,7 +856,6 @@ class Optimization:
         chain.  x64 is enabled for the duration (the FEM adjoints require
         float64) and the caller's setting restored afterwards.
         """
-        import jax
         import jax.numpy as jnp
 
         from cadjoint.extraction import apply_parameters, extract_parameters
@@ -778,7 +897,11 @@ class Optimization:
             return lambda p: jnp.asarray(inner(p))
 
         # GRADIENT-PATH SEAM.  This is the one place the design->points
-        # derivative path is chosen, per gradient_path:
+        # derivative path is chosen, per gradient_path.  Neither chain
+        # names a component here: they ask cadjoint.plugins for whatever
+        # fills the "mesher"/"tetfill"/"*_solver" kinds, which is what lets
+        # a solve move to a container or a cluster without touching this
+        # file.  Per gradient_path:
         # - "direct" (default): the frozen-topology path — node positions
         #   re-projected onto the true SDF (recompute_points /
         #   recompute_tet_points), validated on crease-heavy geometry.  Tet
@@ -798,14 +921,31 @@ class Optimization:
         #   -Y preserves) -> solver tesseract adjoint.  Same geometry as the
         #   direct path, black box confined to the one component that is
         #   genuinely one.
-        use_dc_chain = self.gradient_path == "tesseract-dc"
-        use_tesseract = self.gradient_path in ("tesseract", "tesseract-dc")
+        # Both chains resolve their stages through the plugin registry, so
+        # "tesseract"/"tesseract-dc" and their "plugins"/"plugins-dc"
+        # aliases select the same code; the alias only renames the switch.
+        path = self.gradient_path
+        use_dc_chain = path == GradientPath.TESSERACT_DC
+        use_tesseract = path in (GradientPath.TESSERACT, GradientPath.TESSERACT_DC)
         if use_dc_chain:
             from cadjoint.fem.tesseracts.chain import freeze_study_chain_dc
         elif use_tesseract:
             from cadjoint.fem.tesseracts.chain import freeze_study_chain
 
-        def recompute(field: Any, mesh: Any) -> Any:
+        def recompute(params: Any, field: Any, mesh: Any) -> Any:
+            # A Gmsh mesh carries an ``OwnedNodes`` record instead of a
+            # lattice: its nodes are re-solved against the patches that own
+            # them, which is the ``node_map`` kind (the private tier's).
+            # ``_refuse_frozen_geometry`` has already refused the case where
+            # the kind is unfilled, so this ``require`` cannot fail here for
+            # a reason the user has not already been told.
+            owned = getattr(mesh, "owned", None)
+            if owned is not None:
+                from cadjoint import tier
+                from cadjoint.enums import PluginKind
+
+                node_map = tier.require(PluginKind.NODE_MAP.value).component
+                return node_map.positions(target, params, owned, smooth_passes=2)
             if isinstance(mesh, TetMesh):
                 return recompute_tet_points(field, mesh, smooth_passes=2)
             return recompute_points(field, mesh)
@@ -821,7 +961,7 @@ class Optimization:
                         samples = field_at(params)(jnp.asarray(chain.lattice))
                         value = chain.metric_value(samples, self.metric)
                 else:
-                    points = recompute(field_at(params), mesh)
+                    points = recompute(params, field_at(params), mesh)
                     result = study.solve(mesh=mesh, points=points)
                     value = jnp.asarray(self._metric_value(result, mesh, points))
                 if regularizer is not None:
@@ -893,11 +1033,17 @@ class Optimization:
             state = init(params)
             try:
                 frozen = refreeze(params, 0, None)
-                value_and_grad = jax.value_and_grad(frozen[1])
+                value_and_grad = _differentiator(frozen[1], compiled=use_tesseract)
                 for step in range(count):
                     if step > 0 and self.remesh_every > 0 and step % self.remesh_every == 0:
+                        previous = frozen
                         frozen = refreeze(params, step, frozen)
-                        value_and_grad = jax.value_and_grad(frozen[1])
+                        # Re-wrap only when refreeze returned a NEW topology:
+                        # each `jax.jit` carries its own trace cache, and
+                        # re-wrapping an unchanged objective would discard it
+                        # and re-trace the next step for nothing.
+                        if frozen is not previous:
+                            value_and_grad = _differentiator(frozen[1], compiled=use_tesseract)
                     value, grads = value_and_grad(params)
                     self._record_step(step, value, grads, params, history, trajectory, callback)
                     params, state = step_fn(params, grads, state)
@@ -930,7 +1076,7 @@ class Optimization:
                         "optimization cannot move it."
                     )
                     final_mesh = frozen[0]
-                    final_points = recompute(final_field, final_mesh)
+                    final_points = recompute(held, final_field, final_mesh)
                     result = study.solve(mesh=final_mesh, points=final_points)
                 final_value = jnp.asarray(self._metric_value(result, final_mesh, final_points))
                 if regularizer is not None:

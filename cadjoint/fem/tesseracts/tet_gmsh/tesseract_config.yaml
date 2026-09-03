@@ -1,0 +1,22 @@
+# Tesseract configuration file (tesseract-core 1.11 contract: a Tesseract
+# package is tesseract_api.py + tesseract_config.yaml + a requirements file
+# in one directory; `tesseract build <dir>` turns it into a Docker image).
+
+name: "cadjoint_tet_gmsh"
+version: "0.1.0"
+description: >-
+  Gmsh (HXT, second order) tet meshing of the exact STEP the ownership
+  graph writes, with each node's owning CAD entity reported so the caller
+  can put the graph's patch ownership back on and re-solve every position
+  -- midside nodes included -- through the projection kernel. Topology is
+  frozen at discovery and positions are recomputed outside, so the
+  vector_jacobian_product w.r.t. node_positions is an exact pass-through.
+  Isolated in its own image because Gmsh is GPL-2.0-or-later: the
+  Apache-2.0 library talks to it over the Tesseract ABI and never links it.
+
+build_config:
+  # gmsh, scipy and cadjoint all ship linux-64 and linux-aarch64 wheels, so
+  # the default pip provider is enough -- unlike the jax-fem solver
+  # packages, which need conda for petsc4py.
+  # Decouple the interpreter from the base image's system Python.
+  python_version: "3.12"

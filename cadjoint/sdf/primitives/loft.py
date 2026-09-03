@@ -20,7 +20,9 @@ import jax.numpy as jnp
 from jax import Array
 
 from cadjoint.geometry.parameters import Scalar, Vector2
+from cadjoint.sdf._lowering import is_scalar_lowering
 from cadjoint.sdf.primitives.base import Primitive
+from cadjoint.sdf.primitives.polygon import _polygon_distance_stacked
 
 
 def _lerped_polygon_distance(p: Array, vertices: list[Array]) -> Array:
@@ -40,6 +42,8 @@ def _lerped_polygon_distance(p: Array, vertices: list[Array]) -> Array:
     Returns:
         Signed distance, shape (...). Negative inside.
     """
+    if not is_scalar_lowering():
+        return _polygon_distance_stacked(p, jnp.stack(jnp.broadcast_arrays(*vertices)))
     num = len(vertices)
     d = jnp.sum((p - vertices[0]) ** 2, axis=-1)
     s = jnp.ones(p.shape[:-1])

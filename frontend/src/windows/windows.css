@@ -1,0 +1,350 @@
+/* The window system's furniture.
+ *
+ * The dock library ships a stylesheet that is entirely CSS-variable driven,
+ * so almost nothing here is an override: the vendor rules keep doing the
+ * geometry (absolute positioning, drop overlays, sash hit areas) and every
+ * colour, size and border comes back out of the shell's tokens. What is left
+ * are the handful of places where the library's default look disagrees with
+ * this one — a tab is a mono tracked label on paper, a splitter is a
+ * hairline, and nothing anywhere has a radius or a shadow.
+ *
+ * Read src/styles.css first: the tokens used below are defined there, and the
+ * rules about them apply here too. No literal colours, no literal radii.
+ */
+
+@import "dockview/dist/styles/dockview.css";
+
+/* ── the workspace ────────────────────────────────────────────────────── */
+
+.win-workspace {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.win-dock-host {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+/* ── the theme ────────────────────────────────────────────────────────── */
+
+/* Every `--dv-` variable the library reads, bound to a shell token. Anything
+   omitted here falls back to a vendor default, which is how a literal colour
+   sneaks in — so the list is deliberately complete. */
+.win-theme {
+  --dv-group-view-background-color: var(--surface-panel);
+  --dv-tabs-and-actions-container-background-color: var(--surface-bar);
+  /* One hairline plus a --control-sm cell: the strip's *content* box is then
+     exactly a control, so the buttons in it are the same height as the menu
+     bar's rather than a pixel short of it. */
+  --dv-tabs-and-actions-container-height: calc(var(--control-sm) + 1px);
+  --dv-tabs-and-actions-container-font-size: var(--text-2xs);
+  --dv-tab-font-size: var(--text-2xs);
+  --dv-tab-close-icon-size: var(--text-sm);
+
+  /* A tab is a label on paper. The active one is the sheet the panel is on,
+     so it reads as continuous with the body below it; the inactive ones sit
+     on the bar. No fills, no pills — the hairline does the separating. */
+  --dv-activegroup-visiblepanel-tab-background-color: var(--surface-panel);
+  --dv-activegroup-hiddenpanel-tab-background-color: var(--surface-bar);
+  --dv-inactivegroup-visiblepanel-tab-background-color: var(--surface-panel);
+  --dv-inactivegroup-hiddenpanel-tab-background-color: var(--surface-bar);
+  --dv-activegroup-visiblepanel-tab-color: var(--ink);
+  --dv-activegroup-hiddenpanel-tab-color: var(--ink-3);
+  --dv-inactivegroup-visiblepanel-tab-color: var(--ink-2);
+  --dv-inactivegroup-hiddenpanel-tab-color: var(--ink-3);
+  --dv-tab-divider-color: var(--rule);
+
+  --dv-separator-border: var(--rule);
+  --dv-paneview-header-border-color: var(--rule);
+  --dv-paneview-active-outline-color: var(--rule-strong);
+  --dv-icon-hover-background-color: var(--surface-inset-hover);
+  --dv-scrollbar-background-color: var(--shade-soft);
+  --dv-tabs-container-scrollbar-color: var(--rule);
+  --dv-context-menu-background-color: var(--surface-float-96);
+  --dv-context-menu-color: var(--ink);
+
+  /* The sash is invisible at rest and a hairline under the pointer: a
+     splitter that is always drawn would add a second rule beside the one the
+     panel already has. */
+  --dv-sash-color: transparent;
+  --dv-active-sash-color: var(--accent);
+  --dv-active-sash-transition-duration: var(--dur-fast);
+  --dv-active-sash-transition-delay: 0s;
+
+  /* A drop target is a wash plus the drawn edge — the same vocabulary the
+     viewport uses for a pick rectangle. */
+  --dv-drag-over-background-color: rgba(var(--accent-rgb), var(--alpha-wash));
+  --dv-drag-over-border-color: var(--accent);
+  --dv-drag-over-border: 1px solid var(--accent);
+  --dv-edge-dock-indicator-color: var(--accent);
+  --dv-dnd-compass-color: var(--rule-strong);
+  --dv-dnd-compass-cell-color: rgba(var(--accent-rgb), var(--alpha-wash));
+  --dv-dnd-compass-edge-cell-color: rgba(var(--accent-rgb), var(--alpha-wash));
+  --dv-dnd-compass-active-cell-color: rgba(var(--accent-rgb), var(--alpha-tint));
+  --dv-smart-guides-color: var(--accent);
+  --dv-smart-guides-preview-color: var(--rule-strong);
+
+  /* A floating window is the same furniture lifted off the sheet. It is told
+     apart by a heavier rule, not by a shadow — this system has none. */
+  --dv-floating-box-shadow: none;
+  --dv-floating-border: 1px solid var(--rule-heavy);
+  --dv-floating-group-border: 1px solid var(--rule-heavy);
+  --dv-floating-group-dragging-opacity: 0.9;
+  --dv-floating-titlebar-height: var(--space-6);
+  --dv-floating-titlebar-background-color: var(--surface-bar-alt);
+  --dv-floating-titlebar-border-bottom: 1px solid var(--rule);
+
+  --dv-overlay-z-index: 20;
+  --dv-border-radius: 0px;
+  --dv-tab-border-radius: 0px;
+  --dv-sash-border-radius: 0px;
+  --dv-dropdown-border-radius: 0px;
+  --dv-tab-group-chip-border-radius: 0px;
+  --dv-tab-margin: 0;
+  --dv-tab-margin-block: 0;
+  --dv-tab-margin-inline: 0;
+  --dv-spacing-padding: 0px;
+  --dv-tab-group-line-opacity: 1;
+  --dv-tab-group-chip-font-size: var(--text-3xs);
+  --dv-tab-group-chip-padding: 0 var(--space-3);
+  --dv-tab-group-line-height: 1px;
+}
+
+/* ── tab strip ────────────────────────────────────────────────────────── */
+
+.win-theme .dv-tabs-and-actions-container {
+  border-bottom: 1px solid var(--rule);
+}
+
+.win-theme .dv-tab {
+  padding: 0 var(--space-4);
+  border-right: 1px solid var(--rule);
+  font: var(--weight-regular) var(--text-2xs) / var(--leading-flat) var(--font-mono);
+  letter-spacing: var(--tracking-2xs);
+  text-transform: uppercase;
+}
+
+/* The active tab is marked at the top edge — the same 2px accent strip the
+   panel shell used before it had a tab bar to carry it. */
+.win-theme .dv-groupview.dv-active-group > .dv-tabs-and-actions-container .dv-tab.dv-active-tab {
+  box-shadow: inset 0 2px 0 0 var(--accent);
+}
+
+.win-theme .dv-groupview.dv-inactive-group > .dv-tabs-and-actions-container .dv-tab.dv-active-tab {
+  box-shadow: inset 0 2px 0 0 var(--rule-strong);
+}
+
+/* Our own tab content: a tracked mono label, and a close control that only
+   exists on a window that can be closed. */
+.win-tab {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  height: 100%;
+}
+
+.win-tab-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.win-tab-close {
+  display: grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.win-tab-close:hover {
+  color: var(--ink);
+  background: var(--surface-inset-hover);
+}
+
+.win-tab-close:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.win-theme .dv-tab .dv-default-tab-action {
+  border-radius: 0;
+  color: var(--ink-3);
+}
+
+.win-theme .dv-tab .dv-default-tab-action:hover {
+  color: var(--ink);
+  background: var(--surface-inset-hover);
+}
+
+/* ── group header actions (minimise, float) ───────────────────────────── */
+
+.win-head-actions {
+  display: flex;
+  align-items: stretch;
+}
+
+/* `height` is set explicitly because the shell gives every bare `button` the
+   30px `--control-md` box. That is right for a control on a panel and wrong
+   for one in a 26px tab bar: the button overflowed its own strip, which is
+   what put the strip's two halves 2.5px off a shared baseline and pushed the
+   tray's controls past the bottom of the window. Chrome furniture fills the
+   bar it is in and takes its line box from the bar's own type. */
+.win-head-button {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-left: 1px solid var(--rule);
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink-3);
+  font: var(--weight-regular) var(--text-2xs) / var(--leading-flat) var(--font-mono);
+  cursor: pointer;
+}
+
+/* `display: grid` above out-ranks the user agent's `[hidden]` rule, so the
+   viewport's absent minimise control has to be hidden explicitly. */
+.win-head-button[hidden] {
+  display: none;
+}
+
+.win-head-button:hover {
+  color: var(--ink);
+  background: var(--surface-inset-hover);
+}
+
+.win-head-button:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+
+/* ── panel bodies ─────────────────────────────────────────────────────── */
+
+.win-body {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--surface-panel);
+}
+
+/* The panels were drawn for a dock that floated over the viewport: each
+   carried its own frame, its own accent strip and its own width. Inside a
+   real window the frame is the window's, so they give all of that up and
+   just fill. */
+.win-body > .pane,
+.win-body > .object-tree-panel,
+.win-body > .material-panel,
+.win-body > .sketch-panel,
+.win-body > .sim-panel,
+.win-body > .mode-simulate-slot > .sim-panel {
+  flex: 1;
+  width: auto;
+  max-height: none;
+  min-height: 0;
+  border: 0;
+  animation: none;
+}
+
+.win-body > .editor-pane {
+  border-right: 0;
+}
+
+/* The tab already carries the window's name, so the pane's own title line
+   would say it twice. Its hint and its collapse control stay. */
+.win-body > .editor-pane > .pane-head > .pane-title {
+  display: none;
+}
+
+/* The viewport keeps its own drawn frame: it is the one rectangle in the
+   application whose edge means something. */
+.win-body[data-window="viewport"] {
+  background: var(--surface-viewport);
+}
+
+/* ── floating windows ─────────────────────────────────────────────────── */
+
+/* The frame of a floating window is drawn as an inset outline rather than a
+   border. The library sizes the group inside the container to the
+   container's *outer* width, so a border made its content sit 2px past its
+   own right edge; an outline paints the same hairline and costs no layout. */
+.win-theme .dv-resize-container {
+  border: 0;
+  outline: 1px solid var(--rule-heavy);
+  outline-offset: -1px;
+}
+
+/* ── the tray ─────────────────────────────────────────────────────────── */
+
+/* Parked windows. A strip along the foot of the workspace, in the same
+   register as a status bar: mono, tracked, hairline above. */
+.win-tray {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  height: calc(var(--control-xs) + 1px);
+  border-top: 1px solid var(--rule);
+  background: var(--surface-bar);
+}
+
+/* The label and the parked windows are one row of cells: same grid, same
+   line box, same size. A kicker a size smaller read as a second register in a
+   22px strip, and it put the two on different baselines. */
+.win-tray-label,
+.win-tray-item {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  padding: 0 var(--space-4);
+  border: 0;
+  border-right: 1px solid var(--rule);
+  border-radius: 0;
+  background: transparent;
+  font: var(--weight-regular) var(--text-2xs) / var(--leading-flat) var(--font-mono);
+  letter-spacing: var(--tracking-2xs);
+  text-transform: uppercase;
+}
+
+.win-tray-label {
+  color: var(--ink-3);
+}
+
+.win-tray-item {
+  color: var(--ink-2);
+  cursor: pointer;
+}
+
+.win-tray-item:hover {
+  color: var(--ink);
+  background: var(--surface-inset-hover);
+}
+
+.win-tray-item:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+
+/* ── watermark ────────────────────────────────────────────────────────── */
+
+.win-theme .dv-watermark-container {
+  background: var(--surface-panel);
+}

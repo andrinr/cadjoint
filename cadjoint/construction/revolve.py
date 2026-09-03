@@ -3,6 +3,13 @@
 from __future__ import annotations
 
 from cadjoint.construction.extrude import _place_on_plane
+from cadjoint.construction.faces import (
+    FaceSet,
+    Feature,
+    attach_faces,
+    register_feature,
+    revolve_axis,
+)
 from cadjoint.construction.sketch import PolygonProfile
 from cadjoint.geometry.parameters import Scalar
 
@@ -21,7 +28,12 @@ def revolve(profile: PolygonProfile, offset: float | Scalar = 0.0, material=None
         material: Optional render material.
 
     Returns:
-        SDF solid sharing parameter references with the construction tree.
+        SDF solid sharing parameter references with the construction tree. A
+            surface of revolution has no planar face to name, so ``solid.faces`` is
+            empty and the usable reference is ``solid.axis`` — the world-space
+            :class:`~cadjoint.construction.faces.Axis` it was swept around. For a
+            plane *on* the curved wall, use
+            :meth:`~cadjoint.construction.sketch.SketchPlane.tangent`.
 
     Example:
         ```python
@@ -33,4 +45,9 @@ def revolve(profile: PolygonProfile, offset: float | Scalar = 0.0, material=None
     from cadjoint.sdf.primitives.polygon import RevolvedPolygon
 
     base = RevolvedPolygon(profile.vertices, offset=offset, material=material)
-    return _place_on_plane(base, profile.plane)
+    solid = _place_on_plane(base, profile.plane)
+    faces = FaceSet("revolve", list)
+    axis = revolve_axis(profile)
+    attach_faces(solid, faces, axis)
+    register_feature(profile, Feature("revolve", faces, axis=axis, solid=solid))
+    return solid

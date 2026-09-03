@@ -3,6 +3,12 @@
 from __future__ import annotations
 
 from cadjoint.construction.extrude import _place_on_plane
+from cadjoint.construction.faces import (
+    Feature,
+    attach_faces,
+    loft_faces,
+    register_feature,
+)
 from cadjoint.construction.sketch import PolygonProfile
 from cadjoint.geometry.parameters import Scalar
 
@@ -30,7 +36,10 @@ def loft(
         material: Optional render material.
 
     Returns:
-        SDF solid sharing parameter references with both profiles.
+        SDF solid sharing parameter references with both profiles, with its two
+            planar ends bound on as ``solid.cap("-")`` (profile A) and
+            ``solid.cap("+")`` (profile B). The ruled side walls are planar only by
+            accident, so they are not declared.
 
     Raises:
         ValueError: If the two profiles have different vertex counts.
@@ -50,4 +59,8 @@ def loft(
             f"got {len(profile_a.vertices)} and {len(profile_b.vertices)}"
         )
     base = LoftedPolygon(profile_a.vertices, profile_b.vertices, height=height, material=material)
-    return _place_on_plane(base, profile_a.plane)
+    solid = _place_on_plane(base, profile_a.plane)
+    faces = loft_faces(profile_a, profile_b, height)
+    attach_faces(solid, faces)
+    register_feature(profile_a, Feature("loft", faces, solid=solid))
+    return solid

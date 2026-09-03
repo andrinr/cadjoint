@@ -1,0 +1,156 @@
+/**
+ * The process monitor's own layout.
+ *
+ * Everything visual here is borrowed: the panel shell, the section heads, the
+ * kind chips, the stat rows and the sparkline are the same
+ * primitives every other panel uses, so this window looks like part of the
+ * instrument rather than a bolted-on task manager. What is left — and all
+ * that this file holds — is the shape of a process row: a name that takes
+ * the slack, figures that hang right in tabular mono, and a stop control at
+ * the end of the line.
+ *
+ * No colours, sizes or spacings are invented here; every value is a token
+ * declared in styles.css.
+ */
+
+/* One space between the right-hung count and the control that follows it;
+   `.section-head` closes with `gap: 0`, which leaves them touching. */
+.proc-panel .section-head {
+  gap: var(--space-4);
+}
+
+.proc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Rows of one list are separated by the weakest rule in the system: they are
+   one table, not a stack of cards. */
+.proc-row + .proc-row {
+  border-top: 1px solid var(--divider);
+}
+
+.proc-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+/* The name cell is the row's primary action — expand, or re-open a result —
+   so it is a button that looks like the row, not like a control. */
+.proc-open {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  height: var(--control-sm);
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+  text-align: left;
+}
+
+.proc-open:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--surface-inset);
+}
+
+.proc-open strong {
+  overflow: hidden;
+  min-width: 0;
+  font: var(--type-mono-strong);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The figures column: tabular so the digits of successive rows line up, and
+   fixed-width per cell so a job that jumps from 9s to 10s does not shift the
+   two readouts beside it. */
+.proc-figures {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-4);
+  color: var(--ink-2);
+}
+
+.proc-figures b {
+  min-width: 44px;
+  color: var(--ink);
+  font: var(--type-mono-strong);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* Status is a word, not a colour: cancelled and failed differ from done by
+   what they say. Only failure earns ink, and it earns the system's own. */
+.proc-status {
+  min-width: 60px;
+  color: var(--ink-3);
+  font: var(--type-mono);
+  font-style: normal;
+  letter-spacing: var(--tracking-2xs);
+  text-align: right;
+  text-transform: uppercase;
+}
+
+.proc-status[data-status="failed"] {
+  color: var(--danger-ink);
+}
+
+.proc-progress {
+  margin: 0 0 var(--space-2);
+  padding-left: var(--space-6);
+  color: var(--ink-2);
+  font: var(--type-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.proc-progress b {
+  color: var(--ink);
+  font: var(--type-mono-strong);
+}
+
+/* An expanded row indents under its own name, so the sample chart reads as
+   belonging to that job rather than to the list. */
+.proc-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  padding-left: var(--space-6);
+}
+
+.proc-budget {
+  margin: 0;
+  color: var(--ink-3);
+  font: var(--type-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * The sparklines here are data, not emphasis.
+ *
+ * `.opt-spark` draws its polyline in the accent because on an optimization
+ * card the line *is* the subject of the card. In the monitor it is a
+ * background reading — one of six figures about a job — and the design
+ * language keeps the accent as a fill behind type rather than as a mark or a
+ * data line (`research/design-language.md`, "Colour"). So the trace is drawn
+ * in ink and the frame's bottom edge does duty as its baseline; the kind
+ * chips stay accent fills, because a chip is exactly the fill-behind-type
+ * case the rule is written for.
+ */
+.proc-panel .opt-spark polyline {
+  stroke: var(--ink-2);
+}
+
+.proc-panel .opt-spark svg {
+  border-bottom-color: var(--ink-3);
+}

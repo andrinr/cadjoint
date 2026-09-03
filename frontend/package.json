@@ -13,12 +13,15 @@
     "e2e": "playwright test"
   },
   "dependencies": {
+    "@codemirror/autocomplete": "6.20.3",
     "@codemirror/commands": "^6.7.1",
     "@codemirror/lang-python": "^6.1.6",
     "@codemirror/language": "^6.10.8",
+    "@codemirror/lint": "6.8.5",
     "@codemirror/state": "^6.5.0",
     "@codemirror/view": "^6.36.1",
     "@lezer/highlight": "^1.2.1",
+    "dockview": "^8.2.0",
     "solid-js": "^1.9.3"
   },
   "devDependencies": {

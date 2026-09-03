@@ -7,6 +7,7 @@
  */
 
 import type { SimMeshPayload, StudyPayload } from "./types";
+import { byId } from "./identity";
 
 export function addMeshRequest(name?: string): Record<string, unknown> {
   const body: Record<string, unknown> = { op: "add_mesh" };
@@ -15,7 +16,7 @@ export function addMeshRequest(name?: string): Record<string, unknown> {
 }
 
 export function deleteMeshRequest(mesh: SimMeshPayload): Record<string, unknown> {
-  return { op: "delete_mesh", mesh: mesh.index };
+  return { op: "delete_mesh", ...byId(mesh), mesh: mesh.index };
 }
 
 export type MeshArgument =
@@ -31,7 +32,7 @@ export function setMeshValueRequest(
   argument: MeshArgument,
   value: number | number[] | string,
 ): Record<string, unknown> {
-  return { op: "set_mesh_value", mesh: mesh.index, argument, value };
+  return { op: "set_mesh_value", ...byId(mesh), mesh: mesh.index, argument, value };
 }
 
 /** Point a study at a declared SimMesh (or back to implicit meshing). */
@@ -39,7 +40,13 @@ export function setStudyMeshRequest(
   study: StudyPayload,
   meshName: string,
 ): Record<string, unknown> {
-  return { op: "set_study_value", study: study.index, argument: "mesh", value: meshName };
+  return {
+    op: "set_study_value",
+    ...byId(study),
+    study: study.index,
+    argument: "mesh",
+    value: meshName,
+  };
 }
 
 /** Restrict a study's implicit mesh to a named scene object. */
@@ -47,7 +54,13 @@ export function setStudyDomainRequest(
   study: StudyPayload,
   objectName: string,
 ): Record<string, unknown> {
-  return { op: "set_study_value", study: study.index, argument: "domain", value: objectName };
+  return {
+    op: "set_study_value",
+    ...byId(study),
+    study: study.index,
+    argument: "domain",
+    value: objectName,
+  };
 }
 
 /** The numeric rows a mesh card offers for editing. */
@@ -58,8 +71,10 @@ export function meshArguments(
     { key: "resolution", value: mesh.resolution },
     { key: "padding", value: mesh.padding },
   ];
-  if (mesh.bounds !== null) rows.push({ key: "bounds", value: mesh.bounds });
-  if (mesh.size !== null) rows.push({ key: "size", value: mesh.size });
+  // Both arrive as plain lists and are omitted entirely when the mesh
+  // derives them, so absent and null are the same answer here.
+  if (mesh.bounds != null) rows.push({ key: "bounds", value: mesh.bounds });
+  if (mesh.size != null) rows.push({ key: "size", value: mesh.size });
   return rows;
 }
 

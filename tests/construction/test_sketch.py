@@ -272,3 +272,15 @@ class TestApplyParameters:
         profile = PolygonProfile(SQUARE, name="aps")
         with pytest.raises(ValueError, match="shape"):
             apply_parameters(profile, {"aps_v0": jnp.zeros(3)})
+
+
+class TestDefaultProfileNames:
+    def test_two_unnamed_profiles_extract_together(self):
+        from cadjoint import extract_parameters
+        from cadjoint.sdf.boolean import Union
+
+        a = extrude(PolygonProfile([[0, 0], [1, 0], [1, 1]]), depth=0.2)
+        b = extrude(PolygonProfile([[2, 0], [3, 0], [3, 1]]), depth=0.2)
+        free, _, _ = extract_parameters(Union(a, b))
+        assert len([name for name in free if name.endswith("_v0")]) == 2
+        assert a.params["v0"].name != b.params["v0"].name

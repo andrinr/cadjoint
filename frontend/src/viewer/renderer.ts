@@ -9,6 +9,13 @@
  *
  * Ported from the previous inline playground script, with the depth attachment,
  * the overlay pipelines, and pan support added.
+ *
+ * What is left here is the device and the frame: adapter setup, the GPU
+ * buffers and textures, and the passes that draw them. The declarative parts
+ * moved out — the settings the panels write live in `display.ts`, the vertex
+ * packing in `overlayGeometry.ts`, and the pipeline descriptors in
+ * `pipelines.ts` — and are re-exported below so `viewer/renderer` stays the
+ * one import path callers know.
  */
 
 import {
@@ -18,153 +25,157 @@ import {
   type SliceState,
 } from "../simulation";
 import type {
+  ConstructionFace,
   ConstructionNode,
   GizmoMode,
   MeshEdgePayload,
   Selection,
   SimulationMeshPayload,
 } from "../types";
-import { AXIS_COLORS, gizmoEdges, gizmoScale, type AxisIndex } from "./gizmo";
+import { gizmoScale, type AxisIndex } from "./gizmo";
 import {
+  cameraBasis,
   cameraPosition,
+  FOV_SCALE,
   orthoHeightFor,
   viewProjection,
   type CameraState,
-  type Projection,
   type Vec3,
   type View,
 } from "./math";
-// Kept as a standalone .wgsl file so the shader has one source of truth that
-// both the bundler and the Python shader-validation test read.
-import OVERLAY_WGSL from "./overlay.wgsl?raw";
-import SIMULATION_WGSL from "./simulation.wgsl?raw";
+import {
+  DEFAULT_DISPLAY,
+  DEFAULT_QUALITY,
+  QUALITY_PRESETS,
+  SDF_VIEW_CODE,
+  VIEW_PRESETS,
+  displayFlags,
+  effectiveMarchSteps,
+  slicePosition,
+  type DisplaySettings,
+  type QualityPreset,
+  type Shaders,
+} from "./display";
+import {
+  EDGE_STRIDE,
+  FACE_STRIDE,
+  GIZMO_STRIDE,
+  HANDLE_STRIDE,
+  packConstructionOverlay,
+  packFaceHighlight,
+  packGizmoInstances,
+  packMeshEdgeInstances,
+} from "./overlayGeometry";
+import {
+  DEPTH_FORMAT,
+  GRATICULE_UNIFORM_SIZE,
+  createGraticulePipeline,
+  createOverlayPipelines,
+  type DepthPair,
+  createSimulationPipelines,
+  sharedLayout,
+} from "./pipelines";
+import {
+  CULL_MARGIN_OFF,
+  CULL_MARGIN_ON,
+  PARAMETER_SLOT_BYTES,
+  ShaderModuleCache,
+  packParameters,
+  sameLayout,
+  type ShaderProgramPayload,
+} from "./shaderProgram";
+import { GRID_ALPHA, GRID_FADE, GRID_MAJOR_EVERY, gridSpacing } from "./graticule";
 
-export interface Shaders {
-  preview: string;
-  path: string;
-  present: string;
+/** What the shader path has done this session. See `Renderer.shaderStats`. */
+export interface ShaderStats {
+  /** Render pipelines created since construction. */
+  pipelineBuilds: number;
+  /** Parameter uploads that stood in for a pipeline rebuild. */
+  parameterUploads: number;
+  /** Whether the installed scene reads its parameters from a buffer. */
+  hasParameterBuffer: boolean;
+  /** Shader modules served from cache. */
+  hits: number;
+  /** Shader modules that had to be compiled. */
+  misses: number;
 }
+import { CHROME, hexToRgb } from "../tokens";
 
-export interface QualityPreset {
-  label: string;
-  pixelBudget: number;
-  maxRatio: number;
-  bounces: number;
-  shadowSamples: number;
-  samples: number;
-}
+export {
+  DEFAULT_DISPLAY,
+  DEFAULT_QUALITY,
+  DISPLAY,
+  QUALITY_PRESETS,
+  SDF_SLICE_RANGE,
+  MARCH_STEPS_MAX,
+  MARCH_STEPS_MIN,
+  SDF_VIEW_CODE,
+  VIEW_PRESETS,
+  displayFlags,
+  effectiveMarchSteps,
+  isSliceView,
+  matchViewPreset,
+  sameView,
+  slicePosition,
+  type DisplaySettings,
+  type QualityPreset,
+  type SdfView,
+  type ShadowMode,
+  type Shaders,
+  type ViewPreset,
+} from "./display";
 
-export const QUALITY_PRESETS: Record<string, QualityPreset> = {
-  draft: {
-    label: "Draft",
-    pixelBudget: 320_000,
-    maxRatio: 1,
-    bounces: 3,
-    shadowSamples: 1,
-    samples: 128,
-  },
-  high: {
-    label: "High",
-    pixelBudget: 900_000,
-    maxRatio: 1.25,
-    bounces: 6,
-    shadowSamples: 2,
-    samples: 512,
-  },
-  ultra: {
-    label: "Ultra",
-    pixelBudget: 1_600_000,
-    maxRatio: 2,
-    bounces: 8,
-    shadowSamples: 4,
-    samples: 1024,
-  },
-};
+/**
+ * The viewport's paper ground, `#e6e6e9`, as the swapchain sees it.
+ *
+ * The colour target is `bgra8unorm` and the SDF shaders gamma-encode
+ * themselves, so this is a *display-encoded* value: it is what a `loadOp:
+ * "clear"` writes, and it is what the fullscreen preview pass has to land on
+ * for a ray that hits nothing. Mirrored as `VIEWPORT_BACKGROUND` in
+ * `src/simColors.ts`, which is where every overlay measures itself against it.
+ */
+const BACKGROUND: GPUColorDict = { r: 0.902, g: 0.902, b: 0.914, a: 1 };
 
-const DEPTH_FORMAT: GPUTextureFormat = "depth32float";
-const BACKGROUND: GPUColorDict = { r: 0.035, g: 0.045, b: 0.035, a: 1 };
+/**
+ * The same paper, as *linear radiance* for `u.bg_color`.
+ *
+ * `environment_radiance` in `cadjoint/viewer/_webgpu.py` returns this
+ * unchanged and the result goes through ACES then gamma 2.2, so handing it the
+ * display value would land the background near `#c4c4c8` — visibly grey
+ * against the chrome. These are the pre-images of the three channels above
+ * under `pow(aces(x), 1/2.2)`, solved once here rather than per fragment.
+ */
+const BACKGROUND_RADIANCE: readonly [number, number, number] = [0.9684, 0.9684, 1.0819];
+
+/**
+ * Key-light intensity for the PBR and path-traced modes.
+ *
+ * The part is lit against paper, so the key cannot run hot: at 3.0 every lit
+ * face landed in the tone map's shoulder and converged with the background.
+ * 1.5 keeps the lit faces below the ground and lets the shading, not the
+ * exposure, carry the form.
+ */
+const KEY_LIGHT_INTENSITY = 1.5;
 
 /** Fraction of the distance to the camera that construction overlays are pulled forward. */
 const DEPTH_NUDGE = 0.004;
 const LINE_WIDTH_PX = 2.4;
 const HANDLE_RADIUS_PX = 6.5;
 
-const EDGE_STRIDE = 40;
-const HANDLE_STRIDE = 32;
-const GIZMO_STRIDE = 44;
-
-/** Display flag bits, matching the DISPLAY_* constants in _webgpu.py. */
-export const DISPLAY = {
-  shadows: 1,
-  reflections: 2,
-  flat: 4,
-  hideSolid: 8,
-  hardShadows: 16,
+/**
+ * The ground grid's metrics.
+ *
+ * The line width is in CSS pixels (the renderer scales it into framebuffer
+ * pixels, which are fewer than CSS pixels under the quality budget's
+ * resolution cap): 1px, because this is furniture and a 2px grid on paper
+ * reads as a table. The fades are multiples of the orbit distance, so the
+ * plane dissolves at the same *apparent* place however far out you are.
+ */
+const GRATICULE = {
+  lineWidth: 1,
+  /** The two ground axes carry more weight than a grid line, and no more. */
+  axisWidth: 1.6,
 } as const;
-
-/** Off, one crisp occlusion ray, or a penumbra. */
-export type ShadowMode = "off" | "hard" | "soft";
-
-export interface DisplaySettings {
-  projection: Projection;
-  shadows: ShadowMode;
-  reflections: boolean;
-  flatShading: boolean;
-  hideSolid: boolean;
-  /** 0 disables x-ray; 1 is fully translucent. */
-  xray: number;
-  showSketches: boolean;
-  showMeshEdges: boolean;
-  showMeshWireframe: boolean;
-  showConstraints: boolean;
-  showFixedConstraints: boolean;
-  showDistanceConstraints: boolean;
-  showConstraintValues: boolean;
-}
-
-export const DEFAULT_DISPLAY: DisplaySettings = {
-  projection: "orthographic",
-  // Flat shading with crisp shadows reads like a working drawing, which is
-  // what you want while modelling; full shading is a click away.
-  shadows: "hard",
-  reflections: true,
-  flatShading: true,
-  hideSolid: false,
-  xray: 1,
-  showSketches: true,
-  showMeshEdges: false,
-  showMeshWireframe: false,
-  showConstraints: true,
-  showFixedConstraints: true,
-  showDistanceConstraints: true,
-  showConstraintValues: true,
-};
-
-/** Orbit angles for the standard views, in radians. */
-export const VIEW_PRESETS: Record<string, { yaw: number; pitch: number }> = {
-  iso: { yaw: 0.75, pitch: 0.32 },
-  front: { yaw: 0, pitch: 0 },
-  back: { yaw: Math.PI, pitch: 0 },
-  right: { yaw: Math.PI / 2, pitch: 0 },
-  left: { yaw: -Math.PI / 2, pitch: 0 },
-  top: { yaw: 0, pitch: Math.PI / 2 },
-  bottom: { yaw: 0, pitch: -Math.PI / 2 },
-};
-
-type Rgba = readonly [number, number, number, number];
-
-const COLORS: Record<string, Rgba> = {
-  edge: [0.851, 1.0, 0.341, 0.95],
-  edgeLocked: [0.58, 0.6, 0.56, 0.7],
-  handle: [1.0, 0.506, 0.404, 1.0],
-  handleSelected: [0.98, 0.99, 0.94, 1.0],
-  handleHover: [1.0, 0.72, 0.4, 1.0],
-  handleLocked: [0.62, 0.64, 0.6, 0.9],
-  edgeSelected: [1.0, 0.95, 0.6, 1.0],
-  edgeHover: [0.95, 1.0, 0.72, 1.0],
-  meshWire: [0.5, 0.56, 0.62, 0.22],
-  meshSharp: [0.35, 0.85, 1.0, 0.95],
-};
 
 export interface RendererCallbacks {
   onStatus?: (kind: string, text: string) => void;
@@ -192,19 +203,68 @@ export class Renderer {
   private viewBuffer!: GPUBuffer;
   private overlayBuffer!: GPUBuffer;
   private meshOverlayBuffer!: GPUBuffer;
+  private graticuleBuffer!: GPUBuffer;
 
   private previewPipeline: GPURenderPipeline | null = null;
   private previewDepthPipeline: GPURenderPipeline | null = null;
   private previewBindGroup: GPUBindGroup | null = null;
   private pathPipeline: GPURenderPipeline | null = null;
+
+  // ── The scene's parameters, and what they save ────────────────────────
+  // A scene shader built in the uniform form reads its design parameters
+  // out of a `@group(3)` buffer instead of carrying them as constants, so
+  // the source does not change when a value does. Everything here exists
+  // to notice that and answer a parameter edit with a `writeBuffer`
+  // rather than a shader module and four pipelines.
+  /** Compiled modules held by source, so an undo lands on a hit. */
+  private shaderModules = new ShaderModuleCache();
+  /** The sources currently installed, or null before the first compile. */
+  private installedShaders: Shaders | null = null;
+  /** The scene's uniform contract; null in the literal form. */
+  private program: ShaderProgramPayload | null = null;
+  private parameterBuffer: GPUBuffer | null = null;
+  private parameterBufferBytes = 0;
+  private previewParameterGroup: GPUBindGroup | null = null;
+  private pathParameterGroup: GPUBindGroup | null = null;
+  /**
+   * Values layered over the program's own, keyed by parameter name.
+   *
+   * A handle or gizmo drag writes these at frame rate while the server
+   * patch that makes them permanent is still in flight; the compile that
+   * lands afterwards clears them by installing the same numbers.
+   */
+  private parameterOverrides: Record<string, readonly number[]> | null = null;
+  /**
+   * Render pipelines created since the renderer was constructed.
+   *
+   * Public because it is the thing the drag test asserts about: a drag
+   * that only moves parameter values must not advance this at all.
+   */
+  pipelineBuilds = 0;
+  /** Parameter uploads that stood in for a pipeline rebuild. */
+  parameterUploads = 0;
+  /** `display.cullBounds` as of the last parameter upload. */
+  private uploadedCullBounds = DEFAULT_DISPLAY.cullBounds;
   private presentPipeline: GPURenderPipeline | null = null;
-  private edgePipeline: GPURenderPipeline | null = null;
-  private handlePipeline: GPURenderPipeline | null = null;
+  private edgePipeline: DepthPair | null = null;
+  private facePipeline: DepthPair | null = null;
+  private handlePipeline: DepthPair | null = null;
   private gizmoEdgePipeline: GPURenderPipeline | null = null;
   private gizmoArrowPipeline: GPURenderPipeline | null = null;
   private gizmoScalePipeline: GPURenderPipeline | null = null;
   private overlayBindGroup: GPUBindGroup | null = null;
   private meshOverlayBindGroup: GPUBindGroup | null = null;
+  /**
+   * How firmly the floor is printed, 0…1.
+   *
+   * Set by the viewer pane: sketching on a plane that is not the floor steps
+   * the grid back so the sketch's own plane is the reference. Everything else
+   * about the grid is fixed by the token layer.
+   */
+  groundEmphasis = 1;
+
+  private graticulePipeline: GPURenderPipeline | null = null;
+  private graticuleBindGroup: GPUBindGroup | null = null;
 
   private depthTexture: GPUTexture | null = null;
   private accumulation: GPUTexture[] = [];
@@ -225,6 +285,16 @@ export class Renderer {
   private gizmoCapacity = 0;
   private gizmoCount = 0;
   private visibleGizmoMode: GizmoMode = "translate";
+  // The face under the pointer while face picking is armed: a filled wash
+  // (its own triangle pipeline, since nothing else in the overlay is a
+  // surface) plus a hairline outline drawn through the edge pipeline.
+  private faceHighlight: ConstructionFace | null = null;
+  private faceFillBuffer: GPUBuffer | null = null;
+  private faceFillCapacity = 0;
+  private faceFillVertices = 0;
+  private faceOutlineBuffer: GPUBuffer | null = null;
+  private faceOutlineCapacity = 0;
+  private faceOutlineCount = 0;
   private meshEdgeBuffer: GPUBuffer | null = null;
   private meshEdgeCapacity = 0;
   private meshWireCount = 0;
@@ -268,9 +338,17 @@ export class Renderer {
   private framePending = false;
   private initError = "";
 
-  camera: CameraState = { yaw: 0.75, pitch: 0.32, distance: 4.6, target: [0, 0, 0] };
+  // The session opens on the +X−Y+Z corner, at the exact 1:1:1 direction
+  // rather than near it: the readout says ISO because the camera is on an
+  // isometric direction, not because someone once typed angles that looked
+  // about right. `VIEW_PRESETS.iso` is the same pair of numbers.
+  camera: CameraState = {
+    ...VIEW_PRESETS.iso,
+    distance: 4.6,
+    target: [0, 0, 0],
+  };
   display: DisplaySettings = { ...DEFAULT_DISPLAY };
-  quality: QualityPreset = QUALITY_PRESETS.high;
+  quality: QualityPreset = QUALITY_PRESETS[DEFAULT_QUALITY];
   pathTracing = false;
   pathReady = false;
   interacting = false;
@@ -345,30 +423,35 @@ export class Renderer {
     };
   }
 
-  /** Point the camera along a standard axis; presets switch to orthographic. */
+  /**
+   * Point the camera at a standard view.
+   *
+   * Direction only. A preset used to also force the projection — orthographic
+   * for the axis views, perspective for "iso" — which quietly conflated two
+   * different things: *isometric* names a direction (a 1:1:1 line through the
+   * scene), *orthographic* names a projection (parallel rays). You can look
+   * down an isometric direction in either projection, and which one you are in
+   * is the toggle beside the cube, not a side effect of clicking a corner.
+   *
+   * And it does not take the zoom with it either. A version of this snapped
+   * the distance to the nearest rung of the floor grid's 1-2-5 ladder on every
+   * preset click, on the argument that a view should be framed in a round
+   * number of divisions. The argument is fine and the place is wrong: the
+   * session opens at 4.6 units, which is not on the ladder, so the very first
+   * press of FRONT zoomed out 16% before it turned — one press, two changes,
+   * and the second one unasked for. Detents belong to the control that sets
+   * the zoom (the wheel, in `zoomCamera`), not to the one that sets the
+   * direction.
+   */
   applyViewPreset(name: string): void {
     const preset = VIEW_PRESETS[name];
     if (!preset) return;
     this.camera = { ...this.camera, yaw: preset.yaw, pitch: preset.pitch };
-    this.display = {
-      ...this.display,
-      projection: name === "iso" ? "perspective" : "orthographic",
-    };
     this.invalidate();
   }
 
   private displayFlags(): number {
-    const { shadows, reflections, flatShading, hideSolid } = this.display;
-    return (
-      (shadows === "off" ? 0 : DISPLAY.shadows) |
-      (shadows === "hard" ? DISPLAY.hardShadows : 0) |
-      (reflections ? DISPLAY.reflections : 0) |
-      (flatShading ? DISPLAY.flat : 0) |
-      // While the simulation surface is shown the raymarched solid is hidden:
-      // the preview pass still supplies the environment background and clears
-      // depth to 1, and the FEM mesh depth-tests into that frame.
-      (hideSolid || this._simulationActive ? DISPLAY.hideSolid : 0)
-    );
+    return displayFlags(this.display, this._simulationActive);
   }
 
   async init(canvas: HTMLCanvasElement): Promise<void> {
@@ -406,8 +489,8 @@ export class Renderer {
       this.viewBuffer = this.createUniform(64);
       this.overlayBuffer = this.createUniform(112);
       this.meshOverlayBuffer = this.createUniform(112);
-      this.buildOverlayPipelines();
-      this.buildSimulationPipeline();
+      this.graticuleBuffer = this.createUniform(GRATICULE_UNIFORM_SIZE);
+      this.buildPipelines();
 
       this.device.addEventListener("uncapturederror", (event) => {
         const message = (event as GPUUncapturedErrorEvent).error?.message ?? "WebGPU error";
@@ -445,282 +528,42 @@ export class Renderer {
     });
   }
 
-  private async checkedModule(code: string, label: string): Promise<GPUShaderModule> {
-    const module = this.device!.createShaderModule({ code, label });
-    const info = await module.getCompilationInfo();
-    const errors = info.messages.filter((message) => message.type === "error");
-    if (errors.length) {
-      throw new Error(
-        errors.map((m) => `${label} ${m.lineNum}:${m.linePos} ${m.message}`).join("\n"),
-      );
-    }
-    return module;
-  }
-
-  /**
-   * A bind group layout shared by several pipelines.
-   *
-   * `layout: "auto"` derives a layout that is *exclusive* to one pipeline, so a
-   * bind group built from one pipeline cannot be bound to another even when the
-   * bindings are identical. Declaring the layout explicitly lets the edge and
-   * handle passes — and the two preview variants — share a single bind group.
-   */
-  private sharedLayout(label: string, bindings: number[]): {
-    bindGroupLayout: GPUBindGroupLayout;
-    pipelineLayout: GPUPipelineLayout;
-  } {
+  /** Install the overlay and simulation pipelines on a fresh device. */
+  private buildPipelines(): void {
     const device = this.device!;
-    const bindGroupLayout = device.createBindGroupLayout({
-      label,
-      entries: bindings.map((binding) => ({
-        binding,
-        visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
-        buffer: { type: "uniform" as const },
-      })),
-    });
-    return {
-      bindGroupLayout,
-      pipelineLayout: device.createPipelineLayout({ bindGroupLayouts: [bindGroupLayout] }),
-    };
-  }
+    const overlay = createOverlayPipelines(
+      device,
+      this.format,
+      this.overlayBuffer,
+      this.meshOverlayBuffer,
+    );
+    this.edgePipeline = overlay.edgePipeline;
+    this.facePipeline = overlay.facePipeline;
+    this.handlePipeline = overlay.handlePipeline;
+    this.gizmoEdgePipeline = overlay.gizmoEdgePipeline;
+    this.gizmoArrowPipeline = overlay.gizmoArrowPipeline;
+    this.gizmoScalePipeline = overlay.gizmoScalePipeline;
+    this.overlayBindGroup = overlay.overlayBindGroup;
+    this.meshOverlayBindGroup = overlay.meshOverlayBindGroup;
 
-  private buildOverlayPipelines(): void {
-    const device = this.device!;
-    const module = device.createShaderModule({ code: OVERLAY_WGSL, label: "Overlay WGSL" });
-    const { bindGroupLayout, pipelineLayout } = this.sharedLayout("Overlay bindings", [0]);
-    const blend: GPUBlendState = {
-      color: { srcFactor: "src-alpha", dstFactor: "one-minus-src-alpha", operation: "add" },
-      alpha: { srcFactor: "one", dstFactor: "one-minus-src-alpha", operation: "add" },
-    };
-    const depthStencil: GPUDepthStencilState = {
-      format: DEPTH_FORMAT,
-      depthWriteEnabled: true,
-      depthCompare: "less-equal",
-    };
+    const graticule = createGraticulePipeline(device, this.format, this.graticuleBuffer);
+    this.graticulePipeline = graticule.graticulePipeline;
+    this.graticuleBindGroup = graticule.graticuleBindGroup;
 
-    this.edgePipeline = device.createRenderPipeline({
-      label: "Overlay edges",
-      layout: pipelineLayout,
-      vertex: {
-        module,
-        entryPoint: "vs_edge",
-        buffers: [
-          {
-            arrayStride: EDGE_STRIDE,
-            stepMode: "instance",
-            attributes: [
-              { shaderLocation: 0, offset: 0, format: "float32x3" },
-              { shaderLocation: 1, offset: 12, format: "float32x3" },
-              { shaderLocation: 2, offset: 24, format: "float32x4" },
-            ],
-          },
-        ],
-      },
-      fragment: { module, entryPoint: "fs_edge", targets: [{ format: this.format, blend }] },
-      primitive: { topology: "triangle-list" },
-      depthStencil,
-    });
+    const simulation = createSimulationPipelines(device, this.format, (size) =>
+      this.createUniform(size),
+    );
+    this.simPipeline = simulation.simPipeline;
+    this.simEdgePipeline = simulation.simEdgePipeline;
+    this.simUniformBuffer = simulation.simUniformBuffer;
+    this.simHighlightUniformBuffer = simulation.simHighlightUniformBuffer;
+    this.simBindGroup = simulation.simBindGroup;
+    this.simHighlightBindGroup = simulation.simHighlightBindGroup;
 
-    this.handlePipeline = device.createRenderPipeline({
-      label: "Overlay handles",
-      layout: pipelineLayout,
-      vertex: {
-        module,
-        entryPoint: "vs_handle",
-        buffers: [
-          {
-            arrayStride: HANDLE_STRIDE,
-            stepMode: "instance",
-            attributes: [
-              { shaderLocation: 0, offset: 0, format: "float32x3" },
-              { shaderLocation: 1, offset: 12, format: "float32x4" },
-              { shaderLocation: 2, offset: 28, format: "float32" },
-            ],
-          },
-        ],
-      },
-      fragment: { module, entryPoint: "fs_handle", targets: [{ format: this.format, blend }] },
-      primitive: { topology: "triangle-list" },
-      depthStencil,
-    });
-
-    const alwaysVisibleDepth: GPUDepthStencilState = {
-      format: DEPTH_FORMAT,
-      depthWriteEnabled: false,
-      depthCompare: "always",
-    };
-
-    this.gizmoEdgePipeline = device.createRenderPipeline({
-      label: "Always-visible rotation gizmo",
-      layout: pipelineLayout,
-      vertex: {
-        module,
-        entryPoint: "vs_edge",
-        buffers: [
-          {
-            arrayStride: GIZMO_STRIDE,
-            stepMode: "instance",
-            attributes: [
-              { shaderLocation: 0, offset: 0, format: "float32x3" },
-              { shaderLocation: 1, offset: 12, format: "float32x3" },
-              { shaderLocation: 2, offset: 24, format: "float32x4" },
-            ],
-          },
-        ],
-      },
-      fragment: { module, entryPoint: "fs_edge", targets: [{ format: this.format, blend }] },
-      primitive: { topology: "triangle-list" },
-      depthStencil: alwaysVisibleDepth,
-    });
-
-    this.gizmoArrowPipeline = device.createRenderPipeline({
-      label: "Always-visible translation gizmo",
-      layout: pipelineLayout,
-      vertex: {
-        module,
-        entryPoint: "vs_gizmo_arrow",
-        buffers: [
-          {
-            arrayStride: GIZMO_STRIDE,
-            stepMode: "instance",
-            attributes: [
-              { shaderLocation: 0, offset: 0, format: "float32x3" },
-              { shaderLocation: 1, offset: 12, format: "float32x3" },
-              { shaderLocation: 2, offset: 24, format: "float32x4" },
-              { shaderLocation: 3, offset: 40, format: "float32" },
-            ],
-          },
-        ],
-      },
-      fragment: {
-        module,
-        entryPoint: "fs_gizmo_arrow",
-        targets: [{ format: this.format, blend }],
-      },
-      primitive: { topology: "triangle-list" },
-      depthStencil: alwaysVisibleDepth,
-    });
-
-    this.gizmoScalePipeline = device.createRenderPipeline({
-      label: "Always-visible scale gizmo",
-      layout: pipelineLayout,
-      vertex: {
-        module,
-        entryPoint: "vs_gizmo_scale",
-        buffers: [
-          {
-            arrayStride: GIZMO_STRIDE,
-            stepMode: "instance",
-            attributes: [
-              { shaderLocation: 0, offset: 0, format: "float32x3" },
-              { shaderLocation: 1, offset: 12, format: "float32x3" },
-              { shaderLocation: 2, offset: 24, format: "float32x4" },
-              { shaderLocation: 3, offset: 40, format: "float32" },
-            ],
-          },
-        ],
-      },
-      fragment: {
-        module,
-        entryPoint: "fs_gizmo_arrow",
-        targets: [{ format: this.format, blend }],
-      },
-      primitive: { topology: "triangle-list" },
-      depthStencil: alwaysVisibleDepth,
-    });
-
-    this.overlayBindGroup = device.createBindGroup({
-      layout: bindGroupLayout,
-      entries: [{ binding: 0, resource: { buffer: this.overlayBuffer } }],
-    });
-    this.meshOverlayBindGroup = device.createBindGroup({
-      layout: bindGroupLayout,
-      entries: [{ binding: 0, resource: { buffer: this.meshOverlayBuffer } }],
-    });
-  }
-
-  /**
-   * The indexed triangle-mesh pipeline for FEM results.
-   *
-   * Follows the overlay pattern: an explicit layout (never `layout: "auto"`)
-   * so the base and highlight passes can bind different uniform buffers to
-   * one pipeline. Vertices interleave a position with the nodal scalar; the
-   * fragment stage ramps the scalar and applies the clip plane.
-   */
-  private buildSimulationPipeline(): void {
-    const device = this.device!;
-    const module = device.createShaderModule({ code: SIMULATION_WGSL, label: "Simulation WGSL" });
-    const { bindGroupLayout, pipelineLayout } = this.sharedLayout("Simulation bindings", [0]);
-
-    this.simPipeline = device.createRenderPipeline({
-      label: "Simulation surface",
-      layout: pipelineLayout,
-      vertex: {
-        module,
-        entryPoint: "vs_sim",
-        buffers: [
-          {
-            arrayStride: 32,
-            stepMode: "vertex",
-            attributes: [
-              { shaderLocation: 0, offset: 0, format: "float32x3" },
-              { shaderLocation: 1, offset: 12, format: "float32" },
-              // BC-preview tint: rgb hue + blend strength per vertex.
-              { shaderLocation: 2, offset: 16, format: "float32x4" },
-            ],
-          },
-        ],
-      },
-      fragment: { module, entryPoint: "fs_sim", targets: [{ format: this.format }] },
-      primitive: { topology: "triangle-list" },
-      depthStencil: {
-        format: DEPTH_FORMAT,
-        depthWriteEnabled: true,
-        depthCompare: "less-equal",
-      },
-    });
-
-    // Element-edge hairlines: same vertex buffer (position only), a line
-    // list over the payload's edge index pairs, nudged toward the camera in
-    // the vertex stage so they sit on top of their own faces.
-    this.simEdgePipeline = device.createRenderPipeline({
-      label: "Simulation element edges",
-      layout: pipelineLayout,
-      vertex: {
-        module,
-        entryPoint: "vs_sim_edge",
-        buffers: [
-          {
-            arrayStride: 32,
-            stepMode: "vertex",
-            // The scalar rides along so the hairline can pick a colour that
-            // contrasts with the ramp value underneath it.
-            attributes: [
-              { shaderLocation: 0, offset: 0, format: "float32x3" },
-              { shaderLocation: 1, offset: 12, format: "float32" },
-            ],
-          },
-        ],
-      },
-      fragment: { module, entryPoint: "fs_sim_edge", targets: [{ format: this.format }] },
-      primitive: { topology: "line-list" },
-      depthStencil: {
-        format: DEPTH_FORMAT,
-        depthWriteEnabled: false,
-        depthCompare: "less-equal",
-      },
-    });
-
-    this.simUniformBuffer = this.createUniform(112);
-    this.simHighlightUniformBuffer = this.createUniform(112);
-    this.simBindGroup = device.createBindGroup({
-      layout: bindGroupLayout,
-      entries: [{ binding: 0, resource: { buffer: this.simUniformBuffer } }],
-    });
-    this.simHighlightBindGroup = device.createBindGroup({
-      layout: bindGroupLayout,
-      entries: [{ binding: 0, resource: { buffer: this.simHighlightUniformBuffer } }],
-    });
+    // Draw the empty viewport as soon as there is a device to draw it with.
+    // Before the first compile there is no scene shader and nothing else would
+    // ask for a frame, and an unpainted swap chain is the black the user saw.
+    this.invalidate();
   }
 
   /** Whether the FEM surface replaces the raymarched solid. */
@@ -858,19 +701,67 @@ export class Renderer {
    * The preview pipeline lands first so the viewer updates immediately; the
    * path-trace pipelines follow. A revision guard drops results from a compile
    * that has since been superseded.
+   *
+   * The cheap case comes first. In the uniform form the two scene shaders are
+   * byte-identical for every value of every design parameter, so a compile
+   * whose sources match the installed ones can only differ in its numbers:
+   * it is answered by writing the parameter buffer and redrawing, with no
+   * `createShaderModule` and no pipeline at all. That is the whole point of
+   * the form — a slider drag on `scenes/motor_shield.py` was 440 ms of module
+   * compilation and 520 ms of pipeline creation per edit before it.
    */
   async setShaders(shaders: Shaders): Promise<void> {
     if (!this.device) {
       this.callbacks.onError?.(this.initError || "WGSL compiled, but WebGPU is unavailable.");
       return;
     }
+    const program = shaders.program ?? null;
+    if (this.isValuesOnlyEdit(shaders, program)) {
+      // Newest values win: an older rebuild still in flight reads `program`
+      // rather than the payload it started from, so it cannot resurrect them.
+      this.program = program;
+      this.parameterOverrides = null;
+      this.uploadParameters();
+      // Which handles are live is a property of the program, so the marks
+      // are repacked whenever it is installed — including here, where
+      // nothing else about the scene changed.
+      this.uploadOverlay();
+      this.parameterUploads += 1;
+      this.destroyAccumulation();
+      this.invalidate();
+      return;
+    }
+
     const revision = ++this.shaderRevision;
+    // Nothing about the installed scene changes yet, and that is the whole
+    // rule this method obeys. Everything below the first `await` takes real
+    // time — twelve to twenty-five seconds of module and pipeline building
+    // for `scenes/motor_shield.py` — and every frame drawn in that window
+    // still draws the *previous* scene. It can only do that if the previous
+    // scene is whole. Installing the new program and its buffer up here left
+    // the cached bind groups holding a buffer that had just been destroyed
+    // while the draw asked the *new* program for the index to bind them at,
+    // which is exactly the "Buffer with 'SDF parameters' label has been
+    // destroyed" the big scene reported. The replacement is one synchronous
+    // block, after the pipelines exist and after the revision guard.
     this.pathReady = false;
 
-    const previewModule = await this.checkedModule(shaders.preview, "Preview WGSL");
-    const preview = this.sharedLayout("Preview bindings", [0, 2]);
+    const previewModule = await this.shaderModules.get(
+      this.device,
+      shaders.preview,
+      "Preview WGSL",
+    );
+    const preview = sharedLayout(this.device, "Preview bindings", [0, 2]);
+    const parameterLayout = this.parameterLayoutFor(program);
+    const previewLayout = this.device.createPipelineLayout({
+      bindGroupLayouts: this.sceneBindGroupLayouts(
+        preview.bindGroupLayout,
+        program,
+        parameterLayout,
+      ),
+    });
     const previewDescriptor = (writeMask: number): GPURenderPipelineDescriptor => ({
-      layout: preview.pipelineLayout,
+      layout: previewLayout,
       vertex: { module: previewModule, entryPoint: "vs_main" },
       fragment: {
         module: previewModule,
@@ -888,8 +779,17 @@ export class Renderer {
       this.device.createRenderPipelineAsync(previewDescriptor(GPUColorWrite.ALL)),
       this.device.createRenderPipelineAsync(previewDescriptor(0)),
     ]);
+    this.pipelineBuilds += 2;
     if (revision !== this.shaderRevision) return;
 
+    // ── the swap ─────────────────────────────────────────────────────────
+    // Synchronous, and in this order: the program and its buffer, then every
+    // bind group that holds them. No `await` may appear between here and the
+    // last assignment, because a frame drawn halfway through would mix the
+    // two scenes.
+    this.program = program;
+    this.parameterOverrides = null;
+    this.adoptParameterBuffer();
     this.previewPipeline = colorPipeline;
     this.previewDepthPipeline = depthOnlyPipeline;
     this.previewBindGroup = this.device.createBindGroup({
@@ -899,12 +799,21 @@ export class Renderer {
         { binding: 2, resource: { buffer: this.viewBuffer } },
       ],
     });
+    this.previewParameterGroup = this.parameterBindGroup(parameterLayout);
+    // The path pipeline is still the outgoing one and is not rebuilt until
+    // below; its group belongs to the buffer that just went out of use.
+    // `pathReady` is false, so nothing draws it — dropping it says so.
+    this.pathParameterGroup = null;
+    this.uploadParameters();
+    // Which handles are live is a property of the program, so the marks are
+    // repacked with it.
+    this.uploadOverlay();
     this.destroyAccumulation();
     this.invalidate();
 
     const [pathModule, presentModule] = await Promise.all([
-      this.checkedModule(shaders.path, "Path tracer WGSL"),
-      this.checkedModule(shaders.present, "Present WGSL"),
+      this.shaderModules.get(this.device, shaders.path, "Path tracer WGSL"),
+      this.shaderModules.get(this.device, shaders.present, "Present WGSL"),
     ]);
     const [pathPipeline, presentPipeline] = await Promise.all([
       this.device.createRenderPipelineAsync({
@@ -935,11 +844,246 @@ export class Renderer {
         },
       }),
     ]);
+    this.pipelineBuilds += 2;
     if (revision !== this.shaderRevision) return;
     this.pathPipeline = pathPipeline;
     this.presentPipeline = presentPipeline;
+    // The path pipeline derives its own layout, so its parameter bind group
+    // has to come from that layout rather than the preview's: an automatic
+    // layout is exclusive to the pipeline that produced it.
+    this.pathParameterGroup = this.program
+      ? this.parameterBindGroup(pathPipeline.getBindGroupLayout(this.program.group))
+      : null;
+    this.installedShaders = { ...shaders };
     this.pathReady = true;
     this.invalidate();
+  }
+
+  /**
+   * Whether this compile changed only parameter values.
+   *
+   * True when all three sources are the ones already installed *and* the
+   * uniform contract has the same slots in the same places — the layout is
+   * part of the source's meaning, so a program that repacked its buffer is
+   * a different shader even if the text somehow matched. In the literal
+   * form both programs are null, `sameLayout` agrees, and identical sources
+   * mean nothing changed at all: the upload is a no-op and correct.
+   */
+  private isValuesOnlyEdit(
+    shaders: Shaders,
+    program: ShaderProgramPayload | null,
+  ): boolean {
+    const installed = this.installedShaders;
+    return Boolean(
+      installed &&
+        this.previewPipeline &&
+        this.pathPipeline &&
+        shaders.preview === installed.preview &&
+        shaders.path === installed.path &&
+        shaders.present === installed.present &&
+        sameLayout(program, this.program),
+    );
+  }
+
+  /**
+   * The parameter block's layout for a program that is not installed yet.
+   *
+   * Takes the program rather than reading `this.program`, because it is
+   * called while the *previous* program is still the installed one: nothing
+   * about a scene is swapped in until its pipelines exist.
+   */
+  private parameterLayoutFor(program: ShaderProgramPayload | null): GPUBindGroupLayout | null {
+    if (!this.device || !program) return null;
+    return this.device.createBindGroupLayout({
+      label: "SDF parameter bindings",
+      entries: [
+        {
+          binding: program.binding,
+          visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
+          buffer: { type: "uniform" },
+        },
+      ],
+    });
+  }
+
+  /**
+   * The bind group layouts of a scene pipeline, group by group.
+   *
+   * Group 0 is the camera and view uniforms every scene shader has always
+   * had. A uniform-form shader adds its parameter block at the group the
+   * payload names — 3 today — and WebGPU needs the groups in between
+   * spelled out, so they are declared empty. An empty layout binds nothing
+   * and needs no bind group set against it.
+   */
+  private sceneBindGroupLayouts(
+    scene: GPUBindGroupLayout,
+    program: ShaderProgramPayload | null,
+    parameterLayout: GPUBindGroupLayout | null,
+  ): GPUBindGroupLayout[] {
+    const layouts = [scene];
+    if (!this.device || !program || !parameterLayout) return layouts;
+    while (layouts.length < program.group) {
+      layouts.push(this.device.createBindGroupLayout({ entries: [] }));
+    }
+    layouts.push(parameterLayout);
+    return layouts;
+  }
+
+  /** The parameter buffer bound against one layout, or null without a program. */
+  private parameterBindGroup(layout: GPUBindGroupLayout | null): GPUBindGroup | null {
+    if (!this.device || !this.program || !this.parameterBuffer || !layout) return null;
+    return this.device.createBindGroup({
+      label: "SDF parameters",
+      layout,
+      entries: [{ binding: this.program.binding, resource: { buffer: this.parameterBuffer } }],
+    });
+  }
+
+  /**
+   * Give the freshly installed program a buffer of its own size.
+   *
+   * Called from inside the swap, so every bind group that held the outgoing
+   * buffer is rebuilt in the same synchronous step. A buffer whose size has
+   * not changed is kept and simply rewritten, which is why a values-only
+   * edit never needs this at all.
+   *
+   * The outgoing buffer is deliberately **not** destroyed. It is tiny — the
+   * largest shipped scene, `scenes/motor_shield.py`, buffers 41 parameters
+   * into 672 bytes — so `destroy()` reclaims nothing worth having, and it is
+   * live ammunition: one reference left anywhere, in a cached bind group or
+   * a frame already queued, and the next draw fails validation with no stack
+   * and no way back. That is the bug this replaced. Letting the collector
+   * take it cannot fail.
+   */
+  private adoptParameterBuffer(): void {
+    if (!this.device) return;
+    const size = this.program
+      ? Math.max(this.program.buffer_bytes, PARAMETER_SLOT_BYTES)
+      : 0;
+    if (size === this.parameterBufferBytes) return;
+    this.parameterBufferBytes = size;
+    this.parameterBuffer = size
+      ? this.device.createBuffer({
+          label: "SDF parameters",
+          size,
+          usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        })
+      : null;
+  }
+
+  /**
+   * Write the current parameter values, drag overrides and cull margin
+   * included.
+   */
+  private uploadParameters(): void {
+    if (!this.device || !this.program || !this.parameterBuffer) return;
+    this.uploadedCullBounds = this.display.cullBounds;
+    const packed = packParameters(
+      this.program,
+      this.parameterOverrides ?? undefined,
+      this.display.cullBounds ? CULL_MARGIN_ON : CULL_MARGIN_OFF,
+    );
+    this.device.queue.writeBuffer(this.parameterBuffer, 0, packed.buffer as ArrayBuffer);
+  }
+
+  /**
+   * Re-upload when the cull toggle has moved since the last write.
+   *
+   * The margin lives in the scene's parameter buffer rather than the viewer's
+   * own uniform block — the skip tests are inside the generated shader, which
+   * reads nothing else — so it is the one render setting `writeUniforms` does
+   * not carry. Checked per frame and written only on a change, because the
+   * buffer is the drag's hot path and re-packing it every frame for a switch
+   * nobody touched would be a cost with no reason.
+   */
+  private syncCullMargin(): void {
+    if (!this.program || this.uploadedCullBounds === this.display.cullBounds) return;
+    this.uploadParameters();
+  }
+
+  /**
+   * Show these parameter values now, without a compile.
+   *
+   * What a handle or gizmo drag calls on every pointer move: the shader
+   * already reads its parameters from a buffer, so moving one is a few
+   * hundred bytes and a redraw. The server patch follows at its own pace
+   * and lands as an ordinary compile, which clears the overrides by
+   * installing the same numbers.
+   *
+   * @param overrides Values by parameter name; null drops back to the
+   *   program's own.
+   * @returns False in the literal form, where there is no buffer to write
+   *   and the caller must wait for the round trip.
+   */
+  setParameterOverrides(
+    overrides: Readonly<Record<string, readonly number[]>> | null,
+  ): boolean {
+    if (!this.program || !this.parameterBuffer) return false;
+    this.parameterOverrides = overrides ? { ...overrides } : null;
+    this.uploadParameters();
+    // Counted with the compile-path uploads, because they are the same
+    // event seen from two sides: a value reached the GPU without a shader
+    // being built. A drag's worth of these is what the e2e test measures.
+    this.parameterUploads += 1;
+    this.destroyAccumulation();
+    this.invalidate();
+    return true;
+  }
+
+  /**
+   * The installed scene's uniform contract, or null in the literal form.
+   *
+   * Read by the drag path, which has to know whether the parameter a handle
+   * names actually has a slot before it promises a live drag, and by the
+   * overlay, which draws the handles that do differently from the ones that
+   * do not.
+   */
+  get parameterProgram(): ShaderProgramPayload | null {
+    return this.program;
+  }
+
+  /**
+   * Drop a live drag preview that no compile came along to replace.
+   *
+   * The ordinary end of a drag is a patch, a recompile, and the same numbers
+   * arriving through the payload — which clears the overrides on its way in.
+   * A patch the server refuses ends without any of that, and the overrides
+   * would keep drawing a solid the program does not describe. Called once
+   * the commit has settled, so it is a no-op in every case but that one.
+   */
+  dropStaleParameterOverrides(): void {
+    if (this.parameterOverrides) this.setParameterOverrides(null);
+  }
+
+  /** Whether the installed scene reads its parameters from a buffer. */
+  get hasParameterBuffer(): boolean {
+    return this.program !== null && this.parameterBuffer !== null;
+  }
+
+  /** Shader module cache counters, for tests and the performance study. */
+  get shaderCacheStats(): { hits: number; misses: number; size: number } {
+    return {
+      hits: this.shaderModules.hits,
+      misses: this.shaderModules.misses,
+      size: this.shaderModules.size,
+    };
+  }
+
+  /**
+   * What the shader path has done this session, for the e2e tests.
+   *
+   * Published on `window` by the app (`__cadjointShaders`) because the
+   * claim worth testing is a negative one — a handle drag rebuilds *no*
+   * pipelines — and a negative is only checkable against a counter.
+   */
+  get shaderStats(): ShaderStats {
+    return {
+      pipelineBuilds: this.pipelineBuilds,
+      parameterUploads: this.parameterUploads,
+      hasParameterBuffer: this.hasParameterBuffer,
+      hits: this.shaderModules.hits,
+      misses: this.shaderModules.misses,
+    };
   }
 
   /** Replace the construction geometry drawn on top of the scene. */
@@ -962,105 +1106,63 @@ export class Renderer {
     this.scheduleRender();
   }
 
+  /**
+   * Highlight one analytic face, or clear the highlight.
+   *
+   * Takes the face itself rather than a polygon: the fill has to be
+   * triangulated in the face's own frame, and `usable` decides the weight —
+   * a face the source cannot name is still shown, at half strength.
+   */
+  setFaceHighlight(face: ConstructionFace | null): void {
+    if (this.faceHighlight === face) return;
+    this.faceHighlight = face;
+    this.uploadOverlay();
+    this.scheduleRender();
+  }
+
   private uploadOverlay(): void {
     if (!this.device) return;
-    const edges: number[] = [];
-    const handles: number[] = [];
-    const gizmo: number[] = [];
+    const { edges, handles } = packConstructionOverlay(
+      this.profiles,
+      this.selection,
+      this.hover,
+      this.program,
+    );
 
-    for (const node of this.profiles) {
-      // The payload ships a ready-made wireframe, so boxes, spheres, and
-      // sketches all draw through one path.
-      const selected = this.selection?.nodeId === node.id;
-      // Whole-object hover previews the pick before it is committed.
-      const hovered = this.hover?.nodeId === node.id && this.hover.vertexIndex === null;
-      const edgeColor = selected
-        ? COLORS.edgeSelected
-        : hovered
-          ? COLORS.edgeHover
-          : node.editable
-            ? COLORS.edge
-            : COLORS.edgeLocked;
-      for (const [start, end] of node.edges) {
-        edges.push(start[0], start[1], start[2], end[0], end[1], end[2], ...edgeColor);
-      }
-      for (let index = 0; index < node.vertices.length; index++) {
-        const isSelected =
-          this.selection?.nodeId === node.id && this.selection.vertexIndex === index;
-        const hovered = this.hover?.nodeId === node.id && this.hover.vertexIndex === index;
-        const handleColor = !node.editable
-          ? COLORS.handleLocked
-          : isSelected
-            ? COLORS.handleSelected
-            : hovered
-              ? COLORS.handleHover
-              : COLORS.handle;
-        const position = node.vertices[index].world;
-        handles.push(
-          position[0],
-          position[1],
-          position[2],
-          ...handleColor,
-          isSelected || hovered ? 1 : 0,
-        );
-      }
-    }
-
-    // Transform controls have their own buffer and pass. Translation only
-    // needs one instance per axis; rotation keeps its segmented rings.
+    // Transform controls have their own buffer and pass.
     const target = this.gizmoTarget();
+    let gizmo: number[] = [];
     if (target) {
-      const size = gizmoScale(this.view, target.origin);
       this.visibleGizmoMode = this.gizmoModeFor(target.node);
-      for (const group of gizmoEdges(target.origin, size, this.visibleGizmoMode)) {
-        const base = AXIS_COLORS[group.axis];
-        const active = this.gizmoAxis === group.axis;
-        const color: Rgba = active
-          ? [
-              base[0] + (1 - base[0]) * 0.38,
-              base[1] + (1 - base[1]) * 0.38,
-              base[2] + (1 - base[2]) * 0.38,
-              1,
-            ]
-          : [base[0], base[1], base[2], 0.98];
-        const visibleEdges =
-          this.visibleGizmoMode === "rotate" ? group.edges : group.edges.slice(0, 1);
-        for (const [start, end] of visibleEdges) {
-          gizmo.push(
-            start[0],
-            start[1],
-            start[2],
-            end[0],
-            end[1],
-            end[2],
-            ...color,
-            active ? 1 : 0,
-          );
-        }
-      }
+      gizmo = packGizmoInstances(
+        target.origin,
+        gizmoScale(this.view, target.origin),
+        this.visibleGizmoMode,
+        this.gizmoAxis,
+      );
     }
 
-    // The extracted mesh edges share the sketch edge pipeline in one buffer:
-    // wire first, sharp second, so the two display switches can draw either
-    // instance range independently.
-    const meshSegments: number[] = [];
-    if (this.meshEdges) {
-      for (const [start, end] of this.meshEdges.wire) {
-        meshSegments.push(start[0], start[1], start[2], end[0], end[1], end[2], ...COLORS.meshWire);
-      }
-      for (const [start, end] of this.meshEdges.sharp) {
-        meshSegments.push(
-          start[0],
-          start[1],
-          start[2],
-          end[0],
-          end[1],
-          end[2],
-          ...COLORS.meshSharp,
-        );
-      }
-    }
+    const meshSegments = packMeshEdgeInstances(this.meshEdges);
+    const highlight = packFaceHighlight(this.faceHighlight);
 
+    this.faceFillVertices = highlight.fill.length / (FACE_STRIDE / 4);
+    this.faceOutlineCount = highlight.outline.length / (EDGE_STRIDE / 4);
+    this.faceFillBuffer = this.writeInstances(
+      this.faceFillBuffer,
+      new Float32Array(highlight.fill),
+      FACE_STRIDE,
+      (capacity) => (this.faceFillCapacity = capacity),
+      this.faceFillCapacity,
+      "face highlight fill",
+    );
+    this.faceOutlineBuffer = this.writeInstances(
+      this.faceOutlineBuffer,
+      new Float32Array(highlight.outline),
+      EDGE_STRIDE,
+      (capacity) => (this.faceOutlineCapacity = capacity),
+      this.faceOutlineCapacity,
+      "face highlight outline",
+    );
     this.edgeCount = edges.length / (EDGE_STRIDE / 4);
     this.handleCount = handles.length / (HANDLE_STRIDE / 4);
     this.gizmoCount = gizmo.length / (GIZMO_STRIDE / 4);
@@ -1239,6 +1341,21 @@ export class Renderer {
     }
   }
 
+  /**
+   * Re-attach the swap chain to the canvas.
+   *
+   * `resize()` reconfigures whenever the backing store changes, which covers
+   * almost everything. The exception is a canvas that is moved in the DOM
+   * without changing size — which is what a dock rebuild does when the new
+   * layout happens to give the viewport the same rectangle. The element and
+   * its context survive that move, but configuring again costs nothing and
+   * removes the question.
+   */
+  reconfigure(): void {
+    if (!this.device || !this.context) return;
+    this.context.configure({ device: this.device, format: this.format, alphaMode: "opaque" });
+  }
+
   invalidate(): void {
     this.sampleCount = 0;
     this.scheduleRender();
@@ -1252,14 +1369,32 @@ export class Renderer {
 
   private writeUniforms(): void {
     const device = this.device!;
+    this.syncCullMargin();
     const position = cameraPosition(this.camera);
+    // The six trailing scalars of the first five vec4s are the SDF views and
+    // the march budget; `Uniforms` in `cadjoint/viewer/_webgpu.py` documents
+    // the packing and why they ride here rather than in an eighth vec4.
+    const { sdfView, sdfAxis, sdfFraction, isoOffset } = this.display;
+    const sdfMode = SDF_VIEW_CODE[sdfView] ?? 0;
     const scene = new Float32Array([
-      this.canvas.width, this.canvas.height, 0, 0,
-      position[0], position[1], position[2], 0,
-      this.camera.target[0], this.camera.target[1], this.camera.target[2], 0,
-      0.55, 0.8, 0.35, 3,
-      BACKGROUND.r, BACKGROUND.g, BACKGROUND.b, 1,
-      this.sampleCount, this.quality.bounces, this.quality.shadowSamples, 0,
+      this.canvas.width, this.canvas.height, sdfMode, sdfAxis,
+      position[0], position[1], position[2], slicePosition(sdfFraction),
+      this.camera.target[0], this.camera.target[1], this.camera.target[2], isoOffset,
+      0.55, 0.35, 0.8, KEY_LIGHT_INTENSITY,
+      BACKGROUND_RADIANCE[0],
+      BACKGROUND_RADIANCE[1],
+      BACKGROUND_RADIANCE[2],
+      // The slice's contours are ruled at the floor grid's own spacing, so a
+      // contour interval is the same stated number the GRID readout is
+      // showing and the two annotations cannot disagree.
+      gridSpacing(this.camera.distance),
+      this.sampleCount,
+      this.quality.bounces,
+      this.quality.shadowSamples,
+      // The tier's budget unless the display settings override it; both are
+      // rendering choices that ride in the uniform, so changing either is a
+      // buffer write and a redraw rather than a recompile.
+      effectiveMarchSteps(this.display, this.quality),
       this.display.projection === "orthographic" ? 1 : 0,
       orthoHeightFor(this.camera.distance),
       this.displayFlags(),
@@ -1286,6 +1421,8 @@ export class Renderer {
     overlay.set([DEPTH_NUDGE * 0.4, 0, 0, 0], 24);
     device.queue.writeBuffer(this.meshOverlayBuffer, 0, overlay);
 
+    if (this.display.showGraticule) this.writeGraticuleUniforms();
+
     if (this._simulationActive && this.simUniformBuffer && this.simHighlightUniformBuffer) {
       const { normal, offset } = slicePlane(this.simClip, this.simBounds);
       const [low, high] = this.simRange;
@@ -1296,12 +1433,73 @@ export class Renderer {
       sim.set(matrix, 0);
       sim.set([normal[0], normal[1], normal[2], offset], 16);
       sim.set([low, inverseRange, 0, this.simClip.enabled ? 1 : 0], 20);
-      sim.set([ramp, 0, 0, 0], 24);
+      // extra.yzw is the camera position: the FEM surface builds its facet
+      // normal from screen-space derivatives, and on the paper ground it needs
+      // the eye vector both to orient that normal and to darken the
+      // silhouette, which is what separates a hot field from the background.
+      sim.set([ramp, position[0], position[1], position[2]], 24);
       device.queue.writeBuffer(this.simUniformBuffer, 0, sim);
       // The highlight pass re-draws a face group's range with a warm tint.
       sim.set([low, inverseRange, 0.55, this.simClip.enabled ? 1 : 0], 20);
       device.queue.writeBuffer(this.simHighlightUniformBuffer, 0, sim);
     }
+  }
+
+  /**
+   * The camera the ground grid raycasts with, and the grid's own metrics.
+   *
+   * The basis is recomputed here rather than passed through the view matrix
+   * because the shader needs the same three vectors `primary_ray` uses, not a
+   * matrix: it reconstructs the ray for its fragment and intersects the floor
+   * with it. The line width is the one length in CSS pixels, scaled by the
+   * ratio the framebuffer was, so a hairline is a hairline at every quality
+   * tier.
+   */
+  private writeGraticuleUniforms(): void {
+    const scale = this.canvas.width / Math.max(this.canvas.clientWidth, 1);
+    const px = (css: number) => css * scale;
+    const tone = (name: "graticule-line" | "graticule-axis") => hexToRgb(CHROME[name]);
+    const [lineR, lineG, lineB] = tone("graticule-line");
+    const [axisR, axisG, axisB] = tone("graticule-axis");
+    const position = cameraPosition(this.camera);
+    const { forward, right, up } = cameraBasis(position, this.camera.target);
+    const distance = this.camera.distance;
+    const target = this.camera.target;
+    // One dimmer for the whole plane, so the three weights keep their order.
+    const emphasis = this.groundEmphasis;
+    this.device!.queue.writeBuffer(
+      this.graticuleBuffer,
+      0,
+      new Float32Array([
+        this.canvas.width,
+        this.canvas.height,
+        Math.max(1, px(GRATICULE.lineWidth)),
+        this.display.projection === "orthographic" ? 1 : 0,
+        position[0], position[1], position[2], orthoHeightFor(distance),
+        right[0], right[1], right[2],
+        this.canvas.width / Math.max(this.canvas.height, 1),
+        up[0], up[1], up[2], gridSpacing(distance),
+        forward[0], forward[1], forward[2], FOV_SCALE,
+        lineR, lineG, lineB, GRID_ALPHA.minor * emphasis,
+        lineR, lineG, lineB, GRID_ALPHA.major * emphasis,
+        axisR, axisG, axisB, GRID_ALPHA.axis * emphasis,
+        distance * GRID_FADE.start,
+        distance * GRID_FADE.end,
+        GRATICULE.axisWidth,
+        GRID_MAJOR_EVERY,
+        target[0], target[1], target[2], 0,
+      ]),
+    );
+  }
+
+  /** Draw the graticule between the scene's depth and the overlays. */
+  private drawGraticule(pass: GPURenderPassEncoder): void {
+    if (!this.display.showGraticule || !this.graticulePipeline || !this.graticuleBindGroup) {
+      return;
+    }
+    pass.setPipeline(this.graticulePipeline);
+    pass.setBindGroup(0, this.graticuleBindGroup);
+    pass.draw(3);
   }
 
   /** Draw the FEM surface (and its hovered face group) into the pass. */
@@ -1321,7 +1519,9 @@ export class Renderer {
     pass.setVertexBuffer(0, this.simVertexBuffer);
     pass.setIndexBuffer(this.simIndexBuffer, "uint32");
     pass.drawIndexed(this.simIndexCount);
-    const highlight = this.simHighlight;
+    // The BC preview is a mark on the surface, not part of the field, so it
+    // goes with the rest of the construction overlay.
+    const highlight = this.display.showOverlays ? this.simHighlight : null;
     if (highlight && this.simHighlightBindGroup) {
       pass.setBindGroup(0, this.simHighlightBindGroup);
       pass.drawIndexed(highlight.count, 1, highlight.start);
@@ -1340,8 +1540,24 @@ export class Renderer {
     }
   }
 
+  /**
+   * Whether construction geometry should read through the solid.
+   *
+   * The x-ray strength is the same number the shader fades the surface with,
+   * so the overlay's rule and the solid's translucency turn on together: while
+   * you can see into the part, you can see the sketch inside it. The floor
+   * grid is not in this population — it is the ground, not construction — so
+   * it always tests depth and is always occluded by the part standing on it.
+   */
+  private get seeThroughOverlays(): boolean {
+    return this.display.xray > 0;
+  }
+
   private drawOverlay(pass: GPURenderPassEncoder): void {
     if (!this.overlayBindGroup) return;
+    const depth = this.seeThroughOverlays
+      ? (pair: DepthPair) => pair.seen
+      : (pair: DepthPair) => pair.tested;
     const wantMeshWire = this.display.showMeshWireframe && this.meshWireCount > 0;
     const wantMeshSharp = this.display.showMeshEdges && this.meshSharpCount > 0;
     if (
@@ -1350,15 +1566,33 @@ export class Renderer {
       this.edgePipeline &&
       this.meshOverlayBindGroup
     ) {
-      pass.setPipeline(this.edgePipeline);
+      pass.setPipeline(depth(this.edgePipeline!));
       pass.setBindGroup(0, this.meshOverlayBindGroup);
       pass.setVertexBuffer(0, this.meshEdgeBuffer);
       if (wantMeshWire) pass.draw(6, this.meshWireCount, 0, 0);
       if (wantMeshSharp) pass.draw(6, this.meshSharpCount, 0, this.meshWireCount);
       pass.setBindGroup(0, this.overlayBindGroup);
     }
+    // Everything below is the construction overlay: what the app draws *about*
+    // the model. One switch turns the lot off for a presentation frame; the
+    // mesh edges above belong to the mesh and keep their own.
+    if (!this.display.showOverlays) return;
+    // Fill first, then its own outline: the wash does not write depth, so the
+    // hairline lands on top of it rather than fighting it.
+    if (this.faceFillVertices && this.faceFillBuffer && this.facePipeline) {
+      pass.setPipeline(depth(this.facePipeline!));
+      pass.setBindGroup(0, this.overlayBindGroup);
+      pass.setVertexBuffer(0, this.faceFillBuffer);
+      pass.draw(this.faceFillVertices);
+    }
+    if (this.faceOutlineCount && this.faceOutlineBuffer && this.edgePipeline) {
+      pass.setPipeline(depth(this.edgePipeline!));
+      pass.setBindGroup(0, this.overlayBindGroup);
+      pass.setVertexBuffer(0, this.faceOutlineBuffer);
+      pass.draw(6, this.faceOutlineCount);
+    }
     if (this.display.showSketches && this.edgeCount && this.edgeBuffer && this.edgePipeline) {
-      pass.setPipeline(this.edgePipeline);
+      pass.setPipeline(depth(this.edgePipeline!));
       pass.setBindGroup(0, this.overlayBindGroup);
       pass.setVertexBuffer(0, this.edgeBuffer);
       pass.draw(6, this.edgeCount);
@@ -1369,7 +1603,7 @@ export class Renderer {
       this.handleBuffer &&
       this.handlePipeline
     ) {
-      pass.setPipeline(this.handlePipeline);
+      pass.setPipeline(depth(this.handlePipeline!));
       pass.setBindGroup(0, this.overlayBindGroup);
       pass.setVertexBuffer(0, this.handleBuffer);
       pass.draw(6, this.handleCount);
@@ -1397,10 +1631,48 @@ export class Renderer {
     }
   }
 
+  /**
+   * The viewport with nothing in it: paper, and the floor ruled on it.
+   *
+   * Before the first compile, and whenever a shader rebuild or a compile error
+   * has left no preview pipeline, there is still a viewport to draw. Clearing
+   * to black is what an uninitialised swap chain does, and it looks like a
+   * fault; clearing to the same paper the chrome is on, with the ground grid
+   * over it, says "nothing here yet" instead.
+   */
+  private renderEmpty(): void {
+    const device = this.device!;
+    this.writeUniforms();
+    const encoder = device.createCommandEncoder();
+    const pass = encoder.beginRenderPass({
+      colorAttachments: [
+        {
+          view: this.context!.getCurrentTexture().createView(),
+          clearValue: BACKGROUND,
+          loadOp: "clear",
+          storeOp: "store",
+        },
+      ],
+      depthStencilAttachment: {
+        view: this.ensureDepthTexture(),
+        depthClearValue: 1,
+        depthLoadOp: "clear",
+        depthStoreOp: "store",
+      },
+    });
+    this.drawGraticule(pass);
+    pass.end();
+    device.queue.submit([encoder.finish()]);
+  }
+
   private render(): void {
     this.framePending = false;
-    if (!this.device || !this.context || !this.previewPipeline || !this.previewBindGroup) return;
+    if (!this.device || !this.context) return;
     this.resize();
+    if (!this.previewPipeline || !this.previewBindGroup) {
+      this.renderEmpty();
+      return;
+    }
     this.writeUniforms();
 
     const device = this.device;
@@ -1432,6 +1704,9 @@ export class Renderer {
       });
       tracePass.setPipeline(this.pathPipeline!);
       tracePass.setBindGroup(0, this.pathBindGroups[this.readIndex]);
+      if (this.pathParameterGroup) {
+        tracePass.setBindGroup(this.program!.group, this.pathParameterGroup);
+      }
       tracePass.draw(3);
       tracePass.end();
 
@@ -1445,12 +1720,20 @@ export class Renderer {
       presentPass.setBindGroup(0, this.presentBindGroups[writeIndex]);
       presentPass.draw(3);
       // Re-run the cheap preview purely for depth so overlays interleave with
-      // the path-traced image, which carries no depth of its own.
-      if (this.edgeCount && this.display.showSketches && this.previewDepthPipeline) {
+      // the path-traced image, which carries no depth of its own. The
+      // graticule needs it for the same reason — without a depth buffer it
+      // would paint over the part instead of behind it.
+      const wantDepth =
+        (this.edgeCount && this.display.showSketches) || this.display.showGraticule;
+      if (wantDepth && this.previewDepthPipeline) {
         presentPass.setPipeline(this.previewDepthPipeline);
         presentPass.setBindGroup(0, this.previewBindGroup);
+        if (this.previewParameterGroup) {
+          presentPass.setBindGroup(this.program!.group, this.previewParameterGroup);
+        }
         presentPass.draw(3);
       }
+      this.drawGraticule(presentPass);
       this.drawOverlay(presentPass);
       presentPass.end();
       this.readIndex = writeIndex;
@@ -1463,8 +1746,15 @@ export class Renderer {
       });
       previewPass.setPipeline(this.previewPipeline);
       previewPass.setBindGroup(0, this.previewBindGroup);
+      if (this.previewParameterGroup) {
+        previewPass.setBindGroup(this.program!.group, this.previewParameterGroup);
+      }
       previewPass.draw(3);
       this.drawSimulation(previewPass);
+      // After every pass that writes depth, before every pass that does not:
+      // the faceplate is occluded by the part and the FEM surface, and the
+      // construction overlays are drawn on top of it.
+      this.drawGraticule(previewPass);
       this.drawOverlay(previewPass);
       previewPass.end();
     }
@@ -1495,6 +1785,8 @@ export class Renderer {
     this.destroyAccumulation();
     this.depthTexture?.destroy();
     this.edgeBuffer?.destroy();
+    this.faceFillBuffer?.destroy();
+    this.faceOutlineBuffer?.destroy();
     this.handleBuffer?.destroy();
     this.gizmoBuffer?.destroy();
     this.simVertexBuffer?.destroy();

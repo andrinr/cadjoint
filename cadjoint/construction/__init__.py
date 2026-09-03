@@ -7,8 +7,15 @@ directly on the generated geometry. The construction tree itself is rendered
 as a wireframe overlay on top of SDF renders (``cadjoint.render.overlay``).
 
 Construction tree:
-- SketchPlane(origin, normal) — work plane / coordinate frame
+- SketchPlane(origin, normal, x_axis) — work plane / coordinate frame
 - PolygonProfile(vertices, plane) — closed 2D profile with Vector2 parameters
+
+Face references (``faces``):
+- Every generated solid carries the feature's analytic faces — ``solid.cap("+")``,
+  ``solid.side(i)``, ``block.face("+z")`` — and a revolve carries ``solid.axis``.
+- ``SketchPlane.on/offset/tangent/midplane`` turn those into work planes that
+  move with the parent's parameters, so a gradient through a child solid
+  reaches the parent's ``depth``.
 
 Generators (construction → SDF):
 - extrude(profile, depth) → ExtrudedPolygon placed on the profile's plane
@@ -24,6 +31,7 @@ Geometry-entity helpers:
 from __future__ import annotations
 
 from cadjoint.construction.extrude import extrude
+from cadjoint.construction.faces import Axis, Face, FaceSet, Feature
 from cadjoint.construction.from_circle import from_circle
 from cadjoint.construction.from_line import from_line
 from cadjoint.construction.from_point import from_point
@@ -33,6 +41,10 @@ from cadjoint.construction.sketch import PolygonProfile, SketchPlane
 from cadjoint.construction.solid import ConstructionPrimitive, Solid
 
 __all__ = [
+    "Axis",
+    "Face",
+    "FaceSet",
+    "Feature",
     "SketchPlane",
     "PolygonProfile",
     "ConstructionPrimitive",

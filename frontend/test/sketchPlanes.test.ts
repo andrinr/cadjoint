@@ -26,12 +26,14 @@ function solid(
   };
   return {
     id,
+    stableId: null,
     kind,
     name: id,
     line: 2,
     editable: true,
     edges: [],
     plane: null,
+    faces: [],
     vertices: [],
     transform,
     spans: {},

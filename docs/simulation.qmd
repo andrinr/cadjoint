@@ -6,8 +6,8 @@ description: Declared meshes, declared studies, and node selections that survive
 `cadjoint.fem` turns an SDF into a finite-element answer. Both the
 discretization and the physics are *declared* — a `SimMesh` and a study are
 objects in the scene file, not calls buried in a script — because the same
-declarations are read by the viewer's Simulate panel, re-solved by the
-optimizer, and refrozen every time the geometry moves.
+declarations are read by the playground's Meshes and Studies windows, re-solved
+by the optimizer, and refrozen every time the geometry moves.
 
 Install the solver stack:
 
@@ -44,14 +44,32 @@ dual-contouring extraction grid.
 
 Three `method` values:
 
-| `method` | Element | How it is built |
-|---|---|---|
-| `"hex"` (default) | HEX8 | Voxelize the lattice, Newton-snap boundary nodes onto the SDF. Fast, lattice-aligned, deterministic across platforms. |
-| `"tet4"` | TET4 | Dual-contour the surface, fill it with TetGen. Boundary-conforming. |
-| `"tet10"` | TET10 | The TET4 mesh promoted to straight-sided quadratic tets. Accurate boundary, slower. |
+| `method` | `MeshMethod` | Element | How it is built |
+|---|---|---|---|
+| `"hex"` (default) | `MeshMethod.HEX` | HEX8 | Voxelize the lattice, Newton-snap boundary nodes onto the SDF. Fast, lattice-aligned, deterministic across platforms. |
+| `"tet4"` | `MeshMethod.TET4` | TET4 | Dual-contour the surface, fill it with TetGen. Boundary-conforming. |
+| `"tet10"` | `MeshMethod.TET10` | TET10 | The TET4 mesh promoted to straight-sided quadratic tets. Accurate boundary, slower. |
+
+Both spellings are the same declaration: `method="tet10"` and
+`method=MeshMethod.TET10` (`from cadjoint.enums import MeshMethod`) build the
+same mesh and the same payload, because a `MeshMethod` *is* a `str`. The enum
+is where the option set is defined, so a typo is rejected with the list of
+what is accepted rather than surfacing as a strange mesh.
 
 The tet methods need the `tetgen` package. On the same bar, `"tet10"` gives 947
 nodes across 448 elements against the hex mesh's 336 nodes and 180 elements.
+They also refine themselves: a surface TetGen refuses as self-intersecting is
+re-extracted on a finer grid over the same box before the build gives up, and
+the mesh records which rung it was built on — see
+[the refinement ladder](meshing.qmd#the-refinement-ladder).
+
+There is no fourth `method`, but there is a second mesher. Tets sized by the
+part rather than by the lattice come from Gmsh: `SimMesh(mesher="gmsh")` in
+[the meshing guide](meshing.qmd#the-gmsh-route). Its midside nodes sit on the
+true surface, and whether they *follow* the design parameters depends on the
+`node_map` plugin kind — nothing fills it here, so the mesh reports frozen
+geometry, which [kinds that can be
+filled](getting-started.qmd#pluggable-kinds) explains.
 
 ## Judge it
 
@@ -68,10 +86,10 @@ print(sorted(q))  # ['aspect_ratio', 'scaled_jacobian']
 
 A voxelized hex mesh of an axis-aligned bar is perfect by construction — every
 metric is exactly 1.0. The tet10 mesh of the same bar spans radius ratios from
-0.146 to 0.941. That spread is what the histogram in the viewer's Meshes tab
-shows.
+0.146 to 0.941. That spread is what the histogram in the playground's Meshes
+window shows.
 
-![The declared SimMesh discretized into tet10 elements, shaded by element quality with the quality histogram beside it](../examples/assets/playground-mesh.png)
+![The declared SimMesh discretized into tet10 elements, shaded by element quality with the quality histogram beside it](assets/screens/simulate-meshes.png)
 
 ## Select nodes
 
@@ -81,10 +99,11 @@ whatever mesh they are handed, so they survive re-meshing and a change of shape.
 
 | Factory | Selects |
 |---|---|
-| `Nodes.side("+x")` | One face of the bounding box, within a per-mesh tolerance |
+| `Nodes.side("+x")` | One face of the bounding box, within a per-mesh tolerance (`"+x"`…`"-z"`, or a `Side` member) |
 | `Nodes.box(min_corner, max_corner)` | Inside an axis-aligned box |
 | `Nodes.sphere(center, radius)` | Inside a ball |
 | `Nodes.halfspace(point, normal)` | Where `dot(x - point, normal) >= 0` |
+| `Nodes.cylinder(center, axis, radius, inner=0, half_length=None)` | Within `radius` of the line through `center` along `axis`; `inner` hollows it into an annulus, `half_length` bounds it axially |
 | `Nodes.predicate(fn)` | A vectorized `(N, 3) -> (N,)` boolean callable |
 
 Three operators combine them: `&` (intersection), `|` (union), and `~`
@@ -107,7 +126,9 @@ is how a BC that has drifted off the part during an optimization is caught.
 
 `ThermalStudy` solves steady-state conduction; `ElasticStudy` solves linear
 elasticity. Both take a `SimMesh` and a list of boundary conditions. Material
-properties are keyword-only and have no defaults.
+properties are keyword-only; give them a number, or leave them out and let the
+scene's own materials supply them per element (see
+[Materials drive the solve](#materials-drive-the-solve)).
 
 ```python
 import numpy as np
@@ -145,9 +166,11 @@ or the system is singular and `solve` says so. `HeatFlux` and `Traction` are
 integrated over boundary faces, so their selection has to span complete faces
 rather than isolated nodes.
 
-Units are not declared or enforced anywhere: `conductivity`, `youngs`,
-`poisson`, `source`, `flux`, and `vector` are plain floats in whatever
-consistent system you choose.
+Units are not declared or enforced on the *explicit scalar* path:
+`conductivity`, `youngs`, `poisson`, `source`, `flux`, and `vector` are plain
+floats in whatever consistent system you choose. Properties that come from a
+`Material` are a different matter — those are SI by definition (W/(m·K), Pa,
+kg/m³), so a scene that mixes the two has to be in SI throughout.
 
 An elastic study reads the same way:
 
@@ -167,6 +190,130 @@ study = ElasticStudy(
 `mesh=` and the inline meshing keywords (`resolution`, `bounds`, `size`,
 `domain`) are mutually exclusive — meshing intent lives on the `SimMesh`.
 
+## Materials drive the solve
+
+One scalar for a whole domain is a fiction as soon as a design has two
+materials in it. A copper slug pressed into an aluminium sink is not an
+"average" conductivity — the whole point of the slug is that it is *not*.
+
+Leave a property off the study (or pass the sentinel `"material"`) and it comes
+from the scene's own materials instead, sampled **per element** at solve time:
+
+```python
+import jax.numpy as jnp
+from cadjoint.fem import Dirichlet, HeatFlux, Nodes, SimMesh, ThermalStudy
+from cadjoint.materials import aluminium_6061, copper_c11000
+from cadjoint.sdf.boolean import Union
+from cadjoint.sdf.primitives import Box
+from cadjoint.sdf.transforms import Translate
+
+sink = Translate(Box([0.5, 0.15, 0.15], material=aluminium_6061()),
+                 offset=jnp.array([0.5, 0.0, 0.0]))
+slug = Translate(Box([0.5, 0.15, 0.15], material=copper_c11000()),
+                 offset=jnp.array([-0.5, 0.0, 0.0]))
+scene = Union((sink, slug), smoothness=0.03)
+
+study = ThermalStudy(                       # no conductivity= at all
+    name="two-metal-bar",
+    bcs=[HeatFlux(Nodes.side("-x"), 4.0), Dirichlet(Nodes.side("+x"), 0.0)],
+    mesh=SimMesh(name="bar-mesh", resolution=(22, 5, 5),
+                 bounds=(-1.1, -0.25, -0.25), size=(2.2, 0.5, 0.5)),
+)
+result = study.solve(scene)
+print(result.describe()["range"], result.mass)   # [0.0, 0.0335] 1062.4
+```
+
+Every SDF answers `material_at(p)` and the smooth booleans blend the answers, so
+the scene is already a continuous *field* of properties. Sampling it at each
+element's centroid turns that field into the per-element array the solver wants:
+copper's 391 W/(m·K) in the left half, aluminium's 167 in the right, and a
+transition exactly as wide as the CSG blend joining them. The 4 W/m² entering
+the copper end crosses the bar with a 0.034 K rise, and because both materials
+state a density the result reports the bar's 1062 kg as well (the scene is in
+metres, so it is a two-metre bar).
+
+Nothing about the old API changed. `conductivity=2.0` still means 2.0
+everywhere, on exactly the code path it always took — the per-element array only
+appears when a study asks for one, and the starter's single-material thermal
+solve times identically before and after (0.185 s vs 0.175–0.181 s warm, peak
+temperature bit-identical).
+
+### What each study can derive
+
+| Study | Property | Material key |
+|---|---|---|
+| `ThermalStudy` | `conductivity` | `conductivity` |
+| `ElasticStudy` | `youngs` | `youngs_modulus` |
+| `ElasticStudy` | `poisson` | `poisson_ratio` |
+
+Two more properties are read for *reporting* rather than solving, and are
+best-effort — a scene that never mentions them still solves, it just cannot
+report them:
+
+- `density` becomes `result.mass` (kg), the exact element-wise
+  `sum(rho_e * V_e)`, traced whenever the solve was.
+- `yield_strength` becomes `result.safety_factor` on elastic results: the
+  smallest `yield / von Mises` over the elements, i.e. how far the whole load
+  case could be scaled before the first element yields.
+
+### Self-weight
+
+An elastic study given a `gravity` vector adds `density * gravity` as a body
+force. The materials must state a density, or the study says so:
+
+```python
+ElasticStudy(
+    name="sag",
+    gravity=(0.0, 0.0, -9.81),      # m/s^2, SI throughout
+    bcs=[Fixed(Nodes.side("-x"))],
+    mesh=mesh,
+)
+```
+
+### It stays differentiable
+
+Per-element sampling would be a dead end if it broke the gradient, so it does
+not. The property field is differentiable in *both* directions a designer cares
+about:
+
+- **Geometry** — the blend at an interface moves when the design does, so
+  `d(objective)/d(interface position)` flows through the material field.
+- **Material** — a property marked `free` is traced straight through
+  `Material.as_dict()`, so an optimizer can tune a conductivity and a shape in
+  one gradient.
+
+Both are checked against central finite differences in
+`tests/fem/test_material_properties.py` on a two-material bar with the interface
+position *and* a conductivity free. Measured agreement at that operating point:
+the conductivity sensitivity matches to 4e-6, and the interface sensitivity
+converges to the adjoint as the difference step shrinks — 10 % off at h = 4e-3,
+4.3 % at 1e-3, 0.17 % at 2e-4 (the objective is sharply curved there, because the
+blend is 0.06 wide and the elements are 0.1).
+
+### Backend support
+
+| Backend | Per-element properties | Body force |
+|---|---|---|
+| `"jaxfem"` | Yes — carried as jax-fem `internal_vars`, differentiable | Yes |
+| `"tesseract"` | Yes — optional `cell_conductivity` / `cell_youngs` / `cell_poisson` schema inputs, bit-identical to the direct path | Yes (`body_force`) |
+| `"calculix"` | Approximated — see below | No (`NotImplementedError`) |
+
+CalculiX names materials; it does not take per-element property arrays. A deck
+describes materials with `*MATERIAL` / `*ELSET` / `*SOLID SECTION`, so **a
+blended interface cannot be represented exactly there** — this is a limitation
+of the format, not of the sampling.
+
+What the deck writer does instead: elements whose properties agree to a tight
+relative tolerance are grouped, so every *sharp* region collapses to exactly one
+group and the deck is exact for a two-material part with a crisp interface. Past
+a cap (`max_material_groups`, default 32) — which only a genuinely blended field
+reaches — each element snaps to its nearest reference material in log-property
+space. References default to the field's own dominant materials, or you can pass
+`cadjoint.materials.catalogue()` to snap to named ones. The approximation is
+never silent: the solution carries a `MaterialQuantization` record (elements
+moved, maximum relative property error, reference names) and a
+`CalculixQuantizationWarning` fires whenever any element moved.
+
 ## Read the result
 
 `solve` returns a `SimulationResult` and also stores it on `study.last_result`.
@@ -177,13 +324,16 @@ print(result.describe())
 #  'mesh': 'bar-mesh', 'nodes': 336, 'elements': 180, 'range': [0.0, 1.0], ...}
 ```
 
+`mass` and `safety_factor` are on the result and in `describe()`, `None`
+whenever the scene's materials do not make them computable.
+
 `temperature` (thermal) and `displacement` / `von_mises()` (elastic) give the
 raw fields; `nodal_scalar()` gives the per-node field the viewer colours by.
 `mean()` and `max()` are the traced-safe reductions an objective should use —
 they work under `jax.grad`, where the concrete accessors do not. `to_vtk(path)`
 writes the result out for ParaView.
 
-![The solved temperature field on the same mesh, clipped by the slice plane so the flux entering at the die interface is visible](../examples/assets/playground-field.png)
+![The solved temperature field on the same mesh, clipped by the slice plane so the flux entering at the die interface is visible](assets/screens/simulate-results.png)
 
 ## Backends
 
@@ -195,11 +345,21 @@ writes the result out for ParaView.
 | `"tesseract"` | the same jax-fem solve behind a Tesseract | `fem` + `tesseract` extras | the Tesseract's `vector_jacobian_product` endpoint — bit-identical to the in-process path |
 | `"calculix"` | the CalculiX 2.23 Fortran binary as a subprocess | `tesseract` extra and a `ccx` binary | ccx's own `*SENSITIVITY` discrete adjoint, plus a correction for a term missing in 2.23 |
 
-`available_backends()` lists them and `register_backend(name, factory)` adds
-your own; the ABI is the `SolverBackend` protocol in `cadjoint.fem.backends`,
-two methods wide. The survey in
+The three built-in names are `cadjoint.enums.FemBackend` (`FemBackend.JAXFEM`
+and so on), but unlike the other option sets that enum is open at both ends:
+`available_backends()` lists what is registered and
+`register_backend(name, factory)` adds your own under any name, so
+`backend=` keeps taking a plain string. The ABI is the `SolverBackend`
+protocol in `cadjoint.fem.backends`, two methods wide. The survey in
 [simulator ecosystem](../research/simulator-ecosystem.md) ranks 31 further
 candidates for that slot.
+
+`"tesseract"` and `"calculix"` do not name a package; they name a *kind*.
+`"tesseract"` asks the [plugin registry](plugins.qmd) for whatever fills the
+`thermal_solver` or `elastic_solver` slot, and `"calculix"` for the
+`elastic_calculix` plugin — so a `plugins.toml` that points that kind at a
+container or a cluster URL moves the solve without a line of the study
+changing.
 
 Two constraints worth knowing. CalculiX is **elastic and HEX8 only**, and its
 differentiability is objective-valued: cotangents on the raw displacement field
@@ -219,5 +379,6 @@ jax.config.update("jax_enable_x64", True)
 ## Further reading
 
 - [FEM integration](../research/fem-integration.md) — the `SolverBackend` ABI, adjoint mechanics, and the ccx 2.23 sensitivity correction.
+- [Materials](materials.qmd) — the property field a study samples, and the catalogue of real values.
 - [Meshing](meshing.qmd) — the surface extractor underneath the tet methods.
 - [Optimization](optimization.qmd) — making a study the objective of a descent.

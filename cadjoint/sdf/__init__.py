@@ -5,7 +5,8 @@ This module contains all SDF-related functionality:
 - Primitives (Sphere, Box, Cylinder, etc.)
 - Boolean operations (Union, Intersection, Difference)
 - Transforms (Translate, Rotate, Scale, Twist)
-- Field operations (Shell, Offset, Mirror, LinearPattern, PolarPattern)
+- Field transforms (Shell, Offset, Mirror) and patterns (LinearPattern,
+  PolarPattern), both under `transforms/`
 """
 
 from cadjoint.functionalize import functionalize
@@ -24,19 +25,7 @@ from cadjoint.sdf.boolean import (
     union,
     xor,
 )
-from cadjoint.sdf.measure import volume
-from cadjoint.sdf.operations import (
-    LinearPattern,
-    Mirror,
-    Offset,
-    PolarPattern,
-    Shell,
-    linear_pattern,
-    mirror,
-    offset,
-    polar_pattern,
-    shell,
-)
+from cadjoint.sdf.measure import material_mass, volume
 from cadjoint.sdf.primitives import (
     Box,
     Capsule,
@@ -53,6 +42,13 @@ from cadjoint.sdf.transforms import (
     Translate,
     Twist,
 )
+from cadjoint.sdf.transforms.fields import Mirror, Offset, Shell, mirror, offset, shell
+from cadjoint.sdf.transforms.patterns import (
+    LinearPattern,
+    PolarPattern,
+    linear_pattern,
+    polar_pattern,
+)
 
 __all__ = [
     # Base
@@ -61,6 +57,7 @@ __all__ = [
     "functionalize",
     # Measure
     "measure",
+    "material_mass",
     "volume",
     # Primitives
     "Primitive",
@@ -88,7 +85,7 @@ __all__ = [
     "Rotate",
     "Scale",
     "Twist",
-    # Field operations
+    # Field transforms and patterns
     "Shell",
     "Offset",
     "Mirror",

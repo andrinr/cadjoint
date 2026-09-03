@@ -19,6 +19,8 @@ import {
   type DecorationSet,
 } from "@codemirror/view";
 import { createEffect, onCleanup, onMount } from "solid-js";
+import { intelligenceExtensions } from "../editor/extensions";
+import type { FocusSpan } from "../editorFocus";
 import { consoleText, sceneName, setDirty, setSource, source } from "../state";
 
 /** Highlight the character span of the selected sketch vertex. */
@@ -48,42 +50,66 @@ const highlightField = StateField.define<DecorationSet>({
  * CodeMirror ships no highlighting unless a style is installed — the language
  * package only supplies the parser — so this defines one on the app's palette
  * rather than pulling in the default light-leaning theme.
+ *
+ * Every colour is a design token (src/tokens.ts, mirrored into styles.css), so
+ * the source pane and the panels around it are painted from one system, and
+ * every one of them clears WCAG AA on --surface-panel.
+ *
+ * The mapping is deliberate rather than decorative. There is one accent in
+ * this design and its only legal use is a fill behind near-black type, so
+ * syntax cannot be painted with it: what is left is the status family, and it
+ * is spent on the distinction the reader actually needs while editing a scene
+ * — is this the language, or is it a value? Keywords take --info because they
+ * are the language's own vocabulary, literals take --ok and --warn because
+ * they are the numbers and strings the viewport tools rewrite, names that
+ * denote a type take --danger, and comments drop to the muted ink every
+ * de-emphasised label in the app uses.
  */
 const highlightStyle = HighlightStyle.define([
-  { tag: tags.comment, color: "#6d746a", fontStyle: "italic" },
-  { tag: tags.keyword, color: "#d9ff57" },
-  { tag: [tags.controlKeyword, tags.moduleKeyword], color: "#c7f04a" },
-  { tag: [tags.string, tags.special(tags.string)], color: "#ffb37a" },
-  { tag: [tags.number, tags.bool, tags.null], color: "#8fd8ff" },
-  { tag: [tags.className, tags.typeName, tags.namespace], color: "#ff8167" },
-  { tag: tags.function(tags.variableName), color: "#e7e6df" },
-  { tag: tags.definition(tags.variableName), color: "#f2efe6" },
-  { tag: tags.propertyName, color: "#cfe8a0" },
-  { tag: [tags.operator, tags.punctuation, tags.separator], color: "#9aa294" },
-  { tag: tags.self, color: "#ff8167", fontStyle: "italic" },
+  { tag: tags.comment, color: "var(--ink-3)", fontStyle: "italic" },
+  { tag: tags.keyword, color: "var(--info)" },
+  { tag: [tags.controlKeyword, tags.moduleKeyword], color: "var(--info-ink)" },
+  { tag: [tags.string, tags.special(tags.string)], color: "var(--ok)" },
+  { tag: [tags.number, tags.bool, tags.null], color: "var(--warn)" },
+  { tag: [tags.className, tags.typeName, tags.namespace], color: "var(--danger)" },
+  { tag: tags.function(tags.variableName), color: "var(--ink)" },
+  { tag: tags.definition(tags.variableName), color: "var(--ink)" },
+  { tag: tags.propertyName, color: "var(--ink-2)" },
+  { tag: [tags.operator, tags.punctuation, tags.separator], color: "var(--ink-2)" },
+  { tag: tags.self, color: "var(--danger)", fontStyle: "italic" },
 ]);
 
 const theme = EditorView.theme(
   {
-    "&": { height: "100%", fontSize: "13px", backgroundColor: "var(--panel)" },
-    ".cm-scroller": { fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" },
-    ".cm-content": { caretColor: "var(--lime)" },
-    ".cm-gutters": { backgroundColor: "var(--panel)", border: "none", color: "#5d615a" },
-    ".cm-activeLine": { backgroundColor: "rgba(255,255,255,0.03)" },
+    "&": {
+      height: "100%",
+      fontSize: "var(--text-md)",
+      backgroundColor: "var(--surface-panel)",
+    },
+    ".cm-scroller": { fontFamily: "var(--font-mono)", lineHeight: "var(--leading-normal)" },
+    ".cm-content": { caretColor: "var(--mode-accent, var(--accent))" },
+    ".cm-gutters": {
+      backgroundColor: "var(--surface-panel)",
+      border: "none",
+      color: "var(--ink-3)",
+    },
+    ".cm-activeLine": { backgroundColor: "var(--surface-inset)" },
     ".cm-activeLineGutter": { backgroundColor: "transparent" },
     ".cm-vertex-highlight": {
-      backgroundColor: "rgba(217,255,87,0.28)",
-      outline: "1px solid rgba(217,255,87,0.75)",
-      borderRadius: "3px",
+      backgroundColor: "rgba(var(--mode-accent-rgb, var(--accent-rgb)), var(--alpha-veil))",
+      outline: "1px solid rgba(var(--mode-accent-rgb, var(--accent-rgb)), var(--alpha-mark))",
+      borderRadius: "var(--radius)",
     },
     "&.cm-focused": { outline: "none" },
   },
-  { dark: true },
+  // The pane is paper, like everything else in this build; CodeMirror uses
+  // this only to decide which of its own defaults to reach for.
+  { dark: false },
 );
 
 export interface EditorPaneProps {
-  /** Character span to highlight, or null to clear. */
-  highlight: { from: number; to: number } | null;
+  /** Character span to reveal and highlight, or null to clear. */
+  highlight: FocusSpan | null;
   onRun: () => void;
   /** Collapse the pane to its slim rail (same state as Window → Editor). */
   onCollapse?: () => void;
@@ -101,6 +127,9 @@ export function EditorPane(props: EditorPaneProps) {
       syntaxHighlighting(highlightStyle),
       highlightField,
       theme,
+      // ruff diagnostics, jedi completion, and signature help — all three
+      // read the program without running it (src/editor/extensions.ts).
+      ...intelligenceExtensions(),
       keymap.of([
         {
           key: "Mod-Enter",
@@ -142,15 +171,37 @@ export function EditorPane(props: EditorPaneProps) {
     });
   });
 
+  /**
+   * Reveal and highlight whatever the viewport selected.
+   *
+   * Two judgements beyond "scroll there":
+   *
+   * - **A statement is revealed, not painted.** A precise span is the exact
+   *   literal and is tinted whole; a declaration can run twenty-two lines —
+   *   the starter's fin comb does — and tinting all of it puts a block over a
+   *   fifth of the file. So a statement tints its first line only, which is
+   *   the line that names the object, and the reveal still lands on it.
+   * - **It never fights a cursor.** If the editor has focus the user is
+   *   typing in it, and yanking the viewport out from under them is worse
+   *   than not moving: the highlight still updates, the scroll does not.
+   */
   createEffect(() => {
     const span = props.highlight;
     if (!view) return;
     const limit = view.state.doc.length;
     const valid = span && span.from >= 0 && span.to <= limit && span.from < span.to;
+    const mark =
+      valid && span
+        ? span.precise
+          ? span
+          : { from: span.from, to: Math.min(span.to, view.state.doc.lineAt(span.from).to) }
+        : null;
     view.dispatch({
       effects: [
-        setHighlight.of(valid ? span : null),
-        ...(valid ? [EditorView.scrollIntoView(span.from, { y: "center" })] : []),
+        setHighlight.of(mark),
+        ...(valid && span && !view.hasFocus
+          ? [EditorView.scrollIntoView(span.from, { y: "center" })]
+          : []),
       ],
     });
   });

@@ -98,6 +98,18 @@ class TestMeshExtraction:
         alignment = np.einsum("md,md->m", group.normals, group.centers)
         assert (alignment > 0.0).all()  # radial direction on a sphere
 
+    def test_easy_geometry_meshes_at_the_declared_resolution(self, sphere_mesh, bar_mesh):
+        # The refinement ladder (tests/fem/test_tet_refinement.py) must be
+        # invisible on geometry that never needed it: one attempt, no
+        # re-dicing, the declared grid on the mesh.
+        for mesh, grid in ((sphere_mesh, _SPHERE_GRID), (bar_mesh, _BAR_GRID)):
+            record = mesh.refinement
+            assert record["refined"] is False
+            assert record["declared"] == record["used"] == grid.cells
+            assert len(record["attempts"]) == 1
+            assert record["attempts"][0]["outcome"] == "meshed"
+        assert mesh.grid.cells == _BAR_GRID.cells
+
 
 class TestQualityMetrics:
     def test_regular_tet_scores_one(self):

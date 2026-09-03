@@ -158,6 +158,17 @@ directly with an angle and plane tolerance. `save_step` writes a `CLOSED_SHELL`
 inside a `MANIFOLD_SOLID_BREP` and is validated against the OCCT kernel in
 `tests/meshing/test_step_kernel.py`.
 
+All three write the mesh as it is, and a faceted solid is the whole of what
+this package exports: one triangle per cell crossing, a 28-gon standing in for
+a bore. The STEP is real B-rep topology — an `ADVANCED_FACE` per merged polygon
+over its own `PLANE`, so a CAD kernel opens the file as one closed solid rather
+than as a triangle soup — but its faces are the *mesh's* faces, and a bore
+arrives as the ring of narrow facets the lattice cut it into. A STEP in which
+a plate with a hole is seven faces instead of three thousand, the bore one
+`CYLINDRICAL_SURFACE`, is the `step_export` [plugin
+kind](plugins.qmd#the-five-in-process-kinds); with nothing registered for it
+the writers on this page are what an export uses, and the report says so.
+
 ## Checking a mesh
 
 `mesh_report` bundles the four diagnostics used throughout the test suite:
@@ -181,42 +192,200 @@ Surface deviation samples the mesh and evaluates the true field there, so it
 measures how far the discretization strayed from the geometry it claims to
 represent — a max absolute error of 0.0029 on a unit sphere at 26 cells.
 
-## Native (Rust) kernels
+## Tet meshes need a finer grid than hexes
 
-The stages that evaluate the SDF must stay in JAX, because the SDF *is* a JAX
-function. The stages that do discrete bookkeeping and small dense linear
-algebra do not, and those are the ones that grow with resolution: at 128 cells
-they are 78% of a sphere extraction and 56% of a box.
+The same declared resolution buys you two different things. `method="hex"`
+only has to decide in/out per lattice cell, so a rib 1.3 cells thick still
+produces a legal (if staircased) HEX8 mesh. `method="tet4"` / `"tet10"` hand
+the dual-contour surface to TetGen as a piecewise linear complex (a second
+route, [`mesher="gmsh"`](#the-gmsh-route), hands the same surface to Gmsh
+and sizes elements by the part rather than by the lattice), and a PLC
+has to be *clean*: watertight, manifold, and free of self-intersections. One
+QEF vertex per cell cannot represent two surface sheets passing through one
+cell, so where a wall is thinner than about two cells the extracted quads
+fold over each other and TetGen refuses the whole thing:
 
-`cadjoint/meshing/native.py` binds a Rust cdylib (rayon-parallel, in `native/`)
-that reimplements exactly those: crossing detection, manifold incidence,
-batched QEF solves, and the dual face build. Discrete outputs are bit-identical
-to the Python path; continuous outputs agree to float64. The measured speedup
-on the batched QEF solves is 90–107×.
+```
+RuntimeError: TetGen rejected the surface: The input surface mesh contain
+self-intersections. ...
+```
+
+Blends make it worse, not better: a smooth union whose radius is comparable
+to the rib thickness folds the surface at the fillet even when the rib itself
+would have survived.
+
+### The refinement ladder
+
+`sdf_to_tet_mesh` (and therefore `SimMesh.build` for the tet methods) answers
+this itself. It walks a ladder of grids over the *same box* — the declared
+resolution, then x1.5 and x2.25, rounded up per axis — and at every rung tries
+exact sharp-feature placement first and the more robust Tikhonov placement
+second. Before each TetGen call the projected surface goes through
+`self_intersections`, so a rung already known to be folded is abandoned
+without paying for TetGen (the declared rung included). The first rung TetGen
+accepts wins, and the mesh's `grid` is that rung, not the declared one.
+
+The diagnostic is a *sampled* check: a hit proves the surface is folded, a
+miss proves nothing, and most rungs are still settled by TetGen itself. It is
+there for the *diagnosis*, not for speed — measured on the end cap's housing
+it costs 0.12–0.16 s a rung (145k–200k pairs), about 1% of the ~15 s that
+rung's extraction and projection cost, but more than the 0.06–0.16 s TetGen
+takes to reject a folded surface outright. What it earns is a rung recorded as
+`"self-intersecting"` with a fold count, rather than an opaque TetGen string.
+
+### Reading the record
+
+Every mesh that came through the ladder carries a `refinement` record, and a
+`SimulationResult` re-exports it as `result.refinement` (with a digest under
+`describe()["refinement"]`, `None` when nothing was refined). A plate with a
+blended rib two-thirds of a cell thick is enough to see it fire:
 
 ```python
-from cadjoint.meshing import native
+import jax.numpy as jnp
+from cadjoint.fem import SimMesh
+from cadjoint.sdf.boolean import Union
+from cadjoint.sdf.primitives import Box
+from cadjoint.sdf.transforms import Translate
 
-if native.native_available():
-    mesh = native.extract_mesh_native(sdf, grid)
+plate = Box([1.0, 1.0, 0.1])
+rib = Translate(Box([0.12, 0.8, 0.4]), offset=jnp.array([0.0, 0.0, 0.4]))
+part = Union((plate, rib), smoothness=0.1)
+
+sim_mesh = SimMesh(name="ribbed", resolution=(10, 10, 6), method="tet4",
+                   bounds=(-1.1, -1.1, -0.2), size=(2.2, 2.2, 1.2))
+mesh = sim_mesh.build(part)
+
+record = mesh.refinement
+print(record["declared"], "->", record["used"], record["refined"])
+# (10, 10, 6) -> (15, 15, 9) True
+
+for attempt in record["attempts"]:
+    print(attempt["resolution"], attempt["sharp"], attempt["outcome"])
+# (10, 10, 6)  True  self-intersecting
+# (10, 10, 6)  False self-intersecting
+# (15, 15, 9)  True  meshed
 ```
 
-The library is discovered under `native/target/release/`, or from the path in
-`CADJOINT_NATIVE_MESHER` when that is set. Build it with:
+`outcome` is one of `"meshed"`, `"self-intersecting"` (the diagnostic fired,
+TetGen was never run) or `"rejected"` (TetGen ran and refused; the attempt
+also carries `"error"`). A refined mesh is a *different* mesh — more nodes,
+more elements, a different frozen topology — so if you are comparing solves
+across designs, read `used` rather than assuming the declared resolution.
 
-```bash
-cargo build --release --manifest-path native/Cargo.toml
+Pass `max_refinements=0` to restore the old behaviour of failing at the
+declared grid.
+
+### When the ladder does not help
+
+If no rung works, the error names both ends of the ladder and the heuristic:
+
+```
+TetGen rejected the surface: ... The surface stays self-intersecting up to
+(27, 27, 14) (declared (12, 12, 6), refined x1.5 and x2.25); the part likely
+has features thinner than two cells at the declared resolution — raise the
+declared resolution or use method='hex'.
 ```
 
-`native.qef_vertices_native` is the differentiable entry point. It routes
-through the Tesseract in `native/tesseract_api.py`, whose
-`vector_jacobian_product` is a hand-derived linear-solve VJP that matches JAX
-autodiff to ~4e-14. It requires x64:
+Refinement fixes a surface that is *merely* under-resolved. It does not fix a
+feature that is small in absolute terms and stays small however fine the grid
+gets. `scenes/end_cap.py`'s `housing` is the standing example: measured over
+the ladder and well past it, it self-intersects at (26, 26, 13), (39, 39, 20),
+(59, 59, 30), (78, 78, 39), (104, 104, 52) and (130, 130, 65) alike. What
+changes with resolution is only *which* defect: at the declared (26, 26, 13)
+the surface is not even manifold (one edge shared by three triangles) and
+carries 48 folded triangle pairs; by (59, 59, 30) it is watertight and
+manifold, and still carries 16, all of them clustered on the snap-ring groove
+of the bearing seat (0.06 tall by 0.05 deep) and on the gusset-rib crests.
+Those two features are ~1.5 cells even at 2.25x. That part wants
+`method="hex"`, a coarser blend, or a model change — not a finer grid.
+
+Worth knowing when you read such a count: `sdf_to_tet_mesh` Newton-projects
+the QEF vertices onto the zero set before tetrahedralizing, and at a coarse
+grid that projection can *create* folds — the same end-cap surface at
+(26, 26, 13) has 1 self-intersecting pair before projection and 48 after,
+because the projection clamp is half the cell diagonal and a vertex can be
+dragged across a thin wall. Refining shrinks the clamp along with the cells,
+which is part of why the ladder works at all.
+
+## The Gmsh route {#the-gmsh-route}
+
+`mesher` picks who fills a `tet4`/`tet10` mesh. The default, `"tetgen"`, is
+everything above: the lattice sizes the elements and every node follows the
+design through `recompute_tet_points`.
 
 ```python
-import jax
-jax.config.update("jax_enable_x64", True)
+mesh = SimMesh(name="body", resolution=48, method="tet10", mesher="gmsh")
 ```
+
+`mesher="gmsh"` takes the *same* dual-contour surface, writes it as an STL,
+and hands it to Gmsh through the `tet_mesher` plugin. Gmsh's
+`classifySurfaces` + `createGeometry` split the triangle soup into one
+reparametrised surface per smooth region — so what it meshes is a dozen faces
+of a part rather than three thousand facets — HXT fills the volume, and
+`setOrder(2)` puts the midside nodes on those surfaces rather than at chord
+midpoints. Three things change:
+
+* **Element size is the part's, not the lattice's.** The lattice is only how
+  the surface was extracted; `target_size` (the grid's smallest spacing by
+  default) is what sizes the tets, and the refinement ladder does not run.
+* **Quality is an order up.** The plate measures a worst radius ratio of
+  0.293 against the DC/TetGen path's 0.04, with the median at 0.74.
+* **Every node is tagged with the patches that own it.** `assign_ownership`
+  evaluates `|f_p|` on each Gmsh surface entity's nodes for every patch of
+  the scene's decomposition and keeps the ones that clear the bar; the mesh
+  carries the resulting `OwnedNodes` record.
+
+```python
+built = mesh.build(scene)
+built.mesher                      # 'gmsh'
+built.owned.arity_counts()        # {0: 1105, 1: 1494, 2: 194, 3: 8}
+built.stats["blend_surfaces"]     # 0 — a hard CSG solid has no blend faces
+```
+
+Gmsh is **GPL-2.0-or-later**, so it is an optional extra
+(`pip install 'cadjoint[gmsh]'`) or, in production, the `cadjoint_tet_gmsh`
+image where the licence boundary is a process boundary. Nothing under
+`cadjoint/` imports it at module scope. See [plugins](plugins.qmd).
+
+### Frozen geometry
+
+A Gmsh mesh's *topology* is decided once and held. Its *positions* follow the
+design through the `node_map` plugin kind — a per-arity Newton projection
+onto each node's owning patches with the implicit-function adjoint, midsides
+re-solved on their own surfaces, interior nodes following by Laplacian
+relaxation — and nothing in this repository fills that kind (`cadjoint.tier`
+reports whether anything does).
+
+So here the mesh is **frozen geometry**: it builds, solves, inspects and
+exports exactly as any other `TetMesh`, `SimMesh.inspect()` reports
+`frozen_geometry: true`, and an `Optimization` over a study on it is refused
+*at declaration* with one sentence naming the way out. The refusal is
+deliberate: cadjoint could slide every boundary node onto the scene's
+zero set with a one-field projection and call that a gradient, but it would
+take crease nodes off their creases and put midsides back on chords,
+silently. `mesher="tetgen"` — the default — is differentiable throughout.
+
+## Program size {#program-size}
+
+Every stage above evaluates the scene's SDF under `jax.jit`, so the wall clock
+of a first mesh is mostly XLA compiling one program per stage — and how big
+those programs are is decided by `functionalize`, not by the mesher. Three
+things keep the tree from flattening as it is traced.
+
+- A sketch profile's vertices are stacked into one `(N, 2)` array and its edge
+  loop becomes two reductions, so a 168-vertex profile emits the same
+  operations as a 12-vertex one.
+- A pattern traces its child **once**, over an array of instance transforms, and
+  a node reachable from more than one parent is built once and outlined into its
+  own StableHLO function.
+- Passing the parameter dicts to the jitted function rather than closing over
+  them (`functionalize_parametric`) keeps values out of the program entirely, so
+  a re-dimensioned design reuses the executable the
+  [compilation cache](../research/performance.md) already holds.
+
+Measured on `scenes/end_cap.py` — eight gusset ribs, three polar bolt circles, a
+mirrored dowel — the gradient program dropped from 1.62 MB / 18 090 operations
+to 0.58 MB / 5 771, and its XLA compile from 25.4 s to 0.68 s.
 
 ## Known limitations
 
@@ -229,5 +398,6 @@ octree leaves (2:1 balancing, transition stitching) are also open.
 ## Further reading
 
 - [Differentiable meshing pipeline](../research/differentiable-meshing-pipeline.md) — design principles, the full stage/test map, and the benchmark policy.
-- [Native (Rust) dual-contouring core](../research/native-mesher.md) — the profile that justified the split, the JAX/Rust boundary, and measured speedups.
+- [Plugins](plugins.qmd#the-five-in-process-kinds) — the five in-process kinds, the extension points for a component that reads this mesh and re-solves it against the field for exact-surface export, dragging and meshing.
+- [Native (Rust) dual-contouring core, retired](../research/native-mesher.md) — what the Rust port measured, and why 5 ms of a 4 s request was not worth a second implementation. There is no Rust to build: the JAX/NumPy pipeline on this page is the only one.
 - [Simulation](simulation.qmd) — turning this surface into a volume mesh a solver can use.

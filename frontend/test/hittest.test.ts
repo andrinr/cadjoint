@@ -19,6 +19,7 @@ function square(id: string, editable = true): ConstructionNode {
     [-1, 1],
   ];
   const vertices = corners.map(([x, y]) => ({
+    stableId: null,
     name: `${id}_v`,
     free: true,
     uv: [x, y] as [number, number],
@@ -27,6 +28,7 @@ function square(id: string, editable = true): ConstructionNode {
   }));
   return {
     id,
+    stableId: null,
     kind: "profile",
     name: id,
     line: 3,
@@ -35,7 +37,14 @@ function square(id: string, editable = true): ConstructionNode {
       vertex.world,
       vertices[(index + 1) % vertices.length].world,
     ]),
-    plane: { origin: [0, 0, 0], u: [1, 0, 0], v: [0, 1, 0], normal: [0, 0, 1] },
+    plane: {
+      origin: [0, 0, 0],
+      u: [1, 0, 0],
+      v: [0, 1, 0],
+      normal: [0, 0, 1],
+      stableId: null,
+    },
+    faces: [],
     vertices,
     transform: null,
     spans: {},

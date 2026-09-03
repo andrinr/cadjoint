@@ -1,1 +1,2463 @@
-{"project": "cadjoint", "version": "0.0.9999", "count": 129, "items": [{"name": "cadjoint.extraction.extract_parameters", "domain": "py", "role": "function", "priority": "1", "uri": "reference/extraction.extract_parameters.html#cadjoint.extraction.extract_parameters", "dispname": "-"}, {"name": "cadjoint.functionalize.functionalize", "domain": "py", "role": "function", "priority": "1", "uri": "reference/functionalize.functionalize.html#cadjoint.functionalize.functionalize", "dispname": "-"}, {"name": "cadjoint.functionalize.functionalize_scene", "domain": "py", "role": "function", "priority": "1", "uri": "reference/functionalize.functionalize_scene.html#cadjoint.functionalize.functionalize_scene", "dispname": "-"}, {"name": "cadjoint.backends.wgsl.codegen.compile_sdf_to_wgsl", "domain": "py", "role": "function", "priority": "1", "uri": "reference/backends.wgsl.codegen.compile_sdf_to_wgsl.html#cadjoint.backends.wgsl.codegen.compile_sdf_to_wgsl", "dispname": "-"}, {"name": "cadjoint.backends.wgsl.codegen.compile_scene_to_wgsl", "domain": "py", "role": "function", "priority": "1", "uri": "reference/backends.wgsl.codegen.compile_scene_to_wgsl.html#cadjoint.backends.wgsl.codegen.compile_scene_to_wgsl", "dispname": "-"}, {"name": "cadjoint.parametrization.to_normalized", "domain": "py", "role": "function", "priority": "1", "uri": "reference/parametrization.to_normalized.html#cadjoint.parametrization.to_normalized", "dispname": "-"}, {"name": "cadjoint.parametrization.from_normalized", "domain": "py", "role": "function", "priority": "1", "uri": "reference/parametrization.from_normalized.html#cadjoint.parametrization.from_normalized", "dispname": "-"}, {"name": "cadjoint.parametrization.compute_param_scales", "domain": "py", "role": "function", "priority": "1", "uri": "reference/parametrization.compute_param_scales.html#cadjoint.parametrization.compute_param_scales", "dispname": "-"}, {"name": "cadjoint.constraints.types.base.Constraint.compute_residual", "domain": "py", "role": "function", "priority": "1", "uri": "reference/constraints.types.base.Constraint.html#cadjoint.constraints.types.base.Constraint.compute_residual", "dispname": "-"}, {"name": "cadjoint.constraints.types.base.Constraint.dof_reduction", "domain": "py", "role": "function", "priority": "1", "uri": "reference/constraints.types.base.Constraint.html#cadjoint.constraints.types.base.Constraint.dof_reduction", "dispname": "-"}, {"name": "cadjoint.constraints.types.base.Constraint.get_parameters", "domain": "py", "role": "function", "priority": "1", "uri": "reference/constraints.types.base.Constraint.html#cadjoint.constraints.types.base.Constraint.get_parameters", "dispname": "-"}, {"name": "cadjoint.constraints.types.base.Constraint", "domain": "py", "role": "class", "priority": "1", "uri": "reference/constraints.types.base.Constraint.html#cadjoint.constraints.types.base.Constraint", "dispname": "-"}, {"name": "cadjoint.constraints.types.distance.DistanceConstraint.compute_residual", "domain": "py", "role": "function", "priority": "1", "uri": "reference/constraints.types.distance.DistanceConstraint.html#cadjoint.constraints.types.distance.DistanceConstraint.compute_residual", "dispname": "-"}, {"name": "cadjoint.constraints.types.distance.DistanceConstraint.dof_reduction", "domain": "py", "role": "function", "priority": "1", "uri": "reference/constraints.types.distance.DistanceConstraint.html#cadjoint.constraints.types.distance.DistanceConstraint.dof_reduction", "dispname": "-"}, {"name": "cadjoint.constraints.types.distance.DistanceConstraint.get_parameters", "domain": "py", "role": "function", "priority": "1", "uri": "reference/constraints.types.distance.DistanceConstraint.html#cadjoint.constraints.types.distance.DistanceConstraint.get_parameters", "dispname": "-"}, {"name": "cadjoint.constraints.types.distance.DistanceConstraint", "domain": "py", "role": "class", "priority": "1", "uri": "reference/constraints.types.distance.DistanceConstraint.html#cadjoint.constraints.types.distance.DistanceConstraint", "dispname": "-"}, {"name": "cadjoint.constraints.types.angle.AngleConstraint.compute_residual", "domain": "py", "role": "function", "priority": "1", "uri": "reference/constraints.types.angle.AngleConstraint.html#cadjoint.constraints.types.angle.AngleConstraint.compute_residual", "dispname": "-"}, {"name": "cadjoint.constraints.types.angle.AngleConstraint.dof_reduction", "domain": "py", "role": "function", "priority": "1", "uri": "reference/constraints.types.angle.AngleConstraint.html#cadjoint.constraints.types.angle.AngleConstraint.dof_reduction", "dispname": "-"}, {"name": "cadjoint.constraints.types.angle.AngleConstraint.get_parameters", "domain": "py", "role": "function", "priority": "1", "uri": "reference/constraints.types.angle.AngleConstraint.html#cadjoint.constraints.types.angle.AngleConstraint.get_parameters", "dispname": "-"}, {"name": "cadjoint.constraints.types.angle.AngleConstraint", "domain": "py", "role": "class", "priority": "1", "uri": "reference/constraints.types.angle.AngleConstraint.html#cadjoint.constraints.types.angle.AngleConstraint", "dispname": "-"}, {"name": "cadjoint.constraints.types.parallel.ParallelConstraint.compute_residual", "domain": "py", "role": "function", "priority": "1", "uri": "reference/constraints.types.parallel.ParallelConstraint.html#cadjoint.constraints.types.parallel.ParallelConstraint.compute_residual", "dispname": "-"}, {"name": "cadjoint.constraints.types.parallel.ParallelConstraint.dof_reduction", "domain": "py", "role": "function", "priority": "1", "uri": "reference/constraints.types.parallel.ParallelConstraint.html#cadjoint.constraints.types.parallel.ParallelConstraint.dof_reduction", "dispname": "-"}, {"name": "cadjoint.constraints.types.parallel.ParallelConstraint.get_parameters", "domain": "py", "role": "function", "priority": "1", "uri": "reference/constraints.types.parallel.ParallelConstraint.html#cadjoint.constraints.types.parallel.ParallelConstraint.get_parameters", "dispname": "-"}, {"name": "cadjoint.constraints.types.parallel.ParallelConstraint", "domain": "py", "role": "class", "priority": "1", "uri": "reference/constraints.types.parallel.ParallelConstraint.html#cadjoint.constraints.types.parallel.ParallelConstraint", "dispname": "-"}, {"name": "cadjoint.constraints.types.perpendicular.PerpendicularConstraint.compute_residual", "domain": "py", "role": "function", "priority": "1", "uri": "reference/constraints.types.perpendicular.PerpendicularConstraint.html#cadjoint.constraints.types.perpendicular.PerpendicularConstraint.compute_residual", "dispname": "-"}, {"name": "cadjoint.constraints.types.perpendicular.PerpendicularConstraint.dof_reduction", "domain": "py", "role": "function", "priority": "1", "uri": "reference/constraints.types.perpendicular.PerpendicularConstraint.html#cadjoint.constraints.types.perpendicular.PerpendicularConstraint.dof_reduction", "dispname": "-"}, {"name": "cadjoint.constraints.types.perpendicular.PerpendicularConstraint.get_parameters", "domain": "py", "role": "function", "priority": "1", "uri": "reference/constraints.types.perpendicular.PerpendicularConstraint.html#cadjoint.constraints.types.perpendicular.PerpendicularConstraint.get_parameters", "dispname": "-"}, {"name": "cadjoint.constraints.types.perpendicular.PerpendicularConstraint", "domain": "py", "role": "class", "priority": "1", "uri": "reference/constraints.types.perpendicular.PerpendicularConstraint.html#cadjoint.constraints.types.perpendicular.PerpendicularConstraint", "dispname": "-"}, {"name": "cadjoint.constraints.solve.solve_constraints", "domain": "py", "role": "function", "priority": "1", "uri": "reference/constraints.solve.solve_constraints.html#cadjoint.constraints.solve.solve_constraints", "dispname": "-"}, {"name": "cadjoint.constraints.solve.satisfy_constraints", "domain": "py", "role": "function", "priority": "1", "uri": "reference/constraints.solve.satisfy_constraints.html#cadjoint.constraints.solve.satisfy_constraints", "dispname": "-"}, {"name": "cadjoint.constraints.solve.project_to_manifold", "domain": "py", "role": "function", "priority": "1", "uri": "reference/constraints.solve.project_to_manifold.html#cadjoint.constraints.solve.project_to_manifold", "dispname": "-"}, {"name": "cadjoint.constraints.solve.constraint_residuals", "domain": "py", "role": "function", "priority": "1", "uri": "reference/constraints.solve.constraint_residuals.html#cadjoint.constraints.solve.constraint_residuals", "dispname": "-"}, {"name": "cadjoint.constraints.solve.make_manifold_projection", "domain": "py", "role": "function", "priority": "1", "uri": "reference/constraints.solve.make_manifold_projection.html#cadjoint.constraints.solve.make_manifold_projection", "dispname": "-"}, {"name": "cadjoint.geometry.parameters.Vector.norm", "domain": "py", "role": "function", "priority": "1", "uri": "reference/geometry.parameters.Vector.html#cadjoint.geometry.parameters.Vector.norm", "dispname": "-"}, {"name": "cadjoint.geometry.parameters.Vector.normalize", "domain": "py", "role": "function", "priority": "1", "uri": "reference/geometry.parameters.Vector.html#cadjoint.geometry.parameters.Vector.normalize", "dispname": "-"}, {"name": "cadjoint.geometry.parameters.Vector.xyz", "domain": "py", "role": "attribute", "priority": "1", "uri": "reference/geometry.parameters.Vector.html#cadjoint.geometry.parameters.Vector.xyz", "dispname": "-"}, {"name": "cadjoint.geometry.parameters.Vector", "domain": "py", "role": "class", "priority": "1", "uri": "reference/geometry.parameters.Vector.html#cadjoint.geometry.parameters.Vector", "dispname": "-"}, {"name": "cadjoint.geometry.parameters.Scalar", "domain": "py", "role": "class", "priority": "1", "uri": "reference/geometry.parameters.Scalar.html#cadjoint.geometry.parameters.Scalar", "dispname": "-"}, {"name": "cadjoint.meshing.edge_detection.GridSpec.from_bounds", "domain": "py", "role": "function", "priority": "1", "uri": "reference/meshing.edge_detection.GridSpec.html#cadjoint.meshing.edge_detection.GridSpec.from_bounds", "dispname": "-"}, {"name": "cadjoint.meshing.edge_detection.GridSpec.lattice_points", "domain": "py", "role": "function", "priority": "1", "uri": "reference/meshing.edge_detection.GridSpec.html#cadjoint.meshing.edge_detection.GridSpec.lattice_points", "dispname": "-"}, {"name": "cadjoint.meshing.edge_detection.GridSpec.lattice_shape", "domain": "py", "role": "attribute", "priority": "1", "uri": "reference/meshing.edge_detection.GridSpec.html#cadjoint.meshing.edge_detection.GridSpec.lattice_shape", "dispname": "-"}, {"name": "cadjoint.meshing.edge_detection.GridSpec", "domain": "py", "role": "class", "priority": "1", "uri": "reference/meshing.edge_detection.GridSpec.html#cadjoint.meshing.edge_detection.GridSpec", "dispname": "-"}, {"name": "cadjoint.meshing.dual_contouring.Mesh", "domain": "py", "role": "class", "priority": "1", "uri": "reference/meshing.dual_contouring.Mesh.html#cadjoint.meshing.dual_contouring.Mesh", "dispname": "-"}, {"name": "cadjoint.meshing.dual_contouring.extract_mesh", "domain": "py", "role": "function", "priority": "1", "uri": "reference/meshing.dual_contouring.extract_mesh.html#cadjoint.meshing.dual_contouring.extract_mesh", "dispname": "-"}, {"name": "cadjoint.meshing.edge_detection.sample_grid", "domain": "py", "role": "function", "priority": "1", "uri": "reference/meshing.edge_detection.sample_grid.html#cadjoint.meshing.edge_detection.sample_grid", "dispname": "-"}, {"name": "cadjoint.meshing.edge_detection.find_crossing_edges", "domain": "py", "role": "function", "priority": "1", "uri": "reference/meshing.edge_detection.find_crossing_edges.html#cadjoint.meshing.edge_detection.find_crossing_edges", "dispname": "-"}, {"name": "cadjoint.meshing.edge_detection.edge_hermite_data", "domain": "py", "role": "function", "priority": "1", "uri": "reference/meshing.edge_detection.edge_hermite_data.html#cadjoint.meshing.edge_detection.edge_hermite_data", "dispname": "-"}, {"name": "cadjoint.meshing.edge_detection.detect_edges", "domain": "py", "role": "function", "priority": "1", "uri": "reference/meshing.edge_detection.detect_edges.html#cadjoint.meshing.edge_detection.detect_edges", "dispname": "-"}, {"name": "cadjoint.meshing.features.manifold_cell_incidence", "domain": "py", "role": "function", "priority": "1", "uri": "reference/meshing.features.manifold_cell_incidence.html#cadjoint.meshing.features.manifold_cell_incidence", "dispname": "-"}, {"name": "cadjoint.meshing.features.classify_feature_cells", "domain": "py", "role": "function", "priority": "1", "uri": "reference/meshing.features.classify_feature_cells.html#cadjoint.meshing.features.classify_feature_cells", "dispname": "-"}, {"name": "cadjoint.meshing.dual_contouring.qef_vertices", "domain": "py", "role": "function", "priority": "1", "uri": "reference/meshing.dual_contouring.qef_vertices.html#cadjoint.meshing.dual_contouring.qef_vertices", "dispname": "-"}, {"name": "cadjoint.meshing.dual_contouring.sharp_qef_vertices", "domain": "py", "role": "function", "priority": "1", "uri": "reference/meshing.dual_contouring.sharp_qef_vertices.html#cadjoint.meshing.dual_contouring.sharp_qef_vertices", "dispname": "-"}, {"name": "cadjoint.meshing.dual_contouring.dual_faces", "domain": "py", "role": "function", "priority": "1", "uri": "reference/meshing.dual_contouring.dual_faces.html#cadjoint.meshing.dual_contouring.dual_faces", "dispname": "-"}, {"name": "cadjoint.meshing.adaptive.surface_cells", "domain": "py", "role": "function", "priority": "1", "uri": "reference/meshing.adaptive.surface_cells.html#cadjoint.meshing.adaptive.surface_cells", "dispname": "-"}, {"name": "cadjoint.meshing.adaptive.sparse_crossing_edges", "domain": "py", "role": "function", "priority": "1", "uri": "reference/meshing.adaptive.sparse_crossing_edges.html#cadjoint.meshing.adaptive.sparse_crossing_edges", "dispname": "-"}, {"name": "cadjoint.meshing.simplify.simplify_mesh", "domain": "py", "role": "function", "priority": "1", "uri": "reference/meshing.simplify.simplify_mesh.html#cadjoint.meshing.simplify.simplify_mesh", "dispname": "-"}, {"name": "cadjoint.meshing.native.native_available", "domain": "py", "role": "function", "priority": "1", "uri": "reference/meshing.native.native_available.html#cadjoint.meshing.native.native_available", "dispname": "-"}, {"name": "cadjoint.meshing.native.extract_mesh_native", "domain": "py", "role": "function", "priority": "1", "uri": "reference/meshing.native.extract_mesh_native.html#cadjoint.meshing.native.extract_mesh_native", "dispname": "-"}, {"name": "cadjoint.meshing.native.qef_vertices_native", "domain": "py", "role": "function", "priority": "1", "uri": "reference/meshing.native.qef_vertices_native.html#cadjoint.meshing.native.qef_vertices_native", "dispname": "-"}, {"name": "cadjoint.meshing.export.save_obj", "domain": "py", "role": "function", "priority": "1", "uri": "reference/meshing.export.save_obj.html#cadjoint.meshing.export.save_obj", "dispname": "-"}, {"name": "cadjoint.meshing.export.save_stl", "domain": "py", "role": "function", "priority": "1", "uri": "reference/meshing.export.save_stl.html#cadjoint.meshing.export.save_stl", "dispname": "-"}, {"name": "cadjoint.meshing.export.save_step", "domain": "py", "role": "function", "priority": "1", "uri": "reference/meshing.export.save_step.html#cadjoint.meshing.export.save_step", "dispname": "-"}, {"name": "cadjoint.meshing.export.merge_planar_faces", "domain": "py", "role": "function", "priority": "1", "uri": "reference/meshing.export.merge_planar_faces.html#cadjoint.meshing.export.merge_planar_faces", "dispname": "-"}, {"name": "cadjoint.meshing.diagnostics.mesh_report", "domain": "py", "role": "function", "priority": "1", "uri": "reference/meshing.diagnostics.mesh_report.html#cadjoint.meshing.diagnostics.mesh_report", "dispname": "-"}, {"name": "cadjoint.meshing.diagnostics.surface_deviation", "domain": "py", "role": "function", "priority": "1", "uri": "reference/meshing.diagnostics.surface_deviation.html#cadjoint.meshing.diagnostics.surface_deviation", "dispname": "-"}, {"name": "cadjoint.meshing.diagnostics.triangle_quality", "domain": "py", "role": "function", "priority": "1", "uri": "reference/meshing.diagnostics.triangle_quality.html#cadjoint.meshing.diagnostics.triangle_quality", "dispname": "-"}, {"name": "cadjoint.meshing.diagnostics.self_intersections", "domain": "py", "role": "function", "priority": "1", "uri": "reference/meshing.diagnostics.self_intersections.html#cadjoint.meshing.diagnostics.self_intersections", "dispname": "-"}, {"name": "cadjoint.fem.simmesh.SimMesh.build", "domain": "py", "role": "function", "priority": "1", "uri": "reference/fem.simmesh.SimMesh.html#cadjoint.fem.simmesh.SimMesh.build", "dispname": "-"}, {"name": "cadjoint.fem.simmesh.SimMesh.describe", "domain": "py", "role": "function", "priority": "1", "uri": "reference/fem.simmesh.SimMesh.html#cadjoint.fem.simmesh.SimMesh.describe", "dispname": "-"}, {"name": "cadjoint.fem.simmesh.SimMesh.grid", "domain": "py", "role": "function", "priority": "1", "uri": "reference/fem.simmesh.SimMesh.html#cadjoint.fem.simmesh.SimMesh.grid", "dispname": "-"}, {"name": "cadjoint.fem.simmesh.SimMesh.inspect", "domain": "py", "role": "function", "priority": "1", "uri": "reference/fem.simmesh.SimMesh.html#cadjoint.fem.simmesh.SimMesh.inspect", "dispname": "-"}, {"name": "cadjoint.fem.simmesh.SimMesh.quality", "domain": "py", "role": "function", "priority": "1", "uri": "reference/fem.simmesh.SimMesh.html#cadjoint.fem.simmesh.SimMesh.quality", "dispname": "-"}, {"name": "cadjoint.fem.simmesh.SimMesh", "domain": "py", "role": "class", "priority": "1", "uri": "reference/fem.simmesh.SimMesh.html#cadjoint.fem.simmesh.SimMesh", "dispname": "-"}, {"name": "cadjoint.fem.study.ThermalStudy.describe", "domain": "py", "role": "function", "priority": "1", "uri": "reference/fem.study.ThermalStudy.html#cadjoint.fem.study.ThermalStudy.describe", "dispname": "-"}, {"name": "cadjoint.fem.study.ThermalStudy.solve", "domain": "py", "role": "function", "priority": "1", "uri": "reference/fem.study.ThermalStudy.html#cadjoint.fem.study.ThermalStudy.solve", "dispname": "-"}, {"name": "cadjoint.fem.study.ThermalStudy", "domain": "py", "role": "class", "priority": "1", "uri": "reference/fem.study.ThermalStudy.html#cadjoint.fem.study.ThermalStudy", "dispname": "-"}, {"name": "cadjoint.fem.study.ElasticStudy.describe", "domain": "py", "role": "function", "priority": "1", "uri": "reference/fem.study.ElasticStudy.html#cadjoint.fem.study.ElasticStudy.describe", "dispname": "-"}, {"name": "cadjoint.fem.study.ElasticStudy.solve", "domain": "py", "role": "function", "priority": "1", "uri": "reference/fem.study.ElasticStudy.html#cadjoint.fem.study.ElasticStudy.solve", "dispname": "-"}, {"name": "cadjoint.fem.study.ElasticStudy", "domain": "py", "role": "class", "priority": "1", "uri": "reference/fem.study.ElasticStudy.html#cadjoint.fem.study.ElasticStudy", "dispname": "-"}, {"name": "cadjoint.fem.result.SimulationResult.describe", "domain": "py", "role": "function", "priority": "1", "uri": "reference/fem.result.SimulationResult.html#cadjoint.fem.result.SimulationResult.describe", "dispname": "-"}, {"name": "cadjoint.fem.result.SimulationResult.displacement", "domain": "py", "role": "attribute", "priority": "1", "uri": "reference/fem.result.SimulationResult.html#cadjoint.fem.result.SimulationResult.displacement", "dispname": "-"}, {"name": "cadjoint.fem.result.SimulationResult.max", "domain": "py", "role": "function", "priority": "1", "uri": "reference/fem.result.SimulationResult.html#cadjoint.fem.result.SimulationResult.max", "dispname": "-"}, {"name": "cadjoint.fem.result.SimulationResult.mean", "domain": "py", "role": "function", "priority": "1", "uri": "reference/fem.result.SimulationResult.html#cadjoint.fem.result.SimulationResult.mean", "dispname": "-"}, {"name": "cadjoint.fem.result.SimulationResult.mesh", "domain": "py", "role": "attribute", "priority": "1", "uri": "reference/fem.result.SimulationResult.html#cadjoint.fem.result.SimulationResult.mesh", "dispname": "-"}, {"name": "cadjoint.fem.result.SimulationResult.nodal_scalar", "domain": "py", "role": "function", "priority": "1", "uri": "reference/fem.result.SimulationResult.html#cadjoint.fem.result.SimulationResult.nodal_scalar", "dispname": "-"}, {"name": "cadjoint.fem.result.SimulationResult.temperature", "domain": "py", "role": "attribute", "priority": "1", "uri": "reference/fem.result.SimulationResult.html#cadjoint.fem.result.SimulationResult.temperature", "dispname": "-"}, {"name": "cadjoint.fem.result.SimulationResult.to_vtk", "domain": "py", "role": "function", "priority": "1", "uri": "reference/fem.result.SimulationResult.html#cadjoint.fem.result.SimulationResult.to_vtk", "dispname": "-"}, {"name": "cadjoint.fem.result.SimulationResult.von_mises", "domain": "py", "role": "function", "priority": "1", "uri": "reference/fem.result.SimulationResult.html#cadjoint.fem.result.SimulationResult.von_mises", "dispname": "-"}, {"name": "cadjoint.fem.result.SimulationResult", "domain": "py", "role": "class", "priority": "1", "uri": "reference/fem.result.SimulationResult.html#cadjoint.fem.result.SimulationResult", "dispname": "-"}, {"name": "cadjoint.fem.selection.Nodes.box", "domain": "py", "role": "function", "priority": "1", "uri": "reference/fem.selection.Nodes.html#cadjoint.fem.selection.Nodes.box", "dispname": "-"}, {"name": "cadjoint.fem.selection.Nodes.halfspace", "domain": "py", "role": "function", "priority": "1", "uri": "reference/fem.selection.Nodes.html#cadjoint.fem.selection.Nodes.halfspace", "dispname": "-"}, {"name": "cadjoint.fem.selection.Nodes.predicate", "domain": "py", "role": "function", "priority": "1", "uri": "reference/fem.selection.Nodes.html#cadjoint.fem.selection.Nodes.predicate", "dispname": "-"}, {"name": "cadjoint.fem.selection.Nodes.side", "domain": "py", "role": "function", "priority": "1", "uri": "reference/fem.selection.Nodes.html#cadjoint.fem.selection.Nodes.side", "dispname": "-"}, {"name": "cadjoint.fem.selection.Nodes.sphere", "domain": "py", "role": "function", "priority": "1", "uri": "reference/fem.selection.Nodes.html#cadjoint.fem.selection.Nodes.sphere", "dispname": "-"}, {"name": "cadjoint.fem.selection.Nodes", "domain": "py", "role": "class", "priority": "1", "uri": "reference/fem.selection.Nodes.html#cadjoint.fem.selection.Nodes", "dispname": "-"}, {"name": "cadjoint.fem.selection.NodeSelection.describe", "domain": "py", "role": "function", "priority": "1", "uri": "reference/fem.selection.NodeSelection.html#cadjoint.fem.selection.NodeSelection.describe", "dispname": "-"}, {"name": "cadjoint.fem.selection.NodeSelection.mask", "domain": "py", "role": "function", "priority": "1", "uri": "reference/fem.selection.NodeSelection.html#cadjoint.fem.selection.NodeSelection.mask", "dispname": "-"}, {"name": "cadjoint.fem.selection.NodeSelection.resolve", "domain": "py", "role": "function", "priority": "1", "uri": "reference/fem.selection.NodeSelection.html#cadjoint.fem.selection.NodeSelection.resolve", "dispname": "-"}, {"name": "cadjoint.fem.selection.NodeSelection.serializable", "domain": "py", "role": "attribute", "priority": "1", "uri": "reference/fem.selection.NodeSelection.html#cadjoint.fem.selection.NodeSelection.serializable", "dispname": "-"}, {"name": "cadjoint.fem.selection.NodeSelection", "domain": "py", "role": "class", "priority": "1", "uri": "reference/fem.selection.NodeSelection.html#cadjoint.fem.selection.NodeSelection", "dispname": "-"}, {"name": "cadjoint.fem.study.Dirichlet.describe", "domain": "py", "role": "function", "priority": "1", "uri": "reference/fem.study.Dirichlet.html#cadjoint.fem.study.Dirichlet.describe", "dispname": "-"}, {"name": "cadjoint.fem.study.Dirichlet", "domain": "py", "role": "class", "priority": "1", "uri": "reference/fem.study.Dirichlet.html#cadjoint.fem.study.Dirichlet", "dispname": "-"}, {"name": "cadjoint.fem.study.HeatFlux.describe", "domain": "py", "role": "function", "priority": "1", "uri": "reference/fem.study.HeatFlux.html#cadjoint.fem.study.HeatFlux.describe", "dispname": "-"}, {"name": "cadjoint.fem.study.HeatFlux", "domain": "py", "role": "class", "priority": "1", "uri": "reference/fem.study.HeatFlux.html#cadjoint.fem.study.HeatFlux", "dispname": "-"}, {"name": "cadjoint.fem.study.Fixed.describe", "domain": "py", "role": "function", "priority": "1", "uri": "reference/fem.study.Fixed.html#cadjoint.fem.study.Fixed.describe", "dispname": "-"}, {"name": "cadjoint.fem.study.Fixed", "domain": "py", "role": "class", "priority": "1", "uri": "reference/fem.study.Fixed.html#cadjoint.fem.study.Fixed", "dispname": "-"}, {"name": "cadjoint.fem.study.Traction.describe", "domain": "py", "role": "function", "priority": "1", "uri": "reference/fem.study.Traction.html#cadjoint.fem.study.Traction.describe", "dispname": "-"}, {"name": "cadjoint.fem.study.Traction", "domain": "py", "role": "class", "priority": "1", "uri": "reference/fem.study.Traction.html#cadjoint.fem.study.Traction", "dispname": "-"}, {"name": "cadjoint.fem.backends.SolverBackend.elastic", "domain": "py", "role": "function", "priority": "1", "uri": "reference/fem.backends.SolverBackend.html#cadjoint.fem.backends.SolverBackend.elastic", "dispname": "-"}, {"name": "cadjoint.fem.backends.SolverBackend.thermal", "domain": "py", "role": "function", "priority": "1", "uri": "reference/fem.backends.SolverBackend.html#cadjoint.fem.backends.SolverBackend.thermal", "dispname": "-"}, {"name": "cadjoint.fem.backends.SolverBackend", "domain": "py", "role": "class", "priority": "1", "uri": "reference/fem.backends.SolverBackend.html#cadjoint.fem.backends.SolverBackend", "dispname": "-"}, {"name": "cadjoint.fem.backends.get_backend", "domain": "py", "role": "function", "priority": "1", "uri": "reference/fem.backends.get_backend.html#cadjoint.fem.backends.get_backend", "dispname": "-"}, {"name": "cadjoint.fem.backends.register_backend", "domain": "py", "role": "function", "priority": "1", "uri": "reference/fem.backends.register_backend.html#cadjoint.fem.backends.register_backend", "dispname": "-"}, {"name": "cadjoint.fem.backends.available_backends", "domain": "py", "role": "function", "priority": "1", "uri": "reference/fem.backends.available_backends.html#cadjoint.fem.backends.available_backends", "dispname": "-"}, {"name": "cadjoint.optimize.Optimization.describe", "domain": "py", "role": "function", "priority": "1", "uri": "reference/optimize.Optimization.html#cadjoint.optimize.Optimization.describe", "dispname": "-"}, {"name": "cadjoint.optimize.Optimization.run", "domain": "py", "role": "function", "priority": "1", "uri": "reference/optimize.Optimization.html#cadjoint.optimize.Optimization.run", "dispname": "-"}, {"name": "cadjoint.optimize.Optimization", "domain": "py", "role": "class", "priority": "1", "uri": "reference/optimize.Optimization.html#cadjoint.optimize.Optimization", "dispname": "-"}, {"name": "cadjoint.optimize.OptimizationRun.objective", "domain": "py", "role": "attribute", "priority": "1", "uri": "reference/optimize.OptimizationRun.html#cadjoint.optimize.OptimizationRun.objective", "dispname": "-"}, {"name": "cadjoint.optimize.OptimizationRun", "domain": "py", "role": "class", "priority": "1", "uri": "reference/optimize.OptimizationRun.html#cadjoint.optimize.OptimizationRun", "dispname": "-"}, {"name": "cadjoint.optimize.capture_optimizations", "domain": "py", "role": "function", "priority": "1", "uri": "reference/optimize.capture_optimizations.html#cadjoint.optimize.capture_optimizations", "dispname": "-"}, {"name": "cadjoint.render.scene.Camera", "domain": "py", "role": "class", "priority": "1", "uri": "reference/render.scene.Camera.html#cadjoint.render.scene.Camera", "dispname": "-"}, {"name": "cadjoint.render.scene.Scene", "domain": "py", "role": "class", "priority": "1", "uri": "reference/render.scene.Scene.html#cadjoint.render.scene.Scene", "dispname": "-"}, {"name": "cadjoint.render.settings.RenderSettings.balanced", "domain": "py", "role": "function", "priority": "1", "uri": "reference/render.settings.RenderSettings.html#cadjoint.render.settings.RenderSettings.balanced", "dispname": "-"}, {"name": "cadjoint.render.settings.RenderSettings.draft", "domain": "py", "role": "function", "priority": "1", "uri": "reference/render.settings.RenderSettings.html#cadjoint.render.settings.RenderSettings.draft", "dispname": "-"}, {"name": "cadjoint.render.settings.RenderSettings.high_quality", "domain": "py", "role": "function", "priority": "1", "uri": "reference/render.settings.RenderSettings.html#cadjoint.render.settings.RenderSettings.high_quality", "dispname": "-"}, {"name": "cadjoint.render.settings.RenderSettings", "domain": "py", "role": "class", "priority": "1", "uri": "reference/render.settings.RenderSettings.html#cadjoint.render.settings.RenderSettings", "dispname": "-"}, {"name": "cadjoint.render.raymarch.render.render_scene", "domain": "py", "role": "function", "priority": "1", "uri": "reference/render.raymarch.render.render_scene.html#cadjoint.render.raymarch.render.render_scene", "dispname": "-"}, {"name": "cadjoint.render.raymarch.render.raymarch", "domain": "py", "role": "function", "priority": "1", "uri": "reference/render.raymarch.render.raymarch.html#cadjoint.render.raymarch.render.raymarch", "dispname": "-"}, {"name": "cadjoint.render.raymarch.render.render_raymarched", "domain": "py", "role": "function", "priority": "1", "uri": "reference/render.raymarch.render.render_raymarched.html#cadjoint.render.raymarch.render.render_raymarched", "dispname": "-"}]}
+{
+  "project": "cadjoint",
+  "version": "0.0.9999",
+  "count": 307,
+  "items": [
+    {
+      "name": "cadjoint.extraction.extract_parameters",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/extraction.extract_parameters.html#cadjoint.extraction.extract_parameters",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.functionalize.functionalize",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/functionalize.functionalize.html#cadjoint.functionalize.functionalize",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.functionalize.functionalize_parametric",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/functionalize.functionalize_parametric.html#cadjoint.functionalize.functionalize_parametric",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.functionalize.functionalize_scene",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/functionalize.functionalize_scene.html#cadjoint.functionalize.functionalize_scene",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.functionalize.functionalize_scene_parametric",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/functionalize.functionalize_scene_parametric.html#cadjoint.functionalize.functionalize_scene_parametric",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.cache.enable_compilation_cache",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/cache.enable_compilation_cache.html#cadjoint.cache.enable_compilation_cache",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.cache.cache_directory",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/cache.cache_directory.html#cadjoint.cache.cache_directory",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.backends.wgsl.codegen.compile_sdf_to_wgsl",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/backends.wgsl.codegen.compile_sdf_to_wgsl.html#cadjoint.backends.wgsl.codegen.compile_sdf_to_wgsl",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.backends.wgsl.codegen.compile_scene_to_wgsl",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/backends.wgsl.codegen.compile_scene_to_wgsl.html#cadjoint.backends.wgsl.codegen.compile_scene_to_wgsl",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.parametrization.to_normalized",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/parametrization.to_normalized.html#cadjoint.parametrization.to_normalized",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.parametrization.from_normalized",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/parametrization.from_normalized.html#cadjoint.parametrization.from_normalized",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.parametrization.compute_param_scales",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/parametrization.compute_param_scales.html#cadjoint.parametrization.compute_param_scales",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.constraints.types.base.Constraint.compute_residual",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/constraints.types.base.Constraint.html#cadjoint.constraints.types.base.Constraint.compute_residual",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.constraints.types.base.Constraint.dof_reduction",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/constraints.types.base.Constraint.html#cadjoint.constraints.types.base.Constraint.dof_reduction",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.constraints.types.base.Constraint.get_parameters",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/constraints.types.base.Constraint.html#cadjoint.constraints.types.base.Constraint.get_parameters",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.constraints.types.base.Constraint",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/constraints.types.base.Constraint.html#cadjoint.constraints.types.base.Constraint",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.constraints.types.distance.DistanceConstraint.compute_residual",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/constraints.types.distance.DistanceConstraint.html#cadjoint.constraints.types.distance.DistanceConstraint.compute_residual",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.constraints.types.distance.DistanceConstraint.dof_reduction",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/constraints.types.distance.DistanceConstraint.html#cadjoint.constraints.types.distance.DistanceConstraint.dof_reduction",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.constraints.types.distance.DistanceConstraint.get_parameters",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/constraints.types.distance.DistanceConstraint.html#cadjoint.constraints.types.distance.DistanceConstraint.get_parameters",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.constraints.types.distance.DistanceConstraint",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/constraints.types.distance.DistanceConstraint.html#cadjoint.constraints.types.distance.DistanceConstraint",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.constraints.types.angle.AngleConstraint.compute_residual",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/constraints.types.angle.AngleConstraint.html#cadjoint.constraints.types.angle.AngleConstraint.compute_residual",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.constraints.types.angle.AngleConstraint.dof_reduction",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/constraints.types.angle.AngleConstraint.html#cadjoint.constraints.types.angle.AngleConstraint.dof_reduction",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.constraints.types.angle.AngleConstraint.get_parameters",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/constraints.types.angle.AngleConstraint.html#cadjoint.constraints.types.angle.AngleConstraint.get_parameters",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.constraints.types.angle.AngleConstraint",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/constraints.types.angle.AngleConstraint.html#cadjoint.constraints.types.angle.AngleConstraint",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.constraints.types.parallel.ParallelConstraint.compute_residual",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/constraints.types.parallel.ParallelConstraint.html#cadjoint.constraints.types.parallel.ParallelConstraint.compute_residual",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.constraints.types.parallel.ParallelConstraint.dof_reduction",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/constraints.types.parallel.ParallelConstraint.html#cadjoint.constraints.types.parallel.ParallelConstraint.dof_reduction",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.constraints.types.parallel.ParallelConstraint.get_parameters",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/constraints.types.parallel.ParallelConstraint.html#cadjoint.constraints.types.parallel.ParallelConstraint.get_parameters",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.constraints.types.parallel.ParallelConstraint",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/constraints.types.parallel.ParallelConstraint.html#cadjoint.constraints.types.parallel.ParallelConstraint",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.constraints.types.perpendicular.PerpendicularConstraint.compute_residual",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/constraints.types.perpendicular.PerpendicularConstraint.html#cadjoint.constraints.types.perpendicular.PerpendicularConstraint.compute_residual",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.constraints.types.perpendicular.PerpendicularConstraint.dof_reduction",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/constraints.types.perpendicular.PerpendicularConstraint.html#cadjoint.constraints.types.perpendicular.PerpendicularConstraint.dof_reduction",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.constraints.types.perpendicular.PerpendicularConstraint.get_parameters",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/constraints.types.perpendicular.PerpendicularConstraint.html#cadjoint.constraints.types.perpendicular.PerpendicularConstraint.get_parameters",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.constraints.types.perpendicular.PerpendicularConstraint",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/constraints.types.perpendicular.PerpendicularConstraint.html#cadjoint.constraints.types.perpendicular.PerpendicularConstraint",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.constraints.solve.solve_constraints",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/constraints.solve.solve_constraints.html#cadjoint.constraints.solve.solve_constraints",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.constraints.solve.satisfy_constraints",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/constraints.solve.satisfy_constraints.html#cadjoint.constraints.solve.satisfy_constraints",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.constraints.solve.project_to_manifold",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/constraints.solve.project_to_manifold.html#cadjoint.constraints.solve.project_to_manifold",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.constraints.solve.constraint_residuals",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/constraints.solve.constraint_residuals.html#cadjoint.constraints.solve.constraint_residuals",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.constraints.solve.make_manifold_projection",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/constraints.solve.make_manifold_projection.html#cadjoint.constraints.solve.make_manifold_projection",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.geometry.parameters.Vector.norm",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/geometry.parameters.Vector.html#cadjoint.geometry.parameters.Vector.norm",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.geometry.parameters.Vector.normalize",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/geometry.parameters.Vector.html#cadjoint.geometry.parameters.Vector.normalize",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.geometry.parameters.Vector.xyz",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/geometry.parameters.Vector.html#cadjoint.geometry.parameters.Vector.xyz",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.geometry.parameters.Vector",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/geometry.parameters.Vector.html#cadjoint.geometry.parameters.Vector",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.geometry.parameters.Scalar",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/geometry.parameters.Scalar.html#cadjoint.geometry.parameters.Scalar",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.meshing.edge_detection.GridSpec.from_bounds",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/meshing.edge_detection.GridSpec.html#cadjoint.meshing.edge_detection.GridSpec.from_bounds",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.meshing.edge_detection.GridSpec.lattice_points",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/meshing.edge_detection.GridSpec.html#cadjoint.meshing.edge_detection.GridSpec.lattice_points",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.meshing.edge_detection.GridSpec.lattice_shape",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/meshing.edge_detection.GridSpec.html#cadjoint.meshing.edge_detection.GridSpec.lattice_shape",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.meshing.edge_detection.GridSpec",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/meshing.edge_detection.GridSpec.html#cadjoint.meshing.edge_detection.GridSpec",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.meshing.dual_contouring.Mesh",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/meshing.dual_contouring.Mesh.html#cadjoint.meshing.dual_contouring.Mesh",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.meshing.dual_contouring.extract_mesh",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/meshing.dual_contouring.extract_mesh.html#cadjoint.meshing.dual_contouring.extract_mesh",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.meshing.edge_detection.sample_grid",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/meshing.edge_detection.sample_grid.html#cadjoint.meshing.edge_detection.sample_grid",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.meshing.edge_detection.find_crossing_edges",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/meshing.edge_detection.find_crossing_edges.html#cadjoint.meshing.edge_detection.find_crossing_edges",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.meshing.edge_detection.edge_hermite_data",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/meshing.edge_detection.edge_hermite_data.html#cadjoint.meshing.edge_detection.edge_hermite_data",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.meshing.edge_detection.detect_edges",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/meshing.edge_detection.detect_edges.html#cadjoint.meshing.edge_detection.detect_edges",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.meshing.features.manifold_cell_incidence",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/meshing.features.manifold_cell_incidence.html#cadjoint.meshing.features.manifold_cell_incidence",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.meshing.features.classify_feature_cells",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/meshing.features.classify_feature_cells.html#cadjoint.meshing.features.classify_feature_cells",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.meshing.dual_contouring.qef_vertices",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/meshing.dual_contouring.qef_vertices.html#cadjoint.meshing.dual_contouring.qef_vertices",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.meshing.dual_contouring.sharp_qef_vertices",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/meshing.dual_contouring.sharp_qef_vertices.html#cadjoint.meshing.dual_contouring.sharp_qef_vertices",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.meshing.dual_contouring.dual_faces",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/meshing.dual_contouring.dual_faces.html#cadjoint.meshing.dual_contouring.dual_faces",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.meshing.adaptive.surface_cells",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/meshing.adaptive.surface_cells.html#cadjoint.meshing.adaptive.surface_cells",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.meshing.adaptive.sparse_crossing_edges",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/meshing.adaptive.sparse_crossing_edges.html#cadjoint.meshing.adaptive.sparse_crossing_edges",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.meshing.simplify.simplify_mesh",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/meshing.simplify.simplify_mesh.html#cadjoint.meshing.simplify.simplify_mesh",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.meshing.export.save_obj",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/meshing.export.save_obj.html#cadjoint.meshing.export.save_obj",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.meshing.export.save_stl",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/meshing.export.save_stl.html#cadjoint.meshing.export.save_stl",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.meshing.export.save_step",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/meshing.export.save_step.html#cadjoint.meshing.export.save_step",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.meshing.export.merge_planar_faces",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/meshing.export.merge_planar_faces.html#cadjoint.meshing.export.merge_planar_faces",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.meshing.diagnostics.mesh_report",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/meshing.diagnostics.mesh_report.html#cadjoint.meshing.diagnostics.mesh_report",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.meshing.diagnostics.surface_deviation",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/meshing.diagnostics.surface_deviation.html#cadjoint.meshing.diagnostics.surface_deviation",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.meshing.diagnostics.triangle_quality",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/meshing.diagnostics.triangle_quality.html#cadjoint.meshing.diagnostics.triangle_quality",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.meshing.diagnostics.self_intersections",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/meshing.diagnostics.self_intersections.html#cadjoint.meshing.diagnostics.self_intersections",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.MeshMethod.HEX",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/enums.MeshMethod.html#cadjoint.enums.MeshMethod.HEX",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.MeshMethod.TET10",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/enums.MeshMethod.html#cadjoint.enums.MeshMethod.TET10",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.MeshMethod.TET4",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/enums.MeshMethod.html#cadjoint.enums.MeshMethod.TET4",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.MeshMethod",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/enums.MeshMethod.html#cadjoint.enums.MeshMethod",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.StudyKind.ELASTIC",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/enums.StudyKind.html#cadjoint.enums.StudyKind.ELASTIC",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.StudyKind.THERMAL",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/enums.StudyKind.html#cadjoint.enums.StudyKind.THERMAL",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.StudyKind",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/enums.StudyKind.html#cadjoint.enums.StudyKind",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.BoundaryConditionType.DIRICHLET",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/enums.BoundaryConditionType.html#cadjoint.enums.BoundaryConditionType.DIRICHLET",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.BoundaryConditionType.FIXED",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/enums.BoundaryConditionType.html#cadjoint.enums.BoundaryConditionType.FIXED",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.BoundaryConditionType.HEAT_FLUX",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/enums.BoundaryConditionType.html#cadjoint.enums.BoundaryConditionType.HEAT_FLUX",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.BoundaryConditionType.TRACTION",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/enums.BoundaryConditionType.html#cadjoint.enums.BoundaryConditionType.TRACTION",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.BoundaryConditionType",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/enums.BoundaryConditionType.html#cadjoint.enums.BoundaryConditionType",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.Side",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/enums.Side.html#cadjoint.enums.Side",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.ObjectiveMetric.COMPLIANCE",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/enums.ObjectiveMetric.html#cadjoint.enums.ObjectiveMetric.COMPLIANCE",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.ObjectiveMetric.MAX",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/enums.ObjectiveMetric.html#cadjoint.enums.ObjectiveMetric.MAX",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.ObjectiveMetric.MEAN",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/enums.ObjectiveMetric.html#cadjoint.enums.ObjectiveMetric.MEAN",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.ObjectiveMetric",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/enums.ObjectiveMetric.html#cadjoint.enums.ObjectiveMetric",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.OptimizerMethod.ADAM",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/enums.OptimizerMethod.html#cadjoint.enums.OptimizerMethod.ADAM",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.OptimizerMethod.SGD",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/enums.OptimizerMethod.html#cadjoint.enums.OptimizerMethod.SGD",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.OptimizerMethod",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/enums.OptimizerMethod.html#cadjoint.enums.OptimizerMethod",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.OptimizationArgument.LEARNING_RATE",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/enums.OptimizationArgument.html#cadjoint.enums.OptimizationArgument.LEARNING_RATE",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.OptimizationArgument.STEPS",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/enums.OptimizationArgument.html#cadjoint.enums.OptimizationArgument.STEPS",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.OptimizationArgument",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/enums.OptimizationArgument.html#cadjoint.enums.OptimizationArgument",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.GradientPath.DIRECT",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/enums.GradientPath.html#cadjoint.enums.GradientPath.DIRECT",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.GradientPath.TESSERACT",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/enums.GradientPath.html#cadjoint.enums.GradientPath.TESSERACT",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.GradientPath.TESSERACT_DC",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/enums.GradientPath.html#cadjoint.enums.GradientPath.TESSERACT_DC",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.GradientPath",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/enums.GradientPath.html#cadjoint.enums.GradientPath",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.ConstraintKind.COINCIDENT",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/enums.ConstraintKind.html#cadjoint.enums.ConstraintKind.COINCIDENT",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.ConstraintKind.DISTANCE",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/enums.ConstraintKind.html#cadjoint.enums.ConstraintKind.DISTANCE",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.ConstraintKind.FIXED",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/enums.ConstraintKind.html#cadjoint.enums.ConstraintKind.FIXED",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.ConstraintKind.HORIZONTAL",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/enums.ConstraintKind.html#cadjoint.enums.ConstraintKind.HORIZONTAL",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.ConstraintKind.PARALLEL",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/enums.ConstraintKind.html#cadjoint.enums.ConstraintKind.PARALLEL",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.ConstraintKind.PERPENDICULAR",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/enums.ConstraintKind.html#cadjoint.enums.ConstraintKind.PERPENDICULAR",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.ConstraintKind.VERTICAL",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/enums.ConstraintKind.html#cadjoint.enums.ConstraintKind.VERTICAL",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.ConstraintKind",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/enums.ConstraintKind.html#cadjoint.enums.ConstraintKind",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.ConstraintSolveMethod.ADAM",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/enums.ConstraintSolveMethod.html#cadjoint.enums.ConstraintSolveMethod.ADAM",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.ConstraintSolveMethod.NEWTON",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/enums.ConstraintSolveMethod.html#cadjoint.enums.ConstraintSolveMethod.NEWTON",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.ConstraintSolveMethod.SGD",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/enums.ConstraintSolveMethod.html#cadjoint.enums.ConstraintSolveMethod.SGD",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.ConstraintSolveMethod",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/enums.ConstraintSolveMethod.html#cadjoint.enums.ConstraintSolveMethod",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.FemBackend.CALCULIX",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/enums.FemBackend.html#cadjoint.enums.FemBackend.CALCULIX",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.FemBackend.JAXFEM",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/enums.FemBackend.html#cadjoint.enums.FemBackend.JAXFEM",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.FemBackend.TESSERACT",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/enums.FemBackend.html#cadjoint.enums.FemBackend.TESSERACT",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.FemBackend",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/enums.FemBackend.html#cadjoint.enums.FemBackend",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.PluginKind.ELASTIC_SOLVER",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/enums.PluginKind.html#cadjoint.enums.PluginKind.ELASTIC_SOLVER",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.PluginKind.FLOW_SOLVER",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/enums.PluginKind.html#cadjoint.enums.PluginKind.FLOW_SOLVER",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.PluginKind.MESHER",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/enums.PluginKind.html#cadjoint.enums.PluginKind.MESHER",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.PluginKind.TETFILL",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/enums.PluginKind.html#cadjoint.enums.PluginKind.TETFILL",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.PluginKind.TET_MESHER",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/enums.PluginKind.html#cadjoint.enums.PluginKind.TET_MESHER",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.PluginKind.THERMAL_SOLVER",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/enums.PluginKind.html#cadjoint.enums.PluginKind.THERMAL_SOLVER",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.PluginKind",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/enums.PluginKind.html#cadjoint.enums.PluginKind",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.PluginTransport.CONTAINER",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/enums.PluginTransport.html#cadjoint.enums.PluginTransport.CONTAINER",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.PluginTransport.LOCAL",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/enums.PluginTransport.html#cadjoint.enums.PluginTransport.LOCAL",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.PluginTransport.REMOTE",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/enums.PluginTransport.html#cadjoint.enums.PluginTransport.REMOTE",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.PluginTransport",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/enums.PluginTransport.html#cadjoint.enums.PluginTransport",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.values",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/enums.values.html#cadjoint.enums.values",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.listed",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/enums.listed.html#cadjoint.enums.listed",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.either",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/enums.either.html#cadjoint.enums.either",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.enums.parse",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/enums.parse.html#cadjoint.enums.parse",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.simmesh.SimMesh.build",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/fem.simmesh.SimMesh.html#cadjoint.fem.simmesh.SimMesh.build",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.simmesh.SimMesh.describe",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/fem.simmesh.SimMesh.html#cadjoint.fem.simmesh.SimMesh.describe",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.simmesh.SimMesh.grid",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/fem.simmesh.SimMesh.html#cadjoint.fem.simmesh.SimMesh.grid",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.simmesh.SimMesh.inspect",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/fem.simmesh.SimMesh.html#cadjoint.fem.simmesh.SimMesh.inspect",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.simmesh.SimMesh.quality",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/fem.simmesh.SimMesh.html#cadjoint.fem.simmesh.SimMesh.quality",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.simmesh.SimMesh",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/fem.simmesh.SimMesh.html#cadjoint.fem.simmesh.SimMesh",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.hexmesh.HexMesh.all_boundary_faces",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/fem.hexmesh.HexMesh.html#cadjoint.fem.hexmesh.HexMesh.all_boundary_faces",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.hexmesh.HexMesh.num_cells",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/fem.hexmesh.HexMesh.html#cadjoint.fem.hexmesh.HexMesh.num_cells",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.hexmesh.HexMesh.num_points",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/fem.hexmesh.HexMesh.html#cadjoint.fem.hexmesh.HexMesh.num_points",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.hexmesh.HexMesh",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/fem.hexmesh.HexMesh.html#cadjoint.fem.hexmesh.HexMesh",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.hexmesh.sdf_to_hex_mesh",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/fem.hexmesh.sdf_to_hex_mesh.html#cadjoint.fem.hexmesh.sdf_to_hex_mesh",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.tetmesh.TetMesh.all_boundary_faces",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/fem.tetmesh.TetMesh.html#cadjoint.fem.tetmesh.TetMesh.all_boundary_faces",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.tetmesh.TetMesh.ele_type",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/fem.tetmesh.TetMesh.html#cadjoint.fem.tetmesh.TetMesh.ele_type",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.tetmesh.TetMesh.num_cells",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/fem.tetmesh.TetMesh.html#cadjoint.fem.tetmesh.TetMesh.num_cells",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.tetmesh.TetMesh.num_corner_points",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/fem.tetmesh.TetMesh.html#cadjoint.fem.tetmesh.TetMesh.num_corner_points",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.tetmesh.TetMesh.num_points",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/fem.tetmesh.TetMesh.html#cadjoint.fem.tetmesh.TetMesh.num_points",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.tetmesh.TetMesh.order",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/fem.tetmesh.TetMesh.html#cadjoint.fem.tetmesh.TetMesh.order",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.tetmesh.TetMesh",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/fem.tetmesh.TetMesh.html#cadjoint.fem.tetmesh.TetMesh",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.tetmesh.sdf_to_tet_mesh",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/fem.tetmesh.sdf_to_tet_mesh.html#cadjoint.fem.tetmesh.sdf_to_tet_mesh",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.study.ThermalStudy.describe",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/fem.study.ThermalStudy.html#cadjoint.fem.study.ThermalStudy.describe",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.study.ThermalStudy.solve",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/fem.study.ThermalStudy.html#cadjoint.fem.study.ThermalStudy.solve",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.study.ThermalStudy",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/fem.study.ThermalStudy.html#cadjoint.fem.study.ThermalStudy",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.study.ElasticStudy.describe",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/fem.study.ElasticStudy.html#cadjoint.fem.study.ElasticStudy.describe",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.study.ElasticStudy.solve",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/fem.study.ElasticStudy.html#cadjoint.fem.study.ElasticStudy.solve",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.study.ElasticStudy",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/fem.study.ElasticStudy.html#cadjoint.fem.study.ElasticStudy",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.result.SimulationResult.describe",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/fem.result.SimulationResult.html#cadjoint.fem.result.SimulationResult.describe",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.result.SimulationResult.displacement",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/fem.result.SimulationResult.html#cadjoint.fem.result.SimulationResult.displacement",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.result.SimulationResult.max",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/fem.result.SimulationResult.html#cadjoint.fem.result.SimulationResult.max",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.result.SimulationResult.mean",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/fem.result.SimulationResult.html#cadjoint.fem.result.SimulationResult.mean",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.result.SimulationResult.mesh",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/fem.result.SimulationResult.html#cadjoint.fem.result.SimulationResult.mesh",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.result.SimulationResult.nodal_scalar",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/fem.result.SimulationResult.html#cadjoint.fem.result.SimulationResult.nodal_scalar",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.result.SimulationResult.refinement",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/fem.result.SimulationResult.html#cadjoint.fem.result.SimulationResult.refinement",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.result.SimulationResult.safety_factor",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/fem.result.SimulationResult.html#cadjoint.fem.result.SimulationResult.safety_factor",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.result.SimulationResult.temperature",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/fem.result.SimulationResult.html#cadjoint.fem.result.SimulationResult.temperature",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.result.SimulationResult.to_vtk",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/fem.result.SimulationResult.html#cadjoint.fem.result.SimulationResult.to_vtk",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.result.SimulationResult.von_mises",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/fem.result.SimulationResult.html#cadjoint.fem.result.SimulationResult.von_mises",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.result.SimulationResult",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/fem.result.SimulationResult.html#cadjoint.fem.result.SimulationResult",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.selection.Nodes.box",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/fem.selection.Nodes.html#cadjoint.fem.selection.Nodes.box",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.selection.Nodes.halfspace",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/fem.selection.Nodes.html#cadjoint.fem.selection.Nodes.halfspace",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.selection.Nodes.predicate",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/fem.selection.Nodes.html#cadjoint.fem.selection.Nodes.predicate",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.selection.Nodes.side",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/fem.selection.Nodes.html#cadjoint.fem.selection.Nodes.side",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.selection.Nodes.sphere",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/fem.selection.Nodes.html#cadjoint.fem.selection.Nodes.sphere",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.selection.Nodes",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/fem.selection.Nodes.html#cadjoint.fem.selection.Nodes",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.selection.NodeSelection.describe",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/fem.selection.NodeSelection.html#cadjoint.fem.selection.NodeSelection.describe",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.selection.NodeSelection.mask",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/fem.selection.NodeSelection.html#cadjoint.fem.selection.NodeSelection.mask",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.selection.NodeSelection.resolve",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/fem.selection.NodeSelection.html#cadjoint.fem.selection.NodeSelection.resolve",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.selection.NodeSelection.serializable",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/fem.selection.NodeSelection.html#cadjoint.fem.selection.NodeSelection.serializable",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.selection.NodeSelection",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/fem.selection.NodeSelection.html#cadjoint.fem.selection.NodeSelection",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.study.Dirichlet.describe",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/fem.study.Dirichlet.html#cadjoint.fem.study.Dirichlet.describe",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.study.Dirichlet",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/fem.study.Dirichlet.html#cadjoint.fem.study.Dirichlet",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.study.HeatFlux.describe",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/fem.study.HeatFlux.html#cadjoint.fem.study.HeatFlux.describe",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.study.HeatFlux",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/fem.study.HeatFlux.html#cadjoint.fem.study.HeatFlux",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.study.Fixed.describe",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/fem.study.Fixed.html#cadjoint.fem.study.Fixed.describe",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.study.Fixed",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/fem.study.Fixed.html#cadjoint.fem.study.Fixed",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.study.Traction.describe",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/fem.study.Traction.html#cadjoint.fem.study.Traction.describe",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.study.Traction",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/fem.study.Traction.html#cadjoint.fem.study.Traction",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.properties.sample_cell_property",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/fem.properties.sample_cell_property.html#cadjoint.fem.properties.sample_cell_property",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.properties.maybe_sample_cell_property",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/fem.properties.maybe_sample_cell_property.html#cadjoint.fem.properties.maybe_sample_cell_property",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.properties.sample_material_field",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/fem.properties.sample_material_field.html#cadjoint.fem.properties.sample_material_field",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.properties.cell_centroids",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/fem.properties.cell_centroids.html#cadjoint.fem.properties.cell_centroids",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.properties.cell_volumes",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/fem.properties.cell_volumes.html#cadjoint.fem.properties.cell_volumes",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.properties.total_mass",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/fem.properties.total_mass.html#cadjoint.fem.properties.total_mass",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.properties.quantize_to_materials",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/fem.properties.quantize_to_materials.html#cadjoint.fem.properties.quantize_to_materials",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.backends.SolverBackend.elastic",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/fem.backends.SolverBackend.html#cadjoint.fem.backends.SolverBackend.elastic",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.backends.SolverBackend.thermal",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/fem.backends.SolverBackend.html#cadjoint.fem.backends.SolverBackend.thermal",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.backends.SolverBackend",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/fem.backends.SolverBackend.html#cadjoint.fem.backends.SolverBackend",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.backends.get_backend",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/fem.backends.get_backend.html#cadjoint.fem.backends.get_backend",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.backends.register_backend",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/fem.backends.register_backend.html#cadjoint.fem.backends.register_backend",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.fem.backends.available_backends",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/fem.backends.available_backends.html#cadjoint.fem.backends.available_backends",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.optimize.Optimization.describe",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/optimize.Optimization.html#cadjoint.optimize.Optimization.describe",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.optimize.Optimization.run",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/optimize.Optimization.html#cadjoint.optimize.Optimization.run",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.optimize.Optimization",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/optimize.Optimization.html#cadjoint.optimize.Optimization",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.optimize.OptimizationRun.objective",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/optimize.OptimizationRun.html#cadjoint.optimize.OptimizationRun.objective",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.optimize.OptimizationRun",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/optimize.OptimizationRun.html#cadjoint.optimize.OptimizationRun",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.optimize.capture_optimizations",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/optimize.capture_optimizations.html#cadjoint.optimize.capture_optimizations",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.plugins.plugin.Plugin.apply",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/plugins.plugin.Plugin.html#cadjoint.plugins.plugin.Plugin.apply",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.plugins.plugin.Plugin.as_jax",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/plugins.plugin.Plugin.html#cadjoint.plugins.plugin.Plugin.as_jax",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.plugins.plugin.Plugin.capabilities",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/plugins.plugin.Plugin.html#cadjoint.plugins.plugin.Plugin.capabilities",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.plugins.plugin.Plugin.inputs",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/plugins.plugin.Plugin.html#cadjoint.plugins.plugin.Plugin.inputs",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.plugins.plugin.Plugin.outputs",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/plugins.plugin.Plugin.html#cadjoint.plugins.plugin.Plugin.outputs",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.plugins.plugin.Plugin.probe",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/plugins.plugin.Plugin.html#cadjoint.plugins.plugin.Plugin.probe",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.plugins.plugin.Plugin.vjp",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/plugins.plugin.Plugin.html#cadjoint.plugins.plugin.Plugin.vjp",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.plugins.plugin.Plugin",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/plugins.plugin.Plugin.html#cadjoint.plugins.plugin.Plugin",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.plugins.plugin.TesseractPlugin.apply",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/plugins.plugin.TesseractPlugin.html#cadjoint.plugins.plugin.TesseractPlugin.apply",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.plugins.plugin.TesseractPlugin.as_jax",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/plugins.plugin.TesseractPlugin.html#cadjoint.plugins.plugin.TesseractPlugin.as_jax",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.plugins.plugin.TesseractPlugin.capabilities",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/plugins.plugin.TesseractPlugin.html#cadjoint.plugins.plugin.TesseractPlugin.capabilities",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.plugins.plugin.TesseractPlugin.client",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/plugins.plugin.TesseractPlugin.html#cadjoint.plugins.plugin.TesseractPlugin.client",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.plugins.plugin.TesseractPlugin.close",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/plugins.plugin.TesseractPlugin.html#cadjoint.plugins.plugin.TesseractPlugin.close",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.plugins.plugin.TesseractPlugin.inputs",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/plugins.plugin.TesseractPlugin.html#cadjoint.plugins.plugin.TesseractPlugin.inputs",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.plugins.plugin.TesseractPlugin.outputs",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/plugins.plugin.TesseractPlugin.html#cadjoint.plugins.plugin.TesseractPlugin.outputs",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.plugins.plugin.TesseractPlugin.probe",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/plugins.plugin.TesseractPlugin.html#cadjoint.plugins.plugin.TesseractPlugin.probe",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.plugins.plugin.TesseractPlugin.schema",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/plugins.plugin.TesseractPlugin.html#cadjoint.plugins.plugin.TesseractPlugin.schema",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.plugins.plugin.TesseractPlugin.schema_hash",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/plugins.plugin.TesseractPlugin.html#cadjoint.plugins.plugin.TesseractPlugin.schema_hash",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.plugins.plugin.TesseractPlugin.served_version",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/plugins.plugin.TesseractPlugin.html#cadjoint.plugins.plugin.TesseractPlugin.served_version",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.plugins.plugin.TesseractPlugin.tesseract",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/plugins.plugin.TesseractPlugin.html#cadjoint.plugins.plugin.TesseractPlugin.tesseract",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.plugins.plugin.TesseractPlugin.version",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/plugins.plugin.TesseractPlugin.html#cadjoint.plugins.plugin.TesseractPlugin.version",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.plugins.plugin.TesseractPlugin.vjp",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/plugins.plugin.TesseractPlugin.html#cadjoint.plugins.plugin.TesseractPlugin.vjp",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.plugins.plugin.TesseractPlugin",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/plugins.plugin.TesseractPlugin.html#cadjoint.plugins.plugin.TesseractPlugin",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.plugins.plugin.Capabilities.supports",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/plugins.plugin.Capabilities.html#cadjoint.plugins.plugin.Capabilities.supports",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.plugins.plugin.Capabilities",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/plugins.plugin.Capabilities.html#cadjoint.plugins.plugin.Capabilities",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.plugins.plugin.PluginProbe",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/plugins.plugin.PluginProbe.html#cadjoint.plugins.plugin.PluginProbe",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.plugins.plugin.PluginMismatch",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/plugins.plugin.PluginMismatch.html#cadjoint.plugins.plugin.PluginMismatch",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.plugins.spec.PluginSpec.at",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/plugins.spec.PluginSpec.html#cadjoint.plugins.spec.PluginSpec.at",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.plugins.spec.PluginSpec.from_mapping",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/plugins.spec.PluginSpec.html#cadjoint.plugins.spec.PluginSpec.from_mapping",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.plugins.spec.PluginSpec.open",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/plugins.spec.PluginSpec.html#cadjoint.plugins.spec.PluginSpec.open",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.plugins.spec.PluginSpec.to_mapping",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/plugins.spec.PluginSpec.html#cadjoint.plugins.spec.PluginSpec.to_mapping",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.plugins.spec.PluginSpec",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/plugins.spec.PluginSpec.html#cadjoint.plugins.spec.PluginSpec",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.plugins.spec.runtime_scratch",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/plugins.spec.runtime_scratch.html#cadjoint.plugins.spec.runtime_scratch",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.plugins.registry.PluginRegistry.close",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/plugins.registry.PluginRegistry.html#cadjoint.plugins.registry.PluginRegistry.close",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.plugins.registry.PluginRegistry.default_for",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/plugins.registry.PluginRegistry.html#cadjoint.plugins.registry.PluginRegistry.default_for",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.plugins.registry.PluginRegistry.for_kind",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/plugins.registry.PluginRegistry.html#cadjoint.plugins.registry.PluginRegistry.for_kind",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.plugins.registry.PluginRegistry.kinds",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/plugins.registry.PluginRegistry.html#cadjoint.plugins.registry.PluginRegistry.kinds",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.plugins.registry.PluginRegistry.names",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/plugins.registry.PluginRegistry.html#cadjoint.plugins.registry.PluginRegistry.names",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.plugins.registry.PluginRegistry.plugin",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/plugins.registry.PluginRegistry.html#cadjoint.plugins.registry.PluginRegistry.plugin",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.plugins.registry.PluginRegistry.register",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/plugins.registry.PluginRegistry.html#cadjoint.plugins.registry.PluginRegistry.register",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.plugins.registry.PluginRegistry.set_default",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/plugins.registry.PluginRegistry.html#cadjoint.plugins.registry.PluginRegistry.set_default",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.plugins.registry.PluginRegistry.spec",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/plugins.registry.PluginRegistry.html#cadjoint.plugins.registry.PluginRegistry.spec",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.plugins.registry.PluginRegistry",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/plugins.registry.PluginRegistry.html#cadjoint.plugins.registry.PluginRegistry",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.plugins.registry.plugin_for_kind",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/plugins.registry.plugin_for_kind.html#cadjoint.plugins.registry.plugin_for_kind",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.plugins.registry.get_plugin",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/plugins.registry.get_plugin.html#cadjoint.plugins.registry.get_plugin",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.plugins.registry.register_plugin",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/plugins.registry.register_plugin.html#cadjoint.plugins.registry.register_plugin",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.plugins.registry.available_plugins",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/plugins.registry.available_plugins.html#cadjoint.plugins.registry.available_plugins",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.plugins.registry.build_registry",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/plugins.registry.build_registry.html#cadjoint.plugins.registry.build_registry",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.plugins.registry.load_config",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/plugins.registry.load_config.html#cadjoint.plugins.registry.load_config",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.flow.domain.FlowGrid.cell_volume",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/flow.domain.FlowGrid.html#cadjoint.flow.domain.FlowGrid.cell_volume",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.flow.domain.FlowGrid.cells",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/flow.domain.FlowGrid.html#cadjoint.flow.domain.FlowGrid.cells",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.flow.domain.FlowGrid.centers",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/flow.domain.FlowGrid.html#cadjoint.flow.domain.FlowGrid.centers",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.flow.domain.FlowGrid.flat_centers",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/flow.domain.FlowGrid.html#cadjoint.flow.domain.FlowGrid.flat_centers",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.flow.domain.FlowGrid.spacing",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/flow.domain.FlowGrid.html#cadjoint.flow.domain.FlowGrid.spacing",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.flow.domain.FlowGrid.suggested_epsilon",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/flow.domain.FlowGrid.html#cadjoint.flow.domain.FlowGrid.suggested_epsilon",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.flow.domain.FlowGrid",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/flow.domain.FlowGrid.html#cadjoint.flow.domain.FlowGrid",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.flow.domain.sample_solid_fraction",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/flow.domain.sample_solid_fraction.html#cadjoint.flow.domain.sample_solid_fraction",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.flow.domain.solid_fraction",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/flow.domain.solid_fraction.html#cadjoint.flow.domain.solid_fraction",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.flow.solver.FlowConfig.length_scale",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/flow.solver.FlowConfig.html#cadjoint.flow.solver.FlowConfig.length_scale",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.flow.solver.FlowConfig.mach",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/flow.solver.FlowConfig.html#cadjoint.flow.solver.FlowConfig.mach",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.flow.solver.FlowConfig.omega",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/flow.solver.FlowConfig.html#cadjoint.flow.solver.FlowConfig.omega",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.flow.solver.FlowConfig.viscosity",
+      "domain": "py",
+      "role": "attribute",
+      "priority": "1",
+      "uri": "reference/flow.solver.FlowConfig.html#cadjoint.flow.solver.FlowConfig.viscosity",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.flow.solver.FlowConfig",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/flow.solver.FlowConfig.html#cadjoint.flow.solver.FlowConfig",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.flow.solver.FlowResult",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/flow.solver.FlowResult.html#cadjoint.flow.solver.FlowResult",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.flow.solver.solve",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/flow.solver.solve.html#cadjoint.flow.solver.solve",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.flow.solver.convergence",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/flow.solver.convergence.html#cadjoint.flow.solver.convergence",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.flow.solver.recommended_alpha_max",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/flow.solver.recommended_alpha_max.html#cadjoint.flow.solver.recommended_alpha_max",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.flow.steady.SteadyOptions",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/flow.steady.SteadyOptions.html#cadjoint.flow.steady.SteadyOptions",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.flow.steady.steady_populations",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/flow.steady.steady_populations.html#cadjoint.flow.steady.steady_populations",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.flow.objectives.pressure_drop",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/flow.objectives.pressure_drop.html#cadjoint.flow.objectives.pressure_drop",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.flow.objectives.heat_transfer_proxy",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/flow.objectives.heat_transfer_proxy.html#cadjoint.flow.objectives.heat_transfer_proxy",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.render.material.Material.as_dict",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/render.material.Material.html#cadjoint.render.material.Material.as_dict",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.render.material.Material.blend",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/render.material.Material.html#cadjoint.render.material.Material.blend",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.render.material.Material.describe",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/render.material.Material.html#cadjoint.render.material.Material.describe",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.render.material.Material.get",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/render.material.Material.html#cadjoint.render.material.Material.get",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.render.material.Material",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/render.material.Material.html#cadjoint.render.material.Material",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.materials.aluminium_6061",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/materials.aluminium_6061.html#cadjoint.materials.aluminium_6061",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.materials.copper_c11000",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/materials.copper_c11000.html#cadjoint.materials.copper_c11000",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.materials.steel_1018",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/materials.steel_1018.html#cadjoint.materials.steel_1018",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.materials.titanium_ti6al4v",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/materials.titanium_ti6al4v.html#cadjoint.materials.titanium_ti6al4v",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.materials.fr4",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/materials.fr4.html#cadjoint.materials.fr4",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.materials.silicon",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/materials.silicon.html#cadjoint.materials.silicon",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.materials.thermal_pad",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/materials.thermal_pad.html#cadjoint.materials.thermal_pad",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.materials.pla",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/materials.pla.html#cadjoint.materials.pla",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.materials.catalogue",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/materials.catalogue.html#cadjoint.materials.catalogue",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.sdf.measure.volume.volume",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/sdf.measure.volume.volume.html#cadjoint.sdf.measure.volume.volume",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.sdf.measure.mass.material_mass",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/sdf.measure.mass.material_mass.html#cadjoint.sdf.measure.mass.material_mass",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.render.scene.Camera",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/render.scene.Camera.html#cadjoint.render.scene.Camera",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.render.scene.Scene",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/render.scene.Scene.html#cadjoint.render.scene.Scene",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.render.settings.RenderSettings.balanced",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/render.settings.RenderSettings.html#cadjoint.render.settings.RenderSettings.balanced",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.render.settings.RenderSettings.draft",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/render.settings.RenderSettings.html#cadjoint.render.settings.RenderSettings.draft",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.render.settings.RenderSettings.high_quality",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/render.settings.RenderSettings.html#cadjoint.render.settings.RenderSettings.high_quality",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.render.settings.RenderSettings",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/render.settings.RenderSettings.html#cadjoint.render.settings.RenderSettings",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.render.raymarch.render.render_scene",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/render.raymarch.render.render_scene.html#cadjoint.render.raymarch.render.render_scene",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.render.raymarch.render.raymarch",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/render.raymarch.render.raymarch.html#cadjoint.render.raymarch.render.raymarch",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.render.raymarch.render.render_raymarched",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/render.raymarch.render.render_raymarched.html#cadjoint.render.raymarch.render.render_raymarched",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.viewer.schema.payloads.CompilePayload",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/viewer.schema.payloads.CompilePayload.html#cadjoint.viewer.schema.payloads.CompilePayload",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.viewer.schema.payloads.ConstructionNode",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/viewer.schema.payloads.ConstructionNode.html#cadjoint.viewer.schema.payloads.ConstructionNode",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.viewer.schema.payloads.ConstructionFace",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/viewer.schema.payloads.ConstructionFace.html#cadjoint.viewer.schema.payloads.ConstructionFace",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.viewer.schema.payloads.MaterialDefinition",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/viewer.schema.payloads.MaterialDefinition.html#cadjoint.viewer.schema.payloads.MaterialDefinition",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.viewer.schema.payloads.SimMeshPayload",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/viewer.schema.payloads.SimMeshPayload.html#cadjoint.viewer.schema.payloads.SimMeshPayload",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.viewer.schema.payloads.StudyPayload",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/viewer.schema.payloads.StudyPayload.html#cadjoint.viewer.schema.payloads.StudyPayload",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.viewer.schema.payloads.OptimizationPayload",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/viewer.schema.payloads.OptimizationPayload.html#cadjoint.viewer.schema.payloads.OptimizationPayload",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.viewer.schema.payloads.MeshEdgePayload",
+      "domain": "py",
+      "role": "class",
+      "priority": "1",
+      "uri": "reference/viewer.schema.payloads.MeshEdgePayload.html#cadjoint.viewer.schema.payloads.MeshEdgePayload",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.viewer.schema.requests.validate_patch_request",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/viewer.schema.requests.validate_patch_request.html#cadjoint.viewer.schema.requests.validate_patch_request",
+      "dispname": "-"
+    },
+    {
+      "name": "cadjoint.viewer.schema.emit.typescript_source",
+      "domain": "py",
+      "role": "function",
+      "priority": "1",
+      "uri": "reference/viewer.schema.emit.typescript_source.html#cadjoint.viewer.schema.emit.typescript_source",
+      "dispname": "-"
+    }
+  ]
+}

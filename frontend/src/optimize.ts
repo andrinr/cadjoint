@@ -10,6 +10,7 @@
  */
 
 import type { OptimizationPayload, OptimizeResponse, OptimizeTrajectoryEntry } from "./types";
+import { byId } from "./identity";
 
 // ── /api/optimize NDJSON stream parsing ──────────────────────────────────
 //
@@ -90,14 +91,24 @@ export function setOptimizationValueRequest(
   argument: "steps" | "learning_rate",
   value: number,
 ): Record<string, unknown> {
-  return { op: "set_optimization_value", optimization: optimization.index, argument, value };
+  return {
+    op: "set_optimization_value",
+    ...byId(optimization),
+    optimization: optimization.index,
+    argument,
+    value,
+  };
 }
 
 /** Body for POST /patch deleting the declaration from the program. */
 export function deleteOptimizationRequest(
   optimization: OptimizationPayload,
 ): Record<string, unknown> {
-  return { op: "delete_optimization", optimization: optimization.index };
+  return {
+    op: "delete_optimization",
+    ...byId(optimization),
+    optimization: optimization.index,
+  };
 }
 
 /** Body for POST /api/optimize (steps only when overriding the declared). */

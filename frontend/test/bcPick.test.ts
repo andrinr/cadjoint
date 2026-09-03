@@ -2,8 +2,12 @@ import { describe, expect, it } from "vitest";
 import { nearestVertex, rectAabbProposal, round3, sphereProposal } from "../src/bcPick";
 import { projectPoint, type View } from "../src/viewer/math";
 
+// A three-quarter view in the Z-up world the camera math uses: the elevation
+// is the Z component, so the camera stands above and in front of the cube and
+// sees the +x face obliquely — which is what keeps a rect drawn around that
+// face from also catching the far one.
 const VIEW: View = {
-  position: [4, 3, 6],
+  position: [4, -6, 3],
   target: [0, 0, 0],
   width: 800,
   height: 500,

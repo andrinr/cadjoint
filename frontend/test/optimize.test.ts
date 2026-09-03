@@ -19,6 +19,7 @@ import type { OptimizationPayload } from "../src/types";
 
 const optimization: OptimizationPayload = {
   kind: "optimization",
+  stableId: null,
   index: 2,
   name: "min-aluminum",
   steps: 30,

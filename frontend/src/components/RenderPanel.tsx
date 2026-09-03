@@ -15,21 +15,136 @@ import {
   type RenderPreset,
   type RenderPresetId,
 } from "../renderPresets";
-import type { DisplaySettings, ShadowMode } from "../viewer/renderer";
-import { QUALITY_PRESETS } from "../viewer/renderer";
+import type { DisplaySettings, SdfView, ShadowMode } from "../viewer/renderer";
+import {
+  MARCH_STEPS_MAX,
+  MARCH_STEPS_MIN,
+  QUALITY_PRESETS,
+  SDF_SLICE_RANGE,
+  effectiveMarchSteps,
+  isSliceView,
+  slicePosition,
+} from "../viewer/renderer";
+import { sdfRampCss } from "../viewer/sdfRamp";
+import { MM_PER_UNIT, formatDistance } from "../viewer/graticule";
+import { Segmented, ToggleSwitch, type SegmentedOption } from "./ui";
 
-const SHADOWS: { value: ShadowMode; label: string; hint: string }[] = [
-  { value: "off", label: "Off", hint: "No shadow rays" },
-  { value: "hard", label: "Hard", hint: "One crisp, lifted shadow ray" },
-  { value: "soft", label: "Soft", hint: "Penumbra from multiple samples" },
+const SHADOWS: SegmentedOption<ShadowMode>[] = [
+  {
+    value: "off",
+    label: "Off",
+    title: "No shadow rays",
+    testId: "shadows-off",
+  },
+  {
+    value: "hard",
+    label: "Hard",
+    title: "One crisp, lifted shadow ray",
+    testId: "shadows-hard",
+  },
+  {
+    value: "soft",
+    label: "Soft",
+    title: "Penumbra from multiple samples",
+    testId: "shadows-soft",
+  },
 ];
 
-const SWITCHES: { key: keyof DisplaySettings; label: string; hint: string }[] = [
-  { key: "reflections", label: "Reflections", hint: "Environment reflections" },
-  { key: "hideSolid", label: "Hide solid", hint: "Construction geometry only" },
-  { key: "showMeshEdges", label: "Feature edges", hint: "Sharp creases, corners, and CSG seams" },
-  { key: "showMeshWireframe", label: "Mesh wireframe", hint: "Full dual-contour quad wireframe" },
+/** Shading is a two-way choice; `flatShading` is the underlying flag. */
+const SHADING: SegmentedOption<boolean>[] = [
+  { value: false, label: "Full", testId: "shading-full" },
+  {
+    value: true,
+    label: "Flat",
+    title: "Albedo only, no specular or environment",
+    testId: "shading-flat",
+  },
 ];
+
+const QUALITIES: SegmentedOption<string>[] = Object.entries(
+  QUALITY_PRESETS,
+).map(([key, preset]) => ({
+  value: key,
+  label: preset.label,
+  testId: `quality-${key}`,
+}));
+
+/**
+ * The three ways of looking at the field.
+ *
+ * Solid is the raymarched surface; the other two cut the field open on a
+ * plane. They are not a quality setting or an effect — they answer a different
+ * question about the same scene, which is why they sit above the preset
+ * editor rather than inside it.
+ */
+const SDF_VIEWS: SegmentedOption<SdfView>[] = [
+  {
+    value: "solid",
+    label: "Solid",
+    title: "The raymarched surface",
+    testId: "sdf-solid",
+  },
+  {
+    value: "slice",
+    label: "Slice",
+    title: "Signed distance on a plane through the scene",
+    testId: "sdf-slice",
+  },
+  {
+    value: "gradient",
+    label: "∇f",
+    title: "Gradient magnitude: where the field stops being a metric distance",
+    testId: "sdf-gradient",
+  },
+  {
+    value: "normal",
+    label: "N",
+    title: "World-space surface normals, n × 0.5 + 0.5",
+    testId: "sdf-normal",
+  },
+  {
+    value: "depth",
+    label: "Z",
+    title: "Linear camera depth across the framed volume",
+    testId: "sdf-depth",
+  },
+];
+
+const SLICE_AXES: SegmentedOption<0 | 1 | 2>[] = [
+  { value: 0, label: "X", testId: "sdf-axis-x" },
+  { value: 1, label: "Y", testId: "sdf-axis-y" },
+  { value: 2, label: "Z", testId: "sdf-axis-z" },
+];
+
+/** A world distance, spoken the way the graticule's readout speaks one. */
+const distanceLabel = (units: number): string => {
+  const { value, unit } = formatDistance(units * MM_PER_UNIT);
+  return `${value} ${unit}`;
+};
+
+const SWITCHES: { key: keyof DisplaySettings; label: string; hint: string }[] =
+  [
+    {
+      key: "reflections",
+      label: "Reflections",
+      hint: "Environment reflections",
+    },
+    {
+      key: "hideSolid",
+      label: "Hide solid",
+      hint: "Construction geometry only",
+    },
+    {
+      key: "showMeshEdges",
+      label: "Feature edges",
+      hint: "Sharp creases, corners, and CSG seams",
+    },
+    {
+      key: "showMeshWireframe",
+      label: "Mesh wireframe",
+      hint: "Full dual-contour quad wireframe",
+    },
+  ];
 
 export interface RenderPanelProps {
   display: DisplaySettings;
@@ -52,6 +167,27 @@ export function RenderPanel(props: RenderPanelProps) {
       props.presets.find((preset) => preset.id === props.selectedPreset) ??
       props.presets[0],
   );
+  /** What the tier actually changes, in the numbers it changes them to. */
+  const resolutionHint = () => {
+    const tier = QUALITY_PRESETS[props.quality] ?? QUALITY_PRESETS.ultra;
+    const megapixels = (tier.pixelBudget / 1e6).toFixed(2);
+    // `pane-hint` does not wrap, so this stays a label's length.
+    return props.pathTracing
+      ? `${megapixels} MP · ${tier.bounces} bounces`
+      : `${megapixels} MP · all a tier costs`;
+  };
+  const steps = () =>
+    effectiveMarchSteps(
+      props.display,
+      QUALITY_PRESETS[props.quality] ?? QUALITY_PRESETS.ultra,
+    );
+  /** What the "back to the tier" button is called, and what it would give. */
+  const tierLabel = () => {
+    const tier = QUALITY_PRESETS[props.quality] ?? QUALITY_PRESETS.ultra;
+    return props.display.marchSteps === null
+      ? `${tier.label} tier`
+      : `Tier (${tier.marchSteps})`;
+  };
   const selectedMatches = () =>
     renderPresetMatches(
       selectedPreset(),
@@ -63,9 +199,10 @@ export function RenderPanel(props: RenderPanelProps) {
   return (
     <aside class="render-panel" data-testid="render-panel">
       <header>
+        {/* Kicker first, title second — see ObjectTree. */}
         <span>
-          Render
           <small>presets &amp; display</small>
+          Render
         </span>
       </header>
       <div class="render-settings">
@@ -123,6 +260,158 @@ export function RenderPanel(props: RenderPanelProps) {
           </button>
         </section>
 
+        <section class="render-sdf" data-testid="render-sdf">
+          <div class="render-preset-heading">
+            <h4>Distance field</h4>
+            <small>What the viewport draws</small>
+          </div>
+          <Segmented
+            options={SDF_VIEWS}
+            value={props.display.sdfView}
+            onSelect={(sdfView) => props.onChange({ sdfView })}
+          />
+
+          {/* Section is a *geometry* mode and the three above are *data*
+              modes, so it is a switch beside them rather than a fourth
+              option in them: it cuts the solid, they draw the field. Both
+              use the one plane, which is why the controls below serve
+              either. */}
+          <ToggleSwitch
+            checked={props.display.section}
+            onChange={(section) => props.onChange({ section })}
+            testId="toggle-section"
+          >
+            Capped section
+            <small>
+              {isSliceView(props.display.sdfView)
+                ? "The field card covers the cut"
+                : "Closes the cut with a real face"}
+            </small>
+          </ToggleSwitch>
+
+          <Show
+            when={isSliceView(props.display.sdfView) || props.display.section}
+          >
+            <div class="sim-slice">
+              <Segmented
+                options={SLICE_AXES}
+                value={props.display.sdfAxis}
+                onSelect={(sdfAxis) => props.onChange({ sdfAxis })}
+              />
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.005"
+                value={props.display.sdfFraction}
+                onInput={(event) =>
+                  props.onChange({
+                    sdfFraction: Number(event.currentTarget.value),
+                  })
+                }
+                aria-label="Slice position"
+                data-testid="sdf-fraction"
+              />
+            </div>
+            {/* The plane's coordinate, not its fraction: a fraction of a slab
+                the reader cannot see is not a number they can act on. */}
+            <div class="sim-legend-values">
+              <span>
+                {["X", "Y", "Z"][props.display.sdfAxis]} ={" "}
+                {distanceLabel(slicePosition(props.display.sdfFraction))}
+              </span>
+              <span>± {distanceLabel(SDF_SLICE_RANGE)}</span>
+            </div>
+
+            <Show when={isSliceView(props.display.sdfView)}>
+              <div class="sim-legend" data-testid="sdf-legend">
+                <small>
+                  {props.display.sdfView === "gradient"
+                    ? "|∇f| — 1.0 is an exact distance field"
+                    : "f — signed distance, inside and out"}
+                </small>
+                <div class="sim-ramp" style={{ background: sdfRampCss() }} />
+                <div class="sim-legend-values">
+                  <span>
+                    {props.display.sdfView === "gradient" ? "0.5" : "inside"}
+                  </span>
+                  <span>
+                    {props.display.sdfView === "gradient" ? "1.0" : "0"}
+                  </span>
+                  <span>
+                    {props.display.sdfView === "gradient" ? "1.5" : "outside"}
+                  </span>
+                </div>
+                {/* The intervals themselves are a function of the camera, so
+                  the numbers are printed over the viewport beside the GRID
+                  readout they are taken from; what belongs here is the rule. */}
+                <small>
+                  {props.display.sdfView === "gradient"
+                    ? "Contours every 0.1, heaviest at 1.0"
+                    : `Contours at the grid spacing and a fifth of it, ${"densest within two intervals of the surface"}`}
+                </small>
+              </div>
+            </Show>
+          </Show>
+
+          <Show when={props.display.sdfView === "normal"}>
+            <div class="sim-legend" data-testid="sdf-normal-legend">
+              <small>n × 0.5 + 0.5, in world axes</small>
+              <div class="sim-ramp sdf-axis-ramp" />
+              <div class="sim-legend-values">
+                <span>+X red</span>
+                <span>+Y green</span>
+                <span>+Z blue</span>
+              </div>
+            </div>
+          </Show>
+
+          <Show when={props.display.sdfView === "depth"}>
+            <div class="sim-legend" data-testid="sdf-depth-legend">
+              <small>Linear depth along the primary ray</small>
+              <div class="sim-ramp sdf-depth-ramp" />
+              <div class="sim-legend-values">
+                <span>near</span>
+                <span>far</span>
+              </div>
+              {/* The two ends follow the zoom, so their values are printed
+                  over the viewport where the camera is. */}
+              <small>Half a frame either side of the orbit target</small>
+            </div>
+          </Show>
+
+          {/* Applies to every view, because it is not a view: it moves the
+              surface the tracer resolves, so the solid, the slice's zero
+              contour and the shadows all follow it together. */}
+          <div class="sim-slice">
+            <span class="pane-hint">Offset</span>
+            <input
+              type="range"
+              min="-0.4"
+              max="0.4"
+              step="0.005"
+              value={props.display.isoOffset}
+              onInput={(event) =>
+                props.onChange({ isoOffset: Number(event.currentTarget.value) })
+              }
+              aria-label="Isosurface offset"
+              data-testid="sdf-offset"
+            />
+          </div>
+          <div class="sim-legend-values">
+            <span>f = {distanceLabel(props.display.isoOffset)}</span>
+            <button
+              type="button"
+              class="render-sdf-zero"
+              onClick={() => props.onChange({ isoOffset: 0 })}
+              disabled={props.display.isoOffset === 0}
+              data-testid="sdf-offset-zero"
+            >
+              f = 0
+            </button>
+          </div>
+        </section>
+
         <Show when={editing()}>
           <div class="render-preset-editor" data-testid="render-preset-editor">
             <div class="render-preset-actions">
@@ -150,201 +439,241 @@ export function RenderPanel(props: RenderPanelProps) {
 
             <section>
               <h4>Shading</h4>
-              <div class="segmented">
-                <button
-                  type="button"
-                  class={props.display.flatShading ? "" : "active"}
-                  onClick={() => props.onChange({ flatShading: false })}
-                  data-testid="shading-full"
-                >
-                  Full
-                </button>
-                <button
-                  type="button"
-                  class={props.display.flatShading ? "active" : ""}
-                  onClick={() => props.onChange({ flatShading: true })}
-                  title="Albedo only, no specular or environment"
-                  data-testid="shading-flat"
-                >
-                  Flat
-                </button>
-              </div>
+              <Segmented
+                options={SHADING}
+                value={props.display.flatShading}
+                onSelect={(flatShading) => props.onChange({ flatShading })}
+              />
             </section>
 
             <section>
               <h4>Shadows</h4>
-              <div class="segmented">
-                <For each={SHADOWS}>
-                  {(mode) => (
-                    <button
-                      type="button"
-                      class={props.display.shadows === mode.value ? "active" : ""}
-                      onClick={() => props.onChange({ shadows: mode.value })}
-                      title={mode.hint}
-                      data-testid={`shadows-${mode.value}`}
-                    >
-                      {mode.label}
-                    </button>
-                  )}
-                </For>
-              </div>
+              <Segmented
+                options={SHADOWS}
+                value={props.display.shadows}
+                onSelect={(shadows) => props.onChange({ shadows })}
+              />
             </section>
 
-            <section>
-              <h4>Quality</h4>
-              <div class="segmented">
-                <For each={Object.entries(QUALITY_PRESETS)}>
-                  {([key, preset]) => (
-                    <button
-                      type="button"
-                      class={props.quality === key ? "active" : ""}
-                      onClick={() => props.onQualityChange(key)}
-                      data-testid={`quality-${key}`}
-                    >
-                      {preset.label}
-                    </button>
-                  )}
-                </For>
+            {/* ── How well it is drawn ──────────────────────────────── */}
+            <section data-testid="render-resolution">
+              <div class="render-preset-heading">
+                <h4>Resolution</h4>
+                <small>How well it is drawn</small>
               </div>
+              <Segmented
+                options={QUALITIES}
+                value={props.quality}
+                onSelect={props.onQualityChange}
+              />
+              {/* The tier's real content, named. It used to carry a march
+                  ladder as well, which cost nothing and cost image quality;
+                  see MARCH_STEPS_TIER. */}
+              <small class="pane-hint">{resolutionHint()}</small>
+            </section>
+
+            {/* Marching sits under Quality because it is the same dial at a
+                finer grain: the tier picks a step budget, this overrides it.
+                Both are rendering choices — they ride in the uniform block,
+                so changing one is a buffer write and a redraw, never a
+                recompile, and they survive one. */}
+            <section data-testid="render-march">
+              <div class="render-preset-heading">
+                <h4>Marching</h4>
+                <small>A cap and a refinement</small>
+              </div>
+              <div class="sim-slice">
+                <span class="pane-hint">Steps</span>
+                <input
+                  type="range"
+                  min={MARCH_STEPS_MIN}
+                  max={MARCH_STEPS_MAX}
+                  step="16"
+                  value={steps()}
+                  onInput={(event) =>
+                    props.onChange({
+                      marchSteps: Number(event.currentTarget.value),
+                    })
+                  }
+                  aria-label="Sphere-tracing step budget"
+                  data-testid="march-steps"
+                />
+              </div>
+              <div class="sim-legend-values">
+                <span data-testid="march-steps-value">{steps()} steps</span>
+                <button
+                  type="button"
+                  class="render-sdf-zero"
+                  onClick={() => props.onChange({ marchSteps: null })}
+                  disabled={props.display.marchSteps === null}
+                  data-testid="march-steps-tier"
+                >
+                  {tierLabel()}
+                </button>
+              </div>
+              {/* The number's meaning, not its value: a reader who thinks
+                  this is a speed dial will turn it down and wonder why the
+                  part grew holes. Measured per scene in §13.8 of
+                  research/performance.md. */}
+              {/* `pane-hint` is a label style and does not wrap, so a
+                  sentence goes in the legend block instead. */}
+              <div class="sim-legend">
+                <small>
+                  A cap, not a cost: raising it is nearly free, lowering it
+                  erodes the silhouette.
+                </small>
+              </div>
+              <ToggleSwitch
+                checked={props.display.refineHit}
+                onChange={(refineHit) => props.onChange({ refineHit })}
+                testId="toggle-refine-hit"
+              >
+                Refine hit
+                <small>
+                  Resolves the hit off the last two samples. Moves 0.1–2 % of
+                  the frame, for 0–30 % of one.
+                </small>
+              </ToggleSwitch>
+            </section>
+
+            {/* ── Diagnostics ───────────────────────────────────────────
+                Controls that do not change the picture, only what it costs
+                or what it reveals. Separated because a reader hunting for a
+                look should not have to step over them, and a reader hunting
+                for a cost should find them together. */}
+            <section data-testid="render-diagnostics">
+              <div class="render-preset-heading">
+                <h4>Diagnostics</h4>
+                <small>Cost, not appearance</small>
+              </div>
+              <ToggleSwitch
+                checked={props.display.cullBounds}
+                onChange={(cullBounds) => props.onChange({ cullBounds })}
+                testId="toggle-cull-bounds"
+              >
+                Bounds culling
+                <small>
+                  Skips the leaves a ray is far from. Same image; off is
+                  2.0–2.4× the frame.
+                </small>
+              </ToggleSwitch>
             </section>
 
             <section>
               <h4>Effects</h4>
-              <label class="switch">
-                <input
-                  type="checkbox"
-                  checked={props.pathTracing}
-                  onChange={(event) =>
-                    props.onPathTracingChange(event.currentTarget.checked)
-                  }
-                  data-testid="toggle-path-tracing"
-                />
-                <span>
-                  Path tracing
-                  <small>Progressive physically based rendering</small>
-                </span>
-              </label>
-              <label class="switch">
-                <input
-                  type="checkbox"
-                  checked={props.display.xray > 0}
-                  onChange={(event) =>
-                    props.onChange({
-                      xray: event.currentTarget.checked ? 1 : 0,
-                    })
-                  }
-                  data-testid="toggle-xray"
-                />
-                <span>
-                  X-ray
-                  <small>See construction through the solid</small>
-                </span>
-              </label>
+              <ToggleSwitch
+                checked={props.pathTracing}
+                onChange={props.onPathTracingChange}
+                testId="toggle-path-tracing"
+              >
+                Path tracing
+                <small>Progressive physically based rendering</small>
+              </ToggleSwitch>
+              <ToggleSwitch
+                checked={props.display.xray > 0}
+                onChange={(checked) =>
+                  props.onChange({ xray: checked ? 1 : 0 })
+                }
+                testId="toggle-xray"
+              >
+                X-ray
+                <small>See construction through the solid</small>
+              </ToggleSwitch>
               <For each={SWITCHES}>
                 {(entry) => (
-                  <label class="switch">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(props.display[entry.key])}
-                      onChange={(event) =>
-                        props.onChange({
-                          [entry.key]: event.currentTarget.checked,
-                        })
-                      }
-                      data-testid={`toggle-${entry.key}`}
-                    />
-                    <span>
-                      {entry.label}
-                      <small>{entry.hint}</small>
-                    </span>
-                  </label>
+                  <ToggleSwitch
+                    checked={Boolean(props.display[entry.key])}
+                    onChange={(checked) =>
+                      props.onChange({ [entry.key]: checked })
+                    }
+                    testId={`toggle-${entry.key}`}
+                  >
+                    {entry.label}
+                    <small>{entry.hint}</small>
+                  </ToggleSwitch>
                 )}
               </For>
             </section>
 
             <section>
               <h4>Annotations</h4>
-              <label class="switch">
-                <input
-                  type="checkbox"
-                  checked={props.display.showSketches}
-                  onChange={(event) =>
-                    props.onChange({
-                      showSketches: event.currentTarget.checked,
-                    })
-                  }
-                  data-testid="toggle-showSketches"
-                />
-                <span>
-                  Sketch geometry
-                  <small>Edges and editable point handles</small>
-                </span>
-              </label>
-              <label class="switch">
-                <input
-                  type="checkbox"
-                  checked={props.display.showConstraints}
-                  onChange={(event) =>
-                    props.onChange({
-                      showConstraints: event.currentTarget.checked,
-                    })
-                  }
-                  data-testid="toggle-constraints"
-                />
-                <span>
-                  Constraints
-                  <small>Viewport dimensions and fixed badges</small>
-                </span>
-              </label>
+              <ToggleSwitch
+                checked={props.display.showGraticule}
+                onChange={(showGraticule) => props.onChange({ showGraticule })}
+                testId="toggle-graticule"
+              >
+                Ground grid
+                <small>Floor plane, scale readout, and title block</small>
+              </ToggleSwitch>
+              {/* The master switch over everything drawn *about* the model.
+                  First in the section, because the finer switches below are
+                  all inside it. */}
+              <ToggleSwitch
+                checked={props.display.showOverlays}
+                onChange={(showOverlays) => props.onChange({ showOverlays })}
+                testId="toggle-construction-overlay"
+              >
+                Construction overlay
+                <small>Sketches, handles, gizmo, constraints, BC preview</small>
+              </ToggleSwitch>
+              <ToggleSwitch
+                checked={props.display.showSketches}
+                onChange={(showSketches) => props.onChange({ showSketches })}
+                testId="toggle-showSketches"
+              >
+                Sketch geometry
+                <small>Edges and editable point handles</small>
+              </ToggleSwitch>
+              <ToggleSwitch
+                checked={props.display.showConstraints}
+                onChange={(showConstraints) =>
+                  props.onChange({ showConstraints })
+                }
+                testId="toggle-constraints"
+              >
+                Constraints
+                <small>Viewport dimensions and fixed badges</small>
+              </ToggleSwitch>
               <div
                 class="annotation-options"
                 classList={{ disabled: !props.display.showConstraints }}
               >
-                <label class="switch compact">
-                  <input
-                    type="checkbox"
-                    checked={props.display.showFixedConstraints}
-                    disabled={!props.display.showConstraints}
-                    onChange={(event) =>
-                      props.onChange({
-                        showFixedConstraints: event.currentTarget.checked,
-                      })
-                    }
-                    data-testid="toggle-fixed-constraints"
-                  />
-                  <span>Fixed badges</span>
-                </label>
-                <label class="switch compact">
-                  <input
-                    type="checkbox"
-                    checked={props.display.showDistanceConstraints}
-                    disabled={!props.display.showConstraints}
-                    onChange={(event) =>
-                      props.onChange({
-                        showDistanceConstraints: event.currentTarget.checked,
-                      })
-                    }
-                    data-testid="toggle-distance-constraints"
-                  />
-                  <span>Distance dimensions</span>
-                </label>
-                <label class="switch compact">
-                  <input
-                    type="checkbox"
-                    checked={props.display.showConstraintValues}
-                    disabled={
-                      !props.display.showConstraints ||
-                      !props.display.showDistanceConstraints
-                    }
-                    onChange={(event) =>
-                      props.onChange({
-                        showConstraintValues: event.currentTarget.checked,
-                      })
-                    }
-                    data-testid="toggle-constraint-values"
-                  />
-                  <span>Dimension values</span>
-                </label>
+                <ToggleSwitch
+                  compact
+                  checked={props.display.showFixedConstraints}
+                  disabled={!props.display.showConstraints}
+                  onChange={(showFixedConstraints) =>
+                    props.onChange({ showFixedConstraints })
+                  }
+                  testId="toggle-fixed-constraints"
+                >
+                  Fixed badges
+                </ToggleSwitch>
+                <ToggleSwitch
+                  compact
+                  checked={props.display.showDistanceConstraints}
+                  disabled={!props.display.showConstraints}
+                  onChange={(showDistanceConstraints) =>
+                    props.onChange({ showDistanceConstraints })
+                  }
+                  testId="toggle-distance-constraints"
+                >
+                  Distance dimensions
+                </ToggleSwitch>
+                <ToggleSwitch
+                  compact
+                  checked={props.display.showConstraintValues}
+                  disabled={
+                    !props.display.showConstraints ||
+                    !props.display.showDistanceConstraints
+                  }
+                  onChange={(showConstraintValues) =>
+                    props.onChange({ showConstraintValues })
+                  }
+                  testId="toggle-constraint-values"
+                >
+                  Dimension values
+                </ToggleSwitch>
               </div>
             </section>
           </div>

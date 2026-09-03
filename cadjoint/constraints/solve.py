@@ -3,10 +3,11 @@
 from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
-from typing import Any, Literal
+from typing import Any
 
 import jax
 import jax.numpy as jnp
+import numpy as np
 import optax
 import optimistix as optx
 from jax import Array
@@ -18,10 +19,10 @@ from cadjoint.constraints.residual import (
     pack_param_dict,
     unpack_param_vector,
 )
+from cadjoint.enums import ConstraintSolveMethod, ConstraintSolveMethodLike, listed, parse
 from cadjoint.fluent import Fluent
 from cadjoint.geometry.parameters import Parameter
 
-ConstraintSolveMethod = Literal["newton", "adam", "sgd"]
 _CAPTURED_SOLVES: ContextVar[list[dict[str, Any]] | None] = ContextVar(
     "cadjoint_captured_constraint_solves",
     default=None,
@@ -44,40 +45,103 @@ def _loss(flat_fn, values: Array) -> Array:
     return jnp.mean(jnp.square(residual))
 
 
+def _history(losses: Array) -> list[float]:
+    """One device transfer for the whole loss history.
+
+    ``[float(v) for v in losses]`` iterates the array on device, which costs
+    an ``unstack`` program of its own — a second XLA compilation next to the
+    one the solve is supposed to be.
+    """
+    return [float(value) for value in np.asarray(losses)]
+
+
 def _newton_projection(flat_fn, values: Array, steps: int) -> tuple[Array, list[float]]:
-    """Minimum-norm Newton corrections plus their residual loss history."""
-    x = values
-    losses = [float(_loss(flat_fn, x))]
-    for _ in range(steps):
+    """Minimum-norm Newton corrections plus their residual loss history.
+
+    The step is ``Δ = Jᵀ(JJᵀ)⁻¹ c(p)``, solved as a least-squares problem
+    rather than an exact inverse. The two agree to rounding whenever ``JJᵀ``
+    is invertible, and they differ in exactly the case that matters: a sketch
+    carrying a *redundant* constraint — one implied by the others, such as a
+    perpendicularity that a horizontal and a vertical already force — makes
+    ``J`` rank-deficient and ``JJᵀ`` singular. ``jnp.linalg.solve`` answers
+    that with NaN, which then propagates into every free parameter in the
+    program and turns the whole model into NaN geometry, silently.
+
+    Worse, it did so only *sometimes*: in float32 the redundancy is masked by
+    roundoff and the solve succeeds, while the float64 the FEM path enables
+    makes the singularity exact. A scene could therefore render correctly and
+    become NaN the moment it was meshed.
+
+    A redundant-but-consistent constraint set is a perfectly ordinary thing to
+    draw and every CAD sketcher tolerates it, so the least-squares step is
+    also the semantically right answer: it takes the minimum-norm correction
+    on the constraints that are actually independent.
+
+    The loop is a ``lax.scan`` inside a single ``jax.jit`` rather than a
+    Python ``for``.  Run eagerly it dispatched one XLA program per primitive
+    op — 85 of them for ``scenes/starter.py``, 0.73 s of compilation — and
+    every extra step cost another ~50 ms of Python dispatch.  Rolled into one
+    scanned program it is a single compilation whose cost does not move with
+    ``steps`` (0.09 s at ``steps=2`` and at ``steps=16``), which is what makes
+    asking for more steps affordable.  The arithmetic is untouched: the same
+    residual, the same Jacobian, the same least-squares correction, in the
+    same order.
+    """
+    x, losses = _newton_scan(flat_fn, values, steps)
+    return x, _history(losses)
+
+
+def _newton_scan(flat_fn, values: Array, steps: int) -> tuple[Array, Array]:
+    """One jitted, scanned run of :func:`_newton_projection`'s corrections.
+
+    ``flat_fn`` is closed over rather than passed as a static argument so the
+    jit cache dies with this call; ``build_residual_fn`` hands out a fresh
+    closure per solve, so a module-level cache keyed on it would only grow.
+    """
+
+    def step(x: Array, _) -> tuple[Array, Array]:
         residual = flat_fn(x)
         jacobian = jax.jacobian(flat_fn)(x)
-        delta = jacobian.T @ jnp.linalg.solve(
-            jacobian @ jacobian.T,
-            residual,
-        )
-        x = x - delta
-        losses.append(float(_loss(flat_fn, x)))
-    return x, losses
+        correction = jnp.linalg.lstsq(jacobian @ jacobian.T, residual)[0]
+        return x - jacobian.T @ correction, jnp.mean(jnp.square(residual))
+
+    @jax.jit
+    def run(start: Array) -> tuple[Array, Array]:
+        final, history = jax.lax.scan(step, start, None, length=steps)
+        return final, jnp.concatenate([history, _loss(flat_fn, final)[None]])
+
+    return run(values)
 
 
 def _gradient_projection(
     flat_fn,
     values: Array,
     steps: int,
-    method: Literal["adam", "sgd"],
+    method: ConstraintSolveMethod,
 ) -> tuple[Array, list[float]]:
-    """Minimize squared constraint residuals with an Optax optimizer."""
-    optimizer = optax.adam(0.05) if method == "adam" else optax.sgd(0.15)
-    state = optimizer.init(values)
-    x = values
-    losses = [float(_loss(flat_fn, x))]
+    """Minimize squared constraint residuals with an Optax optimizer.
+
+    Scanned and jitted for the same reason as :func:`_newton_projection`: the
+    Optax paths are the ones a user is *expected* to give a large step count
+    (the tests run 48 Adam steps), and eagerly each step was its own round of
+    XLA dispatch.
+    """
+    optimizer = optax.adam(0.05) if method == ConstraintSolveMethod.ADAM else optax.sgd(0.15)
     loss_and_grad = jax.value_and_grad(lambda current: _loss(flat_fn, current))
-    for _ in range(steps):
-        _, gradient = loss_and_grad(x)
+
+    def step(carry, _):
+        x, state = carry
+        loss, gradient = loss_and_grad(x)
         updates, state = optimizer.update(gradient, state, x)
-        x = optax.apply_updates(x, updates)
-        losses.append(float(_loss(flat_fn, x)))
-    return x, losses
+        return (optax.apply_updates(x, updates), state), loss
+
+    @jax.jit
+    def run(start: Array) -> tuple[Array, Array]:
+        (final, _), history = jax.lax.scan(step, (start, optimizer.init(start)), None, length=steps)
+        return final, jnp.concatenate([history, _loss(flat_fn, final)[None]])
+
+    x, losses = run(values)
+    return x, _history(losses)
 
 
 def solve_constraints(
@@ -168,7 +232,10 @@ def project_to_manifold(
     flat_fn = build_residual_fn(constraints, metadata)
     x = pack_param_dict(free_params, metadata)
 
-    x, _ = _newton_projection(flat_fn, x, steps)
+    # _newton_scan, not _newton_projection: this runs inside optimizer loops
+    # (see make_manifold_projection), where pulling the loss history back to
+    # the host every step would be a device sync for a number nobody reads.
+    x, _ = _newton_scan(flat_fn, x, steps)
 
     return unpack_param_vector(x, metadata)
 
@@ -177,7 +244,7 @@ def satisfy_constraints(
     root: Fluent,
     *,
     steps: int = 8,
-    method: ConstraintSolveMethod = "newton",
+    method: ConstraintSolveMethodLike = ConstraintSolveMethod.NEWTON,
 ) -> dict[str, Array]:
     """Project a construction/SDF tree onto its attached constraints in place.
 
@@ -191,8 +258,10 @@ def satisfy_constraints(
     Args:
         root: Construction or SDF tree whose attached constraints are solved.
         steps: Number of optimizer updates.
-        method: ``"newton"`` for minimum-norm manifold projection, or
-            ``"adam"``/``"sgd"`` for Optax residual minimization.
+        method: A :class:`~cadjoint.enums.ConstraintSolveMethod` or its
+            plain string spelling — ``"newton"`` for minimum-norm manifold
+            projection, or ``"adam"``/``"sgd"`` for Optax residual
+            minimization.
 
     Returns:
         The solved free-parameter mapping, after applying it to ``root``.
@@ -201,15 +270,16 @@ def satisfy_constraints(
 
     if not isinstance(steps, int) or isinstance(steps, bool) or steps < 1:
         raise ValueError("steps must be a positive integer")
-    if method not in {"newton", "adam", "sgd"}:
-        raise ValueError("method must be one of: newton, adam, sgd")
+    method = parse(
+        ConstraintSolveMethod, method, f"method must be one of: {listed(ConstraintSolveMethod)}"
+    )
 
     free, _, metadata = extract_parameters(root)
     constraints = _collect_constraints(metadata)
     if constraints:
         flat_fn = build_residual_fn(constraints, metadata)
         initial = pack_param_dict(free, metadata)
-        if method == "newton":
+        if method == ConstraintSolveMethod.NEWTON:
             values, losses = _newton_projection(flat_fn, initial, steps)
         else:
             values, losses = _gradient_projection(flat_fn, initial, steps, method)

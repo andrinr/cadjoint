@@ -1,0 +1,52 @@
+/**
+ * What the simulation windows add to the shared panel chrome.
+ *
+ * Only one thing, and it earns its own file because it is the difference
+ * between a failure the user can act on and a failure that went to a log:
+ * the block a window shows when the work it asked for did not finish.
+ *
+ * A solver's refusal is a paragraph, not a status line — "TetGen rejected the
+ * surface: the input surface mesh contains self-intersections…" tells you
+ * exactly what to change, and only if you can read all of it. So it is set in
+ * mono at the panel's own size, wrapped rather than clipped, and marked down
+ * the side in the danger ink; and it sits in front of whatever the window was
+ * already showing, so the previous result stays legible behind it instead of
+ * being cleared or quietly re-labelled.
+ *
+ * Every value is a token from styles.css. Square corners, no shadow.
+ */
+
+.sim-failure {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-left: 2px solid var(--danger-ink);
+  background: var(--surface-inset);
+}
+
+/*
+ * The message itself: the solver's words, in the solver's own shape.
+ *
+ * The type is the one the generated-WGSL dialog already uses for machine
+ * text a human has to read — regular, `--text-sm`, `--leading-normal`, mono.
+ * Reusing it rather than inventing an eleventh mono size is the whole point
+ * of having a scale.
+ */
+.sim-failure .sim-error {
+  font: var(--weight-regular) var(--text-sm) / var(--leading-normal)
+    var(--font-mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* The provenance line: which job said it, and the way to the row it is on. */
+.sim-failure-job {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin: 0;
+  font: var(--type-mono);
+  color: var(--ink-3);
+}

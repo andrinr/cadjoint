@@ -25,6 +25,7 @@ from typing import Callable
 import jax.numpy as jnp
 from jax import Array
 
+from cadjoint.construction.faces import FaceSet, attach_faces, primitive_faces
 from cadjoint.fluent import Fluent
 from cadjoint.geometry.parameters import Scalar, Vector
 
@@ -87,13 +88,32 @@ def _ring(radius: float, axis: int, offset: float = 0.0) -> list[tuple]:
     return [(points[i], points[(i + 1) % len(points)]) for i in range(len(points))]
 
 
+_unnamed_counts: dict[str, int] = {}
+
+
+def _default_name(kind: str) -> str:
+    """A name for a primitive declared without one: ``cylinder``, ``cylinder_2``, ...
+
+    Every primitive's parameters are named after it (``<name>_position``,
+    ``<name>_radius``), and extraction refuses two free parameters with one
+    name — so two unnamed cylinders in one program used to be an error the
+    author only met at the first constraint solve. The counter is per kind
+    and per process; within one program it is what makes the names unique.
+    """
+    count = _unnamed_counts.get(kind, 0) + 1
+    _unnamed_counts[kind] = count
+    return kind if count == 1 else f"{kind}_{count}"
+
+
 class ConstructionPrimitive(Fluent):
     """A primitive with an editable placement, mirroring the SDF it generates.
 
     Args:
         kind: One of ``box``, ``sphere``, ``cylinder``.
         position: World position of the primitive's centre.
-        rotation: Intrinsic X, Y, Z angles in radians.
+        rotation: Intrinsic X, Y, Z angles in radians — numbers, or ``Scalar``
+            parameters (a pinned ``Scalar(..., free=False)`` keeps an inclined
+            tool from becoming three optimisation variables).
         material: Optional render material for the generated SDF.
         name: Prefix for the generated parameter names.
         **dimensions: The kind's size arguments — ``size`` for a box (half
@@ -119,15 +139,24 @@ class ConstructionPrimitive(Fluent):
             raise ValueError(f"{kind} needs {', '.join(sorted(missing))}")
 
         self.kind = kind
-        self.name = name or kind
+        self.name = name or _default_name(kind)
         self.material = material
 
-        angles = jnp.asarray(rotation, dtype=jnp.float32)
-        if angles.shape != (3,):
-            raise ValueError(f"rotation must be three angles, got shape {angles.shape}")
+        angles = list(rotation) if isinstance(rotation, (list, tuple)) else rotation
+        if isinstance(angles, list):
+            if len(angles) != 3:
+                raise ValueError(f"rotation must be three angles, got {len(angles)}")
+        else:
+            angles = jnp.asarray(angles, dtype=jnp.float32)
+            if angles.shape != (3,):
+                raise ValueError(f"rotation must be three angles, got shape {angles.shape}")
+            angles = list(angles)
 
         self.params = {"position": _free_vector(position, f"{self.name}_position")}
         for index, axis in enumerate("xyz"):
+            # A Scalar angle is adopted as-is, so a bore drilled at a fixed
+            # inclination can pin its rotation (``Scalar(..., free=False)``)
+            # the same way it pins its position and radius.
             self.params[f"r{axis}"] = _free_scalar(angles[index], f"{self.name}_r{axis}")
         for key in DIMENSIONS[kind]:
             value = dimensions[key]
@@ -150,6 +179,25 @@ class ConstructionPrimitive(Fluent):
     def rotation_values(self) -> tuple[float, float, float]:
         return tuple(float(angle.value) for angle in self.rotation)
 
+    # ── faces ────────────────────────────────────────────────────────────────
+
+    @property
+    def faces(self) -> FaceSet:
+        """The primitive's analytic faces, in its own rotated frame.
+
+        A box declares six (``+x``, ``-x``, ``+y``, …), a cylinder its two
+        circular caps (``cap+``, ``cap-``), a sphere none — it has no planar
+        face, so :meth:`~cadjoint.construction.sketch.SketchPlane.tangent` is
+        the reference to use on it.
+        """
+        if getattr(self, "_faces", None) is None:
+            self._faces = primitive_faces(self)
+        return self._faces
+
+    def face(self, key: str):
+        """The face with this key — ``"+x"``, ``"cap-"``."""
+        return self.faces.face(key)
+
     def sdf(self):
         """Build the placed SDF, sharing this mirror's parameter objects."""
         from cadjoint.sdf.primitives import Box, Cylinder, Sphere
@@ -171,7 +219,7 @@ class ConstructionPrimitive(Fluent):
         for axis, angle in zip("xyz", self.rotation):
             if float(angle.value) != 0.0:
                 solid = Rotate(solid, axis=axis, angle=angle)
-        return Translate(solid, offset=self.position)
+        return attach_faces(Translate(solid, offset=self.position), self.faces)
 
     # ── outline ──────────────────────────────────────────────────────────────
 
@@ -245,6 +293,12 @@ class Solid:
 
     The viewer picks up the mirror separately and draws its outline, which is
     what makes the result selectable and draggable.
+
+    Each returned SDF also carries its analytic faces, so a box is a work-plane
+    reference the moment it exists::
+
+        deck = Solid.box(size=[1, 1, 0.2], position=[0, 0, 0], name="deck")
+        top = SketchPlane.on(deck.face("+z"))
     """
 
     box = staticmethod(_make("box"))

@@ -645,3 +645,127 @@ def test_analytic_curve_coverage(results, name):
         if any_cov <= COVERAGE_MINIMUM or chain_cov <= COVERAGE_MINIMUM
     ]
     assert not failing, f"{name}: undercovered curves (label, any, chain): {failing}"
+
+
+# --------------------------------------------------------------------------
+# The batched seam projection against its per-group reference
+# --------------------------------------------------------------------------
+
+
+def _many_operand_union():
+    """Five hard-unioned primitives — a scene made of seam groups.
+
+    Stands in for the playground starter, whose context geometry (board,
+    die, screw heads, caps) is what turns a handful of seams into fifteen
+    operand sets.  The pieces are arranged so that some seams meet two
+    operands and some meet three, which is what makes the batched
+    projection pad: the widest operand set sets the program's width and
+    every shorter group is padded and masked back out.
+    """
+    half = Vector([0.55, 0.45, 0.35])
+    return Union(
+        Union(
+            Union(Box(size=half), Translate(Box(size=half), offset=Vector([0.5, 0.3, 0.0]))),
+            Union(
+                Translate(Sphere(0.45), offset=Vector([-0.4, 0.35, 0.1])),
+                Translate(Cylinder(radius=0.3, height=0.6), offset=Vector([0.3, -0.4, 0.0])),
+            ),
+            smoothness=0.0,
+        ),
+        Translate(Box(size=Vector([0.25, 0.9, 0.25])), offset=Vector([-0.2, 0.0, 0.3])),
+        smoothness=0.0,
+    )
+
+
+SEAM_CONFIGS: dict[str, object] = {
+    "example-ring-y=1.2": CONFIGS["example-ring-y=1.2"],
+    "box-sphere": _box_sphere_config,
+    "staggered-slabs": _staggered_slabs_config,
+    "many-operand-union": _many_operand_union,
+}
+
+
+@pytest.mark.parametrize("name", list(SEAM_CONFIGS))
+def test_batched_seam_projection_matches_the_per_group_reference(name, monkeypatch):
+    """One all-leaf program must extract exactly what one program per group did.
+
+    ``_project_seam_groups`` replaced a loop of ``_project_to_seam`` calls
+    because the projection's cost is per call and not per point.  The
+    replacement is only allowed to be faster, so the whole payload — the
+    wire layer, which depends on the seam-projected vertex positions, and
+    the sharp layer, which additionally depends on which groups the
+    residual test accepted — is compared segment for segment.
+
+    (Verified on ``scenes/starter.py`` itself out of band: 3052 wire and
+    382 sharp segments, identical.  It is not run here because the starter
+    costs minutes per extraction on a cold XLA cache.)
+    """
+    from cadjoint.viewer import _edge_overlay
+
+    built = SEAM_CONFIGS[name]()
+    scene = built[0] if isinstance(built, tuple) else built
+
+    batched = _mesh_edge_payload(scene)
+    assert batched is not None, f"{name}: mesh edge payload unavailable"
+    assert batched["sharp"], f"{name}: no sharp links at all"
+
+    monkeypatch.setattr(
+        _edge_overlay, "_project_seam_groups", _edge_overlay._project_seam_groups_reference
+    )
+    reference = _mesh_edge_payload(scene)
+
+    assert batched["wire"] == reference["wire"]
+    assert batched["sharp"] == reference["sharp"]
+
+
+# --------------------------------------------------------------------------
+# The design-subtree rule for the sharp layer
+# --------------------------------------------------------------------------
+
+
+def _design_and_scenery():
+    """A construction-mirrored box beside a hand-built one, hard-unioned.
+
+    The left box comes from ``Solid`` (so it carries a ``FaceSet``, exactly
+    as ``extrude``/``revolve`` results do); the right one is raw SDF, the
+    shape of the board/die/screw-head context the starter draws around its
+    heat sink.  The two are far enough apart to share no seam.
+    """
+    from cadjoint.construction import Solid
+
+    design = Solid.box(size=[0.5, 0.4, 0.35], position=[-1.0, 0.0, 0.0], name="design")
+    scenery = Translate(Box(size=Vector([0.5, 0.4, 0.35])), offset=Vector([1.0, 0.0, 0.0]))
+    return Union(design, scenery, smoothness=0.0)
+
+
+def test_the_design_subtree_is_the_construction_owned_leaves():
+    from cadjoint.viewer._edge_overlay import _design_leaves, _world_frame_leaves
+
+    leaves = _world_frame_leaves(_design_and_scenery())
+    assert len(leaves) == 2
+    # Leaf 0 is the Solid mirror, leaf 1 the raw SDF box.
+    assert list(_design_leaves(leaves)) == [0]
+
+
+def test_a_scene_with_no_construction_mirror_falls_back_to_the_whole_scene():
+    from cadjoint.viewer._edge_overlay import _design_leaves, _world_frame_leaves
+
+    scene, _curves = _staggered_slabs_config()
+    leaves = _world_frame_leaves(scene)
+    assert len(leaves) == 2
+    assert _design_leaves(leaves) is None
+
+
+def test_the_sharp_layer_draws_only_the_design_and_the_wire_layer_draws_both():
+    """Scenery keeps its mesh wireframe and loses its feature curves."""
+    payload = _mesh_edge_payload(_design_and_scenery())
+    assert payload is not None
+    sharp = np.asarray(payload["sharp"], dtype=np.float64)
+    wire = np.asarray(payload["wire"], dtype=np.float64)
+    assert sharp.size, "no sharp links at all"
+    # Every sharp endpoint is on the construction-owned box (x around -1.0);
+    # nothing is drawn on the raw one (x around +1.0).
+    assert sharp[..., 0].max() < 0.0
+    # The wire layer is unrestricted: it still meshes the scenery.
+    assert wire[..., 0].max() > 0.5
+    assert wire[..., 0].min() < -0.5

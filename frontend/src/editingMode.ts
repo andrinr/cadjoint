@@ -6,6 +6,7 @@
  * mode. The signals live in `state.ts`; the DOM lives in `ToolRail.tsx`.
  */
 
+import { MODE_ACCENTS as DESIGN_MODE_ACCENTS } from "./tokens";
 import type { ConstructionNode } from "./types";
 
 export type EditingMode = "model" | "sketch" | "simulate";
@@ -14,15 +15,15 @@ export type EditingMode = "model" | "sketch" | "simulate";
 export const EDITING_MODES: EditingMode[] = ["model", "sketch", "simulate"];
 
 /**
- * Per-mode identity: label plus the accent color threaded through the mode
- * switcher, tool rail, dock headers, hint bar, and viewport border. The CSS
- * mirrors these values via `.app[data-mode=…]`; keep the two in sync.
+ * Per-mode accent, threaded through the mode switcher, tool rail, dock
+ * headers, hint bar and viewport border.
+ *
+ * The values live in the design system (src/tokens.ts), which the stylesheet
+ * mirrors as `--accent-model` / `--accent-sketch` / `--accent-simulate` and
+ * `.app[data-mode=…]` binds to `--mode-accent`. Re-exported here so mode code
+ * keeps reading a mode-shaped record.
  */
-export const MODE_ACCENTS: Record<EditingMode, string> = {
-  model: "#d9ff57",
-  sketch: "#7fd6f5",
-  simulate: "#ffb25c",
-};
+export const MODE_ACCENTS: Record<EditingMode, string> = DESIGN_MODE_ACCENTS;
 
 /** The next mode when cycling with the keyboard (wraps around). */
 export function cycleEditingMode(mode: EditingMode, step: 1 | -1 = 1): EditingMode {
@@ -59,6 +60,9 @@ export function groupVisibleInMode(group: RailGroupId, mode: EditingMode): boole
 /** Create-cluster children are themselves mode-filtered. */
 export const CREATE_TOOL_MODES: Record<string, EditingMode[]> = {
   sketch: ["model", "sketch"],
+  // Available in both, and it means something different in each: in Model it
+  // starts a new sketch on the face, in Sketch it re-plants the open one.
+  face: ["model", "sketch"],
   polygon: ["model", "sketch"],
   box: ["model"],
   sphere: ["model"],

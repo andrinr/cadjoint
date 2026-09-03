@@ -31,11 +31,15 @@ export const AXES: Vec3[] = [
   [0, 0, 1],
 ];
 
-/** Crisp, slightly softened CAD axis colours: X red, Y green, Z blue. */
+/**
+ * Crisp CAD axis colours: X red, Y green, Z blue — at the weight the paper
+ * viewport needs. Against `#e6e6e9` they measure 3.44 / 3.44 / 3.45; the
+ * green this replaces (`#4dcc66`) measured 1.84 and read as a pale smear.
+ */
 export const AXIS_COLORS: [number, number, number][] = [
-  [0.96, 0.28, 0.32],
-  [0.3, 0.8, 0.4],
-  [0.28, 0.52, 0.98],
+  [0.922, 0.153, 0.247],
+  [0.118, 0.553, 0.224],
+  [0.192, 0.451, 0.961],
 ];
 
 const RING_SEGMENTS = 40;

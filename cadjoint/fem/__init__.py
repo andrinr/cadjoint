@@ -1,36 +1,49 @@
 """Finite element analysis on SDF geometry.
 
-The mesher (:mod:`cadjoint.fem.hexmesh`) has no solver dependency.  The
-solver layer (:mod:`cadjoint.fem.simulate`) requires the ``fem`` extra
-(jax-fem); the tesseract interop layer requires the ``tesseract`` extra —
-both are imported lazily so this package imports cleanly without them.
+The package is layered so the two element families (HEX8 and TET4/TET10)
+travel the same path, and so no mesh module depends on a solver:
+
+1. :mod:`~cadjoint.fem.elements` — reference-element topology tables.
+2. :mod:`~cadjoint.fem.quality`, :mod:`~cadjoint.fem.boundary`,
+   :mod:`~cadjoint.fem.motion`, :mod:`~cadjoint.fem.properties` — the
+   concerns both families share: element metrics, boundary faces and their
+   selection, differentiable node motion under frozen topology, and the
+   per-element physical properties sampled from the scene's material field.
+3. :mod:`~cadjoint.fem.hexmesh`, :mod:`~cadjoint.fem.tetmesh` — mesh
+   construction only.
+4. :mod:`~cadjoint.fem.backends` (solver ABI + registry),
+   :mod:`~cadjoint.fem.jaxfem` (every direct jax-fem solve, both
+   families), :mod:`~cadjoint.fem.calculix`, and
+   :mod:`~cadjoint.fem.postprocess` (quantities derived from a solution).
+5. :mod:`~cadjoint.fem.simulate`, :mod:`~cadjoint.fem.study` — patch
+   resolution and the declarative entry points.
+
+Layers 1-3 have no solver dependency.  The solver layer requires the
+``fem`` extra (jax-fem); the tesseract interop layer requires the
+``tesseract`` extra — both are imported lazily so this package imports
+cleanly without them.
 """
 
 from __future__ import annotations
 
-from cadjoint.fem.hexmesh import (
+from cadjoint.fem.boundary import (
     FaceGroup,
-    GridSpec,
-    HexMesh,
+    faces_from_nodes,
+    select_faces,
+    tet_faces_from_nodes,
+)
+from cadjoint.fem.hexmesh import GridSpec, HexMesh, sdf_to_hex_mesh
+from cadjoint.fem.motion import project_points, recompute_points, recompute_tet_points
+from cadjoint.fem.quality import (
     aspect_ratios,
     corner_tet_volumes,
-    faces_from_nodes,
-    project_points,
-    recompute_points,
     scaled_jacobians,
-    sdf_to_hex_mesh,
-    select_faces,
+    tet_aspect_ratios,
+    tet_radius_ratios,
 )
 from cadjoint.fem.selection import Nodes, NodeSelection, selection_from_description
 from cadjoint.fem.simmesh import SimMesh, capture_sim_meshes
-from cadjoint.fem.tetmesh import (
-    TetMesh,
-    recompute_tet_points,
-    sdf_to_tet_mesh,
-    tet_aspect_ratios,
-    tet_faces_from_nodes,
-    tet_radius_ratios,
-)
+from cadjoint.fem.tetmesh import TetMesh, sdf_to_tet_mesh
 
 __all__ = [
     "FaceGroup",
@@ -59,6 +72,7 @@ __all__ = [
 
 # Declarative study layer (code-first simulation, capture registry for the
 # compile worker).  Appended additively; no solver import happens here.
+from cadjoint.fem.properties import FROM_MATERIAL  # noqa: E402
 from cadjoint.fem.result import SimulationResult  # noqa: E402
 from cadjoint.fem.study import (  # noqa: E402
     Dirichlet,
@@ -71,6 +85,7 @@ from cadjoint.fem.study import (  # noqa: E402
 )
 
 __all__ += [
+    "FROM_MATERIAL",
     "Dirichlet",
     "ElasticStudy",
     "Fixed",

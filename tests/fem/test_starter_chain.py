@@ -84,7 +84,10 @@ def scene_field(starter):
     """The starter's free parameters and its traced design-field factory."""
     from cadjoint import extract_parameters, functionalize
 
-    scene = starter["scene"]
+    # The body the declared mesh discretizes (its ``domain=``), not the
+    # rendered scene: the starter also draws board-level context the physics
+    # never sees.
+    scene = starter["thermal_body"]
     free0, fixed, _ = extract_parameters(scene)
     scene_fn = functionalize(scene)
 
@@ -115,6 +118,7 @@ def _declared_study(starter, name, method):
         name=f"sink-mesh-{name}",
         resolution=declared.resolution,
         bounds=declared.bounds,
+        domain=declared.domain,
         size=declared.size,
         method=method,
     )

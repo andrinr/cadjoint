@@ -68,7 +68,10 @@ def tet_state(starter):
     from cadjoint import extract_parameters, functionalize
     from cadjoint.fem import SimMesh, ThermalStudy, recompute_tet_points
 
-    scene = starter["scene"]
+    # The body the declared mesh discretizes (its ``domain=``), not the
+    # rendered scene: the starter also draws board-level context the physics
+    # never sees.
+    scene = starter["thermal_body"]
     free0, fixed, _ = extract_parameters(scene)
     scene_fn = functionalize(scene)
     sdf0 = scene_fn(free0, fixed)

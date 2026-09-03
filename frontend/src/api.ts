@@ -5,6 +5,7 @@
  * that response, so requiring the token on writes keeps them same-origin only.
  */
 
+import type { JobDetail, JobsSnapshot, JobStamped } from "./jobs";
 import {
   parseOptimizeStreamLine,
   splitStreamBuffer,
@@ -12,6 +13,9 @@ import {
 } from "./optimize";
 import type {
   CompileResponse,
+  CompleteResponse,
+  ExportRequest,
+  LintResponse,
   MeshInspectResponse,
   MeshResponse,
   OptimizeRequest,
@@ -24,10 +28,31 @@ import type {
   SessionResponse,
   SimulateRequest,
   SimulateResponse,
+  SignatureResponse,
   SimulateStudyRequest,
 } from "./types";
 
 let token = "";
+
+/**
+ * Resolves once the session token is in hand.
+ *
+ * Nothing that needs the token may run before `startSession` has answered,
+ * and some of it now does run early: a panel remounting after a reload asks
+ * the job registry for the result it was showing, and the process monitor
+ * starts polling, both while the app's own startup request is still in
+ * flight. Without this gate those requests are refused with a 403 and the
+ * restored result silently never arrives.
+ */
+let markSessionReady: () => void = () => {};
+const sessionReady = new Promise<void>((resolve) => {
+  markSessionReady = resolve;
+});
+
+/** Await the session token; every job endpoint below does. */
+export function whenSessionReady(): Promise<void> {
+  return sessionReady;
+}
 
 async function readJson<T>(response: Response): Promise<T> {
   const text = await response.text();
@@ -44,21 +69,44 @@ export async function startSession(): Promise<SessionResponse> {
   if (!response.ok) throw new Error(`Could not start a session (${response.status}).`);
   const session = await readJson<SessionResponse>(response);
   token = session.token;
+  markSessionReady();
   return session;
 }
 
-async function post<T>(path: string, body: unknown): Promise<T> {
+async function post<T>(path: string, body: unknown, signal?: AbortSignal): Promise<T> {
   const response = await fetch(path, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Cadjoint-Token": token },
     body: JSON.stringify(body),
+    signal,
   });
   return readJson<T>(response);
 }
 
+/**
+ * How a request that can be replaced by a newer one is labelled and dropped.
+ *
+ * `clientId` is a name the *client* chooses before the request goes out, which
+ * is the only thing that lets it stop work whose server-assigned `job_id` it
+ * cannot know until the answer arrives — see {@link cancelClientJobs}.
+ * `signal` drops the connection on this side; the two are both wanted, and
+ * neither is a substitute for the caller's own revision guard.
+ */
+export interface RequestOptions {
+  clientId?: string;
+  signal?: AbortSignal;
+}
+
 /** Execute the program and compile its scene to WGSL. */
-export async function compile(source: string): Promise<CompileResponse> {
-  return post<CompileResponse>("/compile", { source });
+export async function compile(
+  source: string,
+  options: RequestOptions = {},
+): Promise<CompileResponse & JobStamped> {
+  return post<CompileResponse & JobStamped>(
+    "/compile",
+    { source, ...(options.clientId ? { client_id: options.clientId } : {}) },
+    options.signal,
+  );
 }
 
 /**
@@ -79,8 +127,15 @@ export async function patch(
  * Split out of `/compile` because it dominates the compile round-trip; the
  * viewer only asks while a mesh overlay is actually displayed.
  */
-export async function mesh(source: string): Promise<MeshResponse> {
-  return post<MeshResponse>("/api/mesh", { source });
+export async function mesh(
+  source: string,
+  options: RequestOptions = {},
+): Promise<MeshResponse & JobStamped> {
+  return post<MeshResponse & JobStamped>(
+    "/api/mesh",
+    { source, ...(options.clientId ? { client_id: options.clientId } : {}) },
+    options.signal,
+  );
 }
 
 /**
@@ -89,23 +144,25 @@ export async function mesh(source: string): Promise<MeshResponse> {
  * Errors come back in the body — including `error_kind: "fem_unavailable"`
  * when the optional jax-fem extra is missing — so callers can render them.
  */
-export async function simulate(body: SimulateRequest): Promise<SimulateResponse> {
-  return post<SimulateResponse>("/api/simulate", body);
+export async function simulate(
+  body: SimulateRequest,
+): Promise<SimulateResponse & JobStamped> {
+  return post<SimulateResponse & JobStamped>("/api/simulate", body);
 }
 
 /** Run a study declared in the program; the declaration owns mesh and BCs. */
 export async function simulateStudy(
   body: SimulateStudyRequest,
-): Promise<SimulateResponse> {
-  return post<SimulateResponse>("/api/simulate", body);
+): Promise<SimulateResponse & JobStamped> {
+  return post<SimulateResponse & JobStamped>("/api/simulate", body);
 }
 
 /** Build a declared SimMesh and return its quality report + surface. */
 export async function meshInspect(
   source: string,
   name: string,
-): Promise<MeshInspectResponse> {
-  return post<MeshInspectResponse>("/api/mesh_inspect", { source, name });
+): Promise<MeshInspectResponse & JobStamped> {
+  return post<MeshInspectResponse & JobStamped>("/api/mesh_inspect", { source, name });
 }
 
 /**
@@ -121,19 +178,20 @@ export async function meshInspect(
 export async function optimize(
   body: OptimizeRequest,
   onProgress?: (progress: OptimizeProgress) => void,
-): Promise<OptimizeResponse> {
+  onJob?: (jobId: string) => void,
+): Promise<OptimizeResponse & JobStamped> {
   const response = await fetch("/api/optimize", {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Cadjoint-Token": token },
     body: JSON.stringify(body),
   });
-  if (!response.body) return readJson<OptimizeResponse>(response);
+  if (!response.body) return readJson<OptimizeResponse & JobStamped>(response);
 
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
   let full = "";
-  let done: OptimizeResponse | null = null;
+  let done: (OptimizeResponse & JobStamped) | null = null;
   for (;;) {
     const { value, done: finished } = await reader.read();
     const chunk = decoder.decode(value ?? new Uint8Array(0), { stream: !finished });
@@ -143,6 +201,17 @@ export async function optimize(
     buffer = rest;
     if (finished && buffer.trim().length > 0) lines.push(buffer.trim());
     for (const line of lines) {
+      // Every event of a registered run carries its job id, from the first
+      // progress line onward — which is the only way a caller can learn the
+      // handle for cancelling a run that has not finished yet.
+      if (onJob) {
+        try {
+          const raw = JSON.parse(line) as { job_id?: unknown };
+          if (typeof raw?.job_id === "string") onJob(raw.job_id);
+        } catch {
+          // Not JSON, or not an object: the parser below reports it.
+        }
+      }
       const event = parseOptimizeStreamLine(line);
       if (event?.kind === "progress") {
         const { kind: _kind, ...progress } = event;
@@ -155,10 +224,91 @@ export async function optimize(
   }
   if (done) return done;
   try {
-    return JSON.parse(full) as OptimizeResponse;
+    return JSON.parse(full) as OptimizeResponse & JobStamped;
   } catch {
     throw new Error(`Server returned a non-JSON response (${response.status}).`);
   }
+}
+
+/**
+ * Static-analyse the program: ruff, plus the last compile traceback.
+ *
+ * The whole document goes over the wire, so callers must debounce — the
+ * editor drives this from `linter()`'s idle delay, never from a keystroke.
+ * Lines are 1-based and columns 0-based; see `LintDiagnostic`.
+ */
+export async function lint(source: string): Promise<LintResponse> {
+  return post<LintResponse>("/api/lint", { source });
+}
+
+/** Completions at a caret (1-based `line`, 0-based `column`). */
+export async function complete(
+  source: string,
+  line: number,
+  column: number,
+): Promise<CompleteResponse> {
+  return post<CompleteResponse>("/api/complete", { source, line, column });
+}
+
+/** The signature of the call the caret sits inside, if it sits inside one. */
+export async function signature(
+  source: string,
+  line: number,
+  column: number,
+): Promise<SignatureResponse> {
+  return post<SignatureResponse>("/api/signature", { source, line, column });
+}
+
+/** What the server says about the file beside the bytes (`X-Cadjoint-Export`). */
+export interface ExportReport {
+  format?: string;
+  name?: string;
+  size?: number;
+  report?: Record<string, unknown>;
+}
+
+/** What `exportFile` came back with: the file, or why there is none. */
+export type ExportOutcome =
+  | { ok: true; blob: Blob; filename: string; jobId: string | null; report: ExportReport | null }
+  | { ok: false; error: string; errorKind: string | null; jobId: string | null };
+
+/**
+ * Write one object of the program as a file: `POST /api/export`.
+ *
+ * The one endpoint whose answer is not JSON. A success is the file itself
+ * — its name in `Content-Disposition`, the job that produced it in
+ * `X-Cadjoint-Job`, a small report in `X-Cadjoint-Export` — and a failure
+ * is the ordinary `{ok: false, error}` body every other endpoint sends, so
+ * the two are told apart by the response's content type, not its status.
+ */
+export async function exportFile(body: ExportRequest): Promise<ExportOutcome> {
+  const response = await fetch("/api/export", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Cadjoint-Token": token },
+    body: JSON.stringify(body),
+  });
+  const jobId = response.headers.get("X-Cadjoint-Job") || null;
+  const type = response.headers.get("Content-Type") ?? "";
+  if (!response.ok || type.startsWith("application/json")) {
+    const failure = await readJson<{ error?: string; error_kind?: string }>(response);
+    return {
+      ok: false,
+      error: failure.error ?? `Export failed (${response.status}).`,
+      errorKind: failure.error_kind ?? null,
+      jobId,
+    };
+  }
+  const blob = await response.blob();
+  const disposition = response.headers.get("Content-Disposition");
+  const filename = /filename="([^"]+)"/.exec(disposition ?? "")?.[1] ?? `export.${body.format}`;
+  let report: ExportReport | null = null;
+  try {
+    const raw = response.headers.get("X-Cadjoint-Export");
+    report = raw ? (JSON.parse(raw) as ExportReport) : null;
+  } catch {
+    report = null;
+  }
+  return { ok: true, blob, filename, jobId, report };
 }
 
 /** List saved scene files in the server's `scenes` workspace. */
@@ -178,4 +328,123 @@ export async function saveScene(
   source: string,
 ): Promise<SceneSaveResponse> {
   return post<SceneSaveResponse>("/api/scenes/save", { name, source });
+}
+
+// ── the job registry ───────────────────────────────────────────────────────
+
+/**
+ * Every registered job, newest first, plus the live load totals.
+ *
+ * Cheap enough to poll at 1 Hz: the server answers it from memory and the
+ * payload carries no results, only summaries. See `jobs.ts` for the poller
+ * that calls this and the panels that read it.
+ */
+export async function listJobs(): Promise<JobsSnapshot> {
+  await sessionReady;
+  const response = await fetch("/api/jobs", { headers: { "X-Cadjoint-Token": token } });
+  if (!response.ok) throw new Error(`Could not list jobs (${response.status}).`);
+  return readJson<JobsSnapshot>(response);
+}
+
+/** One job with its resource samples and, for an optimize run, its steps. */
+export async function jobDetail(jobId: string): Promise<JobDetail | null> {
+  await sessionReady;
+  const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}`, {
+    headers: { "X-Cadjoint-Token": token },
+  });
+  if (!response.ok) return null;
+  const body = await readJson<{ ok: boolean; job?: JobDetail }>(response);
+  return body.job ?? null;
+}
+
+/** What `fetchJobResult` found: the payload, or why there is none. */
+export type JobResultOutcome<T> =
+  | { state: "ok"; payload: T }
+  /** Still queued or running — poll the job and ask again when it finishes. */
+  | { state: "pending" }
+  /** The job is gone, or its payload was evicted: the work must be redone. */
+  | { state: "gone" }
+  | { state: "error"; message: string };
+
+/**
+ * The payload a job produced, byte-identical to the response its request got.
+ *
+ * The three refusals are all ordinary states of a stored result rather than
+ * failures, so they are returned rather than thrown: 409 while the job is
+ * still running, 404 for an id this server has never had (a reload against a
+ * restarted playground), 410 for a job whose payload has been evicted.
+ */
+export async function fetchJobResult<T>(jobId: string): Promise<JobResultOutcome<T>> {
+  await sessionReady;
+  let response: Response;
+  try {
+    response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/result`, {
+      headers: { "X-Cadjoint-Token": token },
+    });
+  } catch (error) {
+    return { state: "error", message: error instanceof Error ? error.message : String(error) };
+  }
+  if (response.ok) return { state: "ok", payload: await readJson<T>(response) };
+  if (response.status === 409) return { state: "pending" };
+  if (response.status === 404 || response.status === 410) return { state: "gone" };
+  return { state: "error", message: `Could not read that result (${response.status}).` };
+}
+
+/**
+ * Kill a running job's worker process.
+ *
+ * The request that started the work ends on its own with
+ * `error: "cancelled"`; this only asks for the kill. A 409 means the job had
+ * already finished, which is not worth reporting to the user.
+ */
+export async function cancelJob(jobId: string): Promise<boolean> {
+  await sessionReady;
+  const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/cancel`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Cadjoint-Token": token },
+    body: "{}",
+  });
+  return response.ok;
+}
+
+/**
+ * Kill whatever is running under a client-chosen request id.
+ *
+ * The registry's own ids are minted server-side and only reach the client on
+ * the response — which is exactly the moment the work is already over. A
+ * request that may have to be *replaced while it runs* therefore carries a
+ * `client_id` the caller chose beforehand, and this is the handle that goes
+ * with it. Cancelling an id the server has not registered yet is not an
+ * error: it is remembered, so a request still crossing the wire is killed the
+ * moment it lands rather than escaping the supersession by a few milliseconds.
+ *
+ * Returns the number of jobs actually stopped (zero is an ordinary answer:
+ * the work had already finished).
+ */
+export async function cancelClientJobs(clientId: string): Promise<number> {
+  await sessionReady;
+  try {
+    const response = await fetch("/api/jobs/cancel_client", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Cadjoint-Token": token },
+      body: JSON.stringify({ client_id: clientId }),
+    });
+    if (!response.ok) return 0;
+    const body = await readJson<{ cancelled?: string[] }>(response);
+    return body.cancelled?.length ?? 0;
+  } catch {
+    // A cancel is an optimization: the caller's revision guard is what keeps
+    // the answer from being applied, and that needs no server at all.
+    return 0;
+  }
+}
+
+/** Drop every finished job from the registry; running work is kept. */
+export async function clearJobs(): Promise<void> {
+  await sessionReady;
+  await fetch("/api/jobs/clear", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Cadjoint-Token": token },
+    body: "{}",
+  });
 }

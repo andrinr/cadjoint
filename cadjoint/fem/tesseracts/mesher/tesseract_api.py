@@ -155,7 +155,8 @@ def _run_mesher(inputs: InputSchema):
     """
 
     from cadjoint.fem.backends import _x64_scope
-    from cadjoint.fem.hexmesh import project_points, sdf_to_hex_mesh
+    from cadjoint.fem.hexmesh import sdf_to_hex_mesh
+    from cadjoint.fem.motion import project_points
     from cadjoint.fem.tetmesh import surface_to_tet_mesh, tet10_from_tet4
     from cadjoint.meshing import GridSpec, extract_mesh
 

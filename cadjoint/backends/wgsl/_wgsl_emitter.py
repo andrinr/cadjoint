@@ -34,16 +34,39 @@ def _validate_point_shader_export(
     shader_description: str,
     output_shape: tuple[int, ...],
     output_description: str,
+    extra_inputs: int = 0,
 ) -> None:
-    """Validate a point-query shader export before source generation."""
-    if len(exported.in_avals) != 1:
-        raise ValueError(f"{shader_description} must accept exactly one point argument")
+    """Validate a point-query shader export before source generation.
+
+    Args:
+        exported: The :func:`jax.export.export` result to check.
+        shader_description: How to name the shader in an error message.
+        output_shape: The shape the entry point must return.
+        output_description: How to name that shape in an error message.
+        extra_inputs: Parameter arguments that follow the point, for the
+            uniform-backed form; each must be a float32 scalar or 2–4 vector.
+
+    Raises:
+        ValueError: If the export does not match the point-query contract.
+    """
+    if len(exported.in_avals) != 1 + extra_inputs:
+        raise ValueError(
+            f"{shader_description} must accept exactly one point argument"
+            + (f" and {extra_inputs} parameter arguments" if extra_inputs else "")
+        )
     point = exported.in_avals[0]
     if tuple(point.shape) != (3,) or np.dtype(point.dtype) != np.float32:
         raise ValueError(
             f"{shader_description} must accept one float32 point with shape (3,), "
             f"got {point.dtype}{tuple(point.shape)}"
         )
+    for parameter in exported.in_avals[1:]:
+        shape = _shader_shape(tuple(parameter.shape))
+        if np.dtype(parameter.dtype) != np.float32 or (shape and shape[0] > 4):
+            raise ValueError(
+                f"{shader_description} parameter arguments must be float32 scalars or "
+                f"2-4 vectors, got {parameter.dtype}{tuple(parameter.shape)}"
+            )
     if len(exported.out_avals) != 1:
         raise ValueError(f"{shader_description} must return exactly one value")
     output = exported.out_avals[0]
@@ -100,11 +123,27 @@ _WGSL_BASE = {
 }
 
 
+#: Why a 64-bit value reaches a shader at all.  WGSL has no 64-bit numeric
+#: type, so this is never a matter of adding a row to the table above: the
+#: value has to arrive narrower.  In practice it arrives wide for one reason,
+#: and the message says so because the traceback alone sends the reader into
+#: the emitter, which is the one place the cause is *not*.
+_X64_HINT = (
+    " — WGSL has no 64-bit numeric type. This usually means JAX x64 is enabled"
+    " process-wide (`jax.config.update('jax_enable_x64', True)`), which makes"
+    " every array float64. Enable it for the solve that needs it and restore"
+    " it afterwards, the way `cadjoint.fem.backends` does, rather than at"
+    " import: a scene that turns it on cannot be opened in the viewer."
+)
+
+
 def _wgsl_base(dtype) -> str:
     try:
         return _WGSL_BASE[np.dtype(dtype).type]
     except KeyError as exc:
-        raise ValueError(f"WGSL does not support dtype {np.dtype(dtype)}") from exc
+        resolved = np.dtype(dtype)
+        hint = _X64_HINT if resolved.itemsize >= 8 and resolved.kind in "fc" else ""
+        raise ValueError(f"WGSL does not support dtype {resolved}{hint}") from exc
 
 
 def wgsl_type(shape, dtype) -> str:
@@ -128,7 +167,15 @@ def wgsl_type(shape, dtype) -> str:
     raise ValueError(f"Cannot map shape {shape} to WGSL type")
 
 
-def wgsl_literal(val, shape, dtype) -> str:
+#: How a NaN constant is written when nothing better is available.
+#: Exact and portable, and accepted by Naga — but *not* by Tint, which
+#: const-evaluates it and refuses the result ("value nan cannot be
+#: represented as 'f32'"), so Chromium rejects any module containing one.
+#: The uniform form passes a buffer read instead; see ``nan_expression``.
+DEFAULT_NAN_LITERAL = "bitcast<f32>(0x7fc00000u)"
+
+
+def wgsl_literal(val, shape, dtype, nan: str = DEFAULT_NAN_LITERAL) -> str:
     value = np.asarray(val, dtype=np.dtype(dtype))
     shader_shape = _shader_shape(shape)
     # WGSL matrix constructors consume columns, while StableHLO constants are
@@ -144,7 +191,13 @@ def wgsl_literal(val, shape, dtype) -> str:
             if np.isneginf(fv):
                 return "-3.402823e38"
             if np.isnan(fv):
-                raise ValueError("NaN constants cannot be represented portably in WGSL")
+                # WGSL has no NaN literal, and every way of spelling one as a
+                # *constant* is something a compiler may const-evaluate and
+                # reject. XLA emits these inside the untaken branch of a
+                # guarded sqrt, and for a material property the scene never
+                # set; with the values as literals they fold away, but as
+                # uniforms they survive to here.
+                return nan
             if fv != 0.0 and abs(fv) <= 0.5e-6:
                 return np.format_float_scientific(
                     np.float32(fv),
@@ -218,12 +271,57 @@ def _validate_entry_point(entry_point: str) -> None:
         raise ValueError(f"WGSL entry point must be a valid identifier, got {entry_point!r}")
 
 
+def _live_values(block, live: set | None = None) -> set:
+    """The values a block's return actually depends on.
+
+    A lowered module carries operations no result reads: constants whose one
+    consumer XLA folded away, a dead branch's operands.  Emitting them costs
+    shader text at best and fails at worst — the guarded ``sqrt`` idiom leaves
+    behind a NaN constant, which WGSL has no way to write down.
+
+    A ``stablehlo.case`` nests one block per branch, each closing over values
+    of the enclosing block.  Walking a live case's branches with the same set
+    marks what they read as live before the outer walk reaches the
+    definitions, so the order of one reverse pass is enough.
+
+    Args:
+        block: A ``func.func``'s block, or a branch of a case inside one.
+        live: The set to extend; a fresh one when omitted.
+
+    Returns:
+        The set of MLIR values reachable backwards from the terminator.
+    """
+    if live is None:
+        live = set()
+    for op in reversed(list(block.operations)):
+        if op.name in ("func.return", "stablehlo.return"):
+            live.update(op.operands)
+            continue
+        if any(result in live for result in op.results):
+            live.update(op.operands)
+            for region in op.regions:
+                for inner in region.blocks:
+                    _live_values(inner, live)
+    return live
+
+
 # ── per-function emitter ──────────────────────────────────────────────────────
 
 
 class _WGSLFuncEmitter:
-    def __init__(self, symbol_names: dict[str, str]) -> None:
+    def __init__(
+        self,
+        symbol_names: dict[str, str],
+        bindings: dict | None = None,
+        nan_expression: str = DEFAULT_NAN_LITERAL,
+    ) -> None:
         self._symbol_names = symbol_names
+        self._nan_expression = nan_expression
+        # {function name: {argument index: WGSL expression}} — the arguments
+        # every function reads straight out of the uniform buffer instead of
+        # being handed (see :func:`_uniform_bindings`). Empty in the literal
+        # form, where there is no buffer.
+        self._bindings = bindings or {}
         self._names: dict = {}
         self._counter = 0
         self._lines: list[str] = []
@@ -247,8 +345,14 @@ class _WGSLFuncEmitter:
         blk = func_op.regions[0].blocks[0]
 
         # ── arguments ─────────────────────────────────────────────────────────
+        bound = self._bindings.get(func_op.name.value, {})
         params = []
         for i, arg in enumerate(blk.arguments):
+            if i in bound:
+                # A design parameter: read from the module-scope buffer at the
+                # point of use rather than declared and passed down.
+                self._names[arg] = bound[i]
+                continue
             name = "p" if (i == 0 and point_entry) else f"_arg{i}"
             self._names[arg] = name
             params.append(f"{name}: {mlir_type_to_wgsl(str(arg.type))}")
@@ -259,8 +363,31 @@ class _WGSLFuncEmitter:
             params.append("p: vec3<f32>")
 
         # ── ops ───────────────────────────────────────────────────────────────
+        live = _live_values(blk)
+        ret_name, ret_type = self._emit_block(blk, live, "    ")
+
+        sig = f"fn {fn_name}({', '.join(params)}) -> {ret_type}"
+        body = "\n".join(self._lines)
+        return f"{sig} {{\n{body}\n    return {ret_name};\n}}"
+
+    def _emit_block(self, blk, live: set, indent: str) -> tuple[str, str]:
+        """Emit one block's live operations; return its terminator's value and type.
+
+        Args:
+            blk: The block.
+            live: Values worth emitting (see :func:`_live_values`).
+            indent: Leading whitespace for this nesting level.
+
+        Returns:
+            ``(name, wgsl_type)`` of the value the block returns.
+        """
         ret_name, ret_type = "MISSING", "f32"
         for op in blk.operations:
+            if op.results and not any(result in live for result in op.results):
+                # Dead: XLA leaves behind constants whose only consumer was
+                # folded away, and one of them is the NaN a guarded branch
+                # never reaches — which WGSL cannot spell at all.
+                continue
             if op.name in ("func.return", "stablehlo.return"):
                 if len(op.operands) != 1:
                     raise NotImplementedError("Shader SDF functions must return exactly one value")
@@ -272,17 +399,51 @@ class _WGSLFuncEmitter:
                 raise NotImplementedError(
                     f"StableHLO op '{op.name}' returns multiple values, which is not supported"
                 )
+            if op.name == "stablehlo.case":
+                self._emit_case(op, live, indent)
+                continue
             expr = self._dispatch(op)
             for res in op.results:
                 name = self._fresh()
                 self._names[res] = name
                 if expr is not None:
                     t = mlir_type_to_wgsl(str(res.type))
-                    self._lines.append(f"    let {name}: {t} = {expr};")
+                    self._lines.append(f"{indent}let {name}: {t} = {expr};")
+        return ret_name, ret_type
 
-        sig = f"fn {fn_name}({', '.join(params)}) -> {ret_type}"
-        body = "\n".join(self._lines)
-        return f"{sig} {{\n{body}\n    return {ret_name};\n}}"
+    def _emit_case(self, op, live: set, indent: str) -> None:
+        """A ``stablehlo.case`` as an ``if`` / ``else if`` / ``else`` chain.
+
+        This is what ``jax.lax.cond`` lowers to — branch 0 is the false arm,
+        branch 1 the true arm, the operand an ``i32`` index — and it is the
+        one construct that lets the shader *skip* work rather than select
+        between two values it computed anyway.  Each branch is its own WGSL
+        block, so its ``let``s are scoped to it; the result crosses out
+        through a ``var`` declared before the chain.
+
+        Args:
+            op: The case operation.
+            live: The live set, which already covers the branches.
+            indent: Leading whitespace of the enclosing block.
+        """
+        index = self._resolve(op.operands[0])
+        result = op.results[0]
+        name = self._fresh()
+        self._names[result] = name
+        result_type = mlir_type_to_wgsl(str(result.type))
+        self._lines.append(f"{indent}var {name}: {result_type};")
+        branches = list(op.regions)
+        for position, region in enumerate(branches):
+            if position == 0:
+                head = f"if ({index} == 0)"
+            elif position < len(branches) - 1:
+                head = f"else if ({index} == {position})"
+            else:
+                head = "else"
+            self._lines.append(f"{indent}{head} {{")
+            value, _ = self._emit_block(region.blocks[0], live, indent + "    ")
+            self._lines.append(f"{indent}    {name} = {value};")
+            self._lines.append(f"{indent}}}")
 
     def _dispatch(self, op) -> str | None:
         from jaxlib.mlir import ir as mlir_ir
@@ -327,7 +488,7 @@ class _WGSLFuncEmitter:
         if name == "stablehlo.constant":
             val = np.array(op.attributes["value"])
             shape, dtype = parse_mlir_tensor_type(str(op.results[0].type))
-            return wgsl_literal(val, shape, dtype)
+            return wgsl_literal(val, shape, dtype, self._nan_expression)
 
         if name == "func.call":
             callee = mlir_ir.FlatSymbolRefAttr(op.attributes["callee"]).value
@@ -335,7 +496,10 @@ class _WGSLFuncEmitter:
                 emitted_callee = self._symbol_names[callee]
             except KeyError as exc:
                 raise RuntimeError(f"StableHLO calls unknown function '{callee}'") from exc
-            return f"{emitted_callee}({', '.join(a)})"
+            # Drop the arguments the callee reads from the uniform itself.
+            bound = self._bindings.get(callee, {})
+            passed = [arg for index, arg in enumerate(a) if index not in bound]
+            return f"{emitted_callee}({', '.join(passed)})"
 
         if name in ("stablehlo.broadcast_in_dim", "stablehlo.reshape"):
             in_t = mlir_type_to_wgsl(str(op.operands[0].type))
@@ -496,6 +660,205 @@ class _WGSLFuncEmitter:
         return f"vec{size}<bool>({values})"
 
 
+def _call_sites(func_op):
+    """Every ``func.call`` in a function, as ``(callee, operands)`` pairs."""
+    from jaxlib.mlir import ir as mlir_ir
+
+    sites = []
+
+    def visit(block) -> None:
+        for op in block.operations:
+            if op.name == "func.call":
+                callee = mlir_ir.FlatSymbolRefAttr(op.attributes["callee"]).value
+                sites.append((callee, list(op.operands)))
+            for region in op.regions:
+                for inner in region.blocks:
+                    visit(inner)
+
+    for block in func_op.regions[0].blocks:
+        visit(block)
+    return sites
+
+
+def _constant_expressions(func_op, nan_expression: str) -> dict:
+    """Every ``stablehlo.constant`` in a function, as its WGSL literal.
+
+    A constant is safe to duplicate into a callee: it depends on nothing.
+    That matters because XLA hoists the scene's constants — profile
+    vertices, pattern counts — into the entry function and threads them
+    down to every outlined helper, which is 345 of the 1234 arguments the
+    helpers of ``scenes/motor_shield.py`` take.
+    """
+    expressions = {}
+
+    def visit(block) -> None:
+        for op in block.operations:
+            if op.name == "stablehlo.constant":
+                shape, dtype = parse_mlir_tensor_type(str(op.results[0].type))
+                expressions[op.results[0]] = wgsl_literal(
+                    np.array(op.attributes["value"]), shape, dtype, nan_expression
+                )
+            for region in op.regions:
+                for inner in region.blocks:
+                    visit(inner)
+
+    for block in func_op.regions[0].blocks:
+        visit(block)
+    return expressions
+
+
+def _uniform_bindings(
+    funcs: list,
+    entry_name: str,
+    uniform_arguments: list[str],
+    nan_expression: str = DEFAULT_NAN_LITERAL,
+) -> dict:
+    """Which block arguments are uniform reads rather than real parameters.
+
+    The uniform form gives every design parameter to the traced function as
+    an argument, which is how it stays un-folded.  Lowered naively that is
+    also how it reaches WGSL: ``main`` takes the point and 330 floats, and
+    because outlining closes each shared subtree over the whole parameter
+    tuple, *every* outlined helper takes those 330 floats too.  WGSL caps a
+    function at 255 parameters, so past a couple of dozen parameters the
+    module is rejected outright — 438 declared against a maximum of 255 for
+    ``scenes/end_cap.py``.
+
+    Nothing needs to be passed.  The buffer is a module-scope binding that
+    every function can read, so an argument that is only ever a parameter
+    passed straight through can be replaced, at every depth, by the read
+    itself.  This works out which arguments those are:
+
+    * ``main``'s arguments after the point are the slots, in order.
+    * An argument of a callee is bound when *every* call site passes the
+      same expression into that position — a uniform read, or a constant,
+      which is equally safe to duplicate.  A position that receives a
+      computed value at any call site, or different expressions at
+      different sites, stays an ordinary parameter.
+
+    Iterated to a fixed point, which terminates because the call graph is
+    acyclic (:func:`_callees_first` rejects recursion) and each round
+    settles one more level of it.
+
+    Args:
+        funcs: The module's ``func.func`` operations.
+        entry_name: Name of the entry function, normally ``"main"``.
+        uniform_arguments: The WGSL expression reading each slot, in the
+            order the entry function takes them.
+        nan_expression: How a NaN constant is spelled, for the constants
+            that are inlined rather than passed.
+
+    Returns:
+        ``{function name: {argument index: WGSL expression}}``.
+    """
+    by_name = {func_op.name.value: func_op for func_op in funcs}
+    empty = {name: {} for name in by_name}
+    entry = by_name.get(entry_name)
+    if entry is None or not uniform_arguments:
+        return empty
+
+    arguments = list(entry.regions[0].blocks[0].arguments)
+    # Normally the point comes first; JAX drops it when the body ignores it.
+    offset = len(arguments) - len(uniform_arguments)
+    if offset < 0:
+        return empty
+    entry_bound = {offset + i: expr for i, expr in enumerate(uniform_arguments)}
+
+    bound = dict(empty)
+    bound[entry_name] = entry_bound
+    for _ in range(len(by_name) + 1):
+        proposed: dict[str, dict[int, str | None]] = {}
+        for name, func_op in by_name.items():
+            mapping = bound[name]
+            reads = _constant_expressions(func_op, nan_expression)
+            reads.update(
+                {
+                    argument: mapping[index]
+                    for index, argument in enumerate(func_op.regions[0].blocks[0].arguments)
+                    if index in mapping
+                }
+            )
+            for callee, operands in _call_sites(func_op):
+                if callee not in by_name:
+                    continue
+                positions = proposed.setdefault(callee, {})
+                for position, operand in enumerate(operands):
+                    expression = reads.get(operand)
+                    if position in positions and positions[position] != expression:
+                        positions[position] = None  # disagreeing call sites
+                    else:
+                        positions[position] = expression
+        settled = dict(empty)
+        settled[entry_name] = entry_bound
+        for callee, positions in proposed.items():
+            if callee == entry_name:
+                continue
+            settled[callee] = {
+                position: expression
+                for position, expression in positions.items()
+                if expression is not None
+            }
+        if settled == bound:
+            break
+        bound = settled
+    return bound
+
+
+def _called_symbols(func_op) -> set[str]:
+    """The names a ``func.func`` calls, read off its ``func.call`` operations."""
+    from jaxlib.mlir import ir as mlir_ir
+
+    called: set[str] = set()
+
+    def visit(block) -> None:
+        for op in block.operations:
+            if op.name == "func.call":
+                called.add(mlir_ir.FlatSymbolRefAttr(op.attributes["callee"]).value)
+            for region in op.regions:
+                for inner in region.blocks:
+                    visit(inner)
+
+    for block in func_op.regions[0].blocks:
+        visit(block)
+    return called
+
+
+def _callees_first(funcs: list):
+    """Order functions so every callee is emitted before its caller.
+
+    WGSL has no forward declarations, so a shared helper — an outlined pattern
+    child, a subtree two booleans both use — has to appear above the function
+    that calls it.  Outlining nests those helpers arbitrarily deep, which is
+    more than the module's own declaration order promises.
+
+    Args:
+        funcs: The module's ``func.func`` operations, in declaration order.
+
+    Returns:
+        The same operations, callees first.
+    """
+    by_name = {func_op.name.value: func_op for func_op in funcs}
+    ordered: list = []
+    placed: set[str] = set()
+    visiting: set[str] = set()
+
+    def visit(name: str) -> None:
+        if name in placed or name not in by_name:
+            return
+        if name in visiting:
+            raise ValueError(f"Recursive StableHLO function {name!r} cannot be lowered to WGSL")
+        visiting.add(name)
+        for callee in sorted(_called_symbols(by_name[name])):
+            visit(callee)
+        visiting.discard(name)
+        placed.add(name)
+        ordered.append(by_name[name])
+
+    for func_op in funcs:
+        visit(func_op.name.value)
+    return ordered
+
+
 # ── public API ────────────────────────────────────────────────────────────────
 
 
@@ -509,12 +872,37 @@ class StableHLOToWGSL:
         entry_point: str = "sdf",
         output_shape: tuple[int, ...] = (),
         output_description: str = "scalar float32 distance",
+        extra_inputs: int = 0,
+        uniform_arguments: list[str] | None = None,
+        nan_expression: str = DEFAULT_NAN_LITERAL,
     ) -> str:
+        """Compile a point-query JAX function to WGSL.
+
+        Args:
+            fn: The function to trace.
+            *example_args: Example inputs — the query point first, then any
+                parameter arguments.
+            entry_point: Name for the generated entry function.
+            output_shape: The shape ``fn`` must return.
+            output_description: How to name that shape in an error message.
+            extra_inputs: How many parameter arguments follow the point. Those
+                arguments are kept even when the body ignores them, so the
+                generated signature matches the caller's layout exactly.
+            uniform_arguments: One WGSL expression per parameter argument,
+                reading it from a module-scope uniform. When given, the
+                parameters are read where they are used instead of being
+                declared and passed down, and the generated entry point takes
+                the point alone — see :func:`_uniform_bindings` for why
+                threading them cannot work at this size.
+
+        Returns:
+            WGSL source for the entry point and every function it calls.
+        """
         import jax
         from jax.export import export
 
         _validate_entry_point(entry_point)
-        exported = export(jax.jit(fn))(*example_args)
+        exported = export(jax.jit(fn, keep_unused=extra_inputs > 0))(*example_args)
         _validate_point_shader_export(
             exported,
             shader_description=(
@@ -524,10 +912,23 @@ class StableHLOToWGSL:
             ),
             output_shape=output_shape,
             output_description=output_description,
+            extra_inputs=extra_inputs,
         )
-        return self.convert(exported.mlir_module(), entry_point=entry_point)
+        return self.convert(
+            exported.mlir_module(),
+            entry_point=entry_point,
+            uniform_arguments=uniform_arguments,
+            nan_expression=nan_expression,
+        )
 
-    def convert(self, mlir_text: str, *, entry_point: str = "sdf") -> str:
+    def convert(
+        self,
+        mlir_text: str,
+        *,
+        entry_point: str = "sdf",
+        uniform_arguments: list[str] | None = None,
+        nan_expression: str = DEFAULT_NAN_LITERAL,
+    ) -> str:
         from jax._src.interpreters.mlir import make_ir_context
         from jaxlib.mlir import ir
 
@@ -545,11 +946,16 @@ class StableHLOToWGSL:
                 )
                 for func_op in funcs
             }
+            bindings = (
+                _uniform_bindings(funcs, "main", uniform_arguments, nan_expression)
+                if uniform_arguments
+                else {}
+            )
             parts: list[str] = []
-            for func_op in reversed(funcs):
+            for func_op in _callees_first(funcs):
                 original_name = func_op.name.value
                 parts.append(
-                    _WGSLFuncEmitter(symbol_names).emit(
+                    _WGSLFuncEmitter(symbol_names, bindings, nan_expression).emit(
                         func_op,
                         symbol_names[original_name],
                         point_entry=original_name == "main",

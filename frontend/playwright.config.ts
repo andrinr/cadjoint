@@ -1,6 +1,29 @@
+import { cpSync, mkdirSync, mkdtempSync, readdirSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { defineConfig } from "@playwright/test";
 
 const PORT = Number(process.env.CADJOINT_E2E_PORT ?? 8799);
+
+/**
+ * A throwaway scenes directory, seeded with copies of the shipped scenes.
+ *
+ * The server writes saved scenes to `./scenes` under its working directory,
+ * which for these tests is the repository — so a run that exercised Save As
+ * left a file in the checkout, and a run that exercised Save overwrote one.
+ * `CADJOINT_SCENES_DIR` points the server somewhere disposable instead, and
+ * the copies mean the scene browser still has three real programs to list,
+ * summarise and draw.
+ */
+function scenesWorkspace(): string {
+  const root = join(mkdtempSync(join(tmpdir(), "cadjoint-e2e-")), "scenes");
+  mkdirSync(root, { recursive: true });
+  const shipped = resolve(import.meta.dirname, "..", "scenes");
+  for (const name of readdirSync(shipped)) {
+    if (name.endsWith(".py")) cpSync(join(shipped, name), join(root, name));
+  }
+  return root;
+}
 
 /**
  * End-to-end tests run against the real playground server serving the built
@@ -24,6 +47,7 @@ export default defineConfig({
   webServer: {
     command: `uv run python -m cadjoint.viewer.playground --port ${PORT}`,
     cwd: "..",
+    env: { CADJOINT_SCENES_DIR: scenesWorkspace() },
     url: `http://127.0.0.1:${PORT}/api/session`,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

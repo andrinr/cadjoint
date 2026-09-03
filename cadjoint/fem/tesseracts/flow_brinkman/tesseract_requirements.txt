@@ -1,0 +1,12 @@
+# Python requirements for the cadjoint_flow_brinkman Tesseract.
+#
+# The relative path is the docs-supported local-dependency form: lines
+# starting with "." / "/" / "file://" are staged into the build context by
+# `tesseract build` (tesseract_core.sdk.engine.parse_requirements) and pip-
+# installed inside the image. It resolves to the cadjoint repository root.
+#
+# Nothing follows it, and that is the point: cadjoint.flow is pure JAX on a
+# fixed array, so the core install (jax, numpy) is the whole dependency
+# list. The solver packages need conda for petsc4py and gmsh; this one needs
+# nothing a wheel cannot provide, on any architecture.
+../../../..

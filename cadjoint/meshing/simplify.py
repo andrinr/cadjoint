@@ -68,10 +68,10 @@ def _edge_occurrences(
 
     Returns:
         ``(edges, counts, order, starts)``: the unique undirected edges and
-        their usage counts, plus ``order`` sorting the ``3 m`` directed
-        occurrences by edge and ``starts`` indexing each edge's first
-        occurrence in that order.  Occurrence ``j`` lives in face ``j % m``
-        opposite corner ``(j // m + 2) % 3``.
+            their usage counts, plus ``order`` sorting the ``3 m`` directed
+            occurrences by edge and ``starts`` indexing each edge's first
+            occurrence in that order.  Occurrence ``j`` lives in face ``j % m``
+            opposite corner ``(j // m + 2) % 3``.
     """
     directed = np.concatenate([faces[:, [0, 1]], faces[:, [1, 2]], faces[:, [2, 0]]])
     undirected = np.sort(directed, axis=1)
@@ -169,8 +169,8 @@ def _collapse_pass(
 
     Returns:
         ``(faces, applied)``: the rewritten triangle list and how many
-        collapses were applied.  The quadric arrays are updated in place
-        (the kept vertex absorbs the removed vertex's planes).
+            collapses were applied.  The quadric arrays are updated in place
+            (the kept vertex absorbs the removed vertex's planes).
     """
     quadratic, linear, constant, weight = quadrics
     count = vertices.shape[0]

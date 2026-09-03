@@ -96,11 +96,15 @@ are rejected alongside `study`.
 
 `metric` reduces the solved field to one number.
 
-| `metric` | Means |
-|---|---|
-| `"mean"` | The mean of the field — temperature, or displacement magnitude |
-| `"max"` | Its maximum |
-| `"compliance"` | The work of the applied loads, `f·u` (twice the strain energy) |
+| `metric` | `ObjectiveMetric` | Means |
+|---|---|---|
+| `"mean"` | `ObjectiveMetric.MEAN` | The mean of the field — temperature, or displacement magnitude |
+| `"max"` | `ObjectiveMetric.MAX` | Its maximum |
+| `"compliance"` | `ObjectiveMetric.COMPLIANCE` | The work of the applied loads, `f·u` (twice the strain energy) |
+
+Every fixed option on `Optimization` has an enum in `cadjoint.enums` —
+`ObjectiveMetric`, `GradientPath`, `OptimizerMethod` (`"adam"` / `"sgd"`) —
+and the member and the string are interchangeable everywhere.
 
 `"compliance"` requires an elastic study with at least one `Traction` boundary
 condition; without loads there is no work to compute, and the declaration is
@@ -137,22 +141,34 @@ For the same reason the *final* reported number is always evaluated on a freshly
 extracted mesh, so it does not depend on whichever topology happened to be
 frozen last.
 
+Freezing the topology also fixes every array shape in the objective, so the
+frozen objective is compiled once per topology with `jax.jit` and each step
+pays the solve rather than a re-trace of the scene — on the starter scene an
+optimizer step fell from ~11 s to 0.5–0.8 s with the objective identical to
+13 digits ([performance notes](../research/performance.md)).
+
 ## Gradient paths
 
 `gradient_path` picks how far the derivative has to travel outside JAX.
 
-| Value | Chain |
-|---|---|
-| `"direct"` (default) | Everything in-process. Node positions re-projected onto the true SDF, solved by the chosen backend. |
-| `"tesseract"` | Lattice samples → `mesher` Tesseract → solver Tesseract. Meshes the trilinear interpolant, so the gradient carries only normal boundary motion. |
-| `"tesseract-dc"` | Dual contouring stays in JAX on the true SDF; only TetGen is wrapped, by the `tetfill` Tesseract with its exact pass-through VJP. Tet meshes only. |
+| Value | `GradientPath` | Chain |
+|---|---|---|
+| `"direct"` (default) | `GradientPath.DIRECT` | Everything in-process. Node positions re-projected onto the true SDF, solved by the chosen backend. |
+| `"tesseract"` | `GradientPath.TESSERACT` | Lattice samples → `mesher` Tesseract → solver Tesseract. Meshes the trilinear interpolant, so the gradient carries only normal boundary motion. |
+| `"tesseract-dc"` | `GradientPath.TESSERACT_DC` | Dual contouring stays in JAX on the true SDF; only TetGen is wrapped, by the `tetfill` Tesseract with its exact pass-through VJP. Tet meshes only. |
+
+The aliases `"plugins"` and `"plugins-dc"` name the same two chain paths and
+resolve to the canonical member on construction.
 
 `"tesseract-dc"` is the sharp path — keeping dual contouring in JAX against the
 real field is what preserves fin creases — and it is what the starter scene
 declares. Both Tesseract paths need the `tesseract` extra. Whichever path runs
 the descent, the final result is evaluated on the direct path.
 
-See [Tesseracts](tesseracts.qmd) for what each boundary costs and why it exists.
+The stages behind both paths are [plugins](plugins.qmd) resolved by kind —
+`mesher`, `tetfill`, `thermal_solver`, `elastic_solver` — so where each one runs
+is configuration, not code. That page says what each boundary costs and why it
+exists.
 
 ## Constraints come along
 
@@ -161,7 +177,21 @@ Every update is projected back onto the constraint manifold. When
 the optimizer chains a Newton projection onto the optimizer transform:
 
 ```python
-transform = optax.chain(optax.adam(learning_rate),
+import optax
+from cadjoint import extract_parameters
+from cadjoint.constraints import DistanceConstraint
+from cadjoint.constraints.solve import make_manifold_projection
+from cadjoint.geometry.parameters import Vector
+from cadjoint.sdf.primitives import Sphere
+from cadjoint.sdf.transforms import Translate
+
+p = Vector([2.0, 0.0, 0.0], free=True, name="p")
+anchor = Vector([0.0, 0.0, 0.0], free=False, name="anchor")
+DistanceConstraint(p, anchor, 2.0)
+scene = Translate(Sphere(radius=0.5), offset=p)
+free, fixed, metadata = extract_parameters(scene)
+
+transform = optax.chain(optax.adam(0.1),
                         make_manifold_projection(metadata, steps=2))
 ```
 
@@ -186,7 +216,7 @@ it degrades to plain gradient descent and reports `"gradient-descent"`.
 Study runs execute inside an x64 scope, promote parameters to float64, and
 restore the target's original parameter values on exit — including on failure.
 
-![The finished optimization in the playground: convergence sparkline, trajectory scrubber, and each parameter's before and after value](../examples/assets/playground-optimize.png)
+![The finished optimization in the playground: convergence sparkline, trajectory scrubber, and each parameter's before and after value](assets/screens/optimize-replay.png)
 
 ## The full chain, measured
 
@@ -212,4 +242,4 @@ figure, and before/after VTK files land in `examples/output/`.
 
 - [End-to-end optimization](../research/end-to-end-optimization.md) — the measured bracket run record, box-bound rationale, and a known CalculiX deck fragility.
 - [Simulation](simulation.qmd) — declaring the study this minimizes.
-- [Tesseracts](tesseracts.qmd) — the boundaries `gradient_path` crosses.
+- [Plugins](plugins.qmd) — the boundaries `gradient_path` crosses, and where each stage runs.

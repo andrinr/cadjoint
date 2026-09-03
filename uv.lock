@@ -476,6 +476,11 @@ docs = [
     { name = "griffe" },
     { name = "quartodoc" },
 ]
+editor = [
+    { name = "jedi", version = "0.19.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "jedi", version = "0.20.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
+    { name = "ruff" },
+]
 fem = [
     { name = "fenics-basix", marker = "python_full_version >= '3.11'" },
     { name = "gmsh", marker = "python_full_version >= '3.11'" },
@@ -485,6 +490,9 @@ fem = [
     { name = "petsc4py", marker = "python_full_version >= '3.11'" },
     { name = "pyfiglet", marker = "python_full_version >= '3.11'" },
     { name = "scipy", version = "1.17.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+]
+gmsh = [
+    { name = "gmsh", marker = "python_full_version >= '3.11'" },
 ]
 stepcheck = [
     { name = "cadquery-ocp", marker = "python_full_version >= '3.10' and python_full_version < '3.15'" },
@@ -497,10 +505,13 @@ tesseract = [
 viewer = [
     { name = "anywidget", version = "0.9.21", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "anywidget", version = "0.11.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
+    { name = "psutil" },
 ]
 
 [package.dev-dependencies]
 dev = [
+    { name = "jedi", version = "0.19.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "jedi", version = "0.20.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "matplotlib", version = "3.9.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "matplotlib", version = "3.10.8", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "pre-commit", version = "4.3.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
@@ -522,11 +533,13 @@ requires-dist = [
     { name = "cadquery-ocp", marker = "python_full_version >= '3.10' and python_full_version < '3.15' and extra == 'stepcheck'" },
     { name = "fenics-basix", marker = "python_full_version >= '3.11' and extra == 'fem'" },
     { name = "gmsh", marker = "python_full_version >= '3.11' and extra == 'fem'" },
+    { name = "gmsh", marker = "python_full_version >= '3.11' and extra == 'gmsh'" },
     { name = "griffe", marker = "extra == 'docs'", specifier = "<1.0" },
     { name = "imageio", specifier = ">=2.37.2" },
     { name = "jax", specifier = ">=0.4.20" },
     { name = "jax", extras = ["cuda12"], marker = "extra == 'cuda'", specifier = ">=0.4.20" },
     { name = "jax-fem", marker = "python_full_version >= '3.11' and extra == 'fem'" },
+    { name = "jedi", marker = "extra == 'editor'", specifier = ">=0.19.0" },
     { name = "matplotlib", marker = "extra == 'dev'", specifier = ">=3.7.0" },
     { name = "meshio", marker = "python_full_version >= '3.11' and extra == 'fem'" },
     { name = "numpy", specifier = ">=1.24.0" },
@@ -534,17 +547,20 @@ requires-dist = [
     { name = "optimistix", specifier = ">=0.0.10" },
     { name = "petsc4py", marker = "python_full_version >= '3.11' and extra == 'fem'" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=3.0.0" },
+    { name = "psutil", marker = "extra == 'viewer'", specifier = ">=5.9" },
     { name = "pyfiglet", marker = "python_full_version >= '3.11' and extra == 'fem'" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0.0" },
     { name = "quartodoc", marker = "extra == 'docs'", specifier = ">=0.7" },
+    { name = "ruff", marker = "extra == 'editor'", specifier = ">=0.8.0" },
     { name = "scipy", marker = "python_full_version >= '3.11' and extra == 'fem'" },
     { name = "tesseract-core", extras = ["runtime"], marker = "python_full_version >= '3.11' and extra == 'tesseract'" },
     { name = "tesseract-jax", marker = "python_full_version >= '3.11' and extra == 'tesseract'" },
 ]
-provides-extras = ["cuda", "fem", "tesseract", "stepcheck", "viewer", "dev", "docs"]
+provides-extras = ["cuda", "fem", "tesseract", "gmsh", "stepcheck", "viewer", "editor", "dev", "docs"]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "jedi", specifier = ">=0.19.0" },
     { name = "matplotlib", specifier = ">=3.7.0" },
     { name = "pre-commit", specifier = ">=3.0.0" },
     { name = "pytest", specifier = ">=7.0.0" },

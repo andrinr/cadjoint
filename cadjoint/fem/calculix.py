@@ -31,6 +31,14 @@ variables or ``PATH``.  A conda-forge build works on macOS arm64::
 
     micromamba create -p ./ccx-env -c conda-forge calculix
 
+Heterogeneous materials: a ccx deck names materials — ``*MATERIAL`` /
+``*ELSET`` / ``*SOLID SECTION`` — and has no way to carry a per-element
+property array, so a *continuously blended* interface (what the smooth
+CSG booleans of :mod:`cadjoint.fem.properties` sample) **cannot be
+represented exactly**.  The deck writer therefore discretizes the field
+and says so; see :func:`write_elastic_deck` for the exact rule, and
+:class:`MaterialQuantization` for what a caller gets told about it.
+
 GPL note: CalculiX is GPL-2; it stays behind the subprocess boundary
 (decks in, result files out — no linking).
 """
@@ -42,6 +50,8 @@ import re
 import shutil
 import subprocess
 import tempfile
+import warnings
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -49,12 +59,18 @@ from typing import Any
 import numpy as np
 
 from cadjoint.fem.backends import _TESSERACT_EXTRA_MESSAGE, ElasticBCs, TesseractBackend, _x64_scope
-from cadjoint.fem.hexmesh import _boundary_face_rows
+from cadjoint.fem.boundary import _boundary_face_rows
+from cadjoint.fem.elements import HEX_CORNER_SIGNS
+from cadjoint.fem.properties import quantize_to_materials
 
 __all__ = [
+    "MATERIAL_GROUP_TOLERANCE",
+    "MAX_MATERIAL_GROUPS",
     "CalculixBackend",
+    "CalculixQuantizationWarning",
     "CcxElasticSolution",
     "ElasticDeck",
+    "MaterialQuantization",
     "consistent_nodal_forces",
     "elastic_ccx_solve",
     "energy_volume_gradient",
@@ -73,21 +89,6 @@ _CCX_INSTALL_MESSAGE = (
     "CalculiX binary (ccx) not found. Point the CADJOINT_CCX or CCX environment "
     "variable at a ccx executable, or put one on PATH — e.g. from conda-forge: "
     "micromamba create -p ./ccx-env -c conda-forge calculix"
-)
-
-# Trilinear HEX8 corner signs in reference coordinates [-1, 1]^3 (VTK order).
-_CORNER_SIGNS = np.array(
-    [
-        (-1, -1, -1),
-        (1, -1, -1),
-        (1, 1, -1),
-        (-1, 1, -1),
-        (-1, -1, 1),
-        (1, -1, 1),
-        (1, 1, 1),
-        (-1, 1, 1),
-    ],
-    dtype=np.float64,
 )
 
 # 2x2x2 Gauss abscissae (weights are all 1).
@@ -130,7 +131,7 @@ def _hex_gauss_gradients() -> np.ndarray:
     points = np.array(
         [(a, b, c) for a in (-g, g) for b in (-g, g) for c in (-g, g)], dtype=np.float64
     )
-    s = _CORNER_SIGNS  # (8, 3)
+    s = HEX_CORNER_SIGNS  # (8, 3)
     out = np.zeros((8, 8, 3))
     for q, xi in enumerate(points):
         out[q, :, 0] = 0.125 * s[:, 0] * (1 + s[:, 1] * xi[1]) * (1 + s[:, 2] * xi[2])
@@ -180,6 +181,312 @@ def consistent_nodal_forces(
     return forces
 
 
+#: Relative tolerance below which two elements share one ``*MATERIAL`` block.
+#: Tight on purpose: it exists to collapse the *identical* properties of a
+#: sharp region into one group, not to merge genuinely different materials.
+MATERIAL_GROUP_TOLERANCE = 1e-9
+
+#: Default cap on the number of ``*MATERIAL`` blocks a single deck may carry.
+#: A blended interface produces one group per distinct blend fraction, i.e.
+#: potentially one per element; past this many groups the field is snapped
+#: onto reference materials instead (see :func:`write_elastic_deck`).
+MAX_MATERIAL_GROUPS = 32
+
+#: The property keys a CalculiX ``*ELASTIC`` card carries, in card order.
+_ELASTIC_KEYS = ("youngs_modulus", "poisson_ratio")
+
+
+class CalculixQuantizationWarning(UserWarning):
+    """A blended material field was approximated by named ccx materials.
+
+    Raised (as a warning) by :func:`write_elastic_deck` whenever the deck it
+    produced cannot reproduce the requested per-element properties exactly.
+    Catch it with ``warnings.catch_warnings`` to turn it into an error, or
+    read the same numbers off :attr:`CcxElasticSolution.quantization`.
+    """
+
+
+@dataclass(frozen=True)
+class MaterialQuantization:
+    """What discretizing a material field onto named ccx materials cost.
+
+    A CalculiX deck can only name materials, so a per-element property field
+    becomes a finite set of ``*MATERIAL`` blocks.  This records how faithful
+    that representation is.
+
+    Attributes:
+        num_groups: Number of ``*MATERIAL`` blocks the deck carries.
+        moved: Elements whose properties the deck does *not* reproduce (their
+            relative property error exceeds the grouping tolerance).  Zero
+            for a sharp scene, however many materials it mixes.
+        max_relative_error: Largest relative property error introduced over
+            all elements (0.0 when nothing moved).
+        quantized: True when the group cap was hit and elements were snapped
+            onto reference materials; False when every group is a group the
+            field itself contains.
+        reference_names: Names of the materials the deck ended up using, in
+            deck order (``MAT0``, ``MAT1``, ... map onto these).
+    """
+
+    num_groups: int
+    moved: int
+    max_relative_error: float
+    quantized: bool
+    reference_names: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class _DeckMaterial:
+    """A reference material read off the deck itself (duck-types Material.get)."""
+
+    name: str
+    youngs: float
+    poisson: float
+
+    def get(self, key: str) -> float | None:
+        """Property lookup mirroring :meth:`cadjoint.render.material.Material.get`."""
+        return {"youngs_modulus": self.youngs, "poisson_ratio": self.poisson}.get(key)
+
+
+def _relative_bins(values: np.ndarray, tolerance: float) -> np.ndarray:
+    """Bin values onto a relative grid: equal bins means "agrees to ``tolerance``".
+
+    Log-space binning makes the tolerance relative (a modulus in Pa and the
+    same modulus in MPa group identically) and exact for equal inputs — the
+    property of the rule that matters, since sharp regions carry *bit-identical*
+    properties and must collapse to a single group.
+
+    Args:
+        values: Per-element property values, ``(C,)``.
+        tolerance: Relative grid spacing.
+
+    Returns:
+        An integer-valued ``(C, 2)`` array of (sign, log-magnitude bin).
+    """
+    values = np.asarray(values, dtype=np.float64)
+    magnitude = np.log(np.maximum(np.abs(values), 1e-300)) / np.log1p(tolerance)
+    return np.stack([np.sign(values), np.rint(magnitude)], axis=1)
+
+
+def _distinct_groups(
+    table: np.ndarray, tolerance: float
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Collapse per-element property tuples into groups, in order of appearance.
+
+    Args:
+        table: Per-element property tuples, ``(C, K)``.
+        tolerance: Relative tolerance within which two elements agree.
+
+    Returns:
+        ``(assignment, values, counts)`` — the ``(C,)`` group index of each
+            element, the ``(G, K)`` representative property tuple of each group
+            (the first member's own values, never an invented average), and the
+            ``(G,)`` element count per group.
+    """
+    keys = np.concatenate(
+        [_relative_bins(table[:, k], tolerance) for k in range(table.shape[1])], 1
+    )
+    _, first, inverse = np.unique(keys, axis=0, return_index=True, return_inverse=True)
+    inverse = np.asarray(inverse).reshape(-1)
+    order = np.argsort(first)  # groups numbered by first appearance in the mesh
+    remap = np.empty(order.shape[0], dtype=np.int64)
+    remap[order] = np.arange(order.shape[0])
+    assignment = remap[inverse]
+    counts = np.bincount(assignment, minlength=order.shape[0])
+    return assignment, table[first[order]], counts
+
+
+def _dominant_groups(values: np.ndarray, counts: np.ndarray, max_groups: int) -> np.ndarray:
+    """Choose ``max_groups`` representative groups out of too many.
+
+    Greedy weighted farthest-point selection: seed with the group holding the
+    most elements, then repeatedly take the group maximizing ``count x
+    (log-property distance to the already-chosen set)``.  The count factor
+    keeps the scene's bulk materials (a sharp region is one huge group, a
+    blend band a swarm of tiny ones); the distance factor stops the pick from
+    piling up on near-identical groups, which is what makes the worst-case
+    error small.  Ties resolve to the lowest group index, so the choice is
+    deterministic.
+
+    Args:
+        values: Per-group property tuples, ``(G, K)``.
+        counts: Elements per group, ``(G,)``.
+        max_groups: How many groups to keep.
+
+    Returns:
+        Indices of the chosen groups, ``(<= max_groups,)``.
+    """
+    log_values = np.log(np.maximum(np.abs(values), 1e-30))
+    weight = counts.astype(np.float64)
+    chosen = [int(np.argmax(weight))]
+    distance = np.linalg.norm(log_values - log_values[chosen[0]], axis=1)
+    while len(chosen) < min(max_groups, values.shape[0]):
+        pick = int(np.argmax(weight * distance))
+        if distance[pick] <= 0.0:  # every remaining group duplicates a chosen one
+            break
+        chosen.append(pick)
+        distance = np.minimum(distance, np.linalg.norm(log_values - log_values[pick], axis=1))
+    return np.array(chosen, dtype=np.int64)
+
+
+def _plan_materials(
+    cell_youngs: np.ndarray,
+    cell_poisson: np.ndarray,
+    *,
+    materials: Sequence[Any] | None,
+    max_groups: int,
+    tolerance: float,
+) -> tuple[np.ndarray, np.ndarray, MaterialQuantization]:
+    """Decide the deck's ``*MATERIAL`` blocks for a per-element property field.
+
+    See :func:`write_elastic_deck` for the rule this implements.
+
+    Args:
+        cell_youngs: Per-element Young's modulus, ``(C,)``.
+        cell_poisson: Per-element Poisson ratio, ``(C,)``.
+        materials: Reference materials to snap onto — always, when given
+            (anything with ``get("youngs_modulus")`` / ``get("poisson_ratio")``,
+            e.g. :func:`cadjoint.materials.catalogue`).  ``None`` snaps only
+            past the cap, onto the deck's own dominant groups.
+        max_groups: Cap on the number of ``*MATERIAL`` blocks.
+        tolerance: Relative grouping tolerance.
+
+    Returns:
+        ``(assignment, values, quantization)`` — the ``(C,)`` group index per
+        element, the ``(G, 2)`` ``(youngs, poisson)`` of each group, and the
+        :class:`MaterialQuantization` report.
+
+    Raises:
+        ValueError: If ``max_groups`` is below 1, or an explicit reference set
+            is larger than the cap.
+    """
+    if max_groups < 1:
+        raise ValueError(f"max_material_groups must be at least 1; got {max_groups}.")
+    if materials is not None and len(materials) > max_groups:
+        raise ValueError(
+            f"{len(materials)} reference materials exceed max_material_groups="
+            f"{max_groups}; raise the cap or pass fewer materials."
+        )
+    sampled = np.stack([cell_youngs, cell_poisson], axis=1)
+    assignment, values, counts = _distinct_groups(sampled, tolerance)
+    if materials is None and values.shape[0] <= max_groups:
+        return (
+            assignment,
+            values,
+            MaterialQuantization(
+                num_groups=int(values.shape[0]),
+                moved=0,
+                max_relative_error=0.0,
+                quantized=False,
+                reference_names=tuple(f"MAT{i}" for i in range(values.shape[0])),
+            ),
+        )
+    references: list[Any] = (
+        list(materials)
+        if materials is not None
+        else [
+            _DeckMaterial(f"MAT{rank}", float(values[group, 0]), float(values[group, 1]))
+            for rank, group in enumerate(_dominant_groups(values, counts, max_groups))
+        ]
+    )
+    snapped, error = quantize_to_materials(
+        {"youngs_modulus": cell_youngs, "poisson_ratio": cell_poisson},
+        references,
+        keys=_ELASTIC_KEYS,
+    )
+    used = np.unique(snapped)
+    compress = np.full(len(references), -1, dtype=np.int64)
+    compress[used] = np.arange(used.shape[0])
+    group_values = np.array(
+        [
+            [float(references[i].get("youngs_modulus")), float(references[i].get("poisson_ratio"))]
+            for i in used
+        ],
+        dtype=np.float64,
+    ).reshape(-1, 2)
+    names = tuple(str(getattr(references[i], "name", None) or f"MAT{i}") for i in used)
+    return (
+        compress[snapped],
+        group_values,
+        MaterialQuantization(
+            num_groups=int(used.shape[0]),
+            moved=int(np.count_nonzero(error > tolerance)),
+            max_relative_error=float(np.max(error)) if error.size else 0.0,
+            quantized=True,
+            reference_names=names,
+        ),
+    )
+
+
+def _warn_quantization(
+    quantization: MaterialQuantization | None, num_cells: int, *, stacklevel: int
+) -> None:
+    """Warn when a deck cannot reproduce the requested per-element properties.
+
+    Args:
+        quantization: The grouping report, or ``None`` (single material).
+        num_cells: Element count, for context in the message.
+        stacklevel: Passed to :func:`warnings.warn` so the message points at
+            the caller that asked for the solve.
+    """
+    if quantization is None or not quantization.moved:
+        return
+    warnings.warn(
+        f"CalculiX cannot carry a blended material field: {quantization.moved} of "
+        f"{num_cells} elements were snapped onto {quantization.num_groups} named "
+        f"materials, introducing up to {quantization.max_relative_error:.3%} relative "
+        "property error. Pass explicit reference materials (materials=...) or raise "
+        "max_material_groups, or run the jax-fem backend for an exact per-element field.",
+        CalculixQuantizationWarning,
+        stacklevel=stacklevel,
+    )
+
+
+def _plan_deck_materials(
+    youngs: Any,
+    poisson: Any,
+    *,
+    num_cells: int,
+    materials: Sequence[Any] | None,
+    max_groups: int,
+    tolerance: float,
+) -> tuple[np.ndarray | None, np.ndarray, MaterialQuantization | None]:
+    """Normalize scalar-or-array moduli into deck material groups.
+
+    Args:
+        youngs: Young's modulus — scalar or ``(C,)``.
+        poisson: Poisson ratio — scalar or ``(C,)``.
+        num_cells: Element count ``C``.
+        materials: Reference materials for quantization, or ``None``.
+        max_groups: Cap on the number of ``*MATERIAL`` blocks.
+        tolerance: Relative grouping tolerance.
+
+    Returns:
+        ``(assignment, values, quantization)``; ``assignment`` and
+        ``quantization`` are ``None`` for the scalar (single-material) path,
+        which is byte-for-byte the deck this writer has always produced.
+
+    Raises:
+        ValueError: If a per-element array is not shaped ``(C,)``.
+    """
+    arrays = [np.asarray(value, dtype=np.float64) for value in (youngs, poisson)]
+    if all(array.ndim == 0 for array in arrays):
+        return None, np.array([[float(arrays[0]), float(arrays[1])]]), None
+    for name, array in zip(("youngs", "poisson"), arrays):
+        if array.ndim > 1 or (array.ndim == 1 and array.shape[0] not in (1, num_cells)):
+            raise ValueError(
+                f"{name} must be a scalar or shaped ({num_cells},); got shape {array.shape}."
+            )
+    cell_youngs, cell_poisson = (np.broadcast_to(array, (num_cells,)) for array in arrays)
+    return _plan_materials(
+        np.ascontiguousarray(cell_youngs),
+        np.ascontiguousarray(cell_poisson),
+        materials=materials,
+        max_groups=max_groups,
+        tolerance=tolerance,
+    )
+
+
 @dataclass(frozen=True)
 class ElasticDeck:
     """A rendered ccx input deck plus the metadata needed to interpret results.
@@ -192,6 +499,13 @@ class ElasticDeck:
             variables, or ``None`` for a forward-only deck.
         num_nodes: Number of mesh vertices.
         num_cells: Number of hexahedra.
+        cell_youngs: The Young's modulus the deck actually gives each element,
+            ``(C,)`` — post-grouping, so it differs from the requested field
+            exactly where :attr:`quantization` says it does.  ``None`` for a
+            single-material deck.
+        cell_poisson: Likewise for the Poisson ratio, ``(C,)`` or ``None``.
+        quantization: How faithfully the deck represents the requested
+            per-element field, or ``None`` for a single-material deck.
     """
 
     text: str
@@ -199,6 +513,9 @@ class ElasticDeck:
     design_nodes: np.ndarray | None
     num_nodes: int
     num_cells: int
+    cell_youngs: np.ndarray | None = None
+    cell_poisson: np.ndarray | None = None
+    quantization: MaterialQuantization | None = None
 
 
 def _num(value: float) -> str:
@@ -216,12 +533,63 @@ def _num(value: float) -> str:
     return f"{value:.12g}"
 
 
-def _nset_lines(name: str, nodes: np.ndarray) -> list[str]:
-    """*NSET block with 1-based ids, 16 per line."""
-    ids = (np.asarray(nodes, dtype=np.int64).reshape(-1) + 1).tolist()
-    lines = [f"*NSET, NSET={name}"]
+def _id_lines(header: str, indices: np.ndarray) -> list[str]:
+    """A set block with 1-based ids, 16 per line (ccx's free-format limit)."""
+    ids = (np.asarray(indices, dtype=np.int64).reshape(-1) + 1).tolist()
+    lines = [header]
     for start in range(0, len(ids), 16):
         lines.append(", ".join(str(i) for i in ids[start : start + 16]))
+    return lines
+
+
+def _nset_lines(name: str, nodes: np.ndarray) -> list[str]:
+    """*NSET block with 1-based ids, 16 per line."""
+    return _id_lines(f"*NSET, NSET={name}", nodes)
+
+
+def _material_lines(
+    assignment: np.ndarray | None,
+    values: np.ndarray,
+    quantization: MaterialQuantization | None,
+) -> list[str]:
+    """The ``*MATERIAL`` / ``*SOLID SECTION`` section of a deck.
+
+    One group keeps the historical single-material form (``EALL``, no
+    ``*ELSET``); several groups emit an ``*ELSET`` + ``*MATERIAL`` +
+    ``*SOLID SECTION`` triple each, in group order.
+
+    Args:
+        assignment: Per-element group index ``(C,)``, or ``None`` for the
+            single-material deck.
+        values: Per-group ``(youngs, poisson)``, ``(G, 2)``.
+        quantization: The grouping report, used only for the ``**`` comment
+            naming each group's source material.
+
+    Returns:
+        The deck lines.
+    """
+    names = quantization.reference_names if quantization is not None else ()
+    if values.shape[0] == 1:
+        return [
+            "*MATERIAL, NAME=MAT0",
+            "*ELASTIC",
+            f"{_num(values[0, 0])}, {_num(values[0, 1])}",
+            "*SOLID SECTION, ELSET=EALL, MATERIAL=MAT0",
+        ]
+    lines: list[str] = []
+    assert assignment is not None  # several groups only arise from a per-element field
+    for group, (youngs, poisson) in enumerate(values):
+        elements = np.flatnonzero(assignment == group)
+        lines += _id_lines(f"*ELSET, ELSET=EMAT{group}", elements)
+        source = names[group] if group < len(names) else ""
+        if source and source != f"MAT{group}":
+            lines.append(f"** MAT{group}: {source}")
+        lines += [
+            f"*MATERIAL, NAME=MAT{group}",
+            "*ELASTIC",
+            f"{_num(youngs)}, {_num(poisson)}",
+            f"*SOLID SECTION, ELSET=EMAT{group}, MATERIAL=MAT{group}",
+        ]
     return lines
 
 
@@ -230,9 +598,12 @@ def write_elastic_deck(
     cells: np.ndarray,
     bcs: ElasticBCs,
     *,
-    youngs: float,
-    poisson: float,
+    youngs: float | np.ndarray,
+    poisson: float | np.ndarray,
     design_nodes: np.ndarray | None = None,
+    materials: Sequence[Any] | None = None,
+    max_material_groups: int = MAX_MATERIAL_GROUPS,
+    group_tolerance: float = MATERIAL_GROUP_TOLERANCE,
 ) -> ElasticDeck:
     """Render a linear-elastic ccx deck for a HEX8 mesh.
 
@@ -244,20 +615,81 @@ def write_elastic_deck(
     ``design_nodes`` a second ``*SENSITIVITY`` step with the STRAINENERGY
     design response is appended and ``SEN`` output is requested.
 
+    **Heterogeneous materials.**  ``youngs`` and ``poisson`` may be
+    per-element ``(C,)`` arrays (as sampled from the scene's material field
+    by :mod:`cadjoint.fem.properties`).  A ccx deck *names* materials, so it
+    cannot carry a per-element array and cannot represent a continuously
+    blended interface exactly; this is the rule that discretizes the field,
+    in three steps:
+
+    1. **Group.**  Elements whose ``(youngs, poisson)`` agree to
+       ``group_tolerance`` relative (default ``1e-9``, log-space bins) become
+       one group, which gets one ``*ELSET`` + ``*MATERIAL`` + ``*SOLID
+       SECTION`` triple.  Groups are numbered ``MAT0``, ``MAT1``, ... by
+       first appearance in the mesh, and each carries the properties of its
+       first member (never an average).  A *sharp* multi-material scene has
+       bit-identical properties per region, so it collapses to exactly one
+       group per region and the deck is **exact**.
+    2. **Cap.**  A blended interface produces a distinct blend fraction — so
+       a distinct group — per element, which would emit thousands of
+       ``*MATERIAL`` blocks.  Past ``max_material_groups`` (default 32) every
+       element is instead snapped to its nearest reference material in
+       log-property space (:func:`cadjoint.fem.properties.quantize_to_materials`;
+       ties go to the lowest reference index).  Passing ``materials``
+       explicitly (e.g. :func:`cadjoint.materials.catalogue`) always snaps
+       onto exactly those, cap or no cap — that is what asking for named
+       materials means.  With ``materials=None`` the reference set is drawn
+       from the field itself: the group holding the most elements, then
+       greedily whichever group maximizes ``elements x log-property distance
+       to the set already chosen``.  For the scene this is meant for — sharp
+       bulk regions joined by a thin blend band — that is precisely the list
+       of bulk materials, and it stays well spread when the band is not thin.
+    3. **Report.**  The deck reports what that cost:
+       :attr:`ElasticDeck.quantization` carries the number of elements moved
+       and the maximum relative property error, the same numbers reach a
+       solve's caller on :attr:`CcxElasticSolution.quantization`, and a
+       :class:`CalculixQuantizationWarning` is raised whenever any element
+       moved, so the approximation is never silent.
+
+    A single-material deck (scalar arguments, or a uniform per-element field)
+    emits exactly the historical ``EALL`` section — no ``*ELSET``.
+
     Args:
         points: Vertex positions, ``(N, 3)``.
         cells: HEX8 connectivity, ``(C, 8)`` (VTK corner order).
         bcs: Array-level boundary conditions.
-        youngs: Young's modulus.
-        poisson: Poisson ratio.
+        youngs: Young's modulus — scalar, or per-element ``(C,)``.
+        poisson: Poisson ratio — scalar, or per-element ``(C,)``.
         design_nodes: Optional 0-based node indices for coordinate design
             variables (must lie on the boundary surface).
+        materials: Optional reference materials to quantize onto (anything
+            answering ``get("youngs_modulus")`` / ``get("poisson_ratio")``,
+            such as :class:`cadjoint.render.material.Material`).
+        max_material_groups: Cap on the number of ``*MATERIAL`` blocks.
+        group_tolerance: Relative tolerance for collapsing elements into one
+            group.
 
     Returns:
         The rendered :class:`ElasticDeck`.
+
+    Raises:
+        ValueError: If a per-element property array is not shaped ``(C,)``,
+            the cap is below 1, or an explicit reference set exceeds the cap.
+
+    Warns:
+        CalculixQuantizationWarning: When the deck cannot reproduce the
+            requested per-element properties exactly.
     """
     points = np.asarray(points, dtype=np.float64)
     cells = np.asarray(cells, dtype=np.int64)
+    assignment, group_values, quantization = _plan_deck_materials(
+        youngs,
+        poisson,
+        num_cells=int(cells.shape[0]),
+        materials=materials,
+        max_groups=max_material_groups,
+        tolerance=group_tolerance,
+    )
     lines = ["*NODE, NSET=NALL"]
     for index, (x, y, z) in enumerate(points, start=1):
         lines.append(f"{index}, {_num(x)}, {_num(y)}, {_num(z)}")
@@ -274,14 +706,8 @@ def write_elastic_deck(
         lines += _nset_lines("DESIGN", design_nodes)
         lines += ["*DESIGN VARIABLES, TYPE=COORDINATE", "DESIGN"]
 
-    lines += [
-        "*MATERIAL, NAME=MAT0",
-        "*ELASTIC",
-        f"{_num(youngs)}, {_num(poisson)}",
-        "*SOLID SECTION, ELSET=EALL, MATERIAL=MAT0",
-        "*STEP",
-        "*STATIC",
-    ]
+    lines += _material_lines(assignment, group_values, quantization)
+    lines += ["*STEP", "*STATIC"]
     if bcs.fixed_nodes:
         lines += ["*BOUNDARY", "FIXED, 1, 3, 0.0"]
 
@@ -310,12 +736,17 @@ def write_elastic_deck(
             "*END STEP",
         ]
     lines.append("")
+    _warn_quantization(quantization, int(cells.shape[0]), stacklevel=3)
+    effective = None if assignment is None else group_values[assignment]
     return ElasticDeck(
         text="\n".join(lines),
         nodal_forces=forces,
         design_nodes=design_nodes,
         num_nodes=int(points.shape[0]),
         num_cells=int(cells.shape[0]),
+        cell_youngs=None if effective is None else effective[:, 0],
+        cell_poisson=None if effective is None else effective[:, 1],
+        quantization=quantization,
     )
 
 
@@ -508,12 +939,18 @@ def energy_volume_gradient(
     docstring); adding ``g[i] . n_i`` recovers the true fixed-load shape
     derivative.
 
+    Per-element moduli are supported and *required* for a multi-material
+    deck: the omitted term is ``w_e d(detJ)`` with ``w_e`` the element's own
+    strain-energy density, so each element must contribute with the material
+    ccx actually solved it with (i.e. the deck's post-grouping properties,
+    :attr:`ElasticDeck.cell_youngs`, not the raw blended field).
+
     Args:
         points: Vertex positions, ``(N, 3)``.
         cells: HEX8 connectivity, ``(C, 8)``.
         displacement: Nodal displacements from the forward solve, ``(N, 3)``.
-        youngs: Young's modulus.
-        poisson: Poisson ratio.
+        youngs: Young's modulus — scalar or per-element ``(C,)``.
+        poisson: Poisson ratio — scalar or per-element ``(C,)``.
 
     Returns:
         Per-node gradient field shaped ``(N, 3)``.
@@ -521,6 +958,12 @@ def energy_volume_gradient(
     points = np.asarray(points, dtype=np.float64)
     cells = np.asarray(cells, dtype=np.int64)
     displacement = np.asarray(displacement, dtype=np.float64)
+    # Per-element moduli get a trailing quadrature axis so (C,) broadcasts
+    # against the (C, Q) energy density below; scalars stay scalars.
+    youngs = np.asarray(youngs, dtype=np.float64)
+    poisson = np.asarray(poisson, dtype=np.float64)
+    if youngs.ndim or poisson.ndim:
+        youngs, poisson = (np.reshape(v, (-1, 1)) for v in np.broadcast_arrays(youngs, poisson))
     lame_lambda = youngs * poisson / ((1.0 + poisson) * (1.0 - 2.0 * poisson))
     lame_mu = youngs / (2.0 * (1.0 + poisson))
 
@@ -556,6 +999,10 @@ class CcxElasticSolution:
             their outward normals — or ``None`` for forward-only solves.
         normals: ccx's outward design-node normals, ``(N, 3)`` (zero at
             non-design nodes), or ``None``.
+        quantization: How faithfully the deck represented a per-element
+            material field (see :func:`write_elastic_deck`); ``None`` for a
+            scalar single-material solve, ``moved == 0`` when the field was
+            sharp and the deck exact.
     """
 
     displacement: np.ndarray
@@ -563,6 +1010,7 @@ class CcxElasticSolution:
     cell_stress: np.ndarray
     strain_energy_gradient: np.ndarray | None = None
     normals: np.ndarray | None = None
+    quantization: MaterialQuantization | None = None
 
 
 def elastic_ccx_solve(
@@ -570,21 +1018,29 @@ def elastic_ccx_solve(
     cells: np.ndarray,
     bcs: ElasticBCs,
     *,
-    youngs: float,
-    poisson: float,
+    youngs: float | np.ndarray,
+    poisson: float | np.ndarray,
     sensitivities: bool = False,
     design_nodes: np.ndarray | None = None,
     ccx: str | os.PathLike | None = None,
     workdir: str | os.PathLike | None = None,
+    materials: Sequence[Any] | None = None,
+    max_material_groups: int = MAX_MATERIAL_GROUPS,
+    group_tolerance: float = MATERIAL_GROUP_TOLERANCE,
 ) -> CcxElasticSolution:
     """Run a ccx linear-elastic solve (and optionally the adjoint).
+
+    ``youngs``/``poisson`` may be per-element ``(C,)`` arrays; the deck
+    writer discretizes them onto named ccx materials (see
+    :func:`write_elastic_deck` for the rule) and the result's
+    :attr:`~CcxElasticSolution.quantization` reports what that cost.
 
     Args:
         points: Vertex positions, ``(N, 3)``.
         cells: HEX8 connectivity, ``(C, 8)``.
         bcs: Array-level boundary conditions.
-        youngs: Young's modulus.
-        poisson: Poisson ratio.
+        youngs: Young's modulus — scalar or per-element ``(C,)``.
+        poisson: Poisson ratio — scalar or per-element ``(C,)``.
         sensitivities: Also run the ``*SENSITIVITY`` step and return the
             corrected strain-energy gradient (see module docstring).
         design_nodes: Coordinate design variables for the sensitivity
@@ -592,6 +1048,12 @@ def elastic_ccx_solve(
         ccx: Optional explicit binary path.
         workdir: Optional directory to keep the deck and result files in
             (default: a temporary directory, removed afterwards).
+        materials: Optional reference materials to quantize onto (e.g.
+            :func:`cadjoint.materials.catalogue`); ``None`` snaps only past
+            the cap, onto the field's own dominant groups.
+        max_material_groups: Cap on the number of ``*MATERIAL`` blocks.
+        group_tolerance: Relative tolerance for collapsing elements into one
+            material group.
 
     Returns:
         A :class:`CcxElasticSolution`.
@@ -606,7 +1068,14 @@ def elastic_ccx_solve(
         youngs=youngs,
         poisson=poisson,
         design_nodes=design_nodes if sensitivities else None,
+        materials=materials,
+        max_material_groups=max_material_groups,
+        group_tolerance=group_tolerance,
     )
+    # The correction below must use the properties ccx actually solved with,
+    # which are the deck's post-grouping ones, not the requested field.
+    solved_youngs = youngs if deck.cell_youngs is None else deck.cell_youngs
+    solved_poisson = poisson if deck.cell_poisson is None else deck.cell_poisson
 
     def solve(directory: str | os.PathLike) -> CcxElasticSolution:
         run_ccx(deck.text, directory, ccx=ccx)
@@ -622,7 +1091,7 @@ def elastic_ccx_solve(
             normals = fields["NORM"]
             raw = fields["SENENER"][:, 0]  # DFDN (unfiltered)
             correction = energy_volume_gradient(
-                points, cells, displacement, youngs=youngs, poisson=poisson
+                points, cells, displacement, youngs=solved_youngs, poisson=solved_poisson
             )
             along_normal = raw + np.einsum("nd,nd->n", correction, normals)
             gradient = np.zeros_like(normals)
@@ -634,6 +1103,7 @@ def elastic_ccx_solve(
             cell_stress=stress,
             strain_energy_gradient=gradient,
             normals=normals,
+            quantization=deck.quantization,
         )
 
     if workdir is not None:
@@ -660,12 +1130,15 @@ def _unpack_elastic_bcs(
 
 
 class CalculixBackend(TesseractBackend):
-    """Solver backend running CalculiX behind the packaged tesseract.
+    """Solver backend running CalculiX behind the ``elastic_calculix`` plugin.
 
-    Forward elastic solves route through
-    ``cadjoint/fem/tesseracts/elastic_calculix`` (subprocess ccx, local
-    ``Tesseract.from_tesseract_api``).  Differentiability is
-    objective-valued: the tesseract's ``strain_energy`` output carries an
+    Forward elastic solves route through the ``elastic_calculix`` plugin
+    (subprocess ccx), resolved by name from :mod:`cadjoint.plugins` rather
+    than by importing its ``tesseract_api``: pointing the same backend at a
+    containerized or cluster-hosted ccx is then a ``plugins.toml`` edit, and
+    the ``CADJOINT_CCX`` binary this constructor pins only matters for the
+    ``local`` transport that is its default.  Differentiability is
+    objective-valued: the plugin's ``strain_energy`` output carries an
     adjoint VJP w.r.t. ``points`` (ccx ``*SENSITIVITY`` + the volume-term
     correction); cotangents on the raw displacement field raise
     ``NotImplementedError`` because ccx has no general displacement
@@ -674,6 +1147,10 @@ class CalculixBackend(TesseractBackend):
 
     name = "calculix"
 
+    #: The plugin this backend calls.  A name, not a path: the registry
+    #: decides where it runs.
+    plugin_name = "elastic_calculix"
+
     def __init__(self, ccx: str | os.PathLike | None = None):
         try:
             from tesseract_core import Tesseract  # noqa: F401
@@ -681,10 +1158,10 @@ class CalculixBackend(TesseractBackend):
             raise ImportError(_TESSERACT_EXTRA_MESSAGE) from error
         require_ccx(ccx)  # fail fast with install instructions
         if ccx is not None:
-            os.environ["CADJOINT_CCX"] = str(ccx)  # the tesseract subprocess resolves via env
-        api = Path(__file__).parent / "tesseracts" / "elastic_calculix" / "tesseract_api.py"
-        self._api_paths = {"elastic": api}
-        self._tesseracts: dict[str, Any] = {}
+            os.environ["CADJOINT_CCX"] = str(ccx)  # the ccx subprocess resolves via env
+        self._selection = {"thermal": None, "elastic": self.plugin_name}
+        self._api_paths: dict[str, Path] = {}
+        self._plugins: dict[str, Any] = {}
 
     def thermal(self, points, cells, bcs, *, conductivity, source, base_points=None):
         """Unsupported: the CalculiX integration covers elastic solves only."""
@@ -693,6 +1170,49 @@ class CalculixBackend(TesseractBackend):
             "use the 'jaxfem' or 'tesseract' backend for thermal studies."
         )
 
+    def elastic(self, points, cells, bcs, *, youngs, poisson, base_points=None, body_force=None):
+        """See :meth:`cadjoint.fem.backends.SolverBackend.elastic`.
+
+        ``youngs``/``poisson`` may be per-element ``(C,)`` arrays; they cross
+        the tesseract boundary as the optional ``cell_youngs``/``cell_poisson``
+        arrays and become named ccx materials (see
+        :func:`write_elastic_deck`), with a
+        :class:`CalculixQuantizationWarning` if the deck cannot represent the
+        field exactly.
+
+        Args:
+            points: Vertex positions, ``(N, 3)`` (may be traced).
+            cells: HEX8 connectivity, ``(C, 8)``.
+            bcs: Array-level boundary conditions.
+            youngs: Young's modulus — scalar or per-element ``(C,)``.
+            poisson: Poisson ratio — scalar or per-element ``(C,)``.
+            base_points: Unused (the tesseract runtime hands its endpoints
+                concrete arrays).
+            body_force: Must be ``None``.
+
+        Returns:
+            Nodal displacements ``(N, 3)`` as a JAX array.
+
+        Raises:
+            NotImplementedError: If ``body_force`` is given — a body force
+                needs ``*DLOAD``/``GRAV`` cards this deck writer does not
+                emit, and silently dropping self-weight would be worse than
+                saying so.
+        """
+        del base_points
+
+        if body_force is not None:
+            raise NotImplementedError(
+                "The CalculiX backend does not apply body forces: self-weight would "
+                "need *DLOAD/GRAV cards the ccx deck writer does not emit. Drop "
+                "body_force, or use the 'jaxfem' backend for self-weight studies."
+            )
+        with _x64_scope():
+            outputs = self._plugin_for("elastic").as_jax()(
+                self._elastic_inputs(points, cells, bcs, youngs, poisson)
+            )
+            return outputs["displacement"]
+
     def elastic_strain_energy(self, points, cells, bcs, *, youngs, poisson, base_points=None):
         """Differentiable total strain energy of the elastic solve.
 
@@ -700,20 +1220,26 @@ class CalculixBackend(TesseractBackend):
         ccx ``*SENSITIVITY`` adjoint (normal-projected design-node
         sensitivities plus the volume-term correction).  For a linear
         problem under fixed loads, compliance is twice this value.
+        ``youngs``/``poisson`` accept per-element ``(C,)`` arrays exactly as
+        :meth:`elastic` does.
         """
         del base_points
-        from tesseract_jax import apply_tesseract
 
         with _x64_scope():
-            outputs = apply_tesseract(
-                self._tesseract_for("elastic"),
-                self._elastic_inputs(points, cells, bcs, youngs, poisson),
+            outputs = self._plugin_for("elastic").as_jax()(
+                self._elastic_inputs(points, cells, bcs, youngs, poisson)
             )
             return outputs["strain_energy"]
 
     def _elastic_inputs(self, points, cells, bcs, youngs, poisson) -> dict[str, Any]:
-        """Pack BCs into the flat tesseract schema (mirrors the base class)."""
+        """Pack BCs and materials into the plugin's flat array schema.
+
+        A scalar modulus leaves ``cell_youngs``/``cell_poisson`` empty, so the
+        wire payload of a single-material solve is exactly what it always was.
+        """
         import jax.numpy as jnp
+
+        from cadjoint.fem.backends import _as_cell_array
 
         if bcs.fixed_nodes:
             fixed = np.unique(
@@ -732,6 +1258,25 @@ class CalculixBackend(TesseractBackend):
         offsets = np.concatenate(
             [[0], np.cumsum([len(n) for n in bcs.traction_nodes], dtype=np.int64)]
         ).astype(np.int32)
+        num_cells = int(np.asarray(cells).shape[0])
+        cell_youngs = _as_cell_array(youngs, num_cells)
+        cell_poisson = _as_cell_array(poisson, num_cells)
+        if cell_youngs.size or cell_poisson.size:
+            # Warn on this side of the boundary: the tesseract runtime
+            # redirects its endpoint's stderr into a log file, so the deck
+            # writer's own warning would never reach the person solving.
+            _warn_quantization(
+                _plan_deck_materials(
+                    youngs,
+                    poisson,
+                    num_cells=num_cells,
+                    materials=None,
+                    max_groups=MAX_MATERIAL_GROUPS,
+                    tolerance=MATERIAL_GROUP_TOLERANCE,
+                )[2],
+                num_cells,
+                stacklevel=4,
+            )
         return {
             "points": jnp.asarray(points, dtype=jnp.float64),
             "cells": np.asarray(cells, dtype=np.int32),
@@ -739,9 +1284,20 @@ class CalculixBackend(TesseractBackend):
             "traction_nodes": traction_nodes,
             "traction_offsets": offsets,
             "traction_vectors": traction_vectors,
-            "youngs": np.asarray(youngs, dtype=np.float64),
-            "poisson": np.asarray(poisson, dtype=np.float64),
+            # Exact-face targeting is a tet feature; this path is HEX8-only
+            # and selects faces by node membership (empty offsets = disabled).
+            "traction_faces": np.zeros((0, 3), dtype=np.int32),
+            "traction_face_offsets": np.zeros(0, dtype=np.int32),
+            "youngs": np.asarray(0.0 if cell_youngs.size else youngs, dtype=np.float64),
+            "poisson": np.asarray(0.0 if cell_poisson.size else poisson, dtype=np.float64),
+            "cell_youngs": cell_youngs,
+            "cell_poisson": cell_poisson,
         }
+
+
+def _scalar_or_cells(value: Any) -> Any:
+    """A material property as a plain float, or passed through if per-element."""
+    return value if np.ndim(value) else float(value)
 
 
 def strain_energy_solve(
@@ -765,8 +1321,10 @@ def strain_energy_solve(
 
     Args:
         mesh: Hex mesh from :func:`cadjoint.fem.sdf_to_hex_mesh`.
-        youngs: Young's modulus.
-        poisson: Poisson ratio.
+        youngs: Young's modulus — scalar, or per-element ``(C,)`` (which the
+            deck writer discretizes onto named materials; see
+            :func:`write_elastic_deck`).
+        poisson: Poisson ratio — scalar or per-element ``(C,)``.
         dirichlet: Fully-clamped patches (selections or predicates).
         tractions: ``(patch, vector)`` traction pairs.
         points: Optional traced override of ``mesh.points``.
@@ -788,5 +1346,9 @@ def strain_energy_solve(
     if backend is None:
         backend = CalculixBackend(ccx=ccx)
     return backend.elastic_strain_energy(
-        solve_points, mesh.cells, bcs, youngs=float(youngs), poisson=float(poisson)
+        solve_points,
+        mesh.cells,
+        bcs,
+        youngs=_scalar_or_cells(youngs),
+        poisson=_scalar_or_cells(poisson),
     )

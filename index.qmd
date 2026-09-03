@@ -10,7 +10,7 @@ end to end — from the first named dimension to the last solver residual.
 The API is not stable. Expect breaking changes.
 :::
 
-[![The cadjoint playground: the scene program on the left, the parametric heat sink rendered live on the right, and the declared optimization in the side dock](examples/assets/playground-model.png)](docs/viewer.qmd)
+[![The cadjoint playground: the scene program on the left, the parametric heat sink rendered live on the right, and the declared optimization in the side dock](docs/assets/screens/model-desk.png)](docs/viewer.qmd)
 
 Everything above happens in the browser: model the part, mesh it, declare the
 physics, and descend the objective, with every edit written back into the Python

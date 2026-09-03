@@ -47,6 +47,7 @@ import {
   CylinderIcon,
   DistanceIcon,
   ExtrudeIcon,
+  FaceSketchIcon,
   HorizontalIcon,
   LoftIcon,
   MoveIcon,
@@ -65,8 +66,8 @@ import {
 } from "./icons";
 
 const SELECT_MODES: { key: SelectionMode; label: string; hint: string; icon: Component }[] = [
-  { key: "object", label: "Object", hint: "Select whole objects  (1)", icon: ObjectSelectIcon },
-  { key: "vertex", label: "Vertex", hint: "Select sketch vertices  (2)", icon: VertexSelectIcon },
+  { key: "object", label: "Object", hint: "Select whole objects  (O)", icon: ObjectSelectIcon },
+  { key: "vertex", label: "Vertex", hint: "Select sketch vertices  (V)", icon: VertexSelectIcon },
 ];
 
 interface ToolEntry {
@@ -79,6 +80,7 @@ interface ToolEntry {
 
 const CREATE: ToolEntry[] = [
   { key: "sketch", label: "Sketch", hint: "Place a new 2D sketch", icon: PolygonIcon, testid: "tool-sketch" },
+  { key: "face", label: "Sketch on face", hint: "Place a sketch on a solid's face", icon: FaceSketchIcon, testid: "tool-face" },
   { key: "polygon", label: "Point", hint: "Add a point to a sketch  (P)", icon: PointAddIcon, testid: "tool-polygon" },
   { key: "box", label: "Box", hint: "Place a box  (B)", icon: BoxIcon, testid: "tool-box" },
   { key: "sphere", label: "Sphere", hint: "Place a sphere  (S)", icon: SphereIcon, testid: "tool-sphere" },

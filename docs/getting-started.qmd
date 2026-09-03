@@ -40,8 +40,10 @@ uv sync --extra fem --extra tesseract --extra viewer
 |---|---|
 | `cuda` | GPU JAX (Linux + NVIDIA only) |
 | `fem` | the jax-fem finite-element stack (basix, meshio, petsc4py, gmsh) |
-| `tesseract` | tesseract-core + tesseract-jax, for the cross-boundary gradient paths |
-| `viewer` | the Jupyter widget (`anywidget`) |
+| `tesseract` | tesseract-core + tesseract-jax, which every [plugin](plugins.qmd) is implemented with |
+| `gmsh` | Gmsh in your own process, for the [tet10 mesher](simulation.qmd) — GPL, hence an extra of its own |
+| `viewer` | the Jupyter widget (`anywidget`) and the playground's process monitor (`psutil`) |
+| `editor` | `ruff` and `jedi`, for the playground's lint, completion and signature help |
 | `stepcheck` | OCCT kernel validation of STEP exports (dev) |
 | `docs` | the Quarto API reference (`quartodoc`) |
 
@@ -71,6 +73,38 @@ from cadjoint.sdf import Sphere, Translate
 p = Vector(jnp.array([2.0, 0.0, 0.0]), free=True, name="p")
 scene = Translate(Sphere(radius=0.3), offset=p)
 ```
+
+### Parameters as arguments
+
+`functionalize(scene)(free, fixed)` closes over the parameter values, so
+`jax.jit` of it folds every value into the program as a literal: two designs
+that differ in one slider lower to two different programs and compile twice.
+`functionalize_parametric` takes the parameter dicts as arguments instead, so
+the lowered program is byte-identical for every value and one executable serves
+them all. Pair it with the persistent compilation cache and a re-dimensioned
+design costs no compile at all, even in a fresh process.
+
+```python
+import jax
+from cadjoint import extract_parameters
+from cadjoint.cache import enable_compilation_cache
+from cadjoint.functionalize import functionalize_parametric
+
+enable_compilation_cache()      # ~/.cache/cadjoint/jax, or $CADJOINT_CACHE_DIR
+free, fixed, _ = extract_parameters(scene)
+evaluate = jax.jit(functionalize_parametric(scene))
+
+evaluate(free, fixed, jnp.zeros(3))                                 # compiles once
+evaluate({"p": jnp.array([1.0, 0.0, 0.0])}, fixed, jnp.zeros(3))    # reuses it
+```
+
+The cache is what the playground's compile worker turns on for every request;
+`CADJOINT_NO_COMPILATION_CACHE=1` opts out. The programs it stores are
+structured rather than flattened — a sketch profile is one `(N, 2)` array, a
+pattern traces its child once, a shared subtree is emitted once — which is
+what keeps them small enough to compile in under a second; see
+[program size](meshing.qmd#program-size) and the
+[performance notes](../research/performance.md).
 
 ## Constraints reduce the freedom
 
@@ -104,6 +138,112 @@ sketch stays constrained through a descent. The
 [constraints notebook](../examples/constraints.ipynb) works through a
 fully-determined system.
 
+## Faces are references, not geometry
+
+cadjoint stores no boundary representation. The surface it produces — the
+dual-contoured mesh — is a *reading* of the field at one resolution, not its
+definition, and basing a work plane on it would mean basing a design decision
+on whatever grid the extraction happened to run at.
+
+The construction tree knows better than the mesh does. `extrude` spans
+`±depth/2` around its sketch plane, so it knows exactly where its caps are and
+which plane each profile edge swept; a box knows its six faces; a revolve knows
+its axis. Those are `Face` objects, and every generated solid carries them.
+
+```python
+from cadjoint.construction import PolygonProfile, SketchPlane, Solid, extrude
+from cadjoint.geometry import Scalar
+
+depth = Scalar(0.8, free=True, name="depth")
+plate = PolygonProfile([[-1, -1], [1, -1], [1, 1], [-1, 1]], name="plate")
+body = extrude(plate, depth=depth)
+
+body.faces.keys()        # ['cap+', 'cap-', 'side0', 'side1', 'side2', 'side3']
+body.cap("+").origin     # [0, 0, 0.4]  — depth/2 along the sketch normal
+body.side(0).normal      # [0, -1, 0]   — the plane edge 0 swept
+
+Solid.box(size=[1, 1, 1], position=[0, 0, 0], name="block").face("+z")
+```
+
+A `Face` knows its plane — origin, normal, **and** the in-plane x axis, so a
+sketch's "horizontal" is a decision rather than an accident of how the normal
+happened to be decomposed — plus the polygon that bounds it and a
+`contains(point)` test that says whether a world point lands on it.
+
+### The plane is an expression, not a snapshot
+
+`depth` above is a free `Scalar`, so `body.cap("+")` is not a stored plane at
+z = 0.4. It is the expression `origin + (depth/2)·normal`. Sketch on it and the
+sketch follows:
+
+```python
+boss = PolygonProfile(
+    [[-0.4, -0.4], [0.4, -0.4], [0.4, 0.4], [-0.4, 0.4]],
+    plane=SketchPlane.on(body.cap("+")),
+    name="boss",
+)
+```
+
+Because it is an expression, the whole chain is differentiable:
+
+```python
+import jax
+import jax.numpy as jnp
+
+def stack(depth):
+    body = extrude(PolygonProfile([[-1, -1], [1, -1], [1, 1], [-1, 1]], name="p"), depth=depth)
+    top = PolygonProfile([[-0.4, -0.4], [0.4, -0.4], [0.4, 0.4], [-0.4, 0.4]],
+                         plane=SketchPlane.on(body.cap("+")), name="b")
+    return extrude(top, depth=0.5)
+
+probe = jnp.array([0.0, 0.0, 1.0])
+jax.grad(lambda d: stack(d)(probe))(1.0)   # -0.5, exactly
+```
+
+`-0.5` is exact rather than estimated: the cap rides at half the depth, so the
+boss standing on it does too, and a probe above the boss closes in at that rate.
+
+**This is the thing a traditional CAD kernel cannot do.** There a face is stored
+geometry that a rebuild replaces, and a downstream sketch is re-attached to it by
+a topological-naming heuristic — which is why renaming or reordering a feature
+can detach the sketch entirely. Here the face is a function of the parent's
+parameters. The reference cannot go stale, and it carries a derivative, so an
+optimizer moving `depth` moves everything referenced off it in the same step.
+
+### Curved surfaces: the field is the reference
+
+Blends, fillets and revolved walls have no analytic face to name. The field
+still knows the answer — project the point onto the zero set, and the gradient
+there *is* the surface normal:
+
+```python
+from cadjoint.sdf import Sphere
+
+dome = Sphere(radius=1.0)
+pad = SketchPlane.tangent(dome, near=[0.0, 0.0, 0.9])   # plane at the north pole
+```
+
+The projection is a Newton iteration in JAX
+(`cadjoint.fem.motion.project_points`), so a tangent plane is differentiable
+with respect to the scene's parameters just like an analytic one. Grow the
+sphere and the pad rides out with it.
+
+### The constructors
+
+| Constructor | The plane it gives you |
+|---|---|
+| `SketchPlane(origin, normal, x_axis=None)` | Stated in world coordinates. `x_axis` pins the sketch's horizontal; omit it for the derivation from the normal alone. |
+| `SketchPlane.on(face, x_axis=None, flip=False)` | The face's own plane, inheriting the face's x axis — the profile's `u` for a cap, the swept edge direction for a side wall. |
+| `SketchPlane.offset(face_or_plane, distance)` | Pushed along the normal. `distance` may be a `Scalar`, so the clearance is a design variable. |
+| `SketchPlane.tangent(solid, near, x_axis=None)` | Tangent to the field at the surface point nearest `near`. Horizontal defaults to the world axis most nearly in-plane. |
+| `SketchPlane.midplane(face_a, face_b)` | Halfway between two faces. |
+
+Orientation is captured when a solid is generated, exactly as it always was;
+`origin` is the differentiable half. A drafted or twisted extrusion declares no
+analytic faces at all — draft tapers the walls off their swept planes and twist
+curves them — so those are `tangent` territory, and the API says so by offering
+nothing else.
+
 ## Meshing
 
 `cadjoint.meshing` dual-contours the field into a surface. It is written
@@ -119,8 +259,42 @@ mesh = extract_mesh(lambda q: jnp.sqrt(jnp.sum(q * q)) - 1.0, grid)
 save_stl(mesh, "sphere.stl")
 ```
 
-Full detail, including the exports and the Rust-accelerated kernels, in
-[differentiable meshing](meshing.qmd).
+Full detail, including the exports, in
+[differentiable meshing](meshing.qmd). What comes out is a **faceted** solid,
+in every format: one triangle per cell crossing, coplanar ones merged, a 28-gon
+standing in for a bore.
+
+### Kinds that can be filled {#pluggable-kinds}
+
+Everything on this page runs with nothing else installed: the language, dual
+contouring, the lattice feature classifier, faceted STEP/OBJ/STL, TetGen and
+Gmsh tet meshes, every solver, the optimizer and the playground.
+
+Five [plugin kinds](plugins.qmd#the-five-in-process-kinds) — `node_map`,
+`feature_edges`, `brep`, `step_export`, `drag` — are declared here and filled
+by nothing in this repository. They are the extension points for a component
+that re-solves a surface against the scene's patch fields *with a derivative*,
+which is what a STEP whose bore is one cylinder, an edge curve traced rather
+than sampled, or a Gmsh mesh whose nodes follow the design would need. Such a
+component ships separately and is not part of this project; the slots are
+ordinary `cadjoint.plugins` entry points, so anything registering them fills
+them.
+
+Unfilled is the ordinary case and nothing breaks. Feature edges come from the
+lattice classifier, STEP export is faceted, and exactly one thing is refused: a
+Gmsh-meshed study cannot be optimized — its mesh is *frozen geometry*, and
+`Optimization` says so at declaration rather than handing back a gradient that
+is quietly wrong. `mesher="tetgen"`, the default, is differentiable either way.
+
+```python
+from cadjoint import tier
+
+tier.status().flags()    # {'node_map': False, 'feature_edges': False, ...}
+tier.report()            # versions and status, for a bug report
+```
+
+See [plugins](plugins.qmd#one-contract-two-transports) for the contracts and
+[meshing](meshing.qmd#the-gmsh-route) for what a frozen mesh can still do.
 
 ## Simulation
 
@@ -167,8 +341,9 @@ with the gradient running back through the solve, the mesh, and the SDF to the
 `size` parameter.
 
 Constraint projection is automatic, topology stays frozen between re-meshes, and
-`gradient_path` chooses how much of the chain crosses a Tesseract boundary. See
-[optimization](optimization.qmd) and [tesseracts](tesseracts.qmd).
+`gradient_path` chooses which stages of the chain run as [plugins](plugins.qmd)
+— a mesher, a tet filler or a solver behind a Tesseract, in this process or on a
+cluster. See [optimization](optimization.qmd).
 
 ## Rendering
 
@@ -195,3 +370,6 @@ Rendered pixels are deliberately not an inverse-rendering API. See the
 - [Sketch construction](../examples/sketch_construction.ipynb) — profiles, extrude, revolve
 - [Constraints](../examples/constraints.ipynb) — solving fully-determined systems
 - [Constrained optimization](../examples/constrained_optimization.ipynb) — the full workflow with trajectory visualization
+- [Plugins](plugins.qmd) — the registry, the two transports, and the kinds a
+  component can fill
+- [The playground](viewer.qmd) — all of it in one browser window

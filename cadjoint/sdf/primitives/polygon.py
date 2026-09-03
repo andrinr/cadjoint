@@ -12,20 +12,24 @@ query point and the vertices.
 
 from __future__ import annotations
 
+import jax
 import jax.numpy as jnp
 from jax import Array
 
 from cadjoint.geometry.parameters import Scalar, Vector2
+from cadjoint.sdf._lowering import is_scalar_lowering
 from cadjoint.sdf.primitives.base import Primitive
 
 
-def _polygon_distance(p: Array, vertices: list[Array]) -> Array:
-    """Polygon distance over a Python list of ``(2,)`` vertices.
+def _polygon_distance_scalar(p: Array, vertices: list[Array]) -> Array:
+    """Polygon distance over a Python list of ``(2,)`` vertices, unrolled.
 
     Keeping the vertices in a list rather than one ``(N, 2)`` array matters for
     shader compilation: every traced value stays a 2-vector, so the StableHLO →
     WGSL backend only ever sees ``vec2`` math instead of multi-dimensional
-    slices it cannot lower.
+    slices it cannot lower.  The cost is that the emitted program grows with
+    the vertex count — see :func:`_polygon_distance_stacked` for the form XLA
+    is given instead.
     """
     num = len(vertices)
     d = jnp.sum((p - vertices[0]) ** 2, axis=-1)
@@ -55,6 +59,75 @@ def _polygon_distance(p: Array, vertices: list[Array]) -> Array:
     return s * jnp.where(positive, jnp.sqrt(safe), 0.0)
 
 
+def _polygon_distance_stacked(p: Array, stacked: Array) -> Array:
+    """Polygon distance over one ``(N, ..., 2)`` vertex array.
+
+    Same arithmetic as :func:`_polygon_distance_scalar`, with the per-edge loop
+    replaced by reductions over the leading vertex axis: the nearest-point
+    search becomes one ``min``, and the even-odd crossing test becomes a parity
+    count.  Both reductions are exact, so the two forms agree bit for bit while
+    this one emits a fixed number of operations for any vertex count.
+
+    Args:
+        p: Query point(s) in profile coordinates, shape ``(..., 2)``.
+        stacked: Ordered vertices, shape ``(N, 2)`` — or ``(N, ..., 2)`` when
+            the loop itself varies with the query, as it does in a loft.
+
+    Returns:
+        Signed distance, shape ``(...)``. Negative inside.
+    """
+    # Give the vertex loop as many singleton axes as the query has batch axes,
+    # so a (N, 2) loop broadcasts against a (..., 2) query the way the unrolled
+    # form's individual (2,) vertices did.
+    extra = p.ndim - (stacked.ndim - 1)
+    if extra > 0:
+        stacked = stacked.reshape(stacked.shape[:1] + (1,) * extra + stacked.shape[1:])
+
+    previous = jnp.roll(stacked, 1, axis=0)
+    e = previous - stacked
+    w = p - stacked
+    t = jnp.clip(jnp.sum(w * e, axis=-1) / jnp.sum(e * e, axis=-1), 0.0, 1.0)
+    b = w - e * t[..., None]
+    # ``d`` starts at the distance to vertex 0 in the unrolled form; that value
+    # is attained by edge 0 at t = 0, so the reduction alone already covers it.
+    d = jnp.min(jnp.sum(b * b, axis=-1), axis=0)
+
+    c1 = p[..., 1] >= stacked[..., 1]
+    c2 = p[..., 1] < previous[..., 1]
+    c3 = e[..., 0] * w[..., 1] > e[..., 1] * w[..., 0]
+    flips = (c1 == c2) & (c2 == c3)
+    # An odd number of flips is an odd number of boundary crossings: inside.
+    inside = jnp.sum(flips.astype(jnp.int32), axis=0) % 2 == 1
+    s = jnp.where(inside, -1.0, 1.0)
+
+    positive = d > 1e-18
+    safe = jnp.where(positive, d, 1.0)
+    return s * jnp.where(positive, jnp.sqrt(safe), 0.0)
+
+
+def _polygon_distance(p: Array, vertices: list[Array]) -> Array:
+    """Signed distance to a closed profile, in whichever form the consumer needs.
+
+    Under :func:`~cadjoint.sdf._lowering.scalar_lowering` — which the WGSL
+    backend holds for the whole of its trace — the vertices stay individual
+    2-vectors and the edge loop is unrolled.  Everywhere else they are stacked
+    into one array and the loop becomes two reductions, which is what keeps a
+    profile's contribution to the compiled program constant in its vertex
+    count.
+
+    Args:
+        p: Query point(s) in profile coordinates, shape ``(..., 2)``.
+        vertices: Ordered vertices, each ``(2,)`` (or broadcastable against
+            ``p``'s batch shape, as in a loft).
+
+    Returns:
+        Signed distance, shape ``(...)``. Negative inside.
+    """
+    if is_scalar_lowering():
+        return _polygon_distance_scalar(p, vertices)
+    return _polygon_distance_stacked(p, jnp.stack(jnp.broadcast_arrays(*vertices)))
+
+
 def polygon_sdf_2d(p: Array, vertices: Array) -> Array:
     """Exact signed distance from 2D point(s) to a simple polygon.
 
@@ -82,7 +155,25 @@ def _profile_vertex_values(params: dict) -> list[Array]:
     return [params[name].value for name in names]
 
 
-def _edge_half_plane_fields(verts: list[Array]):
+def _profile_orientation(verts) -> float | Array:
+    """Winding of a closed profile: ``+1.0`` counter-clockwise, ``-1.0`` clockwise.
+
+    Read concretely when the vertices are plain numbers, so the sign is a
+    Python float fixed at construction. Under a tracer — a profile built
+    inside a jitted derived plane — the sign is a traced ``where`` instead:
+    piecewise constant, so it contributes no gradient, but it lets the
+    construction trace rather than fail on a ``float()`` of a tracer.
+    """
+    points = jnp.stack([jnp.asarray(v, dtype=jnp.float32).reshape(2) for v in verts])
+    rolled = jnp.roll(points, -1, axis=0)
+    twice_area = jnp.sum(points[:, 0] * rolled[:, 1] - rolled[:, 0] * points[:, 1])
+    try:
+        return 1.0 if float(twice_area) >= 0.0 else -1.0
+    except jax.errors.ConcretizationTypeError:
+        return jnp.where(twice_area >= 0.0, 1.0, -1.0)
+
+
+def _edge_half_plane_fields(verts: list[Array], orientation: float | None = None):
     """Outward half-plane distance fields, one per profile edge.
 
     Edge ``k`` runs from vertex ``k`` to vertex ``(k+1) % N``; its field is
@@ -92,18 +183,25 @@ def _edge_half_plane_fields(verts: list[Array]):
     field still agrees with the exact distance on its own edge's patch, so
     ``argmin |f_k|`` identifies the owning edge there.
 
+    Every step here is a JAX expression of ``verts``, so the returned fields
+    stay differentiable in the profile vertices — provided ``orientation`` is
+    supplied, since reading the winding off traced vertices would need a
+    concrete value.
+
+    Args:
+        verts: Ordered ``(2,)`` profile vertices; may be tracers.
+        orientation: The profile's winding sign from
+            :func:`_profile_orientation`.  ``None`` reads it from ``verts``,
+            which requires them to be concrete.
+
     Returns:
         List of callables mapping profile points shaped ``(..., 2)`` to
         signed distances shaped ``(...)``.
     """
     num = len(verts)
-    # Shoelace winding: positive area means counterclockwise vertices, whose
-    # outward edge normal is the edge direction rotated by -90 degrees.
-    area = 0.0
-    for i in range(num):
-        a, b = verts[i], verts[(i + 1) % num]
-        area += float(a[0] * b[1] - b[0] * a[1])
-    orient = 1.0 if area >= 0.0 else -1.0
+    # Positive area means counterclockwise vertices, whose outward edge
+    # normal is the edge direction rotated by -90 degrees.
+    orient = _profile_orientation(verts) if orientation is None else orientation
 
     fields = []
     for i in range(num):
@@ -181,6 +279,11 @@ class ExtrudedPolygon(Primitive):
         self.num_vertices = len(vertices)
         self.params = {f"v{i}": v for i, v in enumerate(vertices)}
         self.params["depth"] = depth
+        # Read the winding once, here, from the nominal vertices: patch_fields
+        # may be rebuilt with the vertices traced, and the shoelace sign is a
+        # discrete reading no tracer can give.  ``params`` are still raw at
+        # this point (the base class wraps them after __init__ returns).
+        self._orientation = _profile_orientation([getattr(v, "value", v) for v in vertices])
         if isinstance(draft, Parameter) or not _statically_zero(draft):
             self.params["draft"] = draft
             # Drafted distances have gradient norm up to sec(draft) > 1.
@@ -255,7 +358,9 @@ class ExtrudedPolygon(Primitive):
         if "draft" in self.params or "twist" in self.params:
             return None
         depth = self.params["depth"].value
-        edge_fields = _edge_half_plane_fields(_profile_vertex_values(self.params))
+        edge_fields = _edge_half_plane_fields(
+            _profile_vertex_values(self.params), self._orientation
+        )
         walls = [(lambda p, f=field: f(p[..., :2])) for field in edge_fields]
         caps = [
             lambda p: -p[..., 2] - depth / 2.0,
@@ -288,6 +393,9 @@ class RevolvedPolygon(Primitive):
         self.num_vertices = len(vertices)
         self.params = {f"v{i}": v for i, v in enumerate(vertices)}
         self.params["offset"] = offset
+        # The winding, read once from the nominal vertices (see
+        # ExtrudedPolygon.__init__).
+        self._orientation = _profile_orientation([getattr(v, "value", v) for v in vertices])
 
     def material_at(self, _p):
         return self.material.as_dict()
@@ -326,7 +434,9 @@ class RevolvedPolygon(Primitive):
         are no separate cap fields.
         """
         offset = self.params["offset"].value
-        edge_fields = _edge_half_plane_fields(_profile_vertex_values(self.params))
+        edge_fields = _edge_half_plane_fields(
+            _profile_vertex_values(self.params), self._orientation
+        )
 
         def revolved(p: Array) -> Array:
             radial = jnp.sqrt(p[..., 0] ** 2 + p[..., 2] ** 2 + 1e-20) - offset

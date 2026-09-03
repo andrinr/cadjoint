@@ -3,7 +3,8 @@
  *
  * Menus follow the native pattern — click (or ArrowDown) opens, arrows move,
  * Escape or a click elsewhere closes. Everything acts on the shared state
- * signals; file operations go through the server's `scenes` workspace.
+ * signals; file operations go through the server's `scenes` workspace, and
+ * Export… through `/api/export`.
  */
 
 import { For, Show, createSignal, onCleanup } from "solid-js";
@@ -23,6 +24,9 @@ import {
   type PanelVisibility,
 } from "../state";
 import { EDITING_MODES } from "../editingMode";
+import { windowManager } from "../windows/manager";
+import type { WindowId } from "../windows/panels";
+import { ExportDialog } from "./ExportDialog";
 
 export interface MenuBarProps {
   canUndo: boolean;
@@ -36,7 +40,7 @@ export interface MenuBarProps {
 }
 
 type MenuId = "file" | "edit" | "window" | "help";
-type DialogId = "open" | "saveAs" | "help";
+type DialogId = "saveAs" | "export" | "help";
 
 const PANEL_ITEMS: { key: keyof PanelVisibility; label: string }[] = [
   { key: "editor", label: "Editor" },
@@ -45,13 +49,30 @@ const PANEL_ITEMS: { key: keyof PanelVisibility; label: string }[] = [
   { key: "sketch", label: "Sketch panel" },
 ];
 
+/**
+ * The windows the coarse `panels()` record does not cover.
+ *
+ * `PANEL_ITEMS` above is the older, four-key vocabulary the shell still
+ * mirrors; everything else is addressed by window id straight through the
+ * dock's manager. That is the whole list of what the Window menu can open:
+ * the four simulation windows (which used to be tabs inside one panel and so
+ * had no way in at all), the scene browser and the process monitor — the two
+ * that are parked in every desk rather than docked in any.
+ */
+const WINDOW_ITEMS: { id: WindowId; label: string }[] = [
+  { id: "meshes", label: "Meshes" },
+  { id: "studies", label: "Studies" },
+  { id: "optimize", label: "Optimize" },
+  { id: "results", label: "Results" },
+  { id: "scenes", label: "Scenes" },
+  { id: "processes", label: "Processes" },
+];
+
 const REPO_README_URL = "https://github.com/andrinr/cadjoint#readme";
 
 export function MenuBar(props: MenuBarProps) {
   const [openMenu, setOpenMenu] = createSignal<MenuId | null>(null);
   const [dialog, setDialog] = createSignal<DialogId | null>(null);
-  /** null while the listing request is in flight. */
-  const [sceneFiles, setSceneFiles] = createSignal<string[] | null>(null);
   const [saveAsName, setSaveAsName] = createSignal("");
   const [saveAsError, setSaveAsError] = createSignal("");
 
@@ -85,39 +106,19 @@ export function MenuBar(props: MenuBarProps) {
     if (openMenu() !== null && openMenu() !== id) setOpenMenu(id);
   };
 
-  const confirmDiscard = () =>
-    !dirty() ||
-    window.confirm("Discard unsaved changes to the current scene?");
-
-  const showOpenDialog = () => {
+  /**
+   * Open… is the scene browser now, not a list of file names.
+   *
+   * A modal list of names could only answer "which file", and the question a
+   * user actually has in front of a directory of parts is "which *part*".
+   * The Scenes window answers that — a picture, the docstring, what each file
+   * declares — so Open… raises it rather than opening a smaller, worse
+   * version of it in a dialog. It is parked in every desk, so this is
+   * usually one click and no layout change.
+   */
+  const showScenes = () => {
     setOpenMenu(null);
-    setDialog("open");
-    setSceneFiles(null);
-    void api
-      .listScenes()
-      .then((result) => setSceneFiles(result.files ?? []))
-      .catch(() => {
-        setSceneFiles([]);
-        setStatus({ kind: "error", text: "Could not list saved scenes." });
-      });
-  };
-
-  const openScene = async (name: string) => {
-    if (!confirmDiscard()) return;
-    try {
-      const result = await api.loadScene(name);
-      if (!result.ok || typeof result.source !== "string") {
-        setStatus({ kind: "error", text: result.error ?? `Could not open ${name}.` });
-        return;
-      }
-      setDialog(null);
-      props.onAdoptScene(name, result.source);
-    } catch (error) {
-      setStatus({
-        kind: "error",
-        text: error instanceof Error ? error.message : String(error),
-      });
-    }
+    windowManager()?.open("scenes");
   };
 
   const saveAs = async (rawName: string): Promise<void> => {
@@ -159,6 +160,17 @@ export function MenuBar(props: MenuBarProps) {
     setSaveAsName(sceneName() ?? "scene.py");
     setSaveAsError("");
     setDialog("saveAs");
+  };
+
+  /**
+   * Export… is a dialog, not a window: it asks four things and produces one
+   * file, and a form that is answered and dismissed has no business in the
+   * dock. The work it starts is a job, so it is watched — and cancelled —
+   * from the chip and the Processes window like a solve.
+   */
+  const showExportDialog = () => {
+    setOpenMenu(null);
+    setDialog("export");
   };
 
   const download = () => {
@@ -259,11 +271,12 @@ export function MenuBar(props: MenuBarProps) {
               {item("New", () => (setOpenMenu(null), props.onNew()), {
                 testid: "menu-file-new",
               })}
-              {item("Open…", showOpenDialog, { testid: "menu-file-open" })}
+              {item("Open…", showScenes, { testid: "menu-file-open" })}
               <hr />
               {item("Save", save, { testid: "menu-file-save" })}
               {item("Save As…", showSaveAsDialog, { testid: "menu-file-save-as" })}
               <hr />
+              {item("Export…", showExportDialog, { testid: "menu-file-export" })}
               {item("Download scene.py", download, { testid: "menu-file-download" })}
             </div>
           </Show>
@@ -330,6 +343,74 @@ export function MenuBar(props: MenuBarProps) {
                   </button>
                 )}
               </For>
+              {/* The simulation windows, the scene browser and the process
+                  monitor. The last two are parked in every desk rather than
+                  docked, so this is where they are opened from — and where a
+                  user who has never seen the tray finds out they exist. */}
+              <Show when={windowManager()}>
+                {(manager) => (
+                  <For each={WINDOW_ITEMS}>
+                    {(entry) => (
+                      <button
+                        type="button"
+                        role="menuitemcheckbox"
+                        aria-checked={manager().status(entry.id) === "open"}
+                        onClick={() => manager().toggle(entry.id)}
+                        onKeyDown={onMenuKeyDown}
+                        data-testid={`menu-window-${entry.id}`}
+                      >
+                        <i class="menu-check">
+                          {manager().status(entry.id) === "open" ? "✓" : ""}
+                        </i>
+                        <span>{entry.label}</span>
+                      </button>
+                    )}
+                  </For>
+                )}
+              </Show>
+              {/* Float and dock, and the way back from both. The dock owns
+                  the arrangement and publishes this manager on mount, so the
+                  section simply is not there before it exists — which is also
+                  the case in a unit test, where no dock is ever built. */}
+              <Show when={windowManager()}>
+                {(manager) => (
+                  <>
+                    <hr />
+                    <For each={manager().windows}>
+                      {(window) => (
+                        <button
+                          type="button"
+                          role="menuitemcheckbox"
+                          aria-checked={manager().isFloating(window.id)}
+                          disabled={manager().status(window.id) === "closed"}
+                          onClick={() => {
+                            // Unlike the visibility checks above, this one
+                            // closes the menu: the window it moves lands over
+                            // the dropdown, and a menu underneath a floating
+                            // panel is a menu you cannot click.
+                            setOpenMenu(null);
+                            if (manager().isFloating(window.id)) manager().dock(window.id);
+                            else manager().float(window.id);
+                          }}
+                          onKeyDown={onMenuKeyDown}
+                          data-testid={`menu-window-float-${window.id}`}
+                        >
+                          <i class="menu-check">
+                            {manager().isFloating(window.id) ? "✓" : ""}
+                          </i>
+                          <span>Float {window.title}</span>
+                        </button>
+                      )}
+                    </For>
+                    <hr />
+                    {item(
+                      "Reset layout",
+                      () => (setOpenMenu(null), manager().resetLayout()),
+                      { testid: "menu-window-reset" },
+                    )}
+                  </>
+                )}
+              </Show>
             </div>
           </Show>
         </div>
@@ -363,56 +444,6 @@ export function MenuBar(props: MenuBarProps) {
           {dirty() ? " •" : ""}
         </span>
       </nav>
-
-      <Show when={dialog() === "open"}>
-        <div class="dialog-backdrop" onClick={() => setDialog(null)}>
-          <div
-            class="dialog dialog-compact"
-            role="dialog"
-            aria-label="Open a saved scene"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <header>
-              <span>Open a saved scene</span>
-              <button type="button" onClick={() => setDialog(null)}>
-                Close
-              </button>
-            </header>
-            <div class="dialog-body" data-testid="open-scene-list">
-              <Show
-                when={sceneFiles() !== null}
-                fallback={<p class="dialog-note">Listing scenes…</p>}
-              >
-                <Show
-                  when={sceneFiles()!.length > 0}
-                  fallback={
-                    <p class="dialog-note">
-                      No saved scenes yet. Use File → Save As… to create
-                      <code> scenes/*.py</code> next to the server.
-                    </p>
-                  }
-                >
-                  <ul class="scene-list">
-                    <For each={sceneFiles()!}>
-                      {(name) => (
-                        <li>
-                          <button
-                            type="button"
-                            onClick={() => void openScene(name)}
-                            data-testid={`open-scene-${name}`}
-                          >
-                            {name}
-                          </button>
-                        </li>
-                      )}
-                    </For>
-                  </ul>
-                </Show>
-              </Show>
-            </div>
-          </div>
-        </div>
-      </Show>
 
       <Show when={dialog() === "saveAs"}>
         <div class="dialog-backdrop" onClick={() => setDialog(null)}>
@@ -462,6 +493,10 @@ export function MenuBar(props: MenuBarProps) {
             </form>
           </div>
         </div>
+      </Show>
+
+      <Show when={dialog() === "export"}>
+        <ExportDialog onClose={() => setDialog(null)} />
       </Show>
 
       <Show when={dialog() === "help"}>

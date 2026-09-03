@@ -33,6 +33,7 @@ from typing import Any, Callable
 
 import numpy as np
 
+from cadjoint.enums import Side, SideLike, parse, values
 from cadjoint.fem.hexmesh import HexMesh
 
 __all__ = [
@@ -42,7 +43,9 @@ __all__ = [
     "selection_from_description",
 ]
 
-_SIDES = ("+x", "-x", "+y", "-y", "+z", "-z")
+#: The accepted side spellings, in declaration order.  The option set
+#: itself is :class:`cadjoint.enums.Side`.
+_SIDES = values(Side)
 
 
 def _triplet(value: Any, label: str) -> tuple[float, float, float]:
@@ -121,7 +124,7 @@ def _expect_selection(value: Any) -> NodeSelection:
     if not isinstance(value, NodeSelection):
         raise TypeError(
             f"Expected a NodeSelection to combine with, got {type(value).__name__}. "
-            "Build one via Nodes.box/sphere/halfspace/side/predicate."
+            "Build one via Nodes.box/sphere/halfspace/cylinder/side/predicate."
         )
     return value
 
@@ -170,8 +173,37 @@ class _Halfspace(NodeSelection):
 
 
 @dataclass(frozen=True)
+class _Cylinder(NodeSelection):
+    center: tuple[float, float, float]
+    axis: tuple[float, float, float]
+    radius: float
+    inner: float
+    half_length: float | None
+
+    def _geometric(self, points: np.ndarray, _mesh: HexMesh) -> np.ndarray:
+        direction = np.asarray(self.axis) / np.linalg.norm(self.axis)
+        offsets = points - np.asarray(self.center)
+        axial = offsets @ direction
+        radial_sq = np.einsum("nd,nd->n", offsets, offsets) - axial**2
+        inside = (radial_sq <= self.radius**2) & (radial_sq >= self.inner**2)
+        if self.half_length is not None:
+            inside &= np.abs(axial) <= self.half_length
+        return inside
+
+    def describe(self) -> dict[str, Any]:
+        return {
+            "kind": "cylinder",
+            "center": list(self.center),
+            "axis": list(self.axis),
+            "radius": self.radius,
+            "inner": self.inner,
+            "half_length": self.half_length,
+        }
+
+
+@dataclass(frozen=True)
 class _Side(NodeSelection):
-    side: str
+    side: Side
     tol: float | None = None
 
     def _geometric(self, points: np.ndarray, mesh: HexMesh) -> np.ndarray:
@@ -184,7 +216,7 @@ class _Side(NodeSelection):
         return coords >= extreme - tol if positive else coords <= extreme + tol
 
     def describe(self) -> dict[str, Any]:
-        return {"kind": "side", "side": self.side, "tol": self.tol}
+        return {"kind": "side", "side": str(self.side), "tol": self.tol}
 
 
 def _default_side_tol(mesh: HexMesh) -> float:
@@ -300,7 +332,44 @@ class Nodes:
         return _Halfspace(_triplet(point, "point"), direction)
 
     @staticmethod
-    def side(side: str, tol: float | None = None) -> NodeSelection:
+    def cylinder(
+        center: Any, axis: Any, radius: Any, *, inner: Any = 0.0, half_length: Any = None
+    ) -> NodeSelection:
+        """Nodes inside a (possibly hollow, possibly finite) cylinder about a line.
+
+        The natural selector for anything on a part's own axis of revolution
+        — a bearing seat wall, a bore, a cooling jacket — where a box picks
+        up the corners and a sphere the wrong height.
+
+        Args:
+            center: A point on the axis, three finite numbers.
+            axis: Axis direction (need not be unit length, must be nonzero).
+            radius: Positive finite outer radius.
+            inner: Inner radius of an annulus, ``0`` (the default) for a full
+                cylinder; must be finite, non-negative and below ``radius``.
+            half_length: Half the axial extent about ``center``, or ``None``
+                (the default) for an infinite cylinder.
+        """
+        direction = _triplet(axis, "axis")
+        if not any(component != 0.0 for component in direction):
+            raise ValueError("axis must be nonzero.")
+        outer = float(radius)
+        if not np.isfinite(outer) or outer <= 0.0:
+            raise ValueError(f"radius must be positive and finite, got {radius!r}.")
+        hollow = float(inner)
+        if not np.isfinite(hollow) or hollow < 0.0 or hollow >= outer:
+            raise ValueError(
+                f"inner must be finite, non-negative and below radius {outer}, got {inner!r}."
+            )
+        extent = None
+        if half_length is not None:
+            extent = float(half_length)
+            if not np.isfinite(extent) or extent <= 0.0:
+                raise ValueError(f"half_length must be positive and finite, got {half_length!r}.")
+        return _Cylinder(_triplet(center, "center"), direction, outer, hollow, extent)
+
+    @staticmethod
+    def side(side: SideLike, tol: float | None = None) -> NodeSelection:
         """Nodes on the axis-extreme boundary plane of the mesh.
 
         ``Nodes.side("+x")`` selects boundary nodes whose x coordinate is
@@ -308,14 +377,14 @@ class Nodes:
         this is the end face; for curved geometry it is the extreme cap.
 
         Args:
-            side: One of ``"+x"``, ``"-x"``, ``"+y"``, ``"-y"``, ``"+z"``,
-                ``"-z"``.
+            side: A :class:`~cadjoint.enums.Side`, or its plain string
+                spelling: one of ``"+x"``, ``"-x"``, ``"+y"``, ``"-y"``,
+                ``"+z"``, ``"-z"``.
             tol: Capture distance from the extreme plane.  ``None`` (the
                 default) resolves per mesh to half the smallest cell
                 spacing.
         """
-        if side not in _SIDES:
-            raise ValueError(f"side must be one of {_SIDES}, got {side!r}.")
+        side = parse(Side, side, f"side must be one of {_SIDES}, got {side!r}.")
         if tol is not None:
             tol = float(tol)
             if not np.isfinite(tol) or tol < 0.0:
@@ -360,6 +429,14 @@ def selection_from_description(payload: dict[str, Any]) -> NodeSelection:
         return Nodes.sphere(payload["center"], payload["radius"])
     if kind == "halfspace":
         return Nodes.halfspace(payload["point"], payload["normal"])
+    if kind == "cylinder":
+        return Nodes.cylinder(
+            payload["center"],
+            payload["axis"],
+            payload["radius"],
+            inner=payload.get("inner", 0.0),
+            half_length=payload.get("half_length"),
+        )
     if kind == "side":
         return Nodes.side(payload["side"], payload.get("tol"))
     if kind in ("and", "or"):

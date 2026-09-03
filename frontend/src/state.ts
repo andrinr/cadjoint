@@ -29,6 +29,7 @@ import type {
   ToolMode,
 } from "./types";
 import { placeEdges } from "./viewer/gizmo";
+import { VIEW_PRESETS } from "./viewer/display";
 import type { PlayerState } from "./optimize";
 import type { PendingLoft } from "./loft";
 import {
@@ -39,6 +40,7 @@ import {
   type EditingMode,
 } from "./editingMode";
 import { DEFAULT_SKETCH_PLANE, type SketchPlaneChoice } from "./sketchPlanes";
+import type { FacePick } from "./faces";
 
 export const [source, setSource] = createSignal("");
 export const [nodes, setNodes] = createSignal<ConstructionNode[]>([]);
@@ -139,6 +141,17 @@ export interface SimProbe {
 
 export const [simProbe, setSimProbe] = createSignal<SimProbe | null>(null);
 export const [meshEdges, setMeshEdges] = createSignal<MeshEdgePayload | null>(null);
+
+/**
+ * The analytic face under the pointer while the face tool is armed.
+ *
+ * Written by the viewer's hover resolution and read by two things that must
+ * agree: the GPU highlight, and the hint bar's readout of what a click would
+ * do. Null whenever the pointer is not over a face the construction tree
+ * declared — which is also the state that makes a click fall back to a
+ * tangent plane.
+ */
+export const [faceHover, setFaceHover] = createSignal<FacePick | null>(null);
 export const [selection, setSelection] = createSignal<Selection | null>(null);
 export const [hover, setHover] = createSignal<Selection | null>(null);
 export const [tool, setTool] = createSignal<ToolMode>("select");
@@ -183,33 +196,32 @@ export const DEFAULT_PANELS: PanelVisibility = {
   sketch: true,
 };
 
-const PANELS_STORAGE_KEY = "cadjoint.panels.v1";
+export const [panels, setPanels] = createSignal<PanelVisibility>({ ...DEFAULT_PANELS });
 
-function loadPanels(): PanelVisibility {
-  try {
-    const raw = localStorage.getItem(PANELS_STORAGE_KEY);
-    if (!raw) return { ...DEFAULT_PANELS };
-    const parsed = JSON.parse(raw) as Partial<Record<keyof PanelVisibility, unknown>>;
-    const next = { ...DEFAULT_PANELS };
-    for (const key of Object.keys(next) as (keyof PanelVisibility)[]) {
-      if (typeof parsed[key] === "boolean") next[key] = parsed[key] as boolean;
-    }
-    return next;
-  } catch {
-    return { ...DEFAULT_PANELS };
-  }
+/**
+ * Who actually opens and closes windows.
+ *
+ * The dock (`windows/WindowLayout`) is the source of truth: it owns the
+ * arrangement, the per-mode layouts, and the browser-local record. It
+ * registers here on mount so the menu bar's coarse Window items keep working
+ * unchanged, and mirrors the result back into `panels()` for their check
+ * marks. Before it mounts — and in unit tests, which never build a dock —
+ * this falls back to the plain signal.
+ */
+type PanelVisibilityHandler = (key: keyof PanelVisibility, visible: boolean) => void;
+
+let panelVisibilityHandler: PanelVisibilityHandler | null = null;
+
+export function setPanelVisibilityHandler(handler: PanelVisibilityHandler | null): void {
+  panelVisibilityHandler = handler;
 }
 
-export const [panels, setPanels] = createSignal<PanelVisibility>(loadPanels());
-
 export function setPanelVisible(key: keyof PanelVisibility, visible: boolean): void {
-  const next = { ...panels(), [key]: visible };
-  setPanels(next);
-  try {
-    localStorage.setItem(PANELS_STORAGE_KEY, JSON.stringify(next));
-  } catch {
-    // Persistence is a convenience; private-mode storage failures are fine.
+  if (panelVisibilityHandler) {
+    panelVisibilityHandler(key, visible);
+    return;
   }
+  setPanels({ ...panels(), [key]: visible });
 }
 
 /** Vertex being dragged, with its live sketch-plane position. */
@@ -277,8 +289,18 @@ export const [gizmoDrag, setGizmoDrag] = createSignal<GizmoDrag | null>(null);
 export const [gizmoMode, setGizmoMode] = createSignal<GizmoMode>("translate");
 export const [selectionMode, setSelectionMode] = createSignal<SelectionMode>("object");
 
-/** Camera angles mirrored into a signal so the ViewCube can track them. */
-export const [cameraAngles, setCameraAngles] = createSignal({ yaw: 0.75, pitch: 0.32 });
+/**
+ * Camera angles mirrored into a signal so the ViewCube can track them.
+ *
+ * Seeded from the same table the renderer's own camera is, rather than from a
+ * second copy of the numbers: they were two copies, and when the default view
+ * moved onto the true isometric corner this one stayed behind, so the rose lit
+ * nothing at rest while the cube — reading the renderer — was correct.
+ */
+export const [cameraAngles, setCameraAngles] = createSignal({
+  yaw: VIEW_PRESETS.iso.yaw,
+  pitch: VIEW_PRESETS.iso.pitch,
+});
 
 /** Find a construction node by id. */
 export function nodeById(id: string): ConstructionNode | undefined {

@@ -1,4 +1,0 @@
-/target
-# `tesseract-runtime` / `tesseract run` drop a run_<uuid>/logs directory next to
-# the Tesseract they execute; those are per-invocation artifacts, not sources.
-/run_*/

@@ -227,3 +227,65 @@ class TestFacesFromNodes:
         # Top row of the 3x3 end face (both quad corners at z >= 0): 3 quads.
         assert group.nodes.shape[0] == 3
         assert group.centers[:, 2].min() > 0.0
+
+
+class TestCylinder:
+    """`Nodes.cylinder`: an annular, optionally finite selector about a line."""
+
+    def test_full_cylinder_selects_around_the_axis(self, bar_mesh):
+        # The bar's own axis, radius just past its half-width: every node.
+        everything = Nodes.cylinder([0, 0, 0], [1, 0, 0], 0.30).resolve(bar_mesh)
+        assert everything.size == boundary_node_mask(bar_mesh).sum()
+        # Radius under the half-width: only the nodes near the axis line.
+        near = Nodes.cylinder([0, 0, 0], [1, 0, 0], 0.16).resolve(bar_mesh)
+        radial = np.linalg.norm(bar_mesh.points[near][:, 1:], axis=-1)
+        assert radial.max() <= 0.16
+        assert 0 < near.size < everything.size
+
+    def test_annulus_excludes_the_core(self, bar_mesh):
+        ring = Nodes.cylinder([0, 0, 0], [1, 0, 0], 0.30, inner=0.16).resolve(bar_mesh)
+        radial = np.linalg.norm(bar_mesh.points[ring][:, 1:], axis=-1)
+        assert radial.min() >= 0.16
+        full = Nodes.cylinder([0, 0, 0], [1, 0, 0], 0.30).resolve(bar_mesh)
+        core = Nodes.cylinder([0, 0, 0], [1, 0, 0], 0.16).resolve(bar_mesh)
+        assert ring.size == full.size - core.size
+
+    def test_half_length_bounds_the_axial_extent(self, bar_mesh):
+        slab = Nodes.cylinder([0.5, 0, 0], [1, 0, 0], 0.30, half_length=0.25).resolve(bar_mesh)
+        assert bar_mesh.points[slab, 0].min() >= 0.25 - 1e-9
+        assert bar_mesh.points[slab, 0].max() <= 0.75 + 1e-9
+
+    def test_axis_need_not_be_unit_or_aligned(self, bar_mesh):
+        scaled = Nodes.cylinder([0, 0, 0], [3, 0, 0], 0.16).resolve(bar_mesh)
+        unit = Nodes.cylinder([0, 0, 0], [1, 0, 0], 0.16).resolve(bar_mesh)
+        assert np.array_equal(scaled, unit)
+
+    def test_validation(self):
+        with pytest.raises(ValueError, match="axis"):
+            Nodes.cylinder([0, 0, 0], [0, 0, 0], 1.0)
+        with pytest.raises(ValueError, match="radius"):
+            Nodes.cylinder([0, 0, 0], [0, 0, 1], -1.0)
+        with pytest.raises(ValueError, match="inner"):
+            Nodes.cylinder([0, 0, 0], [0, 0, 1], 1.0, inner=1.0)
+        with pytest.raises(ValueError, match="half_length"):
+            Nodes.cylinder([0, 0, 0], [0, 0, 1], 1.0, half_length=0.0)
+
+    def test_describe_round_trips(self, bar_mesh):
+        selection = Nodes.cylinder([0.5, 0, 0], [1, 0, 0], 0.30, inner=0.16, half_length=0.25)
+        payload = json.loads(json.dumps(selection.describe()))
+        assert payload == {
+            "kind": "cylinder",
+            "center": [0.5, 0.0, 0.0],
+            "axis": [1.0, 0.0, 0.0],
+            "radius": 0.30,
+            "inner": 0.16,
+            "half_length": 0.25,
+        }
+        rebuilt = selection_from_description(payload)
+        assert selection.serializable
+        assert np.array_equal(rebuilt.resolve(bar_mesh), selection.resolve(bar_mesh))
+        # The optional fields default when absent, as an older payload would omit them.
+        plain = selection_from_description(
+            {"kind": "cylinder", "center": [0, 0, 0], "axis": [1, 0, 0], "radius": 0.3}
+        )
+        assert plain.describe()["inner"] == 0.0 and plain.describe()["half_length"] is None

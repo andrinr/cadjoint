@@ -14,7 +14,20 @@ vertex selection composed with ``&``/``|``/``~``.  Node-valued conditions
 (:class:`Dirichlet`, :class:`Fixed`) apply to the selected node set
 directly; area-integrated conditions (:class:`HeatFlux`, :class:`Traction`)
 act on the boundary faces spanned by the selection (all four corners
-selected — :func:`~cadjoint.fem.hexmesh.faces_from_nodes`).
+selected — :func:`~cadjoint.fem.boundary.faces_from_nodes`).
+
+Material properties come from one of two places.  Pass an explicit scalar
+(``ThermalStudy(conductivity=2.0)``) and the whole domain solves with it, as
+it always has.  Leave the argument out — or pass the sentinel
+:data:`~cadjoint.fem.properties.FROM_MATERIAL` (``"material"``) — and the
+study samples the scene's own material field per element at solve time
+(:func:`cadjoint.fem.properties.sample_cell_property`), so a copper slug
+pressed into an aluminium sink solves as two materials with a smooth
+transition exactly as wide as the CSG blend that joins them.  The sampling is
+differentiable in both directions that matter: w.r.t. the geometry (the blend
+moves when the design does) and w.r.t. any material property marked ``free``.
+A study whose materials never state the property it needs fails with an error
+naming the property, rather than inventing a value.
 
 Meshing runs through one path: a study either references a declared
 :class:`~cadjoint.fem.simmesh.SimMesh` (``mesh=<SimMesh or name>`` — the
@@ -50,12 +63,16 @@ from typing import Any
 
 import numpy as np
 
-from cadjoint.fem.hexmesh import HexMesh, faces_from_nodes
+from cadjoint.enums import BoundaryConditionType, StudyKind
+from cadjoint.fem.boundary import faces_from_nodes, tet_faces_from_nodes
+from cadjoint.fem.hexmesh import HexMesh
+from cadjoint.fem.properties import FROM_MATERIAL
 from cadjoint.fem.selection import NodeSelection
 from cadjoint.fem.simmesh import _CAPTURED_MESHES, SimMesh, _anonymous, _domain_entry
-from cadjoint.fem.tetmesh import TetMesh, tet_faces_from_nodes
+from cadjoint.fem.tetmesh import TetMesh
 
 __all__ = [
+    "FROM_MATERIAL",
     "Dirichlet",
     "ElasticStudy",
     "Fixed",
@@ -63,6 +80,7 @@ __all__ = [
     "ThermalStudy",
     "Traction",
     "capture_studies",
+    "register_study",
 ]
 
 # Same domain convention as the viewer's simulate path (compile worker).
@@ -91,10 +109,26 @@ def capture_studies() -> Iterator[list[ThermalStudy | ElasticStudy]]:
         _CAPTURED_STUDIES.reset(token)
 
 
-def _register(study: Any) -> None:
+def register_study(study: Any) -> None:
+    """Add a study to the active :func:`capture_studies` context, if any.
+
+    The registration hook the study classes call from ``__post_init__``.
+    Public because studies live in more than one package:
+    :class:`cadjoint.flow.FlowStudy` is declared in a scene exactly like the
+    two here and lands in the same captured list, but it discretises no mesh
+    and does not belong in this module.  Outside a capture context this does
+    nothing, which is what makes a study usable from a plain script.
+
+    Args:
+        study: Any object with a ``name`` and a ``describe()``.
+    """
     captured = _CAPTURED_STUDIES.get()
     if captured is not None:
         captured.append(study)
+
+
+#: Private spelling kept for the two study classes below.
+_register = register_study
 
 
 def _triplet(value: Any, label: str) -> tuple[float, float, float]:
@@ -108,7 +142,7 @@ def _expect_selection(nodes: Any, bc_kind: str) -> NodeSelection:
     if not isinstance(nodes, NodeSelection):
         raise ValueError(
             f"{bc_kind} takes a node selection, got {type(nodes).__name__}. "
-            "Build one via Nodes.box/sphere/halfspace/side/predicate "
+            "Build one via Nodes.box/sphere/halfspace/cylinder/side/predicate "
             "(from cadjoint.fem import Nodes)."
         )
     return nodes
@@ -129,9 +163,18 @@ class Dirichlet:
     def __post_init__(self):
         _expect_selection(self.nodes, "Dirichlet")
 
+    @property
+    def serializable(self) -> bool:
+        """Whether :meth:`describe` round-trips (false for predicates)."""
+        return self.nodes.serializable
+
     def describe(self) -> dict[str, Any]:
         """JSON-ready description."""
-        return {"type": "dirichlet", "nodes": self.nodes.describe(), "value": self.value}
+        return {
+            "type": BoundaryConditionType.DIRICHLET.value,
+            "nodes": self.nodes.describe(),
+            "value": self.value,
+        }
 
 
 @dataclass(frozen=True)
@@ -148,9 +191,18 @@ class HeatFlux:
     def __post_init__(self):
         _expect_selection(self.nodes, "HeatFlux")
 
+    @property
+    def serializable(self) -> bool:
+        """Whether :meth:`describe` round-trips (false for predicates)."""
+        return self.nodes.serializable
+
     def describe(self) -> dict[str, Any]:
         """JSON-ready description."""
-        return {"type": "heat_flux", "nodes": self.nodes.describe(), "flux": float(self.flux)}
+        return {
+            "type": BoundaryConditionType.HEAT_FLUX.value,
+            "nodes": self.nodes.describe(),
+            "flux": float(self.flux),
+        }
 
 
 @dataclass(frozen=True)
@@ -162,9 +214,14 @@ class Fixed:
     def __post_init__(self):
         _expect_selection(self.nodes, "Fixed")
 
+    @property
+    def serializable(self) -> bool:
+        """Whether :meth:`describe` round-trips (false for predicates)."""
+        return self.nodes.serializable
+
     def describe(self) -> dict[str, Any]:
         """JSON-ready description."""
-        return {"type": "fixed", "nodes": self.nodes.describe()}
+        return {"type": BoundaryConditionType.FIXED.value, "nodes": self.nodes.describe()}
 
 
 @dataclass(frozen=True)
@@ -178,13 +235,141 @@ class Traction:
         _expect_selection(self.nodes, "Traction")
         object.__setattr__(self, "vector", _triplet(self.vector, "vector"))
 
+    @property
+    def serializable(self) -> bool:
+        """Whether :meth:`describe` round-trips (false for predicates)."""
+        return self.nodes.serializable
+
     def describe(self) -> dict[str, Any]:
         """JSON-ready description."""
         return {
-            "type": "traction",
+            "type": BoundaryConditionType.TRACTION.value,
             "nodes": self.nodes.describe(),
             "vector": list(self.vector),
         }
+
+
+def _from_material(value: Any) -> bool:
+    """True when a property argument asks to be sampled from the materials."""
+    return isinstance(value, str)
+
+
+def _property_argument(value: Any, label: str, check: Any) -> Any:
+    """Validate a material-property argument at construction time.
+
+    Args:
+        value: The user's argument — a number, or the
+            :data:`~cadjoint.fem.properties.FROM_MATERIAL` sentinel.
+        label: Argument name, for error messages.
+        check: Predicate a numeric value must satisfy, or None.
+
+    Returns:
+        ``FROM_MATERIAL`` unchanged, or the value as a validated ``float``.
+
+    Raises:
+        ValueError: If a string other than the sentinel is given, or a numeric
+            value fails ``check``.
+    """
+    if _from_material(value):
+        if value != FROM_MATERIAL:
+            raise ValueError(
+                f"{label} must be a number or {FROM_MATERIAL!r} (sample the scene's "
+                f"materials per element); got {value!r}."
+            )
+        return FROM_MATERIAL
+    number = float(value)
+    if check is not None and not check(number):
+        raise ValueError(f"{label} value {number} is out of range.")
+    return number
+
+
+def _material_source(sdf: Any, sim_mesh: SimMesh | None, study: Any = None) -> Any:
+    """The object whose ``material_at`` defines the property field for a solve.
+
+    Tried in order: the SDF handed to ``solve``; the domain of the SimMesh
+    that was actually built; the domain of the study's *declared* SimMesh;
+    the study's own ``domain=``.  A candidate that cannot answer
+    ``material_at`` is skipped rather than returned; if none of them can, the
+    ``solve`` argument comes back unchanged so that
+    :func:`~cadjoint.fem.properties.sample_cell_property` still raises its own
+    error naming what it was handed.
+
+    Two of those rungs exist for :class:`~cadjoint.optimize.Optimization`,
+    which calls a study twice and in neither case the obvious way.
+
+    * *During* the loop it builds the mesh once to freeze its topology and
+      calls ``solve(mesh=hex_mesh, points=...)``, so ``_solve_mesh`` returns
+      no SimMesh at all.  Without the fallback a ``FROM_MATERIAL`` study whose
+      SimMesh names a ``domain`` solves on its own but fails inside an
+      optimisation with "got no SDF to sample: … give the study's SimMesh a
+      ``domain=``" — advice the scene had already taken.
+    * *After* the loop it re-meshes at the final design and calls
+      ``solve(final_field)`` with the **functionalized** field, a bare
+      callable with no materials on it.  Falling through to the declared
+      domain is right rather than merely tolerable: the optimiser has just
+      written the final parameters back onto that object with
+      ``apply_parameters``, so it is the same geometry the callable
+      describes, and it still knows what it is made of.
+
+    Args:
+        sdf: The ``solve(sdf)`` argument, or ``None``.
+        sim_mesh: The SimMesh ``_solve_mesh`` built, or ``None`` when the
+            caller passed an already-extracted mesh.
+        study: The study itself, for its declared mesh and domain.
+
+    Returns:
+        The first candidate that carries materials; failing that, whatever
+        was handed in, so the error comes from the sampler.
+    """
+    declared = (
+        getattr(sim_mesh, "domain", None),
+        getattr(getattr(study, "mesh", None), "domain", None),
+        getattr(study, "domain", None),
+    )
+    for candidate in (sdf, *declared):
+        if candidate is not None and hasattr(candidate, "material_at"):
+            return candidate
+    if sdf is not None:
+        return sdf
+    return next((candidate for candidate in declared if candidate is not None), None)
+
+
+def _resolve_property(
+    value: Any,
+    key: str,
+    *,
+    sdf: Any,
+    points: Any,
+    cells: Any,
+    label: str,
+) -> Any:
+    """A scalar property, or a per-element array sampled from the materials.
+
+    Args:
+        value: The study's stored argument (number or ``FROM_MATERIAL``).
+        key: The :class:`~cadjoint.render.material.Material` property name.
+        sdf: The scene SDF whose ``material_at`` is sampled.
+        points: Node positions the centroids are built from (may be traced).
+        cells: Element connectivity.
+        label: Study name, for error messages.
+
+    Returns:
+        The float itself, or a ``(C,)`` JAX array of per-element values.
+
+    Raises:
+        ValueError: If sampling is asked for but no SDF is available.
+    """
+    if not _from_material(value):
+        return value
+    from cadjoint.fem.properties import sample_cell_property
+
+    if sdf is None:
+        raise ValueError(
+            f"Study {label!r} derives {key!r} from the scene's materials but got no "
+            "SDF to sample: pass the scene to solve(sdf), give the study's SimMesh a "
+            f"domain=, or set an explicit {key} value on the study."
+        )
+    return sample_cell_property(sdf, points, cells, key, label=f"study {label!r}")
 
 
 def _resolve_mesh_reference(mesh: Any) -> SimMesh:
@@ -321,6 +506,28 @@ def _mesh_payload(study: Any) -> dict[str, Any]:
     }
 
 
+def _reported_property(sdf: Any, points: Any, mesh: Any, key: str) -> Any:
+    """A per-element property for reporting, or None when the scene lacks it.
+
+    Reporting is best-effort by design: a study should still solve when its
+    materials say nothing about density or yield strength — it just cannot
+    report a mass or a safety factor.
+    """
+    from cadjoint.fem.properties import maybe_sample_cell_property
+
+    return maybe_sample_cell_property(sdf, points, mesh.cells, key, base_points=mesh.points)
+
+
+def _reported_mass(sdf: Any, points: Any, mesh: Any) -> Any:
+    """Mass of the solved domain, or None when the materials state no density."""
+    density = _reported_property(sdf, points, mesh, "density")
+    if density is None:
+        return None
+    from cadjoint.fem.properties import total_mass
+
+    return total_mass(points, mesh.cells, density)
+
+
 @dataclass
 class ThermalStudy:
     """Declarative steady-state heat conduction study.
@@ -329,7 +536,10 @@ class ThermalStudy:
         name: Study identifier (unique within a scene program).
         resolution: Meshing resolution (cells per axis, int or triplet);
             leave None when ``mesh`` is given.
-        conductivity: Thermal conductivity ``k`` (keyword-only).
+        conductivity: Thermal conductivity ``k`` in W/(m*K), keyword-only.
+            A number applies to the whole domain; the default
+            :data:`~cadjoint.fem.properties.FROM_MATERIAL` sentinel samples
+            the scene's material field per element instead.
         bcs: :class:`Dirichlet` / :class:`HeatFlux` boundary conditions
             (at least one Dirichlet is required to solve).
         source: Volumetric heat source ``q``.
@@ -347,7 +557,7 @@ class ThermalStudy:
     name: str
     resolution: Any = None
     _: KW_ONLY
-    conductivity: float
+    conductivity: Any = FROM_MATERIAL
     bcs: list[Dirichlet | HeatFlux] = field(default_factory=list)
     source: float = 0.0
     bounds: Any = None
@@ -359,17 +569,18 @@ class ThermalStudy:
 
     def __post_init__(self):
         _validate_common(self, "Thermal", (Dirichlet, HeatFlux))
-        if float(self.conductivity) <= 0.0:
-            raise ValueError("conductivity must be positive.")
+        self.conductivity = _property_argument(
+            self.conductivity, "conductivity", lambda value: value > 0.0
+        )
         _register(self)
 
     def describe(self) -> dict[str, Any]:
         """JSON-ready payload: everything the viewer needs to display it."""
         return {
             "name": self.name,
-            "kind": "thermal",
+            "kind": StudyKind.THERMAL.value,
             **_mesh_payload(self),
-            "material": {"conductivity": float(self.conductivity)},
+            "material": {"conductivity": self.conductivity},
             "source": float(self.source),
             "bcs": [bc.describe() for bc in self.bcs],
         }
@@ -411,9 +622,19 @@ class ThermalStudy:
             raise ValueError("A thermal study needs at least one Dirichlet BC to solve.")
         sim_mesh, hex_mesh = _solve_mesh(self, sdf, mesh)
         _check_resolvable(self.bcs, hex_mesh)
+        source_sdf = _material_source(sdf, sim_mesh, self)
+        solve_points = hex_mesh.points if points is None else points
+        conductivity = _resolve_property(
+            self.conductivity,
+            "conductivity",
+            sdf=source_sdf,
+            points=solve_points,
+            cells=hex_mesh.cells,
+            label=self.name,
+        )
         solution = thermal_solve(
             hex_mesh,
-            conductivity=float(self.conductivity),
+            conductivity=conductivity,
             dirichlet=[(bc.nodes, bc.value) for bc in dirichlet],
             neumann=[(bc.nodes, bc.flux) for bc in fluxes],
             source=float(self.source),
@@ -422,10 +643,11 @@ class ThermalStudy:
         )
         result = SimulationResult(
             name=self.name,
-            kind="thermal",
+            kind=StudyKind.THERMAL.value,
             field="temperature",
             solution=solution,
             sim_mesh=sim_mesh,
+            mass=_reported_mass(source_sdf, solve_points, hex_mesh),
         )
         self.last_result = result
         return result
@@ -439,8 +661,15 @@ class ElasticStudy:
         name: Study identifier (unique within a scene program).
         resolution: Meshing resolution (cells per axis, int or triplet);
             leave None when ``mesh`` is given.
-        youngs: Young's modulus (keyword-only).
-        poisson: Poisson ratio in ``[0, 0.5)`` (keyword-only).
+        youngs: Young's modulus in Pa (keyword-only).  A number applies to
+            the whole domain; the default
+            :data:`~cadjoint.fem.properties.FROM_MATERIAL` sentinel samples
+            the scene's material field per element instead.
+        poisson: Poisson ratio in ``[0, 0.5)`` (keyword-only), scalar or
+            material-derived exactly like ``youngs``.
+        gravity: Optional gravity vector in m/s^2 (e.g. ``(0, 0, -9.81)``)
+            adding self-weight as the body force ``density * gravity``.  The
+            scene's materials must specify a density.
         bcs: :class:`Fixed` / :class:`Traction` boundary conditions
             (at least one Fixed is required to solve).
         bounds: Lower corner of the meshing domain (None: default volume).
@@ -457,8 +686,9 @@ class ElasticStudy:
     name: str
     resolution: Any = None
     _: KW_ONLY
-    youngs: float
-    poisson: float
+    youngs: Any = FROM_MATERIAL
+    poisson: Any = FROM_MATERIAL
+    gravity: Any = None
     bcs: list[Fixed | Traction] = field(default_factory=list)
     bounds: Any = None
     size: Any = None
@@ -469,19 +699,20 @@ class ElasticStudy:
 
     def __post_init__(self):
         _validate_common(self, "Elastic", (Fixed, Traction))
-        if float(self.youngs) <= 0.0:
-            raise ValueError("youngs must be positive.")
-        if not 0.0 <= float(self.poisson) < 0.5:
-            raise ValueError("poisson must be in [0, 0.5).")
+        self.youngs = _property_argument(self.youngs, "youngs", lambda value: value > 0.0)
+        self.poisson = _property_argument(self.poisson, "poisson", lambda value: 0.0 <= value < 0.5)
+        if self.gravity is not None:
+            self.gravity = _triplet(self.gravity, "gravity")
         _register(self)
 
     def describe(self) -> dict[str, Any]:
         """JSON-ready payload: everything the viewer needs to display it."""
         return {
             "name": self.name,
-            "kind": "elastic",
+            "kind": StudyKind.ELASTIC.value,
             **_mesh_payload(self),
-            "material": {"youngs": float(self.youngs), "poisson": float(self.poisson)},
+            "material": {"youngs": self.youngs, "poisson": self.poisson},
+            "gravity": list(self.gravity) if self.gravity is not None else None,
             "bcs": [bc.describe() for bc in self.bcs],
         }
 
@@ -522,21 +753,68 @@ class ElasticStudy:
             raise ValueError("An elastic study needs at least one Fixed BC to solve.")
         sim_mesh, hex_mesh = _solve_mesh(self, sdf, mesh)
         _check_resolvable(self.bcs, hex_mesh)
+        source_sdf = _material_source(sdf, sim_mesh, self)
+        solve_points = hex_mesh.points if points is None else points
+        resolved = {
+            key: _resolve_property(
+                getattr(self, key),
+                material_key,
+                sdf=source_sdf,
+                points=solve_points,
+                cells=hex_mesh.cells,
+                label=self.name,
+            )
+            for key, material_key in (("youngs", "youngs_modulus"), ("poisson", "poisson_ratio"))
+        }
         solution = elastic_solve(
             hex_mesh,
-            youngs=float(self.youngs),
-            poisson=float(self.poisson),
+            youngs=resolved["youngs"],
+            poisson=resolved["poisson"],
             dirichlet=[bc.nodes for bc in fixed],
             tractions=[(bc.nodes, bc.vector) for bc in tractions],
             backend=backend,
             points=points,
+            body_force=self._body_force(source_sdf, solve_points, hex_mesh),
         )
         result = SimulationResult(
             name=self.name,
-            kind="elastic",
+            kind=StudyKind.ELASTIC.value,
             field="von_mises",
             solution=solution,
             sim_mesh=sim_mesh,
+            mass=_reported_mass(source_sdf, solve_points, hex_mesh),
+            yield_strength=_reported_property(source_sdf, solve_points, hex_mesh, "yield_strength"),
         )
         self.last_result = result
         return result
+
+    def _body_force(self, sdf: Any, points: Any, mesh: Any) -> Any:
+        """Self-weight ``density * gravity`` per element, or None without gravity.
+
+        Args:
+            sdf: The scene SDF whose material field carries the density.
+            points: Node positions the centroids are built from.
+            mesh: The solved mesh (for its connectivity).
+
+        Returns:
+            A ``(C, 3)`` body force density in N/m^3, or None when the study
+            declares no gravity.
+
+        Raises:
+            ValueError: If gravity is set but the materials state no density.
+        """
+        if self.gravity is None:
+            return None
+        import jax.numpy as jnp
+
+        from cadjoint.fem.properties import sample_cell_property
+
+        if sdf is None:
+            raise ValueError(
+                f"Study {self.name!r} sets gravity but got no SDF to read densities "
+                "from: pass the scene to solve(sdf) or give the SimMesh a domain=."
+            )
+        density = sample_cell_property(
+            sdf, points, mesh.cells, "density", label=f"study {self.name!r} (gravity)"
+        )
+        return density[:, None] * jnp.asarray(self.gravity, dtype=density.dtype)

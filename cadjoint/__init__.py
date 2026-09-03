@@ -13,7 +13,7 @@ from cadjoint.parametrization import (
     unnormalize,
 )
 from cadjoint.render.material import Material
-from cadjoint.sdf import SDF, boolean, operations, primitives, transforms
+from cadjoint.sdf import SDF, boolean, primitives, transforms
 
 __all__ = [
     "SDF",
@@ -21,7 +21,6 @@ __all__ = [
     "primitives",
     "boolean",
     "transforms",
-    "operations",
     "extract_parameters",
     "apply_parameters",
     "functionalize",

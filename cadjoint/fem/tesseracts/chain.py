@@ -1,4 +1,12 @@
-"""The Tesseract chains behind ``gradient_path="tesseract"``/``"tesseract-dc"``.
+"""The frozen chains behind ``gradient_path="tesseract"``/``"tesseract-dc"``.
+
+Both chains are built from **plugins** (:mod:`cadjoint.plugins`), resolved
+by *kind* — ``"mesher"``, ``"tetfill"``, ``"thermal_solver"``,
+``"elastic_solver"`` — rather than by importing a ``tesseract_api`` module.
+Nothing here knows whether the component answering a kind is running in
+this process, in a container, or behind a cluster URL; that is the spec's
+business.  Tesseract remains the implementation of every plugin shipped
+today, which is why the ``gradient_path`` names still say so.
 
 Two frozen chains live here, differing only in **where the black box is
 cut**:
@@ -44,7 +52,6 @@ the in-process backends (parity 1e-9, ``tests/fem/test_tesseract_tet.py``).
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Callable
 
@@ -55,24 +62,73 @@ _TESSERACT_EXTRA_MESSAGE = (
     "Install the 'tesseract' extra: pip install cadjoint[tesseract]."
 )
 
-#: Mesher tesseract ``element`` codes per SimMesh method.
+#: Mesher plugin ``element`` codes per SimMesh method.
 _ELEMENT_CODES = {"tet4": 0, "hex": 1, "tet10": 2}
 
-_TESSERACTS_DIR = Path(__file__).parent
-_LOADED: dict[str, Any] = {}
+
+def _plugin(kind: str):
+    """The plugin currently filling ``kind``.
+
+    The chain names *slots* — ``"mesher"``, ``"tetfill"``,
+    ``"thermal_solver"``, ``"elastic_solver"`` — and lets
+    :mod:`cadjoint.plugins` decide which component fills each one and where
+    it runs.  That indirection is the whole point: a ``plugins.toml`` that
+    moves the thermal solver to a cluster URL changes nothing here.
+
+    Args:
+        kind: The plugin kind to resolve.
+
+    Returns:
+        The (cached, kept-warm) :class:`~cadjoint.plugins.Plugin`.
+    """
+    from cadjoint.plugins import plugin_for_kind
+
+    return plugin_for_kind(kind)
 
 
 def _tesseract(name: str):
-    """Load a packaged tesseract once per process (kept warm)."""
-    if name not in _LOADED:
-        try:
-            from tesseract_core import Tesseract
-        except ImportError as error:
-            raise ImportError(_TESSERACT_EXTRA_MESSAGE) from error
-        _LOADED[name] = Tesseract.from_tesseract_api(
-            str(_TESSERACTS_DIR / name / "tesseract_api.py")
+    """The raw Tesseract client of the plugin registered under ``name``.
+
+    Kept for callers that speak the Tesseract ABI directly (the packaging
+    tests round-trip ``apply``/``vector_jacobian_product`` against it).
+    New code should take a :class:`~cadjoint.plugins.Plugin` from
+    :func:`_plugin` instead, so it does not assume the transport.
+    """
+    from cadjoint.plugins import get_plugin
+
+    return get_plugin(name).client
+
+
+def _require_inputs(plugin: Any, payload: dict, output: str, stage: str) -> None:
+    """Refuse a plugin that cannot accept this stage's frozen payload.
+
+    The chain's payloads are the FEM array ABI; a plugin swapped in by
+    configuration may declare a narrower schema (``elastic_calculix``, for
+    one, has no ``body_force``).  Failing here names the missing field,
+    rather than letting a pydantic validation error surface from inside a
+    traced call several frames down.
+
+    Args:
+        plugin: The resolved plugin.
+        payload: Every input the chain will send, minus the traced one.
+        output: The output the chain reads back.
+        stage: What to call this stage in the error message.
+
+    Raises:
+        ValueError: If the plugin does not declare an input the chain
+            sends, or the output it reads.
+    """
+    missing = sorted(set(payload) - set(plugin.inputs))
+    if missing:
+        raise ValueError(
+            f"the {stage} plugin {plugin.name!r} does not declare the input(s) {missing} "
+            f"the frozen chain sends; it declares {sorted(plugin.inputs)}."
         )
-    return _LOADED[name]
+    if output not in plugin.outputs:
+        raise ValueError(
+            f"the {stage} plugin {plugin.name!r} does not declare the output {output!r} "
+            f"the frozen chain reads; it declares {sorted(plugin.outputs)}."
+        )
 
 
 @dataclass(frozen=True)
@@ -151,15 +207,16 @@ def _discover_mesh(sim_mesh: Any, samples: np.ndarray, grid: Any) -> tuple[Any, 
         RuntimeError: When the mesher rejects the design (the optimizer's
             refreeze fallback catches exactly this).
     """
-    from cadjoint.fem.hexmesh import (
+    from cadjoint.fem.boundary import (
         FaceGroup,
-        HexMesh,
         _boundary_face_rows,
         _face_geometry,
+        tet_boundary_faces,
     )
-    from cadjoint.fem.tetmesh import TetMesh, tet10_mesh, tet_boundary_faces
+    from cadjoint.fem.hexmesh import HexMesh
+    from cadjoint.fem.tetmesh import TetMesh, tet10_mesh
 
-    mesher = _tesseract("mesher")
+    mesher = _plugin("mesher")
     method = sim_mesh.method
     element = _ELEMENT_CODES[method]
     # Discovery always runs the corner-level mesher (TET10 promotes the
@@ -193,7 +250,7 @@ def _discover_mesh(sim_mesh: Any, samples: np.ndarray, grid: Any) -> tuple[Any, 
         except Exception as exc:  # the tesseract wraps the TetGen RuntimeError
             error = exc
     if found is None:
-        raise RuntimeError(f"mesher tesseract rejected the design: {error}")
+        raise RuntimeError(f"mesher plugin rejected the design: {error}")
 
     points = np.asarray(found["points"])
     cells = np.asarray(found["cells"]).astype(np.int32)
@@ -240,7 +297,8 @@ def _discover_mesh(sim_mesh: Any, samples: np.ndarray, grid: Any) -> tuple[Any, 
 
 def _node_patch(mesh: Any, selection: Any) -> np.ndarray:
     """Node-valued patch (Dirichlet / clamp) on the frozen mesh."""
-    from cadjoint.fem.tetmesh import TetMesh, tet10_complete_nodes
+    from cadjoint.fem.boundary import tet10_complete_nodes
+    from cadjoint.fem.tetmesh import TetMesh
 
     indices = selection.resolve(mesh)
     if isinstance(mesh, TetMesh):
@@ -250,8 +308,8 @@ def _node_patch(mesh: Any, selection: Any) -> np.ndarray:
 
 def _face_patch(mesh: Any, selection: Any) -> tuple[np.ndarray, np.ndarray | None]:
     """Area-integrated patch: spanning node set + exact tet faces (or None)."""
-    from cadjoint.fem.hexmesh import faces_from_nodes
-    from cadjoint.fem.tetmesh import TetMesh, tet10_face_midsides, tet_faces_from_nodes
+    from cadjoint.fem.boundary import faces_from_nodes, tet10_face_midsides, tet_faces_from_nodes
+    from cadjoint.fem.tetmesh import TetMesh
 
     indices = selection.resolve(mesh)
     if isinstance(mesh, TetMesh):
@@ -261,6 +319,37 @@ def _face_patch(mesh: Any, selection: Any) -> tuple[np.ndarray, np.ndarray | Non
             nodes = np.concatenate([nodes, np.unique(tet10_face_midsides(mesh, faces))])
         return nodes.astype(np.int32), faces.astype(np.int32)
     return np.unique(faces_from_nodes(mesh, indices).nodes).astype(np.int32), None
+
+
+def _scalar_property(study: Any, name: str) -> float:
+    """A study's material property as a scalar, or a clear refusal.
+
+    The frozen chain is handed a *functionalized* design field, not the scene
+    object, so it has no ``material_at`` to sample and cannot serve a study
+    that derives its properties from the scene's materials.  The solver
+    tesseracts themselves accept a per-element array (``cell_conductivity`` /
+    ``cell_youngs`` / ``cell_poisson``); it is only this chain's inputs that
+    cannot be built without the material field.
+
+    Args:
+        study: The study being frozen.
+        name: The property attribute, e.g. ``"conductivity"``.
+
+    Returns:
+        The property as a float.
+
+    Raises:
+        ValueError: If the study derives the property from its materials.
+    """
+    value = getattr(study, name)
+    if isinstance(value, str):
+        raise ValueError(
+            f"Study {study.name!r} derives {name!r} from the scene's materials, which the "
+            "frozen tesseract chain cannot sample: it is given a functionalized design "
+            f"field with no material_at. Set an explicit {name} on the study for the "
+            'chain paths, or run the study with gradient_path="direct".'
+        )
+    return float(value)
 
 
 def _solver_stage(study: Any, mesh: Any) -> tuple[str, str, str, dict]:
@@ -274,8 +363,9 @@ def _solver_stage(study: Any, mesh: Any) -> tuple[str, str, str, dict]:
         mesh: The frozen mesh its selections resolve on.
 
     Returns:
-        ``(kind, solver_name, output_field, inputs)`` — everything but the
-        (traced) ``points`` entry of the solver tesseract's payload.
+        ``(kind, solver_kind, output_field, inputs)`` — everything but the
+        (traced) ``points`` entry of the solver plugin's payload.
+        ``solver_kind`` is the plugin slot to resolve, not a package name.
     """
     from cadjoint.fem.study import Dirichlet, Fixed, HeatFlux, ThermalStudy, Traction
 
@@ -305,10 +395,16 @@ def _solver_stage(study: Any, mesh: Any) -> tuple[str, str, str, dict]:
             "flux_values": np.asarray([value for _, value in fluxes], dtype=np.float64),
             "flux_faces": _concat(flux_faces, width=3),
             "flux_face_offsets": _offsets(flux_faces) if flux_faces else np.zeros(0, np.int32),
-            "conductivity": np.float64(study.conductivity),
+            "conductivity": np.float64(_scalar_property(study, "conductivity")),
             "source": np.float64(study.source),
+            # Per-element properties do not move with the mesh, so they are a
+            # pure pass-through here: an empty array selects the scalar above.
+            # Sent explicitly rather than left to the schema's default so the
+            # payload names every input the solver tesseract declares — the
+            # chain's frozen inputs should not depend on defaulting.
+            "cell_conductivity": np.zeros(0, dtype=np.float64),
         }
-        return "thermal", "thermal_jaxfem", "temperature", inputs
+        return "thermal", "thermal_solver", "temperature", inputs
 
     clamps = [_node_patch(mesh, bc.nodes) for bc in study.bcs if isinstance(bc, Fixed)]
     tractions = [
@@ -328,10 +424,14 @@ def _solver_stage(study: Any, mesh: Any) -> tuple[str, str, str, dict]:
         "traction_face_offsets": _offsets(traction_faces)
         if traction_faces
         else np.zeros(0, np.int32),
-        "youngs": np.float64(study.youngs),
-        "poisson": np.float64(study.poisson),
+        "youngs": np.float64(_scalar_property(study, "youngs")),
+        "poisson": np.float64(_scalar_property(study, "poisson")),
+        # Pass-through, for the reason given in the thermal branch above.
+        "cell_youngs": np.zeros(0, dtype=np.float64),
+        "cell_poisson": np.zeros(0, dtype=np.float64),
+        "body_force": np.zeros((0, 3), dtype=np.float64),
     }
-    return "elastic", "elastic_jaxfem", "displacement", inputs
+    return "elastic", "elastic_solver", "displacement", inputs
 
 
 def freeze_study_chain(study: Any, sim_mesh: Any, field: Callable[[Any], Any]) -> FrozenChain:
@@ -354,10 +454,10 @@ def freeze_study_chain(study: Any, sim_mesh: Any, field: Callable[[Any], Any]) -
     """
     import jax.numpy as jnp
 
-    try:
-        from tesseract_jax import apply_tesseract
-    except ImportError as error:
-        raise ImportError(_TESSERACT_EXTRA_MESSAGE) from error
+    mesher = _plugin("mesher")
+    # Resolve the traced entry point up front: without the ``tesseract``
+    # extra this raises ImportError before any meshing work is done.
+    mesher_apply = mesher.as_jax()
 
     grid = sim_mesh.grid(field)
     lattice = np.asarray(grid.lattice_points())
@@ -368,13 +468,15 @@ def freeze_study_chain(study: Any, sim_mesh: Any, field: Callable[[Any], Any]) -
     problem = _unresolvable_bc(study, mesh)
     if problem is not None:
         raise RuntimeError(f"{problem} on the mesher tesseract's frozen mesh")
-    mesher = _tesseract("mesher")
-    kind, solver_name, output, inputs = _solver_stage(study, mesh)
-    solver = _tesseract(solver_name)
+    kind, solver_kind, output, inputs = _solver_stage(study, mesh)
+    solver = _plugin(solver_kind)
+    _require_inputs(mesher, templates, "points", "mesher")
+    _require_inputs(solver, inputs, output, solver_kind)
+    solver_apply = solver.as_jax()
 
     def solve(samples):
-        meshed = apply_tesseract(mesher, dict(field_values=samples, **templates))
-        solved = apply_tesseract(solver, dict(points=meshed["points"], **inputs))
+        meshed = mesher_apply(dict(field_values=samples, **templates))
+        solved = solver_apply(dict(points=meshed["points"], **inputs))
         return meshed["points"], solved[output]
 
     return FrozenChain(mesh=mesh, lattice=lattice, study=study, _kind=kind, _solve=solve)
@@ -494,7 +596,7 @@ def _freeze_dc_surface(
     import jax
     import jax.numpy as jnp
 
-    from cadjoint.fem.hexmesh import project_points
+    from cadjoint.fem.motion import project_points
     from cadjoint.meshing import (
         dual_faces,
         edge_hermite_data,
@@ -561,7 +663,7 @@ def _interior_relaxation(mesh: Any) -> Callable[[Any], Any]:
     The tetfill tesseract holds the interior (Steiner) nodes at their frozen
     positions, so a boundary that has marched away from them leaves the
     straddling tets progressively worse shaped.  This composes
-    :func:`~cadjoint.fem.tetmesh.smooth_interior_delta` — a fixed number of
+    :func:`~cadjoint.fem.motion.smooth_interior_delta` — a fixed number of
     Jacobi–Laplacian sweeps over the frozen connectivity, boundary pinned —
     onto the tesseract's returned ``nodes``, and re-derives TET10 midsides
     as midpoints of the relaxed corners.
@@ -584,7 +686,7 @@ def _interior_relaxation(mesh: Any) -> Callable[[Any], Any]:
     """
     import jax.numpy as jnp
 
-    from cadjoint.fem.tetmesh import smooth_interior_delta
+    from cadjoint.fem.motion import smooth_interior_delta
 
     corner_count = mesh.num_corner_points
     count = mesh.num_surface
@@ -642,12 +744,13 @@ def freeze_study_chain_dc(
         ValueError: On a hex ``SimMesh``.
         ImportError: Without the ``tesseract`` extra.
     """
-    try:
-        from tesseract_jax import apply_tesseract
-    except ImportError as error:
-        raise ImportError(_TESSERACT_EXTRA_MESSAGE) from error
+    tetfill = _plugin("tetfill")
+    # Resolve the traced entry point up front: without the ``tesseract``
+    # extra this raises ImportError before any meshing work is done.
+    tetfill_apply = tetfill.as_jax()
 
-    from cadjoint.fem.tetmesh import TetMesh, tet10_mesh, tet_boundary_faces
+    from cadjoint.fem.boundary import tet_boundary_faces
+    from cadjoint.fem.tetmesh import TetMesh, tet10_mesh
 
     method = sim_mesh.method
     if method not in ("tet4", "tet10"):
@@ -658,7 +761,6 @@ def freeze_study_chain_dc(
     grid = sim_mesh.grid(field)
     faces, vertices, extract = _freeze_dc_surface(field, grid)
 
-    tetfill = _tesseract("tetfill")
     static = {
         "triangles": faces,
         "min_ratio": np.float64(_MIN_RATIO),
@@ -679,7 +781,7 @@ def freeze_study_chain_dc(
             )
         )
     except Exception as error:  # the tesseract wraps TetGen's RuntimeError
-        raise RuntimeError(f"tetfill tesseract rejected the DC surface: {error}") from error
+        raise RuntimeError(f"tetfill plugin rejected the DC surface: {error}") from error
 
     points = np.asarray(found["nodes"], dtype=np.float64)
     cells = np.asarray(found["cells"]).astype(np.int32)
@@ -713,14 +815,17 @@ def freeze_study_chain_dc(
         else np.zeros((0, 3), np.float64),
         **static,
     }
-    kind, solver_name, output, inputs = _solver_stage(study, mesh)
-    solver = _tesseract(solver_name)
+    kind, solver_kind, output, inputs = _solver_stage(study, mesh)
+    solver = _plugin(solver_kind)
+    _require_inputs(tetfill, templates, "nodes", "tetfill")
+    _require_inputs(solver, inputs, output, solver_kind)
+    solver_apply = solver.as_jax()
     relax = _interior_relaxation(mesh) if freeze_interior else None
 
     def solve(surface_points):
-        filled = apply_tesseract(tetfill, dict(points=surface_points, **templates))
+        filled = tetfill_apply(dict(points=surface_points, **templates))
         nodes = filled["nodes"] if relax is None else relax(filled["nodes"])
-        solved = apply_tesseract(solver, dict(points=nodes, **inputs))
+        solved = solver_apply(dict(points=nodes, **inputs))
         return nodes, solved[output]
 
     return FrozenDCChain(
