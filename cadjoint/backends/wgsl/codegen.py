@@ -11,7 +11,7 @@ import numpy as np
 
 from cadjoint.sdf._lowering import scalar_lowering
 
-from ._culling import culled_scene_sdf
+from ._culling import CULL_MARGIN, culled_scene_sdf
 from ._wgsl_emitter import StableHLOToWGSL
 
 MATERIAL_BASE_ENTRY_POINT = "material_base"
@@ -34,6 +34,25 @@ PARAMETER_SLOT_BYTES = 16
 #: be in practice: see :func:`compile_scene_with_uniforms` for the 31x it
 #: costs.
 PARAMETER_SCOPES = ("free", "all")
+
+#: The cull margin that turns culling off.
+#:
+#: Every skip test is ``box_distance(p, bounds) >= threshold + margin``. A
+#: margin of positive infinity makes every one of them false, so no operand is
+#: ever skipped and the module computes the flat field — the same numbers the
+#: uncoiled lowering produces, at the cost of evaluating every leaf. This is
+#: how the viewer offers culling as a toggle without a second shader: it is a
+#: buffer write, like every other render setting.
+CULL_DISABLED_MARGIN = float("inf")
+
+#: Slots the uniform buffer reserves after the parameters.
+#:
+#: Two: the NaN the module cannot spell as a constant, and the cull margin the
+#: viewer toggles.  Named because every writer of the buffer has to agree on
+#: it — the emitter, :meth:`ShaderProgram.buffer`, ``packParameters`` in
+#: ``shaderProgram.ts`` — and a bare ``+ 1`` in four places is how they came
+#: apart the last time a slot was added.
+RESERVED_PARAMETER_SLOTS = 2
 
 _COMPONENT_SWIZZLE = {1: "x", 2: "xy", 3: "xyz", 4: "xyzw"}
 
@@ -103,6 +122,17 @@ class ShaderProgram:
             material property the scene never set folds away when the values
             are literals but survives when they are buffer reads. A load from
             this slot is exact, and no compiler can fold it.
+        cull_margin_offset: Byte offset of the reserved slot holding the
+            bounding-box cull margin, or ``None`` when the program reserved
+            no such slot. ``None`` rather than ``0`` because ``0`` names a
+            real parameter's slot, and a program that had merely forgotten to
+            set this would overwrite that parameter's value with the margin.
+            Writing :data:`CULL_MARGIN` there is
+            culling on; writing :data:`CULL_DISABLED_MARGIN` makes every skip
+            test false, which is the flat field that evaluates every leaf.
+            It rides here rather than in the viewer's own uniform block
+            because the tests are inside the *generated* module, which reads
+            nothing else.
     """
 
     wgsl: str
@@ -111,6 +141,7 @@ class ShaderProgram:
     group: int
     binding: int
     nan_offset: int = 0
+    cull_margin_offset: int | None = None
 
     def as_dict(self) -> dict:
         """The buffer contract as plain JSON — what the compile payload carries.
@@ -123,6 +154,7 @@ class ShaderProgram:
             "binding": self.binding,
             "buffer_bytes": self.buffer_bytes,
             "nan_offset": self.nan_offset,
+            "cull_margin_offset": self.cull_margin_offset,
             "parameters": [parameter.as_dict() for parameter in self.parameters],
         }
 
@@ -139,6 +171,12 @@ class ShaderProgram:
             packed[start : start + parameter.components] = parameter.value
         # The reserved slot the module reads wherever it needs a NaN.
         packed[self.nan_offset // 4] = np.float32("nan")
+        # Culling on, which is what every caller that does not say otherwise
+        # wants. Guarded because `None` means "this program reserved no such
+        # slot": a default of 0 would name slot 0, which is a real parameter,
+        # and quietly overwrite it with 1e-4.
+        if self.cull_margin_offset is not None:
+            packed[self.cull_margin_offset // 4] = np.float32(CULL_MARGIN)
         return packed
 
 
@@ -439,16 +477,22 @@ def compile_scene_with_uniforms(
             values.append(jnp.asarray(raw, dtype=jnp.float32))
 
         scene_fn = functionalize_scene(geometry)
+        # The cull margin travels as an argument rather than a constant, so
+        # the viewer can switch culling off without recompiling: every skip
+        # test is `box_distance(p, bounds) >= threshold + margin`, and a
+        # margin of +inf makes every test false, which is the flat field.
+        # See CULL_DISABLED_MARGIN.
+        values.append(jnp.asarray(CULL_MARGIN, dtype=jnp.float32))
         distance_fn = culled_scene_sdf(geometry) if culling else None
 
         def bind(arguments):
             """Overlay the argument values onto the parameter dicts."""
             bound_free, bound_fixed = dict(free), dict(fixed)
-            for slot, argument in zip(slots, arguments):
+            for slot, argument in zip(slots, arguments[:-1]):
                 (bound_free if slot.free else bound_fixed)[slot.name] = argument
             sdf, material = scene_fn(bound_free, bound_fixed)
             if distance_fn is not None:
-                sdf = distance_fn(bound_free, bound_fixed)
+                sdf = distance_fn(bound_free, bound_fixed, arguments[-1])
             return sdf, material
 
         def distance(point, *arguments):
@@ -488,9 +532,13 @@ def compile_scene_with_uniforms(
                 "float32 vector with shape (4,)",
             ),
         )
-        reads = _uniform_reads(slots)
-        # One slot past the parameters, holding a NaN — see ShaderProgram.
+        # Two reserved slots follow the parameters: the NaN the module cannot
+        # spell as a constant, and the cull margin the viewer toggles. The
+        # margin is the last *argument*, so its read is appended to `reads`;
+        # the NaN is not an argument at all and is only ever substituted in.
         nan_slot = len(slots)
+        cull_slot = len(slots) + 1
+        reads = _uniform_reads(slots) + [f"sdf_parameters.values[{cull_slot}].x"]
         nan_expression = f"sdf_parameters.values[{nan_slot}].x"
         sections = [_uniform_block(slots, group, binding)]
         for entry_point, fn, output_shape, output_description in entries:
@@ -512,10 +560,11 @@ def compile_scene_with_uniforms(
     return ShaderProgram(
         wgsl="\n\n".join(sections),
         parameters=tuple(slots),
-        buffer_bytes=(len(slots) + 1) * PARAMETER_SLOT_BYTES,
+        buffer_bytes=(len(slots) + RESERVED_PARAMETER_SLOTS) * PARAMETER_SLOT_BYTES,
         group=group,
         binding=binding,
         nan_offset=len(slots) * PARAMETER_SLOT_BYTES,
+        cull_margin_offset=(len(slots) + 1) * PARAMETER_SLOT_BYTES,
     )
 
 
@@ -527,12 +576,13 @@ def _uniform_block(slots: list, group: int, binding: int) -> str:
     spelling of a NaN is const-evaluated and rejected (see
     :class:`ShaderProgram`).
     """
-    count = len(slots) + 1
+    count = len(slots) + RESERVED_PARAMETER_SLOTS
     lines = [f"// {len(slots)} design parameters, one vec4<f32> slot each."]
     for slot in slots:
         kind = "free" if slot.free else "fixed"
         lines.append(f"// {slot.offset:6d}  {slot.components}f  {kind:5s}  {slot.name}")
     lines.append(f"// {len(slots) * PARAMETER_SLOT_BYTES:6d}  1f  reserved  NaN")
+    lines.append(f"// {(len(slots) + 1) * PARAMETER_SLOT_BYTES:6d}  1f  reserved  cull margin")
     lines.append("struct SdfParameters {")
     lines.append(f"    values: array<vec4<f32>, {count}>,")
     lines.append("};")

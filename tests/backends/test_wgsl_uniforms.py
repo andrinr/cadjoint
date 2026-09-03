@@ -18,6 +18,7 @@ import pytest
 
 from cadjoint.backends.wgsl import (
     PARAMETER_SLOT_BYTES,
+    RESERVED_PARAMETER_SLOTS,
     ShaderProgram,
     compile_scene_to_wgsl,
     compile_scene_with_uniforms,
@@ -67,9 +68,14 @@ def test_the_buffer_layout_is_one_vec4_slot_per_parameter():
     program = compile_scene_with_uniforms(_scene())
 
     assert isinstance(program, ShaderProgram)
-    # One slot per parameter, plus the reserved NaN slot at the end.
-    assert program.buffer_bytes == (len(program.parameters) + 1) * PARAMETER_SLOT_BYTES
+    # One slot per parameter, plus the reserved slots at the end: the NaN,
+    # then the cull margin.
+    assert (
+        program.buffer_bytes
+        == (len(program.parameters) + RESERVED_PARAMETER_SLOTS) * PARAMETER_SLOT_BYTES
+    )
     assert program.nan_offset == len(program.parameters) * PARAMETER_SLOT_BYTES
+    assert program.cull_margin_offset == program.nan_offset + PARAMETER_SLOT_BYTES
     for index, parameter in enumerate(program.parameters):
         assert parameter.offset == index * PARAMETER_SLOT_BYTES
         assert 1 <= parameter.components <= 4
@@ -84,7 +90,7 @@ def test_the_buffer_layout_is_one_vec4_slot_per_parameter():
 
 def test_the_module_declares_the_uniform_it_reads():
     program = compile_scene_with_uniforms(_scene())
-    slots = len(program.parameters) + 1  # the reserved NaN slot
+    slots = len(program.parameters) + RESERVED_PARAMETER_SLOTS  # NaN, cull margin
     assert f"array<vec4<f32>, {slots}>" in program.wgsl
     assert (
         f"@group({program.group}) @binding({program.binding}) "
@@ -311,17 +317,23 @@ def test_the_free_scope_keeps_the_buffer_small_on_a_shipped_scene(stem):
     assert all(p.free for p in free_only.parameters)
     assert len(free_only.parameters) < len(everything.parameters) / 3
     assert free_only.buffer_bytes < everything.buffer_bytes / 3
-    assert free_only.buffer_bytes == (len(free_only.parameters) + 1) * PARAMETER_SLOT_BYTES
+    assert (
+        free_only.buffer_bytes
+        == (len(free_only.parameters) + RESERVED_PARAMETER_SLOTS) * PARAMETER_SLOT_BYTES
+    )
 
 
 def test_the_free_scope_reads_only_its_own_slots():
     """No read may point past the slots the program declares.
 
-    The reserved NaN slot sits one past the last parameter, so the highest
-    index the source may mention is exactly ``len(parameters)``.
+    The reserved slots sit past the last parameter — the NaN, then the cull
+    margin — so the highest index the source may mention is the last of
+    those.
     """
     program = compile_scene_with_uniforms(_shipped_scene("end_cap"))
     indices = {int(index) for index in re.findall(r"sdf_parameters\.values\[(\d+)\]", program.wgsl)}
     assert indices, "the module reads no parameters at all"
-    assert max(indices) <= len(program.parameters)
+    last = len(program.parameters) + RESERVED_PARAMETER_SLOTS - 1
+    assert max(indices) <= last
     assert program.nan_offset == len(program.parameters) * PARAMETER_SLOT_BYTES
+    assert program.cull_margin_offset == last * PARAMETER_SLOT_BYTES

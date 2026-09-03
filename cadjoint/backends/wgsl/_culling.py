@@ -79,11 +79,23 @@ def culled_scene_sdf(geometry, *, margin: float = CULL_MARGIN) -> Callable:
 
     Args:
         geometry: Root SDF node.
-        margin: Slack added to every skip test, in world units.
+        margin: Slack added to every skip test, in world units. A *traced*
+            value here is what lets the viewer switch culling off without a
+            recompile: every test is ``box_distance(p, bounds) >= threshold +
+            margin``, so an infinite margin makes all of them false and the
+            module computes the flat field (see
+            :data:`cadjoint.backends.wgsl.CULL_DISABLED_MARGIN`).
 
     Returns:
-        ``(free_params, fixed_params) -> (point -> distance)``.
+        ``(free_params, fixed_params, margin=None) -> (point -> distance)``.
+            The optional third argument replaces the build-time margin, which
+            is how a traced one gets in: the skip tests read it late, at trace
+            time, so binding it here reaches every one of them.
     """
+    # One cell, read by every skip test at trace time, so `bound` can replace
+    # the margin after the tree is built.
+    nonlocal_margin = [margin]
+
     from cadjoint.render.material import Material
     from cadjoint.sdf.boolean.base import BooleanOp
     from cadjoint.sdf.boolean.difference import Difference
@@ -165,7 +177,7 @@ def culled_scene_sdf(geometry, *, margin: float = CULL_MARGIN) -> Callable:
                         def combine(m, _s=child_sdf):
                             return smooth_min(m, _s(p, free, fixed), smoothness)
 
-                        threshold = jnp.maximum(result + band, 0.0) + margin
+                        threshold = jnp.maximum(result + band, 0.0) + nonlocal_margin[0]
                     else:
 
                         def combine(m, _s=child_sdf):
@@ -176,7 +188,7 @@ def culled_scene_sdf(geometry, *, margin: float = CULL_MARGIN) -> Callable:
                                 jnp.maximum(m, -d),
                             )
 
-                        threshold = jnp.maximum(band - result, 0.0) + margin
+                        threshold = jnp.maximum(band - result, 0.0) + nonlocal_margin[0]
 
                     if bounds is None:
                         result = combine(result)
@@ -234,7 +246,7 @@ def culled_scene_sdf(geometry, *, margin: float = CULL_MARGIN) -> Callable:
                                 m, child(_rotate_about(p, origin, direction, -_theta))
                             )
 
-                        threshold = jnp.maximum(result, 0.0) + margin
+                        threshold = jnp.maximum(result, 0.0) + nonlocal_margin[0]
                         result = _skip(box_distance(p, instance) >= threshold, result, combine)
                     return result
                 direction, spacing = values["direction"], values["spacing"]
@@ -248,7 +260,7 @@ def culled_scene_sdf(geometry, *, margin: float = CULL_MARGIN) -> Callable:
                     def combine(m, _shift=shift):
                         return jnp.minimum(m, child(p - _shift))
 
-                    threshold = jnp.maximum(result, 0.0) + margin
+                    threshold = jnp.maximum(result, 0.0) + nonlocal_margin[0]
                     result = _skip(box_distance(p, instance) >= threshold, result, combine)
                 return result
 
@@ -265,7 +277,17 @@ def culled_scene_sdf(geometry, *, margin: float = CULL_MARGIN) -> Callable:
     inner_sdf, _ = build(geometry)
     if inner_sdf is None:
         raise ValueError("The scene root is not an SDF node")
-    return lambda free, fixed: (lambda p: inner_sdf(p, free, fixed))
+
+    def bound(free, fixed, margin=None):
+        # Every `threshold = ... + margin` above is evaluated when the tree is
+        # traced, not when it is built, and Python closures read their
+        # enclosing scope late — so rebinding the name here reaches all of
+        # them without threading a fourth argument through the outlining.
+        if margin is not None:
+            nonlocal_margin[0] = margin
+        return lambda p: inner_sdf(p, free, fixed)
+
+    return bound
 
 
 def scene_bounds(geometry, free: dict, fixed: dict) -> Bounds | None:

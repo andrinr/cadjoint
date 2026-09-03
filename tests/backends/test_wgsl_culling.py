@@ -249,3 +249,91 @@ def test_box_distance_is_zero_inside_and_euclidean_outside():
     assert float(box_distance(jnp.array([0.5, 0.0, 0.0]), box)) == 0.0
     assert float(box_distance(jnp.array([1.5, 0.0, 0.0]), box)) == pytest.approx(1.0)
     assert float(box_distance(jnp.array([1.5, 1.5, 0.5]), box)) == pytest.approx(np.sqrt(2.0))
+
+
+# ── Culling as a render toggle ───────────────────────────────────────────────
+# The viewer offers culling as a switch, and the switch must not be a
+# recompile. It is not: the margin every skip test is compared against is an
+# *argument*, bound to a reserved slot in the scene shader's own parameter
+# buffer, so turning culling off is a buffer write like any other render
+# setting. An infinite margin makes every test false, which is the flat field.
+
+
+@pytest.mark.parametrize("name,scene", _cases(), ids=[name for name, _ in _cases()])
+def test_an_infinite_margin_is_the_flat_field(name, scene):
+    """Culling off computes exactly what skipping nothing computes."""
+    from cadjoint.backends.wgsl.codegen import CULL_DISABLED_MARGIN
+
+    free, fixed, _ = extract_parameters(scene)
+    points = _sample(scene, 20_000, seed=17)
+    with scalar_lowering():
+        flat = jax.jit(jax.vmap(functionalize_scene(scene)(free, fixed)[0]))(points)
+        off = jax.jit(
+            jax.vmap(culled_scene_sdf(scene)(free, fixed, jnp.float32(CULL_DISABLED_MARGIN)))
+        )(points)
+    assert float(np.max(np.abs(np.asarray(flat) - np.asarray(off)))) <= TOLERANCE
+
+
+@pytest.mark.parametrize("stem", ["starter", "end_cap"])
+def test_both_switch_positions_agree_on_a_shipped_scene(stem):
+    """On and off are the same field, at 100k points of a real part."""
+    from cadjoint.backends.wgsl._culling import CULL_MARGIN
+    from cadjoint.backends.wgsl.codegen import CULL_DISABLED_MARGIN
+
+    scene = dict(_shipped_scenes())[stem]
+    free, fixed, _ = extract_parameters(scene)
+    points = _sample(scene, 100_000, seed=19)
+    with scalar_lowering():
+        build = culled_scene_sdf(scene)
+        on = jax.jit(jax.vmap(build(free, fixed, jnp.float32(CULL_MARGIN))))(points)
+        off = jax.jit(jax.vmap(build(free, fixed, jnp.float32(CULL_DISABLED_MARGIN))))(points)
+    assert float(np.max(np.abs(np.asarray(on) - np.asarray(off)))) <= TOLERANCE
+
+
+def test_the_margin_reaches_every_skip_test():
+    """A margin bound after the tree is built must not miss a node.
+
+    The margin is read late, out of the enclosing scope, rather than threaded
+    through the outlining as a fourth argument. That works because the skip
+    tests run at trace time — but if any test had captured the *value*
+    instead, it would keep culling with the old margin and this would catch
+    it: an infinite margin that reached only some tests would still skip at
+    the others, and the two positions would disagree somewhere.
+    """
+    from cadjoint.backends.wgsl.codegen import CULL_DISABLED_MARGIN
+
+    scene = dict(_shipped_scenes())["end_cap"]
+    free, fixed, _ = extract_parameters(scene)
+    points = _sample(scene, 40_000, seed=23)
+    with scalar_lowering():
+        flat = jax.jit(jax.vmap(functionalize_scene(scene)(free, fixed)[0]))(points)
+        off = jax.jit(
+            jax.vmap(culled_scene_sdf(scene)(free, fixed, jnp.float32(CULL_DISABLED_MARGIN)))
+        )(points)
+    assert float(np.max(np.abs(np.asarray(flat) - np.asarray(off)))) <= TOLERANCE
+
+
+def test_the_program_reserves_a_slot_for_the_margin():
+    """The buffer layout the viewer writes: parameters, NaN, margin."""
+    from cadjoint.backends.wgsl import PARAMETER_SLOT_BYTES, compile_scene_with_uniforms
+    from cadjoint.backends.wgsl._culling import CULL_MARGIN
+
+    program = compile_scene_with_uniforms(
+        Union((Sphere(Scalar(0.6, free=True, name="r")), Sphere(0.4)), smoothness=0.05)
+    )
+    slots = len(program.parameters)
+    assert program.nan_offset == slots * PARAMETER_SLOT_BYTES
+    assert program.cull_margin_offset == (slots + 1) * PARAMETER_SLOT_BYTES
+    assert program.buffer_bytes == (slots + 2) * PARAMETER_SLOT_BYTES
+    assert program.as_dict()["cull_margin_offset"] == program.cull_margin_offset
+    # The default the packer writes is culling on.
+    assert program.buffer()[program.cull_margin_offset // 4] == np.float32(CULL_MARGIN)
+
+
+def test_the_uncompiled_form_still_takes_its_margin_from_the_default():
+    """The literal form has no buffer, so its margin stays a constant."""
+    from cadjoint.backends.wgsl import compile_scene_to_wgsl
+
+    code = compile_scene_to_wgsl(Union((Sphere(0.6), Sphere(0.4)), smoothness=0.05))
+    assert isinstance(code, str)
+    assert "sdf_parameters" not in code

@@ -49,9 +49,32 @@ export interface QualityPreset {
    * 160 in the path tracer — so "Ultra" meant two different marches on the
    * two sides of the same picture. It is a uniform now (`path_settings.w`),
    * and this is the one place the ladder is written.
+   *
+   * **The same on every tier, because it costs the same on every tier.**
+   * Measured on `scenes/end_cap.py` at three resolutions, a budget of 64
+   * against 384 — six times the cap — is inside the noise at all of them
+   * (1.9/1.9/1.9/1.9 ms at 319 k pixels, 2.5/2.6/2.7/2.8 at 900 k,
+   * 4.1/3.9/3.9/3.9 at 1600 k). Almost every ray converges and returns long
+   * before the cap, so the cap is not what is being paid for. What separates
+   * the tiers is the pixel budget: 1.9 → 2.7 → 3.9 ms across the same three,
+   * which is the whole of the difference.
+   *
+   * A ladder here was therefore all cost and no saving — Draft's 64 steps
+   * bought nothing and punched holes in `end_cap`'s silhouette (§13.8) — so
+   * the ladder is gone. `DisplaySettings.marchSteps` still overrides it for
+   * a scene that needs more, which `scenes/motor_shield.py` does.
    */
   marchSteps: number;
 }
+
+/**
+ * The step budget every quality tier uses.
+ *
+ * One number rather than a ladder: see `QualityPreset.marchSteps` for the
+ * measurements. 192 is the value Ultra already ran, converged on every
+ * shipped scene bar `motor_shield`, and free at every resolution.
+ */
+export const MARCH_STEPS_TIER = 192;
 
 export const QUALITY_PRESETS: Record<string, QualityPreset> = {
   draft: {
@@ -61,7 +84,7 @@ export const QUALITY_PRESETS: Record<string, QualityPreset> = {
     bounces: 3,
     shadowSamples: 1,
     samples: 128,
-    marchSteps: 64,
+    marchSteps: MARCH_STEPS_TIER,
   },
   high: {
     label: "High",
@@ -70,7 +93,7 @@ export const QUALITY_PRESETS: Record<string, QualityPreset> = {
     bounces: 6,
     shadowSamples: 2,
     samples: 512,
-    marchSteps: 96,
+    marchSteps: MARCH_STEPS_TIER,
   },
   ultra: {
     label: "Ultra",
@@ -79,7 +102,7 @@ export const QUALITY_PRESETS: Record<string, QualityPreset> = {
     bounces: 8,
     shadowSamples: 4,
     samples: 1024,
-    marchSteps: 192,
+    marchSteps: MARCH_STEPS_TIER,
   },
 };
 
@@ -100,7 +123,42 @@ export const DISPLAY = {
   flat: 4,
   hideSolid: 8,
   hardShadows: 16,
+  refineHit: 32,
+  section: 64,
 } as const;
+
+/**
+ * Sphere-tracing steps a primary ray may take, for one tier and one override.
+ *
+ * The quality tier sets a ladder (64 / 96 / 192); `marchSteps` on the display
+ * settings overrides it, and `null` means "follow the tier". Kept here rather
+ * than in the renderer because the panel has to print the same number the
+ * shader is given, and two places computing it is how they drift.
+ *
+ * @param display The display settings, whose `marchSteps` may override.
+ * @param quality The active quality tier.
+ * @returns The step budget written to `path_settings.w`.
+ */
+export function effectiveMarchSteps(
+  display: Pick<DisplaySettings, "marchSteps">,
+  quality: Pick<QualityPreset, "marchSteps">,
+): number {
+  const override = display.marchSteps;
+  if (override === null || !Number.isFinite(override)) return quality.marchSteps;
+  return Math.min(MARCH_STEPS_MAX, Math.max(MARCH_STEPS_MIN, Math.round(override)));
+}
+
+/**
+ * The range the step budget may be set to.
+ *
+ * The floor is where `scenes/end_cap.py` starts losing pixels outright (at 64
+ * a handful of grazing rays give up mid-flight and punch holes in the
+ * silhouette); the ceiling is well past the point where any shipped scene
+ * still changes, and exists so the field cannot be typed into a number that
+ * hangs the GPU.
+ */
+export const MARCH_STEPS_MIN = 16;
+export const MARCH_STEPS_MAX = 512;
 
 /** Off, one crisp occlusion ray, or a penumbra. */
 export type ShadowMode = "off" | "hard" | "soft";
@@ -196,6 +254,51 @@ export interface DisplaySettings {
    * drawn over the old one.
    */
   isoOffset: number;
+  /**
+   * Sphere-tracing steps a primary ray may take, or `null` for the tier's.
+   *
+   * A budget, not a cost: nearly every ray converges and returns long before
+   * it, so raising this is close to free and lowering it does not reliably
+   * buy time — what it does is silently drop the rays that needed the steps,
+   * which reads as holes and erosion in the silhouette. Measured per scene in
+   * `research/performance.md` §13.8.
+   */
+  marchSteps: number | null;
+  /**
+   * Secant-refine the accepted hit against the surface.
+   *
+   * The march stops at the first sample inside the epsilon band, which on a
+   * grazing ray is short of the surface. Refinement re-solves for the
+   * crossing from the two samples it already has (see `refine_hit` in
+   * `_webgpu.py`). Off by default: it is an improvement, but the default
+   * must be the image the viewer has always drawn.
+   */
+  refineHit: boolean;
+  /**
+   * Skip a boolean's far-away operands with a real branch.
+   *
+   * Not a picture setting: the culled and flat fields are the same numbers to
+   * 2.4e-7, and the rendered frames are identical to the pixel. It is here so
+   * the cost of the acceleration is visible — turning it off is 2.0x to 2.4x
+   * the frame on `end_cap` and `motor_shield`, and nothing at all on a
+   * four-leaf scene. Riding in the scene shader's own parameter buffer, it is
+   * a buffer write like any other, not a recompile.
+   */
+  cullBounds: boolean;
+  /**
+   * Cap the solid where the section plane cuts it.
+   *
+   * A *geometry* mode, not a data one. The two slice views draw the field on
+   * a card at the plane; this cuts the solid at the same plane and closes the
+   * cut with a real face, in the material of whatever was cut. Clipping
+   * without capping is what makes a cut part look hollow — the ray carries on
+   * and hits the inside of the far shell.
+   *
+   * It shares the plane with the slice views rather than having its own, so a
+   * reader places the plane once. When a field card is also on, the card is
+   * drawn on that same plane and covers the cap; the panel says so.
+   */
+  section: boolean;
 }
 
 export const DEFAULT_DISPLAY: DisplaySettings = {
@@ -224,6 +327,13 @@ export const DEFAULT_DISPLAY: DisplaySettings = {
   sdfAxis: 0,
   sdfFraction: 0.5,
   isoOffset: 0,
+  // Both inert: the tier's own budget, and the march the viewer has always
+  // run. Changing either default would change every shipped screenshot.
+  marchSteps: null,
+  refineHit: false,
+  // On, which is what the shader has done since culling shipped.
+  cullBounds: true,
+  section: false,
 };
 
 /**
@@ -345,12 +455,14 @@ export function displayFlags(
   display: DisplaySettings,
   simulationActive: boolean,
 ): number {
-  const { shadows, reflections, flatShading, hideSolid } = display;
+  const { shadows, reflections, flatShading, hideSolid, refineHit, section } = display;
   return (
     (shadows === "off" ? 0 : DISPLAY.shadows) |
     (shadows === "hard" ? DISPLAY.hardShadows : 0) |
     (reflections ? DISPLAY.reflections : 0) |
     (flatShading ? DISPLAY.flat : 0) |
+    (refineHit ? DISPLAY.refineHit : 0) |
+    (section ? DISPLAY.section : 0) |
     // While the simulation surface is shown the raymarched solid is hidden:
     // the preview pass still supplies the environment background and clears
     // depth to 1, and the FEM mesh depth-tests into that frame.

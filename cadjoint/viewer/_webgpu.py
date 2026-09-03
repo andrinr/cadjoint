@@ -88,6 +88,29 @@ const DISPLAY_REFLECTIONS: u32 = 2u;
 const DISPLAY_FLAT: u32 = 4u;
 const DISPLAY_HIDE_SOLID: u32 = 8u;
 const DISPLAY_HARD_SHADOWS: u32 = 16u;
+// Secant refinement of the accepted hit; see `refine_hit`. A new *bit* rather
+// than a new field: `display.z` is a bitfield in a struct that is already the
+// full 112 bytes the notebook widget allocates, and an f32 carries integers
+// exactly to 2^24, so bits are the one thing here that is still free.
+const DISPLAY_REFINE_HIT: u32 = 32u;
+/// Cap the solid where the section plane cuts it — see `traced_field`.
+const DISPLAY_SECTION: u32 = 64u;
+
+/// How much a section cap is darkened against the surface it cuts through.
+const SECTION_CAP_TONE: f32 = 0.72;
+
+/// How much of the sky the ground half of the hemisphere returns.
+const GROUND_BOUNCE: f32 = 0.58;
+
+/// Half-width of the band the march accepts as "on the surface".
+const SURFACE_EPS: f32 = 0.001;
+
+/// Where a primary ray gives up and reports a miss, in world units.
+const MAX_TRACE_DISTANCE: f32 = 100.0;
+
+/// Secant iterations `refine_hit` may take. Each is one field evaluation, and
+/// only pixels that already hit pay for any of them.
+const REFINE_STEPS: i32 = 4;
 
 // Hard shadows stay lifted rather than black: a single occlusion test has no
 // penumbra to soften the edge, and fully dark cores hide the geometry inside.
@@ -95,6 +118,71 @@ const HARD_SHADOW_FLOOR: f32 = 0.45;
 
 fn display_flag(flag: u32) -> bool {
   return (u32(max(u.display.z, 0.0)) & flag) != 0u;
+}
+
+/**
+ * The section plane as a half-space, signed positive on the side removed.
+ *
+ * The plane is the one the slice controls already position — same axis
+ * (`resolution.w`) and same coordinate (`camera_pos.w`) — so a reader who has
+ * placed a slice does not place it twice.
+ *
+ * **Which half is removed depends on the camera, and that is deliberate.**
+ * The design language forbids a *measurable* ground that moves with the eye:
+ * you cannot read a value off a scale that changes as you orbit. A cutaway is
+ * not a scale. Its whole purpose is to open the solid toward the reader, and
+ * a section that keeps the near half shows you the outside of the far shell —
+ * which is the "hollow" complaint this mode exists to answer. So the half the
+ * camera is on is the half that goes, and orbiting through the plane swaps
+ * them, exactly as it does in every drafting package.
+ */
+fn section_halfspace(p: vec3<f32>) -> f32 {
+  let axis = i32(round(clamp(u.resolution.w, 0.0, 2.0)));
+  let coordinate = u.camera_pos.w;
+  // +1 when the camera sits on the positive side, so that side is removed.
+  let side = select(-1.0, 1.0, u.camera_pos[axis] > coordinate);
+  return (p[axis] - coordinate) * side;
+}
+
+/**
+ * The field the tracer marches: the scene, capped at the section plane.
+ *
+ * `max(a, b)` is the intersection of two fields, and intersecting the solid
+ * with a half-space is exactly what a section is. Three things fall out of
+ * that one operation rather than having to be built:
+ *
+ * - **The cap is a real surface.** Clipping alone — refusing to draw in front
+ *   of the plane — leaves the ray to carry on and hit the *inside* of the far
+ *   shell, which is what makes a clipped solid look hollow. Intersecting
+ *   instead means the ray stops *on* the plane, because that is where the
+ *   field reaches zero.
+ * - **The cap has the right normal.** `sdf_normal` takes central differences
+ *   of this function, and on the cap the half-space is what the `max`
+ *   selected, so the differences return the plane's own normal with no
+ *   special case anywhere.
+ * - **The cap has the right material.** `material_base` is still evaluated at
+ *   the hit position, which is inside the solid that was cut, so the cut face
+ *   arrives in the colour of the thing it is a cut through.
+ *
+ * The march stays correct: both operands are proper distance fields, and the
+ * `max` of two of those never overestimates the distance to their
+ * intersection, which is the only property sphere tracing needs.
+ *
+ * `scene_field` itself is left alone, because the data views read it. A
+ * gradient view of a sectioned field would show the plane's own gradient and
+ * report the scene as metric where it is not.
+ */
+fn traced_field(p: vec3<f32>) -> f32 {
+  let field = scene_field(p);
+  if (!display_flag(DISPLAY_SECTION)) { return field; }
+  return max(field, section_halfspace(p));
+}
+
+/// True at a hit the section plane made, rather than the solid's own surface.
+fn on_section_cap(p: vec3<f32>) -> bool {
+  if (!display_flag(DISPLAY_SECTION)) { return false; }
+  // The half-space won the `max`, within the band the march accepts.
+  return section_halfspace(p) >= scene_field(p) - SURFACE_EPS;
 }
 
 // Only referenced by fs_main_depth, so pipelines built from vs_main/fs_main
@@ -108,10 +196,13 @@ __CADJOINT_CAMERA__
 
 fn sdf_normal(p: vec3<f32>) -> vec3<f32> {
   let e = 0.001;
+  // `traced_field`, not `scene_field`: on a section cap the half-space is
+  // what the `max` selected, so these differences return the plane's own
+  // normal and the cut face lights like the flat face it is.
   return safe_normalize(vec3<f32>(
-    scene_field(p + vec3<f32>( e, 0.0, 0.0)) - scene_field(p + vec3<f32>(-e, 0.0, 0.0)),
-    scene_field(p + vec3<f32>(0.0,  e, 0.0)) - scene_field(p + vec3<f32>(0.0, -e, 0.0)),
-    scene_field(p + vec3<f32>(0.0, 0.0,  e)) - scene_field(p + vec3<f32>(0.0, 0.0, -e)),
+    traced_field(p + vec3<f32>( e, 0.0, 0.0)) - traced_field(p + vec3<f32>(-e, 0.0, 0.0)),
+    traced_field(p + vec3<f32>(0.0,  e, 0.0)) - traced_field(p + vec3<f32>(0.0, -e, 0.0)),
+    traced_field(p + vec3<f32>(0.0, 0.0,  e)) - traced_field(p + vec3<f32>(0.0, 0.0, -e)),
   ));
 }
 
@@ -130,13 +221,89 @@ fn sdf_gradient_magnitude(p: vec3<f32>, e: f32) -> f32 {
   )) / (2.0 * e);
 }
 
+/**
+ * Tighten an accepted hit onto the surface, from the two samples the march
+ * already holds.
+ *
+ * Sphere tracing stops at the first sample whose |f| is inside
+ * `SURFACE_EPS` and takes that sample's `t` as the hit. On a ray meeting the
+ * surface squarely that is accurate to the band. On a grazing one it is not:
+ * the step is `0.9|f|`, and along a near-tangent |f| falls slowly, so the
+ * march creeps and stops while still up to a whole epsilon short. The error
+ * lies along the ray, which is why it shows as a bevelled, crawling
+ * silhouette and as normals sampled off the surface rather than on it.
+ *
+ * `f` restricted to the ray is a scalar function of `t`, so this is just root
+ * finding, and the march has already produced two samples of it. The secant
+ * rule takes the first correction for free — no field evaluation at all —
+ * and each further step costs one.
+ *
+ * The clamp is the whole safety argument. `f` along a ray is only locally
+ * linear, and an unclamped secant step on a non-monotone field (a thin wall,
+ * a blend fillet) can land anywhere, including behind the camera. Confining
+ * every step to the bracket the march established, widened by one epsilon,
+ * means refinement can move the hit by at most an epsilon in either
+ * direction — which is exactly the error it exists to remove, and never more.
+ * A hit is never created, destroyed or moved to another surface: silhouettes
+ * are identical with this on and off.
+ *
+ * The path tracer has done the same thing since it was written
+ * (`refine_sign_crossing`, seven bisections on a sign bracket). This is the
+ * preview catching up, which is also why the two used to disagree about where
+ * a grazing surface was.
+ */
+fn refine_hit(
+  ro: vec3<f32>,
+  rd: vec3<f32>,
+  t_prev: f32,
+  d_prev: f32,
+  t_hit: f32,
+  d_hit: f32,
+) -> f32 {
+  var ta = t_prev;
+  var da = d_prev;
+  var tb = t_hit;
+  var db = d_hit;
+  let low = min(t_prev, t_hit) - SURFACE_EPS;
+  let high = max(t_prev, t_hit) + SURFACE_EPS;
+  for (var i = 0; i < REFINE_STEPS; i++) {
+    let denom = db - da;
+    // Two samples of equal value say nothing about where the root is.
+    if (abs(denom) < 1e-9) { break; }
+    let tc = clamp(tb - db * (tb - ta) / denom, low, high);
+    let dc = traced_field(ro + rd * tc);
+    ta = tb;
+    da = db;
+    tb = tc;
+    db = dc;
+    if (abs(dc) < SURFACE_EPS * 0.01) { break; }
+  }
+  return tb;
+}
+
 fn trace(ro: vec3<f32>, rd: vec3<f32>) -> f32 {
   var t = 0.01;
+  // The sample before the current one, which is the second point the secant
+  // rule needs. Held whether or not refinement is on: the branch is on a
+  // uniform, so it is coherent across the whole draw, and the bookkeeping is
+  // two registers rather than a divergent path.
+  var t_prev = t;
+  var d_prev = 0.0;
+  var have_prev = false;
+  let refine = display_flag(DISPLAY_REFINE_HIT);
   let budget = trace_steps();
   for (var i = 0; i < budget; i++) {
-    let d = scene_field(ro + rd * t);
-    if (abs(d) < 0.001) { return t; }
-    if (t > 100.0) { return -1.0; }
+    let d = traced_field(ro + rd * t);
+    if (abs(d) < SURFACE_EPS) {
+      if (refine && have_prev) {
+        return refine_hit(ro, rd, t_prev, d_prev, t, d);
+      }
+      return t;
+    }
+    if (t > MAX_TRACE_DISTANCE) { return -1.0; }
+    t_prev = t;
+    d_prev = d;
+    have_prev = true;
     t += max(abs(d) * 0.9, 0.0005);
   }
   return -1.0;
@@ -148,7 +315,7 @@ fn hard_shadow(ro: vec3<f32>, rd: vec3<f32>) -> f32 {
   var t = 0.02;
   let budget = trace_steps() / 2;
   for (var i = 0; i < budget; i++) {
-    let h = scene_field(ro + rd * t);
+    let h = traced_field(ro + rd * t);
     if (h < 0.001) { return 0.0; }
     t += max(h, 0.002);
     if (t > 30.0) { break; }
@@ -161,7 +328,7 @@ fn soft_shadow(ro: vec3<f32>, rd: vec3<f32>, k: f32) -> f32 {
   var t = 0.02;
   let budget = trace_steps() / 3;
   for (var i = 0; i < budget; i++) {
-    let h = scene_field(ro + rd * t);
+    let h = traced_field(ro + rd * t);
     if (h < 0.001) { return 0.0; }
     visibility = min(visibility, k * h / t);
     t += max(h * 0.9, 0.0005);
@@ -192,6 +359,31 @@ fn environment_radiance(direction: vec3<f32>) -> vec3<f32> {
 fn fresnel_schlick(cosine: f32, f0: vec3<f32>) -> vec3<f32> {
   return f0 + (vec3<f32>(1.0) - f0) *
     pow(1.0 - clamp(cosine, 0.0, 1.0), 5.0);
+}
+
+/// Rotate a direction about the world's up axis (+Z).
+fn rotate_about_up(direction: vec3<f32>, angle: f32) -> vec3<f32> {
+  let c = cos(angle);
+  let s = sin(angle);
+  return vec3<f32>(
+    direction.x * c - direction.y * s,
+    direction.x * s + direction.y * c,
+    direction.z,
+  );
+}
+
+/**
+ * Sky above, ground below, keyed on the world's up axis.
+ *
+ * The viewport's own radiance is the sky; the ground is that radiance
+ * darkened, which is what a light floor under a part actually does — it
+ * bounces, but less than the dome above it. Both are achromatic, so this
+ * lifts an unlit face without tinting it: the model's colour stays the
+ * model's own, and a viridis field drawn on it is still readable as viridis.
+ */
+fn hemisphere_radiance(normal: vec3<f32>) -> vec3<f32> {
+  let sky = environment_radiance(vec3<f32>(0.0, 0.0, 1.0));
+  return mix(sky * GROUND_BOUNCE, sky, 0.5 + 0.5 * normal.z);
 }
 
 fn shade_material(
@@ -251,6 +443,36 @@ fn shade_material(
   let facing = abs(dot(normal, view_direction));
   let contour = mix(0.16, 1.0, smoothstep(0.0, 0.30, facing));
 
+  // The cut face, darkened.
+  //
+  // Drafting hatches a section because the cut is a fiction — it is not a
+  // surface the part has, and a reader has to be able to tell it from one
+  // that is. A hatch cannot be drawn here: it is a screen-space pattern, and
+  // this shader is also what the path tracer converges to and what the
+  // thumbnailer renders at other sizes, so a fixed pitch would alias in one
+  // and disappear in the other. A flat multiplier says the same thing at
+  // every scale. 0.72 is the value that separates the cap from the darkest
+  // real face at a grazing angle without turning it into a hole.
+  let cut = select(1.0, SECTION_CAP_TONE, on_section_cap(position));
+
+  // The rig's two fills, 120 degrees either side of the key about world up.
+  // Declared here because both branches below need them: between the three
+  // directions no normal is more than 60 degrees from a light, which is what
+  // stops a face going dark just because the camera moved to it.
+  let fill_a = rotate_about_up(light_direction, 2.0944);
+  // The second fill is turned the other way *and* pushed below the horizon.
+  //
+  // A textbook three-point rig keeps every lamp above the subject, because a
+  // photographer's subject is not inspected from underneath. A part is: the
+  // orbit goes all the way round, and with all three lamps above, a face
+  // pointing down received nothing but the ground half of the hemisphere.
+  // That was the one view the rig did not fix — 56 % of the model's pixels
+  // still below a readable level when the camera looked up at the board.
+  let fill_b_azimuth = rotate_about_up(light_direction, -2.0944);
+  let fill_b = normalize(vec3<f32>(fill_b_azimuth.xy, -abs(fill_b_azimuth.z)));
+  let fill_incidence =
+    max(dot(normal, fill_a), 0.0) * 0.34 + max(dot(normal, fill_b), 0.0) * 0.26;
+
   if (display_flag(DISPLAY_FLAT)) {
     // Flat shading: albedo lit only by incidence and shadowing — no specular
     // and no environment. The floor was 0.35 against a black viewport, where
@@ -260,21 +482,47 @@ fn shade_material(
     // 0.30..0.92 of a 0.85 albedo lands at sRGB 166..224 against a 230 ground,
     // which is the pale blob. 0.13..0.48 lands at 105..193 — a solid grey part
     // — and the contour closes the silhouette.
-    return base_color * mix(0.13, 0.48, normal_dot_light * visibility) * contour;
+    // The key's share is shadowed; the fills' is not, for the same reason
+    // they cast nothing. The window is unchanged at its ends — an unlit face
+    // still lands at 0.13 and a fully lit one at 0.48 — but a face the key
+    // has turned away from now sits inside it rather than on the floor.
+    let incidence = clamp(normal_dot_light * visibility + fill_incidence, 0.0, 1.0);
+    return base_color * mix(0.13, 0.48, incidence) * contour * cut;
   }
-  let light_radiance =
-    vec3<f32>(1.0, 0.92, 0.82) * max(u.light_dir.w, 1.0);
+  let intensity = max(u.light_dir.w, 1.0);
+  // **White, not warm.** This used to be vec3(1.0, 0.92, 0.82), which tinted
+  // every face of every part. Colour in this app is a reading — a material,
+  // or a viridis field — and a light that pushes the whole model toward amber
+  // competes with both. The rig is achromatic and the model's colour is the
+  // model's own.
+  let light_radiance = vec3<f32>(1.0) * intensity;
   let direct =
     (diffuse + specular) * light_radiance * normal_dot_light * visibility;
-  // The dome is now roughly the background's own radiance rather than a dark
-  // gradient, so the same 0.18 coefficient delivers about five times the
-  // ambient it used to. 0.07 keeps the unlit side of a part where it was in
-  // absolute terms, which is what stops the whole model flattening to the
-  // ground's value.
-  let ambient = base_color * environment_radiance(normal) * 0.07;
+
+  // Two fills, at a third and a fifth of the key.
+  //
+  // One directional light leaves a whole hemisphere of normals on ambient
+  // alone, so orbiting to the far side of a part gave a flat dark shape —
+  // which is what "objects are better visible from more angles" was about.
+  // The fills sit 120 degrees either side of the key about the world's up
+  // axis, so between the three of them no normal is more than 60 degrees from
+  // a light. They are diffuse-only and cast nothing: a fill that threw its
+  // own shadow would put a second, contradictory shadow under the part, and
+  // the cost of the extra marches is the whole reason the key is the only
+  // one that gets them.
+  let fill = base_color * (1.0 - metallic) * intensity * fill_incidence;
+
+  // A hemisphere rather than a constant.
+  //
+  // `environment_radiance` is one flat colour, so ambient used to add the
+  // same amount to every normal — light, but formless, and it could not tell
+  // an upward face from a downward one. A sky/ground pair keyed on the
+  // world's up axis costs one mix and gives the unlit side of a part its
+  // shape back.
+  let ambient = base_color * hemisphere_radiance(normal) * 0.22;
   let reflected = environment_radiance(reflect(ray_direction, normal));
   let mirror = select(0.0, reflectivity, display_flag(DISPLAY_REFLECTIONS));
-  let opaque = mix(direct + ambient, reflected, mirror) * contour;
+  let opaque = mix(direct + fill + ambient, reflected, mirror) * contour * cut;
   let glass_fresnel = fresnel_schlick(
     max(dot(view_direction, normal), 0.0),
     vec3<f32>(0.04),

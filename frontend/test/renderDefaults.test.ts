@@ -45,18 +45,27 @@ describe("the default quality tier", () => {
     }
   });
 
-  it("orders the ladder so every knob rises together", () => {
+  it("orders the ladder so every knob that costs something rises together", () => {
     const tiers = [QUALITY_PRESETS.draft, QUALITY_PRESETS.high, QUALITY_PRESETS.ultra];
     for (const key of [
       "pixelBudget",
       "bounces",
       "shadowSamples",
       "samples",
-      "marchSteps",
     ] as const) {
       expect(tiers[0][key], key).toBeLessThan(tiers[1][key]);
       expect(tiers[1][key], key).toBeLessThan(tiers[2][key]);
     }
+  });
+
+  it("holds the march budget flat, because it is not one of them", () => {
+    // A tier should only ladder what a tier actually buys. The step budget is
+    // a cap, not a cost: measured on end_cap at 319 k / 900 k / 1600 k
+    // pixels, 64 steps against 384 is inside the noise at every one. Laddering
+    // it bought no time and cost Draft a broken silhouette, so it is now one
+    // number for all three and `DisplaySettings.marchSteps` overrides it.
+    const tiers = [QUALITY_PRESETS.draft, QUALITY_PRESETS.high, QUALITY_PRESETS.ultra];
+    expect(new Set(tiers.map((tier) => tier.marchSteps)).size).toBe(1);
   });
 });
 

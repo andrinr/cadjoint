@@ -32,12 +32,14 @@ interface PresetStorage {
  * Bumped with every change to the shape of a stored preset.
  *
  * v3 adds the SDF-view settings and moves every preset to the Ultra quality
- * tier. A v2 entry validates as incomplete and is discarded rather than
+ * tier. v4 adds the three march settings — the step budget, hit refinement
+ * and bounds culling; v5 adds the capped section.
+ * An older entry validates as incomplete and is discarded rather than
  * migrated: these are three named bundles of defaults, not user documents, and
  * a reader that silently half-applies an old bundle is worse than one that
  * starts from the shipped preset.
  */
-export const RENDER_PRESET_STORAGE_KEY = "cadjoint.render-presets.v3";
+export const RENDER_PRESET_STORAGE_KEY = "cadjoint.render-presets.v5";
 
 export const DEFAULT_RENDER_PRESETS: RenderPreset[] = [
   {
@@ -126,7 +128,15 @@ function isDisplaySettings(value: unknown): value is DisplaySettings {
     typeof display.sdfFraction === "number" &&
     Number.isFinite(display.sdfFraction) &&
     typeof display.isoOffset === "number" &&
-    Number.isFinite(display.isoOffset)
+    Number.isFinite(display.isoOffset) &&
+    // `null` is the legitimate "follow the quality tier" value, so this is
+    // one of the few fields where null has to pass.
+    (display.marchSteps === null ||
+      (typeof display.marchSteps === "number" &&
+        Number.isFinite(display.marchSteps))) &&
+    typeof display.refineHit === "boolean" &&
+    typeof display.cullBounds === "boolean" &&
+    typeof display.section === "boolean"
   );
 }
 

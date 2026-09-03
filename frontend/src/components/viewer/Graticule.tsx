@@ -23,6 +23,7 @@ import {
   formatDistance,
   formatGain,
   gainOf,
+  gridPlane,
   octant,
   viewLabel,
 } from "../../viewer/graticule";
@@ -123,11 +124,15 @@ export function Graticule(props: GraticuleProps) {
           class="graticule-gain"
           classList={{ plated: props.sdfView !== "solid" }}
           data-testid="graticule-gain"
-          title="Floor grid spacing, on a 1-2-5 ladder. Scroll to zoom freely; hold Alt to zoom in detents. A > prefix means an on-screen measurement is not to scale."
+          title="Construction grid spacing, on a 1-2-5 ladder, and the world plane it is ruled on: the floor XY wherever the floor is worth drawing, the wall the camera faces in the shallow views where it is not. Scroll to zoom freely; hold Alt to zoom in detents. A > prefix means an on-screen measurement is not to scale."
         >
           <span>GRID</span>
           <b>{gain().text}</b>
-          <i>{gain().unit}</i>
+          {/* The plane qualifies the spacing the way the octant qualifies the
+              view: a number of millimetres between lines says nothing until
+              you know which plane the lines are on, and the grid no longer
+              always answers "the floor". */}
+          <i>{gain().unit} · {gridPlane(props.camera.yaw, props.camera.pitch)}</i>
           <span>VIEW</span>
           <b>{viewLabel(props.camera.yaw, props.camera.pitch)}</b>
           <i>· {octant(props.camera.yaw, props.camera.pitch)}</i>

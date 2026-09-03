@@ -25,8 +25,17 @@ import type { ShaderStats } from "../src/viewer/renderer";
 const PORT = process.env.CADJOINT_E2E_PORT ?? 8799;
 
 async function waitForCompile(page: Page) {
-  await expect(page.getByTestId("status")).not.toContainText("compiling", { timeout: 90_000 });
-  await expect(page.getByTestId("run")).toBeEnabled({ timeout: 90_000 });
+  // The settle signal is the toolbar's busy seam. It is present for exactly
+  // as long as the app is behind its own source — from the edit, through the
+  // debounce window and the request, until the shaders are installed — which
+  // the status line no longer is: while work is in flight the status says
+  // nothing at all, so that the one indicator for running work is the
+  // toolbar's chip. A settled status is therefore a second, independent
+  // signal, and "Starting…" is the placeholder to wait past on a cold load.
+  await expect(page.getByTestId("status")).not.toHaveText(/^(|Starting…)$/, {
+    timeout: 90_000,
+  });
+  await expect(page.getByTestId("toolbar-busy")).toHaveCount(0, { timeout: 90_000 });
 }
 
 async function stats(page: Page): Promise<ShaderStats | null> {
@@ -267,6 +276,114 @@ test("dragging a parameter at frame rate rebuilds no pipeline", async ({}, testI
   expect(errors.join("\n")).not.toContain("WGSL");
   testInfo.attach("drag", {
     body: JSON.stringify({ before, after, dragged, changed }, null, 1),
+    contentType: "application/json",
+  });
+  await browser.close();
+});
+
+/**
+ * A render setting is not a scene edit.
+ *
+ * The march settings — the step budget, hit refinement, bounds culling — are
+ * choices about how the viewer draws, not about what the model is. So they
+ * must reach the GPU without a shader module, without a pipeline and without
+ * a round trip to the worker, and they must survive a recompile rather than
+ * being reset by one.
+ *
+ * All three claims are negatives, so all three are checked against counters,
+ * and the settings are driven through the real panel rather than by poking
+ * the renderer: a control that works only when called directly is not a
+ * control.
+ */
+test("changing a march setting rebuilds nothing", async ({}, testInfo) => {
+  const browser = await chromium.launch({
+    args: [
+      "--enable-unsafe-webgpu",
+      "--enable-features=Vulkan,WebGPU",
+      "--use-angle=metal",
+      "--use-gl=angle",
+      "--ignore-gpu-blocklist",
+      "--enable-gpu",
+    ],
+  });
+  const page = await browser.newPage({ viewport: { width: 1200, height: 800 } });
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+
+  await page.goto(`http://127.0.0.1:${PORT}/`);
+  const adapter = await page.evaluate(async () => {
+    if (!navigator.gpu) return null;
+    return (await navigator.gpu.requestAdapter()) ? "available" : null;
+  });
+  if (!adapter) {
+    await browser.close();
+    test.skip(true, "No WebGPU adapter in this browser build");
+    return;
+  }
+  await waitForCompile(page);
+
+  const source = [
+    "from cadjoint.sdf import Sphere, Box, Union",
+    "from cadjoint.geometry.parameters import Scalar",
+    "",
+    "radius = Scalar(0.60, free=True, name='radius')",
+    "scene = Union((Sphere(radius=radius), Box(size=[0.9, 0.5, 0.2])), smoothness=0.05)",
+    "",
+  ].join("\n");
+  await recompile(page, source);
+
+  // Open the settings and expand the per-setting editor.
+  await page.getByTestId("display-options").click();
+  await expect(page.getByTestId("render-panel")).toBeVisible();
+  await page.getByTestId("render-customize").click();
+  await expect(page.getByTestId("render-march")).toBeVisible();
+
+  const before = await stats(page);
+  expect(before!.hasParameterBuffer).toBe(true);
+
+  // ── the three controls ───────────────────────────────────────────────
+  await page.getByTestId("toggle-refine-hit").check();
+  await expect(page.getByTestId("toggle-refine-hit")).toBeChecked();
+
+  // The budget: a range input, set through its value and an input event.
+  await page.getByTestId("march-steps").fill("320");
+  await expect(page.getByTestId("march-steps-value")).toContainText("320 steps");
+
+  await page.getByTestId("toggle-cull-bounds").uncheck();
+  await expect(page.getByTestId("toggle-cull-bounds")).not.toBeChecked();
+  // Let a frame carry each change to the GPU.
+  await page.waitForTimeout(300);
+
+  const after = await stats(page);
+  expect(after!.pipelineBuilds, "a render setting builds no pipeline").toBe(
+    before!.pipelineBuilds,
+  );
+  expect(after!.misses, "a render setting compiles no shader module").toBe(
+    before!.misses,
+  );
+
+  // ── and they survive a recompile ─────────────────────────────────────
+  // The settings are the viewer's, not the scene's, so a fresh compile must
+  // not reset them.
+  await recompile(page, source.replace("Scalar(0.60,", "Scalar(0.44,"));
+  await page.getByTestId("display-options").click();
+  await expect(page.getByTestId("render-panel")).toBeVisible();
+  await page.getByTestId("render-customize").click();
+  await expect(page.getByTestId("toggle-refine-hit")).toBeChecked();
+  await expect(page.getByTestId("toggle-cull-bounds")).not.toBeChecked();
+  await expect(page.getByTestId("march-steps-value")).toContainText("320 steps");
+
+  // The parameter edit itself still took the values-only path.
+  const recompiled = await stats(page);
+  expect(recompiled!.pipelineBuilds).toBe(before!.pipelineBuilds);
+
+  // ── back to the tier ─────────────────────────────────────────────────
+  await page.getByTestId("march-steps-tier").click();
+  await expect(page.getByTestId("march-steps-value")).toContainText("192 steps");
+
+  expect(errors.join("\n")).not.toContain("WGSL");
+  testInfo.attach("march", {
+    body: JSON.stringify({ before, after, recompiled }, null, 1),
     contentType: "application/json",
   });
   await browser.close();

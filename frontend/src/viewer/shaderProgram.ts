@@ -62,8 +62,37 @@ export interface ShaderProgramPayload {
    * owns.
    */
   nan_offset?: number;
+  /**
+   * Byte offset of the reserved slot holding the bounding-box cull margin.
+   *
+   * Every skip test inside the *generated* module reads
+   * `box_distance(p, bounds) >= threshold + margin`, so writing
+   * `CULL_MARGIN_OFF` here makes every test false and the shader falls back
+   * to evaluating every leaf. That is what makes culling a render toggle
+   * rather than a recompile: the tests are in the scene shader, which reads
+   * no uniform but this buffer.
+   */
+  cull_margin_offset?: number | null;
   parameters: ShaderParameterSlot[];
 }
+
+/**
+ * The cull margin that leaves culling on.
+ *
+ * World-unit slack on every skip test, so float rounding in the box distance
+ * can never flip a test the exact arithmetic would not. Mirrors `CULL_MARGIN`
+ * in `cadjoint/backends/wgsl/_culling.py`.
+ */
+export const CULL_MARGIN_ON = 1e-4;
+
+/**
+ * The cull margin that switches culling off.
+ *
+ * Infinity, so no box test can ever pass and no operand is ever skipped. The
+ * image is identical either way — measured at zero changed pixels on every
+ * shipped scene — and the cost is 2.0x to 2.4x the frame.
+ */
+export const CULL_MARGIN_OFF = Number.POSITIVE_INFINITY;
 
 /** Bytes per parameter: one `vec4<f32>`. Mirrors `PARAMETER_SLOT_BYTES`. */
 export const PARAMETER_SLOT_BYTES = 16;
@@ -80,11 +109,13 @@ export const PARAMETER_SLOT_BYTES = 16;
  *
  * @param program The compiled scene's uniform contract.
  * @param overrides Values to substitute, keyed by parameter name.
+ * @param cullMargin `CULL_MARGIN_ON` or `CULL_MARGIN_OFF`; see the field.
  * @returns A `float32` array of `buffer_bytes / 4` elements, padding zeroed.
  */
 export function packParameters(
   program: ShaderProgramPayload,
   overrides?: Readonly<Record<string, readonly number[]>>,
+  cullMargin: number = CULL_MARGIN_ON,
 ): Float32Array {
   const packed = new Float32Array(Math.max(program.buffer_bytes, PARAMETER_SLOT_BYTES) / 4);
   for (const slot of program.parameters) {
@@ -99,8 +130,15 @@ export function packParameters(
         : component;
     }
   }
-  // The reserved slot: the module reads its NaN from here.
+  // The reserved slots: the module reads its NaN from one and the margin
+  // every bounding-box skip test is compared against from the other.
   if (program.nan_offset !== undefined) packed[program.nan_offset / 4] = Number.NaN;
+  // `null` and absent both mean the program reserved no margin slot — a
+  // literal-form shader, or one built before the toggle existed. Writing
+  // anywhere on that basis would land on a real parameter.
+  if (program.cull_margin_offset != null) {
+    packed[program.cull_margin_offset / 4] = cullMargin;
+  }
   return packed;
 }
 
