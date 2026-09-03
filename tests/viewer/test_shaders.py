@@ -8,11 +8,15 @@ WGSL a browser would, so syntax and type errors fail here instead.
 import struct
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 wgpu = pytest.importorskip("wgpu", reason="wgpu is needed to validate WGSL")
 
-from cadjoint.backends.wgsl import compile_scene_to_wgsl  # noqa: E402
+from cadjoint.backends.wgsl import (  # noqa: E402
+    PARAMETER_SLOT_BYTES,
+    compile_scene_to_wgsl,
+)
 from cadjoint.sdf.boolean import Union  # noqa: E402
 from cadjoint.sdf.primitives import Sphere  # noqa: E402
 from cadjoint.viewer._pathtracer import (  # noqa: E402
@@ -23,6 +27,7 @@ from cadjoint.viewer._webgpu import build_viewer_shader  # noqa: E402
 
 OVERLAY_WGSL = Path(__file__).resolve().parents[2] / "frontend/src/viewer/overlay.wgsl"
 SIMULATION_WGSL = Path(__file__).resolve().parents[2] / "frontend/src/viewer/simulation.wgsl"
+GRATICULE_WGSL = Path(__file__).resolve().parents[2] / "frontend/src/viewer/graticule.wgsl"
 
 
 @pytest.fixture(scope="module")
@@ -79,6 +84,17 @@ def test_sketch_scene_shader_compiles(device):
 @pytest.mark.skipif(not SIMULATION_WGSL.is_file(), reason="frontend sources not present")
 def test_simulation_shader_compiles(device):
     compile_wgsl(device, SIMULATION_WGSL.read_text(), "simulation")
+
+
+@pytest.mark.skipif(not GRATICULE_WGSL.is_file(), reason="frontend sources not present")
+def test_graticule_shader_compiles(device):
+    """The construction grid rules three world planes, each with `fwidth`.
+
+    Derivatives are only legal in uniform control flow, and the plane the grid
+    lands on is chosen per draw — so the one thing that can go wrong here is
+    invisible in a unit test and shows up as a compile failure in a browser.
+    """
+    compile_wgsl(device, GRATICULE_WGSL.read_text(), "graticule")
 
 
 def test_invalid_wgsl_is_actually_rejected(device):
@@ -184,13 +200,17 @@ OVERLAY_BLEND = {
             "overlay.wgsl",
             "vs_handle",
             "fs_handle",
-            32,
+            # Centre, colour, emphasis, and the fill flag that draws a point
+            # backed by a free design parameter as a disc and one the shader
+            # holds as a constant as a ring.
+            36,
             "instance",
             OVERLAY_BLEND,
             [
                 {"shader_location": 0, "offset": 0, "format": "float32x3"},
                 {"shader_location": 1, "offset": 12, "format": "float32x4"},
                 {"shader_location": 2, "offset": 28, "format": "float32"},
+                {"shader_location": 3, "offset": 32, "format": "float32"},
             ],
         ),
         # The simulation surface: interleaved position + scalar + overlay
@@ -288,11 +308,17 @@ def parameter_pipeline_layout(device, scene_layout, program):
     return parameter_layout, device.create_pipeline_layout(bind_group_layouts=layouts)
 
 
-def parameter_bind_group(device, layout, program):
-    """The program's current values, packed and bound."""
-    buffer = device.create_buffer_with_data(
-        data=program.buffer().tobytes(), usage=wgpu.BufferUsage.UNIFORM
-    )
+def parameter_bind_group(device, layout, program, cull_margin=None):
+    """The program's current values, packed and bound.
+
+    ``cull_margin`` overrides the reserved cull-margin slot, which is how the
+    viewer switches bounding-box culling off without a recompile: an infinite
+    margin makes every skip test false.
+    """
+    packed = program.buffer()
+    if cull_margin is not None:
+        packed[program.cull_margin_offset // 4] = cull_margin
+    buffer = device.create_buffer_with_data(data=packed.tobytes(), usage=wgpu.BufferUsage.UNIFORM)
     return device.create_bind_group(
         layout=layout,
         entries=[{"binding": program.binding, "resource": {"buffer": buffer}}],
@@ -407,11 +433,12 @@ def test_preview_and_overlay_draw_in_one_pass(device, scene_code):
     handle_pipeline = overlay_pipeline(
         "vs_handle",
         "fs_handle",
-        32,
+        36,
         [
             {"shader_location": 0, "offset": 0, "format": "float32x3"},
             {"shader_location": 1, "offset": 12, "format": "float32x4"},
             {"shader_location": 2, "offset": 28, "format": "float32"},
+            {"shader_location": 3, "offset": 32, "format": "float32"},
         ],
     )
     overlay_bind_group = device.create_bind_group(
@@ -428,7 +455,7 @@ def test_preview_and_overlay_draw_in_one_pass(device, scene_code):
         ],
     )
     edges = device.create_buffer(size=40 * 4, usage=wgpu.BufferUsage.VERTEX)
-    handles = device.create_buffer(size=32 * 4, usage=wgpu.BufferUsage.VERTEX)
+    handles = device.create_buffer(size=36 * 4, usage=wgpu.BufferUsage.VERTEX)
 
     encoder = device.create_command_encoder()
     render_pass = encoder.begin_render_pass(
@@ -489,6 +516,7 @@ def render_preview(
     sdf=SOLID_VIEW,
     read="color",
     program=None,
+    cull_margin=None,
 ):
     """Render one preview frame and read one of its attachments back.
 
@@ -512,7 +540,12 @@ def render_preview(
         format="depth32float",
         usage=wgpu.TextureUsage.RENDER_ATTACHMENT | wgpu.TextureUsage.COPY_SRC,
     )
-    module = device.create_shader_module(code=build_viewer_shader(scene_code))
+    built = (
+        str(scene_code)
+        if isinstance(scene_code, _SceneCodeOverride)
+        else build_viewer_shader(scene_code)
+    )
+    module = device.create_shader_module(code=built)
     bind_group_layout, pipeline_layout = shared_layout(device, [0, 2])
     parameter_layout = None
     if program is not None:
@@ -596,7 +629,8 @@ def render_preview(
     render_pass.set_bind_group(0, bind_group)
     if parameter_layout is not None:
         render_pass.set_bind_group(
-            program.group, parameter_bind_group(device, parameter_layout, program)
+            program.group,
+            parameter_bind_group(device, parameter_layout, program, cull_margin),
         )
     render_pass.draw(3)
     render_pass.end()
@@ -907,3 +941,243 @@ def test_the_uniform_form_follows_its_buffer(device, parametric_scene):
     assert moved.wgsl == program.wgsl, "only the values were meant to change"
     after = render_preview(device, moved.wgsl, program=moved)
     assert before != after, "halving the radius did not change the image"
+
+
+# ── The march settings ───────────────────────────────────────────────────────
+# Three render settings reach the shader without a recompile: the step budget
+# (`path_settings.w`), hit refinement (a bit in `display.z`) and bounds
+# culling (a reserved slot in the scene's own parameter buffer). Two rules
+# govern all three, and both are checked here: the defaults must draw exactly
+# the image the viewer drew before they existed, and a setting that claims to
+# change nothing visible must actually change nothing.
+
+#: The refinement bit, matching DISPLAY_REFINE_HIT in `_webgpu.py` and
+#: `DISPLAY.refineHit` in `display.ts`.
+REFINE_HIT = 32
+
+#: What the frontend writes to switch culling off — see `CULL_MARGIN_OFF`.
+CULL_OFF = float("inf")
+
+
+def _without_refinement(code: str) -> str:
+    """The same shader with the refinement branch forced off.
+
+    Stands in for the shader as it was before refinement existed. The
+    substitution is one line and the compiler folds the branch away, so what
+    this renders is the old `trace` — including the absence of the
+    `t_prev`/`d_prev` bookkeeping, which is the thing that could have moved
+    the default image without anyone noticing.
+    """
+    marker = "let refine = display_flag(DISPLAY_REFINE_HIT);"
+    assert marker in code, "the refinement branch is not where this test expects it"
+    return code.replace(marker, "let refine = false;")
+
+
+@pytest.mark.parametrize(
+    ("label", "display"),
+    [
+        ("perspective", PERSPECTIVE),
+        ("flat shading", (0.0, 0.0, float(FLAT), 0.0)),
+        ("x-ray", (0.0, 0.0, float(SHADOWS | REFLECTIONS), 1.0)),
+    ],
+)
+def test_the_default_settings_draw_the_shader_that_has_no_refinement(
+    device, scene_code, label, display
+):
+    """The defaults must reproduce today's image, to the byte.
+
+    Adding refinement put two extra `var`s in the primary march and a branch
+    on its exit. With the flag clear none of it may reach the picture — not
+    approximately, exactly, because "the default is unchanged" is the whole
+    licence for adding the feature at all.
+    """
+    current = build_viewer_shader(scene_code)
+    before = _without_refinement(current)
+    assert render_preview(device, scene_code, display=display) == render_preview(
+        device, _SceneCodeOverride(before), display=display
+    )
+
+
+class _SceneCodeOverride(str):
+    """A prebuilt viewer shader passed where scene code is expected.
+
+    `render_preview` wraps whatever it is given in `build_viewer_shader`; this
+    marks a string that is already wrapped, so the two shaders under test
+    differ in exactly one line and nothing else.
+    """
+
+
+def test_refinement_moves_the_grazing_pixels_and_no_others(device, scene_code):
+    """On is a different image, and only along the silhouette.
+
+    A refinement that changed nothing would be a knob with no effect; one that
+    changed a large fraction of the frame would be moving the surface rather
+    than resolving it. Both are failures, and this brackets the real
+    behaviour between them.
+    """
+    plain = render_preview(device, scene_code)
+    refined = render_preview(
+        device, scene_code, display=(0.0, 0.0, float(SHADOWS | REFLECTIONS | REFINE_HIT), 0.0)
+    )
+    changed = sum(1 for a, b in zip(plain, refined) if a != b)
+    assert changed > 0, "refinement changed nothing at all"
+    # Measured at 0.1-2.1 % of the frame on the shipped scenes; a tenth of the
+    # image is far past anything a sub-epsilon correction can justify.
+    assert changed < len(plain) * 0.1, f"refinement moved {changed} of {len(plain)} pixels"
+
+
+def test_bounds_culling_is_invisible(device, parametric_scene):
+    """Culling off must draw the identical frame, at 2x the cost.
+
+    The whole argument for skipping a leaf is that the skip is only taken
+    where the exact value is provably what the result already is. If that
+    holds, the toggle cannot be seen; if it does not, this is where it shows.
+    """
+    from cadjoint.backends.wgsl import compile_scene_with_uniforms
+
+    program = compile_scene_with_uniforms(parametric_scene)
+    culled = render_preview(device, program.wgsl, program=program)
+    flat = render_preview(device, program.wgsl, program=program, cull_margin=CULL_OFF)
+    assert culled == flat
+
+
+def test_the_cull_margin_slot_is_its_own(device, parametric_scene):
+    """Switching culling off must not disturb a parameter or the NaN slot."""
+    from cadjoint.backends.wgsl import compile_scene_with_uniforms
+
+    program = compile_scene_with_uniforms(parametric_scene)
+    assert program.cull_margin_offset == program.nan_offset + PARAMETER_SLOT_BYTES
+    assert program.buffer_bytes == program.cull_margin_offset + PARAMETER_SLOT_BYTES
+    packed = program.buffer()
+    assert packed[program.cull_margin_offset // 4] == np.float32(1e-4)
+    assert np.isnan(packed[program.nan_offset // 4])
+
+
+def test_the_step_budget_is_a_cap_not_a_cost(device, scene_code):
+    """A budget above what the scene needs draws the same picture.
+
+    `path_settings.w` caps the march; almost every ray converges long before
+    it. Raising it must therefore be invisible, which is what makes it safe
+    to expose — and lowering it far enough must not be, which is the other
+    half of the same claim.
+    """
+    generous = render_preview(device, scene_code, sdf=(0.0, 0.0, 0.0, 0.0, 0.0, 512.0))
+    enough = render_preview(device, scene_code, sdf=(0.0, 0.0, 0.0, 0.0, 0.0, 192.0))
+    starved = render_preview(device, scene_code, sdf=(0.0, 0.0, 0.0, 0.0, 0.0, 4.0))
+    assert generous == enough
+    assert starved != enough
+
+
+# ── The capped section ───────────────────────────────────────────────────────
+# Clipping a solid at a plane and *capping* it are different pictures: a clip
+# lets the ray through to hit the inside of the far shell, which is why a
+# clipped part looks hollow. The cap is an intersection with a half-space, so
+# the ray stops on the plane. These pin that it is an intersection and not an
+# approximation of one.
+
+#: The section flag, matching DISPLAY_SECTION in `_webgpu.py` and
+#: `DISPLAY.section` in `display.ts`.
+SECTION = 64
+
+#: The SDF view code for world normals, from `SDF_VIEW_CODE` in `display.ts`.
+NORMAL_VIEW = (3.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+
+
+def _section_display(base=None):
+    """Display tuple with the section on."""
+    flags = float(SHADOWS | REFLECTIONS | SECTION)
+    return (0.0, 0.0, flags, 0.0) if base is None else base
+
+
+def test_the_section_cuts_the_solid(device, scene_code):
+    plain = render_preview(device, scene_code)
+    cut = render_preview(
+        device, scene_code, display=(0.0, 0.0, float(SHADOWS | REFLECTIONS | SECTION), 0.0)
+    )
+    assert plain != cut, "the section flag changed nothing"
+
+
+def test_a_plane_outside_the_scene_is_exactly_no_section(device, scene_code):
+    """The strongest statement available: it is an intersection, not a fudge.
+
+    `traced_field` is `max(scene, halfspace)`. Push the half-space entirely
+    clear of the geometry and the `max` can never select it, so the image must
+    come back *identical* — not close. Anything else means the section is
+    perturbing the field where it has no business to.
+
+    The removed half is always the one the camera is in, so "removes
+    nothing" means putting the plane *between the scene and the camera's far
+    side*: the camera sits at x = 3 and the scene inside |x| <= 1, so a plane
+    at x = 2.5 removes only x > 2.5, which is empty.
+    """
+    far = (0.0, 0.0, 2.5, 0.0, 0.0, 0.0)  # sdf view solid, plane axis X
+    plain = render_preview(device, scene_code, sdf=far)
+    cut = render_preview(
+        device,
+        scene_code,
+        display=(0.0, 0.0, float(SHADOWS | REFLECTIONS | SECTION), 0.0),
+        sdf=far,
+        camera=(3.0, 2.0, 4.0),
+    )
+    assert plain == cut
+
+
+def test_the_cap_carries_the_planes_own_normal(device, scene_code):
+    """The cut face is flat, and the normal view is where that shows.
+
+    `sdf_normal` takes central differences of the *sectioned* field, so on the
+    cap the half-space is what the `max` selected and the differences return
+    the plane's normal. A plane has exactly one normal, so capping introduces
+    a large run of pixels sharing a single value — which is the signature this
+    looks for, and which a hollow clip (showing the curved inside of the far
+    shell) could not produce.
+    """
+    from collections import Counter
+
+    plain = render_preview(device, scene_code, sdf=NORMAL_VIEW)
+    cut = render_preview(
+        device,
+        scene_code,
+        display=(0.0, 0.0, float(SHADOWS | REFLECTIONS | SECTION), 0.0),
+        sdf=NORMAL_VIEW,
+    )
+    assert plain != cut
+    flat_run = Counter(cut).most_common(1)[0][1] - Counter(plain).most_common(1)[0][1]
+    assert flat_run > 0, "the section added no flat-normal region"
+
+
+def test_the_section_leaves_the_data_path_on_the_true_field():
+    """A data view must read the true field, not the sectioned one.
+
+    `scene_field` is what the slice and gradient views sample; only the
+    tracer goes through `traced_field`. If the section leaked into the data
+    path, a |∇f| view would report the plane's own gradient and call the
+    scene metric where it is not — the diagnostic would be diagnosing the
+    diagnostic.
+
+    Checked on the source rather than on pixels because the claim is about
+    *which function is called where*, and the two fields agree everywhere the
+    section is not cutting, so most images cannot tell them apart.
+    """
+    import re
+
+    source = build_viewer_shader("fn sdf(p: vec3<f32>) -> f32 { return length(p) - 1.0; }")
+
+    def body(name: str) -> str:
+        start = source.index(f"fn {name}(")
+        depth, i = 0, source.index("{", start)
+        for j in range(i, len(source)):
+            depth += (source[j] == "{") - (source[j] == "}")
+            if depth == 0:
+                return source[i : j + 1]
+        raise AssertionError(f"unterminated {name}")
+
+    # The diagnostics sample the field the scene actually has.
+    for name in ("sdf_gradient_magnitude", "sdf_view_color"):
+        assert "traced_field" not in body(name), f"{name} reads the sectioned field"
+        assert "scene_field" in body(name)
+    # The tracer, its refinement and both shadow marches see the section.
+    for name in ("trace", "refine_hit", "hard_shadow", "soft_shadow", "sdf_normal"):
+        assert "traced_field" in body(name), f"{name} misses the section"
+    # And the section itself is exactly an intersection with a half-space.
+    assert re.search(r"return max\(field, section_halfspace\(p\)\);", source)

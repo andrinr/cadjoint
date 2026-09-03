@@ -15,7 +15,6 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
-
 from cadjoint.geometry.parameters import Vector2
 from cadjoint.meshing import (
     GridSpec,

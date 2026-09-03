@@ -1,7 +1,6 @@
 """Tests for SDF compilation to pure JAX functions."""
 
 import jax.numpy as jnp
-
 from cadjoint import extract_parameters, functionalize, functionalize_scene
 from cadjoint.geometry.parameters import Scalar, Vector
 from cadjoint.render import Material
@@ -244,7 +243,6 @@ def test_parametric_lowering_is_identical_across_value_edits():
 def test_pattern_count_stays_static_under_a_parametric_trace():
     """``count`` decides how much program is emitted, so it cannot be an argument."""
     import jax
-
     from cadjoint.functionalize import functionalize_parametric
     from cadjoint.sdf.transforms.patterns import PolarPattern
 

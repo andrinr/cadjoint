@@ -33,7 +33,6 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-
 from cadjoint import tier
 from cadjoint.enums import PluginKind
 from cadjoint.fem.gmsh import gmsh_available

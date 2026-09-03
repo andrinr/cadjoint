@@ -15,7 +15,6 @@ from __future__ import annotations
 import jax.numpy as jnp
 import numpy as np
 import pytest
-
 from cadjoint.construction import Axis, PolygonProfile, Solid, extrude, revolve
 from cadjoint.geometry import Scalar
 from cadjoint.sdf.boolean import Difference, Intersection, Union, Xor
