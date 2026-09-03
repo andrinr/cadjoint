@@ -158,11 +158,15 @@ directly with an angle and plane tolerance. `save_step` writes a `CLOSED_SHELL`
 inside a `MANIFOLD_SOLID_BREP` and is validated against the OCCT kernel in
 `tests/meshing/test_step_kernel.py`.
 
-All three write the mesh as it is: a faceted solid, one triangle per cell
-crossing, a 28-gon standing in for a bore. A STEP file in which a plane is a
-`PLANE` and a bore is one `CYLINDRICAL_SURFACE` — seven faces for a plate with
-a hole instead of three thousand — is the `step_export` [plugin
-kind](plugins.qmd#the-five-in-process-kinds), which the private tier fills; without it
+All three write the mesh as it is, and a faceted solid is the whole of what
+this package exports: one triangle per cell crossing, a 28-gon standing in for
+a bore. The STEP is real B-rep topology — an `ADVANCED_FACE` per merged polygon
+over its own `PLANE`, so a CAD kernel opens the file as one closed solid rather
+than as a triangle soup — but its faces are the *mesh's* faces, and a bore
+arrives as the ring of narrow facets the lattice cut it into. A STEP in which
+a plate with a hole is seven faces instead of three thousand, the bore one
+`CYLINDRICAL_SURFACE`, is the `step_export` [plugin
+kind](plugins.qmd#the-five-in-process-kinds); with nothing registered for it
 the writers on this page are what an export uses, and the report says so.
 
 ## Checking a mesh
@@ -349,13 +353,14 @@ A Gmsh mesh's *topology* is decided once and held. Its *positions* follow the
 design through the `node_map` plugin kind — a per-arity Newton projection
 onto each node's owning patches with the implicit-function adjoint, midsides
 re-solved on their own surfaces, interior nodes following by Laplacian
-relaxation — and that kind is the private tier's (`cadjoint.tier`).
+relaxation — and nothing in this repository fills that kind (`cadjoint.tier`
+reports whether anything does).
 
-Without it the mesh is **frozen geometry**: it builds, solves, inspects and
+So here the mesh is **frozen geometry**: it builds, solves, inspects and
 exports exactly as any other `TetMesh`, `SimMesh.inspect()` reports
 `frozen_geometry: true`, and an `Optimization` over a study on it is refused
 *at declaration* with one sentence naming the way out. The refusal is
-deliberate: the public tier could slide every boundary node onto the scene's
+deliberate: cadjoint could slide every boundary node onto the scene's
 zero set with a one-field projection and call that a gradient, but it would
 take crease nodes off their creases and put midsides back on chords,
 silently. `mesher="tetgen"` — the default — is differentiable throughout.
@@ -393,6 +398,6 @@ octree leaves (2:1 balancing, transition stitching) are also open.
 ## Further reading
 
 - [Differentiable meshing pipeline](../research/differentiable-meshing-pipeline.md) — design principles, the full stage/test map, and the benchmark policy.
-- [Plugins](plugins.qmd#the-five-in-process-kinds) — the five in-process kinds the private tier fills, which read this mesh and re-solve it against the field for exact export, dragging and meshing.
+- [Plugins](plugins.qmd#the-five-in-process-kinds) — the five in-process kinds, the extension points for a component that reads this mesh and re-solves it against the field for exact-surface export, dragging and meshing.
 - [Native (Rust) dual-contouring core, retired](../research/native-mesher.md) — what the Rust port measured, and why 5 ms of a 4 s request was not worth a second implementation. There is no Rust to build: the JAX/NumPy pipeline on this page is the only one.
 - [Simulation](simulation.qmd) — turning this surface into a volume mesh a solver can use.

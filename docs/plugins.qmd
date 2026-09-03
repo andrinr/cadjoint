@@ -65,7 +65,7 @@ the `Tesseract` itself, so `plugin.jacobian(...)`,
 | `thermal_jaxfem` | `thermal_solver` | jax-fem Poisson solve | AD strategy — JAX cannot trace PETSc assembly |
 | `elastic_jaxfem` | `elastic_solver` | jax-fem linear elasticity + von Mises | same |
 | `elastic_calculix` | `elastic_solver` | CalculiX 2.23 Fortran, over a subprocess | language, licence (GPL-2 isolated), AD strategy |
-| `tet_gmsh` | `tet_mesher` | Gmsh (HXT, order 2) on a solid — the dual-contour surface as STL, or an exact STEP | licence (GPL-2-or-later isolated), a discrete topology decision |
+| `tet_gmsh` | `tet_mesher` | Gmsh (HXT, order 2) on a solid — the dual-contour surface as STL, or a STEP file | licence (GPL-2-or-later isolated), a discrete topology decision |
 | `flow_brinkman` | `flow_solver` | the [prototype lattice-Boltzmann flow solver](flow.qmd), pure JAX | none yet — it exists to prove a solver with no mesh fits the same slot |
 
 Each solves its VJP differently. The jax-fem pair use an implicit adjoint —
@@ -334,9 +334,9 @@ by the **part** instead of by a lattice. The public input is the
 dual-contour surface written as an STL, which Gmsh's `classifySurfaces` +
 `createGeometry` splits into one reparametrised surface per smooth region
 along the lattice's own feature cells; on the plate that is three thousand
-facets in and a dozen CAD surfaces out. An exact STEP takes the same road
-with `geometry_format="step"` — the same mesher, the same contract, a finer
-input.
+facets in and a dozen CAD surfaces out. `geometry_format="step"` takes the
+same road from a STEP file — the same mesher, the same contract — and is worth
+a finer input than the faceted STEP this package writes.
 
 What it does *not* decide is which patch owns a node. That is
 `cadjoint.fem.gmsh.assign_ownership`, on the caller's side, and it is a
@@ -359,7 +359,7 @@ bore's nodes and midsides land within 2.4e-3 of `r = 0.25`, under the bar
 but not on the cylinder.
 
 Putting them *on* it, and moving them when the design moves, is the
-`node_map` kind's job. The topology is frozen at discovery and only
+`node_map` kind's job, and nothing here fills it. The topology is frozen at discovery and only
 positions move, which is what makes the `vector_jacobian_product` w.r.t.
 `node_positions` an exact pass-through rather than an approximation.
 
@@ -408,10 +408,12 @@ object, which is exactly how `tet_gmsh` is written.
 
 ### The five in-process kinds
 
-These are the capabilities the private tier — `diff-brep`, everything that
-solves against the patch fields *with a derivative* — fills. Public cadjoint
-never writes `import diff_brep`: it asks the registry for a kind and calls
-the object it gets back through the Protocol.
+Five kinds are declared here and filled by nothing in this repository. They
+are the slots for a component that solves against the scene's patch fields
+*with a derivative* — the work that turns a faceted surface back into the
+geometry it was cut from. cadjoint never imports such a component: it asks
+the registry for a kind and calls the object it gets back through the
+Protocol, so anything registering the entry points below fills the slot.
 
 | kind | Protocol | in | out |
 |---|---|---|---|
@@ -426,15 +428,15 @@ inside the jitted objective `Optimization` builds, so its `custom_vjp` has
 to be a primitive of the caller's own program. Its input is
 `OwnedNodes` — per node a seed position, the global patch indices that own
 it, the arity, the Gmsh entity dimension, the midside block and the bar
-ownership was decided at — which the **public**
-`cadjoint.fem.gmsh.assign_ownership` produces from a residual test against
-the scene's own patch fields, no graph involved.
+ownership was decided at — which `cadjoint.fem.gmsh.assign_ownership`, on
+this side of the interface, produces from a residual test against the scene's
+own patch fields, no graph involved.
 
 ```toml
 # what a distribution filling these kinds registers
 [project.entry-points."cadjoint.plugins"]
-node_map      = "diff_brep.plugins:NODE_MAP"     # PluginSpec(transport="python", object=...)
-feature_edges = "diff_brep.plugins:FEATURE_EDGES"
+node_map      = "my_package.plugins:NODE_MAP"     # PluginSpec(transport="python", object=...)
+feature_edges = "my_package.plugins:FEATURE_EDGES"
 ```
 
 `cadjoint.plugins.contracts.CONTRACT_VERSION` bumps whenever a Protocol or
@@ -442,11 +444,9 @@ payload changes shape, and every component carries a `contract_version`, so
 a stale build is refused with a sentence rather than failing inside a trace.
 
 Installing a provider is all it takes — the entry points do the registration,
-and nothing in cadjoint changes:
-
-```bash
-uv pip install "diff-brep @ git+ssh://git@github.com/andrinr/diff-brep@main"
-```
+and nothing in cadjoint changes. One provider for these kinds exists as a
+separate distribution outside this project; a component of your own, registered
+the same way, is indistinguishable to the registry.
 
 A `plugins.toml` is needed only to *override* what discovery found — to point
 one kind somewhere else, or to turn one off without uninstalling:
@@ -473,8 +473,8 @@ object    = "my_package.edges:COMPONENT"
 
 ### When a kind is unfilled
 
-`cadjoint.tier` is the one module that answers "is it installed" and writes
-the one refusal message.
+`cadjoint.tier` is the one module that answers "is anything filling this
+kind" and writes the one refusal message.
 
 ```python
 from cadjoint import tier
@@ -486,13 +486,13 @@ tier.require("node_map")                 # raises TierUnavailable(<one sentence>
 tier.report()                            # versions + status, for a bug report
 ```
 
-Nothing in the public app breaks: it compiles, meshes with TetGen or Gmsh,
-solves, inspects, exports VTK and faceted STEP, and draws feature edges from
-the lattice classifier. What it refuses is a design derivative through a
-Gmsh mesh, which `Optimization` reports at declaration rather than
-discovering inside the trace. The compile payload carries a `tier` field and
-`GET /api/capabilities` returns `tier.status()`, so the viewer says which
-layer it is drawing rather than leaving you to guess from an empty one.
+Unfilled is how cadjoint ships and nothing breaks: it compiles, meshes with
+TetGen or Gmsh, solves, inspects, exports VTK and faceted STEP, and draws
+feature edges from the lattice classifier. What it refuses is a design
+derivative through a Gmsh mesh, which `Optimization` reports at declaration
+rather than discovering inside the trace. The compile payload carries a
+`tier` field and `GET /api/capabilities` returns `tier.status()`, so the
+viewer names the layer it is drawing rather than leaving you to guess.
 
 ## Where plugins are used
 

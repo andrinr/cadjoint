@@ -596,7 +596,7 @@ independent of everything else in this document.
 ## 11. Reproducing this
 
 Scripts live in the scratch workspace
-`/private/tmp/claude-501/-Users-andrinrehnann-code-jaxcad/a114cfb9-aa54-4491-aa84-413fbdf84e92/scratchpad/perf/`
+the session scratchpad (not kept)
 (ephemeral). `bench_all.py` dispatches all of them; each is standalone and takes
 the scene through `BENCH_SCENE`.
 

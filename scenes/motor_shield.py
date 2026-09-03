@@ -5,8 +5,7 @@ with a helical coolant passage cast into the wall of its bearing tower. It
 was chosen over the gearbox end-cap (``scenes/end_cap.py``) because every job
 it does lands on a *harder* corner of the modelling language than the last
 part did, and several of them land on the B-rep extraction's known failure
-classes on purpose (the axiom battery, now in the private diff-brep
-    repository; see ``research/two-tier.md``):
+classes on purpose:
 
   * **cool the bearing.** A helical channel — a ``twist``-ed extrusion of a
     small circle drawn off the tower axis — fed and drained by two bores that

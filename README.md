@@ -1,18 +1,18 @@
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/banner-readme-dark.png">
-  <img src="docs/assets/banner-readme.png" alt="cadjoint — differentiable code-first CAD">
-</picture>
-
 # cadjoint
 
-Differentiable code-first CAD: sketches, constraints, SDF geometry, a derived
-B-rep, meshing, and FEM simulation composed into one function JAX can
-differentiate end to end.
+Differentiable code-first CAD: sketches, constraints, SDF geometry, meshing and
+FEM simulation composed into one function JAX can differentiate end to end.
 
 > [!WARNING]
 > The API is not stable. Expect breaking changes.
 
-[![The cadjoint playground in Model mode: scene.py docked on the left, the parametric heat sink on its board on the world floor grid with the fin comb selected, and the Objects and Materials windows in the right-hand column](docs/assets/screens/model-desk.png)](https://andrinr.github.io/cadjoint/docs/viewer.html)
+[![A fin tip of the heat sink is dragged upward in the viewport of the cadjoint playground. The fin grows with the pointer at frame rate while the rest of the comb stays put, the editor on the left holds the highlighted line fin2_tip_l = Vector2(value=[-0.15, 0.85], free=True, ...), and releasing the pointer writes the new coordinates into that literal and recompiles.](docs/assets/motion/parameter-drag.webp)](https://andrinr.github.io/cadjoint/docs/viewer.html)
+
+*The whole idea in one gesture. The handle under the pointer is a named
+`Vector2` in `scene.py`; dragging it writes the parameter buffer the shader
+already reads, so the solid follows at frame rate without recompiling anything,
+and the release patches the literal in the source. The source is the model —
+there is no second copy of the geometry to drift out of sync with it.*
 
 ---
 
@@ -42,16 +42,16 @@ to its parent's depth — the thing a B-rep modeller cannot do, because there a
 face is stored geometry rather than a function of the feature that made it
 (`tests/construction/test_reference_planes.py`).
 
-The boundary representation is not stored either, and cadjoint does not need
-one: every hard primitive is a `min`/`max` over smooth *patch fields* with exact
-surface ownership, so a face is the part of one patch's zero set that survived
-the booleans, an edge is where two patch zero sets meet, and a vertex is where
-three do. Deriving that graph from the field — and re-solving it under a design
-change with an implicit-function-theorem adjoint — is the **private tier**, a
-separate distribution cadjoint discovers through its plugin registry and names
-in exactly one module, `cadjoint.tier`. Without it everything on this page
-runs; five things read from the public side instead, and each says so
-(`research/two-tier.md`).
+No boundary representation is stored either. The field is the model, and
+everything that wants a surface derives one from it: dual contouring for the
+mesh and the viewport, a lattice classifier over the same samples for the
+feature-edge overlay, and coplanar-polygon merging for the faceted STEP the
+exporter writes. Those are *approximations of* the surface, sampled at a
+resolution you choose — good enough to mesh, solve, print and hand to another
+tool, and honest about being faceted. Exact analytic faces are not part of this
+repository; a handful of typed plugin kinds are extension points where a
+provider can supply sharper implementations, and `cadjoint.tier` reports in one
+sentence which of them are filled.
 
 ---
 
@@ -72,10 +72,10 @@ runs; five things read from the public side instead, and each says so
   parallel, perpendicular, equal-length, point-on-line and fixed (plus the
   edge-pair forms), solved by Riemannian gradient descent and Newton projection
   onto the constraint manifold
-- **A seam for the private tier** — five typed in-process plugin kinds
-  (`node_map`, `feature_edges`, `brep`, `step_export`, `drag`) that a separate
-  distribution fills; `cadjoint.tier` reports what is there and refuses, in one
-  sentence, what is not
+- **Extension points** — five typed in-process plugin kinds (`node_map`,
+  `feature_edges`, `brep`, `step_export`, `drag`) with a working implementation
+  each; a registered provider may replace any of them, and `cadjoint.tier` says
+  in one sentence which are filled
 - **Materials with physics** — density, conductivity, specific heat, Young's
   modulus, Poisson ratio, thermal expansion and yield strength in SI, through
   the same parameter containers as colour; a sourced catalogue in
@@ -190,13 +190,13 @@ furniture and has no close control. The windows are `scene.py`, **Objects**,
 Arrangements survive a reload, and each mode remembers its own desk, so
 switching to Simulate and back restores what you left in Model.
 
-![The Objects window floated out of the dock and hovering over the editor, with Materials and Optimize sharing a tab strip in the right-hand column and the aluminium material's physical properties open in the inspector](docs/assets/screens/windows-float-stack.png)
+![The Objects window's tab is dragged out of the right-hand column and dropped onto the editor's tab strip, where the two become one stack; it is then floated back out as a panel hovering over the desk; finally the Materials window is minimised into the tray along the bottom and restored from it. The heat sink stays rendered in the viewport throughout.](docs/assets/motion/windows-dock.webp)
 
-*Objects floated out of the grid and left hovering over the editor, with
-Materials and Optimize sharing one tab strip on the right — and, because the
-Materials window got the room, the aluminium inspector open to its physical
-rows. The WebGPU canvas is re-parented, not rebuilt, so the context survives
-every drag, dock and mode change (`frontend/e2e/windows.spec.ts`).*
+*Objects dragged onto the editor's tab strip, floated back out over the desk,
+then Materials parked in the tray and brought back — all with the dock's own
+controls, no modes and no dialogs. The WebGPU canvas is re-parented, not
+rebuilt, so the context survives every drag, dock and mode change: the sink
+never blinks (`frontend/e2e/windows.spec.ts`).*
 
 Three modes seed the default desks — **Model**, **Sketch**, **Simulate** —
 cycled with `M` (`Shift+M` backwards, `Esc` returns to Model). Selecting a
@@ -239,33 +239,39 @@ the boundary-condition hues, the axis triad.
   progressive multi-bounce lighting, GGX reflections and glass transport;
   camera and scene changes reset the accumulation automatically
 
-![The same scene with the construction overlay switched off: the shaded solid on the floor grid with no handles, dimensions or gizmos](docs/assets/screens/construction-overlay-off.png)
+![The camera is orbited around the heat sink by dragging in the viewport: it swings a quarter turn to the right, dives under the floor grid to look up at the underside of the board, comes back up on the far side and returns to the isometric view it started from. The navigation cube in the corner turns with it, its face labels changing from ISO through TOP, BOTTOM and LEFT, and the grid-spacing readout stays at 500 mm.](docs/assets/motion/orbit.webp)
 
-*Overlay off. The graticule stays — it is furniture, held deliberately below the
-contrast a meaningful mark owes (`frontend/test/graticule.test.ts`).*
+*One left-drag, orbiting. The cube in the corner is not a decoration: it turns
+with the camera and names the standpoint the view has reached, and the readout
+prints the ruling's real spacing, so the view is calibrated rather than
+decorative. The arc passes under the floor deliberately — the light follows the
+camera, so the underside of a part is lit rather than a silhouette. Right-drag
+pans and the wheel zooms; the construction overlay above can be switched off
+for a presentation frame, and the graticule stays, held below the contrast a
+meaningful mark owes (`frontend/test/graticule.test.ts`).*
 
 The display modes are one set, and all of them are views of the same compiled
 field: **solid**, **x-ray**, **mesh wireframe**, **feature edges**, a signed
 **slice** of the distance field on any axis, its **gradient magnitude**, an
 **iso-offset**, **normals** and **depth**.
 
-![The signed-distance slice view seen face-on from the cube's Right face: the plane x = 0 through the heat sink coloured by signed distance, the sink's section inside, contours tightening toward the surface outside, and the Render popover open beside it](docs/assets/screens/sdf-slice.png)
+![The distance-field slice plane is swept through the heat sink by dragging the slider in the Render popover. The plane is coloured by signed distance — purple inside the solid, gold outside — with contour rings that tighten toward the surface; as it travels the rings open and close around each fin, and the readout over the viewport counts the plane's coordinate from SLICE X -1.68 m through 0 to +1.82 m and back.](docs/assets/motion/sdf-sweep.webp)
 
-*The distance field cut open, seen face-on from the cube's RIGHT face. The
-slice shows the signed value on a plane through the scene — inside and outside,
+*The distance field cut open and the cut dragged through the part. The plane
+shows the signed value at every point on it — inside and outside — with
 contours at the grid spacing and a fifth of it, densest within two intervals of
-the surface — and the legend prints the plane's actual coordinate (`SLICE X ·
-0 mm`). The gradient view beside it shows |∇f|, which is the
-diagnostic that says where a field has stopped being a metric distance.*
+the surface, and the readout over the viewport prints the plane's actual
+coordinate rather than a slider fraction. Watch the rings pinch shut as the
+plane crosses a fin: that is the field's zero set, which is the surface, and it
+is the same field the mesher contours and the shader marches. The gradient view
+beside it shows |∇f|, the diagnostic that says where a field has stopped being a
+metric distance.*
 
-![Feature edges drawn over the heat sink: every crease, corner and CSG seam as an exact curve, with the solid drawn translucent behind them](docs/assets/screens/feature-edges.png)
-
-*Feature edges, drawn by the private tier's `feature_edges` plugin kind: each
-edge is the exact intersection curve of its two patches, so a bore rim is a
-circle wherever the grid falls and curves meet at their corners. With no
-provider installed the overlay is still drawn — from the lattice feature
-classifier, which is public — and the compile payload says which layer produced
-it (`research/two-tier.md`).*
+The **feature-edge** overlay comes from a lattice classifier over the same
+samples: a cell whose corner signs and gradients disagree by more than the
+crease threshold is an edge cell, and the edges are drawn from the dual-contour
+vertices those cells produced. It is a sampled reading of where the creases are,
+not an exact intersection curve, and it sharpens with the lattice resolution.
 
 ### Model mode: direct editing that rewrites the source
 
@@ -337,13 +343,14 @@ call — a row the declaration does not state is offered, not invented
 
 ### Sketch mode: constraints on the geometry they hold
 
-![Sketch mode with the fin comb selected: its constraint chips listed in the Sketch window and its dimensions drawn over the model in the viewport](docs/assets/screens/sketch-constraints.png)
+![A new sketch on the floor in front of the heat sink is constrained and solved. A corner of it is clicked and pinned with FIX POINT, which adds a "fix · P1" chip; DISTANCE is armed and a second corner picked, adding a "distance · P1-P2 · 1.2" chip and a dimension in the viewport; the chip's value is retyped as 0.7 and the sketch immediately pulls in to match; the solver panel is opened and Newton projection run, drawing a residual curve that falls to zero.](docs/assets/motion/sketch-solve.webp)
 
-*The starter's fin comb, 16 points under 17 constraints. Numeric distances draw
-as dimensions in the viewport; relational constraints (horizontal, vertical,
-equal-length) are chips in the Sketch window. Fix a point, dimension a pair, or
-solve the system from the same panel — each writes the constraint back into
-`scene.py`.*
+*Fix a point, dimension a pair, retype the dimension, solve. Numeric distances
+draw as dimensions in the viewport; relational constraints (horizontal,
+vertical, equal-length) are chips in the Sketch window. Every one of those
+clicks writes a `FixedConstraint(...)`, a `DistanceConstraint(...)` or a
+`satisfy_constraints(...)` back into `scene.py` — the panel is a view of the
+program, not a parallel model of it.*
 
 The solver is exposed, not hidden: pick the method and iteration count, run it,
 and the loss curve is drawn beside the chips. `satisfy_constraints(...)` appears
@@ -375,30 +382,29 @@ them — holes and pockets are declared against the face they enter
 (`scenes/end_cap.py` is the worked example, `research/complex-scene.md` the
 report of what it broke).
 
+![The face tool is armed and the pointer moved onto the flat deck between two fins of the heat sink. The face lights up under the pointer and the hint bar reads "Sketch on face: click sink.cap('-') - starts a new sketch there"; clicking writes SketchPlane.on(sink.cap('-')) into the program, which recompiles, and a Sketch window opens with the new sketch selected.](docs/assets/motion/face-sketch.webp)
+
+*Hover a face, and the hint names the accessor the click is about to write —
+`sink.cap('-')`, resolved from the feature that made the face rather than
+looked up in a stored surface. Clicking issues the patch, and the plane the new
+sketch sits on is from then on an expression in the parent's parameters: change
+`fin_depth` and the sketch follows.*
+
 ### The Simulate desk
 
-![The Meshes window: the sink-mesh SimMesh discretized into 2957 TET10 elements, shaded by element quality in the viewport, with resolution, bounds and domain editable and the aspect-ratio histogram beneath](docs/assets/screens/simulate-meshes.png)
+![The sink-conduction thermal study is solved from the Studies window. The Solve button is clicked, a progress bar reports MESHING then SOLVING while a job chip beside the mode switcher counts the seconds up to four, and the grey heat sink is replaced by the solved temperature field in viridis - dark purple over most of the part, brightening toward the die interface - with the Results window filling in a labelled legend from 0 to 1.134 and the mesh statistics, 5726 nodes and 2957 TET10 elements.](docs/assets/motion/solve-field.webp)
 
-*Meshes. The declared `SimMesh` inspected in place: 5 726 nodes, 2 957 TET10
-elements, aspect ratio 1.175 / 2.017 / 3.766 min/mean/max, with the quality
-histogram under it. Resolution, padding, bounds, domain and method are editable
-— each edit is a patch back into `scene.py`. A tet grid that self-intersects
-climbs an automatic refinement ladder before it gives up, and the error names
-the resolutions it tried.*
-
-![The Studies window: the sink-conduction thermal study with its heat-flux and fixed-value boundary conditions listed as node selections, the conductivity source, and a Solve button](docs/assets/screens/simulate-studies.png)
-
-*Studies. Boundary conditions are programmatic node selections
-(`Nodes.halfspace(...) & Nodes.sphere(...)`), listed with the region they resolve
-to. Add one by picking a region in the viewport; the study is rewritten in the
-source.*
-
-![The Results window: the solved temperature field on the sink, in viridis, sliced on X, with the labelled legend, field min/mean/max and the mesh statistics](docs/assets/screens/simulate-results.png)
-
-*Results. The solved temperature field on the same mesh, sliced so the flux
-entering at the die interface reads. The legend is a labelled bar: a ramp with
-no numbers beside it is decoration. Elastic studies report mass and a safety
-factor against the materials' yield strength as well.*
+*One click, and the chain in the diagram above runs end to end: the field is
+sampled on the declared lattice, dual-contoured, filled with TET10 tets, and
+solved. Boundary conditions are programmatic node selections
+(`Nodes.halfspace(...) & Nodes.sphere(...)`), listed with the region they
+resolve to; add one by picking a region in the viewport and the study is
+rewritten in the source. The legend is a labelled bar, because a ramp with no
+numbers beside it is decoration, and elastic studies report mass and a safety
+factor against the materials' yield strength as well. Meshes has the same
+treatment for the discretization — resolution, padding, bounds, domain and
+method editable in place, with the aspect-ratio histogram under them, and an
+automatic refinement ladder when a tet grid self-intersects.*
 
 A solved field lives in the server's job registry, not only in the response, so
 it survives closing the window, switching modes and reloading the page.
@@ -418,35 +424,42 @@ one is re-openable from the history.*
 
 ### Scenes
 
-![The Scenes window tabbed into the editor group: a card per saved scene — bracket and end_cap in view — each with a thumbnail, its docstring summary, and counts of parameters, studies, meshes, optimizations and materials](docs/assets/screens/scenes.png)
+![The Scenes browser open over the editor: a card per saved scene — bracket and end_cap in view — each with a rendered thumbnail, its docstring summary, and counts of parameters, studies, meshes, optimizations and materials](docs/assets/screens/scenes.png)
 
-*Scenes browses the scene directory without running a line of it. Each card's
+*Scenes browses the scene directory without running a line of it: each card's
 summary, parameter, study, mesh and material counts come from an `ast` pass on
-the server (`cadjoint/viewer/_scenes.py`); only the picture costs a compile, and
-that is cached by source hash. Opening a scene goes through the same guarded
-path as **File → Open**.*
+the server (`cadjoint/viewer/_scenes.py`), and only the picture costs a compile,
+cached by source hash. Opening one goes through the same guarded path as
+**File → Open**. The scene being opened here is `scenes/motor_shield.py`, which
+exists to find the ceiling of the modelling language rather than to be pretty —
+a helical cooling channel swept as a field, a bolt circle and a knurl as polar
+patterns, eight materials and 41 free parameters, and a compile that takes
+tens of seconds. The clip plays that compile at about nine times life.*
 
-Three scenes ship: `scenes/starter.py`, the heat sink on its board;
-`scenes/end_cap.py`, a gearbox output end-cap with a stepped bearing seat, eight
-patterned ribs, bolt holes and an oil port, built to find where the modelling
-language runs out; and `scenes/bracket.py`, the parametric L-bracket the
-command-line optimization below descends.
+Five scenes ship: `scenes/starter.py`, the heat sink on its board;
+`scenes/bracket.py`, the parametric L-bracket the command-line optimization
+below descends; `scenes/end_cap.py`, a gearbox output end-cap with a stepped
+bearing seat, eight patterned ribs, bolt holes and an oil port;
+`scenes/motor_shield.py`, the stress test above; and `scenes/duct_sink.py`, a
+finned sink inside a duct — the case the flow prototype exists for.
 
 ### Export
-
-![The File → Export dialog over the Model desk: format, the object to export, the sampling resolution, the format's one option, and the Export button](docs/assets/screens/export-dialog.png)
 
 **File → Export…** is a small form: the format, what to export, how fine, the
 one option the format has, and Export. **STL** (binary or ASCII) and **OBJ**
 (planar faces merged or not) carry the dual-contoured surface of one object at
-the resolution you choose; **STEP** goes to the `step_export` plugin kind when
-one is registered — analytic surfaces, so a box with a bore exports as seven
-exact faces, valid in OCCT with the volume to 1e-7 — and falls back to the
-faceted writer otherwise, with the reason in the report rather than an error.
-**VTK** writes a declared study's solved fields. The run is a job like any
-other (`POST /api/export`), so the chip beside the mode switcher counts the
-seconds and can cancel it, and the download is named after the scene and the
-object (`heatsink-scene.stl`). The public writers are the Python API:
+the resolution you choose. **STEP** is written from that same surface: coplanar
+triangles are merged into polygonal faces and emitted as a faceted B-rep solid,
+so a curved wall arrives as a fan of planar facets rather than a cylinder, and
+the file's fidelity is the lattice resolution you asked for. It opens in OCCT
+and in the CAD tools that read AP214, and it is the right thing to hand a
+downstream tool that needs a solid rather than a mesh; it is not a substitute
+for a modelling kernel's analytic surfaces. (`step_export` is a plugin kind, so
+a registered provider can write something sharper; the report says which writer
+produced the file.) **VTK** writes a declared study's solved fields. The run is
+a job like any other (`POST /api/export`), so the chip beside the mode switcher
+counts the seconds and can cancel it, and the download is named after the scene
+and the object (`heatsink-scene.stl`). The public writers are the Python API:
 `cadjoint.meshing.export.save_obj`, `save_stl` and `save_step`.
 
 ### Editor intelligence
@@ -576,17 +589,20 @@ Running `cool-sink` from the Optimize window drives exactly that chain in the
 browser, streamed step by step, and writes its new parameter values straight back
 into the source.
 
-![The Optimize window after a cool-sink run: the convergence sparkline, the trajectory scrubber, and each parameter's before and after value, with the optimized design's solved field shown in the viewport](docs/assets/screens/optimize-replay.png)
+![The cool-sink optimization is run from the Optimize window. Run becomes Cancel, a progress bar advances and a job chip beside the mode switcher counts up, and a step counter ticks from 0/12 to 12/12 while a convergence sparkline draws itself downward and the objective falls from 1.613 to 1.54. When the run finishes the panel becomes a replay: a scrubber over the trajectory, and a table of each parameter's before and after value.](docs/assets/motion/optimize-converge.webp)
 
-*Three Adam steps of `cool-sink`, peak temperature 1.613 → 1.604 (the window's
-step count patched the source to `steps=3` for the shot; the scene ships with
-twelve). The convergence sparkline, a scrubber that
-replays the geometry along the trajectory step by step, and each parameter's
-before → after value; the optimizer writes the new values straight back into
-`scene.py` on the left — which is why the card marks itself stale: the source
-it ran against has changed, by its own hand. A study-backed run also publishes the optimized design's
-solved field, so the result lands in Results with its temperature attached, and
-the run itself survives a mode switch or a reload by job id.*
+*Twelve Adam steps of `cool-sink`, played at about seven times life — every
+frame is one the app drew. Each step meshes the current design, solves the
+thermal study on it, takes the adjoint back to the sketch parameters and
+projects the update onto the constraints; the sparkline is the objective, peak
+temperature, falling. When it finishes, the card becomes a replay: the scrubber
+ghost-compiles any step's parameters back into the viewport, and the table
+below gives every parameter's before → after. The optimizer writes the new
+values straight into `scene.py`, which is why the card then marks itself stale —
+the source it ran against has changed, by its own hand. A study-backed run also
+publishes the optimized design's solved field, so the result lands in Results
+with its temperature attached, and the run survives a mode switch or a reload by
+job id.*
 
 ## End-to-end optimization from the command line
 
@@ -663,7 +679,7 @@ full contract is in the [plugins guide](https://andrinr.github.io/cadjoint/docs/
 | `cadjoint/fem/tesseracts/elastic_calculix` | `elastic_solver` | **CalculiX 2.23, Fortran**, over a subprocess (text decks in, result files out) | Language, licence (GPL-2 isolated), and AD strategy | The solver's native `*SENSITIVITY` discrete adjoint, plus a correction we derived for a missing Jacobian-variation term in ccx 2.23 — validated to 2e-4 of finite differences |
 | `cadjoint/fem/tesseracts/tetfill` | `tetfill` | **TetGen** — the tet fill alone, with dual contouring left differentiable in JAX upstream | A discrete meshing algorithm, cut at the narrowest place it can be cut | **Pass-through gather**: TetGen's `-Y` preserves the input vertices bit-for-bit, so the VJP is the exact transpose of a gather (0.0 relative error for TET4, 1.25e-16 for TET10); Steiner nodes take zero cotangent, and interior relaxation carries their sensitivity onto the boundary |
 | `cadjoint/fem/tesseracts/mesher` | `mesher` | The **whole black-box mesher** — dual-contoured surface into a tetrahedral volume mesher whose internals nobody differentiates | The boundary everyone gives up on: a discrete, non-differentiable meshing algorithm | **Surface-interpolation VJP**: a boundary vertex lies on the zero set of the trilinearly interpolated SDF samples, so the implicit function theorem gives `∂v/∂fᵢ = −wᵢ(v)·∇f/|∇f|²` — the interpolation weights at the frozen vertex locations *are* the VJP rows. Any mesher becomes differentiable without touching its internals; only the Hadamard-meaningful normal motion is carried |
-| `cadjoint/fem/tesseracts/tet_gmsh` | `tet_mesher` | **Gmsh** (HXT, second order) on the exact STEP the B-rep graph writes | Licence (GPL-2-or-later isolated) and a discrete topology decision | Node ownership from Gmsh drives the B-rep projection kernel, so midside nodes follow their surfaces differentiably |
+| `cadjoint/fem/tesseracts/tet_gmsh` | `tet_mesher` | **Gmsh** (HXT, second order) on the faceted STEP the exporter writes | Licence (GPL-2-or-later isolated) and a discrete topology decision | **No gradient path.** Gmsh meshes the exported solid and returns nodes that are not tied back to the design parameters, so this route is for getting a good second-order mesh, not for differentiating through one — use `tetfill` or `mesher` when the gradient has to reach the CAD |
 | `cadjoint/fem/tesseracts/flow_brinkman` | `flow_solver` | The D3Q19 lattice-Boltzmann flow prototype in `cadjoint/flow/` | No mesh at all: the design enters as a solid fraction sampled from the SDF | Implicit function theorem at the converged fixed point — 457 MB where an unrolled tape needs 21 GB, finite differences matched to 3e-8 (`research/flow-solver.md`) |
 
 ### The composition
@@ -841,9 +857,6 @@ second IR, and §12.10 argues why one would not buy more than this.
   accent is only ever a fill, and the zoning rule that made panels dock
 - [`research/performance.md`](research/performance.md) — the measured profile of
   every worker mode, each speed-up avenue ranked, and the structured lowering
-- [`research/two-tier.md`](research/two-tier.md) — where the line between the
-  public and private tiers falls, the one contract with two transports, and the
-  decisions D1–D12 the split rests on
 - [`research/differentiable-meshing-pipeline.md`](research/differentiable-meshing-pipeline.md)
   — architecture of `cadjoint/meshing`
 - [`research/native-mesher.md`](research/native-mesher.md) — the retired Rust

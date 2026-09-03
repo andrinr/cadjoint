@@ -172,7 +172,7 @@ quartodoc:
         - fem.gmsh.owned_nodes
         - fem.gmsh.patch_table
         - fem.gmsh.GmshMesh
-    - title: The private tier
+    - title: Extension kinds and availability
       contents:
         - tier.status
         - tier.available

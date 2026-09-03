@@ -293,30 +293,40 @@ materials, **Wire** for construction geometry only — over independent switches
 for shadows, reflections, feature edges, and the dual-contour wireframe. Presets
 are stored in the browser and can be edited and saved.
 
-The two mesh overlays are one extraction, and neither of them is the lattice.
-Turning either on asks the server for a boundary representation of the scene on
-the viewport's own 64³ grid — faces are the regions one patch field owns, edges
-are where two of them meet — and both layers are read off it. The **wireframe**
-draws the dual-contour quads, on vertices re-solved by the projection kernel so
-a vertex on a CSG seam sits on the seam. **Feature edges** draws the graph's
-edges, and it *traces* them rather than sampling them: where two surfaces
-cross, the direction of their intersection is the cross product of the two
-normals, so each edge is followed from one corner to the next, stepping along
-that direction and correcting back onto both surfaces. The grid is asked only
-where an edge starts. A bore rim is therefore a circle whose radius is right to
-a millionth of a unit, it stays that circle wherever the cells happen to fall,
-and the step shortens where the curve bends — so a rim narrower than one cell
-is still round, not an octagon. Curves run into their corners and meet there
-exactly.
+The two mesh overlays are one extraction. Turning either on dual-contours the
+scene on the viewport's own 64³ grid and splits the result into two layers. The
+**wireframe** draws the dual-contour quads. **Feature edges** draws the sharp
+layer, and it is read off that same lattice: cells are classified as creases,
+corners or exact `min`/`max` CSG seams — the first from the spread of the
+Hermite normals, the last from which branch of the boolean wins — and the links
+between neighbouring feature cells are the chords the overlay draws.
+Feature-aware QEF placement puts each of those vertices on the feature it
+belongs to, and a vertex sitting on a CSG seam is then Newton-projected onto
+the common zero set of the operands meeting there, one program for every seam
+group at once, so it lands *on* the seam rather than within a cell of it. Both
+layers draw those projected positions, so the wireframe and the sharp layer
+agree everywhere.
+
+What the lattice cannot do is beat its own resolution. A chord per cell the
+curve crosses means a bore rim is a polygon whose vertex count is whatever the
+grid happened to give it, not a circle, and everything downstream of the
+classifier is the price of the lattice being the only witness: an on-surface
+subgradient re-check, identity grouping so two curves within a cell of each
+other cannot cross-link, a tangent-alignment test, chain building that holds
+every vertex at degree two, and debris pruning.
 
 A rounded corner is still an edge if the rounding is finer than the overlay can
 show. The grid puts one vertex where a sub-cell fillet is, so its edge is drawn
 where the sharp corner would have been — which is what a bracket filleted at
 0.02 looks like on screen, and where its bore rims come from. Round a corner by
 more than a cell and it becomes curvature the viewport genuinely renders, and no
-line is drawn inside it. That behaviour belongs to the `feature_edges`
-[plugin kind](plugins.qmd#the-five-in-process-kinds); without a provider the overlay
-falls back to the lattice classifier and the compile payload says `lattice`.
+line is drawn inside it.
+
+Tracing each curve instead — following the cross product of the two surface
+normals from one corner to the next, so a rim is a circle at any cell size — is
+the `feature_edges` [plugin kind](plugins.qmd#the-five-in-process-kinds). The
+compile payload names the source either way: `lattice` here, `graph` when
+something fills the kind.
 
 Path tracing accumulates progressively: one jittered camera sample per pixel per
 frame, averaged in linear HDR, with cosine-weighted diffuse and
@@ -348,10 +358,13 @@ merged into n-gons), `STEP` and, once the program declares a study, `VTK`. The
 dialog asks for the format, the object — any module-level variable bound to an
 SDF, `scene` by default — and the lattice resolution in cells along the
 object's longest axis; the lattice is fitted to the object the same way a
-`SimMesh` without explicit bounds is. STEP is not a faceted mesh with a
-`.step` extension: it is written from the derived B-rep, so planes and
-cylinders are exact with their real edge curves and only blend faces are
-faceted (`analytic` off asks for the faceted writer instead). VTK takes a
+`SimMesh` without explicit bounds is. STEP is the faceted writer of
+[`cadjoint.meshing`](meshing.qmd#export) — coplanar polygons merged and written
+as B-rep topology, which reads back into a CAD kernel as one closed solid but
+carries the mesh's own faces, not the design's. The dialog's `analytic` switch
+asks the `step_export` [plugin kind](plugins.qmd#the-five-in-process-kinds) for
+exact surfaces instead; with nothing filling it the export falls back to the
+faceted writer and says so in its report. VTK takes a
 declared study rather than an object and writes its solved mesh and fields
 for ParaView, solving first if the program has not. The run is a job like a
 solve — the chip beside the mode switcher counts it and can cancel it, and

@@ -403,19 +403,45 @@ named prerequisite.
 
 ### 10.1 Shipped
 
-**The floor grid, the spacing readout and the title block.** The viewport rules
-the **z = 0 plane** — the floor every scene stands on, since the library and every
-scene are Z-up — with a minor line, a firmer major every fifth, and the two axes
-a step above that: **1.36 / 1.58 / 1.69:1** on paper, fading outward from the
-orbit target and again once a cell falls under a few pixels, so the far field
-dissolves rather than aliasing. It is a per-fragment raycast in a fullscreen WGSL
-pass at clip z = 1, depth-tested against the ray-miss depth: it sits behind the
-solid, under every overlay, and costs one triangle. In Sketch mode, when the
-active plane is not the floor, the whole grid steps back one level — the sketch's
-own plane becomes the reference, but the floor still says which way up the world
-is. There is no screen-space faceplate, no centre-axis ticks and no corner
-brackets: a grid that does not live in the scene says nothing about where anything
-is.
+**The construction grid, the spacing readout and the title block.** The viewport
+rules a **world coordinate plane** — by default **z = 0**, the floor every scene
+stands on, since the library and every scene are Z-up — with a minor line, a
+firmer major every fifth, and the two axes a step above that: **1.36 / 1.58 /
+1.69:1** on paper, fading outward from the orbit target and again once a cell
+falls under a few pixels, so the far field dissolves rather than aliasing. It is
+a per-fragment raycast in a fullscreen WGSL pass at clip z = 1, depth-tested
+against the ray-miss depth: it sits behind the solid, under every overlay, and
+costs one triangle. In Sketch mode, when the active plane is not the floor, the
+whole grid steps back one level — the sketch's own plane becomes the reference,
+but the floor still says which way up the world is. There is no screen-space
+faceplate, no centre-axis ticks and no corner brackets: a grid that does not live
+in the scene says nothing about where anything is.
+
+**Which plane it rules.** On z = 0 alone the grid is right in Top and Bottom and
+useless in Front, Back, Left and Right — exactly edge-on, one line, no grid at
+all in the four views someone reaches for to square a measurement up. So it moves
+to whichever world plane the camera most nearly faces, scored by |forward · n|
+with the floor weighted **2×**: the ground is the model's ground and the slice
+contours, the depth ramp and the detent ladder are all stated at its spacing, so
+it holds every corner and edge view and yields only below a pitch of 26.6° in an
+axis view. The two crossovers **dissolve over about three degrees** rather than
+snapping, because swapping on a snapped preset would leave a camera at pitch 0
+and yaw 20° with an edge-on floor and no grid at all — the swap has to be
+geometric, and a geometric swap can land anywhere. The `GRID` field states the
+plane it is on (`GRID 500 mm · XY`) beside the spacing, on the same footing as
+the octant beside `VIEW`: a spacing on an unnamed plane is not a measurement.
+`research/design/light-chrome/grid-{before,after,near-clip,plane-crossover}.png`.
+
+**A parallel camera has no near plane in front of it.** The projection used one
+near/far pair for both projections, measured from the camera position, which is
+right for an eye and wrong for a station: an orthographic camera still sits at
+the orbit distance in front of its target, so everything nearer the camera plane
+than 0.05 was clipped — the whole half of the scene on the camera's own side of
+what you are looking at. Orthographic now brackets a slab hung about the **orbit
+target**, `distance ± MAX_TRACE_DISTANCE`, which is `DEPTH_FAR` deep — the same
+range perspective gets and, being linear rather than 1/z, a uniformly finer depth
+buffer. `near` is negative, which is what a parallel projection's near plane
+looks like when the camera is inside the scene.
 
 The readout states the grid spacing in real millimetres — the unit is not
 invented; the STEP exporter is the one place the repo declares a length and it
@@ -754,7 +780,7 @@ Checks worth adding as the queued devices land:
 | the assertions | `frontend/test/tokens.test.ts`, `frontend/test/graticule.test.ts` |
 | the linter | `frontend/tools/ui-audit/` |
 | the app as shipped, in screenshots | `docs/assets/screens/` |
-| the banner and the live README capture | `research/design/banner/` |
+| the README animations, captured live | `research/design/motion/` |
 | evidence for a specific claim, where one was needed | `research/design/light-chrome/`, `research/design/scenes/` |
 | the refactor, before and after | `research/refactor/` |
 

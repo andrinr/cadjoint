@@ -555,11 +555,13 @@ class Optimization:
     def _refuse_frozen_geometry(self) -> None:
         """Refuse a study whose mesh's nodes cannot follow the design.
 
-        A Gmsh mesh's node positions are the ``node_map`` plugin kind's,
-        which is the private tier's (``research/two-tier.md`` §2.5).
-        Without it the mesh is frozen geometry, and the refusal is here —
-        at declaration — rather than inside the traced objective, where a
-        design derivative would silently be zero or, worse, be faked by
+        A Gmsh mesh's node positions come from the ``node_map`` plugin kind,
+        which nothing in this repository fills.  Unfilled, the mesh is
+        frozen geometry: the nodes are right, but they cannot follow a
+        design parameter, so a gradient through them would be silently
+        wrong.  The refusal is here — at declaration — rather than inside
+        the traced objective, where a design derivative would silently be
+        zero or, worse, be faked by
         an arity-1 projection that slides crease nodes off their creases.
 
         Raises:

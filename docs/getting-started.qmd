@@ -140,11 +140,10 @@ fully-determined system.
 
 ## Faces are references, not geometry
 
-cadjoint stores no boundary representation. The surfaces it produces — the
-dual-contoured mesh, and the graph the private tier derives from the field —
-are *readings* of the field at one resolution, not its definition, and basing
-a work plane on either would mean basing a design decision on whatever grid the
-extraction happened to run at.
+cadjoint stores no boundary representation. The surface it produces — the
+dual-contoured mesh — is a *reading* of the field at one resolution, not its
+definition, and basing a work plane on it would mean basing a design decision
+on whatever grid the extraction happened to run at.
 
 The construction tree knows better than the mesh does. `extrude` spans
 `±depth/2` around its sketch plane, so it knows exactly where its caps are and
@@ -261,31 +260,31 @@ save_stl(mesh, "sphere.stl")
 ```
 
 Full detail, including the exports, in
-[differentiable meshing](meshing.qmd). Exact surfaces rather than facets — a
-STEP file in which a bore is one cylinder, a corner you can drag — are the
-private tier's, below.
+[differentiable meshing](meshing.qmd). What comes out is a **faceted** solid,
+in every format: one triangle per cell crossing, coplanar ones merged, a 28-gon
+standing in for a bore.
 
-### Two tiers
+### Kinds that can be filled {#pluggable-kinds}
 
-cadjoint is the public tier and it is complete on its own: the language, dual
+Everything on this page runs with nothing else installed: the language, dual
 contouring, the lattice feature classifier, faceted STEP/OBJ/STL, TetGen and
-Gmsh tet meshes, every solver, the optimizer and the playground. Everything on
-this page runs with nothing else installed.
+Gmsh tet meshes, every solver, the optimizer and the playground.
 
-A second, private distribution — `diff-brep` — fills five plugin kinds
-(`node_map`, `feature_edges`, `brep`, `step_export`, `drag`) with the parts
-that solve against the patch fields *with a derivative*: the derived B-rep and
-its edge tracer, analytic STEP, the drag inverse problem, and the map from
-design parameters to the node positions of a Gmsh mesh. It is discovered
-through the ordinary `cadjoint.plugins` entry-point group; the word
-`diff_brep` never appears in this repository.
+Five [plugin kinds](plugins.qmd#the-five-in-process-kinds) — `node_map`,
+`feature_edges`, `brep`, `step_export`, `drag` — are declared here and filled
+by nothing in this repository. They are the extension points for a component
+that re-solves a surface against the scene's patch fields *with a derivative*,
+which is what a STEP whose bore is one cylinder, an edge curve traced rather
+than sampled, or a Gmsh mesh whose nodes follow the design would need. Such a
+component ships separately and is not part of this project; the slots are
+ordinary `cadjoint.plugins` entry points, so anything registering them fills
+them.
 
-Without it nothing breaks and one thing is refused. Feature edges come from the
-lattice classifier instead of the traced curves, STEP export is faceted instead
-of analytic, and a Gmsh-meshed study cannot be optimized — its mesh is *frozen
-geometry*, and `Optimization` says so at declaration rather than handing back a
-gradient that is quietly wrong. `mesher="tetgen"`, the default, is
-differentiable either way.
+Unfilled is the ordinary case and nothing breaks. Feature edges come from the
+lattice classifier, STEP export is faceted, and exactly one thing is refused: a
+Gmsh-meshed study cannot be optimized — its mesh is *frozen geometry*, and
+`Optimization` says so at declaration rather than handing back a gradient that
+is quietly wrong. `mesher="tetgen"`, the default, is differentiable either way.
 
 ```python
 from cadjoint import tier
@@ -371,6 +370,6 @@ Rendered pixels are deliberately not an inverse-rendering API. See the
 - [Sketch construction](../examples/sketch_construction.ipynb) — profiles, extrude, revolve
 - [Constraints](../examples/constraints.ipynb) — solving fully-determined systems
 - [Constrained optimization](../examples/constrained_optimization.ipynb) — the full workflow with trajectory visualization
-- [Plugins](plugins.qmd) — the registry, the two transports, and what the
-  private tier adds
+- [Plugins](plugins.qmd) — the registry, the two transports, and the kinds a
+  component can fill
 - [The playground](viewer.qmd) — all of it in one browser window

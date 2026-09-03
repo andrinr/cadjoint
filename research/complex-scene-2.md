@@ -16,8 +16,8 @@ totally-enclosed electric motor, cast in aluminium, with a helical coolant
 passage cast into the wall of its bearing tower. It was chosen over the
 gearbox end-cap because every job it does lands on a *harder* corner than the
 last part did, and because several of them land on the B-rep extraction's
-known failure classes **on purpose** (the axiom battery, moved to the
-private `diff-brep` repository — see `research/two-tier.md`).
+known failure classes **on purpose**. That extraction is no longer part of
+this repository; §6 records what it did while it was.
 
 | job | feature | what it tests |
 | --- | --- | --- |
@@ -1009,15 +1009,13 @@ right, they should agree, and the author should be told once.
 ## 6. B-rep extraction
 
 > **Read this section as a record, not as a reproducible measurement.** It was
-> taken with `cadjoint.brep` in the tree. While this report was being written,
-> a separate line of work cut the differentiable B-rep out of this repository
-> along the seam prepared in `9734324` (see the licence decision recorded in
-> `research/two-tier.md`); `cadjoint/brep/` and `research/brep-axioms.md` are
-> gone from the working tree and `from cadjoint.brep import extract_brep` now
-> raises `ModuleNotFoundError`. The numbers below are what the extractor did
-> on this part on this branch on the day it was still here, and every axiom
-> name cited is from `research/brep-axioms.md` as it stood in `9734324`.
-> Nothing in §6 can be re-run from this tree.
+> taken with `cadjoint.brep` in the tree. That module and
+> `research/brep-axioms.md` were removed while this report was being written,
+> and `from cadjoint.brep import extract_brep` now raises
+> `ModuleNotFoundError`. The numbers below are what the extractor did on this
+> part on this branch on the day it was still here, and every axiom name cited
+> is from `research/brep-axioms.md` as it stood in `9734324`. Nothing in §6
+> can be re-run from this tree.
 
 `extract_brep(shield, grid)` on the viewport's own lattice — 64 cells over the
 6-unit box, **cell 0.0938** — took **155.8 s** and returned:
@@ -1364,10 +1362,11 @@ Ordered by how hard the wall is.
    allowed: sub-cell features. A mesh-resolution-aware warning at declaration
    time — "`shield-tet10` samples at 0.107 and your thinnest wall is 0.05" —
    would have said so in one second instead of 142.
-2. **B-rep extraction, informatively.** It completes in 156 s and returns a
-   structure that is wrong in the ways the axiom battery predicted, at a scale
-   that makes each one visible: χ = 60 against −54, 80 % ambiguous vertices,
-   142 faces on one octagonal flange (§6).
+2. **B-rep extraction, informatively.** It completed in 156 s and returned a
+   structure that was wrong in the ways the axiom battery predicted, at a scale
+   that made each one visible: χ = 60 against −54, 80 % ambiguous vertices,
+   142 faces on one octagonal flange (§6 — measured before the module was
+   removed from this repository).
 3. **Derived dimensions, structurally.** `Scalar` has no arithmetic, so every
    relation between two dimensions is a dead Python float (§2.19). This is the
    largest *language* gap and the one that most changes what the file can be.

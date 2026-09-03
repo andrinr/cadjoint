@@ -67,8 +67,9 @@ There is no fourth `method`, but there is a second mesher. Tets sized by the
 part rather than by the lattice come from Gmsh: `SimMesh(mesher="gmsh")` in
 [the meshing guide](meshing.qmd#the-gmsh-route). Its midside nodes sit on the
 true surface, and whether they *follow* the design parameters depends on the
-`node_map` plugin — without it the mesh reports frozen geometry, which
-[Two tiers](getting-started.qmd#two-tiers) explains.
+`node_map` plugin kind — nothing fills it here, so the mesh reports frozen
+geometry, which [kinds that can be
+filled](getting-started.qmd#pluggable-kinds) explains.
 
 ## Judge it
 
