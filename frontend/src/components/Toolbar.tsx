@@ -6,23 +6,20 @@
  * mode itself.
  */
 
-import { Show, createEffect, createSignal, onCleanup } from "solid-js";
+import { Show, createEffect, createSignal, onCleanup, untrack } from "solid-js";
 import { busy, dirty, nodeById, selection, status } from "../state";
 import {
   cancelJob,
   jobsSnapshot,
   runningJobs,
   watchJobs,
-  type JobKind,
   type RunningJob,
 } from "../jobs";
+import { CHIP_KINDS, cancelLabel, chipJobs, othersLabel } from "./jobChip";
 import { windowManager } from "../windows/manager";
 import { ModeSwitcher } from "./ModeSwitcher";
 import { RenderPanel, type RenderPanelProps } from "./RenderPanel";
 import { CodeIcon, DisplayIcon, PlayIcon, ResetIcon } from "./icons";
-
-/** The kinds worth a chip: work you start and then look away from. */
-const CHIP_KINDS = new Set<JobKind>(["simulate", "optimize", "mesh", "mesh_inspect", "export"]);
 
 /** How long a failure keeps the dot after the job has gone. */
 const FAILURE_LINGER_MS = 6_000;
@@ -92,22 +89,57 @@ function JobChip() {
   });
 
   /**
+   * When the app stopped agreeing with its own source, by the client clock.
+   *
+   * Zero when it agrees. Kept here rather than derived from the job registry
+   * because the registry cannot see the debounce window before the request,
+   * and because this is the number the user is counting: seconds since *my
+   * edit*, not seconds since the worker got round to it.
+   */
+  const [compilingSince, setCompilingSince] = createSignal(0);
+  createEffect(() => {
+    const working = busy();
+    setCompilingSince(working ? untrack(compilingSince) || Date.now() : 0);
+  });
+
+  /**
    * The work this chip is for, which is not all of it.
    *
-   * A compile and a lint are jobs in the registry, and neither belongs here:
-   * the status line two controls to the right already says "JAX compiling…"
-   * and the Run button is already disabled, so a third mark saying the same
-   * thing is noise — and a lint fires on a pause in typing, which would make
-   * the chip blink several times a minute while you write code. What is left
-   * is the work you start and then go and do something else during: a solve,
-   * an optimization, a mesh, an export. The Processes window lists every job; this is the
-   * one sentence, and it is about the ones worth interrupting for.
+   * A lint does not belong here: it fires on a pause in typing, which would
+   * make the chip blink several times a minute while you write code. A
+   * compile does, and used to be excluded on the grounds that the status line
+   * and a disabled Run button already said it — which was true and still left
+   * the longest wait in the app as the quietest thing on screen. What is here
+   * now is everything the machine is doing that a person is waiting on: the
+   * compile first, because it is the one that decides whether the picture is
+   * current, then the work you start and go away from — a solve, an
+   * optimization, a mesh, an export. The Processes window lists every job;
+   * this is the one sentence about the ones worth interrupting for.
    */
-  const jobs = () => {
+  /**
+   * The work this chip is for, which is not all of it — see `./jobChip`.
+   *
+   * `tick()` is read for its reactivity alone: the compile's clock runs off
+   * the client's own `Date.now()`, and without the quarter-second ticker in
+   * the dependency list the seconds would only move when the registry poll
+   * happened to change something.
+   */
+  const jobs = (): RunningJob[] => {
     tick();
-    return runningJobs().filter((job) => CHIP_KINDS.has(job.kind));
+    return chipJobs(runningJobs(), compilingSince(), Date.now());
   };
+  /**
+   * The one named on the chip when several things are running.
+   *
+   * `jobs()` puts the compile first and the registry's newest-first order
+   * after it, and the lead is simply the head of that. A compile leads
+   * because it is the one job that decides whether the picture on screen is
+   * the picture of the code; everything else is work you started on purpose
+   * and can watch in the monitor.
+   */
   const lead = () => jobs()[0];
+  /** How many are running but not named here. Never hidden — see `others`. */
+  const others = () => Math.max(0, jobs().length - 1);
   const recentlyFailed = () => tick() >= 0 && Date.now() - failedAt() < FAILURE_LINGER_MS;
 
   return (
@@ -121,13 +153,14 @@ function JobChip() {
           type="button"
           class="job-chip-open"
           onClick={() => windowManager()?.open("processes")}
-          title="Open the process monitor"
+          title={
+            others() > 0
+              ? `${jobs().length} jobs running — open the process monitor`
+              : "Open the process monitor"
+          }
           data-testid="job-chip-open"
         >
           <i class="dot" aria-hidden="true" />
-          <Show when={jobs().length > 1}>
-            <b>{jobs().length} running</b>
-          </Show>
           <Show
             when={lead()}
             fallback={<b>failed</b>}
@@ -135,7 +168,9 @@ function JobChip() {
             {(job) => (
               <>
                 <b>{job().kind}</b>
-                <span>{job().name}</span>
+                <Show when={job().name}>
+                  <span>{job().name}</span>
+                </Show>
                 <Show when={progressLabel(job())}>
                   <span>{progressLabel(job())}</span>
                 </Show>
@@ -143,15 +178,32 @@ function JobChip() {
               </>
             )}
           </Show>
+          {/*
+            Everything running is accounted for, and the chip is still one
+            sentence: it names the job it can stop and then says how many more
+            there are, rather than showing one and quietly hiding the rest.
+            The count is a link into the Processes window, which is the thing
+            that lists them in full — one vocabulary, two depths.
+          */}
+          <Show when={others() > 0}>
+            <span data-testid="job-chip-others">{othersLabel(others())}</span>
+          </Show>
         </button>
         <Show when={lead()}>
           {(job) => (
             <button
               type="button"
               class="job-chip-cancel"
+              // A compile is on this chip from the moment of the edit, which
+              // is up to a poll before the registry can name the job. The
+              // button keeps its box and goes dead for that second rather
+              // than appearing under the pointer once the id turns up.
+              disabled={!job().id}
               onClick={() => void cancelJob(job().id)}
-              title={`Cancel ${job().kind} ${job().name}`}
-              aria-label="Cancel this job"
+              // Never "cancel this job" when there is more than one: the ×
+              // stops the one the chip names, and it says which that is.
+              title={cancelLabel(job())}
+              aria-label={cancelLabel(job())}
               data-testid="job-chip-cancel"
             >
               ×
@@ -218,9 +270,20 @@ export function Toolbar(props: ToolbarProps) {
         </span>
       </Show>
 
+      {/*
+        The status line is a *result* readout: what the last piece of work
+        produced, what the renderer is drawing, what failed. It used to say
+        "JAX compiling…" as well, which put the same machine state on the
+        same bar twice — the chip to the left already names the compile,
+        counts its seconds and can stop it. So while work is in flight this
+        yields: the element stays (its slot is not a hole that opens and
+        closes) and it says nothing, because it has nothing settled to say.
+      */}
       <span class={`status ${status().kind}`} data-testid="status">
-        <i class="dot" />
-        {status().text}
+        <Show when={status().text}>
+          <i class="dot" />
+          {status().text}
+        </Show>
       </span>
 
       <div class="render-popover-anchor" ref={anchor}>
@@ -260,16 +323,40 @@ export function Toolbar(props: ToolbarProps) {
       >
         <ResetIcon />
       </button>
+      {/* Run is a verb, not an indicator: it no longer relabels itself
+          "Compiling…" — the chip says that, once. It is refused only while
+          pressing it would do nothing, which is a compile of text that is
+          already compiling; over edited text a Run mid-compile is a
+          legitimate thing to ask for and supersedes the one running. */}
       <button
         type="button"
         class="primary"
         onClick={props.onRun}
-        disabled={busy()}
+        disabled={busy() && !dirty()}
         data-testid="run"
       >
         <PlayIcon />
-        {busy() ? "Compiling…" : dirty() ? "Run •" : "Run"}
+        {dirty() ? "Run •" : "Run"}
       </button>
+
+      {/*
+        The seam.
+
+        The chip says what is running and the status says so in words, but
+        both are small marks in a bar the eye has learned to skip. This is the
+        one indicator that cannot be missed and still costs nothing: the rule
+        that separates the chrome from the work below it, doubled to 2px and
+        filled with the accent while the picture on screen is not the picture
+        of the code. It is the language's own vocabulary — a rule, not a box;
+        the accent as a ground, never as a mark; 2px reserved for *active*
+        state (§5) — and it reserves no space, because it is drawn on the
+        border that is there either way.
+      */}
+      <Show when={busy()}>
+        <div class="toolbar-busy" data-testid="toolbar-busy" aria-hidden="true">
+          <i />
+        </div>
+      </Show>
     </header>
   );
 }

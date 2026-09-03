@@ -12,8 +12,17 @@ import { expect, test, type Page } from "@playwright/test";
  */
 
 async function waitForCompile(page: Page) {
-  await expect(page.getByTestId("status")).not.toContainText("compiling", { timeout: 60_000 });
-  await expect(page.getByTestId("run")).toBeEnabled({ timeout: 60_000 });
+  // The settle signal is the toolbar's busy seam. It is present for exactly
+  // as long as the app is behind its own source — from the edit, through the
+  // debounce window and the request, until the shaders are installed — which
+  // the status line no longer is: while work is in flight the status says
+  // nothing at all, so that the one indicator for running work is the
+  // toolbar's chip. A settled status is therefore a second, independent
+  // signal, and "Starting…" is the placeholder to wait past on a cold load.
+  await expect(page.getByTestId("status")).not.toHaveText(/^(|Starting…)$/, {
+    timeout: 60_000,
+  });
+  await expect(page.getByTestId("toolbar-busy")).toHaveCount(0, { timeout: 60_000 });
 }
 
 /** The full document, read off the CodeMirror view rather than the DOM. */

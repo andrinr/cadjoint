@@ -71,16 +71,27 @@ class TestTheFixtureBlanksTheRegistry:
     def test_no_provider_is_shipped_so_the_default_state_is_absent(self):
         """This is the whole point of the split, asserted once.
 
-        Nothing in this repository fills the five kinds, so an unmodified
-        checkout is already the degraded state — ``tier.absent()`` is what
-        the rest of this file uses to reach it deliberately even when a
-        developer *has* installed diff-brep alongside.
+        The claim is about the *repository*, not the machine: nothing here
+        fills the five kinds, so a checkout with nothing else installed is
+        already the degraded state.  Asserting it by reading the live
+        registry would make this test pass only where diff-brep happens not
+        to be installed — which is how a whole file of degradation tests
+        went red the first time somebody installed it.  So ask the builtin
+        table, which is what this repository ships, and use
+        ``tier.absent()`` for the runtime half.
         """
-        status = tier.status()
-        assert not status.installed
-        assert not any(status.flags().values())
-        for kind in tier.KINDS:
-            assert status[kind].reason == "not registered"
+        from cadjoint.plugins import builtin_specs
+
+        shipped = {spec.kind for spec in builtin_specs().values()}
+        assert shipped.isdisjoint(
+            tier.KINDS
+        ), "public cadjoint must ship no provider for the private kinds"
+        with tier.absent():
+            status = tier.status()
+            assert not status.installed
+            assert not any(status.flags().values())
+            for kind in tier.KINDS:
+                assert status[kind].reason == "not registered"
 
     def test_the_switch_still_blanks_a_registry_that_has_a_provider(self, stub_tier):
         """With a provider registered, ``absent`` takes it out and puts it back."""
@@ -191,11 +202,12 @@ class TestStepExportFallsBackToFaceted:
         )
 
     def test_without_the_tier_the_file_is_faceted_and_the_report_says_why(self, tmp_path):
-        result = self._export(tmp_path)
-        assert result["ok"] is True, result
-        assert result["report"]["path"] == "mesh"
-        assert result["report"]["tier"] == tier.message(PluginKind.STEP_EXPORT.value)
-        assert (tmp_path / "out.step").read_text().startswith("ISO-10303-21;")
+        with tier.absent():
+            result = self._export(tmp_path)
+            assert result["ok"] is True, result
+            assert result["report"]["path"] == "mesh"
+            assert result["report"]["tier"] == tier.message(PluginKind.STEP_EXPORT.value)
+            assert (tmp_path / "out.step").read_text().startswith("ISO-10303-21;")
 
     def test_with_the_tier_the_kind_takes_it_and_the_report_says_nothing(self, tmp_path, stub_tier):
         """A registered ``step_export`` provider writes the file instead.
@@ -227,7 +239,8 @@ class TestTheCompilePayloadCarriesTheTier:
     def test_the_flags_are_one_boolean_per_kind(self):
         from cadjoint.viewer._compile_worker import _tier_flags
 
-        assert _tier_flags() == dict.fromkeys(tier.KINDS, False)
+        with tier.absent():
+            assert _tier_flags() == dict.fromkeys(tier.KINDS, False)
 
     def test_the_flags_go_true_when_a_provider_is_registered(self, stub_tier):
         from cadjoint.viewer._compile_worker import _tier_flags
@@ -306,10 +319,11 @@ class TestAGmshMeshIsFrozenGeometry:
 
     def test_inspection_reports_the_frozen_geometry(self, gmsh_mesh):
         declared, _built = gmsh_mesh
-        report = declared.inspect(plate())
-        assert report["mesher"] == "gmsh"
-        assert report["frozen_geometry"] is True
-        assert declared.describe()["frozen_geometry"] is True
+        with tier.absent():
+            report = declared.inspect(plate())
+            assert report["mesher"] == "gmsh"
+            assert report["frozen_geometry"] is True
+            assert declared.describe()["frozen_geometry"] is True
 
     def test_the_node_map_kind_is_what_unfreezes_it(self, gmsh_mesh, stub_tier):
         """``frozen_geometry`` reads the registry, not the mesher."""
@@ -338,7 +352,7 @@ class TestAGmshMeshIsFrozenGeometry:
             conductivity=1.0,
             bcs=[Dirichlet(Nodes.side("-x"), 0.0), Dirichlet(Nodes.side("+x"), 100.0)],
         )
-        with pytest.raises(tier.TierUnavailable) as caught:
+        with tier.absent(), pytest.raises(tier.TierUnavailable) as caught:
             Optimization(name="nope", study=study, metric="max")
         message = str(caught.value)
         assert "frozen geometry" in message

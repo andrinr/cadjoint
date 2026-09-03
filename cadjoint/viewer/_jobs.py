@@ -14,7 +14,9 @@ API cannot:
   RSS are sampled every :data:`SAMPLE_INTERVAL` seconds, so the UI can show
   what is currently burning the machine and for how long.
 - **Cancellation.**  The registry holds the worker's ``Popen``, so a run can
-  actually be killed rather than merely abandoned.
+  actually be killed rather than merely abandoned — by job id once the client
+  has one, or by the client's own request label (:meth:`JobRegistry.cancel_client`)
+  while the request is still in flight and has no job id to name.
 
 The registry never starts work itself: endpoints wrap their existing call in
 :meth:`JobRegistry.track`, which binds the job to the calling thread so that
@@ -38,6 +40,7 @@ import subprocess
 import sys
 import threading
 import time
+from collections import deque
 from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import Any
@@ -76,6 +79,10 @@ MAX_RESULT_BYTES = 64 * 1024 * 1024
 MAX_SAMPLES = 600
 #: Progress events kept per optimize job, for replaying a run's descent.
 MAX_PROGRESS_EVENTS = 256
+#: How many client request ids cancelled ahead of their own registration are
+#: remembered.  One is the realistic depth (a supersession cancels exactly one
+#: predecessor); the rest is slack for a client that supersedes in a burst.
+MAX_PENDING_CANCELS = 32
 #: Seconds between resource samples of a running worker.
 SAMPLE_INTERVAL = 0.5
 #: How many samples apart the worker's child processes are re-enumerated.
@@ -128,9 +135,20 @@ class Job:
         *,
         source: Any = None,
         fields: dict[str, Any] | None = None,
+        client_id: str | None = None,
     ) -> None:
         self.id = job_id
         self.kind = kind
+        #: The name the *client* gave this request before it was sent, when it
+        #: gave one.  A job id is minted here and only reaches the browser on
+        #: the response — which is the moment the work is already over — so it
+        #: is useless as a handle for stopping work that is still running.  A
+        #: request that may be superseded by a newer edit (a compile, a mesh
+        #: extraction) therefore carries its own label, and that is what
+        #: :meth:`JobRegistry.cancel_client` cancels by.  Kept off the
+        #: summary: it is plumbing between one client and its own requests,
+        #: not something the monitor has any use for.
+        self.client_id = client_id
         self.status = "queued"
         self.fields = dict(fields or {})
         self.source_hash = source_hash(source)
@@ -443,6 +461,13 @@ class JobRegistry:
         self.evicted_results = 0
         self._jobs: list[Job] = []
         self._by_id: dict[str, Job] = {}
+        #: Client request ids cancelled before the server had registered them.
+        #: A supersession races the request it supersedes: the browser can ask
+        #: to stop a compile whose POST is still crossing the loopback, and
+        #: without this the older worker would escape the kill by a few
+        #: milliseconds and then burn a core for twenty-five seconds.  Bounded
+        #: and small — it only has to outlive one request's flight time.
+        self._cancelled_clients: deque[str] = deque(maxlen=MAX_PENDING_CANCELS)
         self._counter = 0
         self._result_bytes = 0
         self._lock = threading.RLock()
@@ -456,19 +481,64 @@ class JobRegistry:
 
     # ── registration ───────────────────────────────────────────────────────
 
-    def submit(self, kind: str, *, source: Any = None, fields: dict[str, Any] | None = None) -> Job:
-        """Register a new job in ``queued`` state and evict what no longer fits."""
+    def submit(
+        self,
+        kind: str,
+        *,
+        source: Any = None,
+        fields: dict[str, Any] | None = None,
+        client_id: str | None = None,
+    ) -> Job:
+        """Register a new job in ``queued`` state and evict what no longer fits.
+
+        A job whose *client_id* was already cancelled is born cancelled: the
+        request lost a race with its own supersession, and honouring the kill
+        it arrived after is the whole point of remembering it.
+        """
         with self._lock:
             self._counter += 1
-            job = Job(f"job-{self._counter:06d}", kind, source=source, fields=fields)
+            job = Job(
+                f"job-{self._counter:06d}", kind, source=source, fields=fields, client_id=client_id
+            )
+            if client_id is not None and client_id in self._cancelled_clients:
+                # `attach` kills the worker the moment one is spawned, and
+                # `complete` answers the caller with `cancelled`.
+                job.cancel_requested = True
             self._jobs.append(job)
             self._by_id[job.id] = job
             self._evict_jobs()
             return job
 
+    def cancel_client(self, client_id: str) -> list[str]:
+        """Kill every unfinished job carrying *client_id*; remember the ask.
+
+        The client half of supersession.  The browser names a request before
+        it sends it, so it can stop that request without knowing the id this
+        registry will mint for it — including in the window before the request
+        has arrived at all, which is why the id is remembered rather than only
+        matched.
+
+        Args:
+            client_id: The label the client put on its request.
+
+        Returns:
+            The ids of the jobs actually stopped, oldest first.
+        """
+        with self._lock:
+            if client_id not in self._cancelled_clients:
+                self._cancelled_clients.append(client_id)
+            doomed = [job for job in self._jobs if job.client_id == client_id]
+        # Killing a worker touches the job's own lock, never the registry's.
+        return [job.id for job in doomed if job.cancel()]
+
     @contextmanager
     def track(
-        self, kind: str, *, source: Any = None, fields: dict[str, Any] | None = None
+        self,
+        kind: str,
+        *,
+        source: Any = None,
+        fields: dict[str, Any] | None = None,
+        client_id: str | None = None,
     ) -> Iterator[Job]:
         """Run a block as a registered job, bound to the calling thread.
 
@@ -481,11 +551,14 @@ class JobRegistry:
             kind: One of :data:`JOB_KINDS`.
             source: The program text the request carries, for the source hash.
             fields: The request's identifying fields (study/optimization name).
+            client_id: The client's own label for the request, if it sent one,
+                so :meth:`cancel_client` can stop work whose job id the client
+                cannot know until it is too late to matter.
 
         Yields:
             The registered :class:`Job`, already running.
         """
-        job = self.submit(kind, source=source, fields=fields)
+        job = self.submit(kind, source=source, fields=fields, client_id=client_id)
         previous = current_job()
         _ACTIVE.job = job
         job.start()

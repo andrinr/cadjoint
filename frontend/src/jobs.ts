@@ -571,6 +571,27 @@ export async function cancelJob(jobId: string): Promise<boolean> {
   return stopped;
 }
 
+/**
+ * Kill everything running under a client-chosen request id.
+ *
+ * The counterpart to {@link cancelJob} for work whose server-assigned id the
+ * caller does not have yet, which is every request that is still in flight —
+ * and "still in flight" is the only interesting case when a newer edit has
+ * just replaced an older one. See {@link nextRequestId}.
+ */
+export async function cancelClientJob(clientId: string): Promise<number> {
+  const stopped = await api.cancelClientJobs(clientId);
+  if (stopped > 0) await refreshJobs();
+  return stopped;
+}
+
+let requestCounter = 0;
+/** A session-unique label for one request, minted before it is sent. */
+export function nextRequestId(): string {
+  requestCounter += 1;
+  return `c${requestCounter}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 // ── the cross-panel request ────────────────────────────────────────────────
 
 /**

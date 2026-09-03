@@ -1,10 +1,16 @@
 /**
  * DOM chrome floating over the canvas.
  *
- * The renderer draws the scene; these four things are drawn by the browser on
+ * The renderer draws the scene; these three things are drawn by the browser on
  * top of it because they are text, or because they are transient feedback
  * that should never cost a frame: the BC rubber band, the probe chip anchored
- * to a picked vertex, the compile indicator, and the dismissible viewer error.
+ * to a picked vertex, and the dismissible viewer error.
+ *
+ * There is deliberately no compile indicator among them. There was one, and
+ * with the top bar's running-work chip beside it the app said "compiling" in
+ * two places at once; the chip won, because it names the work, counts its
+ * seconds and can stop it, and because an instrument's viewport should carry
+ * as little chrome as it can get away with.
  *
  * They are grouped only by where they sit. Each reads the shared state it
  * reports on; the rubber band is the exception, since it belongs to the
@@ -13,13 +19,7 @@
 
 import { Show } from "solid-js";
 import { formatScalar } from "../../simulation";
-import {
-  busy,
-  dismissViewerError,
-  editingMode,
-  simProbe,
-  viewerError,
-} from "../../state";
+import { dismissViewerError, editingMode, simProbe, viewerError } from "../../state";
 
 export interface PickRect {
   left: number;
@@ -64,17 +64,6 @@ export function ViewerOverlays(props: ViewerOverlaysProps) {
             </small>
           </div>
         )}
-      </Show>
-      <Show when={busy()}>
-        <span
-          class="viewer-compile-indicator"
-          role="status"
-          aria-label="Compiling scene"
-          data-testid="viewer-compiling"
-        >
-          <i />
-          Compiling
-        </span>
       </Show>
       {viewerError() && (
         <div class="viewer-error">

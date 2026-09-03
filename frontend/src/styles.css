@@ -532,12 +532,65 @@ select option {
 /* Toolbar ------------------------------------------------------------- */
 
 .toolbar {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-5);
   padding: 0 var(--space-5);
   border-bottom: 1px solid var(--rule);
   background: var(--surface-bar-alt);
+}
+
+/* The busy seam ------------------------------------------------------- */
+
+/* A compile of a real scene is twenty-five seconds during which the viewport
+   is showing the *previous* program, and a chip is a small mark in a bar the
+   eye skips. So the bar's own bottom rule — the line between the chrome and
+   the work — doubles to 2px and fills with the accent while that is true. It
+   is 1900px long and it costs no space: the rule is there either way, and 2px
+   is the language's reserved weight for an active state (§5). The accent is a
+   ground here and carries no type, which is the only shape it is allowed. */
+.toolbar-busy {
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  overflow: hidden;
+  background: var(--accent);
+}
+
+/* The travelling segment, in the one darker tone of the same hue. The solid
+   rule is what carries the signal — it survives a still frame, a screenshot
+   and a reduced-motion preference — and this only says the work is still
+   alive, because an indeterminate wait with nothing moving in it reads as a
+   hang, which is half of what was reported. It shares the job dot's 1.4s so
+   the two indicators beat together rather than making two rhythms out of one
+   machine state. */
+.toolbar-busy i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 22%;
+  background: var(--accent-press);
+  animation: toolbar-busy-sweep 1.4s var(--ease-inout) infinite;
+}
+
+@keyframes toolbar-busy-sweep {
+  from {
+    left: -22%;
+  }
+  to {
+    left: 100%;
+  }
+}
+
+/* Reduced motion keeps the signal and drops the travel: the seam is already
+   the whole message, so the runner simply goes away. */
+@media (prefers-reduced-motion: reduce) {
+  .toolbar-busy i {
+    display: none;
+  }
 }
 
 .brand {
@@ -1971,29 +2024,6 @@ input[type="checkbox"] {
    ending in an arrowhead, drawn with the icon pen (§9) in the viewport's
    secondary ink, and never disabled — every standpoint has four turns. The
    glyph is a hairline, so the press lands on an invisible square beneath it. */
-.cube-turn {
-  cursor: pointer;
-}
-
-.cube-turn-hit {
-  fill: transparent;
-  stroke: none;
-}
-
-.cube-turn-glyph {
-  fill: none;
-  stroke: var(--viewport-ink-2);
-  stroke-width: 1.25;
-  stroke-linecap: butt;
-  stroke-linejoin: miter;
-  pointer-events: none;
-  transition: stroke var(--dur-fast) var(--ease);
-}
-
-.cube-turn:hover .cube-turn-glyph {
-  stroke: var(--viewport-ink);
-}
-
 /* @artwork — the axis triad is a reading of orientation, not chrome.
    X-red, Y-green, Z-blue is the convention every CAD and DCC application
    shares, and it is the reason this is the one saturated hue allowed inside
@@ -2493,6 +2523,17 @@ button.icon {
   background: var(--danger);
 }
 
+/* Stopped while working — a compile somebody cancelled, so the view is older
+   than the code. It takes the one tone the accent family is allowed to draw a
+   *mark* in (--accent-press, 3.36:1 on paper, where --accent itself measures
+   2.26:1 and may only ever be a ground), because it belongs to the compile
+   pipeline; and it is still rather than pulsing, because nothing is running.
+   There is no `busy` status: while work is in flight the status line is
+   silent and the toolbar's chip is the one indicator. */
+.status.stale .dot {
+  background: var(--accent-press);
+}
+
 /* The running-work chip, beside the mode switcher ---------------------- */
 
 /* One control's height so the toolbar's baseline row survives it, and no
@@ -2565,6 +2606,17 @@ button.icon {
   text-overflow: ellipsis;
   text-transform: none;
   letter-spacing: normal;
+}
+
+/* The overflow count is the one field that may never be shortened: it is the
+   whole answer to "is that everything that is running", and an ellipsis over
+   it would turn an accounting into a guess. So it keeps its width while the
+   job *name* beside it gives way — the name is recoverable from the Processes
+   window, the count is not recoverable from anywhere. */
+[data-testid="job-chip-others"] {
+  flex: 0 0 auto;
+  overflow: visible;
+  white-space: nowrap;
 }
 
 /* Middots between the fields, the way the graticule's own readout separates
@@ -2895,55 +2947,9 @@ button.icon {
    the cheaper failure, which is why the block sits below the dock in the
    stacking order rather than pushing it around. */
 
-.viewer-compile-indicator {
-  position: absolute;
-  top: var(--space-5);
-  left: 62px;
-  z-index: 8;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--rule-strong);
-  /* Opaque: over paper a translucent chip composites toward the ground and
-     its label loses its measured ratio. */
-  background: var(--surface-viewport);
-  color: var(--viewport-ink-2);
-  font: var(--type-kicker);
-  letter-spacing: var(--tracking-3xs);
-  text-transform: uppercase;
-  pointer-events: none;
-  animation: fade-in var(--dur-base) var(--ease);
-}
-
-.viewer-compile-indicator i {
-  width: var(--text-2xs);
-  height: var(--text-2xs);
-  border: 1.5px solid var(--rule);
-  border-top-color: var(--viewport-ink-2);
-  border-radius: 50%;
-  animation: viewer-spin 650ms linear infinite;
-}
-
-/* The gain readout owns the top-left corner, so the compile chip stacks under
-   it rather than replacing it for the duration of a compile. */
-.viewer-pane.has-graticule .viewer-compile-indicator {
-  top: calc(var(--space-5) + 24px);
-}
-
-@keyframes viewer-spin {
-  to {
-    transform: rotate(1turn);
-  }
-}
-
-/* The spinner reports that work is happening, so it slows rather than stops
-   under a reduced-motion preference. */
-@media (prefers-reduced-motion: reduce) {
-  .viewer-compile-indicator i {
-    animation-duration: 1.6s !important;
-  }
-}
+/* The viewport carried a "COMPILING" chip of its own here. It is gone: the
+   top bar's running-work chip says the same thing, names the work, counts its
+   seconds and can stop it, and one machine state deserves one indicator. */
 
 .constraint-overlay {
   position: absolute;
@@ -4238,7 +4244,6 @@ button.icon {
   .sim-builder,
   .sim-probe,
   .viewer-error,
-  .viewer-compile-indicator,
   .dialog,
   .dialog-backdrop {
     animation: none;

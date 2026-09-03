@@ -338,6 +338,64 @@ class TestSampling:
         assert job.status == "done"
 
 
+class TestClientCancellation:
+    """Stopping work by the *client's* name for it, not by the job id.
+
+    A job id is minted here and reaches the browser on the response, which is
+    the moment the work is already over — useless as a handle for stopping a
+    compile that a newer edit has just replaced.  So a request that can be
+    superseded carries a label the client chose before sending it, and this is
+    what that label can do.
+    """
+
+    def test_it_kills_the_running_job_that_carries_the_label(self, registry):
+        with registry.track("compile", source=SLOW_SOURCE, client_id="c7") as job:
+            process = _sleeper(30)
+            attach_process(process)
+            assert registry.cancel_client("c7") == [job.id]
+            assert process.wait(10) != 0
+            registry.finish(job, {"ok": False, "error": "The compiler process exited."})
+
+        assert job.status == "cancelled"
+        assert job.error == "cancelled"
+
+    def test_it_leaves_work_under_another_label_alone(self, registry):
+        with registry.track("compile", source=TINY_SOURCE, client_id="mine") as job:
+            assert registry.cancel_client("someone-else") == []
+            registry.finish(job, {"ok": True})
+        assert job.status == "done"
+
+    def test_a_request_cancelled_before_it_arrives_is_born_cancelled(self, registry):
+        # The supersession races the request it supersedes: the browser can
+        # ask to stop a compile whose POST is still crossing the loopback.
+        assert registry.cancel_client("early") == []
+        with registry.track("compile", source=SLOW_SOURCE, client_id="early") as job:
+            assert job.cancel_requested is True
+            process = _sleeper(30)
+            attach_process(process)  # killed on arrival, exactly as if late
+            assert process.wait(10) != 0
+            registry.finish(job, {"ok": False, "error": "The compiler process exited."})
+
+        assert job.status == "cancelled"
+
+    def test_the_pending_set_is_bounded(self, registry):
+        for index in range(_jobs.MAX_PENDING_CANCELS * 3):
+            registry.cancel_client(f"c{index}")
+        # Long-lived state fed by a client that supersedes on every drag has
+        # to forget: only the most recent labels are still remembered.
+        assert len(registry._cancelled_clients) == _jobs.MAX_PENDING_CANCELS
+        with registry.track("compile", source=TINY_SOURCE, client_id="c0") as job:
+            registry.finish(job, {"ok": True})
+        assert job.status == "done"
+
+    def test_a_job_with_no_label_is_never_matched(self, registry):
+        with registry.track("compile", source=TINY_SOURCE) as job:
+            assert registry.cancel_client("anything") == []
+            registry.finish(job, {"ok": True})
+        assert job.client_id is None
+        assert job.status == "done"
+
+
 # ── Over live HTTP ──────────────────────────────────────────────────────────
 
 
@@ -398,6 +456,7 @@ class Client:
         ("/api/jobs/job-000001", None),
         ("/api/jobs/job-000001/result", None),
         ("/api/jobs/job-000001/cancel", {}),
+        ("/api/jobs/cancel_client", {"client_id": "c1"}),
         ("/api/jobs/clear", {}),
     ],
 )
@@ -569,6 +628,64 @@ class TestHttpCancellation:
 
             # A second cancel has nothing left to stop.
             assert client.call(f"/api/jobs/{running['job_id']}/cancel", {})[0] == 409
+
+    def test_superseding_a_compile_by_client_label_kills_its_worker(self, registry):
+        """What a second drag does to the first drag's compile.
+
+        The browser labels the request before it sends it, so it can stop the
+        work without ever having seen a job id — which is the only handle it
+        could have while the request is still in flight.
+        """
+        answer: dict = {}
+        with _running_server() as base:
+            client = Client(base)
+            caller = threading.Thread(
+                target=lambda: answer.update(
+                    zip(
+                        ("status", "body"),
+                        client.call("/compile", {"source": SLOW_SOURCE, "client_id": "drag-1"}),
+                        strict=True,
+                    )
+                ),
+                daemon=True,
+            )
+            caller.start()
+            running = _wait_for(
+                lambda: next(
+                    (
+                        job
+                        for job in client.call("/api/jobs")[1]["jobs"]
+                        if job["status"] == "running" and job["pid"]
+                    ),
+                    None,
+                )
+            )
+            pid = running["pid"]
+
+            status, stopped = client.call("/api/jobs/cancel_client", {"client_id": "drag-1"})
+            assert status == 200
+            assert stopped == {
+                "ok": True,
+                "client_id": "drag-1",
+                "cancelled": [running["job_id"]],
+            }
+
+            caller.join(20)
+            assert answer["status"] == 409
+            assert answer["body"]["error_kind"] == "cancelled"
+
+            summary = client.call(f"/api/jobs/{running['job_id']}")[1]["job"]
+            assert summary["status"] == "cancelled"
+            assert summary["elapsed_s"] < 25.0, "the sleep was never waited out"
+            # The point of cancelling rather than merely ignoring the answer:
+            # a superseded compile is a whole core for twenty-five seconds.
+            _wait_for(lambda: not _pid_alive(pid), timeout=10.0)
+
+    def test_a_cancel_without_a_label_is_refused(self, registry):
+        with _running_server() as base:
+            client = Client(base)
+            assert client.call("/api/jobs/cancel_client", {})[0] == 400
+            assert client.call("/api/jobs/cancel_client", {"client_id": "x" * 200})[0] == 400
 
     def test_cancelling_a_streamed_optimize_ends_the_stream(self, registry):
         events: list = []

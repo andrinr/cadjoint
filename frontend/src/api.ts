@@ -73,18 +73,40 @@ export async function startSession(): Promise<SessionResponse> {
   return session;
 }
 
-async function post<T>(path: string, body: unknown): Promise<T> {
+async function post<T>(path: string, body: unknown, signal?: AbortSignal): Promise<T> {
   const response = await fetch(path, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Cadjoint-Token": token },
     body: JSON.stringify(body),
+    signal,
   });
   return readJson<T>(response);
 }
 
+/**
+ * How a request that can be replaced by a newer one is labelled and dropped.
+ *
+ * `clientId` is a name the *client* chooses before the request goes out, which
+ * is the only thing that lets it stop work whose server-assigned `job_id` it
+ * cannot know until the answer arrives — see {@link cancelClientJobs}.
+ * `signal` drops the connection on this side; the two are both wanted, and
+ * neither is a substitute for the caller's own revision guard.
+ */
+export interface RequestOptions {
+  clientId?: string;
+  signal?: AbortSignal;
+}
+
 /** Execute the program and compile its scene to WGSL. */
-export async function compile(source: string): Promise<CompileResponse & JobStamped> {
-  return post<CompileResponse & JobStamped>("/compile", { source });
+export async function compile(
+  source: string,
+  options: RequestOptions = {},
+): Promise<CompileResponse & JobStamped> {
+  return post<CompileResponse & JobStamped>(
+    "/compile",
+    { source, ...(options.clientId ? { client_id: options.clientId } : {}) },
+    options.signal,
+  );
 }
 
 /**
@@ -105,8 +127,15 @@ export async function patch(
  * Split out of `/compile` because it dominates the compile round-trip; the
  * viewer only asks while a mesh overlay is actually displayed.
  */
-export async function mesh(source: string): Promise<MeshResponse & JobStamped> {
-  return post<MeshResponse & JobStamped>("/api/mesh", { source });
+export async function mesh(
+  source: string,
+  options: RequestOptions = {},
+): Promise<MeshResponse & JobStamped> {
+  return post<MeshResponse & JobStamped>(
+    "/api/mesh",
+    { source, ...(options.clientId ? { client_id: options.clientId } : {}) },
+    options.signal,
+  );
 }
 
 /**
@@ -376,6 +405,38 @@ export async function cancelJob(jobId: string): Promise<boolean> {
     body: "{}",
   });
   return response.ok;
+}
+
+/**
+ * Kill whatever is running under a client-chosen request id.
+ *
+ * The registry's own ids are minted server-side and only reach the client on
+ * the response — which is exactly the moment the work is already over. A
+ * request that may have to be *replaced while it runs* therefore carries a
+ * `client_id` the caller chose beforehand, and this is the handle that goes
+ * with it. Cancelling an id the server has not registered yet is not an
+ * error: it is remembered, so a request still crossing the wire is killed the
+ * moment it lands rather than escaping the supersession by a few milliseconds.
+ *
+ * Returns the number of jobs actually stopped (zero is an ordinary answer:
+ * the work had already finished).
+ */
+export async function cancelClientJobs(clientId: string): Promise<number> {
+  await sessionReady;
+  try {
+    const response = await fetch("/api/jobs/cancel_client", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Cadjoint-Token": token },
+      body: JSON.stringify({ client_id: clientId }),
+    });
+    if (!response.ok) return 0;
+    const body = await readJson<{ cancelled?: string[] }>(response);
+    return body.cancelled?.length ?? 0;
+  } catch {
+    // A cancel is an optimization: the caller's revision guard is what keeps
+    // the answer from being applied, and that needs no server at all.
+    return 0;
+  }
 }
 
 /** Drop every finished job from the registry; running work is kept. */

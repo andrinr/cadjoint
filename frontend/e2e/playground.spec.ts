@@ -754,10 +754,15 @@ test("selection mode decides what a click picks", async ({ page }) => {
   const metrics = await canvasMetrics(page);
   const point = projectToCss(FIRST_VERTEX, metrics);
 
-  // Object mode is the default, so a sketch vertex is not picked as a vertex.
+  // Object mode is the default, so a sketch vertex is not picked as a vertex:
+  // the click selects the sketch, and what the editor reveals is that sketch's
+  // declaration rather than a single point's literal. (It used to assert no
+  // highlight at all, which stopped being true when selecting an object began
+  // revealing the statement that declares it.)
   await expect(page.getByTestId("mode-object")).toHaveClass(/active/);
   await page.mouse.click(metrics.left + point.x, metrics.top + point.y);
-  await expect(page.locator(".cm-vertex-highlight")).toHaveCount(0);
+  await expect(page.getByTestId("selection-chip")).not.toHaveText("vertex 0");
+  await expect(page.locator(".cm-vertex-highlight")).not.toHaveText("[-0.9, 0.0]");
 
   await page.getByTestId("mode-vertex").click();
   await page.mouse.click(metrics.left + point.x, metrics.top + point.y);

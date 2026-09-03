@@ -219,6 +219,20 @@ def _job_fields(payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+#: Longest client request label accepted.  It is an opaque token the client
+#: matches against itself, never anything this server parses, so the only
+#: thing worth bounding is how much of one a request can make us remember.
+MAX_CLIENT_ID = 64
+
+
+def _client_id(payload: dict[str, Any]) -> str | None:
+    """The client's own label for this request, if it sent a usable one."""
+    value = payload.get("client_id")
+    if isinstance(value, str) and 0 < len(value) <= MAX_CLIENT_ID:
+        return value
+    return None
+
+
 def _tracked(
     kind: str, endpoint: Callable[[dict[str, Any]], dict[str, Any]]
 ) -> Callable[[dict[str, Any]], dict[str, Any]]:
@@ -239,7 +253,15 @@ def _tracked(
     """
 
     def route(payload: dict[str, Any]) -> dict[str, Any]:
-        with REGISTRY.track(kind, source=payload.get("source"), fields=_job_fields(payload)) as job:
+        with REGISTRY.track(
+            kind,
+            source=payload.get("source"),
+            fields=_job_fields(payload),
+            # A compile or a mesh extraction can be replaced by a newer edit
+            # while it runs, and the client can only stop it by a name it
+            # chose itself — see JobRegistry.cancel_client.
+            client_id=_client_id(payload),
+        ) as job:
             return REGISTRY.finish(job, endpoint(payload))
 
     return route
@@ -364,6 +386,26 @@ def make_handler(token: str):
             if not self._host_allowed():
                 return
             path = urlsplit(self.path).path
+
+            if path == "/api/jobs/cancel_client":
+                # The one job command with a body: the client's own request
+                # label, which is the only handle it has on work whose job id
+                # it will not learn until the work is over.
+                if not self._token_valid():
+                    return
+                payload = self._read_json()
+                if payload is None:
+                    return
+                client_id = _client_id(payload)
+                if client_id is None:
+                    self._reject(HTTPStatus.BAD_REQUEST, "A client_id is required.")
+                    return
+                cancelled = REGISTRY.cancel_client(client_id)
+                self._send_json(
+                    HTTPStatus.OK,
+                    {"ok": True, "client_id": client_id, "cancelled": cancelled},
+                )
+                return
 
             if path == "/api/jobs/clear" or (
                 path.startswith("/api/jobs/") and path.endswith("/cancel")
