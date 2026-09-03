@@ -816,13 +816,13 @@ def test_an_x_rayed_solid_still_writes_its_depth(device, scene_code):
     )
     covered = [index for index, value in enumerate(opaque) if value < 1.0]
     assert len(covered) > 64, "the fixture sphere covered almost none of the frame"
-    assert [
-        index for index, value in enumerate(xrayed) if value < 1.0
-    ] == covered, "an x-rayed solid reported a different silhouette to the depth buffer"
+    assert [index for index, value in enumerate(xrayed) if value < 1.0] == covered, (
+        "an x-rayed solid reported a different silhouette to the depth buffer"
+    )
     for index in covered:
-        assert xrayed[index] == pytest.approx(
-            opaque[index], abs=1e-6
-        ), "an x-rayed solid wrote a different depth than the solid it is"
+        assert xrayed[index] == pytest.approx(opaque[index], abs=1e-6), (
+            "an x-rayed solid wrote a different depth than the solid it is"
+        )
 
     # And the hidden-solid flag is the one case that legitimately writes no
     # depth: there is nothing traced to be in front of anything.
@@ -905,9 +905,9 @@ def test_both_shader_forms_render_the_same_pixels(device, parametric_scene, labe
     assert_rendered(from_literal, label=f"{label} literal")
     assert_rendered(from_uniform, label=f"{label} uniform")
     deviation = _max_deviation(from_literal, from_uniform)
-    assert (
-        deviation <= PIXEL_TOLERANCE
-    ), f"{label}: the uniform form moved a pixel by {deviation} levels"
+    assert deviation <= PIXEL_TOLERANCE, (
+        f"{label}: the uniform form moved a pixel by {deviation} levels"
+    )
 
 
 def test_both_shader_forms_agree_on_depth(parametric_scene, device):

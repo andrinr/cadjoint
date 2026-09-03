@@ -15,6 +15,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
+
 from cadjoint.geometry.parameters import Vector2
 from cadjoint.meshing import (
     GridSpec,
@@ -457,9 +458,9 @@ class TestHouseDemonstration:
             chebyshev_to_curve(mesh.cells[flagged_edges[:, 0]]),
             chebyshev_to_curve(mesh.cells[flagged_edges[:, 1]]),
         )
-        assert (
-            int(near.max()) <= 1
-        ), f"a signature edge strays {near.max()} cells from the analytic edges"
+        assert int(near.max()) <= 1, (
+            f"a signature edge strays {near.max()} cells from the analytic edges"
+        )
 
         # Direction 2: every analytic-curve cell is matched — it has a
         # signature-change vertex within one cell.

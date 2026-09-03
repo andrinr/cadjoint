@@ -15,12 +15,13 @@ from __future__ import annotations
 import jax.numpy as jnp
 import numpy as np
 import pytest
+
 from cadjoint.construction import Axis, PolygonProfile, Solid, extrude, revolve
 from cadjoint.geometry import Scalar
 from cadjoint.sdf.boolean import Difference, Intersection, Union, Xor
-from cadjoint.sdf.transforms import Translate
 from cadjoint.sdf.transforms.fields import Mirror, Offset, Shell
 from cadjoint.sdf.transforms.patterns import LinearPattern, PolarPattern
+from cadjoint.sdf.transforms import Translate
 
 SQUARE = [[-0.5, -0.5], [0.5, -0.5], [0.5, 0.5], [-0.5, 0.5]]
 

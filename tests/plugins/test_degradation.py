@@ -33,6 +33,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+
 from cadjoint import tier
 from cadjoint.enums import PluginKind
 from cadjoint.fem.gmsh import gmsh_available
@@ -82,9 +83,9 @@ class TestTheFixtureBlanksTheRegistry:
         from cadjoint.plugins import builtin_specs
 
         shipped = {spec.kind for spec in builtin_specs().values()}
-        assert shipped.isdisjoint(
-            tier.KINDS
-        ), "public cadjoint must ship no provider for the private kinds"
+        assert shipped.isdisjoint(tier.KINDS), (
+            "public cadjoint must ship no provider for the private kinds"
+        )
         with tier.absent():
             status = tier.status()
             assert not status.installed
