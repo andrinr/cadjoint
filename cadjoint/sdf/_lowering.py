@@ -316,7 +316,6 @@ def node_bounds(node, values: dict, children: list) -> Bounds | None:
     from cadjoint.sdf.boolean.intersection import Intersection
     from cadjoint.sdf.boolean.union import Union
     from cadjoint.sdf.boolean.xor import Xor
-    from cadjoint.sdf.operations import LinearPattern, Mirror, Offset, PolarPattern, Shell
     from cadjoint.sdf.primitives import (
         Box,
         Capsule,
@@ -330,6 +329,8 @@ def node_bounds(node, values: dict, children: list) -> Bounds | None:
     )
     from cadjoint.sdf.transforms.affine import Rotate, Scale, Translate
     from cadjoint.sdf.transforms.deformations import Twist
+    from cadjoint.sdf.transforms.fields import Mirror, Offset, Shell
+    from cadjoint.sdf.transforms.patterns import LinearPattern, PolarPattern
 
     zero = jnp.zeros(3, dtype=jnp.float32)
 

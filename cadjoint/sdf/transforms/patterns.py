@@ -1,13 +1,9 @@
-"""Field operations on SDFs: shell, offset, mirror, and patterns.
+"""Transforms that evaluate their child many times: linear and polar arrays.
 
-Each operation wraps a single child shape and evaluates it one or more times
-with a modified query point and/or a modified distance value. They follow the
-Transform pattern (one SDF child, static ``sdf(child_sdf, p, **params)``), so
-``functionalize``/``functionalize_scene`` and the shader backends handle them
-like any other unary node, and the viewer sees the wrapped shape as one node.
-
-The child may also be a plain callable (``p -> distance``); direct evaluation
-via ``__call__`` works either way, while compilation requires an SDF child.
+These are the one family that does not wrap a child once — a pattern is
+`count` copies, and the lowering traces the child a single time under `vmap`
+rather than unrolling it, which is why `cadjoint/sdf/_lowering.py` knows about
+them by name.
 """
 
 from __future__ import annotations
@@ -18,84 +14,12 @@ import jax
 import jax.numpy as jnp
 from jax import Array
 
-from cadjoint.fluent import Fluent
 from cadjoint.geometry.parameters import Scalar
 from cadjoint.sdf._lowering import is_scalar_lowering
-from cadjoint.sdf.transforms.base import Transform
-
-# The world plane each named mirror axis stands for: the coordinate plane
-# through the origin whose normal is that axis.
-_MIRROR_NORMALS = {
-    "x": (1.0, 0.0, 0.0),
-    "y": (0.0, 1.0, 0.0),
-    "z": (0.0, 0.0, 1.0),
-}
-
-# Below this squared length a direction carries no orientation; the guarded
-# norm keeps value and derivative finite where a bare norm would give 0/0.
-_MIN_SQUARED = 1e-12
-
-
-def _unit(vector: Array) -> Array:
-    """Normalize a 3-vector with a guarded norm, safe under tracing."""
-    return vector / jnp.sqrt(jnp.maximum(jnp.sum(vector * vector), _MIN_SQUARED))
-
-
-def _world_vector(value) -> Array:
-    """A world 3-vector from a raw array or from a ``Vector`` parameter."""
-    return jnp.asarray(getattr(value, "xyz", value), dtype=jnp.float32)
-
-
-def _reference_line(reference, attribute: str) -> tuple[Array, Array] | None:
-    """``(origin, unit direction)`` read off a geometric reference, or None.
-
-    Duck-typed on purpose: ``cadjoint.sdf`` must not import
-    ``cadjoint.construction`` — the dependency runs the other way — but the
-    references a user naturally reaches for all expose the same two
-    attributes. An :class:`~cadjoint.construction.faces.Axis` carries
-    ``origin``/``direction``; a :class:`~cadjoint.construction.faces.Face` and
-    a :class:`~cadjoint.construction.sketch.SketchPlane` carry
-    ``origin``/``normal``, the plane's ``origin`` being a ``Vector``
-    parameter rather than a bare array.
-
-    Args:
-        reference: The object to read.
-        attribute: ``"direction"`` for a line, ``"normal"`` for a plane.
-
-    Returns:
-        The pair, or None when ``reference`` does not carry both attributes.
-    """
-    origin = getattr(reference, "origin", None)
-    vector = getattr(reference, attribute, None)
-    if origin is None or vector is None:
-        return None
-    return _world_vector(origin), _unit(_world_vector(vector))
-
-
-def _mirror_plane(axis) -> tuple[Array, Array]:
-    """The ``(origin, unit normal)`` of a mirror plane named by ``axis``.
-
-    Args:
-        axis: ``'x'``, ``'y'`` or ``'z'`` for the coordinate plane with that
-            normal through the world origin, or any Face / SketchPlane.
-
-    Returns:
-        The plane's origin and unit normal.
-
-    Raises:
-        ValueError: If ``axis`` is neither a known axis name nor something
-            carrying an ``origin`` and a ``normal``.
-    """
-    if isinstance(axis, str):
-        if axis not in _MIRROR_NORMALS:
-            raise ValueError(f"Mirror axis must be 'x', 'y', or 'z', got {axis!r}")
-        return jnp.zeros(3, dtype=jnp.float32), jnp.asarray(_MIRROR_NORMALS[axis])
-    plane = _reference_line(axis, "normal")
-    if plane is None:
-        raise ValueError(
-            f"Mirror axis must be 'x', 'y', 'z', or a Face / SketchPlane, got {axis!r}"
-        )
-    return plane
+from cadjoint.sdf.transforms._operation import (
+    _Operation,
+    _reference_line,
+)
 
 
 def _pattern_axis(axis) -> tuple[Array, Array]:
@@ -221,130 +145,6 @@ def _kept_instances(count: int, skip_mask) -> list[int]:
     """The instance indices a pattern actually emits, seed first."""
     mask = int(skip_mask)
     return [i for i in range(count) if not mask >> i & 1]
-
-
-class _Operation(Transform):
-    """Shared plumbing for field operations wrapping one callable shape."""
-
-    def children(self) -> list:
-        # A plain lambda child cannot be walked as a Fluent tree node.
-        return [self.sdf] if isinstance(self.sdf, Fluent) else []
-
-    def material_at(self, p: Array) -> dict:
-        if isinstance(self.sdf, Fluent):
-            values = self._extract_param_values()
-            return self.sdf.material_at(self.__class__._transform_point(p, **values))
-        return super().material_at(p)
-
-
-class Shell(_Operation):
-    """Hollow shell of a shape's surface: ``|f(p)| - thickness/2``.
-
-    The result is a wall of the given total thickness centered on the child's
-    surface. Exact wherever the child field is exact.
-
-    Args:
-        sdf: Child shape (SDF node or plain callable).
-        thickness: Total wall thickness.
-    """
-
-    def __init__(self, sdf, thickness: float | Scalar):
-        self.sdf = sdf
-        self.params = {"thickness": thickness}
-
-    @staticmethod
-    def _transform_point(p: Array, thickness: Array) -> Array:  # noqa: ARG004
-        return p
-
-    @staticmethod
-    def sdf(child_sdf, p: Array, thickness: Array) -> Array:
-        """Pure function for the shell operation."""
-        return jnp.abs(child_sdf(p)) - thickness / 2.0
-
-    def __call__(self, p: Array) -> Array:
-        return Shell.sdf(self.sdf, p, self.params["thickness"].value)
-
-    def to_functional(self):
-        return Shell.sdf
-
-
-class Offset(_Operation):
-    """Offset (grow/shrink) a shape's surface: ``f(p) - distance``.
-
-    Positive distances grow the shape outward; negative distances shrink it.
-
-    Args:
-        sdf: Child shape (SDF node or plain callable).
-        distance: Offset distance.
-    """
-
-    def __init__(self, sdf, distance: float | Scalar):
-        self.sdf = sdf
-        self.params = {"distance": distance}
-
-    @staticmethod
-    def _transform_point(p: Array, distance: Array) -> Array:  # noqa: ARG004
-        return p
-
-    @staticmethod
-    def sdf(child_sdf, p: Array, distance: Array) -> Array:
-        """Pure function for the offset operation."""
-        return child_sdf(p) - distance
-
-    def __call__(self, p: Array) -> Array:
-        return Offset.sdf(self.sdf, p, self.params["distance"].value)
-
-    def to_functional(self):
-        return Offset.sdf
-
-
-class Mirror(_Operation):
-    """Mirror a shape across a plane by reflecting the query point.
-
-    ``Mirror(shape, 'x')`` reflects across the x=0 plane (the yz plane): the
-    result is the mirror image of the child, an exact SDF.
-
-    The three named axes are the coordinate planes *through the world origin*,
-    which is the one mirror plane a real part rarely has. Any
-    :class:`~cadjoint.construction.faces.Face` or
-    :class:`~cadjoint.construction.sketch.SketchPlane` is accepted instead, so
-    the symmetry plane can be a face of the part or a
-    :meth:`~cadjoint.construction.sketch.SketchPlane.midplane` between two of
-    them — and being built from the parent's parameters, it moves when the
-    part is re-dimensioned rather than stranding the mirrored copy.
-
-    Args:
-        sdf: Child shape (SDF node or plain callable).
-        axis: The mirror plane. ``'x'``, ``'y'`` or ``'z'`` for the coordinate
-            plane with that normal through the origin, or a ``Face`` /
-            ``SketchPlane`` to mirror across it.
-
-    Example:
-        ```python
-        seam = SketchPlane.midplane(housing.cap("+"), housing.cap("-"))
-        both_halves = Union(lug, Mirror(lug, seam))
-        ```
-    """
-
-    def __init__(self, sdf, axis: str = "x"):
-        self.sdf = sdf
-        origin, normal = _mirror_plane(axis)
-        self.params = {"origin": origin, "normal": normal}
-
-    @staticmethod
-    def _transform_point(p: Array, origin: Array, normal: Array) -> Array:
-        return p - 2.0 * jnp.sum((p - origin) * normal, axis=-1, keepdims=True) * normal
-
-    @staticmethod
-    def sdf(child_sdf, p: Array, origin: Array, normal: Array) -> Array:
-        """Pure function for the mirror operation."""
-        return child_sdf(Mirror._transform_point(p, origin, normal))
-
-    def __call__(self, p: Array) -> Array:
-        return Mirror.sdf(self.sdf, p, self.params["origin"].xyz, self.params["normal"].xyz)
-
-    def to_functional(self):
-        return Mirror.sdf
 
 
 class LinearPattern(_Operation):
@@ -570,28 +370,6 @@ class PolarPattern(_Operation):
 
     def to_functional(self):
         return PolarPattern.sdf
-
-
-def shell(shape, thickness: float | Scalar) -> Shell:
-    """Hollow shell of ``shape``'s surface with the given total thickness."""
-    return Shell(shape, thickness)
-
-
-def offset(shape, distance: float | Scalar) -> Offset:
-    """Grow (positive) or shrink (negative) ``shape`` by ``distance``."""
-    return Offset(shape, distance)
-
-
-def mirror(shape, axis: str = "x") -> Mirror:
-    """Mirror image of ``shape`` across a plane.
-
-    Args:
-        shape: The shape to reflect.
-        axis: ``'x'``, ``'y'`` or ``'z'`` for the coordinate plane with that
-            normal through the origin, or a ``Face`` / ``SketchPlane`` to
-            mirror across it.
-    """
-    return Mirror(shape, axis)
 
 
 def linear_pattern(

@@ -141,7 +141,7 @@ class TestTheGeometryIsWhatItClaims:
 
     def test_the_kept_ribs_did_not_move_up_into_the_gaps(self, shield):
         """Suppression leaves the ring's other stations exactly where they were."""
-        from cadjoint.sdf.operations import PolarPattern
+        from cadjoint.sdf.transforms.patterns import PolarPattern
 
         full = _field(PolarPattern(shield.rib, count=8, axis=shield.bore_axis))
         thinned = _field(shield.ribs)

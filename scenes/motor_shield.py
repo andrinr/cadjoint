@@ -114,7 +114,8 @@ from cadjoint.materials import (
 from cadjoint.optimize import Optimization
 from cadjoint.render import Material
 from cadjoint.sdf.boolean import Difference, Intersection, Union
-from cadjoint.sdf.operations import LinearPattern, Mirror, PolarPattern, Shell
+from cadjoint.sdf.transforms.fields import Mirror, Shell
+from cadjoint.sdf.transforms.patterns import LinearPattern, PolarPattern
 
 # ── design parameters ────────────────────────────────────────────────────────
 flange_thickness = Scalar(0.20, free=True, name="flange_thickness")
@@ -363,7 +364,7 @@ PointOnLineConstraint(rib_slope, rib_heel, rib_crest)
 # patterned eight ways and two instances are suppressed. The first draft of
 # this file had no way to say that (`PolarPattern` emitted all eight and the
 # bore drilled straight through one), which is what put `skip` into
-# `cadjoint/sdf/operations.py` — see the report.
+# `cadjoint/sdf/transforms/{fields,patterns}.py` — see the report.
 ribs = PolarPattern(rib, count=8, axis=bore_axis, skip=(3, 5))
 lugs = PolarPattern(lug, count=4, axis=bore_axis)
 

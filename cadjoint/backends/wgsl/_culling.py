@@ -101,13 +101,13 @@ def culled_scene_sdf(geometry, *, margin: float = CULL_MARGIN) -> Callable:
     from cadjoint.sdf.boolean.difference import Difference
     from cadjoint.sdf.boolean.smooth import smooth_max, smooth_min
     from cadjoint.sdf.boolean.union import Union
-    from cadjoint.sdf.operations import (
+    from cadjoint.sdf.primitives.base import Primitive
+    from cadjoint.sdf.transforms.patterns import (
         LinearPattern,
         PolarPattern,
         _kept_instances,
         _rotate_about,
     )
-    from cadjoint.sdf.primitives.base import Primitive
 
     node_counter = {"count": 0}
     repeated = _repeated_nodes(geometry)

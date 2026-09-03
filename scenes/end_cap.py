@@ -65,7 +65,8 @@ from cadjoint.fem import Dirichlet, HeatFlux, Nodes, SimMesh, ThermalStudy
 from cadjoint.geometry import Scalar, Vector2
 from cadjoint.render import Material
 from cadjoint.sdf.boolean import Difference, Union
-from cadjoint.sdf.operations import LinearPattern, Mirror, PolarPattern, Shell
+from cadjoint.sdf.transforms.fields import Mirror, Shell
+from cadjoint.sdf.transforms.patterns import LinearPattern, PolarPattern
 
 # ── design parameters ────────────────────────────────────────────────────────
 # The two marked free are the ones the differentiability test drives; both are

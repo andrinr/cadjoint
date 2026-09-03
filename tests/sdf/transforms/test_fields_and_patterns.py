@@ -1,4 +1,4 @@
-"""Tests for cadjoint.sdf.operations (Shell, Offset, Mirror, patterns)."""
+"""Tests for cadjoint.sdf.transforms (Shell, Offset, Mirror, patterns)."""
 
 from __future__ import annotations
 
@@ -12,7 +12,8 @@ import pytest
 from cadjoint import extract_parameters, functionalize
 from cadjoint.geometry.parameters import Scalar
 from cadjoint.meshing import GridSpec, extract_mesh
-from cadjoint.sdf.operations import LinearPattern, Mirror, Offset, PolarPattern, Shell
+from cadjoint.sdf.transforms.fields import Mirror, Offset, Shell
+from cadjoint.sdf.transforms.patterns import LinearPattern, PolarPattern
 from cadjoint.sdf.primitives import Sphere
 from cadjoint.sdf.transforms import Translate
 from tests.meshing.test_dual_contouring import (

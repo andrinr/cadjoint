@@ -234,7 +234,7 @@ class TestMirrorAcrossAMidplane:
         np.testing.assert_allclose(np.asarray(seam.origin.xyz), [0.0, 0.0, 0.0], atol=1e-6)
 
     def test_a_boss_mirrors_to_the_other_side_of_the_plate(self):
-        from cadjoint.sdf.operations import Mirror
+        from cadjoint.sdf.transforms.fields import Mirror
 
         plate = _plate(depth=0.4)
         boss = extrude(

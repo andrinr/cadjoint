@@ -142,8 +142,8 @@ def test_pattern_emits_one_copy_of_its_child():
     import math
 
     from cadjoint.sdf._lowering import scalar_lowering
-    from cadjoint.sdf.operations import PolarPattern
     from cadjoint.sdf.primitives.polygon import ExtrudedPolygon
+    from cadjoint.sdf.transforms.patterns import PolarPattern
 
     ring = [
         jnp.array(
@@ -171,7 +171,7 @@ def test_pattern_emits_one_copy_of_its_child():
 
 def test_pattern_agrees_with_the_unrolled_form():
     from cadjoint.sdf._lowering import scalar_lowering
-    from cadjoint.sdf.operations import LinearPattern, PolarPattern
+    from cadjoint.sdf.transforms.patterns import LinearPattern, PolarPattern
 
     for pattern in (
         PolarPattern(Box(size=jnp.array([0.2, 0.2, 1.0])), count=6),
@@ -246,7 +246,7 @@ def test_pattern_count_stays_static_under_a_parametric_trace():
     import jax
 
     from cadjoint.functionalize import functionalize_parametric
-    from cadjoint.sdf.operations import PolarPattern
+    from cadjoint.sdf.transforms.patterns import PolarPattern
 
     pattern = PolarPattern(Box(size=jnp.array([0.2, 0.2, 1.0])), count=5)
     free, fixed, _ = extract_parameters(pattern)

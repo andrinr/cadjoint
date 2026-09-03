@@ -67,7 +67,7 @@ def _collect(node_id: str, params_snapshot: dict, free: dict, fixed: dict, stati
         free: Name-keyed free parameter values.
         fixed: Path-keyed fixed parameter values.
         static: Attribute names that must stay concrete (see
-            :attr:`~cadjoint.sdf.operations.LinearPattern.static_params`).
+            :attr:`~cadjoint.sdf.transforms.patterns.LinearPattern.static_params`).
 
     Returns:
         ``dict[str, Array]`` of the values the node's pure ``sdf`` expects.
