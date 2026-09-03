@@ -564,9 +564,11 @@ form. An AST check in CI fails a public function without the block.
   extra's comment already says; distributing the *image* makes the image a
   GPL work, and the image contains only Apache-2.0 code plus Gmsh, which
   is compatible with GPL-2.0-or-later via v3.
-- `diff-brep`: **D8 — proprietary (all rights reserved) or BUSL-1.1 with
-  an Apache change licence.** The memo has no view beyond: decide before
-  the first external reader, and know that Python wheels ship source.
+- `diff-brep`: **D8 — decided: proprietary, all rights reserved.** No
+  open-source or source-available licence for now; the LICENSE file grants
+  no rights, distribution is by private git access only, nothing goes to a
+  public index, and — since Python wheels ship source — no wheel leaves the
+  private repo's release page either.
 - **`diff_brep` never imports `gmsh`** (`TID251`), and the `tet_gmsh`
   image never contains `diff_brep`. The generated `node_map` Tesseract
   image contains `diff_brep` and *no* Gmsh, so no private code ever shares
@@ -772,7 +774,7 @@ throwaway `cadjoint/brep/plugins.py` that step 4 deletes. Recommend yes.
 | D5 | an in-process `python` transport in the plugin registry; diff-brep's capabilities are kinds in the existing `cadjoint.plugins` entry-point group; `cadjoint.tier` is the one status/refusal module | yes |
 | D6 | no lossy public gradient for a Gmsh mesh — refusal with the reason instead | yes |
 | D7 | `SimMesh(mesher="gmsh")` becomes a public keyword | yes |
-| D8 | diff-brep's licence (proprietary vs BUSL-1.1) | user's call; before step 2 |
+| D8 | diff-brep's licence | **decided 2026-09-03: proprietary, all rights reserved — no open-source or source-available licence for now.** The LICENSE file states that no rights are granted; installs are by private git access only; no public index. |
 | D9 | C/Rust ranking: cache, then `while_loop`, then a gated discrete Rust tracer, then a gated census evaluator | yes |
 | D10 | seam first in cadjoint, then fill diff-brep | yes |
 | D11 | diff-brep's `main` starts from `git filter-repo` history | yes |
