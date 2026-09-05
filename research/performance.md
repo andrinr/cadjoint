@@ -1947,9 +1947,15 @@ assembly around it is 698 XLA programs (11.2 s cold, 0.5 s of reads warm).
    parameters → DC → node positions → Tesseract chain — is one 6.2 MB program.
    It traces in 3.4 s and compiles in 4.9 s **on every run, warm or not**:
    `compile_requests_use_cache` 2 144, `cache_hits` 2 140, and the four misses
-   are `folded`. JAX refuses to persist any program carrying a host callback
-   (`jax/_src/compiler.py`, `len(host_callbacks) == 0` in the cache-write
-   condition), and the Tesseract primitive is a callback. So §7's item 1 bought
+   are `folded`. JAX refuses to *write* a persistent cache entry for any
+   program carrying a host callback — `jax/_src/compiler.py::_cache_write`,
+   which returns early with "because it uses host callbacks (e.g. from
+   jax.debug.print or breakpoint)" — and `tesseract-jax` lowers its primitive
+   with `mlir.emit_python_callback` (`tesseract_jax/primitive.py`). Confirmed
+   directly: a two-line `jax.jit` containing one `jax.debug.print` logs exactly
+   that refusal. (The `len(host_callbacks) == 0` test elsewhere in that file
+   guards *multi-process binary sharing*, not the cache write; an earlier draft
+   of this section cited it by mistake.) So §7's item 1 bought
    its 23× on the *marginal step* and nothing on the first one, and a
    persistent worker would not help either: the second in-process run re-traced
    (3.1 s) and recompiled (5.0 s) `folded`, because `_optimize_source` builds a
@@ -1977,9 +1983,9 @@ than the persistent cache.
 
 | # | change | what it removes | evidence |
 |---|---|---|---|
-| **1** | **Split the frozen objective** into a callback-free jitted prefix (parameters → mesh node positions, essentially all of the 6.2 MB) and a thin outer function that calls the Tesseracts. The prefix is persistently cacheable and shape-keyed; only the thin tail recompiles. | ~8 s of every `optimize` run (3.4 s trace + 4.9 s compile), warm or in-process | §15.2 item 1; the callback guard in `compiler.py` |
+| **1** | **Split the frozen objective** at the plugin boundary: compile the pure prefix (design field → dual contouring → QEF vertex map) on its own and leave the plugin calls to eager dispatch. **Done** — `FrozenDCChain.dc_surface` / `.metric_from_surface`, `optimize._compiled_prefix`. | the whole per-process compile of the objective: 4.9 s of XLA and 2.6 s of tracing, **warm runs now compile zero programs** | §15.5 |
 | **2** | **Hoist and jit the projection kernels in `diff_brep/project.py`** (module-level functions, group sizes padded to buckets so the trace cache hits across requests and the persistent cache across processes) | ~2.3 s of a 5.9 s warm `mesh`; the same 2.3 s in a persistent worker | §15.2 item 2 |
-| **3** | **One material export.** Emit `material_impl` as an 8-float output and let the WGSL entry wrappers slice `material_base` / `material_optics` from it, so the material tree traces once; longer term one export with three results once the emitter accepts multi-result `func.call`. | one of three full traces per compile; on `motor_shield` the two material exports are 7.6 s of a 24 s profiled request | §15.2 item 3 |
+| **3** | **One material program.** `material_block_impl` returns a `(2, 4)` block (`mat4x2<f32>`) and the two public entry points are swizzles of it, so the material tree — and every operand's distance under the boolean blends — traces once instead of twice. **Done.** | `motor_shield` compile **13.87 → 10.04 s** warm; starter 1.06 → 0.92 s | §15.5 |
 | **4** | **Persistent worker** (§6.1) — no code beyond the pool | `compile` 1.06→0.81, `mesh` 5.9→4.65, `mesh_inspect` 1.9→0.76, `simulate` 3.1→0.95 s | in-proc column |
 | **5** | Jit the DC stages as whole programs (`sample_grid` → `dual_faces`) keyed on grid shape | part of the 0.6–1.3 s `other` floor; marginal until 1–4 land | §6.5 |
 | — | More persistent-cache tuning | nothing left: warm runs compile zero programs outside `folded` | table |
@@ -1995,3 +2001,56 @@ than the persistent cache.
 
 `--scene scenes/motor_shield.py --mode compile` for the large-scene compile;
 the cProfile numbers are `cProfile.run` around `_compile_worker._compile_source`.
+
+## 15.5 Two of the three, implemented and measured
+
+**1. The frozen objective no longer spans the plugin boundary.**
+`FrozenDCChain.metric_value` was one function from the design field to the
+metric, and the optimizer wrapped the whole of it in `jax.jit`. Everything
+before the plugin call is pure JAX and is most of the program; the plugin call
+itself is a host callback, and one callback anywhere in a module makes the
+*whole* module unwritable to the persistent cache. It is now split —
+`dc_surface` (pure) and `metric_from_surface` (plugins) — and only the pure
+half is compiled (`optimize._compiled_prefix`).
+
+| `optimize`, 2 steps, starter | before | after |
+|---|---:|---:|
+| warm, fresh process | 19.15 s | **16.51 s** |
+| second run, same process | 12.76 s | **10.75 s** |
+| XLA compiles, warm | 4.94 s (1 program) | **0.00 s (0 programs)** |
+| trace, warm | 4.40 s | **1.82 s** |
+
+The objective and its gradient are unchanged to 13 significant digits
+(1.6130011303450023 → 1.6130011303450003; grad norm 1.3599346821625447 →
+1.3599346821625378). The wall-clock win is smaller than the compile-time win
+because the plugin half now dispatches eagerly: `other` rises 4.55 → 7.99 s and
+takes back about 3 s of the 7.5 s saved. The durable gain is that **nothing in
+an optimizer run compiles on a warm cache any more**, so the cost no longer
+returns in every fresh worker process.
+
+Splitting also removed the reason `jax.ensure_compile_time_eval` was needed:
+with no trace enclosing the plugin call, its static inputs are concrete NumPy
+again, which is what `tesseract_jax.is_static_mask` wants.
+
+**3. One material program instead of two.** `compile_scene_to_wgsl` exported
+`material_base` and `material_optics` separately, and each evaluated the whole
+material tree — including, through the boolean blends, every operand's
+distance. They are now swizzles of a single `material_block_impl` returning a
+`(2, 4)` block, which the emitter lowers to `mat4x2<f32>`.
+
+| `compile` mode, warm | before | after |
+|---|---:|---:|
+| `scenes/motor_shield.py` | 13.87 s | **10.04 s** |
+| `scenes/starter.py` | 1.06 s | **0.92 s** |
+
+Trace falls 3.54 → 2.52 s and lowering 1.77 → 1.30 s on the shield; the rest is
+the WGSL emitter walking one module instead of two.
+
+**Is the callback refusal worth reporting upstream?** No, not as a bug.
+Host callbacks are baked into the HLO module and a deserialized executable
+would carry descriptors into a dead process's Python objects, so JAX's refusal
+is correct, and `tesseract-jax` has no alternative — calling a Tesseract *is*
+calling Python. The only defensible upstream item is documentation: a
+`jax.jit` that transitively contains `apply_tesseract` silently loses
+persistent caching for the entire program, however much unrelated pure
+computation it contains, and the mitigation is the split above.
