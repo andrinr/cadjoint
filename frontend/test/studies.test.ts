@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  BC_LABELS,
+  BC_PLACEMENT,
   addBcRequest,
   addStudyRequest,
   bcTypesFor,
@@ -194,5 +196,36 @@ describe("a flow study is reported but not authored", () => {
     expect(isEditableStudyKind("flow")).toBe(false);
     expect(isEditableStudyKind("thermal")).toBe(true);
     expect(isEditableStudyKind("elastic")).toBe(true);
+  });
+
+  // The claim above used to be tested only through those two helpers, and
+  // the panel threw anyway: every row renders `describeSelection(bc.nodes)`
+  // unconditionally, and an inlet, an outlet and the duct walls are faces of
+  // the lattice with no selection at all. `scenes/duct_sink.py` ships one.
+  it("names every one of its condition types", () => {
+    for (const type of ["inlet", "outlet", "walls", "heat_source", "held_temperature"] as const) {
+      expect(BC_LABELS[type], type).toBeTruthy();
+    }
+  });
+
+  it("says where a condition with no region acts, instead of describing one", () => {
+    expect(BC_PLACEMENT.inlet).toBeTruthy();
+    expect(BC_PLACEMENT.outlet).toBeTruthy();
+    expect(BC_PLACEMENT.walls).toBeTruthy();
+    // The two that do carry a region describe it the ordinary way.
+    expect(BC_PLACEMENT.heat_source).toBeUndefined();
+    expect(BC_PLACEMENT.held_temperature).toBeUndefined();
+  });
+
+  it("reads a value off each condition, and none off an outlet", () => {
+    const bc = (fields: Record<string, unknown>) =>
+      ({ stableId: null, serializable: true, span: null, ...fields }) as never;
+    expect(bcValue(bc({ type: "inlet", velocity: [0, 0.05, 0] }))).toEqual([0, 0.05, 0]);
+    expect(bcValue(bc({ type: "heat_source", power: 2.5 }))).toBe(2.5);
+    expect(bcValue(bc({ type: "held_temperature", value: 1.5 }))).toBe(1.5);
+    expect(bcValue(bc({ type: "outlet" }))).toBeNull();
+    // An unheated duct wall states no temperature; that is not a zero.
+    expect(bcValue(bc({ type: "walls", temperature: null }))).toBeNull();
+    expect(bcValue(bc({ type: "walls", temperature: 0.4 }))).toBe(0.4);
   });
 });

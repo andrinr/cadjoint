@@ -808,7 +808,9 @@ export function createSimulateController(props: SimulateControllerProps) {
     const layers: OverlayLayer[] = [];
     const pushBc = (study: StudyPayload, bcIndex: number) => {
       const bc = study.bcs[bcIndex];
-      if (!bc || !selectionEvaluable(bc.nodes)) return;
+      // A condition that places nothing (a duct inlet, outlet or wall) has
+      // no region to paint on the mesh.
+      if (!bc || !bc.nodes || !selectionEvaluable(bc.nodes)) return;
       const mask = evaluateSelection(bc.nodes, positions, grid);
       if (mask) layers.push({ mask, color: BC_TYPE_COLORS[bc.type] });
     };

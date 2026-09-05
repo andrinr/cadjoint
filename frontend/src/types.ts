@@ -161,12 +161,27 @@ export type StudySelection = StudySelectionPayload &
     | { kind: "not"; operand: StudySelection }
   );
 
-export type StudyBcType = "dirichlet" | "heat_flux" | "fixed" | "traction";
+export type MeshStudyBcType = "dirichlet" | "heat_flux" | "fixed" | "traction";
+
+/**
+ * A flow study's conditions. Three of them place nothing: an inlet, an
+ * outlet and the duct walls are faces of the lattice, not a chosen region,
+ * which is why `StudyBc.nodes` is optional.
+ */
+export type FlowStudyBcType =
+  | "inlet"
+  | "outlet"
+  | "walls"
+  | "heat_source"
+  | "held_temperature";
+
+export type StudyBcType = MeshStudyBcType | FlowStudyBcType;
 
 /** The generated BC row, narrowed to the kinds and selections the UI draws. */
 export interface StudyBc extends StudyBcPayload {
   type: StudyBcType;
-  nodes: StudySelection;
+  /** Absent on the conditions that place nothing — see `FlowStudyBcType`. */
+  nodes?: StudySelection | null;
 }
 
 /** The generated study, carrying the narrowed BC rows. */

@@ -117,6 +117,17 @@ export const BC_TYPE_COLORS: Record<StudyBcType, Rgb> = {
   heat_flux: [0.753, 0.408, 0.114],
   fixed: [0.667, 0.322, 0.965],
   traction: [0.953, 0.161, 0.286],
+  // A flow study's five, held to the same numbers as the four above by
+  // `test/simColors.test.ts` and `test/tokens.test.ts`: 3:1 against paper,
+  // clear of both ramps' reserved high ends, of the builder's proposal
+  // teal, of every chrome accent, and of each other. Ordered by what the
+  // condition does — olive in, navy out, blue for the no-slip wall, violet
+  // for heat put in, purple for a held value.
+  inlet: [0.342, 0.51, 0.09],
+  outlet: [0.09, 0.216, 0.51],
+  walls: [0.008, 0.118, 0.832],
+  heat_source: [0.347, 0.218, 0.862],
+  held_temperature: [0.359, 0.006, 0.594],
 };
 
 /**

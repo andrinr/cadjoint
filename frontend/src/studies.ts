@@ -53,6 +53,11 @@ export const BC_LABELS: Record<StudyBcType, string> = {
   heat_flux: "Heat flux",
   fixed: "Fixed support",
   traction: "Traction",
+  inlet: "Inlet",
+  outlet: "Outlet",
+  walls: "Duct walls",
+  heat_source: "Heat source",
+  held_temperature: "Held temperature",
 };
 
 /**
@@ -76,13 +81,30 @@ export function isEditableStudyKind(kind: StudyPayloadKind): kind is "thermal" |
   return kind === "thermal" || kind === "elastic";
 }
 
-/** The scalar/vector a BC row edits, or null for `fixed` (no value). */
+/**
+ * The scalar/vector a BC row shows, or null when it carries no number.
+ *
+ * `fixed` and `outlet` are the two that state a condition and nothing else.
+ * `walls` carries a temperature only when the duct is heated, so an unheated
+ * wall is null rather than a misleading zero.
+ */
 export function bcValue(bc: StudyBc): number | [number, number, number] | null {
   if (bc.type === "dirichlet") return bc.value ?? 0;
   if (bc.type === "heat_flux") return bc.flux ?? 0;
   if (bc.type === "traction") return bc.vector ?? [0, 0, 0];
+  if (bc.type === "inlet") return bc.velocity ?? [0, 0, 0];
+  if (bc.type === "heat_source") return bc.power ?? 0;
+  if (bc.type === "held_temperature") return bc.value ?? 0;
+  if (bc.type === "walls") return bc.temperature ?? null;
   return null;
 }
+
+/** How a condition that places nothing describes where it acts. */
+export const BC_PLACEMENT: Partial<Record<StudyBcType, string>> = {
+  inlet: "lattice inlet face",
+  outlet: "lattice outlet face",
+  walls: "duct walls",
+};
 
 /** The numeric constructor arguments a study kind exposes for editing. */
 export function studyArguments(study: StudyPayload): { key: string; value: number }[] {
