@@ -43,8 +43,7 @@ class TestBuiltinDiscovery:
         The five in-process kinds are discovered, never bundled: an
         installed ``diff-brep`` registers them through the
         ``cadjoint.plugins`` entry-point group, and with it absent the
-        registry simply has no plugin of those kinds
-        (``research/two-tier.md`` §5 step 4).
+        registry simply has no plugin of those kinds.
         """
         import cadjoint.tier as tier
 

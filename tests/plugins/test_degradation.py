@@ -10,7 +10,7 @@ compute nothing — to see what a filled kind changes; and
 those kinds removed, so the degraded assertions hold even on a developer's
 machine that *does* have diff-brep installed alongside.
 
-The matrix this file pins (``research/two-tier.md`` §2.5):
+The matrix this file pins:
 
 =========================  ==================================================
 compile / mesh / solve     unchanged — nothing in a solve moves a node

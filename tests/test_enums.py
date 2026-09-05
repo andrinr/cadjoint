@@ -334,7 +334,7 @@ class TestPlugins:
         assert set(BUILTIN_DEFAULTS.values()) <= set(BUILTIN_PACKAGES)
         # The slots with no shipped package are exactly the private tier's:
         # they are discovered from an installed distribution, never bundled
-        # (``research/two-tier.md`` §2.3).  A new public kind that forgets its
+        # (the two-tier split).  A new public kind that forgets its
         # package lands here rather than silently resolving to nothing.
         assert set(KINDS) - shipped == set(tier.KINDS)
         assert set(BUILTIN_DEFAULTS).isdisjoint(tier.KINDS)
