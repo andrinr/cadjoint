@@ -17,16 +17,15 @@ import jax  # noqa: E402
 import jax.numpy as jnp  # noqa: E402
 
 from cadjoint.fem.backends import ElasticBCs  # noqa: E402
+from cadjoint.fem.jaxfem import tet_elastic_solve  # noqa: E402
+from cadjoint.fem.postprocess import load_work_tri6, load_work_tris  # noqa: E402
 from cadjoint.fem.selection import Nodes  # noqa: E402
 from cadjoint.fem.tetmesh import (  # noqa: E402
     TetMesh,
-    load_work_tri6,
-    load_work_tris,
     recompute_tet_points,
     sdf_to_tet_mesh,
     tet10_from_tet4,
     tet_aspect_ratios,
-    tet_elastic_solve,
     tet_faces_from_nodes,
     tet_radius_ratios,
     tet_volumes,
@@ -126,7 +125,8 @@ class TestQualityMetrics:
 
 class TestVonMises:
     def test_linear_field_is_exact_for_both_orders(self):
-        from cadjoint.fem.tetmesh import _TET10_EDGES, tet_von_mises
+        from cadjoint.fem.elements import TET10_EDGES as _TET10_EDGES
+        from cadjoint.fem.postprocess import tet_von_mises
 
         rng = np.random.default_rng(0)
         points = rng.standard_normal((4, 3))

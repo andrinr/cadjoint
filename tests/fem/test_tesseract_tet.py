@@ -25,6 +25,7 @@ import jax
 import jax.numpy as jnp
 
 from cadjoint.fem.backends import ElasticBCs, ThermalBCs
+from cadjoint.fem.jaxfem import tet_elastic_solve, tet_thermal_solve
 from cadjoint.fem.selection import Nodes
 from cadjoint.fem.tetmesh import (
     recompute_tet_points,
@@ -32,9 +33,7 @@ from cadjoint.fem.tetmesh import (
     tet10_complete_nodes,
     tet10_face_midsides,
     tet10_mesh,
-    tet_elastic_solve,
     tet_faces_from_nodes,
-    tet_thermal_solve,
 )
 from cadjoint.meshing import GridSpec
 

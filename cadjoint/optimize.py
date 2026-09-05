@@ -293,13 +293,9 @@ def _compliance(study: Any, result: Any, mesh: Any, points: Any) -> Any:
     import jax.numpy as jnp
 
     from cadjoint.fem.hexmesh import faces_from_nodes
+    from cadjoint.fem.postprocess import load_work_quads, load_work_tris
     from cadjoint.fem.study import Traction
-    from cadjoint.fem.tetmesh import (
-        TetMesh,
-        load_work_quads,
-        load_work_tris,
-        tet_faces_from_nodes,
-    )
+    from cadjoint.fem.tetmesh import TetMesh, tet_faces_from_nodes
 
     tractions = [bc for bc in study.bcs if isinstance(bc, Traction)]
     if not tractions:
@@ -316,7 +312,8 @@ def _compliance(study: Any, result: Any, mesh: Any, points: Any) -> Any:
         if isinstance(mesh, TetMesh):
             faces = tet_faces_from_nodes(mesh, indices)
             if getattr(mesh, "edge_parents", None) is not None:
-                from cadjoint.fem.tetmesh import load_work_tri6, tet10_face_midsides
+                from cadjoint.fem.postprocess import load_work_tri6
+                from cadjoint.fem.tetmesh import tet10_face_midsides
 
                 faces6 = np.concatenate([faces, tet10_face_midsides(mesh, faces)], axis=1)
                 total = total + load_work_tri6(positions, displacement, faces6, vector)
