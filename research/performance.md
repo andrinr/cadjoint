@@ -1962,9 +1962,22 @@ assembly around it is 698 XLA programs (11.2 s cold, 0.5 s of reads warm).
    fresh closure per request.
 2. *`mesh`: the private tier's projection kernels.* 2.3 s of the 2.6 s of
    tracing is five `iterate` closures (1.1 s), `advance` (0.4 s), a lambda
-   (0.3 s) and `sines`/`worst` (0.3 s), all in `diff_brep/project.py`, all
-   nested functions rebuilt per call — so the in-proc run re-traces them too
-   (2.4 s). The public lattice path does not have this cost.
+   (0.3 s) and `sines`/`worst` (0.3 s), all in `diff_brep/project.py` — so the
+   in-proc run re-traces them too (2.4 s). The public lattice path does not
+   have this cost.
+
+   These kernels **are** already `@jax.jit`, and that is the point worth
+   recording: each is defined *inside* the function that calls it, so every
+   call builds a new function object with an empty trace cache. The jit buys
+   the within-call win its comment claims (one program for the unrolled
+   iteration instead of one trace per patch per step) and nothing across
+   calls. Hoisting them is not enough to fix that: `iterate` closes over
+   `evaluators`, a list of Python callables over the patch fields, and JAX
+   keys a closure's trace cache on object identity, so a hoisted version would
+   still miss on every new patch table. Making it hit needs the patch fields
+   passed as *data* — coefficient arrays over a padded table — so one program
+   serves any table. That is a redesign of the surface-interpolation core, not
+   a code move, and it belongs to whoever owns that design.
 3. *`compile`: the tree is traced three times.* `compile_scene_with_uniforms`
    exports `sdf`, `material_base` and `material_optics` separately; the two
    material exports each evaluate the *entire* material tree — and, for a
@@ -1984,7 +1997,7 @@ than the persistent cache.
 | # | change | what it removes | evidence |
 |---|---|---|---|
 | **1** | **Split the frozen objective** at the plugin boundary: compile the pure prefix (design field → dual contouring → QEF vertex map) on its own and leave the plugin calls to eager dispatch. **Done** — `FrozenDCChain.dc_surface` / `.metric_from_surface`, `optimize._compiled_prefix`. | the whole per-process compile of the objective: 4.9 s of XLA and 2.6 s of tracing, **warm runs now compile zero programs** | §15.5 |
-| **2** | **Hoist and jit the projection kernels in `diff_brep/project.py`** (module-level functions, group sizes padded to buckets so the trace cache hits across requests and the persistent cache across processes) | ~2.3 s of a 5.9 s warm `mesh`; the same 2.3 s in a persistent worker | §15.2 item 2 |
+| **2** | **Make the projection kernels' patch fields data rather than closures**, so one padded program serves any patch table and the trace cache hits across calls and processes. Already jitted, but nested, so the cache is rebuilt per call. **Not attempted** — a redesign of the private tier's surface-interpolation core. | ~2.3 s of a 5.9 s warm `mesh`; the same 2.3 s in a persistent worker | §15.2 item 2 |
 | **3** | **One material program.** `material_block_impl` returns a `(2, 4)` block (`mat4x2<f32>`) and the two public entry points are swizzles of it, so the material tree — and every operand's distance under the boolean blends — traces once instead of twice. **Done.** | `motor_shield` compile **13.87 → 10.04 s** warm; starter 1.06 → 0.92 s | §15.5 |
 | **4** | **Persistent worker** (§6.1) — no code beyond the pool | `compile` 1.06→0.81, `mesh` 5.9→4.65, `mesh_inspect` 1.9→0.76, `simulate` 3.1→0.95 s | in-proc column |
 | **5** | Jit the DC stages as whole programs (`sample_grid` → `dual_faces`) keyed on grid shape | part of the 0.6–1.3 s `other` floor; marginal until 1–4 land | §6.5 |
