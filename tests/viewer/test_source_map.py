@@ -2,7 +2,7 @@
 
 import pytest
 
-from cadjoint.viewer._source_map import (
+from cadjoint.viewer.source_map import (
     PLAYGROUND_FILENAME,
     build_construction_payload,
     build_construction_relations,
@@ -413,7 +413,7 @@ class TestStatementSpans:
         assert text.count("\n") >= 3
 
     def test_a_feature_call_resolves_to_its_own_statement(self):
-        from cadjoint.viewer._source_map import statement_span
+        from cadjoint.viewer.source_map import statement_span
 
         # `extrude(...)` is a statement of its own, and the locator has to
         # find it by line the same way it finds a declaration.
@@ -427,14 +427,14 @@ class TestStatementSpans:
             "    inner = PolygonProfile([[0, 0], [1, 0], [0, 1]], name='inner')\n"
             "    return inner\n"
         )
-        from cadjoint.viewer._source_map import statement_span
+        from cadjoint.viewer.source_map import statement_span
 
         start, end = statement_span(source, 3)
         # The assignment, not the `def` that contains it.
         assert source[start:end].startswith("inner = PolygonProfile(")
 
     def test_an_unplaceable_object_has_no_statement(self):
-        from cadjoint.viewer._source_map import statement_span
+        from cadjoint.viewer.source_map import statement_span
 
         assert statement_span(SIMPLE, None) is None
         assert statement_span("def broken(:\n", 1) is None
@@ -459,7 +459,7 @@ heat = ThermalStudy(
 
 class TestLocateMeshStatements:
     def test_locates_assigned_and_bare_constructors_in_order(self):
-        from cadjoint.viewer._source_map import locate_mesh_statements
+        from cadjoint.viewer.source_map import locate_mesh_statements
 
         statements = locate_mesh_statements(MESHES)
         assert [statement.index for statement in statements] == [0, 1]
@@ -469,7 +469,7 @@ class TestLocateMeshStatements:
         assert MESHES[start:end].startswith("SimMesh(")
 
     def test_skips_statements_with_more_than_one_constructor(self):
-        from cadjoint.viewer._source_map import locate_mesh_statements
+        from cadjoint.viewer.source_map import locate_mesh_statements
 
         two = "pair = (SimMesh(name='a', resolution=8), SimMesh(name='b', resolution=8))\n"
         assert locate_mesh_statements(two) == []
@@ -480,12 +480,12 @@ class TestLocateMeshStatements:
         assert locate_mesh_statements(loop) == []
 
     def test_returns_none_for_unparsable_source(self):
-        from cadjoint.viewer._source_map import locate_mesh_statements
+        from cadjoint.viewer.source_map import locate_mesh_statements
 
         assert locate_mesh_statements("def broken(:\n") is None
 
     def test_positional_name_is_extracted(self):
-        from cadjoint.viewer._source_map import locate_mesh_statements
+        from cadjoint.viewer.source_map import locate_mesh_statements
 
         source = "grid = SimMesh('grid', 12)\n"
         statements = locate_mesh_statements(source)
@@ -494,7 +494,7 @@ class TestLocateMeshStatements:
 
 class TestStudyMeshSpans:
     def test_study_statements_carry_mesh_and_domain_value_spans(self):
-        from cadjoint.viewer._source_map import locate_study_statements
+        from cadjoint.viewer.source_map import locate_study_statements
 
         statement = locate_study_statements(MESHES)[0]
         start, end = statement.mesh_span
@@ -503,7 +503,7 @@ class TestStudyMeshSpans:
         assert MESHES[start:end] == "block"
 
     def test_spans_are_none_when_the_keywords_are_absent(self):
-        from cadjoint.viewer._source_map import locate_study_statements
+        from cadjoint.viewer.source_map import locate_study_statements
 
         source = (
             "from cadjoint.fem import ThermalStudy\n"
@@ -530,7 +530,7 @@ Optimization("bare", volume, scene)
 
 class TestLocateOptimizationStatements:
     def test_locates_assigned_and_bare_constructors_in_order(self):
-        from cadjoint.viewer._source_map import locate_optimization_statements
+        from cadjoint.viewer.source_map import locate_optimization_statements
 
         statements = locate_optimization_statements(OPTIMIZATIONS)
         assert [statement.index for statement in statements] == [0, 1]
@@ -540,7 +540,7 @@ class TestLocateOptimizationStatements:
         assert OPTIMIZATIONS[start:end].startswith("Optimization(")
 
     def test_carries_steps_and_learning_rate_value_spans(self):
-        from cadjoint.viewer._source_map import locate_optimization_statements
+        from cadjoint.viewer.source_map import locate_optimization_statements
 
         first, second = locate_optimization_statements(OPTIMIZATIONS)
         start, end = first.steps_span
@@ -552,7 +552,7 @@ class TestLocateOptimizationStatements:
         assert second.learning_rate_span is None
 
     def test_skips_statements_with_more_than_one_constructor(self):
-        from cadjoint.viewer._source_map import locate_optimization_statements
+        from cadjoint.viewer.source_map import locate_optimization_statements
 
         two = "pair = (Optimization('a', f, s), Optimization('b', f, s))\n"
         assert locate_optimization_statements(two) == []
@@ -560,6 +560,6 @@ class TestLocateOptimizationStatements:
         assert locate_optimization_statements(loop) == []
 
     def test_returns_none_for_unparsable_source(self):
-        from cadjoint.viewer._source_map import locate_optimization_statements
+        from cadjoint.viewer.source_map import locate_optimization_statements
 
         assert locate_optimization_statements("def broken(:\n") is None

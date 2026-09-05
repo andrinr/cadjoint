@@ -112,22 +112,18 @@ def _design_leaves(leaves: list[Any]) -> np.ndarray | None:
     return np.flatnonzero(marked) if marked.any() else None
 
 
-# ── the retired leaf-level seam projection ───────────────────────────────────
+# ── leaf-level seam projection ───────────────────────────────────────────────
 #
-# Before the sharp layer became the B-rep graph's edges, the overlay found
-# CSG seams itself: group the mesh vertices whose surface ownership flips by
-# the *operand set* they sit between, then Newton-project each group onto
-# the common zero set of those operands' whole SDFs.  The graph does the
-# same thing one level down — on patch fields rather than leaf fields, which
-# is what makes a box's twelve edges twelve curves instead of one ownership
-# flip — so nothing below is on the payload path any more.
-#
-# The four functions stay because the pair at the end of them is a *proved
-# equivalence*, and `tests/viewer/test_edge_artifacts.py` is where the proof
-# lives: one all-leaf program extracts exactly what one program per group
-# did.  That is the trick the private tier's batched projection kernel is
-# built on, and this is the only place it is written out plainly enough to
-# check.  Delete them when that test is retired, not before.
+# The lattice sharp layer finds CSG seams from the leaves: group the mesh
+# vertices whose surface ownership flips by the *operand set* they sit
+# between, then Newton-project each group onto the common zero set of those
+# operands' whole SDFs.  `_project_seam_groups` does that for every group in
+# one program and is what `_lattice_layers` calls.  `_project_to_seam` and
+# `_project_seam_groups_reference` are the one-program-per-group reading it
+# replaced; they stay because `tests/viewer/test_edge_artifacts.py` proves
+# the two extract the same edges, and the batched form is only trusted
+# because of that proof.  The private tier's B-rep edges do the same thing
+# one level down, on patch fields rather than leaf fields.
 
 
 def _project_to_seam(fields: list[Any], points: np.ndarray, max_step: float) -> np.ndarray:

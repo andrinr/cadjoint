@@ -1,7 +1,7 @@
 """Every ``/patch`` request the server accepts, as one union per operation.
 
 :data:`PATCH_REQUEST_MODELS` has exactly one entry per operation in
-``cadjoint.viewer._patch.OPERATIONS``, and a test pins that correspondence,
+``cadjoint.viewer.patch.OPERATIONS``, and a test pins that correspondence,
 so an operation added to the registry without a model here fails the build
 rather than reaching the frontend undocumented.
 
@@ -375,7 +375,7 @@ class SetOptimizationValueRequest(OptimizationTargeted):
 
 
 #: One model per operation the server accepts.  The test suite pins this
-#: against ``cadjoint.viewer._patch.OPERATIONS``, so the two tables cannot
+#: against ``cadjoint.viewer.patch.OPERATIONS``, so the two tables cannot
 #: diverge without failing.
 PATCH_REQUEST_MODELS: dict[str, type[BaseModel]] = {
     "set_vertex": SetVertexRequest,

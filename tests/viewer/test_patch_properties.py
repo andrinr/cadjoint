@@ -48,12 +48,12 @@ from typing import Any, Callable
 
 import pytest
 
-from cadjoint.viewer._patch import OPERATIONS
 from cadjoint.viewer._patch_requests import patch_source
-from cadjoint.viewer._source_map import PLAYGROUND_FILENAME, capture_profiles, identity_index
 from cadjoint.viewer._worker_scene import _execute_scene
+from cadjoint.viewer.patch import OPERATIONS
 from cadjoint.viewer.patch.geometry import EDITABLE_CALLS, PRIMITIVE_DIMENSIONS
 from cadjoint.viewer.patch.materials import EDITABLE_PROPERTIES, PROPERTY_BOUNDS
+from cadjoint.viewer.source_map import PLAYGROUND_FILENAME, capture_profiles, identity_index
 from cadjoint.viewer.source_map.features import FEATURE_CALL_KINDS, PRIMITIVE_CALL_KINDS
 from cadjoint.viewer.source_map.identity import Identity
 from cadjoint.viewer.source_map.nodes import _called_name
@@ -696,9 +696,9 @@ def test_a_sequence_of_operations_keeps_every_invariant(scene: str, seed: int) -
         attempted += 1
         applied, source = _step(source, request)
         accepted += applied
-    assert (
-        attempted >= len(OPERATIONS) - 4
-    ), "the generator found targets for almost every operation"
+    assert attempted >= len(OPERATIONS) - 4, (
+        "the generator found targets for almost every operation"
+    )
     assert accepted >= attempted // 3, "most generated requests should be accepted"
 
 
@@ -725,7 +725,7 @@ Inverse = Callable[[str, random.Random], None]
 
 
 def _inverse_set_vertex(source: str, rng: random.Random) -> None:
-    from cadjoint.viewer._source_map import locate_profile_call
+    from cadjoint.viewer.source_map import locate_profile_call
 
     index = identity_index(source)
     vertex = Generator(rng).pick(index, "vertex")
@@ -933,7 +933,7 @@ def _inverse_add_constraint(source: str, rng: random.Random) -> None:
 
 
 def _inverse_set_constraint_value(source: str, rng: random.Random) -> None:
-    from cadjoint.viewer._source_map import locate_constraint_statements
+    from cadjoint.viewer.source_map import locate_constraint_statements
     from cadjoint.viewer.source_map.nodes import _editable_value_node
 
     index = identity_index(source)
@@ -988,7 +988,7 @@ def _inverse_add_study_bc(source: str, rng: random.Random) -> None:
 
 
 def _inverse_set_study_value(source: str, rng: random.Random) -> None:
-    from cadjoint.viewer._source_map import locate_study_statements
+    from cadjoint.viewer.source_map import locate_study_statements
 
     index = identity_index(source)
     study = Generator(rng).pick(index, "study")
@@ -1003,7 +1003,7 @@ def _inverse_set_study_value(source: str, rng: random.Random) -> None:
 
 
 def _inverse_set_mesh_value(source: str, rng: random.Random) -> None:
-    from cadjoint.viewer._source_map import locate_mesh_statements
+    from cadjoint.viewer.source_map import locate_mesh_statements
 
     index = identity_index(source)
     mesh = Generator(rng).pick(index, "mesh")
@@ -1035,7 +1035,7 @@ def _inverse_set_mesh_value(source: str, rng: random.Random) -> None:
 
 
 def _inverse_set_optimization_value(source: str, rng: random.Random) -> None:
-    from cadjoint.viewer._source_map import locate_optimization_statements
+    from cadjoint.viewer.source_map import locate_optimization_statements
 
     index = identity_index(source)
     optimization = Generator(rng).pick(index, "optimization")

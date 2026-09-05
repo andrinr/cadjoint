@@ -42,14 +42,6 @@ from cadjoint.viewer._pathtracer import (
     WGSL_PRESENT_TEMPLATE,
     build_path_tracer_shader,
 )
-from cadjoint.viewer._source_map import (
-    PLAYGROUND_FILENAME,
-    build_construction_payload,
-    build_construction_relations,
-    build_material_payload,
-    capture_profiles,
-    describe_identities,
-)
 from cadjoint.viewer._webgpu import build_viewer_shader
 from cadjoint.viewer._worker_declarations import (
     _mesh_entries,
@@ -65,6 +57,14 @@ from cadjoint.viewer._worker_fem import (  # noqa: F401 - re-exported for caller
 from cadjoint.viewer._worker_optimize import _optimize_source
 from cadjoint.viewer._worker_scene import _execute_scene
 from cadjoint.viewer.schema.payloads import validate_compile_payload
+from cadjoint.viewer.source_map import (
+    PLAYGROUND_FILENAME,
+    build_construction_payload,
+    build_construction_relations,
+    build_material_payload,
+    capture_profiles,
+    describe_identities,
+)
 
 
 def _mesh_source(source: str) -> dict[str, Any]:

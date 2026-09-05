@@ -6,7 +6,7 @@ line, constructor-call span, argument spans — and whether the viewer may
 edit it there.  Declaration only: nothing here meshes, solves, or
 descends; that is what the simulate/optimize/mesh-inspect stages do.
 
-The source locations come from :mod:`cadjoint.viewer._source_map`; these
+The source locations come from :mod:`cadjoint.viewer.source_map`; these
 entries are what the compile payload carries under ``studies``,
 ``sim_meshes``, and ``optimizations``.
 """
@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from cadjoint.viewer._source_map import (
+from cadjoint.viewer.source_map import (
     locate_mesh_statements,
     locate_optimization_statements,
     locate_study_statements,

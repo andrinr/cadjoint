@@ -11,9 +11,9 @@ from __future__ import annotations
 
 import pytest
 
-from cadjoint.viewer._patch import PatchError, apply_operation, set_sketch_plane
 from cadjoint.viewer._patch_requests import patch_source
-from cadjoint.viewer._source_map import (
+from cadjoint.viewer.patch import PatchError, apply_operation, set_sketch_plane
+from cadjoint.viewer.source_map import (
     PLAYGROUND_FILENAME,
     build_construction_payload,
     capture_profiles,

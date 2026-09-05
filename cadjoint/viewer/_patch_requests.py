@@ -4,7 +4,7 @@
 it — so what the endpoint needs is a complete description of what the
 frontend is allowed to ask for.  That description is :data:`PATCH_VALIDATORS`:
 one validator per operation, each checking that operation's fields and
-returning the keyword arguments :func:`cadjoint.viewer._patch.apply_operation`
+returning the keyword arguments :func:`cadjoint.viewer.patch.apply_operation`
 will run with, or the rejection to send back instead.
 
 Every rejection message the endpoint can produce lives in this module, and
@@ -30,7 +30,7 @@ from cadjoint.enums import (
     values,
 )
 from cadjoint.viewer._limits import OVERSIZED_SOURCE_ERROR, exceeds_source_limit
-from cadjoint.viewer._patch import OPERATIONS, PatchError, apply_operation
+from cadjoint.viewer.patch import OPERATIONS, PatchError, apply_operation
 from cadjoint.viewer.patch.geometry import EDITABLE_CALLS, PRIMITIVE_DIMENSIONS
 from cadjoint.viewer.patch.materials import (
     EDITABLE_PROPERTIES,
@@ -791,7 +791,7 @@ def _validate_set_optimization_value(request: dict[str, Any]) -> Checked:
     return None, arguments
 
 
-# One entry per operation in ``cadjoint.viewer._patch.OPERATIONS``: this table
+# One entry per operation in ``cadjoint.viewer.patch.OPERATIONS``: this table
 # is the whole contract ``/patch`` requests must satisfy.  Operations that
 # share a shape (the four study edits all name their study the same way)
 # share the helper that checks it, one validator deep.

@@ -17,7 +17,7 @@ import contextlib
 from collections.abc import Callable
 from typing import Any
 
-from cadjoint.viewer._source_map import PLAYGROUND_FILENAME
+from cadjoint.viewer.source_map import PLAYGROUND_FILENAME
 
 
 def _execute_scene(

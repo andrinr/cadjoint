@@ -68,7 +68,7 @@ def _run_optimization(
     """
     import time
 
-    from cadjoint.viewer._patch import set_parameter_values
+    from cadjoint.viewer.patch import set_parameter_values
 
     optimization = _named_optimization(namespace["__optimizations__"], request.get("name"))
     steps = request.get("steps")
