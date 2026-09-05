@@ -67,12 +67,12 @@ import jax.numpy as jnp
 import numpy as np
 
 from cadjoint.fem.hexmesh import GridSpec, HexMesh, recompute_points, sdf_to_hex_mesh
-from cadjoint.fem.selection import Nodes
 from cadjoint.fem.simulate import elastic_solve
 from cadjoint.sdf.boolean.smooth import smooth_min
 from cadjoint.sdf.primitives.box import Box
 from cadjoint.sdf.primitives.cylinder import Cylinder
 from cadjoint.sdf.primitives.polygon import ExtrudedPolygon
+from cadjoint.studies import Nodes
 
 jax.config.update("jax_enable_x64", True)
 
