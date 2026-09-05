@@ -28,7 +28,7 @@ source that produced it. [Open the playground guide](docs/viewer.qmd).
 | **[Meshing](docs/meshing.qmd)** | Dual contouring built bottom-up in JAX; exact gradients through every continuous stage; OBJ / STL / STEP export |
 | **[Simulation](docs/simulation.qmd)** | Declared `SimMesh` and thermal/elastic studies, node selections, and pluggable solver backends |
 | **[Optimization](docs/optimization.qmd)** | Declarative descent over named CAD parameters with the simulation as objective |
-| **[Tesseracts](docs/tesseracts.qmd)** | Rust, Fortran, and non-differentiable meshers packaged so one `jax.grad` crosses them all |
+| **[Plugins](docs/plugins.qmd)** | Meshers and solvers behind one `apply`/`vjp` contract, so one `jax.grad` crosses every tool boundary |
 | **[Rendering](docs/rendering.qmd)** | Forward sphere tracing, plus StableHLO → WGSL shader compilation |
 | **[The playground](docs/viewer.qmd)** | The whole toolchain as a browser app, with the Python source as its only state |
 

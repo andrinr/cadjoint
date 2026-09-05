@@ -50,8 +50,6 @@ website:
             href: research/differentiable-meshing-pipeline.md
           - text: Where the seconds go (performance)
             href: research/performance.md
-          - text: Native (Rust) dual-contouring core (retired)
-            href: research/native-mesher.md
           - text: FEM integration
             href: research/fem-integration.md
           - text: Tet vs hex meshing
