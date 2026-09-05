@@ -12,10 +12,10 @@ import pytest
 from cadjoint import extract_parameters, functionalize
 from cadjoint.geometry.parameters import Scalar
 from cadjoint.meshing import GridSpec, extract_mesh
-from cadjoint.sdf.transforms.fields import Mirror, Offset, Shell
-from cadjoint.sdf.transforms.patterns import LinearPattern, PolarPattern
 from cadjoint.sdf.primitives import Sphere
 from cadjoint.sdf.transforms import Translate
+from cadjoint.sdf.transforms.fields import Mirror, Offset, Shell
+from cadjoint.sdf.transforms.patterns import LinearPattern, PolarPattern
 from tests.meshing.test_dual_contouring import (
     euler_characteristic,
     signed_volume,

@@ -142,8 +142,8 @@ def test_pattern_emits_one_copy_of_its_child():
     import math
 
     from cadjoint.sdf._lowering import scalar_lowering
-    from cadjoint.sdf.transforms.patterns import PolarPattern
     from cadjoint.sdf.primitives.polygon import ExtrudedPolygon
+    from cadjoint.sdf.transforms.patterns import PolarPattern
 
     ring = [
         jnp.array(
