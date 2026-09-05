@@ -2,8 +2,7 @@
 
 This module provides:
 1. Parameter types (Vector, Scalar) for optimization
-2. Geometric primitives (Line, Circle) for construction
-3. Re-exports for convenience
+2. Re-exports for convenience
 
 The geometry layer is independent of SDFs and constraints.
 """
@@ -20,12 +19,6 @@ from cadjoint.geometry.parameters import (
     deduplicate_params,
 )
 
-# Geometric primitives
-from cadjoint.geometry.primitives import (
-    Circle,
-    Line,
-)
-
 __all__ = [
     # Parameters
     "Parameter",
@@ -36,7 +29,4 @@ __all__ = [
     "PathParams",
     "NamedParams",
     "deduplicate_params",
-    # Primitives
-    "Line",
-    "Circle",
 ]
