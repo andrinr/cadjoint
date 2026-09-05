@@ -68,6 +68,7 @@ from cadjoint.fem.quality import (
     tet_radius_ratios,
 )
 from cadjoint.fem.tetmesh import TetMesh, sdf_to_tet_mesh, tet10_mesh
+from cadjoint.studies import require_triplet
 
 __all__ = ["SimMesh", "capture_sim_meshes"]
 
@@ -115,13 +116,6 @@ def _register(mesh: SimMesh) -> None:
         captured.append(mesh)
 
 
-def _triplet(value: Any, label: str) -> tuple[float, float, float]:
-    array = np.asarray(value, dtype=np.float64)
-    if array.shape != (3,) or not np.isfinite(array).all():
-        raise ValueError(f"{label} must contain three finite numbers, got {value!r}.")
-    return (float(array[0]), float(array[1]), float(array[2]))
-
-
 def _resolution_counts(resolution: Any) -> tuple[int, int, int]:
     counts = (resolution,) * 3 if isinstance(resolution, int) else tuple(resolution)
     if len(counts) != 3 or any(int(count) != count or count < 1 for count in counts):
@@ -165,7 +159,7 @@ def _scan_bounds(
     margin = float(padding) + spacing
     low = inside.min(axis=0) - margin
     high = inside.max(axis=0) + margin
-    return _triplet(low, "bounds"), _triplet(high - low, "size")
+    return require_triplet(low, "bounds"), require_triplet(high - low, "size")
 
 
 @dataclass
@@ -243,8 +237,8 @@ class SimMesh:
         if (self.bounds is None) != (self.size is None):
             raise ValueError("bounds and size must be given together (or both omitted).")
         if self.bounds is not None:
-            self.bounds = _triplet(self.bounds, "bounds")
-            self.size = _triplet(self.size, "size")
+            self.bounds = require_triplet(self.bounds, "bounds")
+            self.size = require_triplet(self.size, "size")
             if any(extent <= 0.0 for extent in self.size):
                 raise ValueError(f"size must be positive per axis, got {self.size!r}.")
         padding = float(self.padding)

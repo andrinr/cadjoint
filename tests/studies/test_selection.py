@@ -1,4 +1,4 @@
-"""Tests for cadjoint.fem.selection (programmatic node selection)."""
+"""Tests for cadjoint.studies.selection (programmatic node selection)."""
 
 from __future__ import annotations
 
@@ -7,17 +7,10 @@ import json
 import numpy as np
 import pytest
 
-from cadjoint.fem import (
-    GridSpec,
-    Nodes,
-    faces_from_nodes,
-    sdf_to_hex_mesh,
-    select_faces,
-    selection_from_description,
-)
-from cadjoint.fem.selection import boundary_node_mask
+from cadjoint.fem import GridSpec, faces_from_nodes, sdf_to_hex_mesh, select_faces
 from cadjoint.geometry.parameters import Vector
 from cadjoint.sdf.primitives import Box
+from cadjoint.studies import Nodes, boundary_node_mask, selection_from_description
 
 # Bar of 2.0 x 0.3 x 0.3 along x on a face-aligned grid (spacing 0.1).
 _BOUNDS = (-1.1, -0.25, -0.25)

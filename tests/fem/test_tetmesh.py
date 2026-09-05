@@ -19,7 +19,6 @@ import jax.numpy as jnp  # noqa: E402
 from cadjoint.fem.backends import ElasticBCs  # noqa: E402
 from cadjoint.fem.jaxfem import tet_elastic_solve  # noqa: E402
 from cadjoint.fem.postprocess import load_work_tri6, load_work_tris  # noqa: E402
-from cadjoint.fem.selection import Nodes  # noqa: E402
 from cadjoint.fem.tetmesh import (  # noqa: E402
     TetMesh,
     recompute_tet_points,
@@ -31,6 +30,7 @@ from cadjoint.fem.tetmesh import (  # noqa: E402
     tet_volumes,
 )
 from cadjoint.meshing import GridSpec  # noqa: E402
+from cadjoint.studies.selection import Nodes  # noqa: E402
 
 
 def _sphere_sdf(radius: float = 1.0):

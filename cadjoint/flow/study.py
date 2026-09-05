@@ -101,6 +101,7 @@ from cadjoint.flow.precision import double_precision
 from cadjoint.flow.regions import region_mask
 from cadjoint.flow.solver import DEFAULT_ALPHA_MAX, FlowConfig, solve
 from cadjoint.flow.steady import SteadyOptions
+from cadjoint.studies import NodeSelection, register_study, require_triplet
 
 __all__ = [
     "FLOW_STUDY_KIND",
@@ -142,22 +143,12 @@ BC_KINDS = ("inlet", "outlet", "walls", "heat_source", "held_temperature")
 FORCED_CONVECTION_RICHARDSON = 0.1
 
 
-def _triplet(value: Any, label: str) -> tuple[float, float, float]:
-    """Three finite floats, or a message naming the argument."""
-    array = np.asarray(value, dtype=np.float64)
-    if array.shape != (3,) or not np.isfinite(array).all():
-        raise ValueError(f"{label} must contain three finite numbers, got {value!r}.")
-    return (float(array[0]), float(array[1]), float(array[2]))
-
-
 def _selection(nodes: Any, bc_kind: str) -> Any:
     """Check a boundary condition was given a node selection."""
-    from cadjoint.fem.selection import NodeSelection
-
     if not isinstance(nodes, NodeSelection):
         raise ValueError(
             f"{bc_kind} takes a node selection, got {type(nodes).__name__}. "
-            "Build one via Nodes.box/sphere/halfspace/cylinder (from cadjoint.fem "
+            "Build one via Nodes.box/sphere/halfspace/cylinder (from cadjoint.studies "
             "import Nodes); on a lattice it selects cell centres volumetrically."
         )
     return nodes
@@ -188,7 +179,7 @@ class Inlet:
         vector = (
             (0.0, float(self.velocity), 0.0)
             if np.ndim(self.velocity) == 0
-            else _triplet(self.velocity, "Inlet velocity")
+            else require_triplet(self.velocity, "Inlet velocity")
         )
         speed = float(np.linalg.norm(vector))
         if not np.isfinite(speed):
@@ -298,7 +289,7 @@ class HeatSource:
     because ``thermal_resistance`` divides by exactly this number.
 
     Attributes:
-        nodes: The region, as a :class:`~cadjoint.fem.selection.NodeSelection`.
+        nodes: The region, as a :class:`~cadjoint.studies.selection.NodeSelection`.
             Resolved volumetrically against cell centres.
         power: Total power in lattice units.  May be negative (a cold plate).
     """
@@ -558,8 +549,6 @@ class FlowStudy:
     last_result: FlowStudyResult | None = field(default=None, init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
-        from cadjoint.fem.study import register_study
-
         if not isinstance(self.name, str) or not self.name.strip():
             raise ValueError("Flow study needs a non-empty name.")
         self._validate_resolution()
@@ -601,10 +590,10 @@ class FlowStudy:
                 "outlet planes, so anything smaller has no interior left to solve in."
             )
         self.resolution = counts
-        self.bounds = _triplet(
+        self.bounds = require_triplet(
             self.bounds if self.bounds is not None else (-1.0, -1.0, -1.0), "bounds"
         )
-        self.size = _triplet(self.size if self.size is not None else (2.0, 2.0, 2.0), "size")
+        self.size = require_triplet(self.size if self.size is not None else (2.0, 2.0, 2.0), "size")
         if any(extent <= 0.0 for extent in self.size):
             raise ValueError(f"size must be positive along every axis, got {self.size}.")
 

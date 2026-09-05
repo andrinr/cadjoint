@@ -10,10 +10,10 @@ import pytest
 pytest.importorskip("jax_fem")
 
 from cadjoint.fem.hexmesh import GridSpec, sdf_to_hex_mesh
-from cadjoint.fem.selection import Nodes
 from cadjoint.fem.simulate import elastic_solve, thermal_solve
 from cadjoint.geometry.parameters import Vector
 from cadjoint.sdf.primitives import Box
+from cadjoint.studies.selection import Nodes
 
 # Bar of 2.0 x 0.3 x 0.3 along x.
 _HALF = (1.0, 0.15, 0.15)

@@ -99,7 +99,7 @@ _TETGEN_MESSAGE = (
 class TetMesh:
     """A TET4/TET10 volume mesh whose boundary vertices are DC surface vertices.
 
-    Duck-compatible with :class:`~cadjoint.fem.selection.NodeSelection`
+    Duck-compatible with :class:`~cadjoint.studies.selection.NodeSelection`
     resolution (``num_points`` / ``points`` / ``all_boundary_faces`` /
     ``grid``), so ``Nodes`` selections resolve on tet meshes unchanged
     (selections resolve to the *corner* boundary nodes; TET10 midside

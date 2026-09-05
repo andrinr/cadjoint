@@ -24,7 +24,7 @@ from cadjoint.fem.calculix import (
     von_mises,
     write_elastic_deck,
 )
-from cadjoint.fem.selection import Nodes
+from cadjoint.studies.selection import Nodes
 
 _CCX = find_ccx()
 needs_ccx = pytest.mark.skipif(_CCX is None, reason="ccx binary not found (CADJOINT_CCX/CCX/PATH)")

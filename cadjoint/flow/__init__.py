@@ -33,7 +33,7 @@ one equation with a variable coefficient -- and
 :class:`~cadjoint.flow.FlowStudy` declares the pair in a scene the way
 ``ThermalStudy`` declares a conduction solve:
 
-    >>> from cadjoint.fem import Nodes
+    >>> from cadjoint.studies import Nodes
     >>> from cadjoint.flow import FlowStudy, HeatSource, Inlet, Outlet, Walls
     >>> study = FlowStudy(                                  # doctest: +SKIP
     ...     name="sink-cooling",

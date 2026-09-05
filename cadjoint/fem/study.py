@@ -8,8 +8,8 @@ scripts and optimizers via :meth:`solve`.  Constructing a study inside a
 worker can collect the studies a user program declares — mirroring
 ``capture_constraint_solves`` in :mod:`cadjoint.constraints.solve`.
 
-Boundary conditions take a :class:`~cadjoint.fem.selection.NodeSelection`
-built from the :class:`~cadjoint.fem.selection.Nodes` factory — programmatic
+Boundary conditions take a :class:`~cadjoint.studies.selection.NodeSelection`
+built from the :class:`~cadjoint.studies.selection.Nodes` factory — programmatic
 vertex selection composed with ``&``/``|``/``~``.  Node-valued conditions
 (:class:`Dirichlet`, :class:`Fixed`) apply to the selected node set
 directly; area-integrated conditions (:class:`HeatFlux`, :class:`Traction`)
@@ -55,21 +55,16 @@ Example::
 
 from __future__ import annotations
 
-from collections.abc import Iterator
-from contextlib import contextmanager
-from contextvars import ContextVar
 from dataclasses import KW_ONLY, dataclass, field
 from typing import Any
-
-import numpy as np
 
 from cadjoint.enums import BoundaryConditionType, StudyKind
 from cadjoint.fem.boundary import faces_from_nodes, tet_faces_from_nodes
 from cadjoint.fem.hexmesh import HexMesh
 from cadjoint.fem.properties import FROM_MATERIAL
-from cadjoint.fem.selection import NodeSelection
 from cadjoint.fem.simmesh import _CAPTURED_MESHES, SimMesh, _anonymous, _domain_entry
 from cadjoint.fem.tetmesh import TetMesh
+from cadjoint.studies import NodeSelection, capture_studies, register_study, require_triplet
 
 __all__ = [
     "FROM_MATERIAL",
@@ -87,55 +82,13 @@ __all__ = [
 _DEFAULT_BOUNDS = (-3.0, -3.0, -3.0)
 _DEFAULT_SIZE = (6.0, 6.0, 6.0)
 
-_CAPTURED_STUDIES: ContextVar[list[Any] | None] = ContextVar(
-    "cadjoint_captured_studies",
-    default=None,
-)
-
-
-@contextmanager
-def capture_studies() -> Iterator[list[ThermalStudy | ElasticStudy]]:
-    """Collect every study constructed inside this context.
-
-    Mirrors ``capture_constraint_solves``: the compile worker wraps user
-    program execution in this context and receives the declared studies in
-    construction order.
-    """
-    studies: list[ThermalStudy | ElasticStudy] = []
-    token = _CAPTURED_STUDIES.set(studies)
-    try:
-        yield studies
-    finally:
-        _CAPTURED_STUDIES.reset(token)
-
-
-def register_study(study: Any) -> None:
-    """Add a study to the active :func:`capture_studies` context, if any.
-
-    The registration hook the study classes call from ``__post_init__``.
-    Public because studies live in more than one package:
-    :class:`cadjoint.flow.FlowStudy` is declared in a scene exactly like the
-    two here and lands in the same captured list, but it discretises no mesh
-    and does not belong in this module.  Outside a capture context this does
-    nothing, which is what makes a study usable from a plain script.
-
-    Args:
-        study: Any object with a ``name`` and a ``describe()``.
-    """
-    captured = _CAPTURED_STUDIES.get()
-    if captured is not None:
-        captured.append(study)
-
-
 #: Private spelling kept for the two study classes below.
 _register = register_study
 
-
-def _triplet(value: Any, label: str) -> tuple[float, float, float]:
-    array = np.asarray(value, dtype=np.float64)
-    if array.shape != (3,) or not np.isfinite(array).all():
-        raise ValueError(f"{label} must contain three finite numbers, got {value!r}.")
-    return (float(array[0]), float(array[1]), float(array[2]))
+#: Re-exported so ``from cadjoint.studies import capture_studies`` keeps
+#: naming the registry the studies in this module land in; it is defined in
+#: :mod:`cadjoint.studies.capture`, which the flow package shares.
+__all__ = ["capture_studies", "register_study"]
 
 
 def _expect_selection(nodes: Any, bc_kind: str) -> NodeSelection:
@@ -233,7 +186,7 @@ class Traction:
 
     def __post_init__(self):
         _expect_selection(self.nodes, "Traction")
-        object.__setattr__(self, "vector", _triplet(self.vector, "vector"))
+        object.__setattr__(self, "vector", require_triplet(self.vector, "vector"))
 
     @property
     def serializable(self) -> bool:
@@ -432,8 +385,8 @@ def _validate_common(study: Any, kind: str, allowed_bcs: tuple[type, ...]) -> No
     )
     if len(counts) != 3 or any(int(count) != count or count < 1 for count in counts):
         raise ValueError("resolution must be a positive integer or a triplet of them.")
-    study.bounds = _triplet(study.bounds if study.bounds is not None else _DEFAULT_BOUNDS, "bounds")
-    study.size = _triplet(study.size if study.size is not None else _DEFAULT_SIZE, "size")
+    study.bounds = require_triplet(study.bounds if study.bounds is not None else _DEFAULT_BOUNDS, "bounds")
+    study.size = require_triplet(study.size if study.size is not None else _DEFAULT_SIZE, "size")
 
 
 def _solve_mesh(study: Any, sdf: Any, mesh: Any) -> tuple[SimMesh | None, HexMesh | TetMesh]:
@@ -702,7 +655,7 @@ class ElasticStudy:
         self.youngs = _property_argument(self.youngs, "youngs", lambda value: value > 0.0)
         self.poisson = _property_argument(self.poisson, "poisson", lambda value: 0.0 <= value < 0.5)
         if self.gravity is not None:
-            self.gravity = _triplet(self.gravity, "gravity")
+            self.gravity = require_triplet(self.gravity, "gravity")
         _register(self)
 
     def describe(self) -> dict[str, Any]:

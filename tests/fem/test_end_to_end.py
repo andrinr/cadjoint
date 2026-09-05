@@ -23,10 +23,10 @@ import jax
 import jax.numpy as jnp
 
 from cadjoint.fem.hexmesh import GridSpec, recompute_points, sdf_to_hex_mesh
-from cadjoint.fem.selection import Nodes
 from cadjoint.fem.simulate import elastic_solve
 from cadjoint.geometry.parameters import Vector
 from cadjoint.sdf.primitives import Box
+from cadjoint.studies.selection import Nodes
 
 _NOMINAL_HALF_HEIGHT = 0.15
 

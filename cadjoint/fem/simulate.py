@@ -5,7 +5,7 @@ between them and the solver ABI — turning a user's selection into the
 node index sets and exact face lists a backend consumes, and wrapping the
 returned field in a result object.  Public entry points
 :func:`thermal_solve` and :func:`elastic_solve` resolve boundary patches
-(:class:`~cadjoint.fem.selection.NodeSelection` values) against the mesh,
+(:class:`~cadjoint.studies.selection.NodeSelection` values) against the mesh,
 hand array-level BCs to a pluggable solver backend
 (:mod:`cadjoint.fem.backends`; direct in-process jax-fem by default), and
 return small result objects with VTK export for ParaView.
@@ -57,8 +57,8 @@ from cadjoint.fem.boundary import (
 from cadjoint.fem.hexmesh import HexMesh
 from cadjoint.fem.jaxfem import tet_elastic_solve, tet_thermal_solve
 from cadjoint.fem.postprocess import hex_von_mises, tet_von_mises
-from cadjoint.fem.selection import NodeSelection
 from cadjoint.fem.tetmesh import TetMesh
+from cadjoint.studies import NodeSelection
 
 __all__ = ["ElasticResult", "ThermalResult", "elastic_solve", "thermal_solve"]
 

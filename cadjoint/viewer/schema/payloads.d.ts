@@ -299,7 +299,7 @@ export interface StudyBc {
 }
 
 /**
- * A serialized node selection, mirroring ``cadjoint.fem.selection``.
+ * A serialized node selection, mirroring ``cadjoint.studies.selection``.
  *
  * Composite selections nest: ``and``/``or`` carry ``operands``, ``not``
  * carries ``operand``, and the leaves carry their own geometry. The

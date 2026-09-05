@@ -40,8 +40,8 @@ def _execute_scene(
             path uses this for constraint-solve reports and sketch profiles.
     """
     from cadjoint.fem.simmesh import capture_sim_meshes
-    from cadjoint.fem.study import capture_studies
     from cadjoint.optimize import capture_optimizations
+    from cadjoint.studies import capture_studies
 
     namespace: dict[str, Any] = {
         "__builtins__": __builtins__,

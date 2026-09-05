@@ -37,7 +37,6 @@ from cadjoint.fem.properties import (
     sample_material_field,
     total_mass,
 )
-from cadjoint.fem.selection import Nodes
 from cadjoint.fem.simmesh import SimMesh
 from cadjoint.fem.simulate import elastic_solve, thermal_solve
 from cadjoint.fem.study import Dirichlet, ElasticStudy, Fixed, ThermalStudy, Traction
@@ -45,6 +44,7 @@ from cadjoint.materials import aluminium_6061, copper_c11000, steel_1018
 from cadjoint.render.material import Material
 from cadjoint.sdf import Box, Translate
 from cadjoint.sdf.boolean import Union
+from cadjoint.studies.selection import Nodes
 
 _HOT_END = Nodes.side("-x")
 _COLD_END = Nodes.side("+x")

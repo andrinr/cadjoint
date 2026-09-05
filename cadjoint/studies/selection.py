@@ -1,16 +1,26 @@
-"""Programmatic node (vertex) selection for boundary conditions.
+"""Programmatic region selection for boundary conditions.
 
-Selections are small declarative values describing a set of mesh vertices.
-They are built from the :class:`Nodes` factory namespace, composed with the
-boolean operators ``&``, ``|`` and ``~``, and evaluated against a
-:class:`~cadjoint.fem.hexmesh.HexMesh` only when a study is solved — so the
-same selection works across resolutions and remeshes.
+Selections are small declarative values describing a region of space.  They
+are built from the :class:`Nodes` factory namespace, composed with the
+boolean operators ``&``, ``|`` and ``~``, and evaluated only when a study is
+solved — so the same selection works across resolutions and remeshes.
 
-Boundary restriction is implicit: **selections always resolve to boundary
-(surface) nodes**.  Boundary conditions only ever act on the surface of the
-meshed part, so interior lattice nodes are never selected — and
-``~selection`` therefore means "the rest of the surface", not "the mesh
-interior".
+**Two evaluations, one language.**  A selection is a geometric criterion, and
+the two physics packages ask it different questions:
+
+:meth:`NodeSelection.contains`
+    Which of these points satisfy the criterion?  Pure geometry over an
+    ``(..., 3)`` array, no mesh and no surface.  This is what a flow study
+    asks of its lattice cell centres, volumetrically, so ``~selection``
+    means "every other cell".
+
+:meth:`NodeSelection.resolve`
+    Which of this mesh's *boundary* nodes satisfy it?  Boundary conditions
+    on a meshed part act on its surface, so interior nodes are never
+    selected and ``~selection`` means "the rest of the surface".
+
+Only :meth:`Nodes.side` needs the mesh itself — it names an axis extreme of
+that mesh's boundary — so it is the one kind :meth:`contains` refuses.
 
 Every selection except :meth:`Nodes.predicate` is serializable:
 :meth:`NodeSelection.describe` emits a JSON-ready dict of the kind plus its
@@ -23,20 +33,22 @@ Example::
 
     clamp = Nodes.sphere([-0.7, 0.35, 0.1], 0.33) | Nodes.sphere([0.7, 0.35, 0.1], 0.33)
     load = Nodes.side("+x") & ~Nodes.halfspace([0.0, 0.0, 0.0], [0.0, 0.0, -1.0])
-    indices = load.resolve(mesh)  # int32 node indices, boundary only
+    indices = load.resolve(mesh)          # int32 node indices, boundary only
+    inside = load.contains(cell_centers)  # boolean mask, volumetric
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any, Callable, Protocol, runtime_checkable
 
 import numpy as np
 
 from cadjoint.enums import Side, SideLike, parse, values
-from cadjoint.fem.hexmesh import HexMesh
+from cadjoint.studies._validate import require_triplet
 
 __all__ = [
+    "BoundaryMesh",
     "NodeSelection",
     "Nodes",
     "boundary_node_mask",
@@ -48,15 +60,23 @@ __all__ = [
 _SIDES = values(Side)
 
 
-def _triplet(value: Any, label: str) -> tuple[float, float, float]:
-    """Validate a 3-vector of finite numbers, returning a plain float tuple."""
-    array = np.asarray(value, dtype=np.float64)
-    if array.shape != (3,) or not np.isfinite(array).all():
-        raise ValueError(f"{label} must contain three finite numbers, got {value!r}.")
-    return (float(array[0]), float(array[1]), float(array[2]))
+@runtime_checkable
+class BoundaryMesh(Protocol):
+    """What :meth:`NodeSelection.resolve` needs of a mesh.
+
+    Structural on purpose: this module sits below both mesh families and
+    must not import either.  :class:`~cadjoint.fem.hexmesh.HexMesh` and
+    :class:`~cadjoint.fem.tetmesh.TetMesh` both satisfy it.
+    """
+
+    points: Any
+    num_points: int
+
+    def all_boundary_faces(self) -> Any:
+        """The mesh's boundary faces, whose ``nodes`` are its surface nodes."""
 
 
-def boundary_node_mask(mesh: HexMesh) -> np.ndarray:
+def boundary_node_mask(mesh: BoundaryMesh) -> np.ndarray:
     """Boolean mask over ``mesh`` nodes that lie on the boundary surface."""
     mask = np.zeros(mesh.num_points, dtype=bool)
     mask[np.unique(mesh.all_boundary_faces().nodes)] = True
@@ -64,13 +84,14 @@ def boundary_node_mask(mesh: HexMesh) -> np.ndarray:
 
 
 class NodeSelection:
-    """A composable, mesh-independent description of a node set.
+    """A composable, mesh-independent description of a region of space.
 
     Build concrete selections via the :class:`Nodes` factory namespace and
     combine them with ``&`` (intersection), ``|`` (union) and ``~``
-    (complement within the boundary surface).  Evaluate with :meth:`mask`
-    (boolean mask over all mesh nodes, true only at boundary nodes) or
-    :meth:`resolve` (selected node indices, raising if empty).
+    (complement).  Evaluate with :meth:`contains` (boolean mask over any
+    points, volumetric), :meth:`mask` (boolean mask over all mesh nodes,
+    true only at boundary nodes) or :meth:`resolve` (selected boundary node
+    indices, raising if empty).
     """
 
     @property
@@ -78,7 +99,27 @@ class NodeSelection:
         """Whether :meth:`describe` round-trips (false only for predicates)."""
         return True
 
-    def mask(self, mesh: HexMesh) -> np.ndarray:
+    def contains(self, points: Any) -> np.ndarray:
+        """Which of ``points`` satisfy the criterion, ignoring any surface.
+
+        The mesh-free evaluation: pure geometry, volumetric, and shaped like
+        ``points`` without its last axis.  ``~selection`` here means every
+        point outside the region, not "the rest of a surface" — see
+        :meth:`mask` for the boundary-restricted reading.
+
+        Args:
+            points: An ``(..., 3)`` array of world coordinates.
+
+        Returns:
+            A boolean array shaped like ``points`` without its last axis.
+
+        Raises:
+            ValueError: For :meth:`Nodes.side`, which names an extreme of a
+                mesh's boundary and so cannot be read from points alone.
+        """
+        return np.asarray(self._contains(np.asarray(points, dtype=np.float64)), dtype=bool)
+
+    def mask(self, mesh: BoundaryMesh) -> np.ndarray:
         """Boolean node mask over ``mesh``, restricted to boundary nodes."""
         points = np.asarray(mesh.points, dtype=np.float64)
         geometric = np.asarray(self._geometric(points, mesh), dtype=bool).reshape(-1)
@@ -91,7 +132,7 @@ class NodeSelection:
             )
         return geometric & boundary_node_mask(mesh)
 
-    def resolve(self, mesh: HexMesh) -> np.ndarray:
+    def resolve(self, mesh: BoundaryMesh) -> np.ndarray:
         """Selected node indices of ``mesh`` as an int32 array.
 
         Raises:
@@ -106,9 +147,17 @@ class NodeSelection:
         """JSON-ready description: kind plus numeric parameters."""
         raise NotImplementedError
 
-    def _geometric(self, points: np.ndarray, mesh: HexMesh) -> np.ndarray:
-        """Geometric criterion over all node positions (pre boundary cut)."""
+    def _contains(self, points: np.ndarray) -> np.ndarray:
+        """The mesh-free criterion.  Overridden by every kind but ``side``."""
         raise NotImplementedError
+
+    def _geometric(self, points: np.ndarray, mesh: BoundaryMesh) -> np.ndarray:
+        """Geometric criterion over all node positions (pre boundary cut).
+
+        Defaults to the mesh-free reading; only ``side`` needs the mesh.
+        """
+        del mesh
+        return self._contains(points)
 
     def __and__(self, other: NodeSelection) -> NodeSelection:
         return _Combined("and", self, _expect_selection(other))
@@ -134,7 +183,7 @@ class _Box(NodeSelection):
     min_corner: tuple[float, float, float]
     max_corner: tuple[float, float, float]
 
-    def _geometric(self, points: np.ndarray, _mesh: HexMesh) -> np.ndarray:
+    def _contains(self, points: np.ndarray) -> np.ndarray:
         low = np.asarray(self.min_corner)
         high = np.asarray(self.max_corner)
         return np.all((points >= low) & (points <= high), axis=-1)
@@ -152,9 +201,9 @@ class _Sphere(NodeSelection):
     center: tuple[float, float, float]
     radius: float
 
-    def _geometric(self, points: np.ndarray, _mesh: HexMesh) -> np.ndarray:
+    def _contains(self, points: np.ndarray) -> np.ndarray:
         offsets = points - np.asarray(self.center)
-        return np.einsum("nd,nd->n", offsets, offsets) <= self.radius**2
+        return np.sum(offsets * offsets, axis=-1) <= self.radius**2
 
     def describe(self) -> dict[str, Any]:
         return {"kind": "sphere", "center": list(self.center), "radius": self.radius}
@@ -165,7 +214,7 @@ class _Halfspace(NodeSelection):
     point: tuple[float, float, float]
     normal: tuple[float, float, float]
 
-    def _geometric(self, points: np.ndarray, _mesh: HexMesh) -> np.ndarray:
+    def _contains(self, points: np.ndarray) -> np.ndarray:
         return (points - np.asarray(self.point)) @ np.asarray(self.normal) >= 0.0
 
     def describe(self) -> dict[str, Any]:
@@ -180,11 +229,11 @@ class _Cylinder(NodeSelection):
     inner: float
     half_length: float | None
 
-    def _geometric(self, points: np.ndarray, _mesh: HexMesh) -> np.ndarray:
+    def _contains(self, points: np.ndarray) -> np.ndarray:
         direction = np.asarray(self.axis) / np.linalg.norm(self.axis)
         offsets = points - np.asarray(self.center)
         axial = offsets @ direction
-        radial_sq = np.einsum("nd,nd->n", offsets, offsets) - axial**2
+        radial_sq = np.sum(offsets * offsets, axis=-1) - axial**2
         inside = (radial_sq <= self.radius**2) & (radial_sq >= self.inner**2)
         if self.half_length is not None:
             inside &= np.abs(axial) <= self.half_length
@@ -206,7 +255,15 @@ class _Side(NodeSelection):
     side: Side
     tol: float | None = None
 
-    def _geometric(self, points: np.ndarray, mesh: HexMesh) -> np.ndarray:
+    def _contains(self, points: np.ndarray) -> np.ndarray:
+        del points
+        raise ValueError(
+            f"Nodes.side({str(self.side)!r}) names the extreme boundary plane of a "
+            "mesh, which points alone do not have. Use Nodes.halfspace or Nodes.box "
+            "against world coordinates instead."
+        )
+
+    def _geometric(self, points: np.ndarray, mesh: BoundaryMesh) -> np.ndarray:
         axis = "xyz".index(self.side[1])
         positive = self.side[0] == "+"
         coords = points[:, axis]
@@ -219,7 +276,7 @@ class _Side(NodeSelection):
         return {"kind": "side", "side": str(self.side), "tol": self.tol}
 
 
-def _default_side_tol(mesh: HexMesh) -> float:
+def _default_side_tol(mesh: BoundaryMesh) -> float:
     """Half the smallest cell spacing (fallback: 1e-3 of the bbox diagonal)."""
     if mesh.grid is not None:
         return 0.5 * float(min(mesh.grid.spacing))
@@ -235,7 +292,7 @@ class _Predicate(NodeSelection):
     def serializable(self) -> bool:
         return False
 
-    def _geometric(self, points: np.ndarray, _mesh: HexMesh) -> np.ndarray:
+    def _contains(self, points: np.ndarray) -> np.ndarray:
         return self.fn(points)
 
     def describe(self) -> dict[str, Any]:
@@ -252,7 +309,12 @@ class _Combined(NodeSelection):
     def serializable(self) -> bool:
         return self.left.serializable and self.right.serializable
 
-    def mask(self, mesh: HexMesh) -> np.ndarray:
+    def _contains(self, points: np.ndarray) -> np.ndarray:
+        left = self.left.contains(points)
+        right = self.right.contains(points)
+        return left & right if self.op == "and" else left | right
+
+    def mask(self, mesh: BoundaryMesh) -> np.ndarray:
         left = self.left.mask(mesh)
         right = self.right.mask(mesh)
         return left & right if self.op == "and" else left | right
@@ -269,7 +331,10 @@ class _Complement(NodeSelection):
     def serializable(self) -> bool:
         return self.operand.serializable
 
-    def mask(self, mesh: HexMesh) -> np.ndarray:
+    def _contains(self, points: np.ndarray) -> np.ndarray:
+        return ~self.operand.contains(points)
+
+    def mask(self, mesh: BoundaryMesh) -> np.ndarray:
         return boundary_node_mask(mesh) & ~self.operand.mask(mesh)
 
     def describe(self) -> dict[str, Any]:
@@ -296,8 +361,8 @@ class Nodes:
             max_corner: Upper corner, three finite numbers (componentwise
                 at least ``min_corner``).
         """
-        low = _triplet(min_corner, "min_corner")
-        high = _triplet(max_corner, "max_corner")
+        low = require_triplet(min_corner, "min_corner")
+        high = require_triplet(max_corner, "max_corner")
         if any(lo > hi for lo, hi in zip(low, high)):
             raise ValueError(f"min_corner {low} must not exceed max_corner {high}.")
         return _Box(low, high)
@@ -313,7 +378,7 @@ class Nodes:
         value = float(radius)
         if not np.isfinite(value) or value <= 0.0:
             raise ValueError(f"radius must be positive and finite, got {radius!r}.")
-        return _Sphere(_triplet(center, "center"), value)
+        return _Sphere(require_triplet(center, "center"), value)
 
     @staticmethod
     def halfspace(point: Any, normal: Any) -> NodeSelection:
@@ -326,10 +391,10 @@ class Nodes:
             normal: Plane normal pointing into the selected halfspace
                 (need not be unit length, must be nonzero).
         """
-        direction = _triplet(normal, "normal")
+        direction = require_triplet(normal, "normal")
         if not any(component != 0.0 for component in direction):
             raise ValueError("normal must be nonzero.")
-        return _Halfspace(_triplet(point, "point"), direction)
+        return _Halfspace(require_triplet(point, "point"), direction)
 
     @staticmethod
     def cylinder(
@@ -350,7 +415,7 @@ class Nodes:
             half_length: Half the axial extent about ``center``, or ``None``
                 (the default) for an infinite cylinder.
         """
-        direction = _triplet(axis, "axis")
+        direction = require_triplet(axis, "axis")
         if not any(component != 0.0 for component in direction):
             raise ValueError("axis must be nonzero.")
         outer = float(radius)
@@ -366,7 +431,7 @@ class Nodes:
             extent = float(half_length)
             if not np.isfinite(extent) or extent <= 0.0:
                 raise ValueError(f"half_length must be positive and finite, got {half_length!r}.")
-        return _Cylinder(_triplet(center, "center"), direction, outer, hollow, extent)
+        return _Cylinder(require_triplet(center, "center"), direction, outer, hollow, extent)
 
     @staticmethod
     def side(side: SideLike, tol: float | None = None) -> NodeSelection:

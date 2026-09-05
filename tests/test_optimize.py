@@ -218,7 +218,7 @@ def _exec_starter() -> tuple[dict, list]:
     compile worker uses (the study-backed declaration resolves its study by
     name through them)."""
     from cadjoint.fem.simmesh import capture_sim_meshes
-    from cadjoint.fem.study import capture_studies
+    from cadjoint.studies import capture_studies
 
     source = STARTER.read_text(encoding="utf-8")
     namespace = {"__name__": "__starter_optimize_test__"}
@@ -324,7 +324,7 @@ class TestStudyFormValidation:
         assert elastic.metric == "compliance"
 
     def test_study_names_resolve_against_captured_studies(self):
-        from cadjoint.fem.study import capture_studies
+        from cadjoint.studies import capture_studies
 
         with capture_studies():
             study = _bar_study("named-bar")

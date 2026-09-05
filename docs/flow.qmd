@@ -141,7 +141,7 @@ by `capture_studies`, with `describe()` and its own boundary conditions — and
 solves the flow *and* the temperature:
 
 ```python
-from cadjoint.fem import Nodes
+from cadjoint.studies import Nodes
 from cadjoint.flow import FlowStudy, HeatSource, Inlet, Outlet, Walls
 
 cooling = FlowStudy(

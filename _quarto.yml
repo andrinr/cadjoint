@@ -217,10 +217,16 @@ quartodoc:
         - fem.study.ThermalStudy
         - fem.study.ElasticStudy
         - fem.result.SimulationResult
-    - title: Simulation — selections and BCs
+    - title: Studies — the physics-agnostic layer
       contents:
-        - fem.selection.Nodes
-        - fem.selection.NodeSelection
+        - studies.selection.Nodes
+        - studies.selection.NodeSelection
+        - studies.selection.selection_from_description
+        - studies.capture.capture_studies
+        - studies.capture.declared_studies
+        - studies.capture.register_study
+    - title: Simulation — boundary conditions
+      contents:
         - fem.study.Dirichlet
         - fem.study.HeatFlux
         - fem.study.Fixed
