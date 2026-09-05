@@ -31,20 +31,12 @@ def bar_mesh():
     return sdf_to_hex_mesh(_bar(), grid)
 
 
-def _hot_end(center):
-    return center[0] < -0.999
-
-
-def _cold_end(center):
-    return center[0] > 0.999
-
-
 class TestThermal:
     def test_linear_monotone_gradient(self, bar_mesh):
         result = thermal_solve(
             bar_mesh,
             conductivity=2.0,
-            dirichlet=[(_hot_end, 1.0), (_cold_end, 0.0)],
+            dirichlet=[(Nodes.side("-x"), 1.0), (Nodes.side("+x"), 0.0)],
         )
         temperature = np.asarray(result.temperature)
         x = bar_mesh.points[:, 0]
@@ -63,7 +55,7 @@ class TestThermal:
         grid = GridSpec.from_bounds((-1.1, -0.2, -0.2), (2.2, 0.4, 0.4), (22, 4, 4))
         mesh = sdf_to_hex_mesh(_bar(), grid)
         result = thermal_solve(
-            mesh, conductivity=1.0, dirichlet=[(_hot_end, 1.0), (_cold_end, 0.0)]
+            mesh, conductivity=1.0, dirichlet=[(Nodes.side("-x"), 1.0), (Nodes.side("+x"), 0.0)]
         )
         temperature = np.asarray(result.temperature)
         expected = (1.0 - mesh.points[:, 0]) / _LENGTH
@@ -76,7 +68,7 @@ class TestThermal:
             bar_mesh,
             conductivity=1.0,
             source=1.0,
-            dirichlet=[(_hot_end, 0.0), (_cold_end, 0.0)],
+            dirichlet=[(Nodes.side("-x"), 0.0), (Nodes.side("+x"), 0.0)],
         )
         temperature = np.asarray(result.temperature)
         mid = np.abs(bar_mesh.points[:, 0]) < 0.1
@@ -86,7 +78,7 @@ class TestThermal:
     def test_vtk_export(self, bar_mesh, tmp_path):
         meshio = pytest.importorskip("meshio")
         result = thermal_solve(
-            bar_mesh, conductivity=1.0, dirichlet=[(_hot_end, 1.0), (_cold_end, 0.0)]
+            bar_mesh, conductivity=1.0, dirichlet=[(Nodes.side("-x"), 1.0), (Nodes.side("+x"), 0.0)]
         )
         path = tmp_path / "thermal.vtk"
         result.vtk_export(str(path))
@@ -102,8 +94,8 @@ class TestElastic:
             bar_mesh,
             youngs=1000.0,
             poisson=0.3,
-            dirichlet=[_hot_end],
-            tractions=[(_cold_end, [0.0, 0.0, -1.0])],
+            dirichlet=[Nodes.side("-x")],
+            tractions=[(Nodes.side("+x"), [0.0, 0.0, -1.0])],
         )
 
     def test_tip_displacement_vs_euler_bernoulli(self, bar_mesh, cantilever):
@@ -142,7 +134,7 @@ class TestElastic:
 
 
 class TestNodeSelectionPatches:
-    def test_thermal_selection_matches_predicate_solution(self, bar_mesh):
+    def test_thermal_side_selections_solve(self, bar_mesh):
         result = thermal_solve(
             bar_mesh,
             conductivity=2.0,
@@ -151,26 +143,19 @@ class TestNodeSelectionPatches:
         expected = (1.0 - bar_mesh.points[:, 0]) / _LENGTH
         assert np.abs(np.asarray(result.temperature) - expected).max() < 1e-6
 
-    def test_elastic_selection_matches_predicate_solution(self, bar_mesh):
-        by_selection = elastic_solve(
+    def test_elastic_side_selections_solve(self, bar_mesh):
+        result = elastic_solve(
             bar_mesh,
             youngs=1000.0,
             poisson=0.3,
             dirichlet=[Nodes.side("-x")],
             tractions=[(Nodes.side("+x"), [0.0, 0.0, -1.0])],
         )
-        by_predicate = elastic_solve(
-            bar_mesh,
-            youngs=1000.0,
-            poisson=0.3,
-            dirichlet=[_hot_end],
-            tractions=[(_cold_end, [0.0, 0.0, -1.0])],
-        )
-        np.testing.assert_allclose(
-            np.asarray(by_selection.displacement),
-            np.asarray(by_predicate.displacement),
-            atol=1e-10,
-        )
+        displacement = np.asarray(result.displacement)
+        assert np.isfinite(displacement).all()
+        clamped = Nodes.side("-x").resolve(bar_mesh)
+        assert np.abs(displacement[clamped]).max() < 1e-12
+        assert displacement[:, 2].min() < 0.0
 
     def test_empty_selection_raises(self, bar_mesh):
         with pytest.raises(ValueError, match="matched no boundary nodes"):
@@ -225,12 +210,14 @@ class TestBackendResolution:
             thermal_solve(
                 bar_mesh,
                 conductivity=1.0,
-                dirichlet=[(_hot_end, 1.0), (_cold_end, 0.0)],
+                dirichlet=[(Nodes.side("-x"), 1.0), (Nodes.side("+x"), 0.0)],
                 backend="no-such-solver",
             )
 
-    def test_empty_patch_raises(self, bar_mesh):
-        with pytest.raises(ValueError, match="selected no boundary faces"):
+    def test_non_selection_patch_raises(self, bar_mesh):
+        # Boundary patches are Nodes selections; a bare callable used to be
+        # resolved as a face predicate and is now refused, naming the fix.
+        with pytest.raises(TypeError, match="Nodes.box/sphere"):
             thermal_solve(
                 bar_mesh,
                 conductivity=1.0,

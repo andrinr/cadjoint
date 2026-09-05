@@ -485,9 +485,9 @@ class TestMaterialFieldGradient:
             finite = (float(objective(base + offset)) - float(objective(base - offset))) / (
                 2.0 * step
             )
-            assert gradient[index] == pytest.approx(
-                finite, rel=1e-2, abs=1e-6
-            ), f"component {index}: adjoint {gradient[index]} vs FD {finite}"
+            assert gradient[index] == pytest.approx(finite, rel=1e-2, abs=1e-6), (
+                f"component {index}: adjoint {gradient[index]} vs FD {finite}"
+            )
         # Guard against a vacuous 0 == 0 agreement: the objective genuinely
         # depends on both the interface position and the conductivity.
         assert abs(gradient[0]) > 1e-3

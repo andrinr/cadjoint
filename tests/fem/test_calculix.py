@@ -24,6 +24,7 @@ from cadjoint.fem.calculix import (
     von_mises,
     write_elastic_deck,
 )
+from cadjoint.fem.selection import Nodes
 
 _CCX = find_ccx()
 needs_ccx = pytest.mark.skipif(_CCX is None, reason="ccx binary not found (CADJOINT_CCX/CCX/PATH)")
@@ -283,16 +284,8 @@ def bar_mesh():
     return sdf_to_hex_mesh(bar, grid)
 
 
-def _clamp(center):
-    return center[0] < -0.999
-
-
-def _tip(center):
-    return center[0] > 0.999
-
-
-_FIXED = [_clamp]
-_TRACTIONS = [(_tip, [0.0, 0.0, -1.0])]
+_FIXED = [Nodes.side("-x")]
+_TRACTIONS = [(Nodes.side("+x"), [0.0, 0.0, -1.0])]
 
 
 @needs_ccx
@@ -359,8 +352,8 @@ class TestLiveForward:
         from cadjoint.fem.simulate import _face_patch, _node_patch
 
         bcs = BCs(
-            fixed_nodes=[_node_patch(bar_mesh, _clamp)],
-            traction_nodes=[_face_patch(bar_mesh, _tip)],
+            fixed_nodes=[_node_patch(bar_mesh, Nodes.side("-x"))],
+            traction_nodes=[_face_patch(bar_mesh, Nodes.side("+x"))],
             traction_vectors=[np.array([0.0, 0.0, -1.0])],
         )
         solution = elastic_ccx_solve(
@@ -453,8 +446,8 @@ class TestLiveAdjoint:
         from cadjoint.fem.simulate import _face_patch, _node_patch, elastic_solve
 
         bcs = ElasticBCs(
-            fixed_nodes=[_node_patch(bar_mesh, _clamp)],
-            traction_nodes=[_face_patch(bar_mesh, _tip)],
+            fixed_nodes=[_node_patch(bar_mesh, Nodes.side("-x"))],
+            traction_nodes=[_face_patch(bar_mesh, Nodes.side("+x"))],
             traction_vectors=[np.array([0.0, 0.0, -1.0])],
         )
         adjoint = elastic_ccx_solve(
@@ -549,8 +542,8 @@ class TestLiveTesseract:
         from cadjoint.fem.simulate import _face_patch, _node_patch
 
         bcs = ElasticBCs(
-            fixed_nodes=[_node_patch(bar_mesh, _clamp)],
-            traction_nodes=[_face_patch(bar_mesh, _tip)],
+            fixed_nodes=[_node_patch(bar_mesh, Nodes.side("-x"))],
+            traction_nodes=[_face_patch(bar_mesh, Nodes.side("+x"))],
             traction_vectors=[np.array([0.0, 0.0, -1.0])],
         )
         backend = CalculixBackend()
