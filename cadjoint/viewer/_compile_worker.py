@@ -139,17 +139,29 @@ def _scene_shader(scene) -> tuple[str, dict | None]:
 def _direct_shader(scene) -> tuple[str, dict | None] | None:
     """The direct backend's module, or None when it cannot emit this scene.
 
-    The profile vertices it would read from a storage buffer are inlined as a
-    constant array here, because the viewer's shader contract carries one
-    uniform buffer and no vertex buffer.  That keeps the module a drop-in at
-    the cost of the one thing this form is *not* being measured for — the
-    vertices are still data rather than code, just data spelled in the
-    module.  See ``research/performance.md`` §16.
+    The free parameters go in the same uniform buffer the traced form uses,
+    so a handle drag stays a buffer write and a redraw rather than a round
+    trip — the module is byte-identical for every value of every free
+    parameter.
+
+    The profile vertices are inlined as a constant array, because the
+    viewer's shader contract carries that one uniform buffer and no vertex
+    buffer.  That keeps the module a drop-in at the cost of the storage-buffer
+    size win: the vertices are still data rather than code, just data spelled
+    in the module.  See ``research/performance.md`` §16.
     """
+    from cadjoint.backends.wgsl.codegen import (
+        DEFAULT_PARAMETER_BINDING,
+        DEFAULT_PARAMETER_GROUP,
+        PARAMETER_SLOT_BYTES,
+        RESERVED_PARAMETER_SLOTS,
+        ShaderParameter,
+        ShaderProgram,
+    )
     from cadjoint.backends.wgsl.direct import UnsupportedNode, compile_sdf_direct
 
     try:
-        program = compile_sdf_direct(scene)
+        program = compile_sdf_direct(scene, uniforms=True)
     except UnsupportedNode as reason:
         print(f"note: the direct shader backend cannot emit this scene ({reason}); tracing it.")
         return None
@@ -162,7 +174,29 @@ def _direct_shader(scene) -> tuple[str, dict | None] | None:
             "@group(1) @binding(0) var<storage, read> profile_vertices: array<vec2<f32>>;",
             f"const profile_vertices = array<vec2<f32>, {len(program.vertices)}>({literals});",
         )
-    return source, None
+    slots = tuple(
+        ShaderParameter(
+            name=name,
+            offset=index * PARAMETER_SLOT_BYTES,
+            components=components,
+            value=tuple(values),
+            free=True,
+        )
+        for index, (name, components, values) in enumerate(program.parameters)
+    )
+    # The two reserved slots are declared and written but never read: this
+    # form spells no NaN constant and does no bounds culling. Keeping them
+    # means the frontend writes one buffer layout, not two.
+    contract = ShaderProgram(
+        wgsl=source,
+        parameters=slots,
+        buffer_bytes=(len(slots) + RESERVED_PARAMETER_SLOTS) * PARAMETER_SLOT_BYTES,
+        group=DEFAULT_PARAMETER_GROUP,
+        binding=DEFAULT_PARAMETER_BINDING,
+        nan_offset=len(slots) * PARAMETER_SLOT_BYTES,
+        cull_margin_offset=(len(slots) + 1) * PARAMETER_SLOT_BYTES,
+    )
+    return source, contract.as_dict()
 
 
 def _compile_source(source: str) -> dict[str, Any]:

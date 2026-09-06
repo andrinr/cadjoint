@@ -37,6 +37,13 @@ from typing import Any
 
 import numpy as np
 
+from cadjoint.backends.wgsl.codegen import (
+    DEFAULT_PARAMETER_BINDING,
+    DEFAULT_PARAMETER_GROUP,
+    PARAMETER_SLOT_BYTES,
+    RESERVED_PARAMETER_SLOTS,
+)
+
 __all__ = ["DirectProgram", "UnsupportedNode", "compile_sdf_direct", "supported_nodes"]
 
 #: The optics row, in the order `material_optics` returns it — the same
@@ -63,6 +70,9 @@ class DirectProgram:
 
     wgsl: str
     vertices: np.ndarray
+    #: `(name, components, value)` per uniform slot, empty in the literal
+    #: form. In the same order the buffer expects them.
+    parameters: tuple[tuple[str, int, list[float]], ...] = ()
 
     def __str__(self) -> str:  # so callers can treat it as source
         return self.wgsl
@@ -165,13 +175,24 @@ _PRIMITIVES: dict[str, _Kernel] = {
 #: pairwise-equality spelling of the even-odd crossing test.
 _PROFILE_BUFFER = """@group(1) @binding(0) var<storage, read> profile_vertices: array<vec2<f32>>;"""
 
+#: In the uniform form the vertices are slots in the parameter buffer, so
+#: `profile_vertices[i]` is `sdf_parameters.values[i].xy`. One accessor, so
+#: the two kernels below are written once.
+_PROFILE_FROM_UNIFORM = """fn profile_vertex(i: u32) -> vec2<f32> {
+    return sdf_parameters.values[i].xy;
+}"""
+
+_PROFILE_FROM_BUFFER = """fn profile_vertex(i: u32) -> vec2<f32> {
+    return profile_vertices[i];
+}"""
+
 _PROFILE_DISTANCE = """fn profile_distance(p: vec2<f32>, offset: u32, count: u32) -> f32 {
-    var d = dot(p - profile_vertices[offset], p - profile_vertices[offset]);
+    var d = dot(p - profile_vertex(offset), p - profile_vertex(offset));
     var s = 1.0;
     for (var i: u32 = 0u; i < count; i = i + 1u) {
         let j = (i + count - 1u) % count;
-        let vi = profile_vertices[offset + i];
-        let vj = profile_vertices[offset + j];
+        let vi = profile_vertex(offset + i);
+        let vj = profile_vertex(offset + j);
         let e = vj - vi;
         let w = p - vi;
         let t = clamp(dot(w, e) / dot(e, e), 0.0, 1.0);
@@ -186,11 +207,16 @@ _PROFILE_DISTANCE = """fn profile_distance(p: vec2<f32>, offset: u32, count: u32
 }"""
 
 _EXTRUDED = """fn prim_extrudedpolygon(
-    p: vec3<f32>, offset: u32, count: u32, depth: f32, slope: f32
+    p: vec3<f32>, offset: u32, count: u32, depth: f32, slope: f32, twist: f32
 ) -> f32 {
-    // `slope` is tan(draft), folded by the caller; zero is the plain
-    // extrusion and the term vanishes, matching the Python's static skip.
-    let d2 = profile_distance(p.xy, offset, count) + slope * (p.z + depth * 0.5);
+    // `slope` is tan(draft) and `twist` is radians over the full depth, both
+    // folded by the caller; zero is the plain extrusion and both terms
+    // vanish, matching the Python's static skips.
+    let theta = twist * p.z / depth;
+    let c = cos(theta);
+    let s = sin(theta);
+    let xy = vec2<f32>(p.x * c + p.y * s, p.y * c - p.x * s);
+    let d2 = profile_distance(xy, offset, count) + slope * (p.z + depth * 0.5);
     let dz = abs(p.z) - depth * 0.5;
     let max_d = max(d2, dz);
     if (max_d <= 0.0) { return max_d; }
@@ -224,13 +250,13 @@ _ROTATE = """fn rotate_about(p: vec3<f32>, origin: vec3<f32>, axis: vec3<f32>, a
 _PROFILE_LERPED = """fn profile_distance_lerped(
     p: vec2<f32>, a: u32, b: u32, count: u32, t: f32
 ) -> f32 {
-    let first = mix(profile_vertices[a], profile_vertices[b], t);
+    let first = mix(profile_vertex(a), profile_vertex(b), t);
     var d = dot(p - first, p - first);
     var s = 1.0;
     for (var i: u32 = 0u; i < count; i = i + 1u) {
         let j = (i + count - 1u) % count;
-        let vi = mix(profile_vertices[a + i], profile_vertices[b + i], t);
-        let vj = mix(profile_vertices[a + j], profile_vertices[b + j], t);
+        let vi = mix(profile_vertex(a + i), profile_vertex(b + i), t);
+        let vj = mix(profile_vertex(a + j), profile_vertex(b + j), t);
         let e = vj - vi;
         let w = p - vi;
         let u = clamp(dot(w, e) / dot(e, e), 0.0, 1.0);
@@ -291,6 +317,7 @@ _BOOLEANS = frozenset({"Union", "Intersection", "Difference"})
 _SHARED.update(
     {
         "profile_distance": _PROFILE_DISTANCE,
+        "profile_vertex": _PROFILE_FROM_BUFFER,
         "profile_distance_lerped": _PROFILE_LERPED,
         "prim_loftedpolygon": _LOFTED,
         "prim_extrudedpolygon": _EXTRUDED,
@@ -319,9 +346,35 @@ def supported_nodes() -> dict[str, tuple[str, ...]]:
         "primitives": tuple(
             sorted([*_PRIMITIVES, "ExtrudedPolygon", "RevolvedPolygon", "LoftedPolygon"])
         ),
-        "transforms": tuple(sorted([*_TRANSFORMS, "Rotate", "LinearPattern", "PolarPattern"])),
+        "transforms": tuple(
+            sorted(
+                [
+                    *_TRANSFORMS,
+                    "Rotate",
+                    "Mirror",
+                    "Shell",
+                    "Offset",
+                    "LinearPattern",
+                    "PolarPattern",
+                ]
+            )
+        ),
         "booleans": tuple(sorted(_BOOLEANS)),
     }
+
+
+def _free_name(node: Any, name: str) -> str | None:
+    """The declared name of *node*'s parameter, when it is a free one.
+
+    Only free parameters get a slot, and for the same reason the traced
+    backend gives only them one: a value the GPU's compiler cannot fold is a
+    value it cannot optimise around, and folding is what makes these fields
+    affordable at all (`compile_scene_with_uniforms` has the 31x).
+    """
+    parameter = node.params.get(name)
+    if getattr(parameter, "free", False) and getattr(parameter, "name", None):
+        return str(parameter.name)
+    return None
 
 
 def _value(node: Any, name: str) -> np.ndarray:
@@ -350,7 +403,10 @@ class _Emitter:
     `vmap` would give it.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, uniforms: bool = False) -> None:
+        self.uniforms = uniforms
+        self.slots: list[tuple[str, int, list[float]]] = []
+        self._slot_of: dict[str, int] = {}
         self.functions: list[str] = []
         self._kernels: set[str] = set()
         self._nodes: dict[int, str] = {}
@@ -362,7 +418,14 @@ class _Emitter:
         return self._vertex_slice(node, "v")
 
     def _vertex_slice(self, node: Any, prefix: str) -> tuple[int, int]:
-        """Append the `prefix0..prefixN-1` vertex loop, returning its slice."""
+        """Append the `prefix0..prefixN-1` vertex loop, returning its slice.
+
+        In the uniform form the vertices are *slots*, not a separate constant
+        array — a sketch vertex is a named free parameter and the whole point
+        of the buffer is that dragging one is a write. That makes the profile
+        loop index the same array every other parameter lives in, so a
+        profile's offset is a slot index rather than a vertex index.
+        """
         names = sorted(
             (
                 name
@@ -371,11 +434,45 @@ class _Emitter:
             ),
             key=lambda name: int(name[len(prefix) :]),
         )
+        if self.uniforms:
+            first = None
+            for name in names:
+                declared = _free_name(node, name)
+                values = _value(node, name)
+                # A fixed vertex still needs a slot: the loop reads them all
+                # from one contiguous run, so it cannot skip over literals.
+                key = declared or f"{id(node):x}.{name}"
+                if key not in self._slot_of:
+                    self._slot_of[key] = len(self.slots)
+                    self.slots.append((key, 2, [float(values[0]), float(values[1])]))
+                index = self._slot_of[key]
+                if first is None:
+                    first = index
+            return (first or 0), len(names)
         offset = len(self.vertices)
         for name in names:
             x, y = _value(node, name)[:2]
             self.vertices.append((float(x), float(y)))
         return offset, len(names)
+
+    def read(self, node: Any, name: str, arity: int) -> str:
+        """A WGSL expression for one parameter: a buffer read, or a literal.
+
+        A free parameter shared by several nodes gets one slot, keyed by its
+        declared name, so editing it moves every use — which is what makes it
+        one design variable rather than several.
+        """
+        values = _value(node, name)
+        if not self.uniforms:
+            return _literal(values, arity)
+        declared = _free_name(node, name)
+        if declared is None:
+            return _literal(values, arity)
+        if declared not in self._slot_of:
+            self._slot_of[declared] = len(self.slots)
+            self.slots.append((declared, arity, [float(v) for v in values[:arity]]))
+        index = self._slot_of[declared]
+        return f"sdf_parameters.values[{index}].{'xyzw'[:arity]}"
 
     def _need(self, *symbols: str) -> None:
         """Emit a shared kernel body once per module."""
@@ -462,9 +559,7 @@ class _Emitter:
         colour = np.asarray(values["color"], dtype=np.float64).reshape(-1)
         row0 = [colour[0], colour[1], colour[2], float(np.asarray(values["roughness"]))]
         row1 = [float(np.asarray(values[key])) for key in _OPTICS_KEYS]
-        columns = ", ".join(
-            f"vec2<f32>({row0[i]:.9g}, {row1[i]:.9g})" for i in range(4)
-        )
+        columns = ", ".join(f"vec2<f32>({row0[i]:.9g}, {row1[i]:.9g})" for i in range(4))
         return f"    return mat4x2<f32>({columns});"
 
     def _moved_point(self, node: Any, name: str) -> str:
@@ -488,9 +583,11 @@ class _Emitter:
             normal = _literal(_value(node, "normal"), 3)
             return f"p - 2.0 * dot(p - {origin}, {normal}) * {normal}"
         names, arity, template = _TRANSFORMS[name]
-        bindings = {
-            parameter: _literal(_value(node, parameter), arity[parameter]) for parameter in names
-        }
+        # Through `read`, not `_literal`: the material walk moves the query
+        # by the same transform the distance walk does, so a free offset must
+        # resolve to the same slot in both or the module stops being
+        # byte-identical across edits — which is the whole point of the form.
+        bindings = {parameter: self.read(node, parameter, arity[parameter]) for parameter in names}
         return template.format(p="p", **bindings)
 
     def _body(self, node: Any) -> str:
@@ -500,8 +597,7 @@ class _Emitter:
             kernel = _PRIMITIVES[name]
             self._need(f"prim_{name.lower()}")
             arguments = ", ".join(
-                _literal(_value(node, parameter), kernel.arity[parameter])
-                for parameter in kernel.params
+                self.read(node, parameter, kernel.arity[parameter]) for parameter in kernel.params
             )
             return f"    return prim_{name.lower()}(p, {arguments});"
 
@@ -547,8 +643,7 @@ class _Emitter:
         if name in _TRANSFORMS:
             names, arity, template = _TRANSFORMS[name]
             bindings = {
-                parameter: _literal(_value(node, parameter), arity[parameter])
-                for parameter in names
+                parameter: self.read(node, parameter, arity[parameter]) for parameter in names
             }
             child = self.function_for(node.sdf)
             moved = template.format(p="p", **bindings)
@@ -566,35 +661,37 @@ class _Emitter:
 
     def _profile_body(self, node: Any, name: str) -> str:
         if name == "ExtrudedPolygon":
-            # Draft and twist bend the walls; guessing a kernel for them is
-            # exactly the silent divergence this backend must not introduce.
-            # Twist rotates the query by an angle that varies with z, which
-            # makes the field non-1-Lipschitz; it has no kernel yet and is
-            # refused rather than approximated. Draft only tapers the walls,
-            # which is one extra term.
-            if "twist" in node.params:
-                raise UnsupportedNode("ExtrudedPolygon with 'twist' has no direct kernel yet.")
-            self._need("profile_distance", "prim_extrudedpolygon")
+            # Draft tapers the walls and twist rotates the query by an angle
+            # varying with z. Both are one extra term in the kernel, and both
+            # fold to zero for a plain extrusion exactly as the Python skips
+            # them for a static zero.
+            self._need("profile_vertex", "profile_distance", "prim_extrudedpolygon")
             offset, count = self.profile_slice(node)
-            depth = _literal(_value(node, "depth"), 1)
+            depth = self.read(node, "depth", 1)
             slope = 0.0
             if "draft" in node.params:
                 draft = math.radians(float(_value(node, "draft")[0]))
                 slope = math.sin(draft) / math.cos(draft)
-            return f"    return prim_extrudedpolygon(p, {offset}u, {count}u, {depth}, {slope:.9g});"
+            twist = 0.0
+            if "twist" in node.params:
+                twist = math.radians(float(_value(node, "twist")[0]))
+            return (
+                f"    return prim_extrudedpolygon("
+                f"p, {offset}u, {count}u, {depth}, {slope:.9g}, {twist:.9g});"
+            )
         if name == "LoftedPolygon":
-            self._need("profile_distance_lerped", "prim_loftedpolygon")
+            self._need("profile_vertex", "profile_distance_lerped", "prim_loftedpolygon")
             # Two loops of equal length: v0..v{N-1} then w0..w{N-1}, appended
             # back to back so the kernel indexes both from one buffer.
             a, count_a = self._vertex_slice(node, "v")
             b, count_b = self._vertex_slice(node, "w")
             if count_a != count_b:
                 raise UnsupportedNode("A loft needs both profiles to have the same vertex count.")
-            height = _literal(_value(node, "height"), 1)
+            height = self.read(node, "height", 1)
             return f"    return prim_loftedpolygon(p, {a}u, {b}u, {count_a}u, {height});"
-        self._need("profile_distance", "prim_revolvedpolygon")
+        self._need("profile_vertex", "profile_distance", "prim_revolvedpolygon")
         offset, count = self.profile_slice(node)
-        radial_offset = _literal(_value(node, "offset"), 1)
+        radial_offset = self.read(node, "offset", 1)
         return f"    return prim_revolvedpolygon(p, {offset}u, {count}u, {radial_offset});"
 
     def _pattern_body(self, node: Any, name: str) -> str:
@@ -661,12 +758,19 @@ def _unique_lets(lines: list[str]) -> list[str]:
     return out
 
 
-def compile_sdf_direct(geometry: Any, *, entry_point: str = "sdf") -> DirectProgram:
+def compile_sdf_direct(
+    geometry: Any, *, entry_point: str = "sdf", uniforms: bool = False
+) -> DirectProgram:
     """Emit WGSL for *geometry* by walking it, with no JAX in the path.
 
     Args:
         geometry: Root SDF node.
         entry_point: Name for the generated `point -> f32` function.
+        uniforms: Read the free parameters from a uniform buffer instead of
+            baking them in, so editing one is a buffer write and a redraw
+            rather than a new module. The module is then byte-identical for
+            every value of every free parameter, which is what lets a handle
+            drag run at frame rate.
 
     Returns:
         A :class:`DirectProgram`: the module, and the profile vertices its
@@ -675,7 +779,7 @@ def compile_sdf_direct(geometry: Any, *, entry_point: str = "sdf") -> DirectProg
     Raises:
         UnsupportedNode: For a node kind this backend has no kernel for.
     """
-    emitter = _Emitter()
+    emitter = _Emitter(uniforms=uniforms)
     root = emitter.function_for(geometry)
     material_root = emitter.material_for(geometry)
     entry = "\n\n".join(
@@ -689,9 +793,46 @@ def compile_sdf_direct(geometry: Any, *, entry_point: str = "sdf") -> DirectProg
         ]
     )
     sections = list(emitter.functions)
-    if emitter.vertices:
+    if uniforms:
+        # The vertices live in the parameter buffer here, so the accessor
+        # reads that instead of a storage array, and there is no second one.
+        sections = [
+            _PROFILE_FROM_UNIFORM if part is _PROFILE_FROM_BUFFER else part for part in sections
+        ]
+        sections.insert(0, _uniform_block(emitter.slots))
+    elif emitter.vertices:
         sections.insert(0, _PROFILE_BUFFER)
     return DirectProgram(
         wgsl="\n\n".join([*sections, entry]),
         vertices=np.asarray(emitter.vertices, dtype=np.float32).reshape(-1, 2),
+        parameters=tuple(emitter.slots),
     )
+
+
+def _uniform_block(slots: list[tuple[str, int, list[float]]]) -> str:
+    """The uniform declaration the generated functions read from.
+
+    The same shape `codegen._uniform_block` emits — one `vec4<f32>` slot per
+    parameter, which is the only element type a WGSL uniform array carries
+    without per-field alignment rules — so the frontend's buffer writer needs
+    to know nothing about which backend produced the module.
+    """
+    lines = [f"// {len(slots)} free parameters, one vec4<f32> slot each."]
+    for index, (name, components, _values) in enumerate(slots):
+        lines.append(f"// {index * PARAMETER_SLOT_BYTES:6d}  {components}f  free   {name}")
+    # The two reserved slots the traced form ends with are declared but never
+    # read here: this module spells no NaN constant and does no bounds
+    # culling. They exist so the buffer layout is the one contract the
+    # frontend already writes, rather than a second one it has to learn.
+    lines.append(f"// {len(slots) * PARAMETER_SLOT_BYTES:6d}  1f  reserved  NaN (unread)")
+    lines.append(
+        f"// {(len(slots) + 1) * PARAMETER_SLOT_BYTES:6d}  1f  reserved  cull margin (unread)"
+    )
+    lines.append("struct SdfParameters {")
+    lines.append(f"    values: array<vec4<f32>, {len(slots) + RESERVED_PARAMETER_SLOTS}>,")
+    lines.append("};")
+    lines.append(
+        f"@group({DEFAULT_PARAMETER_GROUP}) @binding({DEFAULT_PARAMETER_BINDING}) "
+        "var<uniform> sdf_parameters: SdfParameters;"
+    )
+    return "\n".join(lines)

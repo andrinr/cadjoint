@@ -190,7 +190,11 @@ class TestEachSceneWarmsWhenItIsOpened:
         assert load_scene({"name": "widget.py"})["ok"], "a second open must not warm again"
         for thread in threads:
             thread.join(timeout=60)
-        assert [source for source, _mode, _timeout in recorded] == ["scene = None  # widget\n"] * 2
+        assert [source for source, _mode, _timeout in recorded] == ["scene = None  # widget\n"]
+        # The mesh alone. Warming `compile` here would not precede the real
+        # request but race it: the client compiles this very source the
+        # moment it has it, so both would build the same program at once.
+        assert [mode for _source, mode, _timeout in recorded] == ["mesh"]
 
     def test_warming_is_per_program_not_per_process(self, unwarmed, recorded, monkeypatch):
         monkeypatch.setenv(WARM_START_ENV, "1")

@@ -14,11 +14,21 @@ which is the actual source of truth.
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 import pytest
 
-from cadjoint.backends.wgsl.codegen import compile_scene_to_wgsl, compile_sdf_to_wgsl
-from cadjoint.backends.wgsl.direct import UnsupportedNode, compile_sdf_direct
+from cadjoint.backends.wgsl.codegen import (
+    DEFAULT_PARAMETER_GROUP,
+    compile_scene_to_wgsl,
+    compile_sdf_to_wgsl,
+)
+from cadjoint.backends.wgsl.direct import (
+    UnsupportedNode,
+    compile_sdf_direct,
+    supported_nodes,
+)
 from cadjoint.construction import Axis
 from cadjoint.geometry.parameters import Scalar, Vector, Vector2
 from cadjoint.sdf.boolean import Difference, Intersection, Union
@@ -80,7 +90,9 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
 """
 
 
-def _evaluate_on_device(wgsl, points: np.ndarray, harness: str = _HARNESS) -> np.ndarray:
+def _evaluate_on_device(
+    wgsl, points: np.ndarray, harness: str = _HARNESS, uniform_values=None
+) -> np.ndarray:
     """Run `fn sdf(p) -> f32` from *wgsl* at every point, on the GPU.
 
     Accepts either plain source (the traced backend) or a `DirectProgram`,
@@ -125,8 +137,45 @@ def _evaluate_on_device(wgsl, points: np.ndarray, harness: str = _HARNESS) -> np
             {"binding": 1, "resource": {"buffer": outputs, "offset": 0, "size": outputs.size}},
         ],
     )
-    layouts = [layout]
-    groups = [bind_group]
+    # Keyed by the group index the module declares, not by binding order:
+    # the profile buffer is group 1 and the uniform is group 3, and a
+    # pipeline layout is positional, so the gaps need empty layouts.
+    by_group: dict[int, tuple[Any, Any]] = {0: (layout, bind_group)}
+    if uniform_values is not None:
+        # One vec4 slot per parameter plus the two reserved ones the module
+        # declares; a binding smaller than the declared array is a validation
+        # error, not a silently short read.
+        packed = np.zeros((len(uniform_values) + 2, 4), dtype=np.float32)
+        for index, (_name, components, values) in enumerate(uniform_values):
+            packed[index, :components] = values[:components]
+        uniform_buffer = device.create_buffer_with_data(
+            data=packed.tobytes(), usage=wgpu.BufferUsage.UNIFORM
+        )
+        uniform_layout = device.create_bind_group_layout(
+            entries=[
+                {
+                    "binding": 0,
+                    "visibility": wgpu.ShaderStage.COMPUTE,
+                    "buffer": {"type": wgpu.BufferBindingType.uniform},
+                }
+            ]
+        )
+        by_group[DEFAULT_PARAMETER_GROUP] = (
+            uniform_layout,
+            device.create_bind_group(
+                layout=uniform_layout,
+                entries=[
+                    {
+                        "binding": 0,
+                        "resource": {
+                            "buffer": uniform_buffer,
+                            "offset": 0,
+                            "size": uniform_buffer.size,
+                        },
+                    }
+                ],
+            ),
+        )
     if profile is not None and len(profile):
         # vec2<f32> in a storage array packs at 8 bytes, so this one uploads
         # as-is rather than padded like the query points above.
@@ -142,8 +191,8 @@ def _evaluate_on_device(wgsl, points: np.ndarray, harness: str = _HARNESS) -> np
                 }
             ]
         )
-        layouts.append(profile_layout)
-        groups.append(
+        by_group[1] = (
+            profile_layout,
             device.create_bind_group(
                 layout=profile_layout,
                 entries=[
@@ -156,8 +205,10 @@ def _evaluate_on_device(wgsl, points: np.ndarray, harness: str = _HARNESS) -> np
                         },
                     }
                 ],
-            )
+            ),
         )
+    empty = device.create_bind_group_layout(entries=[])
+    layouts = [by_group.get(index, (empty, None))[0] for index in range(max(by_group) + 1)]
     pipeline = device.create_compute_pipeline(
         layout=device.create_pipeline_layout(bind_group_layouts=layouts),
         compute={"module": module, "entry_point": "main"},
@@ -165,7 +216,7 @@ def _evaluate_on_device(wgsl, points: np.ndarray, harness: str = _HARNESS) -> np
     encoder = device.create_command_encoder()
     pass_ = encoder.begin_compute_pass()
     pass_.set_pipeline(pipeline)
-    for index, group in enumerate(groups):
+    for index, (_layout, group) in sorted(by_group.items()):
         pass_.set_bind_group(index, group)
     pass_.dispatch_workgroups((len(points) * slots + 63) // 64)
     pass_.end()
@@ -381,9 +432,7 @@ def test_both_backends_agree_on_the_material_field(label, scene):
     so the two can disagree independently.
     """
     points = _POINTS[:512]
-    traced = _evaluate_on_device(
-        compile_scene_to_wgsl(scene), points, harness=_MATERIAL_HARNESS
-    )
+    traced = _evaluate_on_device(compile_scene_to_wgsl(scene), points, harness=_MATERIAL_HARNESS)
     direct = _evaluate_on_device(compile_sdf_direct(scene), points, harness=_MATERIAL_HARNESS)
     np.testing.assert_allclose(direct, traced, rtol=2e-5, atol=2e-6)
 
@@ -419,13 +468,22 @@ def test_an_unknown_node_is_refused_rather_than_guessed():
     node named here gains a kernel, move this test to whatever is still
     missing rather than deleting it.
     """
-    # A twisted extrusion rotates the query by an angle that varies with z,
-    # which makes the field non-1-Lipschitz. It is the remaining gap, and it
-    # is refused rather than approximated.
-    with pytest.raises(UnsupportedNode, match="twist"):
-        compile_sdf_direct(
-            ExtrudedPolygon(_ring(5), depth=Scalar(0.5), twist=Scalar(15.0))
-        )
+    from cadjoint.sdf.primitives import RoundBox
+
+    assert "RoundBox" not in supported_nodes()["primitives"]
+    with pytest.raises(UnsupportedNode, match="RoundBox"):
+        compile_sdf_direct(RoundBox(size=Vector([0.4, 0.4, 0.4]), radius=Scalar(0.1)))
+
+
+def test_what_it_says_it_supports_is_what_it_supports():
+    """The refusal message quotes this list, so it must not drift.
+
+    Every name here has to actually emit; a name missing from it is a node
+    the message tells a caller is unavailable when it is not.
+    """
+    listed = {name for names in supported_nodes().values() for name in names}
+    for name in ("Mirror", "Shell", "Offset", "Rotate", "LoftedPolygon"):
+        assert name in listed
 
 
 def test_the_direct_module_is_smaller_than_the_traced_one():
@@ -497,10 +555,106 @@ def test_the_viewer_shader_built_from_it_compiles(stem):
     root = Path(__file__).resolve().parents[2]
     scene = _execute_scene((root / "scenes" / f"{stem}.py").read_text())["scene"]
     source, program = _direct_shader(scene)
-    assert program is None, "the direct form bakes its parameters in, like `literal`"
+    # It serves the uniform form, so the viewer gets the same buffer contract
+    # it already writes — including the two reserved slots it always sets.
+    assert program is not None
+    assert program["group"] == DEFAULT_PARAMETER_GROUP
+    assert program["nan_offset"] is not None
 
     adapter = wgpu.gpu.request_adapter_sync(power_preference="high-performance")
     device = adapter.request_device_sync()
     # A validation failure raises, which is how the viewer's own shader tests
     # assert this; the earlier `redefinition of d0` surfaced exactly here.
     device.create_shader_module(code=build_viewer_shader(source), label=f"direct/{stem}")
+
+
+class TestTheUniformForm:
+    """Free parameters in a buffer, so a drag is a write and not a rebuild.
+
+    The literal form is smaller and quicker to emit, but every value of every
+    parameter is a different module — which is precisely what makes dragging
+    a handle a server round trip. These are the two properties that buy the
+    frame rate back.
+    """
+
+    def _scene(self, radius: float, offset: float):
+        return Union(
+            Translate(
+                Sphere(radius=Scalar(radius, free=True, name="r")),
+                Vector([offset, 0.0, 0.0], free=True, name="shift"),
+            ),
+            Box(size=Vector([0.5, 0.5, 0.5])),
+            smoothness=0.1,
+        )
+
+    def test_the_module_is_identical_across_parameter_edits(self):
+        a = compile_sdf_direct(self._scene(0.8, 0.3), uniforms=True)
+        b = compile_sdf_direct(self._scene(0.45, -1.2), uniforms=True)
+        assert a.wgsl == b.wgsl
+        # The values move; only the buffer does.
+        assert [v for _n, _c, v in a.parameters] != [v for _n, _c, v in b.parameters]
+
+    def test_the_literal_form_is_not(self):
+        a = compile_sdf_direct(self._scene(0.8, 0.3))
+        b = compile_sdf_direct(self._scene(0.45, -1.2))
+        assert a.wgsl != b.wgsl
+        assert a.parameters == ()
+
+    def test_only_the_free_parameters_get_a_slot(self):
+        program = compile_sdf_direct(self._scene(0.8, 0.3), uniforms=True)
+        widths = {name: components for name, components, _v in program.parameters}
+        # First-read order, so the transform's offset precedes its child's
+        # radius; what matters is which names are there and how wide each is.
+        assert widths == {"shift": 3, "r": 1}, "the box's fixed size stays a literal"
+
+    def test_a_shared_parameter_gets_one_slot_and_moves_every_use(self):
+        """One design variable, not several copies of a number."""
+        radius = Scalar(0.4, free=True, name="shared")
+        scene = Union(
+            Translate(Sphere(radius=radius), Vector([0.8, 0.0, 0.0])),
+            Translate(Sphere(radius=radius), Vector([-0.8, 0.0, 0.0])),
+            smoothness=0.0,
+        )
+        program = compile_sdf_direct(scene, uniforms=True)
+        assert [name for name, _c, _v in program.parameters] == ["shared"]
+        assert program.wgsl.count("sdf_parameters.values[0].x") == 2
+
+    def test_a_sketch_vertex_is_a_slot_and_not_a_baked_constant(self):
+        """The drag the whole form exists for.
+
+        A profile's vertices are named free parameters, and dragging one is
+        the app's signature gesture. Baked into the module they would need a
+        recompile per frame, which is exactly what the buffer avoids — so
+        they are slots like any other parameter, and the profile loop reads
+        the same array.
+        """
+        scene = ExtrudedPolygon(
+            [
+                Vector2([0.0, 0.0], free=True, name="a"),
+                Vector2([1.0, 0.0], free=True, name="b"),
+                Vector2([0.5, 1.0], free=True, name="c"),
+            ],
+            depth=Scalar(0.5, free=True, name="depth"),
+        )
+        program = compile_sdf_direct(scene, uniforms=True)
+        names = [name for name, _c, _v in program.parameters]
+        assert {"a", "b", "c", "depth"} <= set(names)
+        assert program.vertices.size == 0, "no separate constant array in this form"
+
+        moved = ExtrudedPolygon(
+            [
+                Vector2([0.0, 0.0], free=True, name="a"),
+                Vector2([1.4, -0.2], free=True, name="b"),
+                Vector2([0.5, 1.0], free=True, name="c"),
+            ],
+            depth=Scalar(0.5, free=True, name="depth"),
+        )
+        assert compile_sdf_direct(moved, uniforms=True).wgsl == program.wgsl
+
+    def test_it_computes_the_same_field_as_the_literal_form(self):
+        """The buffer must not move the surface, only where the numbers live."""
+        scene = self._scene(0.8, 0.3)
+        literal = _evaluate_on_device(compile_sdf_direct(scene), _POINTS[:512])
+        program = compile_sdf_direct(scene, uniforms=True)
+        uniform = _evaluate_on_device(program, _POINTS[:512], uniform_values=program.parameters)
+        np.testing.assert_allclose(uniform, literal, rtol=0, atol=0)

@@ -204,16 +204,25 @@ def warm_scene(source: str) -> bool:
     is the same background priming, addressed at the program in front of
     the user, and it is a no-op for one already warmed in this process.
 
+    Only the *mesh* is primed, deliberately.  The startup warm-up covers
+    both modes because it runs before anyone has asked for anything; this
+    one fires the moment a scene is opened, and the client compiles that
+    same source immediately after.  Warming ``compile`` here therefore does
+    not precede the real request, it *races* it — two workers building the
+    same program at once, which on ``scenes/end_cap.py`` is two 14-second
+    compiles for one scene switch.  The mesh is still worth priming: nobody
+    has asked for the feature-edge overlay yet.
+
     Args:
         source: The program that was opened.
 
     Returns:
         Whether a warm-up thread was started.
     """
-    return _warm(source)
+    return _warm(source, modes=("mesh",))
 
 
-def _warm(source: str) -> bool:
+def _warm(source: str, modes: tuple[str, ...] = ("compile", "mesh")) -> bool:
     """Prime one program on a daemon thread, at most once per process."""
     if not _warm_start_enabled():
         return False
@@ -228,7 +237,7 @@ def _warm(source: str) -> bool:
         # All under the mesh budget, not their own: the point of the warm-up
         # is the cold path, where even `compile` can outgrow the edit
         # round-trip budget it is held to in a request.
-        for mode in ("compile", "mesh"):
+        for mode in modes:
             try:
                 # Registered as `warmup` jobs so the process monitor can
                 # say why workers are burning CPU right after launch, and
