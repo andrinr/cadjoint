@@ -154,8 +154,8 @@ def _cases() -> list:
 def _shipped_scenes() -> list:
     """Every scene the playground ships, executed the way the worker does."""
     from cadjoint.fem.simmesh import capture_sim_meshes
-    from cadjoint.fem.study import capture_studies
     from cadjoint.optimize import capture_optimizations
+    from cadjoint.studies import capture_studies
 
     found = []
     for path in sorted(SCENES.glob("*.py")):

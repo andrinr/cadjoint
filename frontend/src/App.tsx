@@ -11,13 +11,14 @@
  * `windows/`, not to this file.
  */
 
-import { createMemo, createEffect, createSignal, onMount, Show } from "solid-js";
+import { createMemo, createEffect, createSignal, on, onMount, Show } from "solid-js";
 import * as api from "./api";
 import { EditorPane } from "./components/EditorPane";
 import { MaterialPanel } from "./components/MaterialPanel";
 import { MenuBar } from "./components/MenuBar";
 import { ObjectTree } from "./components/ObjectTree";
 import { OptimizePanel } from "./components/OptimizePanel";
+import { PropertiesPanel } from "./components/PropertiesPanel";
 import { ScenesPanel } from "./components/ScenesPanel";
 import {
   MeshesWindow,
@@ -42,7 +43,10 @@ import { referenceFor, type FaceTarget } from "./faces";
 import {
   cameraAngles,
   editingMode,
+  elementById,
   gizmoMode,
+  inspected,
+  setInspected,
   reactToSelectionForMode,
   setCameraAngles,
   nodeById,
@@ -76,6 +80,7 @@ declare global {
       overrides: Record<string, readonly number[]> | null,
     ) => boolean;
     __cadjointBindings?: () => HandleBinding[];
+    __cadjointCamera?: () => { yaw: number; pitch: number };
   }
 }
 
@@ -93,6 +98,8 @@ export function App() {
   // path a handle drag uses, which is the thing that claim is about.
   if (typeof window !== "undefined") {
     window.__cadjointShaders = () => renderer.shaderStats;
+    // Where the camera is, so a recording can turn it by a known angle.
+    window.__cadjointCamera = () => cameraAngles();
     window.__cadjointSetParameters = (overrides) =>
       renderer.setParameterOverrides(overrides);
     // The same classification the overlay draws each handle with, published
@@ -172,10 +179,19 @@ export function App() {
     reactToSelectionForMode();
   });
 
+  // Pointing the properties window at an element is one gesture; picking a
+  // node is another, and the later one wins: a fresh selection ends the
+  // inspection so the window follows the viewport again.
+  createEffect(on(selection, () => setInspected(null), { defer: true }));
+
   /** Character span of the selected vertex's literal, for the editor. */
   // A vertex reveals its own literal; a whole object reveals the statement
-  // that declares it. The rule itself lives in `editorFocus.ts`.
+  // that declares it. The rule itself lives in `editorFocus.ts`. An inspected
+  // element (an extrusion, a boolean) reveals its own call.
   const highlight = createMemo(() => {
+    const pointed = inspected();
+    const element = pointed ? elementById(pointed) : undefined;
+    if (element) return { from: element.span[0], to: element.span[1], precise: false };
     const active = selection();
     return active ? focusSpan(nodeById(active.nodeId), active.vertexIndex) : null;
   });
@@ -288,6 +304,16 @@ export function App() {
 
       case "objects":
         return <ObjectTree />;
+
+      // The selection's arguments, each wired to the address the compile
+      // payload published for it; nothing here composes a request itself.
+      case "properties":
+        return (
+          <PropertiesPanel
+            onSetValue={ops.setValueAt}
+            onAssignMaterial={ops.assignMaterialAt}
+          />
+        );
 
       case "materials":
         return (

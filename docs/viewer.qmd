@@ -378,10 +378,21 @@ success is the file itself with `Content-Disposition` and the job id in
 Each run follows the same path as the shader backend:
 
 1. The local server evaluates the Python in a child process and reads `scene`.
-2. JAX traces distance and material evaluation and lowers both to StableHLO.
-3. cadjoint emits WGSL `sdf`, `material_base`, and `material_optics` functions.
-4. The browser embeds those in the preview or path-tracing runtime and builds
+2. cadjoint walks the SDF graph and writes WGSL `sdf`, `material_base` and
+   `material_optics` from it directly.
+3. The browser embeds those in the preview or path-tracing runtime and builds
    the WebGPU pipelines.
+
+Step 2 used to go through JAX: trace the scene, export it to StableHLO, walk
+that text. XLA never produced an executable on that path — it was a tracer —
+and the round trip was most of a compile. Walking the graph instead takes
+`scenes/motor_shield.py` from 10.5 s to 1.6 s, and the module it writes is
+smaller by an order of magnitude, because a profile's vertices are buffer
+slots rather than unrolled code and a pattern is a loop rather than N copies.
+The traced backend is still there and still tested against this one on a real
+device, point for point; `CADJOINT_SHADER_FORM=traced` selects it. A scene
+using a shape the direct backend has no kernel for falls back to it
+automatically and says so.
 
 The code icon shows the complete generated WGSL. Python tracebacks and WGSL
 compiler errors appear under the editor.
@@ -393,12 +404,14 @@ worker turns on JAX's **persistent compilation cache** under
 `CADJOINT_NO_COMPILATION_CACHE=1` to opt out), so a program compiled once is
 reused by every later process; and the scene is traced with its parameter
 values as *arguments* rather than literals, so a re-dimensioned design lowers
-to the same program and hits that cache. Measured on the starter scene, a
-compile fell from 2.1 s to 1.0 s and a mesh overlay from 12.2 s to 5.8 s
-warm. The server warms the cache for every shipped scene at start — those are
-the `warmup` jobs in the Processes window — so the first overlay you ask for
-does not pay the cold cliff. The FEM paths gain nothing from it: a jax-fem
-solve runs in PETSc, outside XLA. See
+to the same program and hits that cache. Measured on the starter scene
+(`benchmarks/jax_compile_profile.py`, cold cache against warm): a compile
+2.1 s → 1.1 s, a mesh overlay 12.7 s → 5.9 s, a mesh inspection 6.9 s → 1.9 s,
+a solve 14.3 s → 3.1 s. The server warms the cache for the scene it opens at
+start — the `warmup` job in the Processes window — so the first overlay you
+ask for does not pay the cold cliff. The linear solve itself runs in PETSc,
+outside XLA, but the assembly around it is hundreds of small XLA programs, and
+those are what the cache saves on a solve. See
 [program size](meshing.qmd#program-size) and the
 [performance notes](../research/performance.md).
 

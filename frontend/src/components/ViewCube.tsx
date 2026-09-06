@@ -318,8 +318,10 @@ export function ViewCube(props: ViewCubeProps) {
         {/* The world axes, above the cube on the left, turning with it. The
             two readouts sit over the cube rather than under it: they are how
             you read the view, and the eye meets them on the way to the cube
-            instead of after leaving it. */}
-        <g class="cube-triad" transform={`translate(${-EXTENT + 20} ${-EXTENT + 20})`}>
+            instead of after leaving it. The origin sits far enough inside
+            the stage that an axis label (32 units out at most) never leaves
+            it: at 20 the labels ran into the viewport's corner. */}
+        <g class="cube-triad" transform={`translate(${-EXTENT + 36} ${-EXTENT + 36})`}>
           <For each={TRIAD}>
             {(entry) => {
               const tip = (): [number, number] => {

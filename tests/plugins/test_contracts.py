@@ -161,7 +161,7 @@ class TestAProviderSatisfiesEveryContract:
 
         The registry ships ``local`` specs for the Tesseract packages in
         this checkout and nothing else; the private tier is discovered, never
-        bundled (``research/two-tier.md`` §5 step 4).
+        bundled.
         """
         from cadjoint.plugins import builtin_specs
 

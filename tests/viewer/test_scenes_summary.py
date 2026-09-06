@@ -23,7 +23,6 @@ from pathlib import Path
 import pytest
 
 from cadjoint.extraction import extract_parameters
-from cadjoint.viewer._compile_worker import _compile_source
 from cadjoint.viewer._scenes import (
     MAX_SUMMARY_CHARS,
     SCENES_DIR_ENV,
@@ -34,7 +33,8 @@ from cadjoint.viewer._scenes import (
     scenes_root,
     summarize_scene,
 )
-from cadjoint.viewer._worker_scene import _execute_scene
+from cadjoint.viewer.worker.main import _compile_source
+from cadjoint.viewer.worker.scene import _execute_scene
 
 SCENES = Path(__file__).resolve().parents[2] / "scenes"
 SHIPPED = ["starter.py", "bracket.py", "end_cap.py"]

@@ -531,16 +531,41 @@ class FrozenDCChain:
         """The DC surface vertices at ``field``, as a traced ``(V, 3)`` array."""
         return self._extract(field)
 
+    def metric_from_surface(self, vertices: Any, metric: str) -> Any:
+        """The study metric from DC surface vertices — the tesseract half.
+
+        The other half of :meth:`metric_value`, split from :meth:`dc_surface`
+        so a caller can compile the two separately.  Everything expensive and
+        *pure* is in :meth:`dc_surface`; everything here crosses a plugin
+        boundary, which under ``tesseract-jax`` lowers to a host callback.
+        XLA bakes a host callback into the module it appears in and JAX then
+        refuses to write that module to the persistent compilation cache
+        (``jax/_src/compiler.py::_cache_write``), so a ``jax.jit`` spanning
+        both halves is uncacheable in its entirety — including the megabytes
+        of dual contouring that have nothing to do with the plugin.  Keeping
+        the halves in separate programs is what lets the expensive one be
+        cached.  See ``research/performance.md`` §15.
+
+        Args:
+            vertices: The DC surface vertices, as :meth:`dc_surface` returns.
+            metric: ``"mean"``, ``"max"``, or ``"compliance"``.
+        """
+        points, solved = self._solve(vertices)
+        return _metric_scalar(self.study, self.mesh, self._kind, metric, points, solved)
+
     def metric_value(self, field: Callable[[Any], Any], metric: str) -> Any:
         """The study metric as a traced JAX scalar of the design field.
+
+        The composition of :meth:`dc_surface` and :meth:`metric_from_surface`;
+        the optimizer calls those two separately so it can compile the pure
+        half on its own.
 
         Args:
             field: The (possibly traced) SDF callable at the current
                 design — a callable on ``(3,)`` points.
             metric: ``"mean"``, ``"max"``, or ``"compliance"``.
         """
-        points, solved = self._solve(self._extract(field))
-        return _metric_scalar(self.study, self.mesh, self._kind, metric, points, solved)
+        return self.metric_from_surface(self.dc_surface(field), metric)
 
 
 def _freeze_dc_surface(

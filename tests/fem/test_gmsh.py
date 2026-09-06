@@ -1,7 +1,7 @@
 """The public Gmsh route: DC surface in, tet10 out, every node tagged.
 
 The private tier owns the map from a design to node *positions*; what is
-public is the mesher and the *tag* (``research/two-tier.md`` §1.2, D4, D7).
+public is the mesher and the *tag*.
 Four claims are worth a test and the rest is plumbing.
 
 **A triangle soup becomes a part.**  Gmsh has to be handed a solid whose
@@ -579,8 +579,7 @@ class TestThePluginSlot:
         Gmsh is GPL-2.0-or-later and ``diff-brep`` is proprietary, so the
         one thing that must stay true by construction is that they never
         share a process: the ``cadjoint_tet_gmsh`` image is built from this
-        package alone, and this package names nothing private
-        (``research/two-tier.md`` §3.5).
+        package alone, and this package names nothing private.
         """
         from cadjoint.plugins.registry import BUILTIN_PACKAGES
 

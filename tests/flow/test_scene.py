@@ -81,7 +81,7 @@ class TestTheSceneCompiles:
 import jax
 assert jax.config.jax_enable_x64 is False, "x64 was on before the scene loaded"
 from cadjoint.backends.wgsl import compile_scene_to_wgsl
-from cadjoint.viewer._worker_scene import _execute_scene
+from cadjoint.viewer.worker.scene import _execute_scene
 namespace = _execute_scene(open("scenes/duct_sink.py").read())
 emitted = compile_scene_to_wgsl(namespace["scene"])
 shader = emitted[0] if isinstance(emitted, tuple) else emitted
@@ -104,7 +104,7 @@ print("OK", len(str(shader)), namespace["__studies__"][0].name)
         the others down with it in the same worker process."""
         script = f"""
 from cadjoint.backends.wgsl import compile_scene_to_wgsl
-from cadjoint.viewer._worker_scene import _execute_scene
+from cadjoint.viewer.worker.scene import _execute_scene
 namespace = _execute_scene(open("scenes/{name}").read())
 emitted = compile_scene_to_wgsl(namespace["scene"])
 shader = emitted[0] if isinstance(emitted, tuple) else emitted
@@ -128,7 +128,7 @@ print("OK")
         and the payload model's ``nodes`` is optional.
         """
         script = """
-from cadjoint.viewer._compile_worker import _compile_source
+from cadjoint.viewer.worker.main import _compile_source
 payload = _compile_source(open("scenes/duct_sink.py").read())
 assert payload["ok"] is True, payload
 assert len(payload["shader"]) > 1000, "no shader"
@@ -153,7 +153,7 @@ print("OK", len(payload["shader"]), types)
         script = """
 import jax
 import jax.numpy as jnp
-from cadjoint.viewer._worker_scene import _execute_scene
+from cadjoint.viewer.worker.scene import _execute_scene
 namespace = _execute_scene(open("scenes/duct_sink.py").read())
 study = namespace["__studies__"][0]
 before = jax.config.jax_enable_x64
@@ -177,8 +177,8 @@ class TestTheDeclarationSerializes:
     """
 
     def test_study_entries_serializes_a_flow_study(self):
-        from cadjoint.viewer._worker_declarations import _study_entries
-        from cadjoint.viewer._worker_scene import _execute_scene
+        from cadjoint.viewer.worker.declarations import _study_entries
+        from cadjoint.viewer.worker.scene import _execute_scene
 
         source = SCENE.read_text(encoding="utf-8")
         namespace = _execute_scene(source)
@@ -203,9 +203,9 @@ class TestTheDeclarationSerializes:
     def test_the_payload_model_accepts_it(self):
         """The compile worker validates against this model before sending,
         so a shape it rejects is a scene the viewer cannot open."""
-        from cadjoint.viewer._worker_declarations import _study_entries
-        from cadjoint.viewer._worker_scene import _execute_scene
         from cadjoint.viewer.schema.payloads import StudyPayload
+        from cadjoint.viewer.worker.declarations import _study_entries
+        from cadjoint.viewer.worker.scene import _execute_scene
 
         source = SCENE.read_text(encoding="utf-8")
         namespace = _execute_scene(source)

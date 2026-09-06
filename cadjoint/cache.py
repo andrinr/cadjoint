@@ -7,17 +7,24 @@ XLA compilation every time for programs that rarely change.
 
 JAX can persist compiled executables to disk, keyed by the lowered HLO
 plus the backend and JAX version, so a later process reuses them instead
-of recompiling.  Measured on the starter scene, worker end to end:
+of recompiling.  Measured on the starter scene, in-process per mode
+(``benchmarks/jax_compile_profile.py``, 2026-09-05):
 
-===============  ==========  ==========
-path             cold        warm
-===============  ==========  ==========
-``compile``      2.1 s       1.0 s
-``mesh``         12.2 s      5.9 s
-===============  ==========  ==========
+================  ==========  ==========  ==================
+mode              cold        warm        programs
+================  ==========  ==========  ==================
+``compile``       2.1 s       1.1 s       103
+``mesh``          12.7 s      5.9 s       455
+``mesh_inspect``  6.9 s       1.9 s       436
+``simulate``      14.3 s      3.1 s       790
+``optimize`` (2)  62.1 s      19.2 s      2068
+================  ==========  ==========  ==================
 
-The FEM paths gain nothing: jax-fem's solve runs in PETSc behind an
-adjoint wrapper rather than in XLA, so there is no executable to cache.
+Nearly every one of those programs is a single eager primitive; the cache
+turns the op-by-op cold cliff into sub-second cache reads.  What it cannot
+hold is a program with a host callback — the optimizer's jitted frozen
+objective calls its Tesseracts through one, so its ~5 s compile is paid by
+every process (``research/performance.md`` §15).
 """
 
 from __future__ import annotations

@@ -261,9 +261,9 @@ class TesseractBackend:
     ``backend="tesseract"`` is a documented, user-facing string.
 
     Args:
-        api_path: Legacy escape hatch — a ``tesseract_api.py`` to run
-            in-process as the thermal solver, bypassing the registry.
-            Equivalent to registering a ``local`` spec for it.
+        api_path: A ``tesseract_api.py`` to run in-process as the thermal
+            solver, bypassing the registry.  Equivalent to registering a
+            ``local`` spec for it.
         elastic_api_path: The same for the elastic solver.
         thermal: A plugin name (or a :class:`~cadjoint.plugins.Plugin`) to
             use as the thermal solver instead of whatever fills the kind.
@@ -335,10 +335,6 @@ class TesseractBackend:
                 plugin = plugin_for_kind(self._KINDS[stage])
             self._plugins[stage] = plugin
         return self._plugins[stage]
-
-    def _tesseract_for(self, stage: StudyKindLike):
-        """The raw Tesseract client behind ``stage`` (legacy accessor)."""
-        return self._plugin_for(stage).client
 
     def thermal(self, points, cells, bcs, *, conductivity, source, base_points=None):
         """See :meth:`SolverBackend.thermal`.
@@ -488,23 +484,6 @@ _REGISTRY: dict[str, Callable[[], SolverBackend]] = {
     FemBackend.TESSERACT.value: TesseractBackend,
     FemBackend.CALCULIX.value: _calculix_backend,
 }
-
-
-def __getattr__(name: str) -> Any:
-    """Resolve :class:`~cadjoint.fem.jaxfem.JaxFemBackend` for legacy importers.
-
-    ``JaxFemBackend`` was defined here before the solver formulations moved
-    to :mod:`cadjoint.fem.jaxfem`; the packaged tesseracts and downstream
-    code still import it from this module.  Serving it through PEP 562
-    keeps ``from cadjoint.fem.backends import JaxFemBackend`` working
-    without a module-level import back into the solver layer (which would
-    make the two modules circular).
-    """
-    if name == "JaxFemBackend":
-        from cadjoint.fem.jaxfem import JaxFemBackend
-
-        return JaxFemBackend
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def register_backend(name: str, factory: Callable[[], SolverBackend]) -> None:

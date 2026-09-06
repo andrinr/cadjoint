@@ -1,14 +1,14 @@
 """Thermal and structural simulation on SDF-extracted hex and tet meshes.
 
 What belongs here: the imperative entry points and the *patch resolution*
-between them and the solver ABI — turning a user's selection or predicate
-into the node index sets and exact face lists a backend consumes, and
-wrapping the returned field in a result object.  Public entry points
-:func:`thermal_solve` and :func:`elastic_solve` resolve boundary patches —
-:class:`~cadjoint.fem.selection.NodeSelection` values or legacy face
-predicates — against the mesh, hand array-level BCs to a pluggable solver
-backend (:mod:`cadjoint.fem.backends`; direct in-process jax-fem by
-default), and return small result objects with VTK export for ParaView.
+between them and the solver ABI — turning a user's selection into the
+node index sets and exact face lists a backend consumes, and wrapping the
+returned field in a result object.  Public entry points
+:func:`thermal_solve` and :func:`elastic_solve` resolve boundary patches
+(:class:`~cadjoint.studies.selection.NodeSelection` values) against the mesh,
+hand array-level BCs to a pluggable solver backend
+(:mod:`cadjoint.fem.backends`; direct in-process jax-fem by default), and
+return small result objects with VTK export for ParaView.
 
 What does *not* belong here: the finite-element formulations
 (:mod:`cadjoint.fem.jaxfem`), the boundary-face rules the patch resolution
@@ -20,9 +20,7 @@ Patch semantics: a ``NodeSelection`` used for a node-valued condition
 used for an area-integrated condition (traction, heat flux) it spans the
 boundary faces all of whose corners are selected
 (:func:`~cadjoint.fem.boundary.faces_from_nodes` on hex meshes,
-:func:`~cadjoint.fem.boundary.tet_faces_from_nodes` on tet meshes).  A
-callable patch is the legacy face-predicate form resolved via
-:func:`~cadjoint.fem.select_faces`.
+:func:`~cadjoint.fem.boundary.tet_faces_from_nodes` on tet meshes).
 
 Both entry points accept a :class:`~cadjoint.fem.tetmesh.TetMesh`
 (``SimMesh(method="tet4"/"tet10")``) with identical semantics: selections
@@ -45,14 +43,13 @@ assembly), so do not place them under ``jax.jit``.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any
 
 import numpy as np
 
 from cadjoint.fem.backends import ElasticBCs, SolverBackend, ThermalBCs, get_backend
 from cadjoint.fem.boundary import (
     faces_from_nodes,
-    select_faces,
     tet10_complete_nodes,
     tet10_face_midsides,
     tet_faces_from_nodes,
@@ -60,36 +57,31 @@ from cadjoint.fem.boundary import (
 from cadjoint.fem.hexmesh import HexMesh
 from cadjoint.fem.jaxfem import tet_elastic_solve, tet_thermal_solve
 from cadjoint.fem.postprocess import hex_von_mises, tet_von_mises
-from cadjoint.fem.selection import NodeSelection
 from cadjoint.fem.tetmesh import TetMesh
+from cadjoint.studies import NodeSelection
 
 __all__ = ["ElasticResult", "ThermalResult", "elastic_solve", "thermal_solve"]
 
-Predicate = Callable[..., Any]
-#: A boundary patch: a node selection or a legacy face predicate.
-Patch = NodeSelection | Predicate
+#: A boundary patch: a node selection.
+Patch = NodeSelection
 
 #: A solvable volume mesh (HEX8, or TET4/TET10 via the tet path).
 SolveMesh = HexMesh | TetMesh
 
 
-def _patch_nodes(mesh: HexMesh, predicate: Predicate) -> np.ndarray:
-    """Unique vertex indices of the boundary faces matching ``predicate``."""
-    group = select_faces(mesh, predicate)
-    if group.nodes.size == 0:
-        raise ValueError("Boundary-condition predicate selected no boundary faces.")
-    return np.unique(group.nodes).astype(np.int32)
+def _require_selection(patch: Any) -> None:
+    """Reject anything that is not a :class:`NodeSelection`, naming the fix."""
+    if not isinstance(patch, NodeSelection):
+        raise TypeError(
+            f"Boundary patches are Nodes selections, got {patch!r}. Build one via "
+            "Nodes.box/sphere/halfspace/cylinder/side/predicate."
+        )
 
 
 def _node_patch(mesh: HexMesh, patch: Patch) -> np.ndarray:
-    """Node indices for a node-valued condition (Dirichlet / clamp).
-
-    A :class:`NodeSelection` applies to its selected node set directly; a
-    legacy predicate resolves to the unique nodes of its matching faces.
-    """
-    if isinstance(patch, NodeSelection):
-        return patch.resolve(mesh)
-    return _patch_nodes(mesh, patch)
+    """Node indices for a node-valued condition (Dirichlet / clamp)."""
+    _require_selection(patch)
+    return patch.resolve(mesh)
 
 
 def _face_patch(mesh: HexMesh, patch: Patch) -> np.ndarray:
@@ -99,16 +91,15 @@ def _face_patch(mesh: HexMesh, patch: Patch) -> np.ndarray:
     are all selected; the returned set is the union of those corners so a
     backend applies the load to exactly the spanned faces.
     """
-    if isinstance(patch, NodeSelection):
-        group = faces_from_nodes(mesh, patch.resolve(mesh))
-        if group.nodes.size == 0:
-            raise ValueError(
-                f"Selection {patch.describe()} spans no complete boundary face; "
-                "area-integrated conditions need all four corners of at least one "
-                "boundary quad selected."
-            )
-        return np.unique(group.nodes).astype(np.int32)
-    return _patch_nodes(mesh, patch)
+    _require_selection(patch)
+    group = faces_from_nodes(mesh, patch.resolve(mesh))
+    if group.nodes.size == 0:
+        raise ValueError(
+            f"Selection {patch.describe()} spans no complete boundary face; "
+            "area-integrated conditions need all four corners of at least one "
+            "boundary quad selected."
+        )
+    return np.unique(group.nodes).astype(np.int32)
 
 
 #: meshio cell type per connectivity width (HEX8 / TET4 / TET10).
@@ -135,18 +126,12 @@ def _export_vtk(path: str, mesh: SolveMesh, point_data: dict, cell_data: dict) -
 def _tet_node_patch(mesh: TetMesh, patch: Patch) -> np.ndarray:
     """Node indices for a node-valued condition on a tet mesh.
 
-    Selections (and legacy predicates) resolve to corner boundary nodes;
-    on TET10 the set is completed with the midside nodes both of whose
-    corner parents are selected, so the whole quadratic patch is pinned.
+    Selections resolve to corner boundary nodes; on TET10 the set is
+    completed with the midside nodes both of whose corner parents are
+    selected, so the whole quadratic patch is pinned.
     """
-    if isinstance(patch, NodeSelection):
-        indices = patch.resolve(mesh)
-    else:
-        group = select_faces(mesh, patch)
-        if group.nodes.size == 0:
-            raise ValueError("Boundary-condition predicate selected no boundary faces.")
-        indices = np.unique(group.nodes)
-    return tet10_complete_nodes(mesh, indices)
+    _require_selection(patch)
+    return tet10_complete_nodes(mesh, patch.resolve(mesh))
 
 
 def _tet_face_patch(mesh: TetMesh, patch: Patch) -> tuple[np.ndarray, np.ndarray]:
@@ -158,19 +143,14 @@ def _tet_face_patch(mesh: TetMesh, patch: Patch) -> tuple[np.ndarray, np.ndarray
             surface map only when *all* its nodes are in the set) and the
             ``(M, 3)`` corner triangles used for exact face targeting.
     """
-    if isinstance(patch, NodeSelection):
-        faces = tet_faces_from_nodes(mesh, patch.resolve(mesh))
-        if faces.shape[0] == 0:
-            raise ValueError(
-                f"Selection {patch.describe()} spans no complete boundary face; "
-                "area-integrated conditions need every corner of at least one "
-                "boundary face selected."
-            )
-    else:
-        group = select_faces(mesh, patch)
-        faces = group.nodes
-        if faces.shape[0] == 0:
-            raise ValueError("Boundary-condition predicate selected no boundary faces.")
+    _require_selection(patch)
+    faces = tet_faces_from_nodes(mesh, patch.resolve(mesh))
+    if faces.shape[0] == 0:
+        raise ValueError(
+            f"Selection {patch.describe()} spans no complete boundary face; "
+            "area-integrated conditions need every corner of at least one "
+            "boundary face selected."
+        )
     nodes = np.unique(faces)
     if mesh.edge_parents is not None:
         nodes = np.concatenate([nodes, np.unique(tet10_face_midsides(mesh, faces))])
@@ -289,9 +269,8 @@ def thermal_solve(
             (:func:`cadjoint.fem.properties.sample_cell_property`), which the
             direct backend carries as a jax-fem internal variable.
         dirichlet: ``(patch, temperature)`` pairs; each patch is a
-            :class:`~cadjoint.fem.Nodes` selection (applied to its node set
-            directly) or a legacy face predicate for
-            :func:`cadjoint.fem.select_faces`.  With the default direct
+            :class:`~cadjoint.fem.Nodes` selection applied to its node set
+            directly.  With the default direct
             backend a temperature may be a traced JAX scalar: the solve is
             then differentiable w.r.t. the prescribed value (lifted
             formulation).
@@ -375,7 +354,7 @@ def elastic_solve(
         poisson: Poisson ratio, scalar or per element like ``youngs``.
         dirichlet: Patches picking fully-clamped node sets (all displacement
             components fixed to zero) — :class:`~cadjoint.fem.Nodes`
-            selections applied directly, or legacy face predicates.
+            selections applied directly.
         tractions: ``(patch, vector)`` pairs applying a constant traction
             (force per area) on the boundary faces spanned by the patch.
         backend: Backend name or instance (see :func:`thermal_solve`).

@@ -5,7 +5,7 @@ boundary condition acts on, for either element family — the
 :class:`FaceGroup` payload both mesh types return, the "faces used by
 exactly one cell" extraction (quads on hexes, triangles on tets), face
 centroids and outward normals, the predicate- and node-set-driven
-selections that bridge :mod:`cadjoint.fem.selection` to area-integrated
+selections that bridge :mod:`cadjoint.studies.selection` to area-integrated
 conditions, and the TET10 midside completion a quadratic patch needs.
 
 What does *not* belong here: mesh construction (:mod:`cadjoint.fem.hexmesh`

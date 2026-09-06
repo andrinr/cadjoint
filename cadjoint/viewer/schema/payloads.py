@@ -236,6 +236,57 @@ class ConstructionNode(Strict):
     material: str | None
 
 
+class PatchAddress(Strict):
+    """The request that rewrites one argument: which op, call, keyword, and target."""
+
+    op: Literal["set_value", "assign_material"]
+    name: str
+    argument: str
+    line: int
+    id: str | None
+
+
+class ConstructionArgument(Strict):
+    """One argument a construction call was written with, and whether it can be edited.
+
+    ``kind`` says what the source holds: a ``number`` or ``vector`` literal
+    (possibly reached through a named parameter, in which case ``parameter``
+    names it), a ``string``, a ``reference`` to another object, a ``default``
+    the call never stated, or an ``expression`` the viewer may only show.
+    ``patch`` is present exactly when the patch layer may rewrite the value.
+    """
+
+    name: str
+    kind: Literal["number", "vector", "string", "reference", "expression", "default"]
+    value: float | list[float] | str | None
+    text: str
+    span: Span | None
+    parameter: str | None
+    patch: PatchAddress | None
+
+
+class ConstructionElement(Strict):
+    """One construction call of the program, as the properties window lists it.
+
+    Built statically from the source (see
+    :mod:`cadjoint.viewer.source_map.elements`): sketches and their planes,
+    primitives, features and booleans, each with the arguments it was written
+    with.  ``id`` is the stable identity where the program has one for the
+    element, else a synthetic id that is still stable under edits elsewhere.
+    """
+
+    id: str
+    stableId: str | None
+    kind: Literal["sketch", "plane", "primitive", "feature", "boolean"]
+    call: str
+    line: int
+    span: Span
+    name: str | None
+    variable: str | None
+    owner: str | None
+    arguments: list[ConstructionArgument]
+
+
 class ConstraintSolverRun(Strict):
     """Diagnostics captured from one source-level constraint solve."""
 
@@ -272,7 +323,7 @@ class MaterialDefinition(Open):
 
 
 class StudySelection(Open):
-    """A serialized node selection, mirroring ``cadjoint.fem.selection``.
+    """A serialized node selection, mirroring ``cadjoint.studies.selection``.
 
     Composite selections nest: ``and``/``or`` carry ``operands``, ``not``
     carries ``operand``, and the leaves carry their own geometry. The
@@ -327,14 +378,18 @@ class DomainEntry(Open):
 class StudyPayload(Open):
     """One study declared in the scene program.
 
-    ``kind`` is wider than :class:`~cadjoint.enums.StudyKind`, deliberately.
-    ``StudyKind`` is the vocabulary of studies the viewer can *create and
-    edit* through the patch endpoints, and it still holds two members; this
-    is the vocabulary it can *display*, which now also holds ``flow`` --
-    a :class:`cadjoint.flow.FlowStudy`, declared in a scene like the others
-    but discretising a fixed lattice rather than a mesh, so it has a
-    ``resolution`` and no ``mesh``. Widening the enum instead would make the
-    patch endpoint advertise a study kind it cannot write.
+    ``kind`` names what a program may *contain*;
+    :class:`~cadjoint.enums.StudyKind` names what the viewer can *create and
+    edit* through the patch endpoints.  The two are equal today — a
+    :class:`cadjoint.flow.FlowStudy` is displayed and written like the other
+    two, though it discretises a fixed lattice rather than a mesh, so it
+    carries a ``resolution`` and no ``mesh``.
+
+    They are kept as separate vocabularies because they have differed and
+    may again: ``flow`` was in this one and not the enum for as long as the
+    patch layer could not write a ``FlowStudy``, and widening the enum ahead
+    of that would have made ``add_study`` advertise a kind it could not
+    produce.  A kind here and not in the enum reports ``editable: false``.
     """
 
     index: int
@@ -489,6 +544,9 @@ class CompilePayload(Strict):
     shader_hash: str = ""
     construction: list[ConstructionNode]
     identities: list[IdentityEntry]
+    # Every construction call with its written arguments, for the properties
+    # window; absent from an older worker, so it defaults to nothing.
+    elements: list[ConstructionElement] = Field(default_factory=list)
     relations: list[ConstructionRelation]
     materials: list[MaterialDefinition]
     studies: list[StudyPayload]

@@ -1,13 +1,17 @@
 """The server's startup compilation-cache warm-up.
 
-``warm_start`` issues one ``compile`` and one ``mesh`` of the scene the
-editor opens with, on a daemon thread, so the first real request meets a
-warm on-disk XLA cache instead of paying 45-53 s for a cold one.  What
-these tests pin down is everything around that: that it never blocks the
-caller, that it runs at most once *per program*, that it asks for exactly
-those two modes on exactly that source and no other scene, that it yields
-the core to a request the user is waiting on, and that a test run does not
-silently spawn two worker processes per server it creates.
+``warm_start`` issues one ``compile`` of the scene the editor opens with,
+on a daemon thread, so the first real request meets a warm on-disk XLA
+cache instead of paying for a cold one.  What these tests pin down is
+everything around that: that it never blocks the caller, that it runs at
+most once per process, that it asks for exactly that mode on exactly that
+source and no other scene, that it yields the core to a request the user
+is waiting on, and that a test run does not silently spawn a worker
+process per server it creates.
+
+The mesh is deliberately *not* warmed, at startup or on scene open: it is
+the overlay's cost, paid on demand.  ``test_opening_a_scene_spawns_nothing``
+pins that.
 """
 
 from __future__ import annotations
@@ -96,14 +100,14 @@ class TestWarmStart:
         assert started.wait(1.0), "no warm-up thread was started"
         started.thread.join(timeout=60)  # type: ignore[attr-defined]
 
-        # Only the scene the editor opens with, as one compile and one mesh.
+        # Only the scene the editor opens with, as one compile and nothing else.
         # Warming the whole scenes directory here is what made a user's first
         # compile queue behind work nobody asked for; the others are warmed
         # when they are opened.
-        assert [mode for _source, mode, _timeout in recorded] == ["compile", "mesh"]
-        assert [source for source, _mode, _timeout in recorded] == [EXAMPLE_SOURCE] * 2
-        # Both run under the mesh budget: the warm-up exists for the cold
-        # path, where even a compile can outgrow the edit round-trip budget.
+        assert [mode for _source, mode, _timeout in recorded] == ["compile"]
+        assert [source for source, _mode, _timeout in recorded] == [EXAMPLE_SOURCE]
+        # Under the mesh budget: the warm-up exists for the cold path, where
+        # a compile can outgrow the edit round-trip budget.
         assert {timeout for _s, _m, timeout in recorded} == {_worker_client.MESH_TIMEOUT_SECONDS}
 
     def test_it_warms_a_given_source_and_only_once(self, unwarmed, recorded, monkeypatch):
@@ -119,7 +123,7 @@ class TestWarmStart:
         assert warm_start("scene = None") is False, "warm_start must run once per process"
         for thread in threads:
             thread.join(timeout=60)
-        assert [source for source, _mode, _timeout in recorded] == ["scene = None"] * 2
+        assert [source for source, _mode, _timeout in recorded] == ["scene = None"]
 
     def test_it_does_not_block_the_caller(self, unwarmed, monkeypatch):
         """A slow worker must not hold up ``create_server``."""
@@ -159,7 +163,7 @@ class TestItYieldsToTheUser:
         assert warm_start("scene = None") is True
         for thread in threads:
             thread.join(timeout=60)
-        assert seen == [_worker_client._WARM_NICE] * 2
+        assert seen == [_worker_client._WARM_NICE]
         assert _worker_client._WARM_NICE > 0, "a warm-up must rank below a request"
 
     def test_a_request_is_not_niced(self, monkeypatch):
@@ -170,10 +174,13 @@ class TestItYieldsToTheUser:
         assert signature.parameters["nice"].default == 0
 
 
-class TestEachSceneWarmsWhenItIsOpened:
-    """Scenes other than the editor's own are warmed on open, not at launch."""
+class TestOpeningASceneSpawnsNothing:
+    """Opening a scene is a file read; the work starts when the client asks."""
 
-    def test_opening_a_scene_warms_it_once(self, unwarmed, recorded, monkeypatch, tmp_path):
+    def test_opening_a_scene_spawns_nothing(self, unwarmed, recorded, monkeypatch, tmp_path):
+        # The scene-open mesh warm-up is gone: it primed an overlay that is
+        # off by default, nothing cancelled or joined it, it outlived the
+        # server, and compiles measured beside one hit their timeout.
         monkeypatch.setenv(WARM_START_ENV, "1")
         (tmp_path / "widget.py").write_text("scene = None  # widget\n")
         monkeypatch.setenv("CADJOINT_SCENES_DIR", str(tmp_path))
@@ -187,23 +194,5 @@ class TestEachSceneWarmsWhenItIsOpened:
         from cadjoint.viewer._scenes import load_scene
 
         assert load_scene({"name": "widget.py"})["ok"]
-        assert load_scene({"name": "widget.py"})["ok"], "a second open must not warm again"
-        for thread in threads:
-            thread.join(timeout=60)
-        assert [source for source, _mode, _timeout in recorded] == ["scene = None  # widget\n"] * 2
-
-    def test_warming_is_per_program_not_per_process(self, unwarmed, recorded, monkeypatch):
-        monkeypatch.setenv(WARM_START_ENV, "1")
-        threads: list[threading.Thread] = []
-        real_thread = threading.Thread
-        monkeypatch.setattr(
-            _worker_client.threading,
-            "Thread",
-            lambda *a, **k: threads.append(real_thread(*a, **k)) or threads[-1],
-        )
-        assert _worker_client.warm_scene("scene = 1") is True
-        assert _worker_client.warm_scene("scene = 1") is False
-        assert _worker_client.warm_scene("scene = 2") is True
-        for thread in threads:
-            thread.join(timeout=60)
-        assert {source for source, _mode, _timeout in recorded} == {"scene = 1", "scene = 2"}
+        assert threads == [], "opening a scene must not start a warm-up thread"
+        assert recorded == [], "and must not spawn a worker"

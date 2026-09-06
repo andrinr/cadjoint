@@ -37,7 +37,6 @@ from cadjoint.fem.properties import (
     sample_material_field,
     total_mass,
 )
-from cadjoint.fem.selection import Nodes
 from cadjoint.fem.simmesh import SimMesh
 from cadjoint.fem.simulate import elastic_solve, thermal_solve
 from cadjoint.fem.study import Dirichlet, ElasticStudy, Fixed, ThermalStudy, Traction
@@ -45,6 +44,7 @@ from cadjoint.materials import aluminium_6061, copper_c11000, steel_1018
 from cadjoint.render.material import Material
 from cadjoint.sdf import Box, Translate
 from cadjoint.sdf.boolean import Union
+from cadjoint.studies.selection import Nodes
 
 _HOT_END = Nodes.side("-x")
 _COLD_END = Nodes.side("+x")
@@ -485,9 +485,9 @@ class TestMaterialFieldGradient:
             finite = (float(objective(base + offset)) - float(objective(base - offset))) / (
                 2.0 * step
             )
-            assert gradient[index] == pytest.approx(
-                finite, rel=1e-2, abs=1e-6
-            ), f"component {index}: adjoint {gradient[index]} vs FD {finite}"
+            assert gradient[index] == pytest.approx(finite, rel=1e-2, abs=1e-6), (
+                f"component {index}: adjoint {gradient[index]} vs FD {finite}"
+            )
         # Guard against a vacuous 0 == 0 agreement: the objective genuinely
         # depends on both the interface position and the conductivity.
         assert abs(gradient[0]) > 1e-3

@@ -1,15 +1,13 @@
-"""Resolving a :class:`~cadjoint.fem.selection.NodeSelection` on a lattice.
+"""Resolving a :class:`~cadjoint.studies.selection.NodeSelection` on a lattice.
 
-The flow grid has no mesh, so it has no nodes and no boundary surface —
-but a study still has to say *where* the heat goes in and *where* a
-temperature is held.  Rather than invent a second selection language, this
-module reuses the one scenes already speak (``Nodes.box``, ``Nodes.sphere``,
+The flow grid has no mesh, so it has no nodes and no boundary surface — but
+a study still has to say *where* the heat goes in and *where* a temperature
+is held.  Rather than invent a second selection language, this module uses
+the one scenes already speak (``Nodes.box``, ``Nodes.sphere``,
 ``Nodes.halfspace``, ``Nodes.cylinder`` and their ``&`` / ``|`` / ``~``
-combinations) by interpreting the JSON payload
-:meth:`~cadjoint.fem.selection.NodeSelection.describe` emits.  That payload
-is the selection language's public, documented, round-trippable form, so
-this reading cannot drift away from the mesh one without the description
-itself changing.
+combinations), evaluated by the selection's own
+:meth:`~cadjoint.studies.selection.NodeSelection.contains` — the same code
+the mesh path runs, one boundary restriction short.
 
 **One semantic difference, and it is deliberate.**  On a mesh a selection is
 always cut down to *boundary* nodes: a boundary condition acts on a surface.
@@ -23,8 +21,10 @@ rest of the surface".
 Two selection kinds are refused rather than approximated.  ``Nodes.side``
 names the extreme plane *of a mesh's boundary*, which a lattice filled by an
 SDF does not have (the extremes of the lattice are the duct, not the part).
-``Nodes.predicate`` is not serializable, so its callable never reaches the
-description this module reads.  Both raise with the alternative named.
+``Nodes.predicate`` would evaluate on cell centres perfectly well, but it is
+not serializable, so a study carrying one cannot round-trip through the
+viewer payload or a saved scene; refusing it here keeps the lattice studies
+uniformly declarative.  Both raise with the alternative named.
 """
 
 from __future__ import annotations
@@ -55,7 +55,7 @@ def region_mask(selection: Any, centers: np.ndarray) -> np.ndarray:
     """Boolean mask over cell centres for a node selection, volumetrically.
 
     Args:
-        selection: A :class:`~cadjoint.fem.selection.NodeSelection`, or
+        selection: A :class:`~cadjoint.studies.selection.NodeSelection`, or
             ``None`` for "every cell".
         centers: ``(..., 3)`` cell-centre world coordinates, as
             :meth:`~cadjoint.flow.FlowGrid.centers` returns.
@@ -70,42 +70,21 @@ def region_mask(selection: Any, centers: np.ndarray) -> np.ndarray:
     points = np.asarray(centers, dtype=np.float64)
     if selection is None:
         return np.ones(points.shape[:-1], dtype=bool)
-    return _evaluate(selection.describe(), points)
+    _refuse_unresolvable(selection.describe())
+    return selection.contains(points)
 
 
-def _evaluate(description: dict[str, Any], points: np.ndarray) -> np.ndarray:
-    """Recursively evaluate a ``describe()`` payload on ``(..., 3)`` points."""
+def _refuse_unresolvable(description: dict[str, Any]) -> None:
+    """Raise if any kind in the selection tree is one a lattice cannot read."""
     kind = description["kind"]
     if kind in _REFUSED:
         raise ValueError(_REFUSED[kind])
     if kind == "not":
-        return ~_evaluate(description["operand"], points)
-    if kind in ("and", "or"):
-        left, right = (_evaluate(operand, points) for operand in description["operands"])
-        return left & right if kind == "and" else left | right
-    if kind == "box":
-        low = np.asarray(description["min_corner"])
-        high = np.asarray(description["max_corner"])
-        return np.all((points >= low) & (points <= high), axis=-1)
-    if kind == "sphere":
-        offsets = points - np.asarray(description["center"])
-        return np.sum(offsets * offsets, axis=-1) <= float(description["radius"]) ** 2
-    if kind == "halfspace":
-        offsets = points - np.asarray(description["point"])
-        return offsets @ np.asarray(description["normal"]) >= 0.0
-    if kind == "cylinder":
-        axis = np.asarray(description["axis"], dtype=np.float64)
-        axis = axis / np.linalg.norm(axis)
-        offsets = points - np.asarray(description["center"])
-        axial = offsets @ axis
-        radial_sq = np.sum(offsets * offsets, axis=-1) - axial**2
-        inside = (radial_sq <= float(description["radius"]) ** 2) & (
-            radial_sq >= float(description["inner"]) ** 2
+        _refuse_unresolvable(description["operand"])
+    elif kind in ("and", "or"):
+        for operand in description["operands"]:
+            _refuse_unresolvable(operand)
+    elif kind not in REGION_KINDS:
+        raise ValueError(
+            f"Selection kind {kind!r} is not one a flow lattice resolves ({REGION_KINDS})."
         )
-        half_length = description["half_length"]
-        if half_length is not None:
-            inside &= np.abs(axial) <= float(half_length)
-        return inside
-    raise ValueError(
-        f"Selection kind {kind!r} is not one a flow lattice resolves ({REGION_KINDS})."
-    )

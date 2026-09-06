@@ -48,15 +48,15 @@ from typing import Any, Callable
 
 import pytest
 
-from cadjoint.viewer._patch import OPERATIONS
 from cadjoint.viewer._patch_requests import patch_source
-from cadjoint.viewer._source_map import PLAYGROUND_FILENAME, capture_profiles, identity_index
-from cadjoint.viewer._worker_scene import _execute_scene
+from cadjoint.viewer.patch import OPERATIONS
 from cadjoint.viewer.patch.geometry import EDITABLE_CALLS, PRIMITIVE_DIMENSIONS
 from cadjoint.viewer.patch.materials import EDITABLE_PROPERTIES, PROPERTY_BOUNDS
+from cadjoint.viewer.source_map import PLAYGROUND_FILENAME, capture_profiles, identity_index
 from cadjoint.viewer.source_map.features import FEATURE_CALL_KINDS, PRIMITIVE_CALL_KINDS
 from cadjoint.viewer.source_map.identity import Identity
 from cadjoint.viewer.source_map.nodes import _called_name
+from cadjoint.viewer.worker.scene import _execute_scene
 
 SEED = 20260902
 SCENES_DIR = Path(__file__).resolve().parents[2] / "scenes"
@@ -162,7 +162,9 @@ BUDGET: dict[str, tuple[frozenset[str], int | None, int | None]] = {
     "insert_vertex": (frozenset({"profile", "constraint"}), None, None),
     "delete_vertex": (frozenset({"profile", "constraint"}), None, None),
     "set_value": (
-        frozenset({"profile", "parameter", "primitive", "feature", "material", "import"}),
+        frozenset(
+            {"profile", "parameter", "primitive", "feature", "material", "union", "scene", "import"}
+        ),
         1,
         1,
     ),
@@ -341,7 +343,25 @@ class Generator:
         return self.point(size) if size > 1 else self.number()
 
     def build_set_value(self, index, source):
-        kind = self.rng.choice(["primitive", "feature", "material", "sketch"])
+        kind = self.rng.choice(["primitive", "feature", "material", "sketch", "boolean"])
+        if kind == "boolean":
+            # Booleans carry no stable id: the properties window names them by
+            # line, and the generator does the same.
+            booleans = [
+                node
+                for node in ast.walk(ast.parse(source))
+                if isinstance(node, ast.Call) and _called_name(node) in _BOOLEAN_CALLS
+            ]
+            if not booleans:
+                return None
+            call = self.rng.choice(booleans)
+            return {
+                "op": "set_value",
+                "line": call.lineno,
+                "name": _called_name(call),
+                "argument": "smoothness",
+                "value": self.number(0.0, 0.2),
+            }
         target = self.pick(index, kind)
         if target is None:
             return None
@@ -725,7 +745,7 @@ Inverse = Callable[[str, random.Random], None]
 
 
 def _inverse_set_vertex(source: str, rng: random.Random) -> None:
-    from cadjoint.viewer._source_map import locate_profile_call
+    from cadjoint.viewer.source_map import locate_profile_call
 
     index = identity_index(source)
     vertex = Generator(rng).pick(index, "vertex")
@@ -933,7 +953,7 @@ def _inverse_add_constraint(source: str, rng: random.Random) -> None:
 
 
 def _inverse_set_constraint_value(source: str, rng: random.Random) -> None:
-    from cadjoint.viewer._source_map import locate_constraint_statements
+    from cadjoint.viewer.source_map import locate_constraint_statements
     from cadjoint.viewer.source_map.nodes import _editable_value_node
 
     index = identity_index(source)
@@ -988,7 +1008,7 @@ def _inverse_add_study_bc(source: str, rng: random.Random) -> None:
 
 
 def _inverse_set_study_value(source: str, rng: random.Random) -> None:
-    from cadjoint.viewer._source_map import locate_study_statements
+    from cadjoint.viewer.source_map import locate_study_statements
 
     index = identity_index(source)
     study = Generator(rng).pick(index, "study")
@@ -1003,7 +1023,7 @@ def _inverse_set_study_value(source: str, rng: random.Random) -> None:
 
 
 def _inverse_set_mesh_value(source: str, rng: random.Random) -> None:
-    from cadjoint.viewer._source_map import locate_mesh_statements
+    from cadjoint.viewer.source_map import locate_mesh_statements
 
     index = identity_index(source)
     mesh = Generator(rng).pick(index, "mesh")
@@ -1035,7 +1055,7 @@ def _inverse_set_mesh_value(source: str, rng: random.Random) -> None:
 
 
 def _inverse_set_optimization_value(source: str, rng: random.Random) -> None:
-    from cadjoint.viewer._source_map import locate_optimization_statements
+    from cadjoint.viewer.source_map import locate_optimization_statements
 
     index = identity_index(source)
     optimization = Generator(rng).pick(index, "optimization")
@@ -1265,12 +1285,15 @@ MALFORMED: list[tuple[str, dict[str, Any], str]] = [
     (
         "study kind unknown",
         {"op": "add_study", "kind": "magnetic"},
-        "Study `kind` must be `thermal` or `elastic`.",
+        "Study `kind` must be `thermal`, `elastic`, or `flow`.",
     ),
     (
         "bc type unknown",
         {"op": "add_study_bc", "id": "assign:heat_study", "bc_type": "convection", "selection": {}},
-        "`bc_type` must be one of: dirichlet, heat_flux, fixed, traction.",
+        (
+            "`bc_type` must be one of: dirichlet, heat_flux, fixed, traction, "
+            "inlet, outlet, walls, heat_source, held_temperature."
+        ),
     ),
     (
         "mesh method unknown",
@@ -1322,12 +1345,12 @@ MALFORMED: list[tuple[str, dict[str, Any], str]] = [
         {
             "op": "set_value",
             "id": "assign:board",
-            "name": "Union",
-            "argument": "smoothness",
+            "name": "Scalar",
+            "argument": "value",
             "value": 1,
         },
-        "`set_value` edits one of these calls: Material, PolygonProfile, SketchPlane, box, cylinder, extrude, loft, "
-        "revolve, sphere.",
+        "`set_value` edits one of these calls: Difference, Intersection, Material, PolygonProfile, "
+        "SketchPlane, Union, box, cylinder, extrude, loft, revolve, sphere.",
     ),
     (
         "set_value on an argument the call lacks",

@@ -658,8 +658,8 @@ shares, so the condition answers for itself. Changed:
 
 | file | change |
 |---|---|
-| `cadjoint/viewer/_worker_declarations.py` | `bc.nodes.serializable` → `bc.serializable` (one line + docstring) |
-| `cadjoint/viewer/_worker_payloads.py` | the same substitution on the solved-study path |
+| `cadjoint/viewer/worker/declarations.py` | `bc.nodes.serializable` → `bc.serializable` (one line + docstring) |
+| `cadjoint/viewer/worker/payloads.py` | the same substitution on the solved-study path |
 | `cadjoint/viewer/schema/payloads.py` | `StudyBc.nodes` optional; `velocity`/`temperature`/`power` added; `StudyPayload.kind` gains `"flow"` |
 | `cadjoint/viewer/schema/payloads.d.ts` | regenerated (`python -m cadjoint.viewer.schema.emit`) |
 | `cadjoint/fem/study.py` | `serializable` property on `Dirichlet`/`HeatFlux`/`Fixed`/`Traction`; `register_study` made public |
@@ -672,16 +672,29 @@ none of that exists for a flow study. What a scene declares is a wider
 vocabulary than what the viewer can author, so the study serialises and
 displays while reporting `editable: false`, which is true.
 
-**Still outstanding on the viewer side**, and not attempted here:
-`frontend/src/types.ts` and `frontend/src/studies.ts` still type a study's
-kind as `"thermal" | "elastic"`, so the Studies window has no rendering for a
-flow study's conditions; `STUDY_CALL_KINDS` in
-`cadjoint/viewer/source_map/declarations.py` does not know `FlowStudy`, which
-is what makes the declaration non-editable — and has one sharp edge worth
-knowing: `_study_entries` aligns statements to studies by count, so a scene
-declaring *both* a mesh study and a flow study would find the mesh study
-marked non-editable too. No scene does that today; `scenes/duct_sink.py`
-declares only the flow study.
+**Closed on 2026-09-06.** What was outstanding: `frontend/src/types.ts` and
+`frontend/src/studies.ts` typed a study's kind as `"thermal" | "elastic"`, so
+the Studies window had no rendering for a flow study's conditions, and
+`STUDY_CALL_KINDS` did not know `FlowStudy`, which is what made the
+declaration non-editable.
+
+The sharp edge predicted here was real and is worth recording as a hit:
+`_study_entries` aligns statements to studies by count, so a scene declaring
+*both* a mesh study and a flow study found neither aligned and marked the
+**mesh** study non-editable too. No shipped scene did that —
+`scenes/duct_sink.py` declares only the flow study — so nothing caught it
+until the alignment was fixed.
+
+Both are done. The source map knows `FlowStudy`; `StudyKind` and
+`BoundaryConditionType` carry the flow members; the patch layer writes a
+`FlowStudy` with its inlet already in place (it refuses to construct
+without one) and imports its classes from `cadjoint.flow`; and the request
+validator makes `selection` conditional, because an inlet, an outlet and the
+duct walls are faces of the lattice and place no region. `enums`'
+`STUDY_KIND_BOUNDARY_CONDITIONS` and `UNPLACED_BOUNDARY_CONDITIONS` state
+those two facts once for the writer, the validator and the panel.
+`tests/viewer/test_flow_declaration.py` and `frontend/e2e/flowStudy.spec.ts`
+hold it, the latter against the real server.
 
 ### 8.7 Two faults the energy balance caught that nothing else did
 

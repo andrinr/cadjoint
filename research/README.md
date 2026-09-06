@@ -9,9 +9,6 @@ their full text is in git history (PR #19).
 - [Differentiable meshing pipeline](./differentiable-meshing-pipeline.md) —
   design principles and final architecture of `cadjoint/meshing`, with
   module/test pointers.
-- [Native (Rust) dual-contouring core](./native-mesher.md) — the profile that
-  justified the Rust split, the JAX/Rust boundary design, measured speedups,
-  and caveats.
 - [FEM integration](./fem-integration.md) — the `SolverBackend` ABI, adjoint
   mechanics, and the ccx 2.23 sensitivity correction.
 - [Tet vs hex meshing](./tet-vs-hex.md) — the mesher-Tesseract validation

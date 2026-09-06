@@ -323,6 +323,14 @@ class Job:
         except Exception:  # noqa: BLE001 - the worker may already be gone
             return
         tracked[process.pid].cpu_percent(None)  # prime the interval
+        # One reading before the first wait. CPU needs an interval to mean
+        # anything and is left at zero here, but RSS does not, and a request
+        # shorter than SAMPLE_INTERVAL would otherwise report "0 B" — which
+        # a served worker made common, since only the first compile in a
+        # process is slow. Reporting nothing about a worker holding a
+        # gigabyte is worse than reporting its memory without its CPU.
+        with contextlib.suppress(Exception):
+            self._add_sample(0.0, tracked[process.pid].memory_info().rss)
         index = 0
         while not self._stop.wait(SAMPLE_INTERVAL):
             if process.poll() is not None:

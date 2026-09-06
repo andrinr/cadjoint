@@ -41,9 +41,14 @@ from cadjoint.fem.quality import (
     tet_aspect_ratios,
     tet_radius_ratios,
 )
-from cadjoint.fem.selection import Nodes, NodeSelection, selection_from_description
 from cadjoint.fem.simmesh import SimMesh, capture_sim_meshes
 from cadjoint.fem.tetmesh import TetMesh, sdf_to_tet_mesh
+
+# The region language every study speaks, defined in cadjoint.studies so the
+# flow package can use it without importing a finite-element package.  It is
+# re-exported here because a study declared against a mesh reaches for it in
+# the same breath as SimMesh and ThermalStudy.
+from cadjoint.studies import Nodes, NodeSelection, selection_from_description
 
 __all__ = [
     "FaceGroup",

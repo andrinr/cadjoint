@@ -571,5 +571,4 @@ now by writing a spec, not by writing an import.
 
 - [FEM integration](../research/fem-integration.md) — the solver ABI, adjoint mechanics, the ccx sensitivity correction, and container conformance.
 - [Tet vs hex meshing](../research/tet-vs-hex.md) — the mesher validation matrix and the surface-interpolation VJP contract.
-- [Native (Rust) dual-contouring core, retired](../research/native-mesher.md) — why a 2 ms in-process kernel is the wrong shape for a plugin.
 - [Optimization](optimization.qmd) — how `gradient_path` selects which chain runs.

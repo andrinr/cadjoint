@@ -125,11 +125,11 @@ def _render_selection(payload: dict) -> str:
 def _selection_source(description) -> str:
     """Validate a selection description and render it as literal source.
 
-    Round-trips through :func:`cadjoint.fem.selection.selection_from_description`
+    Round-trips through :func:`cadjoint.studies.selection.selection_from_description`
     so only selections the runtime can rebuild are ever written — predicate
     descriptions (non-serializable) are rejected here with their own message.
     """
-    from cadjoint.fem.selection import selection_from_description
+    from cadjoint.studies import selection_from_description
 
     if not isinstance(description, dict):
         raise PatchError("The boundary condition needs `selection` as a description object.")

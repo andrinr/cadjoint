@@ -40,9 +40,10 @@ from typing import Callable
 import jax.numpy as jnp
 from jax import Array
 
+from cadjoint.geometry.vectors import unit
+
 # Below this squared length a direction carries no orientation; the guarded
 # norm keeps both the value and its derivative finite instead of 0/0.
-_MIN_SQUARED = 1e-12
 
 # Absolute floor for a face's containment tolerance, so a tiny face still
 # accepts a raymarch hit that landed a float epsilon off its plane.
@@ -52,16 +53,10 @@ _MIN_TOLERANCE = 1e-5
 _TOLERANCE_SCALE = 1e-3
 
 
-def _unit(vector) -> Array:
-    """Normalize a 3-vector with a guarded norm, safe under tracing."""
-    vector = jnp.asarray(vector)
-    return vector / jnp.sqrt(jnp.maximum(jnp.sum(vector * vector), _MIN_SQUARED))
-
-
 def _orthogonalize(x_axis, normal: Array) -> Array:
     """Component of ``x_axis`` inside the plane of ``normal``, normalized."""
     x_axis = jnp.asarray(x_axis)
-    return _unit(x_axis - jnp.sum(x_axis * normal) * normal)
+    return unit(x_axis - jnp.sum(x_axis * normal) * normal)
 
 
 def _scalar(value) -> Array:
@@ -127,7 +122,7 @@ class Face:
         self.kind = kind
         self.key = key
         self.origin = jnp.asarray(origin)
-        self.normal = _unit(normal)
+        self.normal = unit(normal)
         self.x_axis = _orthogonalize(x_axis, self.normal)
         self.boundary = jnp.asarray(boundary)
         self.owner = owner
@@ -364,7 +359,7 @@ class Axis:
 
     def __init__(self, origin, direction, *, owner=None):
         self.origin = jnp.asarray(origin)
-        self.direction = _unit(direction)
+        self.direction = unit(direction)
         self.owner = owner
 
     def point(self, distance) -> Array:
@@ -690,7 +685,7 @@ def _swept_walls(world: Array, normal: Array, high, low) -> list[Face]:
     for index in range(count):
         start = world[index]
         end = world[(index + 1) % count]
-        direction = _unit(end - start)
+        direction = unit(end - start)
         raw = jnp.cross(direction, normal)
         # Orient outward whatever the profile's winding: the wall's normal
         # must point away from the profile's centroid, and a `where` keeps

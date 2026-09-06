@@ -186,18 +186,19 @@ def _resolve_study(study: Any) -> Any:
     name resolves against the studies captured in the same program, so a
     declaration can say ``study="sink-conduction"``.
     """
-    from cadjoint.fem.study import _CAPTURED_STUDIES, ElasticStudy, ThermalStudy
+    from cadjoint.fem.study import ElasticStudy, ThermalStudy
+    from cadjoint.studies import declared_studies
 
     if isinstance(study, (ThermalStudy, ElasticStudy)):
         return study
     if isinstance(study, str):
-        captured = _CAPTURED_STUDIES.get()
-        declared = [candidate for candidate in (captured or []) if candidate.name == study]
+        captured = declared_studies()
+        declared = [candidate for candidate in captured if candidate.name == study]
         if len(declared) == 1:
             return declared[0]
         if len(declared) > 1:
             raise ValueError(f"The program declares more than one study named {study!r}.")
-        names = ", ".join(repr(candidate.name) for candidate in (captured or [])) or "none"
+        names = ", ".join(repr(candidate.name) for candidate in captured) or "none"
         raise ValueError(
             f"No declared study named {study!r} (declared: {names}). "
             "Declare one before the optimization, or pass the study instance itself."
@@ -237,8 +238,8 @@ def _unresolvable_bc(study: Any, mesh: Any) -> str | None:
     return None
 
 
-def _differentiator(objective: Any, *, compiled: bool) -> Any:
-    """``value_and_grad`` of one frozen objective, compiled where it can be.
+def _compiled_prefix(prefix: Any, *, enabled: bool) -> Any:
+    """``jax.jit`` the pure, plugin-free head of a frozen objective.
 
     A frozen topology holds the objective fixed for ``remesh_every`` steps and
     the parameter leaves keep their shapes and dtypes across a descent, so one
@@ -246,39 +247,46 @@ def _differentiator(objective: Any, *, compiled: bool) -> Any:
     op-by-op instead re-dispatches the whole chain per step (measured on the
     starter: ~11 s per step eager against ~0.5 s jitted).
 
-    Only the frozen-chain gradient paths (``gradient_path="tesseract"`` and
-    ``"tesseract-dc"``) are traceable end to end.  The ``"direct"`` path
-    rebuilds a jax-fem problem inside the objective, and that construction
-    resolves boundary conditions with ``np.argwhere`` over the recomputed node
-    positions — a concrete-value read that a tracer cannot satisfy — so it
-    stays eager.
+    **Only the pure half is compiled, and that is the point.**  A frozen chain
+    is a pure JAX prefix — the design field, dual contouring, the QEF vertex
+    map, the bulk of the program — followed by plugin calls, which
+    ``tesseract-jax`` lowers to a *host callback*
+    (``tesseract_jax/primitive.py``: ``mlir.emit_python_callback``).  XLA bakes
+    a host callback into the module it appears in, and JAX then refuses to
+    write that module to the persistent compilation cache at all
+    (``jax/_src/compiler.py::_cache_write`` — "because it uses host
+    callbacks").  One ``jax.jit`` spanning both halves is therefore
+    uncacheable *in its entirety*: on the starter that was 6.2 MB of HLO
+    retraced and recompiled in every process, warm cache or cold, about eight
+    seconds a run.  Compiling this half alone keeps it cacheable, and what is
+    left eager is a couple of plugin calls and a metric reduction.  Measured
+    in ``research/performance.md`` §15.
 
-    The compiled form folds its constants at trace time
-    (:func:`jax.ensure_compile_time_eval`), which is not a micro-optimization
-    but a correctness requirement of the tesseract boundary.  A frozen chain
-    hands its tesseracts NumPy constants — the mesher's ``element`` code, the
-    quality thresholds, the study's conductivity — and ``tesseract_jax``
-    classifies an input as *static* exactly when it is not a tracer
-    (``primitive.py``: ``is_static_mask``).  Under a bare ``jax.jit`` the
-    ``jnp.asarray`` that coerces those constants emits an equation instead of
-    a value, so they arrive traced, and the VJP then has to invent a
-    derivative slot for each one: it writes ``np.full(shape, np.nan, dtype)``,
-    which for the 0-d ``int32`` ``element`` is a NaN cast to an integer
-    (a ``RuntimeWarning``, and an arbitrary element code if anything ever
-    read it).  Folding constants keeps every one of them static, exactly as
-    the eager path had them, while operations on the design parameters still
-    trace normally.
+    Splitting also *removes* a hazard the whole-program form had to work
+    around.  ``tesseract_jax`` classifies an input as static exactly when it is
+    not a tracer (``primitive.py``: ``is_static_mask``), and a frozen chain
+    hands its plugins NumPy constants — the mesher's ``element`` code, the
+    quality thresholds, the study's conductivity.  Under a ``jax.jit``
+    enclosing the plugin call those arrive traced, and the VJP then invents a
+    derivative slot for each: ``np.full(shape, np.nan, dtype)``, which for the
+    0-d ``int32`` ``element`` is a NaN cast to an integer.  The old form
+    defeated that with :func:`jax.ensure_compile_time_eval`; with every plugin
+    call outside every trace the constants are simply concrete, as they are on
+    the eager path.
+
+    Args:
+        prefix: ``params -> array``, containing no plugin call.
+        enabled: False for ``gradient_path="direct"``, which is not traceable
+            at all — it rebuilds a jax-fem problem inside the objective and
+            resolves boundary conditions with ``np.argwhere`` over the
+            recomputed node positions, a concrete read no tracer satisfies.
+
+    Returns:
+        ``prefix``, compiled when ``enabled``.
     """
     import jax
 
-    if not compiled:
-        return jax.value_and_grad(objective)
-
-    def folded(params):
-        with jax.ensure_compile_time_eval():
-            return objective(params)
-
-    return jax.jit(jax.value_and_grad(folded))
+    return jax.jit(prefix) if enabled else prefix
 
 
 def _compliance(study: Any, result: Any, mesh: Any, points: Any) -> Any:
@@ -293,13 +301,9 @@ def _compliance(study: Any, result: Any, mesh: Any, points: Any) -> Any:
     import jax.numpy as jnp
 
     from cadjoint.fem.hexmesh import faces_from_nodes
+    from cadjoint.fem.postprocess import load_work_quads, load_work_tris
     from cadjoint.fem.study import Traction
-    from cadjoint.fem.tetmesh import (
-        TetMesh,
-        load_work_quads,
-        load_work_tris,
-        tet_faces_from_nodes,
-    )
+    from cadjoint.fem.tetmesh import TetMesh, tet_faces_from_nodes
 
     tractions = [bc for bc in study.bcs if isinstance(bc, Traction)]
     if not tractions:
@@ -316,7 +320,8 @@ def _compliance(study: Any, result: Any, mesh: Any, points: Any) -> Any:
         if isinstance(mesh, TetMesh):
             faces = tet_faces_from_nodes(mesh, indices)
             if getattr(mesh, "edge_parents", None) is not None:
-                from cadjoint.fem.tetmesh import load_work_tri6, tet10_face_midsides
+                from cadjoint.fem.postprocess import load_work_tri6
+                from cadjoint.fem.tetmesh import tet10_face_midsides
 
                 faces6 = np.concatenate([faces, tet10_face_midsides(mesh, faces)], axis=1)
                 total = total + load_work_tri6(positions, displacement, faces6, vector)
@@ -856,6 +861,7 @@ class Optimization:
         chain.  x64 is enabled for the duration (the FEM adjoints require
         float64) and the caller's setting restored afterwards.
         """
+        import jax
         import jax.numpy as jnp
 
         from cadjoint.extraction import apply_parameters, extract_parameters
@@ -951,15 +957,32 @@ class Optimization:
             return recompute_points(field, mesh)
 
         def objective_on(mesh: Any, chain: Any = None):
+            """The frozen objective, with its plugin-free head compiled.
+
+            A frozen chain splits at the plugin boundary: everything before it
+            is pure JAX and is compiled once per topology
+            (:func:`_compiled_prefix` says why only that half), everything
+            after is a plugin call and a metric reduction, dispatched eagerly.
+            The ``"direct"`` path has no such seam and stays whole.
+            """
+            if chain is not None and use_dc_chain:
+                # The DC chain differentiates the true SDF itself, so its
+                # pure head takes the field callable, not lattice samples.
+                head = _compiled_prefix(
+                    lambda params: chain.dc_surface(field_at(params)), enabled=True
+                )
+                tail = lambda surface: chain.metric_from_surface(surface, self.metric)  # noqa: E731
+            elif chain is not None:
+                head = _compiled_prefix(
+                    lambda params: field_at(params)(jnp.asarray(chain.lattice)), enabled=True
+                )
+                tail = lambda samples: chain.metric_value(samples, self.metric)  # noqa: E731
+            else:
+                head = None
+
             def objective(params):
-                if chain is not None:
-                    if use_dc_chain:
-                        # The DC chain differentiates the true SDF itself,
-                        # so it takes the field callable, not lattice samples.
-                        value = chain.metric_value(field_at(params), self.metric)
-                    else:
-                        samples = field_at(params)(jnp.asarray(chain.lattice))
-                        value = chain.metric_value(samples, self.metric)
+                if head is not None:
+                    value = tail(head(params))
                 else:
                     points = recompute(params, field_at(params), mesh)
                     result = study.solve(mesh=mesh, points=points)
@@ -1033,7 +1056,7 @@ class Optimization:
             state = init(params)
             try:
                 frozen = refreeze(params, 0, None)
-                value_and_grad = _differentiator(frozen[1], compiled=use_tesseract)
+                value_and_grad = jax.value_and_grad(frozen[1])
                 for step in range(count):
                     if step > 0 and self.remesh_every > 0 and step % self.remesh_every == 0:
                         previous = frozen
@@ -1043,7 +1066,7 @@ class Optimization:
                         # re-wrapping an unchanged objective would discard it
                         # and re-trace the next step for nothing.
                         if frozen is not previous:
-                            value_and_grad = _differentiator(frozen[1], compiled=use_tesseract)
+                            value_and_grad = jax.value_and_grad(frozen[1])
                     value, grads = value_and_grad(params)
                     self._record_step(step, value, grads, params, history, trajectory, callback)
                     params, state = step_fn(params, grads, state)

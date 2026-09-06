@@ -4,7 +4,7 @@ import ast
 
 import pytest
 
-from cadjoint.viewer._patch import (
+from cadjoint.viewer.patch import (
     PatchError,
     apply_operation,
     delete_vertex,
@@ -148,7 +148,7 @@ class TestApplyOperation:
 
 class TestRoundTrip:
     def test_patched_source_still_compiles_a_scene(self):
-        from cadjoint.viewer._source_map import (
+        from cadjoint.viewer.source_map import (
             PLAYGROUND_FILENAME,
             build_construction_payload,
             capture_profiles,
@@ -193,13 +193,13 @@ def call_arguments(source: str, line: int, name: str) -> dict:
 
 class TestSetValue:
     def test_rewrites_an_existing_keyword(self):
-        from cadjoint.viewer._patch import set_value
+        from cadjoint.viewer.patch import set_value
 
         patched = set_value(PRIMITIVES, 4, "box", "position", [1.5, 0.25, -0.5])
         assert call_arguments(patched, 4, "box")["position"] == [1.5, 0.25, -0.5]
 
     def test_adds_a_keyword_that_is_not_there_yet(self):
-        from cadjoint.viewer._patch import set_value
+        from cadjoint.viewer.patch import set_value
 
         # A solid written without `rotation=` must still be rotatable.
         patched = set_value(PRIMITIVES, 4, "box", "rotation", [0, 0.5, 0])
@@ -210,20 +210,20 @@ class TestSetValue:
         assert call_arguments(again, 4, "box")["rotation"] == [0, 1.0, 0]
 
     def test_accepts_scalar_arguments(self):
-        from cadjoint.viewer._patch import set_value
+        from cadjoint.viewer.patch import set_value
 
         source = "from cadjoint.construction import Solid\nball = Solid.sphere(radius=0.5, position=[0, 0, 0])\n"
         patched = set_value(source, 2, "sphere", "radius", 1.25)
         assert call_arguments(patched, 2, "sphere")["radius"] == 1.25
 
     def test_rejects_an_unknown_call(self):
-        from cadjoint.viewer._patch import set_value
+        from cadjoint.viewer.patch import set_value
 
         with pytest.raises(PatchError, match="No editable"):
             set_value(PRIMITIVES, 1, "box", "position", [0, 0, 0])
 
     def test_updates_a_named_vector_parameter_at_its_definition(self):
-        from cadjoint.viewer._patch import set_value
+        from cadjoint.viewer.patch import set_value
 
         source = (
             "from cadjoint.construction import Solid\n"
@@ -236,7 +236,7 @@ class TestSetValue:
         assert "position=location" in patched
 
     def test_updates_a_named_scalar_parameter_at_its_definition(self):
-        from cadjoint.viewer._patch import set_value
+        from cadjoint.viewer.patch import set_value
 
         source = (
             "from cadjoint.construction import Solid\n"
@@ -249,7 +249,7 @@ class TestSetValue:
         assert "radius=radius" in patched
 
     def test_makes_a_default_profile_plane_explicit_when_moved(self):
-        from cadjoint.viewer._patch import set_value
+        from cadjoint.viewer.patch import set_value
 
         source = (
             "from cadjoint.construction import PolygonProfile\n"
@@ -260,7 +260,7 @@ class TestSetValue:
         assert "from cadjoint.construction import" in patched and "SketchPlane" in patched
 
     def test_makes_a_default_profile_plane_explicit_when_reoriented(self):
-        from cadjoint.viewer._patch import set_value
+        from cadjoint.viewer.patch import set_value
 
         source = (
             "from cadjoint.construction import PolygonProfile\n"
@@ -271,7 +271,7 @@ class TestSetValue:
         assert "from cadjoint.construction import" in patched and "SketchPlane" in patched
 
     def test_adds_a_normal_to_an_existing_sketch_plane(self):
-        from cadjoint.viewer._patch import set_value
+        from cadjoint.viewer.patch import set_value
 
         source = (
             "from cadjoint.construction import PolygonProfile, SketchPlane\n"
@@ -284,7 +284,7 @@ class TestSetValue:
         assert patched.count("plane=") == 1
 
     def test_rewrites_an_existing_sketch_plane_normal_in_place(self):
-        from cadjoint.viewer._patch import set_value
+        from cadjoint.viewer.patch import set_value
 
         source = (
             "from cadjoint.construction import PolygonProfile, SketchPlane\n"
@@ -299,14 +299,14 @@ class TestSetValue:
 
 class TestAddPrimitive:
     def test_extends_an_existing_union(self):
-        from cadjoint.viewer._patch import add_primitive
+        from cadjoint.viewer.patch import add_primitive
 
         patched = add_primitive(PRIMITIVES, "sphere", [0.0, 1.0, 0.0], {"radius": 0.4})
         assert "sphere1 = Solid.sphere(radius=0.4, position=[0, 1, 0]" in patched
         assert "scene = Union(block, sphere1)" in patched
 
     def test_wraps_a_scene_that_is_not_a_union(self):
-        from cadjoint.viewer._patch import add_primitive
+        from cadjoint.viewer.patch import add_primitive
 
         source = (
             "from cadjoint.construction import Solid\n"
@@ -317,21 +317,21 @@ class TestAddPrimitive:
         assert patched.rstrip().endswith("cylinder1)")
 
     def test_generates_names_that_do_not_collide(self):
-        from cadjoint.viewer._patch import add_primitive
+        from cadjoint.viewer.patch import add_primitive
 
         once = add_primitive(PRIMITIVES, "sphere", [0, 0, 0], {"radius": 0.4})
         twice = add_primitive(once, "sphere", [1, 0, 0], {"radius": 0.4})
         assert "sphere1 =" in twice and "sphere2 =" in twice
 
     def test_adds_the_Solid_import_when_missing(self):
-        from cadjoint.viewer._patch import add_primitive
+        from cadjoint.viewer.patch import add_primitive
 
         source = "from cadjoint.sdf.primitives import Sphere\nscene = Sphere(1.0)\n"
         patched = add_primitive(source, "box", [0, 0, 0], {"size": [0.5, 0.5, 0.5]})
         assert "from cadjoint.construction import Solid" in patched
 
     def test_requires_a_scene_assignment(self):
-        from cadjoint.viewer._patch import add_primitive
+        from cadjoint.viewer.patch import add_primitive
 
         with pytest.raises(PatchError, match="scene = "):
             add_primitive("x = 1\n", "sphere", [0, 0, 0], {"radius": 0.5})
@@ -339,7 +339,7 @@ class TestAddPrimitive:
 
 class TestMaterials:
     def test_creates_a_named_material_before_the_scene(self):
-        from cadjoint.viewer._patch import add_material
+        from cadjoint.viewer.patch import add_material
 
         patched = add_material(PRIMITIVES, [0.2, 0.4, 0.8], roughness=0.25)
         assert "from cadjoint.render import Material" in patched
@@ -348,7 +348,7 @@ class TestMaterials:
         assert ast.parse(patched)
 
     def test_assigns_and_replaces_a_primitive_material(self):
-        from cadjoint.viewer._patch import assign_material
+        from cadjoint.viewer.patch import assign_material
 
         source = (
             "from cadjoint.construction import Solid\n"
@@ -362,7 +362,7 @@ class TestMaterials:
         assert "Solid.sphere(radius=0.5, material=blue)" in patched
 
     def test_assigns_material_to_a_profiles_extrusion(self):
-        from cadjoint.viewer._patch import assign_material
+        from cadjoint.viewer.patch import assign_material
 
         source = (
             "from cadjoint.construction import PolygonProfile, extrude\n"
@@ -376,7 +376,7 @@ class TestMaterials:
         assert "extrude(profile, depth=0.5, material=paint)" in patched
 
     def test_rejects_a_name_that_is_not_a_material_definition(self):
-        from cadjoint.viewer._patch import assign_material
+        from cadjoint.viewer.patch import assign_material
 
         with pytest.raises(PatchError, match="not a named Material"):
             assign_material(PRIMITIVES, 4, "block")
@@ -384,7 +384,7 @@ class TestMaterials:
 
 class TestSketchHistoryOperations:
     def test_adds_a_standalone_sketch_before_the_scene(self):
-        from cadjoint.viewer._patch import add_sketch
+        from cadjoint.viewer.patch import add_sketch
 
         patched = add_sketch(PRIMITIVES, [2, 3, 0])
         assert "sketch1 = PolygonProfile(" in patched
@@ -393,7 +393,7 @@ class TestSketchHistoryOperations:
         assert ast.parse(patched)
 
     def test_extrudes_a_named_sketch_into_the_scene(self):
-        from cadjoint.viewer._patch import add_extrusion
+        from cadjoint.viewer.patch import add_extrusion
 
         source = (
             "from cadjoint.construction import PolygonProfile\n"
@@ -407,7 +407,7 @@ class TestSketchHistoryOperations:
         assert ast.parse(patched)
 
     def test_adds_constraints_and_a_projection_step(self):
-        from cadjoint.viewer._patch import add_constraint, solve_sketch
+        from cadjoint.viewer.patch import add_constraint, solve_sketch
 
         source = (
             "from cadjoint.construction import PolygonProfile, extrude\n"
@@ -426,7 +426,7 @@ class TestSketchHistoryOperations:
         assert ast.parse(patched)
 
     def test_solve_step_is_idempotent(self):
-        from cadjoint.viewer._patch import solve_sketch
+        from cadjoint.viewer.patch import solve_sketch
 
         source = (
             "from cadjoint.construction import PolygonProfile, extrude\n"
@@ -440,7 +440,7 @@ class TestSketchHistoryOperations:
         assert "steps=24" in twice
 
     def test_rejects_invalid_solver_settings(self):
-        from cadjoint.viewer._patch import solve_sketch
+        from cadjoint.viewer.patch import solve_sketch
 
         source = "from cadjoint.construction import PolygonProfile\nprofile = PolygonProfile([[0, 0], [1, 0], [0, 1]])\n"
         with pytest.raises(PatchError, match="method"):
@@ -451,7 +451,7 @@ class TestSketchHistoryOperations:
 
 class TestDeleteObject:
     def test_removes_a_solid_and_its_use_in_the_scene(self):
-        from cadjoint.viewer._patch import delete_object
+        from cadjoint.viewer.patch import delete_object
 
         source = (
             "from cadjoint.construction import Solid\n"
@@ -469,7 +469,7 @@ class TestDeleteObject:
         assert scene == "scene = Union(block)"
 
     def test_refuses_when_the_value_is_used_elsewhere(self):
-        from cadjoint.viewer._patch import delete_object
+        from cadjoint.viewer.patch import delete_object
 
         source = (
             "from cadjoint.construction import PolygonProfile, extrude\n"
@@ -480,7 +480,7 @@ class TestDeleteObject:
             delete_object(source, 2)
 
     def test_removes_constraints_owned_by_a_deleted_objects_position(self):
-        from cadjoint.viewer._patch import delete_object
+        from cadjoint.viewer.patch import delete_object
 
         source = (
             "from cadjoint.construction import Solid\n"
@@ -500,7 +500,7 @@ class TestDeleteObject:
         assert "scene = Union(right)" in patched
 
     def test_removes_an_inline_solid_from_the_scene(self):
-        from cadjoint.viewer._patch import delete_object
+        from cadjoint.viewer.patch import delete_object
 
         source = (
             "from cadjoint.construction import Solid\n"
@@ -515,7 +515,7 @@ class TestDeleteObject:
         assert "Solid.box" in patched
 
     def test_refuses_two_objects_built_on_one_line(self):
-        from cadjoint.viewer._patch import delete_object
+        from cadjoint.viewer.patch import delete_object
 
         source = (
             "from cadjoint.construction import Solid\n"
@@ -576,7 +576,7 @@ class TestConstraintEditing:
         )
         # Creation order appends: the new subscript statement sits after all
         # of the starter's bare-name constraint statements — the last index.
-        from cadjoint.viewer._source_map import locate_constraint_statements
+        from cadjoint.viewer.source_map import locate_constraint_statements
 
         index = len(locate_constraint_statements(grown, self._profile_line(grown))) - 1
         shrunk = apply_operation(
@@ -748,7 +748,7 @@ BOX_SELECTION = {"kind": "box", "min_corner": [0.0, 0.0, 0.0], "max_corner": [1.
 
 class TestAddStudy:
     def test_appends_a_thermal_study_after_the_scene(self):
-        from cadjoint.viewer._patch import add_study
+        from cadjoint.viewer.patch import add_study
 
         patched = add_study(PRIMITIVES, "thermal")
         assert (
@@ -760,7 +760,7 @@ class TestAddStudy:
         assert ast.parse(patched)
 
     def test_appends_an_elastic_study_after_the_last_study(self):
-        from cadjoint.viewer._patch import add_study
+        from cadjoint.viewer.patch import add_study
 
         patched = add_study(STUDIES, "elastic", name="cantilever")
         assert (
@@ -775,7 +775,7 @@ class TestAddStudy:
         assert len(patched.splitlines()) == len(STUDIES.splitlines()) + 1
 
     def test_keeps_lines_above_the_insertion_untouched(self):
-        from cadjoint.viewer._patch import add_study
+        from cadjoint.viewer.patch import add_study
 
         original = PRIMITIVES.splitlines()
         patched = add_study(PRIMITIVES, "thermal").splitlines()
@@ -1464,7 +1464,7 @@ class TestSetOptimizationValue:
 
 class TestSetParameterValues:
     def test_rewrites_named_scalar_and_vector2_literals_exactly(self):
-        from cadjoint.viewer._patch import set_parameter_values
+        from cadjoint.viewer.patch import set_parameter_values
 
         patched = set_parameter_values(
             OPTIMIZATIONS,
@@ -1476,7 +1476,7 @@ class TestSetParameterValues:
         assert ast.parse(patched)
 
     def test_rejects_a_parameter_without_a_single_declaration(self):
-        from cadjoint.viewer._patch import set_parameter_values
+        from cadjoint.viewer.patch import set_parameter_values
 
         with pytest.raises(PatchError, match="exactly one"):
             set_parameter_values(OPTIMIZATIONS, {"ghost": 1.0})

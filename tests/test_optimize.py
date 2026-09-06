@@ -218,7 +218,7 @@ def _exec_starter() -> tuple[dict, list]:
     compile worker uses (the study-backed declaration resolves its study by
     name through them)."""
     from cadjoint.fem.simmesh import capture_sim_meshes
-    from cadjoint.fem.study import capture_studies
+    from cadjoint.studies import capture_studies
 
     source = STARTER.read_text(encoding="utf-8")
     namespace = {"__name__": "__starter_optimize_test__"}
@@ -324,7 +324,7 @@ class TestStudyFormValidation:
         assert elastic.metric == "compliance"
 
     def test_study_names_resolve_against_captured_studies(self):
-        from cadjoint.fem.study import capture_studies
+        from cadjoint.studies import capture_studies
 
         with capture_studies():
             study = _bar_study("named-bar")
@@ -576,73 +576,84 @@ def _tet_bar_study(name: str = "compiled-bar"):
     )
 
 
-def _counting_differentiator(monkeypatch, *, compile_anyway: bool = True) -> list[int]:
-    """Patch ``_differentiator`` to count executions of the objective body.
+def _counting_prefix(monkeypatch, *, compile_anyway: bool = True) -> list[int]:
+    """Patch ``_compiled_prefix`` to count executions of the prefix body.
 
-    Under ``jax.jit`` the body runs once per *trace*; eagerly it runs once
-    per *call*.  The returned single-element list is that counter.  With
-    ``compile_anyway=False`` the jit is suppressed, which is exactly the
-    pre-compilation behaviour and gives the eager reference values.
+    The prefix is the pure, plugin-free head of the frozen objective and is
+    the only part compiled.  Under ``jax.jit`` its body runs once per
+    *trace*; uncompiled it runs once per *call*.  The returned
+    single-element list is that counter.  With ``compile_anyway=False`` the
+    jit is suppressed, which gives the fully eager reference values.
     """
     import cadjoint.optimize as optimize_module
 
-    original = optimize_module._differentiator
+    original = optimize_module._compiled_prefix
     calls = [0]
 
-    def counting(objective, *, compiled):
+    def counting(prefix, *, enabled):
         def counted(params):
             calls[0] += 1
-            return objective(params)
+            return prefix(params)
 
-        return original(counted, compiled=compiled and compile_anyway)
+        return original(counted, enabled=enabled and compile_anyway)
 
-    monkeypatch.setattr(optimize_module, "_differentiator", counting)
+    monkeypatch.setattr(optimize_module, "_compiled_prefix", counting)
     return calls
 
 
 class TestFrozenObjectiveIsCompiled:
-    """The frozen study objective runs as one compiled program per topology.
+    """The frozen study objective's pure half runs as one compiled program.
 
     A frozen topology holds the objective fixed between refreezes, so the
     traced program is reused by every step in between — the change these
-    tests guard is that the descent stops re-dispatching the whole chain
-    op-by-op once per step.
+    tests guard is that the descent stops re-dispatching the chain op-by-op
+    once per step.  What is compiled is the *prefix* only: a plugin call
+    lowers to a host callback, and a module holding one cannot be written to
+    the persistent compilation cache at all, so a jit spanning both halves
+    would be recompiled in every process.
     """
 
-    def test_compiled_and_eager_gradients_agree_exactly(self):
+    def test_compiled_and_uncompiled_prefixes_agree_exactly(self):
         import jax
         import numpy as np
 
-        from cadjoint.optimize import _differentiator
+        from cadjoint.optimize import _compiled_prefix
 
-        def objective(params):
-            return jnp.sum(jnp.sin(params["a"]) * params["b"] ** 2)
+        def prefix(params):
+            return jnp.sin(params["a"]) * params["b"] ** 2
+
+        def objective_through(head):
+            return jax.value_and_grad(lambda params: jnp.sum(head(params)))
 
         params = {"a": jnp.asarray([0.3, -1.2, 2.0]), "b": jnp.asarray([1.5, 0.25, -0.75])}
-        eager_value, eager_grads = _differentiator(objective, compiled=False)(params)
-        value, grads = _differentiator(objective, compiled=True)(params)
+        eager = _compiled_prefix(prefix, enabled=False)
+        compiled = _compiled_prefix(prefix, enabled=True)
+        eager_value, eager_grads = objective_through(eager)(params)
+        value, grads = objective_through(compiled)(params)
         assert float(value) == pytest.approx(float(eager_value), rel=1e-12)
         for name, gradient in grads.items():
             np.testing.assert_allclose(
                 np.asarray(gradient), np.asarray(eager_grads[name]), rtol=1e-12
             )
-        assert isinstance(_differentiator(objective, compiled=True), jax.stages.Wrapped)
+        assert isinstance(compiled, jax.stages.Wrapped)
+        assert eager is prefix
 
     def test_a_frozen_chain_traces_once_and_keeps_its_constants_static(self, monkeypatch):
         """One trace per frozen topology, and no NaN placeholder on the way.
 
         The ``RuntimeWarning`` guard is the second half of the contract.
-        ``tesseract_jax`` treats a non-tracer input as static; a bare
-        ``jax.jit`` turns the chain's NumPy constants into tracers, and the
-        VJP then fills a derivative slot for each with
+        ``tesseract_jax`` treats a non-tracer input as static; a jit
+        *enclosing* the plugin call turns the chain's NumPy constants into
+        tracers, and the VJP then fills a derivative slot for each with
         ``np.full(shape, nan, dtype)`` — a NaN cast into the mesher's 0-d
-        ``int32`` ``element`` code.  ``_differentiator`` folds constants at
-        trace time to keep them static, and this is what says so.
+        ``int32`` ``element`` code.  Compiling only the prefix leaves every
+        plugin call outside every trace, so the constants stay concrete, and
+        this is what says so.
         """
         pytest.importorskip("jax_fem", reason="study-backed runs need the fem extra")
         pytest.importorskip("tetgen", reason="the DC chain fills a tet mesh")
         pytest.importorskip("tesseract_jax", reason="the frozen chains are tesseracts")
-        traces = _counting_differentiator(monkeypatch)
+        traces = _counting_prefix(monkeypatch)
         with warnings.catch_warnings():
             warnings.simplefilter("error", RuntimeWarning)
             run = Optimization(
@@ -679,7 +690,7 @@ class TestFrozenObjectiveIsCompiled:
                 .history
             ]
 
-        eager_calls = _counting_differentiator(monkeypatch, compile_anyway=False)
+        eager_calls = _counting_prefix(monkeypatch, compile_anyway=False)
         eager = descend()
         assert eager_calls[0] == 3  # eagerly the body runs once per step
         monkeypatch.undo()

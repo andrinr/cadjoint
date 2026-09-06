@@ -21,21 +21,12 @@ import jax
 import jax.numpy as jnp
 
 from cadjoint.fem.hexmesh import GridSpec, sdf_to_hex_mesh
-from cadjoint.fem.selection import Nodes
 from cadjoint.fem.simulate import thermal_solve
 from cadjoint.geometry.parameters import Vector
 from cadjoint.sdf.primitives import Box
+from cadjoint.studies.selection import Nodes
 
-
-def _hot(center):
-    return center[0] < -0.999
-
-
-def _cold(center):
-    return center[0] > 0.999
-
-
-_BC = [(_hot, 1.0), (_cold, 0.0)]
+_BC = [(Nodes.side("-x"), 1.0), (Nodes.side("+x"), 0.0)]
 
 
 @pytest.fixture(scope="module")
@@ -113,8 +104,8 @@ class TestTesseractThermal:
 
 
 class TestTesseractElastic:
-    _FIXED = [_hot]
-    _TRACTIONS = [(_cold, [0.0, 0.0, -1.0])]
+    _FIXED = [Nodes.side("-x")]
+    _TRACTIONS = [(Nodes.side("+x"), [0.0, 0.0, -1.0])]
 
     def _solve(self, mesh, backend=None, points=None):
         from cadjoint.fem.simulate import elastic_solve

@@ -25,18 +25,17 @@ import jax
 import jax.numpy as jnp
 
 from cadjoint.fem.backends import ElasticBCs, ThermalBCs
-from cadjoint.fem.selection import Nodes
+from cadjoint.fem.jaxfem import tet_elastic_solve, tet_thermal_solve
 from cadjoint.fem.tetmesh import (
     recompute_tet_points,
     sdf_to_tet_mesh,
     tet10_complete_nodes,
     tet10_face_midsides,
     tet10_mesh,
-    tet_elastic_solve,
     tet_faces_from_nodes,
-    tet_thermal_solve,
 )
 from cadjoint.meshing import GridSpec
+from cadjoint.studies.selection import Nodes
 
 _TESSERACTS = Path(__file__).parents[2] / "cadjoint" / "fem" / "tesseracts"
 _BAR_GRID = GridSpec.from_bounds((-0.65, -0.32, -0.3), (1.3, 0.64, 0.6), (13, 7, 6))

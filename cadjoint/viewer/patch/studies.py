@@ -32,6 +32,7 @@ from __future__ import annotations
 import ast
 
 from cadjoint.enums import (
+    STUDY_KIND_BOUNDARY_CONDITIONS,
     BoundaryConditionType,
     BoundaryConditionTypeLike,
     StudyKind,
@@ -73,26 +74,54 @@ from cadjoint.viewer.source_map.nodes import (
 # Keyed by the option sets in :mod:`cadjoint.enums`, so the accepted kinds
 # and BC types are stated once for the whole program.  A plain string still
 # indexes these tables: a StrEnum member hashes and compares as its value.
-_STUDY_CLASSES = {StudyKind.THERMAL: "ThermalStudy", StudyKind.ELASTIC: "ElasticStudy"}
+_STUDY_CLASSES = {
+    StudyKind.THERMAL: "ThermalStudy",
+    StudyKind.ELASTIC: "ElasticStudy",
+    StudyKind.FLOW: "FlowStudy",
+}
+#: Where each study kind's constructor is imported from.  A flow study is
+#: declared like the other two and captured in the same list, but it lives in
+#: `cadjoint.flow` because it fills a lattice rather than meshing a part.
+_STUDY_MODULES = {
+    StudyKind.THERMAL: "cadjoint.fem",
+    StudyKind.ELASTIC: "cadjoint.fem",
+    StudyKind.FLOW: "cadjoint.flow",
+}
 _STUDY_DEFAULTS = {
     StudyKind.THERMAL: "conductivity=1.0",
     StudyKind.ELASTIC: "youngs=200.0, poisson=0.3",
+    StudyKind.FLOW: "reynolds=100.0",
 }
+#: The `bcs` a newly declared study starts with.  Empty for the mesh kinds;
+#: a flow study refuses to construct without an inlet ("it is what drives the
+#: flow and what sets the temperature everything else is measured against"),
+#: so writing `bcs=[]` there would produce a program that does not run.
+_STUDY_INITIAL_BCS = {
+    StudyKind.THERMAL: "[]",
+    StudyKind.ELASTIC: "[]",
+    StudyKind.FLOW: "[Inlet(velocity=0.02), Outlet(), Walls()]",
+}
+
+#: `bc_type -> (class, value keyword, module, places a region)`.
+#:
+#: The last field is what separates the two families. Every mesh condition
+#: picks a region and is written `Class(<nodes>, kw=value)`; a flow study's
+#: inlet, outlet and walls are *faces of the lattice*, so they place nothing
+#: and are written `Class()` or `Class(kw=value)`.
 _STUDY_BC_CLASSES = {
-    BoundaryConditionType.DIRICHLET: ("Dirichlet", "value"),
-    BoundaryConditionType.HEAT_FLUX: ("HeatFlux", "flux"),
-    BoundaryConditionType.FIXED: ("Fixed", None),
-    BoundaryConditionType.TRACTION: ("Traction", "vector"),
+    BoundaryConditionType.DIRICHLET: ("Dirichlet", "value", "cadjoint.fem", True),
+    BoundaryConditionType.HEAT_FLUX: ("HeatFlux", "flux", "cadjoint.fem", True),
+    BoundaryConditionType.FIXED: ("Fixed", None, "cadjoint.fem", True),
+    BoundaryConditionType.TRACTION: ("Traction", "vector", "cadjoint.fem", True),
+    BoundaryConditionType.INLET: ("Inlet", "velocity", "cadjoint.flow", False),
+    BoundaryConditionType.OUTLET: ("Outlet", None, "cadjoint.flow", False),
+    BoundaryConditionType.WALLS: ("Walls", "temperature", "cadjoint.flow", False),
+    BoundaryConditionType.HEAT_SOURCE: ("HeatSource", "power", "cadjoint.flow", True),
+    BoundaryConditionType.HELD_TEMPERATURE: ("HeldTemperature", "value", "cadjoint.flow", True),
 }
-_STUDY_KIND_BC_TYPES = {
-    StudyKind.THERMAL: (BoundaryConditionType.DIRICHLET, BoundaryConditionType.HEAT_FLUX),
-    StudyKind.ELASTIC: (BoundaryConditionType.FIXED, BoundaryConditionType.TRACTION),
-}
+_STUDY_KIND_BC_TYPES = dict(STUDY_KIND_BOUNDARY_CONDITIONS)
 _BC_CLASS_VALUE_KEYWORDS = {
-    "Dirichlet": "value",
-    "HeatFlux": "flux",
-    "Fixed": None,
-    "Traction": "vector",
+    symbol: keyword for symbol, keyword, _module, _placed in _STUDY_BC_CLASSES.values()
 }
 #: Meshing intent a study may only state when it meshes itself; on a study
 #: with ``mesh=`` these live on the SimMesh, and the constructor refuses both.
@@ -102,6 +131,19 @@ _MESH_OWNED_ARGUMENTS = frozenset({"resolution", "bounds", "size"})
 _STUDY_FIELDS = {
     StudyKind.THERMAL: ("name", "resolution", "conductivity", "bcs", "source", "bounds", "size"),
     StudyKind.ELASTIC: ("name", "resolution", "youngs", "poisson", "bcs", "bounds", "size"),
+    StudyKind.FLOW: (
+        "name",
+        "resolution",
+        "bounds",
+        "size",
+        "bcs",
+        "reynolds",
+        "characteristic_cells",
+        "viscosity",
+        "prandtl",
+        "conductivity_ratio",
+        "alpha_max",
+    ),
 }
 
 
@@ -155,14 +197,29 @@ def add_study(source: str, kind: StudyKindLike, name: str | None = None) -> str:
             )
     statement = (
         f"{variable} = {symbol}(name={study_name!r}, resolution=20, "
-        f"{_STUDY_DEFAULTS[kind]}, bcs=[])\n"
+        f"{_STUDY_DEFAULTS[kind]}, bcs={_STUDY_INITIAL_BCS[kind]})\n"
     )
     insert = _after_statement(source, anchor)
     patched = source[:insert] + statement + source[insert:]
-    patched = _ensure_import(
-        patched, ast.parse(patched), "cadjoint.fem", symbol, prefer_offset=insert
-    )
+    module = _STUDY_MODULES[kind]
+    patched = _ensure_import(patched, ast.parse(patched), module, symbol, prefer_offset=insert)
+    # A flow study is constructed with its inlet already in place, so the
+    # conditions it starts with need importing beside it.
+    for condition in _initial_bc_symbols(kind):
+        patched = _ensure_import(
+            patched, ast.parse(patched), module, condition, prefer_offset=insert
+        )
     return _validate(patched)
+
+
+def _initial_bc_symbols(kind: StudyKindLike) -> tuple[str, ...]:
+    """The condition classes named in :data:`_STUDY_INITIAL_BCS` for *kind*."""
+    initial = _STUDY_INITIAL_BCS[kind]
+    return tuple(
+        symbol
+        for symbol, _keyword, _module, _placed in _STUDY_BC_CLASSES.values()
+        if f"{symbol}(" in initial
+    )
 
 
 def delete_study(source: str, study) -> str:
@@ -230,19 +287,38 @@ def add_study_bc(
         raise PatchError(
             f"A {located.kind} study accepts {allowed} boundary conditions, not `{bc_type}`."
         )
-    symbol, value_keyword = _STUDY_BC_CLASSES[bc_type]
-    nodes_source = _selection_source(selection)
+    symbol, value_keyword, module, places = _STUDY_BC_CLASSES[bc_type]
+    if places:
+        arguments = [_selection_source(selection)]
+    else:
+        if selection is not None:
+            article = "An" if bc_type == BoundaryConditionType.INLET else "A"
+            raise PatchError(
+                f"{article} `{bc_type}` boundary condition is a face of the lattice and "
+                "places no region, so it takes no selection."
+            )
+        arguments = []
     if value_keyword is None:
         if value is not None:
-            raise PatchError("A `fixed` boundary condition takes no value.")
-        bc_source = f"{symbol}({nodes_source})"
+            raise PatchError(f"A `{bc_type}` boundary condition takes no value.")
+    elif value is None and bc_type == BoundaryConditionType.WALLS:
+        # Unheated duct walls state a no-slip condition and nothing else.
+        pass
     else:
-        if bc_type == BoundaryConditionType.TRACTION:
-            if not (isinstance(value, (list, tuple)) and len(value) == 3):
+        if bc_type in (BoundaryConditionType.TRACTION, BoundaryConditionType.INLET):
+            if isinstance(value, (list, tuple)):
+                if len(value) != 3:
+                    raise PatchError(
+                        f"A `{bc_type}` boundary condition needs `value` as three numbers."
+                    )
+            elif bc_type == BoundaryConditionType.TRACTION:
                 raise PatchError("A `traction` boundary condition needs `value` as three numbers.")
+            elif not isinstance(value, (int, float)) or isinstance(value, bool):
+                raise PatchError("An `inlet` needs `value` as a speed or three numbers.")
         elif not isinstance(value, (int, float)) or isinstance(value, bool):
             raise PatchError(f"A `{bc_type}` boundary condition needs a numeric `value`.")
-        bc_source = f"{symbol}({nodes_source}, {value_keyword}={_exact_value(value)})"
+        arguments.append(f"{value_keyword}={_exact_value(value)}")
+    bc_source = f"{symbol}({', '.join(arguments)})"
 
     offsets = _line_offsets(source)
     anchor_line = located.statement.lineno
@@ -262,12 +338,34 @@ def add_study_bc(
         patched = _set_keyword_expression(source, located.call, "bcs", f"[{bc_source}]")
 
     patched = _ensure_import(
-        patched, ast.parse(patched), "cadjoint.fem", symbol, prefer_offset=import_offset
+        patched, ast.parse(patched), module, symbol, prefer_offset=import_offset
     )
-    patched = _ensure_import(
-        patched, ast.parse(patched), "cadjoint.fem", "Nodes", prefer_offset=import_offset
-    )
+    if places:
+        # `Nodes` is the region language both study kinds speak; it lives in
+        # `cadjoint.studies` and `cadjoint.fem` re-exports it, so a mesh study
+        # keeps the import its scenes already have.
+        nodes_module = "cadjoint.fem" if module == "cadjoint.fem" else "cadjoint.studies"
+        # Recomputed, because the import above may have lengthened a line
+        # earlier in the file. When both imports come from the same module the
+        # second call extends the first's line and never reaches the offset,
+        # which is why this only ever bit the flow path.
+        patched = _ensure_import(
+            patched,
+            ast.parse(patched),
+            nodes_module,
+            "Nodes",
+            prefer_offset=_study_import_offset(patched, study),
+        )
     return _validate(patched)
+
+
+def _study_import_offset(source: str, study) -> int:
+    """Offset of the line an import for *study* should be inserted before."""
+    located = _located_study(source, study)
+    anchor_line = located.statement.lineno
+    if located.bcs is not None:
+        anchor_line = min(anchor_line, located.bcs.lineno)
+    return _line_offsets(source)[anchor_line - 1]
 
 
 def delete_study_bc(source: str, study, bc) -> str:

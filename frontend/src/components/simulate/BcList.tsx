@@ -10,7 +10,15 @@
  */
 
 import { For, Index, Show } from "solid-js";
-import { BC_LABELS, bcValue, deleteBcRequest, describeSelection, setBcValueRequest } from "../../studies";
+import {
+  BC_LABELS,
+  BC_PLACEMENT,
+  bcValue,
+  deleteBcRequest,
+  describeSelection,
+  isEditableStudyKind,
+  setBcValueRequest,
+} from "../../studies";
 import { selectionEvaluable } from "../../selectionEval";
 import { AXIS_LABELS, NumberInput } from "../ui";
 import { bcSwatch } from "./colors";
@@ -41,18 +49,27 @@ export function BcList(props: BcListProps) {
                 <i class="sim-bc-swatch" style={{ background: bcSwatch(bc.type) }} />
                 {BC_LABELS[bc.type]}
               </span>
-              <code title={describeSelection(bc.nodes)}>{describeSelection(bc.nodes)}</code>
-              <Show when={!selectionEvaluable(bc.nodes)}>
-                <small class="sim-note">no preview (predicate)</small>
+              <Show
+                when={bc.nodes}
+                fallback={<code class="sim-bc-placement">{BC_PLACEMENT[bc.type] ?? "—"}</code>}
+              >
+                {(nodes) => (
+                  <>
+                    <code title={describeSelection(nodes())}>{describeSelection(nodes())}</code>
+                    <Show when={!selectionEvaluable(nodes())}>
+                      <small class="sim-note">no preview (predicate)</small>
+                    </Show>
+                  </>
+                )}
               </Show>
             </div>
             <Show
-              when={bc.serializable}
+              when={bc.serializable && isEditableStudyKind(props.study.kind)}
               fallback={<small class="sim-note">edit in code</small>}
             >
               <Show when={bcValue(bc) !== null}>
                 <Show
-                  when={bc.type === "traction"}
+                  when={bc.type === "traction" || bc.type === "inlet"}
                   fallback={
                     <NumberInput
                       value={bcValue(bc) as number}
@@ -73,7 +90,7 @@ export function BcList(props: BcListProps) {
                         <NumberInput
                           value={component()}
                           disabled={sim().solving() !== null}
-                          title={`Traction ${AXIS_LABELS[index]}`}
+                          title={`${BC_LABELS[bc.type]} ${AXIS_LABELS[index]}`}
                           onCommit={(value) => {
                             const vector = [...(bcValue(bc) as number[])];
                             vector[index] = value;

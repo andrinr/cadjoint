@@ -70,22 +70,20 @@ def test_scene_wgsl_has_stable_distance_and_packed_material_signatures():
 
     declarations = re.findall(r"^fn ([A-Za-z_][A-Za-z0-9_]*)\(", source, re.MULTILINE)
     assert len(declarations) == len(set(declarations))
-    base_helpers = {
-        name.removeprefix("material_base__")
-        for name in declarations
-        if name.startswith("material_base__")
-    }
-    optics_helpers = {
-        name.removeprefix("material_optics__")
-        for name in declarations
-        if name.startswith("material_optics__")
-    }
-    assert base_helpers & optics_helpers
-    for prefix, helpers in (
-        ("material_base__", base_helpers),
-        ("material_optics__", optics_helpers),
-    ):
-        assert all(source.count(f"{prefix}{helper}(") >= 2 for helper in helpers)
+
+    # The two public material functions are slices of ONE program. They used
+    # to be separate exports, which traced and lowered the whole material
+    # tree -- and every operand's distance, through the boolean blends --
+    # twice, emitting a `material_base__*` and a `material_optics__*` copy of
+    # each shared helper. Neither family exists now: the helpers all hang off
+    # the single block, and each public function is one call plus a swizzle.
+    assert not [name for name in declarations if name.startswith("material_base__")]
+    assert not [name for name in declarations if name.startswith("material_optics__")]
+    assert "fn material_block_impl(p: vec3<f32>) -> mat4x2<f32>" in source
+    assert source.count("fn material_block_impl(") == 1
+    for name in ("material_base", "material_optics"):
+        body = source.split(f"fn {name}(p: vec3<f32>) -> vec4<f32> {{", 1)[1].split("}", 1)[0]
+        assert body.count("material_block_impl(p)") == 1
 
 
 def test_constant_material_keeps_point_query_signatures():

@@ -6,6 +6,7 @@
  */
 
 import type { ConstructionNode } from "../types";
+import type { PlaneFrame } from "../planes";
 import { projectPoint, type View } from "./math";
 
 /** Picking uses the same view descriptor as projection and ray casting. */
@@ -137,6 +138,45 @@ export function pickNode(
       if (distance <= radius && (best === null || distance < best.distance)) {
         best = { nodeId: node.id, distance };
       }
+    }
+  }
+  return best;
+}
+
+export interface PlaneHit {
+  nodeId: string;
+  distance: number;
+}
+
+/**
+ * Nearest sketch-plane frame to a pixel: its outline, or its origin mark.
+ *
+ * Only planes that belong to a sketch are pickable — the placement preview
+ * has no node — and a derived plane is picked too, so that clicking it can
+ * say why it will not move rather than doing nothing.
+ */
+export function pickPlane(
+  frames: readonly PlaneFrame[],
+  x: number,
+  y: number,
+  view: PickView,
+  radius = 8,
+): PlaneHit | null {
+  let best: PlaneHit | null = null;
+  for (const frame of frames) {
+    if (frame.nodeId === null) continue;
+    const consider = (distance: number) => {
+      if (distance <= radius && (best === null || distance < best.distance)) {
+        best = { nodeId: frame.nodeId!, distance };
+      }
+    };
+    const origin = projectPoint(frame.origin, view);
+    if (origin.visible) consider(Math.hypot(x - origin.x, y - origin.y));
+    for (let index = 0; index < 4; index++) {
+      const a = projectPoint(frame.corners[index], view);
+      const b = projectPoint(frame.corners[(index + 1) % 4], view);
+      if (!a.visible || !b.visible) continue;
+      consider(pointSegmentDistance(x, y, a.x, a.y, b.x, b.y));
     }
   }
   return best;

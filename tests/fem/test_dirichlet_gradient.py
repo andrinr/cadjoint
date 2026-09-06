@@ -21,10 +21,10 @@ import jax
 import jax.numpy as jnp
 
 from cadjoint.fem.hexmesh import GridSpec, sdf_to_hex_mesh
-from cadjoint.fem.selection import Nodes
 from cadjoint.fem.simulate import thermal_solve
 from cadjoint.geometry.parameters import Vector
 from cadjoint.sdf.primitives import Box
+from cadjoint.studies.selection import Nodes
 
 _HOT_END = Nodes.side("-x")
 _COLD_END = Nodes.side("+x")

@@ -39,6 +39,33 @@ export interface ViewerHintProps {
    * the sentence describes a mark, so it goes away with the mark.
    */
   handle: { name: string | null; state: BindingState } | null;
+  /** The sketch plane under the pointer, and whether it can be moved. */
+  plane: PlaneHover | null;
+}
+
+export interface PlaneHover {
+  name: string;
+  derived: boolean;
+  editable: boolean;
+  /** The `SketchPlane` constructor a derived plane was built with. */
+  reference: string | null;
+}
+
+/**
+ * What taking hold of the hovered plane will do.
+ *
+ * Three answers, matching the three kinds of plane the source can hold: a
+ * literal the gizmo moves, a plane derived from a face that follows its
+ * parent and will not, and a plane the source could not be traced for.
+ */
+export function planeSentence(plane: PlaneHover): string {
+  if (plane.derived) {
+    return `Sketch plane of ${plane.name} · derived from a face (SketchPlane.${plane.reference ?? "on"}): follows its parent, not draggable — edit the reference in the code`;
+  }
+  if (!plane.editable) {
+    return `Sketch plane of ${plane.name} · not editable from the viewer`;
+  }
+  return `Sketch plane of ${plane.name} · click to select · drag the gizmo to move its origin`;
 }
 
 /**
@@ -100,8 +127,8 @@ export function ViewerHint(props: ViewerHintProps) {
         ? "Loft: click the second sketch in the viewport · Esc to cancel"
         : tool() === "sketch"
         ? sketchPlane() === "face"
-          ? "Sketch: click a solid's face to place it there · Esc to cancel"
-          : `Sketch: click to place on the ${sketchPlane().toUpperCase()} plane · Esc to cancel`
+          ? "Sketch: click a solid's face to place it there · the ghost shows where the plane lands · Esc to cancel"
+          : `Sketch: click to place on the ${sketchPlane().toUpperCase()} plane · the ghost shows where it lands · Esc to cancel`
         : tool() === "face"
         ? faceSentence()
         : tool() === "polygon"
@@ -118,7 +145,9 @@ export function ViewerHint(props: ViewerHintProps) {
             ? `Click to place a ${tool()} · Esc to cancel`
             : props.handle
               ? handleSentence(props.handle)
-              : "Drag handles or the gizmo · Drag to orbit · Right-drag to pan"}
+              : props.plane
+                ? planeSentence(props.plane)
+                : "Drag handles or the gizmo · Drag to orbit · Right-drag to pan"}
     </p>
   );
 }

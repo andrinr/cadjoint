@@ -60,21 +60,16 @@ from jax import Array
 
 from cadjoint.fluent import Fluent
 from cadjoint.geometry.parameters import Parameter, Vector, Vector2, as_parameter
+from cadjoint.geometry.vectors import unit
 
 # Below this squared length a direction carries no orientation; the guarded
 # norm keeps value and derivative finite where a bare norm would give 0/0.
-_MIN_SQUARED = 1e-12
 
 # The error JAX raises when a tracer is forced to a Python value (bool() or
 # float()). Catching it is how this module tells "concrete scene" from
 # "inside jit/grad" without type-sniffing tracer classes. Nothing else is
 # caught: a genuinely bad value must still raise its own error.
 _NOT_CONCRETE = jax.errors.ConcretizationTypeError
-
-
-def _unit(vector: Array) -> Array:
-    """Normalize a vector with a guarded norm, safe under tracing."""
-    return vector / jnp.sqrt(jnp.maximum(jnp.sum(vector * vector), _MIN_SQUARED))
 
 
 def _surface_normal(field, point: Array, step: float) -> Array:
@@ -104,7 +99,7 @@ def _surface_normal(field, point: Array, step: float) -> Array:
     """
     offsets = jnp.eye(3, dtype=jnp.float32) * step
     difference = jnp.stack([field(point + o) - field(point - o) for o in offsets])
-    return _unit(difference)
+    return unit(difference)
 
 
 def _maybe_float(value) -> float | None:
@@ -143,10 +138,10 @@ def _plane_frame(normal: Array, x_axis: Array | None = None) -> tuple[Array, Arr
             jnp.array([0.0, 0.0, 1.0]),
             jnp.array([0.0, 1.0, 0.0]),
         )
-        u = _unit(jnp.cross(up, normal))
+        u = unit(jnp.cross(up, normal))
     else:
         x_axis = jnp.asarray(x_axis)
-        u = _unit(x_axis - jnp.sum(x_axis * normal) * normal)
+        u = unit(x_axis - jnp.sum(x_axis * normal) * normal)
     v = jnp.cross(normal, u)
     return u, v
 
@@ -177,7 +172,7 @@ def _rotation_axis(matrix: Array, angle: Array) -> Array:
     diagonal = jnp.diag(symmetric)
     column = jnp.argmax(diagonal)
     near_pi = symmetric[:, column] / jnp.sqrt(jnp.maximum(diagonal[column], 1e-12))
-    return _unit(jnp.where(degenerate, near_pi, generic))
+    return unit(jnp.where(degenerate, near_pi, generic))
 
 
 def _reference_frame(reference) -> tuple[Array, Array, Array]:
@@ -365,7 +360,7 @@ class SketchPlane(Fluent):
         aligned = jnp.where(jnp.dot(normal_a, normal_b) < 0.0, -normal_b, normal_b)
         return cls(
             origin=(origin_a + origin_b) / 2.0,
-            normal=_unit(normal_a + aligned),
+            normal=unit(normal_a + aligned),
             x_axis=x_axis,
         )
 
@@ -467,7 +462,7 @@ def _normalized(normal: Vector) -> Vector:
         return normal.normalize()
     except _NOT_CONCRETE:
         return Vector(
-            value=_unit(normal.value),
+            value=unit(normal.value),
             free=normal.free,
             name=normal.name,
             bounds=normal.bounds,

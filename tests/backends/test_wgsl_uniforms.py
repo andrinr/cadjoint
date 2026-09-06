@@ -158,8 +158,8 @@ def _function_parameter_counts(wgsl: str) -> dict[str, int]:
 
 def _shipped_scene(stem: str):
     from cadjoint.fem.simmesh import capture_sim_meshes
-    from cadjoint.fem.study import capture_studies
     from cadjoint.optimize import capture_optimizations
+    from cadjoint.studies import capture_studies
 
     namespace: dict = {"__builtins__": __builtins__, "__name__": "__cadjoint_playground__"}
     path = _SCENES / f"{stem}.py"

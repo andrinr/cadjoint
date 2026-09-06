@@ -41,7 +41,7 @@ export interface ExportFormatInfo {
  * STEP's note says what makes it the interesting one: it is not a faceted
  * mesh with a `.step` extension but the derived B-rep — exact planes and
  * cylinders with their real boundary curves — faceted only where a face is
- * a blend the graph cannot certify (`cadjoint/viewer/_export.py`).
+ * a blend the graph cannot certify (`cadjoint/viewer/worker/export.py`).
  */
 export const EXPORT_FORMATS: readonly ExportFormatInfo[] = [
   {

@@ -343,10 +343,11 @@ class TestDCChain:
 
 def _tet_quality(points, cells):
     """``(signed volumes, cbrt|vol| / longest edge)`` over the corner tets."""
-    from cadjoint.fem.tetmesh import _TET10_EDGES, tet_volumes
+    from cadjoint.fem.elements import TET10_EDGES
+    from cadjoint.fem.tetmesh import tet_volumes
 
     volume = tet_volumes(np.asarray(points), np.asarray(cells)[:, :4])
-    corner = np.asarray(points)[np.asarray(cells)[:, :4]][:, _TET10_EDGES]
+    corner = np.asarray(points)[np.asarray(cells)[:, :4]][:, TET10_EDGES]
     lengths = np.linalg.norm(corner[:, :, 0] - corner[:, :, 1], axis=-1)
     return volume, np.cbrt(np.abs(volume)) / np.maximum(lengths.max(axis=1), 1e-30)
 

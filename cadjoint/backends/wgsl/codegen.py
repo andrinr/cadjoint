@@ -16,6 +16,15 @@ from ._wgsl_emitter import StableHLOToWGSL
 
 MATERIAL_BASE_ENTRY_POINT = "material_base"
 MATERIAL_OPTICS_ENTRY_POINT = "material_optics"
+#: The single program both public material entry points read.  The material
+#: tree is the whole scene's material tree -- and, through the boolean blends,
+#: every operand's *distance* as well -- so exporting `material_base` and
+#: `material_optics` separately traced and lowered all of it twice.  One
+#: program returning both rows costs one trace; the two public functions are
+#: thin slices of it.  See `research/performance.md` s15.
+MATERIAL_BLOCK_ENTRY_POINT = "material_block"
+#: The optics row, in the order ``material_optics`` returns it.
+_OPTICS_KEYS = ("metallic", "opacity", "ior", "reflectivity")
 
 #: Bind group and binding the generated parameter uniform declares itself at.
 DEFAULT_PARAMETER_GROUP = 3
@@ -275,23 +284,8 @@ def compile_scene_to_wgsl(
 
     free_parameters, fixed_parameters, _ = extract_parameters(geometry)
 
-    def material_base(point):
-        material = material_at(point)
-        color = jnp.reshape(jnp.asarray(material["color"], dtype=jnp.float32), (3,))
-        roughness = jnp.reshape(
-            jnp.asarray(material["roughness"], dtype=jnp.float32),
-            (1,),
-        )
-        return jnp.concatenate((color, roughness))
-
-    def material_optics(point):
-        material = material_at(point)
-        return jnp.concatenate(
-            tuple(
-                jnp.reshape(jnp.asarray(material[key], dtype=jnp.float32), (1,))
-                for key in ("metallic", "opacity", "ior", "reflectivity")
-            )
-        )
+    def material_block(point):
+        return _material_rows(material_at(point))
 
     compiler = StableHLOToWGSL()
     with scalar_lowering():
@@ -301,19 +295,13 @@ def compile_scene_to_wgsl(
         sections = (
             compiler.compile(sdf, example_point),
             compiler.compile(
-                material_base,
+                material_block,
                 example_point,
-                entry_point=MATERIAL_BASE_ENTRY_POINT,
-                output_shape=(4,),
-                output_description="float32 vector with shape (4,)",
+                entry_point=f"{MATERIAL_BLOCK_ENTRY_POINT}_impl",
+                output_shape=(2, 4),
+                output_description="float32 array with shape (2, 4)",
             ),
-            compiler.compile(
-                material_optics,
-                example_point,
-                entry_point=MATERIAL_OPTICS_ENTRY_POINT,
-                output_shape=(4,),
-                output_description="float32 vector with shape (4,)",
-            ),
+            _material_entry_points(MATERIAL_BLOCK_ENTRY_POINT),
         )
     return "\n\n".join(sections)
 
@@ -498,38 +486,18 @@ def compile_scene_with_uniforms(
         def distance(point, *arguments):
             return bind(arguments)[0](point)
 
-        def material_base(point, *arguments):
+        def material_block(point, *arguments):
             material = bind(arguments)[1](point)
-            color = jnp.reshape(jnp.asarray(material["color"], dtype=jnp.float32), (3,))
-            roughness = jnp.reshape(
-                jnp.asarray(material["roughness"], dtype=jnp.float32),
-                (1,),
-            )
-            return jnp.concatenate((color, roughness))
-
-        def material_optics(point, *arguments):
-            material = bind(arguments)[1](point)
-            return jnp.concatenate(
-                tuple(
-                    jnp.reshape(jnp.asarray(material[key], dtype=jnp.float32), (1,))
-                    for key in ("metallic", "opacity", "ior", "reflectivity")
-                )
-            )
+            return _material_rows(material)
 
         compiler = StableHLOToWGSL()
         entries = (
             ("sdf", distance, (), "scalar float32 distance"),
             (
-                MATERIAL_BASE_ENTRY_POINT,
-                material_base,
-                (4,),
-                "float32 vector with shape (4,)",
-            ),
-            (
-                MATERIAL_OPTICS_ENTRY_POINT,
-                material_optics,
-                (4,),
-                "float32 vector with shape (4,)",
+                MATERIAL_BLOCK_ENTRY_POINT,
+                material_block,
+                (2, 4),
+                "float32 array with shape (2, 4)",
             ),
         )
         # Two reserved slots follow the parameters: the NaN the module cannot
@@ -555,7 +523,10 @@ def compile_scene_with_uniforms(
                     nan_expression=nan_expression,
                 )
             )
-            sections.append(_uniform_entry_point(entry_point, output_shape))
+            if entry_point == MATERIAL_BLOCK_ENTRY_POINT:
+                sections.append(_material_entry_points(entry_point))
+            else:
+                sections.append(_uniform_entry_point(entry_point, output_shape))
 
     return ShaderProgram(
         wgsl="\n\n".join(sections),
@@ -565,6 +536,45 @@ def compile_scene_with_uniforms(
         binding=binding,
         nan_offset=len(slots) * PARAMETER_SLOT_BYTES,
         cull_margin_offset=(len(slots) + 1) * PARAMETER_SLOT_BYTES,
+    )
+
+
+def _material_rows(material: dict) -> jnp.ndarray:
+    """The material's two public rows as one ``(2, 4)`` block.
+
+    Row 0 is what ``material_base`` returns (RGB and roughness), row 1 what
+    ``material_optics`` returns (metallic, opacity, IOR, reflectivity).  One
+    array so the material tree is traced and lowered once instead of once per
+    public entry point.
+    """
+
+    def scalar(key: str) -> jnp.ndarray:
+        return jnp.reshape(jnp.asarray(material[key], dtype=jnp.float32), (1,))
+
+    color = jnp.reshape(jnp.asarray(material["color"], dtype=jnp.float32), (3,))
+    base = jnp.concatenate((color, scalar("roughness")))
+    optics = jnp.concatenate(tuple(scalar(key) for key in _OPTICS_KEYS))
+    return jnp.stack((base, optics))
+
+
+def _material_entry_points(block: str) -> str:
+    """``material_base`` and ``material_optics`` as slices of one block call.
+
+    A ``(2, 4)`` return lowers to ``mat4x2<f32>`` — WGSL spells a matrix
+    columns-by-rows, so the block's column ``c`` is ``vec2(base[c],
+    optics[c])`` and each public row is gathered across the four columns.
+    """
+
+    def row(index: int) -> str:
+        component = "xy"[index]
+        parts = ", ".join(f"m[{column}].{component}" for column in range(4))
+        return f"vec4<f32>({parts})"
+
+    return "\n\n".join(
+        f"fn {name}(p: vec3<f32>) -> vec4<f32> {{\n"
+        f"    let m = {block}_impl(p);\n"
+        f"    return {row(index)};\n}}"
+        for index, name in enumerate((MATERIAL_BASE_ENTRY_POINT, MATERIAL_OPTICS_ENTRY_POINT))
     )
 
 

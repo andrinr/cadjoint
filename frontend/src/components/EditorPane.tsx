@@ -20,6 +20,7 @@ import {
 } from "@codemirror/view";
 import { createEffect, onCleanup, onMount } from "solid-js";
 import { intelligenceExtensions } from "../editor/extensions";
+import { minimalChange } from "../editor/minimalChange";
 import type { FocusSpan } from "../editorFocus";
 import { consoleText, sceneName, setDirty, setSource, source } from "../state";
 
@@ -162,13 +163,15 @@ export function EditorPane(props: EditorPaneProps) {
     onCleanup(() => view?.destroy());
   });
 
-  // Adopt source changes that came from elsewhere (session start, /patch).
+  // Adopt source changes that came from elsewhere (session start, /patch),
+  // as the smallest edit that produces them: a whole-document replacement
+  // sends the view back to line 1, and a patch is a few characters in one
+  // literal the user is looking at (see `minimalChange`).
   createEffect(() => {
     const text = source();
-    if (!view || view.state.doc.toString() === text) return;
-    view.dispatch({
-      changes: { from: 0, to: view.state.doc.length, insert: text },
-    });
+    if (!view) return;
+    const change = minimalChange(view.state.doc.toString(), text);
+    if (change) view.dispatch({ changes: change });
   });
 
   /**

@@ -26,6 +26,7 @@
 import type {
   ConstraintSolverRun,
   ConstructionConstraint as ConstructionConstraintPayload,
+  ConstructionElement,
   ConstructionNode as ConstructionNodePayload,
   ConstructionRelation,
   MaterialDefinition,
@@ -40,6 +41,8 @@ import type {
 
 export type {
   ConstraintSolverRun,
+  ConstructionArgument,
+  ConstructionElement,
   ConstructionFace,
   ConstructionOperator,
   ConstructionPlane,
@@ -58,6 +61,7 @@ export type {
   PatchOperation,
   PatchRequest,
   ParameterBinding,
+  PatchAddress,
   PatchResponse,
   PlaneReference,
   ShaderParameter,
@@ -120,6 +124,8 @@ export interface CompileResponse {
   path_shader: string;
   present_shader: string;
   construction: ConstructionNode[];
+  /** Every construction call with its written arguments; absent from an older worker. */
+  elements?: ConstructionElement[];
   relations: ConstructionRelation[];
   solver_runs: ConstraintSolverRun[];
   materials: MaterialDefinition[];
@@ -161,12 +167,27 @@ export type StudySelection = StudySelectionPayload &
     | { kind: "not"; operand: StudySelection }
   );
 
-export type StudyBcType = "dirichlet" | "heat_flux" | "fixed" | "traction";
+export type MeshStudyBcType = "dirichlet" | "heat_flux" | "fixed" | "traction";
+
+/**
+ * A flow study's conditions. Three of them place nothing: an inlet, an
+ * outlet and the duct walls are faces of the lattice, not a chosen region,
+ * which is why `StudyBc.nodes` is optional.
+ */
+export type FlowStudyBcType =
+  | "inlet"
+  | "outlet"
+  | "walls"
+  | "heat_source"
+  | "held_temperature";
+
+export type StudyBcType = MeshStudyBcType | FlowStudyBcType;
 
 /** The generated BC row, narrowed to the kinds and selections the UI draws. */
 export interface StudyBc extends StudyBcPayload {
   type: StudyBcType;
-  nodes: StudySelection;
+  /** Absent on the conditions that place nothing — see `FlowStudyBcType`. */
+  nodes?: StudySelection | null;
 }
 
 /** The generated study, carrying the narrowed BC rows. */
@@ -335,6 +356,15 @@ export interface Selection {
   nodeId: string;
   /** Null when the selection is the object itself, as for a primitive. */
   vertexIndex: number | null;
+  /**
+   * Which part of the object was taken hold of.
+   *
+   * A sketch is one object with two graspable things: its polygon and the
+   * plane it sits on. Selecting the plane keeps `nodeId` on the sketch — every
+   * panel that shows "the selected sketch" stays right — and puts the gizmo on
+   * the plane's origin rather than the polygon's centre.
+   */
+  part?: "plane";
 }
 
 export type ToolMode =
@@ -398,12 +428,16 @@ export interface SimulationMeshPayload {
 /**
  * What a study in the payload can be.
  *
- * Wider than `StudyKind` in `cadjoint/enums.py` on purpose: the enum names
- * the kinds the GUI can author, this names the kinds a program may contain.
- * A flow study is declared in the scene and has no patch vocabulary, so it
+ * Equal to `StudyKind` in `cadjoint/enums.py` now that the patch layer
+ * writes all three, and kept separate because the two have differed before
+ * and may again: the enum names the kinds the GUI can *author*, this names
+ * the kinds a program may *contain*. A kind in the second and not the first
  * is reported and read but never built here.
  */
 export type StudyPayloadKind = "thermal" | "elastic" | "flow";
+
+/** The kinds the GUI can author — see `payloads.d.ts`'s generated union. */
+export type { StudyKind } from "../../cadjoint/viewer/schema/payloads";
 
 export type SimulationKind = "probe" | "thermal" | "elastic";
 

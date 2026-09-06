@@ -16,8 +16,8 @@ from urllib.request import Request, urlopen
 
 import pytest
 
-from cadjoint.viewer import _compile_worker
 from cadjoint.viewer.playground import create_server, mesh_inspect_source, simulate_source
+from cadjoint.viewer.worker import main as worker
 
 BOX_SOURCE = """
 from cadjoint.geometry import Vector
@@ -161,13 +161,11 @@ class TestHttp:
 class TestStudySimulate:
     def test_unknown_study_name_lists_the_declared_ones(self):
         with pytest.raises(ValueError, match="'bar'"):
-            _compile_worker._simulate_study(
-                _box_scene(), [_bar_study()], {"kind": "study", "name": "nope"}
-            )
+            worker._simulate_study(_box_scene(), [_bar_study()], {"kind": "study", "name": "nope"})
 
     def test_duplicate_study_names_are_ambiguous(self):
         with pytest.raises(ValueError, match="more than one"):
-            _compile_worker._simulate_study(
+            worker._simulate_study(
                 _box_scene(), [_bar_study(), _bar_study()], {"kind": "study", "name": "bar"}
             )
 
@@ -183,15 +181,13 @@ class TestStudySimulate:
 
         study = _bar_study()
         monkeypatch.setattr(builtins, "__import__", no_jax_fem)
-        result = _compile_worker._simulate_study(
-            _box_scene(), [study], {"kind": "study", "name": "bar"}
-        )
+        result = worker._simulate_study(_box_scene(), [study], {"kind": "study", "name": "bar"})
         assert result["ok"] is False
         assert result["error_kind"] == "fem_unavailable"
 
     def test_thermal_study_solves_with_its_declared_settings(self):
         pytest.importorskip("jax_fem", reason="study solve needs the fem extra")
-        result = _compile_worker._simulate_study(
+        result = worker._simulate_study(
             _box_scene(), [_bar_study()], {"kind": "study", "name": "bar"}
         )
         assert result["ok"] is True
@@ -237,7 +233,7 @@ class TestStudySimulate:
                 Traction(Nodes.side("+x"), (0.0, 0.0, -1.0)),
             ],
         )
-        result = _compile_worker._simulate_study(
+        result = worker._simulate_study(
             _box_scene(), [study], {"kind": "study", "name": "cantilever"}
         )
         assert result["ok"] is True
@@ -270,7 +266,7 @@ class TestStudySimulate:
         pytest.importorskip("jax_fem", reason="study solve needs the fem extra")
         study = _bar_study()
         scene = _box_scene()
-        first = _compile_worker._simulate_study(scene, [study], {"kind": "study", "name": "bar"})
+        first = worker._simulate_study(scene, [study], {"kind": "study", "name": "bar"})
         assert first["cached"] is False
         assert study.last_result is not None
 
@@ -278,7 +274,7 @@ class TestStudySimulate:
             raise AssertionError("cached request must not re-solve")
 
         study.solve = explode
-        second = _compile_worker._simulate_study(
+        second = worker._simulate_study(
             scene, [study], {"kind": "study", "name": "bar", "cached": True}
         )
         assert second["cached"] is True
@@ -287,7 +283,7 @@ class TestStudySimulate:
 
     def test_cached_falls_back_to_solving_when_nothing_is_stored(self):
         pytest.importorskip("jax_fem", reason="study solve needs the fem extra")
-        result = _compile_worker._simulate_study(
+        result = worker._simulate_study(
             _box_scene(), [_bar_study()], {"kind": "study", "name": "bar", "cached": True}
         )
         assert result["ok"] is True
@@ -307,9 +303,7 @@ class TestStudySimulate:
                 "                         Dirichlet(Nodes.side('+x'), 1.0)])",
             ]
         )
-        result = _compile_worker._simulate_source(
-            {"source": source, "kind": "study", "name": "bar"}
-        )
+        result = worker._simulate_source({"source": source, "kind": "study", "name": "bar"})
         assert result["ok"] is True
         assert result["field"] == "temperature"
         assert "output" in result
@@ -330,9 +324,7 @@ class TestStudySimulate:
                 "                         Dirichlet(Nodes.side('+x'), 1.0)])",
             ]
         )
-        result = _compile_worker._simulate_source(
-            {"source": source, "kind": "study", "name": "bar"}
-        )
+        result = worker._simulate_source({"source": source, "kind": "study", "name": "bar"})
         assert result["ok"] is True
         assert result["study"]["mesh"] == "grid"
         assert result["result"]["mesh"] == "grid"
@@ -357,7 +349,7 @@ MESH_SOURCE = "\n".join(
 
 class TestMeshInspect:
     def test_named_mesh_reports_info_and_quality_surface(self):
-        result = _compile_worker._mesh_inspect_source({"source": MESH_SOURCE, "name": "grid"})
+        result = worker._mesh_inspect_source({"source": MESH_SOURCE, "name": "grid"})
         assert result["ok"] is True
         assert result["name"] == "grid"
         assert result["field"] == "scaled_jacobian"
@@ -375,7 +367,7 @@ class TestMeshInspect:
         assert 0.0 < low <= high <= 1.0 + 1e-9
 
     def test_single_declared_mesh_needs_no_name(self):
-        result = _compile_worker._mesh_inspect_source({"source": MESH_SOURCE})
+        result = worker._mesh_inspect_source({"source": MESH_SOURCE})
         assert result["ok"] is True
         assert result["name"] == "grid"
 
@@ -391,7 +383,7 @@ class TestMeshInspect:
                 "                    bcs=[Dirichlet(Nodes.side('-x'), 0.0)])",
             ]
         )
-        result = _compile_worker._mesh_inspect_source({"source": source, "name": "bar"})
+        result = worker._mesh_inspect_source({"source": source, "name": "bar"})
         assert result["ok"] is True
         assert result["name"] == "bar::mesh"
         assert result["info"]["elements"] > 0
@@ -399,13 +391,13 @@ class TestMeshInspect:
     def test_unknown_name_lists_meshes_and_studies(self):
         # The worker's main() turns these into {"ok": False} responses.
         with pytest.raises(ValueError, match="'nope'"):
-            _compile_worker._inspect_mesh(_box_scene(), [], [], {"name": "nope"})
+            worker._inspect_mesh(_box_scene(), [], [], {"name": "nope"})
         with pytest.raises(ValueError, match="'grid'"):
-            _compile_worker._mesh_inspect_source({"source": MESH_SOURCE, "name": "nope"})
+            worker._mesh_inspect_source({"source": MESH_SOURCE, "name": "nope"})
 
     def test_ambiguity_without_a_name_is_an_error(self):
         with pytest.raises(ValueError, match="name"):
-            _compile_worker._mesh_inspect_source({"source": BOX_SOURCE})
+            worker._mesh_inspect_source({"source": BOX_SOURCE})
 
     def test_endpoint_round_trips_over_http(self):
         with _running_server() as base:

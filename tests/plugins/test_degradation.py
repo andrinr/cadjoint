@@ -10,7 +10,7 @@ compute nothing — to see what a filled kind changes; and
 those kinds removed, so the degraded assertions hold even on a developer's
 machine that *does* have diff-brep installed alongside.
 
-The matrix this file pins (``research/two-tier.md`` §2.5):
+The matrix this file pins:
 
 =========================  ==================================================
 compile / mesh / solve     unchanged — nothing in a solve moves a node
@@ -83,9 +83,9 @@ class TestTheFixtureBlanksTheRegistry:
         from cadjoint.plugins import builtin_specs
 
         shipped = {spec.kind for spec in builtin_specs().values()}
-        assert shipped.isdisjoint(tier.KINDS), (
-            "public cadjoint must ship no provider for the private kinds"
-        )
+        assert shipped.isdisjoint(
+            tier.KINDS
+        ), "public cadjoint must ship no provider for the private kinds"
         with tier.absent():
             status = tier.status()
             assert not status.installed
@@ -186,7 +186,7 @@ class TestStepExportFallsBackToFaceted:
     """A STEP file is *always* produced; the report says by which writer."""
 
     def _export(self, tmp_path: Path, **fields) -> dict:
-        from cadjoint.viewer._export import export_scene
+        from cadjoint.viewer.worker.export import export_scene
 
         tmp_path.mkdir(parents=True, exist_ok=True)
         path = tmp_path / "out.step"
@@ -237,13 +237,13 @@ class TestTheCompilePayloadCarriesTheTier:
     """The viewer is told, rather than left to guess from an empty layer."""
 
     def test_the_flags_are_one_boolean_per_kind(self):
-        from cadjoint.viewer._compile_worker import _tier_flags
+        from cadjoint.viewer.worker.main import _tier_flags
 
         with tier.absent():
             assert _tier_flags() == dict.fromkeys(tier.KINDS, False)
 
     def test_the_flags_go_true_when_a_provider_is_registered(self, stub_tier):
-        from cadjoint.viewer._compile_worker import _tier_flags
+        from cadjoint.viewer.worker.main import _tier_flags
 
         assert _tier_flags() == dict.fromkeys(tier.KINDS, True)
         with tier.absent():

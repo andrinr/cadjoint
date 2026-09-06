@@ -46,6 +46,7 @@ import {
   setBusy,
   setConsoleText,
   setDirty,
+  setElements,
   setMaterials,
   setMeshEdges,
   setNodes,
@@ -218,6 +219,7 @@ export function createCompileCycle(options: CompileCycleOptions): CompileCycle {
     setDirty(false);
     setConsoleText(result.output ?? "");
     setNodes(result.construction ?? []);
+    setElements(result.elements ?? []);
     setRelations(result.relations ?? []);
     setSolverRuns(result.solver_runs ?? []);
     setMaterials(result.materials ?? []);

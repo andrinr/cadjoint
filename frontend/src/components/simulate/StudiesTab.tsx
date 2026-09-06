@@ -84,8 +84,10 @@ export function StudiesTab(props: StudiesTabProps) {
                     </For>
                     {/* The mesh/domain a study discretizes: a declared
                         SimMesh by name, or a named object restricting the
-                        implicit mesh. Both are plain source rewrites. */}
-                    <Show when={simMeshes().length > 0}>
+                        implicit mesh. Both are plain source rewrites.
+                        A flow study discretizes neither — it fills a lattice
+                        of its own — so it is offered no mesh to pick. */}
+                    <Show when={simMeshes().length > 0 && study.kind !== "flow"}>
                       <label>
                         <span>mesh</span>
                         <select
@@ -238,6 +240,13 @@ export function StudiesTab(props: StudiesTabProps) {
           data-testid="simulate-add-elastic"
         >
           + Elastic study
+        </button>
+        <button
+          type="button"
+          onClick={() => void sim().patch(addStudyRequest("flow"))}
+          data-testid="simulate-add-flow"
+        >
+          + Flow study
         </button>
       </div>
     </>

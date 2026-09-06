@@ -10,7 +10,16 @@
 
 import { Dynamic } from "solid-js/web";
 import { For, Show, createMemo, createSignal, type Component } from "solid-js";
-import { hover, nodes, selection, setHover, setSelection } from "../state";
+import {
+  elements,
+  hover,
+  inspected,
+  nodes,
+  selection,
+  setHover,
+  setInspected,
+  setSelection,
+} from "../state";
 import { buildSceneTree, visibleRows, type SceneTreeRow } from "../objectTree";
 import {
   BoxIcon,
@@ -27,11 +36,12 @@ const KIND_ICONS: Record<SceneTreeRow["kind"], Component | null> = {
   sphere: SphereIcon,
   cylinder: CylinderIcon,
   operator: null,
+  boolean: ObjectSelectIcon,
 };
 
 export function ObjectTree() {
   const [collapsed, setCollapsed] = createSignal<ReadonlySet<string>>(new Set());
-  const rows = createMemo(() => buildSceneTree(nodes()));
+  const rows = createMemo(() => buildSceneTree(nodes(), elements()));
   const shown = createMemo(() => visibleRows(rows(), collapsed()));
 
   const toggleGroup = (key: string) => {
@@ -42,8 +52,13 @@ export function ObjectTree() {
   };
 
   const selectRow = (row: SceneTreeRow) => {
-    if (row.nodeId === null) return;
-    setSelection({ nodeId: row.nodeId, vertexIndex: null });
+    if (row.nodeId !== null) {
+      setSelection({ nodeId: row.nodeId, vertexIndex: null });
+      return;
+    }
+    // An operator or a boolean has no geometry to select; it points the
+    // properties window at its element instead.
+    if (row.elementId !== null) setInspected(row.elementId);
   };
 
   /** Roving arrow-key navigation over the visible rows. */
@@ -85,9 +100,12 @@ export function ObjectTree() {
               <div
                 class="object-tree-row"
                 classList={{
-                  active: row.nodeId !== null && selection()?.nodeId === row.nodeId,
+                  active:
+                    (row.nodeId !== null && selection()?.nodeId === row.nodeId) ||
+                    (row.elementId !== null && inspected() === row.elementId),
                   hovered: row.nodeId !== null && hover()?.nodeId === row.nodeId,
                   operator: row.kind === "operator",
+                  boolean: row.kind === "boolean",
                 }}
                 role="treeitem"
                 aria-level={row.depth + 1}

@@ -14,9 +14,9 @@ from pathlib import Path
 import pytest
 
 from cadjoint.viewer._patch_requests import patch_source
-from cadjoint.viewer._source_map import PLAYGROUND_FILENAME, capture_profiles, identity_index
-from cadjoint.viewer._worker_scene import _execute_scene
 from cadjoint.viewer.patch import PatchError, apply_operation
+from cadjoint.viewer.source_map import PLAYGROUND_FILENAME, capture_profiles, identity_index
+from cadjoint.viewer.worker.scene import _execute_scene
 
 SCENES_DIR = Path(__file__).resolve().parents[2] / "scenes"
 STARTER = (SCENES_DIR / "starter.py").read_text()
@@ -119,10 +119,11 @@ class TestSetValueWritesOnlyWhatTheCallTakes:
 
     def test_a_call_outside_the_vocabulary_is_refused(self):
         error = refused(
-            STARTER, op="set_value", id="assign:board", name="Union", argument="smoothness", value=1
+            STARTER, op="set_value", id="assign:board", name="Scalar", argument="value", value=1
         )
         assert error.startswith(
-            "`set_value` edits one of these calls: Material, PolygonProfile, SketchPlane, box"
+            "`set_value` edits one of these calls: Difference, Intersection, Material, "
+            "PolygonProfile, SketchPlane, Union, box"
         )
 
     def test_the_value_shape_follows_the_argument(self):

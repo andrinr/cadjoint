@@ -50,8 +50,6 @@ website:
             href: research/differentiable-meshing-pipeline.md
           - text: Where the seconds go (performance)
             href: research/performance.md
-          - text: Native (Rust) dual-contouring core (retired)
-            href: research/native-mesher.md
           - text: FEM integration
             href: research/fem-integration.md
           - text: Tet vs hex meshing
@@ -219,10 +217,16 @@ quartodoc:
         - fem.study.ThermalStudy
         - fem.study.ElasticStudy
         - fem.result.SimulationResult
-    - title: Simulation — selections and BCs
+    - title: Studies — the physics-agnostic layer
       contents:
-        - fem.selection.Nodes
-        - fem.selection.NodeSelection
+        - studies.selection.Nodes
+        - studies.selection.NodeSelection
+        - studies.selection.selection_from_description
+        - studies.capture.capture_studies
+        - studies.capture.declared_studies
+        - studies.capture.register_study
+    - title: Simulation — boundary conditions
+      contents:
         - fem.study.Dirichlet
         - fem.study.HeatFlux
         - fem.study.Fixed

@@ -46,12 +46,12 @@ import jax
 
 from cadjoint import extract_parameters, functionalize
 from cadjoint.construction import Solid
-from cadjoint.fem import Nodes
 from cadjoint.flow import FlowStudy, HeatSource, Inlet, Outlet, SteadyOptions, Walls
 from cadjoint.flow.precision import double_precision
 from cadjoint.geometry import Vector
 from cadjoint.render import Material
 from cadjoint.sdf.boolean import Union
+from cadjoint.studies import Nodes
 
 # ── design parameters ────────────────────────────────────────────────────────
 # The fin box is shared by every fin, so one parameter sets the whole comb.

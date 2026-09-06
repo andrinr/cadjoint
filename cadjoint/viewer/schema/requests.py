@@ -1,7 +1,7 @@
 """Every ``/patch`` request the server accepts, as one union per operation.
 
 :data:`PATCH_REQUEST_MODELS` has exactly one entry per operation in
-``cadjoint.viewer._patch.OPERATIONS``, and a test pins that correspondence,
+``cadjoint.viewer.patch.OPERATIONS``, and a test pins that correspondence,
 so an operation added to the registry without a model here fails the build
 rather than reaching the frontend undocumented.
 
@@ -309,10 +309,17 @@ class DeleteStudyRequest(StudyTargeted):
 class AddStudyBcRequest(StudyTargeted):
     op: Literal["add_study_bc"]
     bc_type: BoundaryConditionType
-    selection: dict[str, Any]
-    """A serialized node selection, as ``StudySelection`` describes it."""
+    selection: dict[str, Any] | None = None
+    """A serialized node selection, as ``StudySelection`` describes it.
+
+    Absent for the three conditions that place nothing: a flow study's
+    inlet, outlet and duct walls are faces of the lattice rather than a
+    chosen region.
+    """
     value: Value | None = None
-    """Absent for ``fixed``; three numbers for ``traction``; a scalar else."""
+    """Absent for ``fixed`` and ``outlet``, and optional for ``walls``;
+    three numbers for ``traction``; a speed or three numbers for ``inlet``;
+    a scalar for the rest."""
 
 
 class DeleteStudyBcRequest(StudyTargeted):
@@ -375,7 +382,7 @@ class SetOptimizationValueRequest(OptimizationTargeted):
 
 
 #: One model per operation the server accepts.  The test suite pins this
-#: against ``cadjoint.viewer._patch.OPERATIONS``, so the two tables cannot
+#: against ``cadjoint.viewer.patch.OPERATIONS``, so the two tables cannot
 #: diverge without failing.
 PATCH_REQUEST_MODELS: dict[str, type[BaseModel]] = {
     "set_vertex": SetVertexRequest,
@@ -432,7 +439,7 @@ class ExportRequest(BaseModel):
     """What ``POST /api/export`` takes: which object, which format, how fine.
 
     Unlike a patch request this one is the gate as well as the description:
-    :mod:`cadjoint.viewer._export` validates against it before a worker is
+    :mod:`cadjoint.viewer.worker.export` validates against it before a worker is
     started, and the message of a failed field is what the dialog shows.
     The response is the file itself, not JSON — see the module.
     """

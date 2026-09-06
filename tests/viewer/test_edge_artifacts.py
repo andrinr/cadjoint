@@ -22,7 +22,7 @@ import pytest
 
 from cadjoint.geometry.parameters import Vector
 from cadjoint.sdf import Box, Cylinder, Sphere, Translate, Union
-from cadjoint.viewer._compile_worker import (
+from cadjoint.viewer.worker.main import (
     _MESH_EDGE_RESOLUTION,
     _MESH_EDGE_SIZE,
     _execute_scene,

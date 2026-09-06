@@ -17,7 +17,6 @@ import pytest
 
 from cadjoint import extract_parameters, functionalize
 from cadjoint.fem import Nodes
-from cadjoint.fem.study import capture_studies
 from cadjoint.flow import (
     FLOW_STUDY_KIND,
     EnergyConfig,
@@ -32,6 +31,7 @@ from cadjoint.flow import (
 )
 from cadjoint.geometry import Vector
 from cadjoint.sdf.primitives import Box
+from cadjoint.studies import capture_studies
 
 
 def _block(size=(0.30, 0.40, 0.47)):

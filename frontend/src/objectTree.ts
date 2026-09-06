@@ -6,16 +6,22 @@
  * always happens through the source or the viewport tools.
  */
 
-import type { ConstructionNode } from "./types";
+import type { ConstructionElement, ConstructionNode } from "./types";
 
 export interface SceneTreeRow {
   /** Stable key for rendering and collapse state. */
   key: string;
   /** Construction node this row selects, or null for scene/operator rows. */
   nodeId: string | null;
+  /**
+   * Construction element this row points the properties window at, when the
+   * row is not a node: an operator, or a boolean. Null for the scene row and
+   * for rows whose node carries the element itself.
+   */
+  elementId: string | null;
   depth: number;
-  /** Icon/label vocabulary: scene, profile, box, sphere, cylinder, operator. */
-  kind: "scene" | "profile" | "box" | "sphere" | "cylinder" | "operator";
+  /** Icon/label vocabulary: scene, profile, box, sphere, cylinder, operator, boolean. */
+  kind: "scene" | "profile" | "box" | "sphere" | "cylinder" | "operator" | "boolean";
   label: string;
   /** Compact dimensions or point-count summary, when derivable. */
   detail: string | null;
@@ -59,24 +65,31 @@ export function dimensionSummary(node: ConstructionNode): string | null {
  * The order mirrors the program: nodes appear as the compiler reported them,
  * and a sketch's operators nest beneath it in source order.
  */
-export function buildSceneTree(nodes: ConstructionNode[]): SceneTreeRow[] {
+export function buildSceneTree(
+  nodes: ConstructionNode[],
+  elements: readonly ConstructionElement[] = [],
+): SceneTreeRow[] {
+  const booleans = elements.filter((element) => element.kind === "boolean");
+  const count = nodes.length + booleans.length;
   const rows: SceneTreeRow[] = [
     {
       key: "scene",
       nodeId: null,
+      elementId: null,
       depth: 0,
       kind: "scene",
       label: "scene",
-      detail: nodes.length > 0 ? `${nodes.length} object${nodes.length === 1 ? "" : "s"}` : "empty",
+      detail: count > 0 ? `${count} object${count === 1 ? "" : "s"}` : "empty",
       material: null,
       constraintCount: 0,
-      group: nodes.length > 0,
+      group: count > 0,
     },
   ];
   for (const node of nodes) {
     rows.push({
       key: node.id,
       nodeId: node.id,
+      elementId: null,
       depth: 1,
       kind: node.kind,
       label: node.name ?? node.kind,
@@ -86,9 +99,14 @@ export function buildSceneTree(nodes: ConstructionNode[]): SceneTreeRow[] {
       group: node.operators.length > 0,
     });
     for (const operator of node.operators) {
+      const element = elements.find(
+        (item) =>
+          item.kind === "feature" && item.call === operator.kind && item.line === operator.line,
+      );
       rows.push({
         key: `${node.id}-op-${operator.kind}-${operator.line}`,
         nodeId: null,
+        elementId: element?.id ?? null,
         depth: 2,
         kind: "operator",
         label: operator.kind,
@@ -98,6 +116,24 @@ export function buildSceneTree(nodes: ConstructionNode[]): SceneTreeRow[] {
         group: false,
       });
     }
+  }
+  // The booleans that combine the objects above, in source order: they have
+  // no outline in the viewport, so the tree is where they can be reached.
+  for (const boolean of booleans) {
+    const operands = boolean.arguments.find((argument) => argument.name === "operands");
+    const names = operands?.text ? operands.text.split(",").length : 0;
+    rows.push({
+      key: boolean.id,
+      nodeId: null,
+      elementId: boolean.id,
+      depth: 1,
+      kind: "boolean",
+      label: boolean.variable ?? boolean.name ?? boolean.call,
+      detail: `${boolean.call} · ${names} operand${names === 1 ? "" : "s"}`,
+      material: null,
+      constraintCount: 0,
+      group: false,
+    });
   }
   return rows;
 }

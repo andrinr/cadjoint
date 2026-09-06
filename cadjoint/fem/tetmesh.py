@@ -90,48 +90,16 @@ __all__ = [
     "tet_volumes",
 ]
 
-#: Deprecated alias of :data:`cadjoint.fem.elements.TET10_EDGES`, kept
-#: because callers have long reached for it through this module.
-_TET10_EDGES = TET10_EDGES
-
-#: Names that moved to the solver / postprocessing layer, resolved lazily
-#: by :func:`__getattr__` so importing a mesh does not import a solver.
-_MOVED = {
-    "tet_elastic_solve": "cadjoint.fem.jaxfem",
-    "tet_thermal_solve": "cadjoint.fem.jaxfem",
-    "load_work_quads": "cadjoint.fem.postprocess",
-    "load_work_tri6": "cadjoint.fem.postprocess",
-    "load_work_tris": "cadjoint.fem.postprocess",
-    "tet_von_mises": "cadjoint.fem.postprocess",
-}
-
 _TETGEN_MESSAGE = (
     "tetgen is not installed (PyPI wheels exist for macOS arm64 / Python 3.14): pip install tetgen"
 )
-
-
-def __getattr__(name: str) -> Any:
-    """Resolve names that moved out of this module (see :data:`_MOVED`).
-
-    The TET4/TET10 solves and the derived-quantity helpers used to live
-    here; they now sit in the solver and postprocessing layers alongside
-    their hex counterparts.  Serving them through PEP 562 keeps every
-    ``from cadjoint.fem.tetmesh import ...`` call site working while
-    leaving this module's own imports pointing strictly *downwards*.
-    """
-    module = _MOVED.get(name)
-    if module is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    import importlib
-
-    return getattr(importlib.import_module(module), name)
 
 
 @dataclass(frozen=True)
 class TetMesh:
     """A TET4/TET10 volume mesh whose boundary vertices are DC surface vertices.
 
-    Duck-compatible with :class:`~cadjoint.fem.selection.NodeSelection`
+    Duck-compatible with :class:`~cadjoint.studies.selection.NodeSelection`
     resolution (``num_points`` / ``points`` / ``all_boundary_faces`` /
     ``grid``), so ``Nodes`` selections resolve on tet meshes unchanged
     (selections resolve to the *corner* boundary nodes; TET10 midside

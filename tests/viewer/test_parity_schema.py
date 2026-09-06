@@ -15,10 +15,9 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from cadjoint.viewer._compile_worker import _compile_source
 from cadjoint.viewer._example_scene import EXAMPLE_SOURCE
-from cadjoint.viewer._patch import OPERATIONS
 from cadjoint.viewer._patch_requests import patch_source
+from cadjoint.viewer.patch import OPERATIONS
 from cadjoint.viewer.schema import (
     PATCH_REQUEST_MODELS,
     TYPESCRIPT_PATH,
@@ -27,6 +26,7 @@ from cadjoint.viewer.schema import (
     typescript_source,
     validate_patch_request,
 )
+from cadjoint.viewer.worker.main import _compile_source
 
 BRACKET = (Path(__file__).resolve().parents[2] / "scenes" / "bracket.py").read_text()
 

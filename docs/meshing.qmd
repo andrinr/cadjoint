@@ -399,5 +399,4 @@ octree leaves (2:1 balancing, transition stitching) are also open.
 
 - [Differentiable meshing pipeline](../research/differentiable-meshing-pipeline.md) — design principles, the full stage/test map, and the benchmark policy.
 - [Plugins](plugins.qmd#the-five-in-process-kinds) — the five in-process kinds, the extension points for a component that reads this mesh and re-solves it against the field for exact-surface export, dragging and meshing.
-- [Native (Rust) dual-contouring core, retired](../research/native-mesher.md) — what the Rust port measured, and why 5 ms of a 4 s request was not worth a second implementation. There is no Rust to build: the JAX/NumPy pipeline on this page is the only one.
 - [Simulation](simulation.qmd) — turning this surface into a volume mesh a solver can use.
