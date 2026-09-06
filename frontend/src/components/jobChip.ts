@@ -31,9 +31,9 @@ import type { JobKind, RunningJob } from "../jobs";
 
 /**
  * The kinds worth a chip beside the compile: work you start and then look
- * away from. `warmup` is here because the session's mesh warm-up genuinely
- * occupies the machine for as long as it runs, and the honest answer to "what
- * is running" includes it.
+ * away from. `warmup` is here because the server's startup compile warm-up
+ * genuinely occupies the machine for as long as it runs, and the honest
+ * answer to "what is running" includes it.
  */
 export const CHIP_KINDS: ReadonlySet<JobKind> = new Set<JobKind>([
   "simulate",

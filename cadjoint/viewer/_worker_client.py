@@ -295,29 +295,28 @@ def _warm_start_enabled() -> bool:
 def warm_start(source: str | None = None) -> bool:
     """Fill the compilation cache for *source* in the background, once.
 
-    The first ``compile`` and the first ``mesh`` of a fresh install pay XLA
-    for every program the scene contains — measured on the starter, ``mesh``
-    costs 45-53 s against an empty cache and 12 s against a warm one.  The
-    cache is on disk and persistent (:mod:`cadjoint.cache`), so that cost is
-    paid once by *somebody*; issuing the two requests on a daemon thread at
-    startup means it is not paid by the user's first overlay, while the
-    browser is still fetching the frontend.
+    The first ``compile`` of a fresh install pays XLA for every program the
+    scene contains.  The cache is on disk and persistent
+    (:mod:`cadjoint.cache`), so that cost is paid once by *somebody*;
+    issuing the request on a daemon thread at startup means it is not paid
+    by the user's first edit, while the browser is still fetching the
+    frontend.
+
+    Only ``compile`` is primed.  The mesh used to be primed too, and on every
+    scene open, on the theory that the feature-edge overlay should be warm
+    by the time it is asked for.  It never was asked for on most opens (the
+    overlay is off by default), it grew to several cores and gigabytes on
+    the larger scenes, nothing cancelled it on a scene switch or joined it
+    when the real request arrived, and it outlived the server.  Measured
+    beside a running one, compiles the user was waiting on hit their
+    timeout.  The overlay now pays its own cold cache once, on demand.
 
     Runs at most once per process and never blocks the caller: it returns as
     soon as the thread is started, and returns ``False`` when the warm-up is
-    disabled or has already run.  Both requests go through the ordinary
+    disabled or has already run.  It goes through the ordinary
     disposable-worker path, so a scene that fails to compile costs nothing
     but a logged-nowhere failure.  See :func:`_warm_start_enabled` for the
     ``CADJOINT_WARM_START`` override and the pytest default.
-
-    Only the scene named is warmed, and each distinct program at most once
-    per process.  It used to warm every file under the scenes directory on
-    the theory that opening one from the browser should be warm too; that
-    was cheap while the scenes were small and became a real cost the moment
-    a deliberately enormous one landed there, because the warm-up is a
-    serial queue of full worker processes and the user's own first compile
-    waits behind it.  Scenes other than the one the editor opens with are
-    warmed when they are actually opened (:func:`warm_scene`).
 
     Args:
         source: The program to warm on. Defaults to the playground's example
@@ -326,43 +325,12 @@ def warm_start(source: str | None = None) -> bool:
     Returns:
         Whether a warm-up thread was started.
     """
+    if not _warm_start_enabled():
+        return False
     if source is None:
         from cadjoint.viewer._example_scene import EXAMPLE_SOURCE
 
         source = EXAMPLE_SOURCE
-    return _warm(source)
-
-
-def warm_scene(source: str) -> bool:
-    """Warm the cache for a scene the user has just opened.
-
-    The startup warm-up covers the editor's opening scene only, so opening
-    any other one meets a cold cache for whatever it does not share.  This
-    is the same background priming, addressed at the program in front of
-    the user, and it is a no-op for one already warmed in this process.
-
-    Only the *mesh* is primed, deliberately.  The startup warm-up covers
-    both modes because it runs before anyone has asked for anything; this
-    one fires the moment a scene is opened, and the client compiles that
-    same source immediately after.  Warming ``compile`` here therefore does
-    not precede the real request, it *races* it — two workers building the
-    same program at once, which on ``scenes/end_cap.py`` is two 14-second
-    compiles for one scene switch.  The mesh is still worth priming: nobody
-    has asked for the feature-edge overlay yet.
-
-    Args:
-        source: The program that was opened.
-
-    Returns:
-        Whether a warm-up thread was started.
-    """
-    return _warm(source, modes=("mesh",))
-
-
-def _warm(source: str, modes: tuple[str, ...] = ("compile", "mesh")) -> bool:
-    """Prime one program on a daemon thread, at most once per process."""
-    if not _warm_start_enabled():
-        return False
     key = hashlib.sha256(source.encode()).hexdigest()
     with _WARM_LOCK:
         if key in _WARMED:
@@ -371,21 +339,20 @@ def _warm(source: str, modes: tuple[str, ...] = ("compile", "mesh")) -> bool:
     _WARM_STARTED.set()
 
     def prime() -> None:
-        # All under the mesh budget, not their own: the point of the warm-up
-        # is the cold path, where even `compile` can outgrow the edit
+        # Under the mesh budget, not the compile one: the point of the
+        # warm-up is the cold path, where a compile can outgrow the edit
         # round-trip budget it is held to in a request.
-        for mode in modes:
-            try:
-                # Registered as `warmup` jobs so the process monitor can
-                # say why workers are burning CPU right after launch, and
-                # niced so a request the user is waiting on wins the core.
-                with REGISTRY.track("warmup", source=source, fields={"mode": mode}) as job:
-                    REGISTRY.finish(
-                        job,
-                        _run_worker(source, mode, MESH_TIMEOUT_SECONDS, nice=_WARM_NICE),
-                    )
-            except Exception:  # noqa: BLE001 - a cold cache is the only cost of failing
-                return
+        try:
+            # Registered as a `warmup` job so the process monitor can say
+            # why a worker is burning CPU right after launch, and niced so
+            # a request the user is waiting on wins the core.
+            with REGISTRY.track("warmup", source=source, fields={"mode": "compile"}) as job:
+                REGISTRY.finish(
+                    job,
+                    _run_worker(source, "compile", MESH_TIMEOUT_SECONDS, nice=_WARM_NICE),
+                )
+        except Exception:  # noqa: BLE001 - a cold cache is the only cost of failing
+            return
 
     threading.Thread(target=prime, name="cadjoint-compile-warmup", daemon=True).start()
     return True
