@@ -56,6 +56,21 @@ def _bc_ids(source: str, study_index: int) -> dict[int, str]:
     }
 
 
+#: The study kinds the viewer can *author*, which is deliberately narrower
+#: than what it can locate and display.
+#: :data:`~cadjoint.viewer.source_map.STUDY_CALL_KINDS` knows ``FlowStudy``
+#: too, because a scene declaring one must not knock its neighbours out of
+#: alignment — but no patch operation writes a ``FlowStudy``, so one reports
+#: ``editable: false`` and the panel points at the code instead.
+#:
+#: This is the same distinction :class:`cadjoint.enums.StudyKind` draws by
+#: holding two members while ``StudyPayload.kind`` holds three: the enum is
+#: what the GUI can *author*, and widening it would make ``add_study``
+#: advertise a kind it cannot write.  Spelled as literals rather than enum
+#: members for exactly that reason.
+_AUTHORABLE_KINDS = frozenset({"thermal", "elastic"})
+
+
 def _study_entries(studies: list[Any], source: str) -> list[dict[str, Any]]:
     """Serialize declared studies for the viewer, with their source locations.
 
@@ -98,7 +113,7 @@ def _study_entries(studies: list[Any], source: str) -> list[dict[str, Any]]:
                 "stableId": stable_ids.get(index) if statement is not None else None,
                 "line": statement.statement.lineno if statement is not None else None,
                 "span": list(statement.call_span) if statement is not None else None,
-                "editable": statement is not None,
+                "editable": statement is not None and described["kind"] in _AUTHORABLE_KINDS,
                 "mesh_span": list(statement.mesh_span)
                 if statement is not None and statement.mesh_span is not None
                 else None,

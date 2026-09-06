@@ -28,8 +28,18 @@ from cadjoint.viewer.source_map.nodes import (
     parse_module,
 )
 
-STUDY_CALL_KINDS = {"ThermalStudy": "thermal", "ElasticStudy": "elastic"}
-"""Study constructor names mapped to their viewer payload ``kind``."""
+STUDY_CALL_KINDS = {
+    "ThermalStudy": "thermal",
+    "ElasticStudy": "elastic",
+    "FlowStudy": "flow",
+}
+"""Study constructor names mapped to their viewer payload ``kind``.
+
+``FlowStudy`` belongs here even though it meshes nothing, and leaving it
+out was not merely a missing feature: :func:`_study_entries` aligns
+statements to captured studies by position and count, so a scene declaring
+a flow study alongside a mesh study found *neither* aligned and marked the
+mesh study non-editable too."""
 
 
 @dataclass(frozen=True)
