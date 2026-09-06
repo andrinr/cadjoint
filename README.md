@@ -6,12 +6,17 @@ FEM simulation composed into one function JAX can differentiate end to end.
 > [!WARNING]
 > The API is not stable. Expect breaking changes.
 
-[![A fin tip of the heat sink is dragged upward in the viewport of the cadjoint playground. The fin grows with the pointer at frame rate while the rest of the comb stays put, the editor on the left holds the highlighted line fin2_tip_l = Vector2(value=[-0.15, 0.85], free=True, ...), and releasing the pointer writes the new coordinates into that literal and recompiles.](docs/assets/motion/parameter-drag.webp)](https://andrinr.github.io/cadjoint/docs/viewer.html)
+[![The bracket scene in the cadjoint playground: the camera is orbited around and under a steel bracket with a triangular gusset rib, then the pointer switches to vertex selection and pulls the rib's tip handle upward. The rib grows with the pointer at frame rate while the plate and web stay put, and the editor on the left holds the highlighted line rib_tip = Vector2(value=[-0.9, -0.62], free=True, ...).](docs/assets/motion/bracket-orbit-drag.webp)](https://andrinr.github.io/cadjoint/docs/viewer.html)
 
-*The handle under the pointer is a named `Vector2` in `scene.py`. Dragging it
-writes the parameter buffer the shader already reads, so the solid follows at
-frame rate; releasing it patches the literal in the source. The source is the
-model.*
+*Left-drag orbits. The handle under the pointer is a named `Vector2` in
+`scene.py`; dragging it writes the parameter buffer the shader already reads,
+so the solid follows at frame rate, and releasing it patches the literal in the
+source. The source is the model.*
+
+| Heat sink | End cap |
+| --- | --- |
+| [![A fin tip of the heat sink is dragged upward. The fin grows with the pointer while the rest of the comb stays put, and the editor holds the highlighted line fin2_tip_l = Vector2(value=[-0.15, 0.85], free=True, ...).](docs/assets/motion/heat-sink-drag.webp)](scenes/starter.py) | [![The end cap is orbited, then the crest handle of one gusset rib is pulled upward and all six ribs of the circular pattern rise together, because they share the one parameter.](docs/assets/motion/end-cap-orbit-drag.webp)](scenes/end_cap.py) |
+| A fin comb from one constrained sketch, extruded, on a copper slug and a board ([`scenes/starter.py`](scenes/starter.py)). | Six ribs from one sketch through a circular pattern, around a revolved bore ([`scenes/end_cap.py`](scenes/end_cap.py)). |
 
 ## The chain
 

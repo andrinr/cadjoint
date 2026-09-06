@@ -185,22 +185,6 @@ function clampRect(r) {
   };
 }
 
-/** The union of some elements' boxes, padded, as a crop. */
-async function boxOf(page, selectors, pad = 0) {
-  const boxes = [];
-  for (const sel of [].concat(selectors)) {
-    const b = await page.locator(sel).first().boundingBox().catch(() => null);
-    if (b) boxes.push(b);
-  }
-  if (boxes.length === 0) return { x: 0, y: 0, w: VIEW.width, h: VIEW.height };
-  const x0 = Math.min(...boxes.map((b) => b.x)) - pad;
-  const y0 = Math.min(...boxes.map((b) => b.y)) - pad;
-  const x1 = Math.max(...boxes.map((b) => b.x + b.width)) + pad;
-  const y1 = Math.max(...boxes.map((b) => b.y + b.height)) + pad;
-  return clampRect({ x: x0, y: y0, w: x1 - x0, h: y1 - y0 });
-}
-const FULL = { x: 0, y: 0, w: VIEW.width, h: VIEW.height };
-
 /** Crop + scale the picked frames into a numbered png sequence. */
 function stage(picked, crop, outWidth, dir) {
   const seq = path.join(dir, "seq");
@@ -269,46 +253,7 @@ function encodeAlternatives(files, dir, stem, quality) {
 }
 
 // ─────────────────────────────────────────────────────────── app driving
-//
-// The helpers below are the ones `frontend/e2e/playground.spec.ts` uses to
-// click the right pixel — the projection is reimplemented there rather than
-// imported, and reimplemented again here, on purpose: if the app's camera
-// drifts, these clips point at the wrong thing and it is visible in the
-// output, instead of both sides agreeing on something wrong.
 
-const FOV_SCALE = 1.5;
-const CAMERA = { yaw: Math.PI / 4, pitch: Math.atan(1 / Math.SQRT2), distance: 4.6, target: [0, 0, 0] };
-const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
-const norm = (a) => { const n = Math.hypot(...a) || 1; return [a[0] / n, a[1] / n, a[2] / n]; };
-
-function cameraPosition(c = CAMERA) {
-  const cp = Math.cos(c.pitch);
-  return [
-    c.target[0] + c.distance * cp * Math.sin(c.yaw),
-    c.target[1] - c.distance * cp * Math.cos(c.yaw),
-    c.target[2] + c.distance * Math.sin(c.pitch),
-  ];
-}
-function projectToCss(world, canvas, camera = CAMERA) {
-  const position = cameraPosition(camera);
-  const forward = norm(sub(camera.target, position));
-  const reference = Math.abs(forward[2]) > 0.999 ? [0, 1, 0] : [0, 0, 1];
-  const right = norm(cross(forward, reference));
-  const up = cross(right, forward);
-  const delta = sub(world, position);
-  const aspect = canvas.width / canvas.height;
-  const divisor = FOV_SCALE * camera.distance;
-  const u = dot(delta, right) / divisor;
-  const v = dot(delta, up) / divisor;
-  const px = (u / aspect + 0.5) * canvas.width;
-  const py = (0.5 - v) * canvas.height;
-  return {
-    x: (px * canvas.clientWidth) / canvas.width,
-    y: (py * canvas.clientHeight) / canvas.height,
-  };
-}
 const canvasMetrics = (page) =>
   page.evaluate(() => {
     const c = document.querySelector("[data-testid=viewer-canvas]");
@@ -319,12 +264,6 @@ const canvasMetrics = (page) =>
       left: r.left, top: r.top,
     };
   });
-/** A world point, in page coordinates. */
-async function at(page, world) {
-  const m = await canvasMetrics(page);
-  const p = projectToCss(world, m);
-  return { x: m.left + p.x, y: m.top + p.y };
-}
 
 /**
  * Where a draggable handle actually is, asked of the app's own hint bar.
@@ -374,20 +313,6 @@ async function clickIf(loc, ms = 0) {
   }
   return false;
 }
-async function railTool(page, group, id) {
-  const child = tid(page, id);
-  for (let i = 0; i < 2 && !(await child.isVisible().catch(() => false)); i++) {
-    await tid(page, `tool-group-${group}`).click();
-    await wait(200);
-  }
-  await child.click();
-}
-const editorText = (page) =>
-  page.evaluate(() => {
-    const c = document.querySelector("[data-testid=editor] .cm-content");
-    const v = c?.cmView?.view ?? c?.cmTile?.view;
-    return v ? v.state.doc.toString() : (c?.innerText ?? "");
-  });
 
 /**
  * A pointer drag with the cursor drawn.
@@ -444,35 +369,6 @@ async function glide(page, to, steps = 14, pause = 16) {
   }
   glide.last = to;
 }
-/** Glide to an element's centre and click it. */
-async function point(page, locator, { steps = 14, pause = 16, settle = 260 } = {}) {
-  const b = await locator.first().boundingBox();
-  if (!b) throw new Error("no box for pointer target");
-  await glide(page, { x: b.x + b.width / 2, y: b.y + b.height / 2 }, steps, pause);
-  await wait(settle);
-}
-async function clickAt(page, locator, opts) {
-  await point(page, locator, opts);
-  await page.mouse.down();
-  await wait(90);
-  await page.mouse.up();
-}
-async function dragTo(page, from, to, steps = 26, pause = 22) {
-  await glide(page, from);
-  await wait(200);
-  await page.mouse.down();
-  await wait(140);
-  for (let i = 1; i <= steps; i++) {
-    await page.mouse.move(
-      from.x + (to.x - from.x) * (i / steps),
-      from.y + (to.y - from.y) * (i / steps),
-    );
-    await wait(pause);
-  }
-  glide.last = to;
-  await wait(240);
-  await page.mouse.up();
-}
 
 /** A fresh page on the starter, settled, with the pointer parked off-frame. */
 async function freshPage(context) {
@@ -500,65 +396,125 @@ async function zoom(page, ticks) {
   await wait(900);
 }
 
-/**
- * Park the right-hand column in the tray.
- *
- * Not staging: it is the dock's own minimise control, and it is how you get
- * the viewport the width of the desk when what you are looking at is the
- * model rather than its tree. It also stops a popover anchored to the toolbar
- * from being cropped against a panel it happens to overlap.
- */
-async function parkColumn(page, tabs) {
-  for (const tab of tabs) {
-    const group = page.locator(`.dv-groupview:has([data-testid=window-tab-${tab}])`);
-    const minimise = group.getByTestId("window-minimise").first();
-    if (await minimise.isVisible().catch(() => false)) {
-      await minimise.click();
-      await wait(500);
-    }
-  }
-  await wait(600);
-}
-
-/** Turn the construction overlay off — chrome, not data — for the render clips. */
-async function overlayOff(page) {
-  await clickIf(tid(page, "display-options"), 350);
-  await clickIf(tid(page, "render-customize"), 350);
-  const ov = tid(page, "toggle-construction-overlay");
-  if (await ov.first().isVisible().catch(() => false)) {
-    const input = (await ov.first().evaluate((el) => el.tagName)) === "INPUT"
-      ? ov.first() : ov.first().locator("input").first();
-    if (await input.isChecked().catch(() => true)) await input.uncheck();
-  }
-  await page.keyboard.press("Escape");
-  await wait(500);
-}
-
 // ─────────────────────────────────────────────────────────── the clips
 //
 // Each clip is: `setup` (not recorded — get the app into the state the clip
 // starts from, however long that takes), `crop` (evaluated after setup), then
 // `act` (recorded). `speed` is wall seconds per played second.
 
-/** fin2_tip_l, uv [-0.15, 0.85]: free, named, and in the parameter buffer. */
-const FIN_TIP = [0.15, 0, 0.85];
-/** The comb's near cap (y = -0.6), between two fins. */
-const CAP_POINT = [0.3, -0.6, 0.09];
-/**
- * Where a new sketch goes: on the floor in front of the part, which projects
- * to the empty left of the viewport. `-Y` is toward the camera at the session's
- * default iso, so nothing in the clip happens behind the heat sink.
- */
-const SKETCH_ORIGIN = [0.0, -2.2, 0];
-
 /** The desk's left two columns — editor and viewport — without the tray. */
 const CODE_AND_VIEW = { x: 0, y: 0, w: 1120, h: 876 };
-/** The viewport column alone, plus whatever sits to its right. */
-const VIEW_AND_PANEL = { x: 460, y: 0, w: 980, h: 876 };
+
+/**
+ * Open a scene from the File menu, not recorded. The compile it triggers is a
+ * real one (2-3 s on the direct shader path), so the clip starts warm.
+ */
+async function openScene(page, file) {
+  await tid(page, "menu-file").click();
+  await wait(300);
+  await tid(page, "menu-file-open").click();
+  await tid(page, "scenes-panel").waitFor({ timeout: 60_000 });
+  await wait(800);
+  await tid(page, `scene-open-${file}`).click();
+  const stem = file.replace(/\.py$/, "");
+  await page.waitForFunction(
+    (s) => (document.querySelector("[data-testid=menu-scene-name]")?.textContent ?? "").includes(s),
+    stem, { timeout: 300_000 });
+  await waitForCompile(page, 300_000);
+  await tid(page, "window-tab-editor").click();
+  await wait(900);
+}
+
+/**
+ * One turn of the camera and one pull on a named handle, on a scene opened
+ * from `scenes/`. The two motions both return to where they started — the
+ * orbit is a closed rectangle in pointer space and the drag comes back down
+ * the same path — so the loop closes, and the pointer never lifts during the
+ * drag, so every frame of it is a parameter-buffer write and not a recompile.
+ * The clip stops before the release, whose recompile would otherwise send
+ * the editor back to line 1 mid-loop.
+ */
+function orbitAndDrag({ name, scene, handle, zoomTicks = 2, pull = { x: 40, y: -130 }, width = 1120 }) {
+  const ease = (u) => (1 - Math.cos(u * Math.PI)) / 2;
+  const sweep = async (page, from, to, steps, pause = 24) => {
+    for (let i = 1; i <= steps; i++) {
+      const u = ease(i / steps);
+      await page.mouse.move(from.x + (to.x - from.x) * u, from.y + (to.y - from.y) * u);
+      await wait(pause);
+    }
+  };
+  const locate = async (page) => {
+    const m = await canvasMetrics(page);
+    const found = await findHandle(page,
+      { x: m.left + m.clientWidth / 2, y: m.top + m.clientHeight / 2 }, 460, handle);
+    if (!found) throw new Error(`no ${handle} handle in the viewport of ${scene}`);
+    return { x: found.x, y: found.y };
+  };
+  return {
+    name,
+    width,
+    quality: 76,
+    async setup(page) {
+      await openScene(page, scene);
+      await zoom(page, zoomTicks);
+      await tid(page, "mode-vertex").click();
+      await wait(400);
+      // Select the handle before recording: selecting scrolls the editor to
+      // the literal the drag rewrites, and that scroll is a jump.
+      const tip = await locate(page);
+      this.tip = tip;
+      await page.mouse.move(tip.x, tip.y);
+      await page.mouse.down(); await wait(90); await page.mouse.up();
+      await wait(1200);
+      glide.last = { x: tip.x + 150, y: tip.y + 120 };
+      await page.mouse.move(glide.last.x, glide.last.y);
+      await wait(600);
+    },
+    crop: () => CODE_AND_VIEW,
+    async act(page) {
+      // The orbit: a closed rectangle, so the camera comes back to its start.
+      const b = await tid(page, "viewer-canvas").boundingBox();
+      const from = { x: b.x + b.width * 0.22, y: b.y + b.height * 0.36 };
+      await glide(page, from, 14, 26);
+      await wait(400);
+      await page.mouse.down();
+      await wait(180);
+      let at = { ...from };
+      for (const [dx, dy] of [[240, 0], [0, -150], [-240, 0], [0, 150]]) {
+        const to = { x: at.x + dx, y: at.y + dy };
+        await sweep(page, at, to, Math.max(10, Math.round(Math.hypot(dx, dy) / 11)), 20);
+        at = to;
+        await wait(220);
+      }
+      await page.mouse.up();
+      await wait(700);
+      // The drag: out along `pull` and back, pointer down throughout. The
+      // orbit closed, so the handle is where setup found it; the short
+      // re-sweep only absorbs a pixel of drift, and is not the seconds-long
+      // search a full one would put on film.
+      const found = await findHandle(page, this.tip, 40, handle);
+      const tip = found ? { x: found.x, y: found.y } : await locate(page);
+      await glide(page, tip, 14, 26);
+      await wait(450);
+      await page.mouse.down();
+      await wait(200);
+      const out = { x: tip.x + pull.x, y: tip.y + pull.y };
+      await sweep(page, tip, out, 26);
+      await wait(650);
+      await sweep(page, out, tip, 26);
+      await wait(350);
+      glide.last = tip;
+    },
+    // The release is not on film: the compile it triggers is now fast enough
+    // that the editor's scroll back to line 1 would land inside the loop.
+    async after(page) { await page.mouse.up(); await waitForCompile(page); },
+  };
+}
 
 const CLIPS = [
+  orbitAndDrag({ name: "bracket-orbit-drag", scene: "bracket.py", handle: "rib_tip" }),
   {
-    name: "parameter-drag",
+    name: "heat-sink-drag",
     width: 1120,
     quality: 76,
     async setup(page) {
@@ -604,373 +560,19 @@ const CLIPS = [
       await wait(650);
       await sweep(top, tip, 26);
       await wait(350);
-      // Stop on the release. The compile it triggers replaces the document,
-      // which sends the editor back to line 1 — a jump, and one that would
-      // make the loop restart somewhere the clip never was.
-      await page.mouse.up();
+      // Stop before the release. The compile it triggers replaces the
+      // document, which sends the editor back to line 1 — a jump, and one
+      // that would make the loop restart somewhere the clip never was.
       glide.last = tip;
-      await wait(500);
     },
-    async after(page) { await waitForCompile(page); },
+    async after(page) { await page.mouse.up(); await waitForCompile(page); },
   },
 
-  {
-    name: "face-sketch",
-    width: 1440,
-    quality: 74,
-    async setup(page) {
-      await railTool(page, "create", "tool-face");
-      await wait(600);
-    },
-    crop: () => FULL,
-    async act(page) {
-      const cap = await at(page, CAP_POINT);
-      await glide(page, { x: cap.x + 150, y: cap.y - 110 }, 12, 22);
-      await glide(page, cap, 16, 26);
-      await page.waitForFunction(
-        () => /cap\('-'\)/.test(document.querySelector("[data-testid=viewer-hint]")?.textContent ?? ""),
-        null, { timeout: 30_000 },
-      ).catch(() => console.log("   !! hint never named the face"));
-      await wait(1100);
-      await page.mouse.down(); await wait(90); await page.mouse.up();
-      await page.waitForFunction(
-        () => {
-          const c = document.querySelector("[data-testid=editor] .cm-content");
-          const v = c?.cmView?.view ?? c?.cmTile?.view;
-          return (v ? v.state.doc.toString() : "").includes("SketchPlane.on(sink.cap('-'))");
-        }, null, { timeout: 60_000 },
-      );
-      await waitForCompile(page);
-      await wait(1400);
-    },
-  },
-
-  {
-    name: "sketch-solve",
-    width: 0,
-    quality: 74,
-    // Seven deliberate clicks is a lot of clip; a third faster than life still
-    // reads as someone working rather than a montage.
-    speed: 1.35,
-    async setup(page) {
-      await railTool(page, "create", "tool-sketch");
-      const m = await canvasMetrics(page);
-      const d = projectToCss(SKETCH_ORIGIN, m);
-      await page.mouse.click(m.left + d.x, m.top + d.y);
-      await waitForCompile(page);
-      await tid(page, "sketch-panel").waitFor({ timeout: 60_000 });
-      await tid(page, "mode-vertex").click();
-      await wait(600);
-      this.origin = SKETCH_ORIGIN;
-    },
-    crop: () => VIEW_AND_PANEL,
-    async act(page) {
-      const m = await canvasMetrics(page);
-      const world = (dx, dy) => {
-        const p = projectToCss([this.origin[0] + dx, this.origin[1] + dy, 0], m);
-        return { x: m.left + p.x, y: m.top + p.y };
-      };
-      // ±0.6: the corners of the square the sketch tool drops, which is what
-      // `frontend/e2e/playground.spec.ts` clicks. Anywhere else is empty plane.
-      const first = world(-0.6, -0.6);
-      const second = world(0.6, -0.6);
-      const tap = async (at) => {
-        await glide(page, at, 14, 22);
-        await wait(220);
-        await page.mouse.down(); await wait(80); await page.mouse.up();
-      };
-
-      await tap(first);
-      await wait(360);
-      await clickAt(page, tid(page, "constraint-fix"), { steps: 14 });
-      await page.waitForFunction(
-        () => /fix/.test(document.querySelector("[data-testid=sketch-panel]")?.textContent ?? ""),
-        null, { timeout: 60_000 });
-      await waitForCompile(page);
-      await wait(700);
-
-      await clickAt(page, tid(page, "constraint-distance"), { steps: 12 });
-      await page.waitForFunction(
-        () => /second point/i.test(document.querySelector("[data-testid=status]")?.textContent ?? ""),
-        null, { timeout: 30_000 });
-      await wait(300);
-      await tap(second);
-      await page.waitForFunction(
-        () => /distance/.test(document.querySelector("[data-testid=sketch-panel]")?.textContent ?? ""),
-        null, { timeout: 60_000 });
-      await waitForCompile(page);
-      await wait(800);
-
-      // Retarget the dimension, then solve for it. Without this the sketch is
-      // already satisfied, the solver reports zero iterations, and nothing on
-      // screen moves — which is the opposite of what the clip is about.
-      await clickAt(page, tid(page, "constraint-label-1"), { steps: 12 });
-      await wait(400);
-      await tid(page, "constraint-value-1").fill("0.7");
-      await wait(300);
-      await tid(page, "constraint-value-1").press("Enter");
-      await waitForCompile(page);
-      await wait(700);
-
-      await clickAt(page, tid(page, "solver-toggle"), { steps: 12 });
-      await tid(page, "solver-panel").waitFor({ timeout: 30_000 });
-      await wait(500);
-      await clickAt(page, tid(page, "constraint-solve"), { steps: 12 });
-      await tid(page, "solver-loss-chart").waitFor({ timeout: 120_000 });
-      await waitForCompile(page);
-      await wait(1800);
-    },
-  },
-
-  {
-    name: "sdf-sweep",
-    width: 0,
-    quality: 78,
-    async setup(page) {
-      await parkColumn(page, ["objects", "materials"]);
-      await zoom(page, 2);
-      await clickIf(tid(page, "display-options"), 400);
-      await tid(page, "render-sdf").waitFor({ timeout: 30_000 });
-      await tid(page, "sdf-slice").click();
-      await tid(page, "sdf-legend").waitFor({ timeout: 30_000 });
-      await tid(page, "sdf-fraction").fill("0.08");
-      await wait(1600);
-    },
-    crop: (page) => boxOf(page, ["[data-testid=viewer-canvas]", "[data-testid=render-popover]"], 6),
-    async act(page) {
-      // The plane is dragged, not typed: the readout over the viewport and the
-      // coordinate in the panel are both functions of the slider, and the
-      // point of the clip is that all three move together.
-      const b = await tid(page, "sdf-fraction").first().boundingBox();
-      const y = b.y + b.height / 2;
-      const at = (f) => ({ x: b.x + 6 + (b.width - 12) * f, y });
-      await glide(page, at(0.08), 14, 24);
-      await wait(500);
-      await page.mouse.down();
-      await wait(200);
-      const sweepTo = async (from, to, steps, pause) => {
-        for (let i = 1; i <= steps; i++) {
-          const u = (1 - Math.cos((i / steps) * Math.PI)) / 2;
-          const f = from + (to - from) * u;
-          await page.mouse.move(at(f).x, at(f).y);
-          await wait(pause);
-        }
-      };
-      await sweepTo(0.08, 0.94, 34, 46);
-      await wait(600);
-      await sweepTo(0.94, 0.08, 30, 40);
-      await wait(300);
-      await page.mouse.up();
-      glide.last = at(0.08);
-      await wait(700);
-    },
-  },
-
-  {
-    name: "solve-field",
-    width: 1440,
-    quality: 74,
-    // No warm pass. The result the server has already computed is fetched
-    // back into a brand-new session the moment Simulate opens, so the only
-    // way to record a field arriving is to be the run that produces it —
-    // which means this clip has to be the first solve the server is asked
-    // for. `--only solve-field` on a server that has already solved will
-    // open on a finished field; restart the server first.
-    async setup(page) {
-      await tid(page, "editmode-simulate").click();
-      await tid(page, "simulate-run-sink-conduction").waitFor({ timeout: 60_000 });
-      await wait(1400);
-    },
-    crop: () => FULL,
-    async act(page) {
-      await clickAt(page, tid(page, "simulate-run-sink-conduction"), { steps: 18, pause: 22 });
-      await tid(page, "simulate-legend").waitFor({ timeout: 900_000 });
-      await wait(3200);
-    },
-  },
-
-  {
-    name: "optimize-converge",
-    width: 0,
-    quality: 74,
-    // A real gradient-descent run on a FEM objective: twelve steps, each a
-    // mesh and a solve and an adjoint, six or seven minutes of wall clock.
-    // `fit` plays all of it in ten seconds — every frame is one the app drew,
-    // sampled, which is the only honest way to show a thing that slow.
-    fit: 10,
-    async setup(page) {
-      await clickIf(tid(page, "window-tab-optimize"), 600);
-      await parkColumn(page, ["objects"]);
-      await tid(page, "optimize-run-cool-sink").waitFor({ timeout: 60_000 });
-      await wait(1000);
-    },
-    crop: () => VIEW_AND_PANEL,
-    async act(page) {
-      await clickAt(page, tid(page, "optimize-run-cool-sink"), { steps: 18, pause: 22 });
-      await tid(page, "optimize-result-cool-sink").waitFor({ timeout: 1_800_000 });
-      await wait(20_000);
-    },
-  },
-
-  {
-    name: "orbit",
-    width: 0,
-    quality: 70,
-    async setup(page) {
-      await zoom(page, 3);
-      await wait(600);
-    },
-    crop: (page) => boxOf(page, ["[data-testid=viewer-canvas]"], 4),
-    async act(page) {
-      // A closed rectangle in pointer space, dragged in one go. Left-drag is
-      // orbit, and the mapping from pointer delta to yaw and pitch is linear,
-      // so a path that returns to its start returns the camera to its start:
-      // the loop closes on the frame it opened on. The lower two legs take
-      // the camera under the floor, which is the half of the sphere the new
-      // lighting made readable.
-      const b = await tid(page, "viewer-canvas").boundingBox();
-      const from = { x: b.x + 110, y: b.y + b.height * 0.42 };
-      // Measured on this build: pointer +y raises the camera, at about a
-      // quarter degree per pixel, and the pitch clamps at the poles — so the
-      // legs go *down* first and stop short of -90, or the return leg would
-      // not undo the outbound one and the loop would not close.
-      const legs = [[300, 0], [0, -250], [300, 0], [0, 250], [-600, 0]];
-      await glide(page, from, 14, 26);
-      await wait(500);
-      await page.mouse.down();
-      await wait(180);
-      let at = { ...from };
-      for (const [dx, dy] of legs) {
-        const steps = Math.max(10, Math.round(Math.hypot(dx, dy) / 11));
-        const to = { x: at.x + dx, y: at.y + dy };
-        for (let i = 1; i <= steps; i++) {
-          const u = (1 - Math.cos((i / steps) * Math.PI)) / 2;
-          await page.mouse.move(at.x + dx * u, at.y + dy * u);
-          await wait(20);
-        }
-        at = to;
-        await wait(260);
-      }
-      await page.mouse.up();
-      glide.last = at;
-      await wait(900);
-    },
-  },
-
-  {
-    name: "scene-motor-shield",
-    width: 1440,
-    quality: 74,
-    // Opening it is a real 25-70 s compile (helical channel, bolt circle,
-    // knurl, 41 free parameters); `fit` plays the whole open in ten seconds.
-    fit: 10,
-    crop: () => FULL,
-    async act(page) {
-      await clickAt(page, tid(page, "menu-file"), { steps: 14 });
-      await wait(400);
-      await clickAt(page, tid(page, "menu-file-open"), { steps: 10 });
-      await tid(page, "scenes-panel").waitFor({ timeout: 60_000 });
-      await wait(2200);
-      await clickAt(page, tid(page, "scene-open-motor_shield.py"), { steps: 16 });
-      await page.waitForFunction(
-        () => /motor_shield/.test(document.querySelector("[data-testid=menu-scene-name]")?.textContent ?? ""),
-        null, { timeout: 300_000 });
-      await waitForCompile(page, 300_000);
-      await wait(1200);
-      await clickAt(page, tid(page, "window-tab-editor"), { steps: 12 });
-      await wait(2500);
-      // One slow turn, so the helix and the bolt circle are both seen.
-      const b = await tid(page, "viewer-canvas").boundingBox();
-      const from = { x: b.x + b.width * 0.3, y: b.y + b.height * 0.5 };
-      await glide(page, from, 14, 26);
-      await page.mouse.down();
-      await wait(160);
-      for (let i = 1; i <= 34; i++) {
-        await page.mouse.move(from.x + (260 * i) / 34, from.y - (60 * i) / 34);
-        await wait(26);
-      }
-      await page.mouse.up();
-      glide.last = { x: from.x + 260, y: from.y - 60 };
-      await wait(2500);
-    },
-  },
-
-  {
-    name: "scene-duct-sink",
-    width: 1440,
-    quality: 74,
-    fit: 9,
-    async setup(page) {
-      await tid(page, "menu-file").click();
-      await tid(page, "menu-file-open").click();
-      await tid(page, "scenes-panel").waitFor({ timeout: 60_000 });
-      await wait(1500);
-      await tid(page, "scene-open-duct_sink.py").click();
-      await page.waitForFunction(
-        () => /duct_sink/.test(document.querySelector("[data-testid=menu-scene-name]")?.textContent ?? ""),
-        null, { timeout: 300_000 });
-      await waitForCompile(page, 300_000);
-      await tid(page, "editmode-simulate").click();
-      await tid(page, "simulate-run-duct-cooling").waitFor({ timeout: 120_000 });
-      await wait(1800);
-    },
-    crop: () => FULL,
-    async act(page) {
-      await clickAt(page, tid(page, "simulate-run-duct-cooling"), { steps: 18, pause: 22 });
-      await tid(page, "simulate-legend").waitFor({ timeout: 1_800_000 });
-      await wait(9000);
-    },
-  },
-
-  {
-    name: "windows-dock",
-    width: 1120,
-    quality: 72,
-    async setup(page) {
-      await wait(400);
-    },
-    crop: () => FULL,
-    async act(page) {
-      const tab = tid(page, "window-tab-objects");
-      const from = await tab.first().boundingBox();
-      const start = { x: from.x + from.width / 2, y: from.y + from.height / 2 };
-      const editor = await tid(page, "window-tab-editor").first().boundingBox();
-
-      // 1. drag Objects onto the editor's tab strip: two windows, one strip.
-      await glide(page, start, 14, 22);
-      await wait(320);
-      await page.mouse.down();
-      await wait(160);
-      const drop = { x: editor.x + editor.width / 2, y: editor.y + editor.height / 2 };
-      for (let i = 1; i <= 20; i++) {
-        await page.mouse.move(
-          start.x + (drop.x - start.x) * (i / 20),
-          start.y + (drop.y - start.y) * (i / 20),
-        );
-        await wait(28);
-      }
-      glide.last = drop;
-      await wait(520);
-      await page.mouse.up();
-      await wait(1100);
-
-      // 2. float it back out over the desk.
-      await clickAt(page, page.locator(".dv-groupview:has([data-testid=window-tab-objects])")
-        .getByTestId("window-float"), { steps: 14 });
-      await wait(1400);
-
-      // 3. park Materials in the tray, and bring it back.
-      await clickAt(page, page.locator(".dv-groupview:has([data-testid=window-tab-materials])")
-        .getByTestId("window-minimise").first(), { steps: 16 });
-      await wait(1100);
-      await clickAt(page, tid(page, "window-restore-materials"), { steps: 14 });
-      await wait(1400);
-    },
-  },
+  // Six ribs share `rib_crest` through the pattern, so a modest pull is a
+  // visible change on every one of them; a long one makes spikes.
+  orbitAndDrag({ name: "end-cap-orbit-drag", scene: "end_cap.py", handle: "rib_crest",
+                 pull: { x: 24, y: -85 } }),
 ];
-
-// ─────────────────────────────────────────────────────────── main
-
 if (flag("list")) {
   for (const c of CLIPS) console.log(c.name);
   process.exit(0);
