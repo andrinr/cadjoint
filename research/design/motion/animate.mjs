@@ -630,11 +630,11 @@ function orbitAndDrag({
 }
 
 const CLIPS = [
-  // The gusset's tip slid up the web, from the opening view where the rib
-  // is nearest the camera: the smooth union re-blends the joint as it moves.
-  // Then one full turn, so the loop closes on the frame it opened on.
+  // Half a turn, then the gusset's tip slid up the web from the far side,
+  // the smooth union re-blending the joint as it moves; then the other half
+  // of the turn, so the loop closes on the frame it opened on.
   orbitAndDrag({ name: "bracket-orbit-drag", scene: "bracket.py", handle: "rib_tip",
-                 legs: [], legsAfter: [[360, 0]], pull: { x: 30, y: -120 } }),
+                 legs: [[180, 0]], legsAfter: [[180, 0]], pull: { x: 30, y: -120 } }),
   {
     name: "end-cap-solve",
     width: 1440,

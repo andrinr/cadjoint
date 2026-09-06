@@ -12,7 +12,7 @@ Do not hand-edit anything in this directory.
 
 | clip | played | frames | delivered | bytes |
 | --- | ---: | ---: | ---: | ---: |
-| `bracket-orbit-drag.webp` | 5.3s | 84 | 1120px wide | 1165 KB |
+| `bracket-orbit-drag.webp` | 5.9s (10s wall) | 94 | 1120px wide | 1246 KB |
 | `end-cap-solve.webp` | 8.7s | 139 | 1440px wide | 1261 KB |
 | `heat-sink-optimize.webp` | 10.8s | 173 | 980px wide | 544 KB |
-| **total** | | | | **2.90 MB** |
+| **total** | | | | **2.98 MB** |
