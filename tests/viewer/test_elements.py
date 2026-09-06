@@ -14,11 +14,11 @@ from pathlib import Path
 
 import pytest
 
-from cadjoint.viewer._compile_worker import _compile_source
 from cadjoint.viewer._patch_requests import patch_source
 from cadjoint.viewer.patch.geometry import EDITABLE_CALLS
 from cadjoint.viewer.schema import CompilePayload, ConstructionElement
 from cadjoint.viewer.source_map.elements import build_element_payload
+from cadjoint.viewer.worker.main import _compile_source
 
 SCENES_DIR = Path(__file__).resolve().parents[2] / "scenes"
 STARTER = (SCENES_DIR / "starter.py").read_text()
