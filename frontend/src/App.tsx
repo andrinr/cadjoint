@@ -76,6 +76,7 @@ declare global {
       overrides: Record<string, readonly number[]> | null,
     ) => boolean;
     __cadjointBindings?: () => HandleBinding[];
+    __cadjointCamera?: () => { yaw: number; pitch: number };
   }
 }
 
@@ -93,6 +94,8 @@ export function App() {
   // path a handle drag uses, which is the thing that claim is about.
   if (typeof window !== "undefined") {
     window.__cadjointShaders = () => renderer.shaderStats;
+    // Where the camera is, so a recording can turn it by a known angle.
+    window.__cadjointCamera = () => cameraAngles();
     window.__cadjointSetParameters = (overrides) =>
       renderer.setParameterOverrides(overrides);
     // The same classification the overlay draws each handle with, published

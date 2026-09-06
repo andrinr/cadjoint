@@ -33,6 +33,7 @@
  *   --port N        server port (default 6700; an already-serving port is reused)
  *   --only a,b      capture just these clips
  *   --list          print the clip names and exit
+ *   --table         rewrite docs/assets/motion/README.md from the files on disk, and exit
  *   --formats       also encode gif / mp4 / webm / apng variants and print sizes
  *   --keep-frames   leave the raw frame dumps in the work directory
  *   --work DIR      scratch directory (default: os tmp)
@@ -112,7 +113,14 @@ class Screencast {
     this.frames = [];
     this.n = 0;
   }
-  async start() {
+  /**
+   * `everyNthFrame` thins the capture at the source. A clip of a slow run
+   * that is later time-lapsed forty-fold needs a frame a second, not ninety,
+   * and encoding ninety full-size JPEGs a second is enough load to starve
+   * the very worker the clip is watching (the optimisation clip once ran at
+   * a fifteenth of its normal speed under it).
+   */
+  async start({ everyNthFrame = 1 } = {}) {
     fs.rmSync(this.dir, { recursive: true, force: true });
     fs.mkdirSync(this.dir, { recursive: true });
     this.cdp = await this.page.context().newCDPSession(this.page);
@@ -125,6 +133,7 @@ class Screencast {
     await this.cdp.send("Page.startScreencast", {
       format: "jpeg",
       quality: 95,
+      everyNthFrame,
       maxWidth: VIEW.width,
       maxHeight: VIEW.height,
       everyNthFrame: 1,
@@ -280,7 +289,11 @@ async function findHandle(page, near, radius = 90, phrase = "free parameter") {
     const rect = canvas.getBoundingClientRect();
     const hint = () => document.querySelector("[data-testid=viewer-hint]")?.textContent ?? "";
     for (let ring = 0; ring <= r; ring += 3) {
-      for (let a = 0; a < 360; a += ring === 0 ? 360 : 12) {
+      // The angular step shrinks with the ring so the samples stay about
+      // three pixels apart along the arc; a fixed step walks past a handle
+      // once the ring is wider than a few dozen pixels.
+      const step = ring === 0 ? 360 : Math.max(0.5, (3 / ring) * (180 / Math.PI));
+      for (let a = 0; a < 360; a += step) {
         const x = cx + ring * Math.cos((a * Math.PI) / 180);
         const y = cy + ring * Math.sin((a * Math.PI) / 180);
         if (x < rect.left + 4 || x > rect.right - 4 || y < rect.top + 4 || y > rect.bottom - 4) continue;
@@ -385,6 +398,40 @@ async function freshPage(context) {
   return page;
 }
 
+/** Glide to an element's centre and click it. */
+async function point(page, locator, { steps = 14, pause = 16, settle = 260 } = {}) {
+  const b = await locator.first().boundingBox();
+  if (!b) throw new Error("no box for pointer target");
+  await glide(page, { x: b.x + b.width / 2, y: b.y + b.height / 2 }, steps, pause);
+  await wait(settle);
+}
+async function clickAt(page, locator, opts) {
+  await point(page, locator, opts);
+  await page.mouse.down();
+  await wait(90);
+  await page.mouse.up();
+}
+
+/**
+ * Park the right-hand column in the tray.
+ *
+ * Not staging: it is the dock's own minimise control, and it is how you get
+ * the viewport the width of the desk when what you are looking at is the
+ * model rather than its tree. It also stops a popover anchored to the toolbar
+ * from being cropped against a panel it happens to overlap.
+ */
+async function parkColumn(page, tabs) {
+  for (const tab of tabs) {
+    const group = page.locator(`.dv-groupview:has([data-testid=window-tab-${tab}])`);
+    const minimise = group.getByTestId("window-minimise").first();
+    if (await minimise.isVisible().catch(() => false)) {
+      await minimise.click();
+      await wait(500);
+    }
+  }
+  await wait(600);
+}
+
 /** Wheel the camera in over the viewport's centre. */
 async function zoom(page, ticks) {
   const b = await tid(page, "viewer-canvas").boundingBox();
@@ -404,6 +451,9 @@ async function zoom(page, ticks) {
 
 /** The desk's left two columns — editor and viewport — without the tray. */
 const CODE_AND_VIEW = { x: 0, y: 0, w: 1120, h: 876 };
+/** The viewport column alone, plus whatever sits to its right. */
+const VIEW_AND_PANEL = { x: 460, y: 0, w: 980, h: 876 };
+const FULL = { x: 0, y: 0, w: VIEW.width, h: VIEW.height };
 
 /**
  * Open a scene from the File menu, not recorded. The compile it triggers is a
@@ -434,7 +484,17 @@ async function openScene(page, file) {
  * The clip stops before the release, whose recompile would otherwise send
  * the editor back to line 1 mid-loop.
  */
-function orbitAndDrag({ name, scene, handle, zoomTicks = 2, pull = { x: 40, y: -130 }, width = 1120 }) {
+function orbitAndDrag({
+  name, scene, handle, zoomTicks = 2, pull = { x: 40, y: -130 }, width = 1120,
+  // The orbit, as pointer legs before the drag and after it, in degrees of
+  // yaw (x) and pitch (y). The app publishes its camera, so the pixels per
+  // degree are measured on the build being filmed rather than assumed: the
+  // rate has changed before, and a turn that is not the angle it claims to
+  // be puts the edit on the wrong side of the part. Before and after should
+  // sum to a whole number of turns, so the loop closes.
+  legs = [[110, 0], [0, -70], [-110, 0], [0, 70]],
+  legsAfter = [],
+}) {
   const ease = (u) => (1 - Math.cos(u * Math.PI)) / 2;
   const sweep = async (page, from, to, steps, pause = 24) => {
     for (let i = 1; i <= steps; i++) {
@@ -459,35 +519,69 @@ function orbitAndDrag({ name, scene, handle, zoomTicks = 2, pull = { x: 40, y: -
       await zoom(page, zoomTicks);
       await tid(page, "mode-vertex").click();
       await wait(400);
-      // Select the handle before recording: selecting scrolls the editor to
-      // the literal the drag rewrites, and that scroll is a jump.
+      // Take the orbit once now, off film, to learn where the handle will be
+      // when the drag comes, then take it back: a search on film is seconds
+      // of a still frame. Selecting the handle there also scrolls the editor
+      // to the literal the drag rewrites, and that scroll is a jump.
+      const orbit = async (path, pause, settle = 0) => {
+        const b = await tid(page, "viewer-canvas").boundingBox();
+        let at = { x: b.x + b.width * 0.22, y: b.y + b.height * 0.36 };
+        await page.mouse.move(at.x, at.y);
+        await page.mouse.down();
+        await wait(120);
+        for (const [dx, dy] of path) {
+          const to = { x: at.x + dx, y: at.y + dy };
+          await sweep(page, at, to, Math.max(10, Math.round(Math.hypot(dx, dy) / 11)), pause);
+          at = to;
+          if (settle) await wait(settle);
+        }
+        await page.mouse.up();
+        await wait(300);
+        return at;
+      };
+      // Pixels per degree, measured: a hundred pixels, and back.
+      const camera = () => page.evaluate(() => window.__cadjointCamera());
+      const c0 = await camera();
+      await orbit([[100, 0]], 6);
+      const c1 = await camera();
+      await orbit([[-100, 0]], 6);
+      const perDegree = 100 / Math.abs(((c1.yaw - c0.yaw) * 180) / Math.PI);
+      const sign = Math.sign(c1.yaw - c0.yaw) || 1;
+      // Yaw was read from a leftward-turning rate; a positive degree means
+      // the same direction that a rightward pointer drag gives.
+      this.px = ([yaw, pitch]) => [yaw * perDegree, -pitch * perDegree * sign * sign];
+      this.orbit = orbit;
+      if (legs.length) await orbit(legs.map(this.px), 8);
       const tip = await locate(page);
       this.tip = tip;
       await page.mouse.move(tip.x, tip.y);
       await page.mouse.down(); await wait(90); await page.mouse.up();
       await wait(1200);
+      if (legs.length) await orbit(legs.map(this.px).map(([dx, dy]) => [-dx, -dy]).reverse(), 8);
       glide.last = { x: tip.x + 150, y: tip.y + 120 };
       await page.mouse.move(glide.last.x, glide.last.y);
       await wait(600);
     },
     crop: () => CODE_AND_VIEW,
     async act(page) {
-      // The orbit: a closed rectangle, so the camera comes back to its start.
-      const b = await tid(page, "viewer-canvas").boundingBox();
-      const from = { x: b.x + b.width * 0.22, y: b.y + b.height * 0.36 };
-      await glide(page, from, 14, 26);
-      await wait(400);
-      await page.mouse.down();
-      await wait(180);
-      let at = { ...from };
-      for (const [dx, dy] of [[240, 0], [0, -150], [-240, 0], [0, 150]]) {
-        const to = { x: at.x + dx, y: at.y + dy };
-        await sweep(page, at, to, Math.max(10, Math.round(Math.hypot(dx, dy) / 11)), 20);
-        at = to;
-        await wait(220);
+      // The orbit, up to the drag.
+      if (legs.length) {
+        const b = await tid(page, "viewer-canvas").boundingBox();
+        const from = { x: b.x + b.width * 0.22, y: b.y + b.height * 0.36 };
+        await glide(page, from, 14, 26);
+        await wait(400);
+        await page.mouse.down();
+        await wait(180);
+        let at = { ...from };
+        for (const [dx, dy] of legs.map(this.px)) {
+          const to = { x: at.x + dx, y: at.y + dy };
+          await sweep(page, at, to, Math.max(10, Math.round(Math.hypot(dx, dy) / 11)), 20);
+          at = to;
+          await wait(220);
+        }
+        await page.mouse.up();
+        await wait(700);
       }
-      await page.mouse.up();
-      await wait(700);
       // The drag: out along `pull` and back, pointer down throughout. The
       // orbit closed, so the handle is where setup found it; the short
       // re-sweep only absorbs a pixel of drift, and is not the seconds-long
@@ -504,77 +598,182 @@ function orbitAndDrag({ name, scene, handle, zoomTicks = 2, pull = { x: 40, y: -
       await sweep(page, out, tip, 26);
       await wait(350);
       glide.last = tip;
+      if (!legsAfter.length) return;
+      // The release is on film here: the orbit that follows is a drag on the
+      // same canvas, so the handle has to be let go first. Its recompile is
+      // the values-only path, and the editor keeps its place through it.
+      await page.mouse.up();
+      this.released = true;
+      await wait(700);
+      const c = await tid(page, "viewer-canvas").boundingBox();
+      let here = { x: c.x + c.width * 0.22, y: c.y + c.height * 0.36 };
+      await glide(page, here, 14, 26);
+      await page.mouse.down();
+      await wait(180);
+      for (const [dx, dy] of legsAfter.map(this.px)) {
+        const to = { x: here.x + dx, y: here.y + dy };
+        await sweep(page, here, to, Math.max(10, Math.round(Math.hypot(dx, dy) / 11)), 20);
+        here = to;
+        await wait(220);
+      }
+      await page.mouse.up();
+      glide.last = here;
+      await wait(500);
     },
-    // The release is not on film: the compile it triggers is now fast enough
-    // that the editor's scroll back to line 1 would land inside the loop.
-    async after(page) { await page.mouse.up(); await waitForCompile(page); },
+    // Without a turn home the release stays off film, so its recompile
+    // cannot land inside the loop.
+    async after(page) {
+      if (!this.released) await page.mouse.up();
+      await waitForCompile(page);
+    },
   };
 }
 
 const CLIPS = [
-  orbitAndDrag({ name: "bracket-orbit-drag", scene: "bracket.py", handle: "rib_tip" }),
+  // The gusset's tip slid up the web, from the opening view where the rib
+  // is nearest the camera: the smooth union re-blends the joint as it moves.
+  // Then one full turn, so the loop closes on the frame it opened on.
+  orbitAndDrag({ name: "bracket-orbit-drag", scene: "bracket.py", handle: "rib_tip",
+                 legs: [], legsAfter: [[360, 0]], pull: { x: 30, y: -120 } }),
   {
-    name: "heat-sink-drag",
-    width: 1120,
-    quality: 76,
+    name: "end-cap-solve",
+    width: 1440,
+    quality: 74,
+    // The end cap's declared thermal study, solved on film. The result the
+    // server has computed once is fetched back into any later session the
+    // moment Simulate opens, so the only way to record a field arriving is
+    // to be the run that produces it: this clip must be the first solve the
+    // server is asked for, and the recorder starts a fresh server per run.
+    // `fit` plays the whole thing in ten seconds: the solve — mesh, assembly,
+    // field — and then as long again with the field on a turning part, so
+    // the result is on screen for half the clip and not the last frames.
+    fit: 10,
     async setup(page) {
-      await tid(page, "mode-vertex").click();
-      await wait(400);
-      await zoom(page, 3);
-      // Select the handle before recording: selecting scrolls the editor to
-      // the `Vector2` literal this drag rewrites, and that scroll is a jump,
-      // not motion worth four seconds.
-      const m = await canvasMetrics(page);
-      const found = await findHandle(page,
-        { x: m.left + m.clientWidth / 2, y: m.top + m.clientHeight / 2 }, 400, "fin2_tip_l");
-      if (!found) throw new Error("no fin2_tip_l handle in the viewport");
-      this.tip = { x: found.x, y: found.y };
-      await page.mouse.move(this.tip.x, this.tip.y);
-      await page.mouse.down(); await wait(90); await page.mouse.up();
-      await wait(1200);
-      glide.last = { x: this.tip.x + 130, y: this.tip.y + 90 };
-      await page.mouse.move(glide.last.x, glide.last.y);
-      await wait(600);
+      await openScene(page, "end_cap.py");
+      await zoom(page, 1);
+      await tid(page, "editmode-simulate").click();
+      await tid(page, "simulate-run-cap-conduction").waitFor({ timeout: 60_000 });
+      await wait(1400);
     },
-    crop: () => CODE_AND_VIEW,
+    crop: () => FULL,
     async act(page) {
-      const tip = this.tip;
-      // One continuous drag, up and back. It ends where it began — so the
-      // loop does not jump — and, because the pointer never comes up, every
-      // frame between is a parameter-buffer write and not a recompile, which
-      // is the claim the clip is making.
-      await glide(page, tip, 14, 26);
-      await wait(500);
+      const t0 = Date.now();
+      await clickAt(page, tid(page, "simulate-run-cap-conduction"), { steps: 18, pause: 22 });
+      await tid(page, "simulate-legend").waitFor({ timeout: 900_000 });
+      const solved = Date.now() - t0;
+      await wait(1500);
+      // One slow turn, for as long as the solve took.
+      const b = await tid(page, "viewer-canvas").boundingBox();
+      const from = { x: b.x + b.width * 0.35, y: b.y + b.height * 0.55 };
+      await glide(page, from, 14, 26);
       await page.mouse.down();
-      await wait(200);
-      const ease = (u) => (1 - Math.cos(u * Math.PI)) / 2;
-      const sweep = async (from, to, steps) => {
-        for (let i = 1; i <= steps; i++) {
-          const u = ease(i / steps);
-          await page.mouse.move(from.x + (to.x - from.x) * u, from.y + (to.y - from.y) * u);
-          await wait(24);
-        }
-      };
-      const top = { x: tip.x - 6, y: tip.y - 150 };
-      await sweep(tip, top, 26);
-      await wait(650);
-      await sweep(top, tip, 26);
-      await wait(350);
-      // Stop before the release. The compile it triggers replaces the
-      // document, which sends the editor back to line 1 — a jump, and one
-      // that would make the loop restart somewhere the clip never was.
-      glide.last = tip;
+      await wait(160);
+      const steps = 60;
+      for (let i = 1; i <= steps; i++) {
+        await page.mouse.move(from.x + (300 * i) / steps, from.y - (70 * i) / steps);
+        await wait(Math.max(20, solved / steps));
+      }
+      await page.mouse.up();
+      glide.last = { x: from.x + 300, y: from.y - 70 };
+      await wait(2000);
     },
-    async after(page) { await page.mouse.up(); await waitForCompile(page); },
   },
-
-  // Six ribs share `rib_crest` through the pattern, so a modest pull is a
-  // visible change on every one of them; a long one makes spikes.
-  orbitAndDrag({ name: "end-cap-orbit-drag", scene: "end_cap.py", handle: "rib_crest",
-                 pull: { x: 24, y: -85 } }),
+  {
+    name: "heat-sink-optimize",
+    width: 0,
+    quality: 74,
+    // A real gradient-descent run on a FEM objective, every step a mesh, a
+    // solve and an adjoint, then the app's own replay of the trajectory.
+    // `fit` plays all of it in twelve seconds — every frame is one the app
+    // drew, sampled, which is the only honest way to show a thing that slow
+    // — and the capture is thinned to one frame in six so the recorder does
+    // not compete with the run for the machine.
+    fit: 12,
+    captureEvery: 6,
+    async setup(page) {
+      await clickIf(tid(page, "window-tab-optimize"), 600);
+      await parkColumn(page, ["objects"]);
+      await tid(page, "optimize-run-cool-sink").waitFor({ timeout: 60_000 });
+      // The scene declares twelve steps at a cautious rate, which moves the
+      // comb by a few percent: right for a default, invisible on film. The
+      // panel's own fields raise the rate and shorten the run (each is a
+      // patch to the declaration, like any edit). Eight steps at 0.02 take
+      // the objective down about nine percent and complete; the tenth step
+      // at that rate meshes a fin into sliver tets and the solve fails.
+      for (const [field, value] of [["optimize-steps-cool-sink", "8"], ["optimize-lr-cool-sink", "0.02"]]) {
+        const input = tid(page, field).first();
+        await input.fill(value);
+        await input.press("Enter");
+        await waitForCompile(page);
+        await wait(600);
+      }
+      await wait(1000);
+    },
+    crop: () => VIEW_AND_PANEL,
+    async act(page) {
+      await clickAt(page, tid(page, "optimize-run-cool-sink"), { steps: 18, pause: 22 });
+      await tid(page, "optimize-result-cool-sink").waitFor({ timeout: 1_800_000 });
+      // The replay: the app steps the viewport through the trajectory.
+      await wait(24_000);
+    },
+  },
 ];
+/**
+ * The directory's README, from the files in it.
+ *
+ * Every clip on disk gets a row, whether or not this run recorded it, so a
+ * `--only` run leaves a table that is still true of the directory. Frames
+ * and canvas are read back out of each WebP; `wall` is known only for the
+ * clips just recorded and is shown for those.
+ */
+function writeTable(report = []) {
+  const byName = Object.fromEntries(report.filter((r) => !r.error).map((r) => [r.name, r]));
+  const rows = fs.readdirSync(OUT_DIR).filter((f) => f.endsWith(".webp")).sort().map((file) => {
+    const full = path.join(OUT_DIR, file);
+    const info = spawnSync("webpmux", ["-info", full], { encoding: "utf8" }).stdout ?? "";
+    const frames = +(info.match(/Number of frames:\s*(\d+)/)?.[1] ?? 0);
+    const width = +(info.match(/Canvas size:\s*(\d+)/)?.[1] ?? 0);
+    const size = bytes(full);
+    const wall = byName[file.replace(/\.webp$/, "")]?.wall;
+    return { file, frames, width, size, played: frames / FPS, wall };
+  });
+  const total = rows.reduce((s, r) => s + r.size, 0);
+  const lines = [
+    "# README motion",
+    "",
+    "Regenerated by one command, against the real app:",
+    "",
+    "```",
+    "node research/design/motion/animate.mjs            # every clip",
+    "node research/design/motion/animate.mjs --only a,b # some; the table covers all",
+    "```",
+    "",
+    `Captured at ${VIEW.width}x${VIEW.height} css px, device scale ${DSF}, played at ${FPS} fps.`,
+    "Do not hand-edit anything in this directory.",
+    "",
+    "| clip | played | frames | delivered | bytes |",
+    "| --- | ---: | ---: | ---: | ---: |",
+    ...rows.map((r) => `| \`${r.file}\` | ${r.played.toFixed(1)}s${r.wall && r.wall > r.played * 1.5 ? ` (${r.wall.toFixed(0)}s wall)` : ""} | ${r.frames} | ${r.width}px wide | ${kb(r.size)} |`),
+    `| **total** | | | | **${(total / 1024 / 1024).toFixed(2)} MB** |`,
+    "",
+  ];
+  const withAlternatives = report.filter((r) => r.alternatives);
+  if (withAlternatives.length) {
+    const kinds = Object.keys(withAlternatives[0].alternatives);
+    lines.push("## Format evidence", "",
+      `| clip | ${kinds.join(" | ")} |`, `| --- | ${kinds.map(() => "---:").join(" | ")} |`,
+      ...withAlternatives.map((r) => `| \`${r.name}\` | ${kinds.map((k) => kb(r.alternatives[k])).join(" | ")} |`), "");
+  }
+  fs.writeFileSync(path.join(OUT_DIR, "README.md"), lines.join("\n"));
+  console.log("wrote", path.join(OUT_DIR, "README.md"));
+}
+
 if (flag("list")) {
   for (const c of CLIPS) console.log(c.name);
+  process.exit(0);
+}
+if (flag("table")) {
+  writeTable();
   process.exit(0);
 }
 const only = (arg("only", "") || "").split(",").filter(Boolean);
@@ -670,7 +869,7 @@ for (const clip of chosen) {
     console.log(`   crop ${crop.w}x${crop.h} +${crop.x}+${crop.y} -> ${width}px`);
 
     const cast = new Screencast(page, path.join(dir, "raw"));
-    await cast.start();
+    await cast.start({ everyNthFrame: clip.captureEvery ?? 1 });
     await wait(250);
     await clip.act.call(clip, page);
     await wait(250);
@@ -714,35 +913,5 @@ const total = ok.reduce((s, r) => s + r.size, 0);
 console.log(`\n${ok.length}/${report.length} clips · ${(total / 1024 / 1024).toFixed(2)} MB total`);
 for (const r of report.filter((x) => x.error)) console.log(`  FAILED ${r.name}: ${r.error}`);
 
-const lines = [
-  "# README motion",
-  "",
-  "Regenerated by one command, against the real app:",
-  "",
-  "```",
-  "node research/design/motion/animate.mjs",
-  "```",
-  "",
-  `Captured at ${VIEW.width}x${VIEW.height} css px, device scale ${DSF}, played at ${FPS} fps.`,
-  "Do not hand-edit anything in this directory.",
-  "",
-  "| clip | played | frames | delivered | bytes |",
-  "| --- | ---: | ---: | ---: | ---: |",
-  ...ok.map((r) => `| \`${r.name}.webp\` | ${r.played.toFixed(1)}s${r.wall && r.wall > r.played * 1.5 ? ` (${r.wall.toFixed(0)}s wall)` : ""} | ${r.frames} | ${r.width}px wide | ${kb(r.size)} |`),
-  `| **total** | | | | **${(total / 1024 / 1024).toFixed(2)} MB** |`,
-  "",
-];
-if (ok.some((r) => r.alternatives)) {
-  const kinds = Object.keys(ok.find((r) => r.alternatives).alternatives);
-  lines.push("## Format evidence", "",
-    "The same staged frames, encoded every way. `webp` is the column the",
-    "README ships.", "",
-    `| clip | webp | ${kinds.join(" | ")} |`,
-    `| --- | ---: | ${kinds.map(() => "---:").join(" | ")} |`,
-    ...ok.filter((r) => r.alternatives).map((r) =>
-      `| ${r.name} | ${kb(r.size)} | ${kinds.map((k) => kb(r.alternatives[k])).join(" | ")} |`),
-    "");
-}
-fs.writeFileSync(path.join(OUT_DIR, "README.md"), lines.join("\n"));
-console.log("wrote", path.join(OUT_DIR, "README.md"));
+writeTable(report);
 process.exit(report.some((r) => r.error) ? 1 : 0);

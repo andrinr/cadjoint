@@ -6,17 +6,13 @@ FEM simulation composed into one function JAX can differentiate end to end.
 > [!WARNING]
 > The API is not stable. Expect breaking changes.
 
-[![The bracket scene in the cadjoint playground: the camera is orbited around and under a steel bracket with a triangular gusset rib, then the pointer switches to vertex selection and pulls the rib's tip handle upward. The rib grows with the pointer at frame rate while the plate and web stay put, and the editor on the left holds the highlighted line rib_tip = Vector2(value=[-0.9, -0.62], free=True, ...).](docs/assets/motion/bracket-orbit-drag.webp)](https://andrinr.github.io/cadjoint/docs/viewer.html)
+[![The bracket scene in the cadjoint playground: with the pointer in vertex selection, the tip of the bracket's triangular gusset rib is dragged up the vertical web. The rib re-attaches where the pointer puts it and the smooth union re-blends the joint at frame rate while the plate and web stay put; the editor on the left holds the highlighted line rib_tip = Vector2(value=[-0.9, -0.62], free=True, ...). Then the camera makes one full turn around the bracket.](docs/assets/motion/bracket-orbit-drag.webp)](https://andrinr.github.io/cadjoint/docs/viewer.html)
 
-*Left-drag orbits. The handle under the pointer is a named `Vector2` in
-`scene.py`; dragging it writes the parameter buffer the shader already reads,
-so the solid follows at frame rate, and releasing it patches the literal in the
-source. The source is the model.*
-
-| Heat sink | End cap |
-| --- | --- |
-| [![A fin tip of the heat sink is dragged upward. The fin grows with the pointer while the rest of the comb stays put, and the editor holds the highlighted line fin2_tip_l = Vector2(value=[-0.15, 0.85], free=True, ...).](docs/assets/motion/heat-sink-drag.webp)](scenes/starter.py) | [![The end cap is orbited, then the crest handle of one gusset rib is pulled upward and all six ribs of the circular pattern rise together, because they share the one parameter.](docs/assets/motion/end-cap-orbit-drag.webp)](scenes/end_cap.py) |
-| A fin comb from one constrained sketch, extruded, on a copper slug and a board ([`scenes/starter.py`](scenes/starter.py)). | Six ribs from one sketch through a circular pattern, around a revolved bore ([`scenes/end_cap.py`](scenes/end_cap.py)). |
+*The handle under the pointer is a named `Vector2` in `scene.py`, and the
+joint it moves is a smooth union of three extrusions. Dragging it writes the
+parameter buffer the shader already reads, so the blend follows at frame
+rate; releasing it patches the literal in the source. The source is the
+model.*
 
 ## The chain
 
@@ -32,8 +28,20 @@ A sketch profile is a list of named `Vector2` parameters. Constraints are
 residuals on those parameters, solved by Newton projection onto the constraint
 manifold. Extruding or revolving the profile produces an SDF that *shares* those
 parameter objects. Dual contouring turns the field into a surface, TetGen or
-Gmsh fills it, jax-fem or CalculiX solves on it, and `jax.grad` reaches from
-the objective back to a fin's tip coordinate.
+Gmsh fills it, and jax-fem or CalculiX solves on it. A study is declared in the
+scene beside the geometry it loads — here the end cap's `ThermalStudy`, a heat
+flux on the bearing boss and a fixed temperature on the flange — and solving it
+is one click, meshing included:
+
+[![The end cap's cap-conduction thermal study is run from the Simulate panel. The job chip counts up while the part is meshed and solved, then the temperature field lands on the solid with its legend, and the part is turned with the field on it.](docs/assets/motion/end-cap-solve.webp)](scenes/end_cap.py)
+
+The same study is a function of the sketch, so `jax.grad` reaches from its
+objective back to a fin's tip coordinate. An `Optimization` declared in the
+scene descends on that gradient, every step a mesh, a solve and an adjoint,
+projected back onto the constraints. The heat sink below starts deliberately
+overbuilt and slims as its peak temperature falls:
+
+[![The heat sink's cool-sink optimisation is run from the Optimize panel. Eight gradient steps, each a mesh, a thermal solve and an adjoint, replayed as a time-lapse: the fin comb reproportions as the peak temperature falls in the panel's trace.](docs/assets/motion/heat-sink-optimize.webp)](scenes/starter.py)
 
 A work plane taken from a face (`SketchPlane.on(body.cap("+"))`) is an
 expression over the parent feature's parameters, so a boss extruded from it
