@@ -101,6 +101,14 @@ def _shader_options() -> tuple[bool, bool, str]:
       rather than only the free ones.  This is 31x slower per frame on
       ``scenes/end_cap.py`` and exists to be measured, not to be used —
       see :func:`cadjoint.backends.wgsl.compile_scene_with_uniforms`.
+    * ``CADJOINT_SHADER_FORM=direct`` emits the same three public functions
+      from :mod:`cadjoint.backends.wgsl.direct`, which walks the SDF graph
+      instead of tracing it.  A literal form like ``literal`` — it has no
+      uniform buffer, so a parameter edit is a new module and the drag
+      optimisation is off — but a far smaller one, because profile vertices
+      live in a storage buffer and patterns loop instead of unrolling
+      (``scenes/end_cap.py``: 365 kB against 12 kB).  Falls back to the
+      traced form for a scene using a node it has no kernel for.
     """
     uniforms = os.environ.get("CADJOINT_SHADER_FORM", "uniform").lower() != "literal"
     culling = os.environ.get("CADJOINT_SHADER_CULL", "1") != "0"
@@ -112,15 +120,49 @@ def _scene_shader(scene) -> tuple[str, dict | None]:
     """The scene's WGSL, and the uniform contract that goes with it.
 
     Returns:
-        ``(source, program)`` — ``program`` is ``None`` in the literal form,
+        ``(source, program)`` — ``program`` is ``None`` in the literal forms,
             where the parameters are baked into ``source`` and any edit is a
             different module.
     """
+    form = os.environ.get("CADJOINT_SHADER_FORM", "uniform").lower()
+    if form == "direct":
+        direct = _direct_shader(scene)
+        if direct is not None:
+            return direct
     uniforms, culling, scope = _shader_options()
     compiled = compile_scene_to_wgsl(scene, uniforms=uniforms, culling=culling, scope=scope)
     if uniforms:
         return compiled.wgsl, compiled.as_dict()
     return compiled, None
+
+
+def _direct_shader(scene) -> tuple[str, dict | None] | None:
+    """The direct backend's module, or None when it cannot emit this scene.
+
+    The profile vertices it would read from a storage buffer are inlined as a
+    constant array here, because the viewer's shader contract carries one
+    uniform buffer and no vertex buffer.  That keeps the module a drop-in at
+    the cost of the one thing this form is *not* being measured for — the
+    vertices are still data rather than code, just data spelled in the
+    module.  See ``research/performance.md`` §16.
+    """
+    from cadjoint.backends.wgsl.direct import UnsupportedNode, compile_sdf_direct
+
+    try:
+        program = compile_sdf_direct(scene)
+    except UnsupportedNode as reason:
+        print(f"note: the direct shader backend cannot emit this scene ({reason}); tracing it.")
+        return None
+    source = program.wgsl
+    if program.vertices.size:
+        literals = ", ".join(
+            f"vec2<f32>({x:.9g}, {y:.9g})" for x, y in program.vertices.tolist()
+        )
+        source = source.replace(
+            "@group(1) @binding(0) var<storage, read> profile_vertices: array<vec2<f32>>;",
+            f"const profile_vertices = array<vec2<f32>, {len(program.vertices)}>({literals});",
+        )
+    return source, None
 
 
 def _compile_source(source: str) -> dict[str, Any]:

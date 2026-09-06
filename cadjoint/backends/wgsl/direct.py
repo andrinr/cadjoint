@@ -39,6 +39,10 @@ import numpy as np
 
 __all__ = ["DirectProgram", "UnsupportedNode", "compile_sdf_direct", "supported_nodes"]
 
+#: The optics row, in the order `material_optics` returns it — the same
+#: order `codegen._material_rows` packs, since both fill the same block.
+_OPTICS_KEYS = ("metallic", "opacity", "ior", "reflectivity")
+
 
 class UnsupportedNode(Exception):
     """A node kind this backend has no kernel for."""
@@ -253,6 +257,19 @@ _LOFTED = """fn prim_loftedpolygon(
     return sqrt(ea * ea + eb * eb);
 }"""
 
+#: The two public material functions, as slices of one block — byte for byte
+#: what `codegen._material_entry_points` emits, because a consumer must not be
+#: able to tell the backends apart.
+_MATERIAL_ENTRY_POINTS = """fn material_base(p: vec3<f32>) -> vec4<f32> {
+    let m = material_block_impl(p);
+    return vec4<f32>(m[0].x, m[1].x, m[2].x, m[3].x);
+}
+
+fn material_optics(p: vec3<f32>) -> vec4<f32> {
+    let m = material_block_impl(p);
+    return vec4<f32>(m[0].y, m[1].y, m[2].y, m[3].y);
+}"""
+
 _SHARED: dict[str, str] = {}
 
 # ── transforms ───────────────────────────────────────────────────────────────
@@ -337,6 +354,7 @@ class _Emitter:
         self.functions: list[str] = []
         self._kernels: set[str] = set()
         self._nodes: dict[int, str] = {}
+        self._materials: dict[int, str] = {}
         self.vertices: list[tuple[float, float]] = []
 
     def profile_slice(self, node: Any) -> tuple[int, int]:
@@ -379,6 +397,101 @@ class _Emitter:
         body = self._body(node)
         self.functions.append(f"fn {symbol}(p: vec3<f32>) -> f32 {{\n{body}\n}}")
         return symbol
+
+    # ── materials ────────────────────────────────────────────────────────
+    #
+    # A second walk, in step with the distance one. A primitive's material is
+    # constant, a transform forwards it through the moved point, and a boolean
+    # blends its children by the same weight the smooth minimum uses — which
+    # is why a material function has to evaluate distances too, exactly as
+    # `functionalize_scene`'s `mat_eval` does.
+
+    def material_for(self, node: Any) -> str:
+        """The WGSL function giving *node*'s material block, emitted once."""
+        key = id(node)
+        if key in self._materials:
+            return self._materials[key]
+        symbol = f"mat{len(self._materials)}"
+        self._materials[key] = symbol
+        body = self._material_body(node)
+        self.functions.append(f"fn {symbol}(p: vec3<f32>) -> mat4x2<f32> {{\n{body}\n}}")
+        return symbol
+
+    def _material_body(self, node: Any) -> str:
+        name = type(node).__name__
+
+        if name in _BOOLEANS:
+            children = node.children()
+            smoothness = (
+                float(_value(node, "smoothness")[0]) if "smoothness" in node.params else 0.0
+            )
+            k = max(smoothness * 4.0, 1e-10)
+            # `acc`, not `d0`: the per-child bindings below are `d0, d1, ...`
+            # and WGSL has no shadowing in a single scope, so an accumulator
+            # called `d0` collides with the first of them.
+            lines = [
+                f"    var acc = {self.function_for(children[0])}(p);",
+                f"    var m = {self.material_for(children[0])}(p);",
+            ]
+            for index, child in enumerate(children[1:]):
+                lines += [
+                    f"    let d{index} = {self.function_for(child)}(p);",
+                    f"    let n{index} = {self.material_for(child)}(p);",
+                    f"    let t{index} = clamp(0.5 + 0.5 * (d{index} - acc) / {k:.9g}, 0.0, 1.0);",
+                    # Material.blend(m1, m2, t) = m2*(1-t) + m1*t, m1 first.
+                    f"    m = m * t{index} + n{index} * (1.0 - t{index});",
+                    f"    let h{index} = max({k:.9g} - abs(acc - d{index}), 0.0);",
+                    f"    acc = min(acc, d{index}) - h{index} * h{index} * 0.25 / {k:.9g};",
+                ]
+            lines.append("    return m;")
+            return "\n".join(lines)
+
+        if name in _TRANSFORMS or name in ("Rotate", "Mirror", "Shell", "Offset"):
+            child = self.material_for(node.sdf)
+            moved = self._moved_point(node, name)
+            return f"    return {child}({moved});"
+
+        if name in ("LinearPattern", "PolarPattern"):
+            # Every instance is the same child, so the material is the
+            # child's, read at the unmoved point — which is copy 0, the one
+            # the child's own references are declared against.
+            return f"    return {self.material_for(node.sdf)}(p);"
+
+        # A primitive's material is constant; evaluate it once, here.
+        values = node.material_at(np.zeros(3, dtype=np.float64))
+        colour = np.asarray(values["color"], dtype=np.float64).reshape(-1)
+        row0 = [colour[0], colour[1], colour[2], float(np.asarray(values["roughness"]))]
+        row1 = [float(np.asarray(values[key])) for key in _OPTICS_KEYS]
+        columns = ", ".join(
+            f"vec2<f32>({row0[i]:.9g}, {row1[i]:.9g})" for i in range(4)
+        )
+        return f"    return mat4x2<f32>({columns});"
+
+    def _moved_point(self, node: Any, name: str) -> str:
+        """The point expression a transform hands its child."""
+        if name in ("Shell", "Offset"):
+            return "p"
+        if name == "Rotate":
+            from cadjoint.sdf.transforms.affine.rotate import Rotate
+
+            matrix = np.asarray(
+                Rotate._rotation_matrix(_value(node, "axis"), float(_value(node, "angle")[0])),
+                dtype=np.float64,
+            ).T
+            columns = ", ".join(
+                f"vec3<f32>({matrix[0][c]:.9g}, {matrix[1][c]:.9g}, {matrix[2][c]:.9g})"
+                for c in range(3)
+            )
+            return f"mat3x3<f32>({columns}) * p"
+        if name == "Mirror":
+            origin = _literal(_value(node, "origin"), 3)
+            normal = _literal(_value(node, "normal"), 3)
+            return f"p - 2.0 * dot(p - {origin}, {normal}) * {normal}"
+        names, arity, template = _TRANSFORMS[name]
+        bindings = {
+            parameter: _literal(_value(node, parameter), arity[parameter]) for parameter in names
+        }
+        return template.format(p="p", **bindings)
 
     def _body(self, node: Any) -> str:
         name = type(node).__name__
@@ -564,7 +677,17 @@ def compile_sdf_direct(geometry: Any, *, entry_point: str = "sdf") -> DirectProg
     """
     emitter = _Emitter()
     root = emitter.function_for(geometry)
-    entry = f"fn {entry_point}(p: vec3<f32>) -> f32 {{\n    return {root}(p);\n}}"
+    material_root = emitter.material_for(geometry)
+    entry = "\n\n".join(
+        [
+            f"fn {entry_point}(p: vec3<f32>) -> f32 {{\n    return {root}(p);\n}}",
+            # The same three public names the traced module defines, so a
+            # consumer cannot tell which backend produced it.
+            f"fn material_block_impl(p: vec3<f32>) -> mat4x2<f32> {{\n"
+            f"    return {material_root}(p);\n}}",
+            _MATERIAL_ENTRY_POINTS,
+        ]
+    )
     sections = list(emitter.functions)
     if emitter.vertices:
         sections.insert(0, _PROFILE_BUFFER)

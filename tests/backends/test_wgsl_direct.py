@@ -17,7 +17,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from cadjoint.backends.wgsl.codegen import compile_sdf_to_wgsl
+from cadjoint.backends.wgsl.codegen import compile_scene_to_wgsl, compile_sdf_to_wgsl
 from cadjoint.backends.wgsl.direct import UnsupportedNode, compile_sdf_direct
 from cadjoint.construction import Axis
 from cadjoint.geometry.parameters import Scalar, Vector, Vector2
@@ -53,8 +53,34 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
 }
 """
 
+#: The same harness, sampling one component of the material block instead —
+#: a material is eight floats, and a backend can be right about geometry and
+#: wrong about which colour belongs where.
+_MATERIAL_HARNESS = """
+@group(0) @binding(0) var<storage, read> points: array<vec4<f32>>;
+@group(0) @binding(1) var<storage, read_write> out: array<f32>;
 
-def _evaluate_on_device(wgsl, points: np.ndarray) -> np.ndarray:
+@compute @workgroup_size(64)
+fn main(@builtin(global_invocation_id) id: vec3<u32>) {
+    let i = id.x;
+    if (i >= arrayLength(&out)) { return; }
+    let n = arrayLength(&out) / 8u;
+    let base = material_base(points[i % n].xyz);
+    let optics = material_optics(points[i % n].xyz);
+    let slot = i / n;
+    if (slot == 0u) { out[i] = base.x; }
+    else if (slot == 1u) { out[i] = base.y; }
+    else if (slot == 2u) { out[i] = base.z; }
+    else if (slot == 3u) { out[i] = base.w; }
+    else if (slot == 4u) { out[i] = optics.x; }
+    else if (slot == 5u) { out[i] = optics.y; }
+    else if (slot == 6u) { out[i] = optics.z; }
+    else { out[i] = optics.w; }
+}
+"""
+
+
+def _evaluate_on_device(wgsl, points: np.ndarray, harness: str = _HARNESS) -> np.ndarray:
     """Run `fn sdf(p) -> f32` from *wgsl* at every point, on the GPU.
 
     Accepts either plain source (the traced backend) or a `DirectProgram`,
@@ -65,7 +91,7 @@ def _evaluate_on_device(wgsl, points: np.ndarray) -> np.ndarray:
     source = str(wgsl)
     adapter = wgpu.gpu.request_adapter_sync(power_preference="high-performance")
     device = adapter.request_device_sync()
-    module = device.create_shader_module(code=source + _HARNESS)
+    module = device.create_shader_module(code=source + harness)
 
     # vec4 rather than vec3: WGSL pads a vec3 in a storage array to 16 bytes,
     # so a packed (N, 3) upload would be read misaligned.
@@ -73,7 +99,11 @@ def _evaluate_on_device(wgsl, points: np.ndarray) -> np.ndarray:
     padded[:, :3] = points
     usage = wgpu.BufferUsage
     inputs = device.create_buffer_with_data(data=padded.tobytes(), usage=usage.STORAGE)
-    outputs = device.create_buffer(size=len(points) * 4, usage=usage.STORAGE | usage.COPY_SRC)
+    # The material harness writes eight values per point, one per block slot.
+    slots = 8 if harness is _MATERIAL_HARNESS else 1
+    outputs = device.create_buffer(
+        size=len(points) * slots * 4, usage=usage.STORAGE | usage.COPY_SRC
+    )
     layout = device.create_bind_group_layout(
         entries=[
             {
@@ -137,7 +167,7 @@ def _evaluate_on_device(wgsl, points: np.ndarray) -> np.ndarray:
     pass_.set_pipeline(pipeline)
     for index, group in enumerate(groups):
         pass_.set_bind_group(index, group)
-    pass_.dispatch_workgroups((len(points) + 63) // 64)
+    pass_.dispatch_workgroups((len(points) * slots + 63) // 64)
     pass_.end()
     device.queue.submit([encoder.finish()])
     raw = device.queue.read_buffer(outputs)
@@ -342,6 +372,22 @@ def test_a_pattern_loops_instead_of_unrolling():
 _SHIPPED = ("starter", "bracket", "duct_sink", "end_cap")
 
 
+@pytest.mark.parametrize(("label", "scene"), _scenes(), ids=[name for name, _ in _scenes()])
+def test_both_backends_agree_on_the_material_field(label, scene):
+    """A shader that draws the right shape in the wrong colour is still wrong.
+
+    The material walk runs in step with the distance one, and a boolean's
+    blend weight is derived from the very distances the other walk computes,
+    so the two can disagree independently.
+    """
+    points = _POINTS[:512]
+    traced = _evaluate_on_device(
+        compile_scene_to_wgsl(scene), points, harness=_MATERIAL_HARNESS
+    )
+    direct = _evaluate_on_device(compile_sdf_direct(scene), points, harness=_MATERIAL_HARNESS)
+    np.testing.assert_allclose(direct, traced, rtol=2e-5, atol=2e-6)
+
+
 @pytest.mark.parametrize("stem", _SHIPPED)
 def test_a_shipped_scene_agrees_field_for_field(stem):
     """The comparison that matters: real geometry, not a synthetic ring.
@@ -425,3 +471,36 @@ def test_the_traced_module_grows_with_the_profile_and_the_direct_one_does_not():
     ]
     assert traced[1] > 8 * traced[0], "the traced form unrolls, so it must grow steeply"
     assert direct[1] < direct[0] + 32, "the direct form only widens two integer literals"
+
+
+@pytest.mark.parametrize("stem", _SHIPPED)
+def test_the_viewer_shader_built_from_it_compiles(stem):
+    """The drop-in claim, against a real WGSL compiler.
+
+    The three public names are not enough on their own: the viewer wraps
+    them in its own preview and path-tracing entry points, and a module that
+    parses alone can still fail to compile inside that template — a
+    redefinition, a missing binding, a type the wrapper disagrees with. This
+    builds the shader the viewer would actually install and hands it to the
+    device.
+
+    (A headless browser cannot stand in for this. Chrome in CI here reports
+    no WebGPU adapter at all, so the only real WGSL compiler available is
+    the one behind `wgpu`.)
+    """
+    from pathlib import Path
+
+    from cadjoint.viewer._compile_worker import _direct_shader
+    from cadjoint.viewer._webgpu import build_viewer_shader
+    from cadjoint.viewer._worker_scene import _execute_scene
+
+    root = Path(__file__).resolve().parents[2]
+    scene = _execute_scene((root / "scenes" / f"{stem}.py").read_text())["scene"]
+    source, program = _direct_shader(scene)
+    assert program is None, "the direct form bakes its parameters in, like `literal`"
+
+    adapter = wgpu.gpu.request_adapter_sync(power_preference="high-performance")
+    device = adapter.request_device_sync()
+    # A validation failure raises, which is how the viewer's own shader tests
+    # assert this; the earlier `redefinition of d0` surfaced exactly here.
+    device.create_shader_module(code=build_viewer_shader(source), label=f"direct/{stem}")
