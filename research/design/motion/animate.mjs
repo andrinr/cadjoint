@@ -307,6 +307,35 @@ async function findHandle(page, near, radius = 90, phrase = "free parameter") {
   }, [near.x, near.y, radius, phrase]);
 }
 
+
+/**
+ * Where the pointer shows a given cursor, nearest to `near` first, sweeping
+ * rings like `findHandle`. The pane's cursor vocabulary is the app's own
+ * answer to "what is under the pointer": `grab` is a handle or a gizmo arrow,
+ * `pointer` selects, `crosshair` places. `pick` chooses among the hits.
+ */
+async function findCursor(page, near, radius, cursor, pick = (hits) => hits[0]) {
+  const hits = await page.evaluate(([cx, cy, r, want]) => {
+    const canvas = document.querySelector("[data-testid=viewer-canvas]");
+    const rect = canvas.getBoundingClientRect();
+    const found = [];
+    for (let ring = 0; ring <= r; ring += 3) {
+      const step = ring === 0 ? 360 : Math.max(0.5, (3 / ring) * (180 / Math.PI));
+      for (let a = 0; a < 360; a += step) {
+        const x = cx + ring * Math.cos((a * Math.PI) / 180);
+        const y = cy + ring * Math.sin((a * Math.PI) / 180);
+        if (x < rect.left + 4 || x > rect.right - 4 || y < rect.top + 4 || y > rect.bottom - 4) continue;
+        canvas.dispatchEvent(new PointerEvent("pointermove", {
+          clientX: x, clientY: y, bubbles: true, pointerId: 1,
+        }));
+        if (canvas.style.cursor === want) found.push({ x, y });
+      }
+    }
+    return found;
+  }, [near.x, near.y, radius, cursor]);
+  return hits.length ? pick(hits) : null;
+}
+
 async function waitForCompile(page, timeout = 120_000) {
   await page.waitForFunction(
     () => {
@@ -715,6 +744,107 @@ const CLIPS = [
       await tid(page, "optimize-result-cool-sink").waitFor({ timeout: 1_800_000 });
       // The replay: the app steps the viewport through the trajectory.
       await wait(24_000);
+    },
+  },
+  {
+    name: "sketch-planes",
+    width: 1120,
+    quality: 76,
+    async setup(page) {
+      await zoom(page, 2);
+      await wait(600);
+    },
+    crop: () => CODE_AND_VIEW,
+    async act(page) {
+      // The sketch tool, armed: a ghost frame says where a click would put a
+      // new plane, and follows the pointer over the floor.
+      const child = tid(page, "tool-sketch").first();
+      for (let attempt = 0; attempt < 2 && !(await child.isVisible().catch(() => false)); attempt++) {
+        await clickAt(page, tid(page, "tool-group-create").first(), { steps: 12 });
+        await wait(300);
+      }
+      await clickAt(page, child, { steps: 12 });
+      await wait(400);
+      const b = await tid(page, "viewer-canvas").boundingBox();
+      for (const [fx, fy] of [[0.22, 0.62], [0.34, 0.72], [0.18, 0.78]]) {
+        await glide(page, { x: b.x + b.width * fx, y: b.y + b.height * fy }, 16, 26);
+        await wait(700);
+      }
+      await page.keyboard.press("Escape");
+      await wait(500);
+      // Take the fin comb's plane by its frame, which the hint names.
+      const m = await canvasMetrics(page);
+      const centre = { x: m.left + m.clientWidth / 2, y: m.top + m.clientHeight / 2 };
+      const edge = await findHandle(page, centre, 520, "Sketch plane of fin comb");
+      if (!edge) throw new Error("no frame edge of the fin comb's plane in view");
+      await glide(page, edge, 14, 26);
+      await wait(500);
+      await page.mouse.down(); await wait(90); await page.mouse.up();
+      await wait(1000);
+      // The gizmo now sits on the plane's origin; its up arrow is the
+      // topmost point that shows the grab cursor near there.
+      const arrow = await findCursor(page, edge, 260, "grab",
+        (hits) => hits.reduce((top, h) => (h.y < top.y ? h : top)));
+      if (!arrow) throw new Error("no gizmo arrow near the selected plane");
+      const ease = (u) => (1 - Math.cos(u * Math.PI)) / 2;
+      const lift = async (from, dy) => {
+        await glide(page, from, 14, 26);
+        await wait(400);
+        await page.mouse.down();
+        await wait(200);
+        for (let i = 1; i <= 26; i++) {
+          await page.mouse.move(from.x, from.y + dy * ease(i / 26));
+          await wait(24);
+        }
+        await wait(500);
+        await page.mouse.up();
+        await waitForCompile(page);
+        await wait(900);
+      };
+      // Up, and after the recompile, back down: the loop closes.
+      await lift(arrow, -90);
+      const back = await findCursor(page, { x: arrow.x, y: arrow.y - 90 }, 200, "grab",
+        (hits) => hits.reduce((top, h) => (h.y < top.y ? h : top)));
+      await lift(back ?? { x: arrow.x, y: arrow.y - 90 }, 90);
+      glide.last = { x: arrow.x, y: arrow.y };
+    },
+  },
+  {
+    name: "properties-window",
+    width: 0,
+    quality: 76,
+    async setup(page) {
+      await zoom(page, 1);
+      await wait(600);
+    },
+    crop: () => VIEW_AND_PANEL,
+    async act(page) {
+      // The tree's operator row points the window at the extrusion.
+      await clickAt(page, page.locator("[data-testid^=tree-row-profile_0-op-extrude]").first(), { steps: 16 });
+      await tid(page, "properties-feature").waitFor({ timeout: 30_000 });
+      await wait(1400);
+      const set = async (id, value) => {
+        const field = tid(page, id).first();
+        await point(page, field, { steps: 14 });
+        await field.fill(value);
+        await wait(300);
+        await field.press("Enter");
+        await waitForCompile(page);
+        await wait(1200);
+      };
+      const choose = async (id, value) => {
+        const field = tid(page, id).first();
+        await point(page, field, { steps: 14 });
+        await field.selectOption(value);
+        await waitForCompile(page);
+        await wait(1200);
+      };
+      await set("prop-feature-depth", "1.8");
+      await choose("prop-feature-material", "copper");
+      await wait(600);
+      // And back, so the loop closes on the frame it opened on.
+      await set("prop-feature-depth", "1.2");
+      await choose("prop-feature-material", "aluminum");
     },
   },
 ];

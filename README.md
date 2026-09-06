@@ -45,9 +45,16 @@ overbuilt and slims as its peak temperature falls:
 
 A work plane taken from a face (`SketchPlane.on(body.cap("+"))`) is an
 expression over the parent feature's parameters, so a boss extruded from it
-differentiates with respect to its parent's depth. No boundary representation
-is stored: the field is the model, and every surface is derived from it at a
-resolution you choose.
+differentiates with respect to its parent's depth. Every sketch's plane is
+drawn in the viewport with its origin and normal; the sketch tool shows where
+a new one will land before it exists, and a plane written as literals can be
+taken by its frame and moved, which rewrites the `SketchPlane(origin=...)`
+in the source:
+
+[![The heat sink in the playground with every sketch plane drawn as a translucent frame, an origin cross and a normal glyph, each named. The sketch tool is armed and a ghost frame labelled new sketch follows the pointer across the floor. Then the fin comb's plane is selected by its frame edge, the gizmo appears at its origin, and dragging the gizmo's Z arrow lifts the whole comb; the editor's SketchPlane(origin=[...]) literal is rewritten on release.](docs/assets/motion/sketch-planes.webp)](scenes/starter.py)
+
+No boundary representation is stored: the field is the model, and every
+surface is derived from it at a resolution you choose.
 
 ## What ships
 
@@ -105,10 +112,16 @@ uv run cadjoint-viewer --open      # serves http://127.0.0.1:8765/
 
 The editor on the left holds `scene.py`; the viewport shows the compiled
 field. Vertex handles, gizmos, material swatches, face picks, constraint chips
-and solver runs all write back into the source. Three desks, Model, Sketch and
-Simulate, share one viewport. Studies solve with one click, results land in a
-labelled legend, and a declared optimization streams step by step and writes
-its optimized values into the program.
+and solver runs all write back into the source. A properties window follows
+the selection and shows every argument the call was written with: literals
+as fields you can edit, expressions as the text they are.
+
+[![The properties window in the playground. Clicking the fin comb's extrude row in the object tree fills the window with the call's arguments: the profile, the depth, which is the named parameter fin_depth, and the material. Typing a new depth and pressing Enter rewrites fin_depth's declaration in the editor and the comb deepens; choosing copper from the material dropdown rewrites the extrude call and the comb changes colour.](docs/assets/motion/properties-window.webp)](scenes/starter.py)
+
+Three desks, Model, Sketch and Simulate, share one viewport. Studies solve
+with one click, results land in a labelled legend, and a declared
+optimization streams step by step and writes its optimized values into the
+program.
 
 The server only listens on localhost and compiles each edit in a timed child
 process, but it executes Python on your machine: only run code you trust.
