@@ -80,6 +80,11 @@ EDITABLE_CALLS: dict[str, dict[str, int]] = {
     "extrude": {"depth": 1},
     "revolve": {"offset": 1},
     "loft": {"height": 1},
+    # The blend radius of a boolean, addressed by line: booleans carry no
+    # stable identity of their own, so the properties window names the call.
+    "Union": {"smoothness": 1},
+    "Difference": {"smoothness": 1},
+    "Intersection": {"smoothness": 1},
     "PolygonProfile": {"planeOrigin": 3, "planeNormal": 3},
     # The viewport addresses a sketch's plane call directly when the sketch is
     # dragged as an object: the same two keywords, named as SketchPlane names them.
@@ -90,6 +95,7 @@ EDITABLE_CALLS: dict[str, dict[str, int]] = {
 #: Arguments that are unit intervals or brackets rather than free numbers.
 _UNIT_INTERVAL_ARGUMENTS = frozenset({"color"})
 _POSITIVE_ARGUMENTS = frozenset({"size", "radius", "height"})
+_NON_NEGATIVE_ARGUMENTS = frozenset({"smoothness"})
 
 
 def _checked_value(name: str, argument: str, value) -> str:
@@ -126,6 +132,8 @@ def _checked_value(name: str, argument: str, value) -> str:
         raise PatchError(
             f"`{argument}` needs {'a positive number' if size == 1 else f'{size} positive numbers'}."
         )
+    if argument in _NON_NEGATIVE_ARGUMENTS and any(item < 0.0 for item in components):
+        raise PatchError(f"`{argument}` needs a number of at least 0.")
     if argument == "planeNormal" and not any(abs(item) > 1e-9 for item in components):
         raise PatchError("A sketch-plane normal must not be zero.")
     return _format_value(value)

@@ -52,6 +52,7 @@ from cadjoint.viewer.source_map import (
     capture_profiles,
     describe_identities,
 )
+from cadjoint.viewer.source_map.elements import build_element_payload
 from cadjoint.viewer.worker.declarations import (
     _mesh_entries,
     _optimization_entries,
@@ -260,6 +261,7 @@ def _compile_source(source: str) -> dict[str, Any]:
             # Every stable id the text declares, so the viewer can name anything
             # the payload reports only by line.
             "identities": describe_identities(source),
+            "elements": build_element_payload(source),
             "relations": relations,
             "materials": materials,
             "studies": studies_payload,

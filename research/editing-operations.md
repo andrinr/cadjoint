@@ -245,14 +245,16 @@ and its shape:
 | box | position 3, rotation 3, size 3 |
 | sphere | position 3, rotation 3, radius 1 |
 | cylinder | position 3, rotation 3, radius 1, height 1 |
-| extrude | depth 1 |
+| extrude | depth 1 (not `draft`/`twist`: a drafted or twisted extrusion has no analytic faces, so rewriting either would break every sketch planted on the feature's cap — shown read-only by the properties window instead) |
 | revolve | offset 1 |
 | loft | height 1 |
+| Union / Difference / Intersection | smoothness 1 (≥ 0). Booleans carry no stable identity, so the request names the call and is addressed by `line`; the properties window reads the line from the `elements` payload of the same compile, which is what keeps a line-addressed request current |
 | PolygonProfile | planeOrigin 3, planeNormal 3 |
 | SketchPlane | origin 3, normal 3 (the viewport's gizmo addresses the plane call directly when a sketch is dragged as an object; same rewrite as `planeOrigin`/`planeNormal`) |
 | Material | color 3 (each in 0…1); roughness, metallic, opacity, ior, reflectivity, density, conductivity, specific_heat, youngs_modulus, poisson_ratio, thermal_expansion, yield_strength — 1 each, inside `PROPERTY_BOUNDS` |
 
-`size`, `radius`, `height` must be positive; `planeNormal` non-zero.
+`size`, `radius`, `height` must be positive; `smoothness` non-negative;
+`planeNormal` non-zero.
 
 **Preconditions.** The line holds exactly one call named `name` (matched by
 exact line first, then by range). For an argument other than a plane
@@ -276,15 +278,16 @@ dimensions, plane origin/normal, material property). Ids survive; none is
 created. Idempotent.
 
 **Refusals.** `The patch request needs a string `name`.` / `…`argument`.`;
-``set_value` edits one of these calls: Material, PolygonProfile, SketchPlane, box,
-cylinder, extrude, loft, revolve, sphere.`; `The patch request needs an
+``set_value` edits one of these calls: Difference, Intersection, Material,
+PolygonProfile, SketchPlane, Union, box, cylinder, extrude, loft, revolve,
+sphere.`; `The patch request needs an
 integer `line`.`; `The patch request needs `value` as a number or numbers.`
 (also for NaN/inf and an empty list); `A sketch-plane edit needs `value` as
 three numbers.`; `A sketch-plane normal must not be zero.`; then from the
 operation: ``<name>` has no editable argument `<argument>`; expected: …`;
 ``<argument>` needs one number.` / ``<argument>` needs 3 numbers.` /
 ``<argument>` needs 3 positive numbers.` / ``<argument>` needs a positive
-number.` / ``color` needs 3 numbers from 0 to 1.` / the material bracket
+number.` / ``smoothness` needs a number of at least 0.` / ``color` needs 3 numbers from 0 to 1.` / the material bracket
 message of §4.8; `No editable <name>() call found at line N.`; `The <name>'s
 `<argument>` is not an editable literal; edit it in the code.`; `The
 sketch's `plane` is an expression over other geometry, not a literal
@@ -920,6 +923,16 @@ literal.`
   fallbacks are positions inside their owner. Inserting or deleting before
   them moves them — by design, and the only ids an operation may take away
   (§6, invariant 3).
+- **The properties window.** Every field it offers is one of these
+  operations with an address the compile payload published beside the value
+  (`elements[].arguments[].patch`, built statically by
+  `cadjoint/viewer/source_map/elements.py`): `set_value` for a literal the
+  contract table lists, `assign_material` for a material named by variable.
+  An argument whose value is an expression, a reference, or a literal the
+  table does not list is published without an address and shown read-only —
+  the window never invents a request the table would refuse. A sketch plane
+  is edited through its sketch (`PolygonProfile` / `planeOrigin`,
+  `planeNormal`), so the same request serves a sketch that states no plane.
 - **A shared `Vector2`.** Two sketches naming one parameter move together
   under set_vertex; deleting the vertex from one sketch removes only that
   sketch's use and the constraints naming the parameter.
@@ -973,6 +986,8 @@ itself, the fact that no operation touches a span outside its target
 | --- | --- | --- |
 | set_value | second keyword appended for an expression-valued argument or a face-derived plane → program stops compiling | fixed: refused with a message naming the fix |
 | set_value | any `name`/`argument`/shape written verbatim; Material scalars unbounded; NaN/inf/`[]` accepted | fixed: `EDITABLE_CALLS` contract, bounds, finite non-empty numbers |
+| set_value | a boolean's `smoothness` had no way in from the viewer | added to the contract table (2026-09): line-addressed, non-negative; covered by the generator, the budget (`union`/`scene` statements) and the idempotence property |
+| set_value | `draft`/`twist` on an extrude looked like plain scalars | not added: the property suite showed a twisted extrusion drops its faces and breaks a sketch planted on its cap; the properties window shows them read-only |
 | add_primitive | unknown `kind`, foreign/missing dimensions → non-compiling program; `{}` → uncaught `SyntaxError` | fixed: kind and dimensions validated against the runtime's table |
 | add_constraint | indices unchecked (IndexError on compile); `fixed` took a scalar; list-valued `kind` crashed | fixed: range, distinct edge endpoints, value shape, hashability |
 | set_constraint_value | no shape check | fixed: same shapes as add_constraint |

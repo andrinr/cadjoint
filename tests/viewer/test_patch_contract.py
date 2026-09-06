@@ -119,10 +119,11 @@ class TestSetValueWritesOnlyWhatTheCallTakes:
 
     def test_a_call_outside_the_vocabulary_is_refused(self):
         error = refused(
-            STARTER, op="set_value", id="assign:board", name="Union", argument="smoothness", value=1
+            STARTER, op="set_value", id="assign:board", name="Scalar", argument="value", value=1
         )
         assert error.startswith(
-            "`set_value` edits one of these calls: Material, PolygonProfile, SketchPlane, box"
+            "`set_value` edits one of these calls: Difference, Intersection, Material, "
+            "PolygonProfile, SketchPlane, Union, box"
         )
 
     def test_the_value_shape_follows_the_argument(self):

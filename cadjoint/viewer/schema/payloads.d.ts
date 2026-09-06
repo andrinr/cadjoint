@@ -29,6 +29,7 @@ export interface CompilePayload {
   shader_hash?: string;
   construction: ConstructionNode[];
   identities: IdentityEntry[];
+  elements?: ConstructionElement[];
   relations: ConstructionRelation[];
   materials: MaterialDefinition[];
   studies: StudyPayload[];
@@ -63,6 +64,56 @@ export interface IdentityEntry {
   owner: string | null;
   name: string | null;
   variable: string | null;
+}
+
+/** The request that rewrites one argument: which op, call, keyword, and target. */
+export interface PatchAddress {
+  op: "set_value" | "assign_material";
+  name: string;
+  argument: string;
+  line: number;
+  id: string | null;
+}
+
+/**
+ * One argument a construction call was written with, and whether it can be edited.
+ *
+ * ``kind`` says what the source holds: a ``number`` or ``vector`` literal
+ * (possibly reached through a named parameter, in which case ``parameter``
+ * names it), a ``string``, a ``reference`` to another object, a ``default``
+ * the call never stated, or an ``expression`` the viewer may only show.
+ * ``patch`` is present exactly when the patch layer may rewrite the value.
+ */
+export interface ConstructionArgument {
+  name: string;
+  kind: "number" | "vector" | "string" | "reference" | "expression" | "default";
+  value: number | number[] | string | null;
+  text: string;
+  span: [number, number] | null;
+  parameter: string | null;
+  patch: PatchAddress | null;
+}
+
+/**
+ * One construction call of the program, as the properties window lists it.
+ *
+ * Built statically from the source (see
+ * :mod:`cadjoint.viewer.source_map.elements`): sketches and their planes,
+ * primitives, features and booleans, each with the arguments it was written
+ * with.  ``id`` is the stable identity where the program has one for the
+ * element, else a synthetic id that is still stable under edits elsewhere.
+ */
+export interface ConstructionElement {
+  id: string;
+  stableId: string | null;
+  kind: "sketch" | "plane" | "primitive" | "feature" | "boolean";
+  call: string;
+  line: number;
+  span: [number, number];
+  name: string | null;
+  variable: string | null;
+  owner: string | null;
+  arguments: ConstructionArgument[];
 }
 
 /** One construction object from the executed program. */

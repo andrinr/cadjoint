@@ -162,7 +162,9 @@ BUDGET: dict[str, tuple[frozenset[str], int | None, int | None]] = {
     "insert_vertex": (frozenset({"profile", "constraint"}), None, None),
     "delete_vertex": (frozenset({"profile", "constraint"}), None, None),
     "set_value": (
-        frozenset({"profile", "parameter", "primitive", "feature", "material", "import"}),
+        frozenset(
+            {"profile", "parameter", "primitive", "feature", "material", "union", "scene", "import"}
+        ),
         1,
         1,
     ),
@@ -341,7 +343,25 @@ class Generator:
         return self.point(size) if size > 1 else self.number()
 
     def build_set_value(self, index, source):
-        kind = self.rng.choice(["primitive", "feature", "material", "sketch"])
+        kind = self.rng.choice(["primitive", "feature", "material", "sketch", "boolean"])
+        if kind == "boolean":
+            # Booleans carry no stable id: the properties window names them by
+            # line, and the generator does the same.
+            booleans = [
+                node
+                for node in ast.walk(ast.parse(source))
+                if isinstance(node, ast.Call) and _called_name(node) in _BOOLEAN_CALLS
+            ]
+            if not booleans:
+                return None
+            call = self.rng.choice(booleans)
+            return {
+                "op": "set_value",
+                "line": call.lineno,
+                "name": _called_name(call),
+                "argument": "smoothness",
+                "value": self.number(0.0, 0.2),
+            }
         target = self.pick(index, kind)
         if target is None:
             return None
@@ -1325,12 +1345,12 @@ MALFORMED: list[tuple[str, dict[str, Any], str]] = [
         {
             "op": "set_value",
             "id": "assign:board",
-            "name": "Union",
-            "argument": "smoothness",
+            "name": "Scalar",
+            "argument": "value",
             "value": 1,
         },
-        "`set_value` edits one of these calls: Material, PolygonProfile, SketchPlane, box, cylinder, extrude, loft, "
-        "revolve, sphere.",
+        "`set_value` edits one of these calls: Difference, Intersection, Material, PolygonProfile, "
+        "SketchPlane, Union, box, cylinder, extrude, loft, revolve, sphere.",
     ),
     (
         "set_value on an argument the call lacks",
