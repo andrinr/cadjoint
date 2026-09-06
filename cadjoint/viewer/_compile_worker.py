@@ -89,9 +89,14 @@ def _shader_options() -> tuple[bool, bool, str]:
     """``(uniforms, culling, scope)`` — the switches, and where they come from.
 
     The defaults are what the viewer ships; the environment overrides exist
-    only so a benchmark can measure the forms against each other without a
-    code edit, and nothing in the product sets them.
+    so a benchmark can measure the forms against each other without a code
+    edit, and so a scene can be put back on the traced path if the direct
+    one ever draws something wrong.
 
+    * ``CADJOINT_SHADER_FORM=traced`` uses the JAX/StableHLO backend, which
+      was the default until the direct one was verified in a browser.  Same
+      buffer contract, same three entry points, 3.5-6.7x slower to compile
+      (``scenes/motor_shield.py``: 10.5 s against 1.6 s).
     * ``CADJOINT_SHADER_FORM=literal`` folds the parameters back into the
       source, which is the form the frontend used before it learned to read
       a buffer.
@@ -101,16 +106,14 @@ def _shader_options() -> tuple[bool, bool, str]:
       rather than only the free ones.  This is 31x slower per frame on
       ``scenes/end_cap.py`` and exists to be measured, not to be used —
       see :func:`cadjoint.backends.wgsl.compile_scene_with_uniforms`.
-    * ``CADJOINT_SHADER_FORM=direct`` emits the same three public functions
-      from :mod:`cadjoint.backends.wgsl.direct`, which walks the SDF graph
-      instead of tracing it.  A literal form like ``literal`` — it has no
-      uniform buffer, so a parameter edit is a new module and the drag
-      optimisation is off — but a far smaller one, because profile vertices
-      live in a storage buffer and patterns loop instead of unrolling
-      (``scenes/end_cap.py``: 365 kB against 12 kB).  Falls back to the
-      traced form for a scene using a node it has no kernel for.
+    ``direct`` is the default: :mod:`cadjoint.backends.wgsl.direct` walks
+    the SDF graph rather than tracing it, which is most of the compile time,
+    and emits a far smaller module because profile vertices are buffer slots
+    and patterns loop instead of unrolling.  A scene using a node it has no
+    kernel for falls back to the traced form and says so on stdout, so
+    coverage gaps cost speed rather than correctness.
     """
-    uniforms = os.environ.get("CADJOINT_SHADER_FORM", "uniform").lower() != "literal"
+    uniforms = os.environ.get("CADJOINT_SHADER_FORM", "direct").lower() != "literal"
     culling = os.environ.get("CADJOINT_SHADER_CULL", "1") != "0"
     scope = os.environ.get("CADJOINT_SHADER_SCOPE", "free").lower()
     return uniforms, culling, scope
@@ -124,7 +127,7 @@ def _scene_shader(scene) -> tuple[str, dict | None]:
             where the parameters are baked into ``source`` and any edit is a
             different module.
     """
-    form = os.environ.get("CADJOINT_SHADER_FORM", "uniform").lower()
+    form = os.environ.get("CADJOINT_SHADER_FORM", "direct").lower()
     if form == "direct":
         direct = _direct_shader(scene)
         if direct is not None:

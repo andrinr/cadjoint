@@ -378,10 +378,21 @@ success is the file itself with `Content-Disposition` and the job id in
 Each run follows the same path as the shader backend:
 
 1. The local server evaluates the Python in a child process and reads `scene`.
-2. JAX traces distance and material evaluation and lowers both to StableHLO.
-3. cadjoint emits WGSL `sdf`, `material_base`, and `material_optics` functions.
-4. The browser embeds those in the preview or path-tracing runtime and builds
+2. cadjoint walks the SDF graph and writes WGSL `sdf`, `material_base` and
+   `material_optics` from it directly.
+3. The browser embeds those in the preview or path-tracing runtime and builds
    the WebGPU pipelines.
+
+Step 2 used to go through JAX: trace the scene, export it to StableHLO, walk
+that text. XLA never produced an executable on that path — it was a tracer —
+and the round trip was most of a compile. Walking the graph instead takes
+`scenes/motor_shield.py` from 10.5 s to 1.6 s, and the module it writes is
+smaller by an order of magnitude, because a profile's vertices are buffer
+slots rather than unrolled code and a pattern is a loop rather than N copies.
+The traced backend is still there and still tested against this one on a real
+device, point for point; `CADJOINT_SHADER_FORM=traced` selects it. A scene
+using a shape the direct backend has no kernel for falls back to it
+automatically and says so.
 
 The code icon shows the complete generated WGSL. Python tracebacks and WGSL
 compiler errors appear under the editor.
