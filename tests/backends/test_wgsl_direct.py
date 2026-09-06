@@ -18,13 +18,15 @@ import numpy as np
 import pytest
 
 from cadjoint.backends.wgsl.codegen import compile_sdf_to_wgsl
-from cadjoint.backends.wgsl.direct import UnsupportedNode, compile_sdf_direct, supported_nodes
+from cadjoint.backends.wgsl.direct import UnsupportedNode, compile_sdf_direct
 from cadjoint.construction import Axis
 from cadjoint.geometry.parameters import Scalar, Vector, Vector2
 from cadjoint.sdf.boolean import Difference, Intersection, Union
 from cadjoint.sdf.primitives import Box, Capsule, Sphere, Torus
+from cadjoint.sdf.primitives.loft import LoftedPolygon
 from cadjoint.sdf.primitives.polygon import ExtrudedPolygon, RevolvedPolygon
 from cadjoint.sdf.transforms import Translate
+from cadjoint.sdf.transforms.fields import Mirror, Offset, Shell
 from cadjoint.sdf.transforms.patterns import LinearPattern, PolarPattern
 
 wgpu = pytest.importorskip("wgpu", reason="the comparison runs both shaders on a device")
@@ -251,6 +253,22 @@ def _scenes() -> list[tuple[str, object]]:
             ),
         ),
         (
+            "loft",
+            LoftedPolygon(
+                vertices_a=_ring(6, 0.6), vertices_b=_ring(6, 0.25), height=Scalar(0.9, name="h")
+            ),
+        ),
+        (
+            "mirror",
+            Mirror(Translate(Sphere(radius=Scalar(0.4)), Vector([0.7, 0.1, 0.0])), axis="x"),
+        ),
+        ("shell", Shell(Sphere(radius=Scalar(0.8)), thickness=Scalar(0.15))),
+        ("offset", Offset(Box(size=Vector([0.4, 0.5, 0.3])), distance=Scalar(0.12))),
+        (
+            "drafted extrusion",
+            ExtrudedPolygon(_ring(7, 0.6), depth=Scalar(0.7), draft=Scalar(8.0)),
+        ),
+        (
             "nested",
             Union(
                 Translate(Sphere(radius=Scalar(0.5, name="a")), Vector([0.6, 0.0, 0.0])),
@@ -321,7 +339,7 @@ def test_a_pattern_loops_instead_of_unrolling():
 
 #: Shipped scenes the direct backend can compile today. The rest name a node
 #: it has no kernel for, which is the honest report of partial coverage.
-_SHIPPED = ("starter", "bracket", "duct_sink")
+_SHIPPED = ("starter", "bracket", "duct_sink", "end_cap")
 
 
 @pytest.mark.parametrize("stem", _SHIPPED)
@@ -351,15 +369,17 @@ def test_an_unknown_node_is_refused_rather_than_guessed():
     """Partial coverage has to announce itself.
 
     A backend that silently emitted *something* for a node it does not know
-    would be the exact failure this whole file exists to prevent. `Mirror`
-    stands in for the remaining gap here; when it gains a kernel, this test
-    should move to whatever is still missing rather than be deleted.
+    would be the exact failure this whole file exists to prevent. When the
+    node named here gains a kernel, move this test to whatever is still
+    missing rather than deleting it.
     """
-    from cadjoint.sdf.transforms.fields import Mirror
-
-    assert "Mirror" not in supported_nodes()["transforms"]
-    with pytest.raises(UnsupportedNode, match="Mirror"):
-        compile_sdf_direct(Mirror(Sphere(radius=Scalar(0.5)), axis="x"))
+    # A twisted extrusion rotates the query by an angle that varies with z,
+    # which makes the field non-1-Lipschitz. It is the remaining gap, and it
+    # is refused rather than approximated.
+    with pytest.raises(UnsupportedNode, match="twist"):
+        compile_sdf_direct(
+            ExtrudedPolygon(_ring(5), depth=Scalar(0.5), twist=Scalar(15.0))
+        )
 
 
 def test_the_direct_module_is_smaller_than_the_traced_one():
@@ -385,8 +405,11 @@ def test_a_profile_costs_the_same_code_whatever_its_vertex_count(count):
     """
     program = compile_sdf_direct(ExtrudedPolygon(_ring(count), depth=Scalar(0.5)))
     assert program.vertices.shape == (count, 2)
-    # Only the two `u32` literals in the call site vary with the count.
-    assert len(program.wgsl) < 1300
+    # Against a baseline rather than an absolute size, so that adding a
+    # parameter to the kernel does not look like a regression here: only the
+    # two `u32` literals at the call site vary with the count.
+    baseline = compile_sdf_direct(ExtrudedPolygon(_ring(4), depth=Scalar(0.5)))
+    assert len(program.wgsl) <= len(baseline.wgsl) + 8
 
 
 def test_the_traced_module_grows_with_the_profile_and_the_direct_one_does_not():

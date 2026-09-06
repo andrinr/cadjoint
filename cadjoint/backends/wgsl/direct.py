@@ -31,6 +31,7 @@ because WGSL cannot type an ``(N, 2)`` array.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import Any
 
@@ -180,8 +181,12 @@ _PROFILE_DISTANCE = """fn profile_distance(p: vec2<f32>, offset: u32, count: u32
     return s * sqrt(d);
 }"""
 
-_EXTRUDED = """fn prim_extrudedpolygon(p: vec3<f32>, offset: u32, count: u32, depth: f32) -> f32 {
-    let d2 = profile_distance(p.xy, offset, count);
+_EXTRUDED = """fn prim_extrudedpolygon(
+    p: vec3<f32>, offset: u32, count: u32, depth: f32, slope: f32
+) -> f32 {
+    // `slope` is tan(draft), folded by the caller; zero is the plain
+    // extrusion and the term vanishes, matching the Python's static skip.
+    let d2 = profile_distance(p.xy, offset, count) + slope * (p.z + depth * 0.5);
     let dz = abs(p.z) - depth * 0.5;
     let max_d = max(d2, dz);
     if (max_d <= 0.0) { return max_d; }
@@ -207,6 +212,47 @@ _ROTATE = """fn rotate_about(p: vec3<f32>, origin: vec3<f32>, axis: vec3<f32>, a
     return origin + v * c + cross(axis, v) * s + parallel * (1.0 - c);
 }"""
 
+#: The loft's profile distance: the same loop, over vertices interpolated
+#: between the two profiles at the query's own height. The Python builds the
+#: interpolated vertex list first and reduces with `axis=-1` so each vertex
+#: may carry the query's batch shape; here `t` is a scalar per invocation, so
+#: the interpolation happens inside the loop and no list is built at all.
+_PROFILE_LERPED = """fn profile_distance_lerped(
+    p: vec2<f32>, a: u32, b: u32, count: u32, t: f32
+) -> f32 {
+    let first = mix(profile_vertices[a], profile_vertices[b], t);
+    var d = dot(p - first, p - first);
+    var s = 1.0;
+    for (var i: u32 = 0u; i < count; i = i + 1u) {
+        let j = (i + count - 1u) % count;
+        let vi = mix(profile_vertices[a + i], profile_vertices[b + i], t);
+        let vj = mix(profile_vertices[a + j], profile_vertices[b + j], t);
+        let e = vj - vi;
+        let w = p - vi;
+        let u = clamp(dot(w, e) / dot(e, e), 0.0, 1.0);
+        let q = w - e * u;
+        d = min(d, dot(q, q));
+        let c1 = p.y >= vi.y;
+        let c2 = p.y < vj.y;
+        let c3 = (e.x * w.y) > (e.y * w.x);
+        if ((c1 == c2) && (c2 == c3)) { s = -s; }
+    }
+    return s * sqrt(d);
+}"""
+
+_LOFTED = """fn prim_loftedpolygon(
+    p: vec3<f32>, a: u32, b: u32, count: u32, height: f32
+) -> f32 {
+    let t = clamp(p.z / height + 0.5, 0.0, 1.0);
+    let d2 = profile_distance_lerped(p.xy, a, b, count, t);
+    let dz = abs(p.z) - height * 0.5;
+    let max_d = max(d2, dz);
+    if (max_d <= 0.0) { return max_d; }
+    let ea = max(d2, 0.0);
+    let eb = max(dz, 0.0);
+    return sqrt(ea * ea + eb * eb);
+}"""
+
 _SHARED: dict[str, str] = {}
 
 # ── transforms ───────────────────────────────────────────────────────────────
@@ -228,6 +274,8 @@ _BOOLEANS = frozenset({"Union", "Intersection", "Difference"})
 _SHARED.update(
     {
         "profile_distance": _PROFILE_DISTANCE,
+        "profile_distance_lerped": _PROFILE_LERPED,
+        "prim_loftedpolygon": _LOFTED,
         "prim_extrudedpolygon": _EXTRUDED,
         "prim_revolvedpolygon": _REVOLVED,
         "rotate_about": _ROTATE,
@@ -251,7 +299,9 @@ _SHARED.update(
 def supported_nodes() -> dict[str, tuple[str, ...]]:
     """What this backend can emit, for a harness to report against."""
     return {
-        "primitives": tuple(sorted([*_PRIMITIVES, "ExtrudedPolygon", "RevolvedPolygon"])),
+        "primitives": tuple(
+            sorted([*_PRIMITIVES, "ExtrudedPolygon", "RevolvedPolygon", "LoftedPolygon"])
+        ),
         "transforms": tuple(sorted([*_TRANSFORMS, "Rotate", "LinearPattern", "PolarPattern"])),
         "booleans": tuple(sorted(_BOOLEANS)),
     }
@@ -291,9 +341,17 @@ class _Emitter:
 
     def profile_slice(self, node: Any) -> tuple[int, int]:
         """Append a profile's vertices to the pool, returning `(offset, count)`."""
+        return self._vertex_slice(node, "v")
+
+    def _vertex_slice(self, node: Any, prefix: str) -> tuple[int, int]:
+        """Append the `prefix0..prefixN-1` vertex loop, returning its slice."""
         names = sorted(
-            (name for name in node.params if name.startswith("v") and name[1:].isdigit()),
-            key=lambda name: int(name[1:]),
+            (
+                name
+                for name in node.params
+                if name.startswith(prefix) and name[len(prefix) :].isdigit()
+            ),
+            key=lambda name: int(name[len(prefix) :]),
         )
         offset = len(self.vertices)
         for name in names:
@@ -334,8 +392,23 @@ class _Emitter:
             )
             return f"    return prim_{name.lower()}(p, {arguments});"
 
-        if name in ("ExtrudedPolygon", "RevolvedPolygon"):
+        if name in ("ExtrudedPolygon", "RevolvedPolygon", "LoftedPolygon"):
             return self._profile_body(node, name)
+
+        if name in ("Shell", "Offset"):
+            child = self.function_for(node.sdf)
+            if name == "Shell":
+                half = float(_value(node, "thickness")[0]) / 2.0
+                return f"    return abs({child}(p)) - {half:.9g};"
+            return f"    return {child}(p) - {float(_value(node, 'distance')[0]):.9g};"
+
+        if name == "Mirror":
+            # Reflect the query across the plane, exactly as the Python does;
+            # the plane is concrete, so it folds to two constants here.
+            child = self.function_for(node.sdf)
+            origin = _literal(_value(node, "origin"), 3)
+            normal = _literal(_value(node, "normal"), 3)
+            return f"    let n = {normal};\n    return {child}(p - 2.0 * dot(p - {origin}, n) * n);"
 
         if name == "Rotate":
             # The rotation matrix is built from concrete parameters, so it is
@@ -382,15 +455,30 @@ class _Emitter:
         if name == "ExtrudedPolygon":
             # Draft and twist bend the walls; guessing a kernel for them is
             # exactly the silent divergence this backend must not introduce.
-            for unsupported in ("draft", "twist"):
-                if unsupported in node.params:
-                    raise UnsupportedNode(
-                        f"ExtrudedPolygon with {unsupported!r} has no direct kernel yet."
-                    )
+            # Twist rotates the query by an angle that varies with z, which
+            # makes the field non-1-Lipschitz; it has no kernel yet and is
+            # refused rather than approximated. Draft only tapers the walls,
+            # which is one extra term.
+            if "twist" in node.params:
+                raise UnsupportedNode("ExtrudedPolygon with 'twist' has no direct kernel yet.")
             self._need("profile_distance", "prim_extrudedpolygon")
             offset, count = self.profile_slice(node)
             depth = _literal(_value(node, "depth"), 1)
-            return f"    return prim_extrudedpolygon(p, {offset}u, {count}u, {depth});"
+            slope = 0.0
+            if "draft" in node.params:
+                draft = math.radians(float(_value(node, "draft")[0]))
+                slope = math.sin(draft) / math.cos(draft)
+            return f"    return prim_extrudedpolygon(p, {offset}u, {count}u, {depth}, {slope:.9g});"
+        if name == "LoftedPolygon":
+            self._need("profile_distance_lerped", "prim_loftedpolygon")
+            # Two loops of equal length: v0..v{N-1} then w0..w{N-1}, appended
+            # back to back so the kernel indexes both from one buffer.
+            a, count_a = self._vertex_slice(node, "v")
+            b, count_b = self._vertex_slice(node, "w")
+            if count_a != count_b:
+                raise UnsupportedNode("A loft needs both profiles to have the same vertex count.")
+            height = _literal(_value(node, "height"), 1)
+            return f"    return prim_loftedpolygon(p, {a}u, {b}u, {count_a}u, {height});"
         self._need("profile_distance", "prim_revolvedpolygon")
         offset, count = self.profile_slice(node)
         radial_offset = _literal(_value(node, "offset"), 1)
