@@ -292,32 +292,99 @@ def _tier_flags() -> dict[str, bool] | None:
         return None
 
 
-def main() -> None:
-    # Every request runs in a fresh process, so without this each edit
-    # recompiles the same XLA programs from scratch (see cadjoint.cache).
-    enable_compilation_cache()
+#: Requests one served worker answers before the client retires it.
+#:
+#: A bound on drift rather than on any measured leak: a process that has run
+#: a hundred scenes has a hundred scenes' worth of JAX caches in it, and
+#: throwing it away is cheaper than reasoning about what it still holds.
+SERVE_REQUEST_LIMIT = 64
+
+#: Response field a served worker sets on its final answer, telling the
+#: client this process is finished and must not receive another request.
+RETIRE_FLAG = "__retire__"
+
+
+def _answer(request: dict[str, Any]) -> dict[str, Any]:
+    """Run one request, turning any exception into an error response."""
     try:
-        request = json.load(sys.stdin)
         source = request.get("source")
         if not isinstance(source, str):
             raise TypeError("The compile request must contain a string `source` field.")
         mode = request.get("mode", "compile")
         if mode == "mesh":
-            result = _mesh_source(source)
-        elif mode == "simulate":
-            result = _simulate_source(request)
-        elif mode == "mesh_inspect":
-            result = _mesh_inspect_source(request)
-        elif mode == "optimize":
-            result = _optimize_source(request)
-        elif mode == "export":
+            return _mesh_source(source)
+        if mode == "simulate":
+            return _simulate_source(request)
+        if mode == "mesh_inspect":
+            return _mesh_inspect_source(request)
+        if mode == "optimize":
+            return _optimize_source(request)
+        if mode == "export":
             from cadjoint.viewer._export import export_scene
 
-            result = export_scene(request)
-        elif mode == "compile":
-            result = _compile_source(source)
+            return export_scene(request)
+        if mode == "compile":
+            return _compile_source(source)
+        raise ValueError(f"Unknown compile worker mode: {mode!r}.")
+    except Exception:
+        return {"ok": False, "error": traceback.format_exc()}
+
+
+def _serve() -> None:
+    """Answer NDJSON requests on stdin until EOF, one response line each.
+
+    The reusable form of :func:`main`, for a client that keeps the process
+    between requests.  Everything expensive that a fresh process throws away
+    survives here — the imports, JAX's tracing caches, the compilation cache
+    reads — which on ``scenes/motor_shield.py`` is most of a compile.
+
+    **A served worker retires itself when the process is no longer neutral.**
+    ``jax_enable_x64`` is process-global, a scene is arbitrary Python, and a
+    scene that flips it (``scenes/duct_sink.py``'s docstring warns against
+    exactly this) would silently make every later request in this process
+    float64.  A disposable worker contained that; a served one must notice
+    it.  So the flag is read before and after each request and a process
+    that changed it exits, which the client sees as a closed pipe and
+    replaces.  Same for any other config the check grows to cover: the rule
+    is that a tainted process is thrown away, never repaired.
+    """
+    import jax
+
+    served = 0
+    for line in sys.stdin:
+        line = line.strip()
+        if not line:
+            continue
+        before = jax.config.jax_enable_x64
+        try:
+            request = json.loads(line)
+        except json.JSONDecodeError:
+            response: dict[str, Any] = {"ok": False, "error": "Malformed worker request."}
         else:
-            raise ValueError(f"Unknown compile worker mode: {mode!r}.")
+            response = _answer(request)
+        served += 1
+        # Told, not inferred. The client cannot poll for our exit without
+        # racing it, and a request sent to a process that is on its way out
+        # is lost, so the last response a worker sends carries the notice.
+        retiring = jax.config.jax_enable_x64 != before or served >= SERVE_REQUEST_LIMIT
+        if retiring:
+            response = {**response, RETIRE_FLAG: True}
+        sys.stdout.write(json.dumps(response) + "\n")
+        sys.stdout.flush()
+        if retiring:
+            return
+
+
+def main() -> None:
+    # Every request runs in a fresh process, so without this each edit
+    # recompiles the same XLA programs from scratch (see cadjoint.cache).
+    enable_compilation_cache()
+    if "--serve" in sys.argv[1:]:
+        _serve()
+        return
+    try:
+        request = json.load(sys.stdin)
+        result = _answer(request)
     except Exception:
         result = {"ok": False, "error": traceback.format_exc()}
     json.dump(result, sys.stdout)

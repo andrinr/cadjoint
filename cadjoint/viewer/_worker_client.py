@@ -23,6 +23,7 @@ compilation cache instead of paying XLA for the whole scene.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import os
@@ -31,6 +32,7 @@ import sys
 import threading
 from typing import Any
 
+from cadjoint.viewer._compile_worker import RETIRE_FLAG
 from cadjoint.viewer._jobs import REGISTRY, attach_process
 from cadjoint.viewer._limits import OVERSIZED_SOURCE_ERROR, exceeds_source_limit
 
@@ -121,8 +123,135 @@ def _run_worker(
     return result
 
 
+#: Set to ``0`` to make every compile a disposable process again.
+WORKER_POOL_ENV = "CADJOINT_WORKER_POOL"
+
+#: The one served worker, and the lock serialising access to its pipes.
+_POOL: dict[str, Any] = {"process": None, "served": 0}
+_POOL_LOCK = threading.Lock()
+
+
+def _pool_enabled() -> bool:
+    return os.environ.get(WORKER_POOL_ENV, "1") not in {"0", "false", "no", "off"}
+
+
+def _retire_pooled(kill: bool = True) -> None:
+    """Drop the served worker; the next request starts a fresh one."""
+    process = _POOL.get("process")
+    _POOL["process"] = None
+    _POOL["served"] = 0
+    if process is None:
+        return
+    with contextlib.suppress(Exception):
+        if kill and process.poll() is None:
+            process.kill()
+        process.communicate(timeout=5)
+
+
+def _pooled_compile(source: str, timeout: float) -> dict[str, Any] | None:
+    """One compile on the served worker, or None to fall back to a fresh one.
+
+    Only ``compile`` is served, and deliberately.  It is the mode a keystroke
+    triggers, it has no progress stream to frame around, and it is where the
+    fixed costs dominate: a fresh process pays 0.4 s of imports and then
+    re-traces what the last one already traced, which on
+    ``scenes/motor_shield.py`` is 2.6 s against 0.9 s served.  The heavier
+    modes stay disposable, where a runaway solve or a mesher that wedges
+    costs one process and nothing else.
+
+    Anything that is not a clean answer retires the worker rather than
+    trying to resynchronise its pipes: a half-read response would corrupt
+    every request after it, and a fresh process costs 0.4 s.
+    """
+    if not _pool_enabled():
+        return None
+    with _POOL_LOCK:
+        process = _POOL.get("process")
+        if process is not None and process.poll() is not None:
+            _retire_pooled(kill=False)
+            process = None
+        if process is None:
+            try:
+                process = subprocess.Popen(
+                    [sys.executable, "-m", "cadjoint.viewer._compile_worker", "--serve"],
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.DEVNULL,
+                    text=True,
+                )
+            except OSError:
+                return None
+            _POOL["process"] = process
+            _POOL["served"] = 0
+        # Still attached to the job, so cancelling a compile still kills a
+        # real process — it just retires the pool along with it.
+        attach_process(process)
+        try:
+            process.stdin.write(json.dumps({"source": source, "mode": "compile"}) + "\n")
+            process.stdin.flush()
+            line = _readline_within(process, timeout)
+        except (BrokenPipeError, OSError):
+            _retire_pooled()
+            return None
+        if line is _TIMED_OUT:
+            _retire_pooled()
+            return {
+                "ok": False,
+                "error": f"Compilation exceeded the {timeout:g}-second timeout.",
+            }
+        if not line:
+            # EOF: the worker died or retired between requests. Not a
+            # timeout — say nothing and let the disposable path answer.
+            _retire_pooled()
+            return None
+        try:
+            result = json.loads(line)
+        except json.JSONDecodeError:
+            _retire_pooled()
+            return None
+        if not isinstance(result, dict):
+            _retire_pooled()
+            return None
+        _POOL["served"] += 1
+        if result.pop(RETIRE_FLAG, False):
+            # The worker retired itself — a scene changed a process-global
+            # jax config, or it hit its request cap. Its answer is good; the
+            # process is not.
+            _retire_pooled(kill=False)
+        return result
+
+
+#: Sentinel distinguishing "nothing arrived in time" from "the pipe closed".
+#: Conflating them made a dead worker report itself as a timeout, which is a
+#: different thing to tell the user and a different thing to do next.
+_TIMED_OUT = object()
+
+
+def _readline_within(process: subprocess.Popen, timeout: float) -> Any:
+    """One response line, ``""`` at EOF, or :data:`_TIMED_OUT`."""
+    result: list[str] = []
+
+    def read() -> None:
+        with contextlib.suppress(Exception):
+            result.append(process.stdout.readline())
+
+    reader = threading.Thread(target=read, daemon=True)
+    reader.start()
+    reader.join(timeout)
+    if not result:
+        return _TIMED_OUT
+    return result[0]
+
+
 def compile_source(source: str, timeout: float = COMPILE_TIMEOUT_SECONDS) -> dict[str, Any]:
-    """Compile playground source in a disposable child process."""
+    """Compile playground source, on the served worker when there is one."""
+    if not isinstance(source, str):
+        return {"ok": False, "error": "Source must be a string."}
+    if exceeds_source_limit(source):
+        return {"ok": False, "error": OVERSIZED_SOURCE_ERROR}
+    pooled = _pooled_compile(source, timeout)
+    if pooled is not None:
+        return pooled
     return _run_worker(source, "compile", timeout)
 
 
