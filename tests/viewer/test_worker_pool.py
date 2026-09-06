@@ -53,7 +53,7 @@ def test_a_scene_that_changes_a_process_global_retires_the_worker():
 
 def test_the_retire_notice_never_reaches_the_caller():
     """It is worker-to-client bookkeeping, not part of the compile payload."""
-    from cadjoint.viewer._compile_worker import RETIRE_FLAG
+    from cadjoint.viewer.worker import RETIRE_FLAG
 
     assert RETIRE_FLAG not in client.compile_source(_SCENE)
 

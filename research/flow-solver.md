@@ -658,8 +658,8 @@ shares, so the condition answers for itself. Changed:
 
 | file | change |
 |---|---|
-| `cadjoint/viewer/_worker_declarations.py` | `bc.nodes.serializable` → `bc.serializable` (one line + docstring) |
-| `cadjoint/viewer/_worker_payloads.py` | the same substitution on the solved-study path |
+| `cadjoint/viewer/worker/declarations.py` | `bc.nodes.serializable` → `bc.serializable` (one line + docstring) |
+| `cadjoint/viewer/worker/payloads.py` | the same substitution on the solved-study path |
 | `cadjoint/viewer/schema/payloads.py` | `StudyBc.nodes` optional; `velocity`/`temperature`/`power` added; `StudyPayload.kind` gains `"flow"` |
 | `cadjoint/viewer/schema/payloads.d.ts` | regenerated (`python -m cadjoint.viewer.schema.emit`) |
 | `cadjoint/fem/study.py` | `serializable` property on `Dirichlet`/`HeatFlux`/`Fixed`/`Traction`; `register_study` made public |

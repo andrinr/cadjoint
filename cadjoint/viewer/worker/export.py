@@ -306,7 +306,7 @@ def _write_result(
     """Solve (or reuse) the named study and write its fields as VTK."""
     import jax.numpy as jnp
 
-    from cadjoint.viewer._worker_scene import _FEM_UNAVAILABLE_MESSAGE, _named_study
+    from cadjoint.viewer.worker.scene import _FEM_UNAVAILABLE_MESSAGE, _named_study
 
     study = _named_study(studies, request.name)
     try:
@@ -339,7 +339,7 @@ def export_scene(request: dict[str, Any]) -> dict[str, Any]:
     if not path.name:
         return {"ok": False, "error": "The export worker was given no path to write to."}
 
-    from cadjoint.viewer._worker_scene import _execute_scene
+    from cadjoint.viewer.worker.scene import _execute_scene
 
     captured = io.StringIO()
     with contextlib.redirect_stdout(captured), contextlib.redirect_stderr(captured):

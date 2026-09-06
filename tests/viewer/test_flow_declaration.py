@@ -11,13 +11,13 @@ from __future__ import annotations
 
 import pytest
 
-from cadjoint.viewer._worker_declarations import _study_entries
-from cadjoint.viewer._worker_scene import _execute_scene
 from cadjoint.viewer.source_map import STUDY_CALL_KINDS, locate_study_statements
+from cadjoint.viewer.worker.declarations import _study_entries
+from cadjoint.viewer.worker.scene import _execute_scene
 
 pytest.importorskip("jax", reason="declaring a study builds parameters")
 
-MIXED = '''
+MIXED = """
 from cadjoint.fem import Dirichlet, Nodes, ThermalStudy
 from cadjoint.flow import FlowStudy, Inlet
 from cadjoint.sdf.primitives import Sphere
@@ -31,9 +31,9 @@ cool = FlowStudy(
     name="cooling", resolution=8, bounds=(-1.0, -1.0, -1.0), size=(2.0, 2.0, 2.0),
     bcs=[Inlet(velocity=0.02)],
 )
-'''
+"""
 
-ONE_FLOW = '''
+ONE_FLOW = """
 from cadjoint.flow import FlowStudy, Inlet
 from cadjoint.sdf.primitives import Sphere
 
@@ -42,7 +42,7 @@ cool = FlowStudy(
     name="cooling", resolution=8, bounds=(-1.0, -1.0, -1.0), size=(2.0, 2.0, 2.0),
     bcs=[Inlet(velocity=0.02)],
 )
-'''
+"""
 
 
 def entries(source: str) -> list[dict]:
@@ -114,8 +114,11 @@ class TestThePatchLayerWritesOne:
     def test_a_new_flow_study_declares_a_runnable_one(self):
         from cadjoint.viewer.patch import add_study
 
-        patched = add_study("from cadjoint.sdf.primitives import Sphere\nscene = Sphere(1.0)\n",
-                            "flow", name="cooling")
+        patched = add_study(
+            "from cadjoint.sdf.primitives import Sphere\nscene = Sphere(1.0)\n",
+            "flow",
+            name="cooling",
+        )
         assert "from cadjoint.flow import" in patched
         # Empty `bcs` would not construct: the inlet is what drives the flow.
         study = self.run(patched)["study1"]
@@ -125,11 +128,17 @@ class TestThePatchLayerWritesOne:
     def test_a_placed_condition_carries_its_region_and_an_unplaced_one_does_not(self):
         from cadjoint.viewer.patch import add_study, add_study_bc
 
-        patched = add_study("from cadjoint.sdf.primitives import Sphere\nscene = Sphere(1.0)\n",
-                            "flow", name="cooling")
+        patched = add_study(
+            "from cadjoint.sdf.primitives import Sphere\nscene = Sphere(1.0)\n",
+            "flow",
+            name="cooling",
+        )
         patched = add_study_bc(
-            patched, "cooling", "heat_source",
-            {"kind": "box", "min_corner": [0.0, 0.0, 0.0], "max_corner": [1.0, 1.0, 1.0]}, 2.5,
+            patched,
+            "cooling",
+            "heat_source",
+            {"kind": "box", "min_corner": [0.0, 0.0, 0.0], "max_corner": [1.0, 1.0, 1.0]},
+            2.5,
         )
         assert "HeatSource(Nodes.box(" in patched
         assert "from cadjoint.studies import Nodes" in patched
@@ -141,19 +150,31 @@ class TestThePatchLayerWritesOne:
 
         from cadjoint.viewer.patch import PatchError, add_study, add_study_bc
 
-        patched = add_study("from cadjoint.sdf.primitives import Sphere\nscene = Sphere(1.0)\n",
-                            "flow", name="cooling")
+        patched = add_study(
+            "from cadjoint.sdf.primitives import Sphere\nscene = Sphere(1.0)\n",
+            "flow",
+            name="cooling",
+        )
         with _pytest.raises(PatchError, match="places no region"):
-            add_study_bc(patched, "cooling", "inlet",
-                         {"kind": "sphere", "center": [0.0, 0.0, 0.0], "radius": 1.0}, 0.02)
+            add_study_bc(
+                patched,
+                "cooling",
+                "inlet",
+                {"kind": "sphere", "center": [0.0, 0.0, 0.0], "radius": 1.0},
+                0.02,
+            )
 
     def test_a_study_refuses_a_condition_of_the_other_family(self):
         import pytest as _pytest
 
         from cadjoint.viewer.patch import PatchError, add_study, add_study_bc
 
-        patched = add_study("from cadjoint.sdf.primitives import Sphere\nscene = Sphere(1.0)\n",
-                            "flow", name="cooling")
+        patched = add_study(
+            "from cadjoint.sdf.primitives import Sphere\nscene = Sphere(1.0)\n",
+            "flow",
+            name="cooling",
+        )
         with _pytest.raises(PatchError, match="accepts"):
-            add_study_bc(patched, "cooling", "dirichlet",
-                         {"kind": "side", "side": "-x", "tol": None}, 1.0)
+            add_study_bc(
+                patched, "cooling", "dirichlet", {"kind": "side", "side": "-x", "tol": None}, 1.0
+            )

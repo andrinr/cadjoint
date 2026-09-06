@@ -4,7 +4,7 @@ The worker's entry point and stdin/stdout protocol: it reads one JSON
 request object from stdin, dispatches on its ``mode``, and writes the JSON
 response to stdout.  ``mode="optimize"`` additionally streams NDJSON
 progress lines to that same stdout before the final response object (see
-:mod:`cadjoint.viewer._worker_optimize`).  Any exception becomes an
+:mod:`cadjoint.viewer.worker.optimize`).  Any exception becomes an
 ``{"ok": false, "error": <traceback>}`` response.
 
 ``mode="compile"`` — the worker's namesake, implemented here — runs the
@@ -14,9 +14,9 @@ the viewer opens with, then checks the whole payload against
 what the frontend's generated types are emitted from, so a payload that
 does not match them would be a type the browser was promised and did not
 get.  The other modes live beside it:
-:mod:`._edge_overlay` (``mesh``), :mod:`._worker_fem` (``simulate``,
-``mesh_inspect``), :mod:`._worker_optimize` (``optimize``), and
-:mod:`._export` (``export``).
+:mod:`cadjoint.viewer._edge_overlay` (``mesh``), :mod:`.fem`
+(``simulate``, ``mesh_inspect``), :mod:`.optimize` (``optimize``), and
+:mod:`.export` (``export``).
 """
 
 from __future__ import annotations
@@ -43,19 +43,6 @@ from cadjoint.viewer._pathtracer import (
     build_path_tracer_shader,
 )
 from cadjoint.viewer._webgpu import build_viewer_shader
-from cadjoint.viewer._worker_declarations import (
-    _mesh_entries,
-    _optimization_entries,
-    _study_entries,
-)
-from cadjoint.viewer._worker_fem import (  # noqa: F401 - re-exported for callers
-    _inspect_mesh,
-    _mesh_inspect_source,
-    _simulate_source,
-    _simulate_study,
-)
-from cadjoint.viewer._worker_optimize import _optimize_source
-from cadjoint.viewer._worker_scene import _execute_scene
 from cadjoint.viewer.schema.payloads import validate_compile_payload
 from cadjoint.viewer.source_map import (
     PLAYGROUND_FILENAME,
@@ -65,6 +52,20 @@ from cadjoint.viewer.source_map import (
     capture_profiles,
     describe_identities,
 )
+from cadjoint.viewer.worker.declarations import (
+    _mesh_entries,
+    _optimization_entries,
+    _study_entries,
+)
+from cadjoint.viewer.worker.fem import (  # noqa: F401 - re-exported for callers
+    _inspect_mesh,
+    _mesh_inspect_source,
+    _simulate_source,
+    _simulate_study,
+)
+from cadjoint.viewer.worker.optimize import _optimize_source
+from cadjoint.viewer.worker.protocol import RETIRE_FLAG
+from cadjoint.viewer.worker.scene import _execute_scene
 
 
 def _mesh_source(source: str) -> dict[str, Any]:
@@ -170,9 +171,7 @@ def _direct_shader(scene) -> tuple[str, dict | None] | None:
         return None
     source = program.wgsl
     if program.vertices.size:
-        literals = ", ".join(
-            f"vec2<f32>({x:.9g}, {y:.9g})" for x, y in program.vertices.tolist()
-        )
+        literals = ", ".join(f"vec2<f32>({x:.9g}, {y:.9g})" for x, y in program.vertices.tolist())
         source = source.replace(
             "@group(1) @binding(0) var<storage, read> profile_vertices: array<vec2<f32>>;",
             f"const profile_vertices = array<vec2<f32>, {len(program.vertices)}>({literals});",
@@ -299,10 +298,6 @@ def _tier_flags() -> dict[str, bool] | None:
 #: throwing it away is cheaper than reasoning about what it still holds.
 SERVE_REQUEST_LIMIT = 64
 
-#: Response field a served worker sets on its final answer, telling the
-#: client this process is finished and must not receive another request.
-RETIRE_FLAG = "__retire__"
-
 
 def _answer(request: dict[str, Any]) -> dict[str, Any]:
     """Run one request, turning any exception into an error response."""
@@ -320,7 +315,7 @@ def _answer(request: dict[str, Any]) -> dict[str, Any]:
         if mode == "optimize":
             return _optimize_source(request)
         if mode == "export":
-            from cadjoint.viewer._export import export_scene
+            from cadjoint.viewer.worker.export import export_scene
 
             return export_scene(request)
         if mode == "compile":

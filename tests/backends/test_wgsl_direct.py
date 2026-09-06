@@ -447,7 +447,7 @@ def test_a_shipped_scene_agrees_field_for_field(stem):
     """
     from pathlib import Path
 
-    from cadjoint.viewer._worker_scene import _execute_scene
+    from cadjoint.viewer.worker.scene import _execute_scene
 
     root = Path(__file__).resolve().parents[2]
     scene = _execute_scene((root / "scenes" / f"{stem}.py").read_text())["scene"]
@@ -548,9 +548,9 @@ def test_the_viewer_shader_built_from_it_compiles(stem):
     """
     from pathlib import Path
 
-    from cadjoint.viewer._compile_worker import _direct_shader
     from cadjoint.viewer._webgpu import build_viewer_shader
-    from cadjoint.viewer._worker_scene import _execute_scene
+    from cadjoint.viewer.worker.main import _direct_shader
+    from cadjoint.viewer.worker.scene import _execute_scene
 
     root = Path(__file__).resolve().parents[2]
     scene = _execute_scene((root / "scenes" / f"{stem}.py").read_text())["scene"]

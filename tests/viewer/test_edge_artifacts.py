@@ -22,7 +22,7 @@ import pytest
 
 from cadjoint.geometry.parameters import Vector
 from cadjoint.sdf import Box, Cylinder, Sphere, Translate, Union
-from cadjoint.viewer._compile_worker import (
+from cadjoint.viewer.worker.main import (
     _MESH_EDGE_RESOLUTION,
     _MESH_EDGE_SIZE,
     _execute_scene,
@@ -616,17 +616,17 @@ def results():
 @pytest.mark.parametrize("name", list(CONFIGS))
 def test_no_crossing_pairs(results, name):
     """No two independent links may pass through each other mid-segment."""
-    assert results[name]["crossings"] == 0, (
-        f"{name}: {results[name]['crossings']} X-crossing link pairs"
-    )
+    assert (
+        results[name]["crossings"] == 0
+    ), f"{name}: {results[name]['crossings']} X-crossing link pairs"
 
 
 @pytest.mark.parametrize("name", list(CONFIGS))
 def test_no_debris_fragments(results, name):
     """No orphan sub-three-cell open fragments may survive."""
-    assert results[name]["debris"] == 0, (
-        f"{name}: {results[name]['debris']} short open link fragments"
-    )
+    assert (
+        results[name]["debris"] == 0
+    ), f"{name}: {results[name]['debris']} short open link fragments"
 
 
 @pytest.mark.parametrize("name", list(CONFIGS))

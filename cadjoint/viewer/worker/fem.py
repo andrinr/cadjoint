@@ -4,8 +4,8 @@
 solved field with its render surface; ``mode="mesh_inspect"`` builds one
 declared (or study-implicit) ``SimMesh`` without solving and returns its
 inspection report plus a quality heatmap.  Both execute the program
-through :mod:`cadjoint.viewer._worker_scene` and shape their response
-through :mod:`cadjoint.viewer._worker_payloads`.
+through :mod:`cadjoint.viewer.worker.scene` and shape their response
+through :mod:`cadjoint.viewer.worker.payloads`.
 """
 
 from __future__ import annotations
@@ -16,12 +16,12 @@ from typing import Any
 
 import numpy as np
 
-from cadjoint.viewer._worker_payloads import (
+from cadjoint.viewer.worker.payloads import (
     _element_edge_pairs,
     _render_surface_payload,
     _study_payload,
 )
-from cadjoint.viewer._worker_scene import (
+from cadjoint.viewer.worker.scene import (
     _FEM_UNAVAILABLE_MESSAGE,
     _execute_scene,
     _named_study,

@@ -81,13 +81,13 @@ def _run(scene: Path, mode: str) -> str:
             from diff_brep.edges import _extract_graph
 
             from cadjoint.viewer._edge_overlay import _overlay_grid
-            from cadjoint.viewer._worker_scene import _execute_scene
+            from cadjoint.viewer.worker.scene import _execute_scene
 
             _extract_graph(
                 _execute_scene(source)["scene"], _overlay_grid(), blend_tolerance=None, steps=4
             )
         else:
-            from cadjoint.viewer import _compile_worker as worker
+            from cadjoint.viewer.worker import main as worker
 
             {"mesh": worker._mesh_source, "compile": worker._compile_source}[mode](source)
     print(f"{mode} on {scene.name}: {time.perf_counter() - started:.1f} s")

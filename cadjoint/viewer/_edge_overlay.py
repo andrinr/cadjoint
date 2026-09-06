@@ -31,7 +31,7 @@ re-solved vertex positions of whichever pass produced them so the two
 layers agree everywhere.
 
 Only the extraction lives here.  The worker mode that calls it (executing
-the user's program first) stays in :mod:`cadjoint.viewer._compile_worker`.
+the user's program first) stays in :mod:`cadjoint.viewer.worker.main`.
 """
 
 from __future__ import annotations

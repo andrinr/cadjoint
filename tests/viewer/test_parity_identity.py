@@ -16,12 +16,6 @@ import pytest
 
 from cadjoint.viewer._example_scene import EXAMPLE_SOURCE
 from cadjoint.viewer._patch_requests import patch_source
-from cadjoint.viewer._worker_declarations import (
-    _mesh_entries,
-    _optimization_entries,
-    _study_entries,
-)
-from cadjoint.viewer._worker_scene import _execute_scene
 from cadjoint.viewer.source_map import (
     PLAYGROUND_FILENAME,
     build_construction_payload,
@@ -30,6 +24,12 @@ from cadjoint.viewer.source_map import (
     describe_identities,
     identity_index,
 )
+from cadjoint.viewer.worker.declarations import (
+    _mesh_entries,
+    _optimization_entries,
+    _study_entries,
+)
+from cadjoint.viewer.worker.scene import _execute_scene
 
 BRACKET = (Path(__file__).resolve().parents[2] / "scenes" / "bracket.py").read_text()
 

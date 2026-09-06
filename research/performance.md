@@ -299,7 +299,7 @@ compilation cache does not touch (re-running with a fully warm cache reproduced
 ### 6.1 Warm worker / process reuse — **worth doing, and it is the enabler for everything else**
 
 Prototype: `warm_worker.py`, a stdin/stdout NDJSON loop importing the real
-`_compile_worker` and dispatching the same five modes, state retained.
+`viewer.worker.main` and dispatching the same five modes, state retained.
 
 | | fresh subprocess (today) | warm worker |
 |---|---:|---:|
@@ -741,7 +741,7 @@ compile, every time"*, and it is now 0.68 s.
 
 ## 12.5 End to end, through the real compile worker
 
-Fresh subprocess per request, `cadjoint/viewer/_compile_worker.py` driven on
+Fresh subprocess per request, `cadjoint/viewer/worker/main.py` driven on
 stdin exactly as the viewer drives it. Three runs; cold is the first against an
 empty cache, warm is the median of the rest. (The machine was shared during
 these runs — the wall clocks carry a few seconds of noise; the HLO figures in
@@ -2013,7 +2013,7 @@ than the persistent cache.
     done
 
 `--scene scenes/motor_shield.py --mode compile` for the large-scene compile;
-the cProfile numbers are `cProfile.run` around `_compile_worker._compile_source`.
+the cProfile numbers are `cProfile.run` around `worker.main._compile_source`.
 
 ## 15.5 Two of the three, implemented and measured
 

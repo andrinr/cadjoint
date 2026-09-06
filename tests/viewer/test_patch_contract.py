@@ -14,9 +14,9 @@ from pathlib import Path
 import pytest
 
 from cadjoint.viewer._patch_requests import patch_source
-from cadjoint.viewer._worker_scene import _execute_scene
 from cadjoint.viewer.patch import PatchError, apply_operation
 from cadjoint.viewer.source_map import PLAYGROUND_FILENAME, capture_profiles, identity_index
+from cadjoint.viewer.worker.scene import _execute_scene
 
 SCENES_DIR = Path(__file__).resolve().parents[2] / "scenes"
 STARTER = (SCENES_DIR / "starter.py").read_text()
@@ -519,9 +519,9 @@ class TestMaterialPropertyRemovalIsExact:
             property="density",
             value=8500.0,
         )
-        assert "metallic=0.85,\n    density=8500.0)" in grown, (
-            "the keyword wrapped onto its own line"
-        )
+        assert (
+            "metallic=0.85,\n    density=8500.0)" in grown
+        ), "the keyword wrapped onto its own line"
         assert (
             accepted(
                 grown,

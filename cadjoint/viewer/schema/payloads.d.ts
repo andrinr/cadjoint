@@ -398,7 +398,7 @@ export interface PatchResponse {
  * What ``POST /api/export`` takes: which object, which format, how fine.
  *
  * Unlike a patch request this one is the gate as well as the description:
- * :mod:`cadjoint.viewer._export` validates against it before a worker is
+ * :mod:`cadjoint.viewer.worker.export` validates against it before a worker is
  * started, and the message of a failed field is what the dialog shows.
  * The response is the file itself, not JSON — see the module.
  */

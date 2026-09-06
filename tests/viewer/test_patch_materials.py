@@ -21,7 +21,6 @@ import pytest
 
 from cadjoint.viewer._example_scene import EXAMPLE_SOURCE
 from cadjoint.viewer._patch_requests import patch_source
-from cadjoint.viewer._worker_scene import _execute_scene
 from cadjoint.viewer.patch import PatchError, apply_operation
 from cadjoint.viewer.patch.materials import (
     EDITABLE_PROPERTIES,
@@ -30,6 +29,7 @@ from cadjoint.viewer.patch.materials import (
 )
 from cadjoint.viewer.source_map import PLAYGROUND_FILENAME, build_material_payload
 from cadjoint.viewer.source_map.capture import capture_profiles
+from cadjoint.viewer.worker.scene import _execute_scene
 
 PHYSICAL = (
     "density",

@@ -49,7 +49,6 @@ from typing import Any, Callable
 import pytest
 
 from cadjoint.viewer._patch_requests import patch_source
-from cadjoint.viewer._worker_scene import _execute_scene
 from cadjoint.viewer.patch import OPERATIONS
 from cadjoint.viewer.patch.geometry import EDITABLE_CALLS, PRIMITIVE_DIMENSIONS
 from cadjoint.viewer.patch.materials import EDITABLE_PROPERTIES, PROPERTY_BOUNDS
@@ -57,6 +56,7 @@ from cadjoint.viewer.source_map import PLAYGROUND_FILENAME, capture_profiles, id
 from cadjoint.viewer.source_map.features import FEATURE_CALL_KINDS, PRIMITIVE_CALL_KINDS
 from cadjoint.viewer.source_map.identity import Identity
 from cadjoint.viewer.source_map.nodes import _called_name
+from cadjoint.viewer.worker.scene import _execute_scene
 
 SEED = 20260902
 SCENES_DIR = Path(__file__).resolve().parents[2] / "scenes"
@@ -696,9 +696,9 @@ def test_a_sequence_of_operations_keeps_every_invariant(scene: str, seed: int) -
         attempted += 1
         applied, source = _step(source, request)
         accepted += applied
-    assert attempted >= len(OPERATIONS) - 4, (
-        "the generator found targets for almost every operation"
-    )
+    assert (
+        attempted >= len(OPERATIONS) - 4
+    ), "the generator found targets for almost every operation"
     assert accepted >= attempted // 3, "most generated requests should be accepted"
 
 

@@ -2,7 +2,7 @@
 
 Every endpoint that has to execute the editor's Python goes through here:
 compile, mesh edges, simulate, mesh inspection, and optimize.  Each call
-spawns a fresh ``python -m cadjoint.viewer._compile_worker``, writes one
+spawns a fresh ``python -m cadjoint.viewer.worker``, writes one
 JSON request to its stdin, and reads its JSON response back — a disposable
 process per request, bounded by a per-mode timeout, so a runaway program
 cannot outlive its request or leak state into the next one.
@@ -32,9 +32,9 @@ import sys
 import threading
 from typing import Any
 
-from cadjoint.viewer._compile_worker import RETIRE_FLAG
 from cadjoint.viewer._jobs import REGISTRY, attach_process, current_job
 from cadjoint.viewer._limits import OVERSIZED_SOURCE_ERROR, exceeds_source_limit
+from cadjoint.viewer.worker.protocol import MODULE, RETIRE_FLAG
 
 # The edit round-trip budget. It used to be 20 s, which the gearbox end-cap's
 # first compile exceeds against a cold compilation cache; a compile that is
@@ -89,7 +89,7 @@ def _run_worker(
 
     request = json.dumps({**(extra or {}), "source": source, "mode": mode})
     process = subprocess.Popen(
-        [sys.executable, "-m", "cadjoint.viewer._compile_worker"],
+        [sys.executable, "-m", MODULE],
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -173,7 +173,7 @@ def _pooled_compile(source: str, timeout: float) -> dict[str, Any] | None:
         if process is None:
             try:
                 process = subprocess.Popen(
-                    [sys.executable, "-m", "cadjoint.viewer._compile_worker", "--serve"],
+                    [sys.executable, "-m", MODULE, "--serve"],
                     stdin=subprocess.PIPE,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.DEVNULL,
@@ -530,7 +530,7 @@ def _stream_optimize_worker(source: str, extra: dict[str, Any], timeout: float):
     import threading
 
     process = subprocess.Popen(
-        [sys.executable, "-m", "cadjoint.viewer._compile_worker"],
+        [sys.executable, "-m", MODULE],
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,

@@ -125,7 +125,7 @@ _compiler.compile_or_get_cached = _compile
 
 
 def _run_mode(mode: str, source: str, names: dict[str, str], steps: int) -> dict[str, Any]:
-    from cadjoint.viewer import _compile_worker as worker
+    from cadjoint.viewer.worker import main as worker
 
     if mode == "compile":
         return worker._compile_source(source)
@@ -136,7 +136,7 @@ def _run_mode(mode: str, source: str, names: dict[str, str], steps: int) -> dict
     if mode == "simulate":
         return worker._simulate_source({"source": source, "name": names["study"]})
     if mode == "optimize":
-        from cadjoint.viewer._worker_optimize import _optimize_source
+        from cadjoint.viewer.worker.optimize import _optimize_source
 
         return _optimize_source({"source": source, "name": names["optimization"], "steps": steps})
     raise ValueError(f"unknown mode {mode!r}")
@@ -144,7 +144,7 @@ def _run_mode(mode: str, source: str, names: dict[str, str], steps: int) -> dict
 
 def _declared_names(source: str) -> dict[str, str]:
     """First declared SimMesh / study / optimization name, by a cheap exec."""
-    from cadjoint.viewer._worker_scene import _execute_scene
+    from cadjoint.viewer.worker.scene import _execute_scene
 
     namespace = _execute_scene(source)
     out = {}

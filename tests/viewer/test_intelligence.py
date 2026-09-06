@@ -168,7 +168,7 @@ def playground_traceback(line: int) -> dict:
         "ok": False,
         "error": (
             "Traceback (most recent call last):\n"
-            '  File "/x/_compile_worker.py", line 97, in main\n'
+            '  File "/x/worker/main.py", line 97, in main\n'
             "    exec(compile(source, PLAYGROUND_FILENAME, 'exec'), namespace)\n"
             f'  File "<cadjoint-playground>", line {line}, in <module>\n'
             "ZeroDivisionError: division by zero\n"

@@ -380,7 +380,7 @@ class TestTheSceneIsViewerReady:
         assert isinstance(shield.scene, SDF)
 
     def test_meshes_and_studies_and_optimisation_are_captured(self, shield):
-        from cadjoint.viewer._worker_scene import _execute_scene
+        from cadjoint.viewer.worker.scene import _execute_scene
 
         source = open("scenes/motor_shield.py").read()
         namespace = _execute_scene(source)

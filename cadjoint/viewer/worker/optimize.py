@@ -6,7 +6,7 @@ playground server tails), and writes the optimized parameter values back
 into the program text through the patch machinery, so the response's
 ``source`` is a patched program exactly like a ``/patch`` response.  A
 study-backed run additionally packages the optimized design's solve through
-:mod:`cadjoint.viewer._worker_payloads`.
+:mod:`cadjoint.viewer.worker.payloads`.
 
 The step caps that bound one HTTP-sized run live here.
 """
@@ -19,8 +19,8 @@ import json
 import sys
 from typing import Any
 
-from cadjoint.viewer._worker_payloads import _study_payload
-from cadjoint.viewer._worker_scene import (
+from cadjoint.viewer.worker.payloads import _study_payload
+from cadjoint.viewer.worker.scene import (
     _FEM_UNAVAILABLE_MESSAGE,
     _execute_scene,
     _named_optimization,
