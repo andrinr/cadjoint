@@ -87,3 +87,30 @@ def test_a_dead_worker_is_replaced_rather_than_reported_as_a_timeout():
     result = client.compile_source(_SCENE)
     assert result["ok"], "the request must be answered, by a new process"
     assert "timeout" not in (result.get("error") or "").lower()
+
+
+def test_cancelling_a_served_compile_does_not_redo_it():
+    """The regression a shared worker makes possible.
+
+    Cancelling kills the worker. With a disposable process that ended the
+    request; with a shared one the closed pipe looks exactly like a worker
+    that died on its own, and the obvious recovery — start a fresh process
+    and retry — would redo the work the user just asked us to stop.
+    """
+    import threading
+    import time
+
+    from cadjoint.viewer._jobs import REGISTRY
+
+    slow = "import time\nfrom cadjoint.sdf.primitives import Sphere\ntime.sleep(6)\nscene = Sphere(1.0)\n"
+    client.compile_source(_SCENE)  # warm the pool so the kill lands mid-request
+
+    with REGISTRY.track("compile", source=slow) as job:
+        threading.Thread(target=lambda: (time.sleep(1.5), job.cancel()), daemon=True).start()
+        started = time.perf_counter()
+        result = client.compile_source(slow)
+        elapsed = time.perf_counter() - started
+
+    assert result["ok"] is False, "a cancelled compile must not come back successful"
+    assert "cancelled" in result["error"].lower()
+    assert elapsed < 5.0, "it returned when cancelled, rather than running the scene again"

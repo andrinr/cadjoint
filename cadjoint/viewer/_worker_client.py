@@ -33,7 +33,7 @@ import threading
 from typing import Any
 
 from cadjoint.viewer._compile_worker import RETIRE_FLAG
-from cadjoint.viewer._jobs import REGISTRY, attach_process
+from cadjoint.viewer._jobs import REGISTRY, attach_process, current_job
 from cadjoint.viewer._limits import OVERSIZED_SOURCE_ERROR, exceeds_source_limit
 
 # The edit round-trip budget. It used to be 20 s, which the gearbox end-cap's
@@ -200,9 +200,17 @@ def _pooled_compile(source: str, timeout: float) -> dict[str, Any] | None:
                 "error": f"Compilation exceeded the {timeout:g}-second timeout.",
             }
         if not line:
-            # EOF: the worker died or retired between requests. Not a
-            # timeout — say nothing and let the disposable path answer.
+            # EOF: the pipe closed mid-request. Two very different causes.
             _retire_pooled()
+            job = current_job()
+            if job is not None and job.cancel_requested:
+                # Cancelling kills the worker, and the worker is shared, so
+                # the closed pipe *is* the cancellation. Falling back here
+                # would start a fresh process and redo the work the user
+                # just asked us to stop — the one outcome cancelling must
+                # not produce.
+                return {"ok": False, "error": "Compilation was cancelled."}
+            # Otherwise the worker died on its own; a fresh one answers.
             return None
         try:
             result = json.loads(line)
