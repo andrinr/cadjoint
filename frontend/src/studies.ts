@@ -10,6 +10,7 @@
 import type {
   StudyBc,
   StudyBcType,
+  StudyKind,
   StudyPayload,
   StudyPayloadKind,
   StudySelection,
@@ -63,22 +64,26 @@ export const BC_LABELS: Record<StudyBcType, string> = {
 /**
  * BC types that make sense for a study kind.
  *
- * A flow study's conditions — inlet, outlet, walls, a heat source — are
- * declared in the scene and have no patch operations behind them, so the
- * panel has nothing to offer for one and says so by offering nothing. That
- * is why the kind is wider here than `StudyKind`: the payload reports what a
- * program *contains*, the enum names what the GUI can *author*, and flow is
- * currently the first that is one without the other.
+ * A flow study's five differ from the mesh kinds' in a way the add form has
+ * to respect: an inlet, an outlet and the duct walls are faces of the
+ * lattice, so they place no region and the form must not ask for one. See
+ * `bcPlacesRegion`.
  */
 export function bcTypesFor(kind: StudyPayloadKind): StudyBcType[] {
   if (kind === "thermal") return ["dirichlet", "heat_flux"];
   if (kind === "elastic") return ["fixed", "traction"];
+  if (kind === "flow") return ["inlet", "outlet", "walls", "heat_source", "held_temperature"];
   return [];
 }
 
 /** Whether the GUI can add and edit this kind of study's conditions. */
-export function isEditableStudyKind(kind: StudyPayloadKind): kind is "thermal" | "elastic" {
-  return kind === "thermal" || kind === "elastic";
+export function isEditableStudyKind(kind: StudyPayloadKind): kind is StudyKind {
+  return kind === "thermal" || kind === "elastic" || kind === "flow";
+}
+
+/** Whether this condition picks a region, or is a face of the lattice. */
+export function bcPlacesRegion(type: StudyBcType): boolean {
+  return BC_PLACEMENT[type] === undefined;
 }
 
 /**
@@ -146,7 +151,7 @@ export interface BcDraft {
 
 export function defaultDraft(kind: StudyPayloadKind): BcDraft {
   return {
-    bcType: kind === "thermal" ? "dirichlet" : "fixed",
+    bcType: bcTypesFor(kind)[0] ?? "fixed",
     selectionKind: "side",
     side: "+x",
     minCorner: [0, 0, 0],
@@ -155,7 +160,7 @@ export function defaultDraft(kind: StudyPayloadKind): BcDraft {
     radius: 0.5,
     point: [0, 0, 0],
     normal: [0, 0, 1],
-    value: kind === "thermal" ? 100 : 0,
+    value: kind === "thermal" ? 100 : kind === "flow" ? 0.02 : 0,
     vector: [0, 0, -1],
   };
 }
@@ -180,15 +185,18 @@ export function addBcRequest(study: StudyPayload, draft: BcDraft): Record<string
     ...byId(study),
     study: study.index,
     bc_type: draft.bcType,
-    selection: draftSelection(draft),
   };
-  // `value` is required for valued BCs and forbidden for fixed supports.
+  // A condition that places nothing must not send a selection: the server
+  // refuses the pair rather than quietly ignoring half of it.
+  if (bcPlacesRegion(draft.bcType)) body.selection = draftSelection(draft);
+  // `value` is required for valued conditions and forbidden for the two that
+  // state themselves — a fixed support and an outlet.
   if (draft.bcType === "traction") body.value = [...draft.vector];
-  else if (draft.bcType !== "fixed") body.value = draft.value;
+  else if (draft.bcType !== "fixed" && draft.bcType !== "outlet") body.value = draft.value;
   return body;
 }
 
-export function addStudyRequest(kind: "thermal" | "elastic"): Record<string, unknown> {
+export function addStudyRequest(kind: StudyKind): Record<string, unknown> {
   return { op: "add_study", kind };
 }
 

@@ -20,7 +20,8 @@ solver reports the laminar answer and so overstates the temperature. It runs on
 CPU at a speed that makes a trustworthy resolution expensive — a Nusselt number
 good to a couple of percent wants about 22 cells across a channel, and the
 examples here use 12 to 16. A scene declaring a flow study opens, renders and
-compiles in the playground, but the Studies window cannot yet edit one. Read
+compiles in the playground, and the Studies window reads and edits one like
+any other study. Read
 [§8.9 of the note](../research/flow-solver.md) before quoting an absolute number
 from it.
 :::

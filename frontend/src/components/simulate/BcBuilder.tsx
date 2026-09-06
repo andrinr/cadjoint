@@ -16,6 +16,8 @@ import { For, Show } from "solid-js";
 import { simView } from "../../state";
 import {
   BC_LABELS,
+  BC_PLACEMENT,
+  bcPlacesRegion,
   bcTypesFor,
   type BcDraft,
   type BuilderSelectionKind,
@@ -75,6 +77,7 @@ export function BcBuilder(props: BcBuilderProps) {
             </For>
           </select>
         </label>
+        <Show when={bcPlacesRegion(draft().bcType)}>
         <label>
           <span>Select</span>
           <select
@@ -92,12 +95,18 @@ export function BcBuilder(props: BcBuilderProps) {
             </For>
           </select>
         </label>
+        </Show>
+        <Show when={!bcPlacesRegion(draft().bcType)}>
+          <p class="sim-note" data-testid="simulate-builder-placement">
+            {BC_PLACEMENT[draft().bcType]} — no region to choose.
+          </p>
+        </Show>
       </div>
 
       {/* Viewport picking: while armed and a mesh is shown, a click proposes
           Nodes.sphere at the picked point and a shift-drag rectangle
           proposes Nodes.box. */}
-      <Show when={simView()}>
+      <Show when={simView() && bcPlacesRegion(draft().bcType)}>
         <button
           type="button"
           class="sim-pick"
@@ -110,7 +119,7 @@ export function BcBuilder(props: BcBuilderProps) {
         </button>
       </Show>
 
-      <Show when={draft().selectionKind === "side"}>
+      <Show when={bcPlacesRegion(draft().bcType) && draft().selectionKind === "side"}>
         <div class="sim-sides" data-testid="simulate-builder-sides">
           <For each={SIDES}>
             {(side) => (
@@ -125,11 +134,11 @@ export function BcBuilder(props: BcBuilderProps) {
           </For>
         </div>
       </Show>
-      <Show when={draft().selectionKind === "box"}>
+      <Show when={bcPlacesRegion(draft().bcType) && draft().selectionKind === "box"}>
         {vectorRow("minCorner", "Min")}
         {vectorRow("maxCorner", "Max")}
       </Show>
-      <Show when={draft().selectionKind === "sphere"}>
+      <Show when={bcPlacesRegion(draft().bcType) && draft().selectionKind === "sphere"}>
         {vectorRow("center", "Center")}
         <NumberField
           class="sim-builder-vector"
@@ -140,7 +149,7 @@ export function BcBuilder(props: BcBuilderProps) {
           onCommit={(radius) => sim().setDraft({ ...draft(), radius })}
         />
       </Show>
-      <Show when={draft().selectionKind === "halfspace"}>
+      <Show when={bcPlacesRegion(draft().bcType) && draft().selectionKind === "halfspace"}>
         {vectorRow("point", "Point")}
         {vectorRow("normal", "Normal")}
       </Show>
@@ -151,6 +160,22 @@ export function BcBuilder(props: BcBuilderProps) {
           label={BC_LABELS[draft().bcType]}
           value={draft().value}
           testId="simulate-builder-value"
+          onCommit={(value) => sim().setDraft({ ...draft(), value })}
+        />
+      </Show>
+      <Show
+        when={
+          draft().bcType === "inlet" ||
+          draft().bcType === "heat_source" ||
+          draft().bcType === "held_temperature" ||
+          draft().bcType === "walls"
+        }
+      >
+        <NumberField
+          class="sim-builder-vector"
+          label={draft().bcType === "inlet" ? "Speed" : BC_LABELS[draft().bcType]}
+          value={draft().value}
+          testId="simulate-builder-flow-value"
           onCommit={(value) => sim().setDraft({ ...draft(), value })}
         />
       </Show>

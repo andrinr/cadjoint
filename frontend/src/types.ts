@@ -413,12 +413,16 @@ export interface SimulationMeshPayload {
 /**
  * What a study in the payload can be.
  *
- * Wider than `StudyKind` in `cadjoint/enums.py` on purpose: the enum names
- * the kinds the GUI can author, this names the kinds a program may contain.
- * A flow study is declared in the scene and has no patch vocabulary, so it
+ * Equal to `StudyKind` in `cadjoint/enums.py` now that the patch layer
+ * writes all three, and kept separate because the two have differed before
+ * and may again: the enum names the kinds the GUI can *author*, this names
+ * the kinds a program may *contain*. A kind in the second and not the first
  * is reported and read but never built here.
  */
 export type StudyPayloadKind = "thermal" | "elastic" | "flow";
+
+/** The kinds the GUI can author — see `payloads.d.ts`'s generated union. */
+export type { StudyKind } from "../../cadjoint/viewer/schema/payloads";
 
 export type SimulationKind = "probe" | "thermal" | "elastic";
 

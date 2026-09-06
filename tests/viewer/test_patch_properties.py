@@ -1265,12 +1265,15 @@ MALFORMED: list[tuple[str, dict[str, Any], str]] = [
     (
         "study kind unknown",
         {"op": "add_study", "kind": "magnetic"},
-        "Study `kind` must be `thermal` or `elastic`.",
+        "Study `kind` must be `thermal`, `elastic`, or `flow`.",
     ),
     (
         "bc type unknown",
         {"op": "add_study_bc", "id": "assign:heat_study", "bc_type": "convection", "selection": {}},
-        "`bc_type` must be one of: dirichlet, heat_flux, fixed, traction.",
+        (
+            "`bc_type` must be one of: dirichlet, heat_flux, fixed, traction, "
+            "inlet, outlet, walls, heat_source, held_temperature."
+        ),
     ),
     (
         "mesh method unknown",

@@ -20,6 +20,7 @@ from collections.abc import Callable
 from typing import Any
 
 from cadjoint.enums import (
+    UNPLACED_BOUNDARY_CONDITIONS,
     BoundaryConditionType,
     ConstraintKind,
     ConstraintSolveMethod,
@@ -56,6 +57,11 @@ def _error(message: str) -> dict[str, Any]:
 # message, the request model and the generated TypeScript at once.
 _STUDY_KINDS = values(StudyKind)
 _BC_TYPES = values(BoundaryConditionType)
+
+#: The conditions that state themselves and carry no number.
+_VALUELESS_BOUNDARY_CONDITIONS = frozenset(
+    {BoundaryConditionType.FIXED, BoundaryConditionType.OUTLET}
+)
 _MESH_METHODS = values(MeshMethod)
 _SOLVE_METHODS = values(ConstraintSolveMethod)
 
@@ -660,18 +666,39 @@ def _validate_add_study_bc(request: dict[str, Any]) -> Checked:
     if not isinstance(bc_type, str) or bc_type not in _BC_TYPES:
         return _error(f"`bc_type` must be one of: {listed(BoundaryConditionType)}."), {}
     selection = request.get("selection")
-    if not isinstance(selection, dict):
+    if bc_type in UNPLACED_BOUNDARY_CONDITIONS:
+        # An inlet, an outlet and the duct walls are faces of the flow
+        # lattice, not a chosen region: they place nothing.
+        if selection is not None:
+            article = "An" if bc_type == BoundaryConditionType.INLET else "A"
+            return _error(
+                f"{article} `{bc_type}` boundary condition is a face of the lattice and "
+                "places no region, so it takes no `selection`."
+            ), {}
+    elif not isinstance(selection, dict):
         return _error("The patch request needs `selection` as a description object."), {}
     arguments.update(bc_type=bc_type, selection=selection)
     raw_value = request.get("value")
-    if bc_type == BoundaryConditionType.FIXED:
+    if bc_type in _VALUELESS_BOUNDARY_CONDITIONS:
         if raw_value is not None:
-            return _error("A `fixed` boundary condition takes no value."), {}
+            return _error(f"A `{bc_type}` boundary condition takes no value."), {}
     elif bc_type == BoundaryConditionType.TRACTION:
         vector = _numbers(raw_value, 3)
         if vector is None:
             return _error("A `traction` boundary condition needs `value` as three numbers."), {}
         arguments["value"] = vector
+    elif bc_type == BoundaryConditionType.INLET:
+        # An inlet takes a speed along the duct or a full velocity vector.
+        vector = _numbers(raw_value, 3)
+        if vector is not None:
+            arguments["value"] = vector
+        elif _number(raw_value):
+            arguments["value"] = float(raw_value)
+        else:
+            return _error("An `inlet` needs `value` as a speed or three numbers."), {}
+    elif bc_type == BoundaryConditionType.WALLS and raw_value is None:
+        # Unheated walls state no-slip and nothing else.
+        pass
     else:
         if not _number(raw_value):
             return _error(f"A `{bc_type}` boundary condition needs a numeric `value`."), {}

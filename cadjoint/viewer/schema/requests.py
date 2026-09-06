@@ -309,10 +309,17 @@ class DeleteStudyRequest(StudyTargeted):
 class AddStudyBcRequest(StudyTargeted):
     op: Literal["add_study_bc"]
     bc_type: BoundaryConditionType
-    selection: dict[str, Any]
-    """A serialized node selection, as ``StudySelection`` describes it."""
+    selection: dict[str, Any] | None = None
+    """A serialized node selection, as ``StudySelection`` describes it.
+
+    Absent for the three conditions that place nothing: a flow study's
+    inlet, outlet and duct walls are faces of the lattice rather than a
+    chosen region.
+    """
     value: Value | None = None
-    """Absent for ``fixed``; three numbers for ``traction``; a scalar else."""
+    """Absent for ``fixed`` and ``outlet``, and optional for ``walls``;
+    three numbers for ``traction``; a speed or three numbers for ``inlet``;
+    a scalar for the rest."""
 
 
 class DeleteStudyBcRequest(StudyTargeted):

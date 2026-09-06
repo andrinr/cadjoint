@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from cadjoint.enums import StudyKind, values
 from cadjoint.viewer.source_map import (
     locate_mesh_statements,
     locate_optimization_statements,
@@ -56,19 +57,15 @@ def _bc_ids(source: str, study_index: int) -> dict[int, str]:
     }
 
 
-#: The study kinds the viewer can *author*, which is deliberately narrower
-#: than what it can locate and display.
-#: :data:`~cadjoint.viewer.source_map.STUDY_CALL_KINDS` knows ``FlowStudy``
-#: too, because a scene declaring one must not knock its neighbours out of
-#: alignment — but no patch operation writes a ``FlowStudy``, so one reports
-#: ``editable: false`` and the panel points at the code instead.
+#: The study kinds the viewer can *author*.
 #:
-#: This is the same distinction :class:`cadjoint.enums.StudyKind` draws by
-#: holding two members while ``StudyPayload.kind`` holds three: the enum is
-#: what the GUI can *author*, and widening it would make ``add_study``
-#: advertise a kind it cannot write.  Spelled as literals rather than enum
-#: members for exactly that reason.
-_AUTHORABLE_KINDS = frozenset({"thermal", "elastic"})
+#: Equal to :class:`~cadjoint.enums.StudyKind` now that the patch layer
+#: writes all three, and kept as its own name because the two have differed
+#: before and the reason they may differ again is worth stating: what a
+#: scene can *contain* is wider than what the GUI can *write*, and a kind
+#: this set does not hold still reports ``editable: false`` and sends the
+#: user to the code rather than offering controls nothing backs.
+_AUTHORABLE_KINDS = frozenset(values(StudyKind))
 
 
 def _study_entries(studies: list[Any], source: str) -> list[dict[str, Any]]:

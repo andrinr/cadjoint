@@ -117,12 +117,15 @@ class TestOptionSets:
 
     def test_listed_joins_in_declaration_order(self):
         assert listed(MeshMethod) == "hex, tet4, tet10"
-        assert listed(BoundaryConditionType) == "dirichlet, heat_flux, fixed, traction"
+        assert listed(BoundaryConditionType) == (
+            "dirichlet, heat_flux, fixed, traction, inlet, outlet, walls, "
+            "heat_source, held_temperature"
+        )
 
     def test_either_reads_as_prose(self):
-        assert either(StudyKind) == "`thermal` or `elastic`"
+        assert either(StudyKind) == "`thermal`, `elastic`, or `flow`"
         assert either(ConstraintSolveMethod) == "`newton`, `adam`, or `sgd`"
-        assert either(StudyKind, quote="") == "thermal or elastic"
+        assert either(StudyKind, quote="") == "thermal, elastic, or flow"
 
     def test_parse_accepts_both_spellings(self):
         assert parse(MeshMethod, "tet4", "nope") is MeshMethod.TET4
@@ -244,17 +247,43 @@ class TestOptimization:
 
 class TestStudyPayloads:
     def test_boundary_conditions_report_their_enum_value(self):
+        """Every condition of both families, in the enum's own order.
+
+        The enum groups by the study kind that accepts them, so this list is
+        the concatenation of `STUDY_KIND_BOUNDARY_CONDITIONS`' values and the
+        assertion catches a member added to one and not the other.
+        """
         from cadjoint.fem import Dirichlet, Fixed, HeatFlux, Nodes, Traction
+        from cadjoint.flow import HeatSource, HeldTemperature, Inlet, Outlet, Walls
 
         payloads = [
             Dirichlet(Nodes.side("-x"), 1.0).describe(),
             HeatFlux(Nodes.side("+x"), 2.0).describe(),
             Fixed(Nodes.side("-y")).describe(),
             Traction(Nodes.side("+y"), (0.0, 0.0, 1.0)).describe(),
+            Inlet(velocity=0.02).describe(),
+            Outlet().describe(),
+            Walls().describe(),
+            HeatSource(Nodes.box([0.0, 0.0, 0.0], [1.0, 1.0, 1.0]), power=1.0).describe(),
+            HeldTemperature(Nodes.box([0.0, 0.0, 0.0], [1.0, 1.0, 1.0]), value=1.0).describe(),
         ]
 
         assert [payload["type"] for payload in payloads] == list(values(BoundaryConditionType))
         assert all(type(payload["type"]) is str for payload in payloads)
+
+    def test_only_the_flow_faces_place_no_region(self):
+        """`nodes` is what separates the two families, and the enum says so."""
+        from cadjoint.enums import UNPLACED_BOUNDARY_CONDITIONS
+        from cadjoint.flow import HeatSource, Inlet, Outlet, Walls
+        from cadjoint.studies import Nodes
+
+        for condition in (Inlet(velocity=0.02), Outlet(), Walls()):
+            described = condition.describe()
+            assert described["type"] in UNPLACED_BOUNDARY_CONDITIONS
+            assert "nodes" not in described
+        placed = HeatSource(Nodes.box([0.0, 0.0, 0.0], [1.0, 1.0, 1.0]), power=1.0).describe()
+        assert placed["type"] not in UNPLACED_BOUNDARY_CONDITIONS
+        assert placed["nodes"]["kind"] == "box"
 
     def test_study_kinds_are_the_enum_values(self):
         from cadjoint.fem import Dirichlet, ElasticStudy, Fixed, Nodes, ThermalStudy
@@ -400,11 +429,14 @@ class TestValidatorMessages:
 
     def test_study_kind(self):
         message = self._rejected("add_study", {"kind": "acoustic"})
-        assert message == "Study `kind` must be `thermal` or `elastic`."
+        assert message == "Study `kind` must be `thermal`, `elastic`, or `flow`."
 
     def test_bc_type(self):
         message = self._rejected("add_study_bc", {"study": 0, "bc_type": "neumann"})
-        assert message == "`bc_type` must be one of: dirichlet, heat_flux, fixed, traction."
+        assert message == (
+            "`bc_type` must be one of: dirichlet, heat_flux, fixed, traction, "
+            "inlet, outlet, walls, heat_source, held_temperature."
+        )
 
     def test_mesh_method(self):
         message = self._rejected(
@@ -438,5 +470,7 @@ class TestValidatorMessages:
         from cadjoint.viewer.patch.errors import PatchError
         from cadjoint.viewer.patch.studies import add_study
 
-        with pytest.raises(PatchError, match=r"^Study `kind` must be `thermal` or `elastic`\.$"):
+        with pytest.raises(
+            PatchError, match=r"^Study `kind` must be `thermal`, `elastic`, or `flow`\.$"
+        ):
             add_study("scene = None\n", "acoustic")

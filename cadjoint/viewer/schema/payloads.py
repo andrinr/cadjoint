@@ -327,14 +327,18 @@ class DomainEntry(Open):
 class StudyPayload(Open):
     """One study declared in the scene program.
 
-    ``kind`` is wider than :class:`~cadjoint.enums.StudyKind`, deliberately.
-    ``StudyKind`` is the vocabulary of studies the viewer can *create and
-    edit* through the patch endpoints, and it still holds two members; this
-    is the vocabulary it can *display*, which now also holds ``flow`` --
-    a :class:`cadjoint.flow.FlowStudy`, declared in a scene like the others
-    but discretising a fixed lattice rather than a mesh, so it has a
-    ``resolution`` and no ``mesh``. Widening the enum instead would make the
-    patch endpoint advertise a study kind it cannot write.
+    ``kind`` names what a program may *contain*;
+    :class:`~cadjoint.enums.StudyKind` names what the viewer can *create and
+    edit* through the patch endpoints.  The two are equal today — a
+    :class:`cadjoint.flow.FlowStudy` is displayed and written like the other
+    two, though it discretises a fixed lattice rather than a mesh, so it
+    carries a ``resolution`` and no ``mesh``.
+
+    They are kept as separate vocabularies because they have differed and
+    may again: ``flow`` was in this one and not the enum for as long as the
+    patch layer could not write a ``FlowStudy``, and widening the enum ahead
+    of that would have made ``add_study`` advertise a kind it could not
+    produce.  A kind here and not in the enum reports ``editable: false``.
     """
 
     index: int

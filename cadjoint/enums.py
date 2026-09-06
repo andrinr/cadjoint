@@ -71,8 +71,10 @@ __all__ = [
     "PluginTransportLike",
     "Side",
     "SideLike",
+    "STUDY_KIND_BOUNDARY_CONDITIONS",
     "StudyKind",
     "StudyKindLike",
+    "UNPLACED_BOUNDARY_CONDITIONS",
     "TetMesher",
     "TetMesherLike",
     "either",
@@ -214,9 +216,16 @@ class StudyKind(Option):
     """Steady-state heat conduction (``ThermalStudy``)."""
     ELASTIC = "elastic"
     """Small-strain linear elasticity (``ElasticStudy``)."""
+    FLOW = "flow"
+    """Forced convection on a lattice (``cadjoint.flow.FlowStudy``).
+
+    The one kind that meshes nothing: it fills a fixed lattice from the
+    scene's SDF, so it carries a ``resolution`` and no ``mesh``, and three
+    of its boundary conditions place no region at all.
+    """
 
 
-StudyKindLike = StudyKind | Literal["thermal", "elastic"]
+StudyKindLike = StudyKind | Literal["thermal", "elastic", "flow"]
 """A study kind, or the plain string spelling of one."""
 
 
@@ -236,12 +245,55 @@ class BoundaryConditionType(Option):
     """Fully clamped nodes (all displacement components zero)."""
     TRACTION = "traction"
     """Constant force per area on the faces the selection spans."""
+    INLET = "inlet"
+    """Prescribed inflow speed and temperature on the lattice's inlet face."""
+    OUTLET = "outlet"
+    """Zero-gradient outflow on the opposite lattice face."""
+    WALLS = "walls"
+    """No-slip duct walls, optionally held at a temperature."""
+    HEAT_SOURCE = "heat_source"
+    """Volumetric heat put into the selected cells."""
+    HELD_TEMPERATURE = "held_temperature"
+    """Temperature held over the selected cells."""
 
 
 BoundaryConditionTypeLike = (
-    BoundaryConditionType | Literal["dirichlet", "heat_flux", "fixed", "traction"]
+    BoundaryConditionType
+    | Literal[
+        "dirichlet",
+        "heat_flux",
+        "fixed",
+        "traction",
+        "inlet",
+        "outlet",
+        "walls",
+        "heat_source",
+        "held_temperature",
+    ]
 )
 """A boundary condition type, or the plain string spelling of one."""
+
+#: Which conditions each study kind accepts, in the order the viewer offers
+#: them.  Stated once because three places need it: the patch layer that
+#: writes one into the source, the request validator that refuses a
+#: mismatched pair, and the panel's add form.
+STUDY_KIND_BOUNDARY_CONDITIONS: dict[str, tuple[str, ...]] = {
+    StudyKind.THERMAL: (BoundaryConditionType.DIRICHLET, BoundaryConditionType.HEAT_FLUX),
+    StudyKind.ELASTIC: (BoundaryConditionType.FIXED, BoundaryConditionType.TRACTION),
+    StudyKind.FLOW: (
+        BoundaryConditionType.INLET,
+        BoundaryConditionType.OUTLET,
+        BoundaryConditionType.WALLS,
+        BoundaryConditionType.HEAT_SOURCE,
+        BoundaryConditionType.HELD_TEMPERATURE,
+    ),
+}
+
+#: The conditions that place nothing: faces of the flow lattice rather than
+#: a chosen region, so they carry no node selection.
+UNPLACED_BOUNDARY_CONDITIONS: frozenset[str] = frozenset(
+    {BoundaryConditionType.INLET, BoundaryConditionType.OUTLET, BoundaryConditionType.WALLS}
+)
 
 
 class Side(Option):

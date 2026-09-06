@@ -180,22 +180,43 @@ describe("patch request builders", () => {
   });
 });
 
-describe("a flow study is reported but not authored", () => {
-  // `StudyPayload.kind` is wider than the `StudyKind` enum on purpose: the
-  // payload reports what a program contains, the enum names what the GUI can
-  // build. A flow study is declared in the scene and has no patch operations
-  // behind it, so the panel must read one without offering to edit it — and
-  // must not throw when it meets one, which is what happened before this.
-  it("offers no boundary-condition types to add", () => {
-    expect(bcTypesFor("flow")).toEqual([]);
+describe("a flow study is authored like the other two", () => {
+  it("offers its own five condition types", () => {
+    expect(bcTypesFor("flow")).toEqual([
+      "inlet",
+      "outlet",
+      "walls",
+      "heat_source",
+      "held_temperature",
+    ]);
     expect(bcTypesFor("thermal")).toEqual(["dirichlet", "heat_flux"]);
     expect(bcTypesFor("elastic")).toEqual(["fixed", "traction"]);
   });
 
-  it("is not an editable kind, and the two that are still are", () => {
-    expect(isEditableStudyKind("flow")).toBe(false);
+  it("is an editable kind, like the two before it", () => {
+    expect(isEditableStudyKind("flow")).toBe(true);
     expect(isEditableStudyKind("thermal")).toBe(true);
     expect(isEditableStudyKind("elastic")).toBe(true);
+  });
+
+  // Three of the five place nothing, and the request must say so by
+  // omission: the server refuses a selection on one rather than ignoring it.
+  it("sends no selection for a condition that places nothing", () => {
+    const flow = { ...study, kind: "flow" as const, index: 2 };
+    for (const type of ["inlet", "outlet", "walls"] as const) {
+      const body = addBcRequest(flow, { ...defaultDraft("flow"), bcType: type });
+      expect(body.selection, type).toBeUndefined();
+    }
+    for (const type of ["heat_source", "held_temperature"] as const) {
+      const body = addBcRequest(flow, { ...defaultDraft("flow"), bcType: type });
+      expect(body.selection, type).toBeDefined();
+    }
+  });
+
+  it("sends a value for everything but the outlet", () => {
+    const flow = { ...study, kind: "flow" as const, index: 2 };
+    expect(addBcRequest(flow, { ...defaultDraft("flow"), bcType: "outlet" }).value).toBeUndefined();
+    expect(addBcRequest(flow, { ...defaultDraft("flow"), bcType: "inlet" }).value).toBe(0.02);
   });
 
   // The claim above used to be tested only through those two helpers, and
