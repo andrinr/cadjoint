@@ -60,6 +60,7 @@ const PANEL_ITEMS: { key: keyof PanelVisibility; label: string }[] = [
  * that are parked in every desk rather than docked in any.
  */
 const WINDOW_ITEMS: { id: WindowId; label: string }[] = [
+  { id: "properties", label: "Properties" },
   { id: "meshes", label: "Meshes" },
   { id: "studies", label: "Studies" },
   { id: "optimize", label: "Optimize" },

@@ -32,9 +32,14 @@ import {
   setBcProposal,
   hover,
   nodeById,
+  nodes,
   pendingLoft,
+  planeFrames,
+  planePreview,
   relations,
   selection,
+  setPlanePreview,
+  sketchPlane,
   setDrag,
   setGizmoDrag,
   setHover,
@@ -49,7 +54,10 @@ import { rectAabbProposal } from "../bcPick";
 import { overridesFor, vertexState } from "../viewer/dragBinding";
 import { intersectPlane, rayFromPixel, worldToPlane } from "../viewer/math";
 import { GRID_ALPHA } from "../viewer/graticule";
-import { pickEdge, pickNode, pickVertex, type PickView } from "../viewer/hittest";
+import { pickEdge, pickNode, pickPlane, pickVertex, type PickView } from "../viewer/hittest";
+import { previewFrame } from "../planes";
+import { quickPlaneEmission } from "../sketchPlanes";
+import { resolveSurfaceHit } from "../faces";
 import {
   CONSTRAINT_TOOL_NAMES,
   isEdgeConstraintTool,
@@ -58,6 +66,8 @@ import {
 import { detentZoomCamera, orbitCamera, panCamera, zoomCamera } from "./viewer/camera";
 import { buildConstraintOverlay } from "./viewer/constraintMarks";
 import { ConstraintOverlay } from "./viewer/ConstraintOverlay";
+import { buildPlaneMarks } from "./viewer/planeMarks";
+import { PlaneLabels } from "./viewer/PlaneLabels";
 import { Graticule } from "./viewer/Graticule";
 import { createGizmoDrag } from "./viewer/gizmoDrag";
 import { createSimInteraction } from "./viewer/simInteraction";
@@ -66,6 +76,7 @@ import { createViewerTools } from "./viewer/tools";
 import { ViewerHint } from "./viewer/ViewerHint";
 import { ViewerOverlays, type PickRect } from "./viewer/ViewerOverlays";
 import type { Gesture, PendingConstraint } from "./viewer/gestures";
+import type { Selection } from "../types";
 import type { ViewerPaneProps } from "./viewer/props";
 import { DOCK_REBUILT_EVENT } from "../windows/events";
 
@@ -145,6 +156,63 @@ export function ViewerPane(props: ViewerPaneProps) {
     );
   });
 
+  /** The plane's ghost while the sketch tool is armed, projected like the rest. */
+  const previewPlane = createMemo(() => {
+    const preview = planePreview();
+    return preview ? previewFrame(preview.origin, preview.normal) : null;
+  });
+
+  const planeMarks = createMemo(() => {
+    overlayRevision();
+    return buildPlaneMarks(
+      pickView(),
+      canvas?.clientWidth ?? 0,
+      canvas?.clientHeight ?? 0,
+      planeFrames(),
+      previewPlane(),
+    );
+  });
+
+  /**
+   * The sketch plane under the pointer, for the hint bar.
+   *
+   * Says which sketch's plane it is and whether it will move: a plane the
+   * source derived from a face follows its parent and cannot be dragged, and
+   * the sentence has to say so before the click rather than after.
+   */
+  const hoveredPlane = createMemo(() => {
+    if (!props.display.showOverlays) return null;
+    const at = hover();
+    if (!at || at.part !== "plane") return null;
+    const node = nodeById(at.nodeId);
+    if (!node?.plane) return null;
+    return {
+      name: node.name ?? node.id,
+      derived: node.plane.reference != null,
+      editable: node.editable && node.transform !== null,
+      reference: node.plane.reference?.constructor ?? null,
+    };
+  });
+
+  /**
+   * Where the sketch tool would plant its plane, from the pointer.
+   *
+   * The same two answers the click gives (`handlePlaceSketch`): a quick-pick
+   * world plane hit by the ray, or the surface point under the pointer with
+   * its normal. Computed on hover so the ghost is the plane the click makes.
+   */
+  const previewSketchPlane = (x: number, y: number) => {
+    const ray = rayFromPixel(x, y, pickView());
+    const choice = sketchPlane();
+    if (choice === "face") {
+      const hit = resolveSurfaceHit(nodes(), ray);
+      setPlanePreview(hit ? { origin: hit.point, normal: hit.normal } : null);
+      return;
+    }
+    const emission = quickPlaneEmission(choice, ray, renderer.camera.distance);
+    setPlanePreview({ origin: emission.origin, normal: emission.normal ?? [0, 0, 1] });
+  };
+
   /**
    * The sketch handle under the pointer, classified.
    *
@@ -201,6 +269,7 @@ export function ViewerPane(props: ViewerPaneProps) {
       return;
     }
     if (tool() !== "select") {
+      if (tool() === "sketch") previewSketchPlane(x, y);
       canvas.style.cursor = "crosshair";
       setHover(null);
       renderer.gizmoAxis = null;
@@ -225,12 +294,24 @@ export function ViewerPane(props: ViewerPaneProps) {
     }
 
     const node = pickNode(displayProfiles(), x, y, view, 10, true);
-    const next = node ? { nodeId: node.nodeId, vertexIndex: null } : null;
+    // The plane's frame is the second thing a sketch offers to the pointer,
+    // after its own edges, and it is shown only while the overlay is.
+    const plane =
+      !node && props.display.showOverlays ? pickPlane(planeFrames(), x, y, view) : null;
+    const next: Selection | null = node
+      ? { nodeId: node.nodeId, vertexIndex: null }
+      : plane
+        ? { nodeId: plane.nodeId, vertexIndex: null, part: "plane" }
+        : null;
     const current = hover();
-    if (next?.nodeId !== current?.nodeId || next?.vertexIndex !== current?.vertexIndex) {
+    if (
+      next?.nodeId !== current?.nodeId ||
+      next?.vertexIndex !== current?.vertexIndex ||
+      next?.part !== current?.part
+    ) {
       setHover(next);
     }
-    canvas.style.cursor = node ? "pointer" : "default";
+    canvas.style.cursor = node || plane ? "pointer" : "default";
   };
 
   const onPointerDown = (event: PointerEvent) => {
@@ -333,6 +414,24 @@ export function ViewerPane(props: ViewerPaneProps) {
           setGizmoMode("translate");
         }
         setSelection({ nodeId: node.nodeId, vertexIndex: null });
+        gesture = { kind: "none" };
+        return;
+      }
+      const plane = props.display.showOverlays
+        ? pickPlane(planeFrames(), x, y, pickView())
+        : null;
+      if (plane) {
+        // Taking hold of the plane: the gizmo goes to its origin, and a
+        // derived plane says in the status line why it will not move.
+        setGizmoMode("translate");
+        setSelection({ nodeId: plane.nodeId, vertexIndex: null, part: "plane" });
+        const picked = nodeById(plane.nodeId);
+        if (picked?.plane?.reference) {
+          setStatus({
+            kind: "",
+            text: `${picked.name ?? "This sketch"}'s plane is derived from a face (SketchPlane.${picked.plane.reference.constructor}); it follows its parent and cannot be dragged — edit the reference in the code.`,
+          });
+        }
         gesture = { kind: "none" };
         return;
       }
@@ -636,6 +735,14 @@ export function ViewerPane(props: ViewerPaneProps) {
     renderer.setMeshEdges(meshEdges());
   });
 
+  // The placement ghost belongs to the sketch tool and leaves with it.
+  createEffect(() => {
+    if (tool() !== "sketch" && planePreview() !== null) setPlanePreview(null);
+  });
+  createEffect(() => {
+    renderer.setPlanePreview(props.display.showOverlays ? previewPlane() : null);
+  });
+
   // The highlight is a readout of the hover, and it never outlives the tool
   // that armed it: leaving the face tool clears both.
   createEffect(() => {
@@ -757,8 +864,13 @@ export function ViewerPane(props: ViewerPaneProps) {
         sdfAxis={props.display.sdfAxis}
         sdfFraction={props.display.sdfFraction}
       />
+      <PlaneLabels show={props.display.showOverlays} geometry={planeMarks()} />
       <ViewerOverlays pickRect={props.display.showOverlays ? pickRect() : null} />
-      <ViewerHint pendingConstraint={pendingConstraint()} handle={hoveredHandle()} />
+      <ViewerHint
+        pendingConstraint={pendingConstraint()}
+        handle={hoveredHandle()}
+        plane={hoveredPlane()}
+      />
     </section>
   );
 }

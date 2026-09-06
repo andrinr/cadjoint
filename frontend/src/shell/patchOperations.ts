@@ -24,7 +24,7 @@
  */
 
 import { nodeById, nodes, selection } from "../state";
-import type { ConstraintKind, SketchPlaneReference } from "../types";
+import type { ConstraintKind, PatchAddress, SketchPlaneReference } from "../types";
 
 export type VertexPatchOp = "set_vertex" | "insert_vertex" | "delete_vertex";
 
@@ -36,6 +36,16 @@ export interface PatchOperations {
     argument: string,
     value: number | number[],
   ) => Promise<void>;
+  /**
+   * Rewrite one argument at the address the compile payload published for it.
+   *
+   * The properties window never composes a request of its own: the element
+   * payload names the call, the keyword, the line and — when the program has
+   * one — the stable id, and this sends exactly that.
+   */
+  setValueAt: (address: PatchAddress, value: number | number[]) => Promise<void>;
+  /** Assign a named material at a published address. */
+  assignMaterialAt: (address: PatchAddress, material: string) => Promise<void>;
   deleteObject: (line: number) => Promise<void>;
   addPrimitive: (
     kind: string,
@@ -90,6 +100,21 @@ export function createPatchOperations(
     argument: string,
     value: number | number[],
   ) => applyPatch({ op: "set_value", ...addressing(line), name, argument, value });
+
+  const published = (address: PatchAddress): { id?: string; line: number } =>
+    address.id ? { id: address.id, line: address.line } : { line: address.line };
+
+  const setValueAt = (address: PatchAddress, value: number | number[]) =>
+    applyPatch({
+      op: "set_value",
+      ...published(address),
+      name: address.name,
+      argument: address.argument,
+      value,
+    });
+
+  const assignMaterialAt = (address: PatchAddress, material: string) =>
+    applyPatch({ op: "assign_material", ...published(address), material });
 
   const deleteObject = (line: number) => applyPatch({ op: "delete_object", ...addressing(line) });
 
@@ -174,6 +199,8 @@ export function createPatchOperations(
   return {
     patch,
     setValue,
+    setValueAt,
+    assignMaterialAt,
     deleteObject,
     addPrimitive,
     addMaterial,

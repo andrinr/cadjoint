@@ -18,6 +18,7 @@ export type WindowId =
   | "viewport"
   | "editor"
   | "objects"
+  | "properties"
   | "materials"
   | "sketch"
   | "meshes"
@@ -69,6 +70,7 @@ export const WINDOW_DEFS: readonly WindowDef[] = [
   { id: "viewport", title: "Viewport", modes: ["model", "sketch", "simulate"], permanent: true },
   { id: "editor", title: "scene.py", modes: ["model", "sketch", "simulate"] },
   { id: "objects", title: "Objects", modes: ["model", "sketch"] },
+  { id: "properties", title: "Properties", modes: ["model", "sketch"] },
   { id: "materials", title: "Materials", modes: ["model"] },
   { id: "sketch", title: "Sketch", modes: ["sketch"] },
   { id: "meshes", title: "Meshes", modes: ["simulate"], tabTestId: "sim-tab-meshes" },
@@ -151,8 +153,10 @@ const COLUMN_WIDTH = 320;
  * Each mode's default arrangement, built by opening these in order.
  *
  * Model puts the code on the left, the viewport in the middle, and the
- * property windows in a right-hand column where Materials and Optimize share
- * a tab strip. Sketch swaps Materials for the sketch's own properties.
+ * property windows in a right-hand column: Objects over Properties — the
+ * tree names the selection, the window under it shows the selection's
+ * arguments — over Materials and Optimize sharing a tab strip. Sketch swaps
+ * Materials for the sketch's own properties.
  * Simulate gives the right column to the
  * four simulation windows: Studies over Results, with Meshes tabbed behind
  * the first and Optimize behind the second — setup above, outcomes below.
@@ -162,14 +166,16 @@ export const DEFAULT_LAYOUTS: Record<EditingMode, readonly LayoutStep[]> = {
     { id: "viewport" },
     { id: "editor", reference: "viewport", direction: "left", size: EDITOR_WIDTH },
     { id: "objects", reference: "viewport", direction: "right", size: COLUMN_WIDTH },
-    { id: "materials", reference: "objects", direction: "below" },
+    { id: "properties", reference: "objects", direction: "below" },
+    { id: "materials", reference: "properties", direction: "below" },
     { id: "optimize", reference: "materials", direction: "within", inactive: true },
   ],
   sketch: [
     { id: "viewport" },
     { id: "editor", reference: "viewport", direction: "left", size: EDITOR_WIDTH },
     { id: "objects", reference: "viewport", direction: "right", size: COLUMN_WIDTH },
-    { id: "sketch", reference: "objects", direction: "below" },
+    { id: "properties", reference: "objects", direction: "below" },
+    { id: "sketch", reference: "properties", direction: "below" },
   ],
   simulate: [
     { id: "viewport" },
@@ -189,6 +195,7 @@ export const FALLBACK_PLACEMENTS: Record<WindowId, OpenPlacement> = {
   viewport: {},
   editor: { reference: "viewport", direction: "left", size: 460 },
   objects: { reference: "viewport", direction: "right", size: 300 },
+  properties: { reference: "objects", direction: "below" },
   materials: { reference: "objects", direction: "below" },
   sketch: { reference: "objects", direction: "below" },
   meshes: { reference: "viewport", direction: "right", size: 340 },

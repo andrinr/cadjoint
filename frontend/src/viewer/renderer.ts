@@ -62,10 +62,12 @@ import {
   GIZMO_STRIDE,
   HANDLE_STRIDE,
   packConstructionOverlay,
+  packPlaneOverlay,
   packFaceHighlight,
   packGizmoInstances,
   packMeshEdgeInstances,
 } from "./overlayGeometry";
+import { planeFrames, type PlaneFrame } from "../planes";
 import {
   DEPTH_FORMAT,
   GRATICULE_UNIFORM_SIZE,
@@ -289,6 +291,8 @@ export class Renderer {
   // (its own triangle pipeline, since nothing else in the overlay is a
   // surface) plus a hairline outline drawn through the edge pipeline.
   private faceHighlight: ConstructionFace | null = null;
+  /** The plane the sketch tool would create under the pointer. */
+  private planePreview: PlaneFrame | null = null;
   private faceFillBuffer: GPUBuffer | null = null;
   private faceFillCapacity = 0;
   private faceFillVertices = 0;
@@ -1106,6 +1110,14 @@ export class Renderer {
     this.scheduleRender();
   }
 
+  /** Show (or drop) the ghost of the plane a sketch click would create. */
+  setPlanePreview(frame: PlaneFrame | null): void {
+    if (this.planePreview === frame) return;
+    this.planePreview = frame;
+    this.uploadOverlay();
+    this.scheduleRender();
+  }
+
   /**
    * Highlight one analytic face, or clear the highlight.
    *
@@ -1144,12 +1156,23 @@ export class Renderer {
 
     const meshSegments = packMeshEdgeInstances(this.meshEdges);
     const highlight = packFaceHighlight(this.faceHighlight);
+    // The sketch planes draw through the face-highlight buffers: the same
+    // wash and the same hairline, in the same pass, so a plane costs nothing
+    // the overlay did not already pay for.
+    const planes = packPlaneOverlay(
+      planeFrames(this.profiles),
+      this.selection,
+      this.hover,
+      this.planePreview,
+    );
+    const fills = planes.fill.concat(highlight.fill);
+    const outlines = planes.outline.concat(highlight.outline);
 
-    this.faceFillVertices = highlight.fill.length / (FACE_STRIDE / 4);
-    this.faceOutlineCount = highlight.outline.length / (EDGE_STRIDE / 4);
+    this.faceFillVertices = fills.length / (FACE_STRIDE / 4);
+    this.faceOutlineCount = outlines.length / (EDGE_STRIDE / 4);
     this.faceFillBuffer = this.writeInstances(
       this.faceFillBuffer,
-      new Float32Array(highlight.fill),
+      new Float32Array(fills),
       FACE_STRIDE,
       (capacity) => (this.faceFillCapacity = capacity),
       this.faceFillCapacity,
@@ -1157,7 +1180,7 @@ export class Renderer {
     );
     this.faceOutlineBuffer = this.writeInstances(
       this.faceOutlineBuffer,
-      new Float32Array(highlight.outline),
+      new Float32Array(outlines),
       EDGE_STRIDE,
       (capacity) => (this.faceOutlineCapacity = capacity),
       this.faceOutlineCapacity,
@@ -1208,6 +1231,11 @@ export class Renderer {
     if (!active || active.vertexIndex !== null) return null;
     const node = this.profiles.find((candidate) => candidate.id === active.nodeId);
     if (!node?.transform || !node.editable) return null;
+    if (active.part === "plane" && node.plane) {
+      // The plane was taken hold of by its own frame: the arrows sit on the
+      // origin the drag will rewrite, not on the polygon.
+      return { node, origin: node.plane.origin as Vec3 };
+    }
     if (node.kind === "profile" && node.vertices.length > 0) {
       const sum = node.vertices.reduce<Vec3>(
         (center, vertex) => [

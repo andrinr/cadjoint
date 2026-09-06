@@ -41,6 +41,9 @@ import {
 } from "./editingMode";
 import { DEFAULT_SKETCH_PLANE, type SketchPlaneChoice } from "./sketchPlanes";
 import type { FacePick } from "./faces";
+import type { ConstructionElement } from "./types";
+import { planeFrames as framesOf, type PlaneFrame } from "./planes";
+import type { Vec3 } from "./viewer/math";
 
 export const [source, setSource] = createSignal("");
 export const [nodes, setNodes] = createSignal<ConstructionNode[]>([]);
@@ -50,6 +53,24 @@ export const [materials, setMaterials] = createSignal<MaterialDefinition[]>([]);
 export const [studies, setStudies] = createSignal<StudyPayload[]>([]);
 export const [simMeshes, setSimMeshes] = createSignal<SimMeshPayload[]>([]);
 export const [optimizations, setOptimizations] = createSignal<OptimizationPayload[]>([]);
+/** Every construction call with its written arguments, for the properties window. */
+export const [elements, setElements] = createSignal<ConstructionElement[]>([]);
+
+/**
+ * An element the properties window was pointed at directly.
+ *
+ * The viewport and the object tree select *nodes* — sketches and primitives,
+ * the things with geometry. An extrusion or a boolean has no outline to
+ * click, so the tree's operator rows name their element here instead; the
+ * window shows it until the next node selection replaces it.
+ */
+export const [inspected, setInspected] = createSignal<string | null>(null);
+
+/** Where the sketch tool would plant a plane right now, or null. */
+export const [planePreview, setPlanePreview] = createSignal<{
+  origin: Vec3;
+  normal: Vec3;
+} | null>(null);
 
 /**
  * The FEM surface currently displayed in the viewport, if any.
@@ -307,6 +328,16 @@ export function nodeById(id: string): ConstructionNode | undefined {
   return nodes().find((node) => node.id === id);
 }
 
+/** Find a construction element by its id. */
+export function elementById(id: string): ConstructionElement | undefined {
+  return elements().find((element) => element.id === id);
+}
+
+/** The sketch planes as they should be drawn right now, drags included. */
+export function planeFrames(): PlaneFrame[] {
+  return framesOf(displayProfiles());
+}
+
 /** Sketch profiles only — the nodes that carry editable vertices. */
 export function profiles(): ConstructionNode[] {
   return nodes().filter((node) => node.kind === "profile");
@@ -371,6 +402,10 @@ function withPlacement(
     edges: placeEdges(node.edges, node.transform, position, rotation, dimensions),
     // A sketch's handles ride along with its plane.
     vertices: node.vertices.map((vertex) => ({ ...vertex, world: move(vertex.world) })),
+    // And so does the plane's own frame, which is what a plane drag shows.
+    plane: node.plane
+      ? { ...node.plane, origin: move(node.plane.origin as [number, number, number]) }
+      : node.plane,
     transform: { ...node.transform, position, rotation, dimensions },
   };
 }

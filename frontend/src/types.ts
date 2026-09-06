@@ -26,6 +26,7 @@
 import type {
   ConstraintSolverRun,
   ConstructionConstraint as ConstructionConstraintPayload,
+  ConstructionElement,
   ConstructionNode as ConstructionNodePayload,
   ConstructionRelation,
   MaterialDefinition,
@@ -40,6 +41,8 @@ import type {
 
 export type {
   ConstraintSolverRun,
+  ConstructionArgument,
+  ConstructionElement,
   ConstructionFace,
   ConstructionOperator,
   ConstructionPlane,
@@ -58,6 +61,7 @@ export type {
   PatchOperation,
   PatchRequest,
   ParameterBinding,
+  PatchAddress,
   PatchResponse,
   PlaneReference,
   ShaderParameter,
@@ -120,6 +124,8 @@ export interface CompileResponse {
   path_shader: string;
   present_shader: string;
   construction: ConstructionNode[];
+  /** Every construction call with its written arguments; absent from an older worker. */
+  elements?: ConstructionElement[];
   relations: ConstructionRelation[];
   solver_runs: ConstraintSolverRun[];
   materials: MaterialDefinition[];
@@ -350,6 +356,15 @@ export interface Selection {
   nodeId: string;
   /** Null when the selection is the object itself, as for a primitive. */
   vertexIndex: number | null;
+  /**
+   * Which part of the object was taken hold of.
+   *
+   * A sketch is one object with two graspable things: its polygon and the
+   * plane it sits on. Selecting the plane keeps `nodeId` on the sketch — every
+   * panel that shows "the selected sketch" stays right — and puts the gizmo on
+   * the plane's origin rather than the polygon's centre.
+   */
+  part?: "plane";
 }
 
 export type ToolMode =

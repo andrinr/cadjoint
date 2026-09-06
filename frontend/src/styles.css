@@ -1268,6 +1268,7 @@ input[type="checkbox"] {
 /* The title stack takes the slack, so the head reads left to right —
    number, kicker, name — instead of drifting to the right edge. */
 .object-tree-panel > header > span,
+.properties-panel > header > span,
 .sim-panel header span,
 .sketch-panel header > span,
 .render-panel > header > span,
@@ -1321,6 +1322,7 @@ input[type="checkbox"] {
    emit <small> first so the kicker is always the top line — see
    ObjectTree/RenderPanel/MaterialPanel. */
 .object-tree-panel > header > span,
+.properties-panel > header > span,
 .sim-panel header span,
 .sketch-panel header > span,
 .render-panel > header > span,
@@ -1338,6 +1340,8 @@ input[type="checkbox"] {
 
 .object-tree-panel > header small,
 .object-tree-panel > header small *,
+.properties-panel > header small,
+.properties-panel > header small *,
 .sketch-panel header small,
 .sketch-panel header small *,
 .material-panel-title small,
@@ -2960,6 +2964,166 @@ button.icon {
   width: 100%;
   height: 100%;
   overflow: visible;
+  pointer-events: none;
+}
+
+/* ── Properties window ─────────────────────────────────────────────────── */
+
+.properties-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: auto;
+}
+
+.properties-panel > header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex: 0 0 auto;
+  padding: var(--space-4) var(--space-3) var(--space-3) var(--space-5);
+  background: var(--surface-float-96);
+}
+
+.properties-follow {
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--rule);
+  background: transparent;
+  color: var(--ink-2);
+  font: var(--type-kicker);
+  cursor: pointer;
+}
+
+.properties-empty,
+.properties-note {
+  margin: 0;
+  padding: 0 var(--space-5) var(--space-4);
+  color: var(--ink-2);
+  font: var(--type-body-small, inherit);
+  line-height: var(--leading-normal, 1.4);
+}
+
+.properties-section {
+  padding: 0 var(--space-5) var(--space-4);
+}
+
+.properties-section + .properties-section {
+  border-top: 1px solid var(--rule);
+  padding-top: var(--space-4);
+}
+
+.properties-section h3 {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-3);
+  font: inherit;
+}
+
+.properties-section h3 small {
+  font: var(--type-kicker);
+  color: var(--ink-2);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.properties-section h3 b {
+  font-weight: 600;
+}
+
+.properties-section h3 i {
+  margin-left: auto;
+  font: var(--type-kicker);
+  font-style: normal;
+  color: var(--ink-3, var(--ink-2));
+}
+
+.properties-row {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.properties-row > span {
+  font: var(--type-kicker);
+  color: var(--ink-2);
+}
+
+.properties-row input,
+.properties-row select {
+  min-width: 0;
+  width: 100%;
+  font: inherit;
+}
+
+.properties-vector {
+  grid-template-columns: 72px 1fr 1fr 1fr;
+}
+
+.properties-parameter {
+  grid-column: 2 / -1;
+  font: var(--type-kicker);
+  color: var(--ink-2);
+}
+
+.properties-readonly code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-2);
+  font: var(--type-mono);
+}
+
+.object-tree-row.boolean .tree-label {
+  color: var(--ink-2);
+}
+
+/* Sketch-plane name tags: DOM text at the frame's +u,+v corner, in the same
+   cool ink the GPU draws the frame with, so the tag reads as part of the
+   plane and not as a second annotation about it. */
+.plane-labels {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.plane-label {
+  position: absolute;
+  transform: translate(4px, -100%);
+  padding: 1px var(--space-2);
+  border: 1px solid rgba(51, 96, 143, 0.55);
+  border-radius: 2px;
+  background: rgba(230, 230, 233, 0.82);
+  color: var(--info-ink);
+  font: var(--type-kicker);
+  line-height: var(--leading-tight);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.plane-label:hover {
+  background: rgba(51, 96, 143, 0.12);
+}
+
+.plane-label.derived {
+  border-style: dashed;
+  color: var(--ink-3);
+  border-color: rgba(90, 90, 96, 0.5);
+}
+
+.plane-label.preview {
+  border-style: dashed;
+  font-style: italic;
   pointer-events: none;
 }
 

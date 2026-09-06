@@ -20,6 +20,7 @@ import type {
   Selection,
 } from "../types";
 import { vertexState } from "./dragBinding";
+import { normalTip, originMarkSize, type PlaneFrame } from "../planes";
 import type { ShaderProgramPayload } from "./shaderProgram";
 import { AXIS_COLORS, gizmoEdges, type AxisIndex } from "./gizmo";
 import type { Vec3 } from "./math";
@@ -74,6 +75,24 @@ export const COLORS: Record<string, Rgba> = {
   // "I see it, and I cannot write it" is one look rather than silence.
   faceOutlineLocked: [0.094, 0.086, 0.102, 0.45],
   faceFillLocked: [0.094, 0.086, 0.102, 0.05],
+  // A sketch plane: a cool wash, so it reads as a *surface a sketch sits on*
+  // rather than as geometry. #33608f on paper is 4.9:1 at full strength; the
+  // resting outline runs at 0.65 so the sketch's own edges stay the darker
+  // mark, and the selected plane borrows the selection ochre of the edges.
+  planeFill: [0.2, 0.376, 0.561, 0.09],
+  planeOutline: [0.2, 0.376, 0.561, 0.65],
+  planeFillHover: [0.2, 0.376, 0.561, 0.14],
+  planeOutlineHover: [0.2, 0.376, 0.561, 0.9],
+  planeFillSelected: [0.569, 0.357, 0.086, 0.14],
+  planeOutlineSelected: [0.569, 0.357, 0.086, 1.0],
+  // A derived plane follows its parent and cannot be dragged: the same
+  // "seen, not writable" half weight the locked face highlight uses.
+  planeFillLocked: [0.353, 0.353, 0.376, 0.06],
+  planeOutlineLocked: [0.353, 0.353, 0.376, 0.5],
+  // The plane a click would create: the resting plane, and nothing else on
+  // screen looks like it, because it is the only frame with no sketch inside.
+  planeFillPreview: [0.2, 0.376, 0.561, 0.12],
+  planeOutlinePreview: [0.2, 0.376, 0.561, 0.85],
 };
 
 /**
@@ -177,6 +196,79 @@ export function packFaceHighlight(face: ConstructionFace | null): {
     const end = face.polygon[(index + 1) % count];
     outline.push(start[0], start[1], start[2], end[0], end[1], end[2], ...outlineColor);
   }
+  return { fill, outline };
+}
+
+function pushSegment(target: number[], start: Vec3, end: Vec3, color: Rgba): void {
+  target.push(start[0], start[1], start[2], end[0], end[1], end[2], ...color);
+}
+
+/**
+ * Flatten the sketch planes into a filled quad each, plus the marks on it.
+ *
+ * The fill shares the face-highlight pipeline (the only filled thing in the
+ * overlay), and the frame, the origin cross and the normal glyph share the
+ * edge pipeline, so a plane costs no pipeline of its own. Two triangles per
+ * quad; the outline is four segments, the origin cross two, the normal
+ * glyph three (a shaft and two barbs), all in the plane's own frame so they
+ * turn with it.
+ */
+export function packPlaneOverlay(
+  frames: readonly PlaneFrame[],
+  selection: Selection | null,
+  hover: Selection | null,
+  preview: PlaneFrame | null,
+): { fill: number[]; outline: number[] } {
+  const fill: number[] = [];
+  const outline: number[] = [];
+  const draw = (frame: PlaneFrame, fillColor: Rgba, lineColor: Rgba) => {
+    const [a, b, c, d] = frame.corners;
+    for (const point of [a, b, c, a, c, d]) {
+      fill.push(point[0], point[1], point[2], ...fillColor);
+    }
+    pushSegment(outline, a, b, lineColor);
+    pushSegment(outline, b, c, lineColor);
+    pushSegment(outline, c, d, lineColor);
+    pushSegment(outline, d, a, lineColor);
+    // Origin cross, along u and v.
+    const mark = originMarkSize(frame);
+    const { origin, u, v, normal } = frame;
+    const along = (axis: Vec3, k: number): Vec3 => [
+      origin[0] + axis[0] * k,
+      origin[1] + axis[1] * k,
+      origin[2] + axis[2] * k,
+    ];
+    pushSegment(outline, along(u, -mark), along(u, mark), lineColor);
+    pushSegment(outline, along(v, -mark), along(v, mark), lineColor);
+    // Normal glyph: shaft plus two barbs leaning back along u and v.
+    const tip = normalTip(frame);
+    pushSegment(outline, origin, tip, lineColor);
+    const barb = mark * 0.8;
+    const back: Vec3 = [
+      tip[0] - normal[0] * barb,
+      tip[1] - normal[1] * barb,
+      tip[2] - normal[2] * barb,
+    ];
+    pushSegment(outline, tip, [back[0] + u[0] * barb, back[1] + u[1] * barb, back[2] + u[2] * barb], lineColor);
+    pushSegment(outline, tip, [back[0] - u[0] * barb, back[1] - u[1] * barb, back[2] - u[2] * barb], lineColor);
+  };
+
+  for (const frame of frames) {
+    const selected = selection?.nodeId === frame.nodeId && selection.vertexIndex === null;
+    const onPlane = selected && selection?.part === "plane";
+    const hovered =
+      hover?.nodeId === frame.nodeId && hover.vertexIndex === null && hover.part === "plane";
+    if (frame.derived && !onPlane && !hovered) {
+      draw(frame, COLORS.planeFillLocked, COLORS.planeOutlineLocked);
+    } else if (onPlane) {
+      draw(frame, COLORS.planeFillSelected, COLORS.planeOutlineSelected);
+    } else if (hovered || selected) {
+      draw(frame, COLORS.planeFillHover, COLORS.planeOutlineHover);
+    } else {
+      draw(frame, COLORS.planeFill, COLORS.planeOutline);
+    }
+  }
+  if (preview) draw(preview, COLORS.planeFillPreview, COLORS.planeOutlinePreview);
   return { fill, outline };
 }
 
