@@ -385,7 +385,9 @@ def _validate_common(study: Any, kind: str, allowed_bcs: tuple[type, ...]) -> No
     )
     if len(counts) != 3 or any(int(count) != count or count < 1 for count in counts):
         raise ValueError("resolution must be a positive integer or a triplet of them.")
-    study.bounds = require_triplet(study.bounds if study.bounds is not None else _DEFAULT_BOUNDS, "bounds")
+    study.bounds = require_triplet(
+        study.bounds if study.bounds is not None else _DEFAULT_BOUNDS, "bounds"
+    )
     study.size = require_triplet(study.size if study.size is not None else _DEFAULT_SIZE, "size")
 
 

@@ -547,6 +547,7 @@ def _material_rows(material: dict) -> jnp.ndarray:
     array so the material tree is traced and lowered once instead of once per
     public entry point.
     """
+
     def scalar(key: str) -> jnp.ndarray:
         return jnp.reshape(jnp.asarray(material[key], dtype=jnp.float32), (1,))
 
@@ -563,6 +564,7 @@ def _material_entry_points(block: str) -> str:
     columns-by-rows, so the block's column ``c`` is ``vec2(base[c],
     optics[c])`` and each public row is gathered across the four columns.
     """
+
     def row(index: int) -> str:
         component = "xy"[index]
         parts = ", ".join(f"m[{column}].{component}" for column in range(4))
