@@ -137,12 +137,16 @@ def _inspect_mesh(
     # radius ratio for tet meshes — each element's quality mapped onto its
     # nodes, min-combined.
     metrics = target.quality(sdf)
-    metric_name = "scaled_jacobian" if "scaled_jacobian" in metrics else "radius_ratio"
-    quality = np.asarray(metrics[metric_name], dtype=np.float64)
-    cells = np.asarray(mesh.cells)
-    node_quality = np.full(mesh.num_points, np.inf, dtype=np.float64)
-    np.minimum.at(node_quality, cells.reshape(-1), np.repeat(quality, cells.shape[1]))
-    node_quality = np.where(np.isfinite(node_quality), node_quality, 1.0)
+    if metrics:
+        metric_name = "scaled_jacobian" if "scaled_jacobian" in metrics else "radius_ratio"
+        quality = np.asarray(metrics[metric_name], dtype=np.float64)
+        cells = np.asarray(mesh.cells)
+        node_quality = np.full(mesh.num_points, np.inf, dtype=np.float64)
+        np.minimum.at(node_quality, cells.reshape(-1), np.repeat(quality, cells.shape[1]))
+        node_quality = np.where(np.isfinite(node_quality), node_quality, 1.0)
+    else:  # cut cells: no elements, so nothing to grade — a flat surface
+        metric_name = None
+        node_quality = np.ones(mesh.num_points, dtype=np.float64)
     payload = _render_surface_payload(mesh, node_quality)
     payload["edges"] = [int(index) for index in _element_edge_pairs(mesh).reshape(-1)]
     return {

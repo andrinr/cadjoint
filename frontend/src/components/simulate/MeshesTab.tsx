@@ -39,6 +39,11 @@ const METHODS = [
   { value: "hex", label: "Hex", title: "Hexahedra: fast, lattice-aligned" },
   { value: "tet4", label: "Tet4", title: "Linear tets: stiff — prefers Tet10" },
   { value: "tet10", label: "Tet10", title: "Quadratic tets: accurate boundary, slower" },
+  {
+    value: "cutfem",
+    label: "Cut cells",
+    title: "No volume mesh: the lattice's cut cells, solved by CutFEM (thermal studies only)",
+  },
 ] as const;
 
 /** Triplet arguments are edited component-wise; the rest are single values. */

@@ -397,7 +397,7 @@ export interface SimMeshPayload {
   bounds?: number[] | null;
   size?: number[] | null;
   padding: number;
-  method?: "hex" | "tet4" | "tet10" | null;
+  method?: "hex" | "tet4" | "tet10" | "cutfem" | null;
   mesher?: "tetgen" | "gmsh" | null;
   frozen_geometry?: boolean;
   domain?: DomainEntry | null;

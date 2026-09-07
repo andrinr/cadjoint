@@ -218,10 +218,13 @@ def _unresolvable_bc(study: Any, mesh: Any) -> str | None:
     failing BC, or ``None`` when every selection resolves (node-valued
     conditions need nodes, area-integrated ones a complete boundary face).
     """
+    from cadjoint.fem.cutfem import CutMesh, unresolvable_condition
     from cadjoint.fem.hexmesh import faces_from_nodes
     from cadjoint.fem.study import HeatFlux, Traction
     from cadjoint.fem.tetmesh import TetMesh, tet_faces_from_nodes
 
+    if isinstance(mesh, CutMesh):
+        return unresolvable_condition(study.bcs, mesh)
     for bc in study.bcs:
         label = f"boundary condition {type(bc).__name__} {bc.nodes.describe()}"
         try:
@@ -866,6 +869,7 @@ class Optimization:
 
         from cadjoint.extraction import apply_parameters, extract_parameters
         from cadjoint.fem.backends import _x64_scope
+        from cadjoint.fem.cutfem import CutMesh
         from cadjoint.fem.hexmesh import recompute_points
         from cadjoint.fem.tetmesh import TetMesh, recompute_tet_points
         from cadjoint.functionalize import functionalize
@@ -983,6 +987,11 @@ class Optimization:
             def objective(params):
                 if head is not None:
                     value = tail(head(params))
+                elif isinstance(mesh, CutMesh):
+                    # No node map: the traced field is the design's whole
+                    # influence, through the cut-cell quadrature.
+                    result = study.solve(mesh=mesh, field=field_at(params))
+                    value = jnp.asarray(self._metric_value(result, mesh, None))
                 else:
                     points = recompute(params, field_at(params), mesh)
                     result = study.solve(mesh=mesh, points=points)
@@ -1099,8 +1108,12 @@ class Optimization:
                         "optimization cannot move it."
                     )
                     final_mesh = frozen[0]
-                    final_points = recompute(held, final_field, final_mesh)
-                    result = study.solve(mesh=final_mesh, points=final_points)
+                    if isinstance(final_mesh, CutMesh):
+                        final_points = None
+                        result = study.solve(mesh=final_mesh, field=final_field)
+                    else:
+                        final_points = recompute(held, final_field, final_mesh)
+                        result = study.solve(mesh=final_mesh, points=final_points)
                 final_value = jnp.asarray(self._metric_value(result, final_mesh, final_points))
                 if regularizer is not None:
                     final_value = final_value + weight * jnp.asarray(regularizer(held))

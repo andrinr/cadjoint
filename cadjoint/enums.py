@@ -180,9 +180,11 @@ class MeshMethod(Option):
     """Dual-contour the surface, then fill it with TetGen (linear tets)."""
     TET10 = "tet10"
     """The TET4 mesh promoted to quadratic straight-sided tets."""
+    CUTFEM = "cutfem"
+    """No volume mesh: cut cells of the lattice, solved by CutFEM (thermal studies)."""
 
 
-MeshMethodLike = MeshMethod | Literal["hex", "tet4", "tet10"]
+MeshMethodLike = MeshMethod | Literal["hex", "tet4", "tet10", "cutfem"]
 """A mesh method, or the plain string spelling of one."""
 
 

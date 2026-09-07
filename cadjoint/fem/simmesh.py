@@ -60,6 +60,7 @@ from cadjoint.enums import (
     parse,
     values,
 )
+from cadjoint.fem.cutfem import CutMesh
 from cadjoint.fem.hexmesh import GridSpec, HexMesh, sdf_to_hex_mesh
 from cadjoint.fem.quality import (
     aspect_ratios,
@@ -336,7 +337,7 @@ class SimMesh:
             bounds, size = _scan_bounds(self._field(sdf), self.padding)
         return GridSpec.from_bounds(bounds, size, _resolution_counts(self.resolution))
 
-    def build(self, sdf: Any = None, *, rebuild: bool = False) -> HexMesh | TetMesh:
+    def build(self, sdf: Any = None, *, rebuild: bool = False) -> HexMesh | TetMesh | CutMesh:
         """Extract (or reuse) the volume mesh for the current parameters.
 
         The result is cached on the instance and reused while the meshing
@@ -367,7 +368,14 @@ class SimMesh:
         if not rebuild and cached is not None and cached[0] is field_fn and cached[1] == parameters:
             return cached[2]
         if self.method == MeshMethod.HEX:
-            mesh: HexMesh | TetMesh = sdf_to_hex_mesh(field_fn, self.grid(sdf))
+            mesh: HexMesh | TetMesh | CutMesh = sdf_to_hex_mesh(field_fn, self.grid(sdf))
+        elif self.method == MeshMethod.CUTFEM:
+            # No elements at all: the lattice's cut cells are the
+            # discretisation, and the surface is extracted only to be drawn
+            # and selected on (:mod:`cadjoint.fem.cutfem`).
+            from cadjoint.fem.cutfem import sdf_to_cut_mesh
+
+            mesh = sdf_to_cut_mesh(field_fn, self.grid(sdf))
         elif self.mesher == TetMesher.GMSH:
             # Gmsh sizes the elements by the part rather than by the
             # lattice and puts order-2 midsides on the reparametrised
@@ -407,6 +415,8 @@ class SimMesh:
             are those of the straight-sided corner tets).
         """
         mesh = self.build(sdf)
+        if isinstance(mesh, CutMesh):
+            return {}  # no elements to grade
         if isinstance(mesh, TetMesh):
             return {
                 "radius_ratio": tet_radius_ratios(mesh.points, mesh.cells),

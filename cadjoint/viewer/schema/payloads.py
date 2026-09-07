@@ -421,7 +421,7 @@ class SimMeshPayload(Open):
     bounds: list[float] | None = None
     size: list[float] | None = None
     padding: float
-    method: Literal["hex", "tet4", "tet10"] | None = None
+    method: Literal["hex", "tet4", "tet10", "cutfem"] | None = None
     # Which volume mesher fills a tet mesh, and whether its nodes can follow
     # the design in this process: a Gmsh mesh is frozen geometry without the
     # ``node_map`` plugin kind (:mod:`cadjoint.tier`).

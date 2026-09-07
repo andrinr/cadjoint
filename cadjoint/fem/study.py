@@ -60,6 +60,7 @@ from typing import Any
 
 from cadjoint.enums import BoundaryConditionType, StudyKind
 from cadjoint.fem.boundary import faces_from_nodes, tet_faces_from_nodes
+from cadjoint.fem.cutfem import CutMesh
 from cadjoint.fem.hexmesh import HexMesh
 from cadjoint.fem.properties import FROM_MATERIAL
 from cadjoint.fem.simmesh import _CAPTURED_MESHES, SimMesh, _anonymous, _domain_entry
@@ -391,7 +392,43 @@ def _validate_common(study: Any, kind: str, allowed_bcs: tuple[type, ...]) -> No
     study.size = require_triplet(study.size if study.size is not None else _DEFAULT_SIZE, "size")
 
 
-def _solve_mesh(study: Any, sdf: Any, mesh: Any) -> tuple[SimMesh | None, HexMesh | TetMesh]:
+def _solve_cut(study: Any, mesh: CutMesh, sim_mesh: Any, field: Any, dirichlet: list, fluxes: list):
+    """A thermal study on cut cells: the study's conditions as regions, no elements.
+
+    Materials are not sampled on cut cells yet, so the conductivity must be
+    a number; Dirichlet values are read as numbers too.
+    """
+    from cadjoint.fem.cutfem import Thermal, solve_thermal, unresolvable_condition
+    from cadjoint.fem.result import SimulationResult
+
+    if _from_material(study.conductivity):
+        raise ValueError(
+            f"Study {study.name!r} solves on cut cells, which do not sample the scene's "
+            "materials yet: give the study a numeric conductivity."
+        )
+    problem = Thermal(
+        conductivity=float(study.conductivity),
+        source=float(study.source),
+        dirichlet=tuple((bc.nodes.contains, float(bc.value)) for bc in dirichlet),
+        neumann=tuple((bc.nodes.contains, float(bc.flux)) for bc in fluxes),
+    )
+    unresolved = unresolvable_condition(study.bcs, mesh)
+    if unresolved is not None:
+        raise ValueError(f"{unresolved} of study {study.name!r}'s cut-cell surface.")
+    solution = solve_thermal(mesh, problem, field)
+    return SimulationResult(
+        name=study.name,
+        kind=StudyKind.THERMAL.value,
+        field="temperature",
+        solution=solution,
+        sim_mesh=sim_mesh,
+        mass=None,
+    )
+
+
+def _solve_mesh(
+    study: Any, sdf: Any, mesh: Any
+) -> tuple[SimMesh | None, HexMesh | TetMesh | CutMesh]:
     """The one meshing path for solves.
 
     An explicit ``HexMesh``/``TetMesh`` is used as-is (no SimMesh
@@ -400,7 +437,7 @@ def _solve_mesh(study: Any, sdf: Any, mesh: Any) -> tuple[SimMesh | None, HexMes
     — reusing its cache.  The mesh's method decides the solve route
     (:mod:`cadjoint.fem.simulate` dispatches hex vs tet).
     """
-    if isinstance(mesh, (HexMesh, TetMesh)):
+    if isinstance(mesh, (HexMesh, TetMesh, CutMesh)):
         return None, mesh
     if mesh is not None:
         target = _resolve_mesh_reference(mesh)
@@ -545,8 +582,9 @@ class ThermalStudy:
         sdf=None,
         *,
         backend=None,
-        mesh: HexMesh | TetMesh | SimMesh | str | None = None,
+        mesh: HexMesh | TetMesh | CutMesh | SimMesh | str | None = None,
         points=None,
+        field=None,
     ):
         """Mesh the field (through the study's SimMesh) and run the solve.
 
@@ -563,6 +601,10 @@ class ThermalStudy:
                 (``recompute_points`` / ``recompute_tet_points``, matching
                 the mesh's method) for differentiable frozen-topology
                 solves; BC selections still resolve on the nominal points.
+            field: For a cut-cell mesh (``method="cutfem"``), the field to
+                solve with instead of the one the mesh was built for — a
+                closure over traced parameters gives the design derivative
+                at frozen structure, as ``points`` does for a mesh.
 
         Returns:
             A :class:`~cadjoint.fem.result.SimulationResult` (also stored
@@ -576,6 +618,10 @@ class ThermalStudy:
         if not dirichlet:
             raise ValueError("A thermal study needs at least one Dirichlet BC to solve.")
         sim_mesh, hex_mesh = _solve_mesh(self, sdf, mesh)
+        if isinstance(hex_mesh, CutMesh):
+            result = _solve_cut(self, hex_mesh, sim_mesh, field, dirichlet, fluxes)
+            self.last_result = result
+            return result
         _check_resolvable(self.bcs, hex_mesh)
         source_sdf = _material_source(sdf, sim_mesh, self)
         solve_points = hex_mesh.points if points is None else points

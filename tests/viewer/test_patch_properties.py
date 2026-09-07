@@ -1298,7 +1298,7 @@ MALFORMED: list[tuple[str, dict[str, Any], str]] = [
     (
         "mesh method unknown",
         {"op": "set_mesh_value", "id": "assign:sink_mesh", "argument": "method", "value": "voxel"},
-        "Mesh `method` must be one of: hex, tet4, tet10.",
+        "Mesh `method` must be one of: hex, tet4, tet10, cutfem.",
     ),
     (
         "solver method unknown",
