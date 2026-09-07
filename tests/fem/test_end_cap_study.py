@@ -1,13 +1,14 @@
 """The end-cap still meshes and solves after all that modelling.
 
 A part is only "complex" in a useful sense if the complexity survives
-discretization. This is the end of the chain: the declared ``SimMesh`` builds a
-hex mesh of the housing, both boundary-condition selections find real surface
-nodes, and the declared thermal study solves on them.
+discretization. This is the end of the chain: the declared ``SimMesh`` cuts
+the lattice's cells with the housing (no volume mesh), both boundary-condition
+selections find real surface nodes *and* real boundary facets, and the
+declared thermal study solves on them.
 
-The specific failure this guards against is silent: a node selection that
-matches scattered nodes but spans no complete boundary face resolves fine and
-then integrates nothing, so a load quietly does not exist.
+The specific failure this guards against is silent: a selection that matches
+scattered surface nodes but no boundary facet resolves fine and then
+integrates nothing, so a load quietly does not exist.
 """
 
 from __future__ import annotations
@@ -36,11 +37,14 @@ class TestTheMesh:
         assert cap.cap_mesh.domain is cap.housing
         assert mesh.num_points > 1000
 
-    def test_the_mesh_is_hexes_and_reports_quality(self, cap, mesh):
+    def test_the_mesh_is_cut_cells_with_nothing_to_grade(self, cap, mesh):
+        from cadjoint.fem.cutfem import CutMesh
+
+        assert isinstance(mesh, CutMesh)
         info = cap.cap_mesh.inspect()
-        assert info["method"] == "hex"
-        assert info["elements"] > 500
-        assert info["quality"]["scaled_jacobian"]["mean"] > 0.7
+        assert info["method"] == "cutfem"
+        assert info["elements"] > 500  # active lattice cells
+        assert info["quality"] == {}
 
     def test_the_box_contains_the_whole_part(self, cap, mesh):
         """Including the dowel mirrored below the mounting face."""
@@ -57,13 +61,13 @@ class TestTheBoundaryConditions:
         for bc in cap.cap_study.bcs:
             assert len(bc.nodes.resolve(mesh)) > 0
 
-    def test_the_flux_region_spans_whole_boundary_faces(self, cap, mesh):
-        """An area-integrated BC that spans no face integrates nothing."""
-        from cadjoint.fem.boundary import faces_from_nodes
+    def test_every_condition_selects_boundary_facets(self, cap, mesh):
+        """An area-integrated BC that catches no facet integrates nothing."""
+        from cadjoint.fem.cutfem import unresolvable_condition
 
+        assert unresolvable_condition(cap.cap_study.bcs, mesh) is None
         flux = next(bc for bc in cap.cap_study.bcs if type(bc).__name__ == "HeatFlux")
-        faces = faces_from_nodes(mesh, flux.nodes.resolve(mesh))
-        assert len(faces) > 0
+        assert flux.nodes.contains(mesh.structure.centroids).sum() > 20
 
     def test_the_ambient_face_is_the_mounting_face(self, cap, mesh):
         dirichlet = next(bc for bc in cap.cap_study.bcs if type(bc).__name__ == "Dirichlet")
@@ -78,7 +82,9 @@ class TestTheSolve:
         assert np.isfinite(temperature).all()
         # Heat enters at the bore and leaves at the clamped mounting face.
         assert float(result.max()) > 0.1
-        assert float(result.min() if hasattr(result, "min") else temperature.min()) > -1e-6
+        # Nitsche holds the ambient face weakly: a small undershoot below 0 is
+        # the method, not a sign error.
+        assert temperature.min() > -0.02 * temperature.max()
 
     def test_the_hot_spot_is_at_the_bore_not_the_flange(self, cap, mesh):
         result = cap.cap_study.solve()
