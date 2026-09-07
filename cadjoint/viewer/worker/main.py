@@ -36,7 +36,8 @@ from cadjoint.constraints.solve import capture_constraint_solves
 from cadjoint.viewer._edge_overlay import (  # noqa: F401 - re-exported for callers
     _MESH_EDGE_RESOLUTION,
     _MESH_EDGE_SIZE,
-    _mesh_edge_payload,
+    _mesh_edge_payload,  # noqa: F401 - re-exported for callers
+    _mesh_edge_result,
 )
 from cadjoint.viewer._pathtracer import (
     WGSL_PRESENT_TEMPLATE,
@@ -79,10 +80,13 @@ def _mesh_source(source: str) -> dict[str, Any]:
     captured = io.StringIO()
     with contextlib.redirect_stdout(captured), contextlib.redirect_stderr(captured):
         namespace = _execute_scene(source)
-        mesh_edges = _mesh_edge_payload(namespace["scene"])
+        mesh_edges, refresh = _mesh_edge_result(namespace["scene"])
     return {
         "ok": True,
         "mesh_edges": mesh_edges,
+        # Server state, not payload: the playground takes it out of the answer
+        # and keeps it to re-solve the overlay at a new design (`/api/mesh_refresh`).
+        "refresh": refresh,
         "output": captured.getvalue()[-8_000:],
     }
 
@@ -202,6 +206,26 @@ def _direct_shader(scene) -> tuple[str, dict | None] | None:
     return source, contract.as_dict()
 
 
+def _table_hash(scene: Any) -> str | None:
+    """The scene's node table with θ left out, hashed — or None if it has no table.
+
+    A free-parameter edit changes only θ, so two compiles with the same hash
+    share every surface the mesh-edge overlay's points lie on, and the
+    overlay can be refreshed rather than extracted.  Lowering is milliseconds
+    (``scenes/motor_shield.py``: 38 ms); the shader's own hash cannot serve,
+    since the direct form names literal vertex slots by object id.
+    """
+    try:
+        from cadjoint.zeroset import lower
+
+        model = lower(scene)
+        table = json.dumps({"node": model.nodes, "root": model.root, "names": model.names})
+        return hashlib.sha256(table.encode()).hexdigest()
+    except Exception as error:  # noqa: BLE001 - optional: without it the overlay is extracted
+        print(f"note: no node table for this scene ({error}); the edge overlay is not refreshable.")
+        return None
+
+
 def _compile_source(source: str) -> dict[str, Any]:
     captured = io.StringIO()
     with contextlib.redirect_stdout(captured), contextlib.redirect_stderr(captured):
@@ -223,6 +247,7 @@ def _compile_source(source: str) -> dict[str, Any]:
         shader_hash = hashlib.sha256(
             preview_shader.encode() + b"\0" + path_shader.encode()
         ).hexdigest()
+        table_hash = _table_hash(namespace["scene"])
         construction = build_construction_payload(profiles, source)
         relations = build_construction_relations(profiles)
         materials = build_material_payload(namespace, source)
@@ -257,6 +282,7 @@ def _compile_source(source: str) -> dict[str, Any]:
             "present_shader": WGSL_PRESENT_TEMPLATE,
             "program": program,
             "shader_hash": shader_hash,
+            "table_hash": table_hash,
             "construction": construction,
             # Every stable id the text declares, so the viewer can name anything
             # the payload reports only by line.

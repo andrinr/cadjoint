@@ -139,6 +139,12 @@ export interface CompileResponse {
    * uses this to tell a parameter edit from a topology edit.
    */
   program?: ShaderProgram | null;
+  /**
+   * Of the scene's node table with its design values left out: unchanged by
+   * a free-parameter edit, changed by any other. `null` when the scene has
+   * no table, and absent from an older worker.
+   */
+  table_hash?: string | null;
   studies?: StudyPayload[];
   sim_meshes?: SimMeshPayload[];
   optimizations?: OptimizationPayload[];
@@ -287,6 +293,19 @@ export type BcProposal =
 export interface MeshResponse {
   ok: boolean;
   mesh_edges?: MeshEdgePayload | null;
+  error?: string;
+}
+
+/** The last extracted mesh edges, re-solved at new parameter values. */
+export interface MeshRefreshResponse {
+  ok: boolean;
+  mesh_edges?: MeshEdgePayload | null;
+  /**
+   * The fraction of points the refresh could not certify — off the boundary,
+   * or on different surfaces than before. Above a few per mille the topology
+   * has changed and the overlay should be extracted again.
+   */
+  stale?: number;
   error?: string;
 }
 

@@ -17,6 +17,7 @@ import type {
   ExportRequest,
   LintResponse,
   MeshInspectResponse,
+  MeshRefreshResponse,
   MeshResponse,
   OptimizeRequest,
   OptimizeResponse,
@@ -136,6 +137,25 @@ export async function mesh(
     { source, ...(options.clientId ? { client_id: options.clientId } : {}) },
     options.signal,
   );
+}
+
+/**
+ * Re-solve the last extracted mesh edges at new parameter values.
+ *
+ * `source` is the program the overlay was extracted from — the base of a
+ * values-only edit, not the edit. The server holds that extraction's points
+ * and the surfaces each lies on, and moves them to `values` in one GPU
+ * dispatch at fixed topology. Not a job: it answers in milliseconds, or says
+ * why it cannot and the caller extracts instead. `certify` asks for the
+ * protocol's certificate (the points re-classified at their new positions);
+ * a live drag skips it and lets the release pay.
+ */
+export async function meshRefresh(
+  source: string,
+  values: Record<string, number[]>,
+  certify: boolean,
+): Promise<MeshRefreshResponse> {
+  return post<MeshRefreshResponse>("/api/mesh_refresh", { source, values, certify });
 }
 
 /**

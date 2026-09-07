@@ -27,6 +27,11 @@ export interface ViewerPaneProps {
     index: number,
     xy?: [number, number],
   ) => Promise<void>;
+  /**
+   * A handle drag's live parameter values, for an overlay that can follow
+   * them: called on every move that has a slot in the shader's buffer.
+   */
+  onLiveParameters?: (overrides: Readonly<Record<string, readonly number[]>>) => void;
   /** Rewrite a primitive's placement keyword. */
   onSetValue: (
     line: number,

@@ -411,6 +411,10 @@ class _Emitter:
         self._kernels: set[str] = set()
         self._nodes: dict[int, str] = {}
         self._materials: dict[int, str] = {}
+        # Sketches in first-visit order, for naming their literal vertices'
+        # slots: the walk is deterministic, so the names are the same from
+        # one compile to the next, which `id()` is not.
+        self._sketches: dict[int, int] = {}
         self.vertices: list[tuple[float, float]] = []
 
     def profile_slice(self, node: Any) -> tuple[int, int]:
@@ -441,7 +445,12 @@ class _Emitter:
                 values = _value(node, name)
                 # A fixed vertex still needs a slot: the loop reads them all
                 # from one contiguous run, so it cannot skip over literals.
-                key = declared or f"{id(node):x}.{name}"
+                # Its name has to be stable across compiles — it is in the
+                # module text and the program's parameter list, and both are
+                # compared to tell a values-only edit from a rebuild — so it
+                # is the sketch's ordinal, never the object's address.
+                ordinal = self._sketches.setdefault(id(node), len(self._sketches))
+                key = declared or f"sketch{ordinal}.{name}"
                 if key not in self._slot_of:
                     self._slot_of[key] = len(self.slots)
                     self.slots.append((key, 2, [float(values[0]), float(values[1])]))
