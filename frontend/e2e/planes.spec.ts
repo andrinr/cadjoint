@@ -138,6 +138,20 @@ async function recompile(page: Page, source: string) {
   await waitForCompile(page);
 }
 
+/**
+ * Turn on the "all sketch planes" switch in the render popover.
+ *
+ * Planes are otherwise drawn only while sketching, and only for the sketch
+ * that is selected or under the pointer; the tests that look at every plane
+ * at once ask for them explicitly, the way a user would.
+ */
+async function showAllPlanes(page: Page) {
+  await page.getByTestId("display-options").click();
+  await page.getByTestId("render-customize").click();
+  await page.getByTestId("toggle-showAllPlanes").click();
+  await page.getByTestId("display-options").click();
+}
+
 test.beforeEach(async ({ page }) => {
   await page.goto("/");
   await waitForCompile(page);
@@ -146,6 +160,10 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("every sketch in the scene draws its plane, named", async ({ page }) => {
+  // Not by default: a dozen sketches would be a dozen quads. The switch
+  // shows them all; the policy itself is the test below this one.
+  await expect(page.getByTestId("plane-label")).toHaveCount(0);
+  await showAllPlanes(page);
   // The starter has two sketches; each gets a frame and a name tag.
   const labels = page.getByTestId("plane-label");
   await expect(labels).toHaveCount(2);
@@ -191,8 +209,28 @@ const FLAT_SKETCH = [
   "",
 ].join("\n");
 
+test("planes are drawn while sketching, for the active sketch only", async ({ page }) => {
+  await recompile(page, FLAT_SKETCH);
+  const labels = page.getByTestId("plane-label");
+  await expect(labels).toHaveCount(0);
+  await page.getByTestId("editmode-sketch").click();
+  await expect(labels).toHaveCount(0);
+
+  // Selecting the sketch — its outline, not its (invisible) plane — reveals its plane.
+  const metrics = await canvasMetrics(page);
+  const edge = projectToCss([0.3, -0.2, 0.4], metrics);
+  await page.mouse.click(metrics.left + edge.x, metrics.top + edge.y);
+  await expect(page.getByTestId("selection-chip")).toHaveText("pad");
+  await expect(labels).toHaveText(["pad"]);
+
+  // Leaving sketch mode hides it again, selection or not.
+  await page.getByTestId("editmode-model").click();
+  await expect(labels).toHaveCount(0);
+});
+
 test("dragging a plane's origin rewrites the plane literal and nothing else", async ({ page }) => {
   await recompile(page, FLAT_SKETCH);
+  await showAllPlanes(page);
   await expect(page.getByTestId("plane-label")).toHaveText(["pad"]);
 
   // Take hold of the plane by its frame edge: the frame's -v edge runs
@@ -311,6 +349,7 @@ test("a face-derived plane is shown but says it cannot be dragged", async ({ pag
     "",
   ].join("\n");
   await recompile(page, program);
+  await showAllPlanes(page);
   const labels = page.getByTestId("plane-label");
   await expect(labels).toHaveCount(2);
   const derived = page.locator("[data-testid=plane-label][data-node=profile_1]");

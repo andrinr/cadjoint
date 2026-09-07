@@ -55,7 +55,7 @@ import { overridesFor, vertexState } from "../viewer/dragBinding";
 import { intersectPlane, rayFromPixel, worldToPlane } from "../viewer/math";
 import { GRID_ALPHA } from "../viewer/graticule";
 import { pickEdge, pickNode, pickPlane, pickVertex, type PickView } from "../viewer/hittest";
-import { previewFrame } from "../planes";
+import { previewFrame, visiblePlaneFrames } from "../planes";
 import { quickPlaneEmission } from "../sketchPlanes";
 import { resolveSurfaceHit } from "../faces";
 import {
@@ -162,13 +162,28 @@ export function ViewerPane(props: ViewerPaneProps) {
     return preview ? previewFrame(preview.origin, preview.normal) : null;
   });
 
+  /**
+   * The planes on screen right now — drawn, picked and labelled from one
+   * list, so a plane that is not drawn cannot be hovered or clicked either.
+   */
+  const visibleFrames = createMemo(() =>
+    visiblePlaneFrames(planeFrames(), {
+      sketching: editingMode() === "sketch",
+      selectedNodeId: selection()?.nodeId ?? null,
+      hoveredNodeId: hover()?.nodeId ?? null,
+      showOverlays: props.display.showOverlays,
+      showSketches: props.display.showSketches,
+      showAllPlanes: props.display.showAllPlanes === true,
+    }),
+  );
+
   const planeMarks = createMemo(() => {
     overlayRevision();
     return buildPlaneMarks(
       pickView(),
       canvas?.clientWidth ?? 0,
       canvas?.clientHeight ?? 0,
-      planeFrames(),
+      visibleFrames(),
       previewPlane(),
     );
   });
@@ -297,7 +312,7 @@ export function ViewerPane(props: ViewerPaneProps) {
     // The plane's frame is the second thing a sketch offers to the pointer,
     // after its own edges, and it is shown only while the overlay is.
     const plane =
-      !node && props.display.showOverlays ? pickPlane(planeFrames(), x, y, view) : null;
+      !node && props.display.showOverlays ? pickPlane(visibleFrames(), x, y, view) : null;
     const next: Selection | null = node
       ? { nodeId: node.nodeId, vertexIndex: null }
       : plane
@@ -418,7 +433,7 @@ export function ViewerPane(props: ViewerPaneProps) {
         return;
       }
       const plane = props.display.showOverlays
-        ? pickPlane(planeFrames(), x, y, pickView())
+        ? pickPlane(visibleFrames(), x, y, pickView())
         : null;
       if (plane) {
         // Taking hold of the plane: the gizmo goes to its origin, and a
@@ -676,7 +691,7 @@ export function ViewerPane(props: ViewerPaneProps) {
     renderer.gizmoAxis = null;
     renderer.interacting = false;
     renderer.setParameterOverrides(null);
-    renderer.setConstruction(displayProfiles(), selection(), hover());
+    renderer.setConstruction(displayProfiles(), selection(), hover(), visibleFrames());
     renderer.invalidate();
   };
 
@@ -733,7 +748,7 @@ export function ViewerPane(props: ViewerPaneProps) {
 
   // Keep the GPU overlay buffers in step with the construction tree.
   createEffect(() => {
-    renderer.setConstruction(displayProfiles(), selection(), hover());
+    renderer.setConstruction(displayProfiles(), selection(), hover(), visibleFrames());
   });
 
   createEffect(() => {
