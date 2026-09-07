@@ -81,6 +81,68 @@ def test_edge_and_vertex_points_land_on_a_box():
     np.testing.assert_allclose(proj.points[2][1:], [0.4, -0.3], atol=1e-6)  # the +y/-z edge
 
 
+def test_a_vertex_of_three_oblique_surfaces():
+    # three spheres whose centres are not axis-aligned: J is a full 3x3 system
+    centres = np.array([[0.5, 0.1, -0.2], [-0.3, 0.6, 0.1], [0.0, -0.4, 0.7]])
+    model = lower(
+        Union(
+            Union(
+                Translate(Sphere(radius=0.9), Vector(centres[0].tolist())),
+                Translate(Sphere(radius=0.9), Vector(centres[1].tolist())),
+                smoothness=0.0,
+            ),
+            Translate(Sphere(radius=0.9), Vector(centres[2].tolist())),
+            smoothness=0.0,
+        )
+    )
+    spheres = [i for i, (k, _) in enumerate(surfaces(model)) if k == "patch"]
+    seeds = np.random.default_rng(5).normal(size=(16, 3)) * 0.3 + [0.1, 0.1, 0.2]
+    proj = Projector(model).solve(model.theta, seeds, [spheres] * len(seeds))
+    assert proj.residual.max() < 1e-5
+    for p in proj.points:
+        np.testing.assert_allclose(np.linalg.norm(centres - p, axis=1), 0.9, atol=1e-5)
+
+
+def test_classify_names_the_surfaces_a_point_lies_on():
+    from cadjoint.zeroset.refresh import Overlay
+
+    model = lower(Box(size=Vector([0.5, 0.4, 0.3], free=True, name="s")))
+    kinds = [k for k, _ in surfaces(model)]
+    faces = [i for i, k in enumerate(kinds) if k == "patch"]  # +x, -x, +y, -y, +z, -z
+    points = np.array([[0.5, 0.1, 0.0], [0.5, 0.4, 0.0], [-0.5, 0.4, 0.3], [0.0, 0.0, 0.0]])
+    found = Overlay(model, points, tolerance=1e-3).incidence
+    assert sorted(found[0]) == [faces[0]]
+    assert sorted(found[1]) == sorted([faces[0], faces[2]])
+    assert sorted(found[2]) == sorted([faces[1], faces[2], faces[4]])
+    assert found[3] == []  # interior: on nothing
+    # the box's extent blend owns nothing on the boundary, so its rim is not a surface here
+    assert not any(kinds[s] in ("band", "rim") for row in found for s in row)
+
+
+def test_classify_covers_a_smooth_union():
+    model = lower(
+        Union(
+            Sphere(radius=0.7),
+            Translate(Box(size=[0.4, 0.4, 0.4]), Vector([0.6, 0.0, 0.0], free=True, name="o")),
+            smoothness=0.08,
+        )
+    )
+    kinds = [k for k, _ in surfaces(model)]
+    band = kinds.index("band")
+    # points on the union's boundary: the band's own field is the whole model
+    seeds = np.random.default_rng(7).normal(size=(200, 3)) * 0.8
+    on = _cpu_newton(model, seeds, [[band]] * len(seeds))
+    found = Projector(model).classify(model.theta, on, tolerance=1e-4)
+    theta = jnp.asarray(model.theta)
+    fields = [f for _, f in surfaces(model)]
+    assert all(found)  # every boundary point lies on something
+    for p, row in zip(on, found):
+        for s in row:
+            assert abs(float(fields[s](theta, jnp.asarray(p)[None])[0])) < 1e-4
+    named = {kinds[s] for row in found for s in row}
+    assert {"band", "patch"} <= named  # some in the fillet, some on the faces
+
+
 def test_the_gpu_lands_where_a_cpu_newton_does():
     model = lower(
         Union(

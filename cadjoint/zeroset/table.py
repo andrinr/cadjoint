@@ -125,8 +125,13 @@ class Table:
         return self.un("COS", a)
 
     def step(self, c: Index) -> Index:
-        """1 where c > 0, 0 where c < 0: a comparison in the grammar (½ at 0, measure zero)."""
-        return self.mul(self.add_(self.un("SIGN", c), self.lit(1)), self.lit(0.5))
+        """1 where c > 0, 0 where c <= 0: a comparison in the grammar.
+
+        Strict at 0 on purpose: a point on a face has the face's extent
+        exactly 0, and a half-and-half there would blend an inside branch
+        with an outside one at the one place a solver samples.
+        """
+        return self.mx(self.un("SIGN", c), self.lit(0))
 
     def same(self, a: Index, b: Index) -> Index:
         """Equality of two 0/1 values."""
@@ -303,9 +308,7 @@ class Table:
             largest = self.mx(largest, pos)
         # The sqrt's argument is guarded like the kernel's: inside, where it is
         # exactly zero, its derivative would be 0·∞ and poison the gradient.
-        outside = self.where(
-            self.neg(max_d), max_d, self.sqrt(self.where(max_d, squared, self.lit(1)))
-        )
+        outside = self.where(max_d, self.sqrt(self.where(max_d, squared, self.lit(1))), max_d)
         return self.blend(outside, patches, self.sub(positives, largest))
 
     def smin(self, k: Index, a: Index, b: Index) -> Index:

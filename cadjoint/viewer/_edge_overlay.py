@@ -813,40 +813,69 @@ def _graph_layers(
     return vertices, quad_edges, edges.chords()
 
 
-def _mesh_edge_payload(scene: Any) -> dict[str, Any] | None:
+def _mesh_edge_layers(scene: Any) -> tuple[np.ndarray, np.ndarray, np.ndarray, str]:
     """Extract the overlay's two layers, from the graph where it is installed.
 
     Asks for the ``feature_edges`` kind and falls back to
     :func:`_lattice_layers` when nothing fills it, so the overlay is always
-    drawn and ``payload["edges"]`` says which layer produced the sharp
-    chords (``"graph"`` or ``"lattice"``).
+    drawn.
+
+    Returns:
+        ``(vertices, wire_edges, sharp, source)`` — the re-solved dual
+            vertices, the unique quad edges indexing them, the sharp chords
+            as ``(m, 2, 3)``, and which layer produced them (``"graph"`` or
+            ``"lattice"``).
+    """
+    from cadjoint import tier
+
+    grid = _overlay_grid()
+    component = tier.component(PluginKind.FEATURE_EDGES.value)
+    source = "lattice" if component is None else "graph"
+    if component is None:
+        vertices, quad_edges, sharp = _lattice_layers(scene, grid)
+    else:
+        vertices, quad_edges, sharp = _graph_layers(component, scene, grid)
+    wire_edges = np.unique(np.sort(quad_edges, axis=1), axis=0)
+    return vertices, wire_edges, np.asarray(sharp, dtype=np.float64).reshape(-1, 2, 3), source
+
+
+def _segments(pairs: np.ndarray) -> list[list[list[float]]]:
+    return [[[round(float(value), 3) for value in point] for point in pair] for pair in pairs]
+
+
+def _mesh_edge_result(scene: Any) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+    """The overlay payload, and the seed a server refreshes it from.
+
+    ``payload["edges"]`` says which layer produced the sharp chords.  The
+    seed (:func:`cadjoint.viewer._overlay_refresh.refresh_seed`) is the same
+    points with the scene's node table, for re-solving them at another
+    design without extracting again; it is optional on top of optional, and
+    its own failure leaves the payload intact.
 
     Optional viewer data: any failure prints a note (captured into the
     compile output) and returns ``None`` rather than failing the compile.
     """
-    from cadjoint import tier
-
     try:
-        grid = _overlay_grid()
-        component = tier.component(PluginKind.FEATURE_EDGES.value)
-        source = "lattice" if component is None else "graph"
-        if component is None:
-            vertices, quad_edges, sharp = _lattice_layers(scene, grid)
-        else:
-            vertices, quad_edges, sharp = _graph_layers(component, scene, grid)
-        wire_edges = np.unique(np.sort(quad_edges, axis=1), axis=0)
-
-        def segments(pairs: np.ndarray) -> list[list[list[float]]]:
-            return [
-                [[round(float(value), 3) for value in point] for point in pair] for pair in pairs
-            ]
-
-        return {
-            "wire": segments(vertices[wire_edges]),
-            "sharp": segments(sharp),
-            "resolution": _MESH_EDGE_RESOLUTION,
-            "edges": source,
-        }
+        vertices, wire_edges, sharp, source = _mesh_edge_layers(scene)
     except Exception as error:  # noqa: BLE001 - viewer extra must never break compiles
         print(f"mesh edge view unavailable: {error}")
-        return None
+        return None, None
+    payload = {
+        "wire": _segments(vertices[wire_edges]),
+        "sharp": _segments(sharp),
+        "resolution": _MESH_EDGE_RESOLUTION,
+        "edges": source,
+    }
+    try:
+        from cadjoint.viewer._overlay_refresh import refresh_seed
+
+        seed = refresh_seed(scene, vertices, wire_edges, sharp, _MESH_EDGE_RESOLUTION, source)
+    except Exception as error:  # noqa: BLE001 - a refresh is a faster path, never the only one
+        print(f"mesh edge refresh unavailable: {error}")
+        seed = None
+    return payload, seed
+
+
+def _mesh_edge_payload(scene: Any) -> dict[str, Any] | None:
+    """The overlay payload alone — see :func:`_mesh_edge_result`."""
+    return _mesh_edge_result(scene)[0]

@@ -517,7 +517,12 @@ export function ViewerPane(props: ViewerPaneProps) {
       const overrides = vertex
         ? overridesFor(vertex.binding ? [vertex.binding] : null, xy, renderer.parameterProgram)
         : null;
-      if (overrides) renderer.setParameterOverrides(overrides);
+      if (overrides) {
+        renderer.setParameterOverrides(overrides);
+        // The mesh-edge overlay can follow too, at fixed topology, when the
+        // server still holds its extraction: same solid, same edges, moved.
+        props.onLiveParameters?.(overrides);
+      }
       return;
     }
 
