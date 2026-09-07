@@ -123,3 +123,68 @@ def test_sphere_smoke():
     g, fixed, free = _grad_and_fd(model, theta, s)
     assert abs(g[0] - 4 * np.pi * radius**4 / 9) / (4 * np.pi * radius**4 / 9) < 0.1
     assert np.abs(g - free).max() < 1e-6 * np.abs(g).max()
+
+
+def test_the_sparse_solve_agrees_with_the_dense_one_in_value_and_gradient():
+    """The custom VJP through SuperLU is the dense solve's derivative."""
+    model, theta, _ = M.disc()
+    s = C.classify(model, theta, C.grid_for([-0.8, -0.8], [0.8, 0.8], 1 / 16), n_sub=4)
+    dense = jax.jit(lambda t: C.objective(t, s, dense=True))
+    sparse = jax.jit(lambda t: C.objective(t, s))
+    assert abs(float(sparse(theta)) - float(dense(theta))) < 1e-12
+    np.testing.assert_allclose(jax.grad(sparse)(theta), jax.grad(dense)(theta), rtol=1e-9)
+
+
+def test_a_cadjoint_scene_is_a_model_too():
+    """A cadjoint node table lowers into the same solver; its θ are the scene's free parameters."""
+    from cadjoint.geometry.parameters import Scalar
+    from cadjoint.sdf.primitives import Sphere
+    from cadjoint.zeroset import lower
+
+    table = lower(Sphere(radius=Scalar(0.6, free=True, name="r")))
+    s = C.classify(table, table.theta, C.grid_for([-0.8] * 3, [0.8] * 3, 1.6 / 8), n_sub=2)
+    obj = jax.jit(lambda t: C.objective(t, s))
+    exact = 4 * np.pi * 0.6**5 / 45  # ∫u for −Δu = 1 in a ball: u = (R² − r²)/6
+    assert abs(float(obj(table.theta)) / exact - 1) < 0.12  # −9 % at three cells per radius
+    (g,) = np.asarray(jax.grad(obj)(jnp.asarray(table.theta)))
+    assert abs(g / (4 * np.pi * 0.6**4 / 9) - 1) < 0.12
+
+
+def test_mixed_conditions_on_an_annulus_converge_to_the_closed_form():
+    """Held at 0 on the inner circle r₀, heated at q on the outer circle R.
+
+    T = (qR/k) ln(r/r₀); the mean over the annulus and its derivative in R
+    are closed forms, and the region predicates sit halfway between the
+    circles so no facet is ever misfiled.  Second order in h for the mean;
+    the derivative through the moving outer boundary follows.
+    """
+    r0, q, k = 0.25, 1.0, 2.0
+    t = M.Table()
+    r = t.norm([t.coord("X"), t.coord("Y"), t.lit(0.0)])
+    ring = t.owning("MAX", [t.patch(t.sub(r, t.param(0))), t.patch(t.sub(t.lit(r0), r))])
+    model = t.model(ring, [0.7])
+    theta = jnp.asarray([0.7])
+
+    def closed_form(R):
+        return (
+            (2 * q * R / k) * (R**2 / 2 * jnp.log(R / r0) - R**2 / 4 + r0**2 / 4) / (R**2 - r0**2)
+        )
+
+    mid = 0.5 * (r0 + 0.7)
+    problem = C.Thermal(
+        conductivity=k,
+        source=0.0,
+        dirichlet=((lambda p: np.linalg.norm(p, axis=1) < mid, 0.0),),
+        neumann=((lambda p: np.linalg.norm(p, axis=1) > mid, q),),
+    )
+    errors = []
+    for h in (1 / 16, 1 / 32):
+        grid = C.grid_for([-0.83, -0.81], [0.83, 0.83], h)
+        s = C.classify(model, theta, grid, n_sub=2, problem=problem)
+        mean = jax.jit(lambda th, s=s: C.mean_temperature(th, s))
+        value, slope = float(mean(theta)), float(jax.grad(mean)(theta)[0])
+        exact, exact_slope = float(closed_form(0.7)), float(jax.grad(closed_form)(0.7))
+        errors.append((abs(value / exact - 1), abs(slope / exact_slope - 1)))
+    assert errors[0][0] < 2e-2 and errors[1][0] < 6e-3, errors
+    assert errors[1][0] < 0.4 * errors[0][0], errors  # second order, roughly
+    assert errors[1][1] < 3e-2, errors

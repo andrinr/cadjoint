@@ -21,15 +21,24 @@ modes, both differentiable:
 
 The boundary integrals use the marching-simplices polyline (2D) or
 triangles (3D) on the same sub-grid, with normals from ∇f, in both modes.
-The linear system is dense and solved inside the JAX graph, so
-``jax.grad`` through :func:`objective` is the discrete shape derivative at
-fixed structure.
+The linear system is assembled in COO form and solved by a sparse direct
+factorisation outside the graph, with a custom VJP whose adjoint is the
+same factorisation (K is symmetric): ``jax.grad`` through
+:func:`objective` is the discrete shape derivative at fixed structure, and
+the cost is two factorisations per objective-and-gradient.  A dense path
+remains for condition numbers and small checks.
+
+The model is anything that evaluates as ``f(θ, points)``: a node table in
+its proto JSON form (:mod:`research.cutfem.model`), a
+:class:`cadjoint.zeroset.table.Model` lowered from a cadjoint scene, or a
+plain function.  Gradients in the point and in θ are taken by JAX.
 """
 
 from __future__ import annotations
 
 import itertools
 import math
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -37,10 +46,53 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import scipy.linalg
+import scipy.sparse
+import scipy.sparse.linalg
 
-from research.cutfem.model import field, parameter_jacobian, spatial_gradient
+from research.cutfem.model import field as _table_field
 
 jax.config.update("jax_enable_x64", True)
+
+
+# ----------------------------------------------------------------- the field
+
+
+@dataclass(frozen=True)
+class Field:
+    """``f(θ, points)`` with its point gradient and θ-Jacobian by JAX.
+
+    Wraps any batch evaluator ``(theta, points (N, d)) -> (N,)``; the point
+    dimension is whatever the caller uses (a 2D model ignores z).
+    """
+
+    f: Callable
+
+    def __call__(self, theta, points):
+        return self.f(theta, points)
+
+    def gradient(self, theta, points):
+        """``∇ₚ f`` at each point, (N, d)."""
+        points = jnp.asarray(points)
+        return jax.vmap(jax.grad(lambda q: self.f(theta, q[None])[0]))(points)
+
+    def jacobian(self, theta, points):
+        """``∂f/∂θ`` at each point, (N, P)."""
+        points = jnp.asarray(points)
+        return jax.vmap(lambda q: jax.grad(lambda th: self.f(th, q[None])[0])(theta))(points)
+
+
+def as_field(model: Any) -> Field:
+    """A :class:`Field` from a proto-JSON table, a cadjoint ``zeroset.Model``, or a function."""
+    if isinstance(model, Field):
+        return model
+    if callable(model):
+        return Field(model)
+    if hasattr(model, "nodes") and hasattr(model, "root"):
+        from cadjoint.zeroset.evaluate import field as zeroset_field
+
+        return Field(zeroset_field(model))
+    return Field(_table_field(model))
+
 
 _TINY = 1e-300
 
@@ -222,6 +274,32 @@ def smooth_heaviside(s, eps):
     return t * t * t * (t * (6.0 * t - 15.0) + 10.0)
 
 
+# ------------------------------------------------------------- the problem
+
+
+@dataclass(frozen=True)
+class Thermal:
+    """Steady heat conduction ``−∇·(k∇T) = q`` with conditions by region.
+
+    ``dirichlet`` and ``neumann`` are ``(region, value)`` pairs: a region is
+    any ``points (N, d) -> bool`` predicate — a cadjoint
+    ``NodeSelection.contains`` qualifies — or ``None`` for the whole
+    boundary.  A Dirichlet value is enforced by Nitsche's method, a
+    Neumann value is an inflow per area (positive heats the body), and the
+    rest of the boundary is insulated.  Regions are read on the facets at
+    the structure's θ, the way the mesh route resolves its conditions on
+    the nominal mesh; a facet keeps its condition while θ moves.
+
+    The default is the prototype's torsion-like problem: unit conductivity
+    and source, ``T = 0`` on the whole boundary.
+    """
+
+    conductivity: float = 1.0
+    source: float = 1.0
+    dirichlet: tuple = ((None, 0.0),)
+    neumann: tuple = ()
+
+
 # ---------------------------------------------------------------- structure
 
 
@@ -234,7 +312,9 @@ class Structure:
     structure's θ, and the ghost-penalty faces as a COO matrix.
     """
 
-    model: dict
+    model: Any
+    f: Field
+    problem: Thermal
     grid: Grid
     n_sub: int
     mode: str
@@ -251,9 +331,19 @@ class Structure:
     bnd_cell: np.ndarray  # (N_b,)
     bnd_ij: np.ndarray  # (N_b, d, 2)
     bnd_ref: np.ndarray  # (N_b, d) unit facet normals at the structure's θ
+    bnd_dirichlet: np.ndarray  # (N_b,) prescribed value, NaN where the facet is not Dirichlet
+    bnd_flux: np.ndarray  # (N_b,) inflow per area, 0 where the facet is not Neumann
     ghost_rows: np.ndarray
     ghost_cols: np.ndarray
     ghost_vals: np.ndarray  # the ghost penalty for unit γ_g
+    # The sparsity pattern, fixed with the structure: the matrix's nonzeros
+    # as (rows, cols), each cell's 2^d × 2^d block as slots into them, and the
+    # ghost entries' slots.  Assembly reduces onto this inside XLA, so the
+    # host solve sees ~27 n values rather than 64 per quadrature point.
+    nz_rows: np.ndarray
+    nz_cols: np.ndarray
+    cell_slots: np.ndarray  # (n_active, 4^d)
+    ghost_slots: np.ndarray
 
     @property
     def dim(self) -> int:
@@ -359,13 +449,45 @@ def _orientations(f_sub, x_sub, vol_cell, vol_ij, bnd_cell, bnd_ij):
     return vol_sign, ref
 
 
+def _scan(f: Field, theta, points: np.ndarray, chunk: int = 1 << 16) -> np.ndarray:
+    """``f`` on many concrete points, jitted and in chunks.
+
+    A node table evaluated eagerly keeps one array per node alive for the
+    whole batch — a thousand nodes on a million points is gigabytes — where
+    the jitted fold frees each as it goes.
+    """
+    jitted = jax.jit(f.f)
+    parts = np.array_split(points, max(1, math.ceil(len(points) / chunk)))
+    return np.concatenate([np.asarray(jitted(theta, part)) for part in parts])
+
+
+def _facet_conditions(problem: Thermal, centroids: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Each facet's Dirichlet value (NaN if none) and Neumann flux (0 if none).
+
+    A Dirichlet region wins over a Neumann one where they overlap; among
+    regions of one kind the first listed wins.
+    """
+    n = len(centroids)
+    dirichlet = np.full(n, np.nan)
+    flux = np.zeros(n)
+    for region, value in reversed(problem.neumann):
+        mask = np.ones(n, bool) if region is None else np.asarray(region(centroids), bool)
+        flux[mask] = value
+    for region, value in reversed(problem.dirichlet):
+        mask = np.ones(n, bool) if region is None else np.asarray(region(centroids), bool)
+        dirichlet[mask] = value
+        flux[mask] = 0.0
+    return dirichlet, flux
+
+
 def classify(
-    model: dict,
+    model: Any,
     theta,
     grid: Grid,
     n_sub: int = 4,
     mode: str = "sharp",
     alpha: float = 0.5,
+    problem: Thermal | None = None,
 ) -> Structure:
     """Fix the discrete structure at ``theta``.
 
@@ -376,6 +498,7 @@ def classify(
         n_sub: Sub-grid divisions per cell axis for the marching simplices.
         mode: ``"sharp"`` (clipped sub-simplices) or ``"smooth"`` (Heaviside weights).
         alpha: The Heaviside half-width ε = α h; unused in sharp mode.
+        problem: The conduction problem; the prototype's torsion problem by default.
 
     Returns:
         The structure: active cells, DOFs, quadrature descriptors, ghost faces.
@@ -385,7 +508,7 @@ def classify(
     dim, h = grid.dim, grid.h
     eps = alpha * h if mode == "smooth" else 0.0
     theta = jnp.asarray(theta, dtype=float)
-    f = field(model)
+    f = as_field(model)
 
     all_cells = np.stack(np.meshgrid(*[np.arange(n) for n in grid.cells], indexing="ij"), -1)
     all_cells = all_cells.reshape(-1, dim)
@@ -393,7 +516,7 @@ def classify(
     n_c = len(local)
     origins_all = np.asarray(grid.origin) + h * all_cells
     x_all = origins_all[:, None, :] + h * local[None]  # (cells, n_c, d)
-    f_all = np.asarray(f(theta, x_all.reshape(-1, dim))).reshape(len(all_cells), n_c)
+    f_all = _scan(f, theta, x_all.reshape(-1, dim)).reshape(len(all_cells), n_c)
     fmin, fmax = f_all.min(axis=1), f_all.max(axis=1)
     band = eps
     active_mask = fmin < band
@@ -459,9 +582,25 @@ def classify(
 
     vol_cell, vol_ij = np.concatenate(vol_cell), np.concatenate(vol_ij)
     vol_sign, bnd_ref = _orientations(f_sub, x_sub, vol_cell, vol_ij, bnd_cell, bnd_ij)
+    problem = problem or Thermal()
+    centroids = np.asarray(
+        _vertices(
+            jnp.asarray(f_sub), jnp.asarray(x_sub), jnp.asarray(bnd_cell), jnp.asarray(bnd_ij)
+        )
+    ).mean(axis=1)
+    bnd_dirichlet, bnd_flux = _facet_conditions(problem, centroids)
     rows, cols, vals = _ghost_penalty(grid, active_index, cut, dofs)
+    m = dofs.shape[1]
+    block_rows = np.broadcast_to(dofs[:, :, None], (n_active, m, m)).reshape(-1)
+    block_cols = np.broadcast_to(dofs[:, None, :], (n_active, m, m)).reshape(-1)
+    all_rows = np.concatenate([block_rows, rows])
+    all_cols = np.concatenate([block_cols, cols])
+    pairs, slots = np.unique(all_rows * len(used) + all_cols, return_inverse=True)
+    nz_rows, nz_cols = pairs // len(used), pairs % len(used)
     return Structure(
         model=model,
+        f=f,
+        problem=problem,
         grid=grid,
         n_sub=n_sub,
         mode=mode,
@@ -478,9 +617,15 @@ def classify(
         bnd_cell=bnd_cell,
         bnd_ij=bnd_ij,
         bnd_ref=bnd_ref,
+        bnd_dirichlet=bnd_dirichlet,
+        bnd_flux=bnd_flux,
         ghost_rows=rows,
         ghost_cols=cols,
         ghost_vals=vals,
+        nz_rows=nz_rows,
+        nz_cols=nz_cols,
+        cell_slots=slots[: n_active * m * m].reshape(n_active, m * m),
+        ghost_slots=slots[n_active * m * m :],
     )
 
 
@@ -501,7 +646,7 @@ def _vertices(f_sub, x_sub, cell, ij):
 def quadrature(theta, s: Structure):
     """The θ-dependent quadrature: volume and boundary points, weights, cells and normals."""
     dim = s.dim
-    f = field(s.model)
+    f = s.f
     x_sub = jnp.asarray(s.x_sub)
     f_sub = f(theta, x_sub.reshape(-1, dim)).reshape(x_sub.shape[:2])
 
@@ -523,7 +668,12 @@ def quadrature(theta, s: Structure):
     bpts = jnp.einsum("qk,nkd->nqd", frule, vb).reshape(-1, dim)
     bw = (bmeasure[:, None] * fw[None]).reshape(-1)
     bcell = jnp.repeat(jnp.asarray(s.bnd_cell), len(fw))
-    grad = spatial_gradient(s.model)(theta, bpts)
+    # The normal from ∇f a hair inside the facet rather than on it: a signed
+    # distance written as sign·√(d·d) has value 0 and derivative 0·∞ exactly
+    # on a planar face, where the interpolated crossings land, and the
+    # gradient of a distance field is the same a hair away.
+    ref = jnp.repeat(jnp.asarray(s.bnd_ref), len(fw), axis=0)
+    grad = s.f.gradient(theta, bpts - 1e-7 * s.h * ref)
     normal = grad / _safe_sqrt(jnp.sum(grad * grad, axis=-1))[:, None]
     return (pts, w, cell), (bpts, bw, bcell, normal)
 
@@ -534,8 +684,52 @@ def _basis_at(pts, cell, s: Structure):
     return vals, grads / s.h, jnp.asarray(s.dofs)[cell]
 
 
+def _entries(theta, s: Structure, nitsche: float, ghost: float):
+    """The stiffness matrix's nonzeros ``(rows, cols, vals)`` on the fixed pattern, and F.
+
+    The volume and boundary contributions are summed per cell first (a
+    segment sum over the quadrature points) and then scattered onto the
+    pattern's slots, so no 64-entries-per-point array leaves XLA.
+    """
+    (pts, w, cell), (bpts, bw, bcell, normal) = quadrature(theta, s)
+    n = s.n_dofs
+    kappa, source = s.problem.conductivity, s.problem.source
+    vals, grads, dofs = _basis_at(pts, cell, s)
+    k_local = (kappa * w)[:, None, None] * jnp.einsum("qid,qjd->qij", grads, grads)
+    F = jnp.zeros(n).at[dofs].add((source * w)[:, None] * vals)
+
+    # each facet's condition, repeated over its quadrature points
+    nq = len(bpts) // max(len(s.bnd_cell), 1)
+    g_d = jnp.repeat(jnp.asarray(s.bnd_dirichlet), nq)
+    is_d = ~jnp.isnan(g_d)
+    g_d = jnp.where(is_d, g_d, 0.0)
+    flux = jnp.repeat(jnp.asarray(s.bnd_flux), nq)
+    bvals, bgrads, bdofs = _basis_at(bpts, bcell, s)
+    dn = kappa * jnp.einsum("qid,qd->qi", bgrads, normal)
+    penalty = nitsche * kappa / s.h
+    wd = jnp.where(is_d, bw, 0.0)
+    k_b = wd[:, None, None] * (
+        -dn[:, :, None] * bvals[:, None, :]
+        - bvals[:, :, None] * dn[:, None, :]
+        + penalty * bvals[:, :, None] * bvals[:, None, :]
+    )
+    # Nitsche's data terms for a nonzero prescribed value, and the inflow
+    F = F.at[bdofs].add((wd * g_d)[:, None] * (penalty * bvals - dn))
+    F = F.at[bdofs].add((bw * flux)[:, None] * bvals)
+
+    n_active, block = s.cell_slots.shape
+    per_cell = jax.ops.segment_sum(k_local.reshape(-1, block), cell, n_active)
+    per_cell = per_cell + jax.ops.segment_sum(k_b.reshape(-1, block), bcell, n_active)
+    vals = jnp.zeros(len(s.nz_rows)).at[jnp.asarray(s.cell_slots)].add(per_cell)
+    if ghost and len(s.ghost_vals):
+        vals = vals.at[jnp.asarray(s.ghost_slots)].add(ghost * jnp.asarray(s.ghost_vals))
+    return jnp.asarray(s.nz_rows), jnp.asarray(s.nz_cols), vals, F
+
+
 def assemble(theta, s: Structure, nitsche: float = 20.0, ghost: float = 0.1):
     """The stiffness matrix and load vector at θ, dense over the active DOFs.
+
+    For condition numbers and small checks; :func:`solve` never forms it.
 
     Args:
         theta: Parameters.
@@ -546,39 +740,79 @@ def assemble(theta, s: Structure, nitsche: float = 20.0, ghost: float = 0.1):
     Returns:
         ``(K, F)`` with K symmetric.
     """
-    (pts, w, cell), (bpts, bw, bcell, normal) = quadrature(theta, s)
+    rows, cols, vals, F = _entries(theta, s, nitsche, ghost)
     n = s.n_dofs
-    vals, grads, dofs = _basis_at(pts, cell, s)
-    k_local = w[:, None, None] * jnp.einsum("qid,qjd->qij", grads, grads)
-    K = jnp.zeros((n, n)).at[dofs[:, :, None], dofs[:, None, :]].add(k_local)
-    F = jnp.zeros(n).at[dofs].add(w[:, None] * vals)
+    return jnp.zeros((n, n)).at[rows, cols].add(vals), F
 
-    bvals, bgrads, bdofs = _basis_at(bpts, bcell, s)
-    dn = jnp.einsum("qid,qd->qi", bgrads, normal)
-    penalty = nitsche / s.h
-    k_b = bw[:, None, None] * (
-        -dn[:, :, None] * bvals[:, None, :]
-        - bvals[:, :, None] * dn[:, None, :]
-        + penalty * bvals[:, :, None] * bvals[:, None, :]
-    )
-    K = K.at[bdofs[:, :, None], bdofs[:, None, :]].add(k_b)
-    if ghost and len(s.ghost_vals):
-        K = K.at[jnp.asarray(s.ghost_rows), jnp.asarray(s.ghost_cols)].add(
-            ghost * jnp.asarray(s.ghost_vals)
+
+# ------------------------------------------------------------ sparse solve
+#
+# K is symmetric, so the adjoint solve is the same factorisation.  The
+# factorisation happens on the host (SuperLU through scipy); what JAX sees
+# is a primitive with the VJP written out:  u = K⁻¹F  gives
+#   F̄ = K⁻¹ ū,   K̄ = −F̄ uᵀ,
+# and K̄ restricted to the COO pattern is −F̄[rows]·u[cols] per entry.
+
+
+def _host_solve(vals, F, rows, cols):
+    def run(vals, F, rows, cols):
+        n = len(F)
+        K = scipy.sparse.csc_matrix(
+            (np.asarray(vals), (np.asarray(rows), np.asarray(cols))), shape=(n, n)
         )
-    return K, F
+        return scipy.sparse.linalg.splu(K).solve(np.asarray(F))
+
+    return jax.pure_callback(run, jax.ShapeDtypeStruct(F.shape, F.dtype), vals, F, rows, cols)
 
 
-def solve(theta, s: Structure, nitsche: float = 20.0, ghost: float = 0.1):
-    """The discrete solution u and the objective J = ∫_Ω u = F·u."""
-    K, F = assemble(theta, s, nitsche, ghost)
-    u = jnp.linalg.solve(K, F)
+@jax.custom_vjp
+def sparse_solve(vals, F, rows, cols):
+    """``u = K⁻¹ F`` for K the COO matrix ``(rows, cols, vals)``, differentiable in vals and F."""
+    return _host_solve(vals, F, rows, cols)
+
+
+def _sparse_solve_fwd(vals, F, rows, cols):
+    u = _host_solve(vals, F, rows, cols)
+    return u, (vals, u, rows, cols)
+
+
+def _sparse_solve_bwd(residuals, u_bar):
+    vals, u, rows, cols = residuals
+    f_bar = _host_solve(vals, u_bar, rows, cols)
+    zero = jnp.zeros(rows.shape, dtype=jax.dtypes.float0)
+    return -f_bar[rows] * u[cols], f_bar, zero, zero
+
+
+sparse_solve.defvjp(_sparse_solve_fwd, _sparse_solve_bwd)
+
+
+def solve(theta, s: Structure, nitsche: float = 20.0, ghost: float = 0.1, dense: bool = False):
+    """The discrete solution u and the objective J = ∫_Ω u = F·u.
+
+    Args:
+        dense: Solve the dense matrix inside the graph instead (small cases,
+            and the check that the sparse path agrees).
+    """
+    if dense:
+        K, F = assemble(theta, s, nitsche, ghost)
+        u = jnp.linalg.solve(K, F)
+        return u, F @ u
+    rows, cols, vals, F = _entries(theta, s, nitsche, ghost)
+    u = sparse_solve(vals, F, rows, cols)
     return u, F @ u
 
 
-def objective(theta, s: Structure, nitsche: float = 20.0, ghost: float = 0.1):
-    """J(θ) = ∫_Ω u dΩ at fixed structure; differentiate with ``jax.grad``."""
-    return solve(theta, s, nitsche, ghost)[1]
+def objective(theta, s: Structure, nitsche: float = 20.0, ghost: float = 0.1, dense: bool = False):
+    """J(θ) = F·u at fixed structure — ∫_Ω u for the torsion problem; differentiate with ``jax.grad``."""
+    return solve(theta, s, nitsche, ghost, dense)[1]
+
+
+def mean_temperature(theta, s: Structure, nitsche: float = 20.0, ghost: float = 0.1):
+    """``∫_Ω T / |Ω|`` at fixed structure, from the quadrature the solve used."""
+    u, _ = solve(theta, s, nitsche, ghost)
+    (pts, w, cell), _ = quadrature(theta, s)
+    vals, _, dofs = _basis_at(pts, cell, s)
+    return jnp.sum(w * jnp.sum(vals * u[dofs], axis=1)) / jnp.sum(w)
 
 
 def hadamard(theta, s: Structure, nitsche: float = 20.0, ghost: float = 0.1):
@@ -591,8 +825,8 @@ def hadamard(theta, s: Structure, nitsche: float = 20.0, ghost: float = 0.1):
     _, (bpts, bw, bcell, normal) = quadrature(theta, s)
     _, bgrads, bdofs = _basis_at(bpts, bcell, s)
     dn_u = jnp.einsum("qid,qd,qi->q", bgrads, normal, u[bdofs])
-    grad = spatial_gradient(s.model)(theta, bpts)
-    speed = -parameter_jacobian(s.model)(theta, bpts) / _safe_sqrt(jnp.sum(grad**2, -1))[:, None]
+    grad = s.f.gradient(theta, bpts)
+    speed = -s.f.jacobian(theta, bpts) / _safe_sqrt(jnp.sum(grad**2, -1))[:, None]
     return jnp.einsum("q,q,qp->p", bw, dn_u**2, speed)
 
 

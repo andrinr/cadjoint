@@ -327,7 +327,136 @@ in DOFs — about 15 s for J and its gradient at n ≈ 11 k, the practical
 ceiling of this prototype; a sparse direct solve with a custom VJP (K is
 symmetric, so the adjoint is the same solve) is the obvious next step.
 
-Left undone: no sparse solver; the 3D test is a single sphere with finite
-differences only at the coarse levels; the structure is fixed by a sign
-scan rather than by the proto's `Discover` topology hash; no comparison
-against the tet-mesh route on the same model.
+Left undone at that point: no sparse solver; the 3D test was a single
+sphere; no real scene; no comparison against the tet-mesh route. The
+section below takes those up; what remains after it is at its end.
+
+## Continuation: a sparse solve, any scene, mixed conditions, and the head to head
+
+**Sparse direct solve with a custom VJP.** The matrix is assembled as its
+nonzeros on a sparsity pattern fixed with the structure: the volume and
+boundary contributions are summed per cell inside XLA (a segment sum over
+the quadrature points) and scattered onto the pattern's slots, so the host
+sees ~27 n values and never the 64 per quadrature point (shipping those —
+366 M entries at 16 k DOFs — was 36 s of the 40 s a step took). SuperLU
+through `jax.pure_callback`; the VJP is written out (F̄ = K⁻¹ū, K̄ =
+−F̄uᵀ restricted to the pattern), and since K is symmetric the adjoint is
+the same factorisation: two factorisations per objective-and-gradient. The
+dense path stays for condition numbers and for the test that the two agree
+in value and gradient to 1e-9.
+
+**Any field.** `classify` takes a proto-JSON table, a
+`cadjoint.zeroset.table.Model` lowered from a scene, or a plain
+`f(θ, points)`; gradients in the point and in θ are JAX's. Two things a
+real scene taught: the classification scan is jitted and chunked (a
+thousand-node table evaluated eagerly keeps an array per node alive for
+the whole batch), and the Nitsche normal is read a hair inside the facet,
+because a polygon's signed distance is `sign·√(d·d)` and the interpolated
+crossings on its planar faces sit exactly where that is 0·∞.
+
+#### `scenes/starter.py` (thermal body: 39 free parameters, 1166 nodes), torsion problem, sharp
+
+| cells across | h | n_sub | DOFs | cut cells | volume pts | J | ‖dJ/dθ‖ | warm J+grad s | AD vs FD (re-classified) |
+|---|---|---|---|---|---|---|---|---|---|
+| 12 | 0.138 | 2 | 1305 | 670 | 0.58 M | 0.004663 | 0.0256 | 0.4 | 7.7e-09 |
+| 24 | 0.069 | 2 | 6592 | 2568 | 2.3 M | 0.005557 | 0.0287 | 2.0 | – |
+| 32 | 0.052 | 2 | 16494 | 6372 | 5.7 M | 0.005782 | 0.0297 | 4.6 | – |
+| 16 | 0.104 | 1 | 2653 | 1206 | 0.26 M | 0.005437 | 0.0288 | 0.3 | 5.1e-09 |
+| 32 | 0.052 | 1 | 16494 | 6372 | 1.7 M | 0.005954 | 0.0308 | 2.2 | – |
+
+`jax.grad` is the derivative of the re-classified objective to 1e-8 on a
+scene with polygons, extrusions and smooth unions; the first call pays
+XLA 15–25 s for the quadrature. The quadrature, not the solve, is now the
+cost: `n_sub = 1` (the cell's own Kuhn tetrahedra, geometry error still
+O(h²)) is 8× fewer points for a 3 % different J at this h.
+
+**Mixed conditions by region** (`Thermal`): conductivity and source, a
+Dirichlet value by Nitsche on the facets a region predicate selects, an
+inflow per area on the facets another selects, insulated elsewhere; a
+cadjoint `NodeSelection.contains` is such a predicate, so a study's
+conditions transfer as written. Regions are read on the facets at the
+structure's θ and kept, as the mesh route keeps its nominal resolution.
+`mean_temperature` is the objective ∫Ω T / |Ω| from the same quadrature.
+
+#### Annulus, T = 0 on r₀ = 0.25, inflow q = 1 on R = 0.7, k = 2 (n_sub = 2)
+
+| h | mean T rel err | d(mean T)/dR rel err | AD vs FD (re-classified) |
+|---|---|---|---|
+| 1/16 | -3.72e-03 | -1.31e-03 | 1.9e-03 |
+| 1/32 | -7.82e-04 | +1.44e-03 | 1.6e-03 |
+| 1/64 | -1.81e-04 | +2.97e-04 | 3.4e-04 |
+
+Second order in the mean against the closed form; the derivative through
+the moving flux boundary within 1e-3 and converging. (A square with
+volumetric region predicates is *not* an exactness test: the marching
+simplices chord its corners and a halfspace predicate catches the first
+facets of the insulated faces; the annulus has neither problem.)
+
+#### Head to head: the starter's own heat study, mean temperature over the body
+
+`run_thermal.py` solves `heat_study` (k = 2, die flux 6 on the slug bottom,
+ambient on the fin field above z = 0.45) two ways on the same design, and
+checks each route's gradient against central differences of its own
+objective.
+
+| route | resolution | DOFs | J = mean T | ‖dJ/dθ‖ | cos ∠(·, finest tet) | J+grad s |
+|---|---|---|---|---|---|---|
+| tet10 ×1 (declared) | (18, 13, 11), 3182 tets | 6019 | 0.151314 | 0.37545 | 0.9654 | 11.2 eager (mesh 4.4) |
+| tet10 ×1.5 | (27, 20, 16), 8229 tets | 14754 | 0.161273 | 0.34894 | 0.9846 | 14.4 eager (mesh 4.9) |
+| tet10 ×2 | (36, 26, 22), 16170 tets | 27949 | 0.207433 | 0.42471 | 1.0000 | 17.6 eager (mesh 6.0) |
+| cut cells, n_sub 1 | h = 0.131 (674 cut of 836 cells) | 1301 | 0.140063 | 0.47543 | 0.7171 | 0.1 warm (7 first) |
+| cut cells | h = 0.066 (2764 / 5794) | 7425 | 0.178916 | 0.41177 | 0.9491 | 0.7 warm (9 first) |
+| cut cells | h = 0.044 (6490 / 17896) | 21511 | 0.189420 | 0.64912 | 0.8663 | 2.8 warm (13 first) |
+| cut cells | h = 0.033 (11150 / 37684) | 43754 | 0.202997 | 0.46606 | 0.9765 | 7.9 warm (23 first) |
+
+| parameter | tet ×1 AD | tet FD δ = 1e-6 / 1e-5 / 1e-4 | tet ×2 AD | cut h=0.131 AD | cut FD fixed structure | cut FD re-classified | cut h=0.033 AD |
+|---|---|---|---|---|---|---|---|
+| fin_depth | -0.12289 | -0.10943 / -0.10723 / -0.10663 | -0.17317 | -0.10191 | -0.10191 | -0.10191 | -0.14672 |
+| fin2_root_l[0] | +0.16101 | +0.14884 / +0.14728 / +0.14721 | +0.16233 | +0.12710 | +0.12710 | +473.31889 | +0.18908 |
+| fin2_root_r[0] | -0.16258 | -0.15795 / -0.14520 / -0.14514 | -0.13202 | -0.17239 | -0.17239 | -0.17239 | -0.18160 |
+| fin3_root_r[0] | -0.10960 | – | -0.13066 | -0.10490 | – | – | -0.17330 |
+| fin1_root_l[0] | +0.08769 | – | +0.12903 | +0.03492 | – | – | +0.15922 |
+
+What it says:
+
+1. *Neither route is converged on this scene at these sizes* — the fins are
+   thin, and both means still climb (tet 0.151 → 0.161 → 0.207; cut 0.140
+   → 0.179 → 0.189 → 0.203). The finest of each are 2 % apart with
+   gradients at cos 0.977, and the per-parameter derivatives differ by
+   15–35 % while both are still moving between levels. Reading a
+   converged derivative on a part like this needs h well under the fin
+   thickness on the cut-cell side and a much finer surface mesh on the
+   other; the cut cells get there at 8 s warm per objective-and-gradient
+   at 44 k DOFs against 18 s eager plus 6 s of meshing per refreeze at 28
+   k nodes.
+2. *The cut-cell gradient is exact* — fixed-structure finite differences
+   agree with `jax.grad` to 8e-9 — and the re-classified difference is
+   meaningless for `fin2_root_l[0]` (473): the Dirichlet plane cuts the
+   fins mid-height, region membership is per facet, and re-classification
+   at θ ± δ moves whole facets across the plane. The objective an
+   optimiser sees is C⁰ at the sub-cell scale there; the mesh route's is
+   too, under re-meshing, only hidden by the frozen mesh between refreezes.
+3. *The mesh route's gradient is not the derivative of its own frozen-mesh
+   objective on this scene.* 11–13 % off finite differences at every step
+   from 1e-6 to 1e-4 (so not solver noise), with the flux condition
+   removed as well, and exact on a ball (0.040527 by both, at every δ).
+   Isolated to the node motion: for a random linear functional of the
+   recomputed positions alone, AD and FD differ by 20–360 % in these
+   parameters, at 136 of the 860 surface corner vertices (820 of 6019
+   nodes with midsides). Nudging the base points off the surface by 1e-7
+   moves the global AD/FD gap to 1.4 % but leaves 814 nodes disagreeing,
+   and a 1e-5 nudge changes both AD and FD threefold: the single-field
+   Newton projection is not a smooth function of the design near creases,
+   where a vertex placed *on* the crease steps between the two faces that
+   meet there. This is the case the zero-set protocol's `Solve` with an
+   incidence was written for — a crease vertex solved on both surfaces at
+   once — and `cadjoint.zeroset.refresh.Overlay` already does that
+   classification and solve for the viewer's overlay.
+
+Left undone now: elasticity (the studies the app optimises are elastic;
+the assembly generalises, Nitsche for a vector field and tractions by
+region); convergence on thin features without brute-force refinement
+(local refinement of the background grid, or a higher-order element);
+the structure still comes from a sign scan rather than the protocol's
+`Discover`; and the mesh route's projection derivative, which is not this
+prototype's to fix but is its most useful finding.
