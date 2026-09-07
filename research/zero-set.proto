@@ -104,6 +104,12 @@ message Node {
       // a rule with no rim, such as an offset. A rule whose owned region
       // has no zero set (a box's Euclidean corners) has a rim nobody meets.
       optional uint32 transition = 2;
+      // Further zero sets over the same child values, each a numbered
+      // surface after the rim: a fold, `child_value p - child_value q`,
+      // where a crease between two children runs on through the band, so an
+      // edge inside the band is [band, fold]. They own nothing; they are
+      // where the band meets something.
+      repeated uint32 auxiliary = 3;
     }
   }
 }
@@ -121,8 +127,8 @@ message Model {
 
 // Surfaces are the nodes that own points: every patch and every Blend,
 // numbered in depth-first pre-order of the model walked as a tree from the
-// root, a node before its children, a Blend's rim numbered right after the
-// Blend; a subtree reached by two paths is two sets of surfaces. Nothing is
+// root, a node before its children, a Blend's rim and then its auxiliaries
+// numbered right after the Blend; a subtree reached by two paths is two sets of surfaces. Nothing is
 // sent for this; both sides apply the rule to one model and agree.
 //
 // A face point lies on one surface, an edge point on two, a vertex on

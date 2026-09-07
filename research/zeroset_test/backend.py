@@ -243,6 +243,15 @@ class Walker:
                             )
 
                         out.append(("rim", self.through(warps, rim)))
+                    for aux in c.blend.auxiliary:
+                        # a fold: owns nothing and pairs with its band, like a rim
+
+                        def fold(pts, c=c, aux=aux):
+                            return self.expr(
+                                aux, pts, [self.shape(ch, pts, {}) for ch in c.children], {}
+                            )
+
+                        out.append(("rim", self.through(warps, fold)))
                 for ch in c.children:
                     go(ch, warps)
 
