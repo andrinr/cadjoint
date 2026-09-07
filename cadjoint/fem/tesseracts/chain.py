@@ -297,28 +297,15 @@ def _discover_mesh(sim_mesh: Any, samples: np.ndarray, grid: Any) -> tuple[Any, 
 
 def _node_patch(mesh: Any, selection: Any) -> np.ndarray:
     """Node-valued patch (Dirichlet / clamp) on the frozen mesh."""
-    from cadjoint.fem.boundary import tet10_complete_nodes
-    from cadjoint.fem.tetmesh import TetMesh
-
-    indices = selection.resolve(mesh)
-    if isinstance(mesh, TetMesh):
-        return tet10_complete_nodes(mesh, indices)
-    return np.asarray(indices, dtype=np.int32)
+    return np.asarray(mesh.node_patch(selection), dtype=np.int32)
 
 
 def _face_patch(mesh: Any, selection: Any) -> tuple[np.ndarray, np.ndarray | None]:
     """Area-integrated patch: spanning node set + exact tet faces (or None)."""
-    from cadjoint.fem.boundary import faces_from_nodes, tet10_face_midsides, tet_faces_from_nodes
-    from cadjoint.fem.tetmesh import TetMesh
-
-    indices = selection.resolve(mesh)
-    if isinstance(mesh, TetMesh):
-        faces = tet_faces_from_nodes(mesh, indices)
-        nodes = np.unique(faces)
-        if mesh.edge_parents is not None:
-            nodes = np.concatenate([nodes, np.unique(tet10_face_midsides(mesh, faces))])
-        return nodes.astype(np.int32), faces.astype(np.int32)
-    return np.unique(faces_from_nodes(mesh, indices).nodes).astype(np.int32), None
+    nodes, faces = mesh.face_patch(selection)
+    return np.asarray(nodes, dtype=np.int32), None if faces is None else np.asarray(
+        faces, dtype=np.int32
+    )
 
 
 def _scalar_property(study: Any, name: str) -> float:

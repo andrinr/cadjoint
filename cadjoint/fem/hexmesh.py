@@ -43,6 +43,7 @@ from cadjoint.fem.boundary import (
     faces_from_nodes,
     select_faces,
 )
+from cadjoint.fem.discretization import Surface
 from cadjoint.fem.elements import HEX_CORNER_OFFSETS
 from cadjoint.fem.motion import project_points, recompute_points
 from cadjoint.fem.quality import aspect_ratios, corner_tet_volumes, scaled_jacobians
@@ -111,6 +112,152 @@ class HexMesh:
             centers=np.concatenate([g.centers for g in groups], axis=0),
             normals=np.concatenate([g.normals for g in groups], axis=0),
         )
+
+    # ── the discretization protocol (cadjoint.fem.discretization) ─────────
+
+    @property
+    def family(self) -> str:
+        return "hex"
+
+    def surface(self) -> Surface:
+        return Surface(
+            points=self.points,
+            groups=tuple(
+                (group_id, self.boundary_faces[group_id].nodes)
+                for group_id in sorted(self.boundary_faces)
+            ),
+        )
+
+    def quality(self) -> dict[str, np.ndarray]:
+        from cadjoint.fem.quality import aspect_ratios, scaled_jacobians
+
+        return {
+            "scaled_jacobian": scaled_jacobians(self.points, self.cells),
+            "aspect_ratio": aspect_ratios(self.points, self.cells),
+        }
+
+    def node_patch(self, selection: Any) -> np.ndarray:
+        _require_selection(selection)
+        return selection.resolve(self)
+
+    def face_patch(self, selection: Any) -> tuple[np.ndarray, None]:
+        """The union of the corners of the boundary quads the selection spans, and no faces.
+
+        A backend applies an area-integrated condition to exactly the faces
+        all of whose corners are in the set.
+        """
+        _require_selection(selection)
+        group = faces_from_nodes(self, selection.resolve(self))
+        if group.nodes.size == 0:
+            raise ValueError(
+                f"Selection {selection.describe()} spans no complete boundary face; "
+                "area-integrated conditions need all four corners of at least one "
+                "boundary quad selected."
+            )
+        return np.unique(group.nodes).astype(np.int32), None
+
+    def unresolvable(self, bcs: list) -> str | None:
+        return _unresolvable_on_mesh(self, bcs)
+
+    def moved(self, field: Any, *, smooth_passes: int = 0, design: Any = None) -> Any:  # noqa: ARG002 - the protocol's signature
+        """Node positions under ``field``: snapped vertices re-projected, the lattice frozen."""
+        from cadjoint.fem.motion import recompute_points
+
+        return recompute_points(field, self)
+
+    def thermal(self, problem: Any, *, placement: Any = None, backend: Any = None) -> Any:
+        """Steady conduction through the backend registry (``jaxfem`` by default)."""
+        from cadjoint.fem.backends import ThermalBCs, get_backend
+        from cadjoint.fem.simulate import ThermalResult, _property_value
+
+        bcs = ThermalBCs(
+            dirichlet_nodes=[self.node_patch(patch) for patch, _ in problem.dirichlet],
+            dirichlet_values=[_scalar_or_traced(value) for _, value in problem.dirichlet],
+            flux_nodes=[self.face_patch(patch)[0] for patch, _ in problem.neumann],
+            flux_values=[float(value) for _, value in problem.neumann],
+        )
+        temperature = get_backend(backend).thermal(
+            self.points if placement is None else placement,
+            self.cells,
+            bcs,
+            conductivity=_property_value(problem.conductivity),
+            source=float(problem.source),
+            base_points=self.points,
+        )
+        return ThermalResult(temperature=temperature, mesh=self)
+
+    def elastic(self, problem: Any, *, placement: Any = None, backend: Any = None) -> Any:
+        """Linear elasticity through the backend registry (``jaxfem`` by default)."""
+        from cadjoint.fem.backends import ElasticBCs, get_backend
+        from cadjoint.fem.simulate import ElasticResult, _property_value
+
+        bcs = ElasticBCs(
+            fixed_nodes=[self.node_patch(patch) for patch in problem.fixed],
+            traction_nodes=[self.face_patch(patch)[0] for patch, _ in problem.tractions],
+            traction_vectors=[np.asarray(v, dtype=np.float64) for _, v in problem.tractions],
+        )
+        extra: dict[str, Any] = {}
+        if problem.body_force is not None:
+            extra["body_force"] = problem.body_force
+        displacement = get_backend(backend).elastic(
+            self.points if placement is None else placement,
+            self.cells,
+            bcs,
+            youngs=_property_value(problem.youngs),
+            poisson=_property_value(problem.poisson),
+            base_points=self.points,
+            **extra,
+        )
+        return ElasticResult(
+            displacement=displacement,
+            mesh=self,
+            youngs=_property_value(problem.youngs),
+            poisson=_property_value(problem.poisson),
+        )
+
+    def traction_work(self, positions: Any, displacement: Any, selection: Any, vector: Any) -> Any:
+        from cadjoint.fem.postprocess import load_work_quads
+
+        quads = faces_from_nodes(self, selection.resolve(self)).nodes
+        return load_work_quads(positions, displacement, quads, vector)
+
+
+def _require_selection(patch: Any) -> None:
+    from cadjoint.studies import NodeSelection
+
+    if not isinstance(patch, NodeSelection):
+        raise TypeError(
+            f"Boundary patches are Nodes selections, got {patch!r}. Build one via "
+            "Nodes.box/sphere/halfspace/cylinder/side/predicate."
+        )
+
+
+def _scalar_or_traced(value: Any) -> Any:
+    """A prescribed value: a plain number as a float, anything traced untouched."""
+    return float(value) if isinstance(value, (int, float)) else value
+
+
+def _unresolvable_on_mesh(mesh: Any, bcs: list) -> str | None:
+    """The first condition that finds no nodes, or spans no face, on a volume mesh.
+
+    Selections are anchored in space, so a re-meshed design can move a loaded
+    surface out of its selection; node-valued conditions need nodes, the
+    area-integrated ones (``HeatFlux``, ``Traction``) a complete boundary face.
+    """
+    from cadjoint.fem.study import HeatFlux, Traction
+
+    for bc in bcs:
+        label = f"boundary condition {type(bc).__name__} {bc.nodes.describe()}"
+        try:
+            bc.nodes.resolve(mesh)
+        except ValueError:
+            return f"{label} matched no surface nodes"
+        if isinstance(bc, (HeatFlux, Traction)):
+            try:
+                mesh.face_patch(bc.nodes)
+            except ValueError:
+                return f"{label} spans no complete boundary face"
+    return None
 
 
 def _evaluate_sdf(sdf: Callable[[Any], Any], points: np.ndarray) -> np.ndarray:

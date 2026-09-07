@@ -15,7 +15,7 @@ from typing import Any
 
 import numpy as np
 
-from cadjoint.fem.hexmesh import HexMesh
+from cadjoint.fem.discretization import Surface
 
 __all__ = ["boundary_render_payload", "cell_to_node_scalar", "face_group_catalog"]
 
@@ -27,40 +27,12 @@ def _quad_areas(points: np.ndarray, faces: np.ndarray) -> np.ndarray:
     return np.linalg.norm(normals, axis=-1)
 
 
-def face_group_catalog(mesh: HexMesh) -> list[dict[str, Any]]:
-    """Describe each boundary face group for the boundary-condition UI.
-
-    Args:
-        mesh: Hex mesh whose ``boundary_faces`` were tagged by the dominant
-            SDF-gradient axis at extraction time.
-
-    Returns:
-        One entry per group, sorted by id, shaped
-        ``{"id", "axis", "side", "center", "area", "faces"}`` — the id is
-        the gradient-axis key (``"+x"``, ``"-z"``, ...), the center is the
-        area-weighted mean of the group's face centroids.
-    """
-    catalog: list[dict[str, Any]] = []
-    for group_id in sorted(mesh.boundary_faces):
-        group = mesh.boundary_faces[group_id]
-        areas = _quad_areas(mesh.points, group.nodes)
-        total = float(areas.sum())
-        weights = areas / max(total, 1e-30)
-        center = (group.centers * weights[:, None]).sum(axis=0)
-        catalog.append(
-            {
-                "id": group_id,
-                "axis": group_id[1],
-                "side": group_id[0],
-                "center": [round(float(value), 5) for value in center],
-                "area": round(total, 6),
-                "faces": int(group.nodes.shape[0]),
-            }
-        )
-    return catalog
+def face_group_catalog(mesh: Any) -> list[dict[str, Any]]:
+    """:func:`surface_catalog` of the mesh's own surface."""
+    return surface_catalog(mesh.surface())
 
 
-def cell_to_node_scalar(mesh: HexMesh, cell_values: np.ndarray) -> np.ndarray:
+def cell_to_node_scalar(mesh: Any, cell_values: np.ndarray) -> np.ndarray:
     """Average a per-cell scalar onto the mesh nodes.
 
     Each node receives the mean of the values of its incident elements —
@@ -88,56 +60,48 @@ def cell_to_node_scalar(mesh: HexMesh, cell_values: np.ndarray) -> np.ndarray:
     return sums / np.maximum(counts, 1.0)
 
 
-def boundary_render_payload(mesh: HexMesh, node_scalar: np.ndarray) -> dict[str, Any]:
-    """Build the indexed-triangle surface payload the viewer renders.
+def surface_render_payload(surface: Surface, node_scalar: np.ndarray) -> dict[str, Any]:
+    """The viewer's boundary-surface payload for any discretization.
 
-    Boundary quads are emitted group by group (sorted by group id) and
-    split into two triangles each, preserving outward orientation.  Only
-    the vertices used by boundary faces are shipped; indices refer to the
-    compacted vertex list.
+    Faces are emitted group by group (in the surface's group order); quads
+    are split into two triangles each, preserving outward orientation, and
+    triangles pass through.  Only the vertices the faces use are shipped;
+    indices refer to the compacted vertex list.
 
     Args:
-        mesh: The hex mesh.
-        node_scalar: One scalar per mesh node, shaped ``(N,)``.
+        surface: The discretization's :meth:`~cadjoint.fem.discretization.Discretization.surface`.
+        node_scalar: One scalar per point of the surface, shaped ``(N,)``.
 
     Returns:
         ``{"positions", "scalars", "indices", "groups", "range", "vertex_count"}``
         where ``positions`` is a flat xyz list, ``scalars`` has one float per
         compacted vertex, ``indices`` is a flat triangle list, and each group
-        entry carries ``{"id", "start", "count"}`` — its range in ``indices``
-        (in index units) — merged with the catalog fields of
-        :func:`face_group_catalog`.
+        entry carries ``{"id", "axis", "side", "center", "area", "faces",
+        "start", "count"}`` — its range in ``indices`` (in index units) and
+        the catalog fields of :func:`surface_catalog`.
     """
     scalar = np.asarray(node_scalar, dtype=np.float64).reshape(-1)
-    if scalar.shape[0] != mesh.num_points:
+    points = np.asarray(surface.points)
+    if scalar.shape[0] != points.shape[0]:
         raise ValueError(
-            f"Expected one scalar per node ({mesh.num_points}), got {scalar.shape[0]}."
+            f"Expected one scalar per node ({points.shape[0]}), got {scalar.shape[0]}."
         )
-
-    catalog = {entry["id"]: entry for entry in face_group_catalog(mesh)}
-    quads_per_group: list[tuple[str, np.ndarray]] = [
-        (group_id, mesh.boundary_faces[group_id].nodes) for group_id in sorted(mesh.boundary_faces)
-    ]
-    all_quads = np.concatenate([quads for _, quads in quads_per_group], axis=0)
-
-    used, remapped = np.unique(all_quads.reshape(-1), return_inverse=True)
-    quads = remapped.reshape(-1, 4).astype(np.int64)
-    # Split each outward-oriented quad (a, b, c, d) into (a, b, c) + (a, c, d).
-    triangles = np.concatenate([quads[:, [0, 1, 2]], quads[:, [0, 2, 3]]], axis=1)
-
-    positions = mesh.points[used]
+    catalog = {entry["id"]: entry for entry in surface_catalog(surface)}
+    all_faces = np.concatenate([np.asarray(faces) for _, faces in surface.groups], axis=0)
+    used, remapped = np.unique(all_faces.reshape(-1), return_inverse=True)
+    compact = remapped.reshape(all_faces.shape).astype(np.int64)
+    triangles = _triangulate(compact)
+    positions = points[used]
     scalars = scalar[used]
     finite = scalars[np.isfinite(scalars)]
     low = float(finite.min()) if finite.size else 0.0
     high = float(finite.max()) if finite.size else 0.0
-
     groups: list[dict[str, Any]] = []
     offset = 0
-    for group_id, group_quads in quads_per_group:
-        count = int(group_quads.shape[0]) * 6
+    for group_id, faces in surface.groups:
+        count = int(np.asarray(faces).shape[0]) * (6 if np.asarray(faces).shape[1] == 4 else 3)
         groups.append({**catalog[group_id], "start": offset, "count": count})
         offset += count
-
     return {
         "positions": [round(float(value), 5) for value in positions.reshape(-1)],
         "scalars": [round(float(value), 6) for value in scalars],
@@ -146,3 +110,47 @@ def boundary_render_payload(mesh: HexMesh, node_scalar: np.ndarray) -> dict[str,
         "range": [round(low, 6), round(high, 6)],
         "vertex_count": int(used.shape[0]),
     }
+
+
+def _triangulate(faces: np.ndarray) -> np.ndarray:
+    """Outward quads ``(a, b, c, d)`` as ``(a, b, c) + (a, c, d)``; triangles as they are."""
+    if faces.shape[1] == 4:
+        return np.concatenate([faces[:, [0, 1, 2]], faces[:, [0, 2, 3]]], axis=1).reshape(-1, 3)
+    return faces
+
+
+def surface_catalog(surface: Surface) -> list[dict[str, Any]]:
+    """One entry per surface group: id, axis and side (for a hex mesh's gradient-axis
+    groups such as ``"+x"``; None otherwise), the area-weighted center, the
+    area and the face count."""
+    points = np.asarray(surface.points)
+    catalog: list[dict[str, Any]] = []
+    for group_id, faces in surface.groups:
+        faces = np.asarray(faces)
+        corners = points[faces]
+        if faces.shape[1] == 4:
+            areas = _quad_areas(points, faces)
+        else:
+            areas = 0.5 * np.linalg.norm(
+                np.cross(corners[:, 1] - corners[:, 0], corners[:, 2] - corners[:, 0]), axis=-1
+            )
+        total = float(areas.sum())
+        weights = areas / max(total, 1e-30)
+        center = (corners.mean(axis=1) * weights[:, None]).sum(axis=0)
+        axis_group = len(group_id) == 2 and group_id[0] in "+-" and group_id[1] in "xyz"
+        catalog.append(
+            {
+                "id": group_id,
+                "axis": group_id[1] if axis_group else None,
+                "side": group_id[0] if axis_group else None,
+                "center": [round(float(value), 5) for value in center],
+                "area": round(total, 6),
+                "faces": int(faces.shape[0]),
+            }
+        )
+    return catalog
+
+
+def boundary_render_payload(mesh: Any, node_scalar: np.ndarray) -> dict[str, Any]:
+    """:func:`surface_render_payload` of the mesh's own surface."""
+    return surface_render_payload(mesh.surface(), node_scalar)

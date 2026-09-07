@@ -66,7 +66,9 @@ from cadjoint.fem.boundary import (
     tet_boundary_faces,
     tet_faces_from_nodes,
 )
+from cadjoint.fem.discretization import Surface
 from cadjoint.fem.elements import TET10_EDGES
+from cadjoint.fem.hexmesh import _require_selection, _scalar_or_traced, _unresolvable_on_mesh
 from cadjoint.fem.motion import project_points, recompute_tet_points, smooth_interior_delta
 from cadjoint.fem.quality import tet_aspect_ratios, tet_radius_ratios, tet_volumes
 from cadjoint.meshing import GridSpec, extract_mesh
@@ -174,6 +176,135 @@ class TetMesh:
         """Boundary triangles as a :class:`FaceGroup` (nodes shaped ``(M, 3)``)."""
         centers, normals = _tri_geometry(self.points, self.boundary_tris)
         return FaceGroup(nodes=self.boundary_tris, centers=centers, normals=normals)
+
+    # ── the discretization protocol (cadjoint.fem.discretization) ─────────
+
+    @property
+    def family(self) -> str:
+        return "tet"
+
+    def surface(self) -> Surface:
+        return Surface(points=self.points, groups=(("surface", np.asarray(self.boundary_tris)),))
+
+    def quality(self) -> dict[str, np.ndarray]:
+        return {
+            "radius_ratio": tet_radius_ratios(self.points, self.cells),
+            "aspect_ratio": tet_aspect_ratios(self.points, self.cells),
+        }
+
+    def node_patch(self, selection: Any) -> np.ndarray:
+        """Corner boundary nodes, completed on TET10 with the midsides both of whose parents are in."""
+        _require_selection(selection)
+        return tet10_complete_nodes(self, selection.resolve(self))
+
+    def face_patch(self, selection: Any) -> tuple[np.ndarray, np.ndarray]:
+        """``(nodes, faces)``: the spanning node set (midsides too on TET10) and the corner triangles.
+
+        jax-fem selects a face for a surface map only when *all* its nodes
+        are in the set, which is why the midsides come along.
+        """
+        _require_selection(selection)
+        faces = tet_faces_from_nodes(self, selection.resolve(self))
+        if faces.shape[0] == 0:
+            raise ValueError(
+                f"Selection {selection.describe()} spans no complete boundary face; "
+                "area-integrated conditions need every corner of at least one "
+                "boundary face selected."
+            )
+        nodes = np.unique(faces)
+        if self.edge_parents is not None:
+            nodes = np.concatenate([nodes, np.unique(tet10_face_midsides(self, faces))])
+        return nodes.astype(np.int32), np.asarray(faces)
+
+    def unresolvable(self, bcs: list) -> str | None:
+        return _unresolvable_on_mesh(self, bcs)
+
+    def moved(self, field: Any, *, smooth_passes: int = 0, design: Any = None) -> Any:
+        """Node positions under ``field``: surface vertices re-projected, the interior following.
+
+        A Gmsh mesh's nodes come from the ``node_map`` plugin kind instead,
+        which needs the design itself (``design=(target, params)``); the
+        refusal for an unfilled kind is at declaration, in the optimiser.
+        """
+        owned = getattr(self, "owned", None)
+        if owned is not None:
+            from cadjoint import tier
+            from cadjoint.enums import PluginKind
+
+            if design is None:
+                raise ValueError(
+                    "a Gmsh mesh moves through the node map, which needs design=(target, params)"
+                )
+            target, params = design
+            node_map = tier.require(PluginKind.NODE_MAP.value).component
+            return node_map.positions(target, params, owned, smooth_passes=smooth_passes)
+        return recompute_tet_points(field, self, smooth_passes=smooth_passes)
+
+    def thermal(self, problem: Any, *, placement: Any = None, backend: Any = None) -> Any:
+        """Steady conduction on the direct jax-fem path, the only one that takes tets."""
+        from cadjoint.fem.backends import ThermalBCs
+        from cadjoint.fem.jaxfem import tet_thermal_solve
+        from cadjoint.fem.simulate import ThermalResult, _property_value, _require_direct_backend
+
+        _require_direct_backend(backend, "Thermal solves")
+        flux_patches = [self.face_patch(patch) for patch, _ in problem.neumann]
+        bcs = ThermalBCs(
+            dirichlet_nodes=[self.node_patch(patch) for patch, _ in problem.dirichlet],
+            dirichlet_values=[_scalar_or_traced(value) for _, value in problem.dirichlet],
+            flux_nodes=[nodes for nodes, _ in flux_patches],
+            flux_values=[float(value) for _, value in problem.neumann],
+        )
+        temperature = tet_thermal_solve(
+            self.points if placement is None else placement,
+            self.cells,
+            bcs,
+            conductivity=_property_value(problem.conductivity),
+            source=float(problem.source),
+            ele_type=self.ele_type,
+            base_points=self.points,
+            flux_faces=[faces for _, faces in flux_patches] if flux_patches else None,
+        )
+        return ThermalResult(temperature=temperature, mesh=self)
+
+    def elastic(self, problem: Any, *, placement: Any = None, backend: Any = None) -> Any:
+        """Linear elasticity on the direct jax-fem path, the only one that takes tets."""
+        from cadjoint.fem.backends import ElasticBCs
+        from cadjoint.fem.jaxfem import tet_elastic_solve
+        from cadjoint.fem.simulate import ElasticResult, _property_value, _require_direct_backend
+
+        _require_direct_backend(backend, "Elastic solves")
+        traction_patches = [self.face_patch(patch) for patch, _ in problem.tractions]
+        bcs = ElasticBCs(
+            fixed_nodes=[self.node_patch(patch) for patch in problem.fixed],
+            traction_nodes=[nodes for nodes, _ in traction_patches],
+            traction_vectors=[np.asarray(v, dtype=np.float64) for _, v in problem.tractions],
+        )
+        displacement = tet_elastic_solve(
+            self.points if placement is None else placement,
+            self.cells,
+            bcs,
+            youngs=_property_value(problem.youngs),
+            poisson=_property_value(problem.poisson),
+            ele_type=self.ele_type,
+            base_points=self.points,
+            traction_faces=[faces for _, faces in traction_patches] if traction_patches else None,
+            body_force=problem.body_force,
+        )
+        return ElasticResult(
+            displacement=displacement,
+            mesh=self,
+            youngs=_property_value(problem.youngs),
+            poisson=_property_value(problem.poisson),
+        )
+
+    def traction_work(self, positions: Any, displacement: Any, selection: Any, vector: Any) -> Any:
+        from cadjoint.fem.postprocess import load_work_tri6, load_work_tris
+
+        faces = tet_faces_from_nodes(self, selection.resolve(self))
+        if self.edge_parents is not None:
+            faces6 = np.concatenate([faces, tet10_face_midsides(self, faces)], axis=1)
+            return load_work_tri6(positions, displacement, faces6, vector)
+        return load_work_tris(positions, displacement, faces, vector)
 
 
 def surface_to_tet_mesh(

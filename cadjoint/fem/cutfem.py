@@ -69,6 +69,7 @@ import scipy.sparse
 import scipy.sparse.linalg
 
 from cadjoint.fem.boundary import FaceGroup, _tri_geometry
+from cadjoint.fem.discretization import Surface
 
 # float64 is required for the solve (Nitsche's penalty and the ghost penalty
 # put the system around cond 1e3-1e4, and the derivative checks are 1e-9),
@@ -135,7 +136,12 @@ def _safe_sqrt(v):
 
 @dataclass(frozen=True)
 class Grid:
-    """A uniform background grid: ``cells[k]`` cells of size ``h`` along axis k from ``origin``."""
+    """The solver's own lattice: ``cells[k]`` cells of size ``h`` along axis k from ``origin``.
+
+    Dimension-generic (the prototype's 2D tables run on it), which is why it
+    is not :class:`~cadjoint.meshing.GridSpec`; the package builds it from
+    one (:func:`sdf_to_cut_mesh`), at the finest of the spec's spacings.
+    """
 
     origin: tuple[float, ...]
     cells: tuple[int, ...]
@@ -900,6 +906,66 @@ class CutMesh:
     def all_boundary_faces(self) -> FaceGroup:
         centers, normals = _tri_geometry(self.points, self.boundary_tris)
         return FaceGroup(nodes=self.boundary_tris, centers=centers, normals=normals)
+
+    # ── the discretization protocol (cadjoint.fem.discretization) ─────────
+
+    @property
+    def family(self) -> str:
+        return "cut"
+
+    def surface(self) -> Surface:
+        return Surface(points=self.points, groups=(("surface", np.asarray(self.boundary_tris)),))
+
+    def quality(self) -> dict[str, np.ndarray]:
+        return {}  # no elements to grade
+
+    def node_patch(self, selection: Any) -> np.ndarray:
+        return selection.resolve(self)
+
+    def face_patch(self, selection: Any) -> tuple[np.ndarray, np.ndarray]:
+        """The surface vertices the selection picks, and the facets whose centroid it contains."""
+        facets = np.nonzero(np.asarray(selection.contains(self.structure.centroids), bool))[0]
+        if facets.size == 0:
+            raise ValueError(
+                f"Selection {selection.describe()} selects no boundary facet; "
+                "a condition by region needs the region to reach the surface."
+            )
+        return np.asarray(selection.resolve(self), dtype=np.int32), facets
+
+    def unresolvable(self, bcs: list) -> str | None:
+        return unresolvable_condition(bcs, self)
+
+    def moved(self, field: Any, *, smooth_passes: int = 0, design: Any = None) -> Any:  # noqa: ARG002 - the protocol's signature
+        """The placement of cut cells is the field itself: there is no node map to move."""
+        return field
+
+    def thermal(
+        self, problem: Any, *, placement: Any = None, backend: Any = None
+    ) -> CutThermalResult:
+        """Conduction on the structure, with the field it was built for or the placement's.
+
+        Materials are not sampled on cut cells yet, so the conductivity is
+        a number; a prescribed temperature is read as a number too.
+        """
+        if backend is not None:
+            raise ValueError("cut cells are their own solver and take no backend")
+        if not isinstance(problem.conductivity, (int, float)):
+            raise ValueError(
+                "cut cells do not sample the scene's materials yet: give the study a numeric conductivity."
+            )
+        conditions = Thermal(
+            conductivity=float(problem.conductivity),
+            source=float(problem.source),
+            dirichlet=tuple((bc.contains, float(value)) for bc, value in problem.dirichlet),
+            neumann=tuple((bc.contains, float(flux)) for bc, flux in problem.neumann),
+        )
+        return solve_thermal(self, conditions, placement)
+
+    def elastic(self, problem: Any, *, placement: Any = None, backend: Any = None) -> Any:
+        raise NotImplementedError("cut cells solve thermal studies only, for now")
+
+    def traction_work(self, positions: Any, displacement: Any, selection: Any, vector: Any) -> Any:
+        raise NotImplementedError("cut cells solve thermal studies only, for now")
 
 
 def _locate(s: Structure, points: np.ndarray) -> tuple[np.ndarray, np.ndarray]:

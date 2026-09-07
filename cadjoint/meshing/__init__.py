@@ -78,7 +78,14 @@ from cadjoint.meshing.patch_fields import (
 )
 from cadjoint.meshing.simplify import simplify_mesh
 
+#: The default sampling volume — the viewer's own view volume — for meshes
+#: and studies that declare no box of their own, and the overlay's grid.
+DEFAULT_BOUNDS = (-3.0, -3.0, -3.0)
+DEFAULT_SIZE = (6.0, 6.0, 6.0)
+
 __all__ = [
+    "DEFAULT_BOUNDS",
+    "DEFAULT_SIZE",
     "Mesh",
     "qef_vertices",
     "sharp_qef_vertices",
