@@ -658,3 +658,23 @@ class TestTheUniformForm:
         program = compile_sdf_direct(scene, uniforms=True)
         uniform = _evaluate_on_device(program, _POINTS[:512], uniform_values=program.parameters)
         np.testing.assert_allclose(uniform, literal, rtol=0, atol=0)
+
+
+def test_the_module_and_its_parameter_names_are_the_same_from_one_compile_to_the_next():
+    """A literal vertex's slot is named by its sketch's ordinal, not its address.
+
+    The module text and the program's parameter list are what the viewer
+    compares to tell a values-only edit from a rebuild; a name that changed
+    with every compile made every edit a rebuild, by luck of allocation.
+    """
+    from pathlib import Path
+
+    from cadjoint.backends.wgsl.direct import compile_sdf_direct
+    from cadjoint.viewer.worker.scene import _execute_scene
+
+    source = Path(__file__).resolve().parents[2].joinpath("scenes", "starter.py").read_text()
+    first = compile_sdf_direct(_execute_scene(source)["scene"], uniforms=True)
+    second = compile_sdf_direct(_execute_scene(source)["scene"], uniforms=True)
+    assert [name for name, _, _ in first.parameters] == [name for name, _, _ in second.parameters]
+    assert first.wgsl == second.wgsl
+    assert any(name.startswith("sketch") for name, _, _ in first.parameters)

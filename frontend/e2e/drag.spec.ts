@@ -235,9 +235,16 @@ test("a free handle drags live; a fixed one falls back to a recompile", async ({
   await page.mouse.up();
   await waitForCompile(page);
   const afterPinned = await stats(page);
-  // The designed cost of a fixed value, pinned so it stays a decision.
-  expect(afterPinned!.pipelineBuilds, "committing a literal does rebuild").toBeGreaterThan(
+  // A literal's cost is the recompile itself: the release patches the source
+  // and the program is executed again. The direct shader form gives literal
+  // vertices slots too (its profile loop reads one contiguous run), so the
+  // module that comes back is byte-identical and, as for a free value, no
+  // pipeline is rebuilt — the buffer is written with the new numbers.
+  expect(afterPinned!.pipelineBuilds, "committing a literal rebuilds no pipeline").toBe(
     beforePinned!.pipelineBuilds,
+  );
+  expect(afterPinned!.parameterUploads, "it writes the buffer on the recompile").toBeGreaterThan(
+    pinnedDuring!.parameterUploads,
   );
 
   expect(errors.join("\n")).not.toContain("WGSL");

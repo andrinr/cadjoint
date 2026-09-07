@@ -1,0 +1,265 @@
+// zeroset — the boundary of an implicit model, and how to extract it.
+//
+// A model is an implicit function f(p, θ): a point p in three dimensions
+// and a parameter vector θ go in, a number comes out, negative inside and
+// positive outside. The boundary is the zero set {p : f(p, θ) = 0}. It is
+// never stored. Every face, edge and vertex is derived from f on demand,
+// and because f depends on θ, so are their derivatives.
+//
+// This file is the whole interface between a frontend that builds f and a
+// backend that finds its zero set. The split is:
+//
+//   frontend   lowers its vocabulary into a table of nodes in three forms
+//   backend    walks the tree; finds where surfaces meet (Discover) and
+//              puts points on them (Solve), by any algorithm
+//   host       computes the derivative from the tree at the returned
+//              points, by the implicit function theorem, so it is the
+//              same for every backend
+//
+// A signed distance is the common, well-behaved field; the interface
+// assumes only the sign and the zero set.
+
+syntax = "proto3";
+
+package zeroset.v1;
+
+import "google/protobuf/any.proto";
+import "google/protobuf/empty.proto";
+
+// ───────────────────────────────────────────────────────────── the field
+
+// The model is a table of nodes, each an expression (a number that may
+// depend on the point and the parameters) or a shape (a field), referring
+// to other nodes by index. Children precede their parents, so a walker
+// needs no recursion, and a subtree used many times — a pattern's copy —
+// is stored once. A model is therefore a DAG; ownership below is still
+// defined by paths through it, so two uses of one subtree are two sets of
+// surfaces.
+//
+// Expressions are a small closed grammar, walkable in any language and
+// differentiable by automatic differentiation in either mode. A frontend
+// lowers anything richer into it; a field it cannot write is an External,
+// evaluated by the backend alone.
+//
+// Shapes come in three forms, and every primitive, transform and boolean
+// is one of them: every primitive is a Combine of patches (a box is six
+// half-spaces, a cylinder a side and two caps), every transform is a Warp,
+// every repetition is a union of warped copies, every boolean is a
+// Combine. The backend never sees the vocabulary.
+message Node {
+  oneof kind {
+    // expressions
+    double   lit      = 1;
+    Axis     coord    = 2;   // x, y or z of the point
+    uint32   param    = 3;   // θ[param]
+    uint32   child_value = 4; // a combine child's value, by position; only inside a Blend rule
+    uint32   external = 5;   // Model.external[external](p, θ); opaque to the host
+    Unary    unary    = 6;
+    Binary   binary   = 7;
+    // shapes
+    uint32   patch    = 8;   // an expression node: one smooth field, its zero set one surface
+    Warp     warp     = 9;   // a transformation of one shape
+    Combine  combine  = 10;  // a rule over many shapes
+  }
+  enum Axis { X = 0; Y = 1; Z = 2; }
+  message Unary {
+    enum Op { NEG = 0; ABS = 1; SIGN = 2; SQRT = 3; EXP = 4; LOG = 5; SIN = 6; COS = 7; TAN = 8; }
+    Op     op = 1;
+    uint32 a  = 2;
+  }
+  message Binary {
+    enum Op { ADD = 0; SUB = 1; MUL = 2; DIV = 3; MIN = 4; MAX = 5; POW = 6; ATAN2 = 7; }
+    Op     op = 1;
+    uint32 a  = 2;
+    uint32 b  = 3;
+  }
+  // p ↦ scale(p) · child(image(p)). Any map of the point and a factor on
+  // the value; an isometry scales by 1, a uniform scale by s maps p/s and
+  // scales by s. The zero set does not depend on the scale.
+  message Warp {
+    uint32 image_x = 1;      // expression nodes
+    uint32 image_y = 2;
+    uint32 image_z = 3;
+    uint32 scale   = 4;
+    uint32 child   = 5;      // a shape node
+  }
+  // MIN, MAX and COMPLEMENT pass ownership through: the value is always
+  // one child's, so a point on the result's boundary lies on that child's
+  // surface. A Blend is any other rule; where it departs from the owning
+  // rule it softens, its zero set is a band (a fillet) that belongs to no
+  // child, and the Blend node owns that band as a surface of its own.
+  message Combine {
+    oneof rule {
+      Owning owning = 1;
+      Blend  blend  = 2;
+    }
+    repeated uint32 children = 3;   // shape nodes
+    enum Owning { MIN = 0; MAX = 1; COMPLEMENT = 2; }
+    message Blend {
+      uint32 rule = 1;         // expression node: the value, over `child_value i` and the point
+      // The band's rim, as a first-order condition over the same values:
+      // for a polynomial smooth minimum of width k, k - |child 0 - child 1|.
+      // At the rim the band and its children agree to first order, so the
+      // rim cannot be solved as {band = 0, child = 0}; this can. Absent for
+      // a rule with no rim, such as an offset. A rule whose owned region
+      // has no zero set (a box's Euclidean corners) has a rim nobody meets.
+      optional uint32 transition = 2;
+      // Further zero sets over the same child values, each a numbered
+      // surface after the rim: a fold, `child_value p - child_value q`,
+      // where a crease between two children runs on through the band, so an
+      // edge inside the band is [band, fold]. They own nothing; they are
+      // where the band meets something.
+      repeated uint32 auxiliary = 3;
+    }
+  }
+}
+
+// What the frontend hands over. A parameter change is a new theta with
+// the same nodes; the nodes are structure, theta is data.
+message Model {
+  repeated Node                node     = 1;   // children before parents
+  uint32                       root     = 2;   // the shape node that is the model
+  repeated double              theta    = 3;
+  repeated google.protobuf.Any external = 4;   // Node.external definitions, in a form the backend accepts
+}
+
+// ────────────────────────────────────────────────────────── the boundary
+
+// Surfaces are the nodes that own points: every patch and every Blend,
+// numbered in depth-first pre-order of the model walked as a tree from the
+// root, a node before its children, a Blend's rim and then its auxiliaries
+// numbered right after the Blend; a subtree reached by two paths is two sets of surfaces. Nothing is
+// sent for this; both sides apply the rule to one model and agree.
+//
+// A face point lies on one surface, an edge point on two, a vertex on
+// three. A band's edge is [band, rim]; a band meeting a crease is a vertex.
+message Incidence {
+  repeated uint32 surface = 1;   // 1 to 3 entries
+}
+
+message Point {
+  double x = 1;
+  double y = 2;
+  double z = 3;
+}
+
+// Where to look, and how finely. Discovery is a search.
+message Domain {
+  Point  min     = 1;
+  Point  max     = 2;
+  double spacing = 3;   // target distance between boundary samples
+}
+
+// The discrete structure of the boundary: which surfaces meet, and a seed
+// near each meeting. Never differentiated. It changes only at a topology
+// event, and two topologies with equal hashes are the same structure.
+//
+// For a parameter change the frontend re-solves the same topology with the
+// previous solution's points as seeds: the derivative predicts exactly that
+// re-solve, and a fresh Discover is needed only when the hash changes.
+message Topology {
+  repeated Incidence   incidence = 1;   // one per point
+  repeated Point       seed      = 2;   // one per incidence, inside the solver's basin
+  string               hash      = 3;   // of the set of distinct incidences (the adjacency); not of the samples
+  google.protobuf.Any  extension = 4;   // a method's native structure (cells, chains), never required
+}
+
+// Points on the boundary. A Solution is valid only if every residual, the
+// largest |f_i(p)| over the point's surfaces, is below the tolerance it was
+// asked for, and its incidence is the topology's, unchanged. A solver that
+// lands a point on other surfaces reports it non-convergent; it never
+// relabels. Residuals are in the field's units, a length for a distance.
+message Solution {
+  repeated Point       point     = 1;
+  repeated Incidence   incidence = 2;
+  repeated double      residual  = 3;
+  google.protobuf.Any  extension = 4;   // a method's native output (a mesh, chains), never required
+}
+
+// ───────────────────────────────────────────────────────── the derivative
+//
+// At a solved point with incident surfaces f_1..f_k, differentiating
+// f_i(p, θ) = 0 gives the implicit-function relation
+//
+//     J_p · dp = -J_θ · dθ        J_p = ∂f/∂p (k×3),  J_θ = ∂f/∂θ (k×P)
+//
+// For k < 3 the system is underdetermined and the gauge is minimum norm,
+// dp = -J_p⁺ J_θ dθ with J_p⁺ = J_pᵀ (J_p J_pᵀ)⁻¹: a face point moves along
+// its normal, an edge point within the edge's normal plane, a vertex
+// exactly. Reverse: θ̄ = -J_θᵀ (J_p J_pᵀ)⁻¹ J_p p̄, summed over points.
+//
+// Only J_p and J_θ at the returned points are needed, and the host takes
+// them from the tree by automatic differentiation. In reverse mode J_θ is
+// never formed: with λ = (J_p J_pᵀ)⁻¹ J_p p̄, a k-vector, θ̄ = -J_θᵀ λ is one
+// backward pass through the field with λ as the cotangent on the k surface
+// values, and J_p is three columns wide, so the whole VJP is a k×k solve
+// and one backprop per point. So the derivative is the same for every
+// backend, and a backend need not supply one. It is valid at fixed
+// topology; a topology event is a discontinuity, signalled by a changed
+// hash, never here. A rank-deficient J_p is a tangency and is refused.
+
+// The incident surfaces at given points: the primitive every derivative
+// follows from. A backend accepting Externals must answer this, since the
+// host cannot differentiate a field it cannot read.
+message FieldSamples {
+  // Per point, per incident surface in incidence order; row-major.
+  repeated double value              = 1;   // N × K
+  repeated double point_jacobian     = 2;   // N × K × 3   ∂f/∂p
+  repeated double parameter_jacobian = 3;   // N × K × P   ∂f/∂θ
+}
+
+message ParameterCotangent { repeated double theta    = 1; }   // ∂L/∂θ, length P
+message PointTangent       { repeated Point  velocity = 1; }   // dp, one per point
+
+// ───────────────────────────────────────────────────────────── the service
+
+// The one error shape: a result, not an exception, so it crosses any transport.
+message Refusal {
+  enum Reason { UNSUPPORTED = 0; NONCONVERGENT = 1; INCIDENCE_MISMATCH = 2; DOMAIN_EMPTY = 3; INVALID_INPUT = 4; }
+  Reason          reason  = 1;
+  string          message = 2;
+  repeated uint32 point   = 3;   // which points, when partial
+}
+
+// Read before a backend is used, so a tree it cannot take is refused with
+// a sentence, not inside a solve.
+message Capabilities {
+  uint32                    contract_version = 1;
+  bool                      blends           = 2;   // Blend rules handled, or refused
+  repeated Node.Unary.Op    unary            = 3;   // the grammar it evaluates
+  repeated Node.Binary.Op   binary           = 4;
+  repeated string           external         = 5;   // Any type URLs it accepts as Externals
+  bool                      evaluate         = 6;   // the derivative operations it answers
+  bool                      vjp              = 7;
+  bool                      jvp              = 8;
+}
+
+message DiscoverRequest  { Model model = 1; Domain   domain   = 2; double tolerance = 3; }
+message SolveRequest     { Model model = 1; Topology topology = 2; double tolerance = 3; }
+message EvaluateRequest  { Model model = 1; repeated Point point = 2; repeated Incidence incidence = 3; }
+message VjpRequest       { Model model = 1; Solution solution = 2; repeated Point  cotangent = 3; }   // ∂L/∂p per point
+message JvpRequest       { Model model = 1; Solution solution = 2; repeated double tangent   = 3; }   // dθ, length P
+
+message DiscoverResponse { oneof result { Topology           topology  = 1; Refusal refusal = 2; } }
+message SolveResponse    { oneof result { Solution           solution  = 1; Refusal refusal = 2; } }
+message EvaluateResponse { oneof result { FieldSamples       samples   = 1; Refusal refusal = 2; } }
+message VjpResponse      { oneof result { ParameterCotangent cotangent = 1; Refusal refusal = 2; } }
+message JvpResponse      { oneof result { PointTangent       tangent   = 1; Refusal refusal = 2; } }
+
+// A backend is exactly this. Discover and Solve are required. The
+// derivative operations are optional and pinned to the formula above; the
+// host has its own and checks a backend's against it.
+//
+// A backend is admitted by four checks that never look inside it: every
+// residual is within tolerance when the host re-evaluates it; the
+// incidence is the topology's; two backends given one model and one
+// topology agree on points within tolerance; and the forward derivative
+// agrees with central differences of Solve over θ, at fixed topology.
+service Extraction {
+  rpc Describe (google.protobuf.Empty) returns (Capabilities);
+  rpc Discover (DiscoverRequest) returns (DiscoverResponse);   // once per topology
+  rpc Solve    (SolveRequest)    returns (SolveResponse);      // once per parameter change
+  rpc Evaluate (EvaluateRequest) returns (EvaluateResponse);   // optional
+  rpc Vjp      (VjpRequest)      returns (VjpResponse);        // optional
+  rpc Jvp      (JvpRequest)      returns (JvpResponse);        // optional
+}

@@ -27,6 +27,7 @@ export interface CompilePayload {
   present_shader: string;
   program?: ShaderProgram | null;
   shader_hash?: string;
+  table_hash?: string | null;
   construction: ConstructionNode[];
   identities: IdentityEntry[];
   elements?: ConstructionElement[];

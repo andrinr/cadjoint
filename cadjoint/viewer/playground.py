@@ -8,6 +8,9 @@ Serves the built frontend (``cadjoint/viewer/static``) and a small JSON API:
 - ``POST /patch``        rewrite sketch vertex literals in the user's source
 - ``POST /api/mesh``     run the source again and return only the dual-contour
                          mesh edges (requested lazily by the viewer)
+- ``POST /api/mesh_refresh`` re-solve the last extracted mesh edges at new
+                         parameter values, at fixed topology, without
+                         running the source (a drag's live overlay)
 - ``POST /api/simulate`` run a study the program declares (``cadjoint.fem``)
                          picked by ``name`` (``kind="study"``); the response
                          carries the solved surface, the result summary, and
@@ -105,6 +108,7 @@ from cadjoint.viewer._intelligence import (
 )
 from cadjoint.viewer._jobs import JOB_KINDS, REGISTRY
 from cadjoint.viewer._limits import MAX_SOURCE_BYTES
+from cadjoint.viewer._overlay_refresh import OVERLAYS
 from cadjoint.viewer._patch_requests import patch_source
 from cadjoint.viewer._scenes import (
     list_scenes,
@@ -190,9 +194,12 @@ def _post_routes() -> dict[str, Callable[[dict[str, Any]], dict[str, Any]]]:
         "/api/mesh": _tracked(
             "mesh",
             lambda payload: record_compile(
-                payload.get("source"), mesh_source(payload.get("source"))
+                payload.get("source"),
+                OVERLAYS.absorb(payload.get("source"), mesh_source(payload.get("source"))),
             ),
         ),
+        # Not a job: a refresh is one GPU dispatch, answered in milliseconds.
+        "/api/mesh_refresh": OVERLAYS.refresh,
         "/api/simulate": _tracked("simulate", simulate_source),
         "/api/mesh_inspect": _tracked("mesh_inspect", mesh_inspect_source),
         "/patch": patch_source,

@@ -251,6 +251,7 @@ export function App() {
             renderer={renderer}
             display={render.display()}
             onPatch={ops.patch}
+            onLiveParameters={compile.refreshOverlay}
             onSetValue={ops.setValue}
             onAddPrimitive={ops.addPrimitive}
             onAddSketch={ops.addSketch}

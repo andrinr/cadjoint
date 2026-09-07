@@ -65,6 +65,7 @@ import {
 import { createSuperseding, type RunToken } from "./supersede";
 import type { SourceHistoryStore } from "./sourceHistory";
 import type { DisplaySettings, Renderer } from "../viewer/renderer";
+import type { ShaderProgram } from "../types";
 
 /** The generated shader pair, for the "Generated WGSL" dialog. */
 export interface WgslPreview {
@@ -91,6 +92,17 @@ export interface WgslPreview {
  */
 export const COMPILE_DEBOUNCE_MS = 150;
 
+/**
+ * The share of overlay points a refresh may fail to certify and still stand.
+ *
+ * A refresh moves an extraction's points to new parameter values at fixed
+ * topology and re-checks each one; the few that a face shrank out from under
+ * are held where they were and reported here. Past this share the topology
+ * has changed and the overlay is extracted again — the refresh is shown in
+ * the meantime, because a mostly-right picture now beats none for a second.
+ */
+export const OVERLAY_STALE_LIMIT = 0.005;
+
 export interface CompileCycleOptions {
   renderer: Renderer;
   /** Every committed run commits a snapshot, so undo lands on compiled states. */
@@ -110,7 +122,26 @@ export interface CompileCycle {
   adoptSource: (text: string) => Promise<void>;
   /** Compile-and-render a transient program without committing it. */
   ghostCompile: (text: string) => Promise<boolean>;
+  /**
+   * Move the mesh-edge overlay to a drag's live parameter values.
+   *
+   * Only while an overlay is displayed and the compiled program is a
+   * values-only edit of the one it was extracted from; otherwise a no-op, and
+   * the overlay catches up when the release recompiles. Latest values win:
+   * one request is out at a time and the newest waiting values follow it.
+   */
+  refreshOverlay: (overrides: Readonly<Record<string, readonly number[]>>) => void;
   wgsl: Accessor<WgslPreview | null>;
+}
+
+/** The free parameters of a program, whole parameters at a time, by name. */
+function programValues(program: ShaderProgram): Record<string, number[]> {
+  const values: Record<string, number[]> = {};
+  for (const parameter of program.parameters) {
+    if (!parameter.free || parameter.value.some((v) => v === null)) continue;
+    values[parameter.name] = parameter.value.map((v) => v as number);
+  }
+  return values;
 }
 
 /** What one `/compile` came back with, before anything has been published. */
@@ -132,6 +163,16 @@ export function createCompileCycle(options: CompileCycleOptions): CompileCycle {
   const [compiledSource, setCompiledSource] = createSignal<string | null>(null);
   let meshRequestFor: string | null = null;
   let meshInFlight: { clientId: string; controller: AbortController } | null = null;
+  // An extraction's topology outlives a values-only edit: the same surfaces
+  // meet in the same places, only somewhere else. `overlayBase` is the
+  // program the displayed overlay was extracted from, and `overlayRefreshable`
+  // says the compiled program is that one or a values-only edit of it — the
+  // node table's hash did not change, so neither did the surfaces the points
+  // lie on.
+  let overlayBase: string | null = null;
+  let overlayRefreshable = false;
+  let lastCompile: { source: string; table: string | null; program: ShaderProgram | null } | null =
+    null;
 
   const compiles = createSuperseding({
     debounceMs: options.debounceMs ?? COMPILE_DEBOUNCE_MS,
@@ -229,6 +270,16 @@ export function createCompileCycle(options: CompileCycleOptions): CompileCycle {
     // Mesh edges are no longer part of the compile payload; clear the stale
     // overlay and let the lazy /api/mesh effect refill it when wanted.
     setMeshEdges(null);
+    const previous = lastCompile;
+    lastCompile = { source: text, table: result.table_hash ?? null, program: result.program ?? null };
+    // The table hash leaves the design values out, so equal hashes mean the
+    // same surfaces at new values; the shader's own hash cannot say that.
+    overlayRefreshable =
+      overlayBase !== null &&
+      previous !== null &&
+      previous.table !== null &&
+      previous.table === lastCompile.table &&
+      (previous.source === overlayBase || overlayRefreshable);
     setCompiledSource(text);
     // Drop a selection that no longer exists in the rebuilt sketch.
     const active = selection();
@@ -416,13 +467,7 @@ export function createCompileCycle(options: CompileCycleOptions): CompileCycle {
    * The guard here is the compiled source rather than a revision counter —
    * same rule, expressed in the thing this cache is keyed by.
    */
-  createEffect(() => {
-    const display = options.display();
-    const wanted = display.showMeshEdges || display.showMeshWireframe;
-    const compiled = compiledSource();
-    if (!wanted || compiled === null || meshEdges() !== null) return;
-    if (meshRequestFor === compiled) return;
-    meshRequestFor = compiled;
+  const extractMeshEdges = (compiled: string): void => {
     const clientId = nextRequestId();
     const controller = new AbortController();
     const inFlight = { clientId, controller };
@@ -442,12 +487,84 @@ export function createCompileCycle(options: CompileCycleOptions): CompileCycle {
         // A newer compile owns the cache now; drop the stale answer.
         if (compiledSource() !== compiled) return;
         if (result.ok) setMeshEdges(result.mesh_edges ?? null);
+        if (result.ok && result.mesh_edges) {
+          overlayBase = compiled;
+          overlayRefreshable = true;
+        }
       })
       .catch(() => {
         // Missing mesh edges only dim an optional overlay; stay quiet.
         settle();
       });
+  };
+
+  createEffect(() => {
+    const display = options.display();
+    const wanted = display.showMeshEdges || display.showMeshWireframe;
+    const compiled = compiledSource();
+    if (!wanted || compiled === null || meshEdges() !== null) return;
+    if (meshRequestFor === compiled) return;
+    meshRequestFor = compiled;
+    const program = lastCompile?.program ?? null;
+    const base = overlayBase;
+    if (overlayRefreshable && base !== null && program !== null) {
+      // The same topology at new values: move the last extraction's points
+      // rather than extract again, and let the certificate say whether that
+      // was enough. Below the stale limit it is the overlay; above it the
+      // refresh shows while the extraction runs.
+      void api
+        .meshRefresh(base, programValues(program), true)
+        .then((result) => {
+          if (compiledSource() !== compiled) return;
+          if (result.ok && result.mesh_edges) setMeshEdges(result.mesh_edges);
+          if (!result.ok || (result.stale ?? 0) > OVERLAY_STALE_LIMIT) {
+            extractMeshEdges(compiled);
+          }
+        })
+        .catch(() => {
+          if (compiledSource() === compiled) extractMeshEdges(compiled);
+        });
+      return;
+    }
+    extractMeshEdges(compiled);
   });
 
-  return { run, applyPatch, adoptSource, ghostCompile, wgsl };
+  // A drag's live values, one request out at a time and the newest waiting.
+  let liveValues: Record<string, number[]> | null = null;
+  let liveBusy = false;
+  const pumpLive = (): void => {
+    const base = overlayBase;
+    if (liveBusy || liveValues === null || base === null) return;
+    const values = liveValues;
+    liveValues = null;
+    const compiled = compiledSource();
+    liveBusy = true;
+    api
+      .meshRefresh(base, values, false)
+      .then((result) => {
+        if (result.ok && result.mesh_edges && compiledSource() === compiled) {
+          setMeshEdges(result.mesh_edges);
+        }
+      })
+      .catch(() => {
+        // A refresh that fails leaves the last overlay standing; the release
+        // recompiles and extracts if it has to.
+      })
+      .finally(() => {
+        liveBusy = false;
+        pumpLive();
+      });
+  };
+  const refreshOverlay = (overrides: Readonly<Record<string, readonly number[]>>): void => {
+    const display = options.display();
+    if (!(display.showMeshEdges || display.showMeshWireframe)) return;
+    const program = lastCompile?.program ?? null;
+    if (!overlayRefreshable || overlayBase === null || program === null) return;
+    const values = programValues(program);
+    for (const [name, value] of Object.entries(overrides)) values[name] = [...value];
+    liveValues = values;
+    pumpLive();
+  };
+
+  return { run, applyPatch, adoptSource, ghostCompile, refreshOverlay, wgsl };
 }

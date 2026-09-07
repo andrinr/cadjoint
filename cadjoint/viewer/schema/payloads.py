@@ -542,6 +542,11 @@ class CompilePayload(Strict):
     # sha256 of the two scene shaders, so the browser can key its module
     # cache without hashing megabytes of source itself.
     shader_hash: str = ""
+    # Of the scene's node table (:mod:`cadjoint.zeroset`) with its design
+    # values left out: unchanged by a free-parameter edit, changed by any
+    # other, which is what tells a refresh of the mesh-edge overlay from an
+    # extraction.  ``None`` when the scene cannot be lowered to the table.
+    table_hash: str | None = None
     construction: list[ConstructionNode]
     identities: list[IdentityEntry]
     # Every construction call with its written arguments, for the properties
