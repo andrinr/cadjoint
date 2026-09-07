@@ -10,6 +10,13 @@ The design enters either as literals baked into the module (``theta=None``
 is not allowed; pass the values) or, with ``theta_binding``, as a storage
 buffer ``array<f32>`` read by index, so a parameter change is a buffer
 write and not a recompile.
+
+This is the extraction backend's fold, not a fourth viewer shader form.
+The viewer's module also carries materials (``material_base``,
+``material_optics``), which are the viewer's concern and not the zero
+set's: the table stays material-free so the protocol stays about surfaces,
+and the viewer keeps :mod:`cadjoint.backends.wgsl.direct`, already its
+fast default.
 """
 
 from __future__ import annotations
