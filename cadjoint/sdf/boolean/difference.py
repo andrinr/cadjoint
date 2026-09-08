@@ -5,7 +5,7 @@ from __future__ import annotations
 import jax.numpy as jnp
 from jax import Array
 
-from cadjoint.sdf.boolean.base import BooleanOp
+from cadjoint.sdf.boolean.base import BooleanOp, _operand_patch_fields
 from cadjoint.sdf.boolean.smooth import smooth_max
 
 
@@ -16,7 +16,16 @@ class Difference(BooleanOp):
 
     Args:
         sdfs: Tuple of SDFs; first is the base, rest are subtracted
-        smoothness: Blend radius (0 = sharp, >0 = smooth)
+        smoothness: Blend half-width in **model units**, not a fillet radius.
+            0 is a sharp boolean; the default of 0.1 blends, so a plain
+            ``Difference(a, b)`` is a blended one and a caller who wants the
+            sharp operation has to ask for ``smoothness=0``. The value does
+            not scale with the part: 0.1 is a tenth of a unit whatever the
+            unit stands for, which on a normalised engine block came to
+            20 mm and removed a water jacket. See
+            :mod:`cadjoint.sdf.boolean.smooth` for what the blend costs —
+            it moves the field by up to ``smoothness`` per operation, and
+            by the full amount wherever the operands agree.
     """
 
     def __init__(self, *sdfs, smoothness: float = 0.1):
@@ -70,6 +79,25 @@ class Difference(BooleanOp):
             result_m = blend_materials(result_m, tool.material_at(p), t)
             result_d = jnp.maximum(result_d, -d)
         return result_m
+
+    def patch_fields(self):
+        """Body patches then tool patches, operand-major, for a sharp cut only.
+
+        ``max(body, -tool_1, -tool_2, ...)``, so the result's surface is the
+        body's surface where no tool reaches plus each tool's surface where it
+        cut into the body — pieces of the operands' surfaces and nothing else.
+        The fields are theirs concatenated in operand order, with **every tool
+        negated**, exactly as the composition negates it: a tool's own field
+        reads positive outside the *tool*, which is inside the cavity it left,
+        so leaving it alone would hand the consumer a patch whose normal
+        points into the material.  Negating flips it to positive outside the
+        *result*, and leaves the zero set — hence ``argmin |f_i|`` ownership
+        — untouched.
+
+        See :func:`~cadjoint.sdf.boolean.base._operand_patch_fields` for the
+        order's guarantees and why a ``smoothness > 0`` difference declines.
+        """
+        return _operand_patch_fields(self, negate_tools=True)
 
     def to_functional(self):
         """Return pure function for compilation."""

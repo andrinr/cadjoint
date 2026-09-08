@@ -79,6 +79,13 @@ def preserved_exactly(original: Mesh, simplified: Mesh, rows) -> bool:
     return all(bool(np.any(np.all(result == source[row], axis=1))) for row in rows)
 
 
+# Whole-module: the cheapest test measured here is the argument-validation
+# one at 165 s, because every test extracts and decimates a real mesh first.
+# Seven of its eleven tests measured 165 s to 251 s; there is no fast half to
+# keep.
+pytestmark = pytest.mark.slow
+
+
 class TestSphere:
     def test_reduces_triangles_within_deviation_bound(self):
         mesh, _ = sphere_mesh()

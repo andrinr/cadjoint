@@ -198,9 +198,9 @@ def test_shipped_scenes_stay_inside_the_wgsl_parameter_limit(stem):
     """The scenes that broke this, at their real size."""
     program = compile_scene_with_uniforms(_shipped_scene(stem), scope="all")
     worst = max(_function_parameter_counts(program.wgsl).values())
-    assert worst <= MAX_WGSL_FUNCTION_PARAMETERS, (
-        f"{stem}: {len(program.parameters)} parameters produced a {worst}-parameter function"
-    )
+    assert (
+        worst <= MAX_WGSL_FUNCTION_PARAMETERS
+    ), f"{stem}: {len(program.parameters)} parameters produced a {worst}-parameter function"
 
 
 def test_the_payload_form_of_a_program_is_strict_json():

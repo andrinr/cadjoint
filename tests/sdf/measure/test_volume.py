@@ -2,6 +2,7 @@
 
 import jax
 import jax.numpy as jnp
+import pytest
 
 from cadjoint.sdf.measure import volume
 from cadjoint.sdf.primitives import Box, Sphere
@@ -11,12 +12,14 @@ SIZE = (4, 4, 4)
 RESOLUTION = 80
 
 
+@pytest.mark.slow
 def test_sphere_volume_accuracy():
     """Volume of unit sphere should be close to (4/3)π ≈ 4.189."""
     v = volume(Sphere(radius=1.0), bounds=BOUNDS, size=SIZE, resolution=RESOLUTION)
     assert jnp.isclose(v, 4 / 3 * jnp.pi, atol=0.2)
 
 
+@pytest.mark.slow
 def test_box_volume_accuracy():
     """Volume of 1×1×1 box centred at origin should be close to 1.0.
 

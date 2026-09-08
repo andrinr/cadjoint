@@ -142,6 +142,18 @@ BC_KINDS = ("inlet", "outlet", "walls", "heat_source", "held_temperature")
 #: wrong tool.
 FORCED_CONVECTION_RICHARDSON = 0.1
 
+#: Cell aspect ratio above which :meth:`FlowStudyResult.warnings` reports a
+#: lattice whose cells are not cubes.
+#:
+#: Nothing in the solve reads the world spacing: ``size`` decides only where
+#: the SDF is sampled, and from there on streaming moves one cell per axis
+#: and the energy stencil is one cell wide.  A lattice whose spacings differ
+#: is therefore solving the duct stretched by their ratio, silently and
+#: exactly.  The threshold is 1% rather than 0 because ``size[i] /
+#: resolution[i]`` is floating-point division and three extents meant to be
+#: equal will not always land on the same double.
+CUBIC_CELL_TOLERANCE = 1.01
+
 
 def _selection(nodes: Any, bc_kind: str) -> Any:
     """Check a boundary condition was given a node selection."""
@@ -421,6 +433,20 @@ class FlowStudyResult:
             Human-readable strings, one per assumption that did not hold.
         """
         notes: list[str] = []
+        dx, dy, dz = self.grid.spacing
+        stretch = max(dx, dy, dz) / min(dx, dy, dz)
+        if stretch > CUBIC_CELL_TOLERANCE:
+            notes.append(
+                f"The lattice's cells are {dx:.4g} x {dy:.4g} x {dz:.4g} in world "
+                f"units, an aspect ratio of {stretch:.3g}. The solve is entirely in "
+                "lattice units, so the duct that was actually solved is this one "
+                "stretched by that ratio, and every length, aspect ratio and "
+                "Nusselt number read off the result is the stretched duct's. Make "
+                "size[i] / resolution[i] equal on the three axes. The exception is "
+                "a field with no transverse structure -- a 1-D column, say -- where "
+                "the stretch cannot reach the answer and the caller converts units "
+                "themselves; tests/fem/test_flow_conjugate.py is that case."
+            )
         if not bool(np.isfinite(np.asarray(self.peak_temperature))):
             notes.append(
                 "The temperature field is not finite, which means the momentum march "

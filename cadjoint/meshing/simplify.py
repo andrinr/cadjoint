@@ -374,7 +374,7 @@ def simplify_mesh(
         cos_threshold=float(np.cos(np.radians(feature_angle))),
     )
     quadrics = _vertex_quadrics(vertices, faces)
-    evaluate = jax.vmap(sdf)
+    evaluate = jax.jit(jax.vmap(sdf))  # mapped repeatedly below; see edge_detection's note
 
     for _ in range(max_passes):
         faces, applied = _collapse_pass(vertices, faces, protected, quadrics, evaluate, error)

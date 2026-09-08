@@ -87,11 +87,24 @@ NODES = {
 }
 
 
-@pytest.mark.parametrize("label", list(NODES))
+#: The node kinds over the thirty-second line — a measured set (rotate 47 s,
+#: box 41 s, smooth union 32 s; the next dearest is cylinder at 27 s), not a
+#: guess.  The cheap kinds stay in the fast loop.
+_SLOW_NODES = frozenset({"rotate", "box", "smooth union"})
+
+
+@pytest.mark.parametrize(
+    "label",
+    [
+        pytest.param(label, marks=pytest.mark.slow) if label in _SLOW_NODES else label
+        for label in NODES
+    ],
+)
 def test_each_node_kind_lowers_to_its_kernel(label):
     _agree(NODES[label]())
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("scene", SCENES, ids=[s.stem for s in SCENES])
 def test_each_shipped_scene_lowers_whole(scene):
     from cadjoint.viewer.worker.scene import _execute_scene
