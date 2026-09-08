@@ -152,6 +152,7 @@ class TestFunctionalizePath:
         lower = float(loss({"radius": jnp.asarray(free["radius"]) - eps}))
         np.testing.assert_allclose(float(gradient), (upper - lower) / (2 * eps), rtol=1e-2)
 
+    @pytest.mark.slow
     def test_box_size_gradient_vs_finite_differences(self):
         # Regression test: parameter gradients through edge_hermite_data were
         # identically zero for an axis-aligned Box.  The Newton step converges
@@ -333,6 +334,7 @@ class TestValidation:
 
 
 class TestGradientFallback:
+    @pytest.mark.slow
     def test_polygon_walls_yield_valid_normals(self):
         # Regression: piecewise-linear walls let the secant land bit-exactly
         # on the surface, where polygon SDFs used to have a dead subgradient

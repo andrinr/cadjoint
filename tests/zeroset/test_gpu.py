@@ -119,6 +119,7 @@ def test_classify_names_the_surfaces_a_point_lies_on():
     assert not any(kinds[s] in ("band", "rim") for row in found for s in row)
 
 
+@pytest.mark.slow
 def test_classify_covers_a_smooth_union():
     model = lower(
         Union(
@@ -143,6 +144,7 @@ def test_classify_covers_a_smooth_union():
     assert {"band", "patch"} <= named  # some in the fillet, some on the faces
 
 
+@pytest.mark.slow
 def test_the_gpu_lands_where_a_cpu_newton_does():
     model = lower(
         Union(
