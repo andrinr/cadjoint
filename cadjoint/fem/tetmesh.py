@@ -144,6 +144,12 @@ class TetMesh:
     grid: GridSpec | None = None
     edge_parents: np.ndarray | None = None
     refinement: dict[str, Any] | None = None
+    #: The scene's node table and, per surface vertex, the census surfaces it
+    #: lies on — set by :func:`~cadjoint.fem.hexmesh.with_table` when the
+    #: scene is known, so :meth:`moved` holds a crease vertex on every face
+    #: that meets there.
+    table: Any = None
+    incidence: Any = None
 
     @property
     def num_points(self) -> int:
@@ -238,7 +244,28 @@ class TetMesh:
             target, params = design
             node_map = tier.require(PluginKind.NODE_MAP.value).component
             return node_map.positions(target, params, owned, smooth_passes=smooth_passes)
-        return recompute_tet_points(field, self, smooth_passes=smooth_passes)
+        if self.table is None or design is None:
+            return recompute_tet_points(field, self, smooth_passes=smooth_passes)
+        import jax.numpy as jnp
+
+        from cadjoint.fem.motion import smooth_interior_delta
+        from cadjoint.zeroset.project import project_table, theta_array
+
+        count = self.num_surface
+        corners = jnp.asarray(self.points[: self.num_corner_points])
+        theta = theta_array(self.table, design[1])
+        projected = project_table(
+            self.table, theta, corners[:count], self.incidence, max_step=self.max_step
+        )
+        if smooth_passes <= 0:
+            moved = jnp.concatenate([projected, corners[count:]], axis=0)
+        else:
+            moved = corners + smooth_interior_delta(
+                self, projected - corners[:count], smooth_passes
+            )
+        if self.edge_parents is None:
+            return moved
+        return jnp.concatenate([moved, moved[jnp.asarray(self.edge_parents)].mean(axis=1)], axis=0)
 
     def thermal(self, problem: Any, *, placement: Any = None, backend: Any = None) -> Any:
         """Steady conduction on the direct jax-fem path, the only one that takes tets."""

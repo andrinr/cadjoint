@@ -63,7 +63,15 @@ re-extracted on a finer grid over the same box before the build gives up, and
 the mesh records which rung it was built on — see
 [the refinement ladder](meshing.qmd#the-refinement-ladder).
 
-There is no fourth `method`, but there is a second mesher. Tets sized by the
+Whatever the method, what the rest of the app holds is a *discretization*
+(`cadjoint.fem.discretization`): it answers for its own surface, its own
+element quality, which nodes and facets a selection picks, how it moves when
+the design does, and which solver runs on it. Studies, the optimizer and the
+viewer's payloads ask it those questions rather than asking which family it
+is — which is why a fourth method was a new class and a table row, not a
+branch in six modules.
+
+There is a second mesher, too. Tets sized by the
 part rather than by the lattice come from Gmsh: `SimMesh(mesher="gmsh")` in
 [the meshing guide](meshing.qmd#the-gmsh-route). Its midside nodes sit on the
 true surface, and whether they *follow* the design parameters depends on the
@@ -77,7 +85,8 @@ filled](getting-started.qmd#pluggable-kinds) explains.
 min/mean/max alongside the counts and bounds. Hex meshes report
 `scaled_jacobian` and `aspect_ratio`; tet meshes report `radius_ratio`
 (3·r_in/r_circ, in (0, 1], higher is better) and `aspect_ratio` (longest over
-shortest edge, ≥ 1).
+shortest edge, ≥ 1). Cut cells report nothing: there are no elements to
+grade, and the Meshes tab says so rather than colouring a flat surface.
 
 ```python
 q = mesh.quality(bar)

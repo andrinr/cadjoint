@@ -61,7 +61,7 @@ from cadjoint.enums import (
     values,
 )
 from cadjoint.fem.cutfem import CutMesh
-from cadjoint.fem.hexmesh import GridSpec, HexMesh, sdf_to_hex_mesh
+from cadjoint.fem.hexmesh import GridSpec, HexMesh, sdf_to_hex_mesh, with_table
 from cadjoint.fem.tetmesh import TetMesh, sdf_to_tet_mesh, tet10_mesh
 from cadjoint.meshing import DEFAULT_BOUNDS, DEFAULT_SIZE
 from cadjoint.studies import require_triplet
@@ -389,6 +389,9 @@ class SimMesh:
             mesh = sdf_to_tet_mesh(field_fn, self.grid(sdf))
             if self.method == MeshMethod.TET10:
                 mesh = tet10_mesh(mesh)
+        # The scene, when it is one, gives the mesh its table: surface
+        # vertices classified onto the census, moved as such (hexmesh.with_table).
+        mesh = with_table(mesh, field_fn)
         self._cache = (field_fn, parameters, mesh)
         return mesh
 

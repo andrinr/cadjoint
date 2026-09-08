@@ -93,6 +93,11 @@ class HexMesh:
     snap_mask: np.ndarray = field(repr=False, default=None)  # type: ignore[assignment]
     max_step: float = 0.0
     grid: GridSpec | None = None
+    #: The scene's node table and, per snapped vertex, the census surfaces it
+    #: lies on — set by :func:`with_table` when the scene is known, so
+    #: :meth:`moved` can hold a crease vertex on both faces that meet there.
+    table: Any = field(repr=False, default=None)
+    incidence: Any = field(repr=False, default=None)
 
     @property
     def num_points(self) -> int:
@@ -160,10 +165,28 @@ class HexMesh:
         return _unresolvable_on_mesh(self, bcs)
 
     def moved(self, field: Any, *, smooth_passes: int = 0, design: Any = None) -> Any:  # noqa: ARG002 - the protocol's signature
-        """Node positions under ``field``: snapped vertices re-projected, the lattice frozen."""
+        """Node positions under the design: snapped vertices re-projected, the lattice frozen.
+
+        With a table and the design's parameters, each snapped vertex is
+        solved onto the census surfaces it was classified on — a crease
+        vertex onto both faces at once — which is the derivative a single
+        field's Newton gets wrong there.  Without, the single field's.
+        """
         from cadjoint.fem.motion import recompute_points
 
-        return recompute_points(field, self)
+        if self.table is None or design is None:
+            return recompute_points(field, self)
+        import jax.numpy as jnp
+
+        from cadjoint.zeroset.project import project_table, theta_array
+
+        indices = np.flatnonzero(self.snap_mask)
+        base = jnp.asarray(self.points)
+        theta = theta_array(self.table, design[1])
+        projected = project_table(
+            self.table, theta, base[indices], self.incidence, max_step=self.max_step
+        )
+        return base.at[indices].set(projected)
 
     def thermal(self, problem: Any, *, placement: Any = None, backend: Any = None) -> Any:
         """Steady conduction through the backend registry (``jaxfem`` by default)."""
@@ -220,6 +243,58 @@ class HexMesh:
 
         quads = faces_from_nodes(self, selection.resolve(self)).nodes
         return load_work_quads(positions, displacement, quads, vector)
+
+
+def with_table(mesh: Any, scene: Any, *, tolerance: float | None = None) -> Any:
+    """The mesh with the scene's node table and its surface vertices classified onto it.
+
+    Lowers ``scene`` (a construction object; a bare callable has no table
+    and the mesh is returned as is), names the census surfaces each
+    surface vertex lies on, and places the vertices with the incidence-aware
+    kernel at the nominal design so that :meth:`moved` at that design is a
+    no-op.  A vertex on no surface within ``tolerance`` (a twentieth of the
+    finest spacing by default) keeps its single-field placement.
+    """
+    if not hasattr(scene, "params") and not hasattr(scene, "children"):
+        return mesh
+    import dataclasses
+
+    import jax.numpy as jnp
+
+    from cadjoint.zeroset import lower
+    from cadjoint.zeroset.project import classify, project_table
+
+    try:
+        table = lower(scene)
+    except Exception:  # noqa: BLE001 - a scene the table cannot express keeps the single field
+        return mesh
+    if isinstance(mesh, HexMesh):
+        indices = np.flatnonzero(mesh.snap_mask)
+    else:
+        indices = np.arange(mesh.num_surface)
+    if indices.size == 0:
+        return dataclasses.replace(mesh, table=table, incidence=[])
+    spacing = min(mesh.grid.spacing) if mesh.grid is not None else mesh.max_step
+    tolerance = 0.05 * float(spacing) if tolerance is None else tolerance
+    theta = jnp.asarray(table.theta)
+    surface = np.asarray(mesh.points)[indices]
+    incidence = classify(table, theta, surface, tolerance=tolerance)
+    # Converged, not merely stepped: `moved` re-solves from these points at
+    # every design, so a placement that is not a fixed point of its own
+    # projection would move the mesh under a design that did not change.
+    placed = surface
+    for _ in range(4):
+        stepped = np.asarray(project_table(table, theta, placed, incidence, max_step=mesh.max_step))
+        if np.abs(stepped - placed).max() < 1e-12:
+            placed = stepped
+            break
+        placed = stepped
+    points = np.array(mesh.points, dtype=np.float64)
+    points[indices] = placed
+    if getattr(mesh, "edge_parents", None) is not None:
+        corners = points[: mesh.num_corner_points]
+        points[mesh.num_corner_points :] = corners[mesh.edge_parents].mean(axis=1)
+    return dataclasses.replace(mesh, points=points, table=table, incidence=incidence)
 
 
 def _require_selection(patch: Any) -> None:

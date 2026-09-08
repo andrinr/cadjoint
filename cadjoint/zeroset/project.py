@@ -25,7 +25,7 @@ from typing import Any
 
 import numpy as np
 
-__all__ = ["classify", "group_by_incidence", "project", "project_table"]
+__all__ = ["classify", "group_by_incidence", "project", "project_table", "theta_array"]
 
 #: Below this squared gradient a field says nothing about where its zero
 #: set is; the point stays put and contributes no derivative there.
@@ -101,6 +101,29 @@ def project(
             )
             x = start + displacement * jnp.minimum(1.0, max_step / length)
     return jnp.where(transversal[:, None], x, start)
+
+
+def theta_array(model: Any, values: dict[str, Any]) -> Any:
+    """The table's θ with ``values`` (by free-parameter name) written in, as a JAX array.
+
+    The traced counterpart of :func:`cadjoint.zeroset.refresh.theta_from_values`:
+    an entry the values name comes from them (and may be traced), any other
+    keeps the table's own.
+    """
+    import jax.numpy as jnp
+
+    slots: dict[str, list[int]] = {}
+    for i, name in enumerate(model.names):
+        slots.setdefault(name.split("[", 1)[0], []).append(i)
+    entries = [jnp.asarray(v, dtype=jnp.result_type(float)) for v in model.theta]
+    for name, value in values.items():
+        indices = slots.get(name)
+        if indices is None:
+            continue
+        flat = jnp.asarray(value).reshape(-1)
+        for k, i in enumerate(indices):
+            entries[i] = flat[k]
+    return jnp.stack(entries) if entries else jnp.zeros(0)
 
 
 def group_by_incidence(incidence: Sequence[Sequence[int]]) -> dict[tuple[int, ...], np.ndarray]:
