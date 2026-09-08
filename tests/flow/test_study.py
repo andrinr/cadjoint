@@ -392,11 +392,26 @@ class TestWarnings:
         assert not bool(jnp.isfinite(result.peak_temperature))
         assert any("diverged" in note for note in result.warnings())
 
+    def test_a_lattice_whose_cells_are_not_cubes_is_reported(self):
+        """The helper's default duct is 8 x 14 x 8 cells over a 2.0 cube, so
+        its cells are 0.25 x 0.143 x 0.25.  The solve is in lattice units, so
+        what it converges on is that duct stretched 1.75x along the flow, and
+        every geometric number read off the result belongs to the stretched
+        one.  Nothing downstream would say so, which is why this does."""
+        result = _study(name="stretched").solve(chi=jnp.zeros((8, 14, 8)))
+
+        assert any("aspect ratio" in note for note in result.warnings())
+
     def test_a_converged_forced_convection_study_warns_about_nothing(self):
+        """The duct is stated here rather than taken from the helper because
+        the helper's is not cubic, and a stretched lattice is now one of the
+        things a study reports: 2.0 x 3.5 x 2.0 over 8 x 14 x 8 cells makes
+        every cell 0.25 on a side."""
         _, fixed, evaluate = _block()
         free = extract_parameters(Box(Vector([0.45, 0.45, 0.62], free=True, name="size")))[0]
+        study = _study(name="clean", bounds=(-1.0, -1.75, -1.0), size=(2.0, 3.5, 2.0))
 
-        assert _study(name="clean").solve(evaluate(free, fixed)).warnings() == []
+        assert study.solve(evaluate(free, fixed)).warnings() == []
 
 
 class TestCoupledGradient:

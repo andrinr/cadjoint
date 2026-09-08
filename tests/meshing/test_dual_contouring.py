@@ -134,6 +134,9 @@ class TestUnionMesh:
 
 
 class TestDifferentiability:
+    # Finite-difference sweeps over a whole extraction: 136 s and 160 s.
+    pytestmark = pytest.mark.slow
+
     def test_sphere_radius_gradient_vs_finite_differences(self):
         edges = find_crossing_edges(sample_grid(sphere_sdf(1.0), SPHERE_GRID))
         incidence = cell_edge_incidence(edges, SPHERE_GRID)

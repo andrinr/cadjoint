@@ -145,6 +145,7 @@ def test_twist_normals_point_outward():
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.slow
 def test_twist_rendering_brightness_parity():
     """A twisted box should have similar mean brightness to the untwisted version.
 

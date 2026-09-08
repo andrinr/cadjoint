@@ -454,7 +454,7 @@ conductivity. The condition for ignoring buoyancy is a small **Richardson
 number** `Ri = g beta dT L / U^2`, which `FlowStudy.richardson` computes from
 the study's own numbers so it can be checked rather than assumed, and which
 `FlowStudyResult.warnings()` reports above 0.1. On `scenes/duct_sink.py` it is
-**3.0e-4** — buoyancy contributes under a thousandth of the momentum, and the
+**2.1e-4** — buoyancy contributes under a thousandth of the momentum, and the
 one-way reading is not measurably wrong. It would stop being so at a crawling
 inlet speed or a large temperature rise, which is exactly when the warning
 fires.
@@ -488,7 +488,8 @@ inlet temperature" ignores both the conduction back out through the inlet and
 the fact that the incoming air is advected at the first cell's temperature, and
 reports a couple of percent of spurious imbalance on a duct where the scheme is
 conserving to round-off. With both ends counted in full, the residual is
-**7.7e-12 on `scenes/duct_sink.py`** and 1e-13 to 1e-15 on the test cases — for
+**2.6e-11 on `scenes/duct_sink.py`** (7.7e-12 on the 14x26x14 lattice it used
+before its cells were made cubic) and 1e-13 to 1e-15 on the test cases — for
 any geometry, since the identity does not depend on one.
 
 That makes the energy balance the sharpest available check on the whole
@@ -550,7 +551,7 @@ the exponential decay of the bulk temperature:
 Converging on the correlation at roughly second order. **This is the number to
 quote when someone asks what resolution a trustworthy answer needs**: about 22
 cells across a channel for a Nusselt number good to a couple of percent, and
-`scenes/duct_sink.py` runs 12, where a heat-transfer coefficient is some 5% low.
+`scenes/duct_sink.py` runs 10, where a heat-transfer coefficient is some 7% low.
 
 ### 8.5 The gradient survives the coupling
 
@@ -600,11 +601,11 @@ of the same shape:
 ```python
 cooling = FlowStudy(
     name="duct-cooling",
-    resolution=(14, 26, 14),
-    bounds=(-0.70, -0.90, -0.50), size=(1.40, 1.80, 0.85),
+    resolution=(20, 26, 12),
+    bounds=(-0.70, -0.91, -0.50), size=(1.40, 1.82, 0.84),
     reynolds=25.0, conductivity_ratio=200.0,
     bcs=[Inlet(velocity=0.02, temperature=0.0), Outlet(), Walls(),
-         HeatSource(Nodes.box([-0.14, -0.18, -0.40], [0.14, 0.18, -0.20]), power=1.0)],
+         HeatSource(Nodes.box([-0.14, -0.18, -0.42], [0.14, 0.18, -0.18]), power=1.0)],
 )
 ```
 
@@ -733,10 +734,10 @@ minimize   T_junction(theta)  +  w . pressure_drop(theta)
 `pressure_drop` is not decoration. A sink that maximises contact with moving air
 by filling the duct with metal strangles the fan driving it; without the
 pressure term the optimizer walks into a solid block. On
-`scenes/duct_sink.py` the sink costs **9.1x** the empty duct's drop
-(9.78e-3 against 1.07e-3) while holding the die 0.602 above inlet air, and
-`d(peak)/d(fin thickness)` is −0.52 against `d(pressure drop)/d(fin thickness)`
-of +0.035 — the two terms genuinely pull opposite ways, which is what makes a
+`scenes/duct_sink.py` the sink costs **11.7x** the empty duct's drop
+(1.041e-2 against 8.88e-4) while holding the die 0.430 above inlet air, and
+`d(peak)/d(fin thickness)` is −1.74 against `d(pressure drop)/d(fin thickness)`
+of +0.025 — the two terms genuinely pull opposite ways, which is what makes a
 fin pitch fall out of the optimisation instead of a block.
 
 The old `heat_transfer` proxy (`int chi|u|`) remains for callers that want a
@@ -762,7 +763,7 @@ act on.
   a coarse duct needs real margin. A diverged march is now visible rather than
   silent, but it is still the caller's job to avoid.
 * **Resolution.** A Nusselt number good to a couple of percent needs about 22
-  cells across a channel (§8.4). `scenes/duct_sink.py` uses 12 and the test
+  cells across a channel (§8.4). `scenes/duct_sink.py` uses 10 and the test
   suite uses 6 to 14. Nothing in the suite is at a resolution whose *absolute*
   numbers should be quoted; what the suite checks is rates, identities and
   gradients, all of which are resolution-independent claims.

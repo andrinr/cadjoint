@@ -117,7 +117,7 @@ def surface_deviation(
         + weight_c[:, None] * corners[:, 2]
     )
 
-    values = np.abs(np.asarray(jax.vmap(sdf)(jnp.asarray(points)), dtype=np.float64))
+    values = np.abs(np.asarray(jax.jit(jax.vmap(sdf))(jnp.asarray(points)), dtype=np.float64))
     return {
         "max_abs": float(values.max()),
         "mean_abs": float(values.mean()),

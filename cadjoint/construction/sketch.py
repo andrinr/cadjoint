@@ -56,6 +56,7 @@ import math
 
 import jax
 import jax.numpy as jnp
+import numpy as np
 from jax import Array
 
 from cadjoint.fluent import Fluent
@@ -479,6 +480,73 @@ def _default_profile_name() -> str:
     return "profile" if _unnamed_profiles == 1 else f"profile_{_unnamed_profiles}"
 
 
+def _without_repeats(vertices: list[list[float]], tolerance: float) -> list[list[float]]:
+    """Drop vertices that repeat their predecessor, and the closing repeat.
+
+    A polygon distance divides by each edge's length, so one repeated vertex
+    is a divide-by-zero that propagates through the whole reduction and
+    leaves the field zero *everywhere*, not merely near the repeat.  It is a
+    silent failure — the profile still draws, the solid still extrudes, and
+    the field is uniformly zero.
+
+    Repeats arise geometrically, not only from bad input: when a rounded
+    rectangle's radius reaches half its shorter side that side's straight run
+    has zero length, so the two arcs meeting there start and end at the same
+    point.  The shape is a legitimate obround; only the winding is redundant.
+
+    Args:
+        vertices: Closed loop, in order, as ``[x, y]`` pairs.
+        tolerance: Separation below which two vertices count as one.
+
+    Returns:
+        The same loop with consecutive duplicates removed, still closed
+        implicitly (the first vertex is not repeated at the end).
+    """
+    kept: list[list[float]] = []
+    for vertex in vertices:
+        if kept and math.dist(vertex, kept[-1]) <= tolerance:
+            continue
+        kept.append(vertex)
+    while len(kept) > 3 and math.dist(kept[0], kept[-1]) <= tolerance:
+        kept.pop()
+    return kept
+
+
+def _refuse_zero_length_edges(vertices: list[Vector2], name: str) -> None:
+    """Reject an outline that repeats a point, loudly rather than silently.
+
+    A polygon distance divides by each edge's length, so a repeated vertex is
+    a divide-by-zero that propagates through the whole reduction and leaves
+    the field zero at *every* point in space, not merely near the repeat.
+    The profile still draws and the solid still extrudes, so the only symptom
+    is a part that has quietly ceased to exist — which is why this is an
+    error at construction rather than a value to be discovered downstream.
+
+    The check reads the vertices' values as given, which is where a duplicate
+    in a written outline shows up.  A free vertex dragged onto its neighbour
+    afterwards is not caught here, and neither is a traced one.
+
+    Raises:
+        ValueError: If any edge, including the closing one, has no length.
+    """
+    try:
+        points = np.asarray([np.asarray(v.value, dtype=np.float64) for v in vertices])
+    except Exception:  # A traced vertex has no position to check yet.
+        return
+    if points.shape[-1] != 2 or not np.isfinite(points).all():
+        return
+    tolerance = 1e-9 * max(float(np.ptp(points, axis=0).max()), 1.0)
+    closed = np.vstack([points, points[:1]])
+    repeats = np.flatnonzero(np.linalg.norm(np.diff(closed, axis=0), axis=1) <= tolerance)
+    if repeats.size:
+        first = int(repeats[0])
+        raise ValueError(
+            f"PolygonProfile {name!r} repeats vertex {first} at "
+            f"{points[first].tolist()}; a zero-length edge divides by zero in the "
+            "polygon distance and leaves the field zero everywhere."
+        )
+
+
 class PolygonProfile(Fluent):
     """Closed polygon profile in a sketch plane — a construction-tree node.
 
@@ -533,6 +601,7 @@ class PolygonProfile(Fluent):
                         name=f"{name}_v{i}",
                     )
                 )
+        _refuse_zero_length_edges(wrapped, name)
         self.vertices = wrapped
         self.params = {f"v{i}": v for i, v in enumerate(wrapped)}
 
@@ -673,7 +742,7 @@ class PolygonProfile(Fluent):
                     [cx + ox + radius * math.cos(angle), cy + oy + radius * math.sin(angle)]
                 )
         kwargs.setdefault("free", False)
-        return cls(vertices, **kwargs)
+        return cls(_without_repeats(vertices, 1e-9 * max(width, height)), **kwargs)
 
     def children(self) -> list[Fluent]:
         return [self.plane]

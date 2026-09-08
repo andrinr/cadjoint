@@ -35,6 +35,7 @@ def test_cache_directory_follows_xdg(monkeypatch, tmp_path):
 
 def test_enable_points_jax_at_the_directory(monkeypatch, tmp_path, restore_jax_cache_config):
     monkeypatch.delenv("CADJOINT_NO_COMPILATION_CACHE", raising=False)
+    monkeypatch.delenv("CADJOINT_CACHE_MIN_COMPILE_SECONDS", raising=False)
     target = tmp_path / "jaxcache"
     assert cache.enable_compilation_cache(target) == target
     assert target.is_dir()
@@ -43,6 +44,31 @@ def test_enable_points_jax_at_the_directory(monkeypatch, tmp_path, restore_jax_c
     # compilations, so a per-program time floor would cache none of them.
     assert jax.config.jax_persistent_cache_min_compile_time_secs == 0.0
     assert jax.config.jax_persistent_cache_min_entry_size_bytes == 0
+
+
+def test_min_compile_seconds_defaults_to_caching_everything(monkeypatch):
+    monkeypatch.delenv("CADJOINT_CACHE_MIN_COMPILE_SECONDS", raising=False)
+    assert cache.min_compile_seconds() == 0.0
+
+
+@pytest.mark.parametrize("raw,expected", [("0.05", 0.05), ("1", 1.0), ("0", 0.0)])
+def test_min_compile_seconds_reads_the_override(monkeypatch, raw, expected):
+    monkeypatch.setenv("CADJOINT_CACHE_MIN_COMPILE_SECONDS", raw)
+    assert cache.min_compile_seconds() == expected
+
+
+@pytest.mark.parametrize("raw", ["", "nonsense", "-3"])
+def test_a_bad_override_falls_back_rather_than_raising(monkeypatch, raw):
+    """A cache is an optimisation; a typo in an env var must not stop a run."""
+    monkeypatch.setenv("CADJOINT_CACHE_MIN_COMPILE_SECONDS", raw)
+    assert cache.min_compile_seconds() == 0.0
+
+
+def test_the_override_reaches_jax(monkeypatch, tmp_path, restore_jax_cache_config):
+    monkeypatch.delenv("CADJOINT_NO_COMPILATION_CACHE", raising=False)
+    monkeypatch.setenv("CADJOINT_CACHE_MIN_COMPILE_SECONDS", "0.25")
+    cache.enable_compilation_cache(tmp_path / "jaxcache")
+    assert jax.config.jax_persistent_cache_min_compile_time_secs == 0.25
 
 
 def test_opt_out_leaves_jax_alone(monkeypatch, tmp_path, restore_jax_cache_config):

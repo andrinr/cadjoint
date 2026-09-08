@@ -93,6 +93,7 @@ class TestSphereClassification:
 
 
 class TestCylinderClassification:
+    @pytest.mark.slow
     def test_rim_creases_without_corners(self):
         def sdf(p):
             return Cylinder.sdf(p, 0.5, 0.5)
@@ -116,6 +117,7 @@ class TestCylinderClassification:
 
 
 class TestDifferentiability:
+    @pytest.mark.slow
     def test_crease_measure_gradient_wrt_box_size_is_finite(self):
         # Regression test: flat-face cells of a box have covariance
         # eigenvalues that are exactly zero, and an unguarded

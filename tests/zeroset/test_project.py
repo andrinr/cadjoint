@@ -5,6 +5,7 @@ from __future__ import annotations
 import jax
 import jax.numpy as jnp
 import numpy as np
+import pytest
 
 from cadjoint.geometry.parameters import Scalar, Vector
 from cadjoint.sdf.primitives import Box, Sphere
@@ -20,6 +21,7 @@ def _sphere(center, radius):
     return lambda p: jnp.linalg.norm(p - c) - radius
 
 
+@pytest.mark.slow
 def test_one_field_lands_on_the_surface_and_the_step_is_clamped():
     seeds = np.random.default_rng(0).normal(size=(64, 3)) * 0.4 + [0.3, 0.0, 0.0]
     on = np.asarray(project([_sphere([0.3, 0, 0], 0.5)], seeds))
@@ -28,6 +30,7 @@ def test_one_field_lands_on_the_surface_and_the_step_is_clamped():
     assert np.linalg.norm(clamped - seeds, axis=1).max() <= 1e-3 + 1e-12
 
 
+@pytest.mark.slow
 def test_two_fields_land_on_their_intersection_and_three_on_a_point():
     a, b = _sphere([0, 0, 0], 0.7), _sphere([0.6, 0, 0], 0.7)
     seeds = np.random.default_rng(1).normal(size=(32, 3)) * 0.2 + [0.3, 0.0, 0.5]
@@ -47,6 +50,7 @@ def test_a_tangency_is_refused_and_the_points_stay():
     assert np.allclose(np.asarray(project([a, b], seeds)), seeds)
 
 
+@pytest.mark.slow
 def test_the_kernel_differentiates_through_the_design():
     def moved(radius):
         return project([_sphere([0, 0, 0], radius)], jnp.asarray([[0.2, 0.3, 0.1]]))[0]
@@ -56,6 +60,7 @@ def test_the_kernel_differentiates_through_the_design():
     np.testing.assert_allclose(dp, p / np.linalg.norm(p), atol=1e-9)  # the point moves radially
 
 
+@pytest.mark.slow
 def test_a_table_projects_by_incidence_and_classifies_its_own_points():
     model = lower(Box(size=Vector([0.5, 0.4, 0.3], free=True, name="s")))
     theta = jnp.asarray(model.theta)

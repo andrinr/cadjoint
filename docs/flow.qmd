@@ -147,14 +147,14 @@ from cadjoint.flow import FlowStudy, HeatSource, Inlet, Outlet, Walls
 
 cooling = FlowStudy(
     name="duct-cooling",
-    resolution=(14, 26, 14),
-    bounds=(-0.70, -0.90, -0.50), size=(1.40, 1.80, 0.85),
+    resolution=(20, 26, 12),        # cubic cells: 1.40/20 = 1.82/26 = 0.84/12
+    bounds=(-0.70, -0.91, -0.50), size=(1.40, 1.82, 0.84),
     reynolds=25.0, conductivity_ratio=200.0,
     bcs=[
         Inlet(velocity=0.02, temperature=0.0),
         Outlet(),
         Walls(),                       # no-slip always; adiabatic by default
-        HeatSource(Nodes.box([-0.14, -0.18, -0.40], [0.14, 0.18, -0.20]), power=1.0),
+        HeatSource(Nodes.box([-0.14, -0.18, -0.42], [0.14, 0.18, -0.18]), power=1.0),
     ],
 )
 result = cooling.solve(scene_sdf)
@@ -162,13 +162,19 @@ print(float(result.peak_temperature), float(result.pressure_drop))
 ```
 
 `scenes/duct_sink.py` is that scene — a three-fin sink in a duct — and running
-it takes about ten seconds:
+it takes well under a minute:
 
 ```
-peak temperature     0.60223      thermal resistance   0.60223
-mean temperature     0.58617      pressure drop        0.009779
-outlet bulk air      0.34657      energy imbalance    -7.700e-12
+peak temperature     0.42973      thermal resistance   0.42973
+mean temperature     0.41265      pressure drop        0.010414
+outlet bulk air      0.27618      energy imbalance    -2.566e-11
 ```
+
+The cubic cells in that declaration are load-bearing rather than tidy. The
+solve is entirely in lattice units — streaming moves one cell per axis, the
+energy stencil is one cell wide — so `size` reaches it only by deciding where
+the SDF is sampled, and a lattice whose spacings differ hands the solver the
+duct stretched by their ratio. `warnings()` reports it; nothing else would.
 
 ### One equation, two phases
 
@@ -192,7 +198,7 @@ The coupling is **one-way**, and in this model that is exact rather than a
 simplification: the momentum solve takes `chi`, an inlet velocity and a
 viscosity, and none of them depends on temperature, so there is nothing to
 iterate. What a two-way coupling would add is buoyancy, which is negligible
-when the Richardson number is small — `result.richardson` reports it (3.0e-4 on
+when the Richardson number is small — `result.richardson` reports it (2.1e-4 on
 the scene above) and `result.warnings()` complains above 0.1.
 
 ### It is checked against things that are not itself
@@ -204,12 +210,13 @@ the scene above) and `result.warnings()` complains above 0.1.
 | metal–air interface vs. a two-layer series resistance | 1.4e-13 at a conductivity ratio of 8000 |
 | advection–diffusion vs. the analytic column | 3.9e-16 (exponential scheme); upwind is off by 0.198 |
 | square-duct Nusselt number vs. the textbook 2.976 | 2.927 at 22 cells across (−1.65%), 2.857 at 14 (−4.0%) |
-| global energy balance | 7.7e-12 of the injected power |
+| global energy balance | 2.6e-11 of the injected power |
 
-`warnings()` reports what the study will not let you assume — a Richardson
-number that has stopped being small, a Reynolds number past the turbulent
-transition, an under-resolved thermal boundary layer, or an energy balance that
-has stopped closing.
+`warnings()` reports what the study will not let you assume — a lattice whose
+cells are not cubes and so is solving a stretched duct, a Richardson number
+that has stopped being small, a Reynolds number past the turbulent transition,
+an under-resolved thermal boundary layer, or an energy balance that has stopped
+closing.
 
 ### The gradient survives both solvers
 
@@ -294,7 +301,7 @@ Krylov vectors, 12.8 GB at 128³, where `"fixed_point"` needs three states.
 The objective a designer actually wants — junction temperature under real
 airflow, against the pressure drop the fan has to pay — is now available from a
 single `FlowStudy`, and both terms are needed: on `scenes/duct_sink.py` the
-sink costs 9.1× the empty duct's pressure drop while holding the die 0.602
+sink costs 11.7× the empty duct's pressure drop while holding the die 0.430
 above inlet air, and thickening a fin moves those two the opposite way. Without
 the pressure term an optimizer walks straight into a solid block.
 

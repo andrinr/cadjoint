@@ -5,6 +5,7 @@ from __future__ import annotations
 import jax
 import jax.numpy as jnp
 import numpy as np
+import pytest
 
 from cadjoint.construction import PolygonProfile, loft
 from cadjoint.meshing import GridSpec, extract_mesh
@@ -42,6 +43,11 @@ def analytic_volume() -> float:
         return 0.5 * abs(float(np.sum(v[:, 0] * rolled[:, 1] - rolled[:, 0] * v[:, 1])))
 
     return HEIGHT / 6.0 * (area(0.0) + 4.0 * area(0.5) + area(1.0))
+
+
+# ``extract`` is not memoised, so all four tests pay a real extraction; the
+# first measured 169 s and the rest share its compilation.
+pytestmark = pytest.mark.slow
 
 
 class TestLoftMesh:

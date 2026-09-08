@@ -136,6 +136,15 @@ BOX_MINUS_BOX_VOL = 1.0 - 0.5 * 0.5 * 1.0
 GRAZING_VOL = 0.8**3 + 4.0 / 3.0 * np.pi * GRAZE_R**3 - cap_volume(GRAZE_R, 0.02)
 
 
+# Every test here is a real dual-contouring extraction or a reader of one.
+# The mark goes on the module rather than the dear tests because ``get_mesh``
+# memoises per scene: the extraction is charged to whichever test touches a
+# scene first (99 s to 296 s for ``test_watertight_manifold``), so marking
+# that test alone would move the cost to ``test_euler_characteristic``
+# instead of removing it.  At least 1351 s of this module is extraction.
+pytestmark = pytest.mark.slow
+
+
 class Scene(NamedTuple):
     """One CSG stress scene and its expected mesh invariants."""
 

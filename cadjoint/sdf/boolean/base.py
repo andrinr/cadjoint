@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from typing import Any
 
+import jax
 import jax.numpy as jnp
 from jax import Array
 
 from cadjoint.sdf import SDF
+from cadjoint.sdf.base import _child_patch_fields
 
 
 def _mix(first: Any, second: Any, weight: Array) -> Array:
@@ -62,6 +64,76 @@ def blend_materials(first: dict, second: dict, weight: Array) -> dict:
         A material dict with the same keys as ``first``.
     """
     return {key: _mix(first[key], second[key], weight) for key in first}
+
+
+def _is_hard(smoothness) -> bool:
+    """Whether a blend radius is a *known* zero, i.e. the node is sharp CSG.
+
+    A traced radius reports ``False``: it could be anything at call time, and
+    the decomposition below is only valid for the sharp composition, so the
+    unknown case has to decline.
+
+    Args:
+        smoothness: The node's blend radius — a number or a tracer.
+
+    Returns:
+        True when the value is concrete and exactly zero.
+    """
+    try:
+        return float(smoothness) == 0.0
+    except (TypeError, ValueError, jax.errors.ConcretizationTypeError):
+        return False
+
+
+def _operand_patch_fields(node: BooleanOp, negate_tools: bool = False):
+    """The operands' patch fields concatenated, operand-major.
+
+    A hard boolean is a ``min``/``max`` over its operands, so its surface is
+    made of pieces of the operands' surfaces and nothing else: the node's
+    decomposition is exactly the operands' decompositions, laid end to end.
+    The order is **operand-major** — all of ``sdfs[0]``'s fields, then all of
+    ``sdfs[1]``'s, and so on — and stable, so a consumer that wants to know
+    which operand a patch came from can recover it by counting.  Nothing here
+    marks it: the consumer's ownership is a two-stage ``argmin`` (nearest
+    leaf, then nearest patch within it), it assumes no operand is convex or
+    even connected, and a declared patch that ends up bounding nothing is
+    dropped by its own boundary probe.  A marker would be a fifth wheel.
+
+    If any operand has no decomposition, neither does the node: the protocol's
+    contract is that the fields cover the whole surface, and a partial cover
+    would hide the missing operand's surface rather than fall back to the
+    single opaque patch a ``None`` earns.
+
+    Where this stops being exact is smoothness.  A blended boolean rounds the
+    seam, and the rounded fillet is **not** on any operand's zero set — it is
+    a surface the blend invents, which no operand field vanishes on.  So a
+    node with a non-zero (or traced, hence unknown) blend radius declines
+    rather than declaring a decomposition with a hole in it where the fillet
+    is.  Sharp nodes, where ``smooth_min``/``smooth_max`` degenerate to plain
+    ``min``/``max``, are exact.
+
+    Args:
+        node: The boolean node, read for its ``smoothness`` and ``sdfs``.
+        negate_tools: Negate every operand after the first, which is what
+            :class:`~cadjoint.sdf.boolean.difference.Difference` needs so its
+            tools' fields still read positive outside the *result*.
+
+    Returns:
+        The concatenated fields, or ``None`` when the node is blended or any
+        operand declares nothing.
+    """
+    if not _is_hard(node.params["smoothness"].value):
+        return None
+    fields: list = []
+    for index, child in enumerate(node.sdfs):
+        child_fields = _child_patch_fields(child)
+        if child_fields is None:
+            return None
+        if negate_tools and index > 0:
+            fields.extend((lambda p, f=field: -f(p)) for field in child_fields)
+        else:
+            fields.extend(child_fields)
+    return fields
 
 
 class BooleanOp(SDF):

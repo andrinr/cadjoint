@@ -200,6 +200,41 @@ class TestGeneratedOutlines:
         )
         assert np.abs(vertices).max() == pytest.approx(0.5, abs=1e-6)
 
+    def test_a_radius_of_half_the_short_side_still_has_a_field(self):
+        """The obround case: no straight run, so two arcs meet at one point.
+
+        The repeated vertex is a zero-length edge, and a polygon distance
+        divides by every edge length, so the divide-by-zero propagated
+        through the reduction and left the field zero *everywhere* — the
+        profile still drew and the solid still extruded, showing nothing.
+        """
+        profile = PolygonProfile.rounded_rect(4.0, 2.0, 1.0, segments=4, name="r")
+        vertices = np.asarray(profile.vertex_array())
+        edges = np.linalg.norm(np.diff(np.vstack([vertices, vertices[:1]]), axis=0), axis=1)
+        assert edges.min() > 1e-6, "an arc junction left a zero-length edge"
+        # Extruded deep enough that the profile, not the depth, sets the
+        # centre's distance: the nearest edge is the 1.0 flank.
+        solid = extrude(profile, depth=4.0)
+        assert float(solid(jnp.zeros(3))) == pytest.approx(-1.0, abs=1e-3)
+        assert float(solid(jnp.array([5.0, 0.0, 0.0]))) == pytest.approx(3.0, abs=1e-3)
+
+    def test_a_radius_of_half_a_square_is_a_disc(self):
+        """Every straight run vanishes at once; the outline is a circle."""
+        profile = PolygonProfile.rounded_rect(2.0, 2.0, 1.0, segments=8, name="r")
+        radii = np.linalg.norm(np.asarray(profile.vertex_array()), axis=1)
+        np.testing.assert_allclose(radii, 1.0, atol=1e-6)
+        assert len(radii) == 4 * 8, "the arc junctions should not be repeated"
+
+    def test_a_repeated_vertex_is_refused_at_construction(self):
+        """The same trap reached directly, where it can only be caught loudly."""
+        with pytest.raises(ValueError, match="repeats vertex 1"):
+            PolygonProfile([[0.0, 0.0], [1.0, 0.0], [1.0, 0.0], [0.0, 1.0]], name="dup")
+
+    def test_a_closing_repeat_is_refused_too(self):
+        """A loop written with its first point repeated at the end."""
+        with pytest.raises(ValueError, match="repeats vertex 3"):
+            PolygonProfile([[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 0.0]], name="closed")
+
     def test_a_non_positive_size_is_refused(self):
         with pytest.raises(ValueError, match="positive size"):
             PolygonProfile.rounded_rect(0.0, 1.0, 0.1)
