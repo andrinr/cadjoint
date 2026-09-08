@@ -31,6 +31,7 @@ from cadjoint.sdf.primitives import (
     Box,
     Cylinder,
     ExtrudedPolygon,
+    LoftedPolygon,
     RevolvedPolygon,
     Sphere,
     Torus,
@@ -396,6 +397,178 @@ class TestRevolvedPolygonPatchFields:
             # Bottom (height = -0.5) is edge 0; top is edge 2.
             assert _patch_id(fields, [1.5 * c, -0.5, 1.5 * s]) == 0
             assert _patch_id(fields, [1.5 * c, 0.5, 1.5 * s]) == 2
+
+
+# A convex, deliberately irregular pentagon: no two walls of a loft built on
+# it share a plane, and none is axis-aligned.
+LOFT_PROFILE = [[-1.0, -0.8], [1.1, -0.7], [1.3, 0.5], [0.1, 1.2], [-1.2, 0.4]]
+LOFT_HEIGHT = 1.4
+
+
+def _scaled(factor: float, profile=LOFT_PROFILE) -> list[list[float]]:
+    return [[factor * x, factor * y] for x, y in profile]
+
+
+def _loft(profile_b, profile_a=None, height: float = LOFT_HEIGHT) -> LoftedPolygon:
+    profile_a = LOFT_PROFILE if profile_a is None else profile_a
+    return LoftedPolygon(
+        [jnp.array(v) for v in profile_a], [jnp.array(v) for v in profile_b], height=height
+    )
+
+
+class TestLoftedPolygonPatchFields:
+    """Walls plus caps — but only for a loft whose every wall is flat."""
+
+    TAPER = 0.55
+
+    def _frustum(self) -> LoftedPolygon:
+        """A truncated pyramid: two scaled copies of one profile.
+
+        Scaling maps edge ``AB`` to a *parallel* edge ``A'B'``, and two
+        parallel lines always span a plane, which is why this shape — a
+        flared port, a draughted pad — is the case worth catching.
+        """
+        return _loft(_scaled(self.TAPER))
+
+    def _wall_point(self, edge: int, t: float, z: float) -> np.ndarray:
+        """A point on wall ``edge``, on the ruling at profile parameter ``t``."""
+        bottom = np.asarray(LOFT_PROFILE)
+        top = np.asarray(_scaled(self.TAPER))
+        count = len(bottom)
+        blend = z / LOFT_HEIGHT + 0.5
+        nxt = (edge + 1) % count
+        first = bottom[edge] + blend * (top[edge] - bottom[edge])
+        second = bottom[nxt] + blend * (top[nxt] - bottom[nxt])
+        xy = first + t * (second - first)
+        return np.array([xy[0], xy[1], z])
+
+    def test_declares_walls_and_caps(self):
+        assert len(self._frustum().patch_fields()) == len(LOFT_PROFILE) + 2
+
+    def test_each_wall_field_vanishes_on_its_own_wall(self):
+        """The declared plane really is the surface the loft's sdf traces."""
+        loft = self._frustum()
+        fields = loft.patch_fields()
+        for edge in range(len(LOFT_PROFILE)):
+            for t in (0.25, 0.5, 0.75):
+                for z in (-0.6, -0.2, 0.0, 0.3, 0.6):
+                    point = jnp.asarray(self._wall_point(edge, t, z), jnp.float32)
+                    assert float(loft(point)) == pytest.approx(0.0, abs=1e-6)
+                    assert float(fields[edge](point)) == pytest.approx(0.0, abs=1e-6)
+                    assert _patch_id(fields, point) == edge
+
+    def test_cap_ids(self):
+        fields = self._frustum().patch_fields()
+        count = len(LOFT_PROFILE)
+        assert _patch_id(fields, [0.0, 0.0, -LOFT_HEIGHT / 2]) == count
+        assert _patch_id(fields, [0.0, 0.0, LOFT_HEIGHT / 2]) == count + 1
+
+    def test_wall_fields_are_unit_gradient_planes(self):
+        """A plane, not merely a surface through the right points.
+
+        The sdf measures within the horizontal slice, which reads
+        ``1/|n_xy|`` times the true distance to a tilted wall; what is
+        declared is the plane itself, so a constant unit gradient over the
+        whole wall is the thing to check.
+        """
+        fields = self._frustum().patch_fields()
+        for edge in range(len(LOFT_PROFILE)):
+            gradient = jax.grad(lambda p, f=fields[edge]: jnp.reshape(f(p), ()))
+            seen = []
+            for t, z in ((0.2, -0.6), (0.5, 0.0), (0.8, 0.6)):
+                value = np.asarray(gradient(jnp.asarray(self._wall_point(edge, t, z), jnp.float32)))
+                assert np.linalg.norm(value) == pytest.approx(1.0, abs=1e-6)
+                seen.append(value)
+            # Constant over the wall: that is what makes it a plane.
+            np.testing.assert_allclose(seen[0], seen[1], atol=1e-6)
+            np.testing.assert_allclose(seen[1], seen[2], atol=1e-6)
+
+    def test_walls_point_outward_for_either_winding(self):
+        clockwise = _loft(
+            list(reversed(_scaled(self.TAPER))), profile_a=list(reversed(LOFT_PROFILE))
+        )
+        for loft in (self._frustum(), clockwise):
+            fields = loft.patch_fields()
+            outside = jnp.array([4.0, 0.0, 0.0])
+            assert float(loft(outside)) > 0.0
+            assert max(float(f(outside)) for f in fields) > 0.0
+            inside = jnp.array([0.0, 0.0, 0.0])
+            assert float(loft(inside)) < 0.0
+            assert max(float(f(inside)) for f in fields) < 0.0
+
+    def test_a_ruled_loft_declares_nothing(self):
+        """Rotate the far profile and every wall becomes a genuine ruled surface."""
+        angle = np.pi / 5
+        cos, sin = np.cos(angle), np.sin(angle)
+        rotated = [[cos * x - sin * y, sin * x + cos * y] for x, y in _scaled(self.TAPER)]
+        assert _loft(rotated).patch_fields() is None
+
+    def test_one_bent_wall_disqualifies_the_whole_node(self):
+        """No partial cover: the contract is that the fields span the surface.
+
+        Nudging a single far-profile vertex rules the two walls that meet
+        there and leaves the other three flat.  A three-wall decomposition
+        would quietly lose the other two, so the node declines outright.
+        """
+        bent = _scaled(self.TAPER)
+        bent[2] = [bent[2][0] + 0.25, bent[2][1] - 0.1]
+        assert _loft(bent).patch_fields() is None
+
+    def test_tolerance_brackets_float32_noise_and_real_bending(self):
+        """The coplanarity threshold, pinned from both sides.
+
+        The tolerance is ``1e-5`` of the loft's bounding diagonal (about
+        4e-5 here).  A vertex off by 1e-6 is float32-grade noise and must
+        still declare; one off by 1e-3 is a real bend and must not.
+        """
+        for nudge, declares in ((1e-6, True), (1e-3, False)):
+            profile = _scaled(self.TAPER)
+            profile[2] = [profile[2][0] + nudge, profile[2][1]]
+            fields = _loft(profile).patch_fields()
+            assert (fields is not None) is declares, f"nudge {nudge} decided the wrong way"
+
+    def test_a_degenerate_height_declares_nothing(self):
+        """Zero height collapses every wall: no plane through the corners."""
+        assert _loft(_scaled(self.TAPER), height=0.0).patch_fields() is None
+
+    def test_opposite_windings_decline(self):
+        """A self-intersecting loft has no outward orientation to declare."""
+        assert _loft(list(reversed(_scaled(self.TAPER)))).patch_fields() is None
+
+    def test_traced_profiles_fall_back_to_the_reading_taken_at_construction(self):
+        """Coplanarity is discrete, so a rebuild under a tracer reuses it.
+
+        The private tier's handle solver re-reads ``patch_fields()`` with the
+        sketch vertices swapped for tracers.  ``float()`` of a tracer cannot
+        say whether four corners are coplanar, so the reading taken from the
+        nominal profiles at construction stands, and the fields themselves
+        stay differentiable in both profiles.
+        """
+        loft = LoftedPolygon(
+            [Vector2(value=list(v)) for v in LOFT_PROFILE],
+            [Vector2(value=list(v)) for v in _scaled(self.TAPER)],
+            height=LOFT_HEIGHT,
+        )
+        point = jnp.asarray([0.6, 0.1, 0.2])
+
+        def walls(profile):
+            names = [f"w{i}" for i in range(loft.num_vertices)]
+            original = [loft.params[name].value for name in names]
+            for index, name in enumerate(names):
+                loft.params[name].value = profile[index]
+            try:
+                fields = loft.patch_fields()
+                assert fields is not None, "a traced rebuild must keep the declaration"
+                return jnp.stack([jnp.reshape(field(point), ()) for field in fields])
+            finally:
+                for name, value in zip(names, original):
+                    loft.params[name].value = value
+
+        nominal = jnp.asarray(_scaled(self.TAPER))
+        analytic = np.asarray(jax.jacrev(walls)(nominal))
+        assert analytic.shape == (len(LOFT_PROFILE) + 2, len(LOFT_PROFILE), 2)
+        assert np.isfinite(analytic).all()
+        assert np.abs(analytic).max() > 0.05, "the walls must move with the far profile"
 
 
 class _Plane:
