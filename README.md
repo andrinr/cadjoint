@@ -33,7 +33,7 @@ scene beside the geometry it loads — here the end cap's `ThermalStudy`, a heat
 flux on the bearing boss and a fixed temperature on the flange — and solving it
 is one click, meshing included:
 
-[![The end cap's cap-conduction thermal study is run from the Simulate panel. The job chip counts up while the part is meshed and solved, then the temperature field lands on the solid with its legend, and the part is turned with the field on it.](docs/assets/motion/end-cap-solve.webp)](scenes/end_cap.py)
+[![The end cap's cap-conduction thermal study is run from the Simulate panel. Its mesh is declared as cut cells, so no volume mesh is built: the job chip counts up while the lattice's cut cells are assembled and solved, then the temperature field lands on the solid with its legend, and the part is turned with the field on it.](docs/assets/motion/end-cap-solve.webp)](scenes/end_cap.py)
 
 The same study is a function of the sketch, so `jax.grad` reaches from its
 objective back to a fin's tip coordinate. An `Optimization` declared in the
@@ -45,13 +45,13 @@ overbuilt and slims as its peak temperature falls:
 
 A work plane taken from a face (`SketchPlane.on(body.cap("+"))`) is an
 expression over the parent feature's parameters, so a boss extruded from it
-differentiates with respect to its parent's depth. Every sketch's plane is
-drawn in the viewport with its origin and normal; the sketch tool shows where
-a new one will land before it exists, and a plane written as literals can be
-taken by its frame and moved, which rewrites the `SketchPlane(origin=...)`
-in the source:
+differentiates with respect to its parent's depth. While sketching, the plane
+of the sketch you touch is drawn with its origin and normal (every plane, in
+every mode, is one switch away); the sketch tool shows where a new one will
+land before it exists, and a plane written as literals can be taken by its
+frame and moved, which rewrites the `SketchPlane(origin=...)` in the source:
 
-[![The heat sink in the playground with every sketch plane drawn as a translucent frame, an origin cross and a normal glyph, each named. The sketch tool is armed and a ghost frame labelled new sketch follows the pointer across the floor. Then the fin comb's plane is selected by its frame edge, the gizmo appears at its origin, and dragging the gizmo's Z arrow lifts the whole comb; the editor's SketchPlane(origin=[...]) literal is rewritten on release.](docs/assets/motion/sketch-planes.webp)](scenes/starter.py)
+[![The heat sink in the playground, switched to Sketch mode: no plane is drawn yet. The sketch tool is armed and a ghost frame labelled new sketch follows the pointer across the floor. Then the pointer lands on one of the fin comb's handles and the comb's plane appears — a translucent frame, an origin cross and a normal glyph, named — and stays once the handle is clicked; the plane is taken by its frame edge, the gizmo appears at its origin, and dragging the gizmo's Z arrow lifts the whole comb; the editor's SketchPlane(origin=[...]) literal is rewritten on release.](docs/assets/motion/sketch-planes.webp)](scenes/starter.py)
 
 No boundary representation is stored: the field is the model, and every
 surface is derived from it at a resolution you choose.

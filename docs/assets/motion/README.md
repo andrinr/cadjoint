@@ -16,5 +16,5 @@ Do not hand-edit anything in this directory.
 | `end-cap-solve.webp` | 8.7s | 139 | 1440px wide | 1261 KB |
 | `heat-sink-optimize.webp` | 10.8s | 173 | 980px wide | 544 KB |
 | `properties-window.webp` | 6.8s | 109 | 980px wide | 288 KB |
-| `sketch-planes.webp` | 10.9s | 174 | 1120px wide | 796 KB |
-| **total** | | | | **4.04 MB** |
+| `sketch-planes.webp` | 9.9s (22s wall) | 159 | 1120px wide | 768 KB |
+| **total** | | | | **4.01 MB** |

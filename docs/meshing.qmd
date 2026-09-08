@@ -194,7 +194,7 @@ represent — a max absolute error of 0.0029 on a unit sphere at 26 cells.
 
 ## Tet meshes need a finer grid than hexes
 
-The same declared resolution buys you two different things. `method="hex"`
+The same declared resolution buys you three different things. `method="hex"`
 only has to decide in/out per lattice cell, so a rib 1.3 cells thick still
 produces a legal (if staircased) HEX8 mesh. `method="tet4"` / `"tet10"` hand
 the dual-contour surface to TetGen as a piecewise linear complex (a second
@@ -203,7 +203,7 @@ and sizes elements by the part rather than by the lattice), and a PLC
 has to be *clean*: watertight, manifold, and free of self-intersections. One
 QEF vertex per cell cannot represent two surface sheets passing through one
 cell, so where a wall is thinner than about two cells the extracted quads
-fold over each other and TetGen refuses the whole thing:
+fold over each other and TetGen refuses the whole thing: `method="cutfem"` builds no volume mesh at all: the lattice's cut cells are the discretisation, and the same dual-contour surface is extracted only to be drawn and selected on — see [the simulation page](simulation.qmd).
 
 ```
 RuntimeError: TetGen rejected the surface: The input surface mesh contain

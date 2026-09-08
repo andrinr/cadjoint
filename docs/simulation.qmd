@@ -42,19 +42,31 @@ supplied together; omit both and the mesh scans for them, padded by `padding`.
 `resolution` is always the *lattice*, not the element count — for tets it is the
 dual-contouring extraction grid.
 
-Three `method` values:
+Four `method` values:
 
 | `method` | `MeshMethod` | Element | How it is built |
 |---|---|---|---|
 | `"hex"` (default) | `MeshMethod.HEX` | HEX8 | Voxelize the lattice, Newton-snap boundary nodes onto the SDF. Fast, lattice-aligned, deterministic across platforms. |
 | `"tet4"` | `MeshMethod.TET4` | TET4 | Dual-contour the surface, fill it with TetGen. Boundary-conforming. |
 | `"tet10"` | `MeshMethod.TET10` | TET10 | The TET4 mesh promoted to straight-sided quadratic tets. Accurate boundary, slower. |
+| `"cutfem"` | `MeshMethod.CUTFEM` | none | No volume mesh: the lattice's cells are the elements, the ones the surface passes through are cut by it, and the boundary is handled weakly (CutFEM). The surface is extracted only to be drawn and selected on. Thermal studies only, numeric conductivity. |
 
 Both spellings are the same declaration: `method="tet10"` and
 `method=MeshMethod.TET10` (`from cadjoint.enums import MeshMethod`) build the
 same mesh and the same payload, because a `MeshMethod` *is* a `str`. The enum
 is where the option set is defined, so a typo is rejected with the list of
 what is accepted rather than surfacing as a strange mesh.
+
+`"cutfem"` is the one without a mesher at all. Nothing is voxelized and
+nothing is tetrahedralized: the study assembles on the lattice's cut cells,
+a design change moves the cut — not a node map — and the gradient of a
+`metric="mean"` optimization comes through the quadrature at fixed structure
+(`gradient_path="direct"`; the Tesseract chains expect a mesh). There are no
+elements to grade, so the Meshes tab draws the surface flat and says so; the
+end cap ships on it. It is thermal-only for now, wants a numeric
+conductivity (materials are not sampled on cut cells yet), and a thin
+feature needs a resolution well under its thickness before the numbers mean
+much. The first solve on a structure pays a compile of its quadrature.
 
 The tet methods need the `tetgen` package. On the same bar, `"tet10"` gives 947
 nodes across 448 elements against the hex mesh's 336 nodes and 180 elements.
@@ -365,7 +377,8 @@ Two constraints worth knowing. CalculiX is **elastic and HEX8 only**, and its
 differentiability is objective-valued: cotangents on the raw displacement field
 are refused, because what ccx hands back is a strain energy. And tet meshes
 (`"tet4"` / `"tet10"`) solve on the direct jax-fem path only — use a hex
-`SimMesh` for the other backends.
+`SimMesh` for the other backends. Cut cells (`"cutfem"`) are their own
+solver and take no backend at all.
 
 Forward solves are not `jax.jit`-able, because PETSc assembly happens outside
 the trace. Each backend call enables x64 for its own duration, but code that
