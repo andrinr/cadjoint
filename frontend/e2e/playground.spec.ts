@@ -686,14 +686,60 @@ test("the projection toggle works on its own", async ({ page }) => {
 
 test("the projection toggle sits inside the cube's square", async ({ page }) => {
   // It used to hang under the widget, which read as orphaned. It belongs to
-  // the cube cluster — the corner opposite the axis triad — so its box is
-  // inside the stage's box, in the lower-right quarter.
+  // the cube cluster, in the corner of the stage the silhouette never reaches
+  // — the top right — so its box is inside the stage's box, in the upper-right
+  // quarter. (This asserted the *lower* right while the stylesheet had already
+  // moved it to the top, and had been failing for it.)
   const stage = (await page.locator(".cube-stage").boundingBox())!;
   const toggle = (await page.getByTestId("projection-toggle").boundingBox())!;
   expect(toggle.x).toBeGreaterThanOrEqual(stage.x + stage.width / 2);
-  expect(toggle.y).toBeGreaterThanOrEqual(stage.y + stage.height / 2);
+  expect(toggle.y).toBeGreaterThanOrEqual(stage.y - 0.5);
   expect(toggle.x + toggle.width).toBeLessThanOrEqual(stage.x + stage.width + 0.5);
-  expect(toggle.y + toggle.height).toBeLessThanOrEqual(stage.y + stage.height + 0.5);
+  expect(toggle.y + toggle.height).toBeLessThanOrEqual(stage.y + stage.height / 2);
+});
+
+/** The union of the client rects of every element a selector matches. */
+const inkBox = (page: Page, selector: string) =>
+  page.locator(selector).evaluateAll((nodes) => {
+    const boxes = nodes.map((node) => node.getBoundingClientRect());
+    return {
+      left: Math.min(...boxes.map((box) => box.left)),
+      top: Math.min(...boxes.map((box) => box.top)),
+      right: Math.max(...boxes.map((box) => box.right)),
+      bottom: Math.max(...boxes.map((box) => box.bottom)),
+    };
+  });
+
+test("the axis triad clears the cube, whichever way the camera turns", async ({ page }) => {
+  // The defect this pins: the triad was drawn inside the cube's own square,
+  // and because it turns with the camera its arms swept a disc across the
+  // silhouette, the face labels and the projection toggle — the X label ran
+  // off the left edge of the stage and the Z arm crossed the top facet. It
+  // has a square of its own under the cube now, so the two never meet: the
+  // topmost triad ink stays below the lowest cube ink at every standpoint.
+  const canvas = page.getByTestId("viewer-canvas");
+  const frame = (await canvas.boundingBox())!;
+  await page.mouse.click(frame.x + frame.width * 0.45, frame.y + frame.height * 0.5);
+
+  const clear = async (view: string) => {
+    const cube = await inkBox(page, ".cube-stage .cube-facet, .cube-stage .cube-label");
+    const triad = await inkBox(page, ".cube-triad line, .cube-triad text");
+    const toggle = (await page.getByTestId("projection-toggle").boundingBox())!;
+    expect(triad.top, `${view}: the triad runs into the cube`).toBeGreaterThan(cube.bottom);
+    expect(triad.top, `${view}: the triad runs into the projection toggle`).toBeGreaterThan(
+      toggle.y + toggle.height,
+    );
+  };
+
+  await clear("iso");
+  await page.keyboard.press("Digit1");
+  await clear("front");
+  await page.keyboard.press("Digit7");
+  await clear("top");
+  await page.keyboard.press("Digit3");
+  await clear("right");
+  await page.keyboard.press("Control+Digit7");
+  await clear("bottom");
 });
 
 test("object and gizmo picking use the orthographic camera", async ({ page }) => {

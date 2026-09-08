@@ -1957,11 +1957,17 @@ input[type="checkbox"] {
   flex-direction: column;
   align-items: center;
   gap: var(--space-3);
+  /* The cluster is taller than the cube since the axis triad moved below it,
+     and an empty absolutely-positioned div is still a hit target: without
+     this, the band the triad is drawn in would be a hole in the viewport
+     where a drag neither orbits the camera nor reaches the canvas. The two
+     halves of this that *are* controls take their events back below. */
+  pointer-events: none;
 }
 
-/* One SVG carries the whole widget: the chamfered solid, the four quarter-turn
-   controls and the axis triad. It is projected in TypeScript (viewer/navCube.ts)
-   rather than by CSS 3D, so what is described here is only paint. */
+/* The cube's own square: the chamfered solid and its face labels, and nothing
+   else. It is projected in TypeScript (viewer/navCube.ts) rather than by CSS
+   3D, so what is described here is only paint. */
 .cube-stage {
   /* Smaller than it was: the cube is a control, not an ornament, and at 168
      it took a corner of the viewport away from the model it describes. */
@@ -1970,6 +1976,7 @@ input[type="checkbox"] {
   cursor: grab;
   touch-action: none;
   overflow: visible;
+  pointer-events: auto;
 }
 
 .cube-stage:active {
@@ -2026,10 +2033,24 @@ input[type="checkbox"] {
   fill: var(--viewport-ink);
 }
 
-/* A quarter turn about one of the camera's own screen axes: a quarter arc
-   ending in an arrowhead, drawn with the icon pen (§9) in the viewport's
-   secondary ink, and never disabled — every standpoint has four turns. The
-   glyph is a hairline, so the press lands on an invisible square beneath it. */
+/* The axis triad's own square, under the cube. 64px, and its viewBox is 64
+   units wide, so one unit is one pixel and the sizes below are the sizes on
+   the screen. It is a legend and not a control: no pointer events, so the
+   canvas underneath still orbits where the triad is drawn over it. */
+.cube-triad {
+  width: 64px;
+  height: 64px;
+  overflow: visible;
+  pointer-events: none;
+  /* Pulled up into the stage's own bottom margin. The cube's silhouette stops
+     about 23px short of the bottom of its square, so the 6px flex gap above
+     would leave a 31px hole and the legend would read as something else
+     floating in the viewport. −20 (net −14 after the gap) closes it to 14px
+     at the tightest standpoint of 360 swept — the one that aims the cube's
+     furthest point and an axis label at each other — and to more elsewhere. */
+  margin-top: -20px;
+}
+
 /* @artwork — the axis triad is a reading of orientation, not chrome.
    X-red, Y-green, Z-blue is the convention every CAD and DCC application
    shares, and it is the reason this is the one saturated hue allowed inside
@@ -2057,9 +2078,10 @@ input[type="checkbox"] {
 .cube-axis-label.axis-z { fill: #1f5fd2; }
 /* @end-artwork */
 
-/* The projection toggle takes the stage's lower-right corner, opposite the
-   triad: the flanks belong to the turn controls and the corners are free, so
-   the widget stays one square instead of a square with a button under it. */
+/* The projection toggle takes the cube stage's top-right corner. However the
+   cube is turned its silhouette reaches less than half the way from the
+   centre to a corner of its own square, so the corners are free: the widget
+   stays one square instead of a square with a button under it. */
 .cube-projection {
   position: absolute;
   right: 0;
@@ -2070,6 +2092,7 @@ input[type="checkbox"] {
   height: var(--control-sm);
   padding: 0;
   background: var(--surface-float);
+  pointer-events: auto;
 }
 
 /* This sits straight on the paper, so its active edge is drawn at viewport
