@@ -1253,6 +1253,7 @@ def _segment_cells(grid: GridSpec, segments) -> np.ndarray:
 class TestHouseDemonstration:
     """Signature-based edge cells on the example house match the analytic edges."""
 
+    @pytest.mark.slow
     def test_signature_edges_match_analytic_profile_edges(self):
         house = _house()
         grid = GridSpec.from_bounds((-1.6, -1.2, -1.0), (3.2, 2.6, 2.0), 26)

@@ -34,6 +34,9 @@ def test_each_node_kind_emits_the_field_jax_evaluates(label):
     np.testing.assert_allclose(_gpu_field(model, pts), expected, rtol=2e-4, atol=2e-5)
 
 
+# Deliberately not marked slow: the bracket case measures 43 s and every
+# other scene under nine, which is the emitter's one compilation landing on
+# whichever case runs first — marking it would move that cost, not remove it.
 @pytest.mark.parametrize("scene", SCENES, ids=[s.stem for s in SCENES])
 def test_each_shipped_scene_emits_the_field_jax_evaluates(scene):
     from cadjoint.viewer.worker.scene import _execute_scene

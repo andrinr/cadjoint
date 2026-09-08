@@ -46,6 +46,11 @@ def _queries(seed: int, shape: tuple[int, ...]) -> jnp.ndarray:
     )
 
 
+# Every case in this module is a whole-profile agreement or gradient sweep:
+# 30 s for the cheapest, 201 s for the dearest, 642 s for the file.
+pytestmark = pytest.mark.slow
+
+
 @pytest.mark.parametrize("shape", [(2,), (64, 2), (4, 8, 2)])
 def test_stacked_and_unrolled_distances_are_identical(shape):
     points = _queries(0, shape)

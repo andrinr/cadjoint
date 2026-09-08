@@ -89,6 +89,7 @@ class TestFieldValues:
         points = sample_points(extent=2.0, seed=1)
         np.testing.assert_allclose(np.asarray(pattern(points)), np.asarray(unit(points)), atol=1e-6)
 
+    @pytest.mark.slow
     def test_polar_pattern_is_min_over_rotations(self):
         shape = Translate(Sphere(0.5), offset=jnp.array([0.7, 0.2, -0.3]))
         pattern = PolarPattern(shape, count=4)
@@ -145,6 +146,10 @@ class TestTreeStructure:
 
 
 class TestMeshingComposition:
+    # Each of these extracts a real mesh on a 31³ grid: 105 s to 163 s apiece,
+    # 621 s for the class, which is a third of the whole sdf directory.
+    pytestmark = pytest.mark.slow
+
     OPS_GRID = GridSpec.from_bounds((-1.55, -1.55, -1.55), (3.1, 3.1, 3.1), 31)
 
     def assert_watertight(self, mesh) -> None:

@@ -136,6 +136,7 @@ class TestPolarPatternAboutALine:
         with pytest.raises(ValueError, match="axis"):
             PolarPattern(_body(), count=3, axis="x")
 
+    @pytest.mark.slow
     def test_default_matches_the_axis_aligned_formula_exactly(self):
         """The general Rodrigues path must not perturb the historical default."""
         import math
@@ -179,6 +180,7 @@ class TestPolarPatternAboutALine:
 
 
 class TestMirrorAcrossAPlane:
+    @pytest.mark.slow
     def test_named_axes_are_unchanged(self):
         body = _body()
         points = np.random.default_rng(1).uniform(-2.0, 2.0, (128, 3)).astype(np.float32)
