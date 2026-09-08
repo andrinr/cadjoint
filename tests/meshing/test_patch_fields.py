@@ -36,6 +36,8 @@ from cadjoint.sdf.primitives import (
     Torus,
 )
 from cadjoint.sdf.transforms import Rotate, Scale, Translate, Twist
+from cadjoint.sdf.transforms.fields import Mirror, Shell
+from cadjoint.sdf.transforms.patterns import LinearPattern, PolarPattern
 
 # Box patch order is [+x, -x, +y, -y, +z, -z]: index 2*axis + side.
 BOX_SIZE = np.array([0.8, 0.6, 0.5])
@@ -289,6 +291,394 @@ class TestRevolvedPolygonPatchFields:
             assert _patch_id(fields, [1.5 * c, 0.5, 1.5 * s]) == 2
 
 
+class _Plane:
+    """The duck type ``Mirror`` accepts as a mirror plane: origin + normal.
+
+    ``cadjoint.sdf`` must not import ``cadjoint.construction``, so a mirror
+    plane is read off whatever carries the two attributes — a ``Face``, a
+    ``SketchPlane``, or this.  Used here to mirror across a plane that is
+    *not* through the origin, which is the case the ``origin`` term exists
+    for and the one a named axis cannot express.
+    """
+
+    def __init__(self, origin, normal):
+        self.origin = jnp.asarray(origin, jnp.float32)
+        self.normal = jnp.asarray(normal, jnp.float32)
+
+
+# The pin the pattern tests copy: small enough that neighbouring instances
+# stay disjoint at the spacings below.  Its patch order is the cylinder's own:
+# [side, +z cap, -z cap].
+PIN_RADIUS = 0.15
+PIN_HEIGHT = 0.25
+PIN_PATCHES = 3
+
+
+def _pin() -> Cylinder:
+    return Cylinder(radius=PIN_RADIUS, height=PIN_HEIGHT)
+
+
+def _pin_patch_points() -> np.ndarray:
+    """One interior surface point per patch of ``_pin()``, in its own frame.
+
+    Row ``j`` sits on patch ``j`` and nowhere near patch ``j``'s rims, so
+    ownership there is unambiguous for the seed copy.
+    """
+    return np.array(
+        [
+            [PIN_RADIUS, 0.0, 0.3 * PIN_HEIGHT],
+            [0.4 * PIN_RADIUS, 0.0, PIN_HEIGHT],
+            [0.4 * PIN_RADIUS, 0.0, -PIN_HEIGHT],
+        ]
+    )
+
+
+def _rotate_z(points: np.ndarray, angle: float) -> np.ndarray:
+    """Rotate ``(..., 3)`` points by ``angle`` about the world z axis."""
+    c, s = np.cos(angle), np.sin(angle)
+    matrix = np.array([[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]])
+    return np.asarray(points, dtype=float) @ matrix.T
+
+
+class TestMirrorPatchFields:
+    """A mirror reflects only, so it forwards the child's patches one for one."""
+
+    OFFSET = jnp.array([0.9, 0.2, -0.3])
+
+    def _child(self) -> Translate:
+        return Translate(Box(size=jnp.asarray(BOX_SIZE)), self.OFFSET)
+
+    def _reflected(self, face: int, plane_x: float) -> np.ndarray:
+        """Points on one box face, carried into the mirrored copy's frame."""
+        world = np.asarray(_box_face_points(face)) + np.asarray(self.OFFSET)
+        world[:, 0] = 2.0 * plane_x - world[:, 0]
+        return world
+
+    def test_count_is_unchanged(self):
+        assert len(Mirror(self._child(), "x").patch_fields()) == 6
+
+    def test_reflected_faces_keep_the_child_patch_ids(self):
+        """On the mirrored surface, the child's own patch still owns the point."""
+        shape = Mirror(self._child(), "x")
+        fields = shape.patch_fields()
+        for face in range(6):
+            for point in self._reflected(face, 0.0):
+                q = jnp.asarray(point, jnp.float32)
+                # The sample really is on this node's zero set...
+                assert float(shape(q)) == pytest.approx(0.0, abs=1e-5)
+                # ...and the decomposition covers it, with the child's id.
+                assert _patch_id(fields, q) == face
+                assert float(fields[face](q)) == pytest.approx(0.0, abs=1e-5)
+
+    def test_mirror_plane_origin_is_honoured(self):
+        """A plane off the origin moves the copy, and the fields with it."""
+        plane_x = 1.4
+        shape = Mirror(self._child(), _Plane([plane_x, 0.0, 0.0], [1.0, 0.0, 0.0]))
+        fields = shape.patch_fields()
+        for face in range(6):
+            for point in self._reflected(face, plane_x):
+                q = jnp.asarray(point, jnp.float32)
+                assert float(shape(q)) == pytest.approx(0.0, abs=1e-5)
+                assert _patch_id(fields, q) == face
+
+    def test_ownership_switches_at_the_mirrored_edges(self):
+        """Across a mirrored box edge the id switches; along a face it does not.
+
+        The ids are the *child's*: the reflected +x face still reports patch
+        0, because a mirror renames nothing.
+        """
+        shape = Mirror(self._child(), "x")
+        fields = shape.patch_fields()
+        eps = 1e-3
+        sx, sy, _ = BOX_SIZE
+        on_x = np.array([[sx, sy - eps, 0.0], [sx, sy - 0.2, 0.0]]) + np.asarray(self.OFFSET)
+        on_y = np.array([[sx - eps, sy, 0.0]]) + np.asarray(self.OFFSET)
+        on_x[:, 0] *= -1.0
+        on_y[:, 0] *= -1.0
+        assert [_patch_id(fields, p) for p in on_x] == [0, 0]
+        assert [_patch_id(fields, p) for p in on_y] == [2]
+
+    def test_child_without_a_decomposition_reports_none(self):
+        assert Mirror(Twist(Sphere(1.0), 1.0), "x").patch_fields() is None
+
+    def test_plain_callable_child_reports_none(self):
+        """A bare lambda declares no patches, so the mirror has none to forward."""
+        assert Mirror(lambda p: jnp.linalg.norm(p, axis=-1) - 1.0, "x").patch_fields() is None
+
+
+class TestLinearPatternPatchFields:
+    """``n_kept * child`` fields, instance-major, in kept order."""
+
+    # A diagonal direction on purpose: patterning a cylinder along x would
+    # leave every copy's two cap half-spaces *coincident* (they depend on z
+    # alone), and ownership between identical fields is not a meaningful
+    # thing to assert.  Along [1, 0, 1] no two instances share a patch.
+    DIRECTION = jnp.array([1.0, 0.0, 1.0])
+    SPACING = 0.6
+    COUNT = 4
+    SKIP = (2,)
+    KEPT = (0, 1, 3)
+
+    def _pattern(self, skip=SKIP) -> LinearPattern:
+        return LinearPattern(_pin(), self.DIRECTION, self.COUNT, self.SPACING, skip=skip)
+
+    def _instance_points(self, instance: int) -> np.ndarray:
+        step = np.asarray(self.DIRECTION) / np.linalg.norm(np.asarray(self.DIRECTION))
+        return _pin_patch_points() + self.SPACING * instance * step
+
+    def test_field_count_is_kept_instances_times_child(self):
+        assert len(self._pattern().patch_fields()) == len(self.KEPT) * PIN_PATCHES
+        assert len(self._pattern(skip=()).patch_fields()) == self.COUNT * PIN_PATCHES
+
+    def test_instance_major_order(self):
+        """Slot ``n``, child patch ``j`` is index ``3n + j`` — not ``3j + n``."""
+        pattern = self._pattern()
+        fields = pattern.patch_fields()
+        for slot, instance in enumerate(self.KEPT):
+            for patch, point in enumerate(self._instance_points(instance)):
+                q = jnp.asarray(point, jnp.float32)
+                assert float(pattern(q)) == pytest.approx(0.0, abs=1e-6)
+                assert _patch_id(fields, q) == PIN_PATCHES * slot + patch
+                index = PIN_PATCHES * slot + patch
+                assert float(fields[index](q)) == pytest.approx(0.0, abs=1e-6)
+
+    def test_seed_instance_is_the_child_untouched(self):
+        """Instance 0 is not displaced, so its fields are the child's own."""
+        pattern = self._pattern()
+        fields = pattern.patch_fields()
+        child_fields = _pin().patch_fields()
+        for point in ([0.05, -0.02, 0.1], [0.4, 0.3, -0.2]):
+            q = jnp.asarray(point, jnp.float32)
+            for patch, child_field in enumerate(child_fields):
+                assert float(fields[patch](q)) == float(child_field(q))
+
+    def test_a_suppressed_instance_contributes_no_fields(self):
+        """The declared count follows the *kept* instances, not ``count``."""
+        skipped, full = self._pattern(), self._pattern(skip=())
+        point = jnp.asarray(self._instance_points(2)[0], jnp.float32)
+        # Instance 2's surface is a patch of the full pattern...
+        assert min(abs(float(f(point))) for f in full.patch_fields()) == pytest.approx(
+            0.0, abs=1e-6
+        )
+        # ...and not on, nor even near, anything the skipping one declares.
+        assert float(skipped(point)) > 0.1
+        assert min(abs(float(f(point))) for f in skipped.patch_fields()) > 0.05
+
+    def test_min_of_max_composition_is_the_sdf_inside(self):
+        """The node's sdf agrees with the composition its patches describe.
+
+        A pattern is a ``min`` over instances of a child that is itself a
+        ``max`` over its patches; the reshape below only lands on the right
+        groups because the layout is instance-major.
+        """
+        pattern = LinearPattern(Box(size=jnp.asarray(BOX_SIZE)), self.DIRECTION, 3, 2.5)
+        fields = pattern.patch_fields()
+        rng = np.random.default_rng(1)
+        points = jnp.asarray(rng.uniform(-1.0, 1.0, size=(96, 3)) * BOX_SIZE)
+        stacked = jnp.stack([field(points) for field in fields])
+        composed = jnp.min(jnp.max(stacked.reshape(3, 6, -1), axis=1), axis=0)
+        reference = pattern(points)
+        inside = np.asarray(reference) <= 0.0
+        assert inside.any()
+        np.testing.assert_allclose(
+            np.asarray(composed)[inside], np.asarray(reference)[inside], atol=1e-6
+        )
+
+
+class TestPolarPatternPatchFields:
+    """``n_kept * child`` fields, instance-major, seed copy unrotated."""
+
+    COUNT = 6
+    SKIP = (2, 4)
+    KEPT = (0, 1, 3, 5)
+    BOLT_CIRCLE = 0.8
+    # Tilted for the same reason the linear pattern runs diagonally: an
+    # upright pin rotated about z would leave every copy's cap half-spaces
+    # coincident, since rotation about z does not move a plane z = const.
+    TILT = 0.4
+
+    def _child(self) -> Translate:
+        return Translate(Rotate(_pin(), "y", self.TILT), jnp.array([self.BOLT_CIRCLE, 0.0, 0.0]))
+
+    def _pattern(self, skip=SKIP) -> PolarPattern:
+        return PolarPattern(self._child(), self.COUNT, skip=skip)
+
+    def _instance_points(self, instance: int) -> np.ndarray:
+        """Surface points of copy ``instance``, one per child patch."""
+        rotation = np.asarray(Rotate._rotation_matrix(jnp.array([0.0, 1.0, 0.0]), self.TILT))
+        seed = _pin_patch_points() @ rotation.T + np.array([self.BOLT_CIRCLE, 0.0, 0.0])
+        return _rotate_z(seed, 2.0 * np.pi * instance / self.COUNT)
+
+    def test_field_count_is_kept_instances_times_child(self):
+        assert len(self._pattern().patch_fields()) == len(self.KEPT) * PIN_PATCHES
+        assert len(self._pattern(skip=()).patch_fields()) == self.COUNT * PIN_PATCHES
+
+    def test_instance_major_order(self):
+        """Slot ``n``, child patch ``j`` is index ``3n + j`` — not ``3j + n``."""
+        pattern = self._pattern()
+        fields = pattern.patch_fields()
+        for slot, instance in enumerate(self.KEPT):
+            for patch, point in enumerate(self._instance_points(instance)):
+                q = jnp.asarray(point, jnp.float32)
+                assert float(pattern(q)) == pytest.approx(0.0, abs=1e-5)
+                assert _patch_id(fields, q) == PIN_PATCHES * slot + patch
+                index = PIN_PATCHES * slot + patch
+                assert float(fields[index](q)) == pytest.approx(0.0, abs=1e-5)
+
+    def test_seed_instance_is_the_child_untouched(self):
+        """Copy 0 is evaluated unrotated, exactly as ``sdf`` leaves it."""
+        pattern = self._pattern()
+        fields = pattern.patch_fields()
+        child_fields = self._child().patch_fields()
+        for point in ([0.7, 0.1, 0.05], [0.2, -0.4, 0.3]):
+            q = jnp.asarray(point, jnp.float32)
+            for patch, child_field in enumerate(child_fields):
+                assert float(fields[patch](q)) == float(child_field(q))
+
+    def test_a_suppressed_instance_contributes_no_fields(self):
+        skipped, full = self._pattern(), self._pattern(skip=())
+        point = jnp.asarray(self._instance_points(2)[0], jnp.float32)
+        assert min(abs(float(f(point))) for f in full.patch_fields()) == pytest.approx(
+            0.0, abs=1e-5
+        )
+        assert float(skipped(point)) > 0.1
+        assert min(abs(float(f(point))) for f in skipped.patch_fields()) > 0.05
+
+    def test_min_of_max_composition_is_the_sdf_inside(self):
+        pattern = PolarPattern(
+            Translate(Box(size=jnp.asarray(BOX_SIZE)), jnp.array([3.0, 0.0, 0.0])), 4
+        )
+        fields = pattern.patch_fields()
+        rng = np.random.default_rng(2)
+        points = jnp.asarray(
+            rng.uniform(-1.0, 1.0, size=(96, 3)) * BOX_SIZE + np.array([3.0, 0.0, 0.0])
+        )
+        stacked = jnp.stack([field(points) for field in fields])
+        composed = jnp.min(jnp.max(stacked.reshape(4, 6, -1), axis=1), axis=0)
+        reference = pattern(points)
+        inside = np.asarray(reference) <= 0.0
+        assert inside.any()
+        np.testing.assert_allclose(
+            np.asarray(composed)[inside], np.asarray(reference)[inside], atol=1e-5
+        )
+
+    def test_child_without_a_decomposition_reports_none(self):
+        assert PolarPattern(Twist(Sphere(1.0), 1.0), 4).patch_fields() is None
+
+
+class TestShellPatchFields:
+    """Two offsets per child patch, adjacent, outward before inward."""
+
+    RADIUS = 0.5
+    HEIGHT = 0.7
+    THICKNESS = 0.2
+
+    @property
+    def half(self) -> float:
+        return self.THICKNESS / 2.0
+
+    def _tube(self) -> Shell:
+        return Shell(Cylinder(radius=self.RADIUS, height=self.HEIGHT), self.THICKNESS)
+
+    def test_field_count_is_twice_the_child(self):
+        assert len(self._tube().patch_fields()) == 2 * 3
+        assert len(Shell(Box(size=jnp.asarray(BOX_SIZE)), self.THICKNESS).patch_fields()) == 12
+
+    def test_outward_then_inward_per_child_patch(self):
+        """Index ``2j`` is ``f_j - t/2``; index ``2j + 1`` is ``-(f_j + t/2)``."""
+        child = Cylinder(radius=self.RADIUS, height=self.HEIGHT)
+        fields = Shell(child, self.THICKNESS).patch_fields()
+        child_fields = child.patch_fields()
+        for point in ([0.3, -0.1, 0.05], [0.0, 0.0, 0.9], [0.62, 0.02, -0.4]):
+            q = jnp.asarray(point, jnp.float32)
+            for j, child_field in enumerate(child_fields):
+                value = float(child_field(q))
+                assert float(fields[2 * j](q)) == pytest.approx(value - self.half, abs=1e-6)
+                assert float(fields[2 * j + 1](q)) == pytest.approx(-(value + self.half), abs=1e-6)
+
+    def test_both_walls_are_on_a_declared_patch(self):
+        """Analytic points on the node's zero set, and who owns each.
+
+        Patch order for a shelled cylinder is
+        ``[side out, side in, +cap out, +cap in, -cap out, -cap in]``.  The
+        cap samples sit at mid-wall radius so they are clear of both side
+        surfaces, and the outward cap sample stays inside the child's radius
+        so it is on the flat offset rather than the rounded rim.
+        """
+        shell = self._tube()
+        fields = shell.patch_fields()
+        mid = 0.4 * self.RADIUS
+        expected = [
+            ([self.RADIUS + self.half, 0.0, 0.0], 0),
+            ([self.RADIUS - self.half, 0.0, 0.0], 1),
+            ([mid, 0.0, self.HEIGHT + self.half], 2),
+            ([mid, 0.0, self.HEIGHT - self.half], 3),
+            ([mid, 0.0, -self.HEIGHT - self.half], 4),
+            ([mid, 0.0, -self.HEIGHT + self.half], 5),
+        ]
+        for point, patch in expected:
+            q = jnp.asarray(point, jnp.float32)
+            assert float(shell(q)) == pytest.approx(0.0, abs=1e-6)
+            magnitudes = [abs(float(f(q))) for f in fields]
+            assert min(magnitudes) == pytest.approx(0.0, abs=1e-6)
+            assert _patch_id(fields, q) == patch
+
+    def test_ownership_switches_at_both_offset_rims(self):
+        """The wall has two rims — outer and inner — and each is a switch."""
+        shell = self._tube()
+        fields = shell.patch_fields()
+        eps = 1e-3
+        outer_r, outer_z = self.RADIUS + self.half, self.HEIGHT + self.half
+        inner_r, inner_z = self.RADIUS - self.half, self.HEIGHT - self.half
+        assert _patch_id(fields, [outer_r, 0.0, outer_z - 2 * eps]) == 0
+        assert _patch_id(fields, [outer_r - 2 * eps, 0.0, outer_z]) == 2
+        assert _patch_id(fields, [inner_r, 0.0, inner_z - 2 * eps]) == 1
+        assert _patch_id(fields, [inner_r - 2 * eps, 0.0, inner_z]) == 3
+
+    def test_max_composition_is_the_sdf_for_a_smooth_child(self):
+        """One child patch, so the two offsets compose to ``|f| - t/2`` exactly."""
+        shell = Shell(Sphere(0.6), self.THICKNESS)
+        fields = shell.patch_fields()
+        assert len(fields) == 2
+        rng = np.random.default_rng(3)
+        points = jnp.asarray(rng.uniform(-1.5, 1.5, size=(128, 3)))
+        composed = jnp.max(jnp.stack([field(points) for field in fields]), axis=0)
+        np.testing.assert_allclose(np.asarray(composed), np.asarray(shell(points)), atol=1e-6)
+
+    def test_both_offset_spheres_are_on_a_declared_patch(self):
+        shell = Shell(Sphere(0.6), self.THICKNESS)
+        fields = shell.patch_fields()
+        rng = np.random.default_rng(4)
+        directions = rng.normal(size=(24, 3))
+        directions /= np.linalg.norm(directions, axis=1, keepdims=True)
+        for radius, patch in ((0.6 + self.half, 0), (0.6 - self.half, 1)):
+            for point in radius * directions:
+                q = jnp.asarray(point, jnp.float32)
+                assert float(shell(q)) == pytest.approx(0.0, abs=1e-6)
+                assert _patch_id(fields, q) == patch
+
+    def test_the_sharp_corner_of_two_outward_patches_is_off_the_surface(self):
+        """The documented caveat, pinned rather than only described.
+
+        ``|f| - t/2`` rounds the outside of a convex child edge, while the
+        max over two outward offset patches continues both to a sharp corner.
+        The corner is therefore a point where two patch fields vanish and the
+        node's own sdf does not — the surfaces are still the right ones, and
+        the consumer re-derives the trim between them, but ``argmin |f_i|``
+        is not exact ownership in that sliver.
+        """
+        shell = self._tube()
+        fields = shell.patch_fields()
+        corner = jnp.asarray([self.RADIUS + self.half, 0.0, self.HEIGHT + self.half])
+        assert float(fields[0](corner)) == pytest.approx(0.0, abs=1e-6)
+        assert float(fields[2](corner)) == pytest.approx(0.0, abs=1e-6)
+        # The rounded surface sits (sqrt(2) - 1) * t/2 inside that corner.
+        assert float(shell(corner)) == pytest.approx((np.sqrt(2.0) - 1.0) * self.half, abs=1e-6)
+
+    def test_child_without_a_decomposition_reports_none(self):
+        assert Shell(Twist(Sphere(1.0), 1.0), self.THICKNESS).patch_fields() is None
+
+
 class TestSceneSignatures:
     def _scene(self):
         return Union(
@@ -458,9 +848,9 @@ class TestHouseDemonstration:
             chebyshev_to_curve(mesh.cells[flagged_edges[:, 0]]),
             chebyshev_to_curve(mesh.cells[flagged_edges[:, 1]]),
         )
-        assert int(near.max()) <= 1, (
-            f"a signature edge strays {near.max()} cells from the analytic edges"
-        )
+        assert (
+            int(near.max()) <= 1
+        ), f"a signature edge strays {near.max()} cells from the analytic edges"
 
         # Direction 2: every analytic-curve cell is matched — it has a
         # signature-change vertex within one cell.

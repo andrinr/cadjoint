@@ -17,6 +17,7 @@ from jax import Array
 from cadjoint.geometry.parameters import Scalar
 from cadjoint.sdf._lowering import is_scalar_lowering
 from cadjoint.sdf.transforms._operation import (
+    _child_patch_fields,
     _Operation,
     _reference_line,
 )
@@ -245,6 +246,41 @@ class LinearPattern(_Operation):
             self.params["skip_mask"].value,
         )
 
+    def patch_fields(self):
+        """Every kept copy's patches, instance-major.
+
+        :meth:`sdf` is a ``min`` over the kept instances of the child
+        evaluated at ``p - axis * spacing * i``, so the pattern's surface is
+        the union of those copies' surfaces and the decomposition is simply
+        the child's fields under each kept instance's point map.
+
+        The result holds ``len(kept) * len(child fields)`` fields laid out
+        **instance-major**: all of instance ``kept[0]``'s patches (the seed,
+        undisplaced), then all of ``kept[1]``'s, and so on in the order
+        :func:`_kept_instances` returns.  Patch ``j`` of instance slot ``n``
+        is therefore index ``n * len(child fields) + j`` — note the slot, not
+        the instance *index*: a pattern with suppressed copies declares
+        fields for the kept ones only.
+
+        A pattern is a ``min``, so a point can be inside another copy while
+        on this one's surface.  Ownership by ``argmin_i |f_i|`` stays exact
+        wherever the copies are disjoint, which is the case a pattern is for;
+        where two copies interpenetrate, their intersection seam is a CSG
+        seam and the consumer derives it from the surfaces, as it does for
+        any other Boolean.
+        """
+        child_fields = _child_patch_fields(self.sdf)
+        if child_fields is None:
+            return None
+        axis = self.params["direction"].xyz / jnp.linalg.norm(self.params["direction"].xyz)
+        spacing = self.params["spacing"].value
+        kept = _kept_instances(int(self.params["count"].value), self.params["skip_mask"].value)
+        return [
+            (lambda p, f=field, i=index: f(p - axis * (spacing * i)))
+            for index in kept
+            for field in child_fields
+        ]
+
     def to_functional(self):
         return LinearPattern.sdf
 
@@ -367,6 +403,48 @@ class PolarPattern(_Operation):
             self.params["direction"].xyz,
             self.params["skip_mask"].value,
         )
+
+    def patch_fields(self):
+        """Every kept copy's patches, instance-major.
+
+        :meth:`sdf` is a ``min`` over the kept instances of the child
+        evaluated at ``p`` rotated by ``-i * 2π/count`` about the pattern
+        axis, so the ring's surface is the union of those copies' surfaces
+        and the decomposition is the child's fields under each kept
+        instance's point map.  Instance 0 is left unrotated, exactly as
+        :meth:`sdf` leaves it — ``origin + (p - origin)`` only equals ``p``
+        up to rounding, and copy 0 is the seed the child's faces belong to.
+
+        The result holds ``len(kept) * len(child fields)`` fields laid out
+        **instance-major**: all of instance ``kept[0]``'s patches, then all
+        of ``kept[1]``'s, in the order :func:`_kept_instances` returns.
+        Patch ``j`` of instance slot ``n`` is index
+        ``n * len(child fields) + j`` — the slot, not the instance *index*,
+        since suppressed copies contribute no fields at all.
+
+        Ownership by ``argmin_i |f_i|`` is exact wherever the copies are
+        disjoint (a ring of bolts or ribs); where two copies overlap, the
+        seam between them is a CSG seam the consumer re-derives from the
+        surfaces like any other.
+        """
+        child_fields = _child_patch_fields(self.sdf)
+        if child_fields is None:
+            return None
+        origin = self.params["origin"].xyz
+        direction = self.params["direction"].xyz
+        count = int(self.params["count"].value)
+        kept = _kept_instances(count, self.params["skip_mask"].value)
+        fields = []
+        for index in kept:
+            if index == 0:
+                fields.extend((lambda p, f=field: f(p)) for field in child_fields)
+                continue
+            theta = 2.0 * math.pi * index / count
+            fields.extend(
+                (lambda p, f=field, a=theta: f(_rotate_about(p, origin, direction, -a)))
+                for field in child_fields
+            )
+        return fields
 
     def to_functional(self):
         return PolarPattern.sdf

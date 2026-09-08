@@ -12,6 +12,7 @@ from jax import Array
 from cadjoint.geometry.parameters import Scalar
 from cadjoint.sdf.transforms._operation import (
     _MIRROR_NORMALS,
+    _child_patch_fields,
     _Operation,
     _reference_line,
 )
@@ -69,6 +70,50 @@ class Shell(_Operation):
 
     def __call__(self, p: Array) -> Array:
         return Shell.sdf(self.sdf, p, self.params["thickness"].value)
+
+    def patch_fields(self):
+        """Both offsets of every child patch: outward first, then inward.
+
+        ``sdf(p) = |f(p)| - t/2`` is the max composition
+        ``max(f - t/2, -(f + t/2))``, so the wall's two surfaces sit where
+        the child field reads ``+t/2`` and ``-t/2``.  Splitting that over the
+        child's own patches, child patch ``f_i`` contributes exactly two
+        fields, kept adjacent and always in this sense:
+
+        - ``f_i - t/2`` — the **outward** offset, patch index ``2*i``, whose
+          zero set is child patch ``i`` pushed out by half the thickness;
+        - ``-(f_i + t/2)`` — the **inward** offset, patch index ``2*i + 1``,
+          child patch ``i`` pulled in by half the thickness, negated so it
+          too reads positive outside the wall.
+
+        Two caveats a reader needs, neither of which the consumer minds:
+
+        The offsets are only as exact as the child's patch field is a *true
+        distance* near its own surface — ``f_i(p) = ±t/2`` has to mean "half
+        a thickness off patch ``i``".  Every primitive that declares patch
+        fields satisfies this (they are plane, cylinder and revolved-profile
+        distances, exact along their own normal), so the offset surfaces are
+        exact for them; an approximate child field would offset by the wrong
+        amount.
+
+        The *trims* between the offset patches are not the child's trims.
+        Offsetting outward pushes neighbouring patches apart and the node's
+        own ``|f| - t/2`` rounds the gap over, while the max composition here
+        continues both patches to a sharp intersection.  The consumer
+        re-derives every trim curve from surface-surface intersections rather
+        than inheriting it, so the untrimmed surfaces are what matters — but
+        do not read ``argmin_i |f_i|`` as exact ownership in the rounded
+        sliver just outside a convex child edge.
+        """
+        child_fields = _child_patch_fields(self.sdf)
+        if child_fields is None:
+            return None
+        half = self.params["thickness"].value / 2.0
+        fields = []
+        for field in child_fields:
+            fields.append(lambda p, f=field: f(p) - half)
+            fields.append(lambda p, f=field: -(f(p) + half))
+        return fields
 
     def to_functional(self):
         return Shell.sdf
@@ -148,6 +193,25 @@ class Mirror(_Operation):
 
     def __call__(self, p: Array) -> Array:
         return Mirror.sdf(self.sdf, p, self.params["origin"].xyz, self.params["normal"].xyz)
+
+    def patch_fields(self):
+        """Forward the child's patch fields through the reflection.
+
+        A mirror only reflects — ``sdf(p) = child(M p)`` — so its surface is
+        the child's surface reflected, patch for patch: the decomposition is
+        the child's fields evaluated at the reflected point, in the child's
+        own order and count.  Reflection is an isometry, so distances, patch
+        ownership and feature edges all survive it exactly.
+        """
+        child_fields = _child_patch_fields(self.sdf)
+        if child_fields is None:
+            return None
+        origin = self.params["origin"].xyz
+        normal = self.params["normal"].xyz
+        return [
+            (lambda p, f=field: f(Mirror._transform_point(p, origin, normal)))
+            for field in child_fields
+        ]
 
     def to_functional(self):
         return Mirror.sdf
