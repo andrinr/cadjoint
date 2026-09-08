@@ -5,6 +5,14 @@ cylinderblock`` CATIA V5R21 model, 4069 faces, 3776 cm³ of iron, 27 kg.
 Every dimension in this file was **measured**, not assumed — see the table at
 the end of this docstring for what the measurement changed.
 
+**This is an idealisation, and deliberately so.**  A hand-authored SDF cannot
+reproduce a 4069-face CATIA casting with 2418 B-spline surfaces, and chasing
+the intersection-over-union toward its own ceiling is the wrong target.  The
+goal here is that somebody who knows engine blocks would identify *this*
+block from a render — from the silhouette and the feature layout — so the
+work was driven by section overlays judged by eye
+(``research/reverse/sections.py``) rather than by a scalar.
+
 The part turns out to be a **closed-deck, siamesed-bore, cast-iron inline
 four** with the main-bearing parting face on the crank axis:
 
@@ -21,8 +29,18 @@ four** with the main-bearing parting face on the crank axis:
     each with a 53.8 mm saddle arch whose centre *is* the crank axis, and a
     Ø28 lightening window above it.
   * a **shallow crankcase**: the pan rail sits only 15 mm below the crank
-    axis, and the width instead goes outward — 164 mm across the deck, 235
-    across the crankcase rails, 349 across the two end flanges.
+    axis, and the width instead goes outward — 114 mm across the deck between
+    its lugs, 232 across the crankcase rails, 349 across the two end flanges.
+  * **lobed flanks**.  The outer wall follows the barrels, bulging over each
+    cylinder and pinching at the waist between them, and it does it at two
+    different radii — 63 mm at the jacket floor, 52 under the deck.  Drawn as
+    a rounded rectangle the part reads as a box; this is the single feature
+    that makes the plan view recognisable.
+  * the **furniture that identifies a flank in a photograph**: a continuous
+    rail under the deck, a raised bolt pad on every main-bearing station, an
+    integral oil-gallery tube running the whole length at (y = +59, z = 113),
+    scalloped lugs round the deck, and the Ø90 crank-seal opening in the
+    drive-end face.
 
 **How it was measured.**  ``research/reverse/step_probe.py`` walks the STEP's
 faces.  A production CAD file is already a drawing: a bore is a
@@ -94,12 +112,19 @@ is written in millimetres and multiplied by ``MM``.
 **How close it is.**  ``research/reverse/overlay.py`` scores this scene
 against the casting on a 3 mm lattice:
 
-    IoU               0.363     ceiling 0.792 at 1 mm, 0.630 at 2 mm
-    recall            0.567     of the casting, how much the model has
-    precision         0.502     of the model, how much is really there
+    IoU               0.398     ceiling 0.792 at 1 mm, 0.630 at 2 mm
+    recall            0.607     of the casting, how much the model has
+    precision         0.536     of the model, how much is really there
     casting           3742 cm³
-    model             4226 cm³  (+13%)
-    surface deviation median 2.1 mm, 74% within 5 mm, 90% within 10 mm
+    model             4240 cm³  (+13%)
+    surface deviation median 1.7 mm, 79% within 5 mm, 93% within 10 mm
+
+Per section (``research/reverse/sections.py``, mean 0.504, from 0.415 before
+the lobes and the flank furniture went in)::
+
+    z = 412  0.732     z = 380  0.480     z = 300  0.447    z = 285  0.690
+    z = 250  0.328     z = 200  0.547     y =   5  0.405    y =  48  0.498
+    y =  91  0.459     y = 134  0.520     y = 263  0.438
 
 The ceiling is the number that makes the IoU readable.  This casting's mean
 wall is 2V/A = 6.6 mm and its surface runs to 11,400 cm², so a lattice IoU is
@@ -119,9 +144,19 @@ Where the remaining difference is, and whether it was a choice:
     10.6 mm at the bore bay — rather than a smooth taper, because an extrusion
     cannot taper its own depth.  Drawing one 20 mm web the whole height was the
     single largest error this model had: 160 cm² in every crankcase slice.
-  * **chosen.**  The deck outline is drawn at its width over the bores.  The
-    casting's is scalloped, reaching 24 mm further out at the bulkhead
-    stations and the ends.
+  * **chosen.**  The deck outline is drawn at its width over the bores plus
+    five lugs and two end pads, which is the scallop the raster found; the
+    casting's has more relief than that.
+  * **stopped, and worth saying why.**  The crankcase wall is 45 mm thick at
+    the pan rail and 5 mm thick fifty-five millimetres higher.  One lofted
+    cavity cannot be both, and z = 250 is the worst section in the table
+    because of it.  Two stacked cavity lofts would fix it — the same trick the
+    bore bank already uses for its two lobe radii — and it is worth about
+    40 cm² in one plane, so it stopped paying before it was done.
+  * **stopped.**  Raising and widening the flank pads to cover the casting's
+    upper fingers was tried and reverted: it cost more at z = 380 (0.462 to
+    0.411) than it gained anywhere, because the casting's fingers there are
+    discrete and a continuous swelling is not what they are.
   * **not modelled.**  The full-length oil gallery — a Ø20 drilling running
     the whole length at (y = +59, z = 113) — and its nine inclined feeds down
     to the mains, which the probe found as r = 5 cylinders on a
@@ -176,54 +211,131 @@ MM = 1.0 / 200.0
 # ── measured proportions ─────────────────────────────────────────────────────
 # Datum: z = 0 is the CRANK AXIS and the main-bearing parting plane; x runs
 # along the crank with cylinder 1 at -x; y is across the block. Every number
-# here is millimetres from research/reverse/step_probe.py.
+# here is millimetres, from research/reverse/step_probe.py or from the
+# silhouette sweep in research/reverse/sections.py.
 DECK_Z = 206.43  # deck face above the crank axis
 DECK_PLATE = 10.2  # the closed deck's plate, 406.3..416.5 in the STEP
 RAIL_Z = -15.0  # pan rail below the crank axis (measured -15.07)
 JACKET_FLOOR_Z = 83.6  # top of the jacket floor web
 BORE_BOTTOM_Z = 73.0  # bore opens into the crankcase here
 BLOCK_LENGTH = 374.0  # along the crank, over the end flanges
-# The deck's outline is scalloped — 152 wide over the bores, reaching out to
-# 176 at the bulkhead stations and the two ends. Drawn here at its width
-# over the bores, which is where the bores and the bolts have to fit.
-DECK_WIDTH = 152.0  # across the deck plate
-DECK_CENTRE_Y = 14.0  # the deck is NOT centred on the bore axis
-UPPER_WIDTH = 127.0  # across the block through the jacket band
-UPPER_CENTRE_Y = 9.5
-RAIL_WIDTH = 232.0  # across the crankcase at the pan rail
-CRANKCASE_TOP_WIDTH = 150.0  # and at the jacket floor, where it has closed in
-CRANKCASE_TOP_Y = -25.0
-# The crankcase walls between the webs are THIN — 13 mm on the cam side and
-# 5 on the other, measured at a bore station. The cavity is sized to leave
-# that rather than the 25 mm a comfortable-looking loft leaves.
-CAVITY_FOOT_WIDTH = 200.0
-CAVITY_FOOT_Y = 2.0
-CAVITY_TOP_WIDTH = 134.0
-CAVITY_TOP_Y = -22.0
-FLANGE_WIDTH = 349.0  # across the two end flanges
-FLANGE_LENGTH = 24.0  # how thick each end flange is, along the crank
-FLANGE_TOP_Z = 30.0
 
 BORE_COUNT = 4
 MAIN_COUNT = 5  # a main bearing between and outside every bore
 BARREL_RADIUS = 43.0  # bore + 5.25 of wall; at 86 pitch the barrels touch
-WALL = 6.0  # outer wall in the jacket band (measured 2.6 to 5.2)
+
+# The deck's outline is not a rectangle. Measured off the deck raster it runs
+# -57 to +57 over the bores, steps out to +77 at each of the five main
+# stations, and goes full width at the two ends: a base plate, five lugs down
+# one flank, an end pad at each end.
+DECK_WIDTH = 114.0
+DECK_CENTRE_Y = 0.0
+DECK_LUG_LENGTH = 36.0
+DECK_LUG_WIDTH = 20.0
+DECK_LUG_Y = 63.0
+DECK_END_LENGTH = 22.0
+DECK_END_WIDTH = 165.0
+DECK_END_Y = -5.5
+
+# The flanks. A silhouette sweep — the outermost material at every station, at
+# a ladder of heights — gives a block that tapers from ±116 at the pan rail to
+# ±52 at the deck, and that is very nearly SYMMETRIC about the bore axis. An
+# earlier version of this file had the jacket band 20 mm proud on one flank
+# because it had guessed a centre rather than measured one.
+#
+# Within that envelope the flank is lobed: the outer wall follows the barrels,
+# bulging over each cylinder and pinching at the waist between them. It is
+# drawn here as four cylinders on the bore stations, blended into a slab that
+# carries the waist — a bulge of 52 and a waist of 44, which is the shallow
+# end of what the casting does and reads correctly in silhouette.
+# The lobe is not one radius: the silhouette sweep gives 63 at the jacket
+# floor and 52 under the deck, so the bank is drawn as two stacked bands. A
+# single band at either number is visibly wrong in the plan — at 52 the model
+# sits inside the casting's waist all the way down the barrel, at 63 it
+# stands 11 mm proud of the deck.
+LOBE_RADIUS_LOW = 63.0
+LOBE_RADIUS_HIGH = 52.0
+WAIST_HALF_LOW = 53.0
+WAIST_HALF_HIGH = 44.0
+BAND_SPLIT_Z = 128.0
+UPPER_BOTTOM_Z = 40.0  # see the note on coincident faces below
+WALL = 3.0  # outer wall in the jacket band (measured 2.6)
+
+# A continuous rail runs the length of each flank under the deck, and a row of
+# raised bolt pads runs down each flank below that. Both are strong silhouette
+# features and both are what a photograph of this block shows first.
+DECK_RAIL_Y = 57.0  # centre of the rail, either flank
+DECK_RAIL_WIDTH = 14.0
+DECK_RAIL_TOP_Z = 196.0
+DECK_RAIL_DEPTH = 20.0
+# Tried larger and higher — 22 mm proud over the whole jacket band — and it
+# cost more than it paid: z = 380 fell from 0.462 to 0.411 because the
+# casting's fingers there are discrete, not a continuous swelling. Kept at
+# the size the raster actually shows.
+FLANK_PAD_Y = 59.0
+FLANK_PAD_WIDTH = 16.0
+FLANK_PAD_LENGTH = 38.0
+FLANK_PAD_Z = 120.0
+FLANK_PAD_HEIGHT = 40.0
+FLANK_BOLT_RADIUS = 5.0
+
+# The oil gallery is an integral tube down one flank: a Ø20 drilling the whole
+# length of the block, measured at (y = +59, z = 113), inside a boss.
+GALLERY_Y = 59.0
+GALLERY_Z = 113.0
+GALLERY_BOSS_RADIUS = 16.0
+GALLERY_BORE_RADIUS = 10.0
+
+RAIL_WIDTH = 232.0  # across the crankcase at the pan rail
+CRANKCASE_TOP_WIDTH = 140.0  # and where it meets the bore bay
+CAVITY_FOOT_WIDTH = 200.0  # the pan rails are thick: 45 mm one side, 23 the other
+CAVITY_FOOT_Y = 2.0
+CAVITY_TOP_WIDTH = 120.0
+CAVITY_TOP_Y = 0.0
+# NO skirt windows. The casting's crank-throw clearance is the crankcase
+# cavity itself — measured, its pan rails are continuous at every station and
+# a window bored through them removed 126 cm² of iron the part has. The
+# arches between the bulkheads that read as windows in a photograph are what
+# the cavity's own loft already makes.
+
+# A Ø90 opening in the drive-end face — the crank seal and its housing. The
+# probe found it as an r = 45 cylinder on a Y axis at (825.4, 363), which is
+# scene (y = -1, z = 153) at the +x end. It is one of the two or three things
+# that identify this face in a photograph.
+END_BORE_RADIUS = 45.0
+END_BORE_Y = -1.0
+END_BORE_Z = 153.0
+
+FLANGE_WIDTH = 349.0  # across the two end flanges
+FLANGE_LENGTH = 24.0
+FLANGE_TOP_Z = 30.0
+
 HEAD_BOLT_Y = 43.0  # measured; a third closer in than this file once guessed
 MAIN_BOLT_Y = 38.0
 BULKHEAD_STEP_Z = 32.0  # where the 20 mm saddle web steps down to a 10.6 mm one
 UPPER_WEB_THICKNESS = 10.6
 WINDOW_Y = -5.0  # the bulkhead's lightening window, Ø28
 WINDOW_Z = 55.0
-SLOT_LENGTH = 17.6  # the deck's coolant slots, measured off the deck raster
-SLOT_WIDTH = 9.8
-SLOT_Y = 43.8
-SLOT_STAGGER = 19.7  # each bore gets a slot either side of it, along the crank
+# The deck's coolant slots are kidneys, not rectangles: each sits on a 48 mm
+# circle about its own bore, 24.2 degrees either side of the transverse axis,
+# which is where the raster found all sixteen of them.
+SLOT_RADIUS = 48.0
+SLOT_HALF_WIDTH = 5.2
+SLOT_HALF_ANGLE = 13.0
+SLOT_AZIMUTH = 24.2
+
 CAST_FILLET = 4.0  # smooth-union radius where webs meet walls
-CORE_RADIUS = 2.0  # smooth-difference radius where a core leaves a corner
-# The machined cuts are SHARP, deliberately. `smooth_max` can lift a field by
-# as much as its own k, once per tool; eight tools at a 1.2 mm blend lifted the
-# middle of a 10.2 mm deck plate clean outside the solid and the deck vanished.
-# A bore and a bolt hole are cut with a tool, not cast, so zero is also right.
+CORE_RADIUS = 1.0  # smooth-difference radius where a core leaves a corner
+# The machined cuts are SHARP, deliberately. `smooth_max` lifts a field by as
+# much as its own k, once per tool; eight tools at a 1.2 mm blend lifted the
+# middle of a 10.2 mm deck plate clean outside the solid and the deck
+# vanished. A bore and a bolt hole are cut with a tool, not cast, so zero is
+# also the right answer.
+#
+# The same trap has a second face, and it cost the jacket floor: where two
+# fields are EQUAL a smooth difference adds its whole k, and along a
+# coincident plane they are equal everywhere. The upper block therefore
+# reaches down past the crankcase ceiling rather than sitting on it.
 
 # ── design parameters ────────────────────────────────────────────────────────
 # The four free ones are handed straight to the feature they dimension, and
@@ -248,6 +360,47 @@ BORE_PITCH = float(bore_pitch.value) / MM  # 86.0, in millimetres
 FIRST_BORE_X = -1.5 * BORE_PITCH  # -129
 FIRST_MAIN_X = -2.0 * BORE_PITCH  # -172
 JACKET_MID_Z = JACKET_FLOOR_Z + (DECK_Z - DECK_PLATE - JACKET_FLOOR_Z) / 2.0
+BAND_MID_Z = (UPPER_BOTTOM_Z + DECK_Z - DECK_PLATE) / 2.0
+BAND_HEIGHT = DECK_Z - DECK_PLATE - UPPER_BOTTOM_Z
+
+
+def rounded(width, height, radius, **kwargs):
+    """`PolygonProfile.rounded_rect`, with the degenerate case refused.
+
+    At a corner radius of exactly half the shorter side that side's straight
+    run has zero length, so the two arcs meeting there begin and end on the
+    same point. The polygon distance divides by every edge length, so one
+    repeated vertex is a divide by zero that propagates through the whole
+    reduction and leaves the field zero *everywhere* — not merely wrong near
+    the repeat. The symptom is silent: no exception, no NaN, just a union that
+    swallows the entire scene and a part that renders as a slab. It cost this
+    file three separate debugging sessions.
+
+    **This is fixed in cadjoint** — ``rounded_rect`` now drops consecutive
+    duplicate vertices before building the profile, so a square with a radius
+    of half its side is a clean disc. The fix is not on this branch yet, so
+    the guard stays; delete this function and call ``rounded_rect`` directly
+    once it lands.
+    """
+    if radius >= 0.5 * min(width, height) - 1e-9:
+        raise ValueError(
+            f"a corner radius of {radius} collapses on a {width} x {height} rectangle; "
+            "keep it under half the shorter side"
+        )
+    return PolygonProfile.rounded_rect(width, height, radius, **kwargs)
+
+
+def pinned(value):
+    """A number this file does not want an optimizer to touch."""
+    return Scalar(value, free=False)
+
+
+def placed(x, y, z):
+    """A pinned position, in millimetres."""
+    return Vector([x * MM, y * MM, z * MM], free=False)
+
+
+ACROSS = [pinned(0.0), pinned(math.pi / 2.0), pinned(0.0)]  # a cylinder turned onto +x
 
 cast_iron = Material(
     name="cast iron",
@@ -277,11 +430,11 @@ nodular_iron = Material(
 
 # ── 1. the deck plate: the top of a CLOSED deck ──────────────────────────────
 # The single most important thing the measurement changed. The casting has a
-# 10.2 mm plate over the whole jacket, with sixteen slots through it; the
+# 10.2 mm plate over the whole jacket with sixteen slots through it; the
 # guessed version of this file had an open deck and therefore the wrong part.
 # The plate is modelled first because it carries the deck face, and the bores,
 # the head bolts and the slots are all sunk from that face.
-deck_profile = PolygonProfile.rounded_rect(
+deck_profile = rounded(
     BLOCK_LENGTH * MM,
     DECK_WIDTH * MM,
     22.0 * MM,
@@ -293,28 +446,80 @@ deck_profile = PolygonProfile.rounded_rect(
 deck_plate = extrude(deck_profile, depth=deck_plate_thickness, material=cast_iron)
 deck = deck_plate.cap("+")
 
-# ── 2. the bore bank: the jacket band, and the crankcase below it ────────────
-# Two bodies because the casting is two: a narrow upper block carrying the
-# barrels and the water, and a crankcase that flares outward to the pan rail.
-# Measured widths: 130 across the jacket band, 235 across the rails.
-upper_profile = PolygonProfile.rounded_rect(
-    BLOCK_LENGTH * MM,
-    UPPER_WIDTH * MM,
-    18.0 * MM,
-    center=(0.0, UPPER_CENTRE_Y * MM),
+deck_lug_profile = rounded(
+    DECK_LUG_LENGTH * MM,
+    DECK_LUG_WIDTH * MM,
+    9.0 * MM,
+    center=(FIRST_MAIN_X * MM, DECK_LUG_Y * MM),
     segments=2,
-    plane=SketchPlane(origin=[0.0, 0.0, (BORE_BOTTOM_Z + DECK_Z - DECK_PLATE) / 2.0 * MM]),
-    name="upper block",
+    plane=SketchPlane(origin=[0.0, 0.0, (DECK_Z - DECK_PLATE / 2.0) * MM]),
+    name="deck lug",
 )
-upper_block = extrude(
-    upper_profile, depth=(DECK_Z - DECK_PLATE - BORE_BOTTOM_Z) * MM, material=cast_iron
+deck_lugs = LinearPattern(
+    extrude(deck_lug_profile, depth=deck_plate_thickness, material=cast_iron),
+    direction=[1.0, 0.0, 0.0],
+    count=MAIN_COUNT,
+    spacing=bore_pitch,
+)
+deck_end_profile = rounded(
+    DECK_END_LENGTH * MM,
+    DECK_END_WIDTH * MM,
+    9.0 * MM,
+    center=(-(BLOCK_LENGTH - DECK_END_LENGTH) / 2.0 * MM, DECK_END_Y * MM),
+    segments=2,
+    plane=SketchPlane(origin=[0.0, 0.0, (DECK_Z - DECK_PLATE / 2.0) * MM]),
+    name="deck end pad",
+)
+deck_end = extrude(deck_end_profile, depth=deck_plate_thickness, material=cast_iron)
+deck_ends = Union(deck_end, Mirror(deck_end, "x"), smoothness=0.0)
+
+
+# ── 2. the bore bank: a LOBED flank, not a slab ──────────────────────────────
+# One cylinder per bore, blended into a slab that carries the waist. This is
+# what makes the plan view read as a cylinder block rather than as a box: the
+# outer wall belled out over each barrel, pinched between them. The blend is a
+# real casting radius, and it is 4 mm — the same 4 mm that appears at every
+# other cast corner in this file.
+def bank_band(lobe_radius, waist_half, low, high, tag):
+    """One band of the bore bank: four lobes blended into a waist slab."""
+    lobes = LinearPattern(
+        Solid.cylinder(
+            radius=pinned(lobe_radius * MM),
+            height=pinned((high - low) / 2.0 * MM),
+            position=placed(FIRST_BORE_X, 0.0, (low + high) / 2.0),
+            material=cast_iron,
+            name=f"bank_lobe_{tag}",
+        ),
+        direction=[1.0, 0.0, 0.0],
+        count=BORE_COUNT,
+        spacing=bore_pitch,
+    )
+    waist = extrude(
+        rounded(
+            BLOCK_LENGTH * MM,
+            2.0 * waist_half * MM,
+            18.0 * MM,
+            segments=2,
+            plane=SketchPlane(origin=[0.0, 0.0, (low + high) / 2.0 * MM]),
+            name=f"bank waist {tag}",
+        ),
+        depth=(high - low) * MM,
+        material=cast_iron,
+    )
+    return Union(lobes, waist, smoothness=CAST_FILLET * MM)
+
+
+upper_block = Union(
+    bank_band(LOBE_RADIUS_LOW, WAIST_HALF_LOW, UPPER_BOTTOM_Z, BAND_SPLIT_Z + 3.0, "low"),
+    bank_band(LOBE_RADIUS_HIGH, WAIST_HALF_HIGH, BAND_SPLIT_Z, DECK_Z - DECK_PLATE, "high"),
+    smoothness=CAST_FILLET * MM,
 )
 
-# The crankcase is a loft, because the flare is the shape: it is what the
-# casting does instead of a deep skirt. `deck` faces up, so a plane derived
-# from it is placed by pushing DOWN; profile A of a loft sits at -height/2
-# along the plane normal, which here is the lower, wider outline.
-crankcase_foot = PolygonProfile.rounded_rect(
+# ── 3. the crankcase: a taper from the pan rail up to the bore bay ───────────
+# 232 mm across at the rail, 140 where it meets the bank. `deck` faces up, so
+# a plane derived from it is placed by pushing down; a loft's profile A sits
+# at -height/2 along the plane normal, which here is the lower, wider outline.
+crankcase_foot = rounded(
     BLOCK_LENGTH * MM,
     RAIL_WIDTH * MM,
     26.0 * MM,
@@ -323,11 +528,11 @@ crankcase_foot = PolygonProfile.rounded_rect(
     plane=SketchPlane(origin=[0.0, 0.0, (RAIL_Z + BORE_BOTTOM_Z) / 2.0 * MM]),
     name="crankcase foot",
 )
-crankcase_top = PolygonProfile.rounded_rect(
+crankcase_top = rounded(
     BLOCK_LENGTH * MM,
     CRANKCASE_TOP_WIDTH * MM,
     20.0 * MM,
-    center=(0.0, CRANKCASE_TOP_Y * MM),
+    center=(0.0, 0.0),
     segments=2,
     name="crankcase top",
 )
@@ -335,15 +540,14 @@ crankcase_wall = loft(
     crankcase_foot, crankcase_top, height=(BORE_BOTTOM_Z - RAIL_Z) * MM, material=cast_iron
 )
 
-# ── 3. end flanges: where the casting's width really goes ─────────────────────
+# ── 4. end flanges, flank rails, bolt pads and the oil gallery ───────────────
 # 349 mm across, but only at the two ends — the bellhousing face and the drive
-# end. One plate, mirrored across the block's transverse midplane.
-# 8 mm corners, not 12: `rounded_rect` clamps the radius to half the shorter
-# side, and at exactly half it collapses each corner arc onto a single point.
-# Two coincident vertices are a zero-length edge, and a zero-length edge is a
-# divide by zero in the polygon distance — the profile evaluates to 0 at every
+# end. 8 mm corners, not 12: `rounded_rect` clamps the radius to half the
+# shorter side, and at exactly half it collapses each corner arc onto a single
+# point. Two coincident vertices are a zero-length edge, which is a divide by
+# zero in the polygon distance — the profile then evaluates to 0 at every
 # point in space and the union it feeds swallows the whole scene.
-flange_profile = PolygonProfile.rounded_rect(
+flange_profile = rounded(
     FLANGE_LENGTH * MM,
     FLANGE_WIDTH * MM,
     8.0 * MM,
@@ -355,14 +559,65 @@ flange_profile = PolygonProfile.rounded_rect(
 end_flange = extrude(flange_profile, depth=(FLANGE_TOP_Z - RAIL_Z) * MM, material=cast_iron)
 end_flanges = Union(end_flange, Mirror(end_flange, "x"), smoothness=0.0)
 
-# A HARD union: these four bodies are one casting cut into slabs for the
-# convenience of drawing it, and a 4 mm blend on a join that is not really
-# there swells the outer surface by 4 mm everywhere two of them meet — which
-# on this part is the whole perimeter, and it showed up as three hundred
-# square centimetres of iron standing proud of the real deck.
-blank = Union(deck_plate, upper_block, crankcase_wall, end_flanges, smoothness=0.0)
+# A continuous rail down each flank under the deck. One profile, mirrored
+# across the block's own longitudinal midplane.
+deck_rail_profile = rounded(
+    BLOCK_LENGTH * MM,
+    DECK_RAIL_WIDTH * MM,
+    5.0 * MM,
+    center=(0.0, -DECK_RAIL_Y * MM),
+    segments=2,
+    plane=SketchPlane(origin=[0.0, 0.0, (DECK_RAIL_TOP_Z - DECK_RAIL_DEPTH / 2.0) * MM]),
+    name="deck rail",
+)
+deck_rail = extrude(deck_rail_profile, depth=DECK_RAIL_DEPTH * MM, material=cast_iron)
+deck_rails = Union(deck_rail, Mirror(deck_rail, "y"), smoothness=0.0)
 
-# ── 4. the barrels: one hole from the deck, patterned four ways ──────────────
+# A raised bolt pad on every main-bearing station, both flanks: one pad,
+# mirrored, then walked along the bore pitch.
+flank_pad_profile = rounded(
+    FLANK_PAD_LENGTH * MM,
+    FLANK_PAD_WIDTH * MM,
+    6.0 * MM,
+    center=(FIRST_MAIN_X * MM, -FLANK_PAD_Y * MM),
+    segments=2,
+    plane=SketchPlane(origin=[0.0, 0.0, FLANK_PAD_Z * MM]),
+    name="flank pad",
+)
+flank_pad = extrude(flank_pad_profile, depth=FLANK_PAD_HEIGHT * MM, material=cast_iron)
+flank_pads = LinearPattern(
+    Union(flank_pad, Mirror(flank_pad, "y"), smoothness=0.0),
+    direction=[1.0, 0.0, 0.0],
+    count=MAIN_COUNT,
+    spacing=bore_pitch,
+)
+
+# The oil gallery: not a drilling through a wall but an integral tube standing
+# proud of the flank, which is how it reads in a photograph. The boss is
+# unioned into the casting and the Ø20 gallery is bored through it below.
+gallery_boss = Solid.cylinder(
+    radius=pinned(GALLERY_BOSS_RADIUS * MM),
+    height=pinned((BLOCK_LENGTH + 4.0) / 2.0 * MM),
+    position=placed(0.0, GALLERY_Y, GALLERY_Z),
+    rotation=ACROSS,
+    material=cast_iron,
+    name="gallery_boss",
+)
+
+blank = Union(
+    deck_plate,
+    deck_lugs,
+    deck_ends,
+    upper_block,
+    crankcase_wall,
+    end_flanges,
+    deck_rails,
+    flank_pads,
+    gallery_boss,
+    smoothness=0.0,
+)
+
+# ── 5. the barrels: one hole from the deck, patterned four ways ──────────────
 # `Face.hole` returns the TOOL rather than a cut, which is what lets this one
 # column be subtracted from the water jacket — where it leaves the barrel
 # standing — without ever being subtracted from the block. At 86 mm pitch and
@@ -376,11 +631,12 @@ barrel = deck.hole(
 )
 barrels = LinearPattern(barrel, direction=[1.0, 0.0, 0.0], count=BORE_COUNT, spacing=bore_pitch)
 
-# ── 5. the crankcase cavity ──────────────────────────────────────────────────
+# ── 6. the crankcase cavity ──────────────────────────────────────────────────
 # Open below and open to the bores above: measured, the bores end at z = 73
 # and nothing hangs below that, so this cavity needs no coring around the
-# barrels. Its ceiling is the underside of the jacket floor.
-cavity_foot = PolygonProfile.rounded_rect(
+# barrels. Its ceiling is the underside of the jacket floor, and the upper
+# block reaches down past it (see the note on coincident faces above).
+cavity_foot = rounded(
     (BLOCK_LENGTH - 2 * 12.0) * MM,
     CAVITY_FOOT_WIDTH * MM,
     20.0 * MM,
@@ -389,7 +645,7 @@ cavity_foot = PolygonProfile.rounded_rect(
     plane=SketchPlane(origin=[0.0, 0.0, (RAIL_Z - 5.0 + BORE_BOTTOM_Z) / 2.0 * MM]),
     name="crankcase cavity",
 )
-cavity_top = PolygonProfile.rounded_rect(
+cavity_top = rounded(
     (BLOCK_LENGTH - 2 * 12.0) * MM,
     CAVITY_TOP_WIDTH * MM,
     16.0 * MM,
@@ -400,7 +656,7 @@ cavity_top = PolygonProfile.rounded_rect(
 crankcase = loft(cavity_foot, cavity_top, height=(BORE_BOTTOM_Z - RAIL_Z + 5.0) * MM)
 hollow = Difference(blank, crankcase, smoothness=CORE_RADIUS * MM)
 
-# ── 6. main bearing bulkheads: the one sketch with design freedom ────────────
+# ── 7. main bearing bulkheads: the one sketch with design freedom ────────────
 # Sketch plane normal +X gives in-plane axes u = -Z, v = +Y, so profile x is
 # world height measured DOWNWARD and profile y is world y. The pads at profile
 # x = 0 sit on the crank axis, which is where this casting's main-cap parting
@@ -433,15 +689,15 @@ bulkheads = LinearPattern(bulkhead, direction=[1.0, 0.0, 0.0], count=MAIN_COUNT,
 # The web does not stay 20 mm the whole way up. Measured along the crank on
 # the bore centreline it is 20.0 mm at the saddle and 10.6 mm where it meets
 # the bore bay, so the upper half is a second, thinner plate on the same
-# stations. Drawing one 20 mm web the full height was the single largest
-# error in this model — a hundred and sixty square centimetres of iron in
-# every slice through the crankcase.
+# stations. Drawing one 20 mm web the full height was the largest single
+# error this model had — a hundred and sixty square centimetres in every
+# slice through the crankcase.
 upper_web_profile = PolygonProfile(
     [
-        [-(BULKHEAD_STEP_Z - 2.0) * MM, -100.0 * MM],
-        [-(BULKHEAD_STEP_Z - 2.0) * MM, 70.0 * MM],
-        [-(BORE_BOTTOM_Z + 3.0) * MM, 62.0 * MM],
-        [-(BORE_BOTTOM_Z + 3.0) * MM, -88.0 * MM],
+        [-(BULKHEAD_STEP_Z - 2.0) * MM, -86.0 * MM],
+        [-(BULKHEAD_STEP_Z - 2.0) * MM, 64.0 * MM],
+        [-(BORE_BOTTOM_Z + 3.0) * MM, 56.0 * MM],
+        [-(BORE_BOTTOM_Z + 3.0) * MM, -76.0 * MM],
     ],
     plane=SketchPlane(origin=[FIRST_MAIN_X * MM, 0.0, 0.0], normal=[1.0, 0.0, 0.0]),
     name="upper web",
@@ -452,24 +708,51 @@ upper_webs = LinearPattern(
     upper_web, direction=[1.0, 0.0, 0.0], count=MAIN_COUNT, spacing=bore_pitch
 )
 
-# 4 mm against a 20 mm web is a fifth of its thickness — a foundry radius,
-# not decoration, in the corner where a bulkhead meets the crankcase wall.
+# 4 mm against a 20 mm web is a fifth of its thickness — a foundry radius, not
+# decoration, in the corner where a bulkhead meets the crankcase wall.
 structure = Union(hollow, bulkheads, upper_webs, smoothness=CAST_FILLET * MM / 2.0)
 
-# ── 7. the water jacket: a void defined by what it is not ────────────────────
+# ── 8. the water jacket: a void defined by what it is not ────────────────────
 # The pocket inside the outer wall, minus the barrel bank, minus the ten
 # head-bolt columns. Nothing here models a boss: the bosses are the material
-# the cut steps around, which is how a core box works.
-jacket_profile = PolygonProfile.rounded_rect(
+# the cut steps around, which is how a core box works. The pocket is lobed for
+# the same reason the outside is — it is the same core.
+jacket_lobes = LinearPattern(
+    Solid.cylinder(
+        radius=pinned((LOBE_RADIUS_LOW - WALL) * MM),
+        height=pinned((BAND_SPLIT_Z - JACKET_FLOOR_Z) / 2.0 * MM),
+        position=placed(FIRST_BORE_X, 0.0, (JACKET_FLOOR_Z + BAND_SPLIT_Z) / 2.0),
+        name="jacket_lobe_low",
+    ),
+    direction=[1.0, 0.0, 0.0],
+    count=BORE_COUNT,
+    spacing=bore_pitch,
+)
+jacket_lobes_high = LinearPattern(
+    Solid.cylinder(
+        radius=pinned((LOBE_RADIUS_HIGH - WALL) * MM),
+        height=pinned((DECK_Z - DECK_PLATE - BAND_SPLIT_Z) / 2.0 * MM),
+        position=placed(FIRST_BORE_X, 0.0, (BAND_SPLIT_Z + DECK_Z - DECK_PLATE) / 2.0),
+        name="jacket_lobe_high",
+    ),
+    direction=[1.0, 0.0, 0.0],
+    count=BORE_COUNT,
+    spacing=bore_pitch,
+)
+jacket_waist_profile = rounded(
     (BLOCK_LENGTH - 2 * 12.0) * MM,
-    (UPPER_WIDTH - 2 * WALL) * MM,
+    2.0 * (WAIST_HALF_HIGH - WALL) * MM,
     14.0 * MM,
-    center=(0.0, UPPER_CENTRE_Y * MM),
     segments=2,
     plane=deck.plane(offset=-(DECK_Z - JACKET_MID_Z) * MM),
     name="water jacket",
 )
-jacket_pocket = extrude(jacket_profile, depth=jacket_depth)
+jacket_pocket = Union(
+    jacket_lobes,
+    jacket_lobes_high,
+    extrude(jacket_waist_profile, depth=jacket_depth),
+    smoothness=0.0,
+)
 
 bolt_column = deck.hole(
     11.0 * MM,
@@ -485,7 +768,7 @@ bolt_columns = LinearPattern(
 )
 jacket = Difference(jacket_pocket, barrels, bolt_columns, smoothness=0.0)
 
-# ── 8. the cuts ──────────────────────────────────────────────────────────────
+# ── 9. the cuts ──────────────────────────────────────────────────────────────
 # Opening the bore eats into the 5.25 mm the fixed `barrel_radius` core left.
 bore = deck.hole(
     bore_radius,
@@ -511,38 +794,64 @@ head_bolts = LinearPattern(
     spacing=bore_pitch,
 )
 
-# Sixteen coolant slots: two per bore per side, staggered 19.7 mm either side
-# of each bore. Three nested patterns — the pair, the bank, the mirror — which
-# is cheaper than sixteen pockets and says what the pattern means.
-slot_pair = LinearPattern(
-    deck.pocket(
-        PolygonProfile.rounded_rect(
-            SLOT_LENGTH * MM, SLOT_WIDTH * MM, 4.0 * MM, segments=2, name="slot"
-        ).vertices,
-        depth=(DECK_PLATE + 6.0) * MM,
-        at=((FIRST_BORE_X - SLOT_STAGGER) * MM, -SLOT_Y * MM),
-        through=6.0 * MM,
+
+def kidney(sign: float) -> list[list[float]]:
+    """A kidney slot on the deck, in face coordinates about bore 1.
+
+    An arc band between two radii about the bore's own axis: the shape a
+    coolant slot in a deck actually is, and the shape the deck raster found
+    sixteen of. ``sign`` picks which side of the transverse axis it sits on.
+    """
+    centre = math.radians(90.0 - sign * SLOT_AZIMUTH)
+    half = math.radians(SLOT_HALF_ANGLE)
+    outer = SLOT_RADIUS + SLOT_HALF_WIDTH
+    inner = SLOT_RADIUS - SLOT_HALF_WIDTH
+    steps = 4
+    points = []
+    for i in range(steps + 1):
+        angle = centre - half + 2.0 * half * i / steps
+        points.append([outer * math.cos(angle) * MM, outer * math.sin(angle) * MM])
+    for i in range(steps + 1):
+        angle = centre + half - 2.0 * half * i / steps
+        points.append([inner * math.cos(angle) * MM, inner * math.sin(angle) * MM])
+    return points
+
+
+slot_row = LinearPattern(
+    Union(
+        deck.pocket(
+            kidney(+1.0),
+            depth=(DECK_PLATE + 6.0) * MM,
+            at=(FIRST_BORE_X * MM, 0.0),
+            through=6.0 * MM,
+        ),
+        deck.pocket(
+            kidney(-1.0),
+            depth=(DECK_PLATE + 6.0) * MM,
+            at=(FIRST_BORE_X * MM, 0.0),
+            through=6.0 * MM,
+        ),
+        smoothness=0.0,
     ),
     direction=[1.0, 0.0, 0.0],
-    count=2,
-    spacing=2.0 * SLOT_STAGGER * MM,
+    count=BORE_COUNT,
+    spacing=bore_pitch,
 )
-slot_row = LinearPattern(slot_pair, direction=[1.0, 0.0, 0.0], count=BORE_COUNT, spacing=bore_pitch)
 deck_slots = Union(slot_row, Mirror(slot_row, "y"), smoothness=0.0)
 
 # One line bore opens all five saddles at once, which is how it is cut.
 crank_tunnel = Solid.cylinder(
     radius=main_saddle_radius,
-    height=Scalar((BLOCK_LENGTH + 60.0) / 2.0 * MM, free=False),
-    position=Vector([0.0, 0.0, 0.0], free=False),
-    rotation=[Scalar(0.0, free=False), Scalar(math.pi / 2.0, free=False), Scalar(0.0, free=False)],
+    height=pinned((BLOCK_LENGTH + 60.0) / 2.0 * MM),
+    position=placed(0.0, 0.0, 0.0),
+    rotation=ACROSS,
     name="crank_tunnel",
 )
 
 main_bolt = Solid.cylinder(
     radius=main_bolt_radius,
-    height=Scalar(28.0 * MM, free=False),
-    position=Vector([FIRST_MAIN_X * MM, -MAIN_BOLT_Y * MM, 22.0 * MM], free=False),
+    height=pinned(28.0 * MM),
+    position=placed(FIRST_MAIN_X, -MAIN_BOLT_Y, 22.0),
     name="main_bolt",
 )
 main_bolts = LinearPattern(
@@ -556,13 +865,50 @@ main_bolts = LinearPattern(
 # (y = -5, z = 55). A short cylinder across the block, patterned onto the webs
 # rather than bored the length of the casting.
 window = Solid.cylinder(
-    radius=Scalar(14.0 * MM, free=False),
-    height=Scalar(18.0 * MM, free=False),
-    position=Vector([FIRST_MAIN_X * MM, WINDOW_Y * MM, WINDOW_Z * MM], free=False),
-    rotation=[Scalar(0.0, free=False), Scalar(math.pi / 2.0, free=False), Scalar(0.0, free=False)],
+    radius=pinned(14.0 * MM),
+    height=pinned(18.0 * MM),
+    position=placed(FIRST_MAIN_X, WINDOW_Y, WINDOW_Z),
+    rotation=ACROSS,
     name="web_window",
 )
 windows = LinearPattern(window, direction=[1.0, 0.0, 0.0], count=MAIN_COUNT, spacing=bore_pitch)
+
+# The gallery itself, bored down the boss unioned on above.
+gallery_bore = Solid.cylinder(
+    radius=pinned(GALLERY_BORE_RADIUS * MM),
+    height=pinned((BLOCK_LENGTH + 40.0) / 2.0 * MM),
+    position=placed(0.0, GALLERY_Y, GALLERY_Z),
+    rotation=ACROSS,
+    name="gallery_bore",
+)
+
+# Confined to the end flange. The casting's opening runs from x = 164 to 179
+# and the barrel of cylinder 4 reaches 172, so a bore drawn at the measured
+# depth eats the fourth barrel wall — in the casting the two clear each other
+# in three dimensions, in a straight cylinder they do not. It is drawn 10 mm
+# deep into the flange instead, which is the face it has to appear on.
+end_bore = Solid.cylinder(
+    radius=pinned(END_BORE_RADIUS * MM),
+    height=pinned(10.0 * MM),
+    position=placed(BLOCK_LENGTH / 2.0 - 1.0, END_BORE_Y, END_BORE_Z),
+    rotation=ACROSS,
+    name="end_bore",
+)
+
+# A bolt into each flank pad, which is what the pads are there for.
+flank_bolt = Solid.cylinder(
+    radius=pinned(FLANK_BOLT_RADIUS * MM),
+    height=pinned(26.0 * MM),
+    position=placed(FIRST_MAIN_X, -(FLANK_PAD_Y + 6.0), FLANK_PAD_Z),
+    rotation=[pinned(math.pi / 2.0), pinned(0.0), pinned(0.0)],
+    name="flank_bolt",
+)
+flank_bolts = LinearPattern(
+    Union(flank_bolt, Mirror(flank_bolt, "y"), smoothness=0.0),
+    direction=[1.0, 0.0, 0.0],
+    count=MAIN_COUNT,
+    spacing=bore_pitch,
+)
 
 block = Difference(
     structure,
@@ -572,12 +918,15 @@ block = Difference(
     deck_slots,
     main_bolts,
     windows,
+    gallery_bore,
+    flank_bolts,
+    end_bore,
     crank_tunnel,
     smoothness=0.0,
 )
 block.name = "block"
 
-# ── 9. main bearing caps: rendered, not part of the casting ──────────────────
+# ── 10. main bearing caps: rendered, not part of the casting ─────────────────
 # Context, and the reason the crank axis reads as an axis in a screenshot.
 # Bored by the SAME tunnel the block is — one subtree, emitted once — which is
 # what makes cap bore and saddle concentric by construction.

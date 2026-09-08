@@ -7,7 +7,9 @@ got.
 | file | what it does |
 | --- | --- |
 | `step_probe.py` | reads a STEP, reports the face census, and derives the part's frame and dimensions |
-| `overlay.py` | scores a cadjoint scene against the same STEP: IoU, where it differs, how far, and a picture |
+| `sections.py` | draws the casting's silhouette and the model's on the same plane, and scores each plane |
+| `overlay.py` | scores the whole scene against the STEP: IoU, where it differs, how far, and a picture |
+| `render.py` | side-by-side orthographic render of both, on the CPU, lit identically |
 | `mesh_query.py` | axis-aligned ray casting on a triangle soup, with no optional dependencies |
 
 They live under `research/` and not in `cadjoint/` because they need
@@ -61,6 +63,36 @@ REFERENCE = {
     "origin_mm": [826.4, 134.0, 210.03],    # the STEP point at the scene origin
     "axes": [[0, 1, 0], [1, 0, 0], [0, 0, 1]],   # scene x, y, z in world terms
 }
+```
+
+## Sections, not the scalar
+
+`overlay.py` tells you a model disagrees. It cannot tell you *how*, and the
+scalar is a bad thing to optimise directly — it will happily reward a model
+that is uniformly slightly fat over one that has the right shape.
+`sections.py` is the tool that actually drives the work: it puts the two
+silhouettes on the same axes at the heights where the part changes character,
+and the answer reads off the picture.
+
+```bash
+python -m research.reverse.sections --scene scenes.cylinder_block \
+    --mesh-cache /tmp/part.npz --png sections.png
+```
+
+Every edit to `scenes/cylinder_block.py` since it was first measured came from
+looking at one of those panels. Two of them were reverted on the evidence of
+the same table, which is the other half of what the tool is for: a feature
+that stops paying says so.
+
+## A picture without a GPU
+
+`render.py` sphere-traces the scene and ray-casts the casting from the same
+orthographic camera, and shades both from their own depth buffers so neither
+is flattered:
+
+```bash
+python -m research.reverse.render --scene scenes.cylinder_block \
+    --mesh-cache /tmp/part.npz --azimuth 35 --elevation 22 --png compare.png
 ```
 
 ## Reading the score
