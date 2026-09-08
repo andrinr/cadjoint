@@ -126,16 +126,31 @@ class TestTheDeckIsClosed:
             assert not solid(blk, x, 0, 60), f"bore {x} does not open into the crankcase"
 
     def test_the_deck_covers_the_water_jacket(self, blk):
-        """The jacket is open at deck level only through its sixteen slots."""
-        for x in BORES:
-            assert solid(blk, x, 55.0, 202), "the deck should close over the jacket"
-            assert not solid(blk, x, 55.0, 140), "and the jacket should be open below it"
+        """The jacket is open at deck level only through its sixteen slots.
 
-    def test_sixteen_coolant_slots_pierce_it(self, blk):
+        46 mm out from a bore axis is inside the jacket: the barrel is 43 and
+        the lobed outer wall is 49, so the water runs in a 6 mm annulus.
+        """
+        for x in BORES:
+            assert solid(blk, x, 46.0, 202), "the deck should close over the jacket"
+            assert not solid(blk, x, 46.0, 140), "and the jacket should be open below it"
+
+    def test_sixteen_kidney_slots_pierce_it(self, blk):
+        """Four per bore, on a 48 mm circle 24.2 degrees off the transverse axis.
+
+        Kidneys, not rectangles: the deck raster found all sixteen sitting on
+        an arc about their own bore, which is the shape a cored coolant slot
+        actually has.
+        """
+        import math
+
         for bore in BORES:
-            for stagger in (-blk.SLOT_STAGGER, blk.SLOT_STAGGER):
-                for y in (-blk.SLOT_Y, blk.SLOT_Y):
-                    assert not solid(blk, bore + stagger, y, 202), "a coolant slot is missing"
+            for sign in (-1.0, 1.0):
+                for flip in (-1.0, 1.0):
+                    angle = math.radians(90.0 - sign * blk.SLOT_AZIMUTH)
+                    x = bore + blk.SLOT_RADIUS * math.cos(angle)
+                    y = flip * blk.SLOT_RADIUS * math.sin(angle)
+                    assert not solid(blk, x, y, 202), f"kidney slot ({x:.0f}, {y:.0f}) is missing"
 
 
 class TestTheBoresAreSiamesed:
@@ -149,11 +164,57 @@ class TestTheBoresAreSiamesed:
         for x in BORES:
             assert not solid(blk, x + 35.0, 0, 140), "the bore is not open to its own radius"
             assert solid(blk, x + 40.0, 0, 140), "the barrel wall is missing"
-            assert not solid(blk, x, 55.0, 140), "the jacket is solid beside the barrel"
+            assert not solid(blk, x, 46.0, 140), "the jacket is solid beside the barrel"
 
     def test_the_jacket_has_a_floor(self, blk):
         for x in BORES:
-            assert solid(blk, x, 55.0, 78), "the jacket floor is missing"
+            assert solid(blk, x, 46.0, 78), "the jacket floor is missing"
+
+
+class TestTheFlanksAreLobed:
+    """What makes the plan view read as a cylinder block rather than a box."""
+
+    def test_the_outer_wall_bulges_over_each_bore(self, blk):
+        """52 mm out at a bore, 44 at the waist between two of them.
+
+        Measured off the silhouette sweep in research/reverse/sections.py: the
+        casting's flank follows the barrels, and drawing it as a slab is what
+        made an earlier version of this file unrecognisable.
+        """
+        for x in BORES:
+            assert solid(blk, x, 50.0, 170), f"no bulge over the bore at x={x}"
+        for x in (-86.0, 0.0, 86.0):
+            assert not solid(blk, x, 50.0, 170), f"no waist between the bores at x={x}"
+
+    def test_the_bulge_is_bigger_low_down(self, blk):
+        """Two stacked bands: 63 at the jacket floor, 52 under the deck.
+
+        61.5 is the 3 mm of wall between the jacket lobe at 60 and the outer
+        lobe at 63; 58 at z = 160 is past the upper band and below the rail.
+        """
+        assert blk.LOBE_RADIUS_LOW > blk.LOBE_RADIUS_HIGH
+        for x in BORES:
+            assert solid(blk, x, 61.5, 100), "the lower band should reach 61.5"
+            assert not solid(blk, x, 58.0, 160), "the upper band should not reach 58"
+
+    def test_the_oil_gallery_runs_the_whole_length_as_a_tube(self, blk):
+        y, z = blk.GALLERY_Y, blk.GALLERY_Z
+        for x in (-170.0, -86.0, 0.0, 86.0, 170.0):
+            assert not solid(blk, x, y, z), f"the gallery is blocked at x={x}"
+            assert solid(blk, x, y + 13.0, z), f"the gallery has no boss at x={x}"
+
+    def test_a_bolt_pad_stands_on_every_main_station(self, blk):
+        # Off the pad's own bolt axis, which is bored right through it.
+        height = blk.FLANK_PAD_Z + 8.0
+        for x in MAINS:
+            for sign in (-1.0, 1.0):
+                assert solid(
+                    blk, x, sign * (blk.FLANK_PAD_Y + 4.0), height
+                ), f"no flank pad at x={x}"
+        for x in BORES:
+            assert not solid(
+                blk, x, blk.FLANK_PAD_Y + 6.0, height
+            ), "the pads should be discrete, not a rail"
 
 
 class TestTheBottomEnd:
@@ -256,9 +317,12 @@ class TestTheParametersMoveWhatTheyName:
             assert not solid(blk, x + 40.0, 0, 140, field=wall), "and be gone at 41"
 
     def test_a_deeper_jacket_drops_its_floor(self, blk):
+        """Probed on the waist, between two bores: that is the part of the
+        jacket the depth parameter drives. The lobes over the bores are sized
+        by the casting's own two-band silhouette instead."""
         deep = perturbed(blk, jacket_depth=112.73 + 20.0)
-        assert solid(blk, 43, 55, 80), "the floor starts above 80"
-        assert not solid(blk, 43, 55, 80, field=deep), "and 10 mm of it should be gone"
+        assert solid(blk, -86, 30, 82), "the floor starts above 82"
+        assert not solid(blk, -86, 30, 82, field=deep), "and 10 mm of it should be gone"
 
     def test_a_bigger_journal_opens_every_saddle(self, blk):
         big = perturbed(blk, main_saddle_radius=34.0)
