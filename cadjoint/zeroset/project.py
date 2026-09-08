@@ -93,6 +93,12 @@ def project(
         regularised = gram + (1e-4 * trace + 1e-12)[..., None, None] * eye
         multipliers = jnp.linalg.solve(regularised, residual[..., None])[..., 0]
         step = jnp.einsum("nij,ni->nj", jacobian, multipliers)
+        # Every iteration, not only the first: a point can walk into a flat
+        # spot of the field (the far interior of a difference, the centre of
+        # a ball), where the linearisation says nothing and the step is
+        # 0/0.  There it stays put, and contributes no derivative.
+        usable = jax.lax.stop_gradient(trace) > _MIN_GRADIENT_SQUARED
+        step = jnp.where(usable[:, None] & jnp.isfinite(step), step, 0.0)
         x = x - step
         if max_step is not None:
             displacement = x - start

@@ -289,12 +289,56 @@ def with_table(mesh: Any, scene: Any, *, tolerance: float | None = None) -> Any:
             placed = stepped
             break
         placed = stepped
-    points = np.array(mesh.points, dtype=np.float64)
-    points[indices] = placed
-    if getattr(mesh, "edge_parents", None) is not None:
-        corners = points[: mesh.num_corner_points]
-        points[mesh.num_corner_points :] = corners[mesh.edge_parents].mean(axis=1)
+    points, incidence = _guard_inversions(mesh, indices, placed, incidence)
     return dataclasses.replace(mesh, points=points, table=table, incidence=incidence)
+
+
+def _guard_inversions(
+    mesh: Any, indices: np.ndarray, placed: np.ndarray, incidence: list[list[int]]
+) -> tuple[np.ndarray, list[list[int]]]:
+    """Take the crease placement only where it costs no element any quality.
+
+    Landing a vertex exactly on the edge two faces make can pull it further
+    than the mesher's own snap did — the mesher guards its snap against
+    inversion (:func:`_snap_boundary_vertices`) and this guards against
+    *degradation*, which is stricter and is the property a mesh is judged
+    on: an element whose metric would drop has the vertices that moved in
+    it put back.  A reverted vertex keeps its position and the single
+    surface nearest it, so it moves exactly as it did before.
+    """
+    from cadjoint.fem.quality import scaled_jacobians, tet_radius_ratios
+
+    points = np.array(mesh.points, dtype=np.float64)
+    cells = np.asarray(mesh.cells)
+    hexes = cells.shape[1] == 8
+    corners = cells if hexes else cells[:, :4]
+
+    def metric(x: np.ndarray) -> np.ndarray:
+        return scaled_jacobians(x, cells) if hexes else tet_radius_ratios(x, corners)
+
+    baseline = metric(points)
+    proposed = points.copy()
+    proposed[indices] = placed
+    moved = np.zeros(points.shape[0], dtype=bool)
+    moved[indices] = True
+    for _ in range(16):
+        worse = np.flatnonzero(metric(proposed) < baseline - 1e-9)
+        if worse.size == 0:
+            break
+        revert = np.unique(corners[worse])
+        revert = revert[moved[revert]]
+        if revert.size == 0:
+            break
+        moved[revert] = False
+        proposed[revert] = points[revert]
+    reverted = set(np.flatnonzero(~moved).tolist())
+    incidence = [
+        (row[:1] if int(index) in reverted else row) for index, row in zip(indices, incidence)
+    ]
+    if getattr(mesh, "edge_parents", None) is not None:
+        parents = proposed[: mesh.num_corner_points]
+        proposed[mesh.num_corner_points :] = parents[mesh.edge_parents].mean(axis=1)
+    return proposed, incidence
 
 
 def _require_selection(patch: Any) -> None:
