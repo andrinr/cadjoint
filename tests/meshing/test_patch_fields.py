@@ -231,10 +231,117 @@ class TestExtrudedPolygonPatchFields:
         )
         assert float(jnp.max(jnp.stack([f(outside) for f in fields]))) > 0.0
 
-    def test_draft_and_twist_report_none(self):
+    def test_twist_reports_none(self):
+        """A twisted wall is a helicoid — none of the surfaces a fitter knows."""
         verts = [jnp.array(v) for v in HOUSE_VERTICES]
-        assert ExtrudedPolygon(verts, depth=1.0, draft=5.0).patch_fields() is None
         assert ExtrudedPolygon(verts, depth=1.0, twist=30.0).patch_fields() is None
+        # Twist decides on its own, whatever the draft alongside it does.
+        assert ExtrudedPolygon(verts, depth=1.0, draft=5.0, twist=30.0).patch_fields() is None
+
+
+class TestDraftedExtrusionPatchFields:
+    """A draft only tilts the walls, so they stay planes and stay declared."""
+
+    DRAFT = 8.0
+
+    def _drafted(self) -> ExtrudedPolygon:
+        return ExtrudedPolygon(
+            [jnp.array(v) for v in HOUSE_VERTICES], depth=HOUSE_DEPTH, draft=self.DRAFT
+        )
+
+    def _wall_point(self, edge: int, t: float, z: float) -> np.ndarray:
+        """A point on drafted wall ``edge``, built from the draft's own geometry.
+
+        The profile is exact at ``z = -depth/2``; above it the wall has moved
+        *inward* along the edge's outward normal by ``tan(δ)·(z + depth/2)``,
+        which is what offsetting the 2D distance by that amount means.
+        """
+        vertices = np.asarray(HOUSE_VERTICES)
+        a, b = vertices[edge], vertices[(edge + 1) % len(vertices)]
+        direction = b - a
+        # HOUSE_VERTICES wind counterclockwise, so the outward normal is the
+        # edge direction turned by -90 degrees.
+        outward = np.array([direction[1], -direction[0]]) / np.linalg.norm(direction)
+        inset = np.tan(np.radians(self.DRAFT)) * (z + HOUSE_DEPTH / 2.0)
+        xy = a + t * direction - inset * outward
+        return np.array([xy[0], xy[1], z])
+
+    def test_declares_walls_and_caps(self):
+        assert len(self._drafted().patch_fields()) == len(HOUSE_VERTICES) + 2
+
+    def test_each_wall_field_vanishes_on_its_drafted_wall(self):
+        shape = self._drafted()
+        fields = shape.patch_fields()
+        for edge in range(len(HOUSE_VERTICES)):
+            for t in (0.3, 0.5, 0.7):
+                # Strictly between the caps: on a cap rim the wall and the cap
+                # both vanish, and ownership there is a tie by construction.
+                for z in (-0.55, -0.2, 0.0, 0.55):
+                    point = jnp.asarray(self._wall_point(edge, t, z), jnp.float32)
+                    # The sample really is on the drafted solid's surface...
+                    assert float(shape(point)) == pytest.approx(0.0, abs=1e-6)
+                    # ...its own wall's field vanishes there...
+                    assert float(fields[edge](point)) == pytest.approx(0.0, abs=1e-6)
+                    # ...and no other patch claims it.
+                    assert _patch_id(fields, point) == edge
+
+    def test_cap_ids_are_unchanged_by_the_draft(self):
+        """A draft tapers the walls; the caps stay the planes they were."""
+        fields = self._drafted().patch_fields()
+        count = len(HOUSE_VERTICES)
+        assert _patch_id(fields, [0.0, 0.0, -HOUSE_DEPTH / 2]) == count
+        assert _patch_id(fields, [0.0, 0.0, HOUSE_DEPTH / 2]) == count + 1
+
+    def test_wall_fields_are_planes_with_unit_gradient(self):
+        """The point of the ``cos(δ)`` scaling, pinned.
+
+        Untouched, a drafted wall field reads ``sec(δ)`` times the true
+        distance — it would then win ``argmin |f_i|`` against neighbours it
+        should lose to.  Scaled, its gradient is a unit vector, and being
+        *constant* over the wall is what makes it a plane rather than merely
+        a surface through the right points.
+        """
+        fields = self._drafted().patch_fields()
+        gradient = jax.grad(lambda p, f=fields[0]: jnp.reshape(f(p), ()))
+        first = np.asarray(gradient(jnp.asarray(self._wall_point(0, 0.4, 0.0), jnp.float32)))
+        assert np.linalg.norm(first) == pytest.approx(1.0, abs=1e-6)
+        # The tilt is the draft angle, off vertical, about the profile edge.
+        assert float(first[2]) == pytest.approx(np.sin(np.radians(self.DRAFT)), abs=1e-6)
+        for wall in range(len(HOUSE_VERTICES)):
+            gradient = jax.grad(lambda p, f=fields[wall]: jnp.reshape(f(p), ()))
+            for t, z in ((0.2, -0.5), (0.8, 0.5)):
+                other = np.asarray(gradient(jnp.asarray(self._wall_point(wall, t, z), jnp.float32)))
+                assert np.linalg.norm(other) == pytest.approx(1.0, abs=1e-6)
+
+    def test_zero_draft_measured_distances_are_metric(self):
+        """One unit outside a drafted wall reads one unit, not ``sec(δ)``."""
+        fields = self._drafted().patch_fields()
+        surface = self._wall_point(0, 0.5, 0.1)
+        normal = np.asarray(
+            jax.grad(lambda p, f=fields[0]: jnp.reshape(f(p), ()))(
+                jnp.asarray(surface, jnp.float32)
+            )
+        )
+        for distance in (0.1, 0.5, 1.0):
+            probe = jnp.asarray(surface + distance * normal, jnp.float32)
+            assert float(fields[0](probe)) == pytest.approx(distance, abs=1e-5)
+
+    def test_composition_agrees_in_sign_but_not_in_distance(self):
+        """The documented cost of normalising: same verdict, rescaled wall term.
+
+        ``sdf`` composes the *unscaled* wall term, so ``max_i f_i`` is not
+        the drafted sdf value — it is ``cos(δ)`` times it wherever a wall
+        dominates.  Inside/outside still agree everywhere, which is what
+        makes the zero sets the same surface.
+        """
+        shape = self._drafted()
+        fields = shape.patch_fields()
+        rng = np.random.default_rng(11)
+        points = jnp.asarray(rng.uniform(-1.4, 1.4, size=(256, 3)))
+        composed = np.asarray(jnp.max(jnp.stack([field(points) for field in fields]), axis=0))
+        reference = np.asarray(shape(points))
+        assert np.all(np.sign(composed) == np.sign(reference))
+        assert not np.allclose(composed, reference, atol=1e-3), "expected the cos(δ) rescale"
 
     def test_jacrev_through_a_traced_profile_matches_finite_differences(self):
         """Patch fields rebuilt with the sketch vertices traced stay differentiable.
