@@ -4,7 +4,7 @@ The smallest scene that exercises the whole conjugate path: geometry from
 sketchable parameters, air driven along the duct by a
 :class:`~cadjoint.flow.FlowStudy`, heat conducted out of a die into the
 fins and carried away by the air, and a derivative of the result with
-respect to the fin height.
+respect to the fin box.
 
 **What makes it different from ``scenes/starter.py``.**  That scene's
 thermal study holds the fin field at ambient with a Dirichlet patch -- an
@@ -15,12 +15,26 @@ than the first, which is the effect that decides how many fins are worth
 building.  Nothing in the loop meshes: the design reaches the solver as a
 solid fraction sampled from this file's SDF on a fixed lattice.
 
-**Deliberately coarse.**  The lattice below is 16 x 30 x 16 so that the
-whole thing -- flow, temperature and a gradient -- runs in a few seconds
-and can live in a test.  That is not a resolution anyone should quote a
-thermal resistance from: at this spacing a Nusselt number is about 5% low
-and the fin channels are three cells wide.  ``research/flow-solver.md``
-carries the resolution study and the expensive version.
+**Deliberately coarse, and necessarily cubic.**  The lattice below is
+20 x 26 x 12 over a 1.40 x 1.82 x 0.84 duct, which makes every cell 0.07 on
+a side.  The three spacings being equal is not tidiness: the solver works in
+lattice units -- streaming moves one cell per axis, the energy stencil is one
+cell wide -- and the world ``size`` reaches it only by deciding where the SDF
+is sampled.  A lattice whose cells are not cubes therefore hands the solver
+the duct *stretched* by the ratio of its spacings, and nothing downstream
+knows.  This file used to do exactly that: 14 x 26 x 14 over a
+1.40 x 1.80 x 0.85 box gave cells of 0.100 x 0.069 x 0.061, so the solver saw
+a duct 1.6x too wide and read a fin 0.16 thick and 0.22 tall as 1.6 by 3.6
+cells -- an aspect ratio of 0.44 where the drawing says 0.73.
+:meth:`~cadjoint.flow.FlowStudyResult.warnings` now reports a non-cubic
+lattice rather than letting it pass.
+
+What coarseness remains is on purpose: the whole thing -- flow, temperature
+and a gradient -- runs in well under a minute and can live in a test.  That
+is not a resolution anyone should quote a thermal resistance from: 10 cells
+span the open duct, where ``research/flow-solver.md``'s resolution study puts
+a Nusselt number about 7% low, and the fin channels are four cells wide.
+That file carries the study and the expensive version.
 
 Run it directly::
 
@@ -55,8 +69,9 @@ from cadjoint.studies import Nodes
 
 # ── design parameters ────────────────────────────────────────────────────────
 # The fin box is shared by every fin, so one parameter sets the whole comb.
-# Its z component is the *full* box height; the lower half is buried in the
-# deck, so the height standing in the airflow is half of it.  Growing the
+# Its z component is a half-extent, so the box is twice it tall; the fin is
+# centred on the deck's top face, which buries the lower half and leaves the
+# z component itself as the height standing in the airflow.  Growing the
 # fins reaches further into the free stream and costs pressure drop, and the
 # flow solve is what makes that trade two-sided instead of one.
 # Primitive dimensions are HALF-extents: Solid.box(size=[a, b, c]) spans
@@ -66,8 +81,9 @@ DECK_HALF_THICKNESS = 0.12
 # Three thick fins on a wide pitch, not a fine comb: the channels between
 # them have to be several cells across for the lattice to resolve a flow in
 # them at all, and a demonstration that runs in seconds does not have cells
-# to spare.  A real design has finer fins and needs the resolution in
-# research/flow-solver.md.
+# to spare.  The 0.28 gap is four cells and a fin is two, which is the least
+# that resolves either.  A real design has finer fins and needs the
+# resolution in research/flow-solver.md.
 # Half-extents: each fin is 0.16 thick, 0.90 long, and 0.44 tall overall.
 # It is centred on the deck's top face, so its lower half is buried in the
 # deck and the height standing in the airflow is the z half-extent.
@@ -104,24 +120,34 @@ fins = [
     for index in range(FIN_COUNT)
 ]
 
-# A 10 mm blend rather than a hard union: the fin roots get a fillet, and a
-# smooth field is what keeps the sampled solid fraction differentiable
-# across the join.
+# A blend rather than a hard union: the fin roots get a fillet, and a smooth
+# field is what keeps the sampled solid fraction differentiable across the
+# join.  ``smoothness`` is the smooth minimum's parameter and not the fillet
+# radius -- smooth_min scales it by four -- so 0.01 rounds each root by about
+# 0.034, half a cell here and nearly invisible to the sampling.  The
+# differentiability is the reason for it; the fillet is a side effect.
 scene = Union(deck, *fins, smoothness=0.01)
 
 # ── the conjugate study ──────────────────────────────────────────────────────
 # The duct is a box around the sink with room above the fins for the air to
 # go; the lateral walls are the lattice's own x and z extremes.  The die is
-# a region under the deck, selected volumetrically the way a mesh study
+# a region inside the deck, selected volumetrically the way a mesh study
 # selects nodes.
 cooling = FlowStudy(
     name="duct-cooling",
-    resolution=(14, 26, 14),
-    bounds=(-0.70, -0.90, -0.50),
-    size=(1.40, 1.80, 0.85),
-    # Re = 40 on a 16-cell duct keeps the BGK relaxation rate well inside
-    # its stable range at this coarseness; see FlowStudy on why the ceiling
-    # falls with the lattice size.
+    # Cubic cells, 0.07 on a side: 1.40/20, 1.82/26 and 0.84/12 are the same
+    # number, and the module docstring says why they have to be.  What that
+    # buys geometrically is two cells across a fin, four across a channel,
+    # three of fin standing above the deck and three of clear air above that,
+    # with the sink's 0.90 of length sitting on 12 cells between seven of
+    # lead-in and seven of run-out.
+    resolution=(20, 26, 12),
+    bounds=(-0.70, -0.91, -0.50),
+    size=(1.40, 1.82, 0.84),
+    # Re = 25 against the duct's 12 cells of height is a lattice viscosity of
+    # 0.0096 and a BGK relaxation rate of 1.891, which leaves real margin
+    # under the 1.95 ceiling -- and a coarse duct needs it, because the
+    # ceiling falls with the lattice size (see FlowStudy).
     reynolds=25.0,
     conductivity_ratio=200.0,
     # 1e-9 rather than 1e-11: on a duct this coarse the per-step relative
@@ -151,11 +177,16 @@ cooling = FlowStudy(
         # heat exchanger, and it is the only wall condition under which the
         # energy balance closes against the die's power alone.
         Walls(),
-        # The die, under the deck.  A lattice region is volumetric: this
-        # box has to enclose whole cell centres, and centres in the outer
-        # layer belong to the duct wall rather than to the part -- putting
-        # it any lower gets a refusal naming exactly that.
-        HeatSource(Nodes.box([-0.14, -0.18, -0.40], [0.14, 0.18, -0.20]), power=1.0),
+        # The die's footprint, injected *through* the deck rather than
+        # under it, and the lattice leaves no choice.  The deck's underside
+        # is z = -0.42; the only cell centres below that belong to the duct
+        # floor, which is wall, so there is nowhere under the deck for a
+        # separate die to sit -- and a source landing in a fluid cell would
+        # heat the air directly instead of conducting out through the metal,
+        # which is the whole thing this scene demonstrates.  The box takes
+        # the deck's own z extent, so it selects exactly the deck cells the
+        # wall does not claim, under a 0.28 x 0.36 footprint.
+        HeatSource(Nodes.box([-0.14, -0.18, -0.42], [0.14, 0.18, -0.18]), power=1.0),
     ],
 )
 
