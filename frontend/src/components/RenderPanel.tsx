@@ -625,6 +625,14 @@ export function RenderPanel(props: RenderPanelProps) {
                 <small>Edges and editable point handles</small>
               </ToggleSwitch>
               <ToggleSwitch
+                checked={props.display.showAllPlanes === true}
+                onChange={(showAllPlanes) => props.onChange({ showAllPlanes })}
+                testId="toggle-showAllPlanes"
+              >
+                All sketch planes
+                <small>Otherwise only the active sketch's, while sketching</small>
+              </ToggleSwitch>
+              <ToggleSwitch
                 checked={props.display.showConstraints}
                 onChange={(showConstraints) =>
                   props.onChange({ showConstraints })

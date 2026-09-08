@@ -202,7 +202,7 @@ export interface StudyPayload extends StudyPayloadShape {
 }
 
 /** Element type a SimMesh extracts. */
-export type MeshMethod = "hex" | "tet4" | "tet10";
+export type MeshMethod = "hex" | "tet4" | "tet10" | "cutfem";
 
 /** min/mean/max summary of a per-element quality metric. */
 export interface QualitySummary {
@@ -227,8 +227,12 @@ export interface MeshInspectResponse {
   ok: boolean;
   kind?: "mesh_inspect";
   name?: string;
-  /** The scalar field carried by `mesh.scalars` (scaled_jacobian). */
-  field?: string;
+  /**
+   * The scalar field carried by `mesh.scalars` — the element quality metric
+   * (`scaled_jacobian` for hexes, `radius_ratio` for tets), or `null` for a
+   * cut-cell mesh, which has no elements to grade.
+   */
+  field?: string | null;
   info?: MeshInspectInfo;
   mesh?: SimulationMeshPayload;
   /** Per-vertex min scaled Jacobian, same order as `mesh.positions`. */

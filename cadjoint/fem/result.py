@@ -163,6 +163,8 @@ class SimulationResult:
         """
         import jax.numpy as jnp
 
+        if hasattr(self.solution, "mean"):  # a cut-cell result: the volume mean of its quadrature
+            return self.solution.mean()
         return jnp.mean(self._objective_scalar())
 
     def max(self) -> Any:
@@ -173,6 +175,8 @@ class SimulationResult:
         """
         import jax.numpy as jnp
 
+        if hasattr(self.solution, "max"):
+            return self.solution.max()
         return jnp.max(self._objective_scalar())
 
     # ── inspection / export ─────────────────────────────────────────────────

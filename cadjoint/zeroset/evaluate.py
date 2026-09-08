@@ -27,7 +27,7 @@ _UNARY = {
     "NEG": jnp.negative,
     "ABS": jnp.abs,
     "SIGN": jnp.sign,
-    "SQRT": lambda a: jnp.sqrt(jnp.maximum(a, 0.0)),
+    "SQRT": lambda a: jnp.sqrt(jnp.maximum(a, 1e-300)),  # ∂ finite at 0: 0, as the GPU fold 0.0)),
     "EXP": jnp.exp,
     "LOG": jnp.log,
     "SIN": jnp.sin,

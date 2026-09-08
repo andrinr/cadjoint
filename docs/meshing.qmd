@@ -194,7 +194,7 @@ represent — a max absolute error of 0.0029 on a unit sphere at 26 cells.
 
 ## Tet meshes need a finer grid than hexes
 
-The same declared resolution buys you two different things. `method="hex"`
+The same declared resolution buys you three different things. `method="hex"`
 only has to decide in/out per lattice cell, so a rib 1.3 cells thick still
 produces a legal (if staircased) HEX8 mesh. `method="tet4"` / `"tet10"` hand
 the dual-contour surface to TetGen as a piecewise linear complex (a second
@@ -203,7 +203,7 @@ and sizes elements by the part rather than by the lattice), and a PLC
 has to be *clean*: watertight, manifold, and free of self-intersections. One
 QEF vertex per cell cannot represent two surface sheets passing through one
 cell, so where a wall is thinner than about two cells the extracted quads
-fold over each other and TetGen refuses the whole thing:
+fold over each other and TetGen refuses the whole thing: `method="cutfem"` builds no volume mesh at all: the lattice's cut cells are the discretisation, and the same dual-contour surface is extracted only to be drawn and selected on — see [the simulation page](simulation.qmd).
 
 ```
 RuntimeError: TetGen rejected the surface: The input surface mesh contain
@@ -346,6 +346,28 @@ Gmsh is **GPL-2.0-or-later**, so it is an optional extra
 (`pip install 'cadjoint[gmsh]'`) or, in production, the `cadjoint_tet_gmsh`
 image where the licence boundary is a process boundary. Nothing under
 `cadjoint/` imports it at module scope. See [plugins](plugins.qmd).
+
+### Every vertex on every surface it touches
+
+A boundary vertex follows the design by being re-solved onto the model, and
+*which* zero sets it is solved onto is the whole question. Solved onto the
+scene's single field, a vertex sitting on a crease steps between the two
+faces that meet there — its position wanders along the crease and its
+derivative is one face's, not the edge's. Measured on the starter in
+[the cut-cell study](https://github.com/andrinr/cadjoint/tree/main/research/cutfem):
+136 of 860 surface vertices, and 11-13 % on the objective's gradient.
+
+So a `SimMesh` lowers its scene to the node table
+(`cadjoint.zeroset`), classifies each boundary vertex onto the census
+surfaces it lies on — one for a face, two for an edge, three at a corner —
+and moves it with the minimum-norm Newton solve on all of them at once
+(`cadjoint.zeroset.project`), which is the same solve the zero-set
+protocol's `Solve` performs. That kernel is the one projection in the
+repository: the mesh motion, the viewer's feature-edge seams and the
+tangent-plane constructor all call it.
+
+Where the scene cannot be lowered (a bare callable field), the single-field
+projection is used exactly as before.
 
 ### Frozen geometry
 

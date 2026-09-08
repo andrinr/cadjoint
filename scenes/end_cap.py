@@ -319,17 +319,21 @@ bolt_heads = PolarPattern(bolt_head, count=4, axis=bore_axis)
 scene = Union(housing, bearing, lip_seal, bolt_heads, smoothness=0.008)
 satisfy_constraints(scene, steps=2)
 
-# ── simulation mesh: the housing only, on a named hex grid ───────────────────
-# Hexes, not tets: at matched accuracy a hex mesh costs about a quarter of a
-# TET10 one, and nothing here is a thin inclined feature the lattice would
-# staircase over badly. The box has to contain the whole housing, port
-# included, with a margin.
+# ── simulation mesh: the housing only, as cut cells of a named grid ──────────
+# No volume mesh at all: the lattice's cells are the elements, the ones the
+# housing's surface passes through are cut by it, and the study solves on
+# them with the boundary handled weakly (CutFEM). Nothing is voxelized and
+# nothing is tetrahedralized, so the design can move without a node map —
+# the surface below is extracted only to be drawn and selected on.
+# method="hex" is the voxelize-and-snap alternative; "tet10" the quadratic
+# tet one (see the bracket).
 cap_mesh = SimMesh(
     name="cap-mesh",
     resolution=(26, 26, 13),
     domain=housing,
     bounds=(-1.08, -1.08, -0.18),
     size=(2.16, 2.16, 1.05),
+    method="cutfem",
 )
 
 # ── thermal study: bearing friction in, mounting face out ────────────────────

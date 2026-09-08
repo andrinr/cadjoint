@@ -50,16 +50,11 @@ _MIN_GRADIENT_SQUARED = 1e-8
 def project_points(sdf: Callable[[Any], Any], points: Any, max_step: float, *, steps: int = 8):
     """Newton-project points onto the SDF zero set along the field gradient.
 
-    Mirrors the seam projection used by the viewer's feature extraction but
-    for a single field: each iteration moves ``x`` by
-    ``-f(x) grad f / |grad f|^2``, and the total displacement from the
-    starting point is clamped to ``max_step`` so callers can bound how far
-    vertices wander (keeping interior elements well-shaped).
-
-    Where the field's gradient underflows (:data:`_MIN_GRADIENT_SQUARED`)
-    the linearization is meaningless, so the step is suppressed in both the
-    forward and the backward pass — the point stays put and contributes no
-    derivative, rather than moving on float noise.
+    The single-field case of :func:`cadjoint.zeroset.project.project` — one
+    kernel for the meshes, the seams and the cut-cell surface — with the
+    total displacement from the starting point clamped to ``max_step`` so
+    callers can bound how far vertices wander.  Where the field's gradient
+    underflows the point stays put and contributes no derivative.
 
     Pure JAX, fixed iteration count — safe to trace and differentiate with
     respect to SDF parameters.
@@ -73,36 +68,9 @@ def project_points(sdf: Callable[[Any], Any], points: Any, max_step: float, *, s
     Returns:
         Projected positions as a JAX array, shaped ``(M, 3)``.
     """
-    import jax
-    import jax.numpy as jnp
+    from cadjoint.zeroset.project import project
 
-    value_and_grad = jax.vmap(jax.value_and_grad(lambda p: jnp.asarray(sdf(p)).reshape(())))
-    start = jnp.asarray(points)
-    x = start
-    for _ in range(steps):
-        value, gradient = value_and_grad(x)
-        squared = jnp.sum(gradient * gradient, axis=-1, keepdims=True)
-        # Double-``where`` guard on the degenerate denominator, the repo's
-        # idiom for this class of bug (cf. ``edge_detection._refine``).
-        # Merely flooring ``squared`` keeps the forward step finite but
-        # freezes the denominator as a *constant*, so the step's Jacobian
-        # becomes ``value * Hessian / floor`` — a 1e12 amplification per
-        # iteration that compounds over ``steps`` even though the forward
-        # step is exactly zero.  Suppressing the step in BOTH passes leaves
-        # value and derivative at zero together; the inner ``where`` keeps
-        # the division itself finite so no NaN reaches the cotangent.
-        usable = jax.lax.stop_gradient(squared) > _MIN_GRADIENT_SQUARED
-        step = jnp.where(usable, value[:, None] * gradient / jnp.where(usable, squared, 1.0), 0.0)
-        x = x - step
-        displacement = x - start
-        # Guarded norm: at zero displacement (vertex already on the surface)
-        # a bare norm's gradient is 0/0, and the NaN would leak through
-        # minimum() into otherwise-clean cotangents.
-        squared_displacement = jnp.sum(displacement * displacement, axis=-1, keepdims=True)
-        length = jnp.sqrt(jnp.maximum(squared_displacement, 1e-24))
-        scale = jnp.minimum(1.0, max_step / length)
-        x = start + displacement * scale
-    return x
+    return project([sdf], points, steps=steps, max_step=max_step)
 
 
 def recompute_points(sdf: Callable[[Any], Any], mesh: HexMesh):

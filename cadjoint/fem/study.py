@@ -59,11 +59,13 @@ from dataclasses import KW_ONLY, dataclass, field
 from typing import Any
 
 from cadjoint.enums import BoundaryConditionType, StudyKind
-from cadjoint.fem.boundary import faces_from_nodes, tet_faces_from_nodes
+from cadjoint.fem.cutfem import CutMesh
+from cadjoint.fem.discretization import Discretization
 from cadjoint.fem.hexmesh import HexMesh
 from cadjoint.fem.properties import FROM_MATERIAL
 from cadjoint.fem.simmesh import _CAPTURED_MESHES, SimMesh, _anonymous, _domain_entry
 from cadjoint.fem.tetmesh import TetMesh
+from cadjoint.meshing import DEFAULT_BOUNDS, DEFAULT_SIZE
 from cadjoint.studies import NodeSelection, capture_studies, register_study, require_triplet
 
 __all__ = [
@@ -79,8 +81,8 @@ __all__ = [
 ]
 
 # Same domain convention as the viewer's simulate path (compile worker).
-_DEFAULT_BOUNDS = (-3.0, -3.0, -3.0)
-_DEFAULT_SIZE = (6.0, 6.0, 6.0)
+_DEFAULT_BOUNDS = DEFAULT_BOUNDS
+_DEFAULT_SIZE = DEFAULT_SIZE
 
 #: Private spelling kept for the two study classes below.
 _register = register_study
@@ -314,6 +316,11 @@ def _resolve_property(
     """
     if not _from_material(value):
         return value
+    if cells is None:
+        raise ValueError(
+            f"Study {label!r} derives {key!r} from the scene's materials, which cut cells do not "
+            f"sample yet: give the study a numeric {key}."
+        )
     from cadjoint.fem.properties import sample_cell_property
 
     if sdf is None:
@@ -391,7 +398,9 @@ def _validate_common(study: Any, kind: str, allowed_bcs: tuple[type, ...]) -> No
     study.size = require_triplet(study.size if study.size is not None else _DEFAULT_SIZE, "size")
 
 
-def _solve_mesh(study: Any, sdf: Any, mesh: Any) -> tuple[SimMesh | None, HexMesh | TetMesh]:
+def _solve_mesh(
+    study: Any, sdf: Any, mesh: Any
+) -> tuple[SimMesh | None, HexMesh | TetMesh | CutMesh]:
     """The one meshing path for solves.
 
     An explicit ``HexMesh``/``TetMesh`` is used as-is (no SimMesh
@@ -400,7 +409,7 @@ def _solve_mesh(study: Any, sdf: Any, mesh: Any) -> tuple[SimMesh | None, HexMes
     — reusing its cache.  The mesh's method decides the solve route
     (:mod:`cadjoint.fem.simulate` dispatches hex vs tet).
     """
-    if isinstance(mesh, (HexMesh, TetMesh)):
+    if isinstance(mesh, Discretization):  # an explicit discretization: used as is
         return None, mesh
     if mesh is not None:
         target = _resolve_mesh_reference(mesh)
@@ -419,21 +428,17 @@ def _solve_mesh(study: Any, sdf: Any, mesh: Any) -> tuple[SimMesh | None, HexMes
     return target, target.build(sdf)
 
 
-def _check_resolvable(bcs: list[Any], mesh: HexMesh | TetMesh) -> None:
-    """Raise a selection-specific error before handing BCs to the solver."""
+def _check_resolvable(bcs: list[Any], mesh: Any) -> None:
+    """Raise a selection-specific error before handing conditions to the solver.
+
+    The family's own refusals, verbatim: a selection that finds no surface
+    nodes says so in the selection's words, an area-integrated condition
+    that spans no face (or, on cut cells, no facet) in the family's.
+    """
     for bc in bcs:
-        indices = bc.nodes.resolve(mesh)
+        mesh.node_patch(bc.nodes)
         if isinstance(bc, (HeatFlux, Traction)):
-            if isinstance(mesh, TetMesh):
-                spanned = int(tet_faces_from_nodes(mesh, indices).shape[0])
-            else:
-                spanned = int(faces_from_nodes(mesh, indices).nodes.shape[0])
-            if spanned == 0:
-                raise ValueError(
-                    f"{type(bc).__name__} selection {bc.nodes.describe()} spans no complete "
-                    "boundary face; area-integrated conditions need every corner of at "
-                    "least one boundary face selected."
-                )
+            mesh.face_patch(bc.nodes)
 
 
 def _mesh_payload(study: Any) -> dict[str, Any]:
@@ -475,6 +480,8 @@ def _reported_property(sdf: Any, points: Any, mesh: Any, key: str) -> Any:
 
 def _reported_mass(sdf: Any, points: Any, mesh: Any) -> Any:
     """Mass of the solved domain, or None when the materials state no density."""
+    if getattr(mesh, "cells", None) is None:
+        return None  # no elements to integrate over
     density = _reported_property(sdf, points, mesh, "density")
     if density is None:
         return None
@@ -545,7 +552,7 @@ class ThermalStudy:
         sdf=None,
         *,
         backend=None,
-        mesh: HexMesh | TetMesh | SimMesh | str | None = None,
+        mesh: HexMesh | TetMesh | CutMesh | SimMesh | str | None = None,
         points=None,
     ):
         """Mesh the field (through the study's SimMesh) and run the solve.
@@ -559,10 +566,10 @@ class ThermalStudy:
                 :class:`~cadjoint.fem.hexmesh.HexMesh` or
                 :class:`~cadjoint.fem.tetmesh.TetMesh`, a SimMesh, or a
                 declared mesh name.
-            points: Optional traced override of the mesh node positions
-                (``recompute_points`` / ``recompute_tet_points``, matching
-                the mesh's method) for differentiable frozen-topology
-                solves; BC selections still resolve on the nominal points.
+            points: The placement — what the mesh's ``moved`` returned for
+                a traced design (node positions for a mesh, the field for
+                cut cells) — for differentiable frozen-topology solves; BC
+                selections still resolve on the nominal mesh.
 
         Returns:
             A :class:`~cadjoint.fem.result.SimulationResult` (also stored
@@ -690,10 +697,10 @@ class ElasticStudy:
                 :class:`~cadjoint.fem.hexmesh.HexMesh` or
                 :class:`~cadjoint.fem.tetmesh.TetMesh`, a SimMesh, or a
                 declared mesh name.
-            points: Optional traced override of the mesh node positions
-                (``recompute_points`` / ``recompute_tet_points``, matching
-                the mesh's method) for differentiable frozen-topology
-                solves; BC selections still resolve on the nominal points.
+            points: The placement — what the mesh's ``moved`` returned for
+                a traced design (node positions for a mesh, the field for
+                cut cells) — for differentiable frozen-topology solves; BC
+                selections still resolve on the nominal mesh.
 
         Returns:
             A :class:`~cadjoint.fem.result.SimulationResult` (also stored

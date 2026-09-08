@@ -479,10 +479,13 @@ export function createSimulateController(props: SimulateControllerProps) {
     const inspect = inspected();
     if (inspect) {
       const quality = inspect.info.quality.scaled_jacobian;
+      // A cut-cell mesh has no elements, so nothing to grade: the surface
+      // is drawn flat and the legend says so rather than naming a metric.
+      const graded = Object.keys(inspect.info.quality).length > 0;
       return {
         scalars: inspect.qualityScalars,
         range: quality ? [quality.min, quality.max] : inspect.payload.range,
-        label: "scaled jacobian",
+        label: graded ? "scaled jacobian" : "no elements to grade",
       };
     }
     const solved = result();

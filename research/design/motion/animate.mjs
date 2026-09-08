@@ -756,6 +756,11 @@ const CLIPS = [
     },
     crop: () => CODE_AND_VIEW,
     async act(page) {
+      // Planes are drawn only while sketching, and only for the sketch that
+      // is selected or under the pointer: Sketch mode first, and a scene of
+      // two sketches shows no plane at all until one is touched.
+      await clickAt(page, tid(page, "editmode-sketch"), { steps: 14 });
+      await wait(700);
       // The sketch tool, armed: a ghost frame says where a click would put a
       // new plane, and follows the pointer over the floor.
       const child = tid(page, "tool-sketch").first();
@@ -772,7 +777,12 @@ const CLIPS = [
       }
       await page.keyboard.press("Escape");
       await wait(500);
-      // Take the fin comb's plane by its frame, which the hint names.
+      // Selecting the fin comb — its row in the object tree — brings its
+      // plane up and keeps it up. Then the plane itself is taken by its
+      // frame, which the hint names.
+      const row = page.locator('[data-testid="tree-row-profile_0"]').first();
+      await clickAt(page, row, { steps: 16 });
+      await wait(900);
       const m = await canvasMetrics(page);
       const centre = { x: m.left + m.clientWidth / 2, y: m.top + m.clientHeight / 2 };
       const edge = await findHandle(page, centre, 520, "Sketch plane of fin comb");

@@ -47,17 +47,9 @@ from typing import Any
 
 import numpy as np
 
-from cadjoint.fem.backends import ElasticBCs, SolverBackend, ThermalBCs, get_backend
-from cadjoint.fem.boundary import (
-    faces_from_nodes,
-    tet10_complete_nodes,
-    tet10_face_midsides,
-    tet_faces_from_nodes,
-)
-from cadjoint.fem.hexmesh import HexMesh
-from cadjoint.fem.jaxfem import tet_elastic_solve, tet_thermal_solve
+from cadjoint.fem.backends import SolverBackend
+from cadjoint.fem.discretization import ElasticProblem, ThermalProblem
 from cadjoint.fem.postprocess import hex_von_mises, tet_von_mises
-from cadjoint.fem.tetmesh import TetMesh
 from cadjoint.studies import NodeSelection
 
 __all__ = ["ElasticResult", "ThermalResult", "elastic_solve", "thermal_solve"]
@@ -66,7 +58,7 @@ __all__ = ["ElasticResult", "ThermalResult", "elastic_solve", "thermal_solve"]
 Patch = NodeSelection
 
 #: A solvable volume mesh (HEX8, or TET4/TET10 via the tet path).
-SolveMesh = HexMesh | TetMesh
+SolveMesh = Any  # any :class:`~cadjoint.fem.discretization.Discretization`
 
 
 def _require_selection(patch: Any) -> None:
@@ -76,30 +68,6 @@ def _require_selection(patch: Any) -> None:
             f"Boundary patches are Nodes selections, got {patch!r}. Build one via "
             "Nodes.box/sphere/halfspace/cylinder/side/predicate."
         )
-
-
-def _node_patch(mesh: HexMesh, patch: Patch) -> np.ndarray:
-    """Node indices for a node-valued condition (Dirichlet / clamp)."""
-    _require_selection(patch)
-    return patch.resolve(mesh)
-
-
-def _face_patch(mesh: HexMesh, patch: Patch) -> np.ndarray:
-    """Node indices spanning an area-integrated condition (traction / flux).
-
-    A :class:`NodeSelection` spans the boundary faces whose four corners
-    are all selected; the returned set is the union of those corners so a
-    backend applies the load to exactly the spanned faces.
-    """
-    _require_selection(patch)
-    group = faces_from_nodes(mesh, patch.resolve(mesh))
-    if group.nodes.size == 0:
-        raise ValueError(
-            f"Selection {patch.describe()} spans no complete boundary face; "
-            "area-integrated conditions need all four corners of at least one "
-            "boundary quad selected."
-        )
-    return np.unique(group.nodes).astype(np.int32)
 
 
 #: meshio cell type per connectivity width (HEX8 / TET4 / TET10).
@@ -121,40 +89,6 @@ def _export_vtk(path: str, mesh: SolveMesh, point_data: dict, cell_data: dict) -
         point_data={k: np.asarray(v) for k, v in point_data.items()},
         cell_data={k: [np.asarray(v)] for k, v in cell_data.items()},
     ).write(path)
-
-
-def _tet_node_patch(mesh: TetMesh, patch: Patch) -> np.ndarray:
-    """Node indices for a node-valued condition on a tet mesh.
-
-    Selections resolve to corner boundary nodes; on TET10 the set is
-    completed with the midside nodes both of whose corner parents are
-    selected, so the whole quadratic patch is pinned.
-    """
-    _require_selection(patch)
-    return tet10_complete_nodes(mesh, patch.resolve(mesh))
-
-
-def _tet_face_patch(mesh: TetMesh, patch: Patch) -> tuple[np.ndarray, np.ndarray]:
-    """Node set and exact boundary triangles of an area-integrated condition.
-
-    Returns:
-        ``(nodes, faces)`` — the spanning node set (corners plus, on
-            TET10, the faces' midside nodes: jax-fem selects a face for a
-            surface map only when *all* its nodes are in the set) and the
-            ``(M, 3)`` corner triangles used for exact face targeting.
-    """
-    _require_selection(patch)
-    faces = tet_faces_from_nodes(mesh, patch.resolve(mesh))
-    if faces.shape[0] == 0:
-        raise ValueError(
-            f"Selection {patch.describe()} spans no complete boundary face; "
-            "area-integrated conditions need every corner of at least one "
-            "boundary face selected."
-        )
-    nodes = np.unique(faces)
-    if mesh.edge_parents is not None:
-        nodes = np.concatenate([nodes, np.unique(tet10_face_midsides(mesh, faces))])
-    return nodes.astype(np.int32), np.asarray(faces)
 
 
 def _property_value(value: Any) -> Any:
@@ -258,77 +192,37 @@ def thermal_solve(
 ) -> ThermalResult:
     """Solve steady-state heat conduction ``-div(k grad T) = q`` on the mesh.
 
+    The discretization resolves the patches and dispatches its own solver
+    (:mod:`cadjoint.fem.discretization`): hex meshes through the backend
+    registry, tet meshes on the direct jax-fem path, cut cells on their own.
+
     Args:
-        mesh: Hex mesh from :func:`cadjoint.fem.sdf_to_hex_mesh`, or a
-            :class:`~cadjoint.fem.tetmesh.TetMesh` (solved with TET4/TET10
-            elements on the direct jax-fem path; same BC semantics, with
-            TET10 midside completion and exact flux-face targeting).
-        conductivity: Thermal conductivity ``k`` — a scalar for a
-            single-material domain, or a per-element ``(C,)`` array sampled
-            from the scene's material field
-            (:func:`cadjoint.fem.properties.sample_cell_property`), which the
-            direct backend carries as a jax-fem internal variable.
-        dirichlet: ``(patch, temperature)`` pairs; each patch is a
-            :class:`~cadjoint.fem.Nodes` selection applied to its node set
-            directly.  With the default direct
-            backend a temperature may be a traced JAX scalar: the solve is
-            then differentiable w.r.t. the prescribed value (lifted
-            formulation).
-        neumann: ``(patch, flux)`` pairs prescribing a heat inflow per area
-            (positive heats the body) on the boundary faces spanned by the
-            patch.  Direct backend only for now.
+        mesh: Any discretization.
+        conductivity: Thermal conductivity ``k`` — a number, a per-element
+            ``(C,)`` field, or a traced scalar.
+        dirichlet: ``(patch, value)`` prescribed temperatures; a value may
+            be traced.
+        neumann: ``(patch, flux)`` inflows per area on the faces a patch spans.
         source: Volumetric heat source ``q``.
         backend: Backend name (``"jaxfem"`` default, ``"tesseract"``) or a
-            :class:`~cadjoint.fem.backends.SolverBackend` instance.
-        points: Optional traced override of ``mesh.points`` (same shape) for
-            differentiable frozen-topology solves; BC patches are always
-            resolved on the nominal ``mesh.points``.
+            :class:`~cadjoint.fem.backends.SolverBackend` instance; hex only.
+        points: The placement — what the mesh's ``moved`` returned for a
+            traced design — for differentiable frozen-topology solves.
+            Patches always resolve on the nominal mesh.
 
     Returns:
-        A :class:`ThermalResult`; ``temperature`` is a JAX array with an
-        adjoint VJP w.r.t. ``points``, ``conductivity``, and ``source``.
+        The family's thermal result; ``temperature`` is a JAX array with an
+        adjoint VJP w.r.t. the placement, ``conductivity``, and ``source``.
     """
-    if isinstance(mesh, TetMesh):
-        _require_direct_backend(backend, "Thermal solves")
-        flux_patches = [_tet_face_patch(mesh, patch) for patch, _ in (neumann or [])]
-        tet_bcs = ThermalBCs(
-            dirichlet_nodes=[_tet_node_patch(mesh, patch) for patch, _ in dirichlet],
-            dirichlet_values=[
-                float(value) if isinstance(value, (int, float)) else value for _, value in dirichlet
-            ],
-            flux_nodes=[nodes for nodes, _ in flux_patches],
-            flux_values=[float(value) for _, value in (neumann or [])],
-        )
-        temperature = tet_thermal_solve(
-            mesh.points if points is None else points,
-            mesh.cells,
-            tet_bcs,
-            conductivity=_property_value(conductivity),
-            source=float(source),
-            ele_type=mesh.ele_type,
-            base_points=mesh.points,
-            flux_faces=[faces for _, faces in flux_patches] if flux_patches else None,
-        )
-        return ThermalResult(temperature=temperature, mesh=mesh)
-    bcs = ThermalBCs(
-        dirichlet_nodes=[_node_patch(mesh, patch) for patch, _ in dirichlet],
-        dirichlet_values=[
-            float(value) if isinstance(value, (int, float)) else value for _, value in dirichlet
-        ],
-        flux_nodes=[_face_patch(mesh, patch) for patch, _ in (neumann or [])],
-        flux_values=[float(value) for _, value in (neumann or [])],
-    )
-    solver = get_backend(backend)
-    solve_points = mesh.points if points is None else points
-    temperature = solver.thermal(
-        solve_points,
-        mesh.cells,
-        bcs,
-        conductivity=_property_value(conductivity),
+    for patch, _ in [*dirichlet, *(neumann or [])]:
+        _require_selection(patch)
+    problem = ThermalProblem(
+        conductivity=conductivity,
         source=float(source),
-        base_points=mesh.points,
+        dirichlet=tuple((patch, value) for patch, value in dirichlet),
+        neumann=tuple((patch, float(value)) for patch, value in (neumann or [])),
     )
-    return ThermalResult(temperature=temperature, mesh=mesh)
+    return mesh.thermal(problem, placement=points, backend=backend)
 
 
 def elastic_solve(
@@ -345,76 +239,26 @@ def elastic_solve(
     """Solve small-strain linear elasticity on the mesh.
 
     Args:
-        mesh: Hex mesh from :func:`cadjoint.fem.sdf_to_hex_mesh`, or a
-            :class:`~cadjoint.fem.tetmesh.TetMesh` (solved with TET4/TET10
-            elements on the direct jax-fem path; same BC semantics, with
-            TET10 midside completion and exact traction-face targeting).
-        youngs: Young's modulus — a scalar, or a per-element ``(C,)``
-            array sampled from the scene's material field.
-        poisson: Poisson ratio, scalar or per element like ``youngs``.
-        dirichlet: Patches picking fully-clamped node sets (all displacement
-            components fixed to zero) — :class:`~cadjoint.fem.Nodes`
-            selections applied directly.
-        tractions: ``(patch, vector)`` pairs applying a constant traction
-            (force per area) on the boundary faces spanned by the patch.
-        backend: Backend name or instance (see :func:`thermal_solve`).
-        points: Optional traced override of ``mesh.points`` (same shape) for
-            differentiable frozen-topology solves.
-        body_force: Optional body force density in N/m^3, ``(3,)`` or
-            ``(C, 3)`` — ``density * gravity`` for self-weight.  Direct
-            backend only.
+        mesh: Any discretization.
+        youngs: Young's modulus — a number, a per-element field, or traced.
+        poisson: Poisson's ratio, likewise.
+        dirichlet: Patches clamped in all three components.
+        tractions: ``(patch, vector)`` tractions on the faces a patch spans.
+        backend: Backend name or instance; hex only.
+        points: The placement (see :func:`thermal_solve`).
+        body_force: Optional per-element ``(C, 3)`` body force.
 
     Returns:
-        An :class:`ElasticResult`; ``displacement`` is a JAX array with an
-        adjoint VJP w.r.t. ``points``.
+        The family's elastic result; ``displacement`` is a JAX array with
+        an adjoint VJP w.r.t. the placement.
     """
-    if isinstance(mesh, TetMesh):
-        _require_direct_backend(backend, "Elastic solves")
-        traction_patches = [_tet_face_patch(mesh, patch) for patch, _ in tractions]
-        tet_bcs = ElasticBCs(
-            fixed_nodes=[_tet_node_patch(mesh, patch) for patch in dirichlet],
-            traction_nodes=[nodes for nodes, _ in traction_patches],
-            traction_vectors=[np.asarray(vector, dtype=np.float64) for _, vector in tractions],
-        )
-        displacement = tet_elastic_solve(
-            mesh.points if points is None else points,
-            mesh.cells,
-            tet_bcs,
-            youngs=_property_value(youngs),
-            poisson=_property_value(poisson),
-            ele_type=mesh.ele_type,
-            base_points=mesh.points,
-            traction_faces=[faces for _, faces in traction_patches] if traction_patches else None,
-            body_force=body_force,
-        )
-        return ElasticResult(
-            displacement=displacement,
-            mesh=mesh,
-            youngs=_property_value(youngs),
-            poisson=_property_value(poisson),
-        )
-    bcs = ElasticBCs(
-        fixed_nodes=[_node_patch(mesh, patch) for patch in dirichlet],
-        traction_nodes=[_face_patch(mesh, patch) for patch, _ in tractions],
-        traction_vectors=[np.asarray(vector, dtype=np.float64) for _, vector in tractions],
+    for patch in [*dirichlet, *(patch for patch, _ in tractions)]:
+        _require_selection(patch)
+    problem = ElasticProblem(
+        youngs=youngs,
+        poisson=poisson,
+        fixed=tuple(dirichlet),
+        tractions=tuple((patch, vector) for patch, vector in tractions),
+        body_force=body_force,
     )
-    solver = get_backend(backend)
-    solve_points = mesh.points if points is None else points
-    elastic_kwargs: dict[str, Any] = {}
-    if body_force is not None:
-        elastic_kwargs["body_force"] = body_force
-    displacement = solver.elastic(
-        solve_points,
-        mesh.cells,
-        bcs,
-        youngs=_property_value(youngs),
-        poisson=_property_value(poisson),
-        base_points=mesh.points,
-        **elastic_kwargs,
-    )
-    return ElasticResult(
-        displacement=displacement,
-        mesh=mesh,
-        youngs=_property_value(youngs),
-        poisson=_property_value(poisson),
-    )
+    return mesh.elastic(problem, placement=points, backend=backend)

@@ -159,6 +159,40 @@ export function originMarkSize(frame: PlaneFrame): number {
 }
 
 /** Every drawable plane of a construction tree. */
+/** What decides which planes are drawn: see {@link visiblePlaneFrames}. */
+export interface PlaneVisibility {
+  /** The editing mode; planes belong to sketching. */
+  sketching: boolean;
+  /** The selected sketch (any part of it: a handle, an edge, the plane itself). */
+  selectedNodeId: string | null;
+  /** The sketch under the pointer, any part of it. */
+  hoveredNodeId: string | null;
+  /** The display switches: the construction overlay, sketch geometry, and "all planes". */
+  showOverlays: boolean;
+  showSketches: boolean;
+  showAllPlanes: boolean;
+}
+
+/**
+ * The planes to draw, pick and label right now.
+ *
+ * Nothing without the overlay or the sketch geometry; everything with the
+ * "all planes" switch; otherwise only while sketching, and only the planes
+ * of the sketch that is selected and the one under the pointer. Hovering a
+ * sketch's outline or a handle is enough to reveal its plane, so a plane
+ * that is not drawn can still be reached — through the sketch it carries.
+ */
+export function visiblePlaneFrames(
+  frames: readonly PlaneFrame[],
+  visibility: PlaneVisibility,
+): PlaneFrame[] {
+  if (!visibility.showOverlays || !visibility.showSketches) return [];
+  if (visibility.showAllPlanes) return [...frames];
+  if (!visibility.sketching) return [];
+  const active = new Set([visibility.selectedNodeId, visibility.hoveredNodeId]);
+  return frames.filter((frame) => active.has(frame.nodeId));
+}
+
 export function planeFrames(nodes: readonly ConstructionNode[]): PlaneFrame[] {
   const frames: PlaneFrame[] = [];
   for (const node of nodes) {

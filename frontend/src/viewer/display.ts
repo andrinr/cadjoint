@@ -229,6 +229,13 @@ export interface DisplaySettings {
    */
   showOverlays: boolean;
   showSketches: boolean;
+  /**
+   * Every sketch's plane, in every mode. Off, a plane is drawn only while
+   * sketching and only for the sketch that is selected or under the pointer
+   * — a scene with a dozen sketches is otherwise a dozen overlapping quads.
+   * The placement preview of the sketch tool is not governed by this.
+   */
+  showAllPlanes: boolean;
   showMeshEdges: boolean;
   showMeshWireframe: boolean;
   showConstraints: boolean;
@@ -317,6 +324,7 @@ export const DEFAULT_DISPLAY: DisplaySettings = {
   showGraticule: true,
   showOverlays: true,
   showSketches: true,
+  showAllPlanes: false,
   showMeshEdges: false,
   showMeshWireframe: false,
   showConstraints: true,

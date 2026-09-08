@@ -142,7 +142,7 @@ def set_mesh_value(source: str, mesh, argument, value) -> str:
         argument: ``resolution``, ``bounds``, ``size``, ``padding`` (numeric,
             written with exact float ``repr``; ``resolution`` stays
             integral), ``domain`` (the variable name of a named scene
-            object), or ``method`` (one of ``hex``/``tet4``/``tet10``,
+            object), or ``method`` (one of ``hex``/``tet4``/``tet10``/``cutfem``,
             written as a string literal).
         value: The new number(s) or name.
 

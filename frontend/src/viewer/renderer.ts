@@ -358,6 +358,7 @@ export class Renderer {
   interacting = false;
 
   private profiles: readonly ConstructionNode[] = [];
+  private planes: readonly PlaneFrame[] = [];
   private _gizmoMode: GizmoMode = "translate";
   private _gizmoAxis: AxisIndex | null = null;
   private selection: Selection | null = null;
@@ -1095,10 +1096,14 @@ export class Renderer {
     profiles: readonly ConstructionNode[],
     selection: Selection | null,
     hover: Selection | null,
+    planes: readonly PlaneFrame[] = planeFrames(profiles),
   ): void {
     this.profiles = profiles;
     this.selection = selection;
     this.hover = hover;
+    // Which planes are drawn is the pane's decision (mode, selection,
+    // hover, the display switches); the renderer draws what it is handed.
+    this.planes = planes;
     this.uploadOverlay();
     this.scheduleRender();
   }
@@ -1160,7 +1165,7 @@ export class Renderer {
     // wash and the same hairline, in the same pass, so a plane costs nothing
     // the overlay did not already pay for.
     const planes = packPlaneOverlay(
-      planeFrames(this.profiles),
+      this.planes,
       this.selection,
       this.hover,
       this.planePreview,

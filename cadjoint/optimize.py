@@ -218,24 +218,7 @@ def _unresolvable_bc(study: Any, mesh: Any) -> str | None:
     failing BC, or ``None`` when every selection resolves (node-valued
     conditions need nodes, area-integrated ones a complete boundary face).
     """
-    from cadjoint.fem.hexmesh import faces_from_nodes
-    from cadjoint.fem.study import HeatFlux, Traction
-    from cadjoint.fem.tetmesh import TetMesh, tet_faces_from_nodes
-
-    for bc in study.bcs:
-        label = f"boundary condition {type(bc).__name__} {bc.nodes.describe()}"
-        try:
-            indices = bc.nodes.resolve(mesh)
-        except ValueError:
-            return f"{label} matched no surface nodes"
-        if isinstance(bc, (HeatFlux, Traction)):
-            if isinstance(mesh, TetMesh):
-                spanned = int(tet_faces_from_nodes(mesh, indices).shape[0])
-            else:
-                spanned = int(faces_from_nodes(mesh, indices).nodes.shape[0])
-            if spanned == 0:
-                return f"{label} spans no complete boundary face"
-    return None
+    return mesh.unresolvable(study.bcs)
 
 
 def _compiled_prefix(prefix: Any, *, enabled: bool) -> Any:
@@ -300,10 +283,7 @@ def _compliance(study: Any, result: Any, mesh: Any, points: Any) -> Any:
     """
     import jax.numpy as jnp
 
-    from cadjoint.fem.hexmesh import faces_from_nodes
-    from cadjoint.fem.postprocess import load_work_quads, load_work_tris
     from cadjoint.fem.study import Traction
-    from cadjoint.fem.tetmesh import TetMesh, tet_faces_from_nodes
 
     tractions = [bc for bc in study.bcs if isinstance(bc, Traction)]
     if not tractions:
@@ -315,21 +295,8 @@ def _compliance(study: Any, result: Any, mesh: Any, points: Any) -> Any:
     displacement = result.displacement
     total = jnp.zeros(())
     for bc in tractions:
-        indices = bc.nodes.resolve(mesh)
         vector = jnp.asarray(list(bc.vector), dtype=positions.dtype)
-        if isinstance(mesh, TetMesh):
-            faces = tet_faces_from_nodes(mesh, indices)
-            if getattr(mesh, "edge_parents", None) is not None:
-                from cadjoint.fem.postprocess import load_work_tri6
-                from cadjoint.fem.tetmesh import tet10_face_midsides
-
-                faces6 = np.concatenate([faces, tet10_face_midsides(mesh, faces)], axis=1)
-                total = total + load_work_tri6(positions, displacement, faces6, vector)
-            else:
-                total = total + load_work_tris(positions, displacement, faces, vector)
-        else:
-            quads = faces_from_nodes(mesh, indices).nodes
-            total = total + load_work_quads(positions, displacement, quads, vector)
+        total = total + mesh.traction_work(positions, displacement, bc.nodes, vector)
     return total
 
 
@@ -866,8 +833,6 @@ class Optimization:
 
         from cadjoint.extraction import apply_parameters, extract_parameters
         from cadjoint.fem.backends import _x64_scope
-        from cadjoint.fem.hexmesh import recompute_points
-        from cadjoint.fem.tetmesh import TetMesh, recompute_tet_points
         from cadjoint.functionalize import functionalize
 
         study = self.study
@@ -939,22 +904,8 @@ class Optimization:
             from cadjoint.fem.tesseracts.chain import freeze_study_chain
 
         def recompute(params: Any, field: Any, mesh: Any) -> Any:
-            # A Gmsh mesh carries an ``OwnedNodes`` record instead of a
-            # lattice: its nodes are re-solved against the patches that own
-            # them, which is the ``node_map`` kind (the private tier's).
-            # ``_refuse_frozen_geometry`` has already refused the case where
-            # the kind is unfilled, so this ``require`` cannot fail here for
-            # a reason the user has not already been told.
-            owned = getattr(mesh, "owned", None)
-            if owned is not None:
-                from cadjoint import tier
-                from cadjoint.enums import PluginKind
-
-                node_map = tier.require(PluginKind.NODE_MAP.value).component
-                return node_map.positions(target, params, owned, smooth_passes=2)
-            if isinstance(mesh, TetMesh):
-                return recompute_tet_points(field, mesh, smooth_passes=2)
-            return recompute_points(field, mesh)
+            """The frozen topology's placement under the design: the family decides how."""
+            return mesh.moved(field, smooth_passes=2, design=(target, params))
 
         def objective_on(mesh: Any, chain: Any = None):
             """The frozen objective, with its plugin-free head compiled.

@@ -64,7 +64,10 @@ export function resolveResultView(input: ResultViewInput): ResultView {
     const range: [number, number] =
       input.qualityRange ??
       [Math.min(...input.qualityScalars), Math.max(...input.qualityScalars)];
-    return { scalars: input.qualityScalars, range, label: "scaled jacobian" };
+    // No element quality at all (a cut-cell mesh has no elements): the
+    // surface is drawn flat and the legend says so rather than naming a metric.
+    const label = input.qualityRange ? "scaled jacobian" : "no elements to grade";
+    return { scalars: input.qualityScalars, range, label };
   }
   const field = input.activeField ?? input.defaultField;
   return {
