@@ -58,26 +58,6 @@ def _reference_line(reference, attribute: str) -> tuple[Array, Array] | None:
     return _world_vector(origin), unit(_world_vector(vector))
 
 
-def _child_patch_fields(child) -> list | None:
-    """The child's patch field decomposition, or None when it has none.
-
-    An operation's child may be a plain callable rather than an SDF node —
-    :meth:`_Operation.children` already tolerates that — and a bare callable
-    declares no patches, so there is nothing for the operation to forward
-    either.  Written as an attribute lookup rather than a call on ``SDF`` so
-    every operation that forwards the protocol shares one guard.
-
-    Args:
-        child: The wrapped shape: an SDF node, or a plain callable.
-
-    Returns:
-        The child's patch fields, or ``None`` when the child is not an SDF
-        node or has no exact decomposition of its own.
-    """
-    patch_fields = getattr(child, "patch_fields", None)
-    return patch_fields() if patch_fields is not None else None
-
-
 class _Operation(Transform):
     """Shared plumbing for field operations wrapping one callable shape."""
 

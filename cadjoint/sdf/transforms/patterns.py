@@ -16,8 +16,8 @@ from jax import Array
 
 from cadjoint.geometry.parameters import Scalar
 from cadjoint.sdf._lowering import is_scalar_lowering
+from cadjoint.sdf.base import _child_patch_fields
 from cadjoint.sdf.transforms._operation import (
-    _child_patch_fields,
     _Operation,
     _reference_line,
 )

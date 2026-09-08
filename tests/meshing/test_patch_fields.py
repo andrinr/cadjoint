@@ -26,7 +26,7 @@ from cadjoint.meshing import (
     signature_function,
     world_frame_leaves,
 )
-from cadjoint.sdf.boolean import Union
+from cadjoint.sdf.boolean import Difference, Intersection, Union
 from cadjoint.sdf.primitives import (
     Box,
     Cylinder,
@@ -784,6 +784,172 @@ class TestShellPatchFields:
 
     def test_child_without_a_decomposition_reports_none(self):
         assert Shell(Twist(Sphere(1.0), 1.0), self.THICKNESS).patch_fields() is None
+
+
+class TestBooleanPatchFields:
+    """The operands' fields concatenated, operand-major, for hard booleans."""
+
+    # Far enough apart that the two boxes are disjoint, so all twelve patches
+    # bound something and every face point has one unambiguous owner.  Offset
+    # on *all three* axes on purpose: a translation along x alone would leave
+    # the two copies' four y/z face planes coincident, and ownership between
+    # two identical fields is not a meaningful thing to assert.
+    APART = jnp.array([3.0, 1.7, 1.1])
+
+    def _boxes(self):
+        return Box(size=jnp.asarray(BOX_SIZE)), Translate(
+            Box(size=jnp.asarray(BOX_SIZE)), self.APART
+        )
+
+    def test_hard_union_declares_both_operands(self):
+        first, second = self._boxes()
+        assert len(Union((first, second), smoothness=0.0).patch_fields()) == 12
+
+    def test_operand_major_order(self):
+        """Operand 0's six patches come first, then operand 1's — not interleaved."""
+        first, second = self._boxes()
+        union = Union((first, second), smoothness=0.0)
+        fields = union.patch_fields()
+        for face in range(6):
+            for point in _box_face_points(face):
+                near = jnp.asarray(point, jnp.float32)
+                far = near + self.APART
+                assert float(union(near)) == pytest.approx(0.0, abs=1e-6)
+                assert float(union(far)) == pytest.approx(0.0, abs=1e-6)
+                assert _patch_id(fields, near) == face
+                assert _patch_id(fields, far) == 6 + face
+
+    def test_min_of_max_composition_is_the_sdf(self):
+        """The node's sdf agrees with the composition its patches describe.
+
+        The reshape only lands on the right groups because the layout is
+        operand-major.  Compared inside, where a box's own ``max`` over its
+        face half-spaces is its exact distance.
+        """
+        first, second = self._boxes()
+        union = Union((first, second), smoothness=0.0)
+        fields = union.patch_fields()
+        rng = np.random.default_rng(21)
+        points = jnp.asarray(rng.uniform(-1.2, 1.2, size=(96, 3)) * BOX_SIZE)
+        stacked = jnp.stack([field(points) for field in fields])
+        composed = jnp.min(jnp.max(stacked.reshape(2, 6, -1), axis=1), axis=0)
+        reference = union(points)
+        inside = np.asarray(reference) <= 0.0
+        assert inside.any()
+        np.testing.assert_allclose(
+            np.asarray(composed)[inside], np.asarray(reference)[inside], atol=1e-6
+        )
+
+    def test_smooth_union_declares_nothing(self):
+        """A blended seam is on no operand's zero set, so there is nothing to say."""
+        first, second = self._boxes()
+        assert Union((first, second), smoothness=0.1).patch_fields() is None
+        # The default constructor is a *smooth* union, and declines too.
+        assert Union((first, second)).patch_fields() is None
+        assert Intersection((first, second)).patch_fields() is None
+        assert Difference((first, second)).patch_fields() is None
+
+    def test_nesting_flattens_operand_major(self):
+        """A union of a union: the inner operands keep their relative order."""
+        first, second = self._boxes()
+        third = Translate(Box(size=jnp.asarray(BOX_SIZE)), 2.0 * self.APART)
+        inner = Union((first, second), smoothness=0.0)
+        outer = Union((inner, third), smoothness=0.0)
+        fields = outer.patch_fields()
+        assert len(fields) == 18
+        for face in range(6):
+            for point in _box_face_points(face):
+                base = jnp.asarray(point, jnp.float32)
+                assert _patch_id(fields, base) == face
+                assert _patch_id(fields, base + self.APART) == 6 + face
+                assert _patch_id(fields, base + 2.0 * self.APART) == 12 + face
+
+    def test_an_operand_without_a_decomposition_declines_the_whole_node(self):
+        """Partial cover is not on offer: the contract is the whole surface."""
+        first, _ = self._boxes()
+        opaque = Translate(Twist(Sphere(0.5), 1.0), self.APART)
+        assert Union((first, opaque), smoothness=0.0).patch_fields() is None
+        assert Difference((first, opaque), smoothness=0.0).patch_fields() is None
+
+    def test_intersection_owns_the_surviving_faces(self):
+        """Two overlapping boxes: each keeps the faces that bound the overlap."""
+        offset = jnp.array([0.9, 0.0, 0.0])
+        first = Box(size=jnp.asarray(BOX_SIZE))
+        second = Translate(Box(size=jnp.asarray(BOX_SIZE)), offset)
+        node = Intersection((first, second), smoothness=0.0)
+        fields = node.patch_fields()
+        assert len(fields) == 12
+        # The overlap runs x in [0.9 - 0.8, 0.8]; its +x wall is operand 0's
+        # +x face (patch 0) and its -x wall is operand 1's -x face (patch 7).
+        plus = jnp.asarray([BOX_SIZE[0], 0.1, 0.05], jnp.float32)
+        minus = jnp.asarray([float(offset[0]) - BOX_SIZE[0], 0.1, 0.05], jnp.float32)
+        for point, patch in ((plus, 0), (minus, 7)):
+            assert float(node(point)) == pytest.approx(0.0, abs=1e-6)
+            assert _patch_id(fields, point) == patch
+
+    def test_difference_negates_its_tools(self):
+        """A cut surface must read positive outside the *result*, not the tool.
+
+        The tool's own field is positive outside the tool — which is inside
+        the material it was cutting.  Negating puts the sign back the way
+        round the consumer expects, without moving the zero set.
+        """
+        body = Box(size=jnp.asarray(BOX_SIZE))
+        tool = Translate(Box(size=jnp.asarray([0.3, 0.3, 0.3])), jnp.array([BOX_SIZE[0], 0.0, 0.0]))
+        node = Difference((body, tool), smoothness=0.0)
+        fields = node.patch_fields()
+        assert len(fields) == 12
+        tool_fields = tool.patch_fields()
+        # Deep inside the cavity: outside the result, so every declared field
+        # of the tool must agree by reading positive there.
+        cavity = jnp.asarray([BOX_SIZE[0], 0.0, 0.0], jnp.float32)
+        assert float(node(cavity)) > 0.0
+        for index in range(6):
+            assert float(fields[6 + index](cavity)) == pytest.approx(
+                -float(tool_fields[index](cavity)), abs=1e-6
+            )
+        assert min(float(fields[6 + index](cavity)) for index in range(6)) > 0.0
+        # The cut's own back wall (the tool's -x face) is on the result, and
+        # the negation leaves that zero set exactly where it was.
+        wall = jnp.asarray([BOX_SIZE[0] - 0.3, 0.1, 0.05], jnp.float32)
+        assert float(node(wall)) == pytest.approx(0.0, abs=1e-6)
+        assert _patch_id(fields, wall) == 6 + 1
+
+    def test_a_boolean_under_a_pattern_is_forwarded(self):
+        """The case the protocol exists for: a nested boolean the scene keeps.
+
+        ``world_frame_leaves`` splits a scene at its booleans, so a boolean
+        only reaches ``patch_fields`` from *under* something else — here a
+        polar pattern of a two-cylinder tool, which is exactly the shape of
+        the motor shield leaf this unblocked.
+        """
+        # Both pins are tilted, and staggered in radius and height.  Upright
+        # coaxial pins would leave every cap patch coincident with every
+        # other's — a cap field depends on z alone, and rotating about z does
+        # not move a plane z = const — and ownership between two identical
+        # fields is not a meaningful thing to assert.
+        places = (np.array([0.8, 0.0, 0.0]), np.array([1.35, 0.0, 0.6]))
+        tilts = (0.4, -0.3)
+        tool = Union(
+            tuple(
+                Translate(Rotate(_pin(), "y", tilt), jnp.asarray(place))
+                for place, tilt in zip(places, tilts)
+            ),
+            smoothness=0.0,
+        )
+        pattern = PolarPattern(tool, 4)
+        fields = pattern.patch_fields()
+        assert len(fields) == 4 * 2 * PIN_PATCHES
+        for instance in range(4):
+            angle = 2.0 * np.pi * instance / 4
+            for operand, (place, tilt) in enumerate(zip(places, tilts)):
+                rotation = np.asarray(Rotate._rotation_matrix(jnp.array([0.0, 1.0, 0.0]), tilt))
+                seed = _pin_patch_points() @ rotation.T + place
+                for patch, point in enumerate(_rotate_z(seed, angle)):
+                    q = jnp.asarray(point, jnp.float32)
+                    assert float(pattern(q)) == pytest.approx(0.0, abs=1e-5)
+                    expected = instance * 2 * PIN_PATCHES + operand * PIN_PATCHES + patch
+                    assert _patch_id(fields, q) == expected
 
 
 class TestSceneSignatures:

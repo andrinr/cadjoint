@@ -10,9 +10,9 @@ import jax.numpy as jnp
 from jax import Array
 
 from cadjoint.geometry.parameters import Scalar
+from cadjoint.sdf.base import _child_patch_fields
 from cadjoint.sdf.transforms._operation import (
     _MIRROR_NORMALS,
-    _child_patch_fields,
     _Operation,
     _reference_line,
 )
