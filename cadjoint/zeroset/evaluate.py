@@ -27,7 +27,9 @@ _UNARY = {
     "NEG": jnp.negative,
     "ABS": jnp.abs,
     "SIGN": jnp.sign,
-    "SQRT": lambda a: jnp.sqrt(jnp.maximum(a, 1e-300)),  # ∂ finite at 0: 0, as the GPU fold 0.0)),
+    # Guarded like the GPU fold's: the derivative at 0 is finite (0) rather
+    # than the infinity a bare sqrt would hand the design derivative.
+    "SQRT": lambda a: jnp.sqrt(jnp.maximum(a, 1e-300)),
     "EXP": jnp.exp,
     "LOG": jnp.log,
     "SIN": jnp.sin,
