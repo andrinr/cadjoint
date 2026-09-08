@@ -347,21 +347,48 @@ class ExtrudedPolygon(Primitive):
         return ExtrudedPolygon.sdf
 
     def patch_fields(self):
-        """Per-edge wall half-planes plus the two caps.
+        """Per-edge wall planes plus the two caps — tilted when drafted.
 
         Order: patch ``k`` (for ``k < N``) is the wall extruded from profile
         edge ``(v_k, v_{k+1})``; patch ``N`` is the bottom cap
-        (``z = -depth/2``), patch ``N+1`` the top cap.  Drafted or twisted
-        extrusions have curved/tapered walls that are no longer half-planes,
-        so they report ``None``.
+        (``z = -depth/2``), patch ``N+1`` the top cap.
+
+        A draft keeps every wall a **plane**.  :meth:`sdf` offsets the 2D
+        profile distance by ``tan(δ)·(z + depth/2)``, so wall ``k``'s field is
+        ``edge_k(x, y) + tan(δ)·(z + depth/2)`` — linear in x, y *and* z, just
+        tilted out of vertical by δ about its own profile edge.  What the
+        draft does cost is the gradient norm: that expression has ``|∇| =
+        sec(δ)``, which is the class docstring's "the field is a bound, not an
+        exact SDF".  Ownership here is ``argmin_i |f_i|``, and a field that
+        reads ``sec(δ)`` times the true distance would claim surface that
+        belongs to its neighbours, so each wall is scaled by ``cos(δ)``:
+
+            ``cos(δ)·edge_k(x, y) + sin(δ)·(z + depth/2)``
+
+        Same zero set, unit gradient, honest distances.  The caps are
+        untouched — a draft tapers the walls and leaves ``z = ±depth/2``
+        where they were.
+
+        A *twist* is where this stops: it rotates the profile by an angle
+        proportional to z, so each wall sweeps a helicoid, which is none of
+        the analytic surfaces a consumer can fit.  Twisted extrusions
+        therefore report ``None``, drafted ones do not.
         """
-        if "draft" in self.params or "twist" in self.params:
+        if "twist" in self.params:
             return None
         depth = self.params["depth"].value
         edge_fields = _edge_half_plane_fields(
             _profile_vertex_values(self.params), self._orientation
         )
-        walls = [(lambda p, f=field: f(p[..., :2])) for field in edge_fields]
+        if "draft" in self.params:
+            angle = jnp.deg2rad(self.params["draft"].value)
+            cos, sin = jnp.cos(angle), jnp.sin(angle)
+            walls = [
+                (lambda p, f=field: cos * f(p[..., :2]) + sin * (p[..., 2] + depth / 2.0))
+                for field in edge_fields
+            ]
+        else:
+            walls = [(lambda p, f=field: f(p[..., :2])) for field in edge_fields]
         caps = [
             lambda p: -p[..., 2] - depth / 2.0,
             lambda p: p[..., 2] - depth / 2.0,
