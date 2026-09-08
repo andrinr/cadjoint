@@ -32,6 +32,7 @@ from cadjoint.fem.boundary import (
     select_faces,
     tet_faces_from_nodes,
 )
+from cadjoint.fem.discretization import Discretization, ElasticProblem, Surface, ThermalProblem
 from cadjoint.fem.hexmesh import GridSpec, HexMesh, sdf_to_hex_mesh
 from cadjoint.fem.motion import project_points, recompute_points, recompute_tet_points
 from cadjoint.fem.quality import (
@@ -56,7 +57,11 @@ __all__ = [
     "HexMesh",
     "NodeSelection",
     "Nodes",
+    "Discretization",
+    "ElasticProblem",
     "SimMesh",
+    "Surface",
+    "ThermalProblem",
     "TetMesh",
     "aspect_ratios",
     "capture_sim_meshes",

@@ -22,77 +22,19 @@ import numpy as np
 def _boundary_vertex_nodes(mesh: Any) -> np.ndarray:
     """Node indices behind the compacted boundary vertex list.
 
-    Must mirror the compaction of :func:`_render_surface_payload`: hex
-    quads are gathered group by group (sorted by group id) exactly like
-    :func:`cadjoint.fem.render_payload.boundary_render_payload`, tet
-    boundary triangles as-is, and node ids deduplicated with
-    ``np.unique`` — so position *i* of the render payload's vertex arrays
-    corresponds to mesh node ``result[i]``.
+    Mirrors the compaction of :func:`cadjoint.fem.render_payload.surface_render_payload`:
+    faces gathered group by group in the surface's order and node ids
+    deduplicated with ``np.unique`` — so position *i* of the render
+    payload's vertex arrays corresponds to mesh node ``result[i]``.
     """
-    if hasattr(mesh, "boundary_faces"):
-        faces = np.concatenate(
-            [mesh.boundary_faces[group_id].nodes for group_id in sorted(mesh.boundary_faces)],
-            axis=0,
-        )
-    else:
-        faces = np.asarray(mesh.boundary_tris)
-    return np.unique(faces.reshape(-1))
+    return np.unique(mesh.surface().faces.reshape(-1))
 
 
 def _render_surface_payload(mesh: Any, node_scalar: np.ndarray) -> dict[str, Any]:
-    """The viewer's boundary-surface payload for any solve mesh.
+    """The viewer's boundary-surface payload for any discretization."""
+    from cadjoint.fem.render_payload import surface_render_payload
 
-    Hex meshes go through the canonical
-    :func:`cadjoint.fem.render_payload.boundary_render_payload`; tet meshes
-    get the same contract built here from their outward corner triangles —
-    identical keys (``positions``/``scalars``/``indices``/``groups``/
-    ``range``/``vertex_count``) with one synthetic ``"surface"`` group, so
-    the frontend renders both without knowing the meshing method.
-    """
-    from cadjoint.fem.render_payload import boundary_render_payload
-
-    if hasattr(mesh, "boundary_faces"):
-        return boundary_render_payload(mesh, node_scalar)
-
-    scalar = np.asarray(node_scalar, dtype=np.float64).reshape(-1)
-    if scalar.shape[0] != mesh.num_points:
-        raise ValueError(
-            f"Expected one scalar per node ({mesh.num_points}), got {scalar.shape[0]}."
-        )
-    tris = np.asarray(mesh.boundary_tris)
-    used, remapped = np.unique(tris.reshape(-1), return_inverse=True)
-    triangles = remapped.reshape(-1, 3).astype(np.int64)
-    positions = np.asarray(mesh.points)[used]
-    scalars = scalar[used]
-    finite = scalars[np.isfinite(scalars)]
-    low = float(finite.min()) if finite.size else 0.0
-    high = float(finite.max()) if finite.size else 0.0
-    corners = positions[triangles]
-    normals = 0.5 * np.cross(corners[:, 1] - corners[:, 0], corners[:, 2] - corners[:, 0])
-    areas = np.linalg.norm(normals, axis=-1)
-    total = float(areas.sum())
-    weights = areas / max(total, 1e-30)
-    center = (corners.mean(axis=1) * weights[:, None]).sum(axis=0)
-    groups = [
-        {
-            "id": "surface",
-            "axis": None,
-            "side": None,
-            "center": [round(float(value), 5) for value in center],
-            "area": round(total, 6),
-            "faces": int(triangles.shape[0]),
-            "start": 0,
-            "count": int(triangles.size),
-        }
-    ]
-    return {
-        "positions": [round(float(value), 5) for value in positions.reshape(-1)],
-        "scalars": [round(float(value), 6) for value in scalars],
-        "indices": [int(value) for value in triangles.reshape(-1)],
-        "groups": groups,
-        "range": [round(low, 6), round(high, 6)],
-        "vertex_count": int(used.shape[0]),
-    }
+    return surface_render_payload(mesh.surface(), node_scalar)
 
 
 def _element_edge_pairs(mesh: Any) -> np.ndarray:
@@ -110,15 +52,8 @@ def _element_edge_pairs(mesh: Any) -> np.ndarray:
     Returns:
         ``(E, 2)`` int64 edge pairs, each sorted, unique.
     """
-    if hasattr(mesh, "boundary_faces"):
-        faces = np.concatenate(
-            [mesh.boundary_faces[group_id].nodes for group_id in sorted(mesh.boundary_faces)],
-            axis=0,
-        )
-        corners = ((0, 1), (1, 2), (2, 3), (3, 0))
-    else:  # tet meshes: outward corner triangles
-        faces = np.asarray(mesh.boundary_tris)
-        corners = ((0, 1), (1, 2), (2, 0))
+    faces = np.asarray(mesh.surface().faces)
+    corners = ((0, 1), (1, 2), (2, 3), (3, 0)) if faces.shape[1] == 4 else ((0, 1), (1, 2), (2, 0))
     _, remapped = np.unique(faces.reshape(-1), return_inverse=True)
     compact = remapped.reshape(faces.shape).astype(np.int64)
     edges = np.concatenate([compact[:, [a, b]] for a, b in corners], axis=0)

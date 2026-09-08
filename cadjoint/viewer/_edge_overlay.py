@@ -41,6 +41,7 @@ from typing import Any
 import numpy as np
 
 from cadjoint.enums import PluginKind
+from cadjoint.meshing import DEFAULT_BOUNDS, DEFAULT_SIZE
 from cadjoint.meshing.patch_fields import world_frame_leaves
 
 #: The overlay's name for the leaf split it shares with the mesher and the
@@ -54,8 +55,8 @@ _world_frame_leaves = world_frame_leaves
 # Detection stays dense rather than Lipschitz-pruned: user-written fields
 # can exceed any assumed gradient bound, and a hole in the viewer is worse
 # than the ~100 ms this costs.
-_MESH_EDGE_BOUNDS = (-3.0, -3.0, -3.0)
-_MESH_EDGE_SIZE = (6.0, 6.0, 6.0)
+_MESH_EDGE_BOUNDS = DEFAULT_BOUNDS
+_MESH_EDGE_SIZE = DEFAULT_SIZE
 _MESH_EDGE_RESOLUTION = 64
 
 # Newton iterations per projection asked of the ``feature_edges`` component.
@@ -129,45 +130,16 @@ def _design_leaves(leaves: list[Any]) -> np.ndarray | None:
 def _project_to_seam(fields: list[Any], points: np.ndarray, max_step: float) -> np.ndarray:
     """Newton-project points onto the common zero set of two or more fields.
 
-    Two fields define a seam curve, three a corner point (triple junction).
-    Points whose gradients are rank-deficient (tangent or coincident
-    surfaces — the system is singular and there is no transversal
-    intersection to project onto) are returned unchanged.
+    :func:`cadjoint.zeroset.project.project` on the seam's fields: the
+    minimum-norm step, a relative regularisation of the Gram matrix, and a
+    refusal for points whose fields meet tangentially — which stay put.
     """
-    import jax
-    import jax.numpy as jnp
+    from cadjoint.zeroset.project import project
 
-    evaluators = [
-        jax.vmap(jax.value_and_grad(lambda p, f=field: jnp.asarray(f(p)))) for field in fields
-    ]
-    count = len(fields)
-    start = jnp.asarray(points, dtype=jnp.float32)
-
-    def system(x):
-        values, gradients = zip(*(evaluate(x) for evaluate in evaluators))
-        jacobian = jnp.stack(gradients, axis=1)
-        gram = jnp.einsum("sij,skj->sik", jacobian, jacobian)
-        return jnp.stack(values, axis=-1), jacobian, gram
-
-    _, _, gram0 = system(start)
-    eigenvalues = jnp.linalg.eigvalsh(gram0)
-    trace = jnp.trace(gram0, axis1=-2, axis2=-1)
-    transversal = eigenvalues[..., 0] > 1e-2 * trace / count
-
-    x = start
-    for _ in range(4):
-        residual, jacobian, gram = system(x)
-        # Regularize at a float32-meaningful scale; smaller epsilons
-        # underflow against unit-gradient Gram entries.
-        trace = jnp.trace(gram, axis1=-2, axis2=-1)
-        gram = gram + (1e-4 * trace + 1e-12)[..., None, None] * jnp.eye(count, dtype=gram.dtype)
-        multipliers = jnp.linalg.solve(gram, residual[..., None])[..., 0]
-        step = jnp.einsum("sij,si->sj", jacobian, multipliers)
-        length = jnp.linalg.norm(step, axis=-1, keepdims=True)
-        step = step * jnp.minimum(1.0, max_step / jnp.maximum(length, 1e-9))
-        x = x - step
-    x = jnp.where(transversal[:, None], x, start)
-    return np.asarray(x, dtype=np.float64)
+    return np.asarray(
+        project(fields, np.asarray(points, dtype=np.float64), steps=4, max_step=max_step),
+        dtype=np.float64,
+    )
 
 
 def _seam_residual(fields: list[Any], points: np.ndarray) -> np.ndarray:

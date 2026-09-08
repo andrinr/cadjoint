@@ -224,7 +224,8 @@ pad = SketchPlane.tangent(dome, near=[0.0, 0.0, 0.9])   # plane at the north pol
 ```
 
 The projection is a Newton iteration in JAX
-(`cadjoint.fem.motion.project_points`), so a tangent plane is differentiable
+(`cadjoint.fem.motion.project_points`, the one-surface case of
+`cadjoint.zeroset.project.project`), so a tangent plane is differentiable
 with respect to the scene's parameters just like an analytic one. Grow the
 sphere and the pad rides out with it.
 

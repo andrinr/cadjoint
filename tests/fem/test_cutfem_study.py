@@ -84,7 +84,7 @@ def test_conditions_by_region_and_the_material_refusal():
         bcs=[Dirichlet(Nodes.sphere([5.0, 5.0, 5.0], 0.1), 0.0)],
         mesh=mesh,
     )
-    with pytest.raises(ValueError, match="selects no boundary facet"):
+    with pytest.raises(ValueError, match="matched no boundary nodes|selects no boundary facet"):
         empty.solve(ball)
     materials = ThermalStudy(
         name="mat", bcs=[Dirichlet(Nodes.sphere([0, 0, 0], 10.0), 0.0)], mesh=mesh

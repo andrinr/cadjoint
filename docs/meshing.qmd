@@ -347,6 +347,28 @@ Gmsh is **GPL-2.0-or-later**, so it is an optional extra
 image where the licence boundary is a process boundary. Nothing under
 `cadjoint/` imports it at module scope. See [plugins](plugins.qmd).
 
+### Every vertex on every surface it touches
+
+A boundary vertex follows the design by being re-solved onto the model, and
+*which* zero sets it is solved onto is the whole question. Solved onto the
+scene's single field, a vertex sitting on a crease steps between the two
+faces that meet there — its position wanders along the crease and its
+derivative is one face's, not the edge's. Measured on the starter in
+[the cut-cell study](https://github.com/andrinr/cadjoint/tree/main/research/cutfem):
+136 of 860 surface vertices, and 11-13 % on the objective's gradient.
+
+So a `SimMesh` lowers its scene to the node table
+(`cadjoint.zeroset`), classifies each boundary vertex onto the census
+surfaces it lies on — one for a face, two for an edge, three at a corner —
+and moves it with the minimum-norm Newton solve on all of them at once
+(`cadjoint.zeroset.project`), which is the same solve the zero-set
+protocol's `Solve` performs. That kernel is the one projection in the
+repository: the mesh motion, the viewer's feature-edge seams and the
+tangent-plane constructor all call it.
+
+Where the scene cannot be lowered (a bare callable field), the single-field
+projection is used exactly as before.
+
 ### Frozen geometry
 
 A Gmsh mesh's *topology* is decided once and held. Its *positions* follow the

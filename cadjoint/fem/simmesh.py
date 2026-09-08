@@ -61,14 +61,9 @@ from cadjoint.enums import (
     values,
 )
 from cadjoint.fem.cutfem import CutMesh
-from cadjoint.fem.hexmesh import GridSpec, HexMesh, sdf_to_hex_mesh
-from cadjoint.fem.quality import (
-    aspect_ratios,
-    scaled_jacobians,
-    tet_aspect_ratios,
-    tet_radius_ratios,
-)
+from cadjoint.fem.hexmesh import GridSpec, HexMesh, sdf_to_hex_mesh, with_table
 from cadjoint.fem.tetmesh import TetMesh, sdf_to_tet_mesh, tet10_mesh
+from cadjoint.meshing import DEFAULT_BOUNDS, DEFAULT_SIZE
 from cadjoint.studies import require_triplet
 
 __all__ = ["SimMesh", "capture_sim_meshes"]
@@ -82,10 +77,10 @@ _METHODS = values(MeshMethod)
 #: these literals); the option set is :class:`cadjoint.enums.TetMesher`.
 _MESHERS = values(TetMesher)
 
-# Same default meshing volume as the implicit study path and the viewer's
-# simulate mode; also the region the automatic domain-bounds scan samples.
-_DEFAULT_BOUNDS = (-3.0, -3.0, -3.0)
-_DEFAULT_SIZE = (6.0, 6.0, 6.0)
+# The automatic domain-bounds scan samples the default meshing volume.
+_DEFAULT_BOUNDS = DEFAULT_BOUNDS
+_DEFAULT_SIZE = DEFAULT_SIZE
+
 _SCAN_CELLS = 32
 
 _CAPTURED_MESHES: ContextVar[list[SimMesh] | None] = ContextVar(
@@ -394,6 +389,9 @@ class SimMesh:
             mesh = sdf_to_tet_mesh(field_fn, self.grid(sdf))
             if self.method == MeshMethod.TET10:
                 mesh = tet10_mesh(mesh)
+        # The scene, when it is one, gives the mesh its table: surface
+        # vertices classified onto the census, moved as such (hexmesh.with_table).
+        mesh = with_table(mesh, field_fn)
         self._cache = (field_fn, parameters, mesh)
         return mesh
 
@@ -414,18 +412,7 @@ class SimMesh:
             :func:`~cadjoint.fem.quality.tet_aspect_ratios`; TET10 metrics
             are those of the straight-sided corner tets).
         """
-        mesh = self.build(sdf)
-        if isinstance(mesh, CutMesh):
-            return {}  # no elements to grade
-        if isinstance(mesh, TetMesh):
-            return {
-                "radius_ratio": tet_radius_ratios(mesh.points, mesh.cells),
-                "aspect_ratio": tet_aspect_ratios(mesh.points, mesh.cells),
-            }
-        return {
-            "scaled_jacobian": scaled_jacobians(mesh.points, mesh.cells),
-            "aspect_ratio": aspect_ratios(mesh.points, mesh.cells),
-        }
+        return self.build(sdf).quality()
 
     def inspect(self, sdf: Any = None) -> dict[str, Any]:
         """JSON-ready inspection summary of the built mesh.

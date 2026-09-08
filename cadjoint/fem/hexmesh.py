@@ -43,6 +43,7 @@ from cadjoint.fem.boundary import (
     faces_from_nodes,
     select_faces,
 )
+from cadjoint.fem.discretization import Surface
 from cadjoint.fem.elements import HEX_CORNER_OFFSETS
 from cadjoint.fem.motion import project_points, recompute_points
 from cadjoint.fem.quality import aspect_ratios, corner_tet_volumes, scaled_jacobians
@@ -92,6 +93,11 @@ class HexMesh:
     snap_mask: np.ndarray = field(repr=False, default=None)  # type: ignore[assignment]
     max_step: float = 0.0
     grid: GridSpec | None = None
+    #: The scene's node table and, per snapped vertex, the census surfaces it
+    #: lies on — set by :func:`with_table` when the scene is known, so
+    #: :meth:`moved` can hold a crease vertex on both faces that meet there.
+    table: Any = field(repr=False, default=None)
+    incidence: Any = field(repr=False, default=None)
 
     @property
     def num_points(self) -> int:
@@ -111,6 +117,266 @@ class HexMesh:
             centers=np.concatenate([g.centers for g in groups], axis=0),
             normals=np.concatenate([g.normals for g in groups], axis=0),
         )
+
+    # ── the discretization protocol (cadjoint.fem.discretization) ─────────
+
+    @property
+    def family(self) -> str:
+        return "hex"
+
+    def surface(self) -> Surface:
+        return Surface(
+            points=self.points,
+            groups=tuple(
+                (group_id, self.boundary_faces[group_id].nodes)
+                for group_id in sorted(self.boundary_faces)
+            ),
+        )
+
+    def quality(self) -> dict[str, np.ndarray]:
+        from cadjoint.fem.quality import aspect_ratios, scaled_jacobians
+
+        return {
+            "scaled_jacobian": scaled_jacobians(self.points, self.cells),
+            "aspect_ratio": aspect_ratios(self.points, self.cells),
+        }
+
+    def node_patch(self, selection: Any) -> np.ndarray:
+        _require_selection(selection)
+        return selection.resolve(self)
+
+    def face_patch(self, selection: Any) -> tuple[np.ndarray, None]:
+        """The union of the corners of the boundary quads the selection spans, and no faces.
+
+        A backend applies an area-integrated condition to exactly the faces
+        all of whose corners are in the set.
+        """
+        _require_selection(selection)
+        group = faces_from_nodes(self, selection.resolve(self))
+        if group.nodes.size == 0:
+            raise ValueError(
+                f"Selection {selection.describe()} spans no complete boundary face; "
+                "area-integrated conditions need all four corners of at least one "
+                "boundary quad selected."
+            )
+        return np.unique(group.nodes).astype(np.int32), None
+
+    def unresolvable(self, bcs: list) -> str | None:
+        return _unresolvable_on_mesh(self, bcs)
+
+    def moved(self, field: Any, *, smooth_passes: int = 0, design: Any = None) -> Any:  # noqa: ARG002 - the protocol's signature
+        """Node positions under the design: snapped vertices re-projected, the lattice frozen.
+
+        With a table and the design's parameters, each snapped vertex is
+        solved onto the census surfaces it was classified on — a crease
+        vertex onto both faces at once — which is the derivative a single
+        field's Newton gets wrong there.  Without, the single field's.
+        """
+        from cadjoint.fem.motion import recompute_points
+
+        if self.table is None or design is None:
+            return recompute_points(field, self)
+        import jax.numpy as jnp
+
+        from cadjoint.zeroset.project import project_table, theta_array
+
+        indices = np.flatnonzero(self.snap_mask)
+        base = jnp.asarray(self.points)
+        theta = theta_array(self.table, design[1])
+        projected = project_table(
+            self.table, theta, base[indices], self.incidence, max_step=self.max_step
+        )
+        return base.at[indices].set(projected)
+
+    def thermal(self, problem: Any, *, placement: Any = None, backend: Any = None) -> Any:
+        """Steady conduction through the backend registry (``jaxfem`` by default)."""
+        from cadjoint.fem.backends import ThermalBCs, get_backend
+        from cadjoint.fem.simulate import ThermalResult, _property_value
+
+        bcs = ThermalBCs(
+            dirichlet_nodes=[self.node_patch(patch) for patch, _ in problem.dirichlet],
+            dirichlet_values=[_scalar_or_traced(value) for _, value in problem.dirichlet],
+            flux_nodes=[self.face_patch(patch)[0] for patch, _ in problem.neumann],
+            flux_values=[float(value) for _, value in problem.neumann],
+        )
+        temperature = get_backend(backend).thermal(
+            self.points if placement is None else placement,
+            self.cells,
+            bcs,
+            conductivity=_property_value(problem.conductivity),
+            source=float(problem.source),
+            base_points=self.points,
+        )
+        return ThermalResult(temperature=temperature, mesh=self)
+
+    def elastic(self, problem: Any, *, placement: Any = None, backend: Any = None) -> Any:
+        """Linear elasticity through the backend registry (``jaxfem`` by default)."""
+        from cadjoint.fem.backends import ElasticBCs, get_backend
+        from cadjoint.fem.simulate import ElasticResult, _property_value
+
+        bcs = ElasticBCs(
+            fixed_nodes=[self.node_patch(patch) for patch in problem.fixed],
+            traction_nodes=[self.face_patch(patch)[0] for patch, _ in problem.tractions],
+            traction_vectors=[np.asarray(v, dtype=np.float64) for _, v in problem.tractions],
+        )
+        extra: dict[str, Any] = {}
+        if problem.body_force is not None:
+            extra["body_force"] = problem.body_force
+        displacement = get_backend(backend).elastic(
+            self.points if placement is None else placement,
+            self.cells,
+            bcs,
+            youngs=_property_value(problem.youngs),
+            poisson=_property_value(problem.poisson),
+            base_points=self.points,
+            **extra,
+        )
+        return ElasticResult(
+            displacement=displacement,
+            mesh=self,
+            youngs=_property_value(problem.youngs),
+            poisson=_property_value(problem.poisson),
+        )
+
+    def traction_work(self, positions: Any, displacement: Any, selection: Any, vector: Any) -> Any:
+        from cadjoint.fem.postprocess import load_work_quads
+
+        quads = faces_from_nodes(self, selection.resolve(self)).nodes
+        return load_work_quads(positions, displacement, quads, vector)
+
+
+def with_table(mesh: Any, scene: Any, *, tolerance: float | None = None) -> Any:
+    """The mesh with the scene's node table and its surface vertices classified onto it.
+
+    Lowers ``scene`` (a construction object; a bare callable has no table
+    and the mesh is returned as is), names the census surfaces each
+    surface vertex lies on, and places the vertices with the incidence-aware
+    kernel at the nominal design so that :meth:`moved` at that design is a
+    no-op.  A vertex on no surface within ``tolerance`` (a twentieth of the
+    finest spacing by default) keeps its single-field placement.
+    """
+    if not hasattr(scene, "params") and not hasattr(scene, "children"):
+        return mesh
+    import dataclasses
+
+    import jax.numpy as jnp
+
+    from cadjoint.zeroset import lower
+    from cadjoint.zeroset.project import classify, project_table
+
+    try:
+        table = lower(scene)
+    except Exception:  # noqa: BLE001 - a scene the table cannot express keeps the single field
+        return mesh
+    if isinstance(mesh, HexMesh):
+        indices = np.flatnonzero(mesh.snap_mask)
+    else:
+        indices = np.arange(mesh.num_surface)
+    if indices.size == 0:
+        return dataclasses.replace(mesh, table=table, incidence=[])
+    spacing = min(mesh.grid.spacing) if mesh.grid is not None else mesh.max_step
+    tolerance = 0.05 * float(spacing) if tolerance is None else tolerance
+    theta = jnp.asarray(table.theta)
+    surface = np.asarray(mesh.points)[indices]
+    incidence = classify(table, theta, surface, tolerance=tolerance)
+    # Converged, not merely stepped: `moved` re-solves from these points at
+    # every design, so a placement that is not a fixed point of its own
+    # projection would move the mesh under a design that did not change.
+    placed = surface
+    for _ in range(4):
+        stepped = np.asarray(project_table(table, theta, placed, incidence, max_step=mesh.max_step))
+        if np.abs(stepped - placed).max() < 1e-12:
+            placed = stepped
+            break
+        placed = stepped
+    points, incidence = _guard_inversions(mesh, indices, placed, incidence)
+    return dataclasses.replace(mesh, points=points, table=table, incidence=incidence)
+
+
+def _guard_inversions(
+    mesh: Any, indices: np.ndarray, placed: np.ndarray, incidence: list[list[int]]
+) -> tuple[np.ndarray, list[list[int]]]:
+    """Take the crease placement only where it costs no element any quality.
+
+    Landing a vertex exactly on the edge two faces make can pull it further
+    than the mesher's own snap did — the mesher guards its snap against
+    inversion (:func:`_snap_boundary_vertices`) and this guards against
+    *degradation*, which is stricter and is the property a mesh is judged
+    on: an element whose metric would drop has the vertices that moved in
+    it put back.  A reverted vertex keeps its position and the single
+    surface nearest it, so it moves exactly as it did before.
+    """
+    from cadjoint.fem.quality import scaled_jacobians, tet_radius_ratios
+
+    points = np.array(mesh.points, dtype=np.float64)
+    cells = np.asarray(mesh.cells)
+    hexes = cells.shape[1] == 8
+    corners = cells if hexes else cells[:, :4]
+
+    def metric(x: np.ndarray) -> np.ndarray:
+        return scaled_jacobians(x, cells) if hexes else tet_radius_ratios(x, corners)
+
+    baseline = metric(points)
+    proposed = points.copy()
+    proposed[indices] = placed
+    moved = np.zeros(points.shape[0], dtype=bool)
+    moved[indices] = True
+    for _ in range(16):
+        worse = np.flatnonzero(metric(proposed) < baseline - 1e-9)
+        if worse.size == 0:
+            break
+        revert = np.unique(corners[worse])
+        revert = revert[moved[revert]]
+        if revert.size == 0:
+            break
+        moved[revert] = False
+        proposed[revert] = points[revert]
+    reverted = set(np.flatnonzero(~moved).tolist())
+    incidence = [
+        (row[:1] if int(index) in reverted else row) for index, row in zip(indices, incidence)
+    ]
+    if getattr(mesh, "edge_parents", None) is not None:
+        parents = proposed[: mesh.num_corner_points]
+        proposed[mesh.num_corner_points :] = parents[mesh.edge_parents].mean(axis=1)
+    return proposed, incidence
+
+
+def _require_selection(patch: Any) -> None:
+    from cadjoint.studies import NodeSelection
+
+    if not isinstance(patch, NodeSelection):
+        raise TypeError(
+            f"Boundary patches are Nodes selections, got {patch!r}. Build one via "
+            "Nodes.box/sphere/halfspace/cylinder/side/predicate."
+        )
+
+
+def _scalar_or_traced(value: Any) -> Any:
+    """A prescribed value: a plain number as a float, anything traced untouched."""
+    return float(value) if isinstance(value, (int, float)) else value
+
+
+def _unresolvable_on_mesh(mesh: Any, bcs: list) -> str | None:
+    """The first condition that finds no nodes, or spans no face, on a volume mesh.
+
+    Selections are anchored in space, so a re-meshed design can move a loaded
+    surface out of its selection; node-valued conditions need nodes, the
+    area-integrated ones (``HeatFlux``, ``Traction``) a complete boundary face.
+    """
+    from cadjoint.fem.study import HeatFlux, Traction
+
+    for bc in bcs:
+        label = f"boundary condition {type(bc).__name__} {bc.nodes.describe()}"
+        try:
+            bc.nodes.resolve(mesh)
+        except ValueError:
+            return f"{label} matched no surface nodes"
+        if isinstance(bc, (HeatFlux, Traction)):
+            try:
+                mesh.face_patch(bc.nodes)
+            except ValueError:
+                return f"{label} spans no complete boundary face"
+    return None
 
 
 def _evaluate_sdf(sdf: Callable[[Any], Any], points: np.ndarray) -> np.ndarray:
