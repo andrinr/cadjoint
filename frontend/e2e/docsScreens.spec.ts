@@ -185,7 +185,9 @@ test("the docs screenshots", async () => {
     // The declared mesh inspected: quality heatmap and histogram.
     await openWindow(page, "meshes", "mesh-sink-mesh");
     await page.getByTestId("mesh-inspect-sink-mesh").click();
-    // Inspecting a tet10 mesh of the starter is a full extraction: minutes.
+    // The scalars land in the Results window, which carries the legend, and
+    // inspecting a tet10 mesh of the starter is a full extraction: minutes.
+    await page.getByTestId("window-tab-results").click({ force: true });
     await expect(page.getByTestId("simulate-legend")).toBeVisible({ timeout: 900_000 });
     await shot(page, "simulate-meshes", 1500);
   });
@@ -218,10 +220,11 @@ test("the docs screenshots", async () => {
   });
 
   await attempt("optimize-replay", async () => {
-    await page.getByTestId("editmode-simulate").click();
+    await page.getByTestId("editmode-model").click();
     await page.waitForTimeout(500);
     // ── The optimization, run to its end and replayed ────────────────────
-    await openWindow(page, "optimize", "optimize-run-cool-sink");
+    await page.getByTestId("window-tab-optimize").click({ force: true });
+    await page.getByTestId("optimize-run-cool-sink").waitFor({ state: "visible" });
     for (const [field, value] of [
       ["optimize-steps-cool-sink", "8"],
       ["optimize-lr-cool-sink", "0.02"],

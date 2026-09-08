@@ -257,6 +257,10 @@ def with_table(mesh: Any, scene: Any, *, tolerance: float | None = None) -> Any:
     """
     if not hasattr(scene, "params") and not hasattr(scene, "children"):
         return mesh
+    if not hasattr(mesh, "base_points"):
+        # Cut cells have no node map to correct: their placement *is* the
+        # field, and `moved` hands the field straight back.
+        return mesh
     import dataclasses
 
     import jax.numpy as jnp
