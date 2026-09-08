@@ -19,6 +19,18 @@ rather than a seam rounding by ``k``.  A cavity ceiling drawn exactly on the
 solid's floor will lift the whole floor out of the solid.  Overlap such faces
 deliberately instead of matching them.
 
+**The blend is not a rolling ball, and calling it a fillet oversells it.**
+Setting the smooth minimum to zero cancels its cross terms exactly and
+leaves ``sqrt(u) + sqrt(v) = sqrt(4k)``, so the blend surface is a parabola
+swept along the operands' intersection.  Against a best-fit circle across
+the band it is wrong by about 6.6 % of ``k``, and its curvature radius
+varies by a factor of 2.828 from end to end.  For a cosmetic rounding that
+is immaterial; for anything that has to match a drawn radius, or for a
+downstream tool that expects a constant-radius surface, it is not.  Only
+two operand pairs have an exact surface — two planes, and a coaxial pair
+with straight meridians — and every other pair has a profile of genus one
+or two, so no NURBS represents it exactly at any degree.
+
 ``k`` is in model units and knows nothing about the part.  The default of
 0.1 was chosen for the unit-sized geometry in the shipped scenes, where it is
 a tenth of the smallest feature and reads as a fillet.  On a scene whose unit

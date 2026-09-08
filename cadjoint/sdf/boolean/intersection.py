@@ -16,7 +16,16 @@ class Intersection(BooleanOp):
 
     Args:
         sdfs: Tuple of SDFs to intersect
-        smoothness: Blend radius (0 = sharp, >0 = smooth)
+        smoothness: Blend half-width in **model units**, not a fillet radius.
+            0 is a sharp boolean; the default of 0.1 blends, so a plain
+            ``Intersection(a, b)`` is a blended one and a caller who wants the
+            sharp operation has to ask for ``smoothness=0``. The value does
+            not scale with the part: 0.1 is a tenth of a unit whatever the
+            unit stands for, which on a normalised engine block came to
+            20 mm and removed a water jacket. See
+            :mod:`cadjoint.sdf.boolean.smooth` for what the blend costs —
+            it moves the field by up to ``smoothness`` per operation, and
+            by the full amount wherever the operands agree.
     """
 
     def __init__(self, *sdfs, smoothness: float = 0.1):
