@@ -134,7 +134,7 @@ assert payload["ok"] is True, payload
 assert len(payload["shader"]) > 1000, "no shader"
 study, = payload["studies"]
 assert study["kind"] == "flow" and study["name"] == "duct-cooling", study
-assert study["resolution"] == [14, 26, 14] and study["mesh"] is None, study
+assert study["resolution"] == [20, 26, 12] and study["mesh"] is None, study
 types = [bc["type"] for bc in study["bcs"]]
 assert types == ["inlet", "outlet", "walls", "heat_source"], types
 assert all(bc["serializable"] for bc in study["bcs"]), study["bcs"]
@@ -273,7 +273,7 @@ class TestTheSceneSolves:
             axis=(0, 2)
         )
 
-        assert scene_shape == (14, 26, 14)
+        assert scene_shape == (20, 26, 12)
         assert blockage[0] == pytest.approx(0.0, abs=1e-12)
         assert blockage[-1] == pytest.approx(0.0, abs=1e-12)
         assert 0.2 < blockage.max() < 0.6
