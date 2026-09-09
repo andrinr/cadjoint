@@ -56,9 +56,23 @@ def _mesh(body, method: str = "tet4"):
     ).build(body)
 
 
+@pytest.fixture(scope="module", autouse=True)
+def _x64():
+    """Double precision for this module only, restored on the way out.
+
+    The finite-difference comparisons below need it.  ``jax_enable_x64`` is
+    process-global, so leaving it on leaks into every module that runs
+    afterwards: every array becomes float64, and the WGSL emitter — which
+    has no 64-bit numeric type — then refuses scenes it should accept.
+    """
+    previous = jax.config.jax_enable_x64
+    jax.config.update("jax_enable_x64", True)
+    yield
+    jax.config.update("jax_enable_x64", previous)
+
+
 @pytest.fixture(scope="module")
 def creased():
-    jax.config.update("jax_enable_x64", True)
     body = _body(0.0)
     return body, _mesh(body)
 
@@ -84,7 +98,6 @@ def test_moving_to_the_design_it_was_built_at_changes_nothing(creased):
 @pytest.mark.parametrize("smoothness", [0.0, 0.06], ids=["hard", "smooth"])
 @pytest.mark.parametrize("parameter", ["r", "s", "o"])
 def test_the_derivative_of_the_motion_is_its_finite_difference(smoothness, parameter):
-    jax.config.update("jax_enable_x64", True)
     body = _body(smoothness)
     mesh = _mesh(body)
     free, _fixed, _meta = extract_parameters(body)
@@ -109,7 +122,6 @@ def test_the_starter_classifies_its_creases_and_holds_its_points():
 
     from cadjoint.viewer.worker.scene import _execute_scene
 
-    jax.config.update("jax_enable_x64", True)
     namespace = _execute_scene(
         Path(__file__).resolve().parents[2].joinpath("scenes", "starter.py").read_text()
     )
