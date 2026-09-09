@@ -97,7 +97,15 @@ print("OK", len(str(shader)), namespace["__studies__"][0].name)
         assert "duct-cooling" in finished.stdout
 
     @pytest.mark.parametrize(
-        "name", ["duct_sink.py", "starter.py", "bracket.py", "end_cap.py", "motor_shield.py"]
+        "name",
+        [
+            "duct_sink.py",
+            "duct_fairing.py",
+            "starter.py",
+            "bracket.py",
+            "end_cap.py",
+            "motor_shield.py",
+        ],
     )
     def test_every_scene_still_compiles(self, name):
         """Not only the new one: a precision leak from any scene would take

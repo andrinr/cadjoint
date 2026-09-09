@@ -101,6 +101,8 @@ from cadjoint.enums import (
     ObjectiveMetricLike,
     OptimizerMethod,
     OptimizerMethodLike,
+    Precision,
+    PrecisionLike,
     StudyKind,
     parse,
     values,
@@ -114,6 +116,8 @@ __all__ = ["Optimization", "OptimizationRun", "capture_optimizations"]
 #: :class:`~cadjoint.enums.GradientPath`.
 METHODS = values(OptimizerMethod)
 METRICS = values(ObjectiveMetric)
+#: The accepted spellings of :class:`~cadjoint.enums.Precision`.
+PRECISIONS = values(Precision)
 #: Study-form design->points derivative paths (see ``Optimization.gradient_path``).
 #: These spellings are the documented, user-facing ones and do not change.
 GRADIENT_PATHS = values(GradientPath)
@@ -401,6 +405,21 @@ class Optimization:
             string spelling — ``"adam"`` (default) or ``"sgd"``
             (keyword-only).  Runs through optax; plain gradient descent
             when optax is missing.
+        precision: A :class:`~cadjoint.enums.Precision` or its plain string
+            spelling, ``"single"`` (default) or ``"double"`` (keyword-only).
+            ``"double"`` holds ``jax_enable_x64`` for the whole of
+            :meth:`run` and restores it afterwards.  An objective whose
+            solver needs float64 needs this, and a scope inside the solver
+            is not enough: :func:`cadjoint.flow.precision.double_precision`
+            covers the *forward* pass, but :func:`jax.grad` runs the
+            transposed pass after that scope has closed, and a float32
+            process cannot then materialise the float64 intermediates the
+            forward built (``lax.dynamic_update_slice requires arguments to
+            have the same dtypes, got float32, float64``).  Declaring it
+            here rather than flipping the flag at a scene's module scope is
+            what keeps the scene itself float32 for the WGSL shader, which
+            has no ``f64`` -- so a scene carrying a flow optimization still
+            opens in the viewer, and the viewer can still run it.
     """
 
     name: str
@@ -416,6 +435,7 @@ class Optimization:
     steps: int = 30
     learning_rate: float = 0.05
     method: OptimizerMethodLike = OptimizerMethod.ADAM
+    precision: PrecisionLike = Precision.SINGLE
 
     def __post_init__(self):
         if not isinstance(self.name, str) or not self.name.strip():
@@ -432,6 +452,11 @@ class Optimization:
         self.learning_rate = float(rate)
         self.method = parse(
             OptimizerMethod, self.method, f"method must be one of: {', '.join(METHODS)}."
+        )
+        self.precision = parse(
+            Precision,
+            self.precision,
+            f"precision must be one of: {', '.join(PRECISIONS)} (got {self.precision!r}).",
         )
         _register(self)
 
@@ -697,9 +722,29 @@ class Optimization:
         count = self.steps if steps is None else steps
         if isinstance(count, bool) or not isinstance(count, int) or count < 1:
             raise ValueError("steps must be a positive integer.")
-        if self.study is not None:
-            return self._run_study(count, callback, scene)
-        return self._run_objective(count, callback)
+        with self._precision():
+            if self.study is not None:
+                return self._run_study(count, callback, scene)
+            return self._run_objective(count, callback)
+
+    @contextmanager
+    def _precision(self) -> Iterator[None]:
+        """Hold ``jax_enable_x64`` for the run when ``precision="double"``.
+
+        The whole loop, not the objective: parameters are read as arrays
+        *before* the first evaluation and the optimizer state carries them
+        between steps, so a narrower scope would leave float32 leaves in the
+        parameter pytree for a float64 gradient to update.  ``"single"``
+        does not touch the flag at all, which is what leaves the default
+        path -- every scene that does not ask for this -- as it was.
+        """
+        if self.precision != Precision.DOUBLE:
+            yield
+            return
+        from cadjoint.flow.precision import double_precision
+
+        with double_precision():
+            yield
 
     def _checked_params(self, target: Any) -> tuple[dict[str, Any], dict[str, Any]]:
         """The target's free parameters as JAX arrays, plus their metadata.

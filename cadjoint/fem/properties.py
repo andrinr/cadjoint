@@ -216,7 +216,12 @@ def sample_cell_property(sdf: Any, points: Any, cells: Any, key: str, *, label: 
 
     material_at = _material_field(sdf)
     centroids = cell_centroids(points, cells)
-    values = jax.vmap(lambda point: jnp.asarray(material_at(point)[key]).reshape(()))(centroids)
+    # Compiled, not mapped bare: an uncompiled vmap over a scene node walks
+    # the whole material tree once per element, dispatching every primitive,
+    # transform and blend on its own — the same trap `edge_hermite_data`
+    # documents.  One jit collapses the sweep to a single dispatch.
+    sample = jax.jit(jax.vmap(lambda point: jnp.asarray(material_at(point)[key]).reshape(())))
+    values = sample(centroids)
     if not _is_traced(values):
         missing = int(np.count_nonzero(np.isnan(np.asarray(values))))
         if missing:

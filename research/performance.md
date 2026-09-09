@@ -2070,6 +2070,294 @@ computation it contains, and the mitigation is the split above.
 
 ---
 
+# 16. The crease placement's hidden cost: `project_table` (2026-09-09)
+
+**The premise this section started from was wrong.** `SimMesh.build()` on
+`scenes/starter.py` had been described as compile-bound. It is not. Measured
+at `a234225` with `benchmarks/jax_compile_profile.py --mode mesh_inspect`, the
+*warm* run dispatched **four** JAX programs and compiled **zero**, and still
+took 58 s — 57.9 s of it in the profiler's `other` column, which is Python and
+eager op-by-op dispatch. Compilation is a third of the cold number and none of
+the warm one.
+
+## 16.1 Where the seconds actually were
+
+Stage timings inside one warm `SimMesh.build()` (monkeypatched wall clock, no
+source edits):
+
+| stage | warm |
+|---|---:|
+| `with_table` → `project_table`, ×4 | **60.04 s** |
+| `sdf_to_tet_mesh` total | 0.74 s |
+| ├ `project_points` (the DC surface) | 0.43 s |
+| ├ `dual_contouring.extract_mesh` | 0.25 s |
+| ├ TetGen `surface_to_tet_mesh` | 0.01 s |
+| └ `tet10_from_tet4` | 0.00 s |
+| `classify` | 0.11 s |
+| `_guard_inversions` | 0.00 s |
+
+The mesher and TetGen together are about 1 % of the build. §15.1 records
+`mesh_inspect` at warm **1.89 s** on 2026-09-05; `with_table` landed on
+2026-09-08 in d33c9b6. The crease-aware placement — which is right, and which
+took the bracket's minimum scaled Jacobian from 1.7e-5 to 0.35 — arrived with a
+34× cost that nothing measured.
+
+## 16.2 The mechanism, isolated
+
+One `project()` call on the largest incidence group (536 points, one field)
+costs **0.96 s cold and 0.97 s warm**. Identical warm and cold is the whole
+diagnosis: this is not compilation. `project` ran its eight Newton steps
+eagerly, and each step re-walked the scene's 1006-node table through the Python
+`_Walker` in `zeroset/evaluate.py`, dispatching every primitive as its own
+one-op XLA program. The starter classifies its 860 surface vertices into 11
+incidence groups (727 points on one surface, 132 on two, 1 on three), and each
+`project_table` call walks the table once per field per group per Newton step —
+about 119 walks — which `with_table`'s fixed point then repeats four times.
+Roughly 400 walks of a 1006-node table, every node its own dispatch.
+
+## 16.3 The fix
+
+Three changes in `cadjoint/zeroset/project.py`, one idea:
+
+1. **One kernel, factored out.** `_system(fields)` and `_iterate(...)` hold the
+   arithmetic that `project` used to inline, so the closure form and the
+   node-table form cannot drift apart.
+2. **The step loop is a `lax.fori_loop`.** A static trip count lowers to a
+   `scan`, which differentiates in both modes, and the traced program holds one
+   sweep instead of eight copies of it.
+3. **`project_table` compiles the whole grouped solve as one program, with the
+   design as a traced argument.** The Python loop over incidence groups is
+   unrolled at trace time, so each group still evaluates only the surfaces its
+   own points lie on — the arithmetic is unchanged — but the table is walked
+   symbolically once instead of once per step per group per dispatch. Because
+   `theta` arrives as an *argument* rather than as a captured constant, the
+   program is keyed on structure alone (`_TABLE_PROGRAMS`, an 8-entry working
+   set that pins its model alive so the `id()` cannot be recycled). The four
+   fixed-point passes in `with_table` share one compile, and so does every
+   optimizer step through `TetMesh.moved`.
+
+`project` itself is jitted fresh per call rather than cached: its `fields` are
+opaque closures, and one may capture either an outer trace's tracers or a scene
+whose parameters are mutated in place between builds — a cached program would
+hold the first as a dead tracer and bake the second in as a stale constant.
+That is the same hazard `diff-brep`'s `refresh._design_functions` documents.
+
+This is the private tier's `_GATHERED_PROGRAMS` lesson — *put nothing
+geometric in the cache key* — applied to the public node table, which is
+already data. Nothing crossed the seam; `cadjoint/zeroset/` is not in it.
+
+Separately, `fem/properties.py::sample_cell_property` mapped the material tree
+over every element centroid with a bare `vmap`, i.e. one eager walk of the CSG
+tree per element on every solve. It is now jitted, the same trap
+`edge_hermite_data` documents in its own comment.
+
+## 16.4 The numbers — the small case first
+
+The whole-scene build is a bad instrument: it takes a minute, it drags TetGen
+and the tet fill's chance behaviour in with it, and on a shared machine it is
+not reproducible. The mechanism needs none of that. **A box met by a sphere —
+87 table nodes, 11 census surfaces, 256 points spread over faces, edges and
+corners, 8 incidence groups of arity 1 to 3 — shows the whole effect in under
+a second**, and shows it identically run to run:
+
+| `project_table`, 256 points, no meshing | first call | each later call |
+|---|---:|---:|
+| a234225 | 1.34 s | **0.353 s** |
+| this branch | 0.33 s | **0.0002 s** |
+
+The second column is the one that matters, and it is why the whole-scene build
+was 60 s. The old code paid 0.35 s on *every* call and never amortised: each
+call re-walked the table eagerly. The new code pays a trace and a compile once
+and then reuses the program at 0.2 ms — about **1 700× on the steady state**.
+`with_table` makes four of these calls per build, and the optimizer makes one
+per step through `TetMesh.moved`, so that is the multiplier that matters.
+Output identical bit for bit, 256 rows of 256 (§16.5).
+
+Measured at load average 2.5-3.5, both arms back to back, and repeatable: the
+later-call figures vary in the last digit only.
+
+**The derivative is preserved, and that is the check that matters most**, since
+the optimizer descends through this projection.
+`tests/fem/test_projection.py` gives 8 passed and 1 failed on *both* revisions,
+and the one failure —
+`TestStarterSurfaceProjection::test_adjoint_agrees_with_finite_differences_off_the_kink`
+— fails with the same numbers on each:
+
+| `fin_depth = 1.18` | adjoint | central difference |
+|---|---:|---:|
+| a234225 | 118.58440783606784 | 122.98187576618602 |
+| this branch | 118.58440779833472 | 122.98187576675446 |
+
+Ten significant figures of agreement between the revisions, on a reverse-mode
+derivative taken through the whole starter projection. The 3.7 % gap to the
+finite difference is pre-existing and is the known kink: a ±1e-4 probe in
+`fin_depth` moves a crease vertex across one of the Newton guards, so the
+difference quotient reads a jump. The test's docstring claims relative errors
+below 3e-5, which is no longer true of this scene at this design point,
+independently of anything here.
+
+### Corroboration on the whole scene
+
+`benchmarks/jax_compile_profile.py --repeat 2`, `scenes/starter.py`, fresh cache
+directory per arm, both arms back to back in one load window. **Contended: the
+machine carried load average 8-10 throughout** — the `diff-brep` benchmark, a
+`duct_fairing` run at ~380 % CPU and two pytest sessions. Absolutes are
+inflated; the ratios are fair because the arms are adjacent.
+
+| mode | | cold | warm | XLA cold | other (warm) |
+|---|---|---:|---:|---:|---:|
+| `mesh_inspect` | a234225 | 88.44 s | 58.04 s | 25.98 s / 1122 progs | 57.88 s |
+| | this branch | **14.12 s** | **4.39 s** | 10.41 s / 250 progs | **0.47 s** |
+| `simulate` | a234225 | 103.04 s | 59.80 s | 39.33 s / 1451 progs | 59.62 s |
+| | this branch | **20.77 s** | **4.83 s** | 15.65 s / 487 progs | **0.60 s** |
+
+6.3× cold and 13.2× warm on `mesh_inspect`; 5.0× and 12.4× on `simulate`. The
+`other` column — the eager-dispatch storm — falls by two orders of magnitude,
+which is the change; the compile column falls with it only because a compiled
+program replaces the thousand one-op programs eager dispatch used to emit.
+
+## 16.5 What it costs the mesh, stated honestly
+
+First, what does *not* change. On a small case with no meshing in it — a box
+met by a sphere, 87 table nodes, 256 points spread over faces, edges and
+corners, 8 incidence groups of arity 1 to 3 — `project_table` before and after
+agrees **bit for bit, 256 rows of 256, maximum absolute difference 0.0**. The
+arithmetic is preserved exactly; `lax.fori_loop` and `jit` did not move it.
+
+What does change is the *single-field* projection on a large tree. Running
+`project_points` over 2 000 points against the starter's `thermal_body`, the
+two revisions agree bit for bit on **1 702 of 2 000** points and differ by up
+to 1.7e-4 on the remaining 298 — four orders of magnitude more than float32
+round-off, so this is not fusion noise. It is the Newton iteration's *discrete*
+guards: `transversal`, the per-iteration `usable` test and `isfinite(step)` are
+comparisons, and near a crease — where the gradient is a dead subgradient and
+two faces are both candidates — a last-bit difference flips one, after which
+the point steps toward a different face and lands a step away. That is the same
+non-smoothness `research/cutfem` measured from the other side (AD 11-13 % off
+its own FD at 136 of 860 starter surface vertices), and it is exactly what the
+incidence-aware `project_table` exists to remove.
+
+So the DC surface handed to TetGen moves at a few hundred of its vertices,
+TetGen inserts Steiner points differently, and the mesh is *not* identical to
+the one `a234225` builds:
+
+| `scenes/starter.py` | | nodes | crease vertices | radius ratio min / mean | aspect min / mean |
+|---|---|---:|---:|---:|---:|
+| float32 (what the viewer runs) | a234225 | 5 793 | 48 | 0.0348 / 0.6779 | 1.147 / 1.976 |
+| | this branch | 5 741 | 92 | **0.1340** / 0.6777 | 1.159 / 1.997 |
+| float64 | a234225 | 5 955 | 6 | 0.0417 / 0.6728 | 1.104 / 1.987 |
+| | this branch | 5 921 | 6 | **0.0291** / 0.6795 | 1.142 / 1.972 |
+
+Node counts move under 1 %, and the *mean* metrics are unchanged to a few
+parts in a thousand. The worst element moves in **both directions** — 3.9×
+better in float32, 30 % worse in float64 — which is the honest reading: this
+is not a quality change, it is TetGen's fill responding to a perturbation, and
+the worst element on this scene is extremely sensitive to it. The size of that
+sensitivity is measurable independently: flipping only `jax_enable_x64`, with
+no code change at all, already swings the raw pre-placement minimum radius
+ratio 4.6× (0.134 against 0.029). Both arms above sit inside that band.
+
+Three consequences worth holding onto. First, no minimum-quality claim about
+this scene means anything at one significant figure — a benchmark that watches
+`radius_ratio.min()` on the starter is watching noise. Second,
+`_guard_inversions` still guarantees what it always guaranteed: no element is
+worse after the crease placement than it was in the raw fill, whichever fill
+that turned out to be. Third, and the useful one: the reason the mesh moves at
+all is a *known defect*, not this change. Any edit that perturbs the last bits
+anywhere upstream of `project_points` will reshuffle the crease vertices the
+single-field Newton cannot decide, and therefore the fill. Putting the DC
+surface projection on the incidence-aware kernel — the thing `project_table`
+already does for the volume mesh's boundary nodes — would make the extraction
+reproducible as well as faster, and is the obvious next piece of work.
+
+## 16.6 What this does *not* fix
+
+The solve itself was never the cost and still is not: §4 measures the linear
+solve at 47 ms, 2.4 % of a warm `simulate`. The remaining large item is
+§4.1's — a novel design changes the node count, so jax-fem's assembly kernels
+are compiled for a shape that will never recur (28-30 s of a 31-77 s cold
+request). The fix for that is shape stability, not a faster solver: pad the
+mesh onto a rung ladder the way `diff-brep`'s `run_chunked` pads its batches
+(`_RUNGS = (256, 1024)`, padding by repeating the first row). That is a
+meshing-side change and is not attempted here.
+
+## 16.7 Reproducing
+
+Prefer the small case. `tests/zeroset/test_project.py::test_the_table_solve_is_
+compiled_once_and_reused` is the same experiment as an assertion; to see the
+seconds, lower a `Union(Box, Translate(Sphere))`, classify a few hundred points
+over its faces and edges, and time four successive `project_table` calls. The
+first is trace-plus-compile, the rest are the steady state, and the ratio
+between the two revisions is the whole result. It runs in a second and does not
+care what else the machine is doing.
+
+The whole-scene corroboration is
+
+    python benchmarks/jax_compile_profile.py --scene scenes/starter.py \
+        --mode mesh_inspect --repeat 2
+
+with `CADJOINT_CACHE_DIR` pointed at an empty directory for the cold number and
+the same directory for the warm one. Check `uptime` first: on a loaded machine
+every number above roughly doubles.
+
+## 16.8 A finding that fell out of the same instrumentation: the 48-vs-6 creases
+
+`tests/fem/test_crease_motion.py::test_the_starter_classifies_its_creases_and_holds_its_points`
+asserts more than 50 crease vertices on the starter and fails, and the standing
+description of the failure was that crease *detection* collapses when the
+precision improves — 48 in float32, 6 in float64. Detection is not what
+collapses. Counting at each stage of the pipeline separately:
+
+| | float32 | float64 |
+|---|---:|---:|
+| detected by `classify` | 133 | 124 |
+| surviving `_guard_inversions` (what `mesh.incidence` holds) | 92 | **6** |
+| crease vertices the guard reverted | 41 of 133 | **118 of 124** |
+| elements in the raw mesh | 2 962 | 3 104 |
+| raw minimum radius ratio | 0.134 | **0.029** |
+| elements the placement would degrade | 222 of 2 962 | 1 327 of 3 104 |
+
+Detection is stable — 133 against 124. What differs is *survival*. Turning on
+x64 changes the dual-contour crossings, which changes what TetGen fills: a
+different mesh, 142 elements larger, whose worst raw element is 4.6× worse.
+`_guard_inversions` reverts any vertex whose incident element's metric would
+drop *at all*, and on the sliver-laden float64 mesh that catches 1 327
+elements, so it reverts 95 % of the crease placements.
+
+So the number the test asserts on is mesh-generation luck read through a very
+strict guard, not classifier quality. Asserting on `classify`'s own output
+would measure what the test says it measures; the guard's revert rate is a
+separate and useful thing to watch, because a mesh that provokes it this hard
+is telling you the raw tet fill has slivers.
+
+The test now asserts on `classify` and that assertion passes: 124 crease
+vertices in x64, on `a234225` and on this branch alike.
+
+**It still fails, for a second and unrelated reason, and that reason is worth
+its own line.** `moved` at the design the mesh was built at does not reproduce
+`mesh.points` — it differs by up to **9.756e-06 at 2 884 of 5 955 nodes**. The
+mesh is not a fixed point of its own motion. The cause is that
+`_guard_inversions` reverts a vertex's *position* while still handing it a
+surface to follow (`row[:1]`), so `moved` re-projects it onto that census
+surface, which is not where the raw dual-contour projection had put it. Every
+number here is identical on `a234225` and on this branch — 124 / 6 /
+9.756e-06 / 3.171e-08 — so it is pre-existing and independent of the
+compilation work:
+
+| x64, `scenes/starter.py` | a234225 | this branch |
+|---|---:|---:|
+| `classify` crease vertices | 124 | 124 |
+| post-guard `mesh.incidence` | 6 | 6 |
+| `moved` vs `mesh.points`, max | 9.756e-06 | 9.756e-06 |
+| nodes over the 1e-8 tolerance | 2 884 of 5 955 | 2 870 of 5 921 |
+| \|f\| on the moved surface, max | 3.171e-08 | 3.171e-08 |
+
+Fixing it means making the guard and `moved` agree — either the guard also
+drops the reverted vertex's surface, which costs that vertex its design
+derivative, or the placement is re-solved so the guarded positions are
+themselves a fixed point. That is a decision about the crease placement, not
+about speed, so it is left here rather than taken.
+
 # 17. The other eager maps: the lattice edge overlay (2026-09-09)
 
 §16 compiled the projection over the node table, which is what a *Gmsh* mesh
