@@ -309,6 +309,23 @@ def _guard_inversions(
     on: an element whose metric would drop has the vertices that moved in
     it put back.  A reverted vertex keeps its position and the single
     surface nearest it, so it moves exactly as it did before.
+
+    **How many vertices this reverts is a property of the tet fill, not of
+    the classifier — and it is worth reading before you believe a crease
+    count.**  Because the test is "no element gets worse *at all*", a mesh
+    with slivers in it trips the guard everywhere.  Measured on
+    ``scenes/starter.py`` (``research/performance.md`` §16.8): in float32
+    :func:`~cadjoint.zeroset.project.classify` finds 133 crease vertices and
+    this reverts 41 of them, leaving 92; in float64 it finds 124 — the same
+    answer, so detection is stable — and this reverts **118**, leaving 6.
+    The difference is not precision reaching the classifier.  Enabling x64
+    moves the dual-contour crossings, TetGen fills the surface differently,
+    and the resulting mesh's worst raw element is 4.6x worse (minimum radius
+    ratio 0.134 against 0.029); on that mesh the placement would degrade
+    1327 of 3104 elements instead of 222 of 2962, so the guard takes almost
+    all of it back.  A high revert rate is therefore a sliver alarm about
+    the fill upstream, and a crease count taken *after* this function is
+    measuring the mesher's luck as much as the geometry.
     """
     from cadjoint.fem.quality import scaled_jacobians, tet_radius_ratios
 

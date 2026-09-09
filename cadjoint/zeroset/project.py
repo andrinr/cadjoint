@@ -20,6 +20,7 @@ stray point from leaving its basin, the same clamp the meshes always had.
 
 from __future__ import annotations
 
+from collections import OrderedDict
 from collections.abc import Callable, Sequence
 from typing import Any
 
@@ -62,13 +63,42 @@ def project(
 
     if not 1 <= len(fields) <= 3:
         raise ValueError(f"a point lies on one to three surfaces, not {len(fields)}")
+    system = _system(fields)
+
+    def run(start):
+        return _iterate(system, start, len(fields), steps, max_step, transversality)
+
+    # One compiled program, not the nine eager walks of the field this used
+    # to dispatch primitive by primitive (one per Newton step plus the
+    # transversality probe).  Fresh per call rather than cached: `fields`
+    # are opaque closures, and one may capture either an outer trace's
+    # tracers or a scene whose parameters are mutated in place between
+    # calls — a cached program would hold the first as a dead tracer and
+    # bake the second in as a stale constant.  `project_table`, the caller
+    # that runs this in a loop, takes the design as an *argument* and so
+    # can and does cache its program (:func:`_table_program`).
+    return jax.jit(run)(jnp.asarray(points))
+
+
+def _system(fields: Sequence[Callable[[Any], Any]]) -> Callable[[Any], Any]:
+    """``x -> (values, jacobian, gram)`` for the fields at every point.
+
+    Args:
+        fields: One to three scalar fields, each callable on a ``(3,)``
+            point; they are ``vmap``-ed here.
+
+    Returns:
+        A callable taking ``(N, 3)`` points to ``values`` ``(N, k)``,
+            ``jacobian`` ``(N, k, 3)`` whose rows are the field gradients,
+            and ``gram`` ``(N, k, k)``.
+    """
+    import jax
+    import jax.numpy as jnp
+
     evaluators = [
         jax.vmap(jax.value_and_grad(lambda p, f=field: jnp.asarray(f(p)).reshape(())))
         for field in fields
     ]
-    count = len(fields)
-    start = jnp.asarray(points)
-    eye = jnp.eye(count, dtype=start.dtype)
 
     def system(x):
         values, gradients = zip(*(evaluate(x) for evaluate in evaluators))
@@ -76,6 +106,42 @@ def project(
         gram = jnp.einsum("nij,nkj->nik", jacobian, jacobian)
         return jnp.stack(values, axis=-1), jacobian, gram
 
+    return system
+
+
+def _iterate(
+    system: Callable[[Any], Any],
+    start: Any,
+    count: int,
+    steps: int,
+    max_step: float | None,
+    transversality: float,
+) -> Any:
+    """The Newton iteration itself — the one kernel, traced once.
+
+    Split out of :func:`project` so the closure form and the node-table
+    form (:func:`project_table`) run the *same* arithmetic rather than two
+    copies that could drift apart.  The sweep is a
+    :func:`jax.lax.fori_loop` with a static trip count, so the traced
+    program holds one body instead of ``steps`` copies of it; a static
+    count lowers to a ``scan``, which differentiates in both modes.
+
+    Args:
+        system: ``x -> (values, jacobian, gram)``, from :func:`_system`.
+        start: Starting positions, ``(N, 3)``.
+        count: Number of fields ``k`` (their Gram is ``(N, k, k)``).
+        steps: Newton iterations.
+        max_step: Total displacement clamp per point, or None for none.
+        transversality: Refusal threshold on the smallest Gram eigenvalue.
+
+    Returns:
+        The projected points, ``(N, 3)``; a refused point is returned
+            where it started.
+    """
+    import jax
+    import jax.numpy as jnp
+
+    eye = jnp.eye(count, dtype=start.dtype)
     _, _, gram0 = system(start)
     trace0 = jnp.trace(gram0, axis1=-2, axis2=-1)
     if count == 1:
@@ -84,8 +150,8 @@ def project(
         transversal = jnp.linalg.eigvalsh(jax.lax.stop_gradient(gram0))[..., 0] > (
             transversality * trace0 / count
         )
-    x = start
-    for _ in range(steps):
+
+    def sweep(_iteration, x):
         residual, jacobian, gram = system(x)
         trace = jnp.trace(gram, axis1=-2, axis2=-1)
         # Relative regularisation: a unit-gradient Gram entry is O(1), and
@@ -106,6 +172,9 @@ def project(
                 jnp.maximum(jnp.sum(displacement * displacement, axis=-1, keepdims=True), 1e-24)
             )
             x = start + displacement * jnp.minimum(1.0, max_step / length)
+        return x
+
+    x = jax.lax.fori_loop(0, steps, sweep, start)
     return jnp.where(transversal[:, None], x, start)
 
 
@@ -165,17 +234,74 @@ def project_table(
     """
     import jax.numpy as jnp
 
+    groups = tuple((key, rows) for key, rows in group_by_incidence(incidence).items() if key)
+    program = _table_program(model, groups, steps, max_step)
+    return program(jnp.asarray(theta), jnp.asarray(points))
+
+
+#: Compiled :func:`project_table` programs, newest last.  Small: an entry
+#: pins its model alive (see :func:`_table_program`), and a scene edit
+#: lowers a new one, so this is a working set and not a registry.
+_TABLE_PROGRAMS: OrderedDict[tuple, tuple[Any, Any]] = OrderedDict()
+_TABLE_PROGRAMS_LIMIT = 8
+
+
+def _table_program(
+    model: Any, groups: tuple, steps: int, max_step: float | None
+) -> Callable[[Any, Any], Any]:
+    """The compiled ``(theta, points) -> points`` solve for one incidence structure.
+
+    The whole grouped solve is *one* program: the loop over incidence
+    groups is unrolled at trace time, so each group still evaluates only
+    the surfaces its own points lie on (the arithmetic is exactly what the
+    ungrouped loop did), but the node table is walked symbolically once
+    instead of once per Newton iteration per group per dispatch.
+
+    The design arrives as an **argument**, not as a captured constant, so
+    the program is keyed on structure alone and every design reuses it —
+    which is what makes :meth:`~cadjoint.fem.tetmesh.TetMesh.moved` cheap
+    inside an optimizer, and what lets the four fixed-point passes in
+    :func:`~cadjoint.fem.hexmesh.with_table` share one compile.
+
+    Args:
+        model: A :class:`~cadjoint.zeroset.table.Model`.
+        groups: ``((surface ids, point rows), ...)``, non-empty keys only.
+        steps: Newton iterations.
+        max_step: Total displacement clamp per point, or None for none.
+
+    Returns:
+        A jitted ``(theta, points) -> points`` callable.
+    """
+    import jax
+    import jax.numpy as jnp
+
     from cadjoint.zeroset.evaluate import surfaces
 
+    for ids, _rows in groups:
+        if not 1 <= len(ids) <= 3:
+            raise ValueError(f"a point lies on one to three surfaces, not {len(ids)}")
+    key = (id(model), tuple((ids, rows.tobytes()) for ids, rows in groups), steps, max_step)
+    cached = _TABLE_PROGRAMS.get(key)
+    # The model is held in the entry, so its id cannot have been recycled
+    # under us; the identity check is the belt to that braces.
+    if cached is not None and cached[0] is model:
+        _TABLE_PROGRAMS.move_to_end(key)
+        return cached[1]
     fields = [field for _, field in surfaces(model)]
-    theta = jnp.asarray(theta)
-    x = jnp.asarray(points)
-    for key, rows in group_by_incidence(incidence).items():
-        if not key:
-            continue
-        per_point = [lambda p, f=fields[s]: f(theta, p[None])[0] for s in key]
-        x = x.at[jnp.asarray(rows)].set(project(per_point, x[rows], steps=steps, max_step=max_step))
-    return x
+
+    def solve(theta, points):
+        x = points
+        for ids, rows in groups:
+            system = _system([lambda p, f=fields[s]: f(theta, p[None])[0] for s in ids])
+            index = jnp.asarray(rows)
+            x = x.at[index].set(_iterate(system, x[index], len(ids), steps, max_step, 1e-2))
+        return x
+
+    program = jax.jit(solve)
+    _TABLE_PROGRAMS[key] = (model, program)
+    while len(_TABLE_PROGRAMS) > _TABLE_PROGRAMS_LIMIT:
+        _TABLE_PROGRAMS.popitem(last=False)
+    return program
 
 
 def classify(
