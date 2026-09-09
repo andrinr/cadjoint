@@ -269,6 +269,65 @@ boundary nodes. `Nodes.side` and `Nodes.predicate` are refused with the
 alternative named. A region thinner than a cell falls between centres, and that
 is refused too rather than silently ignored.
 
+## Immersed shape optimization
+
+A derivative is not a design change. `scenes/duct_fairing.py` is the smallest
+scene that closes the loop: one blunt body immersed in a duct, the pressure
+drop off the converged flow as the objective, and a declared `Optimization`
+descending on it.
+
+```python
+streamline = Optimization(
+    name="streamline",
+    objective=streamlining_cost,   # dp / dp_ref + 6 (V/V_ref - 1)^2
+    of=fairing,                    # the box's free half-extents
+    steps=16, learning_rate=0.005, method="adam",
+    precision="double",            # see below — it is load bearing
+)
+```
+
+**The second term is the whole design problem.** Pressure drop alone is
+minimized by deleting the obstacle, so the volume is held and what is left to
+optimize is the shape at fixed material. In a duct the pressure drop is
+dominated by blockage, so at constant volume the descent trades frontal area
+for length — which is streamlining, and it is already visible in the gradient
+before a single step is taken: at the starting box the adjoint gives
+`d(dp)/d(half-width) = +5.709e-2` across the flow against `+1.242e-2` along it.
+Both are positive, but growing across the flow costs 4.6× as much, and the
+volume constraint turns that ratio into a direction.
+
+Sixteen steps, about two and a half minutes on a laptop CPU:
+
+```
+aspect (y/x)  0.750 -> 1.011      frontal area  0.16000 -> 0.13277
+volume        0.04800 -> 0.04892  pressure drop 4.597e-3 -> 2.684e-3
+```
+
+**And the gain is shape, not shrinkage.** The volume drifts 1.9%, which is
+enough to muddy a 42% claim, so the scene ends by solving one more design: the
+*start* box scaled isotropically to the volume the descent finished with. That
+costs `4.706e-3` against `2.684e-3` for the optimized shape at the identical
+volume — a 43% reduction attributable to proportions alone.
+
+**Verify the gradient before trusting the descent.** A wrong gradient often
+descends too, just to the wrong place, and the loss curve does not reveal it.
+`main()` re-runs the check every time and asserts what makes it meaningful: the
+relative error against a central difference falls by about 100× when the step
+size falls by 10×, which is the second-order convergence a central difference
+has on a smooth objective — and which the `"smootherstep"` solid-fraction
+profile exists to preserve. Agreement at a single step size only proves the
+truncation error happened to be small.
+
+**`precision="double"` is not decoration.** `FlowStudy.solve` scopes
+`jax_enable_x64` around its own forward pass, but `jax.grad` runs the
+transposed pass *after* that scope has closed, and a float32 process cannot
+then materialize the float64 intermediates the forward built — the descent dies
+with `lax.dynamic_update_slice requires arguments to have the same dtypes, got
+float32, float64`. Declaring the precision on the optimization holds the flag
+for the whole loop and restores it afterwards, which is what lets the scene
+itself stay float32 for the WGSL shader: it still opens in the viewer, and the
+viewer can still run the descent.
+
 ## As a plugin
 
 The solver ships as `flow_brinkman`, a [plugin](plugins.qmd) of kind
@@ -303,10 +362,12 @@ airflow, against the pressure drop the fan has to pay — is now available from 
 single `FlowStudy`, and both terms are needed: on `scenes/duct_sink.py` the
 sink costs 11.7× the empty duct's pressure drop while holding the die 0.430
 above inlet air, and thickening a fin moves those two the opposite way. Without
-the pressure term an optimizer walks straight into a solid block.
+the pressure term an optimizer walks straight into a solid block — and there is
+now an optimizer to walk it, in `scenes/duct_fairing.py` above.
 
-What is left is speed and turbulence. Neither is a small job, and §8.9 of the
-note says which answers each one would change.
+What is left is speed and turbulence, and — on the optimization side — a design
+space wider than a handful of primitive dimensions. Neither of the first two is
+a small job, and §8.9 of the note says which answers each one would change.
 
 ## Further reading
 
