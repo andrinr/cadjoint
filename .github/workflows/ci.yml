@@ -22,9 +22,15 @@ jobs:
           pip install -e ".[dev]" --no-deps
           pip install pytest scikit-image matplotlib optax optimistix pydantic
 
+      # The fast loop only. The `slow` marker is on the tests that take
+      # minutes each because they extract a real mesh, run a real solve or a
+      # real descent (tests/conftest.py). They are what makes the suite worth
+      # running, but not on every push: with them in, this job runs for hours
+      # and nobody waits for it, which is how the suite came to be broken for
+      # weeks without anyone noticing. `nightly.yml` runs everything.
       - name: Run tests
         run: |
-          pytest tests/ -q
+          pytest tests/ -q -m "not slow"
 
   lint:
     runs-on: ubuntu-latest

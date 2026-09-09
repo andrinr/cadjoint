@@ -56,9 +56,23 @@ def _mesh(body, method: str = "tet4"):
     ).build(body)
 
 
+@pytest.fixture(scope="module", autouse=True)
+def _x64():
+    """Double precision for this module only, restored on the way out.
+
+    The finite-difference comparisons below need it.  ``jax_enable_x64`` is
+    process-global, so leaving it on leaks into every module that runs
+    afterwards: every array becomes float64, and the WGSL emitter — which
+    has no 64-bit numeric type — then refuses scenes it should accept.
+    """
+    previous = jax.config.jax_enable_x64
+    jax.config.update("jax_enable_x64", True)
+    yield
+    jax.config.update("jax_enable_x64", previous)
+
+
 @pytest.fixture(scope="module")
 def creased():
-    jax.config.update("jax_enable_x64", True)
     body = _body(0.0)
     return body, _mesh(body)
 
@@ -84,7 +98,6 @@ def test_moving_to_the_design_it_was_built_at_changes_nothing(creased):
 @pytest.mark.parametrize("smoothness", [0.0, 0.06], ids=["hard", "smooth"])
 @pytest.mark.parametrize("parameter", ["r", "s", "o"])
 def test_the_derivative_of_the_motion_is_its_finite_difference(smoothness, parameter):
-    jax.config.update("jax_enable_x64", True)
     body = _body(smoothness)
     mesh = _mesh(body)
     free, _fixed, _meta = extract_parameters(body)
@@ -104,18 +117,53 @@ def test_the_derivative_of_the_motion_is_its_finite_difference(smoothness, param
 
 
 def test_the_starter_classifies_its_creases_and_holds_its_points():
-    """The scene the finding came from: polygons, extrusions, a smooth union."""
+    """The scene the finding came from: polygons, extrusions, a smooth union.
+
+    The crease count is asserted on :func:`~cadjoint.zeroset.project.classify`,
+    which is what this test's name claims to measure, and *not* on
+    ``mesh.incidence``.  Those are different numbers, and the difference is
+    what made this test look broken: ``incidence`` is post-guard, and
+    :func:`~cadjoint.fem.hexmesh._guard_inversions` reverts a vertex whenever
+    its placement would cost any incident element any quality at all.  On this
+    scene, in float64, that reverts 118 of 124 — not because detection failed
+    (float32 finds 133, float64 124: the same answer) but because enabling x64
+    moves the dual-contour crossings, TetGen fills the surface differently, and
+    the resulting fill's worst raw element is 4.6x worse, so the guard has far
+    more to object to.  Asserting on the post-guard count measures the tet
+    fill's luck; asserting on ``classify`` measures the classifier.
+    ``research/performance.md`` §16.8 has the numbers, and
+    ``_guard_inversions`` carries the mechanism in its own docstring.
+
+    **A second, unrelated defect also fails this test, and it is not the
+    creases.**  ``moved`` at the design the mesh was built at does not
+    reproduce ``mesh.points``: it differs by up to 9.756e-06 at 2 884 of
+    5 955 nodes.  The cause is that :func:`_guard_inversions` reverts a
+    vertex's *position* but leaves it a surface to follow (``row[:1]``), so
+    :meth:`~cadjoint.fem.tetmesh.TetMesh.moved` re-projects it onto that
+    census surface — which is not where the raw dual-contour projection put
+    it.  The mesh is therefore not a fixed point of its own motion, which is
+    what the ``atol=1e-8`` below is checking.  Measured identical on
+    ``a234225`` and on the branch that made this projection compiled
+    (9.756e-06 either way), so it is pre-existing and independent; fixing it
+    means making the guard and ``moved`` agree, not touching the classifier.
+    """
     from pathlib import Path
 
     from cadjoint.viewer.worker.scene import _execute_scene
+    from cadjoint.zeroset.project import classify
 
-    jax.config.update("jax_enable_x64", True)
     namespace = _execute_scene(
         Path(__file__).resolve().parents[2].joinpath("scenes", "starter.py").read_text()
     )
     body, mesh = namespace["thermal_body"], namespace["sink_mesh"].build(namespace["thermal_body"])
     assert mesh.table is not None
-    assert sum(1 for row in mesh.incidence if len(row) >= 2) > 50, "the fin comb's edges"
+    detected = classify(
+        mesh.table,
+        jnp.asarray(mesh.table.theta),
+        np.asarray(mesh.points)[: mesh.num_surface],
+        tolerance=0.05 * min(mesh.grid.spacing),
+    )
+    assert sum(1 for row in detected if len(row) >= 2) > 50, "the fin comb's edges"
     free, _fixed, _meta = extract_parameters(body)
     params = {name: jnp.asarray(value, dtype=float) for name, value in free.items()}
     moved = np.asarray(mesh.moved(None, design=(body, params)))

@@ -41,14 +41,25 @@ _MAX_BYTES = 2 * 1024**3
 #: model programs; a scene compiles as hundreds of sub-second programs whose
 #: aggregate is the cost, so a per-program threshold would skip all of them.
 #:
-#: That reasoning holds for one process at a time.  Every entry is written
-#: under a single lockfile in the cache directory, so concurrent sessions
-#: serialise on it, and a write that loses the race is abandoned rather than
-#: retried — the entry never lands, the next process recompiles it, and the
-#: cache stops converging while still charging for the lock.  Raise the floor
-#: with ``CADJOINT_CACHE_MIN_COMPILE_SECONDS`` to keep the trivial eager
-#: primitives out of it; :mod:`benchmarks.jax_compile_profile` is how to tell
-#: whether that trade is worth taking on a given machine.
+#: **A claim that was made here and then measured false.**  Entries are
+#: written under one lockfile in the cache directory, and under several
+#: concurrent sessions JAX does sometimes report abandoning a write:
+#: "Error writing persistent compilation cache entry ... the file lock could
+#: not be acquired".  It is tempting to conclude that concurrent sessions
+#: serialise on it, that abandoned entries never land, and that the cache
+#: stops converging.  Measured, none of that holds.  Eight concurrent pytest
+#: sessions against this cache at 135,674 entries finished in 6.9 s against
+#: 11.2 s for the same eight given private caches, with zero lock timeouts —
+#: the shared cache is faster, because it is a cache and it hits.  A separate
+#: run at five-way concurrency into one fresh directory landed every entry a
+#: private directory landed, at the same speed.  Sessions competing for CPU
+#: is what makes a run slow; this is not it.
+#:
+#: ``CADJOINT_CACHE_MIN_COMPILE_SECONDS`` raises the floor anyway, as an
+#: escape hatch for a machine where the lock does contend (JAX's own default
+#: floor is 1 s, so the knob is not exotic).  It is not a fix for a
+#: demonstrated problem, and :mod:`benchmarks.jax_compile_profile` is how to
+#: find out whether you have one before reaching for it.
 _MIN_COMPILE_SECONDS = 0.0
 
 #: Environment override for the floor above.

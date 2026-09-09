@@ -105,6 +105,66 @@ class TestValidation:
         with pytest.raises(ValueError, match="method"):
             Optimization("o", _quadratic, _ball(), method="newton")
 
+    def test_rejects_an_unknown_precision(self):
+        with pytest.raises(ValueError, match="precision"):
+            Optimization("o", _quadratic, _ball(), precision="float128")
+
+
+class TestPrecision:
+    """``precision="double"`` holds ``jax_enable_x64`` for the whole descent.
+
+    The option exists because a solver's own scope cannot cover a gradient:
+    :func:`jax.grad` runs the transposed pass after the forward call has
+    returned, so a flow objective differentiated from a float32 process dies
+    on dtypes it cannot reconcile.  What is asserted here is only the flag's
+    lifetime, which is the part that has nothing to do with any solver --
+    ``tests/flow/test_fairing_scene.py`` is where a real float64 solve rides
+    on it.
+    """
+
+    @staticmethod
+    def _recording_objective(seen: list[bool]):
+        import jax
+
+        def objective(params):
+            seen.append(jax.config.jax_enable_x64)
+            return _quadratic(params)
+
+        return objective
+
+    def test_single_precision_leaves_the_flag_where_it_found_it(self):
+        import jax
+
+        ambient = jax.config.jax_enable_x64
+        seen: list[bool] = []
+
+        Optimization("o", self._recording_objective(seen), _ball(), steps=2).run()
+
+        assert seen and all(flag is ambient for flag in seen)
+        assert jax.config.jax_enable_x64 is ambient
+
+    def test_double_precision_holds_x64_for_the_run_and_restores_it(self):
+        import jax
+
+        ambient = jax.config.jax_enable_x64
+        seen: list[bool] = []
+
+        run = Optimization(
+            "o", self._recording_objective(seen), _ball(), steps=2, precision="double"
+        ).run()
+
+        assert seen and all(flag is True for flag in seen)
+        assert jax.config.jax_enable_x64 is ambient
+        assert run.history[-1]["objective"] < run.history[0]["objective"]
+
+    def test_the_declared_precision_is_normalised_to_the_enum(self):
+        from cadjoint.enums import Precision
+
+        assert Optimization("o", _quadratic, _ball()).precision is Precision.SINGLE
+        assert (
+            Optimization("o", _quadratic, _ball(), precision="double").precision is Precision.DOUBLE
+        )
+
 
 class TestDescribe:
     def test_reports_the_declaration_for_the_viewer(self):

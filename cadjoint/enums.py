@@ -69,6 +69,8 @@ __all__ = [
     "PluginKindLike",
     "PluginTransport",
     "PluginTransportLike",
+    "Precision",
+    "PrecisionLike",
     "Side",
     "SideLike",
     "STUDY_KIND_BOUNDARY_CONDITIONS",
@@ -354,6 +356,29 @@ class OptimizerMethod(Option):
 
 OptimizerMethodLike = OptimizerMethod | Literal["adam", "sgd"]
 """An optimizer method, or the plain string spelling of one."""
+
+
+class Precision(Option):
+    """The floating-point width a descent runs in.
+
+    A property of the *run*, not of the objective: a solver may scope
+    double precision around its own forward pass
+    (:func:`cadjoint.flow.precision.double_precision` does), but
+    :func:`jax.grad` runs the transposed pass after that scope has closed,
+    so the flag has to be held for the whole loop or the backward pass
+    meets float64 intermediates it cannot materialise.  Declaring it on the
+    optimization rather than at a scene's module scope is what keeps the
+    scene float32 for the WGSL shader, which has no ``f64``.
+    """
+
+    SINGLE = "single"
+    """Whatever the process is already in (the default)."""
+    DOUBLE = "double"
+    """``jax_enable_x64`` for the duration of the run, restored after."""
+
+
+PrecisionLike = Precision | Literal["single", "double"]
+"""A run precision, or the plain string spelling of one."""
 
 
 class OptimizationArgument(Option):

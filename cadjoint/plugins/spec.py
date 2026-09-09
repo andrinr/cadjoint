@@ -266,9 +266,10 @@ class PluginSpec:
         """Make the ``Tesseract.from_*`` call this spec names, or the import.
 
         Returns:
-            ``(component, spawned)`` — the ``tesseract_core.Tesseract`` (or,
-            for the ``python`` transport, the imported object) and whether
-            this call started a container the caller must tear down.
+            component: The ``tesseract_core.Tesseract``, or for the
+                ``python`` transport the imported object.
+            spawned: Whether this call started a container the caller must
+                tear down.
 
         Raises:
             ImportError: Without the ``tesseract`` extra (Tesseract

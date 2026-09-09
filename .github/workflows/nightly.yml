@@ -1,0 +1,36 @@
+name: nightly
+
+# Everything, including the tests marked `slow` — the real mesh extractions,
+# solves and descents that CI's per-push job leaves out. Those are the tests
+# that would actually catch a regression in the mesher or the solver, so they
+# have to run somewhere; they just must not run where someone is waiting.
+#
+# Give it a long timeout and expect to use it: the full suite is hours, not
+# minutes, and that is the reason the per-push job is filtered rather than a
+# problem to be papered over here.
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+jobs:
+  full:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install "jax[cpu]>=0.4.20"
+          pip install -e ".[dev]" --no-deps
+          pip install pytest scikit-image matplotlib optax optimistix pydantic
+
+      - name: Run the whole suite
+        run: |
+          pytest tests/ -q --durations=40
