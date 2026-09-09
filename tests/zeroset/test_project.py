@@ -103,3 +103,33 @@ def test_a_sphere_in_a_table_matches_the_plain_kernel():
     via_table = np.asarray(project_table(model, jnp.asarray(model.theta), seeds, [[0]] * 16))
     plain = np.asarray(project([_sphere([0, 0, 0], 0.6)], seeds))
     np.testing.assert_allclose(via_table, plain, atol=1e-9)
+
+
+def test_the_table_solve_is_compiled_once_and_reused():
+    """One program per incidence structure, and a second design reuses it.
+
+    The projection used to walk the node table eagerly — once per Newton step,
+    per incidence group, per call — which is what made a whole mesh build cost
+    a minute (``research/performance.md`` §16).  The fix is a compiled program
+    keyed on structure alone, and the property that makes it a fix is this one:
+    ``theta`` arrives as an *argument*, so moving the design does not lower a
+    second program.  That is what makes ``with_table``'s four fixed-point
+    passes and the optimizer's per-step ``TetMesh.moved`` cheap.
+    """
+    from cadjoint.zeroset import project as project_module
+
+    model = lower(Box(size=Vector([0.5, 0.4, 0.3], free=True, name="s")))
+    kinds = [kind for kind, _field in surfaces(model)]
+    faces = [i for i, kind in enumerate(kinds) if kind == "patch"]
+    seeds = np.array([[0.7, 0.1, 0.0], [0.6, 0.5, 0.1]])
+    incidence = [[faces[0]], [faces[0], faces[2]]]
+
+    project_module._TABLE_PROGRAMS.clear()
+    theta = jnp.asarray(model.theta)
+    nominal = np.asarray(project_table(model, theta, seeds, incidence))
+    assert len(project_module._TABLE_PROGRAMS) == 1, "one program for this structure"
+
+    moved = np.asarray(project_table(model, theta * 1.1, seeds, incidence))
+    assert len(project_module._TABLE_PROGRAMS) == 1, "a new design must reuse the program"
+    np.testing.assert_allclose(nominal[0][0], 0.5, atol=1e-9)
+    np.testing.assert_allclose(moved[0][0], 0.55, atol=1e-9)

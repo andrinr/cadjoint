@@ -20,6 +20,21 @@ from cadjoint.geometry.parameters import Scalar, Vector2
 from cadjoint.sdf._lowering import is_scalar_lowering
 from cadjoint.sdf.primitives.base import Primitive
 
+#: Below this, an edge's squared length counts as zero.  Both distance forms
+#: project the query onto each edge with w·e / e·e, and a repeated vertex
+#: makes that an exact 0/0.  The *value* survives, because the dead edge
+#: never wins the min; the *gradient* does not, because reverse mode visits
+#: every branch and the min propagates the NaN it finds there.  So a
+#: profile with one repeated vertex has a finite field and a NaN derivative at
+#: **every point in space** — the worst way for this to fail in a
+#: differentiable modeller, since nothing downstream looks wrong until an
+#: optimizer stops moving.
+#:
+#: Substituting 1.0 for the denominator leaves t at 0, because the
+#: numerator is 0 as well, so the edge contributes the distance to its own
+#: coincident vertex.  That is the right answer, not merely a safe one.
+_MIN_EDGE_SQUARED = 1e-24
+
 
 def _polygon_distance_scalar(p: Array, vertices: list[Array]) -> Array:
     """Polygon distance over a Python list of ``(2,)`` vertices, unrolled.
@@ -38,7 +53,12 @@ def _polygon_distance_scalar(p: Array, vertices: list[Array]) -> Array:
         j = (i + num - 1) % num
         e = vertices[j] - vertices[i]
         w = p - vertices[i]
-        t = jnp.clip(jnp.sum(w * e, axis=-1) / jnp.sum(e * e), 0.0, 1.0)
+        length = jnp.sum(e * e)
+        t = jnp.clip(
+            jnp.sum(w * e, axis=-1) / jnp.where(length > _MIN_EDGE_SQUARED, length, 1.0),
+            0.0,
+            1.0,
+        )
         b = w - e * t[..., None]
         d = jnp.minimum(d, jnp.sum(b * b, axis=-1))
         # Even-odd crossing test; flips sign once per boundary crossing. Written
@@ -86,7 +106,12 @@ def _polygon_distance_stacked(p: Array, stacked: Array) -> Array:
     previous = jnp.roll(stacked, 1, axis=0)
     e = previous - stacked
     w = p - stacked
-    t = jnp.clip(jnp.sum(w * e, axis=-1) / jnp.sum(e * e, axis=-1), 0.0, 1.0)
+    length = jnp.sum(e * e, axis=-1)
+    t = jnp.clip(
+        jnp.sum(w * e, axis=-1) / jnp.where(length > _MIN_EDGE_SQUARED, length, 1.0),
+        0.0,
+        1.0,
+    )
     b = w - e * t[..., None]
     # ``d`` starts at the distance to vertex 0 in the unrolled form; that value
     # is attained by edge 0 at t = 0, so the reduction alone already covers it.
