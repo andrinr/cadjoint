@@ -2123,6 +2123,10 @@ interleaved, each with its own cache directory, at load average 2.5–3.5:
 | `a234225` | 25.80 s | 4.05 s | 1.08 s | 1209 (52 distinct) | 21.87 s | 1.66 s | 1.54 s | 0.92 MB |
 | this branch | **6.02 s** | **1.95 s** | 1.22 s | **262 (51)** | **4.23 s** | **0.56 s** | **0.44 s** | 1.44 MB |
 
+A second round of the same pair an hour later, at load 5.5–7, gives 32.22 →
+**7.13 s** cold and 4.73 → **2.27 s** warm: the seconds move with the load,
+the ratio and the program counts do not.
+
 **4.3x cold, 2.1x warm, and a fifth of the programs.** The in-proc column is
 the one that goes the wrong way: a *second identical request in one process*
 is 1.08 s before and 1.22 s after, because the compiled form re-traces
