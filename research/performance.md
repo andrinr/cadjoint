@@ -2090,18 +2090,18 @@ solve over every world-frame leaf run entirely op by op.
 ## 17.1 Two halves of one fix, and why one alone is worse than nothing
 
 Wrapping the map in `jax.jit` is half of it. The other half is that the loop
-around it must be *rolled*. Measured on the projection of §16 before that
-part landed, one `jit` around an unrolled eight-sweep Newton loop traced the
-field eight times and lowered eight copies of it: **86 MB of HLO and 30 s of
+around it must be *rolled*. Measured on the projection §16 owns, at the point
+where it had been jitted but not yet rolled, one `jit` around an unrolled
+eight-sweep Newton loop traced the field eight times and lowered eight copies
+of it: **86 MB of HLO and 30 s of
 tracing per `mesh_inspect`**, against 0.98 MB and 0.26 s eager. Wall clock
 went 55.2 s to 53.7 s — the eager dispatch it removed came back as tracing
 and as slower persistent-cache reads of a huge module. With the loop rolled
 into `lax.fori_loop` the same request was 4.1 s at 5.3 MB.
 
-So: **a `jit` whose body repeats the field is a trade, not a win.** Both
-Newton loops here are `fori_loop`s now (`zeroset.project`, `_edge_overlay.
-_project_seam_groups`), and the test that pins it is the program count's
-independence from the sweep count.
+So: **a `jit` whose body repeats the field is a trade, not a win.** Both of
+the tree's Newton loops are rolled now — `zeroset.project` by §16, and
+`_edge_overlay._project_seam_groups` here.
 
 ## 17.2 The numbers
 
@@ -2207,7 +2207,9 @@ seam acceptance test with hysteresis would be worth more than either arm.
 three times — the Newton slope, the final normals, the degenerate-gradient
 fallback — without a `jit`, even though the value side beside it has one.
 Compiling it is worth a further **1.7x cold and 1.3x warm** on the request
-above (6.02 → 3.62 s and 1.95 → 1.48 s, 262 → 85 programs).
+above: a round of the same A/B with it in reads 26.47 → 3.62 s cold and
+4.38 → 1.48 s warm at 85 programs, against 25.80 → 6.02 s and 4.05 → 1.95 s
+at 262 without it.
 
 It is not in this branch, because it moves the QEF vertices by up to 3.8e-2
 (most of a cell) and takes `starter`'s sharp chords from 384 to 439 — a 14 %
