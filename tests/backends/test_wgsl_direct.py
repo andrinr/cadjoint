@@ -420,7 +420,7 @@ def test_a_pattern_loops_instead_of_unrolling():
 
 #: Shipped scenes the direct backend can compile today. The rest name a node
 #: it has no kernel for, which is the honest report of partial coverage.
-_SHIPPED = ("starter", "bracket", "duct_sink", "end_cap")
+_SHIPPED = ("starter", "bracket", "duct_sink", "end_cap", "cylinder_block")
 
 
 @pytest.mark.parametrize(("label", "scene"), _scenes(), ids=[name for name, _ in _scenes()])
