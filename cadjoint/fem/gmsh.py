@@ -597,10 +597,8 @@ def _residuals(fields: FieldTable, points: np.ndarray) -> np.ndarray:
     if not len(fields):
         return np.zeros((points.shape[0], 0), dtype=np.float64)
     probes = jnp.asarray(points, dtype=jnp.float32)
-    # One program for the whole table, not one eager dispatch per primitive
-    # per patch: `snap_toward_patches` calls this twice per node set.
-    program = jax.jit(lambda p: jnp.stack([jax.vmap(patch)(p) for patch in fields], axis=-1))
-    return np.abs(np.asarray(program(probes), dtype=np.float64))
+    values = [jax.vmap(patch)(probes) for patch in fields]
+    return np.abs(np.asarray(jnp.stack(values, axis=-1), dtype=np.float64))
 
 
 def snap_toward_patches(

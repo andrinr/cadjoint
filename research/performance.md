@@ -2087,6 +2087,10 @@ had said so in their own comments since 7432ef0 and were already compiled;
 `cadjoint/viewer/_edge_overlay.py` had five, including a four-sweep Newton
 solve over every world-frame leaf run entirely op by op.
 
+Not all dozen should be compiled, and §17.6 is the one that measured worse.
+The rule that survives the measurements below is: **compile a map when one
+field is read many times, not when many fields are read once.**
+
 ## 17.1 Two halves of one fix, and why one alone is worse than nothing
 
 Wrapping the map in `jax.jit` is half of it. The other half is that the loop
@@ -2218,7 +2222,39 @@ classifier's normal-spread threshold. Unlike the seam-acceptance shift above
 it changes the *mesh*, on every extraction and in both tiers. It should be
 taken, with visual QA, as its own change.
 
-## 17.6 A trap in measuring this
+## 17.6 Also deliberately not taken: the Gmsh patch table, where the crossover bites
+
+`cadjoint/fem/gmsh.py::_residuals` maps *every patch field of the scene's
+decomposition* over a node set, and `assign_ownership` and
+`snap_toward_patches` between them call it three times per Gmsh build. It
+looks like the same fix, and it is not: the starter's patch table has **52
+fields**, so one compiled program over it is a fused tree fifty-two scenes
+wide — §17.3's crossover, at the far end.
+
+Measured on 512 points and that table:
+
+| `_residuals`, 52 fields | first call | second call |
+|---|---:|---:|
+| `a234225` | 15.91 s | 0.056 s |
+| jitted | 5.18 s | 1.008 s |
+
+Three times faster on the first call and **eighteen times slower on every
+one after**, because each call re-traces a fifty-two-field program while the
+eager form reuses its one-op kernels. Worse, the node count differs from
+entity to entity and from mesh to mesh, so every distinct shape is a fresh
+five-second compile: with it in, `pytest tests/fem` ran for **99 minutes of
+CPU without finishing**, and a `sample` of the process put 923 of 1451 stack
+samples inside `xla::cpu::CpuCompiler::RunBackend`. Reverted.
+
+`cadjoint/fem/hexmesh.py::_group_boundary_faces` went back with it: its
+`argmax` over a gradient names the face groups a boundary condition selects,
+and there is no cheap way to verify that from here.
+
+The rule this leaves is narrower and truer than "jit every `vmap`":
+**compile a map when one field is read many times, not when many fields are
+read once.**
+
+## 17.7 A trap in measuring this
 
 **A compile count cannot tell an eager map from a compiled one.** The obvious
 test — "give the sampler a bigger field and check it does not compile more" —
@@ -2235,7 +2271,7 @@ XLA compilations. `tests/test_compiled_fields.py` therefore asserts the shape
 of the computation (one program per sampler, which reads *zero* on the eager
 form) and leaves the seconds to this section.
 
-## 17.7 Reproducing
+## 17.8 Reproducing
 
     S=/tmp/ov; mkdir -p $S; rm -rf $S/cache
     CADJOINT_CACHE_DIR=$S/cache python benchmarks/jax_compile_profile.py \
