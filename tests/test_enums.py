@@ -116,7 +116,7 @@ class TestOptionSets:
         assert option in typing.get_args(alias)
 
     def test_listed_joins_in_declaration_order(self):
-        assert listed(MeshMethod) == "hex, tet4, tet10"
+        assert listed(MeshMethod) == "hex, tet4, tet10, cutfem"
         assert listed(BoundaryConditionType) == (
             "dirichlet, heat_flux, fixed, traction, inlet, outlet, walls, "
             "heat_source, held_temperature"
@@ -166,7 +166,10 @@ class TestSimMesh:
         with pytest.raises(ValueError) as error:
             SimMesh(name="m", resolution=4, method="voxel")
 
-        assert str(error.value) == "method must be one of ['hex', 'tet4', 'tet10'], got 'voxel'."
+        assert (
+            str(error.value)
+            == "method must be one of ['hex', 'tet4', 'tet10', 'cutfem'], got 'voxel'."
+        )
 
 
 class TestSide:
@@ -442,7 +445,7 @@ class TestValidatorMessages:
         message = self._rejected(
             "set_mesh_value", {"mesh": 0, "argument": "method", "value": "voxel"}
         )
-        assert message == "Mesh `method` must be one of: hex, tet4, tet10."
+        assert message == "Mesh `method` must be one of: hex, tet4, tet10, cutfem."
 
     def test_solver_method(self):
         message = self._rejected("solve_sketch", {"line": 1, "method": "bfgs"})
