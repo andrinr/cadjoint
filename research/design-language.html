@@ -1,0 +1,1361 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.10.18">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>design-language – cadjoint</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-89af0c2d685ccb09a4d7d65decb66752.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+</head>
+
+<body class="nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">cadjoint</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../docs/getting-started.html"> 
+<span class="menu-text">Get Started</span></a>
+  </li>  
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-guides" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Guides</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-guides">    
+        <li>
+    <a class="dropdown-item" href="../docs/meshing.html">
+ <span class="dropdown-text">Differentiable Meshing</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../docs/simulation.html">
+ <span class="dropdown-text">Simulation</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../docs/flow.html">
+ <span class="dropdown-text">Flow Solver (prototype)</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../docs/optimization.html">
+ <span class="dropdown-text">Optimization</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../docs/plugins.html">
+ <span class="dropdown-text">Plugins</span></a>
+  </li>  
+        <li><hr class="dropdown-divider"></li>
+        <li>
+    <a class="dropdown-item" href="../docs/materials.html">
+ <span class="dropdown-text">Materials</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../docs/rendering.html">
+ <span class="dropdown-text">Forward Renderer</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="../docs/viewer.html"> 
+<span class="menu-text">Playground</span></a>
+  </li>  
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-examples" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Examples</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-examples">    
+        <li>
+    <a class="dropdown-item" href="../examples/basics.html">
+ <span class="dropdown-text">Basics</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/rendering.html">
+ <span class="dropdown-text">Rendering</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/sketch_construction.html">
+ <span class="dropdown-text">Sketch Construction</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/constraints.html">
+ <span class="dropdown-text">Constraints</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/optimization.html">
+ <span class="dropdown-text">Optimization</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/constrained_optimization.html">
+ <span class="dropdown-text">Constrained Optimization</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-research" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Research</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-research">    
+        <li>
+    <a class="dropdown-item" href="../research/differentiable-meshing-pipeline.html">
+ <span class="dropdown-text">Differentiable meshing pipeline</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/performance.html">
+ <span class="dropdown-text">Where the seconds go (performance)</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/fem-integration.html">
+ <span class="dropdown-text">FEM integration</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/tet-vs-hex.html">
+ <span class="dropdown-text">Tet vs hex meshing</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/end-to-end-optimization.html">
+ <span class="dropdown-text">End-to-end optimization</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/path-tracing.html">
+ <span class="dropdown-text">WebGPU SDF path tracing</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/simulator-ecosystem.html">
+ <span class="dropdown-text">Simulator ecosystem survey</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/constraints.html">
+ <span class="dropdown-text">Constraint system</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/flow-solver.html">
+ <span class="dropdown-text">Differentiable flow solver</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/complex-scene.html">
+ <span class="dropdown-text">Modelling a gearbox end-cap</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/design-language.html">
+ <span class="dropdown-text">The design language</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="../reference/index.html"> 
+<span class="menu-text">API Reference</span></a>
+  </li>  
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/andrinr/cadjoint"> <i class="bi bi-github" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#the-cadjoint-design-language" id="toc-the-cadjoint-design-language" class="nav-link active" data-scroll-target="#the-cadjoint-design-language">The cadjoint design language</a>
+  <ul class="collapse">
+  <li><a href="#the-one-sentence" id="toc-the-one-sentence" class="nav-link" data-scroll-target="#the-one-sentence">1. The one sentence</a></li>
+  <li><a href="#what-it-is-answering" id="toc-what-it-is-answering" class="nav-link" data-scroll-target="#what-it-is-answering">2. What it is answering</a></li>
+  <li><a href="#the-ground-is-paper" id="toc-the-ground-is-paper" class="nav-link" data-scroll-target="#the-ground-is-paper">3. The ground is paper</a>
+  <ul class="collapse">
+  <li><a href="#surfaces" id="toc-surfaces" class="nav-link" data-scroll-target="#surfaces">3.1 Surfaces</a></li>
+  <li><a href="#ink" id="toc-ink" class="nav-link" data-scroll-target="#ink">3.2 Ink</a></li>
+  <li><a href="#rules" id="toc-rules" class="nav-link" data-scroll-target="#rules">3.3 Rules</a></li>
+  <li><a href="#the-accent" id="toc-the-accent" class="nav-link" data-scroll-target="#the-accent">3.4 The accent</a></li>
+  <li><a href="#status-and-taxonomy" id="toc-status-and-taxonomy" class="nav-link" data-scroll-target="#status-and-taxonomy">3.5 Status and taxonomy</a></li>
+  <li><a href="#inside-the-viewport-rectangle" id="toc-inside-the-viewport-rectangle" class="nav-link" data-scroll-target="#inside-the-viewport-rectangle">3.6 Inside the viewport rectangle</a></li>
+  <li><a href="#zoning-where-a-hue-may-be-a-fill" id="toc-zoning-where-a-hue-may-be-a-fill" class="nav-link" data-scroll-target="#zoning-where-a-hue-may-be-a-fill">3.7 Zoning: where a hue may be a fill</a></li>
+  </ul></li>
+  <li><a href="#typography" id="toc-typography" class="nav-link" data-scroll-target="#typography">4. Typography</a>
+  <ul class="collapse">
+  <li><a href="#tabular-figures-are-non-negotiable" id="toc-tabular-figures-are-non-negotiable" class="nav-link" data-scroll-target="#tabular-figures-are-non-negotiable">Tabular figures are non-negotiable</a></li>
+  <li><a href="#the-scale" id="toc-the-scale" class="nav-link" data-scroll-target="#the-scale">The scale</a></li>
+  </ul></li>
+  <li><a href="#line-surface-and-shape" id="toc-line-surface-and-shape" class="nav-link" data-scroll-target="#line-surface-and-shape">5. Line, surface and shape</a></li>
+  <li><a href="#three-modes-one-accent" id="toc-three-modes-one-accent" class="nav-link" data-scroll-target="#three-modes-one-accent">6. Three modes, one accent</a></li>
+  <li><a href="#density-and-rhythm" id="toc-density-and-rhythm" class="nav-link" data-scroll-target="#density-and-rhythm">7. Density and rhythm</a></li>
+  <li><a href="#motion" id="toc-motion" class="nav-link" data-scroll-target="#motion">8. Motion</a>
+  <ul class="collapse">
+  <li><a href="#replay-is-not-animation" id="toc-replay-is-not-animation" class="nav-link" data-scroll-target="#replay-is-not-animation">8.1 Replay is not animation</a></li>
+  <li><a href="#the-settle-law" id="toc-the-settle-law" class="nav-link" data-scroll-target="#the-settle-law">8.2 The settle law</a></li>
+  </ul></li>
+  <li><a href="#iconography" id="toc-iconography" class="nav-link" data-scroll-target="#iconography">9. Iconography</a></li>
+  <li><a href="#character-where-the-personality-lives" id="toc-character-where-the-personality-lives" class="nav-link" data-scroll-target="#character-where-the-personality-lives">10. Character: where the personality lives</a>
+  <ul class="collapse">
+  <li><a href="#shipped" id="toc-shipped" class="nav-link" data-scroll-target="#shipped">10.1 Shipped</a></li>
+  <li><a href="#queued-in-order-of-delight-per-unit-of-cost" id="toc-queued-in-order-of-delight-per-unit-of-cost" class="nav-link" data-scroll-target="#queued-in-order-of-delight-per-unit-of-cost">10.2 Queued, in order of delight per unit of cost</a></li>
+  <li><a href="#the-one-break" id="toc-the-one-break" class="nav-link" data-scroll-target="#the-one-break">10.3 The one break</a></li>
+  </ul></li>
+  <li><a href="#what-this-language-refuses" id="toc-what-this-language-refuses" class="nav-link" data-scroll-target="#what-this-language-refuses">11. What this language refuses</a></li>
+  <li><a href="#decisions-and-the-numbers-behind-them" id="toc-decisions-and-the-numbers-behind-them" class="nav-link" data-scroll-target="#decisions-and-the-numbers-behind-them">12. Decisions, and the numbers behind them</a>
+  <ul class="collapse">
+  <li><a href="#why-paper-and-what-it-costs" id="toc-why-paper-and-what-it-costs" class="nav-link" data-scroll-target="#why-paper-and-what-it-costs">12.1 Why paper, and what it costs</a></li>
+  <li><a href="#the-seam-is-a-rule-not-a-step" id="toc-the-seam-is-a-rule-not-a-step" class="nav-link" data-scroll-target="#the-seam-is-a-rule-not-a-step">12.2 The seam is a rule, not a step</a></li>
+  <li><a href="#the-plate-as-an-object-measured-not-chosen" id="toc-the-plate-as-an-object-measured-not-chosen" class="nav-link" data-scroll-target="#the-plate-as-an-object-measured-not-chosen">12.3 The plate as an object — measured, not chosen</a></li>
+  <li><a href="#why-the-accent-is-orange-and-only-a-fill" id="toc-why-the-accent-is-orange-and-only-a-fill" class="nav-link" data-scroll-target="#why-the-accent-is-orange-and-only-a-fill">12.4 Why the accent is orange, and only a fill</a></li>
+  <li><a href="#chrome-temperature-is-a-rounding-error" id="toc-chrome-temperature-is-a-rounding-error" class="nav-link" data-scroll-target="#chrome-temperature-is-a-rounding-error">12.5 Chrome temperature is a rounding error</a></li>
+  <li><a href="#glass-with-the-receipt" id="toc-glass-with-the-receipt" class="nav-link" data-scroll-target="#glass-with-the-receipt">12.6 Glass, with the receipt</a></li>
+  <li><a href="#rejected-with-the-measurement" id="toc-rejected-with-the-measurement" class="nav-link" data-scroll-target="#rejected-with-the-measurement">12.7 Rejected, with the measurement</a></li>
+  <li><a href="#what-was-looked-at" id="toc-what-was-looked-at" class="nav-link" data-scroll-target="#what-was-looked-at">12.8 What was looked at</a></li>
+  </ul></li>
+  <li><a href="#making-it-stick" id="toc-making-it-stick" class="nav-link" data-scroll-target="#making-it-stick">13. Making it stick</a></li>
+  <li><a href="#files" id="toc-files" class="nav-link" data-scroll-target="#files">14. Files</a></li>
+  </ul></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"></header>
+
+
+
+
+<section id="the-cadjoint-design-language" class="level1">
+<h1>The cadjoint design language</h1>
+<p><em>The settled specification. This is what the app is, not how it was found — the exploration that produced it is in git history. Every value here is the value in <code>frontend/src/tokens.ts</code>, which is the source of truth; <code>frontend/src/styles.css</code> mirrors it and <code>frontend/test/tokens.test.ts</code> asserts the two cannot drift. If this document and the code ever disagree, the code is right and this file is a bug.</em></p>
+<hr>
+<section id="the-one-sentence" class="level2">
+<h2 class="anchored" data-anchor-id="the-one-sentence">1. The one sentence</h2>
+<blockquote class="blockquote">
+<p><strong>Colour is a reading. Anything that is not a reading is drawn without hue.</strong></p>
+</blockquote>
+<p>cadjoint paints measurements in viridis and magma. The chrome is the sheet those measurements are printed on: paper, ink, and rules. Every hue on screen therefore means a number, and the single accent is the one deliberate exception — and it is never a mark, only a ground.</p>
+<p>Everything below is a consequence of that.</p>
+<hr>
+</section>
+<section id="what-it-is-answering" class="level2">
+<h2 class="anchored" data-anchor-id="what-it-is-answering">2. What it is answering</h2>
+<p><code>frontend/tools/ui-audit/audit.mjs</code> measured the playground before this work:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>measured</th>
+<th>value</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>distinct colours in use</td>
+<td>85</td>
+</tr>
+<tr class="even">
+<td>near-black surfaces</td>
+<td>13, adjacent steps <strong>below the just-noticeable difference</strong></td>
+</tr>
+<tr class="odd">
+<td>the brand accent</td>
+<td>one hue at <strong>12 different alphas</strong></td>
+</tr>
+<tr class="even">
+<td>distinct type variants</td>
+<td>49</td>
+</tr>
+</tbody>
+</table>
+<p>None of those is a bug alone. Together they say there was no rule about when a colour is allowed to appear, so the app answered “make this look distinct” by inventing a value, eighty-five times. A design language is not a palette; it is the set of sentences that make the eighty-sixth value obviously wrong.</p>
+<p>Two facts about this product make its version of the problem specific:</p>
+<ul>
+<li><strong>The data already owns colour.</strong> viridis for solved fields, magma for mesh quality, four BC hues, proposal cyan. A reader <em>measures</em> with those.</li>
+<li><strong>The users read numbers.</strong> Tolerances, jacobians, aspect ratios, residuals, gradients. The typography is not a mood, it is an instrument face.</li>
+</ul>
+<p>There is no free hue to give the chrome. Sampling both ramps at 400 stops and bucketing every sample with chroma ≥ 0.04, <strong>viridis ∪ magma claim 36 of 36 hue buckets.</strong> Relaxing to the read third of each ramp and excluding the BC hues and proposal cyan leaves 24° of 360, in two slivers. The old chrome accents proved it the hard way: every one sat on a ramp to within a third of a degree, and three of six were inside the ≈10 ΔOKLab at which two colours read as the same colour — the brand lime 9.8 from viridis(0.90), simulate’s amber 4.7 from magma(0.87), <code>danger</code> 1.8 from magma(0.73). A lime selection dot on a solved heat sink was, measurably, a hot spot.</p>
+<p>So the constraint is not “pick a safe hue”. It is <strong>spatial</strong>, and it is lintable.</p>
+<hr>
+</section>
+<section id="the-ground-is-paper" class="level2">
+<h2 class="anchored" data-anchor-id="the-ground-is-paper">3. The ground is paper</h2>
+<p>One value, <code>#e6e6e9</code> (L 0.926, C 0.004), and <strong>the chrome and the viewport share it</strong>. The seam between them measures <code>dL 0.0000 · contrast 1.00:1</code>. The viewport is not a darker well or a lighter plate cut into the app: it is the same sheet, and what marks its edge is a <strong>rule</strong>, not a step in luminance.</p>
+<p>That is the structural idea in one line: <strong>structure comes from rules, not boxes.</strong> One hairline weight, three contrasts, radius 0, no shadow.</p>
+<section id="surfaces" class="level3">
+<h3 class="anchored" data-anchor-id="surfaces">3.1 Surfaces</h3>
+<p>Not a depth ladder — a paper ladder. The page is the ground and anything above it is a lighter sheet laid on top. Two steps up, because a third would fall below a JND.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>token</th>
+<th>hex</th>
+<th>L</th>
+<th>job</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>surface-viewport</code></td>
+<td><code>#e6e6e9</code></td>
+<td>0.926</td>
+<td>the viewport’s ground</td>
+</tr>
+<tr class="even">
+<td><code>surface-base</code>, <code>surface-bar</code></td>
+<td><code>#e6e6e9</code></td>
+<td>0.926</td>
+<td>the page, and the bars on it</td>
+</tr>
+<tr class="odd">
+<td><code>surface-bar-alt</code></td>
+<td><code>#edecee</code></td>
+<td>0.944</td>
+<td>sub-bars, and the hover state</td>
+</tr>
+<tr class="even">
+<td><code>surface-float</code>, <code>surface-panel</code>, <code>surface-raised</code></td>
+<td><code>#f8f7f8</code></td>
+<td>0.977</td>
+<td>the dock sheet, panels, floating chrome</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Hover is a step <em>down</em>.</strong> <code>surface-raised-hover</code> is <code>#edecee</code>: on paper, pressure darkens the sheet. A light UI that brightens on hover has nowhere to go once the sheet is already white.</p>
+<p><strong>No inset control.</strong> A field drawn darker than the sheet it sits in reads as disabled. Controls are separated by their edge, not by a hole.</p>
+</section>
+<section id="ink" class="level3">
+<h3 class="anchored" data-anchor-id="ink">3.2 Ink</h3>
+<p>Three levels, and nothing else. Text is never faded with <code>opacity</code>, because an opacity fade has no assertable contrast ratio.</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>token</th>
+<th>hex</th>
+<th>on paper</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>ink</code></td>
+<td><code>#18161a</code></td>
+<td>14.43:1</td>
+</tr>
+<tr class="even">
+<td><code>ink-2</code></td>
+<td><code>#48464d</code></td>
+<td>7.46:1</td>
+</tr>
+<tr class="odd">
+<td><code>ink-3</code></td>
+<td><code>#605e65</code></td>
+<td>5.13:1</td>
+</tr>
+<tr class="even">
+<td><code>ink-on-accent</code></td>
+<td><code>#0a0a0c</code></td>
+<td>— (drawn only on <code>accent</code>)</td>
+</tr>
+</tbody>
+</table>
+<p>All three clear AA on every surface, including the darkest. The worst measured text pair anywhere in the shipped screens is 4.74:1 (<code>ok</code> at 12px on paper).</p>
+</section>
+<section id="rules" class="level3">
+<h3 class="anchored" data-anchor-id="rules">3.3 Rules</h3>
+<p>One weight — 1px, always — and three contrasts, because on a sheet the hierarchy is carried by how dark a line is, not by how thick it is.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>token</th>
+<th>hex</th>
+<th>on paper</th>
+<th>job</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>rule</code></td>
+<td><code>#9f9da5</code></td>
+<td>2.15:1</td>
+<td>separation <em>within</em> a panel</td>
+</tr>
+<tr class="even">
+<td><code>rule-strong</code></td>
+<td><code>#747278</code></td>
+<td>3.81:1</td>
+<td>between sections, control edges, and the viewport seam</td>
+</tr>
+<tr class="odd">
+<td><code>rule-heavy</code></td>
+<td><code>#36343b</code></td>
+<td>9.85:1</td>
+<td>the viewport frame and its corner marks</td>
+</tr>
+</tbody>
+</table>
+<p><code>rule</code> is deliberately under 3:1 and is absent from <code>MEANINGFUL_NON_TEXT</code>: a resting hairline inside a panel is structure, not state. <code>rule-strong</code> is the one that has to be <em>found</em> — it is what says “the viewport starts here” when there is no luminance step to say it — so it clears the non-text bar on both grounds.</p>
+<p>A control’s edge is something you must find, so it takes <code>rule-strong</code>; a hairline that divides a panel is structure at 2.15:1. That distinction is what took control borders from 70 to 0 without a fudge.</p>
+<p><strong>Brutalist structure comes from coverage, not contrast.</strong> The reference grid measures 2.16:1; a heavy-border variant at 9.85:1 reads worse than the shipped 2.15:1. More rules, not darker ones.</p>
+</section>
+<section id="the-accent" class="level3">
+<h3 class="anchored" data-anchor-id="the-accent">3.4 The accent</h3>
+<p><strong>One hue, and it has exactly one job: a fill behind near-black type.</strong></p>
+<p><code>accent</code> <code>#f87318</code> measures <strong>7.02:1 as a ground</strong> under <code>ink-on-accent</code> <code>#0a0a0c</code>, and <strong>2.26:1 as ink</strong> on paper. Those are not two options — one passes and one fails. Anywhere a dark chrome would have drawn accent-coloured text or an accent hairline, this design draws a filled block. <code>accent-press</code> <code>#c85d00</code> is the pressed and hovered fill and the only tone allowed to draw an accent-coloured <em>mark</em>: 3.36:1 on paper, which the accent itself cannot clear.</p>
+<p><code>tokens.test.ts</code> encodes the rule in both directions: ≥7:1 as a ground, &lt;3:1 as ink. The accent also appears as a low-alpha wash, tint, veil or edge on paper — six strengths, each meaning something — but the solid block is the one that ever carries type.</p>
+</section>
+<section id="status-and-taxonomy" class="level3">
+<h3 class="anchored" data-anchor-id="status-and-taxonomy">3.5 Status and taxonomy</h3>
+<p>Re-authored for paper: on a light ground a tone is <strong>darkened</strong>, not brightened, to be read. Four tones, and the kind chips reuse them rather than inventing hues.</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>token</th>
+<th>hex</th>
+<th>on paper</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>danger</code></td>
+<td><code>#a8341c</code></td>
+<td>≥4.5:1</td>
+</tr>
+<tr class="even">
+<td><code>danger-ink</code></td>
+<td><code>#8a1f10</code></td>
+<td>≥4.5:1</td>
+</tr>
+<tr class="odd">
+<td><code>info</code></td>
+<td><code>#0065b4</code></td>
+<td>4.79:1</td>
+</tr>
+<tr class="even">
+<td><code>info-ink</code></td>
+<td><code>#004a85</code></td>
+<td>≥4.5:1</td>
+</tr>
+<tr class="odd">
+<td><code>ok</code></td>
+<td><code>#00734c</code></td>
+<td>4.74:1</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="inside-the-viewport-rectangle" class="level3">
+<h3 class="anchored" data-anchor-id="inside-the-viewport-rectangle">3.6 Inside the viewport rectangle</h3>
+<p>Everything the DOM draws inside the viewport — dimension labels, the hint bar, the mode cue on the border — uses the same values chrome does, but owes a separate rule: <strong>inside the rectangle, nothing is coloured.</strong> The field ramp is the only hue there, which is what the measurements score as <code>FIELD WINS</code>, and an achromatic annotation can never be mistaken for a value.</p>
+<p><code>viewport-ink</code> <code>#18161a</code> · <code>viewport-ink-2</code> <code>#605e65</code> · <code>viewport-mark</code> <code>#48464d</code> · <code>viewport-mode</code> <code>#605e65</code>. The mode cue is one tone for all three modes; the mode is named in words beside it.</p>
+<p>The graticule is furniture, not data, so its three tones sit deliberately below the 3:1 a meaningful mark owes and are held to a <strong>band of 1.6–2.8:1</strong> in <code>test/graticule.test.ts</code>: above it the grid competes with the field, below it the grid is invisible. <code>graticule-line</code> <code>#adadb3</code> · <code>graticule-axis</code> <code>#9c9ca2</code> · <code>graticule-frame</code> <code>#8f8f95</code>. The grid paints 1.4% of an empty viewport at 1.79:1.</p>
+</section>
+<section id="zoning-where-a-hue-may-be-a-fill" class="level3">
+<h3 class="anchored" data-anchor-id="zoning-where-a-hue-may-be-a-fill">3.7 Zoning: where a hue may be a fill</h3>
+<ol type="1">
+<li><strong>Chrome hue lives outside the viewport rectangle.</strong> Inside it, the only fills are the field ramp, the quality ramp, the four BC hues and proposal cyan.</li>
+<li><strong>The panel is docked, not floating over the field.</strong> This is the same decision as the zoning rule, not a separate one. A panel floating inside the rectangle must be achromatic to stay clean, which is the old problem restated; unzoned, it puts 26 709 px² of chrome hue inside the rectangle at 95% of viridis’ chroma, with the orange measuring 5.4 ΔOKLab from magma(0.73) — the same colour to the eye. Dock it outside and the conflict disappears: colour goes where the work is, and the viewport stays an instrument.</li>
+<li><strong>Area governs how badly, adjacency governs whether.</strong> A 970 px² accent probe still misreads when it sits beside a same-hue field reading. Area is necessary, not sufficient.</li>
+<li><strong>A ramp may appear in a panel only as a legend</strong>, and a legend is a bar ≤8px tall with both endpoints labelled. A ramp with no numbers beside it is decoration; delete it.</li>
+<li><strong>Selection inside the viewport is achromatic and high-contrast</strong>, never the accent. It must read over any field value.</li>
+</ol>
+<hr>
+</section>
+</section>
+<section id="typography" class="level2">
+<h2 class="anchored" data-anchor-id="typography">4. Typography</h2>
+<p><strong>Mono is the house face.</strong> Every label, tab, menu item, readout and unit in the chrome is monospaced, because the panel is a view of a program and the furniture should say so. Sans is kept for prose — hints, warnings, descriptions — which is the only text here that is sentences.</p>
+<p><strong>The one exception is the strings the program itself wrote.</strong> A study called <code>sink-conduction</code>, a mesh name, a tree label, a pane title: those are values from <code>scene.py</code>, so they are quoted, not restyled. Chrome furniture is tracked uppercase; a program’s own string is neither.</p>
+<section id="tabular-figures-are-non-negotiable" class="level3">
+<h3 class="anchored" data-anchor-id="tabular-figures-are-non-negotiable">Tabular figures are non-negotiable</h3>
+<p>Numbers change while you look at them: a solve streams residuals, an optimize run ticks an objective, a probe updates as the pointer moves. With proportional figures <code>412.80 → 411.79</code> reflows its own row. Every numeric surface takes <code>font-variant-numeric: tabular-nums</code> plus a monospaced family — belt and braces, because some fallback stacks resolve to a proportional face.</p>
+<ul>
+<li><strong>Numbers are right-hung on a shared column</strong>, not left-aligned after their label. Magnitude becomes edge alignment and the decimal point becomes a vertical rule you can read down.</li>
+<li><strong>The unit is <code>ink-3</code>, one size below the value, on the same baseline.</strong> Never in the label — the unit belongs to the number, and when the number is empty the unit should be too.</li>
+<li><strong>The value is a size larger than its own label.</strong> A 9px tracked label above a 13px value reads as a readout; the same row at one size reads as a form.</li>
+</ul>
+</section>
+<section id="the-scale" class="level3">
+<h3 class="anchored" data-anchor-id="the-scale">The scale</h3>
+<p>Six sizes. Below 9px is unreadable; above 15px belongs to the viewport, not the chrome.</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>token</th>
+<th>px</th>
+<th>job</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>text-3xs</code></td>
+<td>9</td>
+<td>tracked small-caps labels</td>
+</tr>
+<tr class="even">
+<td><code>text-2xs</code></td>
+<td>10</td>
+<td>dense secondary, selector expressions</td>
+</tr>
+<tr class="odd">
+<td><code>text-xs</code></td>
+<td>11</td>
+<td>control labels, tabs, hints</td>
+</tr>
+<tr class="even">
+<td><code>text-sm</code></td>
+<td>12</td>
+<td>body, the default</td>
+</tr>
+<tr class="odd">
+<td><code>text-md</code></td>
+<td>13</td>
+<td><strong>numbers</strong> — every value the user reads</td>
+</tr>
+<tr class="even">
+<td><code>text-lg</code></td>
+<td>15</td>
+<td>panel titles, and nothing else</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Tracking is a function of size, not a house style.</strong> At 9px the counters need 0.16em to stay open; at 15px the same value falls apart into letters. A single <code>--tracking-caps</code> is the tell of a system that has not measured its own labels.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+</colgroup>
+<thead>
+<tr class="header">
+<th><code>tracking-3xs</code></th>
+<th><code>tracking-2xs</code></th>
+<th><code>tracking-xs</code></th>
+<th><code>tracking-sm</code></th>
+<th><code>tracking-md</code></th>
+<th><code>tracking-lg</code></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>0.16em</td>
+<td>0.13em</td>
+<td>0.1em</td>
+<td>0.08em</td>
+<td>0.06em</td>
+<td>0.04em</td>
+</tr>
+</tbody>
+</table>
+<p>Weights 400 / 500 / 600 / 700 — 700 is reserved for type on a filled accent block, where it has a 7.02:1 ground under it. Leadings 1 (single-line controls), 1.25, 1.4 (dense stacks), 1.55 (prose).</p>
+<hr>
+</section>
+</section>
+<section id="line-surface-and-shape" class="level2">
+<h2 class="anchored" data-anchor-id="line-surface-and-shape">5. Line, surface and shape</h2>
+<ul>
+<li><strong>Hairlines over boxes.</strong> The default way to separate two things is a 1px <code>rule</code> full-bleed to the container’s padding edge. The default way to <em>group</em> them is a shared left edge and a shared baseline. A filled box is a last resort and needs a reason; “it is a card” is not one.</li>
+<li><strong>One radius, and it is zero.</strong> Kept as a token so the decision has a name and one place to change. Everything here is a cell on a ruled sheet, and cells are square. Circles exist only where roundness carries “this is a point, not a region” — status dots, pipeline nodes.</li>
+<li><strong>No shadow.</strong> <code>tokens.test.ts</code> asserts the stylesheet casts none. Elevation is a lighter sheet and an edge, not a cast.</li>
+<li><strong>One border weight</strong>, 1px. A 2px border is not a stronger border, it is a different element: reserve 2px for the <em>active</em> indicator, where the doubling reads as state.</li>
+<li><strong>Sections are not numbered.</strong> A first cut stamped <code>01</code>/<code>02</code> counter blocks on every panel and section head; the user judged them decoration without a purpose, and they are gone. A section is introduced by its kicker chip — the one word that names its kind (<code>LIBRARY</code>, <code>SERVER</code>, <code>FEM</code>) on the accent fill — and its title in tracked mono; order is carried by position, as everywhere else in this language.</li>
+</ul>
+<p>Scales are deliberately short: six type sizes, six trackings, seven spacing steps, one radius, five control heights, three durations. <strong>If a value is not on a scale it is a bug, not a nuance</strong> — and <code>tokens.test.ts</code> fails on a raw hex outside <code>:root</code>, a literal font-size, or a type size off the scale.</p>
+<hr>
+</section>
+<section id="three-modes-one-accent" class="level2">
+<h2 class="anchored" data-anchor-id="three-modes-one-accent">6. Three modes, one accent</h2>
+<p>Model → Sketch → Simulate is not three parallel worlds. It is <strong>one pipeline</strong>: geometry, then the constraints that drive it, then the physics that scores it. Gradients flow back along exactly that chain.</p>
+<p>So <code>MODE_ACCENTS</code> binds all three modes to the same accent, and the mode is read from:</p>
+<ul>
+<li><strong>the position of the filled cell</strong> in the three-cell switcher, the way you read a segmented gauge;</li>
+<li><strong>the word</strong> in the hint bar, which survives greyscale and colour-blindness;</li>
+<li><strong>the tool set</strong> — rail, panel and shortcuts change wholesale, which is a much louder signal than a hue.</li>
+</ul>
+<p>The one mode signal inside the viewport is the achromatic cue on the border. This is strictly more information than three hues carried, at a cost of zero reserved hues.</p>
+<hr>
+</section>
+<section id="density-and-rhythm" class="level2">
+<h2 class="anchored" data-anchor-id="density-and-rhythm">7. Density and rhythm</h2>
+<p>The target is 500+ elements per screen without the screen feeling loud.</p>
+<ul>
+<li><strong>Base grid 4px.</strong> Spacing <code>2 · 4 · 6 · 8 · 12 · 16 · 24</code> — dense at the bottom, where panels live.</li>
+<li><strong>Control heights <code>22 · 26 · 30 · 34 · 36</code>.</strong> Every interactive box picks one, which is what keeps labels, inputs and icons on a shared baseline inside a row.</li>
+<li><strong>Rows share one baseline.</strong> Every panel row is <code>label | … | value</code> on a single baseline; a row that needs two lines hangs a 10px sub-line under the value, right-aligned, <code>ink-3</code>, ellipsised.</li>
+<li><strong>Value columns line up across panels.</strong> Two panels side by side whose value columns do not align read as unrelated.</li>
+<li><strong>Density is bought with type, not with space.</strong> When a panel is too tall, drop the label to 9px tracked and hang the value at 13px — do not shave 2px off the padding. Padding below 8px stops reading as padding and starts reading as a mistake.</li>
+</ul>
+<hr>
+</section>
+<section id="motion" class="level2">
+<h2 class="anchored" data-anchor-id="motion">8. Motion</h2>
+<p>Motion has exactly one job: <strong>to show causality between an edit and its consequence.</strong> The product’s claim is that a change to the source propagates through geometry, meshing and physics. Movement that does not express that propagation is noise on an instrument face.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>duration</th>
+<th>meaning</th>
+<th>example</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>dur-fast</code> 90ms</td>
+<td><em>acknowledgement</em> — the pointer’s own feedback</td>
+<td>hover tint, press</td>
+</tr>
+<tr class="even">
+<td><code>dur-base</code> 160ms</td>
+<td><em>state</em> — something the user directly caused</td>
+<td>tab switch, toggle, panel open</td>
+</tr>
+<tr class="odd">
+<td><code>dur-slow</code> 260ms</td>
+<td><em>propagation</em> — something changed <strong>because</strong> something else did</td>
+<td>source rewritten → geometry recompiles</td>
+</tr>
+</tbody>
+</table>
+<p>One easing family: <code>ease</code> <code>cubic-bezier(0.2, 0, 0, 1)</code> for anything arriving, <code>ease-inout</code> for anything that moves and settles in place.</p>
+<p><strong>Causal pairs are sequenced, never simultaneous.</strong> When a panel edit rewrites the program, the changed source line highlights first, and only then does the geometry update. Simultaneity teaches that the panel and the viewport are two views; the stagger teaches that the panel <em>edits the code</em> and the code <em>makes the geometry</em>. 60ms buys the product’s core idea.</p>
+<p><strong>What must never animate:</strong></p>
+<ul>
+<li><strong>Numbers.</strong> A tweened number displays values that were never true. Values replace instantly; if a change needs marking, flash the row for 160ms.</li>
+<li>The camera under direct manipulation, ever.</li>
+<li>Anything during a solve except the progress indicator itself.</li>
+<li>Layout on data arrival. Reserve the space; do not grow into it.</li>
+</ul>
+<p><code>prefers-reduced-motion</code> collapses 90ms and 160ms to 0 and reduces the 260ms propagation to a two-frame highlight — causality is information, so it survives in a form that does not move.</p>
+<section id="replay-is-not-animation" class="level3">
+<h3 class="anchored" data-anchor-id="replay-is-not-animation">8.1 Replay is not animation</h3>
+<blockquote class="blockquote">
+<p>Playing a recorded trajectory back is not tweening: every frame shows a value the optimizer actually held at step <em>k</em>. The rule forbids inventing intermediates between two true values; it does not forbid showing true values in the order they occurred.</p>
+<p><strong>The test is mechanical: may this frame be exported as a row of the run log?</strong> If yes it is replay. If no it is a tween, and it is forbidden.</p>
+</blockquote>
+</section>
+<section id="the-settle-law" class="level3">
+<h3 class="anchored" data-anchor-id="the-settle-law">8.2 The settle law</h3>
+<ol type="1">
+<li><strong>Needles, bars and rules may settle. Digits may not.</strong> A bar is not spelling anything; a digit mid-roll is a wrong number.</li>
+<li><strong>Ballistics are VU:</strong> 300 ms to 99% of the final value, overshoot 1.0–1.5%, τ ≈ 160 ms to 63%. For the residual head, a dragged tick, legend percentiles.</li>
+<li><strong>Overshoot budget = half the displayed precision.</strong> ANSI C39.1’s definition of <em>dead-beat</em>, which makes overshoot computable instead of a taste call: a bar under a value shown to two decimals may overshoot 0.005 of its range.</li>
+<li><strong>Peak marks are asymmetric (PPM):</strong> attack ≈10 ms so one bad Newton iteration is never missed, decay ≈8.6 dB/s so the excursion stays readable.</li>
+<li>The second-order settle is not a second easing family; it is a physical model confined to the marks named in (2) and (4).</li>
+</ol>
+<hr>
+</section>
+</section>
+<section id="iconography" class="level2">
+<h2 class="anchored" data-anchor-id="iconography">9. Iconography</h2>
+<ul>
+<li><strong>16px box, 1.25px stroke, no fills, miter joins, no rounded caps.</strong> Drawn on the half-pixel so a vertical stroke lands on a device pixel; the stroke weight matches a hairline in feel, so an icon and a rule look like one pen.</li>
+<li><strong>Icons are <code>ink-2</code>, and colour is not available to them.</strong> An icon that needs a colour to be understood needs a label instead.</li>
+<li><strong>Every rail icon has a text label at ≥1280px wide.</strong> Icon-only is a space optimisation, not a design.</li>
+<li><strong>No icon-only destructive action, at any width.</strong> Delete carries the word.</li>
+<li>Icons never appear inside the viewport rectangle. Gizmos are geometry, drawn by the renderer in the data vocabulary.</li>
+</ul>
+<hr>
+</section>
+<section id="character-where-the-personality-lives" class="level2">
+<h2 class="anchored" data-anchor-id="character-where-the-personality-lives">10. Character: where the personality lives</h2>
+<p>Character is found <strong>in time and in precision, not in colour</strong> — which is why no rule above is bent for it. Every device here either ships or is queued behind a named prerequisite.</p>
+<section id="shipped" class="level3">
+<h3 class="anchored" data-anchor-id="shipped">10.1 Shipped</h3>
+<p><strong>The construction grid, the spacing readout and the title block.</strong> The viewport rules a <strong>world coordinate plane</strong> — by default <strong>z = 0</strong>, the floor every scene stands on, since the library and every scene are Z-up — with a minor line, a firmer major every fifth, and the two axes a step above that: <strong>1.36 / 1.58 / 1.69:1</strong> on paper, fading outward from the orbit target and again once a cell falls under a few pixels, so the far field dissolves rather than aliasing. It is a per-fragment raycast in a fullscreen WGSL pass at clip z = 1, depth-tested against the ray-miss depth: it sits behind the solid, under every overlay, and costs one triangle. In Sketch mode, when the active plane is not the floor, the whole grid steps back one level — the sketch’s own plane becomes the reference, but the floor still says which way up the world is. There is no screen-space faceplate, no centre-axis ticks and no corner brackets: a grid that does not live in the scene says nothing about where anything is.</p>
+<p><strong>Which plane it rules.</strong> On z = 0 alone the grid is right in Top and Bottom and useless in Front, Back, Left and Right — exactly edge-on, one line, no grid at all in the four views someone reaches for to square a measurement up. So it moves to whichever world plane the camera most nearly faces, scored by |forward · n| with the floor weighted <strong>2×</strong>: the ground is the model’s ground and the slice contours, the depth ramp and the detent ladder are all stated at its spacing, so it holds every corner and edge view and yields only below a pitch of 26.6° in an axis view. The two crossovers <strong>dissolve over about three degrees</strong> rather than snapping, because swapping on a snapped preset would leave a camera at pitch 0 and yaw 20° with an edge-on floor and no grid at all — the swap has to be geometric, and a geometric swap can land anywhere. The <code>GRID</code> field states the plane it is on (<code>GRID 500 mm · XY</code>) beside the spacing, on the same footing as the octant beside <code>VIEW</code>: a spacing on an unnamed plane is not a measurement. <code>research/design/light-chrome/grid-{before,after,near-clip,plane-crossover}.png</code>.</p>
+<p><strong>A parallel camera has no near plane in front of it.</strong> The projection used one near/far pair for both projections, measured from the camera position, which is right for an eye and wrong for a station: an orthographic camera still sits at the orbit distance in front of its target, so everything nearer the camera plane than 0.05 was clipped — the whole half of the scene on the camera’s own side of what you are looking at. Orthographic now brackets a slab hung about the <strong>orbit target</strong>, <code>distance ± MAX_TRACE_DISTANCE</code>, which is <code>DEPTH_FAR</code> deep — the same range perspective gets and, being linear rather than 1/z, a uniformly finer depth buffer. <code>near</code> is negative, which is what a parallel projection’s near plane looks like when the camera is inside the scene.</p>
+<p>The readout states the grid spacing in real millimetres — the unit is not invented; the STEP exporter is the one place the repo declares a length and it stamps metres — always on a <strong>1-2-5 rung</strong>, and prefixed <code>&gt;</code> whenever an on-screen measurement is not to scale (perspective). Alt-wheel steps the rungs. The title block sits bottom-right per ASME Y14.100: SCENE / STUDY / MESH / SOLVER / REV, <code>—</code> where a field is empty. An empty or uncompiled viewport clears to paper and rules the floor; it never renders black.</p>
+<p><strong>The light viewport, and everything that assumed a black ground.</strong> The environment radiance is flat, because under the default orthographic camera every primary ray shares one direction and a directional dome collapses to a single colour that changed as you orbited. The FEM surface shades with a signed Lambert term plus a facing-ratio contour, not <code>abs(dot(n, l))</code>, which folds the normal sphere so every facet emits — correct when geometry is the only bright thing on screen, wrong when the ground is brighter than the part. All ten overlay tones, three gizmo axes, four BC hues and the constraint annotations are re-authored dark-on-paper with measured contrast.</p>
+</section>
+<section id="queued-in-order-of-delight-per-unit-of-cost" class="level3">
+<h3 class="anchored" data-anchor-id="queued-in-order-of-delight-per-unit-of-cost">10.2 Queued, in order of delight per unit of cost</h3>
+<ol type="1">
+<li><strong>The flag, and the hatch plate.</strong> An aircraft OFF flag is spring-loaded <em>in</em>; only a good signal holds it out, so a dead instrument cannot hide its own flag. A stale or unavailable value is replaced <strong>in its own slot</strong> by an opaque 45° hatch at 2.5px stripes with a 1px <code>rule-strong</code> border, exactly the width the value column occupies. <strong>Never grey the value; never remove the row.</strong> An unmanufacturable interval on a parameter rule is hatched, not shortened — a barber pole says <em>you may not go here</em>, a missing region says nothing (AC 23.1311-1C §17.7(b)). When an auto-coupled input is pinned by hand, the result region carries an <code>UNCAL</code> annunciator and the viewport reads <code>MEAS UNCAL</code> until it is re-coupled. Cost: effectively none. Ship this even if nothing else does — it is a correctness feature wearing a character costume.</li>
+<li><strong>First run and the empty states.</strong> An empty scope is a ruled screen waiting for a trace, not a blank one: graticule drawn, readout present and prefixed <code>&gt;</code>, title block present with <code>—</code> in every row it cannot fill, the legend a hatch with <code>—</code> endpoints. Empty copy has a form — name the missing precondition <strong>in the language of the program</strong> (anything from the source is mono), then exactly one clause of dry aside, then the action as a 9px tracked mono line. <strong>The aside must be true and must teach something;</strong> delete any sentence that is only a joke. The <code>cj</code> mark exercises its glyph set once per session (seven glyphs, 80 ms each, 560 ms total) — a nixie anti-poisoning routine, which is maintenance rather than ornament, and that is the only way ornament survives a system this strict. Never on tab or mode switches, and not at all under reduced motion.</li>
+<li><strong>The trajectory tape.</strong> The optimizer is the product’s whole argument and it is currently a sparkline. Make a run a scrubbable tape: the geometry morphs, the objective curve draws itself, each parameter walks its own machinist’s rule, and the source literals rewrite as it goes. 12 steps/s, total held to ≈3.4 s by dropping frames, never above 25 steps/s. The strip is <strong>detented</strong> — dragging snaps to the nearest recorded step, so it never lands between two real states. A parameter’s track is a machinist’s rule spanning its declared bounds: 20 minor divisions, every fifth major, no thumb, no fill, no track colour. Travel is shown by <strong>ghosting, not blur</strong> — the last five envelopes as thin achromatic outlines, drawn after the field, present only while moving. The objective is the one place editorial contrast is earned: a 30px mono number is licensed <strong>only</strong> on the objective of a live or replayed optimization. Prerequisite: the trajectory must be recorded and kept.</li>
+<li><strong>The fill.</strong> A 30-second solve is currently a spinner. Replace it with five annunciator cells that light in order — <code>COMPILE MESH ASSEMBLE SOLVE ADJOINT</code>, always allocated, never reflowing (the HP annunciator strip, whose whole virtue is that the layout does not move) — a mesh that builds bottom-up over the real duration of meshing, and a field that fills outward from its own boundary conditions, which is a <em>reading</em>: an iterative solve genuinely converges outward from its BCs. The residual is a nine-decade rule showing the solver’s real iterates, replaced instantly. <strong>No percentage of an unknowable whole.</strong> RUN becomes STOP and drops the accent — a running job is not the identity. Prerequisite: stage events and a residual stream from the pipeline.</li>
+<li><strong>The gradient gutter mark, and only the mark.</strong> A 2px <code>info</code> rule in the editor gutter on lines the adjoint tape touches — no background tint, and only on lines carrying a <em>free</em> parameter, never the whole declaration. <strong>At most fourteen marked lines:</strong> ten marked lines is information, twenty is wallpaper. The animated adjoint wavefront was built and deferred; see §12.</li>
+</ol>
+</section>
+<section id="the-one-break" class="level3">
+<h3 class="anchored" data-anchor-id="the-one-break">10.3 The one break</h3>
+<blockquote class="blockquote">
+<p><strong>One element per view may break the system, and it is always either the thing you act on or the thing that is moving right now.</strong> Since there is no spare hue to spend, the break is spent in <strong>luminance, length, plane or shape</strong> — one of those four, once per view. The 30px objective is one; the breathing RUN key is one; the hatch plate is one. If a view has two breaks, one of them is wrong.</p>
+</blockquote>
+<hr>
+</section>
+</section>
+<section id="what-this-language-refuses" class="level2">
+<h2 class="anchored" data-anchor-id="what-this-language-refuses">11. What this language refuses</h2>
+<ol type="1">
+<li><strong>No hue in chrome that is not the accent.</strong> If it is not a measurement and not the one accent block, it is achromatic.</li>
+<li><strong>The accent is never ink.</strong> 7.02:1 as a ground, 2.26:1 as ink: a filled block with near-black type, or nothing.</li>
+<li><strong>No colour inside the viewport rectangle that is not data.</strong> Selection and hover are achromatic; a chrome accent never enters the field.</li>
+<li><strong>No opacity-faded text.</strong> There are three ink levels; use one.</li>
+<li><strong>No new surface.</strong> Two steps above paper. If a proposed surface is under 3 ΔOKLab from an existing one, it <em>is</em> that surface.</li>
+<li><strong>No decorative gradient.</strong> A gradient in cadjoint is a colormap, and a colormap without a labelled scale beside it is a lie.</li>
+<li><strong>No text, and no colormap, on a backdrop that is a function of the data.</strong> A surface carrying glyphs or a legend is opaque; its contrast and its surround must be constants the linter can assert. This is not a taste position about glass — see §12.6.</li>
+<li><strong>No shadow, no glow, no neon.</strong> Elevation is a lighter sheet and a 1px edge.</li>
+<li><strong>No rounded corners.</strong> One radius and it is zero; circles only where roundness means “a point, not a region”.</li>
+<li><strong>No animated numbers, no skeleton shimmer, no spinner over content that is already legible.</strong></li>
+<li><strong>No indeterminate progress.</strong> A run reports the stage it is in, in words, and a quantity that is genuinely known.</li>
+<li><strong>No motion that changes a colour that is a reading.</strong> Trails, ghosts and fronts are achromatic or geometry-clipped; a field pixel is either its true value or it is not painted.</li>
+<li><strong>No second weight of hairline</strong>, and no border used to say “this is interactive”. Interactivity is said by height, baseline and hover.</li>
+<li><strong>No icon without a word</strong> for anything destructive, and no icon-only tool rail at desktop widths.</li>
+<li><strong>No inset control.</strong> A control is a plane, never a hole; a hole is what “disabled” looks like.</li>
+<li><strong>No token whose name is a colour.</strong> A repaint must be one file’s worth of change.</li>
+<li><strong>No value off the scales.</strong> Six sizes, seven spacings, five control heights, one radius, three durations.</li>
+</ol>
+<p>Two exclusions the user set, which are rules here and not preferences:</p>
+<ol start="18" type="1">
+<li><strong>No cropped display headline.</strong> The reference’s oversized headline running off the page edge is out. Identity rests on the <code>cj</code> block and the filled mode cell instead, and costs what it costs.</li>
+<li><strong>No decorative accent squares.</strong> Orange appears only where it marks something real — never pinned to grid nodes as ornament. The editor pane is framed by its rules alone.</li>
+</ol>
+<hr>
+</section>
+<section id="decisions-and-the-numbers-behind-them" class="level2">
+<h2 class="anchored" data-anchor-id="decisions-and-the-numbers-behind-them">12. Decisions, and the numbers behind them</h2>
+<p>The renders that produced these are in git history; the numbers are kept here so the reasoning is recoverable without them.</p>
+<section id="why-paper-and-what-it-costs" class="level3">
+<h3 class="anchored" data-anchor-id="why-paper-and-what-it-costs">12.1 Why paper, and what it costs</h3>
+<p>The field has a floor and a ceiling: <strong>viridis runs L 0.290 (<code>#460155</code>) to L 0.914 (<code>#fae720</code>)</strong>. A dark ground has to stay under the floor; a light ground has to stay over the ceiling. Paper at <strong>L 0.926 is brighter than 100% of viridis</strong> — but only by <strong>0.012 L of headroom</strong>.</p>
+<p>Light is not a clean inversion of the dark constraint:</p>
+<ul>
+<li><strong>Text separates from the field 2.7× better on paper</strong> — 0.085 L below the floor, against 0.031 L above the ceiling on dark.</li>
+<li><strong>Surface headroom collapses 8.7×.</strong> On paper the chrome is separated from the data by <strong>chroma alone</strong> (paper is 19.2 ΔOKLab from its nearest viridis sample), not by lightness.</li>
+</ul>
+<p>That trade is why the ink discipline in §3.2 and the zoning rule in §3.7 carry more weight here than they would on a dark ground.</p>
+</section>
+<section id="the-seam-is-a-rule-not-a-step" class="level3">
+<h3 class="anchored" data-anchor-id="the-seam-is-a-rule-not-a-step">12.2 The seam is a rule, not a step</h3>
+<p>With chrome and viewport both at <code>#e6e6e9</code> the boundary measures <code>dL 0.0000 · contrast 1.00:1 · dE(OKLab) 0.00</code>, and the rule drawn on it sits at L 0.726 — 1.96:1 against both sides. A luminance step at the seam (viewport at <code>#f8f7f8</code>) was built and measured at 1.17:1: it buys a boundary nobody needed and costs the hot decile 1.37:1 instead of the shared-ground reading. The seam is drawn.</p>
+</section>
+<section id="the-plate-as-an-object-measured-not-chosen" class="level3">
+<h3 class="anchored" data-anchor-id="the-plate-as-an-object-measured-not-chosen">12.3 The plate as an object — measured, not chosen</h3>
+<p>With both chrome and viewport light, does the field stay the subject? In two halves:</p>
+<ul>
+<li><strong>Solved: yes, and by more than on dark.</strong> Geometry separates from paper at <code>dL 0.446</code> against <code>0.332</code> from a dark void, because paper is farther from viridis’ body than black is.</li>
+<li><strong>Unsolved: no.</strong> Grey geometry on paper measures <code>dL 0.099</code> with <strong>51.9% of the part within a tenth of the ground</strong>, and viewport chroma collapses to 0.01% of pixels while the orange chrome holds 2.74% — the accent becomes the most saturated thing on screen and the model the least. The shipped light viewport measures <code>dL 0.076</code> today; the old dark chrome was hiding it.</li>
+<li><strong>The hot end costs too.</strong> With 0.012 L of headroom, 7.8% of a solved field sits within <code>dL 0.10</code> of its own ground and the hottest decile measures <strong>1.20:1</strong> — the yellow-green underside dissolves into the page.</li>
+</ul>
+<p>The answer measured is <strong>a dark plate set into the light page as an object, not a well cut out of it</strong>: it keeps the light system everywhere, restores the hot decile to <strong>5.54:1</strong>, gives an unambiguous boundary (<code>dL 0.8146</code>, 16.42:1), lifts the field’s share of screen chroma to <strong>11.35%</strong>, and fixes the unsolved case for free. <code>frontend/src/tokens.ts</code> still ships the shared-paper viewport, so this is a recorded alternative, not a plan: the user chose the shared-paper viewport after seeing it live, and the plate stays on file as the measured answer should unsolved geometry on paper ever need the lightness step back.</p>
+</section>
+<section id="why-the-accent-is-orange-and-only-a-fill" class="level3">
+<h3 class="anchored" data-anchor-id="why-the-accent-is-orange-and-only-a-fill">12.4 Why the accent is orange, and only a fill</h3>
+<p>Six candidate accents were measured for type contrast on the block and distance from both ramps. <code>#f87318</code> takes near-black type at 7.02:1 and sits 26.6 ΔOKLab from viridis — the largest ramp distance of any candidate that also carries type. Lime <code>#d9ff57</code> is 6.3 from viridis and 17.92:1 under black: legible, but it is a <em>hot field sample</em>, which is the whole reason the old palette failed. Yellow is 4.4 from viridis, worse. Blue <code>#1f3fe0</code> and magenta <code>#e5007d</code> need white type, which puts a second ink on the block.</p>
+<p>About thirty sites were drawing the accent as ink. Converting every one to a filled block with near-black type is the change that made the direction legible rather than merely light.</p>
+</section>
+<section id="chrome-temperature-is-a-rounding-error" class="level3">
+<h3 class="anchored" data-anchor-id="chrome-temperature-is-a-rounding-error">12.5 Chrome temperature is a rounding error</h3>
+<p>At the chroma this language permits chrome (C ≤ 0.014), a <strong>221° hue rotation</strong> moves every surface by less than or barely one JND — 0.73 to 2.25 ΔOKLab across the whole ladder. Temperature only becomes visible at C ≥ 0.03, which is exactly where a chrome hue starts competing with a reading. Anyone asking for warmer greys is asking for a chroma this language has already declined.</p>
+</section>
+<section id="glass-with-the-receipt" class="level3">
+<h3 class="anchored" data-anchor-id="glass-with-the-receipt">12.6 Glass, with the receipt</h3>
+<p>Measured over a worst-case backdrop, a tuned translucent panel drops <code>ink-3</code> to <strong>3.42:1</strong> and a naive one drops <code>ink-2</code> to 4.34:1 and <code>ink-3</code> to 2.68:1 — it fails on the <em>third</em> ink level, which is exactly the level that carries labels and units. The deeper objection is the spread, not the mean: background σ under a column of glyphs goes from 0.016–0.020 to 0.048–0.077, so a translucent panel does not have a contrast ratio, it has a <em>distribution that moves when the camera orbits</em>.</p>
+<p>The argument that settles it cannot be answered by turning a knob: <strong>the panel contains a colormap legend.</strong> Measured ΔE76 of the panel ground as the field behind it sweeps viridis(0) → viridis(1) is <strong>36.4 at α 0.82, 18.9 at 0.91, 8.3 at 0.96, and 0.0 only at 1.00.</strong> A viridis chip judged against an olive-shifted ground is a correctness defect in an instrument. Below α ≈ 0.5, <code>ink-3</code> passes through zero contrast and re-emerges as dark-on-light as the field heats — a label that inverts polarity mid-solve.</p>
+<p>On cost: <strong>translucency itself is free; only the blur is not.</strong> Isolated on an M-series machine, α 0.85 without blur measures −0.02 ms/frame against opaque and with <code>blur(20px)</code> measures <strong>+0.49 ms</strong> — ≈2.9% of a 60 fps budget. It scales with the <em>canvas</em>, not the panel (+0.055 ms at 1.43 MPix, +0.627 at 12.86), because a pixel-moving filter unions the panel’s whole rect into frame damage (<code>cc/trees/damage_tracker.cc</code>), and the viewport damages itself every frame of a solve. Excalidraw removed <code>backdrop-filter</code> from panels over a live canvas for this reason (#3505 / #3506); Linear declined Liquid Glass on legibility grounds; Figma reverted UI3’s floating panels because the canvas peeking around them was distracting.</p>
+<p>The need this was serving — <em>what is under the panel?</em> — is answered by a <strong>peek</strong>: hold a key and the panel drops to 15% with its text hidden entirely, for as long as it is held.</p>
+</section>
+<section id="rejected-with-the-measurement" class="level3">
+<h3 class="anchored" data-anchor-id="rejected-with-the-measurement">12.7 Rejected, with the measurement</h3>
+<ul>
+<li><strong>Motion blur on morphing geometry.</strong> Built and measured against the true frame: mean ΔE76 6.2, p95 11.0, max 21.9; <strong>97% of on-part pixels above JND</strong>, and it repaints <strong>54% of the part’s area outside the true silhouette</strong>. The smear averages five viridis samples into one pixel, so the band is a temperature no node ever had. Rejected on correctness, not taste — ghosting gives the same sense of travel with zero colour error.</li>
+<li><strong>Odometer / split-flap digits.</strong> Every frame of the roll shows a value that is partly one number and partly another, on a screen where people read tolerances. The ballistics belong on a needle or a bar, where nothing is being spelled.</li>
+<li><strong>The adjoint wavefront.</strong> The mechanism is right and the ordering genuinely reads backward, but at 1× it is twenty-odd small flashes in sequence and lands closer to “busy” than to “wave”. The permanent gutter mark carries most of the meaning for none of the motion. Revisit only once the marked-line set is proven to stay under fourteen.</li>
+<li><strong>Gradient magnitude as bars in the panel.</strong> Five ramp-coloured bars above the field legend read as progress bars and compete with the legend. Draw the <em>direction</em> achromatically; let the magnitude be a signed number in mono.</li>
+<li><strong>0 / 10 / 90 / 100% rise-time markers</strong> on the graticule. On a scope they are a normalisation ritual for a waveform; there is no analogue for a 3D field on a spatial axis, so they are four labelled ticks that mean nothing. Recorded here so nobody adds them back for the look of the thing.</li>
+<li><strong>One very large number per panel.</strong> A 40px hero metric is a dashboard gesture. The one licensed exception is §10.2’s optimizer objective.</li>
+<li><strong>Border-led hierarchy.</strong> A resting border at 3:1 turns every panel into a drawn box. Borders move with elevation as an idea; here it is spent on the hairline ladder.</li>
+</ul>
+</section>
+<section id="what-was-looked-at" class="level3">
+<h3 class="anchored" data-anchor-id="what-was-looked-at">12.8 What was looked at</h3>
+<p>Tektronix 2213 (graticule divisions and subdivisions; the detent), 475A (minor ticks on the centre axes only) and 2465 (<code>&gt;</code> for an uncalibrated scale factor); HP 5245L, 3478A and 8566B for annunciators and <code>MEAS UNCAL</code>; FAA-H-8083-15B and AC 25-11B §6.2.1.7 for OFF flags in the location of the information they replace; AC 23.1311-1C §17.7(b) for the 45° barber pole; the Garmin G1000 trend vector, which is <em>absent</em> when the value is steady; ASME Y14.5-2018 §4.3.2 (decimal places <em>are</em> the tolerance) and Y14.100-2017 (the title block); IEC 60268-17 / ITU-R BS.2054-4 for VU ballistics and IEC 60268-10 for PPM asymmetry; ANSI C39.1-1981 for dead-beat; nixie cathode-poisoning prevention routines; Braun’s ET 66, whose single yellow key licenses the one-break rule; Radix, Geist and Linear for elevation-as-a-scale; Grether (1949) on the three-pointer altimeter, the standing argument against any compact multi-ring dial.</p>
+<p>Three claims that earlier drafts made and the sources do <strong>not</strong> support, dropped here so they are not reintroduced: there is no published HP standard assigning colours to functional groups; no primary HP source names Bauhaus, Braun or Rams as an influence; and there is no “dot at 12” as a named Braun device — the documented differentiator on Lubs’ dials is tick <em>length</em>.</p>
+<hr>
+</section>
+</section>
+<section id="making-it-stick" class="level2">
+<h2 class="anchored" data-anchor-id="making-it-stick">13. Making it stick</h2>
+<p>The language is only real if something fails on it.</p>
+<ul>
+<li><strong><code>frontend/test/tokens.test.ts</code></strong> asserts that <code>styles.css</code> declares every token in <code>tokens.ts</code> with the same value; that no raw hex, literal font-size or off-scale type size escapes the token layer; that there is one radius and it is zero; that the stylesheet casts no shadow; that tracking is a function of size; that every text tone clears AA on every surface and every meaningful non-text tone clears 3:1; that the accent clears 7:1 as a ground and fails 3:1 as ink; that nothing drawn inside the viewport rectangle carries chroma; and that chrome and viewport sit on the same sheet.</li>
+<li><strong><code>frontend/test/graticule.test.ts</code></strong> holds the floor-grid tones inside the 1.6–2.8:1 furniture band — a band, not a floor.</li>
+<li><strong><code>frontend/tools/ui-audit/audit.mjs</code></strong> drives a real Chromium through every mode, tab and popover at several widths and measures the result from computed style and layout. It reports; it never edits. The light chrome pass took it from 251 findings to 119 to <strong>39</strong>, with control borders 70 → 0 and 71 <code>border-radius</code> declarations deleted.</li>
+</ul>
+<p>Checks worth adding as the queued devices land:</p>
+<ul>
+<li><code>field-floor</code> / <code>field-ceiling</code> — any chrome fill over 4 000 px² that crosses the ramp’s bound on whichever side the ground is on.</li>
+<li><code>ramp-adjacency</code> — any element painted with a ramp sample that is not inside a legend with two labelled endpoints.</li>
+<li><code>numeric-face</code> — any element whose text matches <code>^[-+]?[0-9]</code> whose resolved family is not monospaced, or which lacks <code>tabular-nums</code>.</li>
+<li><code>replayable</code> — any element whose text changes on more than two consecutive animation frames must be able to name the recorded step its value came from. A number that cannot is a tween.</li>
+</ul>
+<hr>
+</section>
+<section id="files" class="level2">
+<h2 class="anchored" data-anchor-id="files">14. Files</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>what</th>
+<th>where</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>the language</td>
+<td><code>research/design-language.md</code> (this file)</td>
+</tr>
+<tr class="even">
+<td>the tokens, and the truth</td>
+<td><code>frontend/src/tokens.ts</code></td>
+</tr>
+<tr class="odd">
+<td>the mirror</td>
+<td><code>frontend/src/styles.css</code></td>
+</tr>
+<tr class="even">
+<td>the assertions</td>
+<td><code>frontend/test/tokens.test.ts</code>, <code>frontend/test/graticule.test.ts</code></td>
+</tr>
+<tr class="odd">
+<td>the linter</td>
+<td><code>frontend/tools/ui-audit/</code></td>
+</tr>
+<tr class="even">
+<td>the app as shipped, in screenshots</td>
+<td><code>docs/assets/screens/</code></td>
+</tr>
+<tr class="odd">
+<td>the README animations, captured live</td>
+<td><code>research/design/motion/</code></td>
+</tr>
+<tr class="even">
+<td>evidence for a specific claim, where one was needed</td>
+<td><code>research/design/light-chrome/</code>, <code>research/design/scenes/</code></td>
+</tr>
+<tr class="odd">
+<td>the refactor, before and after</td>
+<td><code>research/refactor/</code></td>
+</tr>
+</tbody>
+</table>
+<p>The exploration that chose this language — the dark and light variants, the brutalist and combined panels, the graticule and window studies, and their measurement dumps — is deleted. It was the argument for the design, not the design, and every number it settled is quoted where it is used: the tokens carry their own measurements in <code>frontend/src/tokens.ts</code>, and the linter in <code>frontend/tools/ui-audit/</code> re-derives the rest from the running app, which is a check the pictures could never be.</p>
+
+
+</section>
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/andrinr\.github\.io\/cadjoint\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

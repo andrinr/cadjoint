@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.10.18">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="description" content="One object that says both what a part looks like and what it is made of — and a simulation that reads it.">
+
+<title>Materials – cadjoint</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-89af0c2d685ccb09a4d7d65decb66752.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+</head>
+
+<body class="nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">cadjoint</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../docs/getting-started.html"> 
+<span class="menu-text">Get Started</span></a>
+  </li>  
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-guides" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Guides</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-guides">    
+        <li>
+    <a class="dropdown-item" href="../docs/meshing.html">
+ <span class="dropdown-text">Differentiable Meshing</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../docs/simulation.html">
+ <span class="dropdown-text">Simulation</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../docs/flow.html">
+ <span class="dropdown-text">Flow Solver (prototype)</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../docs/optimization.html">
+ <span class="dropdown-text">Optimization</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../docs/plugins.html">
+ <span class="dropdown-text">Plugins</span></a>
+  </li>  
+        <li><hr class="dropdown-divider"></li>
+        <li>
+    <a class="dropdown-item" href="../docs/materials.html">
+ <span class="dropdown-text">Materials</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../docs/rendering.html">
+ <span class="dropdown-text">Forward Renderer</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="../docs/viewer.html"> 
+<span class="menu-text">Playground</span></a>
+  </li>  
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-examples" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Examples</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-examples">    
+        <li>
+    <a class="dropdown-item" href="../examples/basics.html">
+ <span class="dropdown-text">Basics</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/rendering.html">
+ <span class="dropdown-text">Rendering</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/sketch_construction.html">
+ <span class="dropdown-text">Sketch Construction</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/constraints.html">
+ <span class="dropdown-text">Constraints</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/optimization.html">
+ <span class="dropdown-text">Optimization</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/constrained_optimization.html">
+ <span class="dropdown-text">Constrained Optimization</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-research" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Research</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-research">    
+        <li>
+    <a class="dropdown-item" href="../research/differentiable-meshing-pipeline.html">
+ <span class="dropdown-text">Differentiable meshing pipeline</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/performance.html">
+ <span class="dropdown-text">Where the seconds go (performance)</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/fem-integration.html">
+ <span class="dropdown-text">FEM integration</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/tet-vs-hex.html">
+ <span class="dropdown-text">Tet vs hex meshing</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/end-to-end-optimization.html">
+ <span class="dropdown-text">End-to-end optimization</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/path-tracing.html">
+ <span class="dropdown-text">WebGPU SDF path tracing</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/simulator-ecosystem.html">
+ <span class="dropdown-text">Simulator ecosystem survey</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/constraints.html">
+ <span class="dropdown-text">Constraint system</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/flow-solver.html">
+ <span class="dropdown-text">Differentiable flow solver</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/complex-scene.html">
+ <span class="dropdown-text">Modelling a gearbox end-cap</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/design-language.html">
+ <span class="dropdown-text">The design language</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="../reference/index.html"> 
+<span class="menu-text">API Reference</span></a>
+  </li>  
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/andrinr/cadjoint"> <i class="bi bi-github" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#unspecified-means-unspecified" id="toc-unspecified-means-unspecified" class="nav-link active" data-scroll-target="#unspecified-means-unspecified">Unspecified means unspecified</a></li>
+  <li><a href="#the-catalogue" id="toc-the-catalogue" class="nav-link" data-scroll-target="#the-catalogue">The catalogue</a></li>
+  <li><a href="#properties-can-be-free" id="toc-properties-can-be-free" class="nav-link" data-scroll-target="#properties-can-be-free">Properties can be free</a></li>
+  <li><a href="#a-scene-is-a-material-field" id="toc-a-scene-is-a-material-field" class="nav-link" data-scroll-target="#a-scene-is-a-material-field">A scene is a material <em>field</em></a></li>
+  <li><a href="#mass" id="toc-mass" class="nav-link" data-scroll-target="#mass">Mass</a></li>
+  <li><a href="#inspecting-a-material" id="toc-inspecting-a-material" class="nav-link" data-scroll-target="#inspecting-a-material">Inspecting a material</a></li>
+  <li><a href="#further-reading" id="toc-further-reading" class="nav-link" data-scroll-target="#further-reading">Further reading</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Materials</h1>
+</div>
+
+<div>
+  <div class="description">
+    One object that says both what a part looks like and what it is made of — and a simulation that reads it.
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>A <code>Material</code> in cadjoint carries two families of properties at once:</p>
+<ul>
+<li><strong>Optical</strong> — <code>color</code>, <code>roughness</code>, <code>metallic</code>, <code>opacity</code>, <code>ior</code>, <code>reflectivity</code>. What the renderer shades with. Every one has a default, so a bare <code>Material()</code> is white matte plastic.</li>
+<li><strong>Physical</strong> — <code>density</code>, <code>conductivity</code>, <code>specific_heat</code>, <code>youngs_modulus</code>, <code>poisson_ratio</code>, <code>thermal_expansion</code>, <code>yield_strength</code>. What the solver solves with, in <strong>SI units</strong>. Every one defaults to <code>None</code>, meaning <em>not specified</em>.</li>
+</ul>
+<p>They live in one object because they describe one thing. A scene that says a slug is copper has already said it is orange, that it conducts 391 W/(m·K), and that it weighs 8940 kg/m³ — asking the author to say “copper” twice, once for the picture and once for the physics, is how the two drift apart.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.render <span class="im">import</span> Material</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>copper <span class="op">=</span> Material(</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    name<span class="op">=</span><span class="st">"copper"</span>,</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>    color<span class="op">=</span>[<span class="fl">0.72</span>, <span class="fl">0.45</span>, <span class="fl">0.20</span>], roughness<span class="op">=</span><span class="fl">0.30</span>, metallic<span class="op">=</span><span class="fl">1.0</span>,</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>    density<span class="op">=</span><span class="fl">8940.0</span>, conductivity<span class="op">=</span><span class="fl">391.0</span>, specific_heat<span class="op">=</span><span class="fl">385.0</span>,</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>    youngs_modulus<span class="op">=</span><span class="fl">117e9</span>, poisson_ratio<span class="op">=</span><span class="fl">0.34</span>,</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>    thermal_expansion<span class="op">=</span><span class="fl">17.0e-6</span>, yield_strength<span class="op">=</span><span class="fl">69e6</span>,</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<section id="unspecified-means-unspecified" class="level2">
+<h2 class="anchored" data-anchor-id="unspecified-means-unspecified">Unspecified means unspecified</h2>
+<p>A physical property you do not state stays unstated. It does not quietly become zero, or one, or “steel”.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>Material(color<span class="op">=</span>[<span class="fl">1.0</span>, <span class="fl">0.0</span>, <span class="fl">0.0</span>]).get(<span class="st">"density"</span>)   <span class="co"># None</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>That matters when a study asks for it. Rather than solving with an invented number, the study fails and names what is missing:</p>
+<pre><code>ValueError: study 'sink-conduction': the scene's material field does not
+specify 'conductivity' for 6412 of 6412 elements. Give every material in the
+simulated domain a 'conductivity' value (see cadjoint.materials for a
+catalogue of real ones), or pass an explicit scalar to the study.</code></pre>
+<p>Internally an unstated property is carried as <code>NaN</code> in <code>as_dict()</code>, so the material dict keeps one static pytree structure across a whole scene, and blending an unstated value with a stated one yields <code>NaN</code> — still unknown, which is the honest answer.</p>
+</section>
+<section id="the-catalogue" class="level2">
+<h2 class="anchored" data-anchor-id="the-catalogue">The catalogue</h2>
+<p><code>cadjoint.materials</code> ships real values so a scene never has to invent one. Each entry is a <strong>factory</strong>, not a singleton, so marking one scene’s copper <code>free</code> cannot leak into another scene:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> jax.numpy <span class="im">as</span> jnp</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.materials <span class="im">import</span> aluminium_6061, copper_c11000</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf.boolean <span class="im">import</span> Union</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf.primitives <span class="im">import</span> Box, Cylinder</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf.transforms <span class="im">import</span> Translate</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>sink <span class="op">=</span> Box([<span class="fl">0.6</span>, <span class="fl">0.6</span>, <span class="fl">0.2</span>], material<span class="op">=</span>aluminium_6061())</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>slug <span class="op">=</span> Translate(Cylinder(radius<span class="op">=</span><span class="fl">0.2</span>, height<span class="op">=</span><span class="fl">0.4</span>, material<span class="op">=</span>copper_c11000()),</span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>                 offset<span class="op">=</span>jnp.array([<span class="fl">0.0</span>, <span class="fl">0.0</span>, <span class="fl">0.1</span>]))</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>scene <span class="op">=</span> Union((sink, slug), smoothness<span class="op">=</span><span class="fl">0.03</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 12%">
+<col style="width: 12%">
+<col style="width: 12%">
+<col style="width: 12%">
+<col style="width: 12%">
+<col style="width: 12%">
+<col style="width: 12%">
+<col style="width: 12%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Factory</th>
+<th>Density (kg/m³)</th>
+<th>k (W/(m·K))</th>
+<th>cₚ (J/(kg·K))</th>
+<th>E (GPa)</th>
+<th>ν</th>
+<th>α (1/K)</th>
+<th>Yield (MPa)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>aluminium_6061()</code></td>
+<td>2700</td>
+<td>167</td>
+<td>896</td>
+<td>68.9</td>
+<td>0.33</td>
+<td>23.6e-6</td>
+<td>276</td>
+</tr>
+<tr class="even">
+<td><code>copper_c11000()</code></td>
+<td>8940</td>
+<td>391</td>
+<td>385</td>
+<td>117</td>
+<td>0.34</td>
+<td>17.0e-6</td>
+<td>69</td>
+</tr>
+<tr class="odd">
+<td><code>steel_1018()</code></td>
+<td>7870</td>
+<td>51.9</td>
+<td>486</td>
+<td>205</td>
+<td>0.29</td>
+<td>11.5e-6</td>
+<td>370</td>
+</tr>
+<tr class="even">
+<td><code>titanium_ti6al4v()</code></td>
+<td>4430</td>
+<td>6.7</td>
+<td>526.3</td>
+<td>113.8</td>
+<td>0.342</td>
+<td>8.6e-6</td>
+<td>880</td>
+</tr>
+<tr class="odd">
+<td><code>fr4()</code></td>
+<td>1850</td>
+<td>0.29</td>
+<td>1100</td>
+<td>24</td>
+<td>0.136</td>
+<td>14e-6</td>
+<td>310</td>
+</tr>
+<tr class="even">
+<td><code>silicon()</code></td>
+<td>2329</td>
+<td>148</td>
+<td>700</td>
+<td>130</td>
+<td>0.28</td>
+<td>2.6e-6</td>
+<td>165</td>
+</tr>
+<tr class="odd">
+<td><code>thermal_pad()</code></td>
+<td>2500</td>
+<td>3.0</td>
+<td>1000</td>
+<td>0.001</td>
+<td>0.49</td>
+<td>200e-6</td>
+<td>0.5</td>
+</tr>
+<tr class="even">
+<td><code>pla()</code></td>
+<td>1240</td>
+<td>0.13</td>
+<td>1800</td>
+<td>3.5</td>
+<td>0.36</td>
+<td>68e-6</td>
+<td>50</td>
+</tr>
+</tbody>
+</table>
+<p>Every factory’s docstring cites its sources — MatWeb and ASM datasheets for the metals, the CRC Handbook for the elements, NEMA/IPC and laminate datasheets for FR-4, Hopcroft <em>et al.</em> (JMEMS 2010) for silicon’s modulus, NatureWorks and Farah <em>et al.</em> for PLA. <code>aluminum_6061</code> is a US-spelling alias.</p>
+<p>Three of them come with caveats you should read before trusting a number, and the docstrings say so plainly:</p>
+<ul>
+<li><strong>FR-4</strong> is orthotropic. The entry takes the <em>through-thickness</em> conductivity (0.29, versus ~0.8–1.0 in plane) and the <em>in-plane</em> elastic constants, because those are the numbers that usually decide the answer. <code>yield_strength</code> holds the ultimate tensile strength — FR-4 is brittle and has no yield plateau.</li>
+<li><strong>Silicon</strong> is elastically anisotropic; the entry uses ⟨100⟩ (E = 130 GPa). Its <code>yield_strength</code> is a conservative practical <em>fracture</em> strength, which in reality is dominated by edge and surface damage.</li>
+<li><strong>The thermal pad</strong> has ν = 0.49. Elastomers really are that close to incompressible, and linear HEX8/TET4 elements <em>lock</em> volumetrically there. Use TET10, or drop the ratio deliberately, if the pad’s compliance is what you are solving for.</li>
+</ul>
+</section>
+<section id="properties-can-be-free" class="level2">
+<h2 class="anchored" data-anchor-id="properties-can-be-free">Properties can be free</h2>
+<p>Physical properties go through the same <code>Parameter</code> containers as colors, so an optimizer can tune one:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>tunable <span class="op">=</span> Material(<span class="st">"tim"</span>, conductivity<span class="op">=</span><span class="fl">3.0</span>, free<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>tunable.params[<span class="st">"conductivity"</span>].free     <span class="co"># True</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>tunable.params[<span class="st">"conductivity"</span>].bounds   <span class="co"># (0.001, 3000.0)</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><code>free=True</code> marks only the properties the material actually states — a <em>free</em> NaN would be meaningless — and the bounds are wide engineering brackets (aerogel to tungsten), there to keep a descent inside physical territory rather than to encode a material choice.</p>
+</section>
+<section id="a-scene-is-a-material-field" class="level2">
+<h2 class="anchored" data-anchor-id="a-scene-is-a-material-field">A scene is a material <em>field</em></h2>
+<p>Every SDF node answers <code>material_at(p)</code>, and the smooth booleans blend the answers. So a scene assembled from several materials is already a continuous field of physical properties: copper’s conductivity inside the slug, aluminium’s outside, and a transition exactly as wide as the CSG blend that joins them.</p>
+<p>That is what the simulation layer samples, per element, at solve time — see <a href="../docs/simulation.html#materials-drive-the-solve">Simulation → Materials drive the solve</a>. It is also what makes the whole thing differentiable: moving the interface moves the property field smoothly, so a gradient flows through it.</p>
+</section>
+<section id="mass" class="level2">
+<h2 class="anchored" data-anchor-id="mass">Mass</h2>
+<p>With densities on the materials, mass becomes measurable — and differentiable, so it can regularize an optimization:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf <span class="im">import</span> material_mass, volume</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>lattice <span class="op">=</span> <span class="bu">dict</span>(bounds<span class="op">=</span>(<span class="op">-</span><span class="fl">0.7</span>, <span class="op">-</span><span class="fl">0.7</span>, <span class="op">-</span><span class="fl">0.3</span>), size<span class="op">=</span>(<span class="fl">1.4</span>, <span class="fl">1.4</span>, <span class="fl">0.8</span>), resolution<span class="op">=</span><span class="dv">70</span>)</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="bu">float</span>(volume(scene, <span class="op">**</span>lattice)))          <span class="co"># 0.609  m³, shape only</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="bu">float</span>(material_mass(scene, <span class="op">**</span>lattice)))   <span class="co"># 2074.6 kg, weighted by what each region is</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><code>material_mass</code> is the mass counterpart of <code>volume</code> and takes the same arguments — a sampling box and a resolution, and the <code>epsilon</code> of the sigmoid that softens the boundary. It also accepts an explicit sample lattice, which is the form a scene’s own regularizer usually already has:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> jax</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint <span class="im">import</span> extract_parameters, functionalize</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>free, fixed, _ <span class="op">=</span> extract_parameters(scene)</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>sdf <span class="op">=</span> functionalize(scene)(free, fixed)</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>axis <span class="op">=</span> jnp.linspace(<span class="op">-</span><span class="fl">0.7</span>, <span class="fl">0.7</span>, <span class="dv">70</span>)</span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>cells <span class="op">=</span> jnp.stack(jnp.meshgrid(axis, axis, axis, indexing<span class="op">=</span><span class="st">"ij"</span>), <span class="op">-</span><span class="dv">1</span>).reshape(<span class="op">-</span><span class="dv">1</span>, <span class="dv">3</span>)</span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>cell_volume <span class="op">=</span> <span class="bu">float</span>(axis[<span class="dv">1</span>] <span class="op">-</span> axis[<span class="dv">0</span>]) <span class="op">**</span> <span class="dv">3</span></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a><span class="co"># a volume regularizer …</span></span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>cell_volume <span class="op">*</span> jnp.<span class="bu">sum</span>(jax.nn.sigmoid(<span class="op">-</span>jax.vmap(sdf)(cells) <span class="op">/</span> <span class="fl">0.03</span>))</span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a><span class="co"># … and the same thing weighted by what each cell is made of</span></span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a>material_mass(scene, cells, cell_volume, epsilon<span class="op">=</span><span class="fl">0.03</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>For a single-material part the two differ only by a constant. As soon as a design can trade copper for aluminium, mass is the quantity that actually matters. On a mesh, <code>cadjoint.fem.properties.total_mass(points, cells, density)</code> gives the exact element-wise sum instead of a lattice estimate — and a solved study reports it directly as <code>result.mass</code>.</p>
+</section>
+<section id="inspecting-a-material" class="level2">
+<h2 class="anchored" data-anchor-id="inspecting-a-material">Inspecting a material</h2>
+<p><code>describe()</code> is the JSON-ready payload the playground’s Materials window reads — and edits, physical properties included, as <a href="../docs/viewer.html#materials">source rewrites</a>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>Material(<span class="st">"al"</span>, color<span class="op">=</span>[<span class="fl">0.8</span>, <span class="fl">0.8</span>, <span class="fl">0.82</span>], density<span class="op">=</span><span class="fl">2700.0</span>, conductivity<span class="op">=</span><span class="fl">167.0</span>).describe()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode json code-with-copy"><code class="sourceCode json"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">"color"</span><span class="fu">:</span> <span class="ot">[</span><span class="fl">0.8</span><span class="ot">,</span> <span class="fl">0.8</span><span class="ot">,</span> <span class="fl">0.82</span><span class="ot">]</span><span class="fu">,</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>  <span class="dt">"roughness"</span><span class="fu">:</span> <span class="fl">0.5</span><span class="fu">,</span> <span class="dt">"metallic"</span><span class="fu">:</span> <span class="fl">0.0</span><span class="fu">,</span> <span class="dt">"opacity"</span><span class="fu">:</span> <span class="fl">1.0</span><span class="fu">,</span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>  <span class="dt">"ior"</span><span class="fu">:</span> <span class="fl">1.0</span><span class="fu">,</span> <span class="dt">"reflectivity"</span><span class="fu">:</span> <span class="fl">0.0</span><span class="fu">,</span></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>  <span class="dt">"physical"</span><span class="fu">:</span> <span class="fu">{</span></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>    <span class="dt">"density"</span><span class="fu">:</span> <span class="fl">2700.0</span><span class="fu">,</span> <span class="dt">"conductivity"</span><span class="fu">:</span> <span class="fl">167.0</span><span class="fu">,</span></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>    <span class="dt">"specific_heat"</span><span class="fu">:</span> <span class="kw">null</span><span class="fu">,</span> <span class="dt">"youngs_modulus"</span><span class="fu">:</span> <span class="kw">null</span><span class="fu">,</span></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>    <span class="dt">"poisson_ratio"</span><span class="fu">:</span> <span class="kw">null</span><span class="fu">,</span> <span class="dt">"thermal_expansion"</span><span class="fu">:</span> <span class="kw">null</span><span class="fu">,</span></span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>    <span class="dt">"yield_strength"</span><span class="fu">:</span> <span class="kw">null</span></span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">},</span></span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>  <span class="dt">"units"</span><span class="fu">:</span> <span class="fu">{</span><span class="dt">"density"</span><span class="fu">:</span> <span class="st">"kg/m^3"</span><span class="fu">,</span> <span class="dt">"conductivity"</span><span class="fu">:</span> <span class="st">"W/(m*K)"</span><span class="fu">,</span> <span class="dt">"…"</span><span class="fu">:</span> <span class="st">"…"</span><span class="fu">},</span></span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>  <span class="dt">"free"</span><span class="fu">:</span> <span class="fu">{</span><span class="dt">"color"</span><span class="fu">:</span> <span class="kw">false</span><span class="fu">,</span> <span class="dt">"density"</span><span class="fu">:</span> <span class="kw">false</span><span class="fu">,</span> <span class="dt">"…"</span><span class="fu">:</span> <span class="kw">false</span><span class="fu">}</span></span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><code>physical</code> values are floats or <code>null</code>; <code>units</code> names the SI unit of each so a panel can label a field without hard-coding it; <code>free</code> flags which properties an optimizer controls.</p>
+</section>
+<section id="further-reading" class="level2">
+<h2 class="anchored" data-anchor-id="further-reading">Further reading</h2>
+<ul>
+<li><a href="../docs/simulation.html">Simulation</a> — how a study samples this field per element.</li>
+<li><a href="../docs/rendering.html">Forward renderer</a> — the optical half of the same object.</li>
+<li><a href="../docs/optimization.html">Optimization</a> — regularizing a descent by mass.</li>
+</ul>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/andrinr\.github\.io\/cadjoint\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

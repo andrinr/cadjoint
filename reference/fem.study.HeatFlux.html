@@ -80,7 +80,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <link href="../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-f83c246346592b24d02aa84ae3974412.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-89af0c2d685ccb09a4d7d65decb66752.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -147,14 +147,22 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
  <span class="dropdown-text">Simulation</span></a>
   </li>  
         <li>
+    <a class="dropdown-item" href="../docs/flow.html">
+ <span class="dropdown-text">Flow Solver (prototype)</span></a>
+  </li>  
+        <li>
     <a class="dropdown-item" href="../docs/optimization.html">
  <span class="dropdown-text">Optimization</span></a>
   </li>  
         <li>
-    <a class="dropdown-item" href="../docs/tesseracts.html">
- <span class="dropdown-text">Tesseracts</span></a>
+    <a class="dropdown-item" href="../docs/plugins.html">
+ <span class="dropdown-text">Plugins</span></a>
   </li>  
         <li><hr class="dropdown-divider"></li>
+        <li>
+    <a class="dropdown-item" href="../docs/materials.html">
+ <span class="dropdown-text">Materials</span></a>
+  </li>  
         <li>
     <a class="dropdown-item" href="../docs/rendering.html">
  <span class="dropdown-text">Forward Renderer</span></a>
@@ -206,8 +214,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
  <span class="dropdown-text">Differentiable meshing pipeline</span></a>
   </li>  
         <li>
-    <a class="dropdown-item" href="../research/native-mesher.html">
- <span class="dropdown-text">Native (Rust) dual-contouring core</span></a>
+    <a class="dropdown-item" href="../research/performance.html">
+ <span class="dropdown-text">Where the seconds go (performance)</span></a>
   </li>  
         <li>
     <a class="dropdown-item" href="../research/fem-integration.html">
@@ -232,6 +240,18 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
         <li>
     <a class="dropdown-item" href="../research/constraints.html">
  <span class="dropdown-text">Constraint system</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/flow-solver.html">
+ <span class="dropdown-text">Differentiable flow solver</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/complex-scene.html">
+ <span class="dropdown-text">Modelling a gearbox end-cap</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/design-language.html">
+ <span class="dropdown-text">The design language</span></a>
   </li>  
     </ul>
   </li>
@@ -264,6 +284,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <ul>
   <li><a href="#cadjoint.fem.study.HeatFlux" id="toc-cadjoint.fem.study.HeatFlux" class="nav-link active" data-scroll-target="#cadjoint.fem.study.HeatFlux">fem.study.HeatFlux</a>
   <ul class="collapse">
+  <li><a href="#attributes" id="toc-attributes" class="nav-link" data-scroll-target="#attributes">Attributes</a></li>
   <li><a href="#methods" id="toc-methods" class="nav-link" data-scroll-target="#methods">Methods</a>
   <ul class="collapse">
   <li><a href="#cadjoint.fem.study.HeatFlux.describe" id="toc-cadjoint.fem.study.HeatFlux.describe" class="nav-link" data-scroll-target="#cadjoint.fem.study.HeatFlux.describe">describe</a></li>
@@ -283,6 +304,23 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>fem.study.HeatFlux(nodes, flux)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>Prescribed heat inflow per area on the faces spanned by a selection.</p>
 <p>Positive flux heats the body. Solvable on the direct backend and the thermal tesseract alike (Neumann surface integral either way).</p>
+<section id="attributes" class="level2">
+<h2 class="anchored" data-anchor-id="attributes">Attributes</h2>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Name</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a href="#cadjoint.fem.study.HeatFlux.serializable">serializable</a></td>
+<td>Whether :meth:<code>describe</code> round-trips (false for predicates).</td>
+</tr>
+</tbody>
+</table>
+</section>
 <section id="methods" class="level2">
 <h2 class="anchored" data-anchor-id="methods">Methods</h2>
 <table class="caption-top table">

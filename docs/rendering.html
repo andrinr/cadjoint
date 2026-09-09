@@ -81,7 +81,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <link href="../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-f83c246346592b24d02aa84ae3974412.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-89af0c2d685ccb09a4d7d65decb66752.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -148,14 +148,22 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
  <span class="dropdown-text">Simulation</span></a>
   </li>  
         <li>
+    <a class="dropdown-item" href="../docs/flow.html">
+ <span class="dropdown-text">Flow Solver (prototype)</span></a>
+  </li>  
+        <li>
     <a class="dropdown-item" href="../docs/optimization.html">
  <span class="dropdown-text">Optimization</span></a>
   </li>  
         <li>
-    <a class="dropdown-item" href="../docs/tesseracts.html">
- <span class="dropdown-text">Tesseracts</span></a>
+    <a class="dropdown-item" href="../docs/plugins.html">
+ <span class="dropdown-text">Plugins</span></a>
   </li>  
         <li><hr class="dropdown-divider"></li>
+        <li>
+    <a class="dropdown-item" href="../docs/materials.html">
+ <span class="dropdown-text">Materials</span></a>
+  </li>  
         <li>
     <a class="dropdown-item" href="../docs/rendering.html">
  <span class="dropdown-text">Forward Renderer</span></a>
@@ -207,8 +215,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
  <span class="dropdown-text">Differentiable meshing pipeline</span></a>
   </li>  
         <li>
-    <a class="dropdown-item" href="../research/native-mesher.html">
- <span class="dropdown-text">Native (Rust) dual-contouring core</span></a>
+    <a class="dropdown-item" href="../research/performance.html">
+ <span class="dropdown-text">Where the seconds go (performance)</span></a>
   </li>  
         <li>
     <a class="dropdown-item" href="../research/fem-integration.html">
@@ -233,6 +241,18 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
         <li>
     <a class="dropdown-item" href="../research/constraints.html">
  <span class="dropdown-text">Constraint system</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/flow-solver.html">
+ <span class="dropdown-text">Differentiable flow solver</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/complex-scene.html">
+ <span class="dropdown-text">Modelling a gearbox end-cap</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/design-language.html">
+ <span class="dropdown-text">The design language</span></a>
   </li>  
     </ul>
   </li>
@@ -270,7 +290,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <ul class="collapse">
   <li><a href="#transparency-and-refraction" id="toc-transparency-and-refraction" class="nav-link" data-scroll-target="#transparency-and-refraction">Transparency and refraction</a></li>
   </ul></li>
-  <li><a href="#shader-compilation" id="toc-shader-compilation" class="nav-link" data-scroll-target="#shader-compilation">Shader compilation</a></li>
+  <li><a href="#shader-compilation" id="toc-shader-compilation" class="nav-link" data-scroll-target="#shader-compilation">Shader compilation</a>
+  <ul class="collapse">
+  <li><a href="#how-big-the-shader-gets" id="toc-how-big-the-shader-gets" class="nav-link" data-scroll-target="#how-big-the-shader-gets">How big the shader gets</a></li>
+  </ul></li>
   <li><a href="#further-reading" id="toc-further-reading" class="nav-link" data-scroll-target="#further-reading">Further reading</a></li>
   </ul>
 </nav>
@@ -470,12 +493,24 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>wgsl <span class="op">=</span> compile_sdf_to_wgsl(Sphere(radius<span class="op">=</span><span class="fl">1.0</span>))          <span class="co"># just `fn sdf`</span></span>
 <span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>scene_wgsl <span class="op">=</span> compile_scene_to_wgsl(Sphere(radius<span class="op">=</span><span class="fl">1.0</span>))  <span class="co"># + materials</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p><code>compile_scene_to_wgsl</code> emits <code>sdf</code>, <code>material_base</code> (RGB + roughness), and <code>material_optics</code> (metallic + opacity + IOR + reflectivity) from one scene snapshot, ready to embed in a WebGPU renderer. This is exactly what <a href="../docs/viewer.html">the playground</a> does on every run.</p>
+<section id="how-big-the-shader-gets" class="level3">
+<h3 class="anchored" data-anchor-id="how-big-the-shader-gets">How big the shader gets</h3>
+<p>A shader is one straight-line function per entry point, so its size is decided by how much of the tree the trace unrolls. Two things keep that in check. A node evaluated more than once — a pattern’s child, a subtree two booleans share — is lowered as its own StableHLO function, and the emitter turns each of those into one WGSL function called once per instance; a bearing housing with four polar patterns is 1.45 MB of WGSL rather than 2.42 MB. What is <em>not</em> shared is the vertex loop of a sketch profile: WGSL has no type wider than a <code>mat4</code>, so a profile’s vertices stay individual <code>vec2</code>s and its contribution grows with the vertex count. (Everything else traces the profile as one <code>(N, 2)</code> array; see <a href="../docs/meshing.html#program-size">the meshing notes</a>.)</p>
+<p>Design parameters are inlined as float literals by default, so editing one rewrites the whole module and the browser recompiles it. <code>uniforms=True</code> returns a <code>ShaderProgram</code> instead: the same source for every parameter value, plus a <code>vec4</code>-per-parameter uniform layout to write the values into.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.geometry <span class="im">import</span> Scalar</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>sphere <span class="op">=</span> Sphere(radius<span class="op">=</span>Scalar(<span class="fl">1.0</span>, free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">"radius"</span>))</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>program <span class="op">=</span> compile_scene_to_wgsl(sphere, uniforms<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>program.wgsl                 <span class="co"># identical across every value edit</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>program.parameters[<span class="dv">0</span>].name   <span class="co"># 'radius' — the name extract_parameters uses</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>program.<span class="bu">buffer</span>()             <span class="co"># float32 array to upload at @group(3) @binding(0)</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
 </section>
 <section id="further-reading" class="level2">
 <h2 class="anchored" data-anchor-id="further-reading">Further reading</h2>
 <ul>
 <li><a href="../examples/rendering.html">Rendering notebook</a> — composition, quality presets, and hot reload</li>
-<li><a href="../docs/viewer.html">The playground</a> — the interactive WebGPU viewport and its progressive path tracer</li>
+<li><a href="../docs/viewer.html">The playground</a> — the interactive WebGPU viewport, its progressive path tracer, and its views of the field itself (signed slice, gradient magnitude, iso-offset, normals, depth)</li>
 <li><a href="../research/path-tracing.html">WebGPU SDF path tracing</a> — design and deliberate boundaries of the browser path tracer</li>
 </ul>
 

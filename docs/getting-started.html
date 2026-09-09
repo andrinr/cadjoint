@@ -81,7 +81,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <link href="../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-f83c246346592b24d02aa84ae3974412.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-89af0c2d685ccb09a4d7d65decb66752.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -148,14 +148,22 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
  <span class="dropdown-text">Simulation</span></a>
   </li>  
         <li>
+    <a class="dropdown-item" href="../docs/flow.html">
+ <span class="dropdown-text">Flow Solver (prototype)</span></a>
+  </li>  
+        <li>
     <a class="dropdown-item" href="../docs/optimization.html">
  <span class="dropdown-text">Optimization</span></a>
   </li>  
         <li>
-    <a class="dropdown-item" href="../docs/tesseracts.html">
- <span class="dropdown-text">Tesseracts</span></a>
+    <a class="dropdown-item" href="../docs/plugins.html">
+ <span class="dropdown-text">Plugins</span></a>
   </li>  
         <li><hr class="dropdown-divider"></li>
+        <li>
+    <a class="dropdown-item" href="../docs/materials.html">
+ <span class="dropdown-text">Materials</span></a>
+  </li>  
         <li>
     <a class="dropdown-item" href="../docs/rendering.html">
  <span class="dropdown-text">Forward Renderer</span></a>
@@ -207,8 +215,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
  <span class="dropdown-text">Differentiable meshing pipeline</span></a>
   </li>  
         <li>
-    <a class="dropdown-item" href="../research/native-mesher.html">
- <span class="dropdown-text">Native (Rust) dual-contouring core</span></a>
+    <a class="dropdown-item" href="../research/performance.html">
+ <span class="dropdown-text">Where the seconds go (performance)</span></a>
   </li>  
         <li>
     <a class="dropdown-item" href="../research/fem-integration.html">
@@ -233,6 +241,18 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
         <li>
     <a class="dropdown-item" href="../research/constraints.html">
  <span class="dropdown-text">Constraint system</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/flow-solver.html">
+ <span class="dropdown-text">Differentiable flow solver</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/complex-scene.html">
+ <span class="dropdown-text">Modelling a gearbox end-cap</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/design-language.html">
+ <span class="dropdown-text">The design language</span></a>
   </li>  
     </ul>
   </li>
@@ -264,9 +284,21 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
    
   <ul>
   <li><a href="#install" id="toc-install" class="nav-link active" data-scroll-target="#install">Install</a></li>
-  <li><a href="#geometry-is-a-pure-function" id="toc-geometry-is-a-pure-function" class="nav-link" data-scroll-target="#geometry-is-a-pure-function">Geometry is a pure function</a></li>
+  <li><a href="#geometry-is-a-pure-function" id="toc-geometry-is-a-pure-function" class="nav-link" data-scroll-target="#geometry-is-a-pure-function">Geometry is a pure function</a>
+  <ul class="collapse">
+  <li><a href="#parameters-as-arguments" id="toc-parameters-as-arguments" class="nav-link" data-scroll-target="#parameters-as-arguments">Parameters as arguments</a></li>
+  </ul></li>
   <li><a href="#constraints-reduce-the-freedom" id="toc-constraints-reduce-the-freedom" class="nav-link" data-scroll-target="#constraints-reduce-the-freedom">Constraints reduce the freedom</a></li>
-  <li><a href="#meshing" id="toc-meshing" class="nav-link" data-scroll-target="#meshing">Meshing</a></li>
+  <li><a href="#faces-are-references-not-geometry" id="toc-faces-are-references-not-geometry" class="nav-link" data-scroll-target="#faces-are-references-not-geometry">Faces are references, not geometry</a>
+  <ul class="collapse">
+  <li><a href="#the-plane-is-an-expression-not-a-snapshot" id="toc-the-plane-is-an-expression-not-a-snapshot" class="nav-link" data-scroll-target="#the-plane-is-an-expression-not-a-snapshot">The plane is an expression, not a snapshot</a></li>
+  <li><a href="#curved-surfaces-the-field-is-the-reference" id="toc-curved-surfaces-the-field-is-the-reference" class="nav-link" data-scroll-target="#curved-surfaces-the-field-is-the-reference">Curved surfaces: the field is the reference</a></li>
+  <li><a href="#the-constructors" id="toc-the-constructors" class="nav-link" data-scroll-target="#the-constructors">The constructors</a></li>
+  </ul></li>
+  <li><a href="#meshing" id="toc-meshing" class="nav-link" data-scroll-target="#meshing">Meshing</a>
+  <ul class="collapse">
+  <li><a href="#pluggable-kinds" id="toc-pluggable-kinds" class="nav-link" data-scroll-target="#pluggable-kinds">Kinds that can be filled</a></li>
+  </ul></li>
   <li><a href="#simulation" id="toc-simulation" class="nav-link" data-scroll-target="#simulation">Simulation</a></li>
   <li><a href="#optimization" id="toc-optimization" class="nav-link" data-scroll-target="#optimization">Optimization</a></li>
   <li><a href="#rendering" id="toc-rendering" class="nav-link" data-scroll-target="#rendering">Rendering</a></li>
@@ -326,10 +358,6 @@ Warning
 <p>The default sync pulls plain <code>jax</code>/<code>jaxlib</code>, so it works on Apple Silicon and any CPU-only machine. Everything beyond the geometry core is an extra — repeat the flag, one <code>--extra</code> per name:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> sync <span class="at">--extra</span> fem <span class="at">--extra</span> tesseract <span class="at">--extra</span> viewer</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <table class="caption-top table">
-<colgroup>
-<col style="width: 50%">
-<col style="width: 50%">
-</colgroup>
 <thead>
 <tr class="header">
 <th>Extra</th>
@@ -347,11 +375,19 @@ Warning
 </tr>
 <tr class="odd">
 <td><code>tesseract</code></td>
-<td>tesseract-core + tesseract-jax, for the cross-boundary gradient paths</td>
+<td>tesseract-core + tesseract-jax, which every <a href="../docs/plugins.html">plugin</a> is implemented with</td>
 </tr>
 <tr class="even">
+<td><code>gmsh</code></td>
+<td>Gmsh in your own process, for the <a href="../docs/simulation.html">tet10 mesher</a> — GPL, hence an extra of its own</td>
+</tr>
+<tr class="odd">
 <td><code>viewer</code></td>
-<td>the Jupyter widget (<code>anywidget</code>)</td>
+<td>the Jupyter widget (<code>anywidget</code>) and the playground’s process monitor (<code>psutil</code>)</td>
+</tr>
+<tr class="even">
+<td><code>editor</code></td>
+<td><code>ruff</code> and <code>jedi</code>, for the playground’s lint, completion and signature help</td>
 </tr>
 <tr class="odd">
 <td><code>stepcheck</code></td>
@@ -377,75 +413,190 @@ Warning
 <span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>p <span class="op">=</span> Vector(jnp.array([<span class="fl">2.0</span>, <span class="fl">0.0</span>, <span class="fl">0.0</span>]), free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">"p"</span>)</span>
 <span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>scene <span class="op">=</span> Translate(Sphere(radius<span class="op">=</span><span class="fl">0.3</span>), offset<span class="op">=</span>p)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<section id="parameters-as-arguments" class="level3">
+<h3 class="anchored" data-anchor-id="parameters-as-arguments">Parameters as arguments</h3>
+<p><code>functionalize(scene)(free, fixed)</code> closes over the parameter values, so <code>jax.jit</code> of it folds every value into the program as a literal: two designs that differ in one slider lower to two different programs and compile twice. <code>functionalize_parametric</code> takes the parameter dicts as arguments instead, so the lowered program is byte-identical for every value and one executable serves them all. Pair it with the persistent compilation cache and a re-dimensioned design costs no compile at all, even in a fresh process.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> jax</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint <span class="im">import</span> extract_parameters</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.cache <span class="im">import</span> enable_compilation_cache</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.functionalize <span class="im">import</span> functionalize_parametric</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>enable_compilation_cache()      <span class="co"># ~/.cache/cadjoint/jax, or $CADJOINT_CACHE_DIR</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>free, fixed, _ <span class="op">=</span> extract_parameters(scene)</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>evaluate <span class="op">=</span> jax.jit(functionalize_parametric(scene))</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>evaluate(free, fixed, jnp.zeros(<span class="dv">3</span>))                                 <span class="co"># compiles once</span></span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>evaluate({<span class="st">"p"</span>: jnp.array([<span class="fl">1.0</span>, <span class="fl">0.0</span>, <span class="fl">0.0</span>])}, fixed, jnp.zeros(<span class="dv">3</span>))    <span class="co"># reuses it</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The cache is what the playground’s compile worker turns on for every request; <code>CADJOINT_NO_COMPILATION_CACHE=1</code> opts out. The programs it stores are structured rather than flattened — a sketch profile is one <code>(N, 2)</code> array, a pattern traces its child once, a shared subtree is emitted once — which is what keeps them small enough to compile in under a second; see <a href="../docs/meshing.html#program-size">program size</a> and the <a href="../research/performance.html">performance notes</a>.</p>
+</section>
 </section>
 <section id="constraints-reduce-the-freedom" class="level2">
 <h2 class="anchored" data-anchor-id="constraints-reduce-the-freedom">Constraints reduce the freedom</h2>
 <p>Constraints are relationships between parameters. They are declared, not solved inline.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint <span class="im">import</span> extract_parameters, functionalize</span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.constraints <span class="im">import</span> DistanceConstraint, satisfy_constraints</span>
-<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>anchor <span class="op">=</span> Vector(jnp.array([<span class="fl">0.0</span>, <span class="fl">0.0</span>, <span class="fl">0.0</span>]), free<span class="op">=</span><span class="va">False</span>, name<span class="op">=</span><span class="st">"anchor"</span>)</span>
-<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>DistanceConstraint(p, anchor, <span class="fl">2.0</span>)   <span class="co"># p must lie on a sphere of radius 2</span></span>
-<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>satisfy_constraints(scene, steps<span class="op">=</span><span class="dv">8</span>)</span>
-<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>free, fixed, metadata <span class="op">=</span> extract_parameters(scene)</span>
-<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>sdf <span class="op">=</span> functionalize(scene)(free, fixed)</span>
-<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="bu">float</span>(jnp.linalg.norm(free[<span class="st">"p"</span>])))  <span class="co"># 2.0</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint <span class="im">import</span> extract_parameters, functionalize</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.constraints <span class="im">import</span> DistanceConstraint, satisfy_constraints</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>anchor <span class="op">=</span> Vector(jnp.array([<span class="fl">0.0</span>, <span class="fl">0.0</span>, <span class="fl">0.0</span>]), free<span class="op">=</span><span class="va">False</span>, name<span class="op">=</span><span class="st">"anchor"</span>)</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>DistanceConstraint(p, anchor, <span class="fl">2.0</span>)   <span class="co"># p must lie on a sphere of radius 2</span></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>satisfy_constraints(scene, steps<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>free, fixed, metadata <span class="op">=</span> extract_parameters(scene)</span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>sdf <span class="op">=</span> functionalize(scene)(free, fixed)</span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="bu">float</span>(jnp.linalg.norm(free[<span class="st">"p"</span>])))  <span class="co"># 2.0</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p><code>satisfy_constraints</code> projects the tree onto its constraints in place and works on under-determined systems — the usual case for a real sketch, which keeps design freedom on purpose. <code>solve_constraints</code> is the stricter sibling: it requires an exactly-determined system and refuses anything else, which is what you want when the constraints are supposed to pin the geometry down completely.</p>
 <p><code>extract_parameters</code> returns three things — the free parameters, the fixed ones, and the metadata carrying the constraint system. That metadata is what lets an optimizer project each step back onto the constraint manifold, so a constrained sketch stays constrained through a descent. The <a href="../examples/constraints.html">constraints notebook</a> works through a fully-determined system.</p>
+</section>
+<section id="faces-are-references-not-geometry" class="level2">
+<h2 class="anchored" data-anchor-id="faces-are-references-not-geometry">Faces are references, not geometry</h2>
+<p>cadjoint stores no boundary representation. The surface it produces — the dual-contoured mesh — is a <em>reading</em> of the field at one resolution, not its definition, and basing a work plane on it would mean basing a design decision on whatever grid the extraction happened to run at.</p>
+<p>The construction tree knows better than the mesh does. <code>extrude</code> spans <code>±depth/2</code> around its sketch plane, so it knows exactly where its caps are and which plane each profile edge swept; a box knows its six faces; a revolve knows its axis. Those are <code>Face</code> objects, and every generated solid carries them.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.construction <span class="im">import</span> PolygonProfile, SketchPlane, Solid, extrude</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.geometry <span class="im">import</span> Scalar</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>depth <span class="op">=</span> Scalar(<span class="fl">0.8</span>, free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">"depth"</span>)</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>plate <span class="op">=</span> PolygonProfile([[<span class="op">-</span><span class="dv">1</span>, <span class="op">-</span><span class="dv">1</span>], [<span class="dv">1</span>, <span class="op">-</span><span class="dv">1</span>], [<span class="dv">1</span>, <span class="dv">1</span>], [<span class="op">-</span><span class="dv">1</span>, <span class="dv">1</span>]], name<span class="op">=</span><span class="st">"plate"</span>)</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>body <span class="op">=</span> extrude(plate, depth<span class="op">=</span>depth)</span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>body.faces.keys()        <span class="co"># ['cap+', 'cap-', 'side0', 'side1', 'side2', 'side3']</span></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>body.cap(<span class="st">"+"</span>).origin     <span class="co"># [0, 0, 0.4]  — depth/2 along the sketch normal</span></span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>body.side(<span class="dv">0</span>).normal      <span class="co"># [0, -1, 0]   — the plane edge 0 swept</span></span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>Solid.box(size<span class="op">=</span>[<span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>], position<span class="op">=</span>[<span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">0</span>], name<span class="op">=</span><span class="st">"block"</span>).face(<span class="st">"+z"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>A <code>Face</code> knows its plane — origin, normal, <strong>and</strong> the in-plane x axis, so a sketch’s “horizontal” is a decision rather than an accident of how the normal happened to be decomposed — plus the polygon that bounds it and a <code>contains(point)</code> test that says whether a world point lands on it.</p>
+<section id="the-plane-is-an-expression-not-a-snapshot" class="level3">
+<h3 class="anchored" data-anchor-id="the-plane-is-an-expression-not-a-snapshot">The plane is an expression, not a snapshot</h3>
+<p><code>depth</code> above is a free <code>Scalar</code>, so <code>body.cap("+")</code> is not a stored plane at z = 0.4. It is the expression <code>origin + (depth/2)·normal</code>. Sketch on it and the sketch follows:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>boss <span class="op">=</span> PolygonProfile(</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>    [[<span class="op">-</span><span class="fl">0.4</span>, <span class="op">-</span><span class="fl">0.4</span>], [<span class="fl">0.4</span>, <span class="op">-</span><span class="fl">0.4</span>], [<span class="fl">0.4</span>, <span class="fl">0.4</span>], [<span class="op">-</span><span class="fl">0.4</span>, <span class="fl">0.4</span>]],</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>    plane<span class="op">=</span>SketchPlane.on(body.cap(<span class="st">"+"</span>)),</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>    name<span class="op">=</span><span class="st">"boss"</span>,</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Because it is an expression, the whole chain is differentiable:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> jax</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> jax.numpy <span class="im">as</span> jnp</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> stack(depth):</span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>    body <span class="op">=</span> extrude(PolygonProfile([[<span class="op">-</span><span class="dv">1</span>, <span class="op">-</span><span class="dv">1</span>], [<span class="dv">1</span>, <span class="op">-</span><span class="dv">1</span>], [<span class="dv">1</span>, <span class="dv">1</span>], [<span class="op">-</span><span class="dv">1</span>, <span class="dv">1</span>]], name<span class="op">=</span><span class="st">"p"</span>), depth<span class="op">=</span>depth)</span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>    top <span class="op">=</span> PolygonProfile([[<span class="op">-</span><span class="fl">0.4</span>, <span class="op">-</span><span class="fl">0.4</span>], [<span class="fl">0.4</span>, <span class="op">-</span><span class="fl">0.4</span>], [<span class="fl">0.4</span>, <span class="fl">0.4</span>], [<span class="op">-</span><span class="fl">0.4</span>, <span class="fl">0.4</span>]],</span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>                         plane<span class="op">=</span>SketchPlane.on(body.cap(<span class="st">"+"</span>)), name<span class="op">=</span><span class="st">"b"</span>)</span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> extrude(top, depth<span class="op">=</span><span class="fl">0.5</span>)</span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>probe <span class="op">=</span> jnp.array([<span class="fl">0.0</span>, <span class="fl">0.0</span>, <span class="fl">1.0</span>])</span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>jax.grad(<span class="kw">lambda</span> d: stack(d)(probe))(<span class="fl">1.0</span>)   <span class="co"># -0.5, exactly</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><code>-0.5</code> is exact rather than estimated: the cap rides at half the depth, so the boss standing on it does too, and a probe above the boss closes in at that rate.</p>
+<p><strong>This is the thing a traditional CAD kernel cannot do.</strong> There a face is stored geometry that a rebuild replaces, and a downstream sketch is re-attached to it by a topological-naming heuristic — which is why renaming or reordering a feature can detach the sketch entirely. Here the face is a function of the parent’s parameters. The reference cannot go stale, and it carries a derivative, so an optimizer moving <code>depth</code> moves everything referenced off it in the same step.</p>
+</section>
+<section id="curved-surfaces-the-field-is-the-reference" class="level3">
+<h3 class="anchored" data-anchor-id="curved-surfaces-the-field-is-the-reference">Curved surfaces: the field is the reference</h3>
+<p>Blends, fillets and revolved walls have no analytic face to name. The field still knows the answer — project the point onto the zero set, and the gradient there <em>is</em> the surface normal:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf <span class="im">import</span> Sphere</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>dome <span class="op">=</span> Sphere(radius<span class="op">=</span><span class="fl">1.0</span>)</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>pad <span class="op">=</span> SketchPlane.tangent(dome, near<span class="op">=</span>[<span class="fl">0.0</span>, <span class="fl">0.0</span>, <span class="fl">0.9</span>])   <span class="co"># plane at the north pole</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The projection is a Newton iteration in JAX (<code>cadjoint.fem.motion.project_points</code>, the one-surface case of <code>cadjoint.zeroset.project.project</code>), so a tangent plane is differentiable with respect to the scene’s parameters just like an analytic one. Grow the sphere and the pad rides out with it.</p>
+</section>
+<section id="the-constructors" class="level3">
+<h3 class="anchored" data-anchor-id="the-constructors">The constructors</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Constructor</th>
+<th>The plane it gives you</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>SketchPlane(origin, normal, x_axis=None)</code></td>
+<td>Stated in world coordinates. <code>x_axis</code> pins the sketch’s horizontal; omit it for the derivation from the normal alone.</td>
+</tr>
+<tr class="even">
+<td><code>SketchPlane.on(face, x_axis=None, flip=False)</code></td>
+<td>The face’s own plane, inheriting the face’s x axis — the profile’s <code>u</code> for a cap, the swept edge direction for a side wall.</td>
+</tr>
+<tr class="odd">
+<td><code>SketchPlane.offset(face_or_plane, distance)</code></td>
+<td>Pushed along the normal. <code>distance</code> may be a <code>Scalar</code>, so the clearance is a design variable.</td>
+</tr>
+<tr class="even">
+<td><code>SketchPlane.tangent(solid, near, x_axis=None)</code></td>
+<td>Tangent to the field at the surface point nearest <code>near</code>. Horizontal defaults to the world axis most nearly in-plane.</td>
+</tr>
+<tr class="odd">
+<td><code>SketchPlane.midplane(face_a, face_b)</code></td>
+<td>Halfway between two faces.</td>
+</tr>
+</tbody>
+</table>
+<p>Orientation is captured when a solid is generated, exactly as it always was; <code>origin</code> is the differentiable half. A drafted or twisted extrusion declares no analytic faces at all — draft tapers the walls off their swept planes and twist curves them — so those are <code>tangent</code> territory, and the API says so by offering nothing else.</p>
+</section>
 </section>
 <section id="meshing" class="level2">
 <h2 class="anchored" data-anchor-id="meshing">Meshing</h2>
 <p><code>cadjoint.meshing</code> dual-contours the field into a surface. It is written bottom-up in JAX, so the continuous half of the extraction — crossing positions, Hermite normals, QEF vertices — carries exact derivatives, while the discrete half (which cells are active, how they connect) stays frozen per extraction.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.meshing <span class="im">import</span> GridSpec, extract_mesh, save_stl</span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>grid <span class="op">=</span> GridSpec.from_bounds((<span class="op">-</span><span class="fl">1.3</span>, <span class="op">-</span><span class="fl">1.3</span>, <span class="op">-</span><span class="fl">1.3</span>), (<span class="fl">2.6</span>, <span class="fl">2.6</span>, <span class="fl">2.6</span>), <span class="dv">26</span>)</span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>mesh <span class="op">=</span> extract_mesh(<span class="kw">lambda</span> q: jnp.sqrt(jnp.<span class="bu">sum</span>(q <span class="op">*</span> q)) <span class="op">-</span> <span class="fl">1.0</span>, grid)</span>
-<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>save_stl(mesh, <span class="st">"sphere.stl"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Full detail, including the exports and the Rust-accelerated kernels, in <a href="../docs/meshing.html">differentiable meshing</a>.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.meshing <span class="im">import</span> GridSpec, extract_mesh, save_stl</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>grid <span class="op">=</span> GridSpec.from_bounds((<span class="op">-</span><span class="fl">1.3</span>, <span class="op">-</span><span class="fl">1.3</span>, <span class="op">-</span><span class="fl">1.3</span>), (<span class="fl">2.6</span>, <span class="fl">2.6</span>, <span class="fl">2.6</span>), <span class="dv">26</span>)</span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>mesh <span class="op">=</span> extract_mesh(<span class="kw">lambda</span> q: jnp.sqrt(jnp.<span class="bu">sum</span>(q <span class="op">*</span> q)) <span class="op">-</span> <span class="fl">1.0</span>, grid)</span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>save_stl(mesh, <span class="st">"sphere.stl"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Full detail, including the exports, in <a href="../docs/meshing.html">differentiable meshing</a>. What comes out is a <strong>faceted</strong> solid, in every format: one triangle per cell crossing, coplanar ones merged, a 28-gon standing in for a bore.</p>
+<section id="pluggable-kinds" class="level3">
+<h3 class="anchored" data-anchor-id="pluggable-kinds">Kinds that can be filled</h3>
+<p>Everything on this page runs with nothing else installed: the language, dual contouring, the lattice feature classifier, faceted STEP/OBJ/STL, TetGen and Gmsh tet meshes, every solver, the optimizer and the playground.</p>
+<p>Five <a href="../docs/plugins.html#the-five-in-process-kinds">plugin kinds</a> — <code>node_map</code>, <code>feature_edges</code>, <code>brep</code>, <code>step_export</code>, <code>drag</code> — are declared here and filled by nothing in this repository. They are the extension points for a component that re-solves a surface against the scene’s patch fields <em>with a derivative</em>, which is what a STEP whose bore is one cylinder, an edge curve traced rather than sampled, or a Gmsh mesh whose nodes follow the design would need. Such a component ships separately and is not part of this project; the slots are ordinary <code>cadjoint.plugins</code> entry points, so anything registering them fills them.</p>
+<p>Unfilled is the ordinary case and nothing breaks. Feature edges come from the lattice classifier, STEP export is faceted, and exactly one thing is refused: a Gmsh-meshed study cannot be optimized — its mesh is <em>frozen geometry</em>, and <code>Optimization</code> says so at declaration rather than handing back a gradient that is quietly wrong. <code>mesher="tetgen"</code>, the default, is differentiable either way.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint <span class="im">import</span> tier</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>tier.status().flags()    <span class="co"># {'node_map': False, 'feature_edges': False, ...}</span></span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>tier.report()            <span class="co"># versions and status, for a bug report</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>See <a href="../docs/plugins.html#one-contract-two-transports">plugins</a> for the contracts and <a href="../docs/meshing.html#the-gmsh-route">meshing</a> for what a frozen mesh can still do.</p>
+</section>
 </section>
 <section id="simulation" class="level2">
 <h2 class="anchored" data-anchor-id="simulation">Simulation</h2>
 <p>Discretizations and physics are <em>declared</em>, so the same objects a script solves are the ones the viewer edits and the optimizer re-freezes.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.fem <span class="im">import</span> Dirichlet, HeatFlux, Nodes, SimMesh, ThermalStudy</span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf.primitives <span class="im">import</span> Box</span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>bar <span class="op">=</span> Box(Vector([<span class="fl">1.0</span>, <span class="fl">0.15</span>, <span class="fl">0.15</span>], free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">"size"</span>))</span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>study <span class="op">=</span> ThermalStudy(</span>
-<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>    name<span class="op">=</span><span class="st">"bar-conduction"</span>,</span>
-<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>    conductivity<span class="op">=</span><span class="fl">2.0</span>,</span>
-<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>    bcs<span class="op">=</span>[Dirichlet(Nodes.side(<span class="st">"+x"</span>), <span class="fl">0.0</span>), HeatFlux(Nodes.side(<span class="st">"-x"</span>), <span class="fl">4.0</span>)],</span>
-<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>    mesh<span class="op">=</span>SimMesh(name<span class="op">=</span><span class="st">"bar-mesh"</span>, resolution<span class="op">=</span>(<span class="dv">22</span>, <span class="dv">5</span>, <span class="dv">5</span>),</span>
-<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>                 bounds<span class="op">=</span>(<span class="op">-</span><span class="fl">1.1</span>, <span class="op">-</span><span class="fl">0.25</span>, <span class="op">-</span><span class="fl">0.25</span>), size<span class="op">=</span>(<span class="fl">2.2</span>, <span class="fl">0.5</span>, <span class="fl">0.5</span>)),</span>
-<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> study.solve(bar)   <span class="co"># needs: uv sync --extra fem</span></span>
-<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(result.describe()[<span class="st">"range"</span>])   <span class="co"># [0.0, 4.0]</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.fem <span class="im">import</span> Dirichlet, HeatFlux, Nodes, SimMesh, ThermalStudy</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf.primitives <span class="im">import</span> Box</span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>bar <span class="op">=</span> Box(Vector([<span class="fl">1.0</span>, <span class="fl">0.15</span>, <span class="fl">0.15</span>], free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">"size"</span>))</span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>study <span class="op">=</span> ThermalStudy(</span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>    name<span class="op">=</span><span class="st">"bar-conduction"</span>,</span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a>    conductivity<span class="op">=</span><span class="fl">2.0</span>,</span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>    bcs<span class="op">=</span>[Dirichlet(Nodes.side(<span class="st">"+x"</span>), <span class="fl">0.0</span>), HeatFlux(Nodes.side(<span class="st">"-x"</span>), <span class="fl">4.0</span>)],</span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a>    mesh<span class="op">=</span>SimMesh(name<span class="op">=</span><span class="st">"bar-mesh"</span>, resolution<span class="op">=</span>(<span class="dv">22</span>, <span class="dv">5</span>, <span class="dv">5</span>),</span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a>                 bounds<span class="op">=</span>(<span class="op">-</span><span class="fl">1.1</span>, <span class="op">-</span><span class="fl">0.25</span>, <span class="op">-</span><span class="fl">0.25</span>), size<span class="op">=</span>(<span class="fl">2.2</span>, <span class="fl">0.5</span>, <span class="fl">0.5</span>)),</span>
+<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-14"><a href="#cb13-14" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> study.solve(bar)   <span class="co"># needs: uv sync --extra fem</span></span>
+<span id="cb13-15"><a href="#cb13-15" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(result.describe()[<span class="st">"range"</span>])   <span class="co"># [0.0, 4.0]</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>Boundary conditions attach to node <em>selections</em> rather than index lists, so they survive re-meshing and a change of shape. See <a href="../docs/simulation.html">simulation</a>.</p>
 </section>
 <section id="optimization" class="level2">
 <h2 class="anchored" data-anchor-id="optimization">Optimization</h2>
 <p>An <code>Optimization</code> declares a descent. Its study form makes the simulation above the objective, and the gradient runs the whole chain — geometry, mesh, solve — in one <code>jax.grad</code> call.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.optimize <span class="im">import</span> Optimization</span>
-<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>run <span class="op">=</span> Optimization(name<span class="op">=</span><span class="st">"cool-bar"</span>, study<span class="op">=</span>study, metric<span class="op">=</span><span class="st">"max"</span>,</span>
-<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>                   steps<span class="op">=</span><span class="dv">3</span>, learning_rate<span class="op">=</span><span class="fl">0.01</span>).run(scene<span class="op">=</span>bar)</span>
-<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(run.history[<span class="dv">0</span>][<span class="st">"objective"</span>], <span class="st">"-&gt;"</span>, run.objective)  <span class="co"># 4.0 -&gt; 2.939</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.optimize <span class="im">import</span> Optimization</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>run <span class="op">=</span> Optimization(name<span class="op">=</span><span class="st">"cool-bar"</span>, study<span class="op">=</span>study, metric<span class="op">=</span><span class="st">"max"</span>,</span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>                   steps<span class="op">=</span><span class="dv">3</span>, learning_rate<span class="op">=</span><span class="fl">0.01</span>).run(scene<span class="op">=</span>bar)</span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(run.history[<span class="dv">0</span>][<span class="st">"objective"</span>], <span class="st">"-&gt;"</span>, run.objective)  <span class="co"># 4.0 -&gt; 2.939</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>Three Adam steps thicken the bar and drop its peak temperature by a quarter, with the gradient running back through the solve, the mesh, and the SDF to the <code>size</code> parameter.</p>
-<p>Constraint projection is automatic, topology stays frozen between re-meshes, and <code>gradient_path</code> chooses how much of the chain crosses a Tesseract boundary. See <a href="../docs/optimization.html">optimization</a> and <a href="../docs/tesseracts.html">tesseracts</a>.</p>
+<p>Constraint projection is automatic, topology stays frozen between re-meshes, and <code>gradient_path</code> chooses which stages of the chain run as <a href="../docs/plugins.html">plugins</a> — a mesher, a tet filler or a solver behind a Tesseract, in this process or on a cluster. See <a href="../docs/optimization.html">optimization</a>.</p>
 </section>
 <section id="rendering" class="level2">
 <h2 class="anchored" data-anchor-id="rendering">Rendering</h2>
 <p>Independently of all of the above, cadjoint renders SDFs directly — a forward sphere-tracing raymarcher for still images, and WGSL shader compilation for the browser.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.render <span class="im">import</span> Camera, RenderSettings, Scene, render_scene</span>
-<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf.primitives <span class="im">import</span> Sphere</span>
-<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>image <span class="op">=</span> render_scene(</span>
-<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>    Scene(Sphere(<span class="fl">1.0</span>), camera<span class="op">=</span>Camera(position<span class="op">=</span>(<span class="dv">0</span>, <span class="fl">1.5</span>, <span class="dv">5</span>), target<span class="op">=</span>(<span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">0</span>))),</span>
-<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>    RenderSettings.balanced((<span class="dv">240</span>, <span class="dv">320</span>)),</span>
-<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.render <span class="im">import</span> Camera, RenderSettings, Scene, render_scene</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf.primitives <span class="im">import</span> Sphere</span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>image <span class="op">=</span> render_scene(</span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>    Scene(Sphere(<span class="fl">1.0</span>), camera<span class="op">=</span>Camera(position<span class="op">=</span>(<span class="dv">0</span>, <span class="fl">1.5</span>, <span class="dv">5</span>), target<span class="op">=</span>(<span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">0</span>))),</span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>    RenderSettings.balanced((<span class="dv">240</span>, <span class="dv">320</span>)),</span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>Rendered pixels are deliberately not an inverse-rendering API. See the <a href="../docs/rendering.html">forward renderer</a>.</p>
 </section>
 <section id="next-steps" class="level2">
@@ -455,6 +606,8 @@ Warning
 <li><a href="../examples/sketch_construction.html">Sketch construction</a> — profiles, extrude, revolve</li>
 <li><a href="../examples/constraints.html">Constraints</a> — solving fully-determined systems</li>
 <li><a href="../examples/constrained_optimization.html">Constrained optimization</a> — the full workflow with trajectory visualization</li>
+<li><a href="../docs/plugins.html">Plugins</a> — the registry, the two transports, and the kinds a component can fill</li>
+<li><a href="../docs/viewer.html">The playground</a> — all of it in one browser window</li>
 </ul>
 
 

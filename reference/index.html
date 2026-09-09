@@ -45,7 +45,7 @@ ul.task-list li input[type="checkbox"] {
 <link href="../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-f83c246346592b24d02aa84ae3974412.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-89af0c2d685ccb09a4d7d65decb66752.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -112,14 +112,22 @@ ul.task-list li input[type="checkbox"] {
  <span class="dropdown-text">Simulation</span></a>
   </li>  
         <li>
+    <a class="dropdown-item" href="../docs/flow.html">
+ <span class="dropdown-text">Flow Solver (prototype)</span></a>
+  </li>  
+        <li>
     <a class="dropdown-item" href="../docs/optimization.html">
  <span class="dropdown-text">Optimization</span></a>
   </li>  
         <li>
-    <a class="dropdown-item" href="../docs/tesseracts.html">
- <span class="dropdown-text">Tesseracts</span></a>
+    <a class="dropdown-item" href="../docs/plugins.html">
+ <span class="dropdown-text">Plugins</span></a>
   </li>  
         <li><hr class="dropdown-divider"></li>
+        <li>
+    <a class="dropdown-item" href="../docs/materials.html">
+ <span class="dropdown-text">Materials</span></a>
+  </li>  
         <li>
     <a class="dropdown-item" href="../docs/rendering.html">
  <span class="dropdown-text">Forward Renderer</span></a>
@@ -171,8 +179,8 @@ ul.task-list li input[type="checkbox"] {
  <span class="dropdown-text">Differentiable meshing pipeline</span></a>
   </li>  
         <li>
-    <a class="dropdown-item" href="../research/native-mesher.html">
- <span class="dropdown-text">Native (Rust) dual-contouring core</span></a>
+    <a class="dropdown-item" href="../research/performance.html">
+ <span class="dropdown-text">Where the seconds go (performance)</span></a>
   </li>  
         <li>
     <a class="dropdown-item" href="../research/fem-integration.html">
@@ -197,6 +205,18 @@ ul.task-list li input[type="checkbox"] {
         <li>
     <a class="dropdown-item" href="../research/constraints.html">
  <span class="dropdown-text">Constraint system</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/flow-solver.html">
+ <span class="dropdown-text">Differentiable flow solver</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/complex-scene.html">
+ <span class="dropdown-text">Modelling a gearbox end-cap</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/design-language.html">
+ <span class="dropdown-text">The design language</span></a>
   </li>  
     </ul>
   </li>
@@ -231,19 +251,29 @@ ul.task-list li input[type="checkbox"] {
   <ul class="collapse">
   <li><a href="#parameter-extraction" id="toc-parameter-extraction" class="nav-link" data-scroll-target="#parameter-extraction">Parameter Extraction</a></li>
   <li><a href="#functionalize" id="toc-functionalize" class="nav-link" data-scroll-target="#functionalize">Functionalize</a></li>
+  <li><a href="#compilation-cache" id="toc-compilation-cache" class="nav-link" data-scroll-target="#compilation-cache">Compilation cache</a></li>
   <li><a href="#shader-compilation" id="toc-shader-compilation" class="nav-link" data-scroll-target="#shader-compilation">Shader compilation</a></li>
   <li><a href="#parametrization" id="toc-parametrization" class="nav-link" data-scroll-target="#parametrization">Parametrization</a></li>
   <li><a href="#constraints-types" id="toc-constraints-types" class="nav-link" data-scroll-target="#constraints-types">Constraints — types</a></li>
   <li><a href="#constraints-solver" id="toc-constraints-solver" class="nav-link" data-scroll-target="#constraints-solver">Constraints — solver</a></li>
   <li><a href="#geometry" id="toc-geometry" class="nav-link" data-scroll-target="#geometry">Geometry</a></li>
   <li><a href="#meshing-extraction" id="toc-meshing-extraction" class="nav-link" data-scroll-target="#meshing-extraction">Meshing — extraction</a></li>
-  <li><a href="#meshing-adaptive-simplify-native" id="toc-meshing-adaptive-simplify-native" class="nav-link" data-scroll-target="#meshing-adaptive-simplify-native">Meshing — adaptive, simplify, native</a></li>
+  <li><a href="#meshing-adaptive-and-simplify" id="toc-meshing-adaptive-and-simplify" class="nav-link" data-scroll-target="#meshing-adaptive-and-simplify">Meshing — adaptive and simplify</a></li>
   <li><a href="#meshing-export-and-diagnostics" id="toc-meshing-export-and-diagnostics" class="nav-link" data-scroll-target="#meshing-export-and-diagnostics">Meshing — export and diagnostics</a></li>
+  <li><a href="#gmsh-tet10" id="toc-gmsh-tet10" class="nav-link" data-scroll-target="#gmsh-tet10">Gmsh tet10</a></li>
+  <li><a href="#extension-kinds-and-availability" id="toc-extension-kinds-and-availability" class="nav-link" data-scroll-target="#extension-kinds-and-availability">Extension kinds and availability</a></li>
+  <li><a href="#option-sets" id="toc-option-sets" class="nav-link" data-scroll-target="#option-sets">Option sets</a></li>
   <li><a href="#simulation-meshes-and-studies" id="toc-simulation-meshes-and-studies" class="nav-link" data-scroll-target="#simulation-meshes-and-studies">Simulation — meshes and studies</a></li>
-  <li><a href="#simulation-selections-and-bcs" id="toc-simulation-selections-and-bcs" class="nav-link" data-scroll-target="#simulation-selections-and-bcs">Simulation — selections and BCs</a></li>
+  <li><a href="#studies-the-physics-agnostic-layer" id="toc-studies-the-physics-agnostic-layer" class="nav-link" data-scroll-target="#studies-the-physics-agnostic-layer">Studies — the physics-agnostic layer</a></li>
+  <li><a href="#simulation-boundary-conditions" id="toc-simulation-boundary-conditions" class="nav-link" data-scroll-target="#simulation-boundary-conditions">Simulation — boundary conditions</a></li>
+  <li><a href="#simulation-material-properties" id="toc-simulation-material-properties" class="nav-link" data-scroll-target="#simulation-material-properties">Simulation — material properties</a></li>
   <li><a href="#simulation-backends" id="toc-simulation-backends" class="nav-link" data-scroll-target="#simulation-backends">Simulation — backends</a></li>
   <li><a href="#optimization" id="toc-optimization" class="nav-link" data-scroll-target="#optimization">Optimization</a></li>
+  <li><a href="#plugins" id="toc-plugins" class="nav-link" data-scroll-target="#plugins">Plugins</a></li>
+  <li><a href="#flow-solver-prototype" id="toc-flow-solver-prototype" class="nav-link" data-scroll-target="#flow-solver-prototype">Flow solver (prototype)</a></li>
+  <li><a href="#materials" id="toc-materials" class="nav-link" data-scroll-target="#materials">Materials</a></li>
   <li><a href="#render" id="toc-render" class="nav-link" data-scroll-target="#render">Render</a></li>
+  <li><a href="#viewer-payload-schema" id="toc-viewer-payload-schema" class="nav-link" data-scroll-target="#viewer-payload-schema">Viewer — payload schema</a></li>
   </ul></li>
   </ul>
 </nav>
@@ -276,8 +306,31 @@ ul.task-list li input[type="checkbox"] {
 <td>Compile an SDF to a pure function with free and fixed parameters.</td>
 </tr>
 <tr class="even">
+<td><a href="../reference/functionalize.functionalize_parametric.html#cadjoint.functionalize.functionalize_parametric">functionalize.functionalize_parametric</a></td>
+<td>Compile an SDF to a function whose <em>parameters</em> are arguments.</td>
+</tr>
+<tr class="odd">
 <td><a href="../reference/functionalize.functionalize_scene.html#cadjoint.functionalize.functionalize_scene">functionalize.functionalize_scene</a></td>
 <td>Compile a geometry SDF tree to pure (sdf, material_fn) closures.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/functionalize.functionalize_scene_parametric.html#cadjoint.functionalize.functionalize_scene_parametric">functionalize.functionalize_scene_parametric</a></td>
+<td>Compile a scene so its <em>parameters</em> are arguments, not literals.</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="compilation-cache" class="level2">
+<h2 class="anchored" data-anchor-id="compilation-cache">Compilation cache</h2>
+<table class="caption-top table">
+<tbody>
+<tr class="odd">
+<td><a href="../reference/cache.enable_compilation_cache.html#cadjoint.cache.enable_compilation_cache">cache.enable_compilation_cache</a></td>
+<td>Point JAX’s persistent compilation cache at a stable directory.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/cache.cache_directory.html#cadjoint.cache.cache_directory">cache.cache_directory</a></td>
+<td>Where compiled executables are stored.</td>
 </tr>
 </tbody>
 </table>
@@ -440,8 +493,8 @@ ul.task-list li input[type="checkbox"] {
 </tbody>
 </table>
 </section>
-<section id="meshing-adaptive-simplify-native" class="level2">
-<h2 class="anchored" data-anchor-id="meshing-adaptive-simplify-native">Meshing — adaptive, simplify, native</h2>
+<section id="meshing-adaptive-and-simplify" class="level2">
+<h2 class="anchored" data-anchor-id="meshing-adaptive-and-simplify">Meshing — adaptive and simplify</h2>
 <table class="caption-top table">
 <tbody>
 <tr class="odd">
@@ -455,18 +508,6 @@ ul.task-list li input[type="checkbox"] {
 <tr class="odd">
 <td><a href="../reference/meshing.simplify.simplify_mesh.html#cadjoint.meshing.simplify.simplify_mesh">meshing.simplify.simplify_mesh</a></td>
 <td>Simplify a dual-contour mesh by error-bounded, feature-safe collapses.</td>
-</tr>
-<tr class="even">
-<td><a href="../reference/meshing.native.native_available.html#cadjoint.meshing.native.native_available">meshing.native.native_available</a></td>
-<td>Whether the native cdylib can be located (without loading it).</td>
-</tr>
-<tr class="odd">
-<td><a href="../reference/meshing.native.extract_mesh_native.html#cadjoint.meshing.native.extract_mesh_native">meshing.native.extract_mesh_native</a></td>
-<td>Native counterpart of :func:<code>cadjoint.meshing.extract_mesh</code>.</td>
-</tr>
-<tr class="even">
-<td><a href="../reference/meshing.native.qef_vertices_native.html#cadjoint.meshing.native.qef_vertices_native">meshing.native.qef_vertices_native</a></td>
-<td>Differentiable drop-in for :func:<code>cadjoint.meshing.qef_vertices</code>.</td>
 </tr>
 </tbody>
 </table>
@@ -510,6 +551,199 @@ ul.task-list li input[type="checkbox"] {
 </tbody>
 </table>
 </section>
+<section id="gmsh-tet10" class="level2">
+<h2 class="anchored" data-anchor-id="gmsh-tet10">Gmsh tet10</h2>
+<table class="caption-top table">
+<tbody>
+<tr class="odd">
+<td><a href="../reference/fem.gmsh.gmsh_available.html#cadjoint.fem.gmsh.gmsh_available">fem.gmsh.gmsh_available</a></td>
+<td>Whether the optional <code>gmsh</code> wheel is importable.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/fem.gmsh.gmsh_version.html#cadjoint.fem.gmsh.gmsh_version">fem.gmsh.gmsh_version</a></td>
+<td>The installed Gmsh version string.</td>
+</tr>
+<tr class="odd">
+<td><a href="../reference/fem.gmsh.dc_surface_stl.html#cadjoint.fem.gmsh.dc_surface_stl">fem.gmsh.dc_surface_stl</a></td>
+<td>Dual-contour <code>sdf</code> on <code>grid</code> and return its surface as STL text.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/fem.gmsh.gmsh_tet_mesh.html#cadjoint.fem.gmsh.gmsh_tet_mesh">fem.gmsh.gmsh_tet_mesh</a></td>
+<td>Mesh a geometry with Gmsh and give every node its owners.</td>
+</tr>
+<tr class="odd">
+<td><a href="../reference/fem.gmsh.sdf_gmsh_tet_mesh.html#cadjoint.fem.gmsh.sdf_gmsh_tet_mesh">fem.gmsh.sdf_gmsh_tet_mesh</a></td>
+<td>The whole public route: dual-contour <code>scene</code> on <code>grid</code>, mesh it with Gmsh.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/fem.gmsh.tet_mesh_from_gmsh.html#cadjoint.fem.gmsh.tet_mesh_from_gmsh">fem.gmsh.tet_mesh_from_gmsh</a></td>
+<td>Wrap a :class:<code>GmshMesh</code> as the FEM layer’s :class:<code>GmshTetMesh</code> — static.</td>
+</tr>
+<tr class="odd">
+<td><a href="../reference/fem.gmsh.assign_ownership.html#cadjoint.fem.gmsh.assign_ownership">fem.gmsh.assign_ownership</a></td>
+<td>Tag every node with the patches that own it, by residual alone.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/fem.gmsh.owned_nodes.html#cadjoint.fem.gmsh.owned_nodes">fem.gmsh.owned_nodes</a></td>
+<td>The :class:<code>~cadjoint.plugins.OwnedNodes</code> record of a topology.</td>
+</tr>
+<tr class="odd">
+<td><a href="../reference/fem.gmsh.patch_table.html#cadjoint.fem.gmsh.patch_table">fem.gmsh.patch_table</a></td>
+<td>The scene’s public patch fields, world frame, flattened in table order.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/fem.gmsh.GmshMesh.html#cadjoint.fem.gmsh.GmshMesh">fem.gmsh.GmshMesh</a></td>
+<td>A Gmsh tet mesh with every node owned — a static record.</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="extension-kinds-and-availability" class="level2">
+<h2 class="anchored" data-anchor-id="extension-kinds-and-availability">Extension kinds and availability</h2>
+<table class="caption-top table">
+<tbody>
+<tr class="odd">
+<td><a href="../reference/tier.status.html#cadjoint.tier.status">tier.status</a></td>
+<td>Per kind: filled by whom, at what version, and whether it is usable.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/tier.available.html#cadjoint.tier.available">tier.available</a></td>
+<td>Whether <code>kind</code> is filled and usable in this process.</td>
+</tr>
+<tr class="odd">
+<td><a href="../reference/tier.require.html#cadjoint.tier.require">tier.require</a></td>
+<td>The plugin filling <code>kind</code>, or :class:<code>TierUnavailable</code>.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/tier.component.html#cadjoint.tier.component">tier.component</a></td>
+<td>The imported object filling <code>kind</code>, or <code>default</code> when it is absent.</td>
+</tr>
+<tr class="odd">
+<td><a href="../reference/tier.message.html#cadjoint.tier.message">tier.message</a></td>
+<td>The refusal text for <code>kind</code> — the one wording the app and library use.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/tier.report.html#cadjoint.tier.report">tier.report</a></td>
+<td>Versions and tier status, JSON-ready — what a public bug report carries.</td>
+</tr>
+<tr class="odd">
+<td><a href="../reference/tier.absent.html#cadjoint.tier.absent">tier.absent</a></td>
+<td>Run a block with the private kinds unregistered process-wide.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/tier.TierUnavailable.html#cadjoint.tier.TierUnavailable">tier.TierUnavailable</a></td>
+<td>A private-tier kind was needed and is not filled (or not compatible).</td>
+</tr>
+<tr class="odd">
+<td><a href="../reference/plugins.contracts.NodeMap.html#cadjoint.plugins.contracts.NodeMap">plugins.contracts.NodeMap</a></td>
+<td><code>node_map</code>: design parameters to the node positions of a Gmsh mesh.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/plugins.contracts.FeatureEdges.html#cadjoint.plugins.contracts.FeatureEdges">plugins.contracts.FeatureEdges</a></td>
+<td><code>feature_edges</code>: the exact feature curves of a scene, to draw.</td>
+</tr>
+<tr class="odd">
+<td><a href="../reference/plugins.contracts.BRepExtractor.html#cadjoint.plugins.contracts.BRepExtractor">plugins.contracts.BRepExtractor</a></td>
+<td><code>brep</code>: the derived boundary representation, kept in-process.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/plugins.contracts.StepExporter.html#cadjoint.plugins.contracts.StepExporter">plugins.contracts.StepExporter</a></td>
+<td><code>step_export</code>: analytic STEP from the derived B-rep.</td>
+</tr>
+<tr class="odd">
+<td><a href="../reference/plugins.contracts.Drag.html#cadjoint.plugins.contracts.Drag">plugins.contracts.Drag</a></td>
+<td><code>drag</code>: move a B-rep handle by solving for the design that fits.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/plugins.contracts.OwnedNodes.html#cadjoint.plugins.contracts.OwnedNodes">plugins.contracts.OwnedNodes</a></td>
+<td>Every node of a Gmsh mesh, with the patches that own it — the seam’s record.</td>
+</tr>
+<tr class="odd">
+<td><a href="../reference/plugins.contracts.EdgeSet.html#cadjoint.plugins.contracts.EdgeSet">plugins.contracts.EdgeSet</a></td>
+<td>The feature curves of a scene, as polylines ready to draw.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/plugins.contracts.DragOutcome.html#cadjoint.plugins.contracts.DragOutcome">plugins.contracts.DragOutcome</a></td>
+<td>What a drag did, and why — the <code>drag</code> kind’s result.</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="option-sets" class="level2">
+<h2 class="anchored" data-anchor-id="option-sets">Option sets</h2>
+<table class="caption-top table">
+<tbody>
+<tr class="odd">
+<td><a href="../reference/enums.MeshMethod.html#cadjoint.enums.MeshMethod">enums.MeshMethod</a></td>
+<td>How a <code>SimMesh</code> turns an SDF into elements.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/enums.StudyKind.html#cadjoint.enums.StudyKind">enums.StudyKind</a></td>
+<td>The physics a declared study solves.</td>
+</tr>
+<tr class="odd">
+<td><a href="../reference/enums.BoundaryConditionType.html#cadjoint.enums.BoundaryConditionType">enums.BoundaryConditionType</a></td>
+<td>The boundary conditions a study accepts, as the wire spells them.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/enums.Side.html#cadjoint.enums.Side">enums.Side</a></td>
+<td>An axis-extreme face of a mesh, for <code>Nodes.side</code>.</td>
+</tr>
+<tr class="odd">
+<td><a href="../reference/enums.ObjectiveMetric.html#cadjoint.enums.ObjectiveMetric">enums.ObjectiveMetric</a></td>
+<td>What a study-form optimization minimizes about the solved field.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/enums.OptimizerMethod.html#cadjoint.enums.OptimizerMethod">enums.OptimizerMethod</a></td>
+<td>The optimizer an <code>Optimization</code> descends with.</td>
+</tr>
+<tr class="odd">
+<td><a href="../reference/enums.OptimizationArgument.html#cadjoint.enums.OptimizationArgument">enums.OptimizationArgument</a></td>
+<td>The optimization keywords the viewer may retune.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/enums.GradientPath.html#cadjoint.enums.GradientPath">enums.GradientPath</a></td>
+<td>How a study-form optimization carries the design-&gt;points derivative.</td>
+</tr>
+<tr class="odd">
+<td><a href="../reference/enums.ConstraintKind.html#cadjoint.enums.ConstraintKind">enums.ConstraintKind</a></td>
+<td>The sketch constraints the viewer can add.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/enums.ConstraintSolveMethod.html#cadjoint.enums.ConstraintSolveMethod">enums.ConstraintSolveMethod</a></td>
+<td>How a sketch’s constraints are satisfied.</td>
+</tr>
+<tr class="odd">
+<td><a href="../reference/enums.FemBackend.html#cadjoint.enums.FemBackend">enums.FemBackend</a></td>
+<td>The FEM backends cadjoint registers itself.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/enums.PluginKind.html#cadjoint.enums.PluginKind">enums.PluginKind</a></td>
+<td>The component slots cadjoint’s own pipeline resolves by kind.</td>
+</tr>
+<tr class="odd">
+<td><a href="../reference/enums.PluginTransport.html#cadjoint.enums.PluginTransport">enums.PluginTransport</a></td>
+<td>Where a plugin’s component actually runs.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/enums.values.html#cadjoint.enums.values">enums.values</a></td>
+<td>The option set’s members as plain strings, in declaration order.</td>
+</tr>
+<tr class="odd">
+<td><a href="../reference/enums.listed.html#cadjoint.enums.listed">enums.listed</a></td>
+<td>The option set’s members joined for an error message.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/enums.either.html#cadjoint.enums.either">enums.either</a></td>
+<td>The option set as a prose alternative, in declaration order.</td>
+</tr>
+<tr class="odd">
+<td><a href="../reference/enums.parse.html#cadjoint.enums.parse">enums.parse</a></td>
+<td>Normalise one option value, raising <code>message</code> when it is not a member.</td>
+</tr>
+</tbody>
+</table>
+</section>
 <section id="simulation-meshes-and-studies" class="level2">
 <h2 class="anchored" data-anchor-id="simulation-meshes-and-studies">Simulation — meshes and studies</h2>
 <table class="caption-top table">
@@ -517,6 +751,22 @@ ul.task-list li input[type="checkbox"] {
 <tr class="odd">
 <td><a href="../reference/fem.simmesh.SimMesh.html#cadjoint.fem.simmesh.SimMesh">fem.simmesh.SimMesh</a></td>
 <td>A declarable, named meshing intent — the scene program’s mesh object.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/fem.hexmesh.HexMesh.html#cadjoint.fem.hexmesh.HexMesh">fem.hexmesh.HexMesh</a></td>
+<td>A HEX8 volume mesh extracted from an SDF.</td>
+</tr>
+<tr class="odd">
+<td><a href="../reference/fem.hexmesh.sdf_to_hex_mesh.html#cadjoint.fem.hexmesh.sdf_to_hex_mesh">fem.hexmesh.sdf_to_hex_mesh</a></td>
+<td>Extract a HEX8 volume mesh from an SDF on a regular grid.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/fem.tetmesh.TetMesh.html#cadjoint.fem.tetmesh.TetMesh">fem.tetmesh.TetMesh</a></td>
+<td>A TET4/TET10 volume mesh whose boundary vertices are DC surface vertices.</td>
+</tr>
+<tr class="odd">
+<td><a href="../reference/fem.tetmesh.sdf_to_tet_mesh.html#cadjoint.fem.tetmesh.sdf_to_tet_mesh">fem.tetmesh.sdf_to_tet_mesh</a></td>
+<td>Extract the DC surface of <code>sdf</code> on <code>grid</code> and tet-mesh its inside.</td>
 </tr>
 <tr class="even">
 <td><a href="../reference/fem.study.ThermalStudy.html#cadjoint.fem.study.ThermalStudy">fem.study.ThermalStudy</a></td>
@@ -533,18 +783,41 @@ ul.task-list li input[type="checkbox"] {
 </tbody>
 </table>
 </section>
-<section id="simulation-selections-and-bcs" class="level2">
-<h2 class="anchored" data-anchor-id="simulation-selections-and-bcs">Simulation — selections and BCs</h2>
+<section id="studies-the-physics-agnostic-layer" class="level2">
+<h2 class="anchored" data-anchor-id="studies-the-physics-agnostic-layer">Studies — the physics-agnostic layer</h2>
 <table class="caption-top table">
 <tbody>
 <tr class="odd">
-<td><a href="../reference/fem.selection.Nodes.html#cadjoint.fem.selection.Nodes">fem.selection.Nodes</a></td>
+<td><a href="../reference/studies.selection.Nodes.html#cadjoint.studies.selection.Nodes">studies.selection.Nodes</a></td>
 <td>Factory namespace for :class:<code>NodeSelection</code> values.</td>
 </tr>
 <tr class="even">
-<td><a href="../reference/fem.selection.NodeSelection.html#cadjoint.fem.selection.NodeSelection">fem.selection.NodeSelection</a></td>
-<td>A composable, mesh-independent description of a node set.</td>
+<td><a href="../reference/studies.selection.NodeSelection.html#cadjoint.studies.selection.NodeSelection">studies.selection.NodeSelection</a></td>
+<td>A composable, mesh-independent description of a region of space.</td>
 </tr>
+<tr class="odd">
+<td><a href="../reference/studies.selection.selection_from_description.html#cadjoint.studies.selection.selection_from_description">studies.selection.selection_from_description</a></td>
+<td>Rebuild a :class:<code>NodeSelection</code> from its :meth:<code>~NodeSelection.describe</code> payload.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/studies.capture.capture_studies.html#cadjoint.studies.capture.capture_studies">studies.capture.capture_studies</a></td>
+<td>Collect every study constructed inside this context.</td>
+</tr>
+<tr class="odd">
+<td><a href="../reference/studies.capture.declared_studies.html#cadjoint.studies.capture.declared_studies">studies.capture.declared_studies</a></td>
+<td>The studies declared so far in the active capture context.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/studies.capture.register_study.html#cadjoint.studies.capture.register_study">studies.capture.register_study</a></td>
+<td>Add a study to the active :func:<code>capture_studies</code> context, if any.</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="simulation-boundary-conditions" class="level2">
+<h2 class="anchored" data-anchor-id="simulation-boundary-conditions">Simulation — boundary conditions</h2>
+<table class="caption-top table">
+<tbody>
 <tr class="odd">
 <td><a href="../reference/fem.study.Dirichlet.html#cadjoint.fem.study.Dirichlet">fem.study.Dirichlet</a></td>
 <td>Prescribed temperature on a set of boundary nodes.</td>
@@ -560,6 +833,41 @@ ul.task-list li input[type="checkbox"] {
 <tr class="even">
 <td><a href="../reference/fem.study.Traction.html#cadjoint.fem.study.Traction">fem.study.Traction</a></td>
 <td>Constant traction (force per area) on the faces spanned by a selection.</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="simulation-material-properties" class="level2">
+<h2 class="anchored" data-anchor-id="simulation-material-properties">Simulation — material properties</h2>
+<table class="caption-top table">
+<tbody>
+<tr class="odd">
+<td><a href="../reference/fem.properties.sample_cell_property.html#cadjoint.fem.properties.sample_cell_property">fem.properties.sample_cell_property</a></td>
+<td>Sample one physical property per element, validated.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/fem.properties.maybe_sample_cell_property.html#cadjoint.fem.properties.maybe_sample_cell_property">fem.properties.maybe_sample_cell_property</a></td>
+<td>Sample a property per element, or return None when the scene lacks it.</td>
+</tr>
+<tr class="odd">
+<td><a href="../reference/fem.properties.sample_material_field.html#cadjoint.fem.properties.sample_material_field">fem.properties.sample_material_field</a></td>
+<td>Sample the whole material field at every element centroid.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/fem.properties.cell_centroids.html#cadjoint.fem.properties.cell_centroids">fem.properties.cell_centroids</a></td>
+<td>Element centroids, <code>(C, 3)</code>, differentiable in <code>points</code>.</td>
+</tr>
+<tr class="odd">
+<td><a href="../reference/fem.properties.cell_volumes.html#cadjoint.fem.properties.cell_volumes">fem.properties.cell_volumes</a></td>
+<td>Element volumes, <code>(C,)</code>, differentiable in <code>points</code>.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/fem.properties.total_mass.html#cadjoint.fem.properties.total_mass">fem.properties.total_mass</a></td>
+<td>Mass of the meshed domain, <code>sum(rho_e * V_e)</code>.</td>
+</tr>
+<tr class="odd">
+<td><a href="../reference/fem.properties.quantize_to_materials.html#cadjoint.fem.properties.quantize_to_materials">fem.properties.quantize_to_materials</a></td>
+<td>Snap a per-element property field onto a finite set of named materials.</td>
 </tr>
 </tbody>
 </table>
@@ -606,6 +914,179 @@ ul.task-list li input[type="checkbox"] {
 </tbody>
 </table>
 </section>
+<section id="plugins" class="level2">
+<h2 class="anchored" data-anchor-id="plugins">Plugins</h2>
+<table class="caption-top table">
+<tbody>
+<tr class="odd">
+<td><a href="../reference/plugins.plugin.Plugin.html#cadjoint.plugins.plugin.Plugin">plugins.plugin.Plugin</a></td>
+<td>The interface every cadjoint plugin satisfies.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/plugins.plugin.TesseractPlugin.html#cadjoint.plugins.plugin.TesseractPlugin">plugins.plugin.TesseractPlugin</a></td>
+<td>A cadjoint kind, filled by a Tesseract over one of the transports.</td>
+</tr>
+<tr class="odd">
+<td><a href="../reference/plugins.plugin.Capabilities.html#cadjoint.plugins.plugin.Capabilities">plugins.plugin.Capabilities</a></td>
+<td>What a plugin can do, read off what it declares.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/plugins.plugin.PluginProbe.html#cadjoint.plugins.plugin.PluginProbe">plugins.plugin.PluginProbe</a></td>
+<td>A readiness report for one plugin instance.</td>
+</tr>
+<tr class="odd">
+<td><a href="../reference/plugins.plugin.PluginMismatch.html#cadjoint.plugins.plugin.PluginMismatch">plugins.plugin.PluginMismatch</a></td>
+<td>The running component is not the one the configuration expected.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/plugins.spec.PluginSpec.html#cadjoint.plugins.spec.PluginSpec">plugins.spec.PluginSpec</a></td>
+<td>Which <code>Tesseract.from_*</code> call stands behind one plugin name.</td>
+</tr>
+<tr class="odd">
+<td><a href="../reference/plugins.spec.runtime_scratch.html#cadjoint.plugins.spec.runtime_scratch">plugins.spec.runtime_scratch</a></td>
+<td>One scratch directory for this process, removed when it exits.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/plugins.registry.PluginRegistry.html#cadjoint.plugins.registry.PluginRegistry">plugins.registry.PluginRegistry</a></td>
+<td>The plugins this process knows about, and the instances it has open.</td>
+</tr>
+<tr class="odd">
+<td><a href="../reference/plugins.registry.plugin_for_kind.html#cadjoint.plugins.registry.plugin_for_kind">plugins.registry.plugin_for_kind</a></td>
+<td>The plugin currently filling <code>kind</code> in the process-wide registry.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/plugins.registry.get_plugin.html#cadjoint.plugins.registry.get_plugin">plugins.registry.get_plugin</a></td>
+<td>The plugin registered under <code>name</code> in the process-wide registry.</td>
+</tr>
+<tr class="odd">
+<td><a href="../reference/plugins.registry.register_plugin.html#cadjoint.plugins.registry.register_plugin">plugins.registry.register_plugin</a></td>
+<td>Register <code>spec</code> in the process-wide registry.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/plugins.registry.available_plugins.html#cadjoint.plugins.registry.available_plugins">plugins.registry.available_plugins</a></td>
+<td>Names registered in the process-wide registry.</td>
+</tr>
+<tr class="odd">
+<td><a href="../reference/plugins.registry.build_registry.html#cadjoint.plugins.registry.build_registry">plugins.registry.build_registry</a></td>
+<td>Assemble a registry from built-ins, entry points and the config file.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/plugins.registry.load_config.html#cadjoint.plugins.registry.load_config">plugins.registry.load_config</a></td>
+<td>Load the plugins config in effect.</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="flow-solver-prototype" class="level2">
+<h2 class="anchored" data-anchor-id="flow-solver-prototype">Flow solver (prototype)</h2>
+<table class="caption-top table">
+<tbody>
+<tr class="odd">
+<td><a href="../reference/flow.domain.FlowGrid.html#cadjoint.flow.domain.FlowGrid">flow.domain.FlowGrid</a></td>
+<td>A fixed axis-aligned lattice of cell centres in world coordinates.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/flow.domain.sample_solid_fraction.html#cadjoint.flow.domain.sample_solid_fraction">flow.domain.sample_solid_fraction</a></td>
+<td>Evaluate a scene SDF on the grid and squash it to a solid fraction.</td>
+</tr>
+<tr class="odd">
+<td><a href="../reference/flow.domain.solid_fraction.html#cadjoint.flow.domain.solid_fraction">flow.domain.solid_fraction</a></td>
+<td>Smooth solid indicator from signed distances.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/flow.solver.FlowConfig.html#cadjoint.flow.solver.FlowConfig">flow.solver.FlowConfig</a></td>
+<td>Static settings for one flow problem.</td>
+</tr>
+<tr class="odd">
+<td><a href="../reference/flow.solver.FlowResult.html#cadjoint.flow.solver.FlowResult">flow.solver.FlowResult</a></td>
+<td>The converged flow and the scalars read off it.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/flow.solver.solve.html#cadjoint.flow.solver.solve">flow.solver.solve</a></td>
+<td>Converge the penalised flow and read off both objectives.</td>
+</tr>
+<tr class="odd">
+<td><a href="../reference/flow.solver.convergence.html#cadjoint.flow.solver.convergence">flow.solver.convergence</a></td>
+<td>Run the march without early exit and return its residual history.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/flow.solver.recommended_alpha_max.html#cadjoint.flow.solver.recommended_alpha_max">flow.solver.recommended_alpha_max</a></td>
+<td>A drag strong enough that the solid reads as impermeable.</td>
+</tr>
+<tr class="odd">
+<td><a href="../reference/flow.steady.SteadyOptions.html#cadjoint.flow.steady.SteadyOptions">flow.steady.SteadyOptions</a></td>
+<td>Convergence settings for the forward iteration and the adjoint solve.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/flow.steady.steady_populations.html#cadjoint.flow.steady.steady_populations">flow.steady.steady_populations</a></td>
+<td>The converged populations, differentiated through the fixed point.</td>
+</tr>
+<tr class="odd">
+<td><a href="../reference/flow.objectives.pressure_drop.html#cadjoint.flow.objectives.pressure_drop">flow.objectives.pressure_drop</a></td>
+<td>Mean pressure across the inlet plane minus across the outlet plane.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/flow.objectives.heat_transfer_proxy.html#cadjoint.flow.objectives.heat_transfer_proxy">flow.objectives.heat_transfer_proxy</a></td>
+<td><code>int chi \|u\|</code> – air in motion where the metal is.</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="materials" class="level2">
+<h2 class="anchored" data-anchor-id="materials">Materials</h2>
+<table class="caption-top table">
+<tbody>
+<tr class="odd">
+<td><a href="../reference/render.material.Material.html#cadjoint.render.material.Material">render.material.Material</a></td>
+<td>Material properties for physically-inspired shading and simulation.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/materials.aluminium_6061.html#cadjoint.materials.aluminium_6061">materials.aluminium_6061</a></td>
+<td>Aluminium alloy 6061-T6 — the default structural/heatsink aluminium.</td>
+</tr>
+<tr class="odd">
+<td><a href="../reference/materials.copper_c11000.html#cadjoint.materials.copper_c11000">materials.copper_c11000</a></td>
+<td>Copper C11000 (electrolytic tough pitch), annealed — heat spreaders.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/materials.steel_1018.html#cadjoint.materials.steel_1018">materials.steel_1018</a></td>
+<td>AISI 1018 mild carbon steel, cold drawn — general structural steel.</td>
+</tr>
+<tr class="odd">
+<td><a href="../reference/materials.titanium_ti6al4v.html#cadjoint.materials.titanium_ti6al4v">materials.titanium_ti6al4v</a></td>
+<td>Ti-6Al-4V (Grade 5), annealed — the standard aerospace titanium.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/materials.fr4.html#cadjoint.materials.fr4">materials.fr4</a></td>
+<td>FR-4 woven-glass/epoxy laminate — the standard PCB substrate.</td>
+</tr>
+<tr class="odd">
+<td><a href="../reference/materials.silicon.html#cadjoint.materials.silicon">materials.silicon</a></td>
+<td>Single-crystal silicon, intrinsic, at 300 K — dies and MEMS.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/materials.thermal_pad.html#cadjoint.materials.thermal_pad">materials.thermal_pad</a></td>
+<td>A filled-silicone thermal interface pad (gap filler).</td>
+</tr>
+<tr class="odd">
+<td><a href="../reference/materials.pla.html#cadjoint.materials.pla">materials.pla</a></td>
+<td>PLA (polylactic acid) — the default FDM printing plastic.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/materials.catalogue.html#cadjoint.materials.catalogue">materials.catalogue</a></td>
+<td>Every catalogue material, freshly constructed.</td>
+</tr>
+<tr class="odd">
+<td><a href="../reference/sdf.measure.volume.volume.html#cadjoint.sdf.measure.volume.volume">sdf.measure.volume.volume</a></td>
+<td>Estimate the volume of an SDF as a differentiable JAX scalar.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/sdf.measure.mass.material_mass.html#cadjoint.sdf.measure.mass.material_mass">sdf.measure.mass.material_mass</a></td>
+<td>Estimate the mass of an SDF from its material field, as a JAX scalar.</td>
+</tr>
+</tbody>
+</table>
+</section>
 <section id="render" class="level2">
 <h2 class="anchored" data-anchor-id="render">Render</h2>
 <table class="caption-top table">
@@ -633,6 +1114,53 @@ ul.task-list li input[type="checkbox"] {
 <tr class="even">
 <td><a href="../reference/render.raymarch.render.render_raymarched.html#cadjoint.render.raymarch.render.render_raymarched">render.raymarch.render.render_raymarched</a></td>
 <td>Render an SDF with :func:<code>raymarch</code> and display it with matplotlib.</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="viewer-payload-schema" class="level2">
+<h2 class="anchored" data-anchor-id="viewer-payload-schema">Viewer — payload schema</h2>
+<table class="caption-top table">
+<tbody>
+<tr class="odd">
+<td><a href="../reference/viewer.schema.payloads.CompilePayload.html#cadjoint.viewer.schema.payloads.CompilePayload">viewer.schema.payloads.CompilePayload</a></td>
+<td>What <code>mode="compile"</code> answers with when the program ran.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/viewer.schema.payloads.ConstructionNode.html#cadjoint.viewer.schema.payloads.ConstructionNode">viewer.schema.payloads.ConstructionNode</a></td>
+<td>One construction object from the executed program.</td>
+</tr>
+<tr class="odd">
+<td><a href="../reference/viewer.schema.payloads.ConstructionFace.html#cadjoint.viewer.schema.payloads.ConstructionFace">viewer.schema.payloads.ConstructionFace</a></td>
+<td>One analytic face of a feature — a reference, not stored geometry.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/viewer.schema.payloads.MaterialDefinition.html#cadjoint.viewer.schema.payloads.MaterialDefinition">viewer.schema.payloads.MaterialDefinition</a></td>
+<td>A named Python <code>Material</code> definition shown in the material browser.</td>
+</tr>
+<tr class="odd">
+<td><a href="../reference/viewer.schema.payloads.SimMeshPayload.html#cadjoint.viewer.schema.payloads.SimMeshPayload">viewer.schema.payloads.SimMeshPayload</a></td>
+<td>One <code>SimMesh</code> declared in the scene program.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/viewer.schema.payloads.StudyPayload.html#cadjoint.viewer.schema.payloads.StudyPayload">viewer.schema.payloads.StudyPayload</a></td>
+<td>One study declared in the scene program.</td>
+</tr>
+<tr class="odd">
+<td><a href="../reference/viewer.schema.payloads.OptimizationPayload.html#cadjoint.viewer.schema.payloads.OptimizationPayload">viewer.schema.payloads.OptimizationPayload</a></td>
+<td>One <code>Optimization(...)</code> declared in the scene program.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/viewer.schema.payloads.MeshEdgePayload.html#cadjoint.viewer.schema.payloads.MeshEdgePayload">viewer.schema.payloads.MeshEdgePayload</a></td>
+<td>World-space line segments of the extracted dual-contour mesh.</td>
+</tr>
+<tr class="odd">
+<td><a href="../reference/viewer.schema.requests.validate_patch_request.html#cadjoint.viewer.schema.requests.validate_patch_request">viewer.schema.requests.validate_patch_request</a></td>
+<td>Parse one request against the model for its <code>op</code>.</td>
+</tr>
+<tr class="even">
+<td><a href="../reference/viewer.schema.emit.typescript_source.html#cadjoint.viewer.schema.emit.typescript_source">viewer.schema.emit.typescript_source</a></td>
+<td>The whole generated module, ready to write to :data:<code>TYPESCRIPT_PATH</code>.</td>
 </tr>
 </tbody>
 </table>

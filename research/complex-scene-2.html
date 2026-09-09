@@ -1,0 +1,1951 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.10.18">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>complex-scene-2 – cadjoint</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-89af0c2d685ccb09a4d7d65decb66752.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+</head>
+
+<body class="nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">cadjoint</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../docs/getting-started.html"> 
+<span class="menu-text">Get Started</span></a>
+  </li>  
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-guides" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Guides</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-guides">    
+        <li>
+    <a class="dropdown-item" href="../docs/meshing.html">
+ <span class="dropdown-text">Differentiable Meshing</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../docs/simulation.html">
+ <span class="dropdown-text">Simulation</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../docs/flow.html">
+ <span class="dropdown-text">Flow Solver (prototype)</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../docs/optimization.html">
+ <span class="dropdown-text">Optimization</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../docs/plugins.html">
+ <span class="dropdown-text">Plugins</span></a>
+  </li>  
+        <li><hr class="dropdown-divider"></li>
+        <li>
+    <a class="dropdown-item" href="../docs/materials.html">
+ <span class="dropdown-text">Materials</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../docs/rendering.html">
+ <span class="dropdown-text">Forward Renderer</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="../docs/viewer.html"> 
+<span class="menu-text">Playground</span></a>
+  </li>  
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-examples" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Examples</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-examples">    
+        <li>
+    <a class="dropdown-item" href="../examples/basics.html">
+ <span class="dropdown-text">Basics</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/rendering.html">
+ <span class="dropdown-text">Rendering</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/sketch_construction.html">
+ <span class="dropdown-text">Sketch Construction</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/constraints.html">
+ <span class="dropdown-text">Constraints</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/optimization.html">
+ <span class="dropdown-text">Optimization</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/constrained_optimization.html">
+ <span class="dropdown-text">Constrained Optimization</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-research" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Research</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-research">    
+        <li>
+    <a class="dropdown-item" href="../research/differentiable-meshing-pipeline.html">
+ <span class="dropdown-text">Differentiable meshing pipeline</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/performance.html">
+ <span class="dropdown-text">Where the seconds go (performance)</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/fem-integration.html">
+ <span class="dropdown-text">FEM integration</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/tet-vs-hex.html">
+ <span class="dropdown-text">Tet vs hex meshing</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/end-to-end-optimization.html">
+ <span class="dropdown-text">End-to-end optimization</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/path-tracing.html">
+ <span class="dropdown-text">WebGPU SDF path tracing</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/simulator-ecosystem.html">
+ <span class="dropdown-text">Simulator ecosystem survey</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/constraints.html">
+ <span class="dropdown-text">Constraint system</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/flow-solver.html">
+ <span class="dropdown-text">Differentiable flow solver</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/complex-scene.html">
+ <span class="dropdown-text">Modelling a gearbox end-cap</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/design-language.html">
+ <span class="dropdown-text">The design language</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="../reference/index.html"> 
+<span class="menu-text">API Reference</span></a>
+  </li>  
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/andrinr/cadjoint"> <i class="bi bi-github" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#pushing-the-modelling-language-until-it-gives-out" id="toc-pushing-the-modelling-language-until-it-gives-out" class="nav-link active" data-scroll-target="#pushing-the-modelling-language-until-it-gives-out">Pushing the modelling language until it gives out</a>
+  <ul class="collapse">
+  <li><a href="#the-part" id="toc-the-part" class="nav-link" data-scroll-target="#the-part">1. The part</a></li>
+  <li><a href="#limitations-found" id="toc-limitations-found" class="nav-link" data-scroll-target="#limitations-found">2. Limitations found</a>
+  <ul class="collapse">
+  <li><a href="#fixed-a-pattern-could-not-leave-one-of-its-stations-empty" id="toc-fixed-a-pattern-could-not-leave-one-of-its-stations-empty" class="nav-link" data-scroll-target="#fixed-a-pattern-could-not-leave-one-of-its-stations-empty">2.1 FIXED — a pattern could not leave one of its stations empty</a></li>
+  <li><a href="#fixed-sketchplane.tangent-read-the-normal-off-the-wrong-side-of-the-surface" id="toc-fixed-sketchplane.tangent-read-the-normal-off-the-wrong-side-of-the-surface" class="nav-link" data-scroll-target="#fixed-sketchplane.tangent-read-the-normal-off-the-wrong-side-of-the-surface">2.2 FIXED — <code>SketchPlane.tangent</code> read the normal off the wrong side of the surface</a></li>
+  <li><a href="#fixed-no-node-selection-could-pick-a-bore-a-seat-wall-or-a-jacket" id="toc-fixed-no-node-selection-could-pick-a-bore-a-seat-wall-or-a-jacket" class="nav-link" data-scroll-target="#fixed-no-node-selection-could-pick-a-bore-a-seat-wall-or-a-jacket">2.3 FIXED — no node selection could pick a bore, a seat wall or a jacket</a></li>
+  <li><a href="#fixed-an-inclined-tools-three-rotation-angles-were-always-free" id="toc-fixed-an-inclined-tools-three-rotation-angles-were-always-free" class="nav-link" data-scroll-target="#fixed-an-inclined-tools-three-rotation-angles-were-always-free">2.4 FIXED — an inclined tool’s three rotation angles were always free</a></li>
+  <li><a href="#fixed-two-unnamed-primitives-in-one-program-collided" id="toc-fixed-two-unnamed-primitives-in-one-program-collided" class="nav-link" data-scroll-target="#fixed-two-unnamed-primitives-in-one-program-collided">2.5 FIXED — two unnamed primitives in one program collided</a></li>
+  <li><a href="#fixed-a-hole-erased-the-material-of-the-metal-around-it" id="toc-fixed-a-hole-erased-the-material-of-the-metal-around-it" class="nav-link" data-scroll-target="#fixed-a-hole-erased-the-material-of-the-metal-around-it">2.6 FIXED — a hole erased the material of the metal around it</a></li>
+  <li><a href="#fixed-a-difference-took-its-material-from-the-first-tool-and-ignored-the-other-seventeen" id="toc-fixed-a-difference-took-its-material-from-the-first-tool-and-ignored-the-other-seventeen" class="nav-link" data-scroll-target="#fixed-a-difference-took-its-material-from-the-first-tool-and-ignored-the-other-seventeen">2.7 FIXED — a <code>Difference</code> took its material from the first tool and ignored the other seventeen</a></li>
+  <li><a href="#fixed-a-study-that-reads-the-scenes-materials-could-not-be-optimised" id="toc-fixed-a-study-that-reads-the-scenes-materials-could-not-be-optimised" class="nav-link" data-scroll-target="#fixed-a-study-that-reads-the-scenes-materials-could-not-be-optimised">2.8 FIXED — a study that reads the scene’s materials could not be optimised</a></li>
+  <li><a href="#deferred-there-is-no-sweep-along-a-curve-and-twist-is-the-nearest-thing-to-one" id="toc-deferred-there-is-no-sweep-along-a-curve-and-twist-is-the-nearest-thing-to-one" class="nav-link" data-scroll-target="#deferred-there-is-no-sweep-along-a-curve-and-twist-is-the-nearest-thing-to-one">2.9 DEFERRED — there is no sweep along a curve, and <code>twist</code> is the nearest thing to one</a></li>
+  <li><a href="#deferred-a-drafted-or-twisted-extrusion-declares-no-faces-so-it-cannot-be-built-on" id="toc-deferred-a-drafted-or-twisted-extrusion-declares-no-faces-so-it-cannot-be-built-on" class="nav-link" data-scroll-target="#deferred-a-drafted-or-twisted-extrusion-declares-no-faces-so-it-cannot-be-built-on">2.10 DEFERRED — a drafted or twisted extrusion declares no faces, so it cannot be built on</a></li>
+  <li><a href="#deferred-nothing-checks-whether-two-features-collide" id="toc-deferred-nothing-checks-whether-two-features-collide" class="nav-link" data-scroll-target="#deferred-nothing-checks-whether-two-features-collide">2.11 DEFERRED — nothing checks whether two features collide</a></li>
+  <li><a href="#deferred-a-cylinders-height-is-a-half-height-and-an-extrusions-depth-is-not" id="toc-deferred-a-cylinders-height-is-a-half-height-and-an-extrusions-depth-is-not" class="nav-link" data-scroll-target="#deferred-a-cylinders-height-is-a-half-height-and-an-extrusions-depth-is-not">2.12 DEFERRED — a cylinder’s <code>height</code> is a half-height and an extrusion’s <code>depth</code> is not</a></li>
+  <li><a href="#deferred-difference-blends-by-default-at-a-radius-that-is-part-scale" id="toc-deferred-difference-blends-by-default-at-a-radius-that-is-part-scale" class="nav-link" data-scroll-target="#deferred-difference-blends-by-default-at-a-radius-that-is-part-scale">2.13 DEFERRED — <code>Difference</code> blends by default, at a radius that is part-scale</a></li>
+  <li><a href="#deferred-a-circle-is-a-polygon-and-everything-downstream-believes-it" id="toc-deferred-a-circle-is-a-polygon-and-everything-downstream-believes-it" class="nav-link" data-scroll-target="#deferred-a-circle-is-a-polygon-and-everything-downstream-believes-it">2.14 DEFERRED — a circle is a polygon, and everything downstream believes it</a></li>
+  <li><a href="#deferred-sketchplane.origin-is-a-parameter-face.origin-is-an-array" id="toc-deferred-sketchplane.origin-is-a-parameter-face.origin-is-an-array" class="nav-link" data-scroll-target="#deferred-sketchplane.origin-is-a-parameter-face.origin-is-an-array">2.15 DEFERRED — <code>SketchPlane.origin</code> is a parameter, <code>Face.origin</code> is an array</a></li>
+  <li><a href="#deferred-solid.boxs-size-is-one-parameter-so-one-edge-cannot-share-a-scalar" id="toc-deferred-solid.boxs-size-is-one-parameter-so-one-edge-cannot-share-a-scalar" class="nav-link" data-scroll-target="#deferred-solid.boxs-size-is-one-parameter-so-one-edge-cannot-share-a-scalar">2.16 DEFERRED — <code>Solid.box</code>’s size is one parameter, so one edge cannot share a <code>Scalar</code></a></li>
+  <li><a href="#deferred-an-optimisation-has-no-constraints-only-a-regularizer" id="toc-deferred-an-optimisation-has-no-constraints-only-a-regularizer" class="nav-link" data-scroll-target="#deferred-an-optimisation-has-no-constraints-only-a-regularizer">2.17 DEFERRED — an optimisation has no constraints, only a regularizer</a></li>
+  <li><a href="#deferred-shell-hollows-every-face-so-an-open-end-needs-a-cut" id="toc-deferred-shell-hollows-every-face-so-an-open-end-needs-a-cut" class="nav-link" data-scroll-target="#deferred-shell-hollows-every-face-so-an-open-end-needs-a-cut">2.18 DEFERRED — <code>Shell</code> hollows every face, so an open end needs a cut</a></li>
+  <li><a href="#deferred-a-parameter-cannot-appear-in-an-expression-so-every-derived-dimension-is-dead" id="toc-deferred-a-parameter-cannot-appear-in-an-expression-so-every-derived-dimension-is-dead" class="nav-link" data-scroll-target="#deferred-a-parameter-cannot-appear-in-an-expression-so-every-derived-dimension-is-dead">2.19 DEFERRED — a parameter cannot appear in an expression, so every derived dimension is dead</a></li>
+  <li><a href="#deferred-the-lowered-material-field-is-a-second-disagreeing-implementation" id="toc-deferred-the-lowered-material-field-is-a-second-disagreeing-implementation" class="nav-link" data-scroll-target="#deferred-the-lowered-material-field-is-a-second-disagreeing-implementation">2.20 DEFERRED — the lowered material field is a second, disagreeing implementation</a></li>
+  </ul></li>
+  <li><a href="#program-size-and-compile-time" id="toc-program-size-and-compile-time" class="nav-link" data-scroll-target="#program-size-and-compile-time">3. Program size and compile time</a>
+  <ul class="collapse">
+  <li><a href="#where-the-time-actually-goes" id="toc-where-the-time-actually-goes" class="nav-link" data-scroll-target="#where-the-time-actually-goes">3.1 Where the time actually goes</a></li>
+  <li><a href="#the-shader" id="toc-the-shader" class="nav-link" data-scroll-target="#the-shader">3.2 The shader</a></li>
+  </ul></li>
+  <li><a href="#the-limitation-table" id="toc-the-limitation-table" class="nav-link" data-scroll-target="#the-limitation-table">4. The limitation table</a>
+  <ul class="collapse">
+  <li><a href="#what-the-pipeline-could-not-do" id="toc-what-the-pipeline-could-not-do" class="nav-link" data-scroll-target="#what-the-pipeline-could-not-do">4.2 What the <em>pipeline</em> could not do</a></li>
+  <li><a href="#which-of-these-were-silent" id="toc-which-of-these-were-silent" class="nav-link" data-scroll-target="#which-of-these-were-silent">4.1 Which of these were <em>silent</em></a></li>
+  </ul></li>
+  <li><a href="#meshing" id="toc-meshing" class="nav-link" data-scroll-target="#meshing">5. Meshing</a>
+  <ul class="collapse">
+  <li><a href="#the-hex-lattice-shield-hex" id="toc-the-hex-lattice-shield-hex" class="nav-link" data-scroll-target="#the-hex-lattice-shield-hex">5.1 The hex lattice (<code>shield-hex</code>)</a></li>
+  <li><a href="#the-tet-lattices-the-parts-hardest-ceiling" id="toc-the-tet-lattices-the-parts-hardest-ceiling" class="nav-link" data-scroll-target="#the-tet-lattices-the-parts-hardest-ceiling">5.2 The tet lattices — the part’s hardest ceiling</a></li>
+  </ul></li>
+  <li><a href="#b-rep-extraction" id="toc-b-rep-extraction" class="nav-link" data-scroll-target="#b-rep-extraction">6. B-rep extraction</a>
+  <ul class="collapse">
+  <li><a href="#the-euler-characteristic-is-60" id="toc-the-euler-characteristic-is-60" class="nav-link" data-scroll-target="#the-euler-characteristic-is-60">6.1 The Euler characteristic is 60</a></li>
+  <li><a href="#the-residuals-are-infinite-and-that-is-a-category-of-failure-not-a-number" id="toc-the-residuals-are-infinite-and-that-is-a-category-of-failure-not-a-number" class="nav-link" data-scroll-target="#the-residuals-are-infinite-and-that-is-a-category-of-failure-not-a-number">6.2 The residuals are infinite, and that is a category of failure, not a number</a></li>
+  <li><a href="#which-axiom-failure-classes-it-lands-on-and-where" id="toc-which-axiom-failure-classes-it-lands-on-and-where" class="nav-link" data-scroll-target="#which-axiom-failure-classes-it-lands-on-and-where">6.3 Which axiom failure classes it lands on, and where</a></li>
+  <li><a href="#the-face-areas-say-the-same-thing-a-third-way" id="toc-the-face-areas-say-the-same-thing-a-third-way" class="nav-link" data-scroll-target="#the-face-areas-say-the-same-thing-a-third-way">6.4 The face areas say the same thing a third way</a></li>
+  <li><a href="#what-this-says-about-the-priority" id="toc-what-this-says-about-the-priority" class="nav-link" data-scroll-target="#what-this-says-about-the-priority">6.5 What this says about the priority</a></li>
+  </ul></li>
+  <li><a href="#the-two-studies" id="toc-the-two-studies" class="nav-link" data-scroll-target="#the-two-studies">7. The two studies</a>
+  <ul class="collapse">
+  <li><a href="#what-the-studies-cannot-report" id="toc-what-the-studies-cannot-report" class="nav-link" data-scroll-target="#what-the-studies-cannot-report">7.1 What the studies cannot report</a></li>
+  </ul></li>
+  <li><a href="#the-optimisation" id="toc-the-optimisation" class="nav-link" data-scroll-target="#the-optimisation">8. The optimisation</a></li>
+  <li><a href="#in-the-app" id="toc-in-the-app" class="nav-link" data-scroll-target="#in-the-app">9. In the app</a>
+  <ul class="collapse">
+  <li><a href="#the-90-second-compile-budget-is-a-coin-toss-on-this-part" id="toc-the-90-second-compile-budget-is-a-coin-toss-on-this-part" class="nav-link" data-scroll-target="#the-90-second-compile-budget-is-a-coin-toss-on-this-part">9.1 The 90-second compile budget is a coin toss on this part</a></li>
+  <li><a href="#the-construction-overlay-is-unreadable-at-this-scale" id="toc-the-construction-overlay-is-unreadable-at-this-scale" class="nav-link" data-scroll-target="#the-construction-overlay-is-unreadable-at-this-scale">9.2 The construction overlay is unreadable at this scale</a></li>
+  <li><a href="#nodes.cylinder-reaches-the-viewer-and-stops-there" id="toc-nodes.cylinder-reaches-the-viewer-and-stops-there" class="nav-link" data-scroll-target="#nodes.cylinder-reaches-the-viewer-and-stops-there">9.3 <code>Nodes.cylinder</code> reaches the viewer and stops there</a></li>
+  <li><a href="#two-things-seen-and-not-chased" id="toc-two-things-seen-and-not-chased" class="nav-link" data-scroll-target="#two-things-seen-and-not-chased">9.4 Two things seen and not chased</a></li>
+  </ul></li>
+  <li><a href="#where-the-system-gives-out" id="toc-where-the-system-gives-out" class="nav-link" data-scroll-target="#where-the-system-gives-out">10. Where the system gives out</a></li>
+  </ul></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"></header>
+
+
+
+
+<section id="pushing-the-modelling-language-until-it-gives-out" class="level1">
+<h1>Pushing the modelling language until it gives out</h1>
+<p><em>A second, harder part. <code>scenes/end_cap.py</code> found ten limitations (<code>research/complex-scene.md</code>); this one was built to find the next ten, and to find out where the <strong>pipeline</strong> — shader, mesher, B-rep, tets, FEM, optimiser, viewer — stops keeping up rather than where the language does. The part is <code>scenes/motor_shield.py</code>. Every number below was measured on this branch, on this machine, with the cache state stated.</em></p>
+<hr>
+<section id="the-part" class="level2">
+<h2 class="anchored" data-anchor-id="the-part">1. The part</h2>
+<p>A <strong>liquid-cooled motor end shield</strong>: the drive-end shield of a totally-enclosed electric motor, cast in aluminium, with a helical coolant passage cast into the wall of its bearing tower. It was chosen over the gearbox end-cap because every job it does lands on a <em>harder</em> corner than the last part did, and because several of them land on the B-rep extraction’s known failure classes <strong>on purpose</strong>. That extraction is no longer part of this repository; §6 records what it did while it was.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>job</th>
+<th>feature</th>
+<th>what it tests</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>cool the bearing</td>
+<td>helical channel</td>
+<td><code>extrude(twist=…)</code> — the language has no sweep-along-a-curve</td>
+</tr>
+<tr class="even">
+<td></td>
+<td>inlet/outlet bores</td>
+<td>a bore <em>tangent</em> to and <em>coincident</em> with the helix’s end discs</td>
+</tr>
+<tr class="odd">
+<td></td>
+<td>two cast risers</td>
+<td>cylinders <strong>externally tangent</strong> to the tower (<code>cyl_tangent</code>)</td>
+</tr>
+<tr class="even">
+<td></td>
+<td>two pipe flanges</td>
+<td>a flange face <strong>coplanar</strong> with a boss cap (<code>boxes_coplanar</code>)</td>
+</tr>
+<tr class="odd">
+<td>carry the bearing</td>
+<td>stepped seat + circlip groove + seal counterbore</td>
+<td>three <code>revolve</code>s on one <code>Axis</code></td>
+</tr>
+<tr class="even">
+<td></td>
+<td>grease reservoir + nipple bore</td>
+<td>a 0.85-cell wall, a half-cell bore</td>
+</tr>
+<tr class="odd">
+<td></td>
+<td>through bore</td>
+<td><code>Face.hole</code> sharing a live <code>Scalar</code></td>
+</tr>
+<tr class="even">
+<td>bolt to the stator</td>
+<td>four corner lugs</td>
+<td>extruded in the flange’s own plane → <strong>coplanar caps</strong></td>
+</tr>
+<tr class="odd">
+<td></td>
+<td>counterbored bolt circle</td>
+<td>a hard <code>Union</code> of two tools, then <code>PolarPattern</code></td>
+</tr>
+<tr class="even">
+<td></td>
+<td>four tie bolts, a locating spigot</td>
+<td>a schedule of angular stations; two coaxial cylinders 0.5 cell apart</td>
+</tr>
+<tr class="odd">
+<td>carry the shroud</td>
+<td>four pairs of tapped holes</td>
+<td><code>LinearPattern</code> <strong>inside</strong> a <code>PolarPattern</code></td>
+</tr>
+<tr class="even">
+<td>move air</td>
+<td>seven twisted blades + hub</td>
+<td><code>twist</code> as a named free-ish parameter, <code>PolarPattern</code></td>
+</tr>
+<tr class="odd">
+<td></td>
+<td>conical shroud, 8 louvres</td>
+<td><code>Shell</code> two viewport cells thick, cut by a patterned box</td>
+</tr>
+<tr class="even">
+<td>hold the fan</td>
+<td>threaded shaft end</td>
+<td>a 16-gon with one tooth, twisted 2.5 turns</td>
+</tr>
+<tr class="odd">
+<td></td>
+<td><strong>diamond</strong>-knurled locknut</td>
+<td><code>Intersection</code> of one profile twisted both ways</td>
+</tr>
+<tr class="even">
+<td></td>
+<td>splined drive end</td>
+<td>a toothed profile</td>
+</tr>
+<tr class="odd">
+<td>stiffen</td>
+<td>six gussets on an <strong>eight</strong>-station ring</td>
+<td><code>PolarPattern(skip=(3, 5))</code> — new</td>
+</tr>
+<tr class="even">
+<td></td>
+<td>four tangential stiffeners</td>
+<td>a plane meeting a cylinder along a line</td>
+</tr>
+<tr class="odd">
+<td>cast it</td>
+<td>drafted drain boss</td>
+<td><code>extrude(draft=…)</code> — and the faces it costs</td>
+</tr>
+<tr class="even">
+<td></td>
+<td>nameplate pad on the tower wall</td>
+<td><code>SketchPlane.tangent</code> on a surface with no face</td>
+</tr>
+<tr class="odd">
+<td>instrument it</td>
+<td>encoder pocket + cable gland</td>
+<td><code>Face.pocket</code> in the face’s own frame; an inclined tool</td>
+</tr>
+</tbody>
+</table>
+<p>The feature tree is three <code>SketchPlane.on</code> links deep (flange → bearing tower → seal boss → retainer pad), plus one <code>SketchPlane.tangent</code> link off the tower’s curved wall. Eight materials with handbook properties, eighteen cuts, both pattern kinds and a pattern of patterns, a <code>SimMesh</code> in hex and one in tet10, a thermal <em>and</em> an elastic study on node selections that are the part’s own cylinders, and an optimisation with a mass budget and a minimum-wall constraint as penalties.</p>
+<p>Of those, the hex mesh, both studies and the optimisation all run (§7, §8); <strong>the tet10 mesh does not build at all, on either mesher</strong> (§5.2), which is the hardest single ceiling the part found and the reason it is still declared in the file.</p>
+<p>Sub-cell and super-cell fillets sit side by side on purpose: the tower root gets a 0.12 blend (1.3 viewport cells, the size the axiom battery says fragments into slivers), everything else 0.03 (0.3 cells, the size it says is invisible to the graph), and the cuts 0.012.</p>
+<hr>
+</section>
+<section id="limitations-found" class="level2">
+<h2 class="anchored" data-anchor-id="limitations-found">2. Limitations found</h2>
+<p>Eight fixed here with a test each, twelve recorded and deferred with a proposed design. The fixed ones come first (§2.1 – §2.8), then the deferred (§2.9 – §2.20); within each block they are roughly in the order they were found. The three most expensive are not first: <strong>§2.6 stopped both studies from running at all</strong>, §2.8 stopped the optimisation, and §2.19 is the one that most limits what a file in this language can be.</p>
+<section id="fixed-a-pattern-could-not-leave-one-of-its-stations-empty" class="level3">
+<h3 class="anchored" data-anchor-id="fixed-a-pattern-could-not-leave-one-of-its-stations-empty">2.1 FIXED — a pattern could not leave one of its stations empty</h3>
+<p><strong>What happened.</strong> The coolant gallery is fed from a cast riser and runs radially inward to the helix. It therefore crosses the ring of gusset ribs. At 227° and 133° — stations 5 and 3 of an eight-way ring — the feed bore goes straight through a rib’s root, and a rib with a 0.22 hole in its root is not a rib. There is no phase of an eight-way ring that clears the schedule: the riser bores, the tie bolts and the encoder pocket between them forbid every residue mod 45°, and I checked all of them.</p>
+<p>Every CAD system has the answer — <em>suppress instance 3 and instance 5</em> — and this one did not. <code>PolarPattern</code> emitted <code>count</code> copies and that was the whole of its vocabulary. The alternatives were to abandon the pattern and write six ribs out by hand (six sketches, six sets of constraints, no shared <code>rib_thickness</code>) or to let the bore drill the rib and say nothing.</p>
+<p><strong>Fix.</strong> <code>skip=</code> on both patterns:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>ribs <span class="op">=</span> PolarPattern(rib, count<span class="op">=</span><span class="dv">8</span>, axis<span class="op">=</span>bore_axis, skip<span class="op">=</span>(<span class="dv">3</span>, <span class="dv">5</span>))</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>holes <span class="op">=</span> LinearPattern(hole, direction<span class="op">=</span>[<span class="dv">1</span>, <span class="dv">0</span>, <span class="dv">0</span>], count<span class="op">=</span><span class="dv">6</span>, spacing<span class="op">=</span><span class="fl">0.2</span>, skip<span class="op">=</span>(<span class="dv">2</span>,))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The kept copies keep the angles and offsets they would have had — suppressing one leaves a gap rather than respacing the ring, which is the only behaviour that lets a suppressed station be <em>used</em> by something else. Instance 0 is the seed the child’s analytic faces are declared against and cannot be suppressed; the error says to rotate the seed instead.</p>
+<p><code>cadjoint/sdf/operations.py</code>, tests in <code>tests/sdf/test_operations.py</code> (<code>TestSuppressedInstances</code>) and <code>tests/scenes/test_motor_shield.py</code>.</p>
+<p><strong>The one ugly part</strong>, recorded here because it is a design smell rather than a bug: the suppressed set travels as a <strong>bit mask in one scalar parameter</strong> (<code>skip_mask</code>), because the parameter plumbing carries numbers and a set of indices is not one. <code>static_params</code> already had to exist so that <code>count</code> stays a Python int under <code>jit</code>; <code>skip_mask</code> rides the same rail. The cost is a cap at 24 instances when anything is suppressed (checked, with an error that says so). The real fix is a <em>structural parameter</em> kind that may hold any hashable Python value and is guaranteed never to be traced — see §2.19.</p>
+</section>
+<section id="fixed-sketchplane.tangent-read-the-normal-off-the-wrong-side-of-the-surface" class="level3">
+<h3 class="anchored" data-anchor-id="fixed-sketchplane.tangent-read-the-normal-off-the-wrong-side-of-the-surface">2.2 FIXED — <code>SketchPlane.tangent</code> read the normal off the wrong side of the surface</h3>
+<p><strong>What happened.</strong> The nameplate pad is sketched on the tower’s cylindrical wall, which has no analytic face, so its plane comes from <code>SketchPlane.tangent</code>. The plane came back with its normal pointing <strong>into</strong> the solid, and with length 0.94 rather than 1.</p>
+<p><code>tangent</code> projected the point onto the zero set and then took <code>jax.grad(field)</code> <em>there</em>. But the zero set is exactly where a CSG field changes branch: an extruded polygon’s field is <code>maximum(polygon_distance, cap_distance)</code>, and on the wall the first of those is exactly zero. Autodiff is entitled to return any subgradient of a <code>maximum</code>/<code>where</code> at the tie, and for this field it returned one pointing the wrong way. The existing tests never saw it because they all used a <code>Sphere</code>, whose <code>|p| - r</code> is smooth through its own surface.</p>
+<p>Silently flipping a sketch frame is about as bad as a modelling bug gets: the pad still straddled the wall (an extrusion straddles its plane), so nothing looked wrong, but its <code>u</code> axis was mirrored and any hole placed at <code>at=(x, y)</code> would have gone to <code>(-x, y)</code>.</p>
+<p><strong>Fix.</strong> Read the normal by a <strong>central difference across the surface</strong> instead. Both samples are off the surface, where the field is smooth and its gradient is the real one; the result is still an expression in the shape’s parameters, which is the property the plane needs. A <code>normal_step</code> keyword (default <code>1e-3</code>) sets the half-width.</p>
+<p><code>cadjoint/construction/sketch.py</code> (<code>_surface_normal</code>), tests in <code>tests/construction/test_reference_planes.py</code> (<code>test_the_normal_points_out_of_a_faceted_wall</code>, <code>test_a_pad_on_a_faceted_wall_straddles_it</code>).</p>
+</section>
+<section id="fixed-no-node-selection-could-pick-a-bore-a-seat-wall-or-a-jacket" class="level3">
+<h3 class="anchored" data-anchor-id="fixed-no-node-selection-could-pick-a-bore-a-seat-wall-or-a-jacket">2.3 FIXED — no node selection could pick a bore, a seat wall or a jacket</h3>
+<p><strong>What happened.</strong> Both studies need boundary conditions on <em>annular</em> regions of the part’s own axis: the bearing seat wall for the friction heat and the belt pull, the coolant jacket for the cold sink. <code>Nodes</code> offered box, sphere, halfspace, side and predicate. A box picks up the corners of the tower, a sphere the wrong height, and <code>Nodes.predicate</code> is not serializable — so the study could not be captured by the viewer at all.</p>
+<p><strong>Fix.</strong> <code>Nodes.cylinder(center, axis, radius, inner=…, half_length=…)</code>, hollow and axially bounded, serializable both ways. <code>cadjoint/fem/selection.py</code>, <code>cadjoint/fem/study.py</code>, <code>docs/simulation.qmd</code>, tests in <code>tests/fem/test_selection.py</code>.</p>
+</section>
+<section id="fixed-an-inclined-tools-three-rotation-angles-were-always-free" class="level3">
+<h3 class="anchored" data-anchor-id="fixed-an-inclined-tools-three-rotation-angles-were-always-free">2.4 FIXED — an inclined tool’s three rotation angles were always free</h3>
+<p><strong>What happened.</strong> <code>ConstructionPrimitive</code> cast <code>rotation</code> through <code>jnp.asarray</code>, so a rotation could only ever be three numbers, and <code>_free_scalar</code> then made all three <strong>free optimisation variables</strong>. Nine inclined tools in this part (the two feed bores, the gland boss and bore, the gland nut, the two gallery bosses…) meant twenty-seven free angles the optimiser was entitled to tilt. The first optimisation run did exactly that.</p>
+<p><strong>Fix.</strong> <code>rotation</code> accepts <code>Scalar</code>s and adopts them as-is, so a bore drilled at a fixed inclination pins its angles the same way it pins its radius: <code>rotation=[Scalar(math.pi / 2, free=False), …]</code>. <code>cadjoint/construction/solid.py</code>, tests in <code>tests/construction/test_solid.py</code>.</p>
+</section>
+<section id="fixed-two-unnamed-primitives-in-one-program-collided" class="level3">
+<h3 class="anchored" data-anchor-id="fixed-two-unnamed-primitives-in-one-program-collided">2.5 FIXED — two unnamed primitives in one program collided</h3>
+<p><strong>What happened.</strong> Every primitive names its parameters after itself (<code>cylinder_position</code>, <code>cylinder_radius</code>), and <code>extract_parameters</code> refuses two free parameters with one name. So the <em>second</em> unnamed <code>Solid.cylinder</code> in a program was an error — and not at the call site: at the first constraint solve, hundreds of lines later. Same for a second unnamed <code>PolygonProfile</code>.</p>
+<p><strong>Fix.</strong> Per-kind counters: <code>cylinder</code>, <code>cylinder_2</code>, …; <code>profile</code>, <code>profile_2</code>, …. <code>cadjoint/construction/solid.py</code>, <code>cadjoint/construction/sketch.py</code>, tests in <code>tests/construction/</code>.</p>
+</section>
+<section id="fixed-a-hole-erased-the-material-of-the-metal-around-it" class="level3">
+<h3 class="anchored" data-anchor-id="fixed-a-hole-erased-the-material-of-the-metal-around-it">2.6 FIXED — a hole erased the material of the metal around it</h3>
+<p><strong>What happened.</strong> Both studies refused to run. Not “gave a strange answer” — refused, on the whole domain:</p>
+<pre><code>ValueError: study 'bearing-heat': the scene's material field does not specify
+'conductivity' for 3748 of 3748 elements. Give every material in the simulated
+domain a 'conductivity' value (see cadjoint.materials for a catalogue of real
+ones), or pass an explicit scalar to the study.</code></pre>
+<p>Every element. And the shield is a single casting of <code>aluminium_6061()</code>, whose conductivity is 167 W/m·K and is <em>stated</em>, in the one place a material is stated. The same message came back for <code>youngs_modulus</code> from the elastic study.</p>
+<p>The material field is sampled by walking the CSG tree, and at a boolean node the two children’s materials are lerped by a weight that comes from the distance field, so that a smooth CSG interface is a smooth (and differentiable) property interface. The lerp was <code>Material.blend</code>, which is</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>b <span class="op">*</span> (<span class="fl">1.0</span> <span class="op">-</span> t) <span class="op">+</span> a <span class="op">*</span> t</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>An unspecified property is <code>nan</code>. IEEE 754 says <code>nan * 0.0 == nan</code>. So a child that specifies <em>nothing</em> poisons the result even where its weight is <strong>exactly zero</strong> — at the centre of the flange, a metre of nothing away from the hole in question.</p>
+<p>And every cut tool is such a child. A <code>Face.hole</code> is geometry, not a substance; it has no conductivity because the question is meaningless. Of the eighteen tools in this part’s top-level <code>Difference</code>, the ones that carry a material carry it only for the render. The consequence is not subtle and not local: <strong>any solid with a single hole in it reported <code>nan</code> for every physical property at every interior point</strong>, and no <code>FROM_MATERIAL</code> study over it could be assembled. This is not specific to the shield. <code>scenes/end_cap.py</code> has holes too; it survives because it happens to hand its studies explicit scalars.</p>
+<p>It is worth being clear about how invisible this was. The <em>render</em> was perfect: <code>color</code> is specified by every material, so the one property that reaches a pixel was the one property that never went <code>nan</code>. The shield looked right in the viewer for as long as it took to ask it a physical question.</p>
+<p><strong>Fix.</strong> <code>blend_materials</code> in <code>cadjoint/sdf/boolean/base.py</code>, shared by all three boolean nodes, adds one rule to the lerp: a property is unspecified only when <em>neither</em> side specifies it.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>lerp <span class="op">=</span> b <span class="op">*</span> (<span class="fl">1.0</span> <span class="op">-</span> weight) <span class="op">+</span> a <span class="op">*</span> weight</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="cf">return</span> jnp.where(jnp.isnan(a), b, jnp.where(jnp.isnan(b), a, lerp))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Two specified values still blend exactly as before — the smooth property interface is untouched, and it is still differentiable, because <code>jnp.where</code> on a <code>nan</code> <em>constant</em> is a select on a concrete predicate, not a branch on a traced value. A property neither side specifies stays <code>nan</code>, which is what lets the study’s error message keep working when it is telling the truth.</p>
+<p><code>Xor.material_at</code> had the same lerp at a <em>fixed</em> weight of 0.5, where the erasure is unconditional; it uses <code>blend_materials</code> now too.</p>
+<p><strong>And the fix had to be paid for twice.</strong> The single <code>jnp.where</code> above gives the right value and a <code>nan</code> <strong>gradient</strong>. The VJP of <code>jnp.where</code> multiplies the unselected branch’s cotangent by zero, <code>lerp</code>’s derivative in the blend weight is <code>a - b</code>, and <code>0.0 * nan</code> is <code>nan</code> — the double-<code>where</code> trap, which is a trap precisely because the primal is correct and nothing looks wrong until an optimiser stops five minutes in with</p>
+<pre><code>ValueError: Optimization 'stiff-shield' left the finite range at step 0
+(objective=198.96150236622026, grad_norm=nan); lower the learning rate or
+rescale the objective.</code></pre>
+<p>— advice that would not have helped, since the objective was finite and the learning rate was irrelevant. That is a <em>worse</em> failure than the one being fixed: a <code>nan</code> value is checkable at the point you compute it, and a <code>nan</code> gradient surfaces somewhere else entirely, wearing the mask of a badly scaled problem. Both operands are made finite <em>before</em> the lerp now, and the second <code>where</code> puts the <code>nan</code> back over an expression that never carried one.</p>
+<p>Tests in <code>tests/sdf/boolean/test_boolean.py::TestMaterialThroughBooleans</code>: a drilled plate keeps its conductivity at a point clear of the hole; a union, an intersection and an xor with a material-less child keep theirs; two specified values still blend to something strictly between them; a property neither side specifies is still reported as unspecified; the blend is differentiable where one side is unspecified; and — the guard against over-fixing — a genuine two-material blend’s gradient still matches central finite differences to 2 %.</p>
+</section>
+<section id="fixed-a-difference-took-its-material-from-the-first-tool-and-ignored-the-other-seventeen" class="level3">
+<h3 class="anchored" data-anchor-id="fixed-a-difference-took-its-material-from-the-first-tool-and-ignored-the-other-seventeen">2.7 FIXED — a <code>Difference</code> took its material from the first tool and ignored the other seventeen</h3>
+<p><strong>What happened.</strong> Found while fixing §2.6, in the same three lines. <code>Union.material_at</code> folds over every operand:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> child <span class="kw">in</span> <span class="va">self</span>.sdfs[<span class="dv">1</span>:]:</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>    ...</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><code>Difference.material_at</code> and <code>Intersection.material_at</code> did not. They read <code>self.sdfs[0]</code> and <code>self.sdfs[1]</code>, blended those two, and returned — even though both nodes are variadic and this file’s <code>Difference</code> has <strong>a body and eighteen tools</strong>. So the material on seventeen of the eighteen cut walls was whatever the <em>bore</em> said, and the bore is the first tool only because it is written first. Reorder the argument list and the part’s material field changes.</p>
+<p>The same held for <code>Intersection</code>, where the shroud is built from more than two operands.</p>
+<p>Alone, this bug is milder than §2.6 — with the <code>nan</code> rule in place the body’s value survives the blend anyway, so the field is right almost everywhere. It bites exactly where the two rules interact: a tool that <em>does</em> carry a material (the shield has several, for the render) tints only the wall it cut if the fold reaches it, and before the fix, seventeen tools could not tint anything.</p>
+<p><strong>Fix.</strong> Fold, the way <code>Union</code> does, carrying the running distance so that each tool’s blend weight is measured against the shape as cut <em>so far</em>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> tool <span class="kw">in</span> <span class="va">self</span>.sdfs[<span class="dv">1</span>:]:</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>    d <span class="op">=</span> tool(p)</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>    t <span class="op">=</span> jnp.clip(<span class="fl">0.5</span> <span class="op">+</span> <span class="fl">0.5</span> <span class="op">*</span> (result_d <span class="op">+</span> d) <span class="op">/</span> k, <span class="fl">0.0</span>, <span class="fl">1.0</span>)</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>    result_m <span class="op">=</span> blend_materials(result_m, tool.material_at(p), t)</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>    result_d <span class="op">=</span> jnp.maximum(result_d, <span class="op">-</span>d)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Test: <code>test_every_tool_is_folded_in_not_just_the_first</code> — a steel plate cut by two spheres, the second of which is copper, asserts the copper reaches the wall it cut. Before the fix that point read 52 W/m·K (steel); after it reads above 100.</p>
+<p><strong>Why the scene tests did not catch either.</strong> They asserted <em>geometry</em> — where the metal is — which is what §4.1 says is the only reliable evidence on a part this size. Neither reads the material field, because until the studies were run there was no reason to think a boolean touched it. The lesson is in the same direction as §4.1 and one step further: a scene test that means to stand in for the simulation has to assert the <em>field the simulation reads</em>, not only the surface.</p>
+</section>
+<section id="fixed-a-study-that-reads-the-scenes-materials-could-not-be-optimised" class="level3">
+<h3 class="anchored" data-anchor-id="fixed-a-study-that-reads-the-scenes-materials-could-not-be-optimised">2.8 FIXED — a study that reads the scene’s materials could not be optimised</h3>
+<p><strong>What happened.</strong> With §2.6 and §2.7 in, both studies solved. The optimisation over the elastic one still did not, and it failed twice, in two different places, for the same underlying reason: <code>Optimization</code> calls a study along two paths and <strong>neither of them hands it the scene</strong>.</p>
+<p><em>During</em> the loop it builds the mesh once, to freeze the topology so the gradient is a gradient of the physics and not of the mesher, and then calls</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> study.solve(mesh<span class="op">=</span>mesh, points<span class="op">=</span>points)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><code>_solve_mesh</code> sees an already-extracted <code>HexMesh</code>, returns “no SimMesh attached”, and <code>_material_source</code> had exactly two rungs: the <code>sdf</code> argument (absent) and the built SimMesh’s domain (absent). So:</p>
+<pre><code>ValueError: Study 'belt-pull' derives 'youngs_modulus' from the scene's materials
+but got no SDF to sample: pass the scene to solve(sdf), give the study's SimMesh a
+domain=, or set an explicit youngs_modulus value on the study.</code></pre>
+<p>The scene had <em>taken that advice already</em> — <code>shield_mesh</code> is declared <code>domain=shield</code>, and it is the same object <code>study.mesh</code> points at. The error message was telling the author to do the thing they had done, because the lookup never asked the study what mesh it declared, only what mesh it was handed.</p>
+<p><em>After</em> the loop it writes the final parameters back with <code>apply_parameters</code>, re-extracts, and re-solves with the functionalized field:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> study.solve(final_field)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><code>final_field</code> is a bare closure. It has no <code>material_at</code>, so the sampler refused it — 300 seconds into a run, after every gradient step had already succeeded.</p>
+<p><strong>Fix.</strong> <code>_material_source</code> becomes a ladder, and skips a candidate that cannot answer <code>material_at</code>: the <code>solve</code> argument, then the built SimMesh’s domain, then <strong>the study’s declared SimMesh’s domain</strong>, then the study’s own <code>domain=</code>. If nothing carries materials, whatever was handed in is returned unchanged, so the sampler still raises the error that names what it got.</p>
+<p>The second rung of that ladder is not a mere tolerance. By the time <code>solve(final_field)</code> runs, the optimiser has already written the final parameters onto the scene object, so the declared domain <em>is</em> the geometry the callable describes — and it also knows what it is made of, which the callable never will.</p>
+<p><code>cadjoint/fem/study.py</code>, tests in <code>tests/fem/test_material_properties.py::TestTheGeometryAStudyFallsBackOn</code> (both optimiser call shapes, that an explicit SDF still wins over the fallbacks, and that a study naming no geometry at all still raises), and <code>tests/scenes/test_motor_shield.py::TestTheFieldTheSimulationReads</code>.</p>
+</section>
+<section id="deferred-there-is-no-sweep-along-a-curve-and-twist-is-the-nearest-thing-to-one" class="level3">
+<h3 class="anchored" data-anchor-id="deferred-there-is-no-sweep-along-a-curve-and-twist-is-the-nearest-thing-to-one">2.9 DEFERRED — there is no sweep along a curve, and <code>twist</code> is the nearest thing to one</h3>
+<p><strong>What the part needs.</strong> A cast coolant jacket is a tube of circular section following a helix around the bearing tower. That is a sweep: a profile carried along a 3D path, kept normal to it.</p>
+<p><strong>What the language has.</strong> <code>extrude(profile, depth, twist=…)</code>, which rotates the <em>query point</em> about the extrusion’s local z by <code>twist · z / depth</code>. A circle drawn 0.75 off the axis and extruded with a full turn of twist does sweep a helix of radius 0.75, and that is what the part uses:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>channel_profile <span class="op">=</span> PolygonProfile.circle(radius<span class="op">=</span><span class="fl">0.11</span>, center<span class="op">=</span>(<span class="fl">0.75</span>, <span class="fl">0.0</span>), segments<span class="op">=</span><span class="dv">10</span>, …)</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>channel <span class="op">=</span> extrude(channel_profile, depth<span class="op">=</span><span class="fl">0.44</span>, twist<span class="op">=</span>channel_turns.value <span class="op">*</span> <span class="fl">360.0</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Four things are wrong with it and all four had to be designed around.</p>
+<ol type="1">
+<li><strong>The section is normal to z, not to the path.</strong> The tube’s cross-section in the plane perpendicular to the helix is an <em>ellipse</em> — stretched by <code>1/cos(λ)</code> where λ is the helix angle. Here λ = atan(0.44 / (2π·0.75)) = 5.3°, so the tube is 0.4 % out of round and nobody would notice. Double the turns and it is 1.7 % out; make it a real screw and it stops being a tube.</li>
+<li><strong>The pitch is <code>depth / turns</code> and cannot be named.</strong> There is no <code>pitch</code> to hand a <code>Scalar</code>, so <code>channel_turns</code> drives the twist through <code>channel_turns.value * 360.0</code> — a Python float read out of the parameter, not a live link. Change the turns and the helix changes; <em>differentiate</em> with respect to the turns and nothing happens. The one parameter a coolant designer actually tunes is the one that does not reach the gradient.</li>
+<li><strong>The field is not 1-Lipschitz.</strong> Rotating the query point stretches distance by up to <code>1 + |twist| · r / depth</code>; at r = 0.86 and 360°/0.44 that is a factor of ~12 near the outer wall. Sphere-tracing under-steps, dual contouring’s edge bisection needs more iterations, and every consumer that assumes a metric field is on notice. It is documented in <code>extrude</code>; it is still the reason the mesh times in §5 are what they are.</li>
+<li><strong>A twisted extrusion declares no faces</strong> (see §2.10).</li>
+</ol>
+<p><strong>The nearest honest expression</strong> — and what this file settles for — is a twisted extrusion whose end discs are placed where the tangency argument needs them: the twist is zero at mid-depth and ±180° at the caps, so <em>both</em> end discs land at 180°, on the −x side, and the feed bores can be plain cylinders along ±y that are tangent to the helix’s circle at exactly those points. That is a real cast jacket’s geometry, arrived at backwards from the one primitive available.</p>
+<p><strong>Proposed design.</strong> <code>sweep(profile, path, *, twist=0.0, scale=1.0)</code> where <code>path</code> is a <code>Curve</code> node (initially <code>Helix(radius, pitch, turns)</code>, <code>Arc</code>, <code>Polyline</code>) with a differentiable <code>point(t)</code>, <code>tangent(t)</code> and an approximate inverse <code>nearest_t(p)</code>. The SDF evaluates <code>profile_distance(to_frame(p, nearest_t(p)))</code> in the path’s Frenet (or rotation-minimising) frame. <code>nearest_t</code> is the hard part and is the same Newton projection <code>SketchPlane.tangent</code> already runs; for a helix it has a closed-form initial guess (<code>atan2(y, x)</code> unwrapped by z). The payoff is a named <code>pitch</code>, a section normal to the path, and a field that is 1-Lipschitz wherever the path’s curvature radius exceeds the profile’s.</p>
+</section>
+<section id="deferred-a-drafted-or-twisted-extrusion-declares-no-faces-so-it-cannot-be-built-on" class="level3">
+<h3 class="anchored" data-anchor-id="deferred-a-drafted-or-twisted-extrusion-declares-no-faces-so-it-cannot-be-built-on">2.10 DEFERRED — a drafted or twisted extrusion declares no faces, so it cannot be built on</h3>
+<p><strong>What happened.</strong> A sand casting’s walls have to leave the mould, so the drain-plug boss is drafted: <code>extrude(drain_profile, depth=0.18, draft=drain_draft)</code>. The natural next line is <code>drain_boss.cap("+").hole(0.06, depth=…)</code> — and there is no <code>cap("+")</code>. <code>extrusion_faces</code> returns an empty <code>FaceSet</code> for any non-zero draft or twist, because the walls are no longer half-planes and the caps are no longer the profile. That is <em>correct</em> for the walls, and needlessly strict for the caps: a drafted extrusion’s two caps are still exactly planar, still at <code>±depth/2</code>, and still the polygon (bottom) or the polygon shrunk by <code>tan(draft)·depth</code> (top). Only their <em>outline</em> changes.</p>
+<p>The consequence in the file is that the drain bore is a free-standing <code>Solid.cylinder</code> positioned by hand at <code>(_drain_center[0], _drain_center[1], 0.19)</code>, with a magic <code>0.19</code> and a magic half-height, rather than a <code>Face.hole</code> that would track the boss. The same happens on every twisted extrusion — the fan blades, the thread, both halves of the knurl, the helix — so nothing can be built on any of them.</p>
+<p><strong>Proposed design.</strong> Split <code>extrusion_faces</code> in two: emit the two cap faces whenever the <em>caps</em> are planar (always, for draft and twist alike, with the top cap’s polygon scaled by the draft and rotated by half the twist), and emit the side faces only when they are half-planes (undrafted, untwisted). The <code>FaceSet</code> is already keyed, so <code>solid.cap("+")</code> would work and <code>solid.side(i)</code> would keep raising. A drafted boss could then carry a hole, which is the single most common thing a cast boss does.</p>
+</section>
+<section id="deferred-nothing-checks-whether-two-features-collide" class="level3">
+<h3 class="anchored" data-anchor-id="deferred-nothing-checks-whether-two-features-collide">2.11 DEFERRED — nothing checks whether two features collide</h3>
+<p><strong>What happened, three times.</strong> The flange perimeter is a schedule of angular stations, and every occupant is placed by a number typed in this file: eight rib stations, four stiffeners, four tie bolts, four shroud legs, four counterbored bolts, two risers with two flanges and four screws, an encoder pocket, a cable gland, a drain boss. Nothing in the language relates them. The first schedule drilled a tie bolt through a gusset. The second put the encoder pocket under a stiffener. The third — the one that survived into the draft — ran the coolant gallery through two ribs, and the <em>only</em> reason it was caught is that a test asserted metal where the gallery is.</p>
+<p>None of the three produced an error, a warning, or a visible artefact at viewport resolution. A hole through a rib root looks exactly like a rib.</p>
+<p><strong>Proposed design.</strong> A cheap, opt-in <code>interference(a, b, grid)</code> returning the overlap volume of two subtrees, sampled on the viewport grid and reported by the compile worker as a warning list — not a hard error, because half the overlaps in this file are <em>deliberate</em> (every union is one). The useful form is narrower: <strong><code>Difference</code> should be able to say which of its tools cut which of its body’s named sub-solids</strong>, since a tool that removes material from a solid the author did not name is nearly always a mistake. That is one extra pass over the tree with the tools already compiled, and it is the check that would have caught all three.</p>
+</section>
+<section id="deferred-a-cylinders-height-is-a-half-height-and-an-extrusions-depth-is-not" class="level3">
+<h3 class="anchored" data-anchor-id="deferred-a-cylinders-height-is-a-half-height-and-an-extrusions-depth-is-not">2.12 DEFERRED — a cylinder’s <code>height</code> is a half-height and an extrusion’s <code>depth</code> is not</h3>
+<p><code>Solid.cylinder(height=0.5)</code> is 1.0 tall. <code>Solid.box(size=[a, b, c])</code> is <code>2a × 2b × 2c</code>. <code>extrude(profile, depth=0.5)</code> is 0.5 deep, straddling its plane. Three placement conventions, three different meanings of the size argument, and the SDF-primitive convention (half-extents) leaking into the construction layer where the sketch convention (totals) already lives.</p>
+<p>The first draft of this file had every bore twice as long as it meant. The gland bore reached through the flange and into the bearing tower; the drain bore came out of the underside of the flange; the riser bores went past the gallery. Every one of them was found by looking at a screenshot, not by an error.</p>
+<p><strong>Proposed design.</strong> Deprecate <code>height</code> and <code>size</code> on <code>Solid.cylinder</code>/<code>box</code> in favour of <code>length</code>/<code>extent</code> meaning the total, keeping the old names working for one release with a warning. The SDF primitives keep half-extents; <code>ConstructionPrimitive</code> is the layer that should speak the author’s units, and it is already the layer that translates.</p>
+</section>
+<section id="deferred-difference-blends-by-default-at-a-radius-that-is-part-scale" class="level3">
+<h3 class="anchored" data-anchor-id="deferred-difference-blends-by-default-at-a-radius-that-is-part-scale">2.13 DEFERRED — <code>Difference</code> blends by default, at a radius that is part-scale</h3>
+<p><code>Union</code>, <code>Difference</code> and <code>Intersection</code> all default to <code>smoothness=0.1</code>. On a part whose viewport cell is 0.094 and whose thinnest wall is 0.12, a 0.1 blend on a <em>cut</em> is not a fillet, it is a third of the wall. The locknut’s bore had to be written <code>smoothness=0.0</code> explicitly, and so did the shroud’s window cuts and the counterbore’s <code>Union</code>; every one of the eighteen cuts in the shield is either explicit or deliberate.</p>
+<p>A default that is wrong at part scale is worse than no default, because it is invisible: the part just comes out slightly rounder and slightly lighter than it was drawn. <strong>Proposed:</strong> default <code>smoothness=0.0</code> on <code>Difference</code> and <code>Intersection</code> (a cut is sharp unless you ask), keep the blend default on <code>Union</code> where it is at least a fillet, and make both scale-relative — a blend given as a fraction of the child’s bounding-box diagonal rather than in world units — so that a default cannot be part-scale by accident.</p>
+</section>
+<section id="deferred-a-circle-is-a-polygon-and-everything-downstream-believes-it" class="level3">
+<h3 class="anchored" data-anchor-id="deferred-a-circle-is-a-polygon-and-everything-downstream-believes-it">2.14 DEFERRED — a circle is a polygon, and everything downstream believes it</h3>
+<p><code>PolygonProfile.circle(radius=1.0, segments=28)</code> is a 28-gon inscribed in the circle. Three things in this part depend on it and two of them are wrong by a measurable amount:</p>
+<ul>
+<li>the bearing tower’s wall is between 0.9937 and 1.0 from the axis — an <strong>0.63 % apothem error</strong>, five times the tolerance a bearing seat is machined to;</li>
+<li><code>SketchPlane.tangent</code> on that wall lands on a <em>facet</em>, with the facet’s normal, up to <strong>6.4° off radial</strong> (<code>360°/28/2</code>); the nameplate pad is therefore not quite tangent to the cylinder it looks tangent to, and the test had to be written to allow it;</li>
+<li>the risers’ external tangency (§<code>cyl_tangent</code>) is tangency to a <em>true</em> cylinder — <code>Solid.cylinder</code> is analytic — against a 28-gon tower, so the “tangent line” is really a tangent line to a facet, offset inward by 0.0063.</li>
+</ul>
+<p>None of this is a bug; it is the language being honest about having one 2D primitive. It is recorded because it sets a floor on every geometric claim this part makes, and because the fix is cheap: <strong>an <code>Arc</code>/<code>Circle</code> profile segment</strong> whose SDF is exact (<code>|xy - c| - r</code> clipped to the arc’s wedge), alongside the polygon segments, is the same change §2.9 needs for its paths.</p>
+</section>
+<section id="deferred-sketchplane.origin-is-a-parameter-face.origin-is-an-array" class="level3">
+<h3 class="anchored" data-anchor-id="deferred-sketchplane.origin-is-a-parameter-face.origin-is-an-array">2.15 DEFERRED — <code>SketchPlane.origin</code> is a parameter, <code>Face.origin</code> is an array</h3>
+<p><code>float(face.origin[2])</code> works. <code>float(plane.origin[2])</code> raises <code>TypeError: float() argument must be … not 'Vector'</code>, because a plane hands back its live <code>Vector</code> parameter and a face hands back a plain array. Both are “the origin of a plane”. The test in <code>tests/scenes/test_motor_shield.py</code> says <code>plane.origin.xyz</code> and carries a comment explaining why.</p>
+<p><strong>Proposed:</strong> give <code>Face</code> the same <code>.origin</code>/<code>.normal</code> parameter objects, or give <code>Vector</code> an <code>__array__</code> and <code>__float__</code>-able indexing. The second is one method and fixes every caller.</p>
+</section>
+<section id="deferred-solid.boxs-size-is-one-parameter-so-one-edge-cannot-share-a-scalar" class="level3">
+<h3 class="anchored" data-anchor-id="deferred-solid.boxs-size-is-one-parameter-so-one-edge-cannot-share-a-scalar">2.16 DEFERRED — <code>Solid.box</code>’s size is one parameter, so one edge cannot share a <code>Scalar</code></h3>
+<p>The corner lugs must be exactly as thick as the flange, because their point is that their caps are <em>coplanar</em> with the flange’s (the <code>boxes_coplanar</code> axiom case). <code>Solid.box(size=…)</code> takes one <code>Vector</code>, and one component of a <code>Vector</code> cannot be bound to the shared <code>flange_thickness</code> <code>Scalar</code>. So a lug is a four-vertex <code>PolygonProfile</code> with four constraints, extruded from the flange’s own sketch plane to <code>depth=flange_thickness</code> — which is better modelling anyway, but it was forced, not chosen.</p>
+<p><strong>Proposed:</strong> let <code>Vector</code> accept a per-component <code>Scalar</code> (<code>Vector([a, b, thickness])</code>), the way <code>rotation</code> now accepts per-angle <code>Scalar</code>s after §2.4. The machinery is the same and §2.4 is the precedent.</p>
+</section>
+<section id="deferred-an-optimisation-has-no-constraints-only-a-regularizer" class="level3">
+<h3 class="anchored" data-anchor-id="deferred-an-optimisation-has-no-constraints-only-a-regularizer">2.17 DEFERRED — an optimisation has no constraints, only a regularizer</h3>
+<p>Both manufacturing limits in this part — the casting must not grow past a mass budget, and the wall between the bearing seat and the coolant channel must not fall below 0.12 — are <em>constraints</em>, and <code>Optimization</code> takes a <code>regularizer</code>/<code>regularizer_weight</code> pair. So they are softplus hinges with hand-tuned scales:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>over_budget <span class="op">=</span> <span class="fl">20.0</span> <span class="op">*</span> jax.nn.softplus((shield_volume(parameters) <span class="op">-</span> volume_cap) <span class="op">/</span> <span class="fl">0.02</span>)</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>thin_wall <span class="op">=</span> jax.nn.softplus((seat_radius <span class="op">-</span> (<span class="fl">0.64</span> <span class="op">-</span> min_wall)) <span class="op">/</span> <span class="fl">0.005</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The three magic numbers (20.0, 0.02, 0.005) exist only to make a penalty behave like a constraint, they interact with <code>learning_rate</code>, and a violated constraint is reported as a slightly higher objective rather than as a violated constraint.</p>
+<p><strong>Proposed:</strong> <code>Optimization(constraints=[LessThan(shield_volume, 4.40), GreaterThan(seat_wall_thickness, 0.12)])</code>, implemented as an augmented Lagrangian over the same gradient — the multipliers replace the hand-tuned scales, and the report can then say <em>which</em> constraint bound.</p>
+</section>
+<section id="deferred-shell-hollows-every-face-so-an-open-end-needs-a-cut" class="level3">
+<h3 class="anchored" data-anchor-id="deferred-shell-hollows-every-face-so-an-open-end-needs-a-cut">2.18 DEFERRED — <code>Shell</code> hollows every face, so an open end needs a cut</h3>
+<p>The shroud is a thin conical wall around the fan. <code>Shell(loft(...), thickness=0.20)</code> produces <code>|f| - t/2</code>, which is a closed shell: it walls the two ends as well as the cone. Opening it takes a tall cylinder differenced away — a tool whose radius (1.0) and height (0.6) have to be kept larger than the shroud and are unrelated to it, so a change to the shroud silently leaves a lid on or eats the wall.</p>
+<p><strong>Proposed:</strong> <code>Shell(solid, thickness, open=[face, …])</code> taking the faces to leave off. <code>loft</code> already declares its two caps as <code>solid.cap("±")</code>, so <code>Shell(shroud_blank, 0.20, open=[shroud_blank.cap("+"), shroud_blank.cap("-")])</code> would be exact and would track the loft.</p>
+</section>
+<section id="deferred-a-parameter-cannot-appear-in-an-expression-so-every-derived-dimension-is-dead" class="level3">
+<h3 class="anchored" data-anchor-id="deferred-a-parameter-cannot-appear-in-an-expression-so-every-derived-dimension-is-dead">2.19 DEFERRED — a parameter cannot appear in an expression, so every derived dimension is dead</h3>
+<p><strong>This is the largest gap the part found.</strong> <code>Scalar</code> has no arithmetic:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="op">&gt;&gt;&gt;</span> Scalar(<span class="fl">1.0</span>, name<span class="op">=</span><span class="st">"turns"</span>) <span class="op">*</span> <span class="fl">360.0</span></span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="pp">TypeError</span>: unsupported operand <span class="bu">type</span>(s) <span class="cf">for</span> <span class="op">*</span>: <span class="st">'Scalar'</span> <span class="kw">and</span> <span class="st">'float'</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Any dimension that is a <em>function</em> of another dimension therefore has to be computed in Python, off <code>.value</code>, which severs both the live link and the gradient. Six places in this one file:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>written</th>
+<th>what it means</th>
+<th>what it costs</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>twist=channel_turns.value * 360.0</code></td>
+<td>one turn of helix</td>
+<td><code>channel_turns</code> cannot be optimised</td>
+</tr>
+<tr class="even">
+<td><code>plane(offset=tower_height.value / 2.0)</code></td>
+<td>the tower’s own mid-plane</td>
+<td>the seal boss stops tracking the tower’s height</td>
+</tr>
+<tr class="odd">
+<td><code>_riser_y = sqrt(1.16**2 - 0.75**2)</code></td>
+<td>riser axis at <code>tower_r + riser_r</code></td>
+<td>the external tangency is a coincidence of three literals</td>
+</tr>
+<tr class="even">
+<td><code>SketchPlane(origin=[0, 1.06, 0])</code></td>
+<td>tower radius + half <code>rib_thickness</code></td>
+<td>the tangency holds only while <code>rib_thickness == 0.12</code></td>
+</tr>
+<tr class="odd">
+<td><code>seat_radius = bore_radius + 0.15</code></td>
+<td>the seat is 0.15 wider than the bore</td>
+<td>fine — because it is written <em>inside</em> the jitted penalty, over the parameter <em>dict</em></td>
+</tr>
+<tr class="even">
+<td><code>at=(1.12 cos θ, 1.12 sin θ)</code></td>
+<td>a station on a bolt circle</td>
+<td>the bolt circle radius is not a parameter at all</td>
+</tr>
+</tbody>
+</table>
+<p>The last row of that table is the tell: the arithmetic <em>does</em> work, and stays differentiable, as soon as you are inside a traced function over the free parameter dictionary (<code>shield_volume</code>, <code>manufacturing_penalty</code>). It is only the <em>construction</em> layer, where the author writes, that cannot do it. So the part is fully differentiable in the eleven parameters that happen to be handed directly to a feature, and structurally rigid in every relation between them — which is the opposite of what a parametric CAD file is for.</p>
+<p>The constraint system covers exactly one corner of this: relations <em>between sketch vertices in one profile</em> (<code>DistanceConstraint</code>, <code>PointOnLine</code>, …). It cannot relate a plane’s origin to a cylinder’s radius, and those are the relations a machine part is made of.</p>
+<p><strong>Proposed design.</strong> Make <code>Scalar</code> (and <code>Vector</code>) build a small expression graph under <code>+ - * / **</code>, <code>min</code>, <code>max</code> and the trig functions, producing a <code>Derived</code> parameter that is (a) not free, (b) evaluated lazily from its operands, and (c) traced through <code>functionalize</code> like any other node — the machinery is <code>jax</code>, and the expression is already a jax expression; what is missing is that <code>Parameter</code> is a <code>dataclass</code> holding an array rather than a node. <code>extract_parameters</code> would walk a <code>Derived</code> to its free leaves and report the leaves; <code>apply_parameters</code> would refuse to write to a <code>Derived</code>. Two lines of the six above (<code>_riser_y</code>, the stiffener plane) would then state the tangency they only currently imply, and <code>channel_turns</code> would reach the optimiser.</p>
+</section>
+<section id="deferred-the-lowered-material-field-is-a-second-disagreeing-implementation" class="level3">
+<h3 class="anchored" data-anchor-id="deferred-the-lowered-material-field-is-a-second-disagreeing-implementation">2.20 DEFERRED — the lowered material field is a second, disagreeing implementation</h3>
+<p><strong>What happened.</strong> §2.6 and §2.7 fixed <code>material_at</code> on the SDF <em>objects</em>. There is a second copy of that fold, in <code>cadjoint/functionalize.py</code> (<code>functionalize_scene</code>’s <code>mat_eval</code> for a <code>BooleanOp</code>), and it was not touched — because it is the one the compiled render path uses, which another line of work owns this week. Reading the two side by side, it disagrees with the objects in three ways at once:</p>
+<ul>
+<li>it uses <code>Material.blend</code>, so it has §2.6’s <code>nan</code> erasure and §2.6’s <code>nan</code> gradient, latent;</li>
+<li>it applies <strong>Union’s</strong> blend weight — <code>t = clip(0.5 + 0.5·(d − d₀)/k)</code> — to every boolean node, <code>Difference</code> and <code>Intersection</code> included;</li>
+<li>it advances its running distance with <code>smooth_min</code> for all of them, so after the first operand of a <code>Difference</code> the weights are measured against the wrong shape.</li>
+</ul>
+<p>Only the last two are reachable today: the lowered <code>mat_eval</code> returns the six <em>render</em> properties (<code>color</code>, <code>roughness</code>, <code>metallic</code>, <code>opacity</code>, <code>ior</code>, <code>reflectivity</code>) and defaults each of them at the leaf, so no <code>nan</code> ever enters it. The visible consequence is mild and one-directional — inside a <code>Difference</code>, <code>d − d₀</code> is positive almost everywhere, so <code>t</code> saturates at 1 and the body’s material simply wins: a tool that carries a material to tint the wall it cut never tints it in the compiled render, while it does in the interpreted one. Nothing in this part looks wrong because of it. It is recorded because <em>two implementations of one rule</em> is the interesting fact, not the size of today’s discrepancy.</p>
+<p><strong>Proposed design.</strong> One fold, in <code>cadjoint/sdf/boolean/base.py</code>, over already-evaluated <code>(distance, material)</code> pairs:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> fold_materials(kind, first, rest, smoothness): ...</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><code>Union.material_at</code>, <code>Difference.material_at</code>, <code>Intersection.material_at</code>, <code>Xor.material_at</code> and <code>functionalize</code>’s <code>mat_eval</code> all call it, the last one passing the node’s own <code>kind</code>, which it already has in hand as <code>obj</code>. Then a test can assert the two agree on the same tree — which is the test that does not exist and is the reason this drifted.</p>
+<hr>
+</section>
+</section>
+<section id="program-size-and-compile-time" class="level2">
+<h2 class="anchored" data-anchor-id="program-size-and-compile-time">3. Program size and compile time</h2>
+<p>All figures on this branch, <code>JAX_PLATFORMS</code> default, one core busy. “Cold” means an empty <code>CADJOINT_CACHE_DIR</code>; “warm” means the same request run twice. The end-cap column is from <code>research/complex-scene.md</code> where it was measured the same way.</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th></th>
+<th style="text-align: right;">end-cap</th>
+<th style="text-align: right;">shield</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>module exec, incl.&nbsp;constraint solve</td>
+<td style="text-align: right;">1.9 s</td>
+<td style="text-align: right;"><strong>4.5 s</strong></td>
+</tr>
+<tr class="even">
+<td>free parameters (whole scene)</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">41</td>
+</tr>
+<tr class="odd">
+<td>fixed parameters (whole scene)</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">1 192</td>
+</tr>
+<tr class="even">
+<td>world-frame CSG leaves</td>
+<td style="text-align: right;">17</td>
+<td style="text-align: right;"><strong>52</strong></td>
+</tr>
+<tr class="odd">
+<td>profile vertices, named profiles</td>
+<td style="text-align: right;">122</td>
+<td style="text-align: right;"><strong>259</strong></td>
+</tr>
+<tr class="even">
+<td>construction nodes in the viewer payload</td>
+<td style="text-align: right;">12</td>
+<td style="text-align: right;"><strong>40</strong></td>
+</tr>
+<tr class="odd">
+<td>compile payload</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;"><strong>23.9 MB</strong></td>
+</tr>
+</tbody>
+</table>
+<p>The SDF program, lowered by <code>functionalize</code> and measured with <code>jax.jit(...).lower(...)</code>:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>program</th>
+<th style="text-align: right;">HLO</th>
+<th style="text-align: right;">ops</th>
+<th style="text-align: right;">lower</th>
+<th style="text-align: right;">compile</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>one point query</td>
+<td style="text-align: right;">622 KB</td>
+<td style="text-align: right;">8 223</td>
+<td style="text-align: right;">0.44 s</td>
+<td style="text-align: right;">0.68 s</td>
+</tr>
+<tr class="even">
+<td><code>vmap</code> over 4 096 points</td>
+<td style="text-align: right;">791 KB</td>
+<td style="text-align: right;">9 598</td>
+<td style="text-align: right;">0.56 s</td>
+<td style="text-align: right;">0.96 s</td>
+</tr>
+<tr class="odd">
+<td><code>grad</code> over the free set</td>
+<td style="text-align: right;">1 313 KB</td>
+<td style="text-align: right;">15 756</td>
+<td style="text-align: right;">1.20 s</td>
+<td style="text-align: right;">3.49 s</td>
+</tr>
+</tbody>
+</table>
+<p>Three things are worth saying about that table.</p>
+<p><strong>The batched program is barely larger than the single-point one</strong> (+27 % HLO, +17 % ops). <code>vmap</code> costs almost nothing structurally, which is the whole argument for the functional lowering — the pattern nodes trace their instances <em>once</em> over a batch axis rather than unrolling, so a 7-blade fan and an 8-station rib ring are each one copy of their geometry plus a batched rest.</p>
+<p><strong>The gradient is 2.1× the forward program and 5× its compile time.</strong> Every edit round-trip that touches the optimiser pays that 3.5 s.</p>
+<p><strong>Nothing here is the bottleneck.</strong> The whole SDF program compiles in about 5 s. What the viewer waits for is elsewhere: the shader and the mesher.</p>
+<section id="where-the-time-actually-goes" class="level3">
+<h3 class="anchored" data-anchor-id="where-the-time-actually-goes">3.1 Where the time actually goes</h3>
+<p>Measured twice, six hours apart on the same scene, because the WGSL backend was being changed underneath it by another line of work (§3.2). Both columns are given; the second is the state this report was finished in.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 15%">
+<col style="width: 21%">
+<col style="width: 21%">
+<col style="width: 21%">
+<col style="width: 21%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>stage</th>
+<th style="text-align: right;">cold (early)</th>
+<th style="text-align: right;">cold (final)</th>
+<th style="text-align: right;">warm (final)</th>
+<th style="text-align: right;">budget (<code>_worker_client.py</code>)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>compile</code> worker</td>
+<td style="text-align: right;">27.0 s</td>
+<td style="text-align: right;"><strong>23.3 s</strong></td>
+<td style="text-align: right;">16.2 s</td>
+<td style="text-align: right;">90 s ✓</td>
+</tr>
+<tr class="even">
+<td><code>mesh</code> worker (edge overlay, 64³)</td>
+<td style="text-align: right;">149.0 s</td>
+<td style="text-align: right;"><strong>129.2 s</strong> ✗</td>
+<td style="text-align: right;">49.5 s ✓</td>
+<td style="text-align: right;">90 s</td>
+</tr>
+<tr class="odd">
+<td>compile payload</td>
+<td style="text-align: right;">29.1 MB</td>
+<td style="text-align: right;"><strong>23.9 MB</strong></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+</tr>
+</tbody>
+</table>
+<p><strong>The cold edge overlay blows the mesh budget by 44 %.</strong> A first <code>mesh</code> request on this part, on a machine whose XLA cache does not already hold it, is killed at 90 s and reported to the author as <em>“Meshing exceeded the 90-second timeout”</em> — with no partial result and no indication that a second attempt would succeed.</p>
+<p>The playground’s <code>warm_start()</code> does not rescue it either, quite: it issues a background <code>compile</code> and a background <code>mesh</code> for <strong>every</strong> scene under <code>scenes/</code>, and it holds them to <code>MESH_TIMEOUT_SECONDS</code> too. So the warm-up’s own mesh of this part is killed at 90 s as well. What saves the interactive path is that XLA’s persistent cache is written <em>per executable as each one finishes</em>, so the killed warm-up still leaves most of the cache behind and the user’s first real request lands on the 49.5 s warm path. The part is usable in the app (§6) by that accident rather than by design, and on a machine that has never opened it, a direct <code>mesh</code> request fails.</p>
+<p>The overlay itself: <strong>16 261 wire segments, 3 777 sharp</strong> at resolution 64. The end-cap’s was 8 000-odd. Almost exactly a doubling of profile vertices (122 → 259) for almost exactly a doubling of overlay work, which matches the pricing model in <code>research/complex-scene.md</code> §3: the overlay is priced in profile vertices, not in features.</p>
+</section>
+<section id="the-shader" class="level3">
+<h3 class="anchored" data-anchor-id="the-shader">3.2 The shader</h3>
+<p><code>compile_scene_to_wgsl</code> emitted <strong>5.78 MB of WGSL, 101 721 <code>let</code> bindings, 69 functions, in 42.2 s</strong>.</p>
+<p>That number is <em>not</em> attributable to this scene alone and should not be read as one: the WGSL backend (<code>cadjoint/backends/wgsl/</code>, <code>cadjoint/sdf/_lowering.py</code>) has substantial uncommitted work in this tree from another line of work, including a new culling pass. The same script on an earlier draft of this scene, earlier the same day and before those edits, reported 6.8 MB / 69 100 lets / 6.5 s. The scene grew by roughly a third between those drafts; the shader emission time grew by 6.5×. Whoever owns that backend should measure it against a fixed scene; from here all that can be said is that <strong>shader emission, not the SDF program, is the largest single item in a cold compile</strong>, and that at ~100 k <code>let</code>s the emitter is well into the range where a browser’s WGSL compiler becomes the next wall.</p>
+<hr>
+</section>
+</section>
+<section id="the-limitation-table" class="level2">
+<h2 class="anchored" data-anchor-id="the-limitation-table">4. The limitation table</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>#</th>
+<th>limitation</th>
+<th>status</th>
+<th>where</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>2.1</td>
+<td>a pattern could not leave a station empty</td>
+<td><strong>fixed</strong> — <code>skip=</code></td>
+<td><code>cadjoint/sdf/operations.py</code></td>
+</tr>
+<tr class="even">
+<td>2.2</td>
+<td><code>SketchPlane.tangent</code> read an inward, non-unit normal</td>
+<td><strong>fixed</strong> — central difference</td>
+<td><code>cadjoint/construction/sketch.py</code></td>
+</tr>
+<tr class="odd">
+<td>2.3</td>
+<td>no node selection for a bore, seat wall or jacket</td>
+<td><strong>fixed</strong> — <code>Nodes.cylinder</code></td>
+<td><code>cadjoint/fem/selection.py</code></td>
+</tr>
+<tr class="even">
+<td>2.4</td>
+<td>an inclined tool’s three angles were always free</td>
+<td><strong>fixed</strong> — <code>Scalar</code> rotations</td>
+<td><code>cadjoint/construction/solid.py</code></td>
+</tr>
+<tr class="odd">
+<td>2.5</td>
+<td>two unnamed primitives collided on parameter names</td>
+<td><strong>fixed</strong> — per-kind counters</td>
+<td><code>solid.py</code>, <code>sketch.py</code></td>
+</tr>
+<tr class="even">
+<td>2.6</td>
+<td>a hole erased the material of the metal around it — and masking the <code>nan</code> cost a <code>nan</code> gradient</td>
+<td><strong>fixed</strong> — <code>blend_materials</code>, as a double <code>where</code></td>
+<td><code>cadjoint/sdf/boolean/base.py</code>, <code>xor.py</code></td>
+</tr>
+<tr class="odd">
+<td>2.7</td>
+<td><code>Difference</code>/<code>Intersection</code> blended only their first two operands</td>
+<td><strong>fixed</strong> — fold every operand</td>
+<td><code>sdf/boolean/{difference,intersection}.py</code></td>
+</tr>
+<tr class="even">
+<td>2.8</td>
+<td>a <code>FROM_MATERIAL</code> study could not be optimised</td>
+<td><strong>fixed</strong> — a material-source ladder</td>
+<td><code>cadjoint/fem/study.py</code></td>
+</tr>
+<tr class="odd">
+<td>2.9</td>
+<td>no sweep along a curve; <code>twist</code> is the nearest thing</td>
+<td>deferred — <code>sweep(profile, path)</code></td>
+<td>—</td>
+</tr>
+<tr class="even">
+<td>2.10</td>
+<td>a drafted/twisted extrusion declares <em>no</em> faces</td>
+<td>deferred — emit the caps</td>
+<td><code>construction/faces.py</code></td>
+</tr>
+<tr class="odd">
+<td>2.11</td>
+<td>nothing checks whether two features collide</td>
+<td>deferred — per-tool cut report</td>
+<td><code>sdf/boolean/difference.py</code></td>
+</tr>
+<tr class="even">
+<td>2.12</td>
+<td><code>cylinder(height=)</code> is a half-height, <code>extrude(depth=)</code> is not</td>
+<td>deferred — rename to totals</td>
+<td><code>construction/solid.py</code></td>
+</tr>
+<tr class="odd">
+<td>2.13</td>
+<td><code>Difference</code> blends by default at part scale</td>
+<td>deferred — sharp by default, relative radii</td>
+<td><code>sdf/boolean/</code></td>
+</tr>
+<tr class="even">
+<td>2.14</td>
+<td>a circle is a polygon (0.63 % apothem, 6.4° facet normals)</td>
+<td>deferred — <code>Arc</code> profile segments</td>
+<td><code>construction/sketch.py</code></td>
+</tr>
+<tr class="odd">
+<td>2.15</td>
+<td><code>SketchPlane.origin</code> is a <code>Vector</code>, <code>Face.origin</code> is an array</td>
+<td>deferred — <code>Vector.__array__</code></td>
+<td><code>geometry/parameters.py</code></td>
+</tr>
+<tr class="even">
+<td>2.16</td>
+<td><code>box(size=)</code> is one <code>Vector</code>, so an edge cannot share a <code>Scalar</code></td>
+<td>deferred — per-component <code>Scalar</code></td>
+<td><code>geometry/parameters.py</code></td>
+</tr>
+<tr class="odd">
+<td>2.17</td>
+<td>an optimisation has no constraints, only a regularizer</td>
+<td>deferred — augmented Lagrangian</td>
+<td><code>cadjoint/optimize.py</code></td>
+</tr>
+<tr class="even">
+<td>2.18</td>
+<td><code>Shell</code> hollows every face; an open end needs a cut tool</td>
+<td>deferred — <code>Shell(open=[face])</code></td>
+<td><code>sdf/operations.py</code></td>
+</tr>
+<tr class="odd">
+<td>2.19</td>
+<td><strong>a parameter cannot appear in an expression</strong></td>
+<td>deferred — <code>Derived</code> parameters</td>
+<td><code>geometry/parameters.py</code></td>
+</tr>
+<tr class="even">
+<td>2.20</td>
+<td>the lowered material field is a second, disagreeing fold</td>
+<td>deferred — one <code>fold_materials</code></td>
+<td><code>cadjoint/functionalize.py</code></td>
+</tr>
+</tbody>
+</table>
+<section id="what-the-pipeline-could-not-do" class="level3">
+<h3 class="anchored" data-anchor-id="what-the-pipeline-could-not-do">4.2 What the <em>pipeline</em> could not do</h3>
+<p>The table above is the modelling language. These are the things downstream of it that stopped keeping up on this part; each is measured in the section named, and none has a fix in this change.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>#</th>
+<th>limitation</th>
+<th>where</th>
+<th>section</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>P1</td>
+<td>neither tet route can mesh the part — the refinement ladder walks all three rungs and the surface is still self-intersecting at 4.5× the cells</td>
+<td><code>cadjoint/fem/tetmesh.py</code></td>
+<td>§5.2</td>
+</tr>
+<tr class="even">
+<td>P2</td>
+<td>the Gmsh route reports a raw Gmsh sentence and walks no ladder</td>
+<td><code>cadjoint/fem/gmsh.py</code></td>
+<td>§5.2</td>
+</tr>
+<tr class="odd">
+<td>P3</td>
+<td>the hex route silently includes geometry outside the declared box; the tet route warns</td>
+<td><code>cadjoint/fem/{hexmesh,tetmesh}.py</code></td>
+<td>§5.2</td>
+</tr>
+<tr class="even">
+<td>P4</td>
+<td>no quality floor: a scaled Jacobian of 0.0079 is handed to both solvers</td>
+<td><code>cadjoint/fem/simmesh.py</code></td>
+<td>§5.1</td>
+</tr>
+<tr class="odd">
+<td>P5</td>
+<td>B-rep extraction takes 156 s, reports χ = 60 against a true −54, and gives one octagonal flange 142 faces — <em>measured before the module left this repo</em></td>
+<td><code>cadjoint/brep/</code> (removed)</td>
+<td>§6</td>
+</tr>
+<tr class="even">
+<td>P6</td>
+<td>mass and safety factor are <code>None</code> on a single-alloy casting, vetoed by a structural check that predates §2.6</td>
+<td><code>cadjoint/fem/properties.py</code></td>
+<td>§7.1</td>
+</tr>
+<tr class="odd">
+<td>P7</td>
+<td>the optimiser’s re-meshed objective is 16 % worse than its last frozen-mesh one, and is not reported next to it</td>
+<td><code>cadjoint/optimize.py</code></td>
+<td>§8</td>
+</tr>
+<tr class="even">
+<td>P8</td>
+<td>a parameter with an exactly-zero gradient is indistinguishable from one with a small one</td>
+<td><code>cadjoint/optimize.py</code></td>
+<td>§8</td>
+</tr>
+<tr class="odd">
+<td>P9</td>
+<td>the cold edge overlay is 129 s against a 90 s budget; the app is usable only because a killed warm-up still leaves its XLA cache behind</td>
+<td><code>cadjoint/viewer/_worker_client.py</code></td>
+<td>§3.1, §9</td>
+</tr>
+<tr class="even">
+<td>P10</td>
+<td>the compile budget is wall clock, so a job using 55 CPU-seconds of 90 is killed as “too slow”</td>
+<td><code>cadjoint/viewer/_worker_client.py</code></td>
+<td>§9.1</td>
+</tr>
+<tr class="odd">
+<td>P11</td>
+<td>the construction overlay draws 259 vertices across 40 features at once and is unreadable</td>
+<td><code>frontend/src/components/viewer/</code></td>
+<td>§9.2</td>
+</tr>
+<tr class="even">
+<td>P12</td>
+<td><code>Nodes.cylinder</code> has no <code>describeSelection</code>, no <code>selectionEval</code> and no <code>types.ts</code> variant, so the BCs it selects render blank</td>
+<td><code>frontend/src/{studies,selectionEval,types}.ts</code></td>
+<td>§9.3</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="which-of-these-were-silent" class="level3">
+<h3 class="anchored" data-anchor-id="which-of-these-were-silent">4.1 Which of these were <em>silent</em></h3>
+<p>The task asked for three separate things: what the language could not express, what it expressed awkwardly, and what it silently got wrong. The third list is the one that matters, because the first two announce themselves.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>silently wrong</th>
+<th>how it showed up</th>
+<th>how it was caught</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>SketchPlane.tangent</code>’s inward normal (2.2)</td>
+<td>the pad still straddled the wall, so it <em>looked</em> right; only its <code>u</code> axis was mirrored</td>
+<td>a test that asserted the normal pointed out</td>
+</tr>
+<tr class="even">
+<td>a hole erasing the metal’s material (2.6)</td>
+<td>the render was <strong>perfect</strong> — <code>color</code> is the one property nothing leaves unspecified</td>
+<td>asking the part a physical question: both studies refused, on 3 748 of 3 748 elements</td>
+</tr>
+<tr class="odd">
+<td>seventeen of eighteen cut walls taking the first tool’s material (2.7)</td>
+<td>nothing at all, while §2.6 stood; a reorderable material field</td>
+<td>reading <code>Difference.material_at</code> next to <code>Union.material_at</code></td>
+</tr>
+<tr class="even">
+<td>the <code>nan</code>-masking fix’s own <code>nan</code> <em>gradient</em> (2.6)</td>
+<td>the field was right and <code>grad_norm</code> was <code>nan</code>, 300 s into an optimisation</td>
+<td>asking for the gradient of a drilled plate’s conductivity</td>
+</tr>
+<tr class="odd">
+<td>a bore twice as long as written (2.12)</td>
+<td>the gland bore reached into the bearing tower</td>
+<td>looking at a screenshot</td>
+</tr>
+<tr class="even">
+<td><code>Difference</code>’s 0.1 default blend (2.13)</td>
+<td>the locknut came out rounder and lighter than drawn</td>
+<td>reading the wall thickness off the sketch</td>
+</tr>
+<tr class="odd">
+<td>the coolant gallery through two ribs (2.11)</td>
+<td>a rib with a 0.22 hole in its root still looks like a rib at 64³</td>
+<td>a test that asserted metal at every rib station</td>
+</tr>
+<tr class="even">
+<td><code>channel_turns.value * 360.0</code> (2.19)</td>
+<td>the optimiser reports <strong>gradient zero</strong>, not an error</td>
+<td>asking for the gradient and getting 0</td>
+</tr>
+<tr class="odd">
+<td>a 28-gon “cylinder” (2.14)</td>
+<td>0.63 % apothem error, facet normals 6.4° off</td>
+<td>a test written against the true radius, which failed</td>
+</tr>
+</tbody>
+</table>
+<p>Four of the six were caught by a <em>test that asserted geometry</em>, not by the viewer and not by an exception. That is the argument for <code>tests/scenes/test_motor_shield.py</code> being as long as it is: on a part this size, the render is not evidence.</p>
+<hr>
+</section>
+</section>
+<section id="meshing" class="level2">
+<h2 class="anchored" data-anchor-id="meshing">5. Meshing</h2>
+<p>Both <code>SimMesh</code>es are declared over the shield alone, on the same box (3.20 × 3.20 × 1.45 from (−1.60, −1.60, −0.15)) at the same declared resolution (30, 30, 14) — so the lattice spacing is <strong>0.1067 × 0.1067 × 0.1036</strong>, and the sampling cell is a little <em>coarser</em> than the 0.094 the viewport overlay uses.</p>
+<p>That number is the whole story of this section, because the part’s thin dimensions are stated in viewport cells and the lattice is coarser than they are:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>feature</th>
+<th style="text-align: right;">thickness</th>
+<th style="text-align: right;">lattice cells</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>gusset rib / tangential stiffener</td>
+<td style="text-align: right;">0.12</td>
+<td style="text-align: right;">1.13</td>
+</tr>
+<tr class="even">
+<td>coolant tube bore</td>
+<td style="text-align: right;">0.22</td>
+<td style="text-align: right;">2.06</td>
+</tr>
+<tr class="odd">
+<td>wall outside the coolant tube</td>
+<td style="text-align: right;">0.14</td>
+<td style="text-align: right;">1.31</td>
+</tr>
+<tr class="even">
+<td>wall inside it, to the circlip groove</td>
+<td style="text-align: right;">0.12</td>
+<td style="text-align: right;">1.13</td>
+</tr>
+<tr class="odd">
+<td>locating spigot wall</td>
+<td style="text-align: right;">0.10</td>
+<td style="text-align: right;">0.94</td>
+</tr>
+<tr class="even">
+<td>riser pipe flange</td>
+<td style="text-align: right;">0.06</td>
+<td style="text-align: right;"><strong>0.56</strong></td>
+</tr>
+<tr class="odd">
+<td>nameplate pad, retainer pad</td>
+<td style="text-align: right;">0.06</td>
+<td style="text-align: right;"><strong>0.56</strong></td>
+</tr>
+<tr class="even">
+<td>circlip groove depth</td>
+<td style="text-align: right;">0.05</td>
+<td style="text-align: right;"><strong>0.47</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Three features are <strong>below half a cell</strong>. They are in the part on purpose: the question was what the mesher does with them, and the answer is in the quality figures.</p>
+<section id="the-hex-lattice-shield-hex" class="level3">
+<h3 class="anchored" data-anchor-id="the-hex-lattice-shield-hex">5.1 The hex lattice (<code>shield-hex</code>)</h3>
+<p><code>mesh_inspect</code> took <strong>144.7 s</strong> (budget 300 s, ✓).</p>
+<pre><code>nodes 5 482   elements 3 748
+bounds  [-1.500, -1.500, -0.192] .. [1.500, 1.500, 1.196]
+scaled Jacobian   min 0.0079   mean 0.894   max 1.000
+aspect ratio      min 1.03     mean 1.54    max 18.74</code></pre>
+<p>The mean is healthy and the minimum is not: <strong>0.0079 is a degenerate element</strong>, three orders of magnitude below the mean, and an aspect ratio of 18.7 is a needle. Both come from the sub-cell features in the table above — a 0.06 pad or a 0.05 groove crosses a 0.107 cell, and the dual vertex lands almost on a cell face.</p>
+<p>Nothing rejects it. The mesh is handed to both studies as it is, and a scaled Jacobian of 0.008 in an elastic solve is a stiffness-matrix condition number in the billions. A quality <em>floor</em> — “refuse, or refine, below 0.05” — belongs in <code>SimMesh.build</code>; the ladder that already exists for tets (§5.2) is the machinery for it.</p>
+</section>
+<section id="the-tet-lattices-the-parts-hardest-ceiling" class="level3">
+<h3 class="anchored" data-anchor-id="the-tet-lattices-the-parts-hardest-ceiling">5.2 The tet lattices — the part’s hardest ceiling</h3>
+<p><strong>Neither tet route can mesh this part, at any rung of the ladder.</strong> This is the clearest ceiling the shield found, and both meshers hit it for the same reason and report it very differently.</p>
+<pre><code>tet4  / tetgen   FAILED after 142.0 s
+tet10 / tetgen   FAILED after 141.9 s
+  RuntimeError: TetGen rejected the surface: The input surface mesh contain
+  self-intersections. The surface stays self-intersecting up to (68, 68, 32)
+  (declared (30, 30, 14), refined x1.5 and x2.25); the part likely has features
+  thinner than two cells at the declared resolution — raise the declared
+  resolution or use method='hex'.
+
+tet10 / gmsh     FAILED after 19.9 s
+  Exception: Wrong topology of triangulation for parametrization:
+  one edge is incident to 4 triangles</code></pre>
+<p><strong>The refinement ladder fires, all the way, and it is not enough.</strong> The warning trail shows it walking three rungs — (30, 30, 14) → ×1.5 → ×2.25 = (68, 68, 32) — and trying each one twice, once with exact sharp feature placement and once without. Six dual-contouring extractions of a 52-leaf part in 142 seconds, and the surface is still non-manifold at 4.5× the declared cell count.</p>
+<p>The cause is in §5’s table and is not the mesher’s fault: <strong>three features are below half a lattice cell</strong> (the 0.06 riser flange, the 0.06 nameplate and retainer pads, the 0.05 circlip groove), and a 0.06 wall crossed by a 0.107 cell yields dual vertices on both sides of the same cell, which is a self-intersection by construction. The hex route tolerates it — it snaps cell-centred nodes and produces the scaled Jacobian of 0.0079 in §5.1 instead — and the tet route, which needs a <em>watertight, manifold</em> surface before TetGen will look at it, cannot.</p>
+<p>Three separate observations follow, and they are the useful part.</p>
+<p><strong>1. The TetGen error is a model of what an error should be.</strong> It names the mesher’s own complaint, the ladder it walked with the actual resolutions, the likely cause in the author’s vocabulary (“features thinner than two cells”), and two remedies. Nothing else in this report’s failure list is written that well.</p>
+<p><strong>2. The Gmsh route says nothing usable.</strong> <code>mesher="gmsh"</code> fails <strong>seven times faster</strong> — 19.9 s against 142 s — which is a real advantage when the answer is “no”, but it fails with a raw third-party sentence. “one edge is incident to 4 triangles” <em>is</em> the same fact as “the surface self-intersects”, stated in Gmsh’s internal vocabulary, and an author who has never read Gmsh’s source has no way to get from it to “your circlip groove is half a cell deep”. The gmsh route also does <strong>not</strong> walk the refinement ladder: it takes the declared resolution, hands it over, and reports what comes back. So the comparison is: TetGen tries hard and explains itself; Gmsh fails fast and does not.</p>
+<p>The fix is small and worth doing: catch the Gmsh exception where TetGen’s is caught, wrap it in the same sentence, and give the Gmsh route the same ladder — it is per-mesher today for no reason visible from here.</p>
+<p><strong>3. The extraction box is a hair too small, and only one route says so.</strong></p>
+<pre><code>UserWarning: The isosurface crosses the extraction boundary on 144 grid edges;
+the returned mesh is open.       (144 → 224 → 336 as the ladder refines)</code></pre>
+<p>The shield’s locating spigot reaches z = −0.192; the declared box floor is z = −0.15. The <strong>hex</strong> route absorbs this silently, because its nodes extend half a cell past the declared bounds (−0.15 − 0.052 = −0.202) — which is why §5.1’s mesh reports a lower bound of −0.192 and nobody noticed. The <strong>tet</strong> route warns, correctly, and the count <em>grows</em> with refinement because the cells get smaller while the overhang stays the same size.</p>
+<p>Two meshers, one declared box, one part: one reports an open surface and the other quietly includes geometry outside the box the author drew. Whichever is right, they should agree, and the author should be told once.</p>
+<hr>
+</section>
+</section>
+<section id="b-rep-extraction" class="level2">
+<h2 class="anchored" data-anchor-id="b-rep-extraction">6. B-rep extraction</h2>
+<blockquote class="blockquote">
+<p><strong>Read this section as a record, not as a reproducible measurement.</strong> It was taken with <code>cadjoint.brep</code> in the tree. That module and <code>research/brep-axioms.md</code> were removed while this report was being written, and <code>from cadjoint.brep import extract_brep</code> now raises <code>ModuleNotFoundError</code>. The numbers below are what the extractor did on this part on this branch on the day it was still here, and every axiom name cited is from <code>research/brep-axioms.md</code> as it stood in <code>9734324</code>. Nothing in §6 can be re-run from this tree.</p>
+</blockquote>
+<p><code>extract_brep(shield, grid)</code> on the viewport’s own lattice — 64 cells over the 6-unit box, <strong>cell 0.0938</strong> — took <strong>155.8 s</strong> and returned:</p>
+<pre><code>faces 605   edges 1433   vertices 858   patches 168
+face kinds:  plane 295   blend 210   cylinder 58   opaque 42
+analytic faces 344   freeform faces 261
+quads 4804   blend quads 1791   mesh vertices 4766
+non-simple faces 8   ambiguous vertices 690
+edge pairs 1365   tangent-or-blend edges 859
+χ (open cells) = 60</code></pre>
+<p>It <strong>completes</strong>, on a part with fifty-two world-frame CSG leaves, and it completes with a plausible face count. That is the headline and it is a good one: nothing in <code>research/brep-axioms.md</code> promised that the extractor would survive a part this size at all. What it does <em>not</em> do is produce a B-rep anyone could hand to a CAM system, and the numbers say exactly why.</p>
+<section id="the-euler-characteristic-is-60" class="level3">
+<h3 class="anchored" data-anchor-id="the-euler-characteristic-is-60">6.1 The Euler characteristic is 60</h3>
+<p>A solid of genus <em>g</em> has χ = 2 − 2g. The shield’s real genus is countable: the through bore, four counterbored bolt holes, four tie bolts, eight shroud taps, two riser bores, four riser screws, the gland bore, the drain bore, the grease port, the coolant helix and its two feed bores — call it 28 handles, χ = −54. The extraction reports <strong>+60</strong>.</p>
+<p>That is not a near miss in either direction, and its sign is the informative part: χ too <em>high</em> means faces and vertices that the solid does not have — the extractor is splitting single faces into several and inventing vertices where two patches nearly agree, rather than merging things it should not. <code>ambiguous_vertices 690</code> out of 858 says the same thing from the other side: <strong>80 % of the vertices could not be assigned to a definite set of faces.</strong></p>
+</section>
+<section id="the-residuals-are-infinite-and-that-is-a-category-of-failure-not-a-number" class="level3">
+<h3 class="anchored" data-anchor-id="the-residuals-are-infinite-and-that-is-a-category-of-failure-not-a-number">6.2 The residuals are infinite, and that is a category of failure, not a number</h3>
+<pre><code>edge residual /cell:    median inf   p90 nan   max inf   (934 of 1433 above the 0.1-cell gate)
+vertex residual /cell:  median inf   max inf
+edge polyline points:   median 1     max 68    741 singletons</code></pre>
+<p>A <em>median</em> of <code>inf</code> means more than half of the edges have no finite distance to the analytic curve they are supposed to lie on — because there is no analytic curve: 859 of 1433 edges are classed <code>tangent_or_blend</code>, and 741 of them are <strong>single points</strong>, not polylines. An edge that is one point is a placeholder. The <code>nan</code> at p90 is <code>inf − inf</code> inside <code>numpy.percentile</code>, which is its own small bug in the reporting path but tells you the same thing.</p>
+<p>This is the axiom battery’s <code>fillet_*cell</code> row happening at scale (<code>research/brep-axioms.md</code> §2.1): a blend produces <code>blend</code> faces whose edges have no closed form, the “edge” degenerates to a point, and χ goes wrong. The shield has 210 blend faces — <strong>35 % of all its faces</strong> — because every one of its unions carries a smoothness.</p>
+</section>
+<section id="which-axiom-failure-classes-it-lands-on-and-where" class="level3">
+<h3 class="anchored" data-anchor-id="which-axiom-failure-classes-it-lands-on-and-where">6.3 Which axiom failure classes it lands on, and where</h3>
+<p>The part was built to land on four of them deliberately. All four are identifiable in the output.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>class</th>
+<th>where in the shield</th>
+<th>what shows up</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>fillet_{1,2}cell</code> — a blend wider than a cell</td>
+<td>the tower root, <code>smoothness=0.12</code> (1.3 cells)</td>
+<td>most of the 210 blend faces and the 859 tangent-or-blend edges</td>
+</tr>
+<tr class="even">
+<td><code>fillet_0.2cell</code> — a blend narrower than a cell</td>
+<td>every other union, <code>smoothness=0.03</code> (0.32 cells)</td>
+<td>invisible to the graph, as the battery predicts: those joins come out as plain plane/plane edges with the blend simply lost</td>
+</tr>
+<tr class="odd">
+<td><code>cyl_tangent</code> — antiparallel normals along a seam</td>
+<td>the two cast risers against the tower; the four tangential stiffeners against it</td>
+<td>part of the 690 ambiguous vertices; the seam is not recovered as an edge</td>
+</tr>
+<tr class="even">
+<td><code>boxes_coplanar</code> — a shared plane that should be ONE face</td>
+<td>the four corner lugs’ caps with the flange’s; the riser flange with the riser cap</td>
+<td>the <code>faces per leaf</code> histogram is the evidence: leaf 1 (the flange) carries <strong>142 faces</strong>, leaf 4 carries 73, leaf 0 carries 66</td>
+</tr>
+</tbody>
+</table>
+<p>That first column of the histogram is the clearest single result in this section. The flange is one extruded octagon. It has, honestly counted, about ten faces. The extractor gives it <strong>142</strong>, because every coplanar join with a lug, a rib toe, a stiffener heel, a boss or a pad cuts the shared plane into another piece instead of merging into one face — which is precisely what <code>boxes_coplanar</code> predicts (<code>12/10</code> faces on two boxes; here it compounds across eleven of them).</p>
+</section>
+<section id="the-face-areas-say-the-same-thing-a-third-way" class="level3">
+<h3 class="anchored" data-anchor-id="the-face-areas-say-the-same-thing-a-third-way">6.4 The face areas say the same thing a third way</h3>
+<pre><code>face area: total 33.340   median 0.00907
+           297 faces below 1 cell²   438 faces below 4 cell²</code></pre>
+<p>The median face is <strong>0.0091 units², about one cell² (0.0088)</strong>. Nearly half the faces — 297 of 605 — are smaller than a single sampling cell. A B-rep whose median face is one cell across is not a boundary representation of the part; it is the isosurface mesh with face labels attached. The 344 analytic faces (planes and cylinders that <em>were</em> matched to a leaf) are the part that is real, and 261 freeform faces are the part that is not.</p>
+</section>
+<section id="what-this-says-about-the-priority" class="level3">
+<h3 class="anchored" data-anchor-id="what-this-says-about-the-priority">6.5 What this says about the priority</h3>
+<p>Nothing here is a surprise given <code>research/brep-axioms.md</code>, and that is worth stating plainly: the axiom battery predicted every one of these failures on two-primitive cases, and the shield reproduces all of them at once. The battery is doing its job as the gate. What the shield adds is a <strong>scale</strong> reading:</p>
+<ul>
+<li>extraction of a 52-leaf part takes <strong>156 s</strong> — 1.7× the whole compile budget, and there is no incremental path, so any edit re-derives everything;</li>
+<li>the failure is not graceful. There is no subset of the output that is trustworthy on its own, because <code>analytic</code> and <code>blend</code> faces share vertices with each other and 80 % of the vertices are ambiguous;</li>
+<li>the single highest-value fix is not a new algorithm, it is <strong>coplanar face merging</strong> — 142 faces on one octagonal flange is a bookkeeping failure, not a geometric one, and it is the difference between “605 faces” and something near the true count.</li>
+</ul>
+<hr>
+</section>
+</section>
+<section id="the-two-studies" class="level2">
+<h2 class="anchored" data-anchor-id="the-two-studies">7. The two studies</h2>
+<p>Both studies solve on the hex lattice of §5.1, take every material property from <code>aluminium_6061()</code> (<code>FROM_MATERIAL</code>, no scalar anywhere), and select their boundary nodes with <code>Nodes.cylinder</code> on the part’s own axis.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 30%">
+<col style="width: 40%">
+<col style="width: 30%">
+</colgroup>
+<thead>
+<tr class="header">
+<th></th>
+<th style="text-align: right;">wall</th>
+<th>result</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>hex mesh build (cached after the first)</td>
+<td style="text-align: right;">30.6 s</td>
+<td>5 482 nodes, 3 748 elements</td>
+</tr>
+<tr class="even">
+<td><code>bearing-heat</code> (thermal), first solve</td>
+<td style="text-align: right;">12.6 s</td>
+<td>ΔT 0 → <strong>54.8 K</strong>, mean 12.2 K</td>
+</tr>
+<tr class="odd">
+<td><code>bearing-heat</code>, warm</td>
+<td style="text-align: right;">9.2 – 10.8 s</td>
+<td>identical to 1e-12</td>
+</tr>
+<tr class="even">
+<td><code>belt-pull</code> (elastic)</td>
+<td style="text-align: right;">4.6 – 5.1 s</td>
+<td>displacement −7.7 µm … <strong>+37.5 µm</strong></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Are they sane?</strong> Two closed-form checks, both to within a factor of ~2, which is all a first-order check can promise on a shape like this:</p>
+<p><em>Thermal.</em> 2.0 × 10⁴ W/m² over the seat wall (an annular band of radius 0.55, half-length 0.28 → ≈1.9 m²) is ≈3.9 × 10⁴ W, conducted ≈0.2 m through ≈2 m² of 167 W/m·K aluminium: ΔT ≈ QL/kA ≈ <strong>23 K</strong> against a solved <strong>54.8 K</strong>. The solve is higher, which is the right direction — the real path is not a straight prism, it is a tower wall interrupted by a helical void.</p>
+<p><em>Elastic.</em> 3.0 MPa of traction on the seat, aluminium at 68.9 GPa: strain ≈ σ/E = 4.4 × 10⁻⁵ over a ≈0.5 m lever gives ≈<strong>22 µm</strong> against a solved <strong>37.5 µm</strong>. Again higher, again for the right reason: the load is a cantilever moment on a tower, not pure tension.</p>
+<p>Both fields are finite everywhere and the thermal minimum is exactly 0.0 on the Dirichlet set, as it must be. <strong>Neither of these numbers existed before §2.6</strong>: until the material blend stopped erasing the alloy, both studies refused to assemble at all.</p>
+<section id="what-the-studies-cannot-report" class="level3">
+<h3 class="anchored" data-anchor-id="what-the-studies-cannot-report">7.1 What the studies cannot report</h3>
+<p><code>result.mass</code> is <code>None</code>, and so is the elastic safety factor, on a part made of one alloy whose density is 2 700 kg/m³ and whose yield strength is stated.</p>
+<p>The reason is a <em>structural</em> gate rather than a sampled one. <code>maybe_sample_cell_property</code> — the permissive path used for reporting, as against the strict <code>sample_cell_property</code> used for solving — asks <code>specifies_everywhere(sdf, key)</code> first, which is true only when <strong>every</strong> material in the subtree specifies the key. The shield’s subtree holds 18 materials: <code>aluminium_6061</code> and <strong>17 anonymous defaults belonging to the cut tools</strong>, none of which states a density, because a bore is not a substance.</p>
+<p>So this is §2.6’s mistake one layer up: the sampled field is now correct everywhere, and a structural precondition that predates the fix still vetoes the sample before it is taken. It costs the shield its mass and its safety factor — and the mass is exactly the quantity §2.17’s manufacturing constraint is a proxy for, so the optimisation is regularising on a hand-rolled sigmoid volume integral while the study that could have reported the real mass declines to.</p>
+<p><strong>Deferred</strong> (<code>cadjoint/fem/properties.py</code> and <code>cadjoint/render/material.py</code> are not this change’s to touch). <strong>Proposed:</strong> <code>specifies_everywhere</code> should ask whether the property is specified <em>where the material field is defined</em>, not on every leaf — the cheap version being to keep the structural check as a fast path but fall through to a sampled check when it fails, since <code>maybe_sample_cell_property</code> already catches the sampler’s <code>ValueError</code> and returns <code>None</code>. That is a two-line change and it would restore both reports.</p>
+<hr>
+</section>
+</section>
+<section id="the-optimisation" class="level2">
+<h2 class="anchored" data-anchor-id="the-optimisation">8. The optimisation</h2>
+<p><code>stiffen_shield</code> minimises the elastic study’s compliance in the free parameters of the shield, with a mass budget and a minimum wall as softplus penalties (§2.17). Adam, learning rate 0.01, six steps, <strong>264.9 s</strong> — about 44 s a step, of which the frozen-topology mesh build is amortised and the rest is the gradient of the FEM solve through the SDF.</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th style="text-align: right;">step</th>
+<th style="text-align: right;">objective</th>
+<th style="text-align: right;">‖grad‖</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">198.96</td>
+<td style="text-align: right;">3 698</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">142.62</td>
+<td style="text-align: right;">3 280</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">110.10</td>
+<td style="text-align: right;">875</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">101.12</td>
+<td style="text-align: right;">108</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">100.61</td>
+<td style="text-align: right;">34.3</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">5</td>
+<td style="text-align: right;">100.57</td>
+<td style="text-align: right;">40.9</td>
+</tr>
+</tbody>
+</table>
+<p><strong>It converges</strong>, and convincingly: the objective falls 49 % and the gradient norm falls by two orders of magnitude in six steps, which is what a well-scaled problem looks like. Three things about it are worth recording.</p>
+<p><strong>The re-meshed objective is 16 % worse than the frozen-mesh one.</strong> <code>run.objective</code> — the final design re-extracted on a fresh mesh and re-solved — is <strong>116.69</strong>, against the 100.57 the last frozen-topology step reported. The gradient is a gradient of the physics on a fixed lattice, and the optimiser has spent part of its 49 % moving the design into a place where that lattice flatters it. On a part whose thinnest walls are one cell across (§5) that is not surprising, and it is not a bug; it is the price of freezing the topology, and it should be <em>reported</em> rather than left for the reader to compute. <strong>Proposed:</strong> <code>OptimizationRun</code> already carries both numbers — the run summary should print the re-meshed objective next to the last frozen one whenever they differ by more than a few percent.</p>
+<p><strong>The constraint that was written held; the one that was not written was eaten.</strong> <code>bore_radius</code> grew 0.320 → <strong>0.3663</strong>, which puts the seat radius at 0.516 against the minimum-wall hinge’s limit of 0.64 − 0.12 = <strong>0.52</strong> — the penalty bound, to three digits, exactly as intended. Meanwhile <code>rib_thickness</code> fell 0.120 → <strong>0.0748</strong>, from 1.13 lattice cells to 0.70: below what the mesh can resolve, below what the tet route already refuses (§5.2), and below any sand-casting minimum section. Nothing objected, because nobody wrote that hinge. A manufacturing constraint system (§2.17) with a <em>global</em> minimum-section rule rather than one hand-written hinge per dimension is what this wants.</p>
+<p><strong>Eight of the twenty-three free parameters did not move at all.</strong> The four <code>lug_*</code> sketch vertices and the four <code>stiffener_a/b</code> x-coordinates came back bit-identical. The lugs are at the flange corners, far from the loaded seat, and their compliance sensitivity is genuinely near zero — but “genuinely near zero” and “silently disconnected” look the same in the output, and after §2.19 (a parameter cannot appear in an expression) the reader has real reason to wonder which one they are seeing. <strong>Proposed:</strong> report the per-parameter gradient at step 0 alongside the trajectory; a parameter whose gradient is <em>exactly</em> 0.0 is disconnected, and one whose gradient is merely small is not. —</p>
+</section>
+<section id="in-the-app" class="level2">
+<h2 class="anchored" data-anchor-id="in-the-app">9. In the app</h2>
+<p>Driven with Playwright against <code>python -m cadjoint.viewer.playground --port 5742</code> on this branch’s committed bundle. Screenshots:</p>
+<ul>
+<li><code>research/design/scenes/motor-shield-model.png</code> — the whole casting, MODEL mode</li>
+<li><code>research/design/scenes/motor-shield-tower.png</code> — the bearing tower, riser and ribs</li>
+<li><code>research/design/scenes/motor-shield-underside.png</code> — the flange underside and drain boss</li>
+<li><code>research/design/scenes/motor-shield-simulate.png</code> — SIMULATE mode: both studies, their meshes and their boundary conditions</li>
+</ul>
+<p><strong>It compiles and it renders.</strong> The object tree comes back with <strong>40 construction objects</strong> — flange, lug, spigot, bearing tower, seal boss, retainer pad, bearing seat, seal counterbore and the rest — the WGSL path traces the part in Ultra preview on Metal, and the sketch overlay, dimensions and lock glyphs are all live on it. On the evidence of the screenshots the part in the viewport is the part the file describes.</p>
+<section id="the-90-second-compile-budget-is-a-coin-toss-on-this-part" class="level3">
+<h3 class="anchored" data-anchor-id="the-90-second-compile-budget-is-a-coin-toss-on-this-part">9.1 The 90-second compile budget is a coin toss on this part</h3>
+<p>Three consecutive attempts, same server, same scene:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>attempt</th>
+<th>conditions</th>
+<th>result</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1</td>
+<td>immediately after the warm-up’s four killed <code>mesh</code> jobs, browser rendering the default scene</td>
+<td><strong>failed at exactly 90.0 s</strong> — <em>“Compilation exceeded the 90-second timeout”</em></td>
+</tr>
+<tr class="even">
+<td>2</td>
+<td><code>POST /compile</code> with <code>curl</code>, machine otherwise idle</td>
+<td>ok, <strong>30.8 s</strong>, 23.9 MB</td>
+</tr>
+<tr class="odd">
+<td>3</td>
+<td>through the UI, cache now warm</td>
+<td>ok, <strong>35–37 s</strong></td>
+</tr>
+</tbody>
+</table>
+<p>The worker’s own cold time is 23.3 s (§3.1). The failure is not the scene’s size, it is <strong>contention</strong>: the budget is a wall-clock timeout on a subprocess that shares a laptop with a path tracer and with the playground’s own warm-up, and a job that takes a third of the budget on an idle machine takes all of it on a busy one. When it trips, the author is told <em>“Compilation exceeded the 90-second timeout”</em> and gets nothing else — no partial result, no note that it nearly finished, no suggestion to retry.</p>
+<p><strong>Proposed:</strong> measure the budget in <em>worker CPU seconds</em> rather than wall clock (the job registry already samples <code>cpu_seconds</code> per job — attempt 1’s record shows <code>cpu_seconds: 54.6</code> against <code>elapsed_s: 90.0</code>), and on a timeout say which it was. A job that used 55 CPU-seconds of a 90-second wall budget was starved, and telling the author “compilation is too slow” in that case is simply false.</p>
+</section>
+<section id="the-construction-overlay-is-unreadable-at-this-scale" class="level3">
+<h3 class="anchored" data-anchor-id="the-construction-overlay-is-unreadable-at-this-scale">9.2 The construction overlay is unreadable at this scale</h3>
+<p>259 profile vertices across 40 construction nodes, all drawn at once, over a part 3 units across. The screenshots show the result: several hundred grey handle dots and red vertices layered over the casting, with the green extrusion cages of every feature crossing each other. Every individual glyph is correct and the composite conveys nothing — you cannot see the part through its own sketches, and you cannot pick a vertex you meant.</p>
+<p>This is not a defect in any one piece of it; it is the absence of a rule for what to draw when there are forty features rather than four. The end-cap (twelve nodes) is at the edge of readable. <strong>Proposed:</strong> draw the overlay for the <em>selected</em> feature and its immediate parents at full strength and the rest at a fraction, or gate the whole overlay on a feature being selected — the object tree already knows the selection, and MODEL mode already dims non-selected geometry.</p>
+</section>
+<section id="nodes.cylinder-reaches-the-viewer-and-stops-there" class="level3">
+<h3 class="anchored" data-anchor-id="nodes.cylinder-reaches-the-viewer-and-stops-there">9.3 <code>Nodes.cylinder</code> reaches the viewer and stops there</h3>
+<p>The SIMULATE panel renders both studies and every boundary condition, and one BC row is legible:</p>
+<pre><code>Fixed support    halfspace at [0, 0, 0.01] · n [0, 0, -1]</code></pre>
+<p>The other three — the two <code>Nodes.cylinder</code> selections that §2.3 added, on the bearing seat wall and the coolant jacket — render <strong>no description at all</strong>. Their values (<code>Heat flux 20000</code>, <code>Fixed value 0</code>, <code>Traction …</code>) are right; the region each applies to is blank.</p>
+<p>The cause is exact and is the downstream half of §2.3’s own change: <code>frontend/src/studies.ts</code>’s <code>describeSelection</code> has cases for <code>box</code>, <code>sphere</code>, <code>halfspace</code>, <code>side</code>, <code>predicate</code>, <code>and</code>, <code>or</code>, <code>not</code> — and no <code>cylinder</code>. Neither does <code>frontend/src/selectionEval.ts</code>, which is what previews and highlights the selected nodes in the viewport, nor the <code>StudySelection</code> union in <code>frontend/src/types.ts</code>. So the new selection kind serializes, round-trips and solves correctly, and is invisible in the one place a person would check it.</p>
+<p>A Python-side node selection is not finished when it is serializable. It is finished when the three places that consume the serialization — <code>describeSelection</code>, <code>selectionEval</code>, and the <code>BcBuilder</code>’s kind list — know about it. That is the change §2.3 should have carried and did not; <code>frontend/**</code> belongs to another line of work this week, so it is recorded here rather than made.</p>
+</section>
+<section id="two-things-seen-and-not-chased" class="level3">
+<h3 class="anchored" data-anchor-id="two-things-seen-and-not-chased">9.4 Two things seen and not chased</h3>
+<ul>
+<li><strong>A WebGPU validation error</strong> appears in the viewport after the scene swap: <em>“[Buffer ”SDF parameters”] used in submit while destroyed”</em>. It is non-fatal — the frame after it renders correctly, which is why the screenshots are clean — and it comes from the renderer’s buffer lifecycle during a program change, in <code>frontend/src/viewer/</code> and <code>cadjoint/viewer/_webgpu.py</code>, both of which are being actively changed by another line of work. Recorded, not diagnosed.</li>
+<li><strong>The elastic study’s traction reads <code>3000</code></strong> in the panel where the file says <code>3.0e6</code>. This is most likely the input box clipping a seven-digit number rather than a wrong value — the thermal study’s <code>20000</code> is exact and the solved displacements match a 3 MPa hand check (§7) — but a numeric field that silently shows a <em>plausible wrong number</em> is worth a look by whoever owns it.</li>
+</ul>
+<hr>
+</section>
+</section>
+<section id="where-the-system-gives-out" class="level2">
+<h2 class="anchored" data-anchor-id="where-the-system-gives-out">10. Where the system gives out</h2>
+<p>Ordered by how hard the wall is.</p>
+<ol type="1">
+<li><strong>Tet meshing, absolutely.</strong> Neither TetGen nor Gmsh can mesh this part at any rung of the refinement ladder (§5.2). This is the only outright <em>cannot</em>, and its cause is a modelling decision the language happily allowed: sub-cell features. A mesh-resolution-aware warning at declaration time — “<code>shield-tet10</code> samples at 0.107 and your thinnest wall is 0.05” — would have said so in one second instead of 142.</li>
+<li><strong>B-rep extraction, informatively.</strong> It completed in 156 s and returned a structure that was wrong in the ways the axiom battery predicted, at a scale that made each one visible: χ = 60 against −54, 80 % ambiguous vertices, 142 faces on one octagonal flange (§6 — measured before the module was removed from this repository).</li>
+<li><strong>Derived dimensions, structurally.</strong> <code>Scalar</code> has no arithmetic, so every relation between two dimensions is a dead Python float (§2.19). This is the largest <em>language</em> gap and the one that most changes what the file can be.</li>
+<li><strong>The 90-second budgets, intermittently.</strong> The cold edge overlay is 129 s against 90 (§3.1) and the compile fails under contention at a third of its own budget’s CPU (§9.1).</li>
+<li><strong>The overlay and the panels, at forty features.</strong> Both are correct and both stop being usable somewhere between twelve features and forty (§9.2, §9.3).</li>
+</ol>
+<p>And the four things that <strong>did</strong> hold up, which are worth saying because the rest of this document is a list of what did not:</p>
+<ul>
+<li>the <strong>SDF program</strong> — 52 leaves, 41 free parameters, and the whole thing lowers, <code>vmap</code>s and differentiates in about 5 s, with the batched program only 27 % larger than the single-point one (§3);</li>
+<li>the <strong>hex mesher and both solvers</strong> — 3 748 elements, a thermal and an elastic solve in 10 s and 5 s, both within a factor of two of a hand calculation (§7);</li>
+<li>the <strong>optimiser</strong> — 49 % objective reduction in six steps with the gradient norm falling two orders of magnitude, on a 23-parameter design whose gradient runs through a FEM solve (§8);</li>
+<li>the <strong>constraint solver</strong> — eleven constrained sketches, three <code>SketchPlane</code> levels deep, solved in the 4.5 s the module takes to import at all.</li>
+</ul>
+
+
+</section>
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/andrinr\.github\.io\/cadjoint\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

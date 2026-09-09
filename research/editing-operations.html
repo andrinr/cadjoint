@@ -1,0 +1,1433 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.10.18">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>editing-operations – cadjoint</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-89af0c2d685ccb09a4d7d65decb66752.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+</head>
+
+<body class="nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">cadjoint</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../docs/getting-started.html"> 
+<span class="menu-text">Get Started</span></a>
+  </li>  
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-guides" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Guides</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-guides">    
+        <li>
+    <a class="dropdown-item" href="../docs/meshing.html">
+ <span class="dropdown-text">Differentiable Meshing</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../docs/simulation.html">
+ <span class="dropdown-text">Simulation</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../docs/flow.html">
+ <span class="dropdown-text">Flow Solver (prototype)</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../docs/optimization.html">
+ <span class="dropdown-text">Optimization</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../docs/plugins.html">
+ <span class="dropdown-text">Plugins</span></a>
+  </li>  
+        <li><hr class="dropdown-divider"></li>
+        <li>
+    <a class="dropdown-item" href="../docs/materials.html">
+ <span class="dropdown-text">Materials</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../docs/rendering.html">
+ <span class="dropdown-text">Forward Renderer</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="../docs/viewer.html"> 
+<span class="menu-text">Playground</span></a>
+  </li>  
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-examples" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Examples</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-examples">    
+        <li>
+    <a class="dropdown-item" href="../examples/basics.html">
+ <span class="dropdown-text">Basics</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/rendering.html">
+ <span class="dropdown-text">Rendering</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/sketch_construction.html">
+ <span class="dropdown-text">Sketch Construction</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/constraints.html">
+ <span class="dropdown-text">Constraints</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/optimization.html">
+ <span class="dropdown-text">Optimization</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/constrained_optimization.html">
+ <span class="dropdown-text">Constrained Optimization</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-research" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Research</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-research">    
+        <li>
+    <a class="dropdown-item" href="../research/differentiable-meshing-pipeline.html">
+ <span class="dropdown-text">Differentiable meshing pipeline</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/performance.html">
+ <span class="dropdown-text">Where the seconds go (performance)</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/fem-integration.html">
+ <span class="dropdown-text">FEM integration</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/tet-vs-hex.html">
+ <span class="dropdown-text">Tet vs hex meshing</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/end-to-end-optimization.html">
+ <span class="dropdown-text">End-to-end optimization</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/path-tracing.html">
+ <span class="dropdown-text">WebGPU SDF path tracing</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/simulator-ecosystem.html">
+ <span class="dropdown-text">Simulator ecosystem survey</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/constraints.html">
+ <span class="dropdown-text">Constraint system</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/flow-solver.html">
+ <span class="dropdown-text">Differentiable flow solver</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/complex-scene.html">
+ <span class="dropdown-text">Modelling a gearbox end-cap</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/design-language.html">
+ <span class="dropdown-text">The design language</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="../reference/index.html"> 
+<span class="menu-text">API Reference</span></a>
+  </li>  
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/andrinr/cadjoint"> <i class="bi bi-github" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#editing-operations-the-spec-of-record" id="toc-editing-operations-the-spec-of-record" class="nav-link active" data-scroll-target="#editing-operations-the-spec-of-record">Editing operations — the spec of record</a>
+  <ul class="collapse">
+  <li><a href="#the-request-pipeline" id="toc-the-request-pipeline" class="nav-link" data-scroll-target="#the-request-pipeline">1. The request pipeline</a></li>
+  <li><a href="#addressing-a-target" id="toc-addressing-a-target" class="nav-link" data-scroll-target="#addressing-a-target">2. Addressing a target</a></li>
+  <li><a href="#formatting-rules" id="toc-formatting-rules" class="nav-link" data-scroll-target="#formatting-rules">3. Formatting rules</a></li>
+  <li><a href="#the-operations" id="toc-the-operations" class="nav-link" data-scroll-target="#the-operations">4. The operations</a>
+  <ul class="collapse">
+  <li><a href="#set_vertex" id="toc-set_vertex" class="nav-link" data-scroll-target="#set_vertex">4.1 set_vertex</a></li>
+  <li><a href="#insert_vertex" id="toc-insert_vertex" class="nav-link" data-scroll-target="#insert_vertex">4.2 insert_vertex</a></li>
+  <li><a href="#delete_vertex" id="toc-delete_vertex" class="nav-link" data-scroll-target="#delete_vertex">4.3 delete_vertex</a></li>
+  <li><a href="#set_value" id="toc-set_value" class="nav-link" data-scroll-target="#set_value">4.4 set_value</a></li>
+  <li><a href="#add_primitive" id="toc-add_primitive" class="nav-link" data-scroll-target="#add_primitive">4.5 add_primitive</a></li>
+  <li><a href="#add_material" id="toc-add_material" class="nav-link" data-scroll-target="#add_material">4.6 add_material</a></li>
+  <li><a href="#assign_material" id="toc-assign_material" class="nav-link" data-scroll-target="#assign_material">4.7 assign_material</a></li>
+  <li><a href="#set_material_property" id="toc-set_material_property" class="nav-link" data-scroll-target="#set_material_property">4.8 set_material_property</a></li>
+  <li><a href="#add_sketch" id="toc-add_sketch" class="nav-link" data-scroll-target="#add_sketch">4.9 add_sketch</a></li>
+  <li><a href="#set_sketch_plane" id="toc-set_sketch_plane" class="nav-link" data-scroll-target="#set_sketch_plane">4.10 set_sketch_plane</a></li>
+  <li><a href="#add_extrusion-4.12-add_revolution-4.13-add_loft" id="toc-add_extrusion-4.12-add_revolution-4.13-add_loft" class="nav-link" data-scroll-target="#add_extrusion-4.12-add_revolution-4.13-add_loft">4.11 add_extrusion / 4.12 add_revolution / 4.13 add_loft</a></li>
+  <li><a href="#add_constraint" id="toc-add_constraint" class="nav-link" data-scroll-target="#add_constraint">4.14 add_constraint</a></li>
+  <li><a href="#delete_constraint" id="toc-delete_constraint" class="nav-link" data-scroll-target="#delete_constraint">4.15 delete_constraint</a></li>
+  <li><a href="#set_constraint_value" id="toc-set_constraint_value" class="nav-link" data-scroll-target="#set_constraint_value">4.16 set_constraint_value</a></li>
+  <li><a href="#solve_sketch" id="toc-solve_sketch" class="nav-link" data-scroll-target="#solve_sketch">4.17 solve_sketch</a></li>
+  <li><a href="#delete_object" id="toc-delete_object" class="nav-link" data-scroll-target="#delete_object">4.18 delete_object</a></li>
+  <li><a href="#add_study" id="toc-add_study" class="nav-link" data-scroll-target="#add_study">4.19 add_study</a></li>
+  <li><a href="#delete_study" id="toc-delete_study" class="nav-link" data-scroll-target="#delete_study">4.20 delete_study</a></li>
+  <li><a href="#add_study_bc" id="toc-add_study_bc" class="nav-link" data-scroll-target="#add_study_bc">4.21 add_study_bc</a></li>
+  <li><a href="#delete_study_bc" id="toc-delete_study_bc" class="nav-link" data-scroll-target="#delete_study_bc">4.22 delete_study_bc</a></li>
+  <li><a href="#set_study_value" id="toc-set_study_value" class="nav-link" data-scroll-target="#set_study_value">4.23 set_study_value</a></li>
+  <li><a href="#add_mesh" id="toc-add_mesh" class="nav-link" data-scroll-target="#add_mesh">4.24 add_mesh</a></li>
+  <li><a href="#delete_mesh" id="toc-delete_mesh" class="nav-link" data-scroll-target="#delete_mesh">4.25 delete_mesh</a></li>
+  <li><a href="#set_mesh_value" id="toc-set_mesh_value" class="nav-link" data-scroll-target="#set_mesh_value">4.26 set_mesh_value</a></li>
+  <li><a href="#delete_optimization" id="toc-delete_optimization" class="nav-link" data-scroll-target="#delete_optimization">4.27 delete_optimization</a></li>
+  <li><a href="#set_optimization_value" id="toc-set_optimization_value" class="nav-link" data-scroll-target="#set_optimization_value">4.28 set_optimization_value</a></li>
+  </ul></li>
+  <li><a href="#interactions-stated-once" id="toc-interactions-stated-once" class="nav-link" data-scroll-target="#interactions-stated-once">5. Interactions, stated once</a></li>
+  <li><a href="#invariants-every-operation-every-scene" id="toc-invariants-every-operation-every-scene" class="nav-link" data-scroll-target="#invariants-every-operation-every-scene">6. Invariants — every operation, every scene</a></li>
+  <li><a href="#where-the-code-and-the-contract-disagreed" id="toc-where-the-code-and-the-contract-disagreed" class="nav-link" data-scroll-target="#where-the-code-and-the-contract-disagreed">7. Where the code and the contract disagreed</a></li>
+  </ul></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"></header>
+
+
+
+
+<section id="editing-operations-the-spec-of-record" class="level1">
+<h1>Editing operations — the spec of record</h1>
+<p>The scene is a Python file and the file is the truth. Every gesture in the viewer is a <code>POST /patch</code> that rewrites a span of that file and nothing else; the compile that follows is what the user sees. This document states, for each of the 28 operations, what a request looks like, what must already be in the source, exactly what is rewritten, what the next compile must show, and every refusal with its message. The invariants at the end hold for all of them and are executed by <code>tests/viewer/test_patch_properties.py</code>; the per-operation findings that fixed the code to match this document are in <code>tests/viewer/test_patch_contract.py</code>.</p>
+<p>The implementation this describes: <code>cadjoint/viewer/_patch_requests.py</code> (the gate), <code>cadjoint/viewer/schema/requests.py</code> (the wire, emitted to <code>payloads.d.ts</code>), <code>cadjoint/viewer/patch/**</code> (the rewrites), and <code>cadjoint/viewer/source_map/**</code> (locating things in the text; <code>identity.py</code> gives the stable ids).</p>
+<section id="the-request-pipeline" class="level2">
+<h2 class="anchored" data-anchor-id="the-request-pipeline">1. The request pipeline</h2>
+<p>Every request is <code>{"source", "op", ...fields}</code>. <code>patch_source</code> runs these checks in this order, and the first one that fails is the answer:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>#</th>
+<th>Check</th>
+<th>Refusal</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1</td>
+<td><code>source</code> is a string</td>
+<td><code>The patch request must contain a string</code>source<code>field.</code></td>
+</tr>
+<tr class="even">
+<td>2</td>
+<td><code>source</code> is under the size limit</td>
+<td><code>OVERSIZED_SOURCE_ERROR</code> (<code>_limits.py</code>)</td>
+</tr>
+<tr class="odd">
+<td>3</td>
+<td><code>op</code> is a string</td>
+<td><code>The patch request must contain a string</code>op<code>field.</code></td>
+</tr>
+<tr class="even">
+<td>4</td>
+<td><code>op</code> is in <code>OPERATIONS</code></td>
+<td><code>This server does not support the patch operation '&lt;op&gt;'. If you updated cadjoint, restart the playground server.</code></td>
+</tr>
+<tr class="odd">
+<td>5</td>
+<td>stable ids resolve (§2)</td>
+<td>see §2</td>
+</tr>
+<tr class="even">
+<td>6</td>
+<td>every field is one the operation’s request model names</td>
+<td><code>The patch operation</code><op><code>does not take</code><a><code>,</code><b><code>. If you updated cadjoint, restart the playground server.</code> (fields sorted)</b></a></op></td>
+</tr>
+<tr class="odd">
+<td>7</td>
+<td>the operation’s validator (types, ranges, enums)</td>
+<td>per operation</td>
+</tr>
+<tr class="even">
+<td>8</td>
+<td>the operation itself (the source supports the edit)</td>
+<td>per operation, a <code>PatchError</code></td>
+</tr>
+</tbody>
+</table>
+<p>A refused request answers <code>{"ok": false, "error": &lt;message&gt;}</code> and nothing else; an accepted one <code>{"ok": true, "source": &lt;patched text&gt;}</code>. The gate never executes the program.</p>
+<p><strong>Decision (stray fields).</strong> The server used to read the fields it needed and ignore the rest, on the argument that a browser running newer assets should keep working against an older server. That kept it <em>answering</em> — by silently dropping whatever the new field asked for and applying half an edit. A field none of the request models names is the same skew the unknown-operation check already refuses, so it is refused the same way, with the same advice. The pydantic models (<code>extra="forbid"</code>) and the gate now agree; the pinned test in <code>test_parity_schema.py</code> says so.</p>
+</section>
+<section id="addressing-a-target" class="level2">
+<h2 class="anchored" data-anchor-id="addressing-a-target">2. Addressing a target</h2>
+<p>Every operation that edits something existing accepts the <strong>stable id</strong> the last compile published (<code>identity.py</code>), or the legacy position the payload reported. When both are given the id wins: it is resolved against the text in <em>this</em> request, so a line that moved since the compile cannot misdirect the edit.</p>
+<p>Ids are derived from the AST path and the name the program gave the thing:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Form</th>
+<th>Names</th>
+<th>Resolves to</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>assign:&lt;variable&gt;</code></td>
+<td>any call bound to a module-level variable: sketch, primitive, feature, material, study, mesh, optimization</td>
+<td><code>line</code> (sketches, primitives, features, materials, planes) or the declaration’s source-order <code>index</code> (study, mesh, optimization)</td>
+</tr>
+<tr class="even">
+<td><code>sketch:&lt;name&gt;</code>, <code>box:&lt;name&gt;</code>, … , <code>sketch:#&lt;n&gt;</code></td>
+<td>an unbound call, by its literal <code>name=</code> or its ordinal among anonymous ones</td>
+<td><code>line</code></td>
+</tr>
+<tr class="odd">
+<td><code>call:extrude@&lt;sketch&gt;</code> / <code>call:&lt;kind&gt;:&lt;token&gt;</code></td>
+<td>an unbound feature, keyed by the sketch it consumes</td>
+<td><code>line</code></td>
+</tr>
+<tr class="even">
+<td><code>plane:&lt;sketch&gt;</code></td>
+<td>a sketch’s plane</td>
+<td>the sketch’s <code>line</code></td>
+</tr>
+<tr class="odd">
+<td><code>vertex:&lt;sketch&gt;[&lt;i&gt;]</code></td>
+<td>a sketch vertex</td>
+<td><code>line</code> + <code>index</code></td>
+</tr>
+<tr class="even">
+<td><code>constraint:&lt;sketch&gt;[&lt;i&gt;]</code></td>
+<td>the i-th constraint statement of that sketch, in source order</td>
+<td>the sketch’s <code>line</code> + <code>index</code></td>
+</tr>
+<tr class="odd">
+<td><code>bc:&lt;study&gt;[&lt;i&gt;]</code></td>
+<td>the i-th element of a study’s literal <code>bcs</code> list</td>
+<td><code>study</code> index + <code>bc</code></td>
+</tr>
+</tbody>
+</table>
+<p>An id is a <strong>non-empty string</strong> (<code>The patch request needs</code>id<code>as a non-empty string.</code>), must exist (<code>No statement in this program has the id '&lt;id&gt;'.</code>), and must be of a kind the operation can act on (<code>The id '&lt;id&gt;' names a &lt;kind&gt;, which</code><op><code>cannot address.</code>). An operation that creates something takes no id at all (<code>The patch operation</code><op><code>creates a new object, so it takes no</code>id<code>.</code>); <code>add_loft</code> takes <code>id_a</code>/<code>id_b</code> (`<code>add_loft</code> names its two sketches with <code>id_a</code> and <code>id_b</code>, not <code>id</code>.`). A duplicated id — two module-level assignments to the same variable — resolves to nothing rather than to a guess.</op></op></p>
+<p>What each operation’s <code>id</code> may name (<code>_ID_TARGETS</code>); every entry is a kind the operation can actually edit:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Operation</th>
+<th>id kinds</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>set_vertex, insert_vertex, delete_vertex</td>
+<td>sketch, vertex</td>
+</tr>
+<tr class="even">
+<td>set_value</td>
+<td>sketch, primitive, feature, material, plane</td>
+</tr>
+<tr class="odd">
+<td>assign_material</td>
+<td>sketch, primitive, feature</td>
+</tr>
+<tr class="even">
+<td>set_material_property</td>
+<td>material</td>
+</tr>
+<tr class="odd">
+<td>set_sketch_plane</td>
+<td>sketch, plane</td>
+</tr>
+<tr class="even">
+<td>add_extrusion, add_revolution, add_constraint, solve_sketch</td>
+<td>sketch</td>
+</tr>
+<tr class="odd">
+<td>delete_constraint, set_constraint_value</td>
+<td>sketch, constraint</td>
+</tr>
+<tr class="even">
+<td>delete_object</td>
+<td>sketch, primitive, feature</td>
+</tr>
+<tr class="odd">
+<td>delete_study, add_study_bc</td>
+<td>study</td>
+</tr>
+<tr class="even">
+<td>delete_study_bc, set_study_value</td>
+<td>study, bc</td>
+</tr>
+<tr class="odd">
+<td>delete_mesh, set_mesh_value</td>
+<td>mesh</td>
+</tr>
+<tr class="even">
+<td>delete_optimization, set_optimization_value</td>
+<td>optimization</td>
+</tr>
+<tr class="odd">
+<td>add_primitive, add_material, add_sketch, add_loft, add_study, add_mesh</td>
+<td>none</td>
+</tr>
+</tbody>
+</table>
+<p>Legacy addressing: <code>line</code> (1-based, the line the call was constructed on; a multi-line call is matched by its range), <code>index</code> (vertex or constraint ordinal), <code>study</code>/<code>mesh</code>/<code>optimization</code> (source-order index among top-level declarations, or the declared <code>name=</code>, or the bound variable), <code>material</code> (name or index among literal <code>Material(...)</code> definitions), <code>bc</code>.</p>
+<p>Resolution refuses ambiguity everywhere: two candidate calls on a line, two declarations with one name, a parameter declared twice — each is an error, never a choice.</p>
+</section>
+<section id="formatting-rules" class="level2">
+<h2 class="anchored" data-anchor-id="formatting-rules">3. Formatting rules</h2>
+<ul>
+<li><strong>Viewer-generated numbers</strong> (drag coordinates, ray hits, dimensions, the world plane a sketch is planted on) are written compactly: <code>%.4g</code>, with <code>|x| &lt; 1e-9</code> snapped to <code>0</code>. So <code>[0.30000000000000004, -0.0]</code> is written <code>[0.3, 0]</code>.</li>
+<li><strong>Typed numbers</strong> (constraint values, study/mesh/optimization arguments, material properties) are written exactly, <code>repr(float(x))</code>, so they round trip: <code>2.5</code> stays <code>2.5</code>; <code>68.9e9</code> becomes <code>68900000000.0</code>.</li>
+<li><code>resolution</code> and <code>steps</code> are written as integers; <code>method</code> on a mesh and on a solve step as a single-quoted string literal.</li>
+<li>Vectors are written as lists <code>[a, b, c]</code>; a tuple the user wrote is replaced by a list.</li>
+<li>Node selections are rendered through the runtime (<code>selection_from_description</code> → <code>describe()</code>) so only a selection the runtime can rebuild is ever written.</li>
+</ul>
+<p><strong>Where a new declaration goes, and why</strong></p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Operation</th>
+<th>Placement</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>add_primitive, add_sketch, add_extrusion, add_revolution, add_loft</td>
+<td>immediately above the <code>scene = …</code> assignment</td>
+<td>the scene expression is extended in the same edit, and a name must be bound before the scene reads it</td>
+</tr>
+<tr class="even">
+<td>add_material</td>
+<td>directly after the last import</td>
+<td>a drag can assign the material to an object declared anywhere, so the name must be bound above every object</td>
+</tr>
+<tr class="odd">
+<td>add_constraint</td>
+<td>after the sketch’s last existing constraint statement, else after the sketch</td>
+<td>source order is chip order; prepending would renumber every chip</td>
+</tr>
+<tr class="even">
+<td>solve_sketch</td>
+<td>after the sketch’s constraint block, imports beside it included</td>
+<td>the solve has to see every constraint</td>
+</tr>
+<tr class="odd">
+<td>add_study</td>
+<td>after the last study, else after <code>scene = …</code></td>
+<td>studies come last</td>
+</tr>
+<tr class="even">
+<td>add_mesh</td>
+<td>after the last mesh, else before the first study, else after <code>scene = …</code></td>
+<td>a study can only reference a mesh declared above it</td>
+</tr>
+<tr class="odd">
+<td>add_study_bc</td>
+<td>at the end of the study’s literal <code>bcs</code> list</td>
+<td>chip order</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Imports.</strong> <code>_ensure_import</code> binds a symbol the edit needs. If the symbol is already bound (any import or assignment of that name) nothing happens. Else an existing single-line <code>from &lt;module&gt; import …</code> for that module is extended in place — so no line number moves. Else a new line <code>from &lt;module&gt; import &lt;symbol&gt;</code> is inserted: beside the edited statement for constraints, studies, meshes and boundary conditions (<code>prefer_offset</code>, keeping everything above the target untouched), and otherwise after the last import. A parenthesised multi-line import is never extended; that is why the starter scene, whose constraint import is multi-line, gains a second <code>from cadjoint.constraints import …</code> line beside the first constraint the viewer adds. An import is never removed by the operation’s inverse.</p>
+</section>
+<section id="the-operations" class="level2">
+<h2 class="anchored" data-anchor-id="the-operations">4. The operations</h2>
+<p>Each section: <strong>Request</strong> (fields beyond <code>source</code>/<code>op</code> and the addressing of §2; types as the models state them), <strong>Preconditions</strong>, <strong>Rewrite</strong>, <strong>Postconditions</strong> (what the compile payload shows; which ids survive), <strong>Refusals</strong> (validator messages first, then the operation’s), and <strong>Interactions</strong>.</p>
+<section id="set_vertex" class="level3">
+<h3 class="anchored" data-anchor-id="set_vertex">4.1 set_vertex</h3>
+<p><strong>Request.</strong> <code>id</code> (vertex) or <code>line</code>+<code>index</code>; <code>xy: [x, y]</code>.</p>
+<p><strong>Preconditions.</strong> The line holds exactly one <code>PolygonProfile(...)</code> whose vertex list resolves to a literal list; every element is a two-number literal or a name bound to <code>Vector2(value=[x, y], …)</code>; <code>index &lt; len(vertices)</code>.</p>
+<p><strong>Rewrite.</strong> Exactly the characters of the vertex’s coordinate literal — <code>[x, y]</code> inside the list, or inside the <code>Vector2(value=…)</code> declaration it names — become <code>_format_vertex(xy)</code>. Nothing else changes; line count is preserved.</p>
+<p><strong>Postconditions.</strong> The sketch’s vertex <code>index</code> reports <code>uv ≈ xy</code> (float32). Every id survives; none is created. Idempotent.</p>
+<p><strong>Refusals.</strong> <code>The patch request needs an integer</code>line<code>.</code> / <code>…</code>index<code>.</code>; <code>The patch request needs</code>xy<code>as two numbers.</code>; <code>No editable PolygonProfile literal found at line N. Sketches built in a loop or from variables cannot be edited from the viewer.</code>; <code>Vertex index i is out of range for the sketch at line N (n vertices).</code></p>
+<p><strong>Interactions.</strong> A <code>Vector2</code> shared by two sketches moves in both — the declaration is the truth. Constraints are untouched: they name the vertex by parameter or by position, and neither changed.</p>
+</section>
+<section id="insert_vertex" class="level3">
+<h3 class="anchored" data-anchor-id="insert_vertex">4.2 insert_vertex</h3>
+<p><strong>Request.</strong> <code>id</code> (vertex, meaning “before this one”) or <code>line</code>+<code>index</code> (<code>index == len(vertices)</code> appends); <code>xy</code>.</p>
+<p><strong>Preconditions.</strong> As set_vertex, with <code>0 ≤ index ≤ len(vertices)</code>.</p>
+<p><strong>Rewrite.</strong> <code>[x, y],</code> is inserted before the list element at <code>index</code> (structurally, into the profile’s own list — never inside a <code>Vector2</code> constructor), or <code>, [x, y]</code> after the last. Then every constraint of the sketch written as <code>profile.vertices[j]</code> with <code>j ≥ index</code> is renumbered to <code>j + 1</code>, in place. Parameter-named constraints do not move.</p>
+<p><strong>Postconditions.</strong> Vertex count +1, vertex <code>index</code> reports <code>xy</code>, the vertex ids after it are renumbered (<code>vertex:S[k]</code> for <code>k ≥ index</code> now name the next point), constraints keep naming the points they were written for. Adding twice adds twice.</p>
+<p><strong>Refusals.</strong> As set_vertex, with <code>Insert index i is out of range …</code>.</p>
+<p><strong>Interactions.</strong> Followed by <code>delete_vertex</code> at the same index the text is restored byte for byte, constraints included.</p>
+</section>
+<section id="delete_vertex" class="level3">
+<h3 class="anchored" data-anchor-id="delete_vertex">4.3 delete_vertex</h3>
+<p><strong>Request.</strong> <code>id</code> (vertex) or <code>line</code>+<code>index</code>.</p>
+<p><strong>Preconditions.</strong> As set_vertex, and the sketch has more than three vertices.</p>
+<p><strong>Rewrite.</strong> The list element and its separator are cut (a middle element takes the comma after it, the last takes the comma before). Every constraint statement of the sketch that references the deleted vertex — by <code>profile.vertices[index]</code> or by the parameter name that was in the list — is deleted whole; every remaining <code>profile.vertices[j]</code> with <code>j &gt; index</code> becomes <code>j - 1</code>. A <code>Vector2</code> declaration the list named stays (it is a parameter declaration, not a use).</p>
+<p><strong>Postconditions.</strong> Vertex count −1; <code>vertex:S[n-1]</code> is gone; the sketch’s constraint ordinals are renumbered where statements were removed; the program compiles (the previous behaviour left constraints on a parameter the scene no longer contained, which the next <code>satisfy_constraints(scene)</code> refused).</p>
+<p><strong>Refusals.</strong> As set_vertex, plus <code>A sketch profile needs at least 3 vertices.</code></p>
+<p><strong>Decision.</strong> Cascading the deletion to the vertex’s constraints is the sensible contract — a relation on a point that no longer exists is not one the program can keep — and renumbering positional references is required for correctness: before this, deleting vertex 1 left <code>plate.vertices[2]</code> naming what had been vertex 3.</p>
+</section>
+<section id="set_value" class="level3">
+<h3 class="anchored" data-anchor-id="set_value">4.4 set_value</h3>
+<p><strong>Request.</strong> <code>id</code> (sketch/primitive/feature/material/plane) or <code>line</code>; <code>name</code> (the called function: <code>box</code>, <code>sphere</code>, <code>cylinder</code>, <code>extrude</code>, <code>revolve</code>, <code>loft</code>, <code>PolygonProfile</code>, <code>Material</code>); <code>argument</code>; <code>value</code> (number or numbers).</p>
+<p>The contract table <code>EDITABLE_CALLS</code> (geometry.py) decides what may be written and its shape:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>name</th>
+<th>arguments (component count)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>box</td>
+<td>position 3, rotation 3, size 3</td>
+</tr>
+<tr class="even">
+<td>sphere</td>
+<td>position 3, rotation 3, radius 1</td>
+</tr>
+<tr class="odd">
+<td>cylinder</td>
+<td>position 3, rotation 3, radius 1, height 1</td>
+</tr>
+<tr class="even">
+<td>extrude</td>
+<td>depth 1 (not <code>draft</code>/<code>twist</code>: a drafted or twisted extrusion has no analytic faces, so rewriting either would break every sketch planted on the feature’s cap — shown read-only by the properties window instead)</td>
+</tr>
+<tr class="odd">
+<td>revolve</td>
+<td>offset 1</td>
+</tr>
+<tr class="even">
+<td>loft</td>
+<td>height 1</td>
+</tr>
+<tr class="odd">
+<td>Union / Difference / Intersection</td>
+<td>smoothness 1 (≥ 0). Booleans carry no stable identity, so the request names the call and is addressed by <code>line</code>; the properties window reads the line from the <code>elements</code> payload of the same compile, which is what keeps a line-addressed request current</td>
+</tr>
+<tr class="even">
+<td>PolygonProfile</td>
+<td>planeOrigin 3, planeNormal 3</td>
+</tr>
+<tr class="odd">
+<td>SketchPlane</td>
+<td>origin 3, normal 3 (the viewport’s gizmo addresses the plane call directly when a sketch is dragged as an object; same rewrite as <code>planeOrigin</code>/<code>planeNormal</code>)</td>
+</tr>
+<tr class="even">
+<td>Material</td>
+<td>color 3 (each in 0…1); roughness, metallic, opacity, ior, reflectivity, density, conductivity, specific_heat, youngs_modulus, poisson_ratio, thermal_expansion, yield_strength — 1 each, inside <code>PROPERTY_BOUNDS</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>size</code>, <code>radius</code>, <code>height</code> must be positive; <code>smoothness</code> non-negative; <code>planeNormal</code> non-zero.</p>
+<p><strong>Preconditions.</strong> The line holds exactly one call named <code>name</code> (matched by exact line first, then by range). For an argument other than a plane component: the keyword is absent, or present with a value that is a numeric literal, a list of them, or a name/<code>Scalar</code>/<code>Vector</code> wrapper that resolves to one. For <code>planeOrigin</code>/<code>planeNormal</code>: the sketch has no <code>plane=</code>, or its <code>plane=</code> is a literal <code>SketchPlane(...)</code> call (directly, or through one name bound to one).</p>
+<p><strong>Rewrite.</strong> The literal’s span is replaced by <code>_format_value(value)</code> — following the name to its declaration when the keyword is <code>depth=fin_depth</code> or <code>position=bushing_a</code>, so every use of that parameter follows. An absent keyword is appended after the call’s last argument as <code>, &lt;argument&gt;=&lt;value&gt;</code> (a solid written without <code>rotation=</code> is still rotatable). A plane component is rewritten inside the <code>SketchPlane(...)</code>, appended to it, or — when the sketch has no plane — a <code>plane=SketchPlane(&lt;origin|normal&gt;=…)</code> keyword is added and <code>SketchPlane</code> imported.</p>
+<p><strong>Postconditions.</strong> The payload reports the new value on that node (transform dimensions, plane origin/normal, material property). Ids survive; none is created. Idempotent.</p>
+<p><strong>Refusals.</strong> <code>The patch request needs a string</code>name<code>.</code> / <code>…</code>argument<code>.</code>; <code>set_value` edits one of these calls: Difference, Intersection, Material, PolygonProfile, SketchPlane, Union, box, cylinder, extrude, loft, revolve, sphere.`; `The patch request needs an integer `line`.`; `The patch request needs `value` as a number or numbers.` (also for NaN/inf and an empty list); `A sketch-plane edit needs `value` as three numbers.`; `A sketch-plane normal must not be zero.`; then from the operation:</code><name><code>has no editable argument</code><argument><code>; expected: …</code>; <code>&lt;argument&gt;` needs one number.` /</code><argument><code>needs 3 numbers.</code> / <code>&lt;argument&gt;` needs 3 positive numbers.` /</code><argument><code>needs a positive number.</code> / <code>smoothness` needs a number of at least 0.` /</code>color<code>needs 3 numbers from 0 to 1.</code> / the material bracket message of §4.8; <code>No editable &lt;name&gt;() call found at line N.</code>; <code>The &lt;name&gt;'s</code><argument><code>is not an editable literal; edit it in the code.</code>; <code>The sketch's</code>plane<code>is an expression over other geometry, not a literal</code>SketchPlane(…)<code>; re-plant it with</code>set_sketch_plane<code>or edit it in the code.</code></argument></argument></argument></argument></name></p>
+<p><strong>Defects fixed.</strong> A keyword bound to an expression (<code>position=[_corner, _corner, 0.215]</code>) or a face-derived plane (<code>plane=seal_land.cap("+")…</code>) was <em>appended</em> as a second keyword, which <code>ast.parse</code> accepts and <code>compile</code> rejects — the program stopped running. Any <code>argument</code> and any <code>name</code> were written verbatim (<code>Solid.box(foo=1)</code>). Material scalars were unbounded through this path while bounded through set_material_property. NaN reached the file as the bare name <code>nan</code>.</p>
+</section>
+<section id="add_primitive" class="level3">
+<h3 class="anchored" data-anchor-id="add_primitive">4.5 add_primitive</h3>
+<p><strong>Request.</strong> <code>kind ∈ {box, sphere, cylinder}</code>; <code>position: [x, y, z]</code>; <code>dimensions</code>: exactly the kind’s — box <code>{size: [3 positive]}</code>, sphere <code>{radius &gt; 0}</code>, cylinder <code>{radius &gt; 0, height &gt; 0}</code> (read off the runtime’s <code>DIMENSIONS</code>).</p>
+<p><strong>Preconditions.</strong> A module-level <code>scene = …</code> assignment exists.</p>
+<p><strong>Rewrite.</strong> The scene expression is extended first (§4.18’s union rule: <code>, &lt;var&gt;</code> after the last positional operand of a <code>Union(...)</code>, or the whole value wrapped as <code>Union(&lt;value&gt;, &lt;var&gt;)</code> with <code>Union</code> imported); then <code>&lt;var&gt; = Solid.&lt;kind&gt;(&lt;dims&gt;, position=[…], name="&lt;var&gt;")</code> is inserted on its own line above <code>scene = …</code>, and <code>Solid</code> imported. <code>&lt;var&gt;</code> is <code>&lt;kind&gt;1</code>, <code>&lt;kind&gt;2</code>, … — the first not bound anywhere in the module.</p>
+<p><strong>Postconditions.</strong> One more construction node, <code>assign:&lt;var&gt;</code>, listed in the scene. Every prior id survives. Adding twice adds <code>&lt;kind&gt;2</code>.</p>
+<p><strong>Refusals.</strong> <code>Primitive</code>kind<code>must be one of: box, cylinder, sphere.</code>; <code>The patch request needs</code>position<code>as three numbers.</code>; <code>The patch request needs a</code>dimensions<code>object.</code>; <code>A</code><kind><code>takes exactly these dimensions:</code>size<code>.</code> (or <code>`radius`</code>, <code>`radius`, `height`</code>); <code>Dimension</code><key><code>must be a positive number.</code> / <code>… must be 3 positive numbers.</code>; <code>Add a</code>scene = …<code>assignment before placing solids from the viewer.</code>; <code>The scene Union has no operands to extend.</code></key></kind></p>
+<p><strong>Defects fixed.</strong> <code>kind</code> was any string (<code>Solid.torus</code> compiled to an <code>AttributeError</code>); <code>dimensions</code> any keys (a <code>ValueError</code> on compile); <code>dimensions={}</code> produced <code>Solid.box(, position=…)</code> and an <em>uncaught</em> <code>SyntaxError</code> — a crashed request rather than a refusal.</p>
+</section>
+<section id="add_material" class="level3">
+<h3 class="anchored" data-anchor-id="add_material">4.6 add_material</h3>
+<p><strong>Request.</strong> <code>color: [r, g, b]</code> each in 0…1; optional <code>roughness</code>, <code>metallic</code>, <code>opacity</code>, <code>reflectivity</code> (0…1; defaults 0.4, 0, 1, 0), <code>ior</code> (1…3; default 1.45).</p>
+<p><strong>Preconditions.</strong> A <code>scene = …</code> assignment exists.</p>
+<p><strong>Rewrite.</strong> <code>&lt;var&gt; = Material(name='&lt;var&gt;', color=[…], roughness=…, metallic=…, opacity=…, ior=…, reflectivity=…)</code> inserted directly after the last import (§3); <code>Material</code> imported. <code>&lt;var&gt;</code> is <code>material1</code>, <code>material2</code>, …</p>
+<p><strong>Postconditions.</strong> One more material, <code>assign:&lt;var&gt;</code>, assigned to nothing. No inverse exists (there is no delete_material); documented as such.</p>
+<p><strong>Refusals.</strong> <code>The patch request needs</code>color<code>as three numbers from 0 to 1.</code>; <code>The patch request needs</code><key><code>from &lt;low&gt; to &lt;high&gt;.</code>; <code>Add a</code>scene = …<code>assignment before creating a material.</code></key></p>
+</section>
+<section id="assign_material" class="level3">
+<h3 class="anchored" data-anchor-id="assign_material">4.7 assign_material</h3>
+<p><strong>Request.</strong> <code>id</code> (sketch/primitive/feature) or <code>line</code>; <code>material</code>: a Python identifier.</p>
+<p><strong>Preconditions.</strong> Exactly one module-level <code>&lt;material&gt; = Material(...)</code>. The line holds exactly one construction or feature call. A sketch must be consumed by exactly one operator (extrude, revolve or loft); the keyword goes on that operator, because a profile carries no material.</p>
+<p><strong>Rewrite.</strong> <code>material=&lt;name&gt;</code> replaces the existing keyword’s value, or is appended after the call’s last argument.</p>
+<p><strong>Postconditions.</strong> The node reports <code>material == &lt;name&gt;</code>. Idempotent; assigning the previous name back restores the text byte for byte.</p>
+<p><strong>Refusals.</strong> <code>The patch request needs an integer</code>line<code>.</code>; <code>The patch request needs</code>material<code>as a Python identifier.</code>; <code>&lt;material&gt;` is not a named Material definition.`; `No single construction call found at line N.`;</code><profile><code>needs one operator (extrude, revolve or loft) before a material can be assigned.</code>; <code>Name the sketch before adding constraints or operators from the viewer.</code></profile></p>
+<p><strong>Defects fixed.</strong> <code>_ID_TARGETS</code> promised a feature could be addressed but the operation only knew primitives and sketches, and a sketch could only be given a material through an <code>extrude</code> — a revolved or lofted sketch had no way to a material from the viewer.</p>
+</section>
+<section id="set_material_property" class="level3">
+<h3 class="anchored" data-anchor-id="set_material_property">4.8 set_material_property</h3>
+<p><strong>Request.</strong> <code>id</code> (material) or <code>line</code> or <code>material</code> (name/variable, or index among literal definitions); <code>property ∈ EDITABLE_PROPERTIES</code> (roughness, metallic, opacity, ior, reflectivity, density, conductivity, specific_heat, youngs_modulus, poisson_ratio, thermal_expansion, yield_strength); <code>value</code>: a number inside the property’s bracket, or <code>null</code>; <code>expand: bool</code> (default false).</p>
+<p><strong>Preconditions.</strong> The material is a module-level <code>x = Material(...)</code> — or, with <code>expand</code>, a bare argument-free catalogue factory <code>x = copper_c11000()</code>, which is first rewritten as the literal it builds (one keyword per line). An existing keyword’s value must be a numeric literal (or resolve to one).</p>
+<p><strong>Rewrite.</strong> Existing keyword: its literal’s span becomes <code>repr(float(v))</code>. Absent keyword: <code>, &lt;property&gt;=&lt;v&gt;</code> appended after the last argument on the same line, or — if that would push the line past 100 columns — as <code>,\n&lt;indent&gt;&lt;property&gt;=&lt;v&gt;</code> (the one case that adds a line, by exactly one). <code>value: null</code>: the keyword is removed with its separator; a keyword that owns its line takes the line, and a keyword that was wrapped onto its own line as the last argument takes the line break and the comma before it. Removing what is absent is a no-op that answers the same text.</p>
+<p><strong>Postconditions.</strong> The material payload reports the value under <code>physical</code> or the optical key; <code>spans</code> gains/loses the property. Idempotent; add then remove is byte-identical; set then set-back is AST-identical.</p>
+<p><strong>Refusals.</strong> <code>The patch request needs an integer</code>line<code>.</code>; <code>The patch request needs</code>material<code>as a name or a non-negative index.</code>; <code>Material</code>property<code>must be one of: …</code>; the bracket: <code>&lt;property&gt;` must be a number from &lt;low&gt; to &lt;high&gt; &lt;unit&gt;.` (e.g.</code>density<code>must be a number from 1 to 25000 kg/m^3.</code>, <code>roughness` must be a number from 0 to 1 (dimensionless).`); `The patch request needs `expand` as a boolean.`; `No single material definition found at line N.`; `Material index i is out of range; the program declares n.`; `No single material named '&lt;x&gt;'; the program declares: …`;</code><x><code>is built by the catalogue factory</code><f>()<code>, which has no property keyword to edit. Convert it to a literal</code>Material(…)<code>first — send this request again with</code>expand: true<code>to have that done for you.</code>; <code>&lt;f&gt;()` is called with arguments, so it cannot be expanded automatically. Write the `Material(...)` you want by hand.`;</code><x><code>'s</code><property><code>is not an editable literal; edit it directly in the code.</code>; <code>Cannot add a property to a material call with no arguments.</code></property></x></f></x></p>
+<p><strong>Defect fixed.</strong> Removing a wrapped last keyword left <code>metallic=0.85,\n)</code> behind — AST-equal, not the text that was there.</p>
+</section>
+<section id="add_sketch" class="level3">
+<h3 class="anchored" data-anchor-id="add_sketch">4.9 add_sketch</h3>
+<p><strong>Request.</strong> <code>origin: [x, y, z]</code>.</p>
+<p><strong>Preconditions.</strong> A <code>scene = …</code> assignment exists.</p>
+<p><strong>Rewrite.</strong> <code>&lt;var&gt; = PolygonProfile([[-0.6, -0.6], [0.6, -0.6], [0.6, 0.6], [-0.6, 0.6]], plane=SketchPlane(origin=[…]), name='&lt;var&gt;')</code> above <code>scene = …</code>; <code>PolygonProfile</code> and <code>SketchPlane</code> imported. <code>&lt;var&gt;</code> is <code>sketch1</code>, <code>sketch2</code>, … The scene is <em>not</em> extended — a sketch is not a solid until an operator consumes it.</p>
+<p><strong>Postconditions.</strong> One more construction node with four vertices, a plane and no operators; ids <code>assign:&lt;var&gt;</code>, <code>plane:&lt;var&gt;</code>, <code>vertex:&lt;var&gt;[0..3]</code>.</p>
+<p><strong>Refusals.</strong> <code>The patch request needs</code>origin<code>as three numbers.</code>; <code>Add a</code>scene = …<code>assignment before creating a sketch.</code></p>
+</section>
+<section id="set_sketch_plane" class="level3">
+<h3 class="anchored" data-anchor-id="set_sketch_plane">4.10 set_sketch_plane</h3>
+<p><strong>Request.</strong> <code>id</code> (sketch/plane) or <code>line</code>; <code>reference</code>, one of <code>{kind: "world", origin: [3], normal: [3] ≠ 0}</code>, <code>{kind: "cap", owner, sign: "+"|"-"}</code>, <code>{kind: "side", owner, edge ≥ 0}</code>, <code>{kind: "face", owner, key}</code>, <code>{kind: "tangent", owner, near: [3]}</code> where <code>owner</code> is a feature or primitive id, or its line; optional <code>x_axis: [3] ≠ 0</code>, <code>flip: bool</code> (face references only), <code>offset: number</code>.</p>
+<p><strong>Preconditions.</strong> The line holds exactly one <code>PolygonProfile(...)</code> (bound or not). For a reference: the owner line holds exactly one feature/primitive call bound to a plain variable, whose statement is <em>above</em> the sketch’s. The face must be one that kind of solid declares — decided statically from the kind, the way the runtime’s <code>FaceSet</code> builds them:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>owner kind</th>
+<th>cap</th>
+<th>side</th>
+<th>face keys</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>extrude, loft</td>
+<td><code>+</code>/<code>-</code></td>
+<td><code>0 … n-1</code>, n = the consumed sketch’s literal vertex count (unchecked when the sketch is generated)</td>
+<td><code>cap+</code>, <code>cap-</code>, <code>side&lt;i&gt;</code></td>
+</tr>
+<tr class="even">
+<td>cylinder</td>
+<td><code>+</code>/<code>-</code></td>
+<td>none</td>
+<td><code>cap+</code>, <code>cap-</code></td>
+</tr>
+<tr class="odd">
+<td>box</td>
+<td>none</td>
+<td>none</td>
+<td><code>+x -x +y -y +z -z</code></td>
+</tr>
+<tr class="even">
+<td>sphere, revolve</td>
+<td>none</td>
+<td>none</td>
+<td>none (tangent only)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Rewrite.</strong> The sketch’s <code>plane=</code> value span becomes one of <code>SketchPlane(origin=[…], normal=[…][, x_axis=[…]])</code>, <code>SketchPlane.on(&lt;owner&gt;.cap('+')[, x_axis=…][, flip=True])</code>, <code>SketchPlane.on(&lt;owner&gt;.side(2)…)</code>, <code>SketchPlane.on(&lt;owner&gt;.face('+z')…)</code>, <code>SketchPlane.tangent(&lt;owner&gt;, near=[…][, x_axis=…])</code>, each wrapped as <code>SketchPlane.offset(&lt;plane&gt;, d)</code> when <code>offset</code> is non-zero; or <code>, plane=&lt;expr&gt;</code> is appended when the sketch had none. <code>SketchPlane</code> is imported. The reference is written as <em>source</em>, never as coordinates, so the plane follows the parent’s parameters.</p>
+<p><strong>Postconditions.</strong> The sketch’s plane reference reports the constructor and owner. Idempotent. Planting a plain-plane sketch on a face and then writing its original origin/normal back as a <code>world</code> reference restores the AST.</p>
+<p><strong>Refusals.</strong> <code>The patch request needs an integer</code>line<code>.</code>; <code>The patch request needs</code>reference<code>as an object.</code>; <code>A</code>world<code>plane needs</code>origin<code>and</code>normal<code>as three numbers.</code>; <code>A sketch-plane normal must not be zero.</code>; <code>Plane</code>reference.kind<code>must be one of: cap, face, side, tangent, world.</code>; <code>The plane reference needs an integer</code>owner<code>line.</code>; <code>A cap reference needs</code>sign<code>as</code>+<code>or</code>-<code>.</code>; <code>A side reference needs a non-negative</code>edge<code>index.</code>; <code>A face reference needs a non-empty</code>key<code>.</code>; <code>A tangent reference needs</code>near<code>as three numbers.</code>; <code>x_axis` must be three numbers and must not be zero.`; `The patch request needs `flip` as a boolean.`; `The patch request needs a numeric `offset`.`; then `No single PolygonProfile() call found at line N.`; `No single extrude/revolve/loft or primitive call found at line N.`; `The &lt;kind&gt; at line N is not assigned to a variable, so its faces cannot be referenced. Name it first.`;</code><owner><code>is defined at line M, at or after the sketch at line N; a sketch can only sit on geometry built before it.</code>; <code>A &lt;kind&gt; declares no cap faces;</code><owner><code>has no</code>cap<code>.</code>; <code>A &lt;kind&gt; declares no side faces;</code><owner><code>has no</code>side<code>.</code>; `<code>&lt;owner&gt;</code> has n sides, so <code>edge</code> must be from 0 to n-1.<code>;</code>A <kind> has no face ‘<key>’; <code>&lt;owner&gt;</code> declares: ….`</key></kind></owner></owner></owner></p>
+<p><strong>Interactions.</strong> The ordering rule also stops a sketch from sitting on the feature it feeds. A sketch planted on <code>body.cap("+")</code> is a <em>use</em> of <code>body</code> outside any union, so <code>delete_object</code> on <code>body</code> is refused (§4.18).</p>
+<p><strong>Defect fixed.</strong> <code>SketchPlane.on(plate.face('+z'))</code> and <code>seat_cut.side(0)</code> were written and raised <code>KeyError</code> on compile.</p>
+<p><strong>Known limit (runtime, deferred).</strong> A tangent plane whose normal is ±X fails in <code>SketchPlane.tangent</code> with <code>Cannot normalize zero-length vector</code>: the runtime picks world X as the default in-plane axis and does not fall back. It cannot be known without evaluating the field at <code>near</code>; the fix belongs in <code>cadjoint.construction</code>, not here.</p>
+</section>
+<section id="add_extrusion-4.12-add_revolution-4.13-add_loft" class="level3">
+<h3 class="anchored" data-anchor-id="add_extrusion-4.12-add_revolution-4.13-add_loft">4.11 add_extrusion / 4.12 add_revolution / 4.13 add_loft</h3>
+<p><strong>Request.</strong> extrusion: <code>id</code>/<code>line</code>, <code>depth</code> (default 0.5); revolution: <code>id</code>/<code>line</code>, <code>offset</code> (default 0); loft: <code>id_a</code>/<code>id_b</code> or <code>line_a</code>/<code>line_b</code>, <code>height</code> (default 1).</p>
+<p><strong>Preconditions.</strong> Each sketch is a <code>PolygonProfile(...)</code> bound to a plain variable, and feeds <strong>no</strong> operator yet — one sketch, one solid. A loft needs two different sketches with equal, statically countable vertex counts. A <code>scene = …</code> assignment exists.</p>
+<p><strong>Rewrite.</strong> The scene is extended with <code>&lt;profile&gt;_body</code> (or <code>_body2</code>, …; §4.18’s union rule, <code>Union</code> imported if the scene was wrapped), then <code>&lt;profile&gt;_body = extrude(&lt;profile&gt;, depth=&lt;d&gt;)</code> / <code>revolve(&lt;profile&gt;, offset=&lt;o&gt;)</code> / <code>loft(&lt;a&gt;, &lt;b&gt;, height=&lt;h&gt;)</code> is inserted above <code>scene = …</code> and the operator imported. <code>depth</code>/<code>offset</code>/ <code>height</code> are viewer-formatted.</p>
+<p><strong>Postconditions.</strong> The sketch node reports one operator of that kind; a new feature <code>assign:&lt;profile&gt;_body</code>; the scene lists it. Deleting the body (§4.18) restores the text modulo the import.</p>
+<p><strong>Refusals.</strong> <code>The patch request needs an integer</code>line<code>.</code> / <code>… integer</code>line_a<code>and</code>line_b<code>.</code>; <code>The patch request needs a numeric</code>depth<code>.</code> / <code>offset</code> / <code>height</code>; <code>No single PolygonProfile() call found at line N.</code>; <code>Name the sketch before adding constraints or operators from the viewer.</code>; `<code>&lt;profile&gt;</code> already has an operator.<code>;</code>Loft needs two different sketches.<code>;</code>Could not count the vertices of <code>&lt;profile&gt;</code>.<code>;</code>Loft needs equal vertex counts; <code>&lt;a&gt;</code> has n and <code>&lt;b&gt;</code> has m.<code>;</code>Add a <code>scene = ...</code> assignment before adding an extrusion.<code>;</code>The scene Union has no operands to extend.`</p>
+<p><strong>Defect fixed.</strong> <code>add_extrusion</code> only looked for an existing <em>extrude</em> and happily extruded a sketch a revolve already consumed; the three operators now share one check and one message.</p>
+</section>
+<section id="add_constraint" class="level3">
+<h3 class="anchored" data-anchor-id="add_constraint">4.14 add_constraint</h3>
+<p><strong>Request.</strong> <code>id</code> (sketch) or <code>line</code>; <code>kind ∈ {fixed, distance, horizontal, vertical, coincident, parallel, perpendicular}</code>; <code>indices</code>: exactly 1 (fixed), 2 (distance, horizontal, vertical, coincident) or 4 (parallel, perpendicular) non-negative integers, each below the sketch’s vertex count when that is literal, and each edge’s two endpoints different; <code>value</code>: <code>[x, y]</code> for fixed, a non-negative number for distance, ignored otherwise.</p>
+<p><strong>Preconditions.</strong> A named sketch.</p>
+<p><strong>Rewrite.</strong> One statement — <code>FixedConstraint(&lt;p&gt;.vertices[i], [x, y])</code>, <code>DistanceConstraint(&lt;p&gt;.vertices[i], &lt;p&gt;.vertices[j], d)</code>, <code>HorizontalConstraint(…)</code>, <code>VerticalConstraint(…)</code>, <code>CoincidentConstraint(…)</code>, <code>ParallelEdgesConstraint(a, b, c, d)</code>, <code>PerpendicularEdgesConstraint(a, b, c, d)</code> — inserted after the sketch’s last constraint statement (else after the sketch), its class imported beside it.</p>
+<p><strong>Postconditions.</strong> The sketch’s last constraint reports <code>kind</code> and <code>vertices == indices</code>; id <code>constraint:&lt;sketch&gt;[n]</code>. Adding twice adds twice.</p>
+<p><strong>Refusals.</strong> <code>The patch request needs an integer</code>line<code>.</code>; <code>Constraint</code>kind<code>must be one of: coincident, distance, fixed, horizontal, parallel, perpendicular, vertical.</code>; `<code>&lt;kind&gt;</code> takes exactly <n> integer <code>indices</code>.<code>;</code>A <code>fixed</code> constraint needs <code>value</code> as two numbers.<code>;</code>A <code>distance</code> constraint needs <code>value</code> as a non-negative number.<code>;</code>Constraint <code>indices</code> must be non-negative integers.<code>;</code>Vertex index i is out of range; the sketch has n vertices.<code>;</code>A constraint edge needs two different vertices, not i twice.<code>;</code>Name the sketch before adding constraints or operators from the viewer.`</n></p>
+<p><strong>Defects fixed.</strong> <code>indices</code> were unchecked (<code>plate.vertices[99]</code> → an <code>IndexError</code> on compile); <code>fixed</code> accepted a scalar (<code>FixedConstraint target shape () does not match parameter shape (2,)</code>); a list-valued <code>kind</code> crashed the validator with <code>TypeError</code> instead of answering.</p>
+</section>
+<section id="delete_constraint" class="level3">
+<h3 class="anchored" data-anchor-id="delete_constraint">4.15 delete_constraint</h3>
+<p><strong>Request.</strong> <code>id</code> (constraint) or <code>line</code>+<code>index ≥ 0</code>.</p>
+<p><strong>Preconditions.</strong> A named sketch; <code>index</code> below its constraint count (the ordinal among top-level statements that name the sketch’s vertices, in source order — the same the payload publishes).</p>
+<p><strong>Rewrite.</strong> The statement’s lines are removed. Its import stays.</p>
+<p><strong>Postconditions.</strong> Constraint count −1; <code>constraint:&lt;sketch&gt;[n-1]</code> gone; later ordinals shift down.</p>
+<p><strong>Refusals.</strong> <code>The patch request needs an integer</code>line<code>.</code>; <code>The patch request needs a non-negative</code>index<code>.</code>; <code>Name the sketch before editing constraints from the viewer.</code>; <code>Constraint index i is out of range; the sketch has n.</code></p>
+</section>
+<section id="set_constraint_value" class="level3">
+<h3 class="anchored" data-anchor-id="set_constraint_value">4.16 set_constraint_value</h3>
+<p><strong>Request.</strong> <code>id</code>/<code>line</code>+<code>index</code>; <code>value</code>: <code>[x, y]</code> for a fixed constraint, a non-negative number for a distance.</p>
+<p><strong>Preconditions.</strong> The constraint is <code>fixed</code> or <code>distance</code> and its value argument is a numeric literal or resolves to one (a <code>Scalar</code> name is followed to its declaration, so <code>DistanceConstraint(a, b, base_width)</code> rewrites <code>base_width = Scalar(1.8, …)</code>).</p>
+<p><strong>Rewrite.</strong> The literal’s span becomes the exact repr.</p>
+<p><strong>Postconditions.</strong> The constraint reports <code>value</code>. Idempotent; set-back is AST-identical.</p>
+<p><strong>Refusals.</strong> As delete_constraint, plus <code>The constraint needs a numeric</code>value<code>.</code> (validator), <code>Only</code>fixed<code>and</code>distance<code>constraints carry an editable value.</code>, <code>A</code>fixed<code>constraint needs</code>value<code>as two numbers.</code>, <code>A</code>distance<code>constraint needs</code>value<code>as a non-negative number.</code>, <code>The constraint statement has no value argument to rewrite.</code>, <code>The constraint value is not an editable literal.</code></p>
+</section>
+<section id="solve_sketch" class="level3">
+<h3 class="anchored" data-anchor-id="solve_sketch">4.17 solve_sketch</h3>
+<p><strong>Request.</strong> <code>id</code>/<code>line</code>; <code>method ∈ {newton, adam, sgd}</code> (default newton); <code>iterations</code> 1…512 (default 8).</p>
+<p><strong>Preconditions.</strong> A named sketch.</p>
+<p><strong>Rewrite.</strong> If a <code>satisfy_constraints(&lt;profile&gt;, …)</code> call exists its <code>method=</code> and <code>steps=</code> keywords are rewritten or appended; else <code>satisfy_constraints(&lt;profile&gt;, method='&lt;m&gt;', steps=&lt;n&gt;)</code> is inserted after the sketch’s constraint block (constraint statements and the imports beside them) and <code>satisfy_constraints</code> imported.</p>
+<p><strong>Postconditions.</strong> Exactly one solve call for the sketch. Idempotent.</p>
+<p><strong>Refusals.</strong> <code>The patch request needs an integer</code>line<code>.</code>; <code>Solver</code>method<code>must be</code>newton<code>,</code>adam<code>, or</code>sgd<code>.</code>; <code>Solver</code>iterations<code>must be an integer from 1 to 512.</code>; <code>Name the sketch …</code>.</p>
+</section>
+<section id="delete_object" class="level3">
+<h3 class="anchored" data-anchor-id="delete_object">4.18 delete_object</h3>
+<p><strong>Request.</strong> <code>id</code> (sketch/primitive/feature) or <code>line</code>.</p>
+<p><strong>Preconditions.</strong> The line holds exactly one <code>PolygonProfile</code>, <code>box</code>, <code>sphere</code>, <code>cylinder</code>, <code>extrude</code>, <code>revolve</code> or <code>loft</code> call. Either it is the value of a module-level <code>&lt;var&gt; = …</code> whose every other load of <code>&lt;var&gt;</code> is a positional operand of some module-level <code>&lt;name&gt; = Union(...)</code> (the scene’s or a sub-assembly’s — the <strong>union rule</strong>), and no such union has it as its <em>only</em> operand; or it is itself a direct positional operand of the scene Union (built inline), and not the only one.</p>
+<p><strong>Rewrite.</strong> All in one pass, back to front: each union operand removed with its separator (a middle operand takes the comma after it, the last operand the comma before it, so <code>Union(a, b)</code> → <code>Union(a)</code>); every top-level constraint statement referencing a parameter that only this object’s keywords named (<code>position=bolt_left</code>) removed — the parameter would no longer be in the scene tree and <code>satisfy_constraints(scene)</code> would refuse it; and the object’s own statement removed. An inline operand loses only its argument.</p>
+<p><strong>Postconditions.</strong> Construction count −1; <code>assign:&lt;var&gt;</code> and its children (<code>plane:</code>, <code>vertex:</code>, <code>constraint:</code>) gone; nothing else. A feature’s sketch stays as a bare sketch.</p>
+<p><strong>Refusals.</strong> <code>The patch request needs an integer</code>line<code>.</code>; <code>No single construction call found at line N.</code>; <code>Could not find the statement that builds this object.</code>; <code>&lt;var&gt;` is used elsewhere in the program, so it cannot be deleted from the viewer. Remove those uses first.`;</code><var><code>is the last operand of</code><name> = Union(…)<code>, so deleting it would leave an empty union. Remove that union in the code first.</code>; <code>This object is not a direct operand of the scene Union, so it cannot be deleted from the viewer.</code>; <code>This object is the last operand of the scene Union, so deleting it would leave an empty scene. Remove the union in the code first.</code></name></var></p>
+<p><strong>Interactions.</strong> A sketch consumed by an operator, a solid a <code>Difference</code> subtracts, a feature <code>extract_parameters(sink)</code> reads, a body a sketch is planted on — all “used elsewhere”. <code>Union</code> is recognised bare or qualified (<code>boolean.Union</code>).</p>
+<p><strong>Defects fixed.</strong> Features were promised by <code>_ID_TARGETS</code> and refused by the operation with <code>No single construction call found</code> — deleting <code>plate_body</code> after extruding a sketch was impossible. Deleting the last operand left <code>Union(smoothness=0.05)</code>. Deleting a trailing operand left <code>Union(a, )</code>.</p>
+</section>
+<section id="add_study" class="level3">
+<h3 class="anchored" data-anchor-id="add_study">4.19 add_study</h3>
+<p><strong>Request.</strong> <code>kind ∈ {thermal, elastic}</code>; optional <code>name</code> (non-empty; not already a study’s name).</p>
+<p><strong>Rewrite.</strong> <code>&lt;var&gt; = ThermalStudy(name='&lt;n&gt;', resolution=20, conductivity=1.0, bcs=[])</code> or <code>ElasticStudy(name='&lt;n&gt;', resolution=20, youngs=200.0, poisson=0.3, bcs=[])</code> after the last study, else after <code>scene = …</code>; the class imported beside it. <code>&lt;var&gt;</code> = <code>study1</code>, …; <code>&lt;n&gt;</code> = <code>name</code> or <code>&lt;var&gt;</code>.</p>
+<p><strong>Postconditions.</strong> Studies +1, <code>assign:&lt;var&gt;</code>, no BCs. Deleting it restores the text modulo the import.</p>
+<p><strong>Refusals.</strong> <code>Study</code>kind<code>must be</code>thermal<code>or</code>elastic<code>.</code>; <code>Study</code>name<code>must be a non-empty string.</code>; <code>A study named '&lt;n&gt;' already exists.</code>; <code>Add a</code>scene = …<code>assignment before declaring studies from the viewer.</code></p>
+</section>
+<section id="delete_study" class="level3">
+<h3 class="anchored" data-anchor-id="delete_study">4.20 delete_study</h3>
+<p><strong>Request.</strong> <code>id</code> (study) or <code>study</code> (index/name/variable).</p>
+<p><strong>Preconditions.</strong> The study’s variable is loaded nowhere else, and its literal <code>name</code> is not any call’s <code>study="…"</code> argument.</p>
+<p><strong>Rewrite.</strong> The statement’s lines are removed; its BCs go with it.</p>
+<p><strong>Postconditions.</strong> Studies −1; <code>assign:&lt;var&gt;</code> and <code>bc:&lt;var&gt;[*]</code> gone.</p>
+<p><strong>Refusals.</strong> <code>The patch request needs</code>study<code>as a name or a non-negative index.</code>; <code>Study index i is out of range; the program declares n.</code>; <code>No single study named '&lt;x&gt;'; the program declares: ….</code>; `<code>&lt;var&gt;</code> is used elsewhere in the program, so it cannot be deleted from the viewer. Remove those uses first.<code>;</code>Study ‘<name>’ is referenced by an optimization, so it cannot be deleted from the viewer. Point the optimization at another study first.`</name></p>
+<p><strong>Interactions.</strong> Both reference forms an <code>Optimization</code> can use are guarded: <code>study=pry_study</code> (variable) and <code>study="sink-conduction"</code> (literal). The mirror image — a mesh named by <code>mesh="…"</code> — is §4.25.</p>
+</section>
+<section id="add_study_bc" class="level3">
+<h3 class="anchored" data-anchor-id="add_study_bc">4.21 add_study_bc</h3>
+<p><strong>Request.</strong> <code>id</code>/<code>study</code>; <code>bc_type ∈ {dirichlet, heat_flux, fixed, traction}</code>; <code>selection</code> (a serialised node selection: <code>box</code>, <code>sphere</code>, <code>halfspace</code>, <code>side</code>, <code>and</code>/<code>or</code>/<code>not</code> — never <code>predicate</code>); <code>value</code>: absent for fixed, three numbers for traction, a number otherwise.</p>
+<p><strong>Preconditions.</strong> The BC type fits the study’s kind (thermal: dirichlet, heat_flux; elastic: fixed, traction). The study’s <code>bcs=</code> is absent or a literal list.</p>
+<p><strong>Rewrite.</strong> <code>Dirichlet(Nodes.…, value=v)</code>, <code>HeatFlux(…, flux=v)</code>, <code>Fixed(…)</code>, <code>Traction(…, vector=[…])</code> appended after the last element (<code>, &lt;bc&gt;</code>), placed inside an empty list, or added as <code>bcs=[&lt;bc&gt;]</code>; the class and <code>Nodes</code> imported beside the study.</p>
+<p><strong>Postconditions.</strong> The study’s last BC reports <code>type</code>; id <code>bc:&lt;study&gt;[n]</code>. Deleting it restores the text modulo imports.</p>
+<p><strong>Refusals.</strong> `<code>bc_type</code> must be one of: dirichlet, heat_flux, fixed, traction.<code>;</code>The patch request needs <code>selection</code> as a description object.<code>;</code>A <code>fixed</code> boundary condition takes no value.<code>;</code>A <code>traction</code> boundary condition needs <code>value</code> as three numbers.<code>;</code>A <code>&lt;type&gt;</code> boundary condition needs a numeric <code>value</code>.<code>;</code>A <kind> study accepts <types> boundary conditions, not <code>&lt;type&gt;</code>.<code>;</code>Invalid node selection: …<code>;</code>The study’s <code>bcs</code> argument is not an editable literal list.`</types></kind></p>
+</section>
+<section id="delete_study_bc" class="level3">
+<h3 class="anchored" data-anchor-id="delete_study_bc">4.22 delete_study_bc</h3>
+<p><strong>Request.</strong> <code>id</code> (bc) or <code>study</code>+<code>bc ≥ 0</code>.</p>
+<p><strong>Preconditions.</strong> A literal <code>bcs</code> list; <code>bc</code> in range; the element is not built on <code>Nodes.predicate</code>.</p>
+<p><strong>Rewrite.</strong> The element and its separator are cut; the only element leaves <code>bcs=[]</code> (the list span is rewritten, so a multi-line list keeps no stray comma).</p>
+<p><strong>Postconditions.</strong> BC count −1; <code>bc:&lt;study&gt;[n-1]</code> gone; later ordinals shift.</p>
+<p><strong>Refusals.</strong> <code>The patch request needs a non-negative</code>bc<code>index.</code>; <code>The study's</code>bcs<code>argument is not an editable literal list.</code>; <code>Boundary-condition index i is out of range; the study has n.</code>; <code>This boundary condition uses a</code>Nodes.predicate<code>selection, which is not serializable; edit it directly in the code.</code></p>
+<p><strong>Defect fixed.</strong> Deleting the last BC of a multi-line list wrote <code>bcs=[\n        ,\n    ]</code> — invalid Python, caught by <code>_validate</code> as <code>Patched source is not valid Python</code> instead of doing the edit.</p>
+</section>
+<section id="set_study_value" class="level3">
+<h3 class="anchored" data-anchor-id="set_study_value">4.23 set_study_value</h3>
+<p><strong>Request.</strong> <code>id</code> (study or bc) / <code>study</code>; exactly one of <code>bc ≥ 0</code> or <code>argument</code>; <code>value</code>.</p>
+<ul>
+<li><code>bc</code>: the BC’s value — a number for Dirichlet/HeatFlux, three for Traction; Fixed has none. The literal (keyword or second positional) is rewritten exactly.</li>
+<li><code>argument</code> ∈ thermal <code>resolution, conductivity, source, bounds, size</code> / elastic <code>resolution, youngs, poisson, bounds, size</code>, plus <code>mesh</code> and <code>domain</code>: the keyword (or positional slot, by the constructor’s field order) is rewritten exactly, or appended. <code>resolution</code> is one or three positive integers; <code>bounds</code>/<code>size</code> three numbers, and they are stated together or not at all.</li>
+<li><code>argument: "mesh"</code>, <code>value</code>: a declared SimMesh’s name (written as a string literal) or variable (bare name); the study’s <code>resolution</code>, <code>bounds</code>, <code>size</code>, <code>domain</code> are removed in the same edit — meshing intent lives on the SimMesh.</li>
+<li><code>argument: "domain"</code>, <code>value</code>: the variable of an object assigned above the study; refused when the study has <code>mesh=</code>.</li>
+<li><code>resolution</code>/<code>bounds</code>/<code>size</code> on a study with <code>mesh=</code> are refused — the runtime refuses a study that states both.</li>
+</ul>
+<p><strong>Refusals.</strong> <code>The patch request needs exactly one of</code>bc<code>or</code>argument<code>.</code>; <code>The patch request needs a non-negative</code>bc<code>index.</code>; <code>The patch request needs a string</code>argument<code>.</code>; <code>The patch request needs</code>value<code>as a</code>mesh<code>name.</code> / <code>…</code>domain<code>name.</code>; <code>The patch request needs</code>value<code>as a number or numbers.</code>; <code>A &lt;kind&gt; study's editable arguments are: …, mesh, domain.</code>; <code>This study solves on a SimMesh; set the mesh's</code><argument><code>instead (set_mesh_value).</code>; <code>bounds` and `size` are stated together or not at all; this study states neither, so add both in the code first.`;</code>resolution<code>must be an integer or three integers.</code> / <code>resolution` must be positive whole numbers.` /</code><argument><code>must be three numbers.</code> / <code>&lt;argument&gt;` must be a number.`; `The study's `&lt;argument&gt;` value is not an editable literal.`; `This boundary condition is not an editable constructor call.`; `A `Fixed` boundary condition has no value to edit.`; `A `Traction` boundary condition needs `value` as three numbers.`; `A `&lt;class&gt;` boundary condition needs a numeric `value`.`; `The boundary condition has no value argument to rewrite.`; `The boundary-condition value is not an editable literal.`;</code>mesh<code>needs the name of a declared SimMesh.</code>; <code>No single SimMesh named '&lt;x&gt;'; the program declares: ….</code>; <code>This study solves on a SimMesh; set the mesh's</code>domain<code>instead (set_mesh_value).</code>; <code>domain` needs the variable name of a named scene object.`;</code><x><code>is not assigned before the study;</code>domain<code>must name an existing construction object.</code></x></argument></argument></p>
+<p><strong>Defects fixed.</strong> <code>resolution=10</code> was added to a mesh-backed study (the runtime: <code>Thermal study got mesh= and resolution</code>); <code>bounds</code> alone to a study with neither (<code>bounds and size must be given together</code>).</p>
+</section>
+<section id="add_mesh" class="level3">
+<h3 class="anchored" data-anchor-id="add_mesh">4.24 add_mesh</h3>
+<p><strong>Request.</strong> optional <code>name</code>.</p>
+<p><strong>Rewrite.</strong> <code>&lt;var&gt; = SimMesh(name='&lt;n&gt;', resolution=20)</code> after the last mesh, else before the first study, else after <code>scene = …</code>; <code>SimMesh</code> imported beside it.</p>
+<p><strong>Refusals.</strong> <code>Mesh</code>name<code>must be a non-empty string.</code>; <code>A mesh named '&lt;n&gt;' already exists.</code>; <code>Add a</code>scene = …<code>assignment before declaring meshes from the viewer.</code></p>
+</section>
+<section id="delete_mesh" class="level3">
+<h3 class="anchored" data-anchor-id="delete_mesh">4.25 delete_mesh</h3>
+<p>As delete_study, guarding both reference forms: `<code>&lt;var&gt;</code> is used elsewhere …<code>and</code>Mesh ‘<name>’ is referenced by a study, so it cannot be deleted from the viewer. Point the study at another mesh first.`</name></p>
+</section>
+<section id="set_mesh_value" class="level3">
+<h3 class="anchored" data-anchor-id="set_mesh_value">4.26 set_mesh_value</h3>
+<p><strong>Request.</strong> <code>id</code>/<code>mesh</code>; <code>argument</code> ∈ <code>resolution, bounds, size, padding, domain, method</code>; <code>value</code>.</p>
+<ul>
+<li>numeric arguments as §4.23 (<code>padding ≥ 0</code>, exact repr); <code>bounds</code>/<code>size</code> are a pair.</li>
+<li><code>domain</code>: the variable of an object assigned above the mesh; the existing <code>domain=</code> value span is replaced whatever expression it holds (a domain is a name, not a literal), or the keyword is appended.</li>
+<li><code>method ∈ {hex, tet4, tet10}</code> written as <code>'&lt;m&gt;'</code>.</li>
+</ul>
+<p><strong>Refusals.</strong> <code>The patch request needs</code>mesh<code>as a name or a non-negative index.</code>; <code>The patch request needs a string</code>argument<code>.</code>; <code>The patch request needs</code>value<code>as a</code>domain<code>name.</code>; <code>Mesh</code>method<code>must be one of: hex, tet4, tet10.</code>; <code>The patch request needs</code>value<code>as a number or numbers.</code>; <code>A mesh's editable arguments are: resolution, bounds, size, padding, domain, method.</code>; <code>padding` must be a non-negative number.`;</code>bounds<code>and</code>size<code>are stated together or not at all; this mesh states neither, so add both in the code first.</code>; the <code>resolution</code>/<code>bounds</code>/<code>size</code> shape messages; <code>The mesh's</code><argument><code>value is not an editable literal.</code>; <code>domain` needs the variable name of a named scene object.`;</code><x><code>is not assigned before the mesh;</code>domain<code>must name an existing construction object.</code></x></argument></p>
+<p><strong>Defect fixed.</strong> A mesh that already had <code>domain=thermal_body</code> could not be pointed at anything else: the rewrite went through the literal-only path and answered <code>not an editable literal</code>. Every shipped scene has a domain, so the row in the mesh card was dead.</p>
+</section>
+<section id="delete_optimization" class="level3">
+<h3 class="anchored" data-anchor-id="delete_optimization">4.27 delete_optimization</h3>
+<p><strong>Request.</strong> <code>id</code>/<code>optimization</code>. Refuses while the variable is loaded elsewhere. There is no <code>add_optimization</code> — an objective is code — so this has no inverse.</p>
+</section>
+<section id="set_optimization_value" class="level3">
+<h3 class="anchored" data-anchor-id="set_optimization_value">4.28 set_optimization_value</h3>
+<p><strong>Request.</strong> <code>id</code>/<code>optimization</code>; <code>argument ∈ {steps, learning_rate}</code>; <code>value</code>: a positive whole number for steps, a positive number for learning_rate. Rewrites the keyword exactly (or appends it).</p>
+<p><strong>Refusals.</strong> <code>The patch request needs</code>optimization<code>as a name or a non-negative index.</code>; <code>Optimization</code>argument<code>must be</code>steps<code>or</code>learning_rate<code>.</code>; <code>The patch request needs a numeric</code>value<code>.</code>; <code>steps` must be a positive whole number.`;</code>learning_rate<code>must be a positive number.</code>; <code>The optimization's</code><argument><code>value is not an editable literal.</code></argument></p>
+</section>
+</section>
+<section id="interactions-stated-once" class="level2">
+<h2 class="anchored" data-anchor-id="interactions-stated-once">5. Interactions, stated once</h2>
+<ul>
+<li><strong>The union rule.</strong> Any module-level <code>&lt;name&gt; = Union(...)</code> — the scene’s or a sub-assembly’s, bare or qualified — is a place an object’s name may be dropped from. Any other use (an operator’s operand, a <code>Difference</code>, an <code>extract_parameters</code>, a face reference, a bare <code>probe = a</code>) is “used elsewhere” and refuses the deletion. No union is ever emptied. Adding goes through the <em>scene’s</em> union only.</li>
+<li><strong>Deleting a study an Optimization names.</strong> Refused, in both spellings (<code>study=pry_study</code>, <code>study="sink-conduction"</code>). Delete or repoint the optimization first; then the study deletes.</li>
+<li><strong>Deleting an object a face-derived sketch plane references.</strong> <code>pad_profile</code>’s plane is <code>seal_land.cap("+").plane(...)</code>: that is a load of <code>seal_land</code> outside any union, so <code>delete_object</code> on <code>seal_land</code> is refused as used elsewhere. The sketch keeps its parent.</li>
+<li><strong>Renaming.</strong> There is no rename operation. Ids are derived from the variable name, so renaming in the editor changes the id; the next compile publishes the new one and a request carrying the old id is refused with <code>No statement in this program has the id …</code>. Renaming does not move the legacy <code>line</code>, which is why both are sent.</li>
+<li><strong>Ordinal ids.</strong> <code>vertex:S[i]</code>, <code>constraint:S[i]</code>, <code>bc:T[i]</code> and <code>#n</code> fallbacks are positions inside their owner. Inserting or deleting before them moves them — by design, and the only ids an operation may take away (§6, invariant 3).</li>
+<li><strong>The properties window.</strong> Every field it offers is one of these operations with an address the compile payload published beside the value (<code>elements[].arguments[].patch</code>, built statically by <code>cadjoint/viewer/source_map/elements.py</code>): <code>set_value</code> for a literal the contract table lists, <code>assign_material</code> for a material named by variable. An argument whose value is an expression, a reference, or a literal the table does not list is published without an address and shown read-only — the window never invents a request the table would refuse. A sketch plane is edited through its sketch (<code>PolygonProfile</code> / <code>planeOrigin</code>, <code>planeNormal</code>), so the same request serves a sketch that states no plane.</li>
+<li><strong>A shared <code>Vector2</code>.</strong> Two sketches naming one parameter move together under set_vertex; deleting the vertex from one sketch removes only that sketch’s use and the constraints naming the parameter.</li>
+</ul>
+</section>
+<section id="invariants-every-operation-every-scene" class="level2">
+<h2 class="anchored" data-anchor-id="invariants-every-operation-every-scene">6. Invariants — every operation, every scene</h2>
+<p>Executed by <code>tests/viewer/test_patch_properties.py</code> over <code>scenes/starter.py</code>, <code>scenes/end_cap.py</code> and <code>scenes/bracket.py</code> with a seeded generator (no <code>hypothesis</code> in the environment); counts from the current run.</p>
+<ol type="1">
+<li><strong>Compile.</strong> An accepted operation on a compiling program yields a compiling program. Checked by executing every accepted step of every sequence the way the compile worker does — 6 sequences (3 scenes × 2 seeds) of ~40 generated requests, each covering all 28 operations at least once.</li>
+<li><strong>Refusals are pure.</strong> A refused request answers only <code>ok</code>/<code>error</code> and leaves the request object untouched; the operation is a pure function of the text, so nothing else can change.</li>
+<li><strong>Identity.</strong> Every stable id an operation did not target survives it; a value-setting operation creates no id. The only ids an operation may remove are the target and its children, or the ordinal family it renumbers (a sketch’s vertices and constraints, a study’s BCs, a sketch’s constraint ordinals).</li>
+<li><strong>Span discipline.</strong> An operation changes only statements of the kinds its budget allows, and at most as many: the edited declaration, a parameter it followed a name to, the scene assignment it extends, the imports it adds to, the constraints a vertex deletion cascades to. Checked at statement level (AST dump multisets, numbers by value).</li>
+<li><strong>Inverses.</strong> 18 operations have an inverse and it restores the program: add/delete pairs (primitive, sketch, extrusion, revolution, loft, constraint, study, mesh, boundary condition, inserted vertex) byte for byte modulo an import that stays extended; set/set-back pairs (vertex, value, material, material property, sketch plane, constraint value, study/mesh/optimization values) byte for byte where the formatter agrees with what the user wrote, else AST-identical. The 10 without one say why (<code>NO_INVERSE</code>).</li>
+<li><strong>Idempotence.</strong> The 10 state-setting operations applied to their own output change nothing (12 generated requests each, per scene).</li>
+<li><strong>Malformed requests</strong> — 51 cases of stray fields, wrong types, wrong arity, values out of range, non-finite numbers, empty vectors, unknown or mis-kinded ids — are refused with exactly the documented message.</li>
+</ol>
+<p>The formatter round trip stated in the brief — “source round-trips unchanged when nothing else changes” — is invariant 6 for setters and, for the text itself, the fact that no operation touches a span outside its target (invariant 4): a scene that is not edited is not reformatted.</p>
+</section>
+<section id="where-the-code-and-the-contract-disagreed" class="level2">
+<h2 class="anchored" data-anchor-id="where-the-code-and-the-contract-disagreed">7. Where the code and the contract disagreed</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Operation</th>
+<th>Finding</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>set_value</td>
+<td>second keyword appended for an expression-valued argument or a face-derived plane → program stops compiling</td>
+<td>fixed: refused with a message naming the fix</td>
+</tr>
+<tr class="even">
+<td>set_value</td>
+<td>any <code>name</code>/<code>argument</code>/shape written verbatim; Material scalars unbounded; NaN/inf/<code>[]</code> accepted</td>
+<td>fixed: <code>EDITABLE_CALLS</code> contract, bounds, finite non-empty numbers</td>
+</tr>
+<tr class="odd">
+<td>set_value</td>
+<td>a boolean’s <code>smoothness</code> had no way in from the viewer</td>
+<td>added to the contract table (2026-09): line-addressed, non-negative; covered by the generator, the budget (<code>union</code>/<code>scene</code> statements) and the idempotence property</td>
+</tr>
+<tr class="even">
+<td>set_value</td>
+<td><code>draft</code>/<code>twist</code> on an extrude looked like plain scalars</td>
+<td>not added: the property suite showed a twisted extrusion drops its faces and breaks a sketch planted on its cap; the properties window shows them read-only</td>
+</tr>
+<tr class="odd">
+<td>add_primitive</td>
+<td>unknown <code>kind</code>, foreign/missing dimensions → non-compiling program; <code>{}</code> → uncaught <code>SyntaxError</code></td>
+<td>fixed: kind and dimensions validated against the runtime’s table</td>
+</tr>
+<tr class="even">
+<td>add_constraint</td>
+<td>indices unchecked (IndexError on compile); <code>fixed</code> took a scalar; list-valued <code>kind</code> crashed</td>
+<td>fixed: range, distinct edge endpoints, value shape, hashability</td>
+</tr>
+<tr class="odd">
+<td>set_constraint_value</td>
+<td>no shape check</td>
+<td>fixed: same shapes as add_constraint</td>
+</tr>
+<tr class="even">
+<td>delete_vertex / insert_vertex</td>
+<td>positional constraint references not renumbered; constraints on a deleted parameter left dangling (<code>Parameter values must include …</code>)</td>
+<td>fixed: renumber and cascade</td>
+</tr>
+<tr class="odd">
+<td>delete_object</td>
+<td>features promised by <code>_ID_TARGETS</code>, refused by the operation; last union operand emptied the union; trailing operand left <code>Union(a, )</code></td>
+<td>fixed</td>
+</tr>
+<tr class="even">
+<td>assign_material</td>
+<td>features refused; only <code>extrude</code> accepted as a sketch’s operator</td>
+<td>fixed: any single operator, or the feature itself</td>
+</tr>
+<tr class="odd">
+<td>add_extrusion</td>
+<td>did not see a revolve/loft already consuming the sketch</td>
+<td>fixed: one check for the three operators, one message</td>
+</tr>
+<tr class="even">
+<td>set_mesh_value(domain)</td>
+<td>a mesh with a domain could not change it</td>
+<td>fixed: the value span is replaced whatever it holds</td>
+</tr>
+<tr class="odd">
+<td>set_study_value</td>
+<td><code>resolution</code>/<code>bounds</code>/<code>size</code> added to a mesh-backed study; <code>bounds</code> without <code>size</code></td>
+<td>fixed: refused</td>
+</tr>
+<tr class="even">
+<td>set_mesh_value</td>
+<td><code>bounds</code> without <code>size</code></td>
+<td>fixed: refused</td>
+</tr>
+<tr class="odd">
+<td>delete_study_bc</td>
+<td>last element of a multi-line list left a stray comma</td>
+<td>fixed: <code>bcs=[]</code></td>
+</tr>
+<tr class="even">
+<td>set_material_property</td>
+<td>removing a wrapped last keyword left <code>,\n)</code></td>
+<td>fixed: byte-identical</td>
+</tr>
+<tr class="odd">
+<td>set_sketch_plane</td>
+<td>face keys not checked against the owner’s kind (<code>extrude.face('+z')</code>, <code>revolve.side(0)</code>)</td>
+<td>fixed: static face vocabulary</td>
+</tr>
+<tr class="even">
+<td>patch_source</td>
+<td>stray fields silently ignored, against the models</td>
+<td>changed: refused; pinned test updated (§1)</td>
+</tr>
+<tr class="odd">
+<td>SketchPlane.tangent</td>
+<td>±X normal → <code>Cannot normalize zero-length vector</code> at runtime</td>
+<td>deferred: <code>cadjoint.construction</code> picks world X as the default in-plane axis; not knowable statically</td>
+</tr>
+<tr class="even">
+<td>schema models</td>
+<td><code>AddPrimitiveRequest.kind</code> and <code>SetValueRequest.name</code> are <code>str</code>, narrower on the server</td>
+<td>deferred: narrowing them changes <code>payloads.d.ts</code> and the frontend’s types; the validator is the gate</td>
+</tr>
+<tr class="odd">
+<td>_ensure_import</td>
+<td>a parenthesised multi-line import is never extended, so a new line appears beside the statement</td>
+<td>by design (line stability for legacy addressing); documented</td>
+</tr>
+</tbody>
+</table>
+<p>Messages changed on the way, all previously unpinned except where noted: <code>&lt;profile&gt;` already has an extrusion.` and `… extrusion or revolution.` →</code><profile><code>already has an operator.</code>; `<code>&lt;profile&gt;</code> needs one named extrusion before a material can be assigned.<code>→</code>… needs one operator (extrude, revolve or loft) …<code>;</code>The constraint needs a numeric <code>value</code>.<code>on add_constraint → the two shape messages of §4.14 (it stays for set_constraint_value's validator); the stray-field behaviour of §1 (pinned in</code>test_parity_schema.py`, updated with the reasoning).</profile></p>
+
+
+</section>
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/andrinr\.github\.io\/cadjoint\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

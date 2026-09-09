@@ -80,7 +80,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <link href="../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-f83c246346592b24d02aa84ae3974412.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-89af0c2d685ccb09a4d7d65decb66752.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -147,14 +147,22 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
  <span class="dropdown-text">Simulation</span></a>
   </li>  
         <li>
+    <a class="dropdown-item" href="../docs/flow.html">
+ <span class="dropdown-text">Flow Solver (prototype)</span></a>
+  </li>  
+        <li>
     <a class="dropdown-item" href="../docs/optimization.html">
  <span class="dropdown-text">Optimization</span></a>
   </li>  
         <li>
-    <a class="dropdown-item" href="../docs/tesseracts.html">
- <span class="dropdown-text">Tesseracts</span></a>
+    <a class="dropdown-item" href="../docs/plugins.html">
+ <span class="dropdown-text">Plugins</span></a>
   </li>  
         <li><hr class="dropdown-divider"></li>
+        <li>
+    <a class="dropdown-item" href="../docs/materials.html">
+ <span class="dropdown-text">Materials</span></a>
+  </li>  
         <li>
     <a class="dropdown-item" href="../docs/rendering.html">
  <span class="dropdown-text">Forward Renderer</span></a>
@@ -206,8 +214,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
  <span class="dropdown-text">Differentiable meshing pipeline</span></a>
   </li>  
         <li>
-    <a class="dropdown-item" href="../research/native-mesher.html">
- <span class="dropdown-text">Native (Rust) dual-contouring core</span></a>
+    <a class="dropdown-item" href="../research/performance.html">
+ <span class="dropdown-text">Where the seconds go (performance)</span></a>
   </li>  
         <li>
     <a class="dropdown-item" href="../research/fem-integration.html">
@@ -232,6 +240,18 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
         <li>
     <a class="dropdown-item" href="../research/constraints.html">
  <span class="dropdown-text">Constraint system</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/flow-solver.html">
+ <span class="dropdown-text">Differentiable flow solver</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/complex-scene.html">
+ <span class="dropdown-text">Modelling a gearbox end-cap</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/design-language.html">
+ <span class="dropdown-text">The design language</span></a>
   </li>  
     </ul>
   </li>
@@ -292,16 +312,17 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>    bounds<span class="op">=</span><span class="va">None</span>,</span>
 <span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>    size<span class="op">=</span><span class="va">None</span>,</span>
 <span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>    padding<span class="op">=</span><span class="fl">0.1</span>,</span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>    method<span class="op">=</span><span class="st">'hex'</span>,</span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>    method<span class="op">=</span>MeshMethod.HEX,</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>    mesher<span class="op">=</span>TetMesher.TETGEN,</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>A declarable, named meshing intent — the scene program’s mesh object.</p>
 <section id="attributes" class="level2 doc-section doc-section-attributes">
 <h2 class="doc-section doc-section-attributes anchored" data-anchor-id="attributes">Attributes</h2>
 <table class="caption-top table">
 <colgroup>
-<col style="width: 5%">
-<col style="width: 3%">
-<col style="width: 90%">
+<col style="width: 1%">
+<col style="width: 2%">
+<col style="width: 96%">
 </colgroup>
 <thead>
 <tr class="header">
@@ -343,8 +364,13 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </tr>
 <tr class="odd">
 <td>method</td>
-<td>str</td>
-<td>Meshing method — <code>"hex"</code> (voxelize+snap HEX8, the fast default), <code>"tet4"</code> (DC surface -&gt; TetGen TET4), or <code>"tet10"</code> (the TET4 mesh promoted to quadratic tets — the quality path).</td>
+<td>MeshMethodLike</td>
+<td>Meshing method — a :class:<code>~cadjoint.enums.MeshMethod</code> or its plain string spelling: <code>"hex"</code> (voxelize+snap HEX8, the fast default), <code>"tet4"</code> (DC surface -&gt; TetGen TET4), or <code>"tet10"</code> (the TET4 mesh promoted to quadratic tets — the quality path). Normalised to the enum on construction.</td>
+</tr>
+<tr class="even">
+<td>mesher</td>
+<td>TetMesherLike</td>
+<td>Which volume mesher fills a <code>tet4</code>/<code>tet10</code> mesh — a :class:<code>~cadjoint.enums.TetMesher</code> or its string spelling. <code>"tetgen"</code> (the default) is TetGen on the dual-contour surface, sized by the lattice, and every node follows the design through :func:<code>~cadjoint.fem.motion.recompute_tet_points</code>. <code>"gmsh"</code> is :func:<code>cadjoint.fem.gmsh.sdf_gmsh_tet_mesh</code> — the same surface handed to Gmsh’s HXT as an STL, sized by the <em>part</em>, with second-order midsides on a reparametrised surface and every node tagged with the patches that own it. A Gmsh mesh’s nodes follow the design only through the <code>node_map</code> plugin kind, which is the private tier’s: without it the mesh is frozen geometry and :attr:<code>frozen_geometry</code> says so. Ignored for <code>method="hex"</code>.</td>
 </tr>
 </tbody>
 </table>
@@ -423,9 +449,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h4 class="doc-section doc-section-returns anchored" data-anchor-id="returns">Returns</h4>
 <table class="caption-top table">
 <colgroup>
-<col style="width: 8%">
-<col style="width: 21%">
-<col style="width: 69%">
+<col style="width: 7%">
+<col style="width: 29%">
+<col style="width: 62%">
 </colgroup>
 <thead>
 <tr class="header">
@@ -437,52 +463,52 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <tbody>
 <tr class="odd">
 <td></td>
-<td>HexMesh | TetMesh</td>
+<td>HexMesh | TetMesh | CutMesh</td>
 <td>The extracted :class:<code>~cadjoint.fem.hexmesh.HexMesh</code></td>
 </tr>
 <tr class="even">
 <td></td>
-<td>HexMesh | TetMesh</td>
+<td>HexMesh | TetMesh | CutMesh</td>
 <td>(<code>method="hex"</code>) or :class:<code>~cadjoint.fem.tetmesh.TetMesh</code></td>
 </tr>
 <tr class="odd">
 <td></td>
-<td>HexMesh | TetMesh</td>
+<td>HexMesh | TetMesh | CutMesh</td>
 <td>(<code>method="tet4"</code>/<code>"tet10"</code>; requires <code>tetgen</code>). Tet</td>
 </tr>
 <tr class="even">
 <td></td>
-<td>HexMesh | TetMesh</td>
-<td>extraction tries exact sharp-feature DC placement first and</td>
+<td>HexMesh | TetMesh | CutMesh</td>
+<td>extraction runs :func:<code>~cadjoint.fem.tetmesh.sdf_to_tet_mesh</code>’s</td>
 </tr>
 <tr class="odd">
 <td></td>
-<td>HexMesh | TetMesh</td>
-<td>falls back to the more robust Tikhonov placement when TetGen</td>
+<td>HexMesh | TetMesh | CutMesh</td>
+<td>refinement ladder, which tries exact sharp-feature DC placement</td>
 </tr>
 <tr class="even">
 <td></td>
-<td>HexMesh | TetMesh</td>
-<td>rejects the sharp surface (self-intersections happen at</td>
+<td>HexMesh | TetMesh | CutMesh</td>
+<td>and the more robust Tikhonov placement at every rung and</td>
 </tr>
 <tr class="odd">
 <td></td>
-<td>HexMesh | TetMesh</td>
-<td>unlucky resolutions on crease-heavy geometry); if both fail,</td>
+<td>HexMesh | TetMesh | CutMesh</td>
+<td>records what it tried on <code>mesh.refinement</code>; when no rung</td>
 </tr>
 <tr class="even">
 <td></td>
-<td>HexMesh | TetMesh</td>
-<td>the TetGen error propagates — the fix is a different</td>
+<td>HexMesh | TetMesh | CutMesh</td>
+<td>works the TetGen error propagates, naming both ends of the</td>
 </tr>
 <tr class="odd">
 <td></td>
-<td>HexMesh | TetMesh</td>
-<td>resolution. The tet grid must fully contain the zero surface</td>
+<td>HexMesh | TetMesh | CutMesh</td>
+<td>ladder. The tet grid must fully contain the zero surface</td>
 </tr>
 <tr class="even">
 <td></td>
-<td>HexMesh | TetMesh</td>
+<td>HexMesh | TetMesh | CutMesh</td>
 <td>(unlike voxelization, DC needs the closed boundary).</td>
 </tr>
 </tbody>
@@ -602,12 +628,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <tr class="odd">
 <td></td>
 <td>dict[str, np.ndarray]</td>
-<td>func:<code>~cadjoint.fem.hexmesh.scaled_jacobians</code> /</td>
+<td>func:<code>~cadjoint.fem.quality.scaled_jacobians</code> /</td>
 </tr>
 <tr class="even">
 <td></td>
 <td>dict[str, np.ndarray]</td>
-<td>func:<code>~cadjoint.fem.hexmesh.aspect_ratios</code>);</td>
+<td>func:<code>~cadjoint.fem.quality.aspect_ratios</code>);</td>
 </tr>
 <tr class="odd">
 <td></td>
@@ -617,12 +643,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <tr class="even">
 <td></td>
 <td>dict[str, np.ndarray]</td>
-<td>meshes (see :func:<code>~cadjoint.fem.tetmesh.tet_radius_ratios</code> /</td>
+<td>meshes (see :func:<code>~cadjoint.fem.quality.tet_radius_ratios</code> /</td>
 </tr>
 <tr class="odd">
 <td></td>
 <td>dict[str, np.ndarray]</td>
-<td>func:<code>~cadjoint.fem.tetmesh.tet_aspect_ratios</code>; TET10 metrics</td>
+<td>func:<code>~cadjoint.fem.quality.tet_aspect_ratios</code>; TET10 metrics</td>
 </tr>
 <tr class="even">
 <td></td>

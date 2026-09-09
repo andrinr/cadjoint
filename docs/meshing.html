@@ -81,7 +81,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <link href="../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-f83c246346592b24d02aa84ae3974412.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-89af0c2d685ccb09a4d7d65decb66752.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -148,14 +148,22 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
  <span class="dropdown-text">Simulation</span></a>
   </li>  
         <li>
+    <a class="dropdown-item" href="../docs/flow.html">
+ <span class="dropdown-text">Flow Solver (prototype)</span></a>
+  </li>  
+        <li>
     <a class="dropdown-item" href="../docs/optimization.html">
  <span class="dropdown-text">Optimization</span></a>
   </li>  
         <li>
-    <a class="dropdown-item" href="../docs/tesseracts.html">
- <span class="dropdown-text">Tesseracts</span></a>
+    <a class="dropdown-item" href="../docs/plugins.html">
+ <span class="dropdown-text">Plugins</span></a>
   </li>  
         <li><hr class="dropdown-divider"></li>
+        <li>
+    <a class="dropdown-item" href="../docs/materials.html">
+ <span class="dropdown-text">Materials</span></a>
+  </li>  
         <li>
     <a class="dropdown-item" href="../docs/rendering.html">
  <span class="dropdown-text">Forward Renderer</span></a>
@@ -207,8 +215,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
  <span class="dropdown-text">Differentiable meshing pipeline</span></a>
   </li>  
         <li>
-    <a class="dropdown-item" href="../research/native-mesher.html">
- <span class="dropdown-text">Native (Rust) dual-contouring core</span></a>
+    <a class="dropdown-item" href="../research/performance.html">
+ <span class="dropdown-text">Where the seconds go (performance)</span></a>
   </li>  
         <li>
     <a class="dropdown-item" href="../research/fem-integration.html">
@@ -233,6 +241,18 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
         <li>
     <a class="dropdown-item" href="../research/constraints.html">
  <span class="dropdown-text">Constraint system</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/flow-solver.html">
+ <span class="dropdown-text">Differentiable flow solver</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/complex-scene.html">
+ <span class="dropdown-text">Modelling a gearbox end-cap</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/design-language.html">
+ <span class="dropdown-text">The design language</span></a>
   </li>  
     </ul>
   </li>
@@ -271,7 +291,18 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   </ul></li>
   <li><a href="#export" id="toc-export" class="nav-link" data-scroll-target="#export">Export</a></li>
   <li><a href="#checking-a-mesh" id="toc-checking-a-mesh" class="nav-link" data-scroll-target="#checking-a-mesh">Checking a mesh</a></li>
-  <li><a href="#native-rust-kernels" id="toc-native-rust-kernels" class="nav-link" data-scroll-target="#native-rust-kernels">Native (Rust) kernels</a></li>
+  <li><a href="#tet-meshes-need-a-finer-grid-than-hexes" id="toc-tet-meshes-need-a-finer-grid-than-hexes" class="nav-link" data-scroll-target="#tet-meshes-need-a-finer-grid-than-hexes">Tet meshes need a finer grid than hexes</a>
+  <ul class="collapse">
+  <li><a href="#the-refinement-ladder" id="toc-the-refinement-ladder" class="nav-link" data-scroll-target="#the-refinement-ladder">The refinement ladder</a></li>
+  <li><a href="#reading-the-record" id="toc-reading-the-record" class="nav-link" data-scroll-target="#reading-the-record">Reading the record</a></li>
+  <li><a href="#when-the-ladder-does-not-help" id="toc-when-the-ladder-does-not-help" class="nav-link" data-scroll-target="#when-the-ladder-does-not-help">When the ladder does not help</a></li>
+  </ul></li>
+  <li><a href="#the-gmsh-route" id="toc-the-gmsh-route" class="nav-link" data-scroll-target="#the-gmsh-route">The Gmsh route</a>
+  <ul class="collapse">
+  <li><a href="#every-vertex-on-every-surface-it-touches" id="toc-every-vertex-on-every-surface-it-touches" class="nav-link" data-scroll-target="#every-vertex-on-every-surface-it-touches">Every vertex on every surface it touches</a></li>
+  <li><a href="#frozen-geometry" id="toc-frozen-geometry" class="nav-link" data-scroll-target="#frozen-geometry">Frozen geometry</a></li>
+  </ul></li>
+  <li><a href="#program-size" id="toc-program-size" class="nav-link" data-scroll-target="#program-size">Program size</a></li>
   <li><a href="#known-limitations" id="toc-known-limitations" class="nav-link" data-scroll-target="#known-limitations">Known limitations</a></li>
   <li><a href="#further-reading" id="toc-further-reading" class="nav-link" data-scroll-target="#further-reading">Further reading</a></li>
   </ul>
@@ -435,6 +466,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>save_stl(mesh, <span class="st">"part.stl"</span>)    <span class="co"># binary=True by default</span></span>
 <span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>save_step(mesh, <span class="st">"part.step"</span>)  <span class="co"># AP214 faceted BREP, metres</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p><code>save_obj</code> merges coplanar triangles into n-gons first, so a flat wall exports as one face rather than a fan of triangles; <code>merge_planar_faces</code> exposes that directly with an angle and plane tolerance. <code>save_step</code> writes a <code>CLOSED_SHELL</code> inside a <code>MANIFOLD_SOLID_BREP</code> and is validated against the OCCT kernel in <code>tests/meshing/test_step_kernel.py</code>.</p>
+<p>All three write the mesh as it is, and a faceted solid is the whole of what this package exports: one triangle per cell crossing, a 28-gon standing in for a bore. The STEP is real B-rep topology — an <code>ADVANCED_FACE</code> per merged polygon over its own <code>PLANE</code>, so a CAD kernel opens the file as one closed solid rather than as a triangle soup — but its faces are the <em>mesh’s</em> faces, and a bore arrives as the ring of narrow facets the lattice cut it into. A STEP in which a plate with a hole is seven faces instead of three thousand, the bore one <code>CYLINDRICAL_SURFACE</code>, is the <code>step_export</code> <a href="../docs/plugins.html#the-five-in-process-kinds">plugin kind</a>; with nothing registered for it the writers on this page are what an export uses, and the report says so.</p>
 </section>
 <section id="checking-a-mesh" class="level2">
 <h2 class="anchored" data-anchor-id="checking-a-mesh">Checking a mesh</h2>
@@ -453,19 +485,93 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a><span class="co"># {'max_abs': 0.00294, 'mean_abs': 0.00083, 'samples': 512}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>Surface deviation samples the mesh and evaluates the true field there, so it measures how far the discretization strayed from the geometry it claims to represent — a max absolute error of 0.0029 on a unit sphere at 26 cells.</p>
 </section>
-<section id="native-rust-kernels" class="level2">
-<h2 class="anchored" data-anchor-id="native-rust-kernels">Native (Rust) kernels</h2>
-<p>The stages that evaluate the SDF must stay in JAX, because the SDF <em>is</em> a JAX function. The stages that do discrete bookkeeping and small dense linear algebra do not, and those are the ones that grow with resolution: at 128 cells they are 78% of a sphere extraction and 56% of a box.</p>
-<p><code>cadjoint/meshing/native.py</code> binds a Rust cdylib (rayon-parallel, in <code>native/</code>) that reimplements exactly those: crossing detection, manifold incidence, batched QEF solves, and the dual face build. Discrete outputs are bit-identical to the Python path; continuous outputs agree to float64. The measured speedup on the batched QEF solves is 90–107×.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.meshing <span class="im">import</span> native</span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> native.native_available():</span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>    mesh <span class="op">=</span> native.extract_mesh_native(sdf, grid)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>The library is discovered under <code>native/target/release/</code>, or from the path in <code>CADJOINT_NATIVE_MESHER</code> when that is set. Build it with:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="ex">cargo</span> build <span class="at">--release</span> <span class="at">--manifest-path</span> native/Cargo.toml</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p><code>native.qef_vertices_native</code> is the differentiable entry point. It routes through the Tesseract in <code>native/tesseract_api.py</code>, whose <code>vector_jacobian_product</code> is a hand-derived linear-solve VJP that matches JAX autodiff to ~4e-14. It requires x64:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> jax</span>
-<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>jax.config.update(<span class="st">"jax_enable_x64"</span>, <span class="va">True</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<section id="tet-meshes-need-a-finer-grid-than-hexes" class="level2">
+<h2 class="anchored" data-anchor-id="tet-meshes-need-a-finer-grid-than-hexes">Tet meshes need a finer grid than hexes</h2>
+<p>The same declared resolution buys you three different things. <code>method="hex"</code> only has to decide in/out per lattice cell, so a rib 1.3 cells thick still produces a legal (if staircased) HEX8 mesh. <code>method="tet4"</code> / <code>"tet10"</code> hand the dual-contour surface to TetGen as a piecewise linear complex (a second route, <a href="#the-gmsh-route"><code>mesher="gmsh"</code></a>, hands the same surface to Gmsh and sizes elements by the part rather than by the lattice), and a PLC has to be <em>clean</em>: watertight, manifold, and free of self-intersections. One QEF vertex per cell cannot represent two surface sheets passing through one cell, so where a wall is thinner than about two cells the extracted quads fold over each other and TetGen refuses the whole thing: <code>method="cutfem"</code> builds no volume mesh at all: the lattice’s cut cells are the discretisation, and the same dual-contour surface is extracted only to be drawn and selected on — see <a href="../docs/simulation.html">the simulation page</a>.</p>
+<pre><code>RuntimeError: TetGen rejected the surface: The input surface mesh contain
+self-intersections. ...</code></pre>
+<p>Blends make it worse, not better: a smooth union whose radius is comparable to the rib thickness folds the surface at the fillet even when the rib itself would have survived.</p>
+<section id="the-refinement-ladder" class="level3">
+<h3 class="anchored" data-anchor-id="the-refinement-ladder">The refinement ladder</h3>
+<p><code>sdf_to_tet_mesh</code> (and therefore <code>SimMesh.build</code> for the tet methods) answers this itself. It walks a ladder of grids over the <em>same box</em> — the declared resolution, then x1.5 and x2.25, rounded up per axis — and at every rung tries exact sharp-feature placement first and the more robust Tikhonov placement second. Before each TetGen call the projected surface goes through <code>self_intersections</code>, so a rung already known to be folded is abandoned without paying for TetGen (the declared rung included). The first rung TetGen accepts wins, and the mesh’s <code>grid</code> is that rung, not the declared one.</p>
+<p>The diagnostic is a <em>sampled</em> check: a hit proves the surface is folded, a miss proves nothing, and most rungs are still settled by TetGen itself. It is there for the <em>diagnosis</em>, not for speed — measured on the end cap’s housing it costs 0.12–0.16 s a rung (145k–200k pairs), about 1% of the ~15 s that rung’s extraction and projection cost, but more than the 0.06–0.16 s TetGen takes to reject a folded surface outright. What it earns is a rung recorded as <code>"self-intersecting"</code> with a fold count, rather than an opaque TetGen string.</p>
+</section>
+<section id="reading-the-record" class="level3">
+<h3 class="anchored" data-anchor-id="reading-the-record">Reading the record</h3>
+<p>Every mesh that came through the ladder carries a <code>refinement</code> record, and a <code>SimulationResult</code> re-exports it as <code>result.refinement</code> (with a digest under <code>describe()["refinement"]</code>, <code>None</code> when nothing was refined). A plate with a blended rib two-thirds of a cell thick is enough to see it fire:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> jax.numpy <span class="im">as</span> jnp</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.fem <span class="im">import</span> SimMesh</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf.boolean <span class="im">import</span> Union</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf.primitives <span class="im">import</span> Box</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf.transforms <span class="im">import</span> Translate</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>plate <span class="op">=</span> Box([<span class="fl">1.0</span>, <span class="fl">1.0</span>, <span class="fl">0.1</span>])</span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>rib <span class="op">=</span> Translate(Box([<span class="fl">0.12</span>, <span class="fl">0.8</span>, <span class="fl">0.4</span>]), offset<span class="op">=</span>jnp.array([<span class="fl">0.0</span>, <span class="fl">0.0</span>, <span class="fl">0.4</span>]))</span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>part <span class="op">=</span> Union((plate, rib), smoothness<span class="op">=</span><span class="fl">0.1</span>)</span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>sim_mesh <span class="op">=</span> SimMesh(name<span class="op">=</span><span class="st">"ribbed"</span>, resolution<span class="op">=</span>(<span class="dv">10</span>, <span class="dv">10</span>, <span class="dv">6</span>), method<span class="op">=</span><span class="st">"tet4"</span>,</span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>                   bounds<span class="op">=</span>(<span class="op">-</span><span class="fl">1.1</span>, <span class="op">-</span><span class="fl">1.1</span>, <span class="op">-</span><span class="fl">0.2</span>), size<span class="op">=</span>(<span class="fl">2.2</span>, <span class="fl">2.2</span>, <span class="fl">1.2</span>))</span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a>mesh <span class="op">=</span> sim_mesh.build(part)</span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a>record <span class="op">=</span> mesh.refinement</span>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(record[<span class="st">"declared"</span>], <span class="st">"-&gt;"</span>, record[<span class="st">"used"</span>], record[<span class="st">"refined"</span>])</span>
+<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a><span class="co"># (10, 10, 6) -&gt; (15, 15, 9) True</span></span>
+<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> attempt <span class="kw">in</span> record[<span class="st">"attempts"</span>]:</span>
+<span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(attempt[<span class="st">"resolution"</span>], attempt[<span class="st">"sharp"</span>], attempt[<span class="st">"outcome"</span>])</span>
+<span id="cb7-21"><a href="#cb7-21" aria-hidden="true" tabindex="-1"></a><span class="co"># (10, 10, 6)  True  self-intersecting</span></span>
+<span id="cb7-22"><a href="#cb7-22" aria-hidden="true" tabindex="-1"></a><span class="co"># (10, 10, 6)  False self-intersecting</span></span>
+<span id="cb7-23"><a href="#cb7-23" aria-hidden="true" tabindex="-1"></a><span class="co"># (15, 15, 9)  True  meshed</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><code>outcome</code> is one of <code>"meshed"</code>, <code>"self-intersecting"</code> (the diagnostic fired, TetGen was never run) or <code>"rejected"</code> (TetGen ran and refused; the attempt also carries <code>"error"</code>). A refined mesh is a <em>different</em> mesh — more nodes, more elements, a different frozen topology — so if you are comparing solves across designs, read <code>used</code> rather than assuming the declared resolution.</p>
+<p>Pass <code>max_refinements=0</code> to restore the old behaviour of failing at the declared grid.</p>
+</section>
+<section id="when-the-ladder-does-not-help" class="level3">
+<h3 class="anchored" data-anchor-id="when-the-ladder-does-not-help">When the ladder does not help</h3>
+<p>If no rung works, the error names both ends of the ladder and the heuristic:</p>
+<pre><code>TetGen rejected the surface: ... The surface stays self-intersecting up to
+(27, 27, 14) (declared (12, 12, 6), refined x1.5 and x2.25); the part likely
+has features thinner than two cells at the declared resolution — raise the
+declared resolution or use method='hex'.</code></pre>
+<p>Refinement fixes a surface that is <em>merely</em> under-resolved. It does not fix a feature that is small in absolute terms and stays small however fine the grid gets. <code>scenes/end_cap.py</code>’s <code>housing</code> is the standing example: measured over the ladder and well past it, it self-intersects at (26, 26, 13), (39, 39, 20), (59, 59, 30), (78, 78, 39), (104, 104, 52) and (130, 130, 65) alike. What changes with resolution is only <em>which</em> defect: at the declared (26, 26, 13) the surface is not even manifold (one edge shared by three triangles) and carries 48 folded triangle pairs; by (59, 59, 30) it is watertight and manifold, and still carries 16, all of them clustered on the snap-ring groove of the bearing seat (0.06 tall by 0.05 deep) and on the gusset-rib crests. Those two features are ~1.5 cells even at 2.25x. That part wants <code>method="hex"</code>, a coarser blend, or a model change — not a finer grid.</p>
+<p>Worth knowing when you read such a count: <code>sdf_to_tet_mesh</code> Newton-projects the QEF vertices onto the zero set before tetrahedralizing, and at a coarse grid that projection can <em>create</em> folds — the same end-cap surface at (26, 26, 13) has 1 self-intersecting pair before projection and 48 after, because the projection clamp is half the cell diagonal and a vertex can be dragged across a thin wall. Refining shrinks the clamp along with the cells, which is part of why the ladder works at all.</p>
+</section>
+</section>
+<section id="the-gmsh-route" class="level2">
+<h2 class="anchored" data-anchor-id="the-gmsh-route">The Gmsh route</h2>
+<p><code>mesher</code> picks who fills a <code>tet4</code>/<code>tet10</code> mesh. The default, <code>"tetgen"</code>, is everything above: the lattice sizes the elements and every node follows the design through <code>recompute_tet_points</code>.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>mesh <span class="op">=</span> SimMesh(name<span class="op">=</span><span class="st">"body"</span>, resolution<span class="op">=</span><span class="dv">48</span>, method<span class="op">=</span><span class="st">"tet10"</span>, mesher<span class="op">=</span><span class="st">"gmsh"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><code>mesher="gmsh"</code> takes the <em>same</em> dual-contour surface, writes it as an STL, and hands it to Gmsh through the <code>tet_mesher</code> plugin. Gmsh’s <code>classifySurfaces</code> + <code>createGeometry</code> split the triangle soup into one reparametrised surface per smooth region — so what it meshes is a dozen faces of a part rather than three thousand facets — HXT fills the volume, and <code>setOrder(2)</code> puts the midside nodes on those surfaces rather than at chord midpoints. Three things change:</p>
+<ul>
+<li><strong>Element size is the part’s, not the lattice’s.</strong> The lattice is only how the surface was extracted; <code>target_size</code> (the grid’s smallest spacing by default) is what sizes the tets, and the refinement ladder does not run.</li>
+<li><strong>Quality is an order up.</strong> The plate measures a worst radius ratio of 0.293 against the DC/TetGen path’s 0.04, with the median at 0.74.</li>
+<li><strong>Every node is tagged with the patches that own it.</strong> <code>assign_ownership</code> evaluates <code>|f_p|</code> on each Gmsh surface entity’s nodes for every patch of the scene’s decomposition and keeps the ones that clear the bar; the mesh carries the resulting <code>OwnedNodes</code> record.</li>
+</ul>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>built <span class="op">=</span> mesh.build(scene)</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>built.mesher                      <span class="co"># 'gmsh'</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>built.owned.arity_counts()        <span class="co"># {0: 1105, 1: 1494, 2: 194, 3: 8}</span></span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>built.stats[<span class="st">"blend_surfaces"</span>]     <span class="co"># 0 — a hard CSG solid has no blend faces</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Gmsh is <strong>GPL-2.0-or-later</strong>, so it is an optional extra (<code>pip install 'cadjoint[gmsh]'</code>) or, in production, the <code>cadjoint_tet_gmsh</code> image where the licence boundary is a process boundary. Nothing under <code>cadjoint/</code> imports it at module scope. See <a href="../docs/plugins.html">plugins</a>.</p>
+<section id="every-vertex-on-every-surface-it-touches" class="level3">
+<h3 class="anchored" data-anchor-id="every-vertex-on-every-surface-it-touches">Every vertex on every surface it touches</h3>
+<p>A boundary vertex follows the design by being re-solved onto the model, and <em>which</em> zero sets it is solved onto is the whole question. Solved onto the scene’s single field, a vertex sitting on a crease steps between the two faces that meet there — its position wanders along the crease and its derivative is one face’s, not the edge’s. Measured on the starter in <a href="https://github.com/andrinr/cadjoint/tree/main/research/cutfem">the cut-cell study</a>: 136 of 860 surface vertices, and 11-13 % on the objective’s gradient.</p>
+<p>So a <code>SimMesh</code> lowers its scene to the node table (<code>cadjoint.zeroset</code>), classifies each boundary vertex onto the census surfaces it lies on — one for a face, two for an edge, three at a corner — and moves it with the minimum-norm Newton solve on all of them at once (<code>cadjoint.zeroset.project</code>), which is the same solve the zero-set protocol’s <code>Solve</code> performs. That kernel is the one projection in the repository: the mesh motion, the viewer’s feature-edge seams and the tangent-plane constructor all call it.</p>
+<p>Where the scene cannot be lowered (a bare callable field), the single-field projection is used exactly as before.</p>
+</section>
+<section id="frozen-geometry" class="level3">
+<h3 class="anchored" data-anchor-id="frozen-geometry">Frozen geometry</h3>
+<p>A Gmsh mesh’s <em>topology</em> is decided once and held. Its <em>positions</em> follow the design through the <code>node_map</code> plugin kind — a per-arity Newton projection onto each node’s owning patches with the implicit-function adjoint, midsides re-solved on their own surfaces, interior nodes following by Laplacian relaxation — and nothing in this repository fills that kind (<code>cadjoint.tier</code> reports whether anything does).</p>
+<p>So here the mesh is <strong>frozen geometry</strong>: it builds, solves, inspects and exports exactly as any other <code>TetMesh</code>, <code>SimMesh.inspect()</code> reports <code>frozen_geometry: true</code>, and an <code>Optimization</code> over a study on it is refused <em>at declaration</em> with one sentence naming the way out. The refusal is deliberate: cadjoint could slide every boundary node onto the scene’s zero set with a one-field projection and call that a gradient, but it would take crease nodes off their creases and put midsides back on chords, silently. <code>mesher="tetgen"</code> — the default — is differentiable throughout.</p>
+</section>
+</section>
+<section id="program-size" class="level2">
+<h2 class="anchored" data-anchor-id="program-size">Program size</h2>
+<p>Every stage above evaluates the scene’s SDF under <code>jax.jit</code>, so the wall clock of a first mesh is mostly XLA compiling one program per stage — and how big those programs are is decided by <code>functionalize</code>, not by the mesher. Three things keep the tree from flattening as it is traced.</p>
+<ul>
+<li>A sketch profile’s vertices are stacked into one <code>(N, 2)</code> array and its edge loop becomes two reductions, so a 168-vertex profile emits the same operations as a 12-vertex one.</li>
+<li>A pattern traces its child <strong>once</strong>, over an array of instance transforms, and a node reachable from more than one parent is built once and outlined into its own StableHLO function.</li>
+<li>Passing the parameter dicts to the jitted function rather than closing over them (<code>functionalize_parametric</code>) keeps values out of the program entirely, so a re-dimensioned design reuses the executable the <a href="../research/performance.html">compilation cache</a> already holds.</li>
+</ul>
+<p>Measured on <code>scenes/end_cap.py</code> — eight gusset ribs, three polar bolt circles, a mirrored dowel — the gradient program dropped from 1.62 MB / 18 090 operations to 0.58 MB / 5 771, and its XLA compile from 25.4 s to 0.68 s.</p>
 </section>
 <section id="known-limitations" class="level2">
 <h2 class="anchored" data-anchor-id="known-limitations">Known limitations</h2>
@@ -475,7 +581,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h2 class="anchored" data-anchor-id="further-reading">Further reading</h2>
 <ul>
 <li><a href="../research/differentiable-meshing-pipeline.html">Differentiable meshing pipeline</a> — design principles, the full stage/test map, and the benchmark policy.</li>
-<li><a href="../research/native-mesher.html">Native (Rust) dual-contouring core</a> — the profile that justified the split, the JAX/Rust boundary, and measured speedups.</li>
+<li><a href="../docs/plugins.html#the-five-in-process-kinds">Plugins</a> — the five in-process kinds, the extension points for a component that reads this mesh and re-solves it against the field for exact-surface export, dragging and meshing.</li>
 <li><a href="../docs/simulation.html">Simulation</a> — turning this surface into a volume mesh a solver can use.</li>
 </ul>
 

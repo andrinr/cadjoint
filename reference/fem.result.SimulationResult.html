@@ -80,7 +80,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <link href="../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-f83c246346592b24d02aa84ae3974412.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-89af0c2d685ccb09a4d7d65decb66752.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -147,14 +147,22 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
  <span class="dropdown-text">Simulation</span></a>
   </li>  
         <li>
+    <a class="dropdown-item" href="../docs/flow.html">
+ <span class="dropdown-text">Flow Solver (prototype)</span></a>
+  </li>  
+        <li>
     <a class="dropdown-item" href="../docs/optimization.html">
  <span class="dropdown-text">Optimization</span></a>
   </li>  
         <li>
-    <a class="dropdown-item" href="../docs/tesseracts.html">
- <span class="dropdown-text">Tesseracts</span></a>
+    <a class="dropdown-item" href="../docs/plugins.html">
+ <span class="dropdown-text">Plugins</span></a>
   </li>  
         <li><hr class="dropdown-divider"></li>
+        <li>
+    <a class="dropdown-item" href="../docs/materials.html">
+ <span class="dropdown-text">Materials</span></a>
+  </li>  
         <li>
     <a class="dropdown-item" href="../docs/rendering.html">
  <span class="dropdown-text">Forward Renderer</span></a>
@@ -206,8 +214,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
  <span class="dropdown-text">Differentiable meshing pipeline</span></a>
   </li>  
         <li>
-    <a class="dropdown-item" href="../research/native-mesher.html">
- <span class="dropdown-text">Native (Rust) dual-contouring core</span></a>
+    <a class="dropdown-item" href="../research/performance.html">
+ <span class="dropdown-text">Where the seconds go (performance)</span></a>
   </li>  
         <li>
     <a class="dropdown-item" href="../research/fem-integration.html">
@@ -232,6 +240,18 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
         <li>
     <a class="dropdown-item" href="../research/constraints.html">
  <span class="dropdown-text">Constraint system</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/flow-solver.html">
+ <span class="dropdown-text">Differentiable flow solver</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/complex-scene.html">
+ <span class="dropdown-text">Modelling a gearbox end-cap</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/design-language.html">
+ <span class="dropdown-text">The design language</span></a>
   </li>  
     </ul>
   </li>
@@ -286,15 +306,23 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 <section id="cadjoint.fem.result.SimulationResult" class="level1">
 <h1>fem.result.SimulationResult</h1>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>fem.result.SimulationResult(name, kind, field, solution, sim_mesh<span class="op">=</span><span class="va">None</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>fem.result.SimulationResult(</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>    name,</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>    kind,</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    field,</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>    solution,</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>    sim_mesh<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>    mass<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>    yield_strength<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>One solved study: named, typed, inspectable, exportable.</p>
 <section id="attributes" class="level2 doc-section doc-section-attributes">
 <h2 class="doc-section doc-section-attributes anchored" data-anchor-id="attributes">Attributes</h2>
 <table class="caption-top table">
 <colgroup>
-<col style="width: 5%">
-<col style="width: 18%">
-<col style="width: 75%">
+<col style="width: 6%">
+<col style="width: 13%">
+<col style="width: 80%">
 </colgroup>
 <thead>
 <tr class="header">
@@ -328,6 +356,16 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <td>sim_mesh</td>
 <td>Any</td>
 <td>The :class:<code>~cadjoint.fem.simmesh.SimMesh</code> the study solved on (None when a raw <code>HexMesh</code> was passed to <code>solve</code>).</td>
+</tr>
+<tr class="even">
+<td>mass</td>
+<td>Any</td>
+<td>Mass of the solved domain in kg — <code>sum(rho_e * V_e)</code> over the elements — or None when the scene’s materials state no density. Traced whenever the solve was, so it can be optimized against.</td>
+</tr>
+<tr class="odd">
+<td>yield_strength</td>
+<td>Any</td>
+<td>Per-element yield strength <code>(C,)</code> in Pa, or None when the materials state none; drives :attr:<code>safety_factor</code>.</td>
 </tr>
 </tbody>
 </table>
@@ -377,7 +415,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <table class="caption-top table">
 <colgroup>
 <col style="width: 8%">
-<col style="width: 20%">
+<col style="width: 19%">
 <col style="width: 71%">
 </colgroup>
 <thead>
@@ -391,27 +429,62 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <tr class="odd">
 <td></td>
 <td>dict[str, Any]</td>
-<td><code>{"name", "kind", "field", "mesh", "nodes", "elements",       | |        | dict\[str, Any\] | "range", "fields"}</code> where <code>mesh</code> is the SimMesh name (or</td>
+<td><code>{"name", "kind", "field", "mesh", "nodes", "elements",        | |        | dict\[str, Any\] | "range", "fields", "mass", "safety_factor", "refinement"}</code></td>
 </tr>
 <tr class="even">
 <td></td>
 <td>dict[str, Any]</td>
-<td>None), <code>range</code> is the <code>[min, max]</code> of the display field of</td>
+<td>where <code>mesh</code> is</td>
 </tr>
 <tr class="odd">
 <td></td>
 <td>dict[str, Any]</td>
-<td>meth:<code>nodal_scalar</code>, and <code>fields</code> maps each solved field to</td>
+<td>the SimMesh name (or None), <code>range</code> is the <code>[min, max]</code> of</td>
 </tr>
 <tr class="even">
 <td></td>
 <td>dict[str, Any]</td>
-<td>a <code>{"min", "mean", "max"}</code> summary (displacement summarized</td>
+<td>the display field of :meth:<code>nodal_scalar</code>, <code>fields</code> maps each</td>
 </tr>
 <tr class="odd">
 <td></td>
 <td>dict[str, Any]</td>
-<td>by magnitude, von Mises per cell).</td>
+<td>solved field to a <code>{"min", "mean", "max"}</code> summary</td>
+</tr>
+<tr class="even">
+<td></td>
+<td>dict[str, Any]</td>
+<td>(displacement summarized by magnitude, von Mises per cell), and</td>
+</tr>
+<tr class="odd">
+<td></td>
+<td>dict[str, Any]</td>
+<td><code>mass</code> (kg) / <code>safety_factor</code> are None when the scene’s</td>
+</tr>
+<tr class="even">
+<td></td>
+<td>dict[str, Any]</td>
+<td>materials do not make them computable. <code>refinement</code> is None</td>
+</tr>
+<tr class="odd">
+<td></td>
+<td>dict[str, Any]</td>
+<td>unless the tet mesher had to re-dice the declared grid, in</td>
+</tr>
+<tr class="even">
+<td></td>
+<td>dict[str, Any]</td>
+<td>which case it is <code>{"declared", "used", "attempts"}</code> — the</td>
+</tr>
+<tr class="odd">
+<td></td>
+<td>dict[str, Any]</td>
+<td>declared and actually-used cell counts and how many</td>
+</tr>
+<tr class="even">
+<td></td>
+<td>dict[str, Any]</td>
+<td>extractions it took (:attr:<code>refinement</code> holds the full record).</td>
 </tr>
 </tbody>
 </table>

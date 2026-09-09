@@ -81,7 +81,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <link href="../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-f83c246346592b24d02aa84ae3974412.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-89af0c2d685ccb09a4d7d65decb66752.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -148,14 +148,22 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
  <span class="dropdown-text">Simulation</span></a>
   </li>  
         <li>
+    <a class="dropdown-item" href="../docs/flow.html">
+ <span class="dropdown-text">Flow Solver (prototype)</span></a>
+  </li>  
+        <li>
     <a class="dropdown-item" href="../docs/optimization.html">
  <span class="dropdown-text">Optimization</span></a>
   </li>  
         <li>
-    <a class="dropdown-item" href="../docs/tesseracts.html">
- <span class="dropdown-text">Tesseracts</span></a>
+    <a class="dropdown-item" href="../docs/plugins.html">
+ <span class="dropdown-text">Plugins</span></a>
   </li>  
         <li><hr class="dropdown-divider"></li>
+        <li>
+    <a class="dropdown-item" href="../docs/materials.html">
+ <span class="dropdown-text">Materials</span></a>
+  </li>  
         <li>
     <a class="dropdown-item" href="../docs/rendering.html">
  <span class="dropdown-text">Forward Renderer</span></a>
@@ -207,8 +215,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
  <span class="dropdown-text">Differentiable meshing pipeline</span></a>
   </li>  
         <li>
-    <a class="dropdown-item" href="../research/native-mesher.html">
- <span class="dropdown-text">Native (Rust) dual-contouring core</span></a>
+    <a class="dropdown-item" href="../research/performance.html">
+ <span class="dropdown-text">Where the seconds go (performance)</span></a>
   </li>  
         <li>
     <a class="dropdown-item" href="../research/fem-integration.html">
@@ -233,6 +241,18 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
         <li>
     <a class="dropdown-item" href="../research/constraints.html">
  <span class="dropdown-text">Constraint system</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/flow-solver.html">
+ <span class="dropdown-text">Differentiable flow solver</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/complex-scene.html">
+ <span class="dropdown-text">Modelling a gearbox end-cap</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/design-language.html">
+ <span class="dropdown-text">The design language</span></a>
   </li>  
     </ul>
   </li>
@@ -267,6 +287,13 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <li><a href="#judge-it" id="toc-judge-it" class="nav-link" data-scroll-target="#judge-it">Judge it</a></li>
   <li><a href="#select-nodes" id="toc-select-nodes" class="nav-link" data-scroll-target="#select-nodes">Select nodes</a></li>
   <li><a href="#declare-a-study" id="toc-declare-a-study" class="nav-link" data-scroll-target="#declare-a-study">Declare a study</a></li>
+  <li><a href="#materials-drive-the-solve" id="toc-materials-drive-the-solve" class="nav-link" data-scroll-target="#materials-drive-the-solve">Materials drive the solve</a>
+  <ul class="collapse">
+  <li><a href="#what-each-study-can-derive" id="toc-what-each-study-can-derive" class="nav-link" data-scroll-target="#what-each-study-can-derive">What each study can derive</a></li>
+  <li><a href="#self-weight" id="toc-self-weight" class="nav-link" data-scroll-target="#self-weight">Self-weight</a></li>
+  <li><a href="#it-stays-differentiable" id="toc-it-stays-differentiable" class="nav-link" data-scroll-target="#it-stays-differentiable">It stays differentiable</a></li>
+  <li><a href="#backend-support" id="toc-backend-support" class="nav-link" data-scroll-target="#backend-support">Backend support</a></li>
+  </ul></li>
   <li><a href="#read-the-result" id="toc-read-the-result" class="nav-link" data-scroll-target="#read-the-result">Read the result</a></li>
   <li><a href="#backends" id="toc-backends" class="nav-link" data-scroll-target="#backends">Backends</a></li>
   <li><a href="#further-reading" id="toc-further-reading" class="nav-link" data-scroll-target="#further-reading">Further reading</a></li>
@@ -300,7 +327,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </header>
 
 
-<p><code>cadjoint.fem</code> turns an SDF into a finite-element answer. Both the discretization and the physics are <em>declared</em> — a <code>SimMesh</code> and a study are objects in the scene file, not calls buried in a script — because the same declarations are read by the viewer’s Simulate panel, re-solved by the optimizer, and refrozen every time the geometry moves.</p>
+<p><code>cadjoint.fem</code> turns an SDF into a finite-element answer. Both the discretization and the physics are <em>declared</em> — a <code>SimMesh</code> and a study are objects in the scene file, not calls buried in a script — because the same declarations are read by the playground’s Meshes and Studies windows, re-solved by the optimizer, and refrozen every time the geometry moves.</p>
 <p>Install the solver stack:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> sync <span class="at">--extra</span> fem</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <section id="declare-a-mesh" class="level2">
@@ -322,16 +349,18 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(mesh.inspect(bar))</span>
 <span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a><span class="co"># {'name': 'bar-mesh', 'method': 'hex', 'nodes': 336, 'elements': 180, ...}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p><code>bounds</code> and <code>size</code> give the corner and extent of the lattice and must be supplied together; omit both and the mesh scans for them, padded by <code>padding</code>. <code>resolution</code> is always the <em>lattice</em>, not the element count — for tets it is the dual-contouring extraction grid.</p>
-<p>Three <code>method</code> values:</p>
+<p>Four <code>method</code> values:</p>
 <table class="caption-top table">
 <colgroup>
-<col style="width: 33%">
-<col style="width: 33%">
-<col style="width: 33%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
 </colgroup>
 <thead>
 <tr class="header">
 <th><code>method</code></th>
+<th><code>MeshMethod</code></th>
 <th>Element</th>
 <th>How it is built</th>
 </tr>
@@ -339,32 +368,45 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <tbody>
 <tr class="odd">
 <td><code>"hex"</code> (default)</td>
+<td><code>MeshMethod.HEX</code></td>
 <td>HEX8</td>
 <td>Voxelize the lattice, Newton-snap boundary nodes onto the SDF. Fast, lattice-aligned, deterministic across platforms.</td>
 </tr>
 <tr class="even">
 <td><code>"tet4"</code></td>
+<td><code>MeshMethod.TET4</code></td>
 <td>TET4</td>
 <td>Dual-contour the surface, fill it with TetGen. Boundary-conforming.</td>
 </tr>
 <tr class="odd">
 <td><code>"tet10"</code></td>
+<td><code>MeshMethod.TET10</code></td>
 <td>TET10</td>
 <td>The TET4 mesh promoted to straight-sided quadratic tets. Accurate boundary, slower.</td>
 </tr>
+<tr class="even">
+<td><code>"cutfem"</code></td>
+<td><code>MeshMethod.CUTFEM</code></td>
+<td>none</td>
+<td>No volume mesh: the lattice’s cells are the elements, the ones the surface passes through are cut by it, and the boundary is handled weakly (CutFEM). The surface is extracted only to be drawn and selected on. Thermal studies only, numeric conductivity.</td>
+</tr>
 </tbody>
 </table>
-<p>The tet methods need the <code>tetgen</code> package. On the same bar, <code>"tet10"</code> gives 947 nodes across 448 elements against the hex mesh’s 336 nodes and 180 elements.</p>
+<p>Both spellings are the same declaration: <code>method="tet10"</code> and <code>method=MeshMethod.TET10</code> (<code>from cadjoint.enums import MeshMethod</code>) build the same mesh and the same payload, because a <code>MeshMethod</code> <em>is</em> a <code>str</code>. The enum is where the option set is defined, so a typo is rejected with the list of what is accepted rather than surfacing as a strange mesh.</p>
+<p><code>"cutfem"</code> is the one without a mesher at all. Nothing is voxelized and nothing is tetrahedralized: the study assembles on the lattice’s cut cells, a design change moves the cut — not a node map — and the gradient of a <code>metric="mean"</code> optimization comes through the quadrature at fixed structure (<code>gradient_path="direct"</code>; the Tesseract chains expect a mesh). There are no elements to grade, so the Meshes tab draws the surface flat and says so; the end cap ships on it. It is thermal-only for now, wants a numeric conductivity (materials are not sampled on cut cells yet), and a thin feature needs a resolution well under its thickness before the numbers mean much. The first solve on a structure pays a compile of its quadrature.</p>
+<p>The tet methods need the <code>tetgen</code> package. On the same bar, <code>"tet10"</code> gives 947 nodes across 448 elements against the hex mesh’s 336 nodes and 180 elements. They also refine themselves: a surface TetGen refuses as self-intersecting is re-extracted on a finer grid over the same box before the build gives up, and the mesh records which rung it was built on — see <a href="../docs/meshing.html#the-refinement-ladder">the refinement ladder</a>.</p>
+<p>Whatever the method, what the rest of the app holds is a <em>discretization</em> (<code>cadjoint.fem.discretization</code>): it answers for its own surface, its own element quality, which nodes and facets a selection picks, how it moves when the design does, and which solver runs on it. Studies, the optimizer and the viewer’s payloads ask it those questions rather than asking which family it is — which is why a fourth method was a new class and a table row, not a branch in six modules.</p>
+<p>There is a second mesher, too. Tets sized by the part rather than by the lattice come from Gmsh: <code>SimMesh(mesher="gmsh")</code> in <a href="../docs/meshing.html#the-gmsh-route">the meshing guide</a>. Its midside nodes sit on the true surface, and whether they <em>follow</em> the design parameters depends on the <code>node_map</code> plugin kind — nothing fills it here, so the mesh reports frozen geometry, which <a href="../docs/getting-started.html#pluggable-kinds">kinds that can be filled</a> explains.</p>
 </section>
 <section id="judge-it" class="level2">
 <h2 class="anchored" data-anchor-id="judge-it">Judge it</h2>
-<p><code>quality()</code> returns per-element metric arrays; <code>inspect()</code> folds them into min/mean/max alongside the counts and bounds. Hex meshes report <code>scaled_jacobian</code> and <code>aspect_ratio</code>; tet meshes report <code>radius_ratio</code> (3·r_in/r_circ, in (0, 1], higher is better) and <code>aspect_ratio</code> (longest over shortest edge, ≥ 1).</p>
+<p><code>quality()</code> returns per-element metric arrays; <code>inspect()</code> folds them into min/mean/max alongside the counts and bounds. Hex meshes report <code>scaled_jacobian</code> and <code>aspect_ratio</code>; tet meshes report <code>radius_ratio</code> (3·r_in/r_circ, in (0, 1], higher is better) and <code>aspect_ratio</code> (longest over shortest edge, ≥ 1). Cut cells report nothing: there are no elements to grade, and the Meshes tab says so rather than colouring a flat surface.</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>q <span class="op">=</span> mesh.quality(bar)</span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="bu">sorted</span>(q))  <span class="co"># ['aspect_ratio', 'scaled_jacobian']</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>A voxelized hex mesh of an axis-aligned bar is perfect by construction — every metric is exactly 1.0. The tet10 mesh of the same bar spans radius ratios from 0.146 to 0.941. That spread is what the histogram in the viewer’s Meshes tab shows.</p>
+<p>A voxelized hex mesh of an axis-aligned bar is perfect by construction — every metric is exactly 1.0. The tet10 mesh of the same bar spans radius ratios from 0.146 to 0.941. That spread is what the histogram in the playground’s Meshes window shows.</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="../examples/assets/playground-mesh.png" class="img-fluid figure-img"></p>
+<p><img src="assets/screens/simulate-meshes.png" class="img-fluid figure-img"></p>
 <figcaption>The declared SimMesh discretized into tet10 elements, shaded by element quality with the quality histogram beside it</figcaption>
 </figure>
 </div>
@@ -386,7 +428,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <tbody>
 <tr class="odd">
 <td><code>Nodes.side("+x")</code></td>
-<td>One face of the bounding box, within a per-mesh tolerance</td>
+<td>One face of the bounding box, within a per-mesh tolerance (<code>"+x"</code>…<code>"-z"</code>, or a <code>Side</code> member)</td>
 </tr>
 <tr class="even">
 <td><code>Nodes.box(min_corner, max_corner)</code></td>
@@ -401,6 +443,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <td>Where <code>dot(x - point, normal) &gt;= 0</code></td>
 </tr>
 <tr class="odd">
+<td><code>Nodes.cylinder(center, axis, radius, inner=0, half_length=None)</code></td>
+<td>Within <code>radius</code> of the line through <code>center</code> along <code>axis</code>; <code>inner</code> hollows it into an annulus, <code>half_length</code> bounds it axially</td>
+</tr>
+<tr class="even">
 <td><code>Nodes.predicate(fn)</code></td>
 <td>A vectorized <code>(N, 3) -&gt; (N,)</code> boolean callable</td>
 </tr>
@@ -416,7 +462,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="declare-a-study" class="level2">
 <h2 class="anchored" data-anchor-id="declare-a-study">Declare a study</h2>
-<p><code>ThermalStudy</code> solves steady-state conduction; <code>ElasticStudy</code> solves linear elasticity. Both take a <code>SimMesh</code> and a list of boundary conditions. Material properties are keyword-only and have no defaults.</p>
+<p><code>ThermalStudy</code> solves steady-state conduction; <code>ElasticStudy</code> solves linear elasticity. Both take a <code>SimMesh</code> and a list of boundary conditions. Material properties are keyword-only; give them a number, or leave them out and let the scene’s own materials supply them per element (see <a href="#materials-drive-the-solve">Materials drive the solve</a>).</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.fem <span class="im">import</span> Dirichlet, Nodes, SimMesh, ThermalStudy</span>
 <span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.geometry.parameters <span class="im">import</span> Vector</span>
@@ -442,7 +488,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(np.<span class="bu">abs</span>(temperature <span class="op">-</span> (<span class="fl">1.0</span> <span class="op">-</span> x) <span class="op">/</span> <span class="fl">2.0</span>).<span class="bu">max</span>())  <span class="co"># 4.4e-10</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>The bar is the one case with a closed-form answer — a linear ramp between the two prescribed ends — and the solve reproduces it to 4.4e-10.</p>
 <p>The boundary conditions are <code>Dirichlet(nodes, value)</code> and <code>HeatFlux(nodes, flux)</code> for thermal, <code>Fixed(nodes)</code> and <code>Traction(nodes, vector)</code> for elastic. A thermal study needs at least one <code>Dirichlet</code> and an elastic study at least one <code>Fixed</code>, or the system is singular and <code>solve</code> says so. <code>HeatFlux</code> and <code>Traction</code> are integrated over boundary faces, so their selection has to span complete faces rather than isolated nodes.</p>
-<p>Units are not declared or enforced anywhere: <code>conductivity</code>, <code>youngs</code>, <code>poisson</code>, <code>source</code>, <code>flux</code>, and <code>vector</code> are plain floats in whatever consistent system you choose.</p>
+<p>Units are not declared or enforced on the <em>explicit scalar</em> path: <code>conductivity</code>, <code>youngs</code>, <code>poisson</code>, <code>source</code>, <code>flux</code>, and <code>vector</code> are plain floats in whatever consistent system you choose. Properties that come from a <code>Material</code> are a different matter — those are SI by definition (W/(m·K), Pa, kg/m³), so a scene that mixes the two has to be in SI throughout.</p>
 <p>An elastic study reads the same way:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.fem <span class="im">import</span> ElasticStudy, Fixed, Nodes, SimMesh, Traction</span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a></span>
@@ -456,16 +502,134 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p><code>mesh=</code> and the inline meshing keywords (<code>resolution</code>, <code>bounds</code>, <code>size</code>, <code>domain</code>) are mutually exclusive — meshing intent lives on the <code>SimMesh</code>.</p>
 </section>
+<section id="materials-drive-the-solve" class="level2">
+<h2 class="anchored" data-anchor-id="materials-drive-the-solve">Materials drive the solve</h2>
+<p>One scalar for a whole domain is a fiction as soon as a design has two materials in it. A copper slug pressed into an aluminium sink is not an “average” conductivity — the whole point of the slug is that it is <em>not</em>.</p>
+<p>Leave a property off the study (or pass the sentinel <code>"material"</code>) and it comes from the scene’s own materials instead, sampled <strong>per element</strong> at solve time:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> jax.numpy <span class="im">as</span> jnp</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.fem <span class="im">import</span> Dirichlet, HeatFlux, Nodes, SimMesh, ThermalStudy</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.materials <span class="im">import</span> aluminium_6061, copper_c11000</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf.boolean <span class="im">import</span> Union</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf.primitives <span class="im">import</span> Box</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf.transforms <span class="im">import</span> Translate</span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>sink <span class="op">=</span> Translate(Box([<span class="fl">0.5</span>, <span class="fl">0.15</span>, <span class="fl">0.15</span>], material<span class="op">=</span>aluminium_6061()),</span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>                 offset<span class="op">=</span>jnp.array([<span class="fl">0.5</span>, <span class="fl">0.0</span>, <span class="fl">0.0</span>]))</span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>slug <span class="op">=</span> Translate(Box([<span class="fl">0.5</span>, <span class="fl">0.15</span>, <span class="fl">0.15</span>], material<span class="op">=</span>copper_c11000()),</span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>                 offset<span class="op">=</span>jnp.array([<span class="op">-</span><span class="fl">0.5</span>, <span class="fl">0.0</span>, <span class="fl">0.0</span>]))</span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>scene <span class="op">=</span> Union((sink, slug), smoothness<span class="op">=</span><span class="fl">0.03</span>)</span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a>study <span class="op">=</span> ThermalStudy(                       <span class="co"># no conductivity= at all</span></span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a>    name<span class="op">=</span><span class="st">"two-metal-bar"</span>,</span>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a>    bcs<span class="op">=</span>[HeatFlux(Nodes.side(<span class="st">"-x"</span>), <span class="fl">4.0</span>), Dirichlet(Nodes.side(<span class="st">"+x"</span>), <span class="fl">0.0</span>)],</span>
+<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a>    mesh<span class="op">=</span>SimMesh(name<span class="op">=</span><span class="st">"bar-mesh"</span>, resolution<span class="op">=</span>(<span class="dv">22</span>, <span class="dv">5</span>, <span class="dv">5</span>),</span>
+<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a>                 bounds<span class="op">=</span>(<span class="op">-</span><span class="fl">1.1</span>, <span class="op">-</span><span class="fl">0.25</span>, <span class="op">-</span><span class="fl">0.25</span>), size<span class="op">=</span>(<span class="fl">2.2</span>, <span class="fl">0.5</span>, <span class="fl">0.5</span>)),</span>
+<span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> study.solve(scene)</span>
+<span id="cb7-21"><a href="#cb7-21" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(result.describe()[<span class="st">"range"</span>], result.mass)   <span class="co"># [0.0, 0.0335] 1062.4</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Every SDF answers <code>material_at(p)</code> and the smooth booleans blend the answers, so the scene is already a continuous <em>field</em> of properties. Sampling it at each element’s centroid turns that field into the per-element array the solver wants: copper’s 391 W/(m·K) in the left half, aluminium’s 167 in the right, and a transition exactly as wide as the CSG blend joining them. The 4 W/m² entering the copper end crosses the bar with a 0.034 K rise, and because both materials state a density the result reports the bar’s 1062 kg as well (the scene is in metres, so it is a two-metre bar).</p>
+<p>Nothing about the old API changed. <code>conductivity=2.0</code> still means 2.0 everywhere, on exactly the code path it always took — the per-element array only appears when a study asks for one, and the starter’s single-material thermal solve times identically before and after (0.185 s vs 0.175–0.181 s warm, peak temperature bit-identical).</p>
+<section id="what-each-study-can-derive" class="level3">
+<h3 class="anchored" data-anchor-id="what-each-study-can-derive">What each study can derive</h3>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Study</th>
+<th>Property</th>
+<th>Material key</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>ThermalStudy</code></td>
+<td><code>conductivity</code></td>
+<td><code>conductivity</code></td>
+</tr>
+<tr class="even">
+<td><code>ElasticStudy</code></td>
+<td><code>youngs</code></td>
+<td><code>youngs_modulus</code></td>
+</tr>
+<tr class="odd">
+<td><code>ElasticStudy</code></td>
+<td><code>poisson</code></td>
+<td><code>poisson_ratio</code></td>
+</tr>
+</tbody>
+</table>
+<p>Two more properties are read for <em>reporting</em> rather than solving, and are best-effort — a scene that never mentions them still solves, it just cannot report them:</p>
+<ul>
+<li><code>density</code> becomes <code>result.mass</code> (kg), the exact element-wise <code>sum(rho_e * V_e)</code>, traced whenever the solve was.</li>
+<li><code>yield_strength</code> becomes <code>result.safety_factor</code> on elastic results: the smallest <code>yield / von Mises</code> over the elements, i.e.&nbsp;how far the whole load case could be scaled before the first element yields.</li>
+</ul>
+</section>
+<section id="self-weight" class="level3">
+<h3 class="anchored" data-anchor-id="self-weight">Self-weight</h3>
+<p>An elastic study given a <code>gravity</code> vector adds <code>density * gravity</code> as a body force. The materials must state a density, or the study says so:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>ElasticStudy(</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>    name<span class="op">=</span><span class="st">"sag"</span>,</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>    gravity<span class="op">=</span>(<span class="fl">0.0</span>, <span class="fl">0.0</span>, <span class="op">-</span><span class="fl">9.81</span>),      <span class="co"># m/s^2, SI throughout</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>    bcs<span class="op">=</span>[Fixed(Nodes.side(<span class="st">"-x"</span>))],</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>    mesh<span class="op">=</span>mesh,</span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="it-stays-differentiable" class="level3">
+<h3 class="anchored" data-anchor-id="it-stays-differentiable">It stays differentiable</h3>
+<p>Per-element sampling would be a dead end if it broke the gradient, so it does not. The property field is differentiable in <em>both</em> directions a designer cares about:</p>
+<ul>
+<li><strong>Geometry</strong> — the blend at an interface moves when the design does, so <code>d(objective)/d(interface position)</code> flows through the material field.</li>
+<li><strong>Material</strong> — a property marked <code>free</code> is traced straight through <code>Material.as_dict()</code>, so an optimizer can tune a conductivity and a shape in one gradient.</li>
+</ul>
+<p>Both are checked against central finite differences in <code>tests/fem/test_material_properties.py</code> on a two-material bar with the interface position <em>and</em> a conductivity free. Measured agreement at that operating point: the conductivity sensitivity matches to 4e-6, and the interface sensitivity converges to the adjoint as the difference step shrinks — 10 % off at h = 4e-3, 4.3 % at 1e-3, 0.17 % at 2e-4 (the objective is sharply curved there, because the blend is 0.06 wide and the elements are 0.1).</p>
+</section>
+<section id="backend-support" class="level3">
+<h3 class="anchored" data-anchor-id="backend-support">Backend support</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Backend</th>
+<th>Per-element properties</th>
+<th>Body force</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>"jaxfem"</code></td>
+<td>Yes — carried as jax-fem <code>internal_vars</code>, differentiable</td>
+<td>Yes</td>
+</tr>
+<tr class="even">
+<td><code>"tesseract"</code></td>
+<td>Yes — optional <code>cell_conductivity</code> / <code>cell_youngs</code> / <code>cell_poisson</code> schema inputs, bit-identical to the direct path</td>
+<td>Yes (<code>body_force</code>)</td>
+</tr>
+<tr class="odd">
+<td><code>"calculix"</code></td>
+<td>Approximated — see below</td>
+<td>No (<code>NotImplementedError</code>)</td>
+</tr>
+</tbody>
+</table>
+<p>CalculiX names materials; it does not take per-element property arrays. A deck describes materials with <code>*MATERIAL</code> / <code>*ELSET</code> / <code>*SOLID SECTION</code>, so <strong>a blended interface cannot be represented exactly there</strong> — this is a limitation of the format, not of the sampling.</p>
+<p>What the deck writer does instead: elements whose properties agree to a tight relative tolerance are grouped, so every <em>sharp</em> region collapses to exactly one group and the deck is exact for a two-material part with a crisp interface. Past a cap (<code>max_material_groups</code>, default 32) — which only a genuinely blended field reaches — each element snaps to its nearest reference material in log-property space. References default to the field’s own dominant materials, or you can pass <code>cadjoint.materials.catalogue()</code> to snap to named ones. The approximation is never silent: the solution carries a <code>MaterialQuantization</code> record (elements moved, maximum relative property error, reference names) and a <code>CalculixQuantizationWarning</code> fires whenever any element moved.</p>
+</section>
+</section>
 <section id="read-the-result" class="level2">
 <h2 class="anchored" data-anchor-id="read-the-result">Read the result</h2>
 <p><code>solve</code> returns a <code>SimulationResult</code> and also stores it on <code>study.last_result</code>.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(result.describe())</span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="co"># {'name': 'bar-conduction', 'kind': 'thermal', 'field': 'temperature',</span></span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="co">#  'mesh': 'bar-mesh', 'nodes': 336, 'elements': 180, 'range': [0.0, 1.0], ...}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(result.describe())</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="co"># {'name': 'bar-conduction', 'kind': 'thermal', 'field': 'temperature',</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="co">#  'mesh': 'bar-mesh', 'nodes': 336, 'elements': 180, 'range': [0.0, 1.0], ...}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><code>mass</code> and <code>safety_factor</code> are on the result and in <code>describe()</code>, <code>None</code> whenever the scene’s materials do not make them computable.</p>
 <p><code>temperature</code> (thermal) and <code>displacement</code> / <code>von_mises()</code> (elastic) give the raw fields; <code>nodal_scalar()</code> gives the per-node field the viewer colours by. <code>mean()</code> and <code>max()</code> are the traced-safe reductions an objective should use — they work under <code>jax.grad</code>, where the concrete accessors do not. <code>to_vtk(path)</code> writes the result out for ParaView.</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="../examples/assets/playground-field.png" class="img-fluid figure-img"></p>
+<p><img src="assets/screens/simulate-results.png" class="img-fluid figure-img"></p>
 <figcaption>The solved temperature field on the same mesh, clipped by the slice plane so the flux entering at the die interface is visible</figcaption>
 </figure>
 </div>
@@ -509,16 +673,18 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </tr>
 </tbody>
 </table>
-<p><code>available_backends()</code> lists them and <code>register_backend(name, factory)</code> adds your own; the ABI is the <code>SolverBackend</code> protocol in <code>cadjoint.fem.backends</code>, two methods wide. The survey in <a href="../research/simulator-ecosystem.html">simulator ecosystem</a> ranks 31 further candidates for that slot.</p>
-<p>Two constraints worth knowing. CalculiX is <strong>elastic and HEX8 only</strong>, and its differentiability is objective-valued: cotangents on the raw displacement field are refused, because what ccx hands back is a strain energy. And tet meshes (<code>"tet4"</code> / <code>"tet10"</code>) solve on the direct jax-fem path only — use a hex <code>SimMesh</code> for the other backends.</p>
+<p>The three built-in names are <code>cadjoint.enums.FemBackend</code> (<code>FemBackend.JAXFEM</code> and so on), but unlike the other option sets that enum is open at both ends: <code>available_backends()</code> lists what is registered and <code>register_backend(name, factory)</code> adds your own under any name, so <code>backend=</code> keeps taking a plain string. The ABI is the <code>SolverBackend</code> protocol in <code>cadjoint.fem.backends</code>, two methods wide. The survey in <a href="../research/simulator-ecosystem.html">simulator ecosystem</a> ranks 31 further candidates for that slot.</p>
+<p><code>"tesseract"</code> and <code>"calculix"</code> do not name a package; they name a <em>kind</em>. <code>"tesseract"</code> asks the <a href="../docs/plugins.html">plugin registry</a> for whatever fills the <code>thermal_solver</code> or <code>elastic_solver</code> slot, and <code>"calculix"</code> for the <code>elastic_calculix</code> plugin — so a <code>plugins.toml</code> that points that kind at a container or a cluster URL moves the solve without a line of the study changing.</p>
+<p>Two constraints worth knowing. CalculiX is <strong>elastic and HEX8 only</strong>, and its differentiability is objective-valued: cotangents on the raw displacement field are refused, because what ccx hands back is a strain energy. And tet meshes (<code>"tet4"</code> / <code>"tet10"</code>) solve on the direct jax-fem path only — use a hex <code>SimMesh</code> for the other backends. Cut cells (<code>"cutfem"</code>) are their own solver and take no backend at all.</p>
 <p>Forward solves are not <code>jax.jit</code>-able, because PETSc assembly happens outside the trace. Each backend call enables x64 for its own duration, but code that differentiates <em>through</em> a solve has to set it process-wide itself:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> jax</span>
-<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>jax.config.update(<span class="st">"jax_enable_x64"</span>, <span class="va">True</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> jax</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>jax.config.update(<span class="st">"jax_enable_x64"</span>, <span class="va">True</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section>
 <section id="further-reading" class="level2">
 <h2 class="anchored" data-anchor-id="further-reading">Further reading</h2>
 <ul>
 <li><a href="../research/fem-integration.html">FEM integration</a> — the <code>SolverBackend</code> ABI, adjoint mechanics, and the ccx 2.23 sensitivity correction.</li>
+<li><a href="../docs/materials.html">Materials</a> — the property field a study samples, and the catalogue of real values.</li>
 <li><a href="../docs/meshing.html">Meshing</a> — the surface extractor underneath the tet methods.</li>
 <li><a href="../docs/optimization.html">Optimization</a> — making a study the objective of a descent.</li>
 </ul>

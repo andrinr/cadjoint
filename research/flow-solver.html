@@ -1,0 +1,1730 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.10.18">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>flow-solver – cadjoint</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-89af0c2d685ccb09a4d7d65decb66752.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+</head>
+
+<body class="nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">cadjoint</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../docs/getting-started.html"> 
+<span class="menu-text">Get Started</span></a>
+  </li>  
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-guides" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Guides</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-guides">    
+        <li>
+    <a class="dropdown-item" href="../docs/meshing.html">
+ <span class="dropdown-text">Differentiable Meshing</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../docs/simulation.html">
+ <span class="dropdown-text">Simulation</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../docs/flow.html">
+ <span class="dropdown-text">Flow Solver (prototype)</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../docs/optimization.html">
+ <span class="dropdown-text">Optimization</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../docs/plugins.html">
+ <span class="dropdown-text">Plugins</span></a>
+  </li>  
+        <li><hr class="dropdown-divider"></li>
+        <li>
+    <a class="dropdown-item" href="../docs/materials.html">
+ <span class="dropdown-text">Materials</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../docs/rendering.html">
+ <span class="dropdown-text">Forward Renderer</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="../docs/viewer.html"> 
+<span class="menu-text">Playground</span></a>
+  </li>  
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-examples" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Examples</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-examples">    
+        <li>
+    <a class="dropdown-item" href="../examples/basics.html">
+ <span class="dropdown-text">Basics</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/rendering.html">
+ <span class="dropdown-text">Rendering</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/sketch_construction.html">
+ <span class="dropdown-text">Sketch Construction</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/constraints.html">
+ <span class="dropdown-text">Constraints</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/optimization.html">
+ <span class="dropdown-text">Optimization</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../examples/constrained_optimization.html">
+ <span class="dropdown-text">Constrained Optimization</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-research" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Research</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-research">    
+        <li>
+    <a class="dropdown-item" href="../research/differentiable-meshing-pipeline.html">
+ <span class="dropdown-text">Differentiable meshing pipeline</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/performance.html">
+ <span class="dropdown-text">Where the seconds go (performance)</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/fem-integration.html">
+ <span class="dropdown-text">FEM integration</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/tet-vs-hex.html">
+ <span class="dropdown-text">Tet vs hex meshing</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/end-to-end-optimization.html">
+ <span class="dropdown-text">End-to-end optimization</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/path-tracing.html">
+ <span class="dropdown-text">WebGPU SDF path tracing</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/simulator-ecosystem.html">
+ <span class="dropdown-text">Simulator ecosystem survey</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/constraints.html">
+ <span class="dropdown-text">Constraint system</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/flow-solver.html">
+ <span class="dropdown-text">Differentiable flow solver</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/complex-scene.html">
+ <span class="dropdown-text">Modelling a gearbox end-cap</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/design-language.html">
+ <span class="dropdown-text">The design language</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="../reference/index.html"> 
+<span class="menu-text">API Reference</span></a>
+  </li>  
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/andrinr/cadjoint"> <i class="bi bi-github" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#a-differentiable-flow-solver-and-what-it-would-take-to-cool-a-real-heat-sink" id="toc-a-differentiable-flow-solver-and-what-it-would-take-to-cool-a-real-heat-sink" class="nav-link active" data-scroll-target="#a-differentiable-flow-solver-and-what-it-would-take-to-cool-a-real-heat-sink">A differentiable flow solver, and what it would take to cool a real heat sink</a>
+  <ul class="collapse">
+  <li><a href="#the-one-paragraph-answer" id="toc-the-one-paragraph-answer" class="nav-link" data-scroll-target="#the-one-paragraph-answer">0. The one-paragraph answer</a></li>
+  <li><a href="#xlb-evaluated-and-not-used" id="toc-xlb-evaluated-and-not-used" class="nav-link" data-scroll-target="#xlb-evaluated-and-not-used">1. XLB: evaluated, and not used</a>
+  <ul class="collapse">
+  <li><a href="#it-installs-but-not-against-its-own-declared-dependency-ranges" id="toc-it-installs-but-not-against-its-own-declared-dependency-ranges" class="nav-link" data-scroll-target="#it-installs-but-not-against-its-own-declared-dependency-ranges">1.1 It installs, but not against its own declared dependency ranges</a></li>
+  <li><a href="#it-is-fast-and-it-is-genuinely-differentiable" id="toc-it-is-fast-and-it-is-genuinely-differentiable" class="nav-link" data-scroll-target="#it-is-fast-and-it-is-genuinely-differentiable">1.2 It is fast, and it is genuinely differentiable</a></li>
+  <li><a href="#why-it-still-is-not-the-right-vehicle-here" id="toc-why-it-still-is-not-the-right-vehicle-here" class="nav-link" data-scroll-target="#why-it-still-is-not-the-right-vehicle-here">1.3 Why it still is not the right vehicle here</a></li>
+  </ul></li>
+  <li><a href="#what-was-built" id="toc-what-was-built" class="nav-link" data-scroll-target="#what-was-built">2. What was built</a></li>
+  <li><a href="#the-finding-that-mattered-most-chi-must-have-compact-support" id="toc-the-finding-that-mattered-most-chi-must-have-compact-support" class="nav-link" data-scroll-target="#the-finding-that-mattered-most-chi-must-have-compact-support">3. The finding that mattered most: <code>chi</code> must have compact support</a>
+  <ul class="collapse">
+  <li><a href="#which-compact-profile-the-clamps-smoothness-sets-the-fd-order" id="toc-which-compact-profile-the-clamps-smoothness-sets-the-fd-order" class="nav-link" data-scroll-target="#which-compact-profile-the-clamps-smoothness-sets-the-fd-order">3.1 Which compact profile: the clamp’s smoothness sets the FD order</a></li>
+  </ul></li>
+  <li><a href="#the-penalised-steady-problem" id="toc-the-penalised-steady-problem" class="nav-link" data-scroll-target="#the-penalised-steady-problem">4. The penalised steady problem</a>
+  <ul class="collapse">
+  <li><a href="#setup" id="toc-setup" class="nav-link" data-scroll-target="#setup">4.1 Setup</a></li>
+  <li><a href="#results" id="toc-results" class="nav-link" data-scroll-target="#results">4.2 Results</a></li>
+  <li><a href="#a-stability-ceiling-on-omega-now-enforced-up-front" id="toc-a-stability-ceiling-on-omega-now-enforced-up-front" class="nav-link" data-scroll-target="#a-stability-ceiling-on-omega-now-enforced-up-front">4.3 A stability ceiling on <code>omega</code>, now enforced up front</a></li>
+  </ul></li>
+  <li><a href="#the-adjoint-implicit-verified-and-much-cheaper" id="toc-the-adjoint-implicit-verified-and-much-cheaper" class="nav-link" data-scroll-target="#the-adjoint-implicit-verified-and-much-cheaper">5. The adjoint: implicit, verified, and much cheaper</a>
+  <ul class="collapse">
+  <li><a href="#against-finite-differences-on-real-design-parameters" id="toc-against-finite-differences-on-real-design-parameters" class="nav-link" data-scroll-target="#against-finite-differences-on-real-design-parameters">5.1 Against finite differences, on real design parameters</a></li>
+  <li><a href="#against-an-unrolled-tape-with-memory" id="toc-against-an-unrolled-tape-with-memory" class="nav-link" data-scroll-target="#against-an-unrolled-tape-with-memory">5.2 Against an unrolled tape, with memory</a></li>
+  </ul></li>
+  <li><a href="#packaging" id="toc-packaging" class="nav-link" data-scroll-target="#packaging">6. Packaging</a></li>
+  <li><a href="#what-this-costs-on-a-gpu" id="toc-what-this-costs-on-a-gpu" class="nav-link" data-scroll-target="#what-this-costs-on-a-gpu">7. What this costs on a GPU</a>
+  <ul class="collapse">
+  <li><a href="#measured-scaling-on-cpu" id="toc-measured-scaling-on-cpu" class="nav-link" data-scroll-target="#measured-scaling-on-cpu">7.1 Measured scaling on CPU</a></li>
+  <li><a href="#projection" id="toc-projection" class="nav-link" data-scroll-target="#projection">7.2 Projection</a></li>
+  </ul></li>
+  <li><a href="#coupling-this-to-the-thermal-study-built-and-measured" id="toc-coupling-this-to-the-thermal-study-built-and-measured" class="nav-link" data-scroll-target="#coupling-this-to-the-thermal-study-built-and-measured">8. Coupling this to the thermal study — built, and measured</a>
+  <ul class="collapse">
+  <li><a href="#there-is-no-interface-condition-and-that-is-the-point" id="toc-there-is-no-interface-condition-and-that-is-the-point" class="nav-link" data-scroll-target="#there-is-no-interface-condition-and-that-is-the-point">8.1 There is no interface condition, and that is the point</a></li>
+  <li><a href="#the-coupling-is-one-way-and-in-this-model-that-is-exact" id="toc-the-coupling-is-one-way-and-in-this-model-that-is-exact" class="nav-link" data-scroll-target="#the-coupling-is-one-way-and-in-this-model-that-is-exact">8.2 The coupling is one-way, and in this model that is exact</a></li>
+  <li><a href="#the-convective-flux-is-rho-u-and-that-decides-whether-energy-is-conserved" id="toc-the-convective-flux-is-rho-u-and-that-decides-whether-energy-is-conserved" class="nav-link" data-scroll-target="#the-convective-flux-is-rho-u-and-that-decides-whether-energy-is-conserved">8.3 The convective flux is <code>rho u</code>, and that decides whether energy is conserved</a></li>
+  <li><a href="#verification-against-answers-the-solver-cannot-produce" id="toc-verification-against-answers-the-solver-cannot-produce" class="nav-link" data-scroll-target="#verification-against-answers-the-solver-cannot-produce">8.4 Verification against answers the solver cannot produce</a></li>
+  <li><a href="#the-gradient-survives-the-coupling" id="toc-the-gradient-survives-the-coupling" class="nav-link" data-scroll-target="#the-gradient-survives-the-coupling">8.5 The gradient survives the coupling</a></li>
+  <li><a href="#what-the-study-declares" id="toc-what-the-study-declares" class="nav-link" data-scroll-target="#what-the-study-declares">8.6 What the study declares</a></li>
+  <li><a href="#what-it-took-to-make-the-viewer-accept-it" id="toc-what-it-took-to-make-the-viewer-accept-it" class="nav-link" data-scroll-target="#what-it-took-to-make-the-viewer-accept-it">8.6.1 What it took to make the viewer accept it</a></li>
+  <li><a href="#two-faults-the-energy-balance-caught-that-nothing-else-did" id="toc-two-faults-the-energy-balance-caught-that-nothing-else-did" class="nav-link" data-scroll-target="#two-faults-the-energy-balance-caught-that-nothing-else-did">8.7 Two faults the energy balance caught that nothing else did</a></li>
+  <li><a href="#the-objective-and-why-both-terms-are-needed" id="toc-the-objective-and-why-both-terms-are-needed" class="nav-link" data-scroll-target="#the-objective-and-why-both-terms-are-needed">8.8 The objective, and why both terms are needed</a></li>
+  <li><a href="#what-is-still-not-true" id="toc-what-is-still-not-true" class="nav-link" data-scroll-target="#what-is-still-not-true">8.9 What is still not true</a></li>
+  </ul></li>
+  <li><a href="#what-fought-back" id="toc-what-fought-back" class="nav-link" data-scroll-target="#what-fought-back">9. What fought back</a></li>
+  <li><a href="#where-the-code-is" id="toc-where-the-code-is" class="nav-link" data-scroll-target="#where-the-code-is">10. Where the code is</a></li>
+  </ul></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"></header>
+
+
+
+
+<section id="a-differentiable-flow-solver-and-what-it-would-take-to-cool-a-real-heat-sink" class="level1">
+<h1>A differentiable flow solver, and what it would take to cool a real heat sink</h1>
+<p>Status: working solver, coupled to a conjugate heat-transfer study and measured (momentum 2026-09-02, coupling 2026-09-03). Code in <code>cadjoint/flow/</code>, packaged as <code>cadjoint/fem/tesseracts/flow_brinkman/</code> and registered as the <code>flow_solver</code> kind. Tests: <code>tests/flow/</code> (158 passing) plus <code>tests/fem/test_flow_conjugate.py</code>.</p>
+<p><strong>Read §8 first if you want the coupling</strong>: what it solves, what it was checked against (a closed form, a two-layer series resistance, an analytic advection–diffusion column, a textbook Nusselt number, and finite differences through both adjoints), and <strong>§8.9, what is still not true</strong> — the Reynolds range, the absent turbulence model, the resolution a trustworthy answer needs against the resolution the tests use, and how far the Brinkman smearing moves the result.</p>
+<p><strong>Machine</strong>: Apple M5 Max, 48 GB, macOS 25.4, CPython 3.14.5, jax 0.8.2 (CPU backend), float64 throughout. A <code>jnp</code> add over 64 M elements sustains <strong>208 GB/s</strong> on this box; that is the roofline every throughput number below is measured against.</p>
+<p><strong>Scene</strong>: <code>scenes/starter.py</code> — the parametric finned heat sink, its copper slug and two bushings, executed inside the capture registries and sampled through <code>functionalize(sink)</code>.</p>
+<hr>
+<section id="the-one-paragraph-answer" class="level2">
+<h2 class="anchored" data-anchor-id="the-one-paragraph-answer">0. The one-paragraph answer</h2>
+<p>A steady flow solve <strong>can</strong> join cadjoint’s gradient path on the same terms the thermal solve already does, and it can do so with no mesh anywhere in the loop. The design enters as a smooth solid fraction <code>chi(x)</code> sampled from the scene SDF on a fixed lattice, drives a Brinkman drag in a D3Q19 BGK lattice Boltzmann step, and the gradient comes from the implicit function theorem at the converged fixed point rather than from a tape. Against the starter sink this reproduces finite differences on real design parameters to <strong>3e-8</strong> and agrees with a converged unrolled tape to <strong>5.6e-11</strong>, while using <strong>457 MB</strong> where the tape needs <strong>21 GB</strong>. The two things that had to be got right were not the adjoint — they were the <em>shape of <code>chi</code></em> (§3) and the <em>stability ceiling on <code>omega</code></em> (§4.3), both of which fail silently and expensively if guessed.</p>
+<hr>
+</section>
+<section id="xlb-evaluated-and-not-used" class="level2">
+<h2 class="anchored" data-anchor-id="xlb-evaluated-and-not-used">1. XLB: evaluated, and not used</h2>
+<p>The plan’s first choice was <a href="https://github.com/Autodesk/XLB">XLB</a>, Autodesk’s JAX/Warp lattice Boltzmann library. It was installed and driven to a verdict rather than dismissed on inspection.</p>
+<section id="it-installs-but-not-against-its-own-declared-dependency-ranges" class="level3">
+<h3 class="anchored" data-anchor-id="it-installs-but-not-against-its-own-declared-dependency-ranges">1.1 It installs, but not against its own declared dependency ranges</h3>
+<p><code>pip install xlb</code> resolves <strong>xlb 0.3.1</strong> (pure-Python wheel, <code>requires-python &gt;=3.11</code>) and pulls jax 0.11.1, jaxlib 0.11.1, numpy 2.5.2, warp-lang 1.17.0, pyvista 0.48.4, vtk 9.6.2, trimesh 5.1.0, matplotlib 3.11.1, scipy 1.18.1 and ruff 0.16.5. Two of those break it immediately:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>break</th>
+<th>cause</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>import xlb</code> raises <code>ImportError: cannot import name 'ScopedTimer' from 'warp.utils'</code></td>
+<td><code>xlb/operator/stepper/ibm_stepper.py</code> imports a symbol removed from warp-lang after 1.10; xlb declares only <code>warp-lang&gt;=1.10.0</code>. Pinning <code>warp-lang==1.10.0</code> fixes it.</td>
+</tr>
+<tr class="even">
+<td><code>check_bc_overlaps</code> raises <code>ValueError: operands could not be broadcast together with shapes (0,) (5120,)</code></td>
+<td><code>xlb/helper/check_boundary_overlaps.py:17</code> does <code>index_list[d] += bc.indices[d]</code>. Under NumPy ≥ 2 a <code>list += ndarray</code> goes through NumPy’s broadcast path instead of <code>list.extend</code>. Passing boundary indices as Python lists avoids it.</td>
+</tr>
+</tbody>
+</table>
+<p>Both were worked around in an <strong>isolated venv</strong>, deliberately: xlb’s <code>ruff&gt;=0.14.1</code> and <code>jax&gt;=0.8.0</code> would have moved this repo’s pinned ruff and upgraded jax 0.8.2 → 0.11.1 in the shared checkout.</p>
+</section>
+<section id="it-is-fast-and-it-is-genuinely-differentiable" class="level3">
+<h3 class="anchored" data-anchor-id="it-is-fast-and-it-is-genuinely-differentiable">1.2 It is fast, and it is genuinely differentiable</h3>
+<p>32³ lid-driven cavity, JAX backend, <code>PrecisionPolicy.FP32FP32</code>, CPU: <strong>200 steps in 0.13 s = 52.2 MLUPS</strong>.</p>
+<p>Differentiability was verified rather than assumed (all against central differences on the same problem, fp64, 16³):</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 20%">
+<col style="width: 26%">
+<col style="width: 26%">
+<col style="width: 26%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>quantity</th>
+<th style="text-align: right;">autodiff</th>
+<th style="text-align: right;">finite difference</th>
+<th style="text-align: right;">rel. err</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>directional derivative w.r.t. populations</td>
+<td style="text-align: right;">−2.24052992e+02</td>
+<td style="text-align: right;">−2.24052992e+02</td>
+<td style="text-align: right;">1.7e-10</td>
+</tr>
+<tr class="even">
+<td><code>d/d(omega)</code> of one step</td>
+<td style="text-align: right;">+3.91587320e-03</td>
+<td style="text-align: right;">+3.91594313e-03</td>
+<td style="text-align: right;">1.8e-05</td>
+</tr>
+<tr class="odd">
+<td><code>d/d(omega)</code> through a 20-step <code>lax.scan</code></td>
+<td style="text-align: right;">+1.86813474e-02</td>
+<td style="text-align: right;">+1.86814191e-02</td>
+<td style="text-align: right;">3.8e-06</td>
+</tr>
+</tbody>
+</table>
+<p>(An early NaN reading was my own error: XLB’s stepper returns <code>(f_0, f_1)</code> and the <strong>second</strong> element is the new state. Reading the first differentiates the identity.)</p>
+</section>
+<section id="why-it-still-is-not-the-right-vehicle-here" class="level3">
+<h3 class="anchored" data-anchor-id="why-it-still-is-not-the-right-vehicle-here">1.3 Why it still is not the right vehicle here</h3>
+<p><strong>XLB has no per-cell force field.</strong> Brinkman penalisation needs a drag <code>alpha(x)·u</code> that varies cell by cell — that <em>is</em> the design. XLB’s <code>ForcedCollision</code> accepts a single <code>force_vector</code> of shape <code>(d,)</code> and asserts <code>force_vector.shape[0] == velocity_set.d</code>; <code>ExactDifference</code> closes over that one constant. Supporting a field means editing XLB’s collision operators in both the JAX and Warp backends, at which point the library is being forked, not used.</p>
+<p>Secondarily, XLB offers only the taped gradient. There is no fixed-point or adjoint-at-convergence path, and §5 is the measurement of why that matters.</p>
+<p><strong>Verdict: fall back to a minimal D3Q19 BGK in pure JAX</strong> (<code>cadjoint/flow/</code>), which is what the plan specified. XLB remains the right thing to revisit if a per-cell forcing term ever lands upstream — its throughput is 3–4× ours (§7) and its Warp backend is a GPU story we do not otherwise have.</p>
+<hr>
+</section>
+</section>
+<section id="what-was-built" class="level2">
+<h2 class="anchored" data-anchor-id="what-was-built">2. What was built</h2>
+<pre><code>cadjoint/flow/
+  lattice.py    D3Q19 velocities, weights, bounce-back permutation (NumPy constants)
+  domain.py     SDF -&gt; chi on a fixed grid: FlowGrid, solid_fraction, profiles
+  lbm.py        one differentiable step: collide + Brinkman drag, bounce-back, stream, BCs
+  steady.py     pseudo-time march, and the IFT adjoint behind jax.custom_vjp
+  objectives.py pressure drop and the convective proxy
+  solver.py     FlowConfig / solve / convergence, and the step-closure cache</code></pre>
+<p>The chain, end to end, is one JAX expression:</p>
+<pre><code>sketch point -&gt; SDF -&gt; chi = profile(-f(x)/eps) -&gt; alpha = alpha_max*chi
+             -&gt; LBM fixed point -&gt; pressure drop / heat proxy</code></pre>
+<p>Nothing in it contours, meshes, or decides membership. The grid never moves; the field on it does. That is the property a body-fitted mesh cannot offer, and it is why <code>d(pressure drop)/d(fin tip)</code> exists at all.</p>
+<hr>
+</section>
+<section id="the-finding-that-mattered-most-chi-must-have-compact-support" class="level2">
+<h2 class="anchored" data-anchor-id="the-finding-that-mattered-most-chi-must-have-compact-support">3. The finding that mattered most: <code>chi</code> must have compact support</h2>
+<p>The obvious profile is <code>sigmoid(-f(x)/eps)</code> — it is exactly what <code>scenes/starter.py</code> already uses for its <code>material_volume</code> regulariser, and reusing it looked like consistency. It is wrong here, and wrong in a way that looks like a solver bug.</p>
+<p>A sigmoid never reaches zero. In the cells the geometry calls <em>clearly</em> open (<code>f &gt; 2 eps</code>) it still leaves <code>chi</code> up to <strong>0.118</strong>. <code>alpha_max</code> multiplies that tail along with everything else, so at <code>alpha_max = 100</code> the middle of an open fin channel carries a drag of <strong>11.8</strong> against a kinematic viscosity of <strong>0.0064</strong>. Raising <code>alpha_max</code> to make the solid impermeable makes the fluid porous at the same rate.</p>
+<p>Measured on the starter sink at 32×64×32, pressure drop vs <code>alpha_max</code>:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th style="text-align: right;"><code>alpha_max</code></th>
+<th style="text-align: right;">sigmoid</th>
+<th style="text-align: right;">compact profile</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">2.12e-2</td>
+<td style="text-align: right;">5.63e-3</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">5</td>
+<td style="text-align: right;">5.02e-2</td>
+<td style="text-align: right;">6.24e-3</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">20</td>
+<td style="text-align: right;">1.22e-1</td>
+<td style="text-align: right;">6.49e-3</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">100</td>
+<td style="text-align: right;"><strong>diverged</strong></td>
+<td style="text-align: right;">6.64e-3</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">400</td>
+<td style="text-align: right;"><strong>diverged</strong></td>
+<td style="text-align: right;">6.72e-3</td>
+</tr>
+</tbody>
+</table>
+<p>The sigmoid column grows without bound and then the duct plugs, density climbs monotonically and the march NaNs. The compact column <em>converges</em> — 1.1% over the last factor of four. Leakage (mean <code>|u|</code> where <code>chi &gt; 0.8</code>, as a fraction of inlet speed) falls like <code>1/alpha</code>: 2.2e-2 → 6.1e-3 → 1.9e-3 → 5.0e-4 → 2.0e-4 → 4.3e-5 (α=2000) → 2.7e-6 (α=5e4).</p>
+<p>Clamping to exact 0 and 1 costs nothing real: the derivative outside the band <em>is</em> zero, because moving a surface already more than <code>epsilon</code> away does not change that cell’s occupancy. Every cell the design can influence sits inside the band.</p>
+<section id="which-compact-profile-the-clamps-smoothness-sets-the-fd-order" class="level3">
+<h3 class="anchored" data-anchor-id="which-compact-profile-the-clamps-smoothness-sets-the-fd-order">3.1 Which compact profile: the clamp’s smoothness sets the FD order</h3>
+<p>Clamping puts a join at each band edge. How smooth that join is does not affect whether the adjoint is <em>correct</em> — it affects whether it can be <em>checked</em>. Measured on a box obstacle whose faces land exactly on cell centres (the worst case; many cells sit precisely on a join), relative error between a central difference and the adjoint:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: right;"><code>h</code></th>
+<th style="text-align: right;"><code>smootherstep</code> (quintic, C²)</th>
+<th style="text-align: right;"><code>smoothstep</code> (cubic, C¹)</th>
+<th style="text-align: right;"><code>sigmoid</code> (C^∞)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: right;">1e-2</td>
+<td style="text-align: right;">2.57e-3</td>
+<td style="text-align: right;">1.64e-1</td>
+<td style="text-align: right;">2.57e-6</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">1e-3</td>
+<td style="text-align: right;">2.59e-5</td>
+<td style="text-align: right;">1.93e-2</td>
+<td style="text-align: right;">2.43e-8</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">1e-4</td>
+<td style="text-align: right;">2.60e-7</td>
+<td style="text-align: right;">1.97e-3</td>
+<td style="text-align: right;">1.11e-9</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">1e-5</td>
+<td style="text-align: right;">2.90e-9</td>
+<td style="text-align: right;">1.97e-4</td>
+<td style="text-align: right;">1.29e-9</td>
+</tr>
+</tbody>
+</table>
+<p>The cubic falls by ten per ten — first order, the signature of a jump in the second derivative. The quintic falls by a hundred per ten, the second order a central difference should have. <code>"smootherstep"</code> is therefore the default: one extra multiply, and the gradient becomes checkable. All three remain available (<code>cadjoint.flow.PROFILES</code>); <code>"sigmoid"</code> is kept for reproducing the regulariser’s field, where it is the right choice because a volume integral never multiplies it by 200.</p>
+<hr>
+</section>
+</section>
+<section id="the-penalised-steady-problem" class="level2">
+<h2 class="anchored" data-anchor-id="the-penalised-steady-problem">4. The penalised steady problem</h2>
+<section id="setup" class="level3">
+<h3 class="anchored" data-anchor-id="setup">4.1 Setup</h3>
+<p>Duct along <code>+Y</code>, inlet at <code>y = 0</code>, outlet at <code>y = NY−1</code>, halfway bounce-back on the four lateral walls. Grid 32×64×32 = 65,536 cells over <code>origin = (−1.05, −1.2, −0.30)</code>, <code>size = (2.1, 2.4, 1.35)</code> world units, which leaves clear inlet and outlet runs with the sink blocking ~30% of the mid-duct cross-section. <code>epsilon</code> = half a cell = 0.0235.</p>
+<p><code>inlet_speed</code> 0.02 lattice units, <code>Re</code> 100 against 32 cells → <code>nu</code> 0.0064, <code>omega</code> 1.9260, Ma 0.035. <code>alpha_max</code> 200.</p>
+</section>
+<section id="results" class="level3">
+<h3 class="anchored" data-anchor-id="results">4.2 Results</h3>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>quantity</th>
+<th style="text-align: right;">value</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>cells</td>
+<td style="text-align: right;">65,536</td>
+</tr>
+<tr class="even">
+<td>throughput</td>
+<td style="text-align: right;">13.7 MLUPS (6000 steps in 28.7 s)</td>
+</tr>
+<tr class="odd">
+<td>steps to residual 1e-6 / 1e-7</td>
+<td style="text-align: right;">2,800 / 4,200</td>
+</tr>
+<tr class="even">
+<td>pressure drop</td>
+<td style="text-align: right;">6.610e-3</td>
+</tr>
+<tr class="odd">
+<td>empty-duct pressure drop</td>
+<td style="text-align: right;">5.279e-4 (the sink costs <strong>12.5×</strong>)</td>
+</tr>
+<tr class="even">
+<td>max |u|</td>
+<td style="text-align: right;">0.0845 (Ma 0.146)</td>
+</tr>
+<tr class="odd">
+<td>density range</td>
+<td style="text-align: right;">0.9983 – 1.0249 (<strong>2.7%</strong>)</td>
+</tr>
+<tr class="even">
+<td>leak, mean |u| in <code>chi&gt;0.8</code> / inlet</td>
+<td style="text-align: right;">2.8e-4</td>
+</tr>
+</tbody>
+</table>
+<p>Residual history is monotone and geometric. The 2.7% density variation is the number that says the answer may be <em>read</em> as incompressible; the first working point tried (inlet 0.05, <code>alpha_max</code> 1, sigmoid) reached <strong>39%</strong>, which is not a flow solution at all.</p>
+</section>
+<section id="a-stability-ceiling-on-omega-now-enforced-up-front" class="level3">
+<h3 class="anchored" data-anchor-id="a-stability-ceiling-on-omega-now-enforced-up-front">4.3 A stability ceiling on <code>omega</code>, now enforced up front</h3>
+<p>Coarsening the grid at fixed <code>Re</code> and fixed inlet speed <em>lowers</em> the viscosity (<code>nu = u·L_cells/Re</code>), pushing <code>omega</code> toward 2 where BGK loses stability — and the Brinkman drag brings it on sooner than the textbook limit. Measured on the starter sink at <code>alpha_max = 200</code>:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>grid</th>
+<th style="text-align: right;"><code>omega</code></th>
+<th>outcome</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>24×48×24</td>
+<td style="text-align: right;">1.9440</td>
+<td>converges</td>
+</tr>
+<tr class="even">
+<td>20×40×20</td>
+<td style="text-align: right;">1.9531</td>
+<td><strong>NaN</strong></td>
+</tr>
+<tr class="odd">
+<td>16×32×16</td>
+<td style="text-align: right;">1.9623</td>
+<td><strong>NaN</strong></td>
+</tr>
+</tbody>
+</table>
+<p><code>FlowConfig.__post_init__</code> now refuses <code>omega &gt; 1.95</code> with a message naming the three ways out. A NaN an hour into a march is a much worse error message than a <code>ValueError</code> at construction.</p>
+<hr>
+</section>
+</section>
+<section id="the-adjoint-implicit-verified-and-much-cheaper" class="level2">
+<h2 class="anchored" data-anchor-id="the-adjoint-implicit-verified-and-much-cheaper">5. The adjoint: implicit, verified, and much cheaper</h2>
+<p><code>R(f; theta) = T(f; theta) − f = 0</code> at convergence. With <code>A = dT/df</code>, the reverse-mode rule solves <code>(I − A)ᵀ λ = g</code> matrix-free — <code>jax.vjp</code> of a <em>single</em> step at the converged state supplies both <code>Aᵀ</code> and the parameter pullback — and then <code>dJ/dtheta = λᵀ ∂T/∂theta</code>. Two solvers are offered because they fail differently: <code>"gmres"</code> is fastest when it converges; <code>"fixed_point"</code> is Richardson on the same system, so it converges exactly when the forward march does. Disagreement between them means the forward had not converged.</p>
+<section id="against-finite-differences-on-real-design-parameters" class="level3">
+<h3 class="anchored" data-anchor-id="against-finite-differences-on-real-design-parameters">5.1 Against finite differences, on real design parameters</h3>
+<p>Starter sink, 16×32×16, <code>Re</code> 30, <code>alpha_max</code> 200, <code>smootherstep</code>, adjoint via GMRES. Parameters are the scene’s own free <code>Scalar</code> / <code>Vector2</code> sketch handles; <code>h = 1e-5</code>, central.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 22%">
+<col style="width: 22%">
+<col style="width: 22%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>parameter</th>
+<th>objective</th>
+<th style="text-align: right;">adjoint</th>
+<th style="text-align: right;">finite difference</th>
+<th style="text-align: right;">rel. err</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>fin_depth</code></td>
+<td>pressure drop</td>
+<td style="text-align: right;">+1.6352066e-01</td>
+<td style="text-align: right;">+1.6352067e-01</td>
+<td style="text-align: right;"><strong>3.2e-08</strong></td>
+</tr>
+<tr class="even">
+<td><code>fin_depth</code></td>
+<td>heat proxy</td>
+<td style="text-align: right;">+2.5522866e-04</td>
+<td style="text-align: right;">+2.5522857e-04</td>
+<td style="text-align: right;">3.5e-07</td>
+</tr>
+<tr class="odd">
+<td><code>fin1_tip_r.x</code></td>
+<td>pressure drop</td>
+<td style="text-align: right;">+4.9243823e-05</td>
+<td style="text-align: right;">+4.9243665e-05</td>
+<td style="text-align: right;">3.2e-06</td>
+</tr>
+<tr class="even">
+<td><code>fin1_tip_r.x</code></td>
+<td>heat proxy</td>
+<td style="text-align: right;">+4.7585354e-07</td>
+<td style="text-align: right;">+4.7585354e-07</td>
+<td style="text-align: right;">5.8e-09</td>
+</tr>
+<tr class="odd">
+<td><code>fin1_tip_r.y</code></td>
+<td>pressure drop</td>
+<td style="text-align: right;">+1.1359323e-04</td>
+<td style="text-align: right;">+1.1359316e-04</td>
+<td style="text-align: right;">6.0e-07</td>
+</tr>
+<tr class="even">
+<td><code>fin1_tip_r.y</code></td>
+<td>heat proxy</td>
+<td style="text-align: right;">+5.6017353e-07</td>
+<td style="text-align: right;">+5.6017352e-07</td>
+<td style="text-align: right;">2.7e-08</td>
+</tr>
+<tr class="odd">
+<td><code>fin2_tip_l.x</code></td>
+<td>pressure drop</td>
+<td style="text-align: right;">−1.5604409e-02</td>
+<td style="text-align: right;">−1.5622686e-02</td>
+<td style="text-align: right;">1.2e-03</td>
+</tr>
+<tr class="even">
+<td><code>fin2_tip_l.x</code></td>
+<td>heat proxy</td>
+<td style="text-align: right;">−1.6280292e-05</td>
+<td style="text-align: right;">−1.6299516e-05</td>
+<td style="text-align: right;">1.2e-03</td>
+</tr>
+</tbody>
+</table>
+<p>At <code>h = 1e-4</code> the same rows read 5.2e-6, 3.1e-5, 5.3e-8, 2.0e-6, 6.6e-6, 3.9e-6, 1.1e-1, 1.1e-1 — so shrinking <code>h</code> by ten improves five of the eight by between 87× and 349×, i.e.&nbsp;the second order a central difference should have. The discrepancy is the difference scheme’s truncation, not the adjoint. Two rows behave otherwise, both for understood reasons:</p>
+<ul>
+<li><code>fin1_tip_r.y</code> / pressure drop improves only 11×, because at 6.0e-7 it is approaching the same floor.</li>
+<li><code>fin1_tip_r.x</code> / pressure drop <em>worsens</em>, 5.3e-8 → 3.2e-6. It was already at the round-off floor at <code>h = 1e-4</code>; halving the step further just amplifies cancellation in the difference of two nearly equal solves. This is the usual finite-difference U-curve, and it is evidence the adjoint is right rather than evidence it is wrong — the agreement at the <em>bottom</em> of the curve is 5.3e-8.</li>
+</ul>
+<p><code>fin2_tip_l.x</code> is the slowest to converge (that fin face lands nearest a band edge) but tracks second order cleanly, 90× per decade.</p>
+</section>
+<section id="against-an-unrolled-tape-with-memory" class="level3">
+<h3 class="anchored" data-anchor-id="against-an-unrolled-tape-with-memory">5.2 Against an unrolled tape, with memory</h3>
+<p>12×24×12 = 3,456 cells, <code>alpha_max</code> 1 (chosen so the march converges inside a tape that fits), box obstacle, objective <code>pressure_drop + 50·heat_proxy</code>.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 15%">
+<col style="width: 21%">
+<col style="width: 21%">
+<col style="width: 21%">
+<col style="width: 21%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>gradient</th>
+<th style="text-align: right;">value</th>
+<th style="text-align: right;">rel. diff vs IFT</th>
+<th style="text-align: right;">peak RSS</th>
+<th style="text-align: right;">tape at 19·cells·8 B/step</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>IFT</strong></td>
+<td style="text-align: right;">+9.7368441121e+00</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;"><strong>+457 MB</strong></td>
+<td style="text-align: right;">—</td>
+</tr>
+<tr class="even">
+<td>unrolled 500</td>
+<td style="text-align: right;">+9.6497293665e+00</td>
+<td style="text-align: right;">8.95e-03</td>
+<td style="text-align: right;">+1,486 MB</td>
+<td style="text-align: right;">263 MB</td>
+</tr>
+<tr class="odd">
+<td>unrolled 1000</td>
+<td style="text-align: right;">+9.7385522073e+00</td>
+<td style="text-align: right;">1.75e-04</td>
+<td style="text-align: right;">+2,917 MB</td>
+<td style="text-align: right;">525 MB</td>
+</tr>
+<tr class="even">
+<td>unrolled 2000</td>
+<td style="text-align: right;">+9.7368443369e+00</td>
+<td style="text-align: right;">2.31e-08</td>
+<td style="text-align: right;">+5,232 MB</td>
+<td style="text-align: right;">1,051 MB</td>
+</tr>
+<tr class="odd">
+<td>unrolled 4000</td>
+<td style="text-align: right;">+9.7368441116e+00</td>
+<td style="text-align: right;"><strong>5.58e-11</strong></td>
+<td style="text-align: right;"><strong>+10,849 MB</strong></td>
+<td style="text-align: right;">2,101 MB</td>
+</tr>
+</tbody>
+</table>
+<p>The tape converges <em>to</em> the implicit answer as the march it tapes converges — which is the cleanest possible statement that the two compute the same derivative. Its memory grows linearly; the adjoint’s does not. Note also that the IFT gradient is a property of the converged state alone: <code>f0</code> correctly receives a <strong>zero</strong> cotangent, where the tape’s gradient depends on the initial guess and on how many iterations were spent.</p>
+<p>The regime where this matters is exactly the useful one. At <code>alpha_max = 200</code> the march needs ~5,200 steps at 32×64×32, where a tape would want <strong>52 GB</strong>; §7 extrapolates that to 5 PB at 128³.</p>
+<hr>
+</section>
+</section>
+<section id="packaging" class="level2">
+<h2 class="anchored" data-anchor-id="packaging">6. Packaging</h2>
+<p><code>cadjoint/fem/tesseracts/flow_brinkman/</code> follows the existing packages’ layout. The wire contract is unusually small: the solver plugins beside it ship a <em>mesh</em>; this one ships one array.</p>
+<ul>
+<li><strong>Differentiable inputs</strong>: <code>chi</code> (<code>(NX,NY,NZ)</code>), <code>inlet_velocity</code> (<code>(3,)</code>).</li>
+<li><strong>Outputs</strong>: <code>pressure_drop</code>, <code>heat_transfer</code>, both <code>Differentiable</code> scalars.</li>
+<li><strong>Requirements</strong>: <code>python-pip</code> provider with a single local <code>../../../..</code>. <code>cadjoint.flow</code> is pure JAX over a fixed array — no PETSc, no gmsh, no meshing — so unlike <code>thermal_jaxfem</code> it needs no conda and <strong>no new <code>pyproject.toml</code> extra</strong>.</li>
+<li><strong>Registration</strong>: kind <code>flow_solver</code> added to <code>KINDS</code>, <code>flow_brinkman</code> to <code>BUILTIN_PACKAGES</code> and <code>BUILTIN_DEFAULTS</code>. That is the whole change to <code>cadjoint/plugins/</code>.</li>
+</ul>
+<p>Loaded through <code>Tesseract.from_tesseract_api</code> and driven via <code>plugin_for_kind("flow_solver")</code>, <code>apply</code> and <code>vector_jacobian_product</code> are <strong>bit-identical</strong> to the in-process solve and gradient (max abs difference 0.0e+00 on the <code>chi</code> gradient; <code>tests/flow/test_plugin.py</code> asserts it to <code>rel=1e-10</code>). Both sides run the same <code>custom_vjp</code>, so they cannot drift.</p>
+<hr>
+</section>
+<section id="what-this-costs-on-a-gpu" class="level2">
+<h2 class="anchored" data-anchor-id="what-this-costs-on-a-gpu">7. What this costs on a GPU</h2>
+<section id="measured-scaling-on-cpu" class="level3">
+<h3 class="anchored" data-anchor-id="measured-scaling-on-cpu">7.1 Measured scaling on CPU</h3>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>grid</th>
+<th style="text-align: right;">cells</th>
+<th style="text-align: right;">MLUPS</th>
+<th style="text-align: right;">useful GB/s</th>
+<th style="text-align: right;">one state</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>16×32×16</td>
+<td style="text-align: right;">8,192</td>
+<td style="text-align: right;">14.4</td>
+<td style="text-align: right;">4.4</td>
+<td style="text-align: right;">1.2 MB</td>
+</tr>
+<tr class="even">
+<td>24×48×24</td>
+<td style="text-align: right;">27,648</td>
+<td style="text-align: right;">15.7</td>
+<td style="text-align: right;">4.8</td>
+<td style="text-align: right;">4.2 MB</td>
+</tr>
+<tr class="odd">
+<td>32×64×32</td>
+<td style="text-align: right;">65,536</td>
+<td style="text-align: right;">15.7</td>
+<td style="text-align: right;">4.8</td>
+<td style="text-align: right;">10.0 MB</td>
+</tr>
+<tr class="even">
+<td>40×80×40</td>
+<td style="text-align: right;">128,000</td>
+<td style="text-align: right;">12.0</td>
+<td style="text-align: right;">3.7</td>
+<td style="text-align: right;">19.5 MB</td>
+</tr>
+<tr class="odd">
+<td>48×96×48</td>
+<td style="text-align: right;">221,184</td>
+<td style="text-align: right;">11.9</td>
+<td style="text-align: right;">3.6</td>
+<td style="text-align: right;">33.6 MB</td>
+</tr>
+</tbody>
+</table>
+<p>Iterations to a 1e-7 residual grow close to linearly in the linear grid size: 3,300 (N=16), 4,100 (N=24), 5,200 (N=32) — about <code>119·N + 1,400</code>.</p>
+<p><strong>The honest caveat</strong>: 4.8 GB/s of useful traffic against 208 GB/s achievable is <strong>2.3% of roofline</strong>. <code>stream()</code> is 19 separate <code>jnp.roll</code> calls plus a <code>stack</code>, so each step makes ~19 full passes over the populations where a fused pull-stream kernel makes one. The CPU numbers therefore understate what the <em>algorithm</em> costs and overstate what <em>this implementation</em> costs.</p>
+</section>
+<section id="projection" class="level3">
+<h3 class="anchored" data-anchor-id="projection">7.2 Projection</h3>
+<p>Minimum traffic per cell-update is 19 populations × 8 B × (read + write) = <strong>304 B</strong> (152 B in fp32). Extrapolating iterations as above:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>grid</th>
+<th style="text-align: right;">cells</th>
+<th style="text-align: right;">steps to 1e-7</th>
+<th style="text-align: right;">cell-updates</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>96³</td>
+<td style="text-align: right;">884,736</td>
+<td style="text-align: right;">~12,800</td>
+<td style="text-align: right;">1.13e10</td>
+</tr>
+<tr class="even">
+<td>128³</td>
+<td style="text-align: right;">2,097,152</td>
+<td style="text-align: right;">~16,600</td>
+<td style="text-align: right;">3.48e10</td>
+</tr>
+</tbody>
+</table>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 27%">
+<col style="width: 36%">
+<col style="width: 36%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>scenario</th>
+<th style="text-align: right;">96³</th>
+<th style="text-align: right;">128³</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>this CPU, as measured (12 MLUPS)</td>
+<td style="text-align: right;">~16 min</td>
+<td style="text-align: right;">~48 min</td>
+</tr>
+<tr class="even">
+<td>A100 (2.0 TB/s) at today’s 2.3% efficiency</td>
+<td style="text-align: right;">~75 s</td>
+<td style="text-align: right;">~230 s</td>
+</tr>
+<tr class="odd">
+<td>A100 with a fused stream at 70% of bandwidth</td>
+<td style="text-align: right;"><strong>~2.5 s</strong></td>
+<td style="text-align: right;"><strong>~7.6 s</strong></td>
+</tr>
+<tr class="even">
+<td>the same in fp32</td>
+<td style="text-align: right;">~1.2 s</td>
+<td style="text-align: right;">~3.8 s</td>
+</tr>
+</tbody>
+</table>
+<p>The middle row is the “port nothing, just move it” estimate and is the one to plan against first; the third is what the algorithm is actually worth and needs <code>stream()</code> rewritten as a single gather. Either way a forward solve at 128³ is seconds, not minutes, which puts it inside an optimization loop.</p>
+<p><strong>Adjoint memory is the constraint nobody expects.</strong> One state is 134 MB at 96³ and 319 MB at 128³ — but GMRES holds <code>restart</code> Krylov vectors:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>solver</th>
+<th style="text-align: right;">96³</th>
+<th style="text-align: right;">128³</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>"gmres"</code>, <code>adjoint_restart=40</code></td>
+<td style="text-align: right;">5.4 GB</td>
+<td style="text-align: right;"><strong>12.8 GB</strong></td>
+</tr>
+<tr class="even">
+<td><code>"fixed_point"</code> (3 states)</td>
+<td style="text-align: right;">0.4 GB</td>
+<td style="text-align: right;">1.0 GB</td>
+</tr>
+<tr class="odd">
+<td>an unrolled tape</td>
+<td style="text-align: right;">1.7 PB</td>
+<td style="text-align: right;"><strong>5.3 PB</strong></td>
+</tr>
+</tbody>
+</table>
+<p>So <code>"gmres"</code> at 128³ wants an 80 GB card, <code>"fixed_point"</code> runs on anything, and the tape is not a strategy at any budget. Lowering <code>adjoint_restart</code> trades adjoint iterations for memory and is the first knob to reach for on a small card.</p>
+<hr>
+</section>
+</section>
+<section id="coupling-this-to-the-thermal-study-built-and-measured" class="level2">
+<h2 class="anchored" data-anchor-id="coupling-this-to-the-thermal-study-built-and-measured">8. Coupling this to the thermal study — built, and measured</h2>
+<p>§8.1 and §8.2 of the earlier draft set out two options: a heat-transfer coefficient correlated from <code>|u|</code> into a Robin condition on the FEM study (cheap, needs an <code>h0</code> to calibrate), or conjugate heat transfer on the flow lattice (right, expected to be stiff and slow). <strong>What was built is neither, quite.</strong> It is conjugate heat transfer on the same lattice, but the energy equation is discretised by <em>finite volume and solved once by a Krylov method</em> rather than marched as a second distribution function:</p>
+<pre><code>div(k grad T)  =  (rho cp)_f  u . grad T  -  q</code></pre>
+<p>with <code>k</code> interpolated linearly by <code>chi</code> between the air’s and the solid’s. The reason for abandoning the second-lattice plan is the reason that plan was listed as expensive in the first place. The steady energy equation is <strong>linear in T</strong>, so pseudo-time marching it buys nothing and pays the full stiffness of a conductivity ratio of several thousand. One matrix-free GMRES solve gets the same answer in one shot, and its adjoint is <code>jax.lax.custom_linear_solve</code>’s transposed solve — exact, implicit, and composing with the momentum solve’s fixed-point adjoint without either solver knowing the other exists.</p>
+<p>Code: <code>cadjoint/flow/energy.py</code> (the solve), <code>cadjoint/flow/regions.py</code> (selections on a lattice), <code>cadjoint/flow/study.py</code> (<code>FlowStudy</code>).</p>
+<section id="there-is-no-interface-condition-and-that-is-the-point" class="level3">
+<h3 class="anchored" data-anchor-id="there-is-no-interface-condition-and-that-is-the-point">8.1 There is no interface condition, and that is the point</h3>
+<p>A two-domain formulation would have to find the metal–air interface, mesh it, and match temperature and flux across it — the three things this project exists not to do. A single-domain formulation with a variable coefficient satisfies both conditions <strong>by construction</strong>: one unknown field admits no temperature jump, and a conservative finite-volume flux is shared by the two cells either side of a face.</p>
+<p>The one place a choice is still made is how a <em>face</em> between an air cell and a metal cell conducts. It is the <strong>harmonic</strong> mean of the two cell conductivities, which is the exact series resistance of the two half-cells. Measured against the analytic two-layer answer on a 24-cell column:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th><code>k_solid / k_fluid</code></th>
+<th>max abs error vs.&nbsp;series resistance</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>10</td>
+<td>3.1e-13</td>
+</tr>
+<tr class="even">
+<td>200</td>
+<td>1.8e-14</td>
+</tr>
+<tr class="odd">
+<td>8000 (aluminium in air)</td>
+<td>1.4e-13</td>
+</tr>
+</tbody>
+</table>
+<p>An arithmetic mean would smear the step over a cell and report a flux wrong by a factor approaching the ratio. This is the discrete form of “continuity of heat flux at the interface”, and it holds to machine precision.</p>
+</section>
+<section id="the-coupling-is-one-way-and-in-this-model-that-is-exact" class="level3">
+<h3 class="anchored" data-anchor-id="the-coupling-is-one-way-and-in-this-model-that-is-exact">8.2 The coupling is one-way, and in this model that is exact</h3>
+<p>The momentum solve’s inputs are <code>chi</code>, the inlet velocity and a viscosity. Not one of them is a function of temperature. Nothing the energy solve computes can change the flow, so iterating between them to a fixed point would converge in one pass <em>by definition</em> — one-way is not a first landing here, it is the whole of the coupling this model contains.</p>
+<p>What makes conjugate heat transfer genuinely two-way elsewhere is physics this model does not carry: buoyancy, and temperature-dependent viscosity and conductivity. The condition for ignoring buoyancy is a small <strong>Richardson number</strong> <code>Ri = g beta dT L / U^2</code>, which <code>FlowStudy.richardson</code> computes from the study’s own numbers so it can be checked rather than assumed, and which <code>FlowStudyResult.warnings()</code> reports above 0.1. On <code>scenes/duct_sink.py</code> it is <strong>2.1e-4</strong> — buoyancy contributes under a thousandth of the momentum, and the one-way reading is not measurably wrong. It would stop being so at a crawling inlet speed or a large temperature rise, which is exactly when the warning fires.</p>
+<p>Temperature-dependent properties are simply absent. For air over 0–100 K of rise, conductivity moves about 25% and viscosity about 25%; nothing here models that, and nothing warns about it either.</p>
+</section>
+<section id="the-convective-flux-is-rho-u-and-that-decides-whether-energy-is-conserved" class="level3">
+<h3 class="anchored" data-anchor-id="the-convective-flux-is-rho-u-and-that-decides-whether-energy-is-conserved">8.3 The convective flux is <code>rho u</code>, and that decides whether energy is conserved</h3>
+<p>The energy equation transports <code>rho cp T</code>, so its flux is <code>rho cp u</code>. The <code>rho</code> looked like a refinement and is not: lattice Boltzmann conserves <em>mass</em> exactly in its streaming step, so <code>rho u</code> satisfies a discrete continuity equation that <code>u</code> alone does not. Global energy balance as a fraction of injected power, same solve, one multiply apart:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>lattice</th>
+<th>flux = <code>u</code></th>
+<th>flux = <code>rho u</code></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>8x14x8</td>
+<td>3.6e-2</td>
+<td>8.9e-16</td>
+</tr>
+<tr class="even">
+<td>10x18x10</td>
+<td>9.4e-3</td>
+<td>1.6e-6</td>
+</tr>
+</tbody>
+</table>
+<p>What is left with <code>u</code> alone is not round-off; it is the lattice’s compressibility error appearing as energy the duct creates or destroys.</p>
+<p>The balance itself also had to be stated correctly before it could check anything. Summing the discrete equations over every solved cell makes each interior face cancel <em>exactly</em> — the coefficient <code>P</code> gives <code>E</code> and the flux <code>P</code> sends <code>E</code> telescope whatever the mass flux is doing — so what remains is the inlet plane, the outlet plane and the source. Counting only “mass flux times inlet temperature” ignores both the conduction back out through the inlet and the fact that the incoming air is advected at the first cell’s temperature, and reports a couple of percent of spurious imbalance on a duct where the scheme is conserving to round-off. With both ends counted in full, the residual is <strong>2.6e-11 on <code>scenes/duct_sink.py</code></strong> (7.7e-12 on the 14x26x14 lattice it used before its cells were made cubic) and 1e-13 to 1e-15 on the test cases — for any geometry, since the identity does not depend on one.</p>
+<p>That makes the energy balance the sharpest available check on the whole assembly, and it has since caught two separate faults that nothing else did (§8.7).</p>
+</section>
+<section id="verification-against-answers-the-solver-cannot-produce" class="level3">
+<h3 class="anchored" data-anchor-id="verification-against-answers-the-solver-cannot-produce">8.4 Verification against answers the solver cannot produce</h3>
+<p><strong>Pure conduction, against a closed form and against <code>ThermalStudy</code>.</strong> With the inlet held still the momentum solve is skipped entirely (a zero inlet velocity with a pressure-anchored outlet has rest as its fixed point, so this is an equality, not an approximation) and the study solves <code>-k T'' = q</code>, <code>T(0) = 0</code>, <code>T'(L) = 0</code>, whose answer is <code>(q/k)(Ly - y^2/2)</code>. Max relative error of the lattice, against cells along the duct:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>cells</th>
+<th>max rel. error</th>
+<th>ratio</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>8</td>
+<td>3.92e-3</td>
+<td></td>
+</tr>
+<tr class="even">
+<td>16</td>
+<td>9.78e-4</td>
+<td>4.01</td>
+</tr>
+<tr class="odd">
+<td>32</td>
+<td>2.44e-4</td>
+<td>4.01</td>
+</tr>
+<tr class="even">
+<td>64</td>
+<td>6.10e-5</td>
+<td>4.00</td>
+</tr>
+</tbody>
+</table>
+<p>Exactly second order. The FEM <code>ThermalStudy</code> on the same problem is accurate to <strong>1e-14</strong> — trilinear elements reproduce a quadratic solution exactly — so the whole of the gap between the two solvers is the lattice’s truncation, and the honest form of “zero flow reproduces <code>ThermalStudy</code>” is: <strong>2.4e-4 of the peak at 32 cells, falling as h².</strong> Two discretisations of one problem never agree to solver tolerance; they agree to the coarser one’s error, and the useful claim is the rate. <code>tests/fem/test_flow_conjugate.py</code>.</p>
+<p><strong>Advection–diffusion, against the analytic column.</strong> Patankar’s exponential blend is nodally exact for one-dimensional constant-coefficient advection–diffusion at any cell Péclet number, and it is:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>scheme</th>
+<th>max abs error vs.&nbsp;<code>(e^{Pe s/L} - 1)/(e^{Pe} - 1)</code>, cell Pe = 2</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>exponential</td>
+<td>3.9e-16</td>
+</tr>
+<tr class="even">
+<td>upwind</td>
+<td>1.98e-1</td>
+</tr>
+</tbody>
+</table>
+<p>The upwind row is the false diffusion, not a bug: <code>A = 1</code> adds a numerical conductivity <code>|u| h / 2</code>, which at cell Péclet 2 is the air’s own conductivity again. It is offered because it is what most codes do, and measured because the difference is the argument for not using it.</p>
+<p><strong>Nusselt number, against a textbook correlation.</strong> The strongest external check, because it exercises the convective half against something with no connection to this code: fully developed laminar flow in a square duct with isothermal walls has <code>Nu = 2.976</code>. Imposing the analytic square-duct velocity profile (isolating the energy discretisation from the momentum one) and fitting the exponential decay of the bulk temperature:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>cells across the duct</th>
+<th>Nu</th>
+<th>error</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>6</td>
+<td>2.463</td>
+<td>−17.2%</td>
+</tr>
+<tr class="even">
+<td>10</td>
+<td>2.755</td>
+<td>−7.4%</td>
+</tr>
+<tr class="odd">
+<td>14</td>
+<td>2.857</td>
+<td>−4.0%</td>
+</tr>
+<tr class="even">
+<td>22</td>
+<td>2.927</td>
+<td>−1.65%</td>
+</tr>
+</tbody>
+</table>
+<p>Converging on the correlation at roughly second order. <strong>This is the number to quote when someone asks what resolution a trustworthy answer needs</strong>: about 22 cells across a channel for a Nusselt number good to a couple of percent, and <code>scenes/duct_sink.py</code> runs 10, where a heat-transfer coefficient is some 7% low.</p>
+</section>
+<section id="the-gradient-survives-the-coupling" class="level3">
+<h3 class="anchored" data-anchor-id="the-gradient-survives-the-coupling">8.5 The gradient survives the coupling</h3>
+<p><code>d(mean temperature)/d(geometry)</code> runs through the momentum fixed point’s adjoint <em>and</em> the energy solve’s transposed linear solve. Against a central difference on a box in a duct, 10x18x10:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>step <code>h</code></th>
+<th>relative error</th>
+<th>order</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1e-2</td>
+<td>6.54e-2</td>
+<td></td>
+</tr>
+<tr class="even">
+<td>1e-3</td>
+<td>6.39e-4</td>
+<td>2.01</td>
+</tr>
+<tr class="odd">
+<td>1e-4</td>
+<td>7.05e-6</td>
+<td>1.96</td>
+</tr>
+<tr class="even">
+<td>1e-5</td>
+<td>4.59e-8</td>
+<td>2.19</td>
+</tr>
+</tbody>
+</table>
+<p>The difference converges on the adjoint at second order down to <strong>4.6e-8</strong>, which is a central difference behaving exactly as it should on a smooth objective. That the <em>rate</em> is 2 matters as much as the magnitude: agreement at one step size can be agreement with a truncation error that happens to be small.</p>
+<p><strong>One direction behaves worse, and it is the finite difference’s fault.</strong> When the design perturbation puts the geometry’s surface exactly on a plane of cell centres, the same check converges at first order instead:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>step <code>h</code></th>
+<th>relative error</th>
+<th>order</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1e-2</td>
+<td>2.09e-1</td>
+<td></td>
+</tr>
+<tr class="even">
+<td>1e-3</td>
+<td>1.61e-2</td>
+<td>1.11</td>
+</tr>
+<tr class="odd">
+<td>1e-4</td>
+<td>1.57e-3</td>
+<td>1.01</td>
+</tr>
+<tr class="even">
+<td>1e-5</td>
+<td>1.56e-4</td>
+<td>1.00</td>
+</tr>
+</tbody>
+</table>
+<p>It is still converging <em>to the adjoint</em> — a clean factor of ten per decade, heading to zero — so the adjoint is the correct value and the objective simply has a C1 kink at that configuration, from the compact profile’s clamp joins crossing the perturbation path. The practical consequence is for whoever validates a new configuration: check a finite difference at two step sizes and look at the rate, because a single ratio at a single <code>h</code> cannot tell a wrong adjoint from a kinked difference. §3.1’s smoothstep/smootherstep measurement is the same effect seen from the other side.</p>
+</section>
+<section id="what-the-study-declares" class="level3">
+<h3 class="anchored" data-anchor-id="what-the-study-declares">8.6 What the study declares</h3>
+<p><code>FlowStudy</code> is declared in a scene the way <code>ThermalStudy</code> is, registers itself with <code>capture_studies</code>, and has <code>describe()</code>, boundary conditions and refusals of the same shape:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>cooling <span class="op">=</span> FlowStudy(</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>    name<span class="op">=</span><span class="st">"duct-cooling"</span>,</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>    resolution<span class="op">=</span>(<span class="dv">20</span>, <span class="dv">26</span>, <span class="dv">12</span>),</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>    bounds<span class="op">=</span>(<span class="op">-</span><span class="fl">0.70</span>, <span class="op">-</span><span class="fl">0.91</span>, <span class="op">-</span><span class="fl">0.50</span>), size<span class="op">=</span>(<span class="fl">1.40</span>, <span class="fl">1.82</span>, <span class="fl">0.84</span>),</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>    reynolds<span class="op">=</span><span class="fl">25.0</span>, conductivity_ratio<span class="op">=</span><span class="fl">200.0</span>,</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>    bcs<span class="op">=</span>[Inlet(velocity<span class="op">=</span><span class="fl">0.02</span>, temperature<span class="op">=</span><span class="fl">0.0</span>), Outlet(), Walls(),</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>         HeatSource(Nodes.box([<span class="op">-</span><span class="fl">0.14</span>, <span class="op">-</span><span class="fl">0.18</span>, <span class="op">-</span><span class="fl">0.42</span>], [<span class="fl">0.14</span>, <span class="fl">0.18</span>, <span class="op">-</span><span class="fl">0.18</span>]), power<span class="op">=</span><span class="fl">1.0</span>)],</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><code>Inlet</code> drives the flow and sets the temperature everything is measured against (<code>velocity=0.0</code> is legal and means the pure-conduction case). <code>Outlet</code> takes no arguments, deliberately: a duct that exhausts to the room is fully specified by the fact that it does. <code>Walls</code> is no-slip always and adiabatic unless given a temperature. <code>HeatSource</code> and <code>HeldTemperature</code> are the volumetric counterparts of <code>HeatFlux</code> and <code>Dirichlet</code>.</p>
+<p>Selections reuse the mesh language (<code>Nodes.box</code>, <code>Nodes.sphere</code>, <code>Nodes.halfspace</code>, <code>Nodes.cylinder</code>, composed with <code>&amp; | ~</code>) read through its <code>describe()</code> payload, so the two readings cannot drift. One semantic difference is deliberate: on a lattice a selection is <strong>volumetric</strong>, every cell whose centre satisfies the criterion, because the two things a flow study selects with one — a heated region inside the solid, a block of cells held at a temperature — are volumes. <code>Nodes.side</code> and <code>Nodes.predicate</code> are refused with the alternative named: a lattice filled by an SDF has no boundary surface whose extreme plane <code>side</code> could mean, and a predicate’s callable never reaches the serialized description.</p>
+</section>
+<section id="what-it-took-to-make-the-viewer-accept-it" class="level3">
+<h3 class="anchored" data-anchor-id="what-it-took-to-make-the-viewer-accept-it">8.6.1 What it took to make the viewer accept it</h3>
+<p>Declaring the study in a scene broke the viewer twice, in ways worth writing down because both were about <em>scope</em> rather than about physics.</p>
+<p><strong>A scene must not set jax flags.</strong> The first version enabled <code>jax_enable_x64</code> at the scene’s module scope, because the solve needs float64 and the design parameters are built at import. <code>jax_enable_x64</code> is a <strong>process</strong> setting, the viewer’s compile worker imports the scene, and every array afterwards was float64 — including the ones the WGSL backend has to emit, and WebGPU has no <code>f64</code>. Merely <em>declaring</em> a flow study stopped the scene from opening. The flip now lives in <code>cadjoint/flow/precision.py::double_precision</code>, entered by <code>FlowStudy.solve</code> and restored on the way out, following <code>cadjoint/fem/backends.py</code>. The boundary is the same one that file documents and is worth repeating: <strong>a scope covers a forward solve and cannot cover a gradient</strong>, because <code>jax.grad</code> runs its transposed pass after the scope has closed and then cannot materialise the float64 intermediates. So forward solves scope themselves — which is all the viewer ever does — and callers who differentiate enable x64 for their process, as <code>tests/flow/conftest.py</code> and <code>scenes/duct_sink.py</code>’s <code>main</code> do.</p>
+<p><strong>A boundary condition is not always a node selection.</strong> The compile worker serialised every BC as <code>bc.nodes.serializable</code>, which <code>ThermalStudy</code> and <code>ElasticStudy</code> conditions satisfy and <code>Inlet</code>, <code>Outlet</code> and <code>Walls</code> do not — they are planes of a duct, and carry a velocity or a wall temperature. The fix is the seam rather than an attribute: <code>serializable</code> is a statement <em>about</em> <code>describe()</code>, and <code>describe()</code> is the only shape every condition shares, so the condition answers for itself. Changed:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>file</th>
+<th>change</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>cadjoint/viewer/worker/declarations.py</code></td>
+<td><code>bc.nodes.serializable</code> → <code>bc.serializable</code> (one line + docstring)</td>
+</tr>
+<tr class="even">
+<td><code>cadjoint/viewer/worker/payloads.py</code></td>
+<td>the same substitution on the solved-study path</td>
+</tr>
+<tr class="odd">
+<td><code>cadjoint/viewer/schema/payloads.py</code></td>
+<td><code>StudyBc.nodes</code> optional; <code>velocity</code>/<code>temperature</code>/<code>power</code> added; <code>StudyPayload.kind</code> gains <code>"flow"</code></td>
+</tr>
+<tr class="even">
+<td><code>cadjoint/viewer/schema/payloads.d.ts</code></td>
+<td>regenerated (<code>python -m cadjoint.viewer.schema.emit</code>)</td>
+</tr>
+<tr class="odd">
+<td><code>cadjoint/fem/study.py</code></td>
+<td><code>serializable</code> property on <code>Dirichlet</code>/<code>HeatFlux</code>/<code>Fixed</code>/<code>Traction</code>; <code>register_study</code> made public</td>
+</tr>
+</tbody>
+</table>
+<p><code>StudyPayload.kind</code> is deliberately <em>wider</em> than <code>cadjoint.enums.StudyKind</code>, which still holds two members. The enum is the vocabulary the viewer can <strong>create and edit</strong> — it drives four tables in <code>viewer/patch/studies.py</code> that say how to write a study’s constructor — and none of that exists for a flow study. What a scene declares is a wider vocabulary than what the viewer can author, so the study serialises and displays while reporting <code>editable: false</code>, which is true.</p>
+<p><strong>Closed on 2026-09-06.</strong> What was outstanding: <code>frontend/src/types.ts</code> and <code>frontend/src/studies.ts</code> typed a study’s kind as <code>"thermal" | "elastic"</code>, so the Studies window had no rendering for a flow study’s conditions, and <code>STUDY_CALL_KINDS</code> did not know <code>FlowStudy</code>, which is what made the declaration non-editable.</p>
+<p>The sharp edge predicted here was real and is worth recording as a hit: <code>_study_entries</code> aligns statements to studies by count, so a scene declaring <em>both</em> a mesh study and a flow study found neither aligned and marked the <strong>mesh</strong> study non-editable too. No shipped scene did that — <code>scenes/duct_sink.py</code> declares only the flow study — so nothing caught it until the alignment was fixed.</p>
+<p>Both are done. The source map knows <code>FlowStudy</code>; <code>StudyKind</code> and <code>BoundaryConditionType</code> carry the flow members; the patch layer writes a <code>FlowStudy</code> with its inlet already in place (it refuses to construct without one) and imports its classes from <code>cadjoint.flow</code>; and the request validator makes <code>selection</code> conditional, because an inlet, an outlet and the duct walls are faces of the lattice and place no region. <code>enums</code>’ <code>STUDY_KIND_BOUNDARY_CONDITIONS</code> and <code>UNPLACED_BOUNDARY_CONDITIONS</code> state those two facts once for the writer, the validator and the panel. <code>tests/viewer/test_flow_declaration.py</code> and <code>frontend/e2e/flowStudy.spec.ts</code> hold it, the latter against the real server.</p>
+</section>
+<section id="two-faults-the-energy-balance-caught-that-nothing-else-did" class="level3">
+<h3 class="anchored" data-anchor-id="two-faults-the-energy-balance-caught-that-nothing-else-did">8.7 Two faults the energy balance caught that nothing else did</h3>
+<p>Both returned a plausible number under a success flag, which is the failure mode worth naming.</p>
+<p><strong>Restarted GMRES stagnating on the conductivity ratio.</strong> <code>restart = 30</code> on a 14x26x14 duct converges to 2.9e-12 at <code>conductivity_ratio = 50</code> and stalls at a relative residual of <strong>0.23</strong> at 200 — reporting a peak temperature of <strong>0.014 where the answer is 0.602</strong>, a factor of 42, with no error raised. The subspace size has to grow with the conductivity ratio; the default is now 60, which converges at both, and <code>warnings()</code> reports a non-round-off energy balance as a stagnated linear solve rather than as physics.</p>
+<p><strong>bicgstab returning NaN, silently.</strong> The predecessor formulation used <code>jax.scipy.sparse.linalg.bicgstab</code>, which carries no breakdown guard. On a pure <em>advection</em> column — an inlet temperature at one end, a held temperature at the other, no source — the <code>rho</code> recurrence collapses and it returns <code>NaN</code> at every tolerance from 1e-8 to 1e-12, with the same convergence flag it returns on success. GMRES reaches 4.2e-16 of a dense reference on the same system, and is no slower on the problems where bicgstab does converge.</p>
+<p>A third fault of the same shape sits one layer out and is now guarded rather than fixed: when the <em>momentum</em> march diverges it hands the energy solve a velocity full of <code>NaN</code>, and GMRES answers a <code>NaN</code> operator with its zero initial guess under a success flag — so the study reported a heat sink sitting at exactly ambient. <code>solve_temperature</code> now poisons the result deliberately: a <code>NaN</code> objective stops an optimizer, a plausible zero steers it.</p>
+</section>
+<section id="the-objective-and-why-both-terms-are-needed" class="level3">
+<h3 class="anchored" data-anchor-id="the-objective-and-why-both-terms-are-needed">8.8 The objective, and why both terms are needed</h3>
+<pre><code>minimize   T_junction(theta)  +  w . pressure_drop(theta)</code></pre>
+<p><code>pressure_drop</code> is not decoration. A sink that maximises contact with moving air by filling the duct with metal strangles the fan driving it; without the pressure term the optimizer walks into a solid block. On <code>scenes/duct_sink.py</code> the sink costs <strong>11.7x</strong> the empty duct’s drop (1.041e-2 against 8.88e-4) while holding the die 0.430 above inlet air, and <code>d(peak)/d(fin thickness)</code> is −1.74 against <code>d(pressure drop)/d(fin thickness)</code> of +0.025 — the two terms genuinely pull opposite ways, which is what makes a fin pitch fall out of the optimisation instead of a block.</p>
+<p>The old <code>heat_transfer</code> proxy (<code>int chi|u|</code>) remains for callers that want a scalar without an energy solve, but it is no longer the recommended objective: a temperature is now available and a proxy for one is not needed.</p>
+</section>
+<section id="what-is-still-not-true" class="level3">
+<h3 class="anchored" data-anchor-id="what-is-still-not-true">8.9 What is still not true</h3>
+<p>Stated plainly, because every one of these would change an answer someone might act on.</p>
+<ul>
+<li><strong>Turbulence is not modelled at all.</strong> The solver is laminar BGK. A duct transitions around <code>Re ≈ 2300</code> and real forced-convection heat sinks run well above it, where mixing raises the heat-transfer coefficient several fold. Above 2300 this code reports the laminar answer, which <em>overstates</em> the temperature; <code>warnings()</code> says so, and that is the extent of the treatment.</li>
+<li><strong>The validated Reynolds range is roughly 5 to a few hundred.</strong> The upper end is set by BGK stability rather than by physics, and the ceiling is a function of the lattice size, not only of <code>omega</code>: a 10x18x10 duct converges at <code>omega = 1.9417</code> while an 8x14x8 duct diverges at <code>omega = 1.8248</code>. The <code>OMEGA_CEILING = 1.95</code> guard is therefore necessary and <em>not</em> sufficient, and a coarse duct needs real margin. A diverged march is now visible rather than silent, but it is still the caller’s job to avoid.</li>
+<li><strong>Resolution.</strong> A Nusselt number good to a couple of percent needs about 22 cells across a channel (§8.4). <code>scenes/duct_sink.py</code> uses 10 and the test suite uses 6 to 14. Nothing in the suite is at a resolution whose <em>absolute</em> numbers should be quoted; what the suite checks is rates, identities and gradients, all of which are resolution-independent claims.</li>
+<li><strong>Brinkman interface smearing.</strong> The solid fraction transitions over about two cells by construction (<code>FlowGrid.suggested_epsilon</code>), and the penalised wall sits a penetration depth <code>sqrt(nu/alpha)</code> inside the true one. At <code>alpha_max = 200</code> the velocity leak into the solid is under 3e-4 of the inlet speed, but the pressure drop is still converging: it moves ~3% between <code>alpha_max = 200</code> and 50x that (§4.2), and only as <code>1/sqrt(alpha)</code>. So a pressure drop from this solver carries a few percent of penalisation bias on top of its discretisation error, and a <em>thermal</em> interface smeared over two cells puts the same order of uncertainty on the heat-transfer coefficient. This has not been separately quantified against a body-fitted reference, which is the obvious next measurement.</li>
+<li><strong>Compressibility.</strong> Lattice Boltzmann is a low-Mach method and the inlet runs at Ma 0.035, so the compressibility error is under a tenth of a percent — provided the duct is not heavily blocked. It is not a fixed budget: the scene’s first draft blocked 87% of every cross-section, which drove the density down 18% and <em>inverted the pressure drop</em>. Blockage is the thing to watch, and it is not obvious from the source.</li>
+<li><strong>Constant fluid properties</strong>, per §8.2, and no radiation.</li>
+</ul>
+<hr>
+</section>
+</section>
+<section id="what-fought-back" class="level2">
+<h2 class="anchored" data-anchor-id="what-fought-back">9. What fought back</h2>
+<ul>
+<li><strong>The sigmoid.</strong> §3. It presented as a solver instability (<code>NaN</code> at <code>alpha_max ≥ 100</code>) and was actually a modelling error — the drag was being applied to the fluid. Chasing it as a stability bug would have wasted the whole exercise. The tell was density climbing <em>monotonically</em> rather than oscillating: the duct was plugging, not going unstable.</li>
+<li><strong>A tracer leak through an <code>lru_cache</code>.</strong> <code>step_for</code> caches its step closure on the config (it must — <code>steady_populations</code> takes it as a <code>nondiff_argnum</code> and JAX hashes those by identity). The wall masks were built with <code>jnp</code>, so the <em>first</em> call inside a <code>jit</code> cached tracers and every later call leaked them. Fixed by building the masks in NumPy, which is also simply correct: they are fixed geometry that nothing differentiates. <code>tests/flow/test_solver.py</code> and <code>test_lbm.py</code> both guard it.</li>
+<li><strong>Coarse grids at fixed <code>Re</code>.</strong> §4.3. Silently NaN, now a <code>ValueError</code>.</li>
+<li><strong>XLB’s return convention.</strong> <code>stepper(...)</code> returns <code>(f_0, f_1)</code> with the new state <em>second</em>; reading the first differentiates the identity and produces a confident, wrong verdict. Caught by finite differences.</li>
+<li><strong>The clamp’s smoothness.</strong> §3.1. A gradient that was exactly right looked wrong at 1e-3 against a central difference, purely because the cubic profile degrades FD to first order.</li>
+</ul>
+<hr>
+</section>
+<section id="where-the-code-is" class="level2">
+<h2 class="anchored" data-anchor-id="where-the-code-is">10. Where the code is</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>file</th>
+<th>what</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>cadjoint/flow/</code></td>
+<td>the solver (6 modules, ~1,400 lines)</td>
+</tr>
+<tr class="even">
+<td><code>cadjoint/fem/tesseracts/flow_brinkman/</code></td>
+<td>the Tesseract package</td>
+</tr>
+<tr class="odd">
+<td><code>cadjoint/plugins/registry.py</code></td>
+<td><code>flow_solver</code> kind + built-in spec</td>
+</tr>
+<tr class="even">
+<td><code>cadjoint/flow/energy.py</code></td>
+<td>the conjugate energy solve (finite volume + GMRES)</td>
+</tr>
+<tr class="odd">
+<td><code>cadjoint/flow/regions.py</code></td>
+<td>node selections resolved volumetrically on a lattice</td>
+</tr>
+<tr class="even">
+<td><code>cadjoint/flow/study.py</code></td>
+<td><code>FlowStudy</code> and its boundary conditions</td>
+</tr>
+<tr class="odd">
+<td><code>scenes/duct_sink.py</code></td>
+<td>the demonstration: a finned sink in a duct</td>
+</tr>
+<tr class="even">
+<td><code>tests/flow/</code></td>
+<td>158 tests: lattice, domain, lbm, steady, solver, plugin, energy, regions, study, scene</td>
+</tr>
+<tr class="odd">
+<td><code>tests/fem/test_flow_conjugate.py</code></td>
+<td>the still-inlet solve against <code>ThermalStudy</code></td>
+</tr>
+</tbody>
+</table>
+<p>Verification: <code>pytest tests/flow -q</code> (158 passed, 87 s), <code>pytest tests/fem/test_tesseract_packaging.py -q</code> (28 passed), <code>pytest tests/plugins -q</code> (54 passed, 1 skipped), ruff clean and formatted.</p>
+
+
+</section>
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/andrinr\.github\.io\/cadjoint\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

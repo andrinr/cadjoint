@@ -81,7 +81,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <link href="../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-f83c246346592b24d02aa84ae3974412.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-89af0c2d685ccb09a4d7d65decb66752.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -148,14 +148,22 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
  <span class="dropdown-text">Simulation</span></a>
   </li>  
         <li>
+    <a class="dropdown-item" href="../docs/flow.html">
+ <span class="dropdown-text">Flow Solver (prototype)</span></a>
+  </li>  
+        <li>
     <a class="dropdown-item" href="../docs/optimization.html">
  <span class="dropdown-text">Optimization</span></a>
   </li>  
         <li>
-    <a class="dropdown-item" href="../docs/tesseracts.html">
- <span class="dropdown-text">Tesseracts</span></a>
+    <a class="dropdown-item" href="../docs/plugins.html">
+ <span class="dropdown-text">Plugins</span></a>
   </li>  
         <li><hr class="dropdown-divider"></li>
+        <li>
+    <a class="dropdown-item" href="../docs/materials.html">
+ <span class="dropdown-text">Materials</span></a>
+  </li>  
         <li>
     <a class="dropdown-item" href="../docs/rendering.html">
  <span class="dropdown-text">Forward Renderer</span></a>
@@ -207,8 +215,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
  <span class="dropdown-text">Differentiable meshing pipeline</span></a>
   </li>  
         <li>
-    <a class="dropdown-item" href="../research/native-mesher.html">
- <span class="dropdown-text">Native (Rust) dual-contouring core</span></a>
+    <a class="dropdown-item" href="../research/performance.html">
+ <span class="dropdown-text">Where the seconds go (performance)</span></a>
   </li>  
         <li>
     <a class="dropdown-item" href="../research/fem-integration.html">
@@ -233,6 +241,18 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
         <li>
     <a class="dropdown-item" href="../research/constraints.html">
  <span class="dropdown-text">Constraint system</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/flow-solver.html">
+ <span class="dropdown-text">Differentiable flow solver</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/complex-scene.html">
+ <span class="dropdown-text">Modelling a gearbox end-cap</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../research/design-language.html">
+ <span class="dropdown-text">The design language</span></a>
   </li>  
     </ul>
   </li>
@@ -264,11 +284,27 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
    
   <ul>
   <li><a href="#start-it" id="toc-start-it" class="nav-link active" data-scroll-target="#start-it">Start it</a></li>
-  <li><a href="#three-modes" id="toc-three-modes" class="nav-link" data-scroll-target="#three-modes">Three modes</a></li>
-  <li><a href="#modelling" id="toc-modelling" class="nav-link" data-scroll-target="#modelling">Modelling</a></li>
-  <li><a href="#simulate" id="toc-simulate" class="nav-link" data-scroll-target="#simulate">Simulate</a></li>
+  <li><a href="#one-desk-many-windows" id="toc-one-desk-many-windows" class="nav-link" data-scroll-target="#one-desk-many-windows">One desk, many windows</a></li>
+  <li><a href="#modelling" id="toc-modelling" class="nav-link" data-scroll-target="#modelling">Modelling</a>
+  <ul class="collapse">
+  <li><a href="#finding-your-way-around" id="toc-finding-your-way-around" class="nav-link" data-scroll-target="#finding-your-way-around">Finding your way around</a></li>
+  <li><a href="#sketching-on-a-face" id="toc-sketching-on-a-face" class="nav-link" data-scroll-target="#sketching-on-a-face">Sketching on a face</a></li>
+  </ul></li>
+  <li><a href="#simulating" id="toc-simulating" class="nav-link" data-scroll-target="#simulating">Simulating</a></li>
+  <li><a href="#materials" id="toc-materials" class="nav-link" data-scroll-target="#materials">Materials</a></li>
+  <li><a href="#looking-at-the-field" id="toc-looking-at-the-field" class="nav-link" data-scroll-target="#looking-at-the-field">Looking at the field</a></li>
   <li><a href="#rendering" id="toc-rendering" class="nav-link" data-scroll-target="#rendering">Rendering</a></li>
+  <li><a href="#export" id="toc-export" class="nav-link" data-scroll-target="#export">Export</a></li>
   <li><a href="#compilation-path" id="toc-compilation-path" class="nav-link" data-scroll-target="#compilation-path">Compilation path</a></li>
+  <li><a href="#code-parity" id="toc-code-parity" class="nav-link" data-scroll-target="#code-parity">Code parity</a>
+  <ul class="collapse">
+  <li><a href="#stable-identities" id="toc-stable-identities" class="nav-link" data-scroll-target="#stable-identities">Stable identities</a></li>
+  <li><a href="#a-schema-and-types-generated-from-it" id="toc-a-schema-and-types-generated-from-it" class="nav-link" data-scroll-target="#a-schema-and-types-generated-from-it">A schema, and types generated from it</a></li>
+  <li><a href="#the-round-trip-invariant" id="toc-the-round-trip-invariant" class="nav-link" data-scroll-target="#the-round-trip-invariant">The round-trip invariant</a></li>
+  </ul></li>
+  <li><a href="#editor-intelligence" id="toc-editor-intelligence" class="nav-link" data-scroll-target="#editor-intelligence">Editor intelligence</a></li>
+  <li><a href="#work-that-outlives-the-request" id="toc-work-that-outlives-the-request" class="nav-link" data-scroll-target="#work-that-outlives-the-request">Work that outlives the request</a></li>
+  <li><a href="#scenes" id="toc-scenes" class="nav-link" data-scroll-target="#scenes">Scenes</a></li>
   <li><a href="#a-live-example" id="toc-a-live-example" class="nav-link" data-scroll-target="#a-live-example">A live example</a></li>
   <li><a href="#jupyter-widget" id="toc-jupyter-widget" class="nav-link" data-scroll-target="#jupyter-widget">Jupyter widget</a></li>
   <li><a href="#developing-the-ui" id="toc-developing-the-ui" class="nav-link" data-scroll-target="#developing-the-ui">Developing the UI</a></li>
@@ -307,7 +343,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p>The single rule that makes it coherent: <strong>the Python source is the only state.</strong> Dragging a sketch vertex, adding a boundary condition, or accepting an optimized design all rewrite literals in the program. There is no hidden scene graph to drift out of sync, and anything whose literals cannot be rewritten — geometry built in a loop, or from a variable — still renders, but is read-only.</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><a href="../examples/assets/playground-model.png"><img src="../examples/assets/playground-model.png" class="img-fluid figure-img"></a></p>
+<p><a href="assets/screens/model-desk.png"><img src="assets/screens/model-desk.png" class="img-fluid figure-img"></a></p>
 <figcaption>The playground in Model mode: the scene program on the left, the parametric heat sink rendered live on the right, and the declared cool-sink optimization in the side dock</figcaption>
 </figure>
 </div>
@@ -334,9 +370,10 @@ Warning
 </div>
 </div>
 </section>
-<section id="three-modes" class="level2">
-<h2 class="anchored" data-anchor-id="three-modes">Three modes</h2>
-<p>The toolbar carries a segmented switcher, the way Blender scopes its tool set to a mode. <code>M</code> cycles it, <code>Esc</code> returns to Model. Each mode has its own accent colour, threaded through the tool rail, dock headers, and viewport border.</p>
+<section id="one-desk-many-windows" class="level2">
+<h2 class="anchored" data-anchor-id="one-desk-many-windows">One desk, many windows</h2>
+<p>Every panel is a <strong>window</strong>: the editor, the viewport, Objects, Materials, Sketch, Meshes, Studies, Results, Optimize, Scenes and Processes. A window can be moved, closed, minimised to a tray, tabbed with another, stacked, dragged to split the desk, floated over the page and docked back. The WebGPU canvas keeps its context through all of it — the viewport is repositioned, never re-parented — and the arrangement is persisted in the browser, with Window ▸ Reset layout to get the default back.</p>
+<p>The toolbar’s three-cell switcher — <code>M</code> cycles it, <code>Esc</code> returns to Model — picks a <strong>desk</strong>: a default arrangement of windows and the tool set the rail offers, the way Blender scopes its tools to a mode.</p>
 <table class="caption-top table">
 <colgroup>
 <col style="width: 33%">
@@ -345,30 +382,38 @@ Warning
 </colgroup>
 <thead>
 <tr class="header">
-<th>Mode</th>
-<th>For</th>
-<th>Tools</th>
+<th>Desk</th>
+<th>Opens by default</th>
+<th>Tools on the rail</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
 <td><strong>Model</strong></td>
-<td>Solids and transforms</td>
-<td>Select, place box / sphere / cylinder, move and rotate gizmos, delete</td>
+<td>Editor, viewport, Objects, Materials, Optimize</td>
+<td>Select, place box / sphere / cylinder, sketch on a face, move and rotate gizmos, delete</td>
 </tr>
 <tr class="even">
 <td><strong>Sketch</strong></td>
-<td>2D profiles and constraints</td>
+<td>Editor, viewport, Objects, Sketch</td>
 <td>Everything in Model, plus polygon editing, modify, and constraint annotation</td>
 </tr>
 <tr class="odd">
 <td><strong>Simulate</strong></td>
-<td>FEM setup and results</td>
-<td>The four-tab Simulate panel; the viewport becomes a picker</td>
+<td>Editor, viewport, Studies with Meshes tabbed behind it, Results with Optimize tabbed behind</td>
+<td>None — the viewport becomes a picker for boundary conditions</td>
 </tr>
 </tbody>
 </table>
-<p>Rendering is deliberately <em>not</em> a mode. Presets, shading, shadows, and quality live in a popover behind the eye icon, which opens from any mode — how the scene is drawn is orthogonal to what you are editing.</p>
+<p>Simulate is not a second application. Meshes, Studies, Results and Optimize are ordinary windows on the same desk as everything else, and Window ▸ opens any of them from any desk; the desk only decides which are open when you arrive. Scenes and Processes are parked in the tray on every desk rather than docked on any, because a browser or a monitor that took a column before you asked for it would be in the way of the work. Selecting a sketch profile in the viewport auto-enters the Sketch desk once; <code>Esc</code> or the switcher leaves again.</p>
+<p>All three desks share one accent. Which one you are on is read from the position of the filled cell in the switcher, the word in the hint bar, and the tool set — not from a hue, because colour in this app is reserved for data.</p>
+<p>Rendering is deliberately <em>not</em> a desk. Presets, shading, shadows, quality and the views of the field live in a popover behind the eye icon, which opens from any desk — how the scene is drawn is orthogonal to what you are editing.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="assets/screens/windows-float-stack.png"><img src="assets/screens/windows-float-stack.png" class="img-fluid figure-img"></a></p>
+<figcaption>Windows floated, tabbed and stacked over the Simulate desk</figcaption>
+</figure>
+</div>
 </section>
 <section id="modelling" class="level2">
 <h2 class="anchored" data-anchor-id="modelling">Modelling</h2>
@@ -417,53 +462,300 @@ Warning
 <td>Drag empty space / Shift-drag / scroll</td>
 <td>Orbit / pan / zoom</td>
 </tr>
+<tr class="odd">
+<td>Click a face of a solid</td>
+<td>Highlights it; <strong>New sketch on face</strong> plants a sketch there</td>
+</tr>
 </tbody>
 </table>
-<p><code>1</code> and <code>2</code> switch between selecting whole objects and selecting sketch vertices; <code>G</code> and <code>R</code> switch the gizmo between move and rotate. <code>Ctrl/⌘ + Enter</code> runs the program, <code>Ctrl/⌘ + Z</code> undoes the last source change.</p>
-</section>
-<section id="simulate" class="level2">
-<h2 class="anchored" data-anchor-id="simulate">Simulate</h2>
-<p>Simulate mode opens a four-tab panel over the same declarations a script would read. Every edit goes through the same source-patch round-trip as the sketch tools; solving posts the study’s <em>name</em>, and the server re-derives everything from the declaration.</p>
-<p><strong>Meshes</strong> declares and regenerates <code>SimMesh</code> objects. Resolution, padding, bounds, size, and the Hex / Tet4 / Tet10 method are editable inline; regenerating reports node and element counts and shades the mesh by element quality with a histogram beside it.</p>
+<p><code>O</code> and <code>V</code> switch between selecting whole objects and selecting sketch vertices; <code>G</code> and <code>R</code> switch the gizmo between move and rotate. <code>Ctrl/⌘ + Enter</code> runs the program, <code>Ctrl/⌘ + Z</code> undoes the last source change.</p>
+<section id="finding-your-way-around" class="level3">
+<h3 class="anchored" data-anchor-id="finding-your-way-around">Finding your way around</h3>
+<p>The world is <strong>Z-up</strong>, as every scene is, and the viewport defaults to orthographic projection — <code>5</code> toggles perspective. A <strong>floor grid</strong> on <code>z = 0</code> rules the ground with one honest 1-2-5 spacing readout that follows the zoom, and a title block names the scene and the view; an empty viewport rules the floor rather than rendering black.</p>
+<p>The <strong>navigation cube</strong> in the corner is a chamfered cube in the FreeCAD lineage: its six faces, twelve bevels and eight corners are the twenty-six standard views, each a real facet you can press, and the flank controls turn a quarter about the camera’s own axes. Shift-click a facet for the view directly opposite — from above the floor there is never a BOTTOM to click, but its far side is one Shift away. <code>1</code>, <code>3</code> and <code>7</code> are front, right and top (with <code>Ctrl</code> for back, left and bottom), and <code>9</code> turns to the opposite side.</p>
+<p>One <strong>construction-overlay switch</strong> hides everything the app draws <em>about</em> the model rather than <em>of</em> it — construction edges, sketch handles, the gizmo, constraint marks and their dimension labels, the boundary-condition preview — for a presentation state that is the solid, the field and the floor and nothing else.</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="../examples/assets/playground-mesh.png" class="img-fluid figure-img"></p>
+<p><a href="assets/screens/construction-overlay-off.png"><img src="assets/screens/construction-overlay-off.png" class="img-fluid figure-img"></a></p>
+<figcaption>The same scene with the construction overlay off: solid, field and floor only</figcaption>
+</figure>
+</div>
+</section>
+<section id="sketching-on-a-face" class="level3">
+<h3 class="anchored" data-anchor-id="sketching-on-a-face">Sketching on a face</h3>
+<p>The compile payload lists every construction node’s <em>analytic</em> faces — read off the construction tree, never off the render mesh — each with its plane frame, its world-space boundary polygon, a hit tolerance, and the accessor that names it in source. Hover resolution happens in the browser: the raymarch hit is tested against those polygons, so highlighting costs no round trip.</p>
+<p>Planting a sketch does take one. The viewer posts a <code>set_sketch_plane</code> patch naming the face — the feature’s line plus which face of it — and the server rewrites the sketch’s <code>plane=</code> argument to <code>SketchPlane.on(body.cap("+"))</code>, <code>SketchPlane.on(block.face("+z"))</code>, or, when the hit landed on a curved surface with no face to name, <code>SketchPlane.tangent(body, near=[...])</code>.</p>
+<p>What gets written is the <em>reference</em>, never the coordinates it currently evaluates to. Re-dimension the parent and the sketch moves with it, and the gradient of anything downstream still reaches the parent’s <code>depth</code> — see <a href="../docs/getting-started.html#faces-are-references-not-geometry">faces as references</a>. A sketch can only sit on geometry the program builds before it; the server refuses the patch otherwise rather than writing a <code>NameError</code>.</p>
+</section>
+</section>
+<section id="simulating" class="level2">
+<h2 class="anchored" data-anchor-id="simulating">Simulating</h2>
+<p>Four windows — Meshes, Studies, Results and Optimize — work over the same declarations a script would read; the Simulate desk opens them, and Window ▸ opens any of them anywhere else. Every edit goes through the same source-patch round-trip as the sketch tools; solving posts the study’s <em>name</em>, and the server re-derives everything from the declaration. Every option they offer — mesh method, study kind, boundary-condition type, objective metric, gradient path — is one of the <code>cadjoint.enums</code> option sets, so the window’s choices, the validator’s rejections and the generated TypeScript unions are the same list.</p>
+<p><strong>Meshes</strong> declares and regenerates <code>SimMesh</code> objects. Resolution, padding, bounds, size, and the Hex / Tet4 / Tet10 method are editable inline; regenerating reports node and element counts and shades the mesh by element quality with a histogram beside it. A tet mesh that had to climb the <a href="../docs/meshing.html#the-refinement-ladder">refinement ladder</a> says which grid it was actually built on.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="assets/screens/simulate-meshes.png" class="img-fluid figure-img"></p>
 <figcaption>The declared SimMesh discretized into tet10 elements, shaded by element quality with a quality histogram</figcaption>
 </figure>
 </div>
-<p><strong>Studies</strong> holds the study declarations, their materials, and their boundary conditions — and this is where the viewport becomes a picker. Clicking the surface proposes a <code>Nodes.sphere</code> selection sized from the mesh spacing; shift-dragging a rectangle proposes a <code>Nodes.box</code> from the world-space bounds of the vertices inside it. The proposal is written into the program as a real selection expression, so a BC picked by hand is indistinguishable from one typed by hand, and it re-resolves against whatever the mesh becomes.</p>
+<p><strong>Studies</strong> holds the study declarations, their materials, and their boundary conditions — and this is where the viewport becomes a picker. Clicking the surface proposes a <code>Nodes.sphere</code> selection sized from the mesh spacing; shift-dragging a rectangle proposes a <code>Nodes.box</code> from the world-space bounds of the vertices inside it. The proposal is written into the program as a real selection expression, so a BC picked by hand is indistinguishable from one typed by hand, and it re-resolves against whatever the mesh becomes. A study with no <code>conductivity=</code> (or <code>youngs=</code> / <code>poisson=</code>) takes the property from the scene’s <a href="../docs/materials.html">materials</a>, sampled per element at solve time.</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="../examples/assets/playground-field.png" class="img-fluid figure-img"></p>
+<p><img src="assets/screens/simulate-results.png" class="img-fluid figure-img"></p>
 <figcaption>The solved temperature field, clipped by the slice plane so the flux entering at the die interface is visible</figcaption>
 </figure>
 </div>
-<p><strong>Optimize</strong> runs the declared <code>Optimization</code> objects, streaming each step’s objective and gradient norm as it arrives. When a run finishes it lands in a player: a convergence sparkline with a moving cursor, play/pause, and a scrubber that replays the geometry along the trajectory by substituting each step’s parameter snapshot and ghost-compiling it. Only the adopted final source ever touches undo history.</p>
+<p><strong>Optimize</strong> runs the declared <code>Optimization</code> objects, streaming each step’s objective and gradient norm as it arrives. When a run finishes it lands in a player: a convergence sparkline with a moving cursor, play/pause, and a scrubber that replays the geometry along the trajectory by substituting each step’s parameter snapshot and ghost-compiling it. Only the adopted final source ever touches undo history. While it runs, a chip in the mode strip shows what is running and for how long, wherever on the desk you happen to be looking.</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="../examples/assets/playground-optimize.png" class="img-fluid figure-img"></p>
+<p><img src="assets/screens/optimize-replay.png" class="img-fluid figure-img"></p>
 <figcaption>The finished cool-sink optimization: convergence sparkline, trajectory scrubber, and each parameter’s before and after value</figcaption>
 </figure>
 </div>
-<p><strong>Results</strong> browses the solved surface — a field picker that swaps displayed scalars without re-solving, a deformed view for elastic results, per-vertex BC previews, and an axis-aligned slice plane.</p>
+<p><strong>Results</strong> browses the solved surface — a field picker that swaps displayed scalars without re-solving, a deformed view for elastic results, per-vertex BC previews, and an axis-aligned slice plane. The field is drawn in the viridis ramp and nothing else in the app is, so colour on screen always means data.</p>
+</section>
+<section id="materials" class="level2">
+<h2 class="anchored" data-anchor-id="materials">Materials</h2>
+<p>A <code>Material</code> carries two families of property in one object: the optical ones the renderer shades with (<code>color</code>, <code>roughness</code>, <code>metallic</code>, <code>opacity</code>, <code>ior</code>, <code>reflectivity</code>) and the physical ones the simulation solves with, in SI — <code>density</code>, <code>conductivity</code>, <code>specific_heat</code>, <code>youngs_modulus</code>, <code>poisson_ratio</code>, <code>thermal_expansion</code>, <code>yield_strength</code>. Optical properties always have a value; physical ones default to <em>unspecified</em>, so a scene that only cares about looks never has to invent a Young’s modulus.</p>
+<p>Both families are editable from the inspector through one operation, <code>set_material_property</code>, which names the material by its stable id, its payload index, or its name, and carries the property and a number:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode json code-with-copy"><code class="sourceCode json"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span><span class="dt">"op"</span><span class="fu">:</span> <span class="st">"set_material_property"</span><span class="fu">,</span> <span class="dt">"id"</span><span class="fu">:</span> <span class="st">"assign:copper"</span><span class="fu">,</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a> <span class="dt">"property"</span><span class="fu">:</span> <span class="st">"youngs_modulus"</span><span class="fu">,</span> <span class="dt">"value"</span><span class="fu">:</span> <span class="fl">1.185e11</span><span class="fu">}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The physical half is why the operation exists rather than reusing <code>set_value</code>. An unspecified property has no keyword in the call and therefore <strong>no span</strong> in the payload, so there is nothing for the inspector to drag — the material payload publishes <code>physical</code> (the value, or <code>null</code>), <code>units</code>, <code>free</code>, and a <code>spans</code> entry only for the properties actually stated. A row with no span is a row the inspector offers to <em>state</em>: the same request with a number adds the keyword to the call. Sending <code>"value": null</code> takes it back out, returning a physical property to unspecified and an optical one to its default.</p>
+<p>Values are checked against the same brackets <code>Material</code> enforces when <code>free=True</code>, so a number the viewer accepts is one the optimizer accepts, and a rejection names the unit it was measured in — <code>`density` must be a number from 1 to 25000 kg/m^3.</code></p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Property</th>
+<th>Range</th>
+<th>Unit</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>density</code></td>
+<td>1 – 25000</td>
+<td>kg/m^3</td>
+</tr>
+<tr class="even">
+<td><code>conductivity</code></td>
+<td>0.001 – 3000</td>
+<td>W/(m·K)</td>
+</tr>
+<tr class="odd">
+<td><code>specific_heat</code></td>
+<td>1 – 10000</td>
+<td>J/(kg·K)</td>
+</tr>
+<tr class="even">
+<td><code>youngs_modulus</code></td>
+<td>1000 – 1e12</td>
+<td>Pa</td>
+</tr>
+<tr class="odd">
+<td><code>poisson_ratio</code></td>
+<td>0 – 0.499</td>
+<td>—</td>
+</tr>
+<tr class="even">
+<td><code>thermal_expansion</code></td>
+<td>0 – 0.001</td>
+<td>1/K</td>
+</tr>
+<tr class="odd">
+<td><code>yield_strength</code></td>
+<td>1000 – 1e11</td>
+<td>Pa</td>
+</tr>
+<tr class="even">
+<td><code>roughness</code>, <code>metallic</code>, <code>opacity</code>, <code>reflectivity</code></td>
+<td>0 – 1</td>
+<td>—</td>
+</tr>
+<tr class="odd">
+<td><code>ior</code></td>
+<td>1 – 3</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p>The edit is span surgery like every other: the keyword is written on the line of the argument it follows, so no line number moves — unless that would push the line past 100 columns, in which case the keyword wraps onto its own line and the file grows by exactly one.</p>
+<p>A material built by a <a href="../docs/materials.html">catalogue</a> factory — <code>alu = aluminium_6061()</code> — has no property keyword to edit, and the operation says so rather than guessing. Sending the same request again with <code>"expand": true</code> rewrites the binding as the literal <code>Material(...)</code> the factory builds, one keyword per line, and then applies the edit; from there every property is an editable row. Only the cheap conversion is done: a bare, argument-free factory call, whose result the server can build and read without executing any of the user’s own code.</p>
+</section>
+<section id="looking-at-the-field" class="level2">
+<h2 class="anchored" data-anchor-id="looking-at-the-field">Looking at the field</h2>
+<p>The solid is one way to look at a signed distance field, and the render popover offers four more. All of them are branches inside the same generated shader, views of the one SDF the solid is traced from, so there is no second scene to fall out of step.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>View</th>
+<th>Shows</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Solid</strong></td>
+<td>The raymarched surface everything else in the app assumes</td>
+</tr>
+<tr class="even">
+<td><strong>Slice</strong></td>
+<td>The signed value of the field on a plane, inside and outside, with isolines that tighten toward the boundary — the part’s own section outline is the <code>f = 0</code> contour</td>
+</tr>
+<tr class="odd">
+<td><strong>∇f</strong></td>
+<td>The gradient magnitude on the same plane: <code>|∇f| = 1</code> is a true distance, and anything else is where a blend, a scale or a twist has stopped it being one</td>
+</tr>
+<tr class="even">
+<td><strong>N</strong></td>
+<td>World-space normals on the surface</td>
+</tr>
+<tr class="odd">
+<td><strong>Z</strong></td>
+<td>Linear camera depth</td>
+</tr>
+</tbody>
+</table>
+<p>The slice plane takes any axis and sweeps a slab of ±2 units about the origin; the legend prints the plane’s actual coordinate, and both slice views draw their isolines one pixel wide at every zoom. The slice is data, so it is composited after tone mapping in the achromatic ink the chrome uses, and the field values are read from the same shader <code>sdf()</code> the primary rays march.</p>
+<p>An <strong>iso-offset</strong> slider traces the solid at <code>f = c</code> instead of <code>f = 0</code>: a positive offset dilates the part, a negative one erodes it. It is applied to every <code>sdf()</code> read — primary rays, shadows, normals — so the offset surface shades and casts like a real surface rather than a shell drawn over the old one, which makes it a quick check of a wall thickness or a clearance.</p>
 </section>
 <section id="rendering" class="level2">
 <h2 class="anchored" data-anchor-id="rendering">Rendering</h2>
 <p>The eye icon opens the render popover. It carries three editable presets — <strong>X-Ray</strong> for modelling and inspection, <strong>Studio</strong> for clean path-traced materials, <strong>Wire</strong> for construction geometry only — over independent switches for shadows, reflections, feature edges, and the dual-contour wireframe. Presets are stored in the browser and can be edited and saved.</p>
+<p>The two mesh overlays are one extraction. Turning either on dual-contours the scene on the viewport’s own 64³ grid and splits the result into two layers. The <strong>wireframe</strong> draws the dual-contour quads. <strong>Feature edges</strong> draws the sharp layer, and it is read off that same lattice: cells are classified as creases, corners or exact <code>min</code>/<code>max</code> CSG seams — the first from the spread of the Hermite normals, the last from which branch of the boolean wins — and the links between neighbouring feature cells are the chords the overlay draws. Feature-aware QEF placement puts each of those vertices on the feature it belongs to, and a vertex sitting on a CSG seam is then Newton-projected onto the common zero set of the operands meeting there, one program for every seam group at once, so it lands <em>on</em> the seam rather than within a cell of it. Both layers draw those projected positions, so the wireframe and the sharp layer agree everywhere.</p>
+<p>What the lattice cannot do is beat its own resolution. A chord per cell the curve crosses means a bore rim is a polygon whose vertex count is whatever the grid happened to give it, not a circle, and everything downstream of the classifier is the price of the lattice being the only witness: an on-surface subgradient re-check, identity grouping so two curves within a cell of each other cannot cross-link, a tangent-alignment test, chain building that holds every vertex at degree two, and debris pruning.</p>
+<p>A rounded corner is still an edge if the rounding is finer than the overlay can show. The grid puts one vertex where a sub-cell fillet is, so its edge is drawn where the sharp corner would have been — which is what a bracket filleted at 0.02 looks like on screen, and where its bore rims come from. Round a corner by more than a cell and it becomes curvature the viewport genuinely renders, and no line is drawn inside it.</p>
+<p>Tracing each curve instead — following the cross product of the two surface normals from one corner to the next, so a rim is a circle at any cell size — is the <code>feature_edges</code> <a href="../docs/plugins.html#the-five-in-process-kinds">plugin kind</a>. The compile payload names the source either way: <code>lattice</code> here, <code>graph</code> when something fills the kind.</p>
 <p>Path tracing accumulates progressively: one jittered camera sample per pixel per frame, averaged in linear HDR, with cosine-weighted diffuse and importance-sampled GGX reflection, Schlick-Fresnel glass, finite-sun next-event estimation, multi-bounce environment lighting, Russian-roulette termination, and ACES tone mapping in a separate presentation pass. Accumulation resets automatically when the scene, camera, viewport, or mode changes.</p>
 <p>Quality is a three-step budget. <strong>High</strong> is the default at roughly 900,000 pixels, six bounces, two sun-visibility samples per hit, and 512 samples per pixel; <strong>Draft</strong> drops to 320,000 pixels, three bounces, one visibility sample, and 128 samples; <strong>Ultra</strong> opts into 1.6 million pixels, eight bounces, four visibility samples, and 1,024 samples.</p>
 <p>Two half-float textures alternate between sampled input and render attachment. WebGPU does not allow one texture to be sampled and rendered into in the same pass, so this ping-pong is required rather than incidental. The finite sun is sampled only through next-event estimation and is not part of the environment radiance seen by BSDF paths, so the strategies do not overlap; multiple importance sampling becomes useful only once emissive area lights or an importance-sampled environment map are added. The scope decisions are recorded in <a href="../research/path-tracing.html">WebGPU SDF path tracing</a>.</p>
+</section>
+<section id="export" class="level2">
+<h2 class="anchored" data-anchor-id="export">Export</h2>
+<p><strong>File ▸ Export…</strong> writes one object of the program as a file, in the formats the library already exports: <code>STL</code> (binary or ASCII), <code>OBJ</code> (coplanar quads merged into n-gons), <code>STEP</code> and, once the program declares a study, <code>VTK</code>. The dialog asks for the format, the object — any module-level variable bound to an SDF, <code>scene</code> by default — and the lattice resolution in cells along the object’s longest axis; the lattice is fitted to the object the same way a <code>SimMesh</code> without explicit bounds is. STEP is the faceted writer of <a href="../docs/meshing.html#export"><code>cadjoint.meshing</code></a> — coplanar polygons merged and written as B-rep topology, which reads back into a CAD kernel as one closed solid but carries the mesh’s own faces, not the design’s. The dialog’s <code>analytic</code> switch asks the <code>step_export</code> <a href="../docs/plugins.html#the-five-in-process-kinds">plugin kind</a> for exact surfaces instead; with nothing filling it the export falls back to the faceted writer and says so in its report. VTK takes a declared study rather than an object and writes its solved mesh and fields for ParaView, solving first if the program has not. The run is a job like a solve — the chip beside the mode switcher counts it and can cancel it, and the Processes window lists it — and the browser saves the file under the scene’s name (<code>heatsink-scene.stl</code>). The endpoint is <code>POST /api/export</code>; a success is the file itself with <code>Content-Disposition</code> and the job id in <code>X-Cadjoint-Job</code>, a failure the usual JSON.</p>
 </section>
 <section id="compilation-path" class="level2">
 <h2 class="anchored" data-anchor-id="compilation-path">Compilation path</h2>
 <p>Each run follows the same path as the shader backend:</p>
 <ol type="1">
 <li>The local server evaluates the Python in a child process and reads <code>scene</code>.</li>
-<li>JAX traces distance and material evaluation and lowers both to StableHLO.</li>
-<li>cadjoint emits WGSL <code>sdf</code>, <code>material_base</code>, and <code>material_optics</code> functions.</li>
+<li>cadjoint walks the SDF graph and writes WGSL <code>sdf</code>, <code>material_base</code> and <code>material_optics</code> from it directly.</li>
 <li>The browser embeds those in the preview or path-tracing runtime and builds the WebGPU pipelines.</li>
 </ol>
+<p>Step 2 used to go through JAX: trace the scene, export it to StableHLO, walk that text. XLA never produced an executable on that path — it was a tracer — and the round trip was most of a compile. Walking the graph instead takes <code>scenes/motor_shield.py</code> from 10.5 s to 1.6 s, and the module it writes is smaller by an order of magnitude, because a profile’s vertices are buffer slots rather than unrolled code and a pattern is a loop rather than N copies. The traced backend is still there and still tested against this one on a real device, point for point; <code>CADJOINT_SHADER_FORM=traced</code> selects it. A scene using a shape the direct backend has no kernel for falls back to it automatically and says so.</p>
 <p>The code icon shows the complete generated WGSL. Python tracebacks and WGSL compiler errors appear under the editor.</p>
+<p>Every request runs in a fresh child process, so nothing would survive between edits by default. Two things make the second edit cheaper than the first. The worker turns on JAX’s <strong>persistent compilation cache</strong> under <code>~/.cache/cadjoint/jax</code> (<code>CADJOINT_CACHE_DIR</code> to move it, <code>CADJOINT_NO_COMPILATION_CACHE=1</code> to opt out), so a program compiled once is reused by every later process; and the scene is traced with its parameter values as <em>arguments</em> rather than literals, so a re-dimensioned design lowers to the same program and hits that cache. Measured on the starter scene (<code>benchmarks/jax_compile_profile.py</code>, cold cache against warm): a compile 2.1 s → 1.1 s, a mesh overlay 12.7 s → 5.9 s, a mesh inspection 6.9 s → 1.9 s, a solve 14.3 s → 3.1 s. The server warms the cache for the scene it opens at start — the <code>warmup</code> job in the Processes window — so the first overlay you ask for does not pay the cold cliff. The linear solve itself runs in PETSc, outside XLA, but the assembly around it is hundreds of small XLA programs, and those are what the cache saves on a solve. See <a href="../docs/meshing.html#program-size">program size</a> and the <a href="../research/performance.html">performance notes</a>.</p>
+</section>
+<section id="code-parity" class="level2">
+<h2 class="anchored" data-anchor-id="code-parity">Code parity</h2>
+<p>The source is the single truth: every viewer action is a rewrite of a span of the user’s Python, and the payload the viewer draws is read back out of that same text. Three things hold that contract together.</p>
+<section id="stable-identities" class="level3">
+<h3 class="anchored" data-anchor-id="stable-identities">Stable identities</h3>
+<p>A payload entry used to be addressed by the line it sat on at the last compile. Any edit between the compile and the click — a blank line, an import, an <code>add_sketch</code> that inserts three lines — moved every line and silently aimed the next patch at the wrong statement.</p>
+<p>Every addressable thing now also carries a <strong>stable id</strong>, derived from its AST path and the name the program assigned it rather than from its position:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Id</th>
+<th>Names</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>assign:comb_profile</code></td>
+<td>The call that is the value of a module-level assignment — sketches, primitives, features, materials, studies, meshes, optimizations</td>
+</tr>
+<tr class="even">
+<td><code>call:extrude@comb_profile</code></td>
+<td>A feature call bound to no variable, keyed by the sketch it consumes</td>
+</tr>
+<tr class="odd">
+<td><code>sketch:comb</code>, <code>box:block</code></td>
+<td>An unbound construction call carrying a literal <code>name=</code></td>
+</tr>
+<tr class="even">
+<td><code>bc:sink-conduction[1]</code></td>
+<td>An ordinal inside its owner — also <code>constraint:&lt;sketch&gt;[i]</code>, <code>vertex:&lt;sketch&gt;[i]</code></td>
+</tr>
+<tr class="odd">
+<td><code>plane:comb_profile</code>, <code>face:sink:cap+</code></td>
+<td>A sketch’s work plane; one analytic face of a feature</td>
+</tr>
+</tbody>
+</table>
+<p>Ids survive every edit that does not touch their own statement. Only the <code>#&lt;n&gt;</code> fallback — an object with neither a variable nor a <code>name=</code> — is ordinal, and every statement the viewer itself writes is named.</p>
+<p>Every <code>/patch</code> request takes <code>id</code> wherever it used to take <code>line</code>, and the id wins: it is resolved against the text in that same request, so a stale line cannot survive the round trip. The old fields still work unchanged, and the compile payload carries both — <code>stableId</code> on every entry, plus an <code>identities</code> table mapping each id to the line it currently sits on.</p>
+</section>
+<section id="a-schema-and-types-generated-from-it" class="level3">
+<h3 class="anchored" data-anchor-id="a-schema-and-types-generated-from-it">A schema, and types generated from it</h3>
+<p>The payload is defined once, as pydantic models in <code>cadjoint/viewer/schema/</code>. The compile worker validates every payload against them before answering, and <code>cadjoint/viewer/schema/payloads.d.ts</code> is generated from the same models — one interface per payload shape, and one per <code>/patch</code> operation, discriminated on <code>op</code>. Regenerate it with:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> <span class="at">-m</span> cadjoint.viewer.schema.emit</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>A test regenerates and diffs, so the models and the checked-in types cannot drift apart.</p>
+</section>
+<section id="the-round-trip-invariant" class="level3">
+<h3 class="anchored" data-anchor-id="the-round-trip-invariant">The round-trip invariant</h3>
+<p><code>tests/viewer/test_parity_roundtrip.py</code> closes the loop for all 28 operations: for each generated request the patched text must still parse, patching twice from the same input must be byte-identical, the id and the legacy line must produce the same source, and compiling the result must show exactly the change that was asked for. Operations that describe a state rather than a step — every <code>set_*</code> — must additionally be idempotent.</p>
+</section>
+</section>
+<section id="editor-intelligence" class="level2">
+<h2 class="anchored" data-anchor-id="editor-intelligence">Editor intelligence</h2>
+<p>The editor lints and completes as you type. Both analysers are <em>static</em> — they read the program without importing or running it — so they are safe to fire on every keystroke, unlike compilation, which needs its disposable child process.</p>
+<p>Three endpoints back it, all answered in the server process:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Endpoint</th>
+<th>Backed by</th>
+<th>Warm latency</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>POST /api/lint</code></td>
+<td>the <code>ruff</code> binary, <code>--isolated</code></td>
+<td>~6 ms</td>
+</tr>
+<tr class="even">
+<td><code>POST /api/complete</code></td>
+<td><code>jedi</code>, warm per server process</td>
+<td>~15 ms</td>
+</tr>
+<tr class="odd">
+<td><code>POST /api/signature</code></td>
+<td><code>jedi.Script.get_signatures</code></td>
+<td>~2 ms</td>
+</tr>
+</tbody>
+</table>
+<p>Every line in these requests and responses is <strong>1-based</strong> and every column is <strong>0-based</strong> — CodeMirror’s and jedi’s own convention.</p>
+<p>Diagnostics carry a <code>severity</code> of <code>error</code>, <code>warning</code> or <code>info</code>, so the gutter markers and underlines are colour-coded: a syntax error or an undefined name is red, a probable mistake such as an unused import is amber, and an import-order or modernisation remark is blue. Where ruff knows a fix, the diagnostic carries its text and edits, and the editor offers it as an action.</p>
+<p>The most valuable diagnostic is not static at all. When a <code>/compile</code> fails with a traceback that names a line of your scene, that failure is remembered and folded into the next lint of the <em>same</em> text — the line that actually blew up gets a red squiggle. Editing anything invalidates it, so it never outlives the code that caused it.</p>
+<p>Completions resolve against the <strong>installed</strong> <code>cadjoint</code>, so they know its real types: <code>SketchPlane(</code> offers <code>origin=</code> and <code>normal=</code> with their defaults, <code>plane.</code> offers <code>to_world</code>, <code>frame</code>, <code>rotation_matrix</code>, and each entry’s popup carries the signature and docstring. Jedi pays a few hundred milliseconds for its first analysis; the server primes it on a background thread at startup so the first popup you see is already warm.</p>
+<p>Both tools are optional extras (<code>pip install "cadjoint[editor]"</code>). Without them these endpoints answer with an install hint and the editor simply goes quiet.</p>
+</section>
+<section id="work-that-outlives-the-request" class="level2">
+<h2 class="anchored" data-anchor-id="work-that-outlives-the-request">Work that outlives the request</h2>
+<p>Every request that costs real time — a compile, a mesh extraction, a mesh inspection, a simulation, an optimization run, a lint, and the startup warm-up — is registered as a <strong>job</strong> in the server process the moment it starts, and stays registered after it ends. Nothing about the endpoints changes: they answer exactly as before, with a <code>job_id</code> added.</p>
+<p>That id buys three things a plain request/response API cannot give you.</p>
+<p><strong>A result survives the panel that asked for it.</strong> Switch modes, close the Results tab, come back an hour later: <code>GET /api/jobs/&lt;id&gt;/result</code> returns the identical payload the original request received, byte for byte, without re-running a nine-second solve. Each job also carries the sha256 of the program text it ran on, so the UI can tell a result that still describes the document from one the last edit invalidated.</p>
+<p><strong>You can see what is burning the machine.</strong> While a job runs, its worker subprocess (and anything that worker spawns, such as a CalculiX solve) is sampled twice a second for CPU and resident memory. <code>GET /api/jobs</code> answers with every job newest-first plus live totals — how many are running, their combined CPU and RSS, the server’s uptime, and the machine’s core count and memory — cheaply enough to poll once a second. The startup warm-up appears as a <code>warmup</code> job, which is the answer to “why are two Python processes at 100% the moment I open the playground?”.</p>
+<p><strong>A run can actually be stopped.</strong> <code>POST /api/jobs/&lt;id&gt;/cancel</code> kills the worker subprocess rather than merely abandoning it; the request that started the work ends immediately with <code>{"ok": false, "error": "cancelled"}</code> and the job is marked <code>cancelled</code>. <code>POST /api/jobs/clear</code> drops finished jobs.</p>
+<p>The registry is a fixed-size window, not a log: the last 50 jobs (at most 10 of them lints, so a typing session cannot flush the expensive history), and 64 MB of stored payloads. Past either bound the oldest finished entries go — payloads first, so a job’s timings and samples outlive its result. Every listing reports both budgets and how much has been evicted.</p>
+<p>In the UI this is the <strong>Processes</strong> window. It is parked in the tray of every desk rather than docked — a monitor that took a column of the desk before you asked for it would be in the way of the work it monitors — and it opens from the tray or from Window ▸ Processes. It has three zones: <code>01 RUNNING</code>, one row per job with its elapsed time, CPU, memory and a cancel control (an optimization also shows its step and objective); <code>02 HISTORY</code>, what finished, newest first, where clicking a solve, mesh inspection or optimization re-opens that result in the panel that draws it; and <code>03 LOAD</code>, the totals, a minute of worker CPU, and how much of the store’s budget is used. It polls once a second while it is open, and not at all while it is not.</p>
+<p>The panels do their half of the same bargain. The Simulate panel’s Results tab, the mesh inspection and an optimization run each remember only the job id, the source hash and the request’s name, and fetch the payload back when they mount again — so closing the Results window, or leaving the Simulate desk, and coming back no longer costs a second solve. A result whose hash no longer matches the editor is kept and marked <code>stale · source changed</code> rather than discarded, and a result the server has evicted says so and offers the run again.</p>
+<p>Sampling uses <code>psutil</code>, part of the <code>viewer</code> extra. Without it the server still registers everything and still cancels; it falls back to <code>resource.getrusage</code> totals over all child processes and says so in each payload’s <code>sampling</code> field, which reads <code>"psutil"</code> or <code>"rusage"</code>.</p>
+</section>
+<section id="scenes" class="level2">
+<h2 class="anchored" data-anchor-id="scenes">Scenes</h2>
+<p><strong>File ▸ Open…</strong> raises the <strong>Scenes</strong> window, a browser over the <code>scenes/</code> directory under the server’s working directory — the repository’s own scene directory when you start from a checkout, or wherever <code>CADJOINT_SCENES_DIR</code> points. Each card carries a thumbnail, the first paragraph of the file’s docstring, its size and modification time, and counts of what it declares: named and free design parameters, studies, meshes, optimizations, and the materials it defines.</p>
+<p>All of that is read with <code>ast</code>, never by executing the file. A browser that ran every program in a directory to describe it would be a browser that runs arbitrary code on a directory listing, which is not a trade the server makes anywhere else either. The thumbnails are the one thing that does cost a compile: they are rendered serially in the browser from each scene’s own compiled shader and cached, so the directory is described instantly and drawn as it goes.</p>
+<p>Opening a scene replaces the editor’s text (an unsaved buffer asks first); <strong>File ▸ Save</strong> and <strong>Save As…</strong> write back into the same directory, and the endpoints — <code>GET /api/scenes</code>, <code>POST /api/scenes/load</code>, <code>POST /api/scenes/save</code> — accept bare <code>*.py</code> names only. Path separators, traversal and hidden files are refused before anything touches the filesystem.</p>
 </section>
 <section id="a-live-example" class="level2">
 <h2 class="anchored" data-anchor-id="a-live-example">A live example</h2>
@@ -484,7 +776,7 @@ Note
 <div class="cadjoint-webgpu-demo" data-cadjoint-webgpu-viewer="">
 <canvas data-viewer-canvas="" aria-label="Interactive WebGPU rendering of the cadjoint orbital example">
 </canvas>
-<img data-viewer-fallback="" src="../examples/assets/playground-model.png" alt="The cadjoint playground with the scene program on the left and the heat sink rendered on the right">
+<img data-viewer-fallback="" src="assets/screens/model-desk.png" alt="The cadjoint playground with the scene program on the left and the heat sink rendered on the right">
 <div class="cadjoint-webgpu-status" data-viewer-status="" aria-live="polite">
 Starting WebGPU…
 </div>
@@ -499,25 +791,25 @@ Drag to orbit · Scroll to zoom
 <section id="jupyter-widget" class="level2">
 <h2 class="anchored" data-anchor-id="jupyter-widget">Jupyter widget</h2>
 <p>For a compact viewer inside a notebook rather than a full application:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> sync <span class="at">--extra</span> viewer</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf.primitives <span class="im">import</span> Sphere</span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.viewer <span class="im">import</span> SDFViewer</span>
-<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>viewer <span class="op">=</span> SDFViewer(Sphere(radius<span class="op">=</span><span class="fl">1.0</span>), height<span class="op">=</span><span class="dv">480</span>)</span>
-<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>viewer</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> sync <span class="at">--extra</span> viewer</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf.primitives <span class="im">import</span> Sphere</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.viewer <span class="im">import</span> SDFViewer</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>viewer <span class="op">=</span> SDFViewer(Sphere(radius<span class="op">=</span><span class="fl">1.0</span>), height<span class="op">=</span><span class="dv">480</span>)</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>viewer</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>It supports orbit, zoom, pan, and camera reset. Recompile an existing widget after changing a scene without recreating its output cell:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>viewer.update_scene(new_scene)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>viewer.update_scene(new_scene)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>See the <a href="../examples/rendering.html">rendering notebook</a> for a complete composition and hot-reload example.</p>
 </section>
 <section id="developing-the-ui" class="level2">
 <h2 class="anchored" data-anchor-id="developing-the-ui">Developing the UI</h2>
 <p>The app is a Solid + TypeScript project in <code>frontend/</code>, built into <code>cadjoint/viewer/static</code> and committed, so installing cadjoint needs no Node toolchain.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> frontend</span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="ex">npm</span> install</span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="ex">npm</span> run dev        <span class="co"># Vite on :5173, proxying the API to the Python server</span></span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a><span class="ex">npm</span> run build      <span class="co"># refresh cadjoint/viewer/static (commit the result)</span></span>
-<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a><span class="ex">npm</span> test           <span class="co"># projection and picking unit tests</span></span>
-<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a><span class="ex">npm</span> run e2e        <span class="co"># Playwright, drives the real server end to end</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> frontend</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="ex">npm</span> install</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="ex">npm</span> run dev        <span class="co"># Vite on :5173, proxying the API to the Python server</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a><span class="ex">npm</span> run build      <span class="co"># refresh cadjoint/viewer/static (commit the result)</span></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a><span class="ex">npm</span> test           <span class="co"># projection and picking unit tests</span></span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a><span class="ex">npm</span> run e2e        <span class="co"># Playwright, drives the real server end to end</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>Run <code>uv run cadjoint-viewer</code> alongside <code>npm run dev</code> so the dev server has an API to proxy to.</p>
 </section>
 <section id="troubleshooting" class="level2">
