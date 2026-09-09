@@ -316,7 +316,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>    steps<span class="op">=</span><span class="dv">30</span>,</span>
 <span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>    learning_rate<span class="op">=</span><span class="fl">0.05</span>,</span>
 <span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>    method<span class="op">=</span>OptimizerMethod.ADAM,</span>
-<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>    precision<span class="op">=</span>Precision.SINGLE,</span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>Declarative gradient-based optimization of a scene’s free parameters.</p>
 <section id="attributes" class="level2 doc-section doc-section-attributes">
 <h2 class="doc-section doc-section-attributes anchored" data-anchor-id="attributes">Attributes</h2>
@@ -393,6 +394,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <td>method</td>
 <td>OptimizerMethodLike</td>
 <td>A :class:<code>~cadjoint.enums.OptimizerMethod</code> or its plain string spelling — <code>"adam"</code> (default) or <code>"sgd"</code> (keyword-only). Runs through optax; plain gradient descent when optax is missing.</td>
+</tr>
+<tr class="odd">
+<td>precision</td>
+<td>PrecisionLike</td>
+<td>A :class:<code>~cadjoint.enums.Precision</code> or its plain string spelling, <code>"single"</code> (default) or <code>"double"</code> (keyword-only). <code>"double"</code> holds <code>jax_enable_x64</code> for the whole of :meth:<code>run</code> and restores it afterwards. An objective whose solver needs float64 needs this, and a scope inside the solver is not enough: :func:<code>cadjoint.flow.precision.double_precision</code> covers the <em>forward</em> pass, but :func:<code>jax.grad</code> runs the transposed pass after that scope has closed, and a float32 process cannot then materialise the float64 intermediates the forward built (<code>lax.dynamic_update_slice requires arguments to have the same dtypes, got float32, float64</code>). Declaring it here rather than flipping the flag at a scene’s module scope is what keeps the scene itself float32 for the WGSL shader, which has no <code>f64</code> – so a scene carrying a flow optimization still opens in the viewer, and the viewer can still run it.</td>
 </tr>
 </tbody>
 </table>

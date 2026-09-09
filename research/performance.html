@@ -412,6 +412,20 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <li><a href="#reproducing" id="toc-reproducing" class="nav-link" data-scroll-target="#reproducing">15.4 Reproducing</a></li>
   <li><a href="#two-of-the-three-implemented-and-measured" id="toc-two-of-the-three-implemented-and-measured" class="nav-link" data-scroll-target="#two-of-the-three-implemented-and-measured">15.5 Two of the three, implemented and measured</a></li>
   </ul></li>
+  <li><a href="#the-crease-placements-hidden-cost-project_table-2026-09-09" id="toc-the-crease-placements-hidden-cost-project_table-2026-09-09" class="nav-link" data-scroll-target="#the-crease-placements-hidden-cost-project_table-2026-09-09">16. The crease placement’s hidden cost: <code>project_table</code> (2026-09-09)</a>
+  <ul class="collapse">
+  <li><a href="#where-the-seconds-actually-were" id="toc-where-the-seconds-actually-were" class="nav-link" data-scroll-target="#where-the-seconds-actually-were">16.1 Where the seconds actually were</a></li>
+  <li><a href="#the-mechanism-isolated" id="toc-the-mechanism-isolated" class="nav-link" data-scroll-target="#the-mechanism-isolated">16.2 The mechanism, isolated</a></li>
+  <li><a href="#the-fix" id="toc-the-fix" class="nav-link" data-scroll-target="#the-fix">16.3 The fix</a></li>
+  <li><a href="#the-numbers-the-small-case-first" id="toc-the-numbers-the-small-case-first" class="nav-link" data-scroll-target="#the-numbers-the-small-case-first">16.4 The numbers — the small case first</a>
+  <ul class="collapse">
+  <li><a href="#corroboration-on-the-whole-scene" id="toc-corroboration-on-the-whole-scene" class="nav-link" data-scroll-target="#corroboration-on-the-whole-scene">Corroboration on the whole scene</a></li>
+  </ul></li>
+  <li><a href="#what-it-costs-the-mesh-stated-honestly" id="toc-what-it-costs-the-mesh-stated-honestly" class="nav-link" data-scroll-target="#what-it-costs-the-mesh-stated-honestly">16.5 What it costs the mesh, stated honestly</a></li>
+  <li><a href="#what-this-does-not-fix" id="toc-what-this-does-not-fix" class="nav-link" data-scroll-target="#what-this-does-not-fix">16.6 What this does <em>not</em> fix</a></li>
+  <li><a href="#reproducing-1" id="toc-reproducing-1" class="nav-link" data-scroll-target="#reproducing-1">16.7 Reproducing</a></li>
+  <li><a href="#a-finding-that-fell-out-of-the-same-instrumentation-the-48-vs-6-creases" id="toc-a-finding-that-fell-out-of-the-same-instrumentation-the-48-vs-6-creases" class="nav-link" data-scroll-target="#a-finding-that-fell-out-of-the-same-instrumentation-the-48-vs-6-creases">16.8 A finding that fell out of the same instrumentation: the 48-vs-6 creases</a></li>
+  </ul></li>
   </ul>
 </nav>
     </div>
@@ -3968,6 +3982,353 @@ done</code></pre>
 </table>
 <p>Trace falls 3.54 → 2.52 s and lowering 1.77 → 1.30 s on the shield; the rest is the WGSL emitter walking one module instead of two.</p>
 <p><strong>Is the callback refusal worth reporting upstream?</strong> No, not as a bug. Host callbacks are baked into the HLO module and a deserialized executable would carry descriptors into a dead process’s Python objects, so JAX’s refusal is correct, and <code>tesseract-jax</code> has no alternative — calling a Tesseract <em>is</em> calling Python. The only defensible upstream item is documentation: a <code>jax.jit</code> that transitively contains <code>apply_tesseract</code> silently loses persistent caching for the entire program, however much unrelated pure computation it contains, and the mitigation is the split above.</p>
+<hr>
+</section>
+</section>
+<section id="the-crease-placements-hidden-cost-project_table-2026-09-09" class="level1">
+<h1>16. The crease placement’s hidden cost: <code>project_table</code> (2026-09-09)</h1>
+<p><strong>The premise this section started from was wrong.</strong> <code>SimMesh.build()</code> on <code>scenes/starter.py</code> had been described as compile-bound. It is not. Measured at <code>a234225</code> with <code>benchmarks/jax_compile_profile.py --mode mesh_inspect</code>, the <em>warm</em> run dispatched <strong>four</strong> JAX programs and compiled <strong>zero</strong>, and still took 58 s — 57.9 s of it in the profiler’s <code>other</code> column, which is Python and eager op-by-op dispatch. Compilation is a third of the cold number and none of the warm one.</p>
+<section id="where-the-seconds-actually-were" class="level2">
+<h2 class="anchored" data-anchor-id="where-the-seconds-actually-were">16.1 Where the seconds actually were</h2>
+<p>Stage timings inside one warm <code>SimMesh.build()</code> (monkeypatched wall clock, no source edits):</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>stage</th>
+<th style="text-align: right;">warm</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>with_table</code> → <code>project_table</code>, ×4</td>
+<td style="text-align: right;"><strong>60.04 s</strong></td>
+</tr>
+<tr class="even">
+<td><code>sdf_to_tet_mesh</code> total</td>
+<td style="text-align: right;">0.74 s</td>
+</tr>
+<tr class="odd">
+<td>├ <code>project_points</code> (the DC surface)</td>
+<td style="text-align: right;">0.43 s</td>
+</tr>
+<tr class="even">
+<td>├ <code>dual_contouring.extract_mesh</code></td>
+<td style="text-align: right;">0.25 s</td>
+</tr>
+<tr class="odd">
+<td>├ TetGen <code>surface_to_tet_mesh</code></td>
+<td style="text-align: right;">0.01 s</td>
+</tr>
+<tr class="even">
+<td>└ <code>tet10_from_tet4</code></td>
+<td style="text-align: right;">0.00 s</td>
+</tr>
+<tr class="odd">
+<td><code>classify</code></td>
+<td style="text-align: right;">0.11 s</td>
+</tr>
+<tr class="even">
+<td><code>_guard_inversions</code></td>
+<td style="text-align: right;">0.00 s</td>
+</tr>
+</tbody>
+</table>
+<p>The mesher and TetGen together are about 1 % of the build. §15.1 records <code>mesh_inspect</code> at warm <strong>1.89 s</strong> on 2026-09-05; <code>with_table</code> landed on 2026-09-08 in d33c9b6. The crease-aware placement — which is right, and which took the bracket’s minimum scaled Jacobian from 1.7e-5 to 0.35 — arrived with a 34× cost that nothing measured.</p>
+</section>
+<section id="the-mechanism-isolated" class="level2">
+<h2 class="anchored" data-anchor-id="the-mechanism-isolated">16.2 The mechanism, isolated</h2>
+<p>One <code>project()</code> call on the largest incidence group (536 points, one field) costs <strong>0.96 s cold and 0.97 s warm</strong>. Identical warm and cold is the whole diagnosis: this is not compilation. <code>project</code> ran its eight Newton steps eagerly, and each step re-walked the scene’s 1006-node table through the Python <code>_Walker</code> in <code>zeroset/evaluate.py</code>, dispatching every primitive as its own one-op XLA program. The starter classifies its 860 surface vertices into 11 incidence groups (727 points on one surface, 132 on two, 1 on three), and each <code>project_table</code> call walks the table once per field per group per Newton step — about 119 walks — which <code>with_table</code>’s fixed point then repeats four times. Roughly 400 walks of a 1006-node table, every node its own dispatch.</p>
+</section>
+<section id="the-fix" class="level2">
+<h2 class="anchored" data-anchor-id="the-fix">16.3 The fix</h2>
+<p>Three changes in <code>cadjoint/zeroset/project.py</code>, one idea:</p>
+<ol type="1">
+<li><strong>One kernel, factored out.</strong> <code>_system(fields)</code> and <code>_iterate(...)</code> hold the arithmetic that <code>project</code> used to inline, so the closure form and the node-table form cannot drift apart.</li>
+<li><strong>The step loop is a <code>lax.fori_loop</code>.</strong> A static trip count lowers to a <code>scan</code>, which differentiates in both modes, and the traced program holds one sweep instead of eight copies of it.</li>
+<li><strong><code>project_table</code> compiles the whole grouped solve as one program, with the design as a traced argument.</strong> The Python loop over incidence groups is unrolled at trace time, so each group still evaluates only the surfaces its own points lie on — the arithmetic is unchanged — but the table is walked symbolically once instead of once per step per group per dispatch. Because <code>theta</code> arrives as an <em>argument</em> rather than as a captured constant, the program is keyed on structure alone (<code>_TABLE_PROGRAMS</code>, an 8-entry working set that pins its model alive so the <code>id()</code> cannot be recycled). The four fixed-point passes in <code>with_table</code> share one compile, and so does every optimizer step through <code>TetMesh.moved</code>.</li>
+</ol>
+<p><code>project</code> itself is jitted fresh per call rather than cached: its <code>fields</code> are opaque closures, and one may capture either an outer trace’s tracers or a scene whose parameters are mutated in place between builds — a cached program would hold the first as a dead tracer and bake the second in as a stale constant. That is the same hazard <code>diff-brep</code>’s <code>refresh._design_functions</code> documents.</p>
+<p>This is the private tier’s <code>_GATHERED_PROGRAMS</code> lesson — <em>put nothing geometric in the cache key</em> — applied to the public node table, which is already data. Nothing crossed the seam; <code>cadjoint/zeroset/</code> is not in it.</p>
+<p>Separately, <code>fem/properties.py::sample_cell_property</code> mapped the material tree over every element centroid with a bare <code>vmap</code>, i.e.&nbsp;one eager walk of the CSG tree per element on every solve. It is now jitted, the same trap <code>edge_hermite_data</code> documents in its own comment.</p>
+</section>
+<section id="the-numbers-the-small-case-first" class="level2">
+<h2 class="anchored" data-anchor-id="the-numbers-the-small-case-first">16.4 The numbers — the small case first</h2>
+<p>The whole-scene build is a bad instrument: it takes a minute, it drags TetGen and the tet fill’s chance behaviour in with it, and on a shared machine it is not reproducible. The mechanism needs none of that. <strong>A box met by a sphere — 87 table nodes, 11 census surfaces, 256 points spread over faces, edges and corners, 8 incidence groups of arity 1 to 3 — shows the whole effect in under a second</strong>, and shows it identically run to run:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 27%">
+<col style="width: 36%">
+<col style="width: 36%">
+</colgroup>
+<thead>
+<tr class="header">
+<th><code>project_table</code>, 256 points, no meshing</th>
+<th style="text-align: right;">first call</th>
+<th style="text-align: right;">each later call</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>a234225</td>
+<td style="text-align: right;">1.34 s</td>
+<td style="text-align: right;"><strong>0.353 s</strong></td>
+</tr>
+<tr class="even">
+<td>this branch</td>
+<td style="text-align: right;">0.33 s</td>
+<td style="text-align: right;"><strong>0.0002 s</strong></td>
+</tr>
+</tbody>
+</table>
+<p>The second column is the one that matters, and it is why the whole-scene build was 60 s. The old code paid 0.35 s on <em>every</em> call and never amortised: each call re-walked the table eagerly. The new code pays a trace and a compile once and then reuses the program at 0.2 ms — about <strong>1 700× on the steady state</strong>. <code>with_table</code> makes four of these calls per build, and the optimizer makes one per step through <code>TetMesh.moved</code>, so that is the multiplier that matters. Output identical bit for bit, 256 rows of 256 (§16.5).</p>
+<p>Measured at load average 2.5-3.5, both arms back to back, and repeatable: the later-call figures vary in the last digit only.</p>
+<p><strong>The derivative is preserved, and that is the check that matters most</strong>, since the optimizer descends through this projection. <code>tests/fem/test_projection.py</code> gives 8 passed and 1 failed on <em>both</em> revisions, and the one failure — <code>TestStarterSurfaceProjection::test_adjoint_agrees_with_finite_differences_off_the_kink</code> — fails with the same numbers on each:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th><code>fin_depth = 1.18</code></th>
+<th style="text-align: right;">adjoint</th>
+<th style="text-align: right;">central difference</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>a234225</td>
+<td style="text-align: right;">118.58440783606784</td>
+<td style="text-align: right;">122.98187576618602</td>
+</tr>
+<tr class="even">
+<td>this branch</td>
+<td style="text-align: right;">118.58440779833472</td>
+<td style="text-align: right;">122.98187576675446</td>
+</tr>
+</tbody>
+</table>
+<p>Ten significant figures of agreement between the revisions, on a reverse-mode derivative taken through the whole starter projection. The 3.7 % gap to the finite difference is pre-existing and is the known kink: a ±1e-4 probe in <code>fin_depth</code> moves a crease vertex across one of the Newton guards, so the difference quotient reads a jump. The test’s docstring claims relative errors below 3e-5, which is no longer true of this scene at this design point, independently of anything here.</p>
+<section id="corroboration-on-the-whole-scene" class="level3">
+<h3 class="anchored" data-anchor-id="corroboration-on-the-whole-scene">Corroboration on the whole scene</h3>
+<p><code>benchmarks/jax_compile_profile.py --repeat 2</code>, <code>scenes/starter.py</code>, fresh cache directory per arm, both arms back to back in one load window. <strong>Contended: the machine carried load average 8-10 throughout</strong> — the <code>diff-brep</code> benchmark, a <code>duct_fairing</code> run at ~380 % CPU and two pytest sessions. Absolutes are inflated; the ratios are fair because the arms are adjacent.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 13%">
+<col style="width: 13%">
+<col style="width: 18%">
+<col style="width: 18%">
+<col style="width: 18%">
+<col style="width: 18%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>mode</th>
+<th></th>
+<th style="text-align: right;">cold</th>
+<th style="text-align: right;">warm</th>
+<th style="text-align: right;">XLA cold</th>
+<th style="text-align: right;">other (warm)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>mesh_inspect</code></td>
+<td>a234225</td>
+<td style="text-align: right;">88.44 s</td>
+<td style="text-align: right;">58.04 s</td>
+<td style="text-align: right;">25.98 s / 1122 progs</td>
+<td style="text-align: right;">57.88 s</td>
+</tr>
+<tr class="even">
+<td></td>
+<td>this branch</td>
+<td style="text-align: right;"><strong>14.12 s</strong></td>
+<td style="text-align: right;"><strong>4.39 s</strong></td>
+<td style="text-align: right;">10.41 s / 250 progs</td>
+<td style="text-align: right;"><strong>0.47 s</strong></td>
+</tr>
+<tr class="odd">
+<td><code>simulate</code></td>
+<td>a234225</td>
+<td style="text-align: right;">103.04 s</td>
+<td style="text-align: right;">59.80 s</td>
+<td style="text-align: right;">39.33 s / 1451 progs</td>
+<td style="text-align: right;">59.62 s</td>
+</tr>
+<tr class="even">
+<td></td>
+<td>this branch</td>
+<td style="text-align: right;"><strong>20.77 s</strong></td>
+<td style="text-align: right;"><strong>4.83 s</strong></td>
+<td style="text-align: right;">15.65 s / 487 progs</td>
+<td style="text-align: right;"><strong>0.60 s</strong></td>
+</tr>
+</tbody>
+</table>
+<p>6.3× cold and 13.2× warm on <code>mesh_inspect</code>; 5.0× and 12.4× on <code>simulate</code>. The <code>other</code> column — the eager-dispatch storm — falls by two orders of magnitude, which is the change; the compile column falls with it only because a compiled program replaces the thousand one-op programs eager dispatch used to emit.</p>
+</section>
+</section>
+<section id="what-it-costs-the-mesh-stated-honestly" class="level2">
+<h2 class="anchored" data-anchor-id="what-it-costs-the-mesh-stated-honestly">16.5 What it costs the mesh, stated honestly</h2>
+<p>First, what does <em>not</em> change. On a small case with no meshing in it — a box met by a sphere, 87 table nodes, 256 points spread over faces, edges and corners, 8 incidence groups of arity 1 to 3 — <code>project_table</code> before and after agrees <strong>bit for bit, 256 rows of 256, maximum absolute difference 0.0</strong>. The arithmetic is preserved exactly; <code>lax.fori_loop</code> and <code>jit</code> did not move it.</p>
+<p>What does change is the <em>single-field</em> projection on a large tree. Running <code>project_points</code> over 2 000 points against the starter’s <code>thermal_body</code>, the two revisions agree bit for bit on <strong>1 702 of 2 000</strong> points and differ by up to 1.7e-4 on the remaining 298 — four orders of magnitude more than float32 round-off, so this is not fusion noise. It is the Newton iteration’s <em>discrete</em> guards: <code>transversal</code>, the per-iteration <code>usable</code> test and <code>isfinite(step)</code> are comparisons, and near a crease — where the gradient is a dead subgradient and two faces are both candidates — a last-bit difference flips one, after which the point steps toward a different face and lands a step away. That is the same non-smoothness <code>research/cutfem</code> measured from the other side (AD 11-13 % off its own FD at 136 of 860 starter surface vertices), and it is exactly what the incidence-aware <code>project_table</code> exists to remove.</p>
+<p>So the DC surface handed to TetGen moves at a few hundred of its vertices, TetGen inserts Steiner points differently, and the mesh is <em>not</em> identical to the one <code>a234225</code> builds:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 13%">
+<col style="width: 13%">
+<col style="width: 18%">
+<col style="width: 18%">
+<col style="width: 18%">
+<col style="width: 18%">
+</colgroup>
+<thead>
+<tr class="header">
+<th><code>scenes/starter.py</code></th>
+<th></th>
+<th style="text-align: right;">nodes</th>
+<th style="text-align: right;">crease vertices</th>
+<th style="text-align: right;">radius ratio min / mean</th>
+<th style="text-align: right;">aspect min / mean</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>float32 (what the viewer runs)</td>
+<td>a234225</td>
+<td style="text-align: right;">5 793</td>
+<td style="text-align: right;">48</td>
+<td style="text-align: right;">0.0348 / 0.6779</td>
+<td style="text-align: right;">1.147 / 1.976</td>
+</tr>
+<tr class="even">
+<td></td>
+<td>this branch</td>
+<td style="text-align: right;">5 741</td>
+<td style="text-align: right;">92</td>
+<td style="text-align: right;"><strong>0.1340</strong> / 0.6777</td>
+<td style="text-align: right;">1.159 / 1.997</td>
+</tr>
+<tr class="odd">
+<td>float64</td>
+<td>a234225</td>
+<td style="text-align: right;">5 955</td>
+<td style="text-align: right;">6</td>
+<td style="text-align: right;">0.0417 / 0.6728</td>
+<td style="text-align: right;">1.104 / 1.987</td>
+</tr>
+<tr class="even">
+<td></td>
+<td>this branch</td>
+<td style="text-align: right;">5 921</td>
+<td style="text-align: right;">6</td>
+<td style="text-align: right;"><strong>0.0291</strong> / 0.6795</td>
+<td style="text-align: right;">1.142 / 1.972</td>
+</tr>
+</tbody>
+</table>
+<p>Node counts move under 1 %, and the <em>mean</em> metrics are unchanged to a few parts in a thousand. The worst element moves in <strong>both directions</strong> — 3.9× better in float32, 30 % worse in float64 — which is the honest reading: this is not a quality change, it is TetGen’s fill responding to a perturbation, and the worst element on this scene is extremely sensitive to it. The size of that sensitivity is measurable independently: flipping only <code>jax_enable_x64</code>, with no code change at all, already swings the raw pre-placement minimum radius ratio 4.6× (0.134 against 0.029). Both arms above sit inside that band.</p>
+<p>Three consequences worth holding onto. First, no minimum-quality claim about this scene means anything at one significant figure — a benchmark that watches <code>radius_ratio.min()</code> on the starter is watching noise. Second, <code>_guard_inversions</code> still guarantees what it always guaranteed: no element is worse after the crease placement than it was in the raw fill, whichever fill that turned out to be. Third, and the useful one: the reason the mesh moves at all is a <em>known defect</em>, not this change. Any edit that perturbs the last bits anywhere upstream of <code>project_points</code> will reshuffle the crease vertices the single-field Newton cannot decide, and therefore the fill. Putting the DC surface projection on the incidence-aware kernel — the thing <code>project_table</code> already does for the volume mesh’s boundary nodes — would make the extraction reproducible as well as faster, and is the obvious next piece of work.</p>
+</section>
+<section id="what-this-does-not-fix" class="level2">
+<h2 class="anchored" data-anchor-id="what-this-does-not-fix">16.6 What this does <em>not</em> fix</h2>
+<p>The solve itself was never the cost and still is not: §4 measures the linear solve at 47 ms, 2.4 % of a warm <code>simulate</code>. The remaining large item is §4.1’s — a novel design changes the node count, so jax-fem’s assembly kernels are compiled for a shape that will never recur (28-30 s of a 31-77 s cold request). The fix for that is shape stability, not a faster solver: pad the mesh onto a rung ladder the way <code>diff-brep</code>’s <code>run_chunked</code> pads its batches (<code>_RUNGS = (256, 1024)</code>, padding by repeating the first row). That is a meshing-side change and is not attempted here.</p>
+</section>
+<section id="reproducing-1" class="level2">
+<h2 class="anchored" data-anchor-id="reproducing-1">16.7 Reproducing</h2>
+<p>Prefer the small case. <code>tests/zeroset/test_project.py::test_the_table_solve_is_ compiled_once_and_reused</code> is the same experiment as an assertion; to see the seconds, lower a <code>Union(Box, Translate(Sphere))</code>, classify a few hundred points over its faces and edges, and time four successive <code>project_table</code> calls. The first is trace-plus-compile, the rest are the steady state, and the ratio between the two revisions is the whole result. It runs in a second and does not care what else the machine is doing.</p>
+<p>The whole-scene corroboration is</p>
+<pre><code>python benchmarks/jax_compile_profile.py --scene scenes/starter.py \
+    --mode mesh_inspect --repeat 2</code></pre>
+<p>with <code>CADJOINT_CACHE_DIR</code> pointed at an empty directory for the cold number and the same directory for the warm one. Check <code>uptime</code> first: on a loaded machine every number above roughly doubles.</p>
+</section>
+<section id="a-finding-that-fell-out-of-the-same-instrumentation-the-48-vs-6-creases" class="level2">
+<h2 class="anchored" data-anchor-id="a-finding-that-fell-out-of-the-same-instrumentation-the-48-vs-6-creases">16.8 A finding that fell out of the same instrumentation: the 48-vs-6 creases</h2>
+<p><code>tests/fem/test_crease_motion.py::test_the_starter_classifies_its_creases_and_holds_its_points</code> asserts more than 50 crease vertices on the starter and fails, and the standing description of the failure was that crease <em>detection</em> collapses when the precision improves — 48 in float32, 6 in float64. Detection is not what collapses. Counting at each stage of the pipeline separately:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 27%">
+<col style="width: 36%">
+<col style="width: 36%">
+</colgroup>
+<thead>
+<tr class="header">
+<th></th>
+<th style="text-align: right;">float32</th>
+<th style="text-align: right;">float64</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>detected by <code>classify</code></td>
+<td style="text-align: right;">133</td>
+<td style="text-align: right;">124</td>
+</tr>
+<tr class="even">
+<td>surviving <code>_guard_inversions</code> (what <code>mesh.incidence</code> holds)</td>
+<td style="text-align: right;">92</td>
+<td style="text-align: right;"><strong>6</strong></td>
+</tr>
+<tr class="odd">
+<td>crease vertices the guard reverted</td>
+<td style="text-align: right;">41 of 133</td>
+<td style="text-align: right;"><strong>118 of 124</strong></td>
+</tr>
+<tr class="even">
+<td>elements in the raw mesh</td>
+<td style="text-align: right;">2 962</td>
+<td style="text-align: right;">3 104</td>
+</tr>
+<tr class="odd">
+<td>raw minimum radius ratio</td>
+<td style="text-align: right;">0.134</td>
+<td style="text-align: right;"><strong>0.029</strong></td>
+</tr>
+<tr class="even">
+<td>elements the placement would degrade</td>
+<td style="text-align: right;">222 of 2 962</td>
+<td style="text-align: right;">1 327 of 3 104</td>
+</tr>
+</tbody>
+</table>
+<p>Detection is stable — 133 against 124. What differs is <em>survival</em>. Turning on x64 changes the dual-contour crossings, which changes what TetGen fills: a different mesh, 142 elements larger, whose worst raw element is 4.6× worse. <code>_guard_inversions</code> reverts any vertex whose incident element’s metric would drop <em>at all</em>, and on the sliver-laden float64 mesh that catches 1 327 elements, so it reverts 95 % of the crease placements.</p>
+<p>So the number the test asserts on is mesh-generation luck read through a very strict guard, not classifier quality. Asserting on <code>classify</code>’s own output would measure what the test says it measures; the guard’s revert rate is a separate and useful thing to watch, because a mesh that provokes it this hard is telling you the raw tet fill has slivers.</p>
+<p>The test now asserts on <code>classify</code> and that assertion passes: 124 crease vertices in x64, on <code>a234225</code> and on this branch alike.</p>
+<p><strong>It still fails, for a second and unrelated reason, and that reason is worth its own line.</strong> <code>moved</code> at the design the mesh was built at does not reproduce <code>mesh.points</code> — it differs by up to <strong>9.756e-06 at 2 884 of 5 955 nodes</strong>. The mesh is not a fixed point of its own motion. The cause is that <code>_guard_inversions</code> reverts a vertex’s <em>position</em> while still handing it a surface to follow (<code>row[:1]</code>), so <code>moved</code> re-projects it onto that census surface, which is not where the raw dual-contour projection had put it. Every number here is identical on <code>a234225</code> and on this branch — 124 / 6 / 9.756e-06 / 3.171e-08 — so it is pre-existing and independent of the compilation work:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>x64, <code>scenes/starter.py</code></th>
+<th style="text-align: right;">a234225</th>
+<th style="text-align: right;">this branch</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>classify</code> crease vertices</td>
+<td style="text-align: right;">124</td>
+<td style="text-align: right;">124</td>
+</tr>
+<tr class="even">
+<td>post-guard <code>mesh.incidence</code></td>
+<td style="text-align: right;">6</td>
+<td style="text-align: right;">6</td>
+</tr>
+<tr class="odd">
+<td><code>moved</code> vs <code>mesh.points</code>, max</td>
+<td style="text-align: right;">9.756e-06</td>
+<td style="text-align: right;">9.756e-06</td>
+</tr>
+<tr class="even">
+<td>nodes over the 1e-8 tolerance</td>
+<td style="text-align: right;">2 884 of 5 955</td>
+<td style="text-align: right;">2 870 of 5 921</td>
+</tr>
+<tr class="odd">
+<td>|f| on the moved surface, max</td>
+<td style="text-align: right;">3.171e-08</td>
+<td style="text-align: right;">3.171e-08</td>
+</tr>
+</tbody>
+</table>
+<p>Fixing it means making the guard and <code>moved</code> agree — either the guard also drops the reverted vertex’s surface, which costs that vertex its design derivative, or the placement is re-solved so the guarded positions are themselves a fixed point. That is a decision about the crease placement, not about speed, so it is left here rather than taken.</p>
 
 
 </section>
