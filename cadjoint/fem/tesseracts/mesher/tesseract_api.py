@@ -290,7 +290,7 @@ def vector_jacobian_product(
         # Normal velocity scale per boundary vertex: s = (vbar . g) / |g|^2
         # with g the interpolant gradient at the frozen vertex position.
         interpolant = make_interpolant(field, origin, spacing)
-        gradients = jax.vmap(jax.grad(lambda p: interpolant(p).reshape(())))(boundary)
+        gradients = jax.jit(jax.vmap(jax.grad(lambda p: interpolant(p).reshape(()))))(boundary)
         squared = jnp.sum(gradients * gradients, axis=-1)
         scale = jnp.sum(cotangent * gradients, axis=-1) / jnp.maximum(squared, 1e-12)
         _, vjp_fn = jax.vjp(values_at_boundary, field)

@@ -399,7 +399,7 @@ def _group_boundary_faces(
 
     centers, normals = _face_geometry(points, faces)
     gradient = np.asarray(
-        jax.vmap(jax.grad(lambda p: jnp.asarray(sdf(p)).reshape(())))(jnp.asarray(centers))
+        jax.jit(jax.vmap(jax.grad(lambda p: jnp.asarray(sdf(p)).reshape(()))))(jnp.asarray(centers))
     )
     axis = np.argmax(np.abs(gradient), axis=-1)
     positive = np.take_along_axis(gradient, axis[:, None], axis=-1)[:, 0] >= 0.0

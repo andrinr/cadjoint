@@ -156,7 +156,10 @@ def patch_signatures(scene: Any, points: Array) -> tuple[np.ndarray, np.ndarray]
     signature = signature_function(scene)
     array = jnp.asarray(points, dtype=jnp.float32)
     flat = array.reshape(-1, 3)
-    leaf_ids, patch_ids = jax.vmap(signature)(flat)
+    # Compiled: `signature` reads every leaf and every patch field of the
+    # scene, so an eager `vmap` is one XLA program per primitive of all of
+    # them.  One `jit` makes the labelling a single program.
+    leaf_ids, patch_ids = jax.jit(jax.vmap(signature))(flat)
     shape = array.shape[:-1]
     return (
         np.asarray(leaf_ids, dtype=np.int32).reshape(shape),

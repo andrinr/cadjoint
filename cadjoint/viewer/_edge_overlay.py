@@ -153,19 +153,17 @@ def _seam_residual(fields: list[Any], points: np.ndarray) -> np.ndarray:
     import jax.numpy as jnp
 
     probes = jnp.asarray(points, dtype=jnp.float32)
-    return np.max(
-        np.stack(
-            [
-                np.abs(
-                    np.asarray(
-                        jax.vmap(lambda p, f=field: jnp.asarray(f(p)))(probes), dtype=np.float64
-                    )
-                )
-                for field in fields
-            ]
-        ),
-        axis=0,
+    # One program over every field, not an eager walk of each: see
+    # `_project_seam_groups`.
+    program = jax.jit(
+        lambda p: jnp.max(
+            jnp.abs(
+                jnp.stack([jax.vmap(lambda q, f=field: jnp.asarray(f(q)))(p) for field in fields])
+            ),
+            axis=0,
+        )
     )
+    return np.asarray(program(probes), dtype=np.float64)
 
 
 def _project_seam_groups_reference(
@@ -248,39 +246,53 @@ def _project_seam_groups(
     start = jnp.asarray(np.concatenate(point_blocks), dtype=jnp.float32)
     picker = jnp.arange(start.shape[0])[:, None]
 
-    def system(x):
-        values, gradients = zip(*(evaluate(x) for evaluate in evaluators))
-        jacobian = jnp.stack(gradients, axis=1)[picker, members] * valid[..., None]
-        gram = jnp.einsum("sij,skj->sik", jacobian, jacobian)
-        return jnp.stack(values, axis=-1)[picker, members] * valid, jacobian, gram
+    # Compiled, not dispatched op by op: five reads of every used leaf's
+    # value and gradient, plus four Newton sweeps of stacks, solves and
+    # einsums.  Eagerly that is one XLA program per primitive per leaf —
+    # hundreds for one call; under one `jit` it is a single program.
+    @jax.jit
+    def solve(start: Any) -> tuple[Any, Any]:
+        def system(x):
+            values, gradients = zip(*(evaluate(x) for evaluate in evaluators))
+            jacobian = jnp.stack(gradients, axis=1)[picker, members] * valid[..., None]
+            gram = jnp.einsum("sij,skj->sik", jacobian, jacobian)
+            return jnp.stack(values, axis=-1)[picker, members] * valid, jacobian, gram
 
-    identity = jnp.eye(width, dtype=start.dtype)
-    _, _, gram0 = system(start)
-    trace = jnp.trace(gram0, axis1=-2, axis2=-1)
-    # A padded row is exactly zero, so it would contribute the smallest
-    # eigenvalue and fail every point with a short operand set.  Lift the
-    # padded diagonal above the real block's spectrum (bounded by its
-    # trace) so the minimum is the real block's own.
-    lifted = gram0 + ((trace[:, None] + 1.0) * (1.0 - valid))[..., None] * identity
-    transversal = jnp.linalg.eigvalsh(lifted)[..., 0] > 1e-2 * trace / counts
+        identity = jnp.eye(width, dtype=start.dtype)
+        _, _, gram0 = system(start)
+        trace = jnp.trace(gram0, axis1=-2, axis2=-1)
+        # A padded row is exactly zero, so it would contribute the smallest
+        # eigenvalue and fail every point with a short operand set.  Lift the
+        # padded diagonal above the real block's spectrum (bounded by its
+        # trace) so the minimum is the real block's own.
+        lifted = gram0 + ((trace[:, None] + 1.0) * (1.0 - valid))[..., None] * identity
+        transversal = jnp.linalg.eigvalsh(lifted)[..., 0] > 1e-2 * trace / counts
 
-    x = start
-    for _ in range(4):
-        residual, jacobian, gram = system(x)
-        # Regularize at a float32-meaningful scale; smaller epsilons
-        # underflow against unit-gradient Gram entries.
-        trace = jnp.trace(gram, axis1=-2, axis2=-1)
-        gram = gram + (1e-4 * trace + 1e-12)[..., None, None] * identity
-        multipliers = jnp.linalg.solve(gram, residual[..., None])[..., 0]
-        step = jnp.einsum("sij,si->sj", jacobian, multipliers)
-        length = jnp.linalg.norm(step, axis=-1, keepdims=True)
-        step = step * jnp.minimum(1.0, max_step / jnp.maximum(length, 1e-9))
-        x = x - step
-    x = jnp.where(transversal[:, None], x, start)
+        # Rolled, so the leaves are traced and lowered once instead of four
+        # times over; `fori_loop` with a static trip count is `scan` and
+        # differentiates like the unrolled form (see
+        # `cadjoint.zeroset.project`, which had the same unrolling).
+        def sweep(_iteration, x):
+            residual, jacobian, gram = system(x)
+            # Regularize at a float32-meaningful scale; smaller epsilons
+            # underflow against unit-gradient Gram entries.
+            trace = jnp.trace(gram, axis1=-2, axis2=-1)
+            gram = gram + (1e-4 * trace + 1e-12)[..., None, None] * identity
+            multipliers = jnp.linalg.solve(gram, residual[..., None])[..., 0]
+            step = jnp.einsum("sij,si->sj", jacobian, multipliers)
+            length = jnp.linalg.norm(step, axis=-1, keepdims=True)
+            step = step * jnp.minimum(1.0, max_step / jnp.maximum(length, 1e-9))
+            return x - step
 
-    values, _gradients = zip(*(evaluate(x) for evaluate in evaluators))
-    # Padded slots are masked to zero and |f| >= 0, so they never win the max.
-    residual = jnp.max(jnp.abs(jnp.stack(values, axis=-1)[picker, members]) * valid, axis=1)
+        x = jax.lax.fori_loop(0, 4, sweep, start)
+        x = jnp.where(transversal[:, None], x, start)
+
+        values, _gradients = zip(*(evaluate(x) for evaluate in evaluators))
+        # Padded slots are masked to zero and |f| >= 0, so they never win the max.
+        residual = jnp.max(jnp.abs(jnp.stack(values, axis=-1)[picker, members]) * valid, axis=1)
+        return x, residual
+
+    x, residual = solve(start)
     projected = np.asarray(x, dtype=np.float64)
     residuals = np.asarray(residual, dtype=np.float64)
 
@@ -381,7 +393,7 @@ def _lattice_layers(scene: Any, grid: Any) -> tuple[np.ndarray, np.ndarray, np.n
         ]
         base = np.asarray(hermite.points, dtype=np.float64)[used]
         probes = jnp.asarray(np.concatenate([base - offsets, base + offsets]), jnp.float32)
-        gradients = np.asarray(jax.vmap(jax.grad(sdf))(probes), dtype=np.float64)
+        gradients = np.asarray(jax.jit(jax.vmap(jax.grad(sdf)))(probes), dtype=np.float64)
         scale = np.linalg.norm(gradients, axis=1, keepdims=True)
         probe_normals = np.where(scale > 1e-9, gradients / np.maximum(scale, 1e-12), 0.0)
         lookup = np.zeros(int(used.max()) + 1, dtype=np.int64)
@@ -410,16 +422,17 @@ def _lattice_layers(scene: Any, grid: Any) -> tuple[np.ndarray, np.ndarray, np.n
     seam_groups: list[tuple[np.ndarray, tuple[int, int]]] = []
     if len(leaves) >= 2 and quads.shape[0] > 0:
         points = jnp.asarray(vertices, dtype=jnp.float32)
-        magnitudes = np.stack(
-            [
-                np.abs(
-                    np.asarray(
-                        jax.vmap(lambda p, field=leaf: jnp.asarray(field(p)))(points),
-                        dtype=np.float64,
+        # Every leaf in one program: an eager `vmap` per leaf dispatches
+        # one XLA program per primitive of that leaf's whole SDF tree.
+        magnitudes = np.abs(
+            np.asarray(
+                jax.jit(
+                    lambda p: jnp.stack(
+                        [jax.vmap(lambda q, f=leaf: jnp.asarray(f(q)))(p) for leaf in leaves]
                     )
-                )
-                for leaf in leaves
-            ]
+                )(points),
+                dtype=np.float64,
+            )
         )
         owners = np.argmin(magnitudes, axis=0)
         # The sharp layer is the DESIGN's feature curves: a dual vertex
@@ -552,14 +565,17 @@ def _lattice_layers(scene: Any, grid: Any) -> tuple[np.ndarray, np.ndarray, np.n
         # is a curve, not a corner fan.
         for seam_rows, (index_a, index_b) in seam_groups:
             points = jnp.asarray(vertices[seam_rows], dtype=jnp.float32)
-            grad_a = np.asarray(
-                jax.vmap(jax.grad(lambda p, f=leaves[index_a]: jnp.asarray(f(p))))(points),
-                dtype=np.float64,
+            # Both operands' gradients in one program, for the reason
+            # `magnitudes` above is one program.
+            pair = jax.jit(
+                lambda p, a=leaves[index_a], b=leaves[index_b]: (
+                    jax.vmap(jax.grad(lambda q: jnp.asarray(a(q))))(p),
+                    jax.vmap(jax.grad(lambda q: jnp.asarray(b(q))))(p),
+                )
             )
-            grad_b = np.asarray(
-                jax.vmap(jax.grad(lambda p, f=leaves[index_b]: jnp.asarray(f(p))))(points),
-                dtype=np.float64,
-            )
+            raw_a, raw_b = pair(points)
+            grad_a = np.asarray(raw_a, dtype=np.float64)
+            grad_b = np.asarray(raw_b, dtype=np.float64)
             cross = np.cross(grad_a, grad_b)
             cross_norms = np.linalg.norm(cross, axis=1, keepdims=True)
             scale = np.linalg.norm(grad_a, axis=1, keepdims=True) * np.linalg.norm(

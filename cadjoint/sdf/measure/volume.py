@@ -37,7 +37,9 @@ def volume(
     X, Y, Z = jnp.meshgrid(x, y, z, indexing="ij")
     points = jnp.stack([X.ravel(), Y.ravel(), Z.ravel()], axis=1)
 
-    distances = jax.vmap(sdf)(points)
+    # Compiled: an eager `vmap` of a scene node dispatches one XLA program
+    # per primitive of the whole tree, and this maps it over the grid once.
+    distances = jax.jit(jax.vmap(sdf))(points)
     indicators = jax.nn.sigmoid(-distances / epsilon)
 
     voxel_vol = (size[0] / resolution) * (size[1] / resolution) * (size[2] / resolution)
