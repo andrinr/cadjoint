@@ -2168,22 +2168,32 @@ genuine (`residual < 0.1 * cell`). Both are knife-edge by construction — at a
 seam the operands are *equal* — so a numerical change reshuffles a few of
 them.
 
-Measured on all four shipped scenes, comparing the whole overlay payload:
+Measured on all four shipped scenes, comparing the whole overlay payload.
+The wire layer's *edge list* is bit-identical on every one of them (same
+count, same index checksum); what moves is where the vertices it indexes sit
+and how many sharp chords are drawn over them:
 
-| scene | wire edges | sharp chords | max vertex move |
-|---|---|---|---:|
-| `duct_sink` | same | 164 → 164, bit-identical | 0 |
-| `bracket` | same | 531 → 531 | 1.2e-7 |
-| `starter` | same | 384 → 384, checksum bit-identical | 3.0e-3 |
-| `end_cap` | same | **311 → 300** | 8.9e-3 |
+| scene | vertices | wire edge list | sharp chords | max vertex move |
+|---|---|---|---|---:|
+| `duct_sink` | 448 | identical | 164 → 164, bit-identical | 0 |
+| `bracket` | 2046 | identical | 531 → 531 | 1.2e-7 |
+| `starter` | 1534 | identical | 384 → 384, checksum bit-identical | 3.0e-3 |
+| `end_cap` | 1736 | identical | **311 → 300** | 8.9e-3 |
+
+A moved vertex is a *seam* vertex: the Newton solve is under-determined along
+the seam curve, so a change of rounding slides the point along the curve
+without leaving it. The overlay grid's cell is 9.4e-2 (`DEFAULT_SIZE` 6.0
+over `_MESH_EDGE_RESOLUTION` 64), so 8.9e-3 is under a tenth of a cell and
+the residual at the moved point is the same or lower.
 
 The mechanism, row by row on `end_cap`'s 790 seam rows: the median change in
 residual is **exactly zero** — most rows are bit-identical — the mean
 residual is marginally *lower* after (1.551e-2 against 1.562e-2, i.e. the
 projection converges no worse), and **one row** of 790 crosses the acceptance
-bar. Four more rows change owner where two leaves are equidistant. The greedy
-chain builder turns those five rows into eleven fewer chords. On `starter`,
-zero rows of 120 cross the bar and the sharp layer is bit-identical.
+bar of 9.375e-3 (620 accepted against 621). Four more rows change owner where
+two leaves are equidistant. The greedy chain builder turns those five rows
+into eleven fewer chords. On `starter`, zero rows of 120 cross the bar — 78
+accepted either way — and the sharp layer is bit-identical.
 
 That the overlay amplifies five knife-edge rows into a 3.5 % change in what
 is drawn is a property of the lattice path, not of this change; it is the
