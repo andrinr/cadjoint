@@ -88,6 +88,12 @@ quartodoc:
   package: cadjoint
   dir: reference
   parser: google
+  # quartodoc 0.11 renders every docstring section cadjoint uses except
+  # Yields, and dies on the first generator or context manager it meets.
+  # tools/quartodoc_yields.py fills that one gap; drop it when upstream
+  # renders Yields itself.
+  renderer:
+    style: _quartodoc_renderer.py
   sections:
     - title: Parameter Extraction
       contents:
