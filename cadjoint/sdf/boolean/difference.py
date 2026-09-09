@@ -28,7 +28,7 @@ class Difference(BooleanOp):
             by the full amount wherever the operands agree.
     """
 
-    def __init__(self, *sdfs, smoothness: float = 0.1):
+    def __init__(self, *sdfs, smoothness: float = 0.0):
         if len(sdfs) == 1 and isinstance(sdfs[0], (tuple, list)):
             sdfs = tuple(sdfs[0])
         self.sdfs = sdfs
