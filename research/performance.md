@@ -2087,9 +2087,15 @@ had said so in their own comments since 7432ef0 and were already compiled;
 `cadjoint/viewer/_edge_overlay.py` had five, including a four-sweep Newton
 solve over every world-frame leaf run entirely op by op.
 
-Not all dozen should be compiled, and §17.6 is the one that measured worse.
-The rule that survives the measurements below is: **compile a map when one
-field is read many times, not when many fields are read once.**
+Not all dozen should be compiled. Compiling a map is a *trade* — a Python
+dispatch per primitive against one trace, one lowering and one XLA compile of
+a fused tree — and §17.3 and §17.6 are the two measurements that show which
+way it goes. What separated the wins from the losses here was, in order:
+how many times one call re-reads the same tree (the overlay's seam solve
+reads every leaf five times; `_residuals` reads each patch once), how wide
+the fused tree ends up (ten leaves against fifty-two patch fields), and
+whether the shapes recur so the compile is paid once. Sites that are not
+obviously on the winning side of that were left alone.
 
 ## 17.1 Two halves of one fix, and why one alone is worse than nothing
 
@@ -2246,13 +2252,18 @@ five-second compile: with it in, `pytest tests/fem` ran for **99 minutes of
 CPU without finishing**, and a `sample` of the process put 923 of 1451 stack
 samples inside `xla::cpu::CpuCompiler::RunBackend`. Reverted.
 
-`cadjoint/fem/hexmesh.py::_group_boundary_faces` went back with it: its
-`argmax` over a gradient names the face groups a boundary condition selects,
-and there is no cheap way to verify that from here.
+Two more went back with it, for the same reason in weaker form — one read of
+one tree per call, no measurement to justify a numerical change:
+`cadjoint/fem/hexmesh.py::_group_boundary_faces`, whose `argmax` over a
+gradient names the face groups a boundary condition selects, and the mesher
+Tesseract's `vector_jacobian_product`, which reads its interpolant's gradient
+once per gradient step.
 
-The rule this leaves is narrower and truer than "jit every `vmap`":
-**compile a map when one field is read many times, not when many fields are
-read once.**
+What is left is the overlay, where the reads-per-call is five and the fused
+tree is the scene, plus the four samplers that have no in-tree caller at all
+(`active_branches`, `patch_signatures`, `sample_material_field`,
+`_seam_residual`) and the two measures, whose outputs are continuous and
+carry no threshold.
 
 ## 17.7 A trap in measuring this
 
