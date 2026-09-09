@@ -28,9 +28,16 @@ jobs:
       # running, but not on every push: with them in, this job runs for hours
       # and nobody waits for it, which is how the suite came to be broken for
       # weeks without anyone noticing. `nightly.yml` runs everything.
+      #
+      # `--durations` because the marking is not finished: tests/fem,
+      # tests/flow and tests/viewer carry no markers at all and
+      # tests/meshing only above 93 s, so this job is still tens of
+      # minutes rather than the seconds tests/sdf manages. A clean
+      # runner is the only place to measure that honestly — a laptop
+      # with agents on it inflates everything by an unknown factor.
       - name: Run tests
         run: |
-          pytest tests/ -q -m "not slow"
+          pytest tests/ -q -m "not slow" --durations=25
 
   lint:
     runs-on: ubuntu-latest
