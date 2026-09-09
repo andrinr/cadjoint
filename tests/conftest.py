@@ -11,6 +11,14 @@ against 3.1, an optimization step 62 against 19 (the measurements in
 The cache is keyed by the lowered HLO plus the backend and JAX version, so
 it cannot serve a stale executable for changed code; ``CADJOINT_NO_COMPILATION_CACHE=1``
 turns it off for a run that wants to measure cold compilation.
+
+It also fails the run if a module leaves ``jax_enable_x64`` on.  That flag
+is process-global: a module that sets it at import, or in a fixture that
+does not restore it, silently makes every later module's arrays float64,
+and the WGSL emitter — which has no 64-bit numeric type — starts refusing
+scenes it should accept.  The symptom lands nowhere near the cause, passes
+when the offending file is run alone, and stayed hidden here for as long as
+CI could not run the suite at all.
 """
 
 from __future__ import annotations
@@ -36,4 +44,35 @@ def pytest_configure(config):
     enable_compilation_cache()
     config.addinivalue_line(
         "markers", "slow: minutes-long (a real mesh extraction, solve or descent)"
+    )
+
+
+def pytest_sessionstart(session):
+    """Remember the precision the session began at."""
+    import jax
+
+    session.config._cadjoint_x64 = jax.config.jax_enable_x64
+
+
+def pytest_sessionfinish(session, exitstatus):
+    """Fail the run if a module left ``jax_enable_x64`` flipped.
+
+    Checked once, at the end, rather than per test: a module is entitled to
+    hold the flag on for its own duration through a scoped fixture, and only
+    failing to put it back is the defect.  Modules that need double
+    precision should follow ``tests/fem/conftest.py`` — save, set, yield,
+    restore.
+    """
+    import jax
+
+    before = getattr(session.config, "_cadjoint_x64", None)
+    if before is None or jax.config.jax_enable_x64 == before:
+        return
+    session.exitstatus = 1
+    print(
+        "\nERROR: the session left jax_enable_x64 as "
+        f"{jax.config.jax_enable_x64} (it began {before}). It is "
+        "process-global, so this makes every later module's arrays float64 "
+        "and the WGSL emitter refuse scenes it should accept. Set it in a "
+        "fixture that restores it, as tests/fem/conftest.py does."
     )
