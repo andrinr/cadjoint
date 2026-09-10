@@ -41,7 +41,7 @@ jobs:
         run: |
           pip install "jax[cpu]>=0.4.20"
           pip install -e ".[dev]" --no-deps
-          pip install pytest scikit-image matplotlib optax optimistix pydantic
+          pip install pytest scikit-image matplotlib optax optimistix pydantic filelock
 
       # `tests/conftest.py` turns JAX's persistent compilation cache on for
       # every session, but a fresh runner starts with nothing in it, so this
