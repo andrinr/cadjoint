@@ -29,7 +29,7 @@ jobs:
         run: |
           pip install "jax[cpu]>=0.4.20"
           pip install -e ".[dev]" --no-deps
-          pip install pytest scikit-image matplotlib optax optimistix pydantic
+          pip install pytest scikit-image matplotlib optax optimistix pydantic filelock
 
       # The same cache as the per-push job, and deliberately the same key
       # prefix: this run compiles everything the fast loop skips as well, so
