@@ -48,7 +48,7 @@ from typing import Any
 import numpy as np
 
 from cadjoint.fem.backends import SolverBackend
-from cadjoint.fem.discretization import ElasticProblem, ThermalProblem
+from cadjoint.fem.discretization import ElasticProblem, ThermalProblem, _require_selection
 from cadjoint.fem.postprocess import hex_von_mises, tet_von_mises
 from cadjoint.studies import NodeSelection
 
@@ -59,15 +59,6 @@ Patch = NodeSelection
 
 #: A solvable volume mesh (HEX8, or TET4/TET10 via the tet path).
 SolveMesh = Any  # any :class:`~cadjoint.fem.discretization.Discretization`
-
-
-def _require_selection(patch: Any) -> None:
-    """Reject anything that is not a :class:`NodeSelection`, naming the fix."""
-    if not isinstance(patch, NodeSelection):
-        raise TypeError(
-            f"Boundary patches are Nodes selections, got {patch!r}. Build one via "
-            "Nodes.box/sphere/halfspace/cylinder/side/predicate."
-        )
 
 
 #: meshio cell type per connectivity width (HEX8 / TET4 / TET10).

@@ -139,3 +139,51 @@ class Discretization(Protocol):
     def traction_work(self, positions: Any, displacement: Any, selection: Any, vector: Any) -> Any:
         """``∫ t · u`` over the faces a traction selection spans, at ``positions``."""
         ...
+
+
+# ── what every discretization needs to satisfy the contract above ─────────
+#
+# Shared implementation, not protocol: each family answers `node_patch`,
+# `face_patch` and `unresolvable` its own way, but the argument check, the
+# prescribed-value rule and the "does this condition still resolve" sweep
+# are the same three answers for all of them.  They lived in `hexmesh` and
+# were imported from there by `tetmesh`, which is the wrong direction —
+# nothing here is about hexahedra.
+
+
+def _require_selection(patch: Any) -> None:
+    from cadjoint.studies import NodeSelection
+
+    if not isinstance(patch, NodeSelection):
+        raise TypeError(
+            f"Boundary patches are Nodes selections, got {patch!r}. Build one via "
+            "Nodes.box/sphere/halfspace/cylinder/side/predicate."
+        )
+
+
+def _scalar_or_traced(value: Any) -> Any:
+    """A prescribed value: a plain number as a float, anything traced untouched."""
+    return float(value) if isinstance(value, (int, float)) else value
+
+
+def _unresolvable_on_mesh(mesh: Any, bcs: list) -> str | None:
+    """The first condition that finds no nodes, or spans no face, on a volume mesh.
+
+    Selections are anchored in space, so a re-meshed design can move a loaded
+    surface out of its selection; node-valued conditions need nodes, the
+    area-integrated ones (``HeatFlux``, ``Traction``) a complete boundary face.
+    """
+    from cadjoint.fem.study import HeatFlux, Traction
+
+    for bc in bcs:
+        label = f"boundary condition {type(bc).__name__} {bc.nodes.describe()}"
+        try:
+            bc.nodes.resolve(mesh)
+        except ValueError:
+            return f"{label} matched no surface nodes"
+        if isinstance(bc, (HeatFlux, Traction)):
+            try:
+                mesh.face_patch(bc.nodes)
+            except ValueError:
+                return f"{label} spans no complete boundary face"
+    return None
