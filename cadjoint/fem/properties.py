@@ -175,7 +175,13 @@ def sample_material_field(sdf: Any, points: Any, cells: Any) -> dict[str, Any]:
     """
     import jax
 
-    return jax.vmap(_material_field(sdf))(cell_centroids(points, cells))
+    # Compiled, not mapped eagerly: `material_at` walks the scene's whole
+    # material tree — every primitive's distance under every blend — and an
+    # uncompiled `vmap` of it dispatches one XLA program per primitive.  One
+    # `jit` makes the sample a single program (`research/performance.md` §17).
+    # The centroids stay outside it, so the connectivity is an argument
+    # rather than a constant baked into the cached executable.
+    return jax.jit(jax.vmap(_material_field(sdf)))(cell_centroids(points, cells))
 
 
 def _is_traced(values: Any) -> bool:

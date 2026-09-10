@@ -2357,3 +2357,229 @@ drops the reverted vertex's surface, which costs that vertex its design
 derivative, or the placement is re-solved so the guarded positions are
 themselves a fixed point. That is a decision about the crease placement, not
 about speed, so it is left here rather than taken.
+
+# 17. The other eager maps: the lattice edge overlay (2026-09-09)
+
+§16 compiled the projection over the node table, which is what a *Gmsh* mesh
+moves through. This is the same defect in the rest of the tree — every place
+that hands `jax.vmap` a bare scene node — and the largest of them is the
+public tier's edge overlay, the one a user without `diff-brep` looks at on
+every compile.
+
+**The rule, and where it was broken.** `jax.vmap(field)(points)` on a scene
+node runs the map *eagerly*: JAX takes every primitive of the whole SDF tree
+through its own one-op program, so one sample costs what the scene is big
+rather than what the point set is big. `edge_hermite_data` and `sample_grid`
+had said so in their own comments since 7432ef0 and were already compiled;
+`grep -rn "jax.vmap(" cadjoint/ | grep -v jit` found a dozen that were not.
+`cadjoint/viewer/_edge_overlay.py` had five, including a four-sweep Newton
+solve over every world-frame leaf run entirely op by op.
+
+Not all dozen should be compiled. Compiling a map is a *trade* — a Python
+dispatch per primitive against one trace, one lowering and one XLA compile of
+a fused tree — and §17.3 and §17.6 are the two measurements that show which
+way it goes. What separated the wins from the losses here was, in order:
+how many times one call re-reads the same tree (the overlay's seam solve
+reads every leaf five times; `_residuals` reads each patch once), how wide
+the fused tree ends up (ten leaves against fifty-two patch fields), and
+whether the shapes recur so the compile is paid once. Sites that are not
+obviously on the winning side of that were left alone.
+
+## 17.1 Two halves of one fix, and why one alone is worse than nothing
+
+Wrapping the map in `jax.jit` is half of it. The other half is that the loop
+around it must be *rolled*. Measured on the projection §16 owns, at the point
+where it had been jitted but not yet rolled, one `jit` around an unrolled
+eight-sweep Newton loop traced the field eight times and lowered eight copies
+of it: **86 MB of HLO and 30 s of
+tracing per `mesh_inspect`**, against 0.98 MB and 0.26 s eager. Wall clock
+went 55.2 s to 53.7 s — the eager dispatch it removed came back as tracing
+and as slower persistent-cache reads of a huge module. With the loop rolled
+into `lax.fori_loop` the same request was 4.1 s at 5.3 MB.
+
+So: **a `jit` whose body repeats the field is a trade, not a win.** Both of
+the tree's Newton loops are rolled now — `zeroset.project` by §16, and
+`_edge_overlay._project_seam_groups` here.
+
+## 17.2 The numbers
+
+The overlay's seam solve alone, on a small solid (four primitives per leaf,
+two leaves, 256 points), with the persistent cache in its own directory —
+this is the measurement that does not care what else the machine is doing:
+
+| `_project_seam_groups` | cold | warm | programs |
+|---|---:|---:|---:|
+| `a234225` | 1.716 s | 0.623 s | 116 |
+| this branch | **0.518 s** | **0.281 s** | **5** |
+
+The whole public-tier request, `--public` so the lattice overlay runs on a
+machine that has `diff-brep` installed, `scenes/starter.py`, the two arms
+interleaved, each with its own cache directory, at load average 2.5–3.5:
+
+| `mesh --public` | cold | warm | in-proc | programs | XLA cold | lower warm | other warm | HLO |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| `a234225` | 25.80 s | 4.05 s | 1.08 s | 1209 (52 distinct) | 21.87 s | 1.66 s | 1.54 s | 0.92 MB |
+| this branch | **6.02 s** | **1.95 s** | 1.22 s | **262 (51)** | **4.23 s** | **0.56 s** | **0.44 s** | 1.44 MB |
+
+A second round of the same pair an hour later, at load 5.5–7, gives 32.22 →
+**7.13 s** cold and 4.73 → **2.27 s** warm: the seconds move with the load,
+the ratio and the program counts do not.
+
+**4.3x cold, 2.1x warm, and a fifth of the programs.** The in-proc column is
+the one that goes the wrong way: a *second identical request in one process*
+is 1.08 s before and 1.22 s after, because the compiled form re-traces
+(0.49 s) where the eager form reuses its one-op programs from the first
+request. The viewer runs each request in a fresh worker, so the warm column
+is the operative one; a persistent worker (§6.1) would want the compiled
+programs memoised on the leaves' identity, which is what the private tier's
+`point_program` does and what §16's `_table_program` does with the design as
+an argument.
+
+## 17.3 The crossover, because there is one
+
+A compiled map is not free: it trades a Python dispatch per primitive for one
+trace, one lowering and one XLA compile of a fused program, and XLA's cost
+grows faster than linearly in the fused tree. The same seam solve with
+**eighteen** primitives per leaf instead of four (measured contended, load
+7–11, both arms back to back):
+
+| `_project_seam_groups`, 18 primitives | cold | of which XLA | warm | programs |
+|---|---:|---:|---:|---:|
+| `a234225` | 3.53 s | 1.34 s | 2.20 s | 116 |
+| this branch | 6.06 s | 4.91 s | **1.36 s** | 5 |
+
+So the compiled form wins warm at both sizes (2.2x at four primitives, 1.6x
+at eighteen) and loses *cold* on a large single leaf, because XLA spends
+4.9 s on one fused program where it spends 1.3 s on 116 small ones. The
+persistent cache pays that once and every later process reads it.
+
+No leaf in the shipped scenes is anywhere near that size — `starter` is the
+4.3x row above — but the shape of the trade is worth knowing before applying
+this rule to a scene with one enormous primitive.
+
+## 17.4 What it moves, stated honestly
+
+Fusing changes float association, and the overlay decides two things with
+hard thresholds on float32 quantities: which world-frame leaf owns a dual
+vertex (`argmin` over leaf magnitudes) and whether a projected seam group is
+genuine (`residual < 0.1 * cell`). Both are knife-edge by construction — at a
+seam the operands are *equal* — so a numerical change reshuffles a few of
+them.
+
+Measured on all four shipped scenes, comparing the whole overlay payload.
+The wire layer's *edge list* is bit-identical on every one of them (same
+count, same index checksum); what moves is where the vertices it indexes sit
+and how many sharp chords are drawn over them:
+
+| scene | vertices | wire edge list | sharp chords | max vertex move |
+|---|---|---|---|---:|
+| `duct_sink` | 448 | identical | 164 → 164, bit-identical | 0 |
+| `bracket` | 2046 | identical | 531 → 531 | 1.2e-7 |
+| `starter` | 1534 | identical | 384 → 384, checksum bit-identical | 3.0e-3 |
+| `end_cap` | 1736 | identical | **311 → 300** | 8.9e-3 |
+
+A moved vertex is a *seam* vertex: the Newton solve is under-determined along
+the seam curve, so a change of rounding slides the point along the curve
+without leaving it. The overlay grid's cell is 9.4e-2 (`DEFAULT_SIZE` 6.0
+over `_MESH_EDGE_RESOLUTION` 64), so 8.9e-3 is under a tenth of a cell and
+the residual at the moved point is the same or lower.
+
+The mechanism, row by row on `end_cap`'s 790 seam rows: the median change in
+residual is **exactly zero** — most rows are bit-identical — the mean
+residual is marginally *lower* after (1.551e-2 against 1.562e-2, i.e. the
+projection converges no worse), and **one row** of 790 crosses the acceptance
+bar of 9.375e-3 (620 accepted against 621). Four more rows change owner where
+two leaves are equidistant. The greedy chain builder turns those five rows
+into eleven fewer chords. On `starter`, zero rows of 120 cross the bar — 78
+accepted either way — and the sharp layer is bit-identical.
+
+That the overlay amplifies five knife-edge rows into a 3.5 % change in what
+is drawn is a property of the lattice path, not of this change; it is the
+same instability §16.5 measured from the mesh side. The honest summary is
+that the drawn feature edges are inside the method's own noise, and that a
+seam acceptance test with hysteresis would be worth more than either arm.
+
+## 17.5 Deliberately not taken: compiling the Hermite gradient
+
+`edge_hermite_data` computes `gradient = jax.vmap(jax.grad(sdf))` and reads it
+three times — the Newton slope, the final normals, the degenerate-gradient
+fallback — without a `jit`, even though the value side beside it has one.
+Compiling it is worth a further **1.7x cold and 1.3x warm** on the request
+above: a round of the same A/B with it in reads 26.47 → 3.62 s cold and
+4.38 → 1.48 s warm at 85 programs, against 25.80 → 6.02 s and 4.05 → 1.95 s
+at 262 without it.
+
+It is not in this branch, because it moves the QEF vertices by up to 3.8e-2
+(most of a cell) and takes `starter`'s sharp chords from 384 to 439 — a 14 %
+change in what the viewer draws, from a gradient that feeds the crease
+classifier's normal-spread threshold. Unlike the seam-acceptance shift above
+it changes the *mesh*, on every extraction and in both tiers. It should be
+taken, with visual QA, as its own change.
+
+## 17.6 Also deliberately not taken: the Gmsh patch table, where the crossover bites
+
+`cadjoint/fem/gmsh.py::_residuals` maps *every patch field of the scene's
+decomposition* over a node set, and `assign_ownership` and
+`snap_toward_patches` between them call it three times per Gmsh build. It
+looks like the same fix, and it is not: the starter's patch table has **52
+fields**, so one compiled program over it is a fused tree fifty-two scenes
+wide — §17.3's crossover, at the far end.
+
+Measured on 512 points and that table:
+
+| `_residuals`, 52 fields | first call | second call |
+|---|---:|---:|
+| `a234225` | 15.91 s | 0.056 s |
+| jitted | 5.18 s | 1.008 s |
+
+Three times faster on the first call and **eighteen times slower on every
+one after**, because each call re-traces a fifty-two-field program while the
+eager form reuses its one-op kernels. Worse, the node count differs from
+entity to entity and from mesh to mesh, so every distinct shape is a fresh
+five-second compile: with it in, `pytest tests/fem` ran for **99 minutes of
+CPU without finishing**, and a `sample` of the process put 923 of 1451 stack
+samples inside `xla::cpu::CpuCompiler::RunBackend`. Reverted.
+
+Two more went back with it, for the same reason in weaker form — one read of
+one tree per call, no measurement to justify a numerical change:
+`cadjoint/fem/hexmesh.py::_group_boundary_faces`, whose `argmax` over a
+gradient names the face groups a boundary condition selects, and the mesher
+Tesseract's `vector_jacobian_product`, which reads its interpolant's gradient
+once per gradient step.
+
+What is left is the overlay, where the reads-per-call is five and the fused
+tree is the scene, plus the four samplers that have no in-tree caller at all
+(`active_branches`, `patch_signatures`, `sample_material_field`,
+`_seam_residual`) and the two measures, whose outputs are continuous and
+carry no threshold.
+
+## 17.7 A trap in measuring this
+
+**A compile count cannot tell an eager map from a compiled one.** The obvious
+test — "give the sampler a bigger field and check it does not compile more" —
+passes on the *unfixed* code: eager one-op programs are keyed on primitive
+and shape, so once the in-process cache is warm a bigger tree compiles
+nothing extra and merely dispatches the same kernels more times. On the
+starter scene the same counter reads 1209 programs because the *shapes* vary
+there, not because the tree is big.
+
+The metric that survives is seconds, and the mechanism behind them is the
+split in `benchmarks/jax_compile_profile.py`: the eager arm above spends
+1.54 s of a 4.05 s warm request in `other` — Python dispatch — with **zero**
+XLA compilations. `tests/test_compiled_fields.py` therefore asserts the shape
+of the computation (one program per sampler, which reads *zero* on the eager
+form) and leaves the seconds to this section.
+
+## 17.8 Reproducing
+
+    S=/tmp/ov; mkdir -p $S; rm -rf $S/cache
+    CADJOINT_CACHE_DIR=$S/cache python benchmarks/jax_compile_profile.py \
+        --scene scenes/starter.py --mode mesh --public          # cold
+    CADJOINT_CACHE_DIR=$S/cache python benchmarks/jax_compile_profile.py \
+        --scene scenes/starter.py --mode mesh --public --repeat 2   # warm
+
+`--public` unregisters the private tier for the run, which is what makes the
+lattice overlay the thing being measured on a machine that has `diff-brep`
+installed. Use a cache directory of your own: the shared one is contended,
+and a number taken against it is not comparable to anything. Check `uptime`
+first — every number above roughly doubles at load 10.

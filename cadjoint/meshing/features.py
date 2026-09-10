@@ -464,9 +464,16 @@ def active_branches(
         raise ValueError("active_branches needs at least two child fields.")
     if mode not in {"min", "max"}:
         raise ValueError("mode must be 'min' or 'max'.")
-    stacked = jnp.stack([jax.vmap(field)(points) for field in child_fields])
-    winner = jnp.argmin(stacked, axis=0) if mode == "min" else jnp.argmax(stacked, axis=0)
-    return np.asarray(jax.lax.stop_gradient(winner), dtype=np.int32)
+    # Every operand in one program: eagerly this walks each child's whole
+    # SDF tree, dispatching an XLA program per primitive of each.
+    pick = jnp.argmin if mode == "min" else jnp.argmax
+
+    @jax.jit
+    def winner(p: Array) -> Array:
+        stacked = jnp.stack([jax.vmap(field)(p) for field in child_fields])
+        return jax.lax.stop_gradient(pick(stacked, axis=0))
+
+    return np.asarray(winner(points), dtype=np.int32)
 
 
 def detect_branch_changes(

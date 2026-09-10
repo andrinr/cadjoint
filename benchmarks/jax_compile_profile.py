@@ -26,6 +26,9 @@ Run one mode in a fresh process, twice, against one cache directory:
 The first run is the cold cliff (XLA compiles every program); the second
 is what a user sees after the server's warm-up.  ``--repeat 2`` runs the
 mode twice in one process, which is what a persistent worker would see.
+``--public`` unregisters the private tier for the run, which is how the
+public paths — the lattice edge overlay above all — are profiled on a
+machine that has ``diff-brep`` installed.
 """
 
 from __future__ import annotations
@@ -248,6 +251,13 @@ def main() -> None:
     )
     ap.add_argument("--steps", type=int, default=2, help="optimize steps")
     ap.add_argument("--repeat", type=int, default=1, help="run the mode N times in-process")
+    ap.add_argument(
+        "--public",
+        action="store_true",
+        help="unregister the private tier's plugin kinds for the run, so the public "
+        "paths (the lattice edge overlay, the faceted exporter) are what is profiled "
+        "even where diff-brep is installed",
+    )
     ap.add_argument("--json", type=Path)
     args = ap.parse_args()
 
@@ -260,26 +270,30 @@ def main() -> None:
     names = _declared_names(source)
     exec_s = time.perf_counter() - t0
 
+    from cadjoint import tier
+
     results = []
-    for i in range(args.repeat):
-        before = len(PROGRAMS)
-        TRACES.clear()
-        TRACE["seconds"] = TRACE["calls"] = 0
-        LOWER["seconds"] = LOWER["calls"] = 0
-        t0 = time.perf_counter()
-        out = _run_mode(args.mode, source, names, args.steps)
-        wall = time.perf_counter() - t0
-        if isinstance(out, dict) and out.get("ok") is False:
-            print(out.get("error"), file=sys.stderr)
-            sys.exit(1)
-        r = _report(f"{args.mode} run {i + 1}/{args.repeat}", wall, before)
-        r["scene"] = args.scene
-        r["cache_dir"] = str(cache_dir)
-        r["scene_exec_seconds"] = exec_s
-        r["jax_cache_events"] = dict(_COUNTS)
-        r["jax_version"] = jax.__version__
-        results.append(r)
-        _print(r)
+    with tier.absent() if args.public else contextlib.nullcontext():
+        for i in range(args.repeat):
+            before = len(PROGRAMS)
+            TRACES.clear()
+            TRACE["seconds"] = TRACE["calls"] = 0
+            LOWER["seconds"] = LOWER["calls"] = 0
+            t0 = time.perf_counter()
+            out = _run_mode(args.mode, source, names, args.steps)
+            wall = time.perf_counter() - t0
+            if isinstance(out, dict) and out.get("ok") is False:
+                print(out.get("error"), file=sys.stderr)
+                sys.exit(1)
+            r = _report(f"{args.mode} run {i + 1}/{args.repeat}", wall, before)
+            r["scene"] = args.scene
+            r["cache_dir"] = str(cache_dir)
+            r["scene_exec_seconds"] = exec_s
+            r["tier"] = "public" if args.public else "installed"
+            r["jax_cache_events"] = dict(_COUNTS)
+            r["jax_version"] = jax.__version__
+            results.append(r)
+            _print(r)
 
     if args.json:
         args.json.parent.mkdir(parents=True, exist_ok=True)

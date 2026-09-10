@@ -88,9 +88,10 @@ def material_mass(
             "sample stands for — since it cannot be inferred from arbitrary points."
         )
 
-    distances = jax.vmap(sdf)(jnp.asarray(points))
+    # Compiled for the reason `cadjoint.sdf.measure.volume` is.
+    distances = jax.jit(jax.vmap(sdf))(jnp.asarray(points))
     indicators = jax.nn.sigmoid(-jnp.reshape(distances, (-1,)) / epsilon)
-    densities = jax.vmap(lambda point: jnp.asarray(sdf.material_at(point)["density"]))(
+    densities = jax.jit(jax.vmap(lambda point: jnp.asarray(sdf.material_at(point)["density"])))(
         jnp.asarray(points)
     )
     return jnp.sum(indicators * jnp.reshape(densities, (-1,))) * cell_volume
