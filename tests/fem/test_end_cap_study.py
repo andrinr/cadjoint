@@ -76,8 +76,17 @@ class TestTheBoundaryConditions:
 
 
 class TestTheSolve:
-    def test_the_study_solves_and_the_field_is_physical(self, cap):
-        result = cap.cap_study.solve()
+    @pytest.fixture(scope="class")
+    def result(self, cap):
+        """One solve for the whole class.
+
+        Both tests below read the same field; solving twice measured 7.1 s of
+        setup and bought nothing, because ``solve()`` is deterministic and
+        neither test mutates what it returns.
+        """
+        return cap.cap_study.solve()
+
+    def test_the_study_solves_and_the_field_is_physical(self, result):
         temperature = np.asarray(result.temperature, dtype=float)
         assert np.isfinite(temperature).all()
         # Heat enters at the bore and leaves at the clamped mounting face.
@@ -86,8 +95,7 @@ class TestTheSolve:
         # the method, not a sign error.
         assert temperature.min() > -0.02 * temperature.max()
 
-    def test_the_hot_spot_is_at_the_bore_not_the_flange(self, cap, mesh):
-        result = cap.cap_study.solve()
+    def test_the_hot_spot_is_at_the_bore_not_the_flange(self, result):
         points = np.asarray(result.mesh.points, dtype=float)
         temperature = np.asarray(result.temperature, dtype=float)
         hottest = points[int(np.argmax(temperature))]

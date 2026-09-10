@@ -6,9 +6,30 @@ on:
   pull_request:
     branches: [main]
 
+# Five CI runs raced on main inside ten minutes on 2026-09-09, each one a
+# 50-minute job computing the same answer. Supersede instead of piling up.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
+    # Bounded, and far below the six-hour default. Every `test` job in this
+    # repository's recorded history ran 33 to 55 minutes and then ended with
+    # "The runner has received a shutdown signal" — no summary, no failing
+    # test, nothing to act on, because `-q` prints one line per 72 tests and
+    # the last 20 minutes produced no line at all. A timeout gives a name
+    # and a duration instead.
+    #
+    # 45 and not 10 because 10 would be a lie today. Measured on a cold
+    # runner, the first 34% of this selection costs 1319 s, and almost all of
+    # that is XLA compilation rather than test work — a stack sample of the
+    # same suite locally sits in LLVM and MLIR, not in numerics. So the honest
+    # cold figure is roughly half an hour, and the way it comes down is the
+    # cache below doing its job across runs, not this number being optimistic.
+    # Lower it when a warm run has been measured.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
@@ -22,15 +43,40 @@ jobs:
           pip install -e ".[dev]" --no-deps
           pip install pytest scikit-image matplotlib optax optimistix pydantic
 
+      # `tests/conftest.py` turns JAX's persistent compilation cache on for
+      # every session, but a fresh runner starts with nothing in it, so this
+      # job paid XLA for the same few thousand programs on every push. The
+      # cache is keyed by the lowered HLO plus the backend and JAX version,
+      # so it cannot serve a stale executable for changed code — carrying it
+      # between runs is safe, and a miss costs only what today already costs.
+      # `github.run_id` makes every run save a fresh entry; `restore-keys`
+      # picks up the newest earlier one.
+      - name: Restore the JAX compilation cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/cadjoint/jax
+          key: cadjoint-jax-${{ runner.os }}-py312-${{ hashFiles('pyproject.toml') }}-${{ github.run_id }}
+          restore-keys: |
+            cadjoint-jax-${{ runner.os }}-py312-${{ hashFiles('pyproject.toml') }}-
+            cadjoint-jax-${{ runner.os }}-py312-
+
       # The fast loop only. The `slow` marker is on the tests that take
       # minutes each because they extract a real mesh, run a real solve or a
       # real descent (tests/conftest.py). They are what makes the suite worth
       # running, but not on every push: with them in, this job runs for hours
       # and nobody waits for it, which is how the suite came to be broken for
       # weeks without anyone noticing. `nightly.yml` runs everything.
+      #
+      # `-v`, not `-q`, and that is the whole lesson of the nine failures this
+      # replaces. `-q` emits one line per 72 tests, so a job killed mid-line
+      # says nothing at all about where it was — every one of those failures
+      # ended after 18 to 26 minutes of total log silence. One line per test
+      # costs a few hundred kilobytes of log and means the last line names the
+      # test that was running. `--durations` is so the cost stays visible
+      # before it creeps back into another 50-minute job.
       - name: Run tests
         run: |
-          pytest tests/ -q -m "not slow"
+          pytest tests/ -v -m "not slow" --durations=25
 
   lint:
     runs-on: ubuntu-latest
