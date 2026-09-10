@@ -354,6 +354,38 @@ class TestTheFieldTheSimulationReads:
         expected = float(shield.aluminium.params[key].value)
         assert float(np.asarray(sampled)) == pytest.approx(expected, rel=1e-5)
 
+    # ---------------------------------------------------------------------
+    # The two tests below build `shield_mesh`, and until the defect described
+    # here is fixed that is not a slow test, it is a runner killer.
+    #
+    # `SimMesh.build` on the hex path goes through `cadjoint.fem.hexmesh`'s
+    # `with_table` into `cadjoint.zeroset.project.project_table`, whose
+    # `_table_program` unrolls its loop over incidence groups at trace time
+    # into a single jitted program. This part produces **147 groups** (68 on
+    # one surface, 36 on two, 43 on three, 2010 points projected), and each
+    # one contributes a whole `_iterate` -- a `fori_loop` carrying a linear
+    # solve, an einsum and an eigvalsh over a 4499-equation scene field -- to
+    # the same jaxpr. Tracing it does not finish: measured on a GitHub
+    # `ubuntu-latest` runner it ran 24 minutes inside
+    # `jax._src.interpreters.partial_eval.get_eqns`, grew RSS from 5.9 GB to
+    # 15.2 GB at about 500 MB a minute, drove available memory to 7 MB and
+    # 3 GB of swap, and the runner was then reclaimed with "The runner has
+    # received a shutdown signal". That is what every CI `test` job in this
+    # repository's history died of, always at 36-39% of the suite, which is
+    # exactly where these two tests sit.
+    #
+    # `end_cap`'s SimMesh is on the cutfem path and never reaches
+    # `_table_program`, which is why it builds in 15.5 s and why this went
+    # unnoticed: the cost is not in meshing generally, it is in trace-time
+    # unrolling that is linear in a group count only a part this complex
+    # reaches.
+    #
+    # Marked rather than cheapened because there is no smaller version of
+    # "the declared simulation mesh builds": a coarser lattice changes which
+    # incidence groups exist, which is the thing under test. The real fix is
+    # in `_table_program` -- stop unrolling 147 groups into one program -- and
+    # until it lands the nightly, which runs everything, will keep dying here.
+    @pytest.mark.slow
     def test_no_property_the_studies_need_is_unspecified_anywhere(self, shield):
         """A hole is geometry, not a substance; it must not erase the alloy."""
         from cadjoint.fem.properties import sample_cell_property
@@ -364,6 +396,8 @@ class TestTheFieldTheSimulationReads:
             assert np.isfinite(values).all(), f"{key}: {np.isnan(values).sum()} nan elements"
             assert values.min() > 0.0
 
+    # Same `shield_mesh.build`, same runner killer -- see the note above.
+    @pytest.mark.slow
     def test_a_study_solves_off_its_simmeshs_domain_alone(self, shield):
         """The call shape `Optimization` uses: a prebuilt mesh and no SDF."""
         mesh = shield.shield_mesh.build(shield.shield)
