@@ -225,6 +225,18 @@ class _Walker:
         # alive for the walk keeps the ids distinct.  (`evaluate.py` carries
         # the same guard for the same reason.)
         self._alive: list[Any] = []
+        # **A memo on `shape` was tried here and buys nothing.**  Counting
+        # visits against distinct shape nodes looks like heavy redundancy —
+        # cylinder_block 3.11x, motor_shield 1.80x, end_cap 1.69x — and it
+        # is tempting to cache the result per node.  Measured, almost none
+        # of those repeats are shareable: 2 of 872 calls on cylinder_block
+        # and **zero** on every other shipped scene.  A shape node is
+        # revisited because a pattern stores its child once and each
+        # instance bounds it over that instance's own warped box, so the
+        # repeats are different computations that happen to share an index,
+        # not the same computation done twice.  A memo keyed on the node
+        # alone would be unsound; keyed on the box as well, as `expr`'s is,
+        # it is sound and never hits.
 
     def expr(
         self, index: int, box: tuple[Interval, Interval, Interval], children, memo
