@@ -437,6 +437,26 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <li><a href="#a-trap-in-measuring-this" id="toc-a-trap-in-measuring-this" class="nav-link" data-scroll-target="#a-trap-in-measuring-this">17.7 A trap in measuring this</a></li>
   <li><a href="#reproducing-2" id="toc-reproducing-2" class="nav-link" data-scroll-target="#reproducing-2">17.8 Reproducing</a></li>
   </ul></li>
+  <li><a href="#shape-stability-in-the-fem-assembly-the-rung-ladder-2026-09-10" id="toc-shape-stability-in-the-fem-assembly-the-rung-ladder-2026-09-10" class="nav-link" data-scroll-target="#shape-stability-in-the-fem-assembly-the-rung-ladder-2026-09-10">18. Shape stability in the FEM assembly: the rung ladder (2026-09-10)</a>
+  <ul class="collapse">
+  <li><a href="#the-premise-checked-before-it-was-believed" id="toc-the-premise-checked-before-it-was-believed" class="nav-link" data-scroll-target="#the-premise-checked-before-it-was-believed">18.1 The premise, checked before it was believed</a></li>
+  <li><a href="#what-actually-recompiles" id="toc-what-actually-recompiles" class="nav-link" data-scroll-target="#what-actually-recompiles">18.2 What actually recompiles</a></li>
+  <li><a href="#the-fix-a-ghost-body-on-a-ladder" id="toc-the-fix-a-ghost-body-on-a-ladder" class="nav-link" data-scroll-target="#the-fix-a-ghost-body-on-a-ladder">18.3 The fix: a ghost body on a ladder</a></li>
+  <li><a href="#the-numbers-the-small-case-first-1" id="toc-the-numbers-the-small-case-first-1" class="nav-link" data-scroll-target="#the-numbers-the-small-case-first-1">18.4 The numbers — the small case first</a>
+  <ul class="collapse">
+  <li><a href="#at-the-node-count-the-starter-actually-has" id="toc-at-the-node-count-the-starter-actually-has" class="nav-link" data-scroll-target="#at-the-node-count-the-starter-actually-has">At the node count the starter actually has</a></li>
+  <li><a href="#corroboration-on-the-whole-scene-1" id="toc-corroboration-on-the-whole-scene-1" class="nav-link" data-scroll-target="#corroboration-on-the-whole-scene-1">Corroboration on the whole scene</a></li>
+  </ul></li>
+  <li><a href="#the-warm-side-which-is-where-this-kind-of-change-goes-wrong" id="toc-the-warm-side-which-is-where-this-kind-of-change-goes-wrong" class="nav-link" data-scroll-target="#the-warm-side-which-is-where-this-kind-of-change-goes-wrong">18.5 The warm side, which is where this kind of change goes wrong</a>
+  <ul class="collapse">
+  <li><a href="#the-ladders-ratio-is-not-the-knob-it-looks-like" id="toc-the-ladders-ratio-is-not-the-knob-it-looks-like" class="nav-link" data-scroll-target="#the-ladders-ratio-is-not-the-knob-it-looks-like">The ladder’s ratio is not the knob it looks like</a></li>
+  <li><a href="#two-placements-measured-and-rejected" id="toc-two-placements-measured-and-rejected" class="nav-link" data-scroll-target="#two-placements-measured-and-rejected">Two placements measured and rejected</a></li>
+  <li><a href="#what-it-costs-the-answer-stated-honestly" id="toc-what-it-costs-the-answer-stated-honestly" class="nav-link" data-scroll-target="#what-it-costs-the-answer-stated-honestly">What it costs the answer, stated honestly</a></li>
+  <li><a href="#what-the-padding-costs-when-it-does-not-help" id="toc-what-the-padding-costs-when-it-does-not-help" class="nav-link" data-scroll-target="#what-the-padding-costs-when-it-does-not-help">What the padding costs when it does not help</a></li>
+  </ul></li>
+  <li><a href="#what-is-left-and-what-was-deliberately-not-taken" id="toc-what-is-left-and-what-was-deliberately-not-taken" class="nav-link" data-scroll-target="#what-is-left-and-what-was-deliberately-not-taken">18.6 What is left, and what was deliberately not taken</a></li>
+  <li><a href="#reproducing-3" id="toc-reproducing-3" class="nav-link" data-scroll-target="#reproducing-3">18.7 Reproducing</a></li>
+  </ul></li>
   </ul>
 </nav>
     </div>
@@ -4576,6 +4596,362 @@ CADJOINT_CACHE_DIR=$S/cache python benchmarks/jax_compile_profile.py \
 CADJOINT_CACHE_DIR=$S/cache python benchmarks/jax_compile_profile.py \
     --scene scenes/starter.py --mode mesh --public --repeat 2   # warm</code></pre>
 <p><code>--public</code> unregisters the private tier for the run, which is what makes the lattice overlay the thing being measured on a machine that has <code>diff-brep</code> installed. Use a cache directory of your own: the shared one is contended, and a number taken against it is not comparable to anything. Check <code>uptime</code> first — every number above roughly doubles at load 10.</p>
+<hr>
+</section>
+</section>
+<section id="shape-stability-in-the-fem-assembly-the-rung-ladder-2026-09-10" class="level1">
+<h1>18. Shape stability in the FEM assembly: the rung ladder (2026-09-10)</h1>
+<p>§16.6 left this as the largest item on the list and named the fix: “a novel design changes the node count, so jax-fem’s assembly kernels are compiled for a shape that will never recur (28–30 s of a 31–77 s cold request). The fix for that is shape stability, not a faster solver: pad the mesh onto a rung ladder the way <code>diff-brep</code>’s <code>run_chunked</code> pads its batches.”</p>
+<p>This section is that, and it is worth saying up front what the <em>shape</em> of the cost turned out to be, because it is not what §4.1’s phrasing suggests.</p>
+<section id="the-premise-checked-before-it-was-believed" class="level2">
+<h2 class="anchored" data-anchor-id="the-premise-checked-before-it-was-believed">18.1 The premise, checked before it was believed</h2>
+<p><strong>§4.1’s table predates §16 and the revision it measured is long gone.</strong> Before building anything, the cheap check from §16.2: <em>is the cost the same cold and warm?</em> If it is, it is not compilation.</p>
+<p>The instrument is a bar — one SDF box with a half-height knob, dual-contoured and tetrahedralised on a 29x15x13 grid, about 900 nodes and 3 100 TET4 elements, solved thermally with one Dirichlet patch and one flux patch. Six values of the knob give six meshes whose node counts differ by a handful, which is exactly what a design edit does. Each design is solved in <strong>its own process</strong> against a <strong>shared</strong> compilation cache, because that is the viewer’s situation: a fresh worker per request, one cache on disk.</p>
+<p><strong>The trap this walked into first, recorded because it looks like an answer.</strong> The first run of that experiment showed every design at 2.2 s, novel or repeated, which reads as “not compilation” and would have killed the whole idea. It was measuring a process with no persistent cache at all: <code>CADJOINT_CACHE_DIR</code> names the directory but <code>cadjoint.cache. enable_compilation_cache()</code> is what points JAX at it, and the probe never called it. The viewer’s worker does (<code>viewer/worker/main.py:404</code>) and so does <code>tests/conftest.py</code>; a bare script does not. With the cache actually on, the same experiment separates cleanly:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>bar, 902 nodes / 3 135 cells, fresh process, shared cache</th>
+<th style="text-align: right;">solve</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>design 1 — empty cache</td>
+<td style="text-align: right;">3.22 s</td>
+</tr>
+<tr class="even">
+<td>design 2 — novel shape</td>
+<td style="text-align: right;">2.51 s</td>
+</tr>
+<tr class="odd">
+<td>design 3 — novel shape</td>
+<td style="text-align: right;">2.81 s</td>
+</tr>
+<tr class="even">
+<td>design 1 <strong>again</strong> — shape already in the cache</td>
+<td style="text-align: right;"><strong>0.80 s</strong></td>
+</tr>
+<tr class="odd">
+<td>design 2 <strong>again</strong></td>
+<td style="text-align: right;"><strong>0.76 s</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Cold and warm differ by 3.3x on the same mesh, so the cost <em>is</em> compilation, and the persistent cache already removes all of it — for a shape it has seen. The whole problem is that a novel design never presents one.</p>
+</section>
+<section id="what-actually-recompiles" class="level2">
+<h2 class="anchored" data-anchor-id="what-actually-recompiles">18.2 What actually recompiles</h2>
+<p>“jax-fem compiles assembly kernels for a shape that never recurs” is right about the effect and misleading about the mechanism, and the difference decides what has to be padded.</p>
+<p>Counting the programs a solve dispatches, and which of them miss the cache: a novel design misses <strong>120–122 of 224</strong>. Only three of those are fused assembly kernels (<code>jit_kernel_jac</code>, from jax-fem’s <code>pre_jit_fns</code>). The rest are §15’s eager one-op storm — <code>jit_inv</code>, <code>jit_cumsum</code>, <code>jit_gather</code>, <code>jit_scatter-add</code>, <code>jit_dynamic_slice</code>, <code>jit__in1d</code>, <code>jit_remainder</code> — each its own XLA program at 10–25 ms, each keyed on its operand shape.</p>
+<p>That matters because a one-op program is keyed on the shape of <em>whatever it touches</em>, not only on the node count. Four families of shape move with a design edit, and all four had to be pinned before the misses fell:</p>
+<ol type="1">
+<li><strong>the node count</strong>, which sets the solution and residual vectors, every scatter target and the tangent’s size;</li>
+<li><strong>the element count</strong>, which sets the assembly and the <code>internal_vars</code>;</li>
+<li><strong>each Dirichlet patch’s selected node count</strong>, which the row elimination indexes with (<code>apply_bc_vec</code>, <code>assign_bc</code>, <code>copy_bc</code>, and PETSc’s <code>zeroRows</code>);</li>
+<li><strong>each surface patch’s selected face count</strong>, which sets its own compiled surface kernel.</li>
+</ol>
+<p>All four had to go: with the node and element counts pinned but the boundary-condition shapes left alone, a design still recompiled 50 programs where its neighbours recompiled 28. The last two of the 28 were self- inflicted and are in §18.5.</p>
+</section>
+<section id="the-fix-a-ghost-body-on-a-ladder" class="level2">
+<h2 class="anchored" data-anchor-id="the-fix-a-ghost-body-on-a-ladder">18.3 The fix: a ghost body on a ladder</h2>
+<p><code>cadjoint/fem/rungs.py</code> holds the ladder and the array padding; <code>fem/jaxfem.py</code> holds the two pieces of jax-fem surgery, next to the face pruning that already does that kind of thing.</p>
+<p><strong>The ladder</strong> is <code>64 * 1.5**k</code> rounded up and unbounded, so a mesh of any size lands on a rung and the padding is never more than half the true count. Eighteen rungs cover every count from 1 to 60 000; §18.5 is why the ratio is 1.5 and not something finer.</p>
+<p><strong>The ghost body</strong> is what fills the gap, and its shape is forced by two constraints that only showed up when it ran.</p>
+<p><em>A padded node cannot be left isolated.</em> The obvious padding — extra rows of <code>points</code> that no element names — is not merely wasteful, it is fatal: an isolated node owns a row of the tangent that no element writes to, so the row has no diagonal entry and PETSc stops with “Matrix is missing diagonal entry in the zeroed row 906”. Every ghost node has to appear in some ghost cell.</p>
+<p><em>A padded cell cannot be degenerate.</em> <code>shape_grads</code> inverts the element Jacobian, so a cell whose nodes share a position produces infinities, and they would sit in the tangent whether or not anything reduces over them.</p>
+<p>Both are answered by the same construction, and it is <code>run_chunked</code>’s rule — <em>pad with a real row</em> — carried up a dimension: <strong>every ghost cell is element 0 again</strong>. Ghost nodes take element 0’s node positions, in element 0’s order, in groups of four (TET4) or ten (TET10); the <code>ghosts % arity</code> left over each get a cell that replaces corner 0 of the first ghost cell and carry corner 0’s position, so that cell is element 0 too — same volume, same orientation, same conditioning. Whatever is left of the cell rung is filled with repeats of a ghost cell, which costs nothing extra: the assembly runs over <code>cell_rung</code> elements either way.</p>
+<p><strong>Why the answer does not move.</strong> Ghost cells name ghost nodes only, so the ghost body shares no degree of freedom with the mesh; the caller pins every ghost node with a Dirichlet condition, so its rows become identity rows and its columns appear only in rows that are eliminated. The real block of the system is the one the unpadded mesh gives.</p>
+<p><strong>The index sets</strong> are padded by repetition, which every consumer in this path is idempotent under — membership (<code>jnp.isin</code>, which decides which faces a patch carries) does not count, and a Dirichlet <code>.set</code> writes the same value twice. The one operation that <em>does</em> accumulate is jax-fem’s <code>res.at[nodes, vecs].add(-values)</code>, and that is why a Dirichlet selection is padded with a <strong>ghost</strong> index rather than one of its own: a repeated real index would subtract its prescribed value twice and move the boundary, while a repeated ghost index moves a degree of freedom that is pinned, disconnected, and cut off the answer before it is returned. The padding is inert by construction rather than by arithmetic.</p>
+<p><strong>Face selections</strong> are padded with <code>(ghost cell, local face 0)</code>, whose contribution lands in eliminated rows for the same reason.</p>
+<p><strong>Per-element material fields</strong> are padded to the cell rung by repeating element 0’s value — a heterogeneous solve carries one modulus or conductivity per element, and jax-fem reads it as an <code>internal_vars</code> entry shaped by the cell count, so an unpadded field on a padded mesh is a shape error rather than a slow solve. This has to happen <em>before</em> <code>_elastic_problem</code> builds the problem class, which bakes the Lame constants into its tensor map.</p>
+</section>
+<section id="the-numbers-the-small-case-first-1" class="level2">
+<h2 class="anchored" data-anchor-id="the-numbers-the-small-case-first-1">18.4 The numbers — the small case first</h2>
+<p>The bar again: 902 nodes, 3 135 TET4 elements, one Dirichlet patch and one flux patch, six designs off one half-height knob. <strong>One design per process, each arm holding its own empty cache directory, the two arms interleaved design by design</strong>, load average 5.6-6.4. <em>Misses</em> is XLA compiles; the rest of the 221-224 programs a solve dispatches are cache reads.</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>bar, TET4</th>
+<th style="text-align: right;"><code>main</code>: solve / misses</th>
+<th style="text-align: right;">this branch: solve / misses</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>design 1 — empty cache</td>
+<td style="text-align: right;">3.72 s / 222</td>
+<td style="text-align: right;">3.70 s / 220</td>
+</tr>
+<tr class="even">
+<td>design 2</td>
+<td style="text-align: right;">3.08 s / 122</td>
+<td style="text-align: right;"><strong>1.09 s / 20</strong></td>
+</tr>
+<tr class="odd">
+<td>design 3</td>
+<td style="text-align: right;">3.78 s / 122</td>
+<td style="text-align: right;"><strong>1.19 s / 20</strong></td>
+</tr>
+<tr class="even">
+<td>design 4</td>
+<td style="text-align: right;">4.36 s / 120</td>
+<td style="text-align: right;"><strong>1.26 s / 20</strong></td>
+</tr>
+<tr class="odd">
+<td>design 5</td>
+<td style="text-align: right;">4.94 s / 121</td>
+<td style="text-align: right;"><strong>1.25 s / 20</strong></td>
+</tr>
+<tr class="even">
+<td>design 6</td>
+<td style="text-align: right;">5.46 s / 121</td>
+<td style="text-align: right;"><strong>1.31 s / 20</strong></td>
+</tr>
+<tr class="odd">
+<td>design 1 again — shapes cached</td>
+<td style="text-align: right;">0.87 s / 0</td>
+<td style="text-align: right;">0.86 s / 0</td>
+</tr>
+<tr class="even">
+<td>design 2 again</td>
+<td style="text-align: right;">0.85 s / 0</td>
+<td style="text-align: right;">0.80 s / 0</td>
+</tr>
+</tbody>
+</table>
+<p><strong>2.8-4.2x on every design after the first, and 122 cache misses become 20.</strong> The first design is unchanged (3.70 against 3.72), and so is the steady state (0.80-0.86 against 0.85-0.87): the ladder is neither a cold tax nor a warm one at this ratio, it simply stops the second design from starting over. (The <code>main</code> column drifts upward across the table — 3.08 to 5.46 s on near-identical meshes — because two other pytest sessions were on the machine. That is exactly why the arms are interleaved: at every instant the two rows either side of each other saw the same load.)</p>
+<p>The temperature field agrees to nine decimals in its sum on every row — §18.5 has the node-by-node difference, which is at machine epsilon.</p>
+<section id="at-the-node-count-the-starter-actually-has" class="level3">
+<h3 class="anchored" data-anchor-id="at-the-node-count-the-starter-actually-has">At the node count the starter actually has</h3>
+<p>The same bar meshed TET10 — 5 650 nodes, 3 135 elements, which is the starter’s scale (§4: 5 726 nodes, 2 957 TET10):</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>bar, TET10</th>
+<th style="text-align: right;"><code>main</code></th>
+<th style="text-align: right;">this branch</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>design 1 — empty cache</td>
+<td style="text-align: right;">4.46 s / 223</td>
+<td style="text-align: right;">4.34 s / 221</td>
+</tr>
+<tr class="even">
+<td>design 2</td>
+<td style="text-align: right;">3.65 s / 123</td>
+<td style="text-align: right;"><strong>1.41 s / 20</strong></td>
+</tr>
+<tr class="odd">
+<td>design 3</td>
+<td style="text-align: right;">4.25 s / 123</td>
+<td style="text-align: right;"><strong>1.37 s / 20</strong></td>
+</tr>
+<tr class="even">
+<td>design 4</td>
+<td style="text-align: right;">4.68 s / 121</td>
+<td style="text-align: right;"><strong>1.38 s / 20</strong></td>
+</tr>
+<tr class="odd">
+<td>design 1 again</td>
+<td style="text-align: right;">0.95 s / 0</td>
+<td style="text-align: right;">0.96 s / 0</td>
+</tr>
+</tbody>
+</table>
+<p>2.6-3.4x, and the same 20-miss floor. The saving per design is about the same in <em>seconds</em> at six times the node count, which is the useful thing to know about it: the cost being removed is a per-program XLA compile, and XLA’s cost for a one-op program barely moves with the size of the operand.</p>
+</section>
+<section id="corroboration-on-the-whole-scene-1" class="level3">
+<h3 class="anchored" data-anchor-id="corroboration-on-the-whole-scene-1">Corroboration on the whole scene</h3>
+<p><code>scenes/starter.py</code> at four fin depths, <code>benchmarks/jax_compile_profile.py --mode simulate</code>, one request per process, own cache per arm, interleaved, load 6.5-7.7. The solve is instrumented separately from the request so the meshing — which this change does not touch — can be told apart from it:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 13%">
+<col style="width: 13%">
+<col style="width: 18%">
+<col style="width: 18%">
+<col style="width: 18%">
+<col style="width: 18%">
+</colgroup>
+<thead>
+<tr class="header">
+<th><code>fin_depth</code></th>
+<th>nodes / cells</th>
+<th style="text-align: right;"><code>main</code>: solve</th>
+<th style="text-align: right;">branch: solve</th>
+<th style="text-align: right;"><code>main</code>: request</th>
+<th style="text-align: right;">branch: request</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1.20 (empty cache)</td>
+<td>5 741 / 2 962</td>
+<td style="text-align: right;">6.48 s</td>
+<td style="text-align: right;">7.70 s</td>
+<td style="text-align: right;">24.03 s</td>
+<td style="text-align: right;">27.39 s</td>
+</tr>
+<tr class="even">
+<td>1.31</td>
+<td>5 782 / 3 003</td>
+<td style="text-align: right;">5.03 s</td>
+<td style="text-align: right;"><strong>1.66 s</strong></td>
+<td style="text-align: right;">19.87 s</td>
+<td style="text-align: right;"><strong>15.39 s</strong></td>
+</tr>
+<tr class="odd">
+<td>1.42</td>
+<td>6 724 / 3 501</td>
+<td style="text-align: right;">7.67 s</td>
+<td style="text-align: right;"><strong>2.71 s</strong></td>
+<td style="text-align: right;">30.14 s</td>
+<td style="text-align: right;"><strong>24.27 s</strong></td>
+</tr>
+<tr class="even">
+<td>1.53</td>
+<td>6 705 / 3 490</td>
+<td style="text-align: right;">8.55 s</td>
+<td style="text-align: right;"><strong>1.77 s</strong></td>
+<td style="text-align: right;">23.73 s</td>
+<td style="text-align: right;"><strong>16.21 s</strong></td>
+</tr>
+</tbody>
+</table>
+<p><strong>The solve is 3.0-4.8x faster on a novel design, and 4.5-7.5 s comes off the whole request</strong> — 19-23 % of a <code>simulate</code>, on a change that touches nothing outside the two tet solve entry points. The misses inside the solve fall from 153-154 to 20, except at <code>fin_depth=1.42</code> where they are 39: that design’s boundary-condition selection crosses a rung even though its node and element counts do not.</p>
+<p>The first request costs 1.2 s more in the solve (7.70 against 6.48) because 248 programs at padded shapes compile a little slower than 223 at true ones. That is paid once per cache directory, and the second design gives it back three times over.</p>
+</section>
+</section>
+<section id="the-warm-side-which-is-where-this-kind-of-change-goes-wrong" class="level2">
+<h2 class="anchored" data-anchor-id="the-warm-side-which-is-where-this-kind-of-change-goes-wrong">18.5 The warm side, which is where this kind of change goes wrong</h2>
+<p>The private tier’s session recorded the trap this family of change falls into: they built the ladder first, it moved cold 17.1 to 16.7 s and made <em>warm</em> worse, and it only paid once the traced body was shared. The warning that came with it — “a rung you add is a trace you pay for” — is why the tables above carry a repeated design as their last rows, and why the growth factor was measured rather than picked.</p>
+<section id="the-ladders-ratio-is-not-the-knob-it-looks-like" class="level3">
+<h3 class="anchored" data-anchor-id="the-ladders-ratio-is-not-the-knob-it-looks-like">The ladder’s ratio is not the knob it looks like</h3>
+<p>It reads as a trade of padded arithmetic against compiles. It is not: what it actually sets is <strong>how often a run of designs crosses a rung</strong>, and a crossing is a partial recompile. Measured on two bar sizes — 900 nodes and 600 nodes, four to six designs each, one design per process, own empty cache per arm:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>growth</th>
+<th style="text-align: right;">later designs</th>
+<th>misses per design</th>
+<th style="text-align: right;">cell padding</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1.25</td>
+<td style="text-align: right;">1.29-2.30 s</td>
+<td>20, 39, 73</td>
+<td style="text-align: right;">13-20 %</td>
+</tr>
+<tr class="even">
+<td><strong>1.50</strong></td>
+<td style="text-align: right;"><strong>1.19-1.33 s</strong></td>
+<td><strong>20, 20, 20</strong></td>
+<td style="text-align: right;">21-27 %</td>
+</tr>
+<tr class="odd">
+<td>2.00</td>
+<td style="text-align: right;">1.19-2.92 s</td>
+<td>20, 105, 20</td>
+<td style="text-align: right;">5-110 %</td>
+</tr>
+</tbody>
+</table>
+<p>1.5 was the only ratio that put every design of a run on one rung on <em>both</em> mesh sizes. 1.25 splits them — a 600-node design and a 616-node design land on different rungs, and the 616-node one then pays 73 misses instead of 20. 2.0 splits them too <em>and</em> pays 100 % padding for the privilege. The padded arithmetic itself is not measurable here: a design whose shapes are already cached solves in 0.92-0.94 s at all three ratios.</p>
+<p><strong>A false lead worth recording, because it nearly became a shipped constant.</strong> On the 900-node bar, growth 1.5 dispatched 221 programs against 1.25’s 248, and was correspondingly faster on every column. That looked like a property of the ratio and it is not: at the 600-node size the counts are 248 / 248 / 244, indistinguishable. The 221 was an accident of that one mesh — at 1.5 its flux patch selected exactly 96 faces, which <em>is</em> a rung, so the face padding did not fire and a handful of shapes happened to coincide with others already compiled. Adopting 1.5 on that number would have been tuning to one mesh. The rung-crossing table above is the reason that survives.</p>
+</section>
+<section id="two-placements-measured-and-rejected" class="level3">
+<h3 class="anchored" data-anchor-id="two-placements-measured-and-rejected">Two placements measured and rejected</h3>
+<p><em>Padding the Dirichlet index lists in <code>jax.numpy</code>.</em> The obvious way to write <code>_pad_dirichlet_selection</code> is <code>jnp.concatenate</code>, and it costs about ten one-op programs keyed on <strong>the unpadded count</strong> — the very count being padded away. Host <code>np.concatenate</code>, device transfer avoided entirely: 28 misses per novel design became 20.</p>
+<p><em>Handing the padded lists back to the device.</em> The mirror image — pad on the host, then <code>jnp.asarray</code> the result so jax-fem indexes with a device array — was tried on the theory that a host index array costs a conversion at each of its several uses per solve. It measured <strong>worse</strong>: 248 programs became 254 for the Dirichlet lists, and 248 became 251 for the face selections. The transfers are not free and jax-fem is happy to index with a host array. Reverted; both stay NumPy.</p>
+</section>
+<section id="what-it-costs-the-answer-stated-honestly" class="level3">
+<h3 class="anchored" data-anchor-id="what-it-costs-the-answer-stated-honestly">What it costs the answer, stated honestly</h3>
+<p>Not nothing, and the number is small enough to be worth naming rather than waving at. Comparing the temperature field the two arms return, node by node, on all six bar designs (TET4 at 897-902 nodes, TET10 at 5 615-5 658):</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>design</th>
+<th style="text-align: right;">nodes</th>
+<th style="text-align: right;">max abs difference</th>
+<th style="text-align: right;">relative to the field’s max</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>TET10, 0.155</td>
+<td style="text-align: right;">5 658</td>
+<td style="text-align: right;">1.09e-14</td>
+<td style="text-align: right;">1.1e-14</td>
+</tr>
+<tr class="even">
+<td>TET10, 0.16</td>
+<td style="text-align: right;">5 650</td>
+<td style="text-align: right;">1.95e-14</td>
+<td style="text-align: right;">1.9e-14</td>
+</tr>
+<tr class="odd">
+<td>TET10, 0.165</td>
+<td style="text-align: right;">5 615</td>
+<td style="text-align: right;">4.11e-15</td>
+<td style="text-align: right;">4.0e-15</td>
+</tr>
+<tr class="even">
+<td>TET10, 0.17</td>
+<td style="text-align: right;">5 632</td>
+<td style="text-align: right;">7.55e-15</td>
+<td style="text-align: right;">7.4e-15</td>
+</tr>
+<tr class="odd">
+<td>TET4, 0.175</td>
+<td style="text-align: right;">897</td>
+<td style="text-align: right;">4.44e-15</td>
+<td style="text-align: right;">4.4e-15</td>
+</tr>
+<tr class="even">
+<td>TET4, 0.18</td>
+<td style="text-align: right;">884</td>
+<td style="text-align: right;">4.55e-15</td>
+<td style="text-align: right;">4.6e-15</td>
+</tr>
+</tbody>
+</table>
+<p><strong>A few units in the last place of float64, and no more.</strong> It is not bit identical, and it cannot be: the tangent handed to PETSc has a few hundred extra identity rows, its nested-dissection ordering therefore differs, and a different elimination order rounds differently. Nothing about the real block of the system changes — the arithmetic on it is the same arithmetic — which is why the difference sits at machine epsilon instead of at the 1e-4 that a changed <em>formulation</em> would give. <code>tests/fem/test_rungs.py::TestPaddingIsInert</code> pins temperature, displacement and the reverse-mode gradient at 1e-12 relative, which is four orders of margin over what is measured here.</p>
+</section>
+<section id="what-the-padding-costs-when-it-does-not-help" class="level3">
+<h3 class="anchored" data-anchor-id="what-the-padding-costs-when-it-does-not-help">What the padding costs when it does not help</h3>
+<p>The last two rows of §18.4’s first table are the honest warm answer: a design whose shapes are already in the cache solves in 0.80-0.86 s with the ladder and 0.85-0.87 s without it. At this ratio the padded arithmetic and the three fewer programs cancel, so the steady state is unchanged. The cost that remains is the first request against a fresh cache, which is up to 1.2 s slower on the whole scene and neutral on the bar.</p>
+<p>Mesh quality is not in these tables because nothing here can move it: the padding lives inside the two solve entry points, after the mesh is built and before its result is returned, and the mesh object never sees it.</p>
+</section>
+</section>
+<section id="what-is-left-and-what-was-deliberately-not-taken" class="level2">
+<h2 class="anchored" data-anchor-id="what-is-left-and-what-was-deliberately-not-taken">18.6 What is left, and what was deliberately not taken</h2>
+<p><strong>Twenty programs still miss on a novel design, and nineteen of them are jax-fem’s.</strong> They are <code>Dirichlet_boundary_conditions</code> in <code>jax_fem/fe.py</code>, lines 252–254: the node set is found with <code>jnp.argwhere</code> over every node, which returns a <em>data-dependent</em> size, and the vector-index and value arrays built from it inherit that size. Padding cannot reach them, because they are computed during problem construction from the real selection — the padding that follows is what fixes every later use of those arrays, but not their birth. The twentieth is the slice that cuts the answer back to the true node count, which is a shape nobody can stabilise: the caller asked for <code>N</code> rows.</p>
+<p>It is worth about 0.3 s per novel design and, unlike the 120 that were removed, it does <strong>not</strong> grow with the mesh: XLA’s cost for a one-op program is roughly flat, so this is a fixed residue rather than a scaling problem. Removing it means not giving jax-fem <code>dirichlet_bc_info</code> at all and installing <code>node_inds_list</code> / <code>vec_inds_list</code> / <code>vals_list</code> directly from NumPy — a bigger bet on jax-fem’s internals than 0.3 s justifies. It is the obvious next piece if this residue ever matters.</p>
+<p><strong>Deliberately not taken: making the ghost count itself a rung.</strong> The tempting symmetry — pad so that the <em>number of ghost nodes</em> is a rung, so the ghost Dirichlet patch is a stable shape too — cannot coexist with the padded node count being a rung. <code>N</code> is arbitrary, so <code>N + G</code> and <code>G</code> cannot both be on a ladder. <code>N + G</code> is the one that drives the solution vector, the residual, every scatter and the tangent, so it is the one that is pinned.</p>
+<p><strong>A rung crossing is still a partial recompile.</strong> A design that moves far enough to change rung pays for the shapes that changed — 39 misses instead of 20 on the starter at <code>fin_depth=1.42</code>, where the node and element counts stayed on their rungs but a boundary-condition selection did not. The ladder makes that the exception rather than the rule; it does not abolish it, and a coarser one would not either (§18.5 measures 2.0 crossing <em>more</em> often than 1.5, not less).</p>
+<p><strong>Not a mesh change.</strong> Nothing here touches meshing. The DC surface, TetGen’s fill, the crease placement and every quality metric are the ones <code>main</code> produces; the padding lives entirely inside the two tet solve entry points and is undone before their result is returned.</p>
+</section>
+<section id="reproducing-3" class="level2">
+<h2 class="anchored" data-anchor-id="reproducing-3">18.7 Reproducing</h2>
+<p>Prefer the small case; it runs in seconds and does not care what else the machine is doing. <code>tests/fem/test_rungs.py</code> is the same experiment as assertions — <code>TestShapesRecur</code> for the shapes, <code>TestPaddingIsInert</code> for the temperature, the displacement and the reverse-mode gradient.</p>
+<p>To see the seconds, solve one design per <em>process</em> against a shared cache, with the arms interleaved and each arm holding its own cache directory:</p>
+<pre><code># arm A: main's behaviour
+CADJOINT_FEM_RUNGS=off CADJOINT_CACHE_DIR=$S/off python probe.py &lt;design&gt;
+# arm B: the ladder
+CADJOINT_CACHE_DIR=$S/on python probe.py &lt;design&gt;</code></pre>
+<p>where <code>probe.py</code> builds one bar mesh at the given half-height and calls <code>tet_thermal_solve</code>, and — this is the part that is easy to get wrong — calls <code>cadjoint.cache.enable_compilation_cache()</code> first. Without it the environment variable names a directory nothing writes to, every run is cold, and the ladder appears to buy nothing (§18.1).</p>
+<p>The whole-scene corroboration is one <code>simulate</code> per design against a shared cache:</p>
+<pre><code>for d in 1.20 1.31 1.42 1.53; do
+  sed "s/^fin_depth = Scalar(1.2,/fin_depth = Scalar($d,/" scenes/starter.py &gt; /tmp/s_$d.py
+  CADJOINT_CACHE_DIR=$S/on python benchmarks/jax_compile_profile.py \
+      --scene /tmp/s_$d.py --mode simulate
+done</code></pre>
+<p>Note what <code>--repeat 2</code> would <em>not</em> show: repeating a request re-presents the same shapes, so both arms are warm and equal. The ladder’s whole subject is the <em>second design</em>, which is why every table above varies the design and holds the cache.</p>
+<p>Check <code>uptime</code> first, and interleave the arms — every number in §18.4 was taken at load average 8–9 with three other pytest sessions on the machine, and the ratios are fair only because the two arms are adjacent in time.</p>
 
 
 </section>
