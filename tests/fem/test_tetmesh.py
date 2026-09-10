@@ -823,6 +823,10 @@ class TestTwoTesseractChain:
         else:
             pytest.skip("no topology-stable FD window found")
 
+    # 40.5 s, and it is already down to three steps: a descent that decreases
+    # is the assertion, and two points cannot show a trend the third confirms.
+    # This is the "real descent" the marker exists for (tests/conftest.py).
+    @pytest.mark.slow
     def test_short_descent_decreases_the_objective(self, chain):
         example, discover, make_objective, frozen, theta0 = chain
         learning_rate = np.array([1e-3, 2e-3, 2e-5])  # per-parameter step scaling
