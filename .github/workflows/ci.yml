@@ -22,6 +22,23 @@ jobs:
           pip install -e ".[dev]" --no-deps
           pip install pytest scikit-image matplotlib optax optimistix pydantic
 
+      # `tests/conftest.py` turns JAX's persistent compilation cache on for
+      # every session, but a fresh runner has nothing in it, so this job paid
+      # XLA for the same few thousand programs on every push. The cache is
+      # keyed by the lowered HLO plus the backend and JAX version — it cannot
+      # serve a stale executable for changed code, so carrying it between runs
+      # is safe, and it is small: a whole directory measured 13 MB for 3330
+      # entries. `github.run_id` in the key makes every run save a fresh
+      # entry; `restore-keys` picks up the newest earlier one.
+      - name: Restore the JAX compilation cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/cadjoint/jax
+          key: cadjoint-jax-${{ runner.os }}-py312-${{ hashFiles('pyproject.toml') }}-${{ github.run_id }}
+          restore-keys: |
+            cadjoint-jax-${{ runner.os }}-py312-${{ hashFiles('pyproject.toml') }}-
+            cadjoint-jax-${{ runner.os }}-py312-
+
       # The fast loop only. The `slow` marker is on the tests that take
       # minutes each because they extract a real mesh, run a real solve or a
       # real descent (tests/conftest.py). They are what makes the suite worth

@@ -146,7 +146,17 @@ satisfy_constraints(scene, steps=2)
 """
 
 RING_ORIGIN = "origin=[0.0, 1.65, 0.15]"
-RING_YS = (0.95, 1.05, 1.12, 1.2, 1.35, 1.65)
+#: Ring heights, one per regime rather than a sweep.  What changes with the
+#: height is how the ring meets the roof: 0.95 buries a stretch of the eave
+#: and cap edges inside the ring, 1.2 grazes it (the tangential-contact case
+#: — surfaces within a cell of each other, and no sharp edge to draw), 1.35
+#: clears it by less than the reach the coverage metric allows, and 1.65 is
+#: the starter's own position, clear of it entirely.  ``_example_config``
+#: switches on 1.3, so the first two exclude the ring's own circles from the
+#: analytic set and the last two include them.  The sweep this replaces also
+#: carried 1.05 and 1.12, which sit between 0.95 and 1.2 in the buried
+#: regime and re-extract the scene (~5 s each) to re-check what 0.95 checks.
+RING_YS = (0.95, 1.2, 1.35, 1.65)
 
 
 # --------------------------------------------------------------------------
@@ -533,30 +543,13 @@ def curve_coverage(segments: np.ndarray, samples: np.ndarray) -> tuple[float, fl
 # --------------------------------------------------------------------------
 
 
-def _visible_runs(scene, label, samples: np.ndarray, others=()) -> list[tuple[str, np.ndarray]]:
-    """Split an analytic curve into the parts that stay cleanly drawable.
+def _split_runs(label, samples: np.ndarray, hidden: np.ndarray) -> list[tuple[str, np.ndarray]]:
+    """The drawable stretches of one curve, given its per-sample hidden mask.
 
-    Two honest reasons an edge stops being a feature curve: another solid
-    swallows it (the copper ring at low heights eats a stretch of the roof
-    cap edges — there is genuinely no edge inside), and another surface
-    passes within a fraction of a cell (tangential contact: the region is
-    seam-contested and nothing sharp exists to draw).  Interior samples and
-    samples within 0.75 cells of a listed other operand are dropped, a
-    further 1.5 cells around each dropped stretch is trimmed (seam
+    A further 1.5 cells around each dropped stretch is trimmed (seam
     junctions replace the edge there), and each remaining run at least 3
     cells long becomes its own curve.
     """
-    import jax
-    import jax.numpy as jnp
-
-    points = jnp.asarray(samples, dtype=jnp.float32)
-    values = np.asarray(jax.vmap(lambda p: jnp.asarray(scene(p)))(points), dtype=np.float64)
-    hidden = values < -1e-3
-    for field in others:
-        magnitude = np.abs(
-            np.asarray(jax.vmap(lambda p, f=field: jnp.asarray(f(p)))(points), dtype=np.float64)
-        )
-        hidden |= magnitude < 0.75 * CELL
     if not hidden.any():
         return [(label, samples)]
     margin = int(np.ceil(1.5 * CELL / (CELL / 4)))
@@ -564,13 +557,65 @@ def _visible_runs(scene, label, samples: np.ndarray, others=()) -> list[tuple[st
     runs: list[tuple[str, np.ndarray]] = []
     start = None
     minimum = int(np.ceil(3.0 * CELL / (CELL / 4)))
-    for index, hidden in enumerate([*padded, True]):
-        if not hidden and start is None:
+    for index, covered in enumerate([*padded, True]):
+        if not covered and start is None:
             start = index
-        elif hidden and start is not None:
+        elif covered and start is not None:
             if index - start >= minimum:
                 runs.append((f"{label}#{len(runs)}", samples[start:index]))
             start = None
+    return runs
+
+
+def _visible_runs(scene, entries) -> list[tuple[str, np.ndarray]]:
+    """Split every analytic curve of one scene into its drawable parts.
+
+    Two honest reasons an edge stops being a feature curve: another solid
+    swallows it (the copper ring at low heights eats a stretch of the roof
+    cap edges — there is genuinely no edge inside), and another surface
+    passes within a fraction of a cell (tangential contact: the region is
+    seam-contested and nothing sharp exists to draw).  Interior samples and
+    samples within 0.75 cells of a listed other operand are dropped.
+
+    **One field evaluation per scene, not one per curve.**  ``jax.vmap`` of
+    a fresh closure traces the whole scene SDF on the first call for a given
+    batch shape, and the curves all have different sample counts — so
+    calling this per curve traced the house SDF fifteen times and cost 9 s
+    where the arithmetic is milliseconds.  Concatenating every curve's
+    samples into one batch makes that a single trace: identical numbers
+    (the field is evaluated point by point either way), a twentieth of the
+    time.  Each listed ``other`` field is evaluated once for the same
+    reason, keyed by identity — within a config they are all the same
+    object.
+    """
+    import jax
+    import jax.numpy as jnp
+
+    if not entries:
+        return []
+    samples = [np.asarray(entry[1], dtype=np.float64) for entry in entries]
+    others = [tuple(entry[2]) if len(entry) > 2 else () for entry in entries]
+    bounds = np.cumsum([0, *(block.shape[0] for block in samples)])
+    points = jnp.asarray(np.concatenate(samples), dtype=jnp.float32)
+
+    def evaluate(field) -> np.ndarray:
+        batched = jax.vmap(lambda p, f=field: jnp.asarray(f(p)))(points)
+        return np.asarray(batched, dtype=np.float64)
+
+    values = evaluate(scene)
+    fields: dict[int, np.ndarray] = {}
+    for group in others:
+        for field in group:
+            if id(field) not in fields:
+                fields[id(field)] = evaluate(field)
+
+    runs: list[tuple[str, np.ndarray]] = []
+    for index, entry in enumerate(entries):
+        start, stop = bounds[index], bounds[index + 1]
+        hidden = values[start:stop] < -1e-3
+        for field in others[index]:
+            hidden = hidden | (np.abs(fields[id(field)][start:stop]) < 0.75 * CELL)
+        runs.extend(_split_runs(entry[0], samples[index], hidden))
     return runs
 
 
@@ -584,10 +629,7 @@ def results():
         assert payload is not None, f"{name}: mesh edge payload unavailable"
         segments = np.asarray(payload["sharp"], dtype=np.float64)
         assert segments.size, f"{name}: no sharp links at all"
-        visible = []
-        for entry in curves:
-            label, samples, *rest = entry
-            visible.extend(_visible_runs(scene, label, samples, rest[0] if rest else ()))
+        visible = _visible_runs(scene, curves)
         coverages = [(label, curve_coverage(segments, samples)) for label, samples in visible]
         computed[name] = {
             "links": segments.shape[0],

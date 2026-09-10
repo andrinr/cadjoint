@@ -31,6 +31,18 @@ jobs:
           pip install -e ".[dev]" --no-deps
           pip install pytest scikit-image matplotlib optax optimistix pydantic
 
+      # Same cache as the per-push job, and deliberately the same key prefix:
+      # this run compiles everything the fast loop skips as well, so what it
+      # leaves behind is a superset of what a push needs.
+      - name: Restore the JAX compilation cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/cadjoint/jax
+          key: cadjoint-jax-${{ runner.os }}-py312-${{ hashFiles('pyproject.toml') }}-${{ github.run_id }}
+          restore-keys: |
+            cadjoint-jax-${{ runner.os }}-py312-${{ hashFiles('pyproject.toml') }}-
+            cadjoint-jax-${{ runner.os }}-py312-
+
       - name: Run the whole suite
         run: |
           pytest tests/ -q --durations=40
