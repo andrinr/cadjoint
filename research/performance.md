@@ -2753,8 +2753,8 @@ near-identical meshes — because two other pytest sessions were on the machine.
 That is exactly why the arms are interleaved: at every instant the two rows
 either side of each other saw the same load.)
 
-The temperature field is the same to nine decimals on every row
-(`Tsum` printed above, identical digit for digit in all six pairs).
+The temperature field agrees to nine decimals in its sum on every row —
+§18.5 has the node-by-node difference, which is at machine epsilon.
 
 ### At the node count the starter actually has
 
