@@ -194,6 +194,20 @@ def test_culling_reproduces_the_flat_field(name, scene):
     assert _deviation(scene, _sample(scene, 20_000, seed=7)) <= TOLERANCE
 
 
+# The most expensive module in the per-push job by a wide margin: measured on
+# a cold GitHub runner this parametrisation alone cost 356 s of a 1319 s run
+# (duct_fairing 156.3 s, starter 127.0 s, the rest smaller), because
+# `_deviation` jits both the flat and the culled field for each scene and a
+# fresh runner has no compilation cache to serve either.
+#
+# Marked rather than shrunk. The point sampling is not the cost — the two
+# compilations are — so cutting 100k points would buy little and weaken the
+# check; and 100k is a deliberate figure, not an accident. What stays in the
+# fast loop is `test_culling_reproduces_the_flat_field`, which asserts the
+# same property over the whole battery of node families at 20k points, so a
+# bound that stops being a lower bound is still caught on every push. What
+# moves to the nightly is the confirmation on the seven real shipped scenes.
+@pytest.mark.slow
 @pytest.mark.parametrize("name,scene", _shipped_scenes(), ids=[n for n, _ in _shipped_scenes()])
 def test_culling_reproduces_the_flat_field_in_shipped_scenes(name, scene):
     """The real scenes, at the 100k points the brief asks for."""
