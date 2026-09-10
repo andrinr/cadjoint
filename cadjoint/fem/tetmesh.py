@@ -66,9 +66,13 @@ from cadjoint.fem.boundary import (
     tet_boundary_faces,
     tet_faces_from_nodes,
 )
-from cadjoint.fem.discretization import Surface
+from cadjoint.fem.discretization import (
+    Surface,
+    _require_selection,
+    _scalar_or_traced,
+    _unresolvable_on_mesh,
+)
 from cadjoint.fem.elements import TET10_EDGES
-from cadjoint.fem.hexmesh import _require_selection, _scalar_or_traced, _unresolvable_on_mesh
 from cadjoint.fem.motion import project_points, recompute_tet_points, smooth_interior_delta
 from cadjoint.fem.quality import tet_aspect_ratios, tet_radius_ratios, tet_volumes
 from cadjoint.meshing import GridSpec, extract_mesh

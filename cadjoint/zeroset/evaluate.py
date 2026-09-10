@@ -17,7 +17,7 @@ from typing import Any
 import jax
 import jax.numpy as jnp
 
-from cadjoint.zeroset.table import Model
+from cadjoint.zeroset.table import Model, node_kind
 
 __all__ = ["census", "field", "surfaces"]
 
@@ -49,10 +49,6 @@ _BINARY = {
 _AXIS = {"X": 0, "Y": 1, "Z": 2}
 
 
-def _kind(node: dict[str, Any]) -> str:
-    return next(iter(node))
-
-
 class _Walker:
     """One evaluation of the table at a batch of points.
 
@@ -71,7 +67,7 @@ class _Walker:
         if i in memo:
             return memo[i]
         node = self.nodes[i]
-        kind = _kind(node)
+        kind = node_kind(node)
         if kind == "lit":
             v = jnp.full(pts.shape[0], node["lit"])
         elif kind == "coord":
@@ -107,7 +103,7 @@ class _Walker:
         if key in self._shapes:
             return self._shapes[key]
         node = self.nodes[i]
-        kind = _kind(node)
+        kind = node_kind(node)
         if kind == "patch":
             v = self.expr(node["patch"], pts, None, {})
         elif kind == "warp":
@@ -153,7 +149,7 @@ def census(model: Model) -> list[tuple[str, list[int], int | tuple[int, int]]]:
 
     def go(i: int, warps: list[int]) -> None:
         node = nodes[i]
-        kind = _kind(node)
+        kind = node_kind(node)
         if kind == "patch":
             out.append(("patch", warps, node["patch"]))
         elif kind == "warp":

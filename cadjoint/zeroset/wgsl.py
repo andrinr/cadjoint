@@ -24,7 +24,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any
 
-from cadjoint.zeroset.table import Model
+from cadjoint.zeroset.table import Model, node_kind
 
 __all__ = ["emit", "emit_dual"]
 
@@ -59,15 +59,44 @@ def _f32(v: float) -> str:
     return s if "." in s or "e" in s else s + ".0"
 
 
-def _kind(node: dict[str, Any]) -> str:
-    return next(iter(node))
-
-
 class _Emitter:
+    """The table's fold to WGSL, over one carrier.
+
+    Both emitters walk the table identically and differ only in what a
+    node's value *is* — a scalar here, a dual number in
+    :class:`_DualEmitter`.  A subclass supplies the carrier (``TYPE``, the
+    three op tables and :meth:`_lift`) and the two places the carrier
+    changes the *shape* of the emitted code rather than one operand's
+    spelling — a warp's chain rule and a hard ``min``/``max`` — and
+    inherits the walk, so a new operation or a new node form is written
+    once.
+    """
+
+    TYPE = "f32"  #: WGSL type of every expression binding and shape function
+    PREFIX = "s"  #: shape functions are named ``s<i>`` (``d<i>`` for the dual)
+    UNARY, BINARY, AXIS = _UNARY, _BINARY, _AXIS
+
     def __init__(self, model: Model, theta_binding: tuple[int, int] | None) -> None:
         self.nodes, self.theta, self.binding = model.nodes, model.theta, theta_binding
         self.functions: list[str] = []
         self.emitted: set[int] = set()
+
+    @staticmethod
+    def _lift(scalar: str) -> str:
+        """A scalar WGSL expression as a value of this carrier.
+
+        Literals and parameters are the only nodes whose value is a plain
+        number in every carrier; a coordinate is not (it carries a unit
+        derivative), which is why ``AXIS`` stays its own table.
+        """
+        return scalar
+
+    def _function(self, name: str, body: list[str]) -> str:
+        """Append ``fn <name>(p) -> TYPE`` with *body*, and return its name."""
+        self.functions.append(
+            f"fn {name}(p: vec3<f32>) -> {self.TYPE} {{\n" + "\n".join(body) + "\n}"
+        )
+        return name
 
     # -- expressions inside one shape function ------------------------------
 
@@ -81,7 +110,7 @@ class _Emitter:
                 continue
             seen.add(i)
             node = self.nodes[i]
-            kind = _kind(node)
+            kind = node_kind(node)
             if kind == "unary":
                 stack.append(node["unary"]["a"])
             elif kind == "binary":
@@ -92,37 +121,49 @@ class _Emitter:
         lines = []
         for i in self._reachable(roots):
             node = self.nodes[i]
-            kind = _kind(node)
+            kind = node_kind(node)
             if kind == "lit":
-                rhs = _f32(node["lit"])
+                rhs = self._lift(_f32(node["lit"]))
             elif kind == "coord":
-                rhs = _AXIS[node["coord"]]
+                rhs = self.AXIS[node["coord"]]
             elif kind == "param":
                 k = node["param"]
-                rhs = f"theta[{k}u]" if self.binding else _f32(self.theta[k])
+                rhs = self._lift(f"theta[{k}u]" if self.binding else _f32(self.theta[k]))
             elif kind == "childValue":
                 if children is None:
                     raise ValueError("`childValue` outside a blend rule")
                 rhs = children[node["childValue"]]
             elif kind == "unary":
-                rhs = _UNARY[node["unary"]["op"]].format(a=f"e{node['unary']['a']}")
+                rhs = self.UNARY[node["unary"]["op"]].format(a=f"e{node['unary']['a']}")
             elif kind == "binary":
                 b = node["binary"]
-                rhs = _BINARY[b["op"]].format(a=f"e{b['a']}", b=f"e{b['b']}")
+                rhs = self.BINARY[b["op"]].format(a=f"e{b['a']}", b=f"e{b['b']}")
             else:
                 raise ValueError(f"node {i} ({kind}) is not an expression")
-            lines.append(f"    let e{i}: f32 = {rhs};")
+            lines.append(f"    let e{i}: {self.TYPE} = {rhs};")
         return lines
 
     # -- shapes, one function each ----------------------------------------------
 
+    def _warp_body(self, w: dict[str, Any], child: str, lets: list[str]) -> list[str]:
+        """Map the point and call the child at it."""
+        return [
+            *lets,
+            f"    let q = vec3<f32>(e{w['imageX']}, e{w['imageY']}, e{w['imageZ']});",
+            f"    return e{w['scale']} * {child}(q);",
+        ]
+
+    def _reduce(self, acc: str, k: int, owning: str) -> str:
+        """Fold one more child into a hard union's or intersection's accumulator."""
+        return f"{'min' if owning == 'MIN' else 'max'}({acc}, c{k})"
+
     def shape(self, i: int) -> str:
-        name = f"s{i}"
+        name = f"{self.PREFIX}{i}"
         if i in self.emitted:
             return name
         self.emitted.add(i)
         node = self.nodes[i]
-        kind = _kind(node)
+        kind = node_kind(node)
         body: list[str]
         if kind == "patch":
             e = node["patch"]
@@ -131,15 +172,11 @@ class _Emitter:
             w = node["warp"]
             child = self.shape(w["child"])
             roots = [w["imageX"], w["imageY"], w["imageZ"], w["scale"]]
-            body = [
-                *self._expr_lets(roots, None),
-                f"    let q = vec3<f32>(e{w['imageX']}, e{w['imageY']}, e{w['imageZ']});",
-                f"    return e{w['scale']} * {child}(q);",
-            ]
+            body = self._warp_body(w, child, self._expr_lets(roots, None))
         elif kind == "combine":
             c = node["combine"]
             kids = [self.shape(ch) for ch in c["children"]]
-            calls = [f"    let c{k}: f32 = {fn}(p);" for k, fn in enumerate(kids)]
+            calls = [f"    let c{k}: {self.TYPE} = {fn}(p);" for k, fn in enumerate(kids)]
             if "blend" in c:
                 rule = c["blend"]["rule"]
                 body = [
@@ -150,15 +187,13 @@ class _Emitter:
             elif c["owning"] == "COMPLEMENT":
                 body = [*calls, "    return -c0;"]
             else:
-                op = "min" if c["owning"] == "MIN" else "max"
                 acc = "c0"
                 for k in range(1, len(kids)):
-                    acc = f"{op}({acc}, c{k})"
+                    acc = self._reduce(acc, k, c["owning"])
                 body = [*calls, f"    return {acc};"]
         else:
             raise ValueError(f"node {i} ({kind}) is not a shape")
-        self.functions.append(f"fn {name}(p: vec3<f32>) -> f32 {{\n" + "\n".join(body) + "\n}")
-        return name
+        return self._function(name, body)
 
 
 def emit(model: Model, *, theta_binding: tuple[int, int] | None = None) -> str:
@@ -244,37 +279,25 @@ fn zs_atan2(a: vec4<f32>, b: vec4<f32>) -> vec4<f32> {
 
 
 class _DualEmitter(_Emitter):
-    """Shape and surface functions returning ``vec4<f32>``: value and gradient."""
+    """Shape and surface functions returning ``vec4<f32>``: value and gradient.
 
-    def _expr_lets(self, roots: Iterable[int], children: list[str] | None) -> list[str]:
-        lines = []
-        for i in self._reachable(roots):
-            node = self.nodes[i]
-            kind = _kind(node)
-            if kind == "lit":
-                rhs = f"vec4<f32>({_f32(node['lit'])}, 0.0, 0.0, 0.0)"
-            elif kind == "coord":
-                rhs = _DUAL_AXIS[node["coord"]]
-            elif kind == "param":
-                k = node["param"]
-                value = f"theta[{k}u]" if self.binding else _f32(self.theta[k])
-                rhs = f"vec4<f32>({value}, 0.0, 0.0, 0.0)"
-            elif kind == "childValue":
-                if children is None:
-                    raise ValueError("`childValue` outside a blend rule")
-                rhs = children[node["childValue"]]
-            elif kind == "unary":
-                rhs = _DUAL_UNARY[node["unary"]["op"]].format(a=f"e{node['unary']['a']}")
-            elif kind == "binary":
-                b = node["binary"]
-                rhs = _DUAL_BINARY[b["op"]].format(a=f"e{b['a']}", b=f"e{b['b']}")
-            else:
-                raise ValueError(f"node {i} ({kind}) is not an expression")
-            lines.append(f"    let e{i}: vec4<f32> = {rhs};")
-        return lines
+    The carrier is the only difference from :class:`_Emitter`: the same
+    walk, with a dual number where it had a scalar.  Two rules do not fit
+    in an operand's spelling and are overridden instead — a warp chains
+    the gradient through the point map, and a hard ``min``/``max`` has to
+    ``select`` the whole dual rather than the value alone, or the surviving
+    operand's gradient would be lost.
+    """
+
+    TYPE = "vec4<f32>"
+    PREFIX = "d"
+    UNARY, BINARY, AXIS = _DUAL_UNARY, _DUAL_BINARY, _DUAL_AXIS
 
     @staticmethod
-    def _warp_lines(w: dict[str, Any], child: str, lets: list[str]) -> list[str]:
+    def _lift(scalar: str) -> str:
+        return f"vec4<f32>({scalar}, 0.0, 0.0, 0.0)"
+
+    def _warp_body(self, w: dict[str, Any], child: str, lets: list[str]) -> list[str]:
         """Map the point, call the child at it, and chain: ∂f/∂p = (∂q/∂p)ᵀ ∂f/∂q."""
         ix, iy, iz, sc = w["imageX"], w["imageY"], w["imageZ"], w["scale"]
         return [
@@ -285,48 +308,9 @@ class _DualEmitter(_Emitter):
             f"    return vec4<f32>(e{sc}.x * inner.x, e{sc}.x * grad + inner.x * e{sc}.yzw);",
         ]
 
-    def shape(self, i: int) -> str:
-        name = f"d{i}"
-        if i in self.emitted:
-            return name
-        self.emitted.add(i)
-        node = self.nodes[i]
-        kind = _kind(node)
-        body: list[str]
-        if kind == "patch":
-            e = node["patch"]
-            body = [*self._expr_lets([e], None), f"    return e{e};"]
-        elif kind == "warp":
-            w = node["warp"]
-            child = self.shape(w["child"])
-            body = self._warp_lines(
-                w, child, self._expr_lets([w["imageX"], w["imageY"], w["imageZ"], w["scale"]], None)
-            )
-        elif kind == "combine":
-            c = node["combine"]
-            kids = [self.shape(ch) for ch in c["children"]]
-            calls = [f"    let c{k}: vec4<f32> = {fn}(p);" for k, fn in enumerate(kids)]
-            if "blend" in c:
-                rule = c["blend"]["rule"]
-                body = [
-                    *calls,
-                    *self._expr_lets([rule], [f"c{k}" for k in range(len(kids))]),
-                    f"    return e{rule};",
-                ]
-            elif c["owning"] == "COMPLEMENT":
-                body = [*calls, "    return -c0;"]
-            else:
-                pick = "<=" if c["owning"] == "MIN" else ">="
-                acc = "c0"
-                for k in range(1, len(kids)):
-                    acc = f"select(c{k}, {acc}, {acc}.x {pick} c{k}.x)"
-                body = [*calls, f"    return {acc};"]
-        else:
-            raise ValueError(f"node {i} ({kind}) is not a shape")
-        self.functions.append(
-            f"fn {name}(p: vec3<f32>) -> vec4<f32> {{\n" + "\n".join(body) + "\n}"
-        )
-        return name
+    def _reduce(self, acc: str, k: int, owning: str) -> str:
+        pick = "<=" if owning == "MIN" else ">="
+        return f"select(c{k}, {acc}, {acc}.x {pick} c{k}.x)"
 
     def surface(self, k: int, kind: str, warps: list[int], what: Any) -> str:
         """A census entry as ``fn surf<k>(p) -> vec4``: its own field, through its warps."""
@@ -339,25 +323,19 @@ class _DualEmitter(_Emitter):
             i, e = what
             c = self.nodes[i]["combine"]
             kids = [self.shape(ch) for ch in c["children"]]
-            calls = [f"    let c{j}: vec4<f32> = {fn}(p);" for j, fn in enumerate(kids)]
+            calls = [f"    let c{j}: {self.TYPE} = {fn}(p);" for j, fn in enumerate(kids)]
             leaf_body = [
                 *calls,
                 *self._expr_lets([e], [f"c{j}" for j in range(len(kids))]),
                 f"    return e{e};",
             ]
-        name = f"surf{k}_{len(warps)}"
-        self.functions.append(
-            f"fn {name}(p: vec3<f32>) -> vec4<f32> {{\n" + "\n".join(leaf_body) + "\n}"
-        )
+        name = self._function(f"surf{k}_{len(warps)}", leaf_body)
         # each warp above it, innermost first, wraps the function below
         for depth, wi in reversed(list(enumerate(warps))):
             w = self.nodes[wi]["warp"]
-            inner, name = name, f"surf{k}_{depth}"
-            lines = self._warp_lines(
-                w, inner, self._expr_lets([w["imageX"], w["imageY"], w["imageZ"], w["scale"]], None)
-            )
-            self.functions.append(
-                f"fn {name}(p: vec3<f32>) -> vec4<f32> {{\n" + "\n".join(lines) + "\n}"
+            roots = [w["imageX"], w["imageY"], w["imageZ"], w["scale"]]
+            name = self._function(
+                f"surf{k}_{depth}", self._warp_body(w, name, self._expr_lets(roots, None))
             )
         return name
 

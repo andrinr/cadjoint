@@ -32,6 +32,17 @@ Index = int
 Vec3 = tuple[Index, Index, Index]
 
 
+def node_kind(node: dict[str, Any]) -> str:
+    """Which of the grammar's forms *node* is — its single key.
+
+    Lives with the table rather than in each walker: the encoding of "what
+    kind of node is this" is the table's own, and every fold over it
+    (:mod:`.evaluate`, :mod:`.wgsl`, :mod:`.bounds`) asks the question the
+    same way.
+    """
+    return next(iter(node))
+
+
 @dataclass(frozen=True)
 class Model:
     """A lowered model: the table, its root shape, and the design as data."""

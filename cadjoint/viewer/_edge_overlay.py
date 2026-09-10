@@ -194,8 +194,6 @@ def _project_seam_groups(
 ) -> list[tuple[np.ndarray, np.ndarray]]:
     """Project every seam group at once, in one all-leaf program.
 
-    Retired with the rest of this section; see its banner.
-
     :func:`_project_to_seam` is exact but pays a fixed cost per call —
     building the ``vmap(value_and_grad)`` evaluators and dispatching four
     Newton iterations op-by-op — that is independent of how many points it

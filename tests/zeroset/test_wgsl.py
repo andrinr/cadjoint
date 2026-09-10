@@ -15,14 +15,16 @@ import pytest
 
 from cadjoint.zeroset import lower
 from cadjoint.zeroset.evaluate import field
-from cadjoint.zeroset.wgsl import emit
-from tests.backends.test_wgsl_direct import _evaluate_on_device
+from cadjoint.zeroset.wgsl import emit, emit_dual
 from tests.zeroset.test_lowering import NODES, SCENES
-
-wgpu = pytest.importorskip("wgpu")
 
 
 def _gpu_field(model, pts):
+    # The device is reached from here rather than at import, so the tests
+    # below that only read the emitted text still run without a GPU.
+    pytest.importorskip("wgpu")
+    from tests.backends.test_wgsl_direct import _evaluate_on_device
+
     return _evaluate_on_device(emit(model), pts.astype(np.float32))
 
 
@@ -81,3 +83,40 @@ def test_theta_can_be_a_buffer_instead_of_literals():
     baked, bound = emit(model), emit(model, theta_binding=(2, 0))
     assert "0.8" in baked and "theta[0u]" in bound
     assert "@group(2) @binding(0) var<storage, read> theta: array<f32>;" in bound
+
+
+# ── the two emitters are one fold over two carriers ──────────────────────────
+
+
+def test_every_fold_over_the_table_knows_every_operation():
+    """One operation, four rules: JAX values, intervals, WGSL, WGSL duals.
+
+    The folds are deliberately *not* merged — each carries a different value
+    type and one of them emits text — so the standing hazard is an operation
+    given a rule in one table and forgotten in another, which surfaces only
+    as a ``KeyError`` on the first scene that lowers to it.  This is the
+    check that stands in for merging them.
+    """
+    from cadjoint.zeroset import bounds, evaluate, wgsl
+
+    for tables in (
+        (evaluate._UNARY, bounds._UNARY, wgsl._UNARY, wgsl._DUAL_UNARY),
+        (evaluate._BINARY, bounds._BINARY, wgsl._BINARY, wgsl._DUAL_BINARY),
+    ):
+        expected = set(tables[0])
+        for table in tables[1:]:
+            assert set(table) == expected
+
+
+@pytest.mark.parametrize("label", list(NODES))
+def test_the_two_emitters_reach_the_same_shape_nodes(label):
+    """Value and dual emit one function per shape node, and the same ones.
+
+    They share :meth:`_Emitter.shape`, so this is what that sharing buys:
+    the dual cannot silently stop following a node form the value emitter
+    follows.  Names differ only in their prefix (``s`` against ``d``).
+    """
+    model = lower(NODES[label]())
+    value = set(re.findall(r"^fn s(\d+)\(", emit(model), re.M))
+    dual = set(re.findall(r"^fn d(\d+)\(", emit_dual(model), re.M))
+    assert value == dual

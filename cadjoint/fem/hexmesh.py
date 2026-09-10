@@ -43,7 +43,12 @@ from cadjoint.fem.boundary import (
     faces_from_nodes,
     select_faces,
 )
-from cadjoint.fem.discretization import Surface
+from cadjoint.fem.discretization import (
+    Surface,
+    _require_selection,
+    _scalar_or_traced,
+    _unresolvable_on_mesh,
+)
 from cadjoint.fem.elements import HEX_CORNER_OFFSETS
 from cadjoint.fem.motion import project_points, recompute_points
 from cadjoint.fem.quality import aspect_ratios, corner_tet_volumes, scaled_jacobians
@@ -360,44 +365,6 @@ def _guard_inversions(
         parents = proposed[: mesh.num_corner_points]
         proposed[mesh.num_corner_points :] = parents[mesh.edge_parents].mean(axis=1)
     return proposed, incidence
-
-
-def _require_selection(patch: Any) -> None:
-    from cadjoint.studies import NodeSelection
-
-    if not isinstance(patch, NodeSelection):
-        raise TypeError(
-            f"Boundary patches are Nodes selections, got {patch!r}. Build one via "
-            "Nodes.box/sphere/halfspace/cylinder/side/predicate."
-        )
-
-
-def _scalar_or_traced(value: Any) -> Any:
-    """A prescribed value: a plain number as a float, anything traced untouched."""
-    return float(value) if isinstance(value, (int, float)) else value
-
-
-def _unresolvable_on_mesh(mesh: Any, bcs: list) -> str | None:
-    """The first condition that finds no nodes, or spans no face, on a volume mesh.
-
-    Selections are anchored in space, so a re-meshed design can move a loaded
-    surface out of its selection; node-valued conditions need nodes, the
-    area-integrated ones (``HeatFlux``, ``Traction``) a complete boundary face.
-    """
-    from cadjoint.fem.study import HeatFlux, Traction
-
-    for bc in bcs:
-        label = f"boundary condition {type(bc).__name__} {bc.nodes.describe()}"
-        try:
-            bc.nodes.resolve(mesh)
-        except ValueError:
-            return f"{label} matched no surface nodes"
-        if isinstance(bc, (HeatFlux, Traction)):
-            try:
-                mesh.face_patch(bc.nodes)
-            except ValueError:
-                return f"{label} spans no complete boundary face"
-    return None
 
 
 def _evaluate_sdf(sdf: Callable[[Any], Any], points: np.ndarray) -> np.ndarray:

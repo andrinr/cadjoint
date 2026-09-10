@@ -57,7 +57,7 @@ from typing import Any
 
 import numpy as np
 
-from cadjoint.zeroset.table import Model
+from cadjoint.zeroset.table import Model, node_kind
 
 __all__ = ["Interval", "bound_field", "surface_cells"]
 
@@ -209,10 +209,6 @@ _BINARY = {
 _AXIS = {"X": 0, "Y": 1, "Z": 2}
 
 
-def _kind(node: dict[str, Any]) -> str:
-    return next(iter(node))
-
-
 class _Walker:
     """The table's fold, carrying intervals instead of point values."""
 
@@ -233,7 +229,7 @@ class _Walker:
         if key in memo:
             return memo[key]
         node = self.nodes[index]
-        kind = _kind(node)
+        kind = node_kind(node)
         n = box[0].lo.shape[0]
         if kind == "lit":
             value = _constant(node["lit"], n)
@@ -258,7 +254,7 @@ class _Walker:
     def shape(self, index: int, box: tuple[Interval, Interval, Interval]) -> Interval:
         self._alive.append(box)
         node = self.nodes[index]
-        kind = _kind(node)
+        kind = node_kind(node)
         memo: dict = {}
         if kind == "patch":
             return self.expr(node["patch"], box, None, memo)
