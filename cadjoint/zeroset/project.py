@@ -239,6 +239,89 @@ def project_table(
     return program(jnp.asarray(theta), jnp.asarray(points))
 
 
+def _arity_classes(groups: tuple) -> list[tuple[int, np.ndarray, np.ndarray, list[int]]]:
+    """The incidence groups collapsed to one class per surface count.
+
+    Groups of the same arity differ only in data, so they are merged into
+    one batch and the surface identity becomes a column index.  The rows of
+    a class are its groups' rows concatenated, and they stay disjoint
+    across classes because a point has one incidence, so writing the
+    classes back one after another is the same as writing the groups back
+    one after another.
+
+    Args:
+        groups: ``((surface ids, point rows), ...)``, non-empty keys only.
+
+    Returns:
+        ``(count, rows, columns, wanted)`` per arity present, ascending:
+            ``rows`` the class's point indices ``(M,)``; ``wanted`` the
+            census ids the class needs, ascending; ``columns`` ``(M, count)``
+            the index into ``wanted`` of each point's surfaces, in the same
+            ascending-id order the ungrouped solve used them in.
+    """
+    out = []
+    for count in (1, 2, 3):
+        members = [(ids, rows) for ids, rows in groups if len(ids) == count]
+        if not members:
+            continue
+        wanted = sorted({s for ids, _ in members for s in ids})
+        column = {s: c for c, s in enumerate(wanted)}
+        rows = np.concatenate([rows for _, rows in members])
+        columns = np.concatenate(
+            [np.tile([column[s] for s in ids], (len(rows), 1)) for ids, rows in members]
+        )
+        out.append((count, rows, columns.astype(np.int64), wanted))
+    return out
+
+
+def _selected(
+    values: Callable[[Any, Any], Any], theta: Any, points: Any, columns: Any, count: int
+) -> tuple[Any, Any, Any]:
+    """``(values, jacobian, gram)`` for the surfaces each point was classified on.
+
+    The same triple :func:`_system` builds, from a gathered evaluation
+    instead of one closure per field: the class's surfaces are computed by
+    a single walk of the table and each point takes the ``count`` columns
+    that are its own.  Its gradients come from reverse passes over that one
+    walk, seeded one column at a time, which is ``jax.value_and_grad`` of
+    that column's field and nothing else — the other columns' seeds are
+    exact zeros.  Reverse mode, and not the three forward tangents that
+    would also serve, because reverse is what the per-field form used and
+    the last bits have to agree with it; measured, forward mode is also the
+    larger program (118 096 equations against 52 507).
+
+    The ``count`` seeds are pushed through **one** ``vmap``-ed reverse pass
+    rather than ``count`` separate ones.  They run the same arithmetic on
+    the same graph and differ only in the seed, so batching them costs a
+    leading axis and saves two copies of the backward pass — which decides
+    whether XLA can compile the three-surface class at all.
+
+    Args:
+        values: ``(theta, points) -> (N, S)`` from
+            :func:`~cadjoint.zeroset.evaluate.gathered`.
+        theta: The design.
+        points: ``(N, 3)``.
+        columns: ``(N, count)`` column of ``values`` per point per slot.
+        count: Surfaces per point, 1 to 3.
+
+    Returns:
+        ``values`` ``(N, count)``, ``jacobian`` ``(N, count, 3)`` whose rows
+            are the field gradients, and ``gram`` ``(N, count, count)``.
+    """
+    import jax
+    import jax.numpy as jnp
+
+    selected, pull = jax.vjp(
+        lambda p: jnp.take_along_axis(values(theta, p), columns, axis=1), points
+    )
+    seeds = jnp.broadcast_to(
+        jnp.eye(count, dtype=selected.dtype)[:, None, :], (count, *selected.shape)
+    )
+    gradients = jax.vmap(lambda seed: pull(seed)[0])(seeds)  # (count, N, 3)
+    jacobian = jnp.moveaxis(gradients, 0, 1)  # (N, count, 3): rows are the gradients
+    return selected, jacobian, jnp.einsum("nij,nkj->nik", jacobian, jacobian)
+
+
 #: Compiled :func:`project_table` programs, newest last.  Small: an entry
 #: pins its model alive (see :func:`_table_program`), and a scene edit
 #: lowers a new one, so this is a working set and not a registry.
@@ -251,11 +334,34 @@ def _table_program(
 ) -> Callable[[Any, Any], Any]:
     """The compiled ``(theta, points) -> points`` solve for one incidence structure.
 
-    The whole grouped solve is *one* program: the loop over incidence
-    groups is unrolled at trace time, so each group still evaluates only
-    the surfaces its own points lie on (the arithmetic is exactly what the
-    ungrouped loop did), but the node table is walked symbolically once
-    instead of once per Newton iteration per group per dispatch.
+    **One program per arity, not one per group.**  Groups that name the
+    same number of surfaces run structurally identical arithmetic and
+    differ only in *which* surfaces and which rows, so the 147 groups a
+    real part produces collapse to the three classes — on one surface, on
+    two, on three — and the surface choice becomes a column index into a
+    gathered evaluation rather than traced structure.  Each class's
+    surfaces are evaluated by a single :func:`~cadjoint.zeroset.evaluate.gathered`
+    walk of the table (:func:`_selected`), so the traced program is the
+    size of the table and **does not grow with the number of groups**.
+
+    That is the whole point.  The unrolled form this replaces put a
+    complete Newton kernel — a ``fori_loop`` carrying a linear solve, an
+    einsum and an ``eigvalsh`` — in the jaxpr once per group, and on
+    ``scenes/motor_shield.py`` (147 groups, 6 645 table nodes) that jaxpr
+    reached 15.2 GB of RSS after 24 minutes of tracing without finishing,
+    which killed every CI run in this repository's history.  The same
+    structure here traces in seconds (``research/performance.md`` §18).
+
+    **One jitted program per class, chained, rather than one for all three.**
+    The classes are disjoint — a point has one incidence — so each reads and
+    writes only its own rows and running them one after another is running
+    them together.  Keeping them apart is what bounds what XLA is handed at
+    once: its compile cost is steeply superlinear in program size (7.6 GB
+    for the shield's one-surface class alone), so a single program holding
+    all three costs far more than three costing one each, and each also
+    caches, and is served from the persistent cache, on its own.  Under an
+    outer ``jit`` they inline back into one, which is the caller's choice
+    and not this function's.
 
     The design arrives as an **argument**, not as a captured constant, so
     the program is keyed on structure alone and every design reuses it —
@@ -270,12 +376,12 @@ def _table_program(
         max_step: Total displacement clamp per point, or None for none.
 
     Returns:
-        A jitted ``(theta, points) -> points`` callable.
+        A ``(theta, points) -> points`` callable over jitted per-class solves.
     """
     import jax
     import jax.numpy as jnp
 
-    from cadjoint.zeroset.evaluate import surfaces
+    from cadjoint.zeroset.evaluate import gathered
 
     for ids, _rows in groups:
         if not 1 <= len(ids) <= 3:
@@ -287,17 +393,28 @@ def _table_program(
     if cached is not None and cached[0] is model:
         _TABLE_PROGRAMS.move_to_end(key)
         return cached[1]
-    fields = [field for _, field in surfaces(model)]
 
-    def solve(theta, points):
-        x = points
-        for ids, rows in groups:
-            system = _system([lambda p, f=fields[s]: f(theta, p[None])[0] for s in ids])
-            index = jnp.asarray(rows)
-            x = x.at[index].set(_iterate(system, x[index], len(ids), steps, max_step, 1e-2))
-        return x
+    def one_class(count: int, rows: Any, columns: Any, wanted: list[int]):
+        values = gathered(model, wanted)
 
-    program = jax.jit(solve)
+        def solve(theta, points):
+            index, column = jnp.asarray(rows), jnp.asarray(columns)
+
+            def system(y):
+                return _selected(values, theta, y, column, count)
+
+            moved = _iterate(system, points[index], count, steps, max_step, 1e-2)
+            return points.at[index].set(moved)
+
+        return jax.jit(solve)
+
+    passes = [one_class(*c) for c in _arity_classes(groups)]
+
+    def program(theta, points):
+        for run in passes:
+            points = run(theta, points)
+        return points
+
     _TABLE_PROGRAMS[key] = (model, program)
     while len(_TABLE_PROGRAMS) > _TABLE_PROGRAMS_LIMIT:
         _TABLE_PROGRAMS.popitem(last=False)
