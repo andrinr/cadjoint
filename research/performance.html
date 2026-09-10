@@ -426,6 +426,17 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <li><a href="#reproducing-1" id="toc-reproducing-1" class="nav-link" data-scroll-target="#reproducing-1">16.7 Reproducing</a></li>
   <li><a href="#a-finding-that-fell-out-of-the-same-instrumentation-the-48-vs-6-creases" id="toc-a-finding-that-fell-out-of-the-same-instrumentation-the-48-vs-6-creases" class="nav-link" data-scroll-target="#a-finding-that-fell-out-of-the-same-instrumentation-the-48-vs-6-creases">16.8 A finding that fell out of the same instrumentation: the 48-vs-6 creases</a></li>
   </ul></li>
+  <li><a href="#the-other-eager-maps-the-lattice-edge-overlay-2026-09-09" id="toc-the-other-eager-maps-the-lattice-edge-overlay-2026-09-09" class="nav-link" data-scroll-target="#the-other-eager-maps-the-lattice-edge-overlay-2026-09-09">17. The other eager maps: the lattice edge overlay (2026-09-09)</a>
+  <ul class="collapse">
+  <li><a href="#two-halves-of-one-fix-and-why-one-alone-is-worse-than-nothing" id="toc-two-halves-of-one-fix-and-why-one-alone-is-worse-than-nothing" class="nav-link" data-scroll-target="#two-halves-of-one-fix-and-why-one-alone-is-worse-than-nothing">17.1 Two halves of one fix, and why one alone is worse than nothing</a></li>
+  <li><a href="#the-numbers" id="toc-the-numbers" class="nav-link" data-scroll-target="#the-numbers">17.2 The numbers</a></li>
+  <li><a href="#the-crossover-because-there-is-one" id="toc-the-crossover-because-there-is-one" class="nav-link" data-scroll-target="#the-crossover-because-there-is-one">17.3 The crossover, because there is one</a></li>
+  <li><a href="#what-it-moves-stated-honestly" id="toc-what-it-moves-stated-honestly" class="nav-link" data-scroll-target="#what-it-moves-stated-honestly">17.4 What it moves, stated honestly</a></li>
+  <li><a href="#deliberately-not-taken-compiling-the-hermite-gradient" id="toc-deliberately-not-taken-compiling-the-hermite-gradient" class="nav-link" data-scroll-target="#deliberately-not-taken-compiling-the-hermite-gradient">17.5 Deliberately not taken: compiling the Hermite gradient</a></li>
+  <li><a href="#also-deliberately-not-taken-the-gmsh-patch-table-where-the-crossover-bites" id="toc-also-deliberately-not-taken-the-gmsh-patch-table-where-the-crossover-bites" class="nav-link" data-scroll-target="#also-deliberately-not-taken-the-gmsh-patch-table-where-the-crossover-bites">17.6 Also deliberately not taken: the Gmsh patch table, where the crossover bites</a></li>
+  <li><a href="#a-trap-in-measuring-this" id="toc-a-trap-in-measuring-this" class="nav-link" data-scroll-target="#a-trap-in-measuring-this">17.7 A trap in measuring this</a></li>
+  <li><a href="#reproducing-2" id="toc-reproducing-2" class="nav-link" data-scroll-target="#reproducing-2">17.8 Reproducing</a></li>
+  </ul></li>
   </ul>
 </nav>
     </div>
@@ -4329,6 +4340,242 @@ done</code></pre>
 </tbody>
 </table>
 <p>Fixing it means making the guard and <code>moved</code> agree — either the guard also drops the reverted vertex’s surface, which costs that vertex its design derivative, or the placement is re-solved so the guarded positions are themselves a fixed point. That is a decision about the crease placement, not about speed, so it is left here rather than taken.</p>
+</section>
+</section>
+<section id="the-other-eager-maps-the-lattice-edge-overlay-2026-09-09" class="level1">
+<h1>17. The other eager maps: the lattice edge overlay (2026-09-09)</h1>
+<p>§16 compiled the projection over the node table, which is what a <em>Gmsh</em> mesh moves through. This is the same defect in the rest of the tree — every place that hands <code>jax.vmap</code> a bare scene node — and the largest of them is the public tier’s edge overlay, the one a user without <code>diff-brep</code> looks at on every compile.</p>
+<p><strong>The rule, and where it was broken.</strong> <code>jax.vmap(field)(points)</code> on a scene node runs the map <em>eagerly</em>: JAX takes every primitive of the whole SDF tree through its own one-op program, so one sample costs what the scene is big rather than what the point set is big. <code>edge_hermite_data</code> and <code>sample_grid</code> had said so in their own comments since 7432ef0 and were already compiled; <code>grep -rn "jax.vmap(" cadjoint/ | grep -v jit</code> found a dozen that were not. <code>cadjoint/viewer/_edge_overlay.py</code> had five, including a four-sweep Newton solve over every world-frame leaf run entirely op by op.</p>
+<p>Not all dozen should be compiled. Compiling a map is a <em>trade</em> — a Python dispatch per primitive against one trace, one lowering and one XLA compile of a fused tree — and §17.3 and §17.6 are the two measurements that show which way it goes. What separated the wins from the losses here was, in order: how many times one call re-reads the same tree (the overlay’s seam solve reads every leaf five times; <code>_residuals</code> reads each patch once), how wide the fused tree ends up (ten leaves against fifty-two patch fields), and whether the shapes recur so the compile is paid once. Sites that are not obviously on the winning side of that were left alone.</p>
+<section id="two-halves-of-one-fix-and-why-one-alone-is-worse-than-nothing" class="level2">
+<h2 class="anchored" data-anchor-id="two-halves-of-one-fix-and-why-one-alone-is-worse-than-nothing">17.1 Two halves of one fix, and why one alone is worse than nothing</h2>
+<p>Wrapping the map in <code>jax.jit</code> is half of it. The other half is that the loop around it must be <em>rolled</em>. Measured on the projection §16 owns, at the point where it had been jitted but not yet rolled, one <code>jit</code> around an unrolled eight-sweep Newton loop traced the field eight times and lowered eight copies of it: <strong>86 MB of HLO and 30 s of tracing per <code>mesh_inspect</code></strong>, against 0.98 MB and 0.26 s eager. Wall clock went 55.2 s to 53.7 s — the eager dispatch it removed came back as tracing and as slower persistent-cache reads of a huge module. With the loop rolled into <code>lax.fori_loop</code> the same request was 4.1 s at 5.3 MB.</p>
+<p>So: <strong>a <code>jit</code> whose body repeats the field is a trade, not a win.</strong> Both of the tree’s Newton loops are rolled now — <code>zeroset.project</code> by §16, and <code>_edge_overlay._project_seam_groups</code> here.</p>
+</section>
+<section id="the-numbers" class="level2">
+<h2 class="anchored" data-anchor-id="the-numbers">17.2 The numbers</h2>
+<p>The overlay’s seam solve alone, on a small solid (four primitives per leaf, two leaves, 256 points), with the persistent cache in its own directory — this is the measurement that does not care what else the machine is doing:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th><code>_project_seam_groups</code></th>
+<th style="text-align: right;">cold</th>
+<th style="text-align: right;">warm</th>
+<th style="text-align: right;">programs</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>a234225</code></td>
+<td style="text-align: right;">1.716 s</td>
+<td style="text-align: right;">0.623 s</td>
+<td style="text-align: right;">116</td>
+</tr>
+<tr class="even">
+<td>this branch</td>
+<td style="text-align: right;"><strong>0.518 s</strong></td>
+<td style="text-align: right;"><strong>0.281 s</strong></td>
+<td style="text-align: right;"><strong>5</strong></td>
+</tr>
+</tbody>
+</table>
+<p>The whole public-tier request, <code>--public</code> so the lattice overlay runs on a machine that has <code>diff-brep</code> installed, <code>scenes/starter.py</code>, the two arms interleaved, each with its own cache directory, at load average 2.5–3.5:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 8%">
+<col style="width: 11%">
+<col style="width: 11%">
+<col style="width: 11%">
+<col style="width: 11%">
+<col style="width: 11%">
+<col style="width: 11%">
+<col style="width: 11%">
+<col style="width: 11%">
+</colgroup>
+<thead>
+<tr class="header">
+<th><code>mesh --public</code></th>
+<th style="text-align: right;">cold</th>
+<th style="text-align: right;">warm</th>
+<th style="text-align: right;">in-proc</th>
+<th style="text-align: right;">programs</th>
+<th style="text-align: right;">XLA cold</th>
+<th style="text-align: right;">lower warm</th>
+<th style="text-align: right;">other warm</th>
+<th style="text-align: right;">HLO</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>a234225</code></td>
+<td style="text-align: right;">25.80 s</td>
+<td style="text-align: right;">4.05 s</td>
+<td style="text-align: right;">1.08 s</td>
+<td style="text-align: right;">1209 (52 distinct)</td>
+<td style="text-align: right;">21.87 s</td>
+<td style="text-align: right;">1.66 s</td>
+<td style="text-align: right;">1.54 s</td>
+<td style="text-align: right;">0.92 MB</td>
+</tr>
+<tr class="even">
+<td>this branch</td>
+<td style="text-align: right;"><strong>6.02 s</strong></td>
+<td style="text-align: right;"><strong>1.95 s</strong></td>
+<td style="text-align: right;">1.22 s</td>
+<td style="text-align: right;"><strong>262 (51)</strong></td>
+<td style="text-align: right;"><strong>4.23 s</strong></td>
+<td style="text-align: right;"><strong>0.56 s</strong></td>
+<td style="text-align: right;"><strong>0.44 s</strong></td>
+<td style="text-align: right;">1.44 MB</td>
+</tr>
+</tbody>
+</table>
+<p>A second round of the same pair an hour later, at load 5.5–7, gives 32.22 → <strong>7.13 s</strong> cold and 4.73 → <strong>2.27 s</strong> warm: the seconds move with the load, the ratio and the program counts do not.</p>
+<p><strong>4.3x cold, 2.1x warm, and a fifth of the programs.</strong> The in-proc column is the one that goes the wrong way: a <em>second identical request in one process</em> is 1.08 s before and 1.22 s after, because the compiled form re-traces (0.49 s) where the eager form reuses its one-op programs from the first request. The viewer runs each request in a fresh worker, so the warm column is the operative one; a persistent worker (§6.1) would want the compiled programs memoised on the leaves’ identity, which is what the private tier’s <code>point_program</code> does and what §16’s <code>_table_program</code> does with the design as an argument.</p>
+</section>
+<section id="the-crossover-because-there-is-one" class="level2">
+<h2 class="anchored" data-anchor-id="the-crossover-because-there-is-one">17.3 The crossover, because there is one</h2>
+<p>A compiled map is not free: it trades a Python dispatch per primitive for one trace, one lowering and one XLA compile of a fused program, and XLA’s cost grows faster than linearly in the fused tree. The same seam solve with <strong>eighteen</strong> primitives per leaf instead of four (measured contended, load 7–11, both arms back to back):</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 15%">
+<col style="width: 21%">
+<col style="width: 21%">
+<col style="width: 21%">
+<col style="width: 21%">
+</colgroup>
+<thead>
+<tr class="header">
+<th><code>_project_seam_groups</code>, 18 primitives</th>
+<th style="text-align: right;">cold</th>
+<th style="text-align: right;">of which XLA</th>
+<th style="text-align: right;">warm</th>
+<th style="text-align: right;">programs</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>a234225</code></td>
+<td style="text-align: right;">3.53 s</td>
+<td style="text-align: right;">1.34 s</td>
+<td style="text-align: right;">2.20 s</td>
+<td style="text-align: right;">116</td>
+</tr>
+<tr class="even">
+<td>this branch</td>
+<td style="text-align: right;">6.06 s</td>
+<td style="text-align: right;">4.91 s</td>
+<td style="text-align: right;"><strong>1.36 s</strong></td>
+<td style="text-align: right;">5</td>
+</tr>
+</tbody>
+</table>
+<p>So the compiled form wins warm at both sizes (2.2x at four primitives, 1.6x at eighteen) and loses <em>cold</em> on a large single leaf, because XLA spends 4.9 s on one fused program where it spends 1.3 s on 116 small ones. The persistent cache pays that once and every later process reads it.</p>
+<p>No leaf in the shipped scenes is anywhere near that size — <code>starter</code> is the 4.3x row above — but the shape of the trade is worth knowing before applying this rule to a scene with one enormous primitive.</p>
+</section>
+<section id="what-it-moves-stated-honestly" class="level2">
+<h2 class="anchored" data-anchor-id="what-it-moves-stated-honestly">17.4 What it moves, stated honestly</h2>
+<p>Fusing changes float association, and the overlay decides two things with hard thresholds on float32 quantities: which world-frame leaf owns a dual vertex (<code>argmin</code> over leaf magnitudes) and whether a projected seam group is genuine (<code>residual &lt; 0.1 * cell</code>). Both are knife-edge by construction — at a seam the operands are <em>equal</em> — so a numerical change reshuffles a few of them.</p>
+<p>Measured on all four shipped scenes, comparing the whole overlay payload. The wire layer’s <em>edge list</em> is bit-identical on every one of them (same count, same index checksum); what moves is where the vertices it indexes sit and how many sharp chords are drawn over them:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 18%">
+<col style="width: 18%">
+<col style="width: 18%">
+<col style="width: 18%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>scene</th>
+<th>vertices</th>
+<th>wire edge list</th>
+<th>sharp chords</th>
+<th style="text-align: right;">max vertex move</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>duct_sink</code></td>
+<td>448</td>
+<td>identical</td>
+<td>164 → 164, bit-identical</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="even">
+<td><code>bracket</code></td>
+<td>2046</td>
+<td>identical</td>
+<td>531 → 531</td>
+<td style="text-align: right;">1.2e-7</td>
+</tr>
+<tr class="odd">
+<td><code>starter</code></td>
+<td>1534</td>
+<td>identical</td>
+<td>384 → 384, checksum bit-identical</td>
+<td style="text-align: right;">3.0e-3</td>
+</tr>
+<tr class="even">
+<td><code>end_cap</code></td>
+<td>1736</td>
+<td>identical</td>
+<td><strong>311 → 300</strong></td>
+<td style="text-align: right;">8.9e-3</td>
+</tr>
+</tbody>
+</table>
+<p>A moved vertex is a <em>seam</em> vertex: the Newton solve is under-determined along the seam curve, so a change of rounding slides the point along the curve without leaving it. The overlay grid’s cell is 9.4e-2 (<code>DEFAULT_SIZE</code> 6.0 over <code>_MESH_EDGE_RESOLUTION</code> 64), so 8.9e-3 is under a tenth of a cell and the residual at the moved point is the same or lower.</p>
+<p>The mechanism, row by row on <code>end_cap</code>’s 790 seam rows: the median change in residual is <strong>exactly zero</strong> — most rows are bit-identical — the mean residual is marginally <em>lower</em> after (1.551e-2 against 1.562e-2, i.e.&nbsp;the projection converges no worse), and <strong>one row</strong> of 790 crosses the acceptance bar of 9.375e-3 (620 accepted against 621). Four more rows change owner where two leaves are equidistant. The greedy chain builder turns those five rows into eleven fewer chords. On <code>starter</code>, zero rows of 120 cross the bar — 78 accepted either way — and the sharp layer is bit-identical.</p>
+<p>That the overlay amplifies five knife-edge rows into a 3.5 % change in what is drawn is a property of the lattice path, not of this change; it is the same instability §16.5 measured from the mesh side. The honest summary is that the drawn feature edges are inside the method’s own noise, and that a seam acceptance test with hysteresis would be worth more than either arm.</p>
+</section>
+<section id="deliberately-not-taken-compiling-the-hermite-gradient" class="level2">
+<h2 class="anchored" data-anchor-id="deliberately-not-taken-compiling-the-hermite-gradient">17.5 Deliberately not taken: compiling the Hermite gradient</h2>
+<p><code>edge_hermite_data</code> computes <code>gradient = jax.vmap(jax.grad(sdf))</code> and reads it three times — the Newton slope, the final normals, the degenerate-gradient fallback — without a <code>jit</code>, even though the value side beside it has one. Compiling it is worth a further <strong>1.7x cold and 1.3x warm</strong> on the request above: a round of the same A/B with it in reads 26.47 → 3.62 s cold and 4.38 → 1.48 s warm at 85 programs, against 25.80 → 6.02 s and 4.05 → 1.95 s at 262 without it.</p>
+<p>It is not in this branch, because it moves the QEF vertices by up to 3.8e-2 (most of a cell) and takes <code>starter</code>’s sharp chords from 384 to 439 — a 14 % change in what the viewer draws, from a gradient that feeds the crease classifier’s normal-spread threshold. Unlike the seam-acceptance shift above it changes the <em>mesh</em>, on every extraction and in both tiers. It should be taken, with visual QA, as its own change.</p>
+</section>
+<section id="also-deliberately-not-taken-the-gmsh-patch-table-where-the-crossover-bites" class="level2">
+<h2 class="anchored" data-anchor-id="also-deliberately-not-taken-the-gmsh-patch-table-where-the-crossover-bites">17.6 Also deliberately not taken: the Gmsh patch table, where the crossover bites</h2>
+<p><code>cadjoint/fem/gmsh.py::_residuals</code> maps <em>every patch field of the scene’s decomposition</em> over a node set, and <code>assign_ownership</code> and <code>snap_toward_patches</code> between them call it three times per Gmsh build. It looks like the same fix, and it is not: the starter’s patch table has <strong>52 fields</strong>, so one compiled program over it is a fused tree fifty-two scenes wide — §17.3’s crossover, at the far end.</p>
+<p>Measured on 512 points and that table:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th><code>_residuals</code>, 52 fields</th>
+<th style="text-align: right;">first call</th>
+<th style="text-align: right;">second call</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>a234225</code></td>
+<td style="text-align: right;">15.91 s</td>
+<td style="text-align: right;">0.056 s</td>
+</tr>
+<tr class="even">
+<td>jitted</td>
+<td style="text-align: right;">5.18 s</td>
+<td style="text-align: right;">1.008 s</td>
+</tr>
+</tbody>
+</table>
+<p>Three times faster on the first call and <strong>eighteen times slower on every one after</strong>, because each call re-traces a fifty-two-field program while the eager form reuses its one-op kernels. Worse, the node count differs from entity to entity and from mesh to mesh, so every distinct shape is a fresh five-second compile: with it in, <code>pytest tests/fem</code> ran for <strong>99 minutes of CPU without finishing</strong>, and a <code>sample</code> of the process put 923 of 1451 stack samples inside <code>xla::cpu::CpuCompiler::RunBackend</code>. Reverted.</p>
+<p>Two more went back with it, for the same reason in weaker form — one read of one tree per call, no measurement to justify a numerical change: <code>cadjoint/fem/hexmesh.py::_group_boundary_faces</code>, whose <code>argmax</code> over a gradient names the face groups a boundary condition selects, and the mesher Tesseract’s <code>vector_jacobian_product</code>, which reads its interpolant’s gradient once per gradient step.</p>
+<p>What is left is the overlay, where the reads-per-call is five and the fused tree is the scene, plus the four samplers that have no in-tree caller at all (<code>active_branches</code>, <code>patch_signatures</code>, <code>sample_material_field</code>, <code>_seam_residual</code>) and the two measures, whose outputs are continuous and carry no threshold.</p>
+</section>
+<section id="a-trap-in-measuring-this" class="level2">
+<h2 class="anchored" data-anchor-id="a-trap-in-measuring-this">17.7 A trap in measuring this</h2>
+<p><strong>A compile count cannot tell an eager map from a compiled one.</strong> The obvious test — “give the sampler a bigger field and check it does not compile more” — passes on the <em>unfixed</em> code: eager one-op programs are keyed on primitive and shape, so once the in-process cache is warm a bigger tree compiles nothing extra and merely dispatches the same kernels more times. On the starter scene the same counter reads 1209 programs because the <em>shapes</em> vary there, not because the tree is big.</p>
+<p>The metric that survives is seconds, and the mechanism behind them is the split in <code>benchmarks/jax_compile_profile.py</code>: the eager arm above spends 1.54 s of a 4.05 s warm request in <code>other</code> — Python dispatch — with <strong>zero</strong> XLA compilations. <code>tests/test_compiled_fields.py</code> therefore asserts the shape of the computation (one program per sampler, which reads <em>zero</em> on the eager form) and leaves the seconds to this section.</p>
+</section>
+<section id="reproducing-2" class="level2">
+<h2 class="anchored" data-anchor-id="reproducing-2">17.8 Reproducing</h2>
+<pre><code>S=/tmp/ov; mkdir -p $S; rm -rf $S/cache
+CADJOINT_CACHE_DIR=$S/cache python benchmarks/jax_compile_profile.py \
+    --scene scenes/starter.py --mode mesh --public          # cold
+CADJOINT_CACHE_DIR=$S/cache python benchmarks/jax_compile_profile.py \
+    --scene scenes/starter.py --mode mesh --public --repeat 2   # warm</code></pre>
+<p><code>--public</code> unregisters the private tier for the run, which is what makes the lattice overlay the thing being measured on a machine that has <code>diff-brep</code> installed. Use a cache directory of your own: the shared one is contended, and a number taken against it is not comparable to anything. Check <code>uptime</code> first — every number above roughly doubles at load 10.</p>
 
 
 </section>
