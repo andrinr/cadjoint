@@ -332,7 +332,7 @@ remaining the fast default. What shipped, out of prototype status:
   elements for hex, the DC extraction grid for tets (TetGen decides tet counts).
 - Studies route both physics to tet solves: `tet_elastic_solve` promoted, and a
   new `tet_thermal_solve` mirroring the lifted Dirichlet formulation, both with
-  exact boundary-face targeting (`_restrict_surface_faces` now covers heat-flux
+  exact boundary-face targeting (`_prune_surface_faces` now covers heat-flux
   patches too). TET10 BC sets are completed with midside nodes
   (`tet10_complete_nodes` / `tet10_face_midsides`). `SimulationResult` is
   method-agnostic (tet von Mises at centroids — for TET10 the corner shape

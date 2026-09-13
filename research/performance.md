@@ -2583,3 +2583,392 @@ lattice overlay the thing being measured on a machine that has `diff-brep`
 installed. Use a cache directory of your own: the shared one is contended,
 and a number taken against it is not comparable to anything. Check `uptime`
 first — every number above roughly doubles at load 10.
+
+---
+
+# 18. Shape stability in the FEM assembly: the rung ladder (2026-09-10)
+
+§16.6 left this as the largest item on the list and named the fix: "a novel
+design changes the node count, so jax-fem's assembly kernels are compiled for
+a shape that will never recur (28–30 s of a 31–77 s cold request). The fix
+for that is shape stability, not a faster solver: pad the mesh onto a rung
+ladder the way `diff-brep`'s `run_chunked` pads its batches."
+
+This section is that, and it is worth saying up front what the *shape* of the
+cost turned out to be, because it is not what §4.1's phrasing suggests.
+
+## 18.1 The premise, checked before it was believed
+
+**§4.1's table predates §16 and the revision it measured is long gone.**
+Before building anything, the cheap check from §16.2: *is the cost the same cold and warm?*
+If it is, it is not compilation.
+
+The instrument is a bar — one SDF box with a half-height knob, dual-contoured
+and tetrahedralised on a 29x15x13 grid, about 900 nodes and 3 100 TET4
+elements, solved thermally with one Dirichlet patch and one flux patch. Six
+values of the knob give six meshes whose node counts differ by a handful,
+which is exactly what a design edit does. Each design is solved in **its own
+process** against a **shared** compilation cache, because that is the viewer's
+situation: a fresh worker per request, one cache on disk.
+
+**The trap this walked into first, recorded because it looks like an
+answer.** The first run of that experiment showed every design at 2.2 s,
+novel or repeated, which reads as "not compilation" and would have killed
+the whole idea. It was measuring a process with no persistent cache at all:
+`CADJOINT_CACHE_DIR` names the directory but `cadjoint.cache.
+enable_compilation_cache()` is what points JAX at it, and the probe never
+called it. The viewer's worker does (`viewer/worker/main.py:404`) and so does
+`tests/conftest.py`; a bare script does not. With the cache actually on, the
+same experiment separates cleanly:
+
+| bar, 902 nodes / 3 135 cells, fresh process, shared cache | solve |
+|---|---:|
+| design 1 — empty cache | 3.22 s |
+| design 2 — novel shape | 2.51 s |
+| design 3 — novel shape | 2.81 s |
+| design 1 **again** — shape already in the cache | **0.80 s** |
+| design 2 **again** | **0.76 s** |
+
+Cold and warm differ by 3.3x on the same mesh, so the cost *is* compilation,
+and the persistent cache already removes all of it — for a shape it has seen.
+The whole problem is that a novel design never presents one.
+
+## 18.2 What actually recompiles
+
+"jax-fem compiles assembly kernels for a shape that never recurs" is right
+about the effect and misleading about the mechanism, and the difference
+decides what has to be padded.
+
+Counting the programs a solve dispatches, and which of them miss the cache:
+a novel design misses **120–122 of 224**. Only three of those are fused
+assembly kernels (`jit_kernel_jac`, from jax-fem's `pre_jit_fns`). The rest
+are §15's eager one-op storm — `jit_inv`, `jit_cumsum`, `jit_gather`,
+`jit_scatter-add`, `jit_dynamic_slice`, `jit__in1d`, `jit_remainder` — each
+its own XLA program at 10–25 ms, each keyed on its operand shape.
+
+That matters because a one-op program is keyed on the shape of *whatever it
+touches*, not only on the node count. Four families of shape move with a
+design edit, and all four had to be pinned before the misses fell:
+
+1. **the node count**, which sets the solution and residual vectors, every
+   scatter target and the tangent's size;
+2. **the element count**, which sets the assembly and the `internal_vars`;
+3. **each Dirichlet patch's selected node count**, which the row elimination
+   indexes with (`apply_bc_vec`, `assign_bc`, `copy_bc`, and PETSc's
+   `zeroRows`);
+4. **each surface patch's selected face count**, which sets its own compiled
+   surface kernel.
+
+All four had to go: with the node and element counts pinned but the
+boundary-condition shapes left alone, a design still recompiled 50 programs
+where its neighbours recompiled 28.  The last two of the 28 were self-
+inflicted and are in §18.5.
+
+## 18.3 The fix: a ghost body on a ladder
+
+`cadjoint/fem/rungs.py` holds the ladder and the array padding;
+`fem/jaxfem.py` holds the two pieces of jax-fem surgery, next to the face
+pruning that already does that kind of thing.
+
+**The ladder** is `64 * 1.5**k` rounded up and unbounded, so a mesh of any
+size lands on a rung and the padding is never more than half the true count.
+Eighteen rungs cover every count from 1 to 60 000; §18.5 is why the ratio is
+1.5 and not something finer.
+
+**The ghost body** is what fills the gap, and its shape is forced by two
+constraints that only showed up when it ran.
+
+*A padded node cannot be left isolated.* The obvious padding — extra rows of
+`points` that no element names — is not merely wasteful, it is fatal: an
+isolated node owns a row of the tangent that no element writes to, so the row
+has no diagonal entry and PETSc stops with "Matrix is missing diagonal entry
+in the zeroed row 906". Every ghost node has to appear in some ghost cell.
+
+*A padded cell cannot be degenerate.* `shape_grads` inverts the element
+Jacobian, so a cell whose nodes share a position produces infinities, and
+they would sit in the tangent whether or not anything reduces over them.
+
+Both are answered by the same construction, and it is `run_chunked`'s rule —
+*pad with a real row* — carried up a dimension: **every ghost cell is
+element 0 again**. Ghost nodes take element 0's node positions, in element
+0's order, in groups of four (TET4) or ten (TET10); the `ghosts % arity`
+left over each get a cell that replaces corner 0 of the first ghost cell and
+carry corner 0's position, so that cell is element 0 too — same volume, same
+orientation, same conditioning. Whatever is left of the cell rung is filled
+with repeats of a ghost cell, which costs nothing extra: the assembly runs
+over `cell_rung` elements either way.
+
+**Why the answer does not move.** Ghost cells name ghost nodes only, so the
+ghost body shares no degree of freedom with the mesh; the caller pins every
+ghost node with a Dirichlet condition, so its rows become identity rows and
+its columns appear only in rows that are eliminated. The real block of the
+system is the one the unpadded mesh gives.
+
+**The index sets** are padded by repetition, which every consumer in this
+path is idempotent under — membership (`jnp.isin`, which decides which faces
+a patch carries) does not count, and a Dirichlet `.set` writes the same value
+twice. The one operation that *does* accumulate is jax-fem's
+`res.at[nodes, vecs].add(-values)`, and that is why a Dirichlet selection is
+padded with a **ghost** index rather than one of its own: a repeated real
+index would subtract its prescribed value twice and move the boundary, while
+a repeated ghost index moves a degree of freedom that is pinned,
+disconnected, and cut off the answer before it is returned. The padding is
+inert by construction rather than by arithmetic.
+
+**Face selections** are padded with `(ghost cell, local face 0)`, whose
+contribution lands in eliminated rows for the same reason.
+
+**Per-element material fields** are padded to the cell rung by repeating
+element 0's value — a heterogeneous solve carries one modulus or conductivity
+per element, and jax-fem reads it as an `internal_vars` entry shaped by the
+cell count, so an unpadded field on a padded mesh is a shape error rather
+than a slow solve. This has to happen *before* `_elastic_problem` builds the
+problem class, which bakes the Lame constants into its tensor map.
+
+## 18.4 The numbers — the small case first
+
+The bar again: 902 nodes, 3 135 TET4 elements, one Dirichlet patch and one
+flux patch, six designs off one half-height knob. **One design per process,
+each arm holding its own empty cache directory, the two arms interleaved
+design by design**, load average 5.6-6.4. *Misses* is XLA compiles; the rest
+of the 221-224 programs a solve dispatches are cache reads.
+
+| bar, TET4 | `main`: solve / misses | this branch: solve / misses |
+|---|---:|---:|
+| design 1 — empty cache | 3.72 s / 222 | 3.70 s / 220 |
+| design 2 | 3.08 s / 122 | **1.09 s / 20** |
+| design 3 | 3.78 s / 122 | **1.19 s / 20** |
+| design 4 | 4.36 s / 120 | **1.26 s / 20** |
+| design 5 | 4.94 s / 121 | **1.25 s / 20** |
+| design 6 | 5.46 s / 121 | **1.31 s / 20** |
+| design 1 again — shapes cached | 0.87 s / 0 | 0.86 s / 0 |
+| design 2 again | 0.85 s / 0 | 0.80 s / 0 |
+
+**2.8-4.2x on every design after the first, and 122 cache misses become 20.**
+The first design is unchanged (3.70 against 3.72), and so is the steady state
+(0.80-0.86 against 0.85-0.87): the ladder is neither a cold tax nor a warm
+one at this ratio, it simply stops the second design from starting over.
+(The `main` column drifts upward across the table — 3.08 to 5.46 s on
+near-identical meshes — because two other pytest sessions were on the machine.
+That is exactly why the arms are interleaved: at every instant the two rows
+either side of each other saw the same load.)
+
+The temperature field agrees to nine decimals in its sum on every row —
+§18.5 has the node-by-node difference, which is at machine epsilon.
+
+### At the node count the starter actually has
+
+The same bar meshed TET10 — 5 650 nodes, 3 135 elements, which is the
+starter's scale (§4: 5 726 nodes, 2 957 TET10):
+
+| bar, TET10 | `main` | this branch |
+|---|---:|---:|
+| design 1 — empty cache | 4.46 s / 223 | 4.34 s / 221 |
+| design 2 | 3.65 s / 123 | **1.41 s / 20** |
+| design 3 | 4.25 s / 123 | **1.37 s / 20** |
+| design 4 | 4.68 s / 121 | **1.38 s / 20** |
+| design 1 again | 0.95 s / 0 | 0.96 s / 0 |
+
+2.6-3.4x, and the same 20-miss floor. The saving per design is about the
+same in *seconds* at six times the node count, which is the useful thing to
+know about it: the cost being removed is a per-program XLA compile, and
+XLA's cost for a one-op program barely moves with the size of the operand.
+
+### Corroboration on the whole scene
+
+`scenes/starter.py` at four fin depths, `benchmarks/jax_compile_profile.py
+--mode simulate`, one request per process, own cache per arm, interleaved,
+load 6.5-7.7. The solve is instrumented separately from the request so the
+meshing — which this change does not touch — can be told apart from it:
+
+| `fin_depth` | nodes / cells | `main`: solve | branch: solve | `main`: request | branch: request |
+|---|---|---:|---:|---:|---:|
+| 1.20 (empty cache) | 5 741 / 2 962 | 6.48 s | 7.70 s | 24.03 s | 27.39 s |
+| 1.31 | 5 782 / 3 003 | 5.03 s | **1.66 s** | 19.87 s | **15.39 s** |
+| 1.42 | 6 724 / 3 501 | 7.67 s | **2.71 s** | 30.14 s | **24.27 s** |
+| 1.53 | 6 705 / 3 490 | 8.55 s | **1.77 s** | 23.73 s | **16.21 s** |
+
+**The solve is 3.0-4.8x faster on a novel design, and 4.5-7.5 s comes off the
+whole request** — 19-23 % of a `simulate`, on a change that touches nothing
+outside the two tet solve entry points. The misses inside the solve fall from
+153-154 to 20, except at `fin_depth=1.42` where they are 39: that design's
+boundary-condition selection crosses a rung even though its node and element
+counts do not.
+
+The first request costs 1.2 s more in the solve (7.70 against 6.48) because
+248 programs at padded shapes compile a little slower than 223 at true ones.
+That is paid once per cache directory, and the second design gives it back
+three times over.
+
+## 18.5 The warm side, which is where this kind of change goes wrong
+
+The private tier's session recorded the trap this family of change falls
+into: they built the ladder first, it moved cold 17.1 to 16.7 s and made
+*warm* worse, and it only paid once the traced body was shared. The warning
+that came with it — "a rung you add is a trace you pay for" — is why the
+tables above carry a repeated design as their last rows, and why the growth
+factor was measured rather than picked.
+
+### The ladder's ratio is not the knob it looks like
+
+It reads as a trade of padded arithmetic against compiles. It is not: what
+it actually sets is **how often a run of designs crosses a rung**, and a
+crossing is a partial recompile. Measured on two bar sizes — 900 nodes and
+600 nodes, four to six designs each, one design per process, own empty cache
+per arm:
+
+| growth | later designs | misses per design | cell padding |
+|---|---:|---|---:|
+| 1.25 | 1.29-2.30 s | 20, 39, 73 | 13-20 % |
+| **1.50** | **1.19-1.33 s** | **20, 20, 20** | 21-27 % |
+| 2.00 | 1.19-2.92 s | 20, 105, 20 | 5-110 % |
+
+1.5 was the only ratio that put every design of a run on one rung on *both*
+mesh sizes. 1.25 splits them — a 600-node design and a 616-node design land
+on different rungs, and the 616-node one then pays 73 misses instead of 20.
+2.0 splits them too *and* pays 100 % padding for the privilege. The padded
+arithmetic itself is not measurable here: a design whose shapes are already
+cached solves in 0.92-0.94 s at all three ratios.
+
+**A false lead worth recording, because it nearly became a shipped
+constant.** On the 900-node bar, growth 1.5 dispatched 221 programs against
+1.25's 248, and was correspondingly faster on every column. That looked like
+a property of the ratio and it is not: at the 600-node size the counts are
+248 / 248 / 244, indistinguishable. The 221 was an accident of that one mesh
+— at 1.5 its flux patch selected exactly 96 faces, which *is* a rung, so the
+face padding did not fire and a handful of shapes happened to coincide with
+others already compiled. Adopting 1.5 on that number would have been tuning
+to one mesh. The rung-crossing table above is the reason that survives.
+
+### Two placements measured and rejected
+
+*Padding the Dirichlet index lists in `jax.numpy`.* The obvious way to write
+`_pad_dirichlet_selection` is `jnp.concatenate`, and it costs about ten
+one-op programs keyed on **the unpadded count** — the very count being
+padded away. Host `np.concatenate`, device transfer avoided entirely: 28
+misses per novel design became 20.
+
+*Handing the padded lists back to the device.* The mirror image — pad on the
+host, then `jnp.asarray` the result so jax-fem indexes with a device array —
+was tried on the theory that a host index array costs a conversion at each
+of its several uses per solve. It measured **worse**: 248 programs became
+254 for the Dirichlet lists, and 248 became 251 for the face selections. The
+transfers are not free and jax-fem is happy to index with a host array.
+Reverted; both stay NumPy.
+
+### What it costs the answer, stated honestly
+
+Not nothing, and the number is small enough to be worth naming rather than
+waving at. Comparing the temperature field the two arms return, node by
+node, on all six bar designs (TET4 at 897-902 nodes, TET10 at 5 615-5 658):
+
+| design | nodes | max abs difference | relative to the field's max |
+|---|---:|---:|---:|
+| TET10, 0.155 | 5 658 | 1.09e-14 | 1.1e-14 |
+| TET10, 0.16 | 5 650 | 1.95e-14 | 1.9e-14 |
+| TET10, 0.165 | 5 615 | 4.11e-15 | 4.0e-15 |
+| TET10, 0.17 | 5 632 | 7.55e-15 | 7.4e-15 |
+| TET4, 0.175 | 897 | 4.44e-15 | 4.4e-15 |
+| TET4, 0.18 | 884 | 4.55e-15 | 4.6e-15 |
+
+**A few units in the last place of float64, and no more.** It is not bit
+identical, and it cannot be: the tangent handed to PETSc has a few hundred
+extra identity rows, its nested-dissection ordering therefore differs, and a
+different elimination order rounds differently. Nothing about the real block
+of the system changes — the arithmetic on it is the same arithmetic — which
+is why the difference sits at machine epsilon instead of at the 1e-4 that a
+changed *formulation* would give. `tests/fem/test_rungs.py::TestPaddingIsInert`
+pins temperature, displacement and the reverse-mode gradient at 1e-12
+relative, which is four orders of margin over what is measured here.
+
+### What the padding costs when it does not help
+
+The last two rows of §18.4's first table are the honest warm answer: a
+design whose shapes are already in the cache solves in 0.80-0.86 s with the
+ladder and 0.85-0.87 s without it. At this ratio the padded arithmetic and
+the three fewer programs cancel, so the steady state is unchanged. The
+cost that remains is the first request against a fresh cache, which is up to
+1.2 s slower on the whole scene and neutral on the bar.
+
+Mesh quality is not in these tables because nothing here can move it: the
+padding lives inside the two solve entry points, after the mesh is built and
+before its result is returned, and the mesh object never sees it.
+
+## 18.6 What is left, and what was deliberately not taken
+
+**Twenty programs still miss on a novel design, and nineteen of them are
+jax-fem's.** They are `Dirichlet_boundary_conditions` in `jax_fem/fe.py`,
+lines 252–254: the node set is found with `jnp.argwhere` over every node,
+which returns a *data-dependent* size, and the vector-index and value arrays
+built from it inherit that size. Padding cannot reach them, because they are
+computed during problem construction from the real selection — the padding
+that follows is what fixes every later use of those arrays, but not their
+birth. The twentieth is the slice that cuts the answer back to the true node
+count, which is a shape nobody can stabilise: the caller asked for `N` rows.
+
+It is worth about 0.3 s per novel design and, unlike the 120 that were
+removed, it does **not** grow with the mesh: XLA's cost for a one-op program
+is roughly flat, so this is a fixed residue rather than a scaling problem.
+Removing it means not giving jax-fem `dirichlet_bc_info` at all and
+installing `node_inds_list` / `vec_inds_list` / `vals_list` directly from
+NumPy — a bigger bet on jax-fem's internals than 0.3 s justifies. It is the
+obvious next piece if this residue ever matters.
+
+**Deliberately not taken: making the ghost count itself a rung.** The
+tempting symmetry — pad so that the *number of ghost nodes* is a rung, so
+the ghost Dirichlet patch is a stable shape too — cannot coexist with the
+padded node count being a rung. `N` is arbitrary, so `N + G` and `G` cannot
+both be on a ladder. `N + G` is the one that drives the solution vector, the
+residual, every scatter and the tangent, so it is the one that is pinned.
+
+**A rung crossing is still a partial recompile.** A design that moves far
+enough to change rung pays for the shapes that changed — 39 misses instead
+of 20 on the starter at `fin_depth=1.42`, where the node and element counts
+stayed on their rungs but a boundary-condition selection did not. The ladder
+makes that the exception rather than the rule; it does not abolish it, and
+a coarser one would not either (§18.5 measures 2.0 crossing *more* often
+than 1.5, not less).
+
+**Not a mesh change.** Nothing here touches meshing. The DC surface, TetGen's
+fill, the crease placement and every quality metric are the ones `main`
+produces; the padding lives entirely inside the two tet solve entry points
+and is undone before their result is returned.
+
+## 18.7 Reproducing
+
+Prefer the small case; it runs in seconds and does not care what else the
+machine is doing. `tests/fem/test_rungs.py` is the same experiment as
+assertions — `TestShapesRecur` for the shapes, `TestPaddingIsInert` for the
+temperature, the displacement and the reverse-mode gradient.
+
+To see the seconds, solve one design per *process* against a shared cache,
+with the arms interleaved and each arm holding its own cache directory:
+
+    # arm A: main's behaviour
+    CADJOINT_FEM_RUNGS=off CADJOINT_CACHE_DIR=$S/off python probe.py <design>
+    # arm B: the ladder
+    CADJOINT_CACHE_DIR=$S/on python probe.py <design>
+
+where `probe.py` builds one bar mesh at the given half-height and calls
+`tet_thermal_solve`, and — this is the part that is easy to get wrong —
+calls `cadjoint.cache.enable_compilation_cache()` first. Without it the
+environment variable names a directory nothing writes to, every run is cold,
+and the ladder appears to buy nothing (§18.1).
+
+The whole-scene corroboration is one `simulate` per design against a shared
+cache:
+
+    for d in 1.20 1.31 1.42 1.53; do
+      sed "s/^fin_depth = Scalar(1.2,/fin_depth = Scalar($d,/" scenes/starter.py > /tmp/s_$d.py
+      CADJOINT_CACHE_DIR=$S/on python benchmarks/jax_compile_profile.py \
+          --scene /tmp/s_$d.py --mode simulate
+    done
+
+Note what `--repeat 2` would *not* show: repeating a request re-presents the
+same shapes, so both arms are warm and equal. The ladder's whole subject is
+the *second design*, which is why every table above varies the design and
+holds the cache.
+
+Check `uptime` first, and interleave the arms — every number in §18.4 was
+taken at load average 8–9 with three other pytest sessions on the machine,
+and the ratios are fair only because the two arms are adjacent in time.

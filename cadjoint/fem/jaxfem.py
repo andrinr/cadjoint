@@ -40,6 +40,7 @@ from cadjoint.fem.backends import (
     _require_jax_fem,
     _x64_scope,
 )
+from cadjoint.fem.rungs import PaddedTets, pad_cell_field, pad_indices, pad_tets, rung
 
 __all__ = [
     "JaxFemBackend",
@@ -434,29 +435,19 @@ def _rows_in(rows: np.ndarray, table: np.ndarray) -> np.ndarray:
     return np.isin(rows.view(void).reshape(-1), table.view(void).reshape(-1))
 
 
-def _restrict_surface_faces(problem: Any, surface_faces: list[np.ndarray]) -> None:
-    """Prune jax-fem's face selection to exactly the given boundary triangles.
+def _rebuild_face_blocks(problem: Any) -> None:
+    """Realign a problem's face structures with its current face selection.
 
-    jax-fem selects a (cell, local face) pair for a surface map whenever
-    *all* the face's nodes satisfy the location function.  With node-set
-    membership locations on a tet mesh this over-selects: an interior
-    face whose three corners all happen to lie on the loaded surface
-    patch is selected once per adjacent cell, double-loading a face that
-    is not even on the boundary (observed on the bracket web at fine
-    resolutions).  This helper prunes each patch's selection (traction or
-    heat-flux alike) to the faces whose corner triple matches the
-    requested boundary triangles, and rebuilds the dependent structures
-    (``cells_list_face_list`` and the face blocks of the assembly
-    sparsity pattern ``I``/``J``) so value and index arrays stay aligned.
-    Surface quadrature data is recomputed from the pruned selection by
-    ``set_params`` before every solve.
+    ``boundary_inds_list`` is the (cell, local face) selection each surface
+    map integrates over, and two things are derived from it at construction:
+    ``cells_list_face_list``, the connectivity the face residual scatters
+    through, and the face blocks of the assembly sparsity pattern
+    ``I``/``J``.  Anything that rewrites the selection — the pruning of
+    :func:`_prune_surface_faces`, the padding of :func:`_pad_surface_faces` —
+    has to rebuild both, or the value and index arrays of the tangent stop
+    lining up.  Surface quadrature data needs no help here: ``set_params``
+    recomputes it from the selection before every solve.
     """
-    finite_element = problem.fes[0]
-    face_inds = np.asarray(finite_element.face_inds)
-    # Local corner slots per face: for TET4 all three face nodes are
-    # corners; for TET10 the corners are the local indices below 4.
-    corner_slots = np.stack([np.sort(local[local < 4])[:3] for local in face_inds])
-    cells0 = np.asarray(finite_element.cells)
 
     def flat_dof_ids(cells_arrays: list[np.ndarray]) -> np.ndarray:
         parts = []
@@ -473,7 +464,42 @@ def _restrict_surface_faces(problem: Any, surface_faces: list[np.ndarray]) -> No
     inds = flat_dof_ids(problem.cells_list)
     pattern_i = np.repeat(inds[:, :, None], inds.shape[1], axis=2).reshape(-1)
     pattern_j = np.repeat(inds[:, None, :], inds.shape[1], axis=1).reshape(-1)
-    new_cells_face_list = []
+    faces = []
+    for binds in problem.boundary_inds_list:
+        cells_face = [np.asarray(c)[np.asarray(binds)[:, 0]] for c in problem.cells_list]
+        faces.append(cells_face)
+        inds_face = flat_dof_ids(cells_face)
+        pattern_i = np.hstack(
+            [pattern_i, np.repeat(inds_face[:, :, None], inds_face.shape[1], axis=2).reshape(-1)]
+        )
+        pattern_j = np.hstack(
+            [pattern_j, np.repeat(inds_face[:, None, :], inds_face.shape[1], axis=1).reshape(-1)]
+        )
+    problem.cells_list_face_list = faces
+    problem.I = pattern_i
+    problem.J = pattern_j
+
+
+def _prune_surface_faces(problem: Any, surface_faces: list[np.ndarray]) -> None:
+    """Prune jax-fem's face selection to exactly the given boundary triangles.
+
+    jax-fem selects a (cell, local face) pair for a surface map whenever
+    *all* the face's nodes satisfy the location function.  With node-set
+    membership locations on a tet mesh this over-selects: an interior
+    face whose three corners all happen to lie on the loaded surface
+    patch is selected once per adjacent cell, double-loading a face that
+    is not even on the boundary (observed on the bracket web at fine
+    resolutions).  This helper prunes each patch's selection (traction or
+    heat-flux alike) to the faces whose corner triple matches the
+    requested boundary triangles; the caller rebuilds the dependent
+    structures with :func:`_rebuild_face_blocks`.
+    """
+    finite_element = problem.fes[0]
+    face_inds = np.asarray(finite_element.face_inds)
+    # Local corner slots per face: for TET4 all three face nodes are
+    # corners; for TET10 the corners are the local indices below 4.
+    corner_slots = np.stack([np.sort(local[local < 4])[:3] for local in face_inds])
+    cells0 = np.asarray(finite_element.cells)
     for patch, target in enumerate(surface_faces):
         binds = np.asarray(problem.boundary_inds_list[patch])
         slots = corner_slots[binds[:, 1]]
@@ -487,20 +513,137 @@ def _restrict_surface_faces(problem: Any, surface_faces: list[np.ndarray]) -> No
                 f"{target_keys.shape[0]} requested boundary faces; the patch node "
                 "set must contain every corner of every requested face."
             )
-        pruned = binds[mask]
-        problem.boundary_inds_list[patch] = pruned
-        cells_face = [np.asarray(c)[pruned[:, 0]] for c in problem.cells_list]
-        new_cells_face_list.append(cells_face)
-        inds_face = flat_dof_ids(cells_face)
-        pattern_i = np.hstack(
-            [pattern_i, np.repeat(inds_face[:, :, None], inds_face.shape[1], axis=2).reshape(-1)]
+        problem.boundary_inds_list[patch] = binds[mask]
+
+
+def _pad_surface_faces(problem: Any, ghost_cell: int) -> None:
+    """Grow every face selection to a rung with faces of the ghost body.
+
+    The selections are the last mesh-dependent shapes in the solve: one
+    surface kernel is compiled per patch per face count, and the count of
+    boundary triangles a patch carries moves with every design edit even
+    when the node and cell counts have been pinned.  A padded row names
+    local face 0 of a padded cell, whose nodes are ghost nodes, so its
+    contribution is scattered into rows the Dirichlet elimination replaces
+    and reaches no real degree of freedom.  Empty selections are left
+    alone: an empty patch is already a stable shape, and padding it would
+    turn "this patch carries nothing" into "this patch carries something",
+    which is a different problem even when the something is inert.
+    """
+    for patch, binds in enumerate(problem.boundary_inds_list):
+        selection = np.asarray(binds)
+        target = rung(int(selection.shape[0]))
+        if target <= selection.shape[0]:
+            continue
+        filler = np.tile(
+            np.asarray([[ghost_cell, 0]], dtype=selection.dtype), (target - len(selection), 1)
         )
-        pattern_j = np.hstack(
-            [pattern_j, np.repeat(inds_face[:, None, :], inds_face.shape[1], axis=1).reshape(-1)]
+        problem.boundary_inds_list[patch] = np.concatenate([selection, filler])
+
+
+def _pad_dirichlet_selection(problem: Any, ghost_node: int) -> None:
+    """Grow every Dirichlet selection to a rung with a ghost degree of freedom.
+
+    ``node_inds_list`` is what the row elimination indexes with, and it is
+    the *selected* count, not the node set the caller passed: jax-fem
+    evaluates the location function over every node and keeps the distinct
+    matches, so repeating an index in the caller's set does not reach here.
+    The count moves with the design — a clamped face gains a node when the
+    surface does — and each patch is a shape in ``apply_bc_vec``,
+    ``assign_bc`` and ``copy_bc`` alike.
+
+    Padding with a *ghost* node is what makes this exact rather than nearly
+    so.  ``apply_bc_vec`` reads ``res.at[nodes, vecs].set(sol[...])``
+    followed by ``.at[nodes, vecs].add(-values)``, and the second one
+    accumulates: a repeated *real* index would subtract its prescribed
+    value twice and move the boundary.  A ghost index cannot, whatever any
+    patch prescribes — the ghost body shares no degree of freedom with the
+    mesh and is cut off the answer — so the padded rows are inert by
+    construction and not by arithmetic.  A patch that selected nothing is
+    left alone; it is already a stable shape.
+
+    The concatenation runs on the host, and it stays there.  Building the
+    padded arrays in ``jax.numpy`` would put the *unpadded* count back into
+    the shapes — a dozen one-op programs keyed on exactly the count being
+    padded away, which is the trap ``research/performance.md`` §17.7
+    describes from the other side.  Handing the finished NumPy arrays back
+    to the device with ``jnp.asarray`` was tried and measured *worse*
+    (six more eager programs per solve, §18.5): jax-fem is happy to index
+    with a host array, and the transfers are not free.
+    """
+    finite_element = problem.fes[0]
+    for patch, nodes in enumerate(finite_element.node_inds_list):
+        indices = np.asarray(nodes)
+        count = int(indices.shape[0])
+        target = rung(count)
+        if target <= count:
+            continue
+        fill = target - count
+        component = np.asarray(finite_element.vec_inds_list[patch])
+        values = np.asarray(finite_element.vals_list[patch])
+        finite_element.node_inds_list[patch] = np.concatenate(
+            [indices, np.full(fill, ghost_node, dtype=indices.dtype)]
         )
-    problem.cells_list_face_list = new_cells_face_list
-    problem.I = pattern_i
-    problem.J = pattern_j
+        finite_element.vec_inds_list[patch] = np.concatenate(
+            [component, np.full(fill, component[0], dtype=component.dtype)]
+        )
+        finite_element.vals_list[patch] = np.concatenate(
+            [values, np.zeros(fill, dtype=values.dtype)]
+        )
+
+
+def _pinning_sets(patches: list[np.ndarray], ghosts: np.ndarray) -> list[np.ndarray]:
+    """The Dirichlet node sets with the ghost body pinned, each on a rung.
+
+    The ghosts go into the first patch because they have to go somewhere —
+    an unpinned ghost node owns an empty row of the tangent — and the first
+    patch is the one that exists whenever padding is on at all.  Every set
+    is then grown to a rung, which stabilises the shape of the membership
+    test each location function closes over.  Repetition is the filler and
+    it changes nothing: the location function asks whether a node is in the
+    set, and jax-fem keeps the distinct matches.
+    """
+    filler = int(ghosts[-1])
+    return [
+        pad_indices(np.concatenate([np.asarray(nodes, dtype=np.int32), ghosts]), filler)
+        if patch == 0
+        else pad_indices(nodes)
+        for patch, nodes in enumerate(patches)
+    ]
+
+
+def _padded_thermal_bcs(bcs: ThermalBCs, ghosts: np.ndarray) -> ThermalBCs:
+    """``bcs`` with the ghost body pinned and every node set on a rung."""
+    return ThermalBCs(
+        dirichlet_nodes=_pinning_sets(bcs.dirichlet_nodes, ghosts),
+        dirichlet_values=list(bcs.dirichlet_values),
+        flux_nodes=[pad_indices(nodes) for nodes in bcs.flux_nodes],
+        flux_values=list(bcs.flux_values),
+    )
+
+
+def _padded_elastic_bcs(bcs: ElasticBCs, ghosts: np.ndarray) -> ElasticBCs:
+    """``bcs`` with the ghost body clamped and every node set on a rung."""
+    return ElasticBCs(
+        fixed_nodes=_pinning_sets(bcs.fixed_nodes, ghosts),
+        traction_nodes=[pad_indices(nodes) for nodes in bcs.traction_nodes],
+        traction_vectors=list(bcs.traction_vectors),
+    )
+
+
+def _pad_problem(
+    points: Any, base_points: Any, cells: np.ndarray, pinned: list[np.ndarray]
+) -> PaddedTets | None:
+    """The mesh grown to the ladder, or ``None`` when it must be solved as given.
+
+    Padding needs somewhere to pin the ghost body, so a problem with no
+    Dirichlet patch at all is solved on the raw mesh: an unpinned ghost
+    block is a singular tangent, which is a wrong answer where an
+    unstable shape is only a slow one.
+    """
+    if not any(len(np.asarray(nodes)) for nodes in pinned):
+        return None
+    return pad_tets(points, base_points, cells)
 
 
 def tet_elastic_solve(
@@ -524,12 +667,23 @@ def tet_elastic_solve(
     ``points`` may be traced; the displacement participates in the
     surrounding autodiff graph via jax-fem's adjoint.
 
+    The mesh is solved on a *rung* — grown to a fixed size with a pinned,
+    disconnected ghost body, so a run of similar designs shares one
+    compiled assembly instead of compiling a fresh one per design
+    (:mod:`cadjoint.fem.rungs`, ``research/performance.md`` §18).  The
+    returned displacement is cut back to the caller's ``N`` rows and
+    differs from the unpadded solve only by the rounding of a larger
+    factorization; ``CADJOINT_FEM_RUNGS=off`` solves the raw mesh.
+
     Args:
         points: Node positions, ``(N, 3)`` (traced allowed).
         cells: Connectivity, ``(T, 4)`` or ``(T, 10)``.
         bcs: Array-level boundary conditions (the backend ABI).  For
             ``TET10``, node sets must include midside nodes (a face
             carries a traction when *all* its nodes are in the set).
+            At least one ``fixed_nodes`` patch must be non-empty for the
+            mesh to be padded; without one the ghost body cannot be
+            pinned and the raw mesh is solved instead.
         youngs: Young's modulus — scalar, or per element ``(T,)``.
         poisson: Poisson ratio — scalar, or per element ``(T,)``.
         ele_type: ``"TET4"`` or ``"TET10"``.
@@ -540,7 +694,7 @@ def tet_elastic_solve(
             triangles).  When given, jax-fem's node-membership face
             selection is pruned to exactly these faces — closing the
             interior-face double-count hole of pure node membership (see
-            :func:`_restrict_surface_faces`).  Every corner must also be
+            :func:`_prune_surface_faces`).  Every corner must also be
             in the corresponding ``bcs.traction_nodes`` set.
         body_force: Optional body force density in N/m^3, ``(3,)`` or
             ``(T, 3)`` — ``density * gravity`` for self-weight.
@@ -556,14 +710,30 @@ def tet_elastic_solve(
         from jax_fem.generate_mesh import Mesh
         from jax_fem.solver import ad_wrapper
 
+        if base_points is None:
+            base_points = points
+        base_points = np.asarray(base_points, dtype=np.float64)
+        cells = np.asarray(cells)
+        if traction_faces is not None and len(traction_faces) != len(bcs.traction_nodes):
+            raise ValueError(
+                "traction_faces must provide one face array per traction patch "
+                f"({len(traction_faces)} given for {len(bcs.traction_nodes)} patches)."
+            )
+        # Padding comes before the problem class is built: the class bakes
+        # the Lame constants into its tensor map and closes over the body
+        # force, so a field padded afterwards would never reach the solve.
+        padding = _pad_problem(points, base_points, cells, bcs.fixed_nodes)
+        if padding is not None:
+            points, base_points, cells = padding.points, padding.base_points, padding.cells
+            bcs = _padded_elastic_bcs(bcs, padding.ghost_nodes)
+            youngs = pad_cell_field(youngs, padding, 1)
+            poisson = pad_cell_field(poisson, padding, 1)
+            body_force = pad_cell_field(body_force, padding, 2)
         tractions = [np.asarray(vector, dtype=np.float64) for vector in bcs.traction_vectors]
         problem_class, make_params = _elastic_problem(
             tractions, youngs=youngs, poisson=poisson, body_force=body_force
         )
-
-        if base_points is None:
-            base_points = points
-        mesh = Mesh(np.asarray(base_points, dtype=np.float64), np.asarray(cells), ele_type=ele_type)
+        mesh = Mesh(base_points, cells, ele_type=ele_type)
         fixed_locations = [_membership_location(nodes) for nodes in bcs.fixed_nodes]
         dirichlet = [
             [location for location in fixed_locations for _ in range(3)],
@@ -579,18 +749,19 @@ def tet_elastic_solve(
             location_fns=[_membership_location(nodes) for nodes in bcs.traction_nodes],
         )
         if traction_faces is not None:
-            if len(traction_faces) != len(bcs.traction_nodes):
-                raise ValueError(
-                    "traction_faces must provide one face array per traction patch "
-                    f"({len(traction_faces)} given for {len(bcs.traction_nodes)} patches)."
-                )
-            _restrict_surface_faces(problem, traction_faces)
+            _prune_surface_faces(problem, traction_faces)
+        if padding is not None:
+            _pad_surface_faces(problem, padding.ghost_cell)
+            _pad_dirichlet_selection(problem, int(padding.ghost_nodes[0]))
+        if traction_faces is not None or padding is not None:
+            _rebuild_face_blocks(problem)
         forward = ad_wrapper(
             problem,
             solver_options=dict(_TET_SOLVER_OPTIONS),
             adjoint_solver_options=dict(_TET_SOLVER_OPTIONS),
         )
-        return forward(make_params(jnp.asarray(points)))[0]
+        displacement = forward(make_params(jnp.asarray(points)))[0]
+        return displacement if padding is None else displacement[: padding.node_count]
 
 
 def tet_thermal_solve(
@@ -614,12 +785,23 @@ def tet_thermal_solve(
     the temperature participates in the surrounding autodiff graph via
     jax-fem's adjoint.
 
+    The mesh is solved on a *rung* — grown to a fixed size with a pinned,
+    disconnected ghost body, so a run of similar designs shares one
+    compiled assembly instead of compiling a fresh one per design
+    (:mod:`cadjoint.fem.rungs`, ``research/performance.md`` §18).  The
+    returned temperature is cut back to the caller's ``N`` rows and differs
+    from the unpadded solve only by the rounding of a larger factorization;
+    ``CADJOINT_FEM_RUNGS=off`` solves the raw mesh.
+
     Args:
         points: Node positions, ``(N, 3)`` (traced allowed).
         cells: Connectivity, ``(T, 4)`` or ``(T, 10)``.
         bcs: Array-level thermal boundary conditions (the backend ABI).
             For ``TET10``, node sets must include midside nodes
             (:func:`~cadjoint.fem.boundary.tet10_complete_nodes`).
+            At least one ``dirichlet_nodes`` patch must be non-empty for
+            the mesh to be padded; without one the ghost body cannot be
+            pinned and the raw mesh is solved instead.
         conductivity: Thermal conductivity ``k`` (may be traced).
         source: Volumetric heat source ``q`` (may be traced).
         ele_type: ``"TET4"`` or ``"TET10"``.
@@ -628,7 +810,7 @@ def tet_thermal_solve(
         flux_faces: Optional exact face targeting: one ``(M, >=3)`` array
             of *corner* node triples per heat-flux patch, pruning jax-fem's
             node-membership face selection to exactly these boundary
-            triangles (see :func:`_restrict_surface_faces`).
+            triangles (see :func:`_prune_surface_faces`).
 
     Returns:
         Per-node temperature, ``(N,)`` JAX array.
@@ -684,7 +866,19 @@ def tet_thermal_solve(
         if base_points is None:
             base_points = points
         base_points = np.asarray(base_points, dtype=np.float64)
-        mesh = Mesh(base_points, np.asarray(cells), ele_type=ele_type)
+        cells = np.asarray(cells)
+        if flux_faces is not None and len(flux_faces) != len(bcs.flux_nodes):
+            raise ValueError(
+                "flux_faces must provide one face array per flux patch "
+                f"({len(flux_faces)} given for {len(bcs.flux_nodes)} patches)."
+            )
+        padding = _pad_problem(points, base_points, cells, bcs.dirichlet_nodes)
+        if padding is not None:
+            points, base_points, cells = padding.points, padding.base_points, padding.cells
+            bcs = _padded_thermal_bcs(bcs, padding.ghost_nodes)
+            conductivity = pad_cell_field(conductivity, padding, 1)
+            source = pad_cell_field(source, padding, 1)
+        mesh = Mesh(base_points, cells, ele_type=ele_type)
         dirichlet = [
             [_membership_location(nodes) for nodes in bcs.dirichlet_nodes],
             [0] * len(bcs.dirichlet_nodes),
@@ -699,20 +893,26 @@ def tet_thermal_solve(
             location_fns=[_membership_location(nodes) for nodes in bcs.flux_nodes],
         )
         if flux_faces is not None:
-            if len(flux_faces) != len(bcs.flux_nodes):
-                raise ValueError(
-                    "flux_faces must provide one face array per flux patch "
-                    f"({len(flux_faces)} given for {len(bcs.flux_nodes)} patches)."
-                )
-            _restrict_surface_faces(problem, flux_faces)
+            _prune_surface_faces(problem, flux_faces)
+        if padding is not None:
+            _pad_surface_faces(problem, padding.ghost_cell)
+            _pad_dirichlet_selection(problem, int(padding.ghost_nodes[0]))
+        if flux_faces is not None or padding is not None:
+            _rebuild_face_blocks(problem)
         forward = ad_wrapper(
             problem,
             solver_options=dict(_TET_SOLVER_OPTIONS),
             adjoint_solver_options=dict(_TET_SOLVER_OPTIONS),
         )
 
+        # Built from the padded node sets, so its scatter has a rung's shape
+        # like everything else.  The ghost body lands in patch 0 and takes
+        # that patch's temperature; being one constant over a disconnected,
+        # pinned block, it has no gradient inside a ghost element and no
+        # degree of freedom outside one.
         lift = jnp.zeros(base_points.shape[0], dtype=jnp.float64)
-        for nodes, value in zip(bcs.dirichlet_nodes, bcs.dirichlet_values):
+        for nodes, value in zip(bcs.dirichlet_nodes, bcs.dirichlet_values, strict=True):
             lift = lift.at[jnp.asarray(np.asarray(nodes, dtype=np.int32))].set(value)
         solution = forward((jnp.asarray(points), conductivity, source, lift))
-        return solution[0][:, 0] + lift
+        temperature = solution[0][:, 0] + lift
+        return temperature if padding is None else temperature[: padding.node_count]
