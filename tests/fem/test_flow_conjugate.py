@@ -83,6 +83,11 @@ class TestAgainstTheAnalyticAnswer:
         """Trilinear elements reproduce a quadratic solution exactly, so the
         FEM side of the comparison contributes no error of its own -- which
         is what makes the lattice's error attributable to the lattice."""
+        # Only this test reaches the mesh solver; the lattice tests beside it
+        # need no solver stack, so the guard is per-test rather than on the
+        # module.  Without it this failed rather than skipped wherever the
+        # `fem` extra is absent, which is every CI run.
+        pytest.importorskip("jax_fem")
         mesh = SimMesh(
             name="slab-mesh",
             resolution=(8, 12, 8),

@@ -92,6 +92,12 @@ dev = [
     "pytest>=7.0.0",
     "pre-commit>=3.0.0",
     "matplotlib>=3.7.0",
+    # cadjoint.cache sets jax_compilation_cache_max_size, and JAX raises
+    # without filelock -- so the persistent cache is silently unusable and
+    # every process pays full XLA. It arrives transitively in most
+    # environments, which is exactly why its absence went unnoticed until CI
+    # installed with --no-deps and ran the suite for the first time.
+    "filelock>=3.12",
 ]
 docs = [
     "quartodoc>=0.7",
