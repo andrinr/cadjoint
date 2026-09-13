@@ -33,13 +33,29 @@ from cadjoint.zeroset.project import _table_program
 
 
 def _equations(jaxpr) -> int:
-    """Every equation, including those inside nested jaxprs (jit, loops)."""
+    """Every equation, including those inside nested jaxprs (jit, loops).
+
+    Walks parameter values by duck typing rather than through
+    ``jax.core.jaxprs_in_params``, which JAX 0.11 removed — the first
+    version of this test used it, and so *errored* on CI (JAX 0.11.1)
+    while passing on a 0.8 venv, which is a test that guards nothing.
+    """
     n = 0
     for eqn in jaxpr.eqns:
         n += 1
-        for sub in jax.core.jaxprs_in_params(eqn.params):
-            n += _equations(sub)
+        for value in eqn.params.values():
+            n += _nested(value)
     return n
+
+
+def _nested(value) -> int:
+    """Equations inside ``value`` if it is, or holds, a jaxpr."""
+    inner = getattr(value, "jaxpr", value)  # a ClosedJaxpr wraps a Jaxpr
+    if hasattr(inner, "eqns"):
+        return _equations(inner)
+    if isinstance(value, (list, tuple)):
+        return sum(_nested(v) for v in value)
+    return 0
 
 
 def _program_size(model, n_groups: int, seed: int = 0) -> int:
