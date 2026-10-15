@@ -11,6 +11,10 @@ resolution-markers = [
 ]
 
 [manifest]
+build-constraints = [
+    { name = "cython", specifier = "<3.3" },
+    { name = "petsc", specifier = "==3.25.4" },
+]
 
 [[manifest.dependency-metadata]]
 name = "petsc"
