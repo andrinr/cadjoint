@@ -112,6 +112,21 @@ as Tesseracts: their images get PETSc from conda-forge and are published
 prebuilt to GHCR for amd64 and arm64, so Docker is the only requirement
 (see [prebuilt images](docs/plugins.qmd#prebuilt-images)).
 
+### Supported platforms
+
+| Platform | `uv sync` | `uv sync --extra fem` |
+| --- | --- | --- |
+| Linux x86_64 | yes | compiles PETSc |
+| Linux ARM64 | yes | no: gmsh has no Linux ARM wheel |
+| macOS arm64 | yes | compiles PETSc |
+| macOS x86_64 (Intel) | no on Python ≥ 3.10: jaxlib has no Intel-Mac wheel | no |
+| Windows x86_64 | yes | no: PETSc does not build natively |
+
+Every "yes" is a fresh `uv sync --locked` and `import cadjoint` in
+[`install.yml`](.github/workflows/install.yml), run on each push. Where
+the `fem` column says no, the prebuilt solver Tesseracts above run the
+same solvers in Docker.
+
 ## The playground
 
 ```bash
