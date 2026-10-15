@@ -1,0 +1,58 @@
+name: install
+
+# The test job in ci.yml installs with pip on one Linux runner, so it says
+# nothing about what `uv sync` does on a user's machine. Issue #43 was two
+# install failures nobody saw in CI: a stale uv.lock, then petsc4py being
+# compiled during resolution. This job is the fresh-clone path from the
+# README, `uv sync --locked` and an import, on every platform the README
+# claims, so the "Supported platforms" table there is a CI result and not an
+# assertion.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: install-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  install:
+    name: install (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+
+      # Every dependency must arrive as a wheel. A package that needs a
+      # source build would pass on a runner, which has compilers, and fail
+      # for a user who has none. `--no-build` cannot cover the sync below
+      # because it also refuses cadjoint's own editable build, hence the
+      # dependencies-only pass. It is the check that holds on Windows, where
+      # pointing CC at `false` does nothing to MSVC.
+      - name: Dependencies install from wheels only
+        run: uv sync --locked --no-build --no-install-project
+
+      # The README's command as a user runs it. The compilers are pointed at
+      # `false` on Linux and macOS so a build that slips past the step above
+      # fails loudly rather than compiling.
+      - name: uv sync --locked
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" != "Windows" ]; then
+            export CC=false CXX=false FC=false
+          fi
+          uv sync --locked
+
+      - name: Import cadjoint
+        run: uv run --locked python -c "import cadjoint; print(cadjoint.__file__)"
