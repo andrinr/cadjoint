@@ -10,6 +10,17 @@ resolution-markers = [
     "python_full_version < '3.10'",
 ]
 
+[manifest]
+
+[[manifest.dependency-metadata]]
+name = "petsc"
+version = "3.25.4"
+
+[[manifest.dependency-metadata]]
+name = "petsc4py"
+version = "3.25.4"
+requires-dist = ["numpy", "petsc"]
+
 [[package]]
 name = "absl-py"
 version = "2.3.1"
@@ -465,6 +476,8 @@ cuda = [
     { name = "jax", version = "0.8.2", source = { registry = "https://pypi.org/simple" }, extra = ["cuda12"], marker = "python_full_version >= '3.11'" },
 ]
 dev = [
+    { name = "filelock", version = "3.19.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "filelock", version = "3.25.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "matplotlib", version = "3.9.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "matplotlib", version = "3.10.8", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "pre-commit", version = "4.3.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
@@ -533,6 +546,7 @@ requires-dist = [
     { name = "anywidget", marker = "extra == 'viewer'", specifier = ">=0.9.21" },
     { name = "cadquery-ocp", marker = "python_full_version >= '3.10' and python_full_version < '3.15' and extra == 'stepcheck'" },
     { name = "fenics-basix", marker = "python_full_version >= '3.11' and extra == 'fem'" },
+    { name = "filelock", marker = "extra == 'dev'", specifier = ">=3.12" },
     { name = "gmsh", marker = "python_full_version >= '3.11' and extra == 'fem'" },
     { name = "gmsh", marker = "python_full_version >= '3.11' and extra == 'gmsh'" },
     { name = "griffe", marker = "extra == 'docs'", specifier = "<1.0" },

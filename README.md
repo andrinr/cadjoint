@@ -104,6 +104,13 @@ Everything beyond the geometry core is an extra, one `--extra` per name:
 
 Avoid `--all-extras` on macOS: `cuda` has no macOS wheels.
 
+`fem` is the one extra that compiles. petsc4py publishes no wheels, so
+`uv sync --extra fem` builds PETSc from source and needs a C compiler,
+gfortran and BLAS/LAPACK headers (`apt install build-essential gfortran
+libopenblas-dev` on Debian/Ubuntu). To skip the toolchain, run the solvers
+as Tesseracts: their images get PETSc from conda-forge, so Docker is the
+only requirement.
+
 ## The playground
 
 ```bash
