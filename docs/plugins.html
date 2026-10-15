@@ -320,7 +320,10 @@ window.Quarto = {
   </ul></li>
   <li><a href="#configuring-plugins.toml" id="toc-configuring-plugins.toml" class="nav-link" data-scroll-target="#configuring-plugins.toml">Configuring: <code>plugins.toml</code></a></li>
   <li><a href="#writing-one" id="toc-writing-one" class="nav-link" data-scroll-target="#writing-one">Writing one</a></li>
-  <li><a href="#building-and-serving" id="toc-building-and-serving" class="nav-link" data-scroll-target="#building-and-serving">Building and serving</a></li>
+  <li><a href="#building-and-serving" id="toc-building-and-serving" class="nav-link" data-scroll-target="#building-and-serving">Building and serving</a>
+  <ul class="collapse">
+  <li><a href="#prebuilt-images" id="toc-prebuilt-images" class="nav-link" data-scroll-target="#prebuilt-images">Prebuilt images</a></li>
+  </ul></li>
   <li><a href="#staleness-probe" id="toc-staleness-probe" class="nav-link" data-scroll-target="#staleness-probe">Staleness: <code>probe()</code></a></li>
   <li><a href="#the-two-mesher-boundaries" id="toc-the-two-mesher-boundaries" class="nav-link" data-scroll-target="#the-two-mesher-boundaries">The two mesher boundaries</a></li>
   <li><a href="#one-contract-two-transports" id="toc-one-contract-two-transports" class="nav-link" data-scroll-target="#one-contract-two-transports">One contract, two transports</a>
@@ -602,6 +605,41 @@ window.Quarto = {
 <span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a><span class="ex">tesseract</span> build cadjoint/fem/tesseracts/elastic_jaxfem   <span class="co"># ~3 min</span></span>
 <span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a><span class="ex">tesseract</span> build cadjoint/fem/tesseracts/tet_gmsh         <span class="co"># Gmsh behind the GPL boundary</span></span>
 <span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a><span class="ex">tesseract</span> build cadjoint/fem/tesseracts/flow_brinkman    <span class="co"># pure JAX, pip provider</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<section id="prebuilt-images" class="level3">
+<h3 class="anchored" data-anchor-id="prebuilt-images">Prebuilt images</h3>
+<p>Every push to <code>main</code> publishes the same images to GHCR (<code>.github/workflows/tesseract-images.yml</code>), so the build above is only needed for a modified package. A <code>container</code> spec that names one pulls it on first use — tesseract-core itself never pulls, so cadjoint does it before <code>Tesseract.from_image</code>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode toml code-with-copy"><code class="sourceCode toml"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="kw">[plugins.thermal_jaxfem]</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="dt">kind</span> <span class="op">=</span> <span class="st">"thermal_solver"</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="dt">transport</span> <span class="op">=</span> <span class="st">"container"</span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="dt">image</span> <span class="op">=</span> <span class="st">"ghcr.io/andrinr/cadjoint_thermal_jaxfem:latest"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Tag</th>
+<th>Moves when</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>:latest</code></td>
+<td>every publish from <code>main</code></td>
+</tr>
+<tr class="even">
+<td><code>:&lt;version&gt;</code></td>
+<td>the <code>version</code> in <code>tesseract_config.yaml</code> — what <code>probe()</code> reports</td>
+</tr>
+<tr class="odd">
+<td><code>:sha-&lt;commit&gt;</code></td>
+<td>never; pin this for a reproducible run</td>
+</tr>
+</tbody>
+</table>
+<p>All images are multi-arch (linux/amd64 and linux/arm64) except <code>cadjoint_tet_gmsh</code>, which is amd64 only: it installs gmsh with pip, and gmsh publishes no linux/aarch64 wheels. Docker on Apple Silicon runs it under emulation.</p>
+<p>Each architecture is built on a native runner and the two are joined into one tag afterwards. A single cross-building <code>buildx --platform</code> call would produce broken arm64 images: the Dockerfile tesseract-core generates pins its build stage to <code>$BUILDPLATFORM</code>, so the Python environment it copies into the runtime stage would be the host’s architecture.</p>
 <table class="caption-top table">
 <colgroup>
 <col style="width: 25%">
@@ -647,14 +685,15 @@ window.Quarto = {
 <p>One package uses pip, three use the SDK’s conda provider — because petsc4py publishes no PyPI wheels at all and gmsh publishes manylinux wheels for x86-64 only, so the jax-fem stack is simply not pip-installable on Linux, and ccx is a Fortran binary no Python requirement can supply. In every case cadjoint itself is a local path dependency, which <code>tesseract build</code> stages into the build context automatically.</p>
 <p>For a long-lived server, <code>tesseract serve &lt;image&gt;</code> is the SDK’s own command and is what a Kubernetes Deployment should run; point a <code>remote</code> spec at the Service in front of it. The SDK also serves several Tesseracts together (<code>tesseract serve a b c</code>), which is the natural shape when the mesher and the solver live on the same node. Locally, <code>tesseract-runtime serve --port &lt;n&gt;</code> with <code>TESSERACT_API_PATH</code> set will serve a package directly — that is what <code>tests/plugins/</code> uses, and setting <code>TESSERACT_NAME</code> / <code>TESSERACT_VERSION</code> is what makes the served instance advertise a version for <code>probe()</code> to check.</p>
 </section>
+</section>
 <section id="staleness-probe" class="level2">
 <h2 class="anchored" data-anchor-id="staleness-probe">Staleness: <code>probe()</code></h2>
 <p>A long-lived remote is the case where “which component am I actually talking to?” stops being rhetorical. <code>Plugin.probe()</code> calls the runtime’s <code>/health</code>, reads the version it advertises, and hashes the schema it publishes:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.plugins <span class="im">import</span> get_plugin</span>
-<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>probe <span class="op">=</span> get_plugin(<span class="st">"thermal_jaxfem"</span>).probe()</span>
-<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="co"># PluginProbe(name='thermal_jaxfem', kind='thermal_solver', transport='local',</span></span>
-<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a><span class="co">#             status='ok', version='0.1.0', schema_hash='sha256:251b6b…', …)</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.plugins <span class="im">import</span> get_plugin</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>probe <span class="op">=</span> get_plugin(<span class="st">"thermal_jaxfem"</span>).probe()</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a><span class="co"># PluginProbe(name='thermal_jaxfem', kind='thermal_solver', transport='local',</span></span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a><span class="co">#             status='ok', version='0.1.0', schema_hash='sha256:251b6b…', …)</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>Put that <code>schema_hash</code> in the spec, and a redeployed cluster that changed the component’s interface is refused <strong>before</strong> a run instead of failing inside a traced call. The hash covers the schema sections the runtime itself returns — field names, shapes, dtypes, <code>Differentiable</code> flags, requiredness — and is measured identical across the <code>local</code> and <code>remote</code> forms of the same package. It deliberately excludes the endpoint list: an in-process runtime serves a <code>test</code> endpoint that a served one does not.</p>
 </section>
 <section id="the-two-mesher-boundaries" class="level2">
@@ -729,41 +768,41 @@ window.Quarto = {
 </tbody>
 </table>
 <p><code>node_map</code> is the centrepiece and the reason the transport exists: it runs inside the jitted objective <code>Optimization</code> builds, so its <code>custom_vjp</code> has to be a primitive of the caller’s own program. Its input is <code>OwnedNodes</code> — per node a seed position, the global patch indices that own it, the arity, the Gmsh entity dimension, the midside block and the bar ownership was decided at — which <code>cadjoint.fem.gmsh.assign_ownership</code>, on this side of the interface, produces from a residual test against the scene’s own patch fields, no graph involved.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode toml code-with-copy"><code class="sourceCode toml"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="co"># what a distribution filling these kinds registers</span></span>
-<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="kw">[project.entry-points."</span><span class="dt">cadjoint.plugins"</span><span class="kw">]</span></span>
-<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a><span class="dt">node_map</span>      <span class="op">=</span> <span class="st">"my_package.plugins:NODE_MAP"</span>     <span class="co"># PluginSpec(transport="python", object=...)</span></span>
-<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a><span class="dt">feature_edges</span> <span class="op">=</span> <span class="st">"my_package.plugins:FEATURE_EDGES"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode toml code-with-copy"><code class="sourceCode toml"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="co"># what a distribution filling these kinds registers</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="kw">[project.entry-points."</span><span class="dt">cadjoint.plugins"</span><span class="kw">]</span></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="dt">node_map</span>      <span class="op">=</span> <span class="st">"my_package.plugins:NODE_MAP"</span>     <span class="co"># PluginSpec(transport="python", object=...)</span></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a><span class="dt">feature_edges</span> <span class="op">=</span> <span class="st">"my_package.plugins:FEATURE_EDGES"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p><code>cadjoint.plugins.contracts.CONTRACT_VERSION</code> bumps whenever a Protocol or payload changes shape, and every component carries a <code>contract_version</code>, so a stale build is refused with a sentence rather than failing inside a trace.</p>
 <p>Installing a provider is all it takes — the entry points do the registration, and nothing in cadjoint changes. One provider for these kinds exists as a separate distribution outside this project; a component of your own, registered the same way, is indistinguishable to the registry.</p>
 <p>A <code>plugins.toml</code> is needed only to <em>override</em> what discovery found — to point one kind somewhere else, or to turn one off without uninstalling:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode toml code-with-copy"><code class="sourceCode toml"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="co"># ~/.config/cadjoint/plugins.toml</span></span>
-<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="co"># The node map is a Tesseract on the cluster for a fully remote chain; every</span></span>
-<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a><span class="co"># other kind stays the in-process object the entry point registered.</span></span>
-<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a><span class="kw">[plugins.node_map]</span></span>
-<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a><span class="dt">kind</span>      <span class="op">=</span> <span class="st">"node_map"</span></span>
-<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a><span class="dt">transport</span> <span class="op">=</span> <span class="st">"remote"</span></span>
-<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a><span class="dt">url</span>       <span class="op">=</span> <span class="st">"http://node-map.cadjoint.svc.cluster.local:8000"</span></span>
-<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a><span class="co"># A second provider, chosen by name rather than by what happens to be installed.</span></span>
-<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a><span class="kw">[defaults]</span></span>
-<span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a><span class="dt">feature_edges</span> <span class="op">=</span> <span class="st">"my_edges"</span></span>
-<span id="cb11-13"><a href="#cb11-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb11-14"><a href="#cb11-14" aria-hidden="true" tabindex="-1"></a><span class="kw">[plugins.my_edges]</span></span>
-<span id="cb11-15"><a href="#cb11-15" aria-hidden="true" tabindex="-1"></a><span class="dt">kind</span>      <span class="op">=</span> <span class="st">"feature_edges"</span></span>
-<span id="cb11-16"><a href="#cb11-16" aria-hidden="true" tabindex="-1"></a><span class="dt">transport</span> <span class="op">=</span> <span class="st">"python"</span></span>
-<span id="cb11-17"><a href="#cb11-17" aria-hidden="true" tabindex="-1"></a><span class="dt">object</span>    <span class="op">=</span> <span class="st">"my_package.edges:COMPONENT"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12"><pre class="sourceCode toml code-with-copy"><code class="sourceCode toml"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="co"># ~/.config/cadjoint/plugins.toml</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a><span class="co"># The node map is a Tesseract on the cluster for a fully remote chain; every</span></span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a><span class="co"># other kind stays the in-process object the entry point registered.</span></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a><span class="kw">[plugins.node_map]</span></span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a><span class="dt">kind</span>      <span class="op">=</span> <span class="st">"node_map"</span></span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a><span class="dt">transport</span> <span class="op">=</span> <span class="st">"remote"</span></span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a><span class="dt">url</span>       <span class="op">=</span> <span class="st">"http://node-map.cadjoint.svc.cluster.local:8000"</span></span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a><span class="co"># A second provider, chosen by name rather than by what happens to be installed.</span></span>
+<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a><span class="kw">[defaults]</span></span>
+<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a><span class="dt">feature_edges</span> <span class="op">=</span> <span class="st">"my_edges"</span></span>
+<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a><span class="kw">[plugins.my_edges]</span></span>
+<span id="cb12-15"><a href="#cb12-15" aria-hidden="true" tabindex="-1"></a><span class="dt">kind</span>      <span class="op">=</span> <span class="st">"feature_edges"</span></span>
+<span id="cb12-16"><a href="#cb12-16" aria-hidden="true" tabindex="-1"></a><span class="dt">transport</span> <span class="op">=</span> <span class="st">"python"</span></span>
+<span id="cb12-17"><a href="#cb12-17" aria-hidden="true" tabindex="-1"></a><span class="dt">object</span>    <span class="op">=</span> <span class="st">"my_package.edges:COMPONENT"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section>
 <section id="when-a-kind-is-unfilled" class="level3">
 <h3 class="anchored" data-anchor-id="when-a-kind-is-unfilled">When a kind is unfilled</h3>
 <p><code>cadjoint.tier</code> is the one module that answers “is anything filling this kind” and writes the one refusal message.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint <span class="im">import</span> tier</span>
-<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>tier.status().flags()      <span class="co"># {'node_map': False, 'feature_edges': False, ...}</span></span>
-<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>tier.available(<span class="st">"brep"</span>)     <span class="co"># False</span></span>
-<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>tier.component(<span class="st">"step_export"</span>)            <span class="co"># None — the caller degrades</span></span>
-<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>tier.require(<span class="st">"node_map"</span>)                 <span class="co"># raises TierUnavailable(&lt;one sentence&gt;)</span></span>
-<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>tier.report()                            <span class="co"># versions + status, for a bug report</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint <span class="im">import</span> tier</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>tier.status().flags()      <span class="co"># {'node_map': False, 'feature_edges': False, ...}</span></span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>tier.available(<span class="st">"brep"</span>)     <span class="co"># False</span></span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>tier.component(<span class="st">"step_export"</span>)            <span class="co"># None — the caller degrades</span></span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>tier.require(<span class="st">"node_map"</span>)                 <span class="co"># raises TierUnavailable(&lt;one sentence&gt;)</span></span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>tier.report()                            <span class="co"># versions + status, for a bug report</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>Unfilled is how cadjoint ships and nothing breaks: it compiles, meshes with TetGen or Gmsh, solves, inspects, exports VTK and faceted STEP, and draws feature edges from the lattice classifier. What it refuses is a design derivative through a Gmsh mesh, which <code>Optimization</code> reports at declaration rather than discovering inside the trace. The compile payload carries a <code>tier</code> field and <code>GET /api/capabilities</code> returns <code>tier.status()</code>, so the viewer names the layer it is drawing rather than leaving you to guess.</p>
 </section>
 </section>
