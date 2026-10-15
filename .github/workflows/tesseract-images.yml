@@ -1,0 +1,165 @@
+name: tesseract-images
+
+# Prebuilt solver Tesseracts on GHCR, so running the FEM stack needs Docker
+# and nothing else: no PETSc build, no gfortran, no three-minute
+# `tesseract build` per image on every machine.
+#
+# Each architecture is built on its own native runner and the two are then
+# stitched into one multi-arch tag. A single `buildx --platform
+# linux/amd64,linux/arm64` build would be wrong, not just slow: the
+# Dockerfile tesseract-core generates pins its build stage to
+# $BUILDPLATFORM, so a cross build copies a host-arch Python environment
+# into the other arch's runtime image.
+#
+# tet_gmsh is amd64 only. It installs gmsh with pip, and gmsh publishes no
+# linux/aarch64 wheels (measured: the arm64 build fails resolving gmsh).
+# Apple Silicon Docker runs the amd64 image under emulation.
+#
+# Pull requests that touch a Tesseract build and smoke-test both arches but
+# push nothing. Pushes to main publish, because every image installs
+# cadjoint itself from this checkout, so any change under cadjoint/ is a
+# change to the images.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "cadjoint/**"
+      - "pyproject.toml"
+      - ".github/workflows/tesseract-images.yml"
+  pull_request:
+    paths:
+      - "cadjoint/fem/tesseracts/**"
+      - ".github/workflows/tesseract-images.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: tesseract-images-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io/${{ github.repository_owner }}
+  # Matches uv.lock; the generated Dockerfile comes from this version.
+  TESSERACT_CORE: "tesseract-core==1.11.0"
+  PUBLISH: ${{ github.event_name != 'pull_request' }}
+
+jobs:
+  build:
+    name: ${{ matrix.tesseract }} (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        tesseract:
+          - mesher
+          - tetfill
+          - flow_brinkman
+          - elastic_calculix
+          - thermal_jaxfem
+          - elastic_jaxfem
+          - tet_gmsh
+        arch: [amd64, arm64]
+        exclude:
+          - tesseract: tet_gmsh
+            arch: arm64
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      # The jax-fem images are 5.7 GB, and the conda build stage roughly
+      # doubles that during the build.
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install tesseract-core
+        run: pip install "$TESSERACT_CORE"
+
+      - name: Build
+        id: build
+        run: |
+          dir=cadjoint/fem/tesseracts/${{ matrix.tesseract }}
+          image=$(tesseract build "$dir" | jq -r '.[0]')
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+          echo "name=$(yq -r '.name' "$dir/tesseract_config.yaml")" >> "$GITHUB_OUTPUT"
+
+      # The runtime imports tesseract_api.py at startup, so a missing
+      # dependency or a broken import fails here rather than on a user's
+      # machine.
+      - name: Smoke test
+        run: |
+          out=$(docker run --rm "${{ steps.build.outputs.image }}" health)
+          echo "$out"
+          test "$(echo "$out" | jq -r .status)" = ok
+
+      - name: Log in to GHCR
+        if: env.PUBLISH == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push arch image
+        if: env.PUBLISH == 'true'
+        run: |
+          target="$REGISTRY/${{ steps.build.outputs.name }}:sha-${GITHUB_SHA::7}-${{ matrix.arch }}"
+          docker tag "${{ steps.build.outputs.image }}" "$target"
+          docker push "$target"
+
+  publish:
+    name: publish ${{ matrix.tesseract }}
+    needs: build
+    if: github.event_name != 'pull_request'
+    strategy:
+      fail-fast: false
+      matrix:
+        tesseract:
+          - mesher
+          - tetfill
+          - flow_brinkman
+          - elastic_calculix
+          - thermal_jaxfem
+          - elastic_jaxfem
+          - tet_gmsh
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      # :latest follows main, :sha-<commit> is immutable, and :<version> is
+      # the tesseract_config.yaml version -- what `probe()` reports -- so it
+      # moves only when that version is bumped.
+      - name: Create multi-arch tags
+        run: |
+          config=cadjoint/fem/tesseracts/${{ matrix.tesseract }}/tesseract_config.yaml
+          name=$(yq -r '.name' "$config")
+          version=$(yq -r '.version' "$config")
+          base="$REGISTRY/$name"
+          sha="sha-${GITHUB_SHA::7}"
+          archs="amd64 arm64"
+          [ "${{ matrix.tesseract }}" = tet_gmsh ] && archs="amd64"
+          sources=()
+          for arch in $archs; do sources+=("$base:$sha-$arch"); done
+          docker buildx imagetools create \
+            --annotation "index:org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
+            --annotation "index:org.opencontainers.image.revision=${{ github.sha }}" \
+            -t "$base:latest" -t "$base:$version" -t "$base:$sha" \
+            "${sources[@]}"
+          docker buildx imagetools inspect "$base:$sha"
