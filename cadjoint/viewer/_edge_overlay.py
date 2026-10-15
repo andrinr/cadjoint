@@ -280,7 +280,10 @@ def _project_seam_groups(
             step = jnp.einsum("sij,si->sj", jacobian, multipliers)
             length = jnp.linalg.norm(step, axis=-1, keepdims=True)
             step = step * jnp.minimum(1.0, max_step / jnp.maximum(length, 1e-9))
-            return x - step
+            # Under x64 the leaves evaluate in float64, so the step does too;
+            # the loop carry must keep its float32 type or fori_loop refuses
+            # it, and the overlay -- which swallows errors -- draws nothing.
+            return (x - step).astype(x.dtype)
 
         x = jax.lax.fori_loop(0, 4, sweep, start)
         x = jnp.where(transversal[:, None], x, start)
