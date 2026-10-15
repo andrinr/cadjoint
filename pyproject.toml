@@ -121,6 +121,17 @@ include = ["cadjoint*"]
 # resolution skip the build entirely. It does not make `.[fem]` installable
 # by pip on Linux; the jax-fem Tesseracts get PETSc from conda-forge for that
 # reason. Bump these versions together with the lock.
+#
+# Building petsc4py for `--extra fem` is a separate trap: its build-system
+# asks for `cython >= 3` with no upper bound, and Cython 3.3 rejects
+# petsc4py 3.25.4's PC.pyx ("Invalid index type 'int'" at line 1256) before
+# any C is compiled. 3.2.4 cythonizes it cleanly. Lift this with the
+# petsc4py bump that supports 3.3. The build also pulls an unpinned `petsc`,
+# so without the second constraint petsc4py compiles against the newest
+# PETSc while the runtime gets the locked one -- and PETSc is built twice.
+[tool.uv]
+build-constraint-dependencies = ["cython<3.3", "petsc==3.25.4"]
+
 [[tool.uv.dependency-metadata]]
 name = "petsc"
 version = "3.25.4"
