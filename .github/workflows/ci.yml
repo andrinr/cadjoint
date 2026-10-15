@@ -92,3 +92,24 @@ jobs:
 
       - name: Run pre-commit hooks
         run: pre-commit run --all-files
+
+  # The test job installs with pip, so nothing else here reads uv.lock -- it
+  # went stale once a dev extra changed and every `uv sync` then re-resolved,
+  # which is how issue #43 reached users. `--check` resolves without writing
+  # and fails when the lock no longer matches pyproject.toml. The compilers
+  # are pointed at `false` so a resolution that tries to build an sdist (the
+  # petsc4py trap the static metadata in pyproject.toml exists to avoid)
+  # fails here instead of compiling PETSc for minutes on someone's laptop.
+  lock:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Check uv.lock is current
+        env:
+          CC: "false"
+          CXX: "false"
+          FC: "false"
+        run: uv lock --check

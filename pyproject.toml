@@ -113,6 +113,24 @@ include = ["cadjoint*"]
 [tool.setuptools.package-data]
 "cadjoint.viewer" = ["static/*", "static/**/*"]
 
+# petsc4py (fem extra) publishes only an sdist, and uv resolves every extra
+# universally, so without this a plain `uv sync` or `uv lock` builds
+# petsc4py to read its metadata -- and its build-system pulls `petsc`, which
+# compiles the full PETSc C library and fails on any machine without BLAS
+# headers and gfortran (issue #43). Declaring the metadata statically lets
+# resolution skip the build entirely. It does not make `.[fem]` installable
+# by pip on Linux; the jax-fem Tesseracts get PETSc from conda-forge for that
+# reason. Bump these versions together with the lock.
+[[tool.uv.dependency-metadata]]
+name = "petsc"
+version = "3.25.4"
+requires-dist = []
+
+[[tool.uv.dependency-metadata]]
+name = "petsc4py"
+version = "3.25.4"
+requires-dist = ["numpy", "petsc"]
+
 [dependency-groups]
 dev = [
     "pytest>=7.0.0",
