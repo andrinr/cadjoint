@@ -251,6 +251,38 @@ tesseract build cadjoint/fem/tesseracts/tet_gmsh         # Gmsh behind the GPL b
 tesseract build cadjoint/fem/tesseracts/flow_brinkman    # pure JAX, pip provider
 ```
 
+### Prebuilt images
+
+Every push to `main` publishes the same images to GHCR
+(`.github/workflows/tesseract-images.yml`), so the build above is only
+needed for a modified package. A `container` spec that names one pulls it
+on first use — tesseract-core itself never pulls, so cadjoint does it before
+`Tesseract.from_image`:
+
+```toml
+[plugins.thermal_jaxfem]
+kind = "thermal_solver"
+transport = "container"
+image = "ghcr.io/andrinr/cadjoint_thermal_jaxfem:latest"
+```
+
+| Tag | Moves when |
+|---|---|
+| `:latest` | every publish from `main` |
+| `:<version>` | the `version` in `tesseract_config.yaml` — what `probe()` reports |
+| `:sha-<commit>` | never; pin this for a reproducible run |
+
+All images are multi-arch (linux/amd64 and linux/arm64) except
+`cadjoint_tet_gmsh`, which is amd64 only: it installs gmsh with pip, and
+gmsh publishes no linux/aarch64 wheels. Docker on Apple Silicon runs it
+under emulation.
+
+Each architecture is built on a native runner and the two are joined into
+one tag afterwards. A single cross-building `buildx --platform` call would
+produce broken arm64 images: the Dockerfile tesseract-core generates pins
+its build stage to `$BUILDPLATFORM`, so the Python environment it copies
+into the runtime stage would be the host's architecture.
+
 | Image | Requirements provider | The non-obvious payload | Size |
 |---|---|---|---|
 | `cadjoint_mesher` | pip | cadjoint + TetGen + SciPy on a uv-installed CPython 3.12 | 1.36 GB |

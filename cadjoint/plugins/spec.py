@@ -122,6 +122,39 @@ def runtime_scratch() -> Path:
         return _scratch
 
 
+def _pull_if_missing(image: str) -> None:
+    """``docker pull`` a registry image that is not present locally.
+
+    tesseract-core never pulls: ``Tesseract.from_image`` inspects the local
+    store and its fallback runs with ``--pull never``, so a spec naming
+    ``ghcr.io/andrinr/cadjoint_thermal_jaxfem:latest`` would otherwise fail
+    with "not found" until someone pulled it by hand.  Only names with a
+    registry or namespace part (a ``/``) are pulled: a bare
+    ``cadjoint_mesher:latest`` is a local ``tesseract build`` output, and
+    pulling it would ask Docker Hub for ``library/cadjoint_mesher`` and fail
+    with a misleading "access denied".
+
+    Without a ``docker`` executable this does nothing and leaves the error
+    to tesseract-core, which already reports that case.
+
+    Raises:
+        PluginConfigError: If the pull fails, with Docker's own reason.
+    """
+    import subprocess
+
+    docker = shutil.which("docker")
+    if docker is None or "/" not in image:
+        return
+    present = subprocess.run([docker, "image", "inspect", image], capture_output=True, check=False)
+    if present.returncode == 0:
+        return
+    pulled = subprocess.run([docker, "pull", image], capture_output=True, text=True, check=False)
+    if pulled.returncode != 0:
+        raise PluginConfigError(
+            f"could not pull image {image!r}: {pulled.stderr.strip() or pulled.stdout.strip()}"
+        )
+
+
 class PluginConfigError(ValueError):
     """A plugin spec is malformed or names a transport it cannot serve."""
 
@@ -296,6 +329,7 @@ class PluginSpec:
             options.setdefault("output_path", runtime_scratch())
             return Tesseract.from_tesseract_api(str(path), **options), False
         if self.transport == PluginTransport.CONTAINER:
+            _pull_if_missing(str(self.image))
             tesseract = Tesseract.from_image(self.image, **options)
             tesseract.serve()
             return tesseract, True

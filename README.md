@@ -108,8 +108,9 @@ Avoid `--all-extras` on macOS: `cuda` has no macOS wheels.
 `uv sync --extra fem` builds PETSc from source and needs a C compiler,
 gfortran and BLAS/LAPACK headers (`apt install build-essential gfortran
 libopenblas-dev` on Debian/Ubuntu). To skip the toolchain, run the solvers
-as Tesseracts: their images get PETSc from conda-forge, so Docker is the
-only requirement.
+as Tesseracts: their images get PETSc from conda-forge and are published
+prebuilt to GHCR for amd64 and arm64, so Docker is the only requirement
+(see [prebuilt images](docs/plugins.qmd#prebuilt-images)).
 
 ## The playground
 
