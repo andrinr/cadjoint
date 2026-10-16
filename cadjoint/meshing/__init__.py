@@ -54,7 +54,13 @@ from cadjoint.meshing.edge_detection import (
     find_crossing_edges,
     sample_grid,
 )
-from cadjoint.meshing.export import merge_planar_faces, save_obj, save_step, save_stl
+from cadjoint.meshing.export import (
+    merge_planar_faces,
+    remove_slivers,
+    save_obj,
+    save_step,
+    save_stl,
+)
 from cadjoint.meshing.features import (
     CORNER,
     CREASE,
@@ -96,6 +102,7 @@ __all__ = [
     "merge_planar_faces",
     "save_obj",
     "save_stl",
+    "remove_slivers",
     "save_step",
     "surface_deviation",
     "self_intersections",

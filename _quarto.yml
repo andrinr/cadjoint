@@ -158,6 +158,7 @@ quartodoc:
       contents:
         - meshing.export.save_obj
         - meshing.export.save_stl
+        - meshing.export.remove_slivers
         - meshing.export.save_step
         - meshing.export.merge_planar_faces
         - meshing.diagnostics.mesh_report

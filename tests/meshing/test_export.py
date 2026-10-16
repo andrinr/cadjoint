@@ -10,7 +10,13 @@ import pytest
 
 from cadjoint.meshing.dual_contouring import Mesh, extract_mesh
 from cadjoint.meshing.edge_detection import GridSpec
-from cadjoint.meshing.export import merge_planar_faces, save_obj, save_step, save_stl
+from cadjoint.meshing.export import (
+    merge_planar_faces,
+    remove_slivers,
+    save_obj,
+    save_step,
+    save_stl,
+)
 from cadjoint.sdf.primitives import Box
 
 BOX_SIZE = jnp.array([0.4, 0.5, 0.6])
@@ -252,6 +258,93 @@ def check_step_graph(mesh: Mesh, text: str) -> None:
     assert len(vertex_points) == len(used_vertices)
     assert len(edge_curves) == len(undirected_edges)
     assert len(of_type("ORIENTED_EDGE")) == sum(len(loop) for loop in loops)
+
+
+def _stl_bad_edges(path) -> tuple[int, int]:
+    """``(triangles, edges not used exactly twice)`` as an index-free reader sees them.
+
+    The corners are merged by exact float32 position, which is what STL
+    readers (trimesh, slicers) do to rebuild connectivity.
+    """
+    data = path.read_bytes()
+    count = int(np.frombuffer(data[80:84], dtype="<u4")[0])
+    records = np.frombuffer(
+        data[84:],
+        dtype=[("normal", "<f4", (3,)), ("corners", "<f4", (3, 3)), ("attribute", "<u2")],
+        count=count,
+    )
+    corners = records["corners"].reshape(-1, 3)
+    _, index = np.unique(corners, axis=0, return_inverse=True)
+    faces = index.reshape(-1, 3)
+    edges = np.sort(np.concatenate([faces[:, [0, 1]], faces[:, [1, 2]], faces[:, [2, 0]]]), axis=1)
+    _, uses = np.unique(edges, axis=0, return_counts=True)
+    return count, int((uses != 2).sum())
+
+
+def _sharp_cutout_mesh() -> Mesh:
+    """A plate with a sharp triangular hole: concave creases dual contouring slivers."""
+    from cadjoint.construction import PolygonProfile, SketchPlane, Solid, extrude
+    from cadjoint.sdf.boolean import Difference
+
+    plate = Solid.box(size=(15.0, 10.0, 1.5), name="plate")
+    hole = extrude(
+        PolygonProfile([(-6, -5), (6, -5), (0, 6)], plane=SketchPlane(), name="hole"), depth=10.0
+    )
+    scene = Difference(plate, hole, smoothness=0.0)
+    grid = GridSpec.from_bounds((-16.0, -11.0, -2.5), (32.0, 22.0, 5.0), (32, 22, 5))
+    return extract_mesh(lambda p: jnp.asarray(scene(p)), grid)
+
+
+class TestRemoveSlivers:
+    """Issue #52: coincident rows must not reach an index-free file as slivers."""
+
+    @staticmethod
+    def _tetrahedron_with_a_sliver() -> Mesh:
+        # A closed tetrahedron, plus a duplicate of vertex 0 (row 4, 1e-15
+        # away) and a triangle (0, 4, 1) that is a sliver once they merge.
+        base = np.array([[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]], dtype=np.float64)
+        vertices = np.vstack([base, base[:1] + 1e-15])
+        faces = np.array([[0, 2, 1], [0, 1, 3], [1, 2, 3], [4, 3, 2], [0, 4, 1]], dtype=np.int32)
+        return Mesh(
+            vertices=jnp.asarray(vertices),
+            faces=faces,
+            quads=np.empty((0, 4), dtype=np.int32),
+            normals=jnp.zeros_like(jnp.asarray(vertices)),
+            cells=np.zeros((5, 3), dtype=np.int32),
+        )
+
+    def test_the_sliver_is_dropped_and_the_duplicate_welded(self):
+        mesh, removed = remove_slivers(self._tetrahedron_with_a_sliver())
+        assert removed == 1
+        assert mesh.faces.tolist() == [[0, 2, 1], [0, 1, 3], [1, 2, 3], [0, 3, 2]]
+
+    def test_a_clean_mesh_is_unchanged(self, box_mesh):
+        mesh, removed = remove_slivers(box_mesh)
+        assert removed == 0
+        np.testing.assert_array_equal(mesh.faces, box_mesh.faces)
+
+    def test_the_stl_of_a_sliver_mesh_is_watertight(self, tmp_path):
+        path = tmp_path / "tet.stl"
+        save_stl(self._tetrahedron_with_a_sliver(), path)
+        assert _stl_bad_edges(path) == (4, 0)
+
+    def test_the_obj_indexes_the_welded_vertex(self, tmp_path):
+        path = tmp_path / "tet.obj"
+        save_obj(self._tetrahedron_with_a_sliver(), path, merge_planar=False)
+        faces = [line.split()[1:] for line in path.read_text().splitlines() if line[:2] == "f "]
+        assert faces == [["1", "3", "2"], ["1", "2", "4"], ["2", "3", "4"], ["1", "4", "3"]]
+
+    @pytest.mark.filterwarnings("ignore:The isosurface crosses")
+    def test_a_sharp_concave_cutout_exports_watertight(self, tmp_path):
+        """The real case: the hole's apex leaves slivers along the crease."""
+        mesh = _sharp_cutout_mesh()
+        _, removed = remove_slivers(mesh)
+        assert removed > 0  # the repro still produces slivers to remove
+        path = tmp_path / "plate.stl"
+        save_stl(mesh, path)
+        triangles, bad = _stl_bad_edges(path)
+        assert triangles == mesh.faces.shape[0] - removed
+        assert bad == 0
 
 
 class TestSaveStep:
