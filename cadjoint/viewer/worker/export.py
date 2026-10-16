@@ -225,21 +225,23 @@ def _named_object(namespace: dict[str, Any], name: str) -> Any:
 
 
 def _object_grid(sdf: Any, resolution: int) -> Any:
-    """A uniform lattice fitted to the object's inside region.
+    """A uniform lattice fitted to the object, at whatever scale it is modelled.
 
-    The bounds come from the same coarse scan a ``SimMesh`` without explicit
-    bounds uses, so an exported part and its simulation mesh agree on where
-    the part is.  ``resolution`` counts cells along the longest axis and
-    the other two axes take proportionally fewer, which keeps the spacing
-    isotropic — a cube of cells over a flat plate would spend most of its
-    budget on the thin axis.
+    The bounds come from :func:`cadjoint.meshing.bounds.fit_bounds`, which
+    scans growing cubes until one holds the part, so a 100 mm part
+    modelled in millimetres is not clipped to the ±3 default volume and a
+    plate thinner than the scan spacing is still found (issue #49).
+    ``resolution`` counts cells along the longest axis and the other two
+    axes take proportionally fewer, which keeps the spacing isotropic — a
+    cube of cells over a flat plate would spend most of its budget on the
+    thin axis.
     """
     import numpy as np
 
-    from cadjoint.fem.simmesh import _scan_bounds
     from cadjoint.meshing import GridSpec
+    from cadjoint.meshing.bounds import fit_bounds
 
-    bounds, size = _scan_bounds(sdf, padding=0.0)
+    bounds, size = fit_bounds(sdf)
     extent = np.asarray(size, dtype=np.float64)
     cells = tuple(int(max(1, round(resolution * axis / float(extent.max())))) for axis in extent)
     return GridSpec.from_bounds(bounds, size, cells)
@@ -251,6 +253,7 @@ def _write_geometry(obj: Any, request: ExportRequest, path: Path) -> dict[str, A
 
     import jax.numpy as jnp
 
+    from cadjoint.meshing.bounds import boundary_inside
     from cadjoint.meshing.dual_contouring import extract_mesh
     from cadjoint.meshing.export import save_obj, save_step, save_stl
 
@@ -283,11 +286,19 @@ def _write_geometry(obj: Any, request: ExportRequest, path: Path) -> dict[str, A
                 return report
 
     with warnings.catch_warnings():
-        # The lattice is fitted to the object with a margin, so the open
-        # boundary warning can only mean a scene that fills the default
-        # scan volume (a ground plane); clipping it is the point.
+        # Clipping is measured below, on the field itself: the extractor's
+        # warning fires only where the surface crosses the boundary, not
+        # when the lattice lies wholly inside the part.
         warnings.filterwarnings("ignore", message="The isosurface crosses the extraction boundary")
         mesh = extract_mesh(sdf, grid)
+    clipped = boundary_inside(sdf, grid)
+    if mesh.faces.shape[0] == 0:
+        raise ValueError(
+            f"The export lattice holds no surface of {request.name!r}: it lies wholly "
+            + ("inside" if clipped else "outside")
+            + " the part."
+        )
+    report["clipped"] = clipped
     report["vertices"] = int(mesh.vertices.shape[0])
     report["triangles"] = int(mesh.faces.shape[0])
     if request.format is ExportFormat.OBJ:

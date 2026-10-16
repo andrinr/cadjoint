@@ -221,6 +221,51 @@ class TestWorker:
         assert text.startswith("ISO-10303-21;")
         assert "MANIFOLD_SOLID_BREP(" in text
 
+    @staticmethod
+    def _stl_extent(path: Path) -> list[float]:
+        raw = path.read_bytes()
+        count = struct.unpack("<I", raw[80:84])[0]
+        corners = [
+            struct.unpack("<9f", raw[84 + 50 * i + 12 : 84 + 50 * i + 48]) for i in range(count)
+        ]
+        axes = [
+            [c[k] for corner in corners for c in [corner[0:3], corner[3:6], corner[6:9]]]
+            for k in range(3)
+        ]
+        return [max(axis) - min(axis) for axis in axes]
+
+    def test_a_millimetre_part_is_not_clipped_to_the_default_box(self, tmp_path):
+        """Issue #49: a 100 x 40 x 6 plate came back as a 6 x 6 x 6 chunk."""
+        source = (
+            "from cadjoint.construction import Solid\n"
+            'scene = Solid.box(size=(50, 20, 3), name="plate")\n'
+        )
+        result, path = _export(tmp_path, source, resolution=24)
+        assert result["ok"], result
+        assert result["report"]["clipped"] is False
+        assert self._stl_extent(path) == pytest.approx([100.0, 40.0, 6.0], rel=0.02)
+
+    def test_a_part_enclosing_the_default_box_is_not_an_empty_file(self, tmp_path):
+        """Issue #49: the ±3 grid lay wholly inside, so no surface and no warning."""
+        source = (
+            "from cadjoint.geometry import Vector\n"
+            "from cadjoint.sdf.primitives import Box\n"
+            "scene = Box(Vector([10.0, 10.0, 10.0]))\n"
+        )
+        result, path = _export(tmp_path, source)
+        assert result["ok"], result
+        assert result["report"]["triangles"] > 0
+        assert self._stl_extent(path) == pytest.approx([20.0, 20.0, 20.0], rel=0.02)
+
+    def test_an_unbounded_object_is_an_error_not_a_clipped_file(self, tmp_path):
+        source = (
+            "from cadjoint.geometry import Vector\n"
+            "from cadjoint.sdf.primitives import Box\n"
+            "scene = Box(Vector([1e5, 1e5, 1.0]))\n"
+        )
+        with pytest.raises(ValueError, match="No closed part"):
+            _export(tmp_path, source)
+
     def test_any_sdf_variable_can_be_named(self, tmp_path):
         result, path = _export(tmp_path, PLACED_SOURCE, format="stl", name="part")
         assert result["ok"] is True, result
