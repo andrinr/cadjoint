@@ -93,7 +93,7 @@ const BEFORE = {
   className: CHROME.danger,
   string: CHROME.ok,
   number: CHROME.warn,
-  keyword: CHROME.info,
+  keyword: "#0065b4",
   cubeX: "#d21f2b",
   gizmoX: "#eb273f",
   cubeY: "#1f8a2e",
@@ -221,12 +221,12 @@ function Axioms() {
                   </div>
                   <div class="dl-rows">
                     <div>
-                      <span style={{ color: v("info") }}>peak</span>
+                      <span style={{ color: "#0065b4" }}>peak</span>
                       <b style={{ color: v("ok") }}>412.80</b>
                       <small>K</small>
                     </div>
                     <div>
-                      <span style={{ color: v("info") }}>mean</span>
+                      <span style={{ color: "#0065b4" }}>mean</span>
                       <b style={{ color: v("warn") }}>338.07</b>
                       <small>K</small>
                     </div>
@@ -2080,7 +2080,7 @@ function Changes() {
                 </span>
               )}
             </For>
-            <span class="dl-before-chip" style={{ background: v("info"), color: v("surface-float") }}>
+            <span class="dl-before-chip" style={{ background: "#0065b4", color: v("surface-float") }}>
               elastic
             </span>
           </div>
@@ -2123,10 +2123,10 @@ function Changes() {
         why="The blue was a constraint count, a residual line, a plane label and the elastic chip: four meanings (A3)."
         before={
           <div class="dl-row-of">
-            <span class="dl-badge" style={{ background: v("info"), color: v("surface-float") }} title="constraints">
+            <span class="dl-badge" style={{ background: "#0065b4", color: v("surface-float") }} title="constraints">
               17
             </span>
-            <span style={{ color: v("info-ink") }}>FIN COMB</span>
+            <span style={{ color: "#004a85" }}>FIN COMB</span>
           </div>
         }
         after={

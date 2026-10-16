@@ -39,21 +39,12 @@
  * file and holds the two copies to the same numbers.
  */
 
-import type { Rgb } from "../simColors";
+import { SDF_CENTRE, SDF_INSIDE, SDF_OUTSIDE } from "../tokens";
 
-/** f < 0 — inside the solid. `oklch(0.50 0.292 285°)`. */
-export const SDF_INSIDE: Rgb = [0.3924, 0.0015, 0.9925];
+export { SDF_CENTRE, SDF_INSIDE, SDF_OUTSIDE };
 
-/** f > 0 — outside the solid. `oklch(0.50 0.108 70°)`. */
-export const SDF_OUTSIDE: Rgb = [0.5398, 0.3384, 0.0033];
 
-/**
- * The ramp's neutral centre: the viewport's own paper.
- *
- * Mirrors `VIEWPORT_BACKGROUND`, so a field value at zero is the value of the
- * ground it is drawn on and the isoline is the only thing at the crossing.
- */
-export const SDF_CENTRE: Rgb = [0.902, 0.902, 0.914];
+
 
 /**
  * The ramp at a normalized signed value, t ∈ [-1, 1].

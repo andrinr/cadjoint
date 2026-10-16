@@ -1,4 +1,5 @@
 import { render } from "solid-js/web";
+import "../tokens.css";
 import "../styles.css";
 import "./design.css";
 import { DesignPage } from "./DesignPage";

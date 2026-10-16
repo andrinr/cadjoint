@@ -28,6 +28,7 @@ import {
   relativeLuminance,
   type Rgb,
 } from "../src/simColors";
+import { readdirSync } from "node:fs";
 import {
   ACCENT_FILL,
   CHROME,
@@ -47,7 +48,10 @@ import {
   TYPE_SCALE,
   WEIGHTS,
   chromeContrast,
+  cssProperties,
   hexToRgb,
+  tokensCss,
+  tokensScss,
   type ChromeToken,
 } from "../src/tokens";
 import { MODE_ACCENTS as EDITING_MODE_ACCENTS } from "../src/editingMode";
@@ -55,11 +59,21 @@ import { MODE_ACCENTS as EDITING_MODE_ACCENTS } from "../src/editingMode";
 const here = dirname(fileURLToPath(import.meta.url));
 const css = readFileSync(join(here, "../src/styles.css"), "utf8");
 
-/** The stylesheet's :root declaration block, where every token is defined. */
-const rootBlock = (() => {
-  const match = css.match(/^:root \{[\s\S]*?\n\}/m);
-  if (!match) throw new Error("styles.css has no :root token block");
-  return match[0];
+/** The generated token block, which styles.css no longer carries itself. */
+const rootBlock = readFileSync(join(here, "../src/tokens.css"), "utf8");
+
+/** Every stylesheet in src/, generated block excluded. */
+const stylesheets = (() => {
+  const files: string[] = [];
+  const walk = (dir: string) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) walk(path);
+      else if (entry.name.endsWith(".css") && entry.name !== "tokens.css") files.push(path);
+    }
+  };
+  walk(join(here, "../src"));
+  return files.map((path) => ({ path, text: readFileSync(path, "utf8") }));
 })();
 
 /**
@@ -71,14 +85,49 @@ const rootBlock = (() => {
  * chrome, so they keep literal colours on purpose.
  */
 const ruleBody = css
-  .replace(rootBlock, "")
   .replace(/\/\* @artwork[\s\S]*?\/\* @end-artwork \*\//g, "");
 
 /** Value declared for `--name` in :root, or undefined. */
 const token = (name: string): string | undefined =>
   rootBlock.match(new RegExp(`--${name}:\\s*([^;]+);`))?.[1].trim();
 
-describe("styles.css mirrors src/tokens.ts", () => {
+describe("the generated files are current", () => {
+  it("src/tokens.css is what tokensCss() emits", () => {
+    expect(rootBlock, "run `npm run tokens`").toBe(tokensCss());
+  });
+
+  it("docs/assets/tokens.scss is what tokensScss() emits", () => {
+    const scss = readFileSync(join(here, "../../docs/assets/tokens.scss"), "utf8");
+    expect(scss, "run `npm run tokens`").toBe(tokensScss());
+  });
+
+  it("styles.css declares no token of its own", () => {
+    expect(css).not.toMatch(/^:root \{/m);
+  });
+
+  it("uses no custom property that the token layer does not declare", () => {
+    // A var() of an undeclared name falls back silently to nothing; this is
+    // how --type-body-small went unnoticed. Local properties a stylesheet
+    // declares itself (--mode-accent and friends) are allowed.
+    const declared = new Set(cssProperties().map(([name]) => name));
+    // Set at runtime by MaterialPanel's previewStyle(), per swatch.
+    for (const name of ["material-rgb", "material-opacity", "material-roughness", "material-metallic"]) {
+      declared.add(name);
+    }
+    for (const { text } of stylesheets) {
+      for (const match of text.matchAll(/--([\w-]+)\s*:/g)) declared.add(match[1]);
+    }
+    const unknown: string[] = [];
+    for (const { path, text } of stylesheets) {
+      for (const match of text.matchAll(/var\(--([\w-]+)/g)) {
+        if (!declared.has(match[1])) unknown.push(`${path.split("/src/")[1]}: --${match[1]}`);
+      }
+    }
+    expect([...new Set(unknown)]).toEqual([]);
+  });
+});
+
+describe("tokens.css mirrors src/tokens.ts", () => {
   it("declares every chrome colour with the same value", () => {
     for (const [name, value] of Object.entries(CHROME)) {
       expect(token(name), `--${name}`).toBe(value);
@@ -274,7 +323,7 @@ const distance = (a: Rgb, b: Rgb): number =>
   Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 
 describe("chrome stays clear of the data palette", () => {
-  const chromeAccents: ChromeToken[] = ["accent", "danger", "info", "ok", "warn"];
+  const chromeAccents: ChromeToken[] = ["accent", "danger", "param", "ok", "warn"];
 
   it("puts no chrome accent on either ramp's reserved high end", () => {
     for (const name of chromeAccents) {

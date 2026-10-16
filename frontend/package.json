@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "tokens": "node tools/emit-tokens.ts"
   },
   "dependencies": {
     "@codemirror/autocomplete": "6.20.3",

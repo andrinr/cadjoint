@@ -28,7 +28,34 @@
  * a bug, not a nuance.
  */
 
-import { contrastRatio, type Rgb } from "./simColors";
+import type { StudyBcType } from "./types";
+
+// ── colour math ───────────────────────────────────────────────────────────
+// Kept here, with no runtime imports, so `tools/emit-tokens.ts` can load this
+// file directly under Node and so every module that needs a ratio reads it
+// from the same place the values live.
+
+export type Rgb = readonly [number, number, number];
+
+function linearChannel(value: number): number {
+  return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+}
+
+/** WCAG relative luminance of a normalized rgb triple. */
+export function relativeLuminance(rgb: Rgb): number {
+  return (
+    0.2126 * linearChannel(rgb[0]) +
+    0.7152 * linearChannel(rgb[1]) +
+    0.0722 * linearChannel(rgb[2])
+  );
+}
+
+/** WCAG contrast ratio between two colours (≥ 1, order-independent). */
+export function contrastRatio(a: Rgb, b: Rgb): number {
+  const lighter = Math.max(relativeLuminance(a), relativeLuminance(b));
+  const darker = Math.min(relativeLuminance(a), relativeLuminance(b));
+  return (lighter + 0.05) / (darker + 0.05);
+}
 
 // ── colour ────────────────────────────────────────────────────────────────
 
@@ -116,11 +143,10 @@ export const CHROME = {
   // past the 3:1 a non-text mark owes, and past AA as well, which is what
   // lets the same tone label a diagnostic and underline it.
   warn: "#8a5a00",
-  info: "#0065b4",
-  "info-ink": "#004a85",
   ok: "#00734c",
-  // The free-parameter role (design page §Colour roles): the same blue as
-  // `info`, named for the one thing it is to mean once the guide is adopted.
+  // The free-parameter role, and nothing else: a value the optimiser or a
+  // drag may move. Was `info`, which also meant a constraint count, a
+  // residual line, a plane label and the elastic chip.
   param: "#0065b4",
   "param-ink": "#004a85",
 
@@ -212,8 +238,11 @@ export const MEANINGFUL_NON_TEXT: ChromeToken[] = [
   "rule-strong",
   "rule-heavy",
   "danger",
-  "info",
+  "param",
   "ok",
+  "axis-x",
+  "axis-y",
+  "axis-z",
 ];
 
 /**
@@ -235,8 +264,8 @@ export const TEXT_TONES: ChromeToken[] = [
   "ink-3",
   "danger",
   "danger-ink",
-  "info",
-  "info-ink",
+  "param",
+  "param-ink",
   "ok",
   "warn",
 ];
@@ -331,14 +360,16 @@ export const RADII = {
 } as const;
 
 /**
- * Control heights. Every interactive box picks one, which is what keeps
- * labels, inputs and icons on a shared baseline inside a row.
+ * Control heights, five to nine units. Every box picks one, which is what
+ * keeps labels, inputs and icons on a shared baseline inside a row. 24px is
+ * the WCAG 2.2 (2.5.8) minimum target, so `control-tag` is for things that
+ * cannot be clicked and everything clickable is `control-sm` or taller.
  */
 export const CONTROL_HEIGHTS = {
-  "control-xs": 22,
-  "control-sm": 26,
-  "control-md": 30,
-  "control-lg": 34,
+  "control-tag": 20,
+  "control-sm": 24,
+  "control-md": 28,
+  "control-lg": 32,
   "control-xl": 36,
 } as const;
 
@@ -359,6 +390,18 @@ export const EASINGS = {
 } as const;
 
 // ── helpers ───────────────────────────────────────────────────────────────
+
+/** Lengths outside the scales: the unit, and the two line weights. */
+export const LINES = {
+  unit: 4,
+  hairline: 1,
+  "stroke-active": 2,
+} as const;
+
+export const FONTS = {
+  "font-sans": 'system-ui, -apple-system, "Segoe UI", sans-serif',
+  "font-mono": "ui-monospace, SFMono-Regular, Menlo, monospace",
+} as const;
 
 /** A `#rrggbb` string as the normalized triple the contrast math wants. */
 export function hexToRgb(hex: string): Rgb {
@@ -386,18 +429,8 @@ export const chromeContrast = (a: ChromeToken, b: ChromeToken): number =>
 /** The unit every length is a multiple of (axiom A6). */
 export const UNIT = 4;
 
-/**
- * Control heights on the 4px grid, five to nine units. Proposed by the guide
- * to replace CONTROL_HEIGHTS (22 · 26 · 30 · 34 · 36); 24px is the WCAG 2.2
- * 2.5.8 minimum target, so it is the smallest height anything clickable takes.
- */
-export const GRID_CONTROL_HEIGHTS = {
-  "control-tag": 20,
-  "control-sm": 24,
-  "control-md": 28,
-  "control-lg": 32,
-  "control-xl": 36,
-} as const;
+/** The control heights, as the design page names them. */
+export const GRID_CONTROL_HEIGHTS = CONTROL_HEIGHTS;
 
 /** Where a role's hue may appear. */
 export type RoleZone = "chrome" | "editor" | "viewport" | "legend";
@@ -485,3 +518,241 @@ export const VIEWPORT_STATES = {
   selected: "ink",
   locked: "rule",
 } as const satisfies Record<string, ChromeToken>;
+
+
+// ── data palettes ─────────────────────────────────────────────────────────
+// The colours that carry readings. simColors.ts and sdfRamp.ts evaluate and
+// test them; the WGSL shaders receive them through `wgslTokens()`; nothing
+// declares them a second time.
+
+/** Degree-6 per-channel polynomial fit of matplotlib's viridis. */
+export const VIRIDIS_COEFFICIENTS: readonly Rgb[] = [
+  [0.2744554245, 0.0057679624, 0.3326638811],
+  [0.1077083262, 1.3964696839, 1.3867705979],
+  [-0.3272410968, 0.2148135645, 0.0919768808],
+  [-4.5999315182, -5.7582381893, -19.2918089503],
+  [6.2037359013, 14.1539649474, 56.6562995652],
+  [4.7517868889, -13.7494394044, -65.3209678276],
+  [-5.432077171, 4.641571316, 26.2721076045],
+] as const;
+
+/** Degree-6 per-channel polynomial fit of matplotlib's magma (err ≤ 0.024). */
+export const MAGMA_COEFFICIENTS: readonly Rgb[] = [
+  [-0.0020666453, -0.0006875655, -0.0095482507],
+  [0.2504864448, 0.6944550333, 2.4952869139],
+  [8.3459009063, -3.5960313696, 0.3290570684],
+  [-27.6669694889, 14.2538530831, -13.6465831585],
+  [52.1706837385, -27.9445843529, 12.8810906346],
+  [-50.7585722964, 29.0538803789, 4.2699357345],
+  [18.6642528253, -11.4900266123, -5.5707689618],
+] as const;
+
+/**
+ * The viewport's paper ground (`surface-viewport`, `#e6e6e9`) as the shaders
+ * carry it: three decimals, the same literal the Python-generated raymarch
+ * WGSL uses, so the SDF ramp's centre and the ground are the same number.
+ * test/tokens.test.ts holds it to the hex.
+ */
+export const VIEWPORT_BACKGROUND: Rgb = [0.902, 0.902, 0.914];
+
+/**
+ * BC-type overlay hues (role: boundary). Mutually distinguishable, ≥3:1 on
+ * paper, clear of both ramps' high ends, the proposal teal and every chrome
+ * tone — held to those numbers by test/simColors.test.ts.
+ */
+export const BC_TYPE_COLORS: Record<StudyBcType, Rgb> = {
+  dirichlet: [0.122, 0.482, 0.961],
+  heat_flux: [0.753, 0.408, 0.114],
+  fixed: [0.667, 0.322, 0.965],
+  traction: [0.953, 0.161, 0.286],
+  inlet: [0.342, 0.51, 0.09],
+  outlet: [0.09, 0.216, 0.51],
+  walls: [0.008, 0.118, 0.832],
+  heat_source: [0.347, 0.218, 0.862],
+  held_temperature: [0.359, 0.006, 0.594],
+};
+
+/** The builder's live selection preview (role: proposal). 4.1:1 on paper. */
+export const PROPOSAL_COLOR: Rgb = [0.106, 0.475, 0.529];
+
+/**
+ * Element-edge lines over a field: ink where the ramp under the line is
+ * bright, the sheet where it is dark. Both achromatic (C4).
+ */
+export const ELEMENT_EDGE_COLOR: Rgb = hexToRgb(CHROME.ink);
+export const ELEMENT_EDGE_COLOR_LIGHT: Rgb = hexToRgb(CHROME["surface-float"]);
+
+/** The diverging SDF ramp (role: distance): inside, outside, and the paper centre. */
+export const SDF_INSIDE: Rgb = [0.3924, 0.0015, 0.9925];
+export const SDF_OUTSIDE: Rgb = [0.5398, 0.3384, 0.0033];
+export const SDF_CENTRE: Rgb = VIEWPORT_BACKGROUND;
+
+// ── viewport overlays ─────────────────────────────────────────────────────
+
+export type Rgba = [number, number, number, number];
+
+/**
+ * Every overlay tone the renderer draws, as a role token and an alpha.
+ *
+ * The ink ladder carries state (V1): rest `ink-3`, hover `ink-2`, selected
+ * `ink`, locked `rule`. Free versus held is carried by the handle's shape,
+ * not a hue, so nothing in this table is chromatic except the axes.
+ */
+export const OVERLAY_TONES: Record<string, { token: ChromeToken; alpha: number }> = {
+  edge: { token: "ink-3", alpha: 0.95 },
+  edgeHover: { token: "ink-2", alpha: 1 },
+  edgeSelected: { token: "ink", alpha: 1 },
+  edgeLocked: { token: "rule-strong", alpha: 0.7 },
+  handle: { token: "ink-2", alpha: 1 },
+  handleHover: { token: "ink", alpha: 1 },
+  handleSelected: { token: "ink", alpha: 1 },
+  handleLocked: { token: "rule", alpha: 0.9 },
+  meshWire: { token: "ink-3", alpha: 0.3 },
+  meshSharp: { token: "ink", alpha: 0.95 },
+  faceOutline: { token: "ink", alpha: 0.9 },
+  faceFill: { token: "ink", alpha: 0.12 },
+  faceOutlineLocked: { token: "ink", alpha: 0.45 },
+  faceFillLocked: { token: "ink", alpha: 0.05 },
+  planeFill: { token: "ink-3", alpha: 0.08 },
+  planeOutline: { token: "ink-3", alpha: 0.65 },
+  planeFillHover: { token: "ink-2", alpha: 0.12 },
+  planeOutlineHover: { token: "ink-2", alpha: 0.9 },
+  planeFillSelected: { token: "ink", alpha: 0.12 },
+  planeOutlineSelected: { token: "ink", alpha: 1 },
+  planeFillLocked: { token: "rule", alpha: 0.06 },
+  planeOutlineLocked: { token: "rule", alpha: 0.5 },
+  planeFillPreview: { token: "ink-2", alpha: 0.1 },
+  planeOutlinePreview: { token: "ink-2", alpha: 0.85 },
+};
+
+/** An overlay tone as the renderer's straight-alpha rgba. */
+export function overlayRgba(name: string): Rgba {
+  const tone = OVERLAY_TONES[name];
+  const [r, g, b] = hexToRgb(CHROME[tone.token]);
+  return [r, g, b, tone.alpha];
+}
+
+/** World X, Y, Z as triples, for the gizmo and the triad. */
+export const AXIS_RGB: [Rgb, Rgb, Rgb] = [
+  hexToRgb(CHROME["axis-x"]),
+  hexToRgb(CHROME["axis-y"]),
+  hexToRgb(CHROME["axis-z"]),
+];
+
+// ── derived CSS values ────────────────────────────────────────────────────
+// The stylesheet's non-scale custom properties: alpha ladders and the rgb
+// triples a rule tints with. Each is a function of a token above, so none
+// is a free value.
+
+const triple = (token: ChromeToken) =>
+  hexToRgb(CHROME[token]).map((channel) => Math.round(channel * 255)).join(", ");
+const rgba = (token: ChromeToken, alpha: number) => `rgba(${triple(token)}, ${alpha})`;
+
+/**
+ * The accent and ink alpha ladder. Six strengths, each with a job: a wash is
+ * a sheet barely touched, a tint an active row's fill, a veil a decorative
+ * hairline, an edge an active control's border, a mark something to find.
+ */
+export const ALPHAS = {
+  "alpha-wash": 0.06,
+  "alpha-tint": 0.12,
+  "alpha-tint-strong": 0.18,
+  "alpha-veil": 0.28,
+  "alpha-edge": 0.55,
+  "alpha-mark": 0.85,
+} as const;
+
+export const DERIVED: Record<string, string> = {
+  // Chrome floating over the viewport: opaque at rest (no text on a
+  // data-dependent backdrop), with a transparent end for fades.
+  "surface-viewport-94": rgba("surface-viewport", 0.94),
+  "surface-viewport-70": rgba("surface-viewport", 0.7),
+  "surface-float-00": rgba("surface-float", 0),
+  // Shade is a fade of ink, never of black.
+  "shade-none": rgba("ink", 0),
+  "shade-soft": rgba("ink", 0.1),
+  "shade-strong": rgba("ink", 0.16),
+  "shade-scroll": rgba("ink", 0.22),
+  scrim: rgba("ink", 0.42),
+  // Separation between rows of one list: weaker than `rule`.
+  divider: rgba("ink", 0.09),
+  "accent-rgb": triple("accent"),
+  "ink-rgb": triple("ink"),
+  "danger-rgb": triple("danger"),
+  "param-rgb": triple("param"),
+  "ok-rgb": triple("ok"),
+  "viewport-mark-rgb": triple("viewport-mark"),
+  "viewport-mode-rgb": triple("viewport-mode"),
+  // Type composites for the combinations that repeat everywhere.
+  "type-kicker": "var(--weight-semibold) var(--text-3xs) / var(--leading-flat) var(--font-mono)",
+  "type-mono": "var(--weight-medium) var(--text-2xs) / var(--leading-tight) var(--font-mono)",
+  "type-mono-strong": "var(--weight-semibold) var(--text-2xs) / var(--leading-tight) var(--font-mono)",
+  "type-body-small": "var(--weight-regular) var(--text-xs) / var(--leading-snug) var(--font-sans)",
+};
+
+// ── emitters ──────────────────────────────────────────────────────────────
+// `npm run tokens` writes these to src/tokens.css and docs/assets/tokens.scss;
+// test/tokens.test.ts fails when either file differs from what they return.
+
+const GENERATED = "Generated from frontend/src/tokens.ts by `npm run tokens`. Do not edit.";
+
+/** Every custom property, as `name: value` pairs, in a stable order. */
+export function cssProperties(): [string, string][] {
+  const px = (value: number) => `${value}px`;
+  const ms = (value: number) => `${value}ms`;
+  return [
+    ...Object.entries(CHROME),
+    ...Object.entries(FONTS),
+    ...Object.entries(TYPE_SCALE).map(([k, v]) => [k, px(v)] as [string, string]),
+    ...Object.entries(WEIGHTS).map(([k, v]) => [k, String(v)] as [string, string]),
+    ...Object.entries(LEADING).map(([k, v]) => [k, String(v)] as [string, string]),
+    ...Object.entries(TRACKING),
+    ...Object.entries(LINES).map(([k, v]) => [k, px(v)] as [string, string]),
+    ...Object.entries(SPACE).map(([k, v]) => [k, px(v)] as [string, string]),
+    ...Object.entries(RADII).map(([k, v]) => [k, px(v)] as [string, string]),
+    ...Object.entries(CONTROL_HEIGHTS).map(([k, v]) => [k, px(v)] as [string, string]),
+    ...Object.entries(DURATIONS).map(([k, v]) => [k, ms(v)] as [string, string]),
+    ...Object.entries(EASINGS),
+    ...Object.entries(ALPHAS).map(([k, v]) => [k, String(v)] as [string, string]),
+    ...Object.entries(DERIVED),
+  ];
+}
+
+/** The `:root` block the stylesheet imports. */
+export function tokensCss(): string {
+  const lines = cssProperties().map(([name, value]) => `  --${name}: ${value};`);
+  return `/* ${GENERATED} */\n\n:root {\n${lines.join("\n")}\n  color-scheme: light;\n}\n`;
+}
+
+/** The same values as Sass variables, for the Quarto docs theme. */
+export function tokensScss(): string {
+  const lines = cssProperties()
+    .filter(([, value]) => !value.includes("var("))
+    .map(([name, value]) => `$cj-${name}: ${value};`);
+  return `// ${GENERATED}\n\n${lines.join("\n")}\n`;
+}
+
+const vec3 = (rgb: Rgb) => `vec3<f32>(${rgb.map((c) => Number(c.toFixed(10))).join(", ")})`;
+
+/**
+ * Constants every WGSL module is prefixed with, so a shader names a role
+ * (`INK`, `AXIS_X`, `VIRIDIS_C3`) instead of carrying a literal.
+ */
+export function wgslTokens(): string {
+  const lines = [
+    `// ${GENERATED.replace("`npm run tokens`", "wgslTokens()")}`,
+    `const INK = ${vec3(hexToRgb(CHROME.ink))};`,
+    `const INK_2 = ${vec3(hexToRgb(CHROME["ink-2"]))};`,
+    `const INK_3 = ${vec3(hexToRgb(CHROME["ink-3"]))};`,
+    `const PAPER = ${vec3(VIEWPORT_BACKGROUND)};`,
+    `const SHEET = ${vec3(hexToRgb(CHROME["surface-float"]))};`,
+    `const AXIS_X = ${vec3(AXIS_RGB[0])};`,
+    `const AXIS_Y = ${vec3(AXIS_RGB[1])};`,
+    `const AXIS_Z = ${vec3(AXIS_RGB[2])};`,
+    `const EDGE_DARK = ${vec3(ELEMENT_EDGE_COLOR)};`,
+    `const EDGE_LIGHT = ${vec3(ELEMENT_EDGE_COLOR_LIGHT)};`,
+    ...VIRIDIS_COEFFICIENTS.map((c, i) => `const VIRIDIS_C${i} = ${vec3(c)};`),
+    ...MAGMA_COEFFICIENTS.map((c, i) => `const MAGMA_C${i} = ${vec3(c)};`),
+  ];
+  return `${lines.join("\n")}\n`;
+}
