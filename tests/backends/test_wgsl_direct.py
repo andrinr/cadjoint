@@ -299,6 +299,13 @@ def _scenes() -> list[tuple[str, object]]:
         ),
         ("revolve", RevolvedPolygon(_ring(6, 0.3), offset=Scalar(0.9, name="o"))),
         (
+            # The left edge lies on the axis, where it is interior (#50).
+            "revolve on its axis",
+            RevolvedPolygon(
+                [Vector2(v) for v in [[0.0, -0.6], [0.8, -0.6], [1.0, 0.6], [0.0, 0.6]]]
+            ),
+        ),
+        (
             "linear pattern",
             LinearPattern(
                 Sphere(radius=Scalar(0.25)),

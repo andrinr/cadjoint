@@ -17,9 +17,9 @@ import numpy as np
 import pytest
 
 from cadjoint import extract_parameters, functionalize
-from cadjoint.geometry.parameters import Scalar, Vector
+from cadjoint.geometry.parameters import Scalar, Vector, Vector2
 from cadjoint.sdf.boolean import Difference, Intersection, Union
-from cadjoint.sdf.primitives import Box, Capsule, Cylinder, Sphere, Torus
+from cadjoint.sdf.primitives import Box, Capsule, Cylinder, RevolvedPolygon, Sphere, Torus
 from cadjoint.sdf.transforms import Rotate, Scale, Translate
 from cadjoint.sdf.transforms.fields import Offset, Shell
 from cadjoint.zeroset import lower
@@ -72,6 +72,11 @@ NODES = {
     "scale": lambda: Scale(Sphere(radius=0.5), [1.5, 1.5, 1.5]),
     "offset": lambda: Offset(Box(size=[0.5, 0.5, 0.5]), Scalar(0.1, free=True, name="d")),
     "shell": lambda: Shell(Sphere(radius=0.8), Scalar(0.2, free=True, name="t")),
+    # A cup section whose left edge lies on the axis: interior, not surface (#50).
+    "revolve on its axis": lambda: RevolvedPolygon(
+        [Vector2(v) for v in [[0.0, -0.6], [0.8, -0.6], [1.0, 0.6], [0.0, 0.6]]],
+        offset=Scalar(0.0, free=True, name="o"),
+    ),
     "hard union": lambda: Union(Sphere(radius=0.8), Box(size=[0.5, 0.5, 0.5]), smoothness=0.0),
     "smooth union": lambda: Union(
         Sphere(radius=Scalar(0.8, free=True, name="a")),
