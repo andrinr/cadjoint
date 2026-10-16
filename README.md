@@ -1,5 +1,9 @@
 # cadjoint
 
+[![PyPI](https://img.shields.io/pypi/v/cadjoint)](https://pypi.org/project/cadjoint/)
+[![Python](https://img.shields.io/pypi/pyversions/cadjoint)](https://pypi.org/project/cadjoint/)
+[![License](https://img.shields.io/pypi/l/cadjoint)](https://github.com/andrinr/cadjoint/blob/main/LICENSE)
+
 Differentiable code-first CAD: sketches, constraints, SDF geometry, meshing and
 FEM simulation composed into one function JAX can differentiate end to end.
 
