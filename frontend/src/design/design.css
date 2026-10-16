@@ -1589,3 +1589,8 @@ html:has(.dl-body),
   letter-spacing: var(--tracking-3xs);
   text-transform: uppercase;
 }
+.dl-features tr.issue .decision {
+  display: block;
+  margin-top: var(--space-1);
+  color: var(--ok);
+}

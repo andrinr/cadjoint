@@ -59,7 +59,7 @@ export function FeatureIndex() {
           </button>
         </div>
         <span class="dl-status">
-          <s>struck</s>&nbsp;today · → bold: the rule · ▲ what is wrong
+          <s>struck</s>&nbsp;today · → bold: the rule · ▲ what is wrong · ● decided
         </span>
       </div>
       <table class="dl-table dl-features">
@@ -93,7 +93,12 @@ export function FeatureIndex() {
                         <Show when={feature.issue}>
                           <tr class="issue">
                             <td />
-                            <td colSpan={COLUMNS.length}>▲ {feature.issue}</td>
+                            <td colSpan={COLUMNS.length}>
+                              ▲ {feature.issue}
+                              <Show when={feature.decision}>
+                                <span class="decision">● Decided: {feature.decision}</span>
+                              </Show>
+                            </td>
                           </tr>
                         </Show>
                       </>

@@ -51,6 +51,8 @@ export interface Feature {
   rule: Homes;
   /** What is wrong with `now`, when something is. */
   issue?: string;
+  /** How the issue was settled, once it has been. */
+  decision?: string;
 }
 
 export const FEATURE_GROUPS = [
@@ -79,6 +81,7 @@ export const FEATURES: Feature[] = [
     now: { menu: "File › New", toolbar: "Reset (icon only, beside Run)" },
     rule: { menu: "File › New" },
     issue: "Two homes, two names (New, Reset); the toolbar copy is a destructive icon-only button next to Run.",
+    decision: "Remove the toolbar Reset; File › New is the only home.",
   },
   {
     name: "Open a scene",
@@ -92,6 +95,7 @@ export const FEATURES: Feature[] = [
     now: { menu: "File › Save" },
     rule: { menu: "File › Save", key: "⌘S" },
     issue: "No shortcut for the most frequent file command.",
+    decision: "⌘S, with preventDefault so the browser does not save the page.",
   },
   {
     name: "Save as",
@@ -125,6 +129,7 @@ export const FEATURES: Feature[] = [
     now: { toolbar: "Run", key: "⌘↵" },
     rule: { menu: "Program › Run", toolbar: "Run", key: "⌘↵" },
     issue: "No menu home.",
+    decision: "Program › Run (menu structure, settled).",
   },
   {
     name: "Stop the compile",
@@ -138,6 +143,7 @@ export const FEATURES: Feature[] = [
     now: { toolbar: "<> (icon only)" },
     rule: { menu: "Program › Show generated WGSL" },
     issue: "A developer view holds a primary toolbar slot beside Run.",
+    decision: "Moves to Program › Show generated WGSL; the toolbar slot goes.",
   },
   {
     name: "Undo",
@@ -172,8 +178,9 @@ export const FEATURES: Feature[] = [
     group: "Edit and selection",
     modes: MODEL_SKETCH,
     now: { rail: "Delete (icon only)", key: "⌫" },
-    rule: { menu: "Edit › Delete", rail: "Delete", key: "⌫" },
+    rule: { menu: "Edit › Delete", rail: "Delete (worded ≥1280px)", key: "⌫" },
     issue: "The rail's delete is icon-only (I2).",
+    decision: "The rail's Delete carries the word at 1280px and wider, like every rail icon (I1).",
   },
   {
     name: "Clear the selection",
@@ -201,6 +208,7 @@ export const FEATURES: Feature[] = [
     now: { key: "1 3 7", viewport: "view cube faces, ⌃ for the opposite" },
     rule: { menu: "View › Camera › Front, Right, Top", key: "1 3 7", viewport: "view cube faces, ⌃ for the opposite" },
     issue: "No menu home: there is no View menu.",
+    decision: "A View menu (menu structure, settled).",
   },
   {
     name: "Turn to the opposite side",
@@ -226,6 +234,7 @@ export const FEATURES: Feature[] = [
     now: { viewport: "Alt + wheel" },
     rule: { menu: "View › Grid › Finer, Coarser", key: "[ ]", viewport: "Alt + wheel" },
     issue: "Reachable only by a gesture nobody can discover.",
+    decision: "View › Grid › Finer, Coarser, on [ and ].",
   },
   {
     name: "Render preset",
@@ -308,6 +317,7 @@ export const FEATURES: Feature[] = [
     now: { rail: "Modify › Extrude, Revolve, Loft" },
     rule: { menu: "Shape › Extrude, Revolve, Loft", rail: "Shape › Extrude, Revolve, Loft", key: "E" },
     issue: "The rail calls the group Modify; what it does is turn a sketch into a solid.",
+    decision: "Rename the rail group Shape.",
   },
   {
     name: "Move, rotate, scale",
@@ -316,6 +326,7 @@ export const FEATURES: Feature[] = [
     now: { rail: "Transform › Move, Rotate, Scale", key: "G R" },
     rule: { menu: "Shape › Move, Rotate, Scale", rail: "Transform › Move, Rotate, Scale", key: "G R T" },
     issue: "Scale has no key.",
+    decision: "Scale on T.",
   },
 
   // ── Constrain ───────────────────────────────────────────────────────────
@@ -326,6 +337,7 @@ export const FEATURES: Feature[] = [
     now: { rail: "Annotate › Distance, Horizontal, Vertical, Coincident", panel: "Sketch › Distance, Horiz, Vert, Coinc" },
     rule: { menu: "Constrain › Distance, Horizontal, Vertical, Coincident", rail: "Constrain › Distance, Horizontal, Vertical, Coincident", panel: "Sketch (list only)" },
     issue: "Two homes with two sets of names (Coincident / Coinc); the rail group is called Annotate.",
+    decision: "The rail (and Constrain menu) adds, the Sketch panel lists and removes; the rail group is renamed Constrain.",
   },
   {
     name: "Parallel, perpendicular",
@@ -334,14 +346,16 @@ export const FEATURES: Feature[] = [
     now: { rail: "Annotate › Parallel, Perpendicular", panel: "Sketch › ∥ Edges, ⊥ Edges" },
     rule: { menu: "Constrain › Parallel, Perpendicular", rail: "Constrain › Parallel, Perpendicular", panel: "Sketch (list only)" },
     issue: "Glyph labels in the panel, words on the rail.",
+    decision: "Words everywhere; the panel no longer adds.",
   },
   {
     name: "Fix a point",
     group: "Constrain",
     modes: ["sketch"],
     now: { panel: "Sketch › anchor" },
-    rule: { menu: "Constrain › Fix", rail: "Constrain › Fix", key: "F", panel: "Sketch › anchor" },
+    rule: { menu: "Constrain › Fix", rail: "Constrain › Fix", panel: "Sketch › anchor" },
     issue: "Only in the panel, unlike every other constraint.",
+    decision: "Fix joins the rail's Constrain group. No letter key: F stays free for framing the selection.",
   },
   {
     name: "Remove a constraint",
@@ -370,8 +384,9 @@ export const FEATURES: Feature[] = [
     name: "Assign a material",
     group: "Materials",
     now: { panel: "Materials (drag a swatch onto an object)" },
-    rule: { panel: "Materials (drag), Properties › material", viewport: "drop" },
+    rule: { panel: "Properties › material · Materials (drag)", viewport: "drop" },
     issue: "Drag is the only way: no keyboard or selection-based path.",
+    decision: "Properties gains a material field that rewrites the source; drag stays as the shortcut.",
   },
   {
     name: "Edit a material",
@@ -400,8 +415,9 @@ export const FEATURES: Feature[] = [
     group: "Simulate",
     modes: ["simulate"],
     now: { panel: "Studies › + Thermal, + Elastic, + Flow" },
-    rule: { menu: "Simulate › New study › Thermal, Elastic, Flow", panel: "Studies › + Study" },
+    rule: { menu: "Simulate › New study › Thermal, Elastic, Flow", panel: "Studies › + Study (kind menu)" },
     issue: "Three add buttons side by side truncate in a 320px column.",
+    decision: "One dashed + Study button opening the three kinds, as in Simulate › New study.",
   },
   {
     name: "Add a boundary condition",
@@ -466,6 +482,7 @@ export const FEATURES: Feature[] = [
     now: { menu: "Window › Editor, Object tree, Sketch panel…" },
     rule: { menu: "Window › Windows › scene.py, Objects, Properties, Sketch, Materials, Meshes, Studies, Results, Optimize, Scenes, Processes" },
     issue: "The menu names differ from the tab names (N4).",
+    decision: "The menu uses the tab names (menu structure, settled).",
   },
   {
     name: "Float a window",
