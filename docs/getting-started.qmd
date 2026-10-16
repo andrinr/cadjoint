@@ -42,17 +42,19 @@ uv sync --extra fem --extra tesseract --extra viewer
 | `fem` | the jax-fem finite-element stack (basix, meshio, petsc4py, gmsh) |
 | `tesseract` | tesseract-core + tesseract-jax, which every [plugin](plugins.qmd) is implemented with |
 | `gmsh` | Gmsh in your own process, for the [tet10 mesher](simulation.qmd) — GPL, hence an extra of its own |
-| `viewer` | the Jupyter widget (`anywidget`) and the playground's process monitor (`psutil`) |
+| `viewer` | the playground server (`pydantic`), the Jupyter widget (`anywidget`) and the process monitor (`psutil`) |
 | `editor` | `ruff` and `jedi`, for the playground's lint, completion and signature help |
 | `stepcheck` | OCCT kernel validation of STEP exports (dev) |
 | `docs` | the Quarto API reference (`quartodoc`) |
 
 Avoid `--all-extras` on macOS — it includes `cuda`, which has no macOS wheels.
 
-The fastest way to see all of it at once is the browser app:
+The fastest way to see all of it at once is the browser app, which ships in
+the package and needs the `viewer` extra:
 
 ```bash
-uv run cadjoint-viewer --open
+uvx --from "cadjoint[viewer,editor]" cadjoint-viewer --open   # nothing installed
+uv run --extra viewer --extra editor cadjoint-viewer --open   # from a checkout
 ```
 
 It opens on a parametric heat sink that already declares a mesh, a thermal

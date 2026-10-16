@@ -107,7 +107,7 @@ Everything beyond the geometry core is an extra, one `--extra` per name:
 | `fem` | jax-fem finite-element stack (basix, meshio, petsc4py, gmsh) |
 | `tesseract` | tesseract-core + tesseract-jax, the plugin runtime |
 | `gmsh` | Gmsh in-process for the tet10 mesher (GPL, hence its own extra) |
-| `viewer` | Jupyter widget (`anywidget`) and the playground's process monitor (`psutil`) |
+| `viewer` | the playground server (`pydantic`), the Jupyter widget (`anywidget`) and the process monitor (`psutil`) |
 | `editor` | playground lint, completion and signature help (`ruff`, `jedi`) |
 | `stepcheck` | OCCT validation of STEP exports (dev) |
 | `docs` | Quarto API reference (`quartodoc`) |
@@ -139,9 +139,37 @@ same solvers in Docker.
 
 ## The playground
 
+The playground ships inside the `cadjoint` package: the built UI is package
+data and `cadjoint-viewer` is its console script. It needs the `viewer` extra
+(the request schema imports pydantic), and `editor` adds lint, completion and
+signature help. A plain `pip install cadjoint` installs the command, but it
+stops at startup without them.
+
+Without a checkout:
+
 ```bash
-uv run cadjoint-viewer --open      # serves http://127.0.0.1:8765/
+uvx --from "cadjoint[viewer,editor]" cadjoint-viewer --open
 ```
+
+or into an environment of your own:
+
+```bash
+pip install "cadjoint[viewer,editor]"
+cadjoint-viewer --open             # serves http://127.0.0.1:8765/
+```
+
+From a checkout, where `scenes/` holds the example scenes:
+
+```bash
+uv sync --extra viewer --extra editor
+uv run cadjoint-viewer --open
+```
+
+Scenes are opened from and saved to `./scenes` under the directory the
+server was started in (`CADJOINT_SCENES_DIR` points it elsewhere). Outside a
+checkout that directory starts empty and the playground opens on its
+built-in starter. It runs in any browser with WebGPU: current Chrome, Edge and
+Safari.
 
 The editor on the left holds `scene.py`; the viewport shows the compiled
 field. Vertex handles, gizmos, material swatches, face picks, constraint chips

@@ -1964,11 +1964,8 @@ input[type="checkbox"] {
   flex-direction: column;
   align-items: center;
   gap: var(--gap);
-  /* The cluster is taller than the cube since the axis triad moved below it,
-     and an empty absolutely-positioned div is still a hit target: without
-     this, the band the triad is drawn in would be a hole in the viewport
-     where a drag neither orbits the camera nor reaches the canvas. The two
-     halves of this that *are* controls take their events back below. */
+  /* An absolutely-positioned box is a hit target even where it draws
+     nothing; the cube stage takes its events back below. */
   pointer-events: none;
 }
 
@@ -2059,17 +2056,14 @@ input[type="checkbox"] {
    the screen. It is a legend and not a control: no pointer events, so the
    canvas underneath still orbits where the triad is drawn over it. */
 .cube-triad {
+  position: absolute;
+  left: var(--section);
+  bottom: var(--section);
+  z-index: 10;
   width: calc(var(--unit) * 16);
   height: calc(var(--unit) * 16);
   overflow: visible;
   pointer-events: none;
-  /* Pulled up into the stage's own bottom margin. The cube's silhouette stops
-     about 23px short of the bottom of its square, so the 6px flex gap above
-     would leave a 31px hole and the legend would read as something else
-     floating in the viewport. −20 (net −14 after the gap) closes it to 14px
-     at the tightest standpoint of 360 swept — the one that aims the cube's
-     furthest point and an axis label at each other — and to more elsewhere. */
-  margin-top: calc(var(--unit) * -5);
 }
 
 /* The axis triad is a reading of orientation, and X-red, Y-green, Z-blue is

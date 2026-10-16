@@ -297,6 +297,7 @@ export function ViewCube(props: ViewCubeProps) {
   });
 
   return (
+    <>
     <div class="view-cube" data-testid="view-cube">
       <svg
         class="cube-stage"
@@ -346,12 +347,13 @@ export function ViewCube(props: ViewCubeProps) {
           )}
         </For>
       </svg>
+    </div>
 
-      {/* The world axes, turning with the cube, in a square of their own
-          directly under it. The origin is that square's centre, because the
-          arms sweep a full circle as the camera turns and any other origin
-          would put one of them off the edge at some standpoint — which is
-          exactly what happened while this lived in the cube's own square. */}
+      {/* The world axes, turning with the cube, in a square of their own in
+          the viewport's bottom-left corner, out of the cube's way and clear
+          of the dock and the hint. The origin is that square's centre,
+          because the arms sweep a full circle as the camera turns and any
+          other origin would put one of them off the edge at some standpoint. */}
       <svg
         class="cube-triad"
         viewBox={`${-TRIAD_EXTENT} ${-TRIAD_EXTENT} ${TRIAD_EXTENT * 2} ${TRIAD_EXTENT * 2}`}
@@ -389,8 +391,7 @@ export function ViewCube(props: ViewCubeProps) {
           )}
         </For>
       </svg>
-
-    </div>
+    </>
   );
 }
 
