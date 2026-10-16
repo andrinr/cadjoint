@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-import jax.numpy as jnp
 from jax import Array
 
 from cadjoint.geometry.parameters import Scalar
-from cadjoint.sdf.primitives.base import Primitive
+from cadjoint.sdf.primitives.base import Primitive, safe_norm
 
 
 class Sphere(Primitive):
@@ -61,7 +60,7 @@ class Sphere(Primitive):
         Returns:
             Signed distance: ||p|| - radius
         """
-        return jnp.linalg.norm(p, axis=-1) - radius
+        return safe_norm(p) - radius
 
     def __call__(self, p: Array) -> Array:
         """Evaluate SDF at point(s) p.

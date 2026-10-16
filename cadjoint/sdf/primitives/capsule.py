@@ -6,7 +6,7 @@ import jax.numpy as jnp
 from jax import Array
 
 from cadjoint.geometry.parameters import Scalar
-from cadjoint.sdf.primitives.base import Primitive
+from cadjoint.sdf.primitives.base import Primitive, safe_norm
 
 
 class Capsule(Primitive):
@@ -42,7 +42,7 @@ class Capsule(Primitive):
         z_clamped = jnp.clip(p[..., 2], -height, height)
         # Distance to line segment along z-axis
         q = jnp.stack([p[..., 0], p[..., 1], p[..., 2] - z_clamped], axis=-1)
-        return jnp.linalg.norm(q, axis=-1) - radius
+        return safe_norm(q) - radius
 
     def __call__(self, p: Array) -> Array:
         """Evaluate SDF at point(s) p."""
