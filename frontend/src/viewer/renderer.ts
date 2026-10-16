@@ -1751,7 +1751,46 @@ export class Renderer {
     device.queue.submit([encoder.finish()]);
   }
 
+  /** Wall-clock times of recent frames, for the viewport's FPS readout. */
+  private frameLog: number[] = [];
+  /** CPU milliseconds spent encoding and submitting each recent frame. */
+  private cpuLog: number[] = [];
+
+  /**
+   * What the last second of drawing cost, for the performance readout.
+   *
+   * The renderer draws on demand, so a still picture draws nothing: `fps` is
+   * null when no frame has been drawn for a second, which the readout states
+   * as idle rather than as zero. `cpuMs` is the time to encode and submit a
+   * frame on the CPU, not GPU time, and is labelled as such.
+   */
+  get frameStats(): { fps: number | null; cpuMs: number | null; width: number; height: number; samples: number } {
+    const now = performance.now();
+    const recent = this.frameLog.filter((time) => now - time <= 1000);
+    const cpu = this.cpuLog.length
+      ? this.cpuLog.reduce((sum, value) => sum + value, 0) / this.cpuLog.length
+      : null;
+    return {
+      fps: recent.length ? recent.length : null,
+      cpuMs: recent.length ? cpu : null,
+      // Before the viewport mounts there is no canvas to measure.
+      width: this.canvas?.width ?? 0,
+      height: this.canvas?.height ?? 0,
+      samples: this.sampleCount,
+    };
+  }
+
   private render(): void {
+    const started = performance.now();
+    this.renderFrame();
+    const ended = performance.now();
+    this.frameLog.push(ended);
+    if (this.frameLog.length > 240) this.frameLog.splice(0, this.frameLog.length - 240);
+    this.cpuLog.push(ended - started);
+    if (this.cpuLog.length > 30) this.cpuLog.shift();
+  }
+
+  private renderFrame(): void {
     this.framePending = false;
     if (!this.device || !this.context) return;
     this.resize();

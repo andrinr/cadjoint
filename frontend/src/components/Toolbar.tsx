@@ -18,8 +18,7 @@ import {
 import { CHIP_KINDS, cancelLabel, chipJobs, othersLabel } from "./jobChip";
 import { windowManager } from "../windows/manager";
 import { ModeSwitcher } from "./ModeSwitcher";
-import { RenderPanel, type RenderPanelProps } from "./RenderPanel";
-import { DisplayIcon, PlayIcon } from "./icons";
+import { PlayIcon } from "./icons";
 
 /**
  * Whether the render-settings popover is open.
@@ -226,37 +225,9 @@ function JobChip() {
 
 export interface ToolbarProps {
   onRun: () => void;
-  /** Everything the render-settings popover forwards to RenderPanel. */
-  render: RenderPanelProps;
 }
 
 export function Toolbar(props: ToolbarProps) {
-  const renderOpen = renderPopoverOpen;
-  const setRenderOpen = setRenderPopoverOpen;
-  let anchor: HTMLDivElement | undefined;
-
-  // Escape closes the popover in the capture phase, so the viewer's own
-  // Escape handling (clear selection, return to model) never sees the key.
-  const onKeyDown = (event: KeyboardEvent) => {
-    if (event.key === "Escape" && renderOpen()) {
-      event.preventDefault();
-      event.stopPropagation();
-      setRenderOpen(false);
-    }
-  };
-  // Clicking anywhere outside the anchor dismisses like any popover.
-  const onPointerDown = (event: PointerEvent) => {
-    if (renderOpen() && anchor && !anchor.contains(event.target as Node)) {
-      setRenderOpen(false);
-    }
-  };
-  window.addEventListener("keydown", onKeyDown, true);
-  window.addEventListener("pointerdown", onPointerDown, true);
-  onCleanup(() => {
-    window.removeEventListener("keydown", onKeyDown, true);
-    window.removeEventListener("pointerdown", onPointerDown, true);
-  });
-
   return (
     <header class="toolbar">
       <div class="brand">
@@ -293,24 +264,8 @@ export function Toolbar(props: ToolbarProps) {
         </Show>
       </span>
 
-      <div class="render-popover-anchor" ref={anchor}>
-        <button
-          type="button"
-          class={`icon ${renderOpen() ? "active" : ""}`}
-          onClick={() => setRenderOpen(!renderOpen())}
-          title="Render settings — presets, shading, and quality"
-          aria-label="Render settings"
-          aria-expanded={renderOpen()}
-          data-testid="display-options"
-        >
-          <DisplayIcon />
-        </button>
-        <Show when={renderOpen()}>
-          <div class="render-popover" data-testid="render-popover">
-            <RenderPanel {...props.render} />
-          </div>
-        </Show>
-      </div>
+      {/* Render settings moved into the viewport bar, beside the projection
+          toggle: it changes the picture, so it lives with the picture. */}
       {/* Reset and the WGSL view used to sit here, beside Run. New is a file
           command (File › New) and the generated shader is a developer view
           (Program › Show generated WGSL): neither is the program's verb, and

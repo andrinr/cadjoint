@@ -83,8 +83,8 @@ export const SHORTCUTS: Shortcut[] = [
   { command: "view-top", key: "7", label: "7", action: "Top view (Ctrl: bottom)", group: "View", dispatch: false },
   { command: "view-opposite", key: "9", label: "9", action: "Turn to the opposite side", group: "View", dispatch: false },
   { command: "view-ortho", key: "5", label: "5", action: "Toggle orthographic / perspective", group: "View", dispatch: false },
-  { command: "grid-finer", key: "[", label: "[", action: "Finer grid", group: "View" },
-  { command: "grid-coarser", key: "]", label: "]", action: "Coarser grid", group: "View" },
+  { command: "grid-finer", key: "[", label: "[", action: "Zoom in one grid step", group: "View" },
+  { command: "grid-coarser", key: "]", label: "]", action: "Zoom out one grid step", group: "View" },
   { command: "show-construction", key: "c", shift: true, label: "⇧C", action: "Toggle the construction overlay", group: "View" },
 
   // ── Viewport ─────────────────────────────────────────────────────────

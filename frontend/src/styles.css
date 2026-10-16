@@ -97,7 +97,6 @@ body {
    name, a study name) stays as the program wrote it, because §4's rule is
    that anything appearing in scene.py is quoted, not restyled. */
 button,
-select,
 .pane-hint,
 .status,
 .sim-row label,
@@ -512,6 +511,47 @@ button:disabled {
   cursor: default;
 }
 
+/* A select is an input, not a button: the sheet with a rule-strong edge, the
+   value in mono exactly as the program writes it (a material name, a mesh
+   name — never uppercased, T2), and a drawn ink chevron in place of the
+   platform's arrow, which ignores every token. */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  height: var(--control-md);
+  padding: 0 calc(var(--unit) * 7) 0 var(--space-3);
+  border: var(--hairline) solid var(--rule-strong);
+  border-radius: var(--radius);
+  background-color: var(--surface-float);
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--ink-2) 50%),
+    linear-gradient(135deg, var(--ink-2) 50%, transparent 50%);
+  background-position:
+    calc(100% - var(--space-5)) 50%,
+    calc(100% - var(--space-4)) 50%;
+  background-size: var(--space-2) var(--space-2);
+  background-repeat: no-repeat;
+  color: var(--ink);
+  font: var(--weight-medium) var(--text-sm) / var(--leading-flat) var(--font-mono);
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+select:hover:not(:disabled) {
+  background-color: var(--surface-raised-hover);
+}
+
+select:focus-visible {
+  outline: var(--stroke-active) solid var(--ink);
+  outline-offset: calc(var(--hairline) * -1);
+}
+
+select:disabled {
+  border-color: var(--rule);
+  color: var(--ink-3);
+  cursor: default;
+}
+
 /* One "this control is on" treatment for the whole app: the accent as a solid
    fill with near-black type on it, and that is the only shape the accent is
    allowed to take anywhere. As a fill it measures 7.02:1 under
@@ -610,18 +650,63 @@ input[type="checkbox"] {
 
 /* Viewport overlays ---------------------------------------------------- */
 
-.tool-rail {
+/* The viewport bar: one strip across the top of the viewport. The picture's
+   tools on the left, how it is drawn (projection, render settings) on the
+   right. A bar, not a floating card, so the readout and the cube sit under it
+   instead of being covered by it (guide N6). */
+.viewport-bar {
   position: absolute;
-  top: var(--space-5);
-  left: var(--space-5);
+  top: 0;
+  left: 0;
+  right: 0;
   z-index: 10;
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  height: calc(var(--unit) * 10);
+  padding: 0 var(--space-4);
+  border-bottom: var(--hairline) solid var(--rule-strong);
+  background: var(--surface-float);
+}
+
+.viewport-bar-end {
+  display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding: var(--space-3);
-  border: var(--hairline) solid var(--rule);
+  margin-left: auto;
+}
+
+.viewport-bar-button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: var(--control-lg);
+  padding: 0 var(--space-3);
+  border-color: transparent;
+  background: transparent;
+  color: var(--ink-2);
+}
+
+.viewport-bar-button:hover:not(:disabled) {
+  border-color: var(--rule);
+  background: var(--surface-raised-hover);
+  color: var(--ink);
+}
+
+/* Projection and the open render popover are states, not the current tool:
+   an ink edge, not the accent. */
+.viewport-bar-button.active,
+.viewport-bar-button.active:hover:not(:disabled) {
+  border-color: var(--ink);
   background: var(--surface-float);
+  color: var(--ink);
+}
+
+.tool-rail {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 .tool-rail button {
@@ -658,9 +743,9 @@ input[type="checkbox"] {
 }
 
 .tool-rail hr {
-  width: var(--space-7);
-  height: var(--hairline);
-  margin: var(--space-1) 0;
+  width: var(--hairline);
+  height: var(--control-md);
+  margin: 0 var(--space-2);
   border: 0;
   background: var(--rule);
 }
@@ -707,8 +792,8 @@ input[type="checkbox"] {
 .tool-flyout {
   display: none;
   position: absolute;
-  top: calc(var(--hairline) * -1);
-  left: calc(100% + var(--space-5));
+  top: calc(100% + var(--space-3));
+  left: calc(var(--hairline) * -1);
   z-index: 11;
   gap: var(--space-2);
   padding: var(--space-2);
@@ -726,19 +811,20 @@ input[type="checkbox"] {
 .tool-group.open::after {
   content: "";
   position: absolute;
-  top: 0;
-  left: 100%;
-  width: var(--space-5);
-  height: 100%;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  height: var(--space-3);
 }
 
 /* Sketch-plane quick picks, shown while the sketch tool is armed. */
 .plane-picks {
   display: flex;
-  flex-direction: column;
-  align-items: stretch;
+  flex-direction: row;
+  align-items: center;
   gap: var(--space-1);
-  padding-top: var(--space-1);
+  padding-left: var(--space-3);
+  border-left: var(--hairline) solid var(--rule);
 }
 
 .plane-picks-label {
@@ -751,7 +837,7 @@ input[type="checkbox"] {
 
 .tool-rail .plane-picks button {
   width: var(--control-lg);
-  height: var(--control-sm);
+  height: var(--control-md);
   font: var(--type-kicker);
   letter-spacing: var(--tracking-md);
 }
@@ -1774,7 +1860,7 @@ input[type="checkbox"] {
 
 .view-cube {
   position: absolute;
-  top: var(--space-5);
+  top: calc(var(--unit) * 10 + var(--space-4));
   right: var(--space-5);
   z-index: 10;
   display: flex;
@@ -2638,8 +2724,8 @@ button.icon {
    it. No plate: it sits where the tool rail already holds the field back. */
 .graticule-gain {
   position: absolute;
-  top: var(--space-5);
-  left: calc(var(--unit) * 16);
+  top: calc(var(--unit) * 10 + var(--space-4));
+  left: var(--space-5);
   z-index: 5;
   display: flex;
   /* Every cell is given the same line box, so centring them also lands their

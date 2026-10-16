@@ -285,12 +285,14 @@ export function ViewportSpecimen(props: { field?: boolean }) {
         </div>
       ) : null}
       <div class="titleblock">
-        <span>SCENE</span>
-        <span>heat_sink</span>
-        <span>STUDY</span>
-        <span>{props.field ? "sink-conduction" : "—"}</span>
-        <span>REV</span>
-        <span>14</span>
+        <span>FPS</span>
+        <span>{props.field ? "60" : "idle"}</span>
+        <span>CPU</span>
+        <span>{props.field ? "1.8 ms/frame" : "—"}</span>
+        <span>RES</span>
+        <span>1696 × 1104 px</span>
+        <span>NODES</span>
+        <span>12</span>
       </div>
       <div class="hint">
         <span class="dl-tag">{props.field ? "SIMULATE" : "SKETCH"}</span>

@@ -42,7 +42,9 @@ export type RailGroupId =
   | "delete";
 
 const GROUPS_BY_MODE: Record<EditingMode, RailGroupId[]> = {
-  model: ["select", "create", "transform", "delete"],
+  // Shape is in Model as well: a sketch is extruded from Model as often as from
+  // Sketch, and its tools disable with the reason until a sketch is selected.
+  model: ["select", "create", "modify", "transform", "delete"],
   sketch: ["select", "create", "modify", "transform", "annotate", "delete"],
   simulate: [],
 };

@@ -20,9 +20,9 @@ interface Region {
 const REGIONS: Record<string, Region> = {
   menu: { id: "menu", name: "Menu bar", answers: "What can the application do? File, Edit, Window (every window, by its tab name), Help." },
   modes: { id: "modes", name: "Mode switcher", answers: "Where am I in the pipeline? Model → Sketch → Simulate." },
-  program: { id: "program", name: "Program status · Run", answers: "Does the screen match the code? Status, render settings, Reset, Run." },
+  program: { id: "program", name: "Program status · Run", answers: "Does the screen match the code? The running-work chip, the status, Run." },
   editor: { id: "editor", name: "scene.py", answers: "What is true? The program; every edit lands here." },
-  viewport: { id: "viewport", name: "Viewport", answers: "What does the program make? The picture, and direct manipulation of it." },
+  viewport: { id: "viewport", name: "Viewport", answers: "What does the program make? The picture, its tools and how it is drawn in the bar across its top, and direct manipulation of it." },
   column: { id: "column", name: "Right column", answers: "What is selected, and what follows from it? Setup above, outcomes below." },
   tray: { id: "tray", name: "Tray", answers: "What is parked? Monitors and browsers, one click away: Scenes, Processes." },
 };
@@ -71,7 +71,7 @@ export function DeskMap() {
           </span>
         </div>
         <div class={cls("program", "bar")} tabIndex={0} onMouseEnter={() => setFocus("program")} onFocus={() => setFocus("program")} style={{ "grid-area": "program" }}>
-          <span>status · display · reset · run</span>
+          <span>jobs · status · run</span>
         </div>
         <div class={cls("editor", "sheet")} tabIndex={0} onMouseEnter={() => setFocus("editor")} onFocus={() => setFocus("editor")} style={{ "grid-area": "editor" }}>
           <b>scene.py</b>
@@ -79,10 +79,9 @@ export function DeskMap() {
         </div>
         <div class={cls("viewport", "viewport")} tabIndex={0} onMouseEnter={() => setFocus("viewport")} onFocus={() => setFocus("viewport")} style={{ "grid-area": "viewport" }}>
           <b>Viewport</b>
-          <small class="tl">readout · tool rail</small>
-          <small class="tr">view cube</small>
+          <small class="tl">bar: tools · · · projection · render</small>
           <small class="bl">legend</small>
-          <small class="br">title block</small>
+          <small class="br">performance</small>
           <small class="bc">hint</small>
         </div>
         <div class={cls("column", "sheet column")} tabIndex={0} onMouseEnter={() => setFocus("column")} onFocus={() => setFocus("column")} style={{ "grid-area": "column" }}>

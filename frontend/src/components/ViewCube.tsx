@@ -390,27 +390,37 @@ export function ViewCube(props: ViewCubeProps) {
         </For>
       </svg>
 
-      {/* The projection toggle: a glyph, not a facet, because it is not a
-          direction. It sits in the stage's top-right corner, which the cube's
-          silhouette never reaches, so the widget stays one block instead of a
-          square with a button hung under it — which is where it was. */}
-      <button
-        type="button"
-        class="cube-projection"
-        classList={{ active: props.projection === "orthographic" }}
-        onClick={toggleProjection}
-        title={
-          props.projection === "orthographic"
-            ? "Orthographic — click for perspective  (5)"
-            : "Perspective — click for orthographic  (5)"
-        }
-        aria-label="Toggle projection"
-        data-testid="projection-toggle"
-      >
-        <Show when={props.projection === "orthographic"} fallback={<PerspectiveIcon />}>
-          <OrthographicIcon />
-        </Show>
-      </button>
     </div>
+  );
+}
+
+/**
+ * The projection toggle, in the viewport bar beside render settings.
+ *
+ * It used to sit in the cube stage's corner. Projection is not a direction,
+ * and the cube is the direction control, so the toggle joins the other
+ * controls of how the picture is drawn. Key 5 stays with the cube's handler.
+ */
+export function ProjectionToggle(props: {
+  projection: Projection;
+  onProjection: (projection: Projection) => void;
+}) {
+  const ortho = () => props.projection === "orthographic";
+  return (
+    <button
+      type="button"
+      class="viewport-bar-button"
+      classList={{ active: ortho() }}
+      onClick={() => props.onProjection(ortho() ? "perspective" : "orthographic")}
+      title={ortho() ? "Orthographic — click for perspective  (5)" : "Perspective — click for orthographic  (5)"}
+      aria-label="Toggle projection"
+      aria-pressed={ortho()}
+      data-testid="projection-toggle"
+    >
+      <Show when={ortho()} fallback={<PerspectiveIcon size={16} />}>
+        <OrthographicIcon size={16} />
+      </Show>
+      <span class="rail-word">{ortho() ? "Ortho" : "Persp"}</span>
+    </button>
   );
 }

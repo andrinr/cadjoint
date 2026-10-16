@@ -311,7 +311,11 @@ export function ToolRail(props: ToolRailProps) {
       <Show when={groupVisibleInMode("modify", editingMode())}>
         {group("modify", "Shape", SHAPE, {
           isActive: (entry) =>
-            entry.key === "loft" && pendingLoft()?.nodeId === modifyProfile()?.id,
+            // Both sides are undefined when nothing is pending and no profile is
+            // selected, which lit the group as current beside Object.
+            entry.key === "loft" &&
+            pendingLoft() !== null &&
+            pendingLoft()?.nodeId === modifyProfile()?.id,
           isEnabled: (entry) => shapeBlocked(entry.key as "extrude") === null,
           hint: (entry) => {
             const reason = shapeBlocked(entry.key as "extrude");

@@ -29,7 +29,8 @@ import { createSimulateController } from "./components/simulate/controller";
 import { SketchPanel } from "./components/SketchPanel";
 import { ToolRail } from "./components/ToolRail";
 import { Toolbar } from "./components/Toolbar";
-import { ViewCube } from "./components/ViewCube";
+import { ProjectionToggle, ViewCube } from "./components/ViewCube";
+import { RenderSettingsButton } from "./components/viewer/RenderSettingsButton";
 import { ViewerPane } from "./components/ViewerPane";
 import { createCompileCycle } from "./shell/compileCycle";
 import { createPatchOperations } from "./shell/patchOperations";
@@ -213,7 +214,9 @@ export function App() {
   // Pointing the properties window at an element is one gesture; picking a
   // node is another, and the later one wins: a fresh selection ends the
   // inspection so the window follows the viewport again.
-  createEffect(on(selection, () => setInspected(null), { defer: true }));
+  // Clearing the selection does not end an inspection: the tree clears the
+  // selection itself when it starts one.
+  createEffect(on(selection, (next) => next && setInspected(null), { defer: true }));
 
   /** Character span of the selected vertex's literal, for the editor. */
   // A vertex reveals its own literal; a whole object reveals the statement
@@ -274,6 +277,21 @@ export function App() {
    * window is: docked, tabbed behind another, floating or parked all render
    * the same tree.
    */
+  /** Everything the render-settings popover forwards to RenderPanel. */
+  const renderPanelProps = () => ({
+    display: render.display(),
+    presets: render.presets(),
+    selectedPreset: render.selectedPreset(),
+    pathTracing: render.pathTracing(),
+    quality: render.quality(),
+    onChange: render.applyDisplay,
+    onQualityChange: render.applyQuality,
+    onPresetActivate: render.activateRenderPreset,
+    onPresetSave: render.saveRenderPreset,
+    onPresetReset: render.resetRenderPreset,
+    onPathTracingChange: render.applyPathTracing,
+  });
+
   const renderWindow = (id: WindowId) => {
     switch (id) {
       case "viewport":
@@ -293,12 +311,23 @@ export function App() {
             onAssignMaterial={ops.assignMaterial}
             overlay={
               <>
-                <ToolRail
-                  onDelete={deleteSelection}
-                  onExtrude={ops.extrudeSelection}
-                  onRevolve={ops.revolveSelection}
-                  onFix={() => fixSelectedPoint(ops.addConstraint)}
-                />
+                {/* The viewport bar: the picture's tools on the left, how it is
+                    drawn (projection, render settings) on the right. */}
+                <div class="viewport-bar" data-testid="viewport-bar">
+                  <ToolRail
+                    onDelete={deleteSelection}
+                    onExtrude={ops.extrudeSelection}
+                    onRevolve={ops.revolveSelection}
+                    onFix={() => fixSelectedPoint(ops.addConstraint)}
+                  />
+                  <div class="viewport-bar-end">
+                    <ProjectionToggle
+                      projection={render.display().projection}
+                      onProjection={(projection) => render.applyDisplay({ projection })}
+                    />
+                    <RenderSettingsButton render={renderPanelProps()} />
+                  </div>
+                </div>
                 <ViewCube
                   yaw={cameraAngles().yaw}
                   pitch={cameraAngles().pitch}
@@ -407,19 +436,6 @@ export function App() {
       <MenuBar />
       <Toolbar
         onRun={() => void compile.run()}
-        render={{
-          display: render.display(),
-          presets: render.presets(),
-          selectedPreset: render.selectedPreset(),
-          pathTracing: render.pathTracing(),
-          quality: render.quality(),
-          onChange: render.applyDisplay,
-          onQualityChange: render.applyQuality,
-          onPresetActivate: render.activateRenderPreset,
-          onPresetSave: render.saveRenderPreset,
-          onPresetReset: render.resetRenderPreset,
-          onPathTracingChange: render.applyPathTracing,
-        }}
       />
 
       <WindowLayout renderWindow={renderWindow} />

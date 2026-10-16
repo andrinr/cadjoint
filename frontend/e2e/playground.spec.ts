@@ -1744,9 +1744,9 @@ test("the construction overlay can be switched off for a presentation frame", as
   // Every mark the app draws *about* the model is gone…
   await expect(page.locator(".constraint-distance")).toHaveCount(0);
   await expect(page.getByTestId("constraint-overlay")).toHaveCount(0);
-  // …while the viewport, its ground grid and the title block stay.
+  // …while the viewport, its ground grid and the performance readout stay.
   await expect(page.getByTestId("viewer-canvas")).toBeVisible();
-  await expect(page.getByTestId("title-block")).toBeVisible();
+  await expect(page.getByTestId("perf-readout")).toBeVisible();
   await expect(page.getByTestId("graticule-gain")).toBeVisible();
 
   await toggle.check();

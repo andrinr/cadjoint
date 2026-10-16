@@ -52,42 +52,39 @@
   text-transform: uppercase;
 }
 
-/* Tool rail words (design language I2) -------------------------------- */
-
-.tool-rail .rail-word {
+/* Viewport bar words (design language I1, I2) -------------------------- */
+/* Icon and word inline, at 1280px and wider; below that, icons alone with
+   the word in the tooltip. */
+.tool-rail .rail-word,
+.viewport-bar .rail-word {
   display: none;
 }
 
 @media (min-width: 1280px) {
-  .tool-rail {
-    align-items: stretch;
-  }
-
   .tool-rail > button,
   .tool-rail .tool-group-parent,
   .tool-rail .tool-flyout button {
-    display: flex;
-    flex-direction: column;
+    display: inline-flex;
+    flex-direction: row;
     align-items: center;
-    justify-content: center;
-    gap: var(--space-1);
+    gap: var(--space-3);
     width: auto;
-    min-width: var(--control-lg);
-    height: auto;
-    min-height: var(--control-lg);
-    padding: var(--space-2) var(--space-2);
+    height: var(--control-lg);
+    padding: 0 var(--space-3);
   }
 
-  .tool-rail .rail-word {
-    display: block;
+  .tool-rail .rail-word,
+  .viewport-bar .rail-word {
+    display: inline;
     font: var(--type-kicker);
     letter-spacing: var(--tracking-3xs);
     text-transform: uppercase;
     white-space: nowrap;
   }
 
-  .tool-rail hr {
-    align-self: center;
+  /* The group's caret moves to the right of its word. */
+  .tool-rail .tool-group-parent {
+    padding-right: var(--space-5);
   }
 }
 
@@ -108,4 +105,56 @@
   left: 0;
   right: 0;
   min-width: 0;
+}
+
+/* Menu type ------------------------------------------------------------ */
+/* The bar's titles are furniture (tracked uppercase, like tabs); the items
+   are commands read down a list, so they are mono in sentence case: a list
+   of tracked capitals reads slower than the same list as words, and the
+   window names include program strings (scene.py) that are never restyled
+   (T2). Section labels are 9px tracked kickers on the items' left edge. */
+.menu-bar .menu-dropdown,
+.study-kinds.menu-dropdown {
+  min-width: calc(var(--unit) * 60);
+}
+
+.menu-bar .menu-dropdown button,
+.menu-bar .menu-dropdown a,
+.study-kinds.menu-dropdown button {
+  font: var(--weight-regular) var(--text-sm) / var(--leading-flat) var(--font-mono);
+  letter-spacing: normal;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+.menu-bar .menu-dropdown button > small,
+.menu-bar .menu-dropdown a > small {
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.menu-section {
+  padding-left: calc(var(--unit) * 6 + var(--space-6));
+}
+
+/* The open title is the accent fill whatever the pointer does; the generic
+   button.active:hover rule would otherwise press it to accent-press. */
+.menu-bar .menu-title.active,
+.menu-bar .menu-title.active:hover:not(:disabled) {
+  background: var(--accent);
+  color: var(--ink-on-accent);
+}
+
+/* Chrome is not text to select ---------------------------------------- */
+/* A quick multi-click or a shift-click on a bar used to extend the page's
+   text selection across the editor beside it, which read as "clicking the
+   mode selects the whole code". Furniture is pressed, not selected; the
+   editor, panels' values and the tree's names stay selectable. */
+.menu-bar,
+.toolbar,
+.viewport-bar,
+.win-tray,
+.win-theme .dv-tabs-and-actions-container {
+  user-select: none;
+  -webkit-user-select: none;
 }

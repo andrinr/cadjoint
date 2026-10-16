@@ -53,12 +53,14 @@ describe("editing mode cycling", () => {
 });
 
 describe("mode filtering of tool groups", () => {
-  it("model mode offers solids and transforms but no sketch-only groups", () => {
+  it("model mode offers solids, shaping and transforms but no constraints", () => {
+    // Shape (extrude, revolve, loft) is in Model too: turning a selected
+    // sketch into a solid is a Model-mode step as often as a Sketch one.
     const groups = railGroupsForMode("model");
     expect(groups).toContain("create");
+    expect(groups).toContain("modify");
     expect(groups).toContain("transform");
     expect(groups).not.toContain("annotate");
-    expect(groups).not.toContain("modify");
   });
 
   it("sketch mode adds constraint and operator groups", () => {

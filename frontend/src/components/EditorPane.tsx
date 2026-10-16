@@ -17,6 +17,9 @@ import {
   keymap,
   lineNumbers,
   type DecorationSet,
+  MatchDecorator,
+  ViewPlugin,
+  type ViewUpdate,
 } from "@codemirror/view";
 import { createEffect, onCleanup, onMount } from "solid-js";
 import { intelligenceExtensions } from "../editor/extensions";
@@ -81,6 +84,29 @@ const highlightStyle = HighlightStyle.define([
   { tag: tags.self, color: "var(--ink)", fontStyle: "italic" },
 ]);
 
+/**
+ * The editor's one hue besides diagnostics: `free=True` in the free-parameter
+ * blue (role: free, token `param`). It marks the literal a drag or the
+ * optimiser may rewrite, which is the one thing worth seeing in colour while
+ * reading a scene. `free=False` is a held value and stays ink.
+ */
+const freeMatcher = new MatchDecorator({
+  regexp: /\bfree\s*=\s*True\b/g,
+  decoration: Decoration.mark({ class: "cm-free-param" }),
+});
+const freeParameters = ViewPlugin.fromClass(
+  class {
+    decorations: DecorationSet;
+    constructor(view: EditorView) {
+      this.decorations = freeMatcher.createDeco(view);
+    }
+    update(update: ViewUpdate) {
+      this.decorations = freeMatcher.updateDeco(update, this.decorations);
+    }
+  },
+  { decorations: (plugin) => plugin.decorations },
+);
+
 const theme = EditorView.theme(
   {
     "&": {
@@ -96,6 +122,7 @@ const theme = EditorView.theme(
       color: "var(--ink-3)",
     },
     ".cm-activeLine": { backgroundColor: "var(--surface-bar-alt)" },
+    ".cm-free-param, .cm-free-param *": { color: "var(--param)" },
     ".cm-activeLineGutter": { backgroundColor: "transparent" },
     ".cm-vertex-highlight": {
       // The edited span: the accent as a veil behind the type, never an edge.
@@ -127,6 +154,7 @@ export function EditorPane(props: EditorPaneProps) {
       history(),
       python(),
       syntaxHighlighting(highlightStyle),
+      freeParameters,
       highlightField,
       theme,
       // ruff diagnostics, jedi completion, and signature help — all three

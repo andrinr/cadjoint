@@ -1381,7 +1381,8 @@ function Components() {
           </Plate>
         }
       >
-        An input is the sheet with a <code>rule-strong</code> edge and right-aligned tabular mono.
+        An input is the sheet with a <code>rule-strong</code> edge and right-aligned tabular mono;
+        a select is the same field with a drawn ink chevron and its value as the program writes it.
         Focus is a 2px <code>ink</code> edge; invalid is a <code>danger</code> edge with the text
         kept; an expression is read-only and dashed.
       </Rule>
@@ -1473,7 +1474,10 @@ function Components() {
         }
       >
         A menu is the sheet with a <code>rule-strong</code> edge; items are 24px, in one column,
-        shortcuts right-aligned in <code>ink-3</code>. The open menu's title is the accent block.
+        shortcuts right-aligned in <code>ink-3</code>. The bar's titles are furniture, tracked
+        uppercase; the items are commands read down a list, so they are mono in sentence case, on
+        one line, with section labels as kickers on the items' left edge. The open menu's title
+        is the accent block.
       </Rule>
 
       <h3>Notices</h3>
@@ -1661,9 +1665,11 @@ function Layout() {
         id="N6"
         why="Corners are learned once. A readout that moves is a readout you have to look for."
       >
-        The viewport's furniture has fixed places: readout and tool rail top-left, view cube
-        top-right, legend bottom-left, title block bottom-right, hint bottom-centre (V3). Nothing
-        else is pinned there.
+        The viewport's furniture has fixed places. Across the top, the viewport bar: the picture's
+        tools on the left, how it is drawn (projection, render settings) on the right. Under it,
+        the readout top-left and the view cube top-right; the legend bottom-left, the performance
+        readout bottom-right, the hint bottom-centre (V3). Nothing else is pinned there, and
+        nothing covers anything else.
       </Rule>
       <Rule
         id="N7"
@@ -1761,8 +1767,11 @@ function Viewport() {
       <Rule id="V3" why="A spacing on an unnamed plane is not a measurement; a value on a perspective view is not to scale.">
         The graticule is furniture, held to 1.4–2.8:1. It rules the world plane the camera most
         nearly faces and states its spacing on a 1-2-5 ladder (<code>GRID 100 mm · XZ</code>), prefixed{" "}
-        <code>&gt;</code> when the view is not to scale. The title block lists SCENE, STUDY, MESH,
-        SOLVER, REV, with <code>—</code> where a field is empty. The hint bar names the mode as an
+        <code>&gt;</code> when the view is not to scale; because the spacing follows the zoom, the
+        grid steps are a detented zoom (View › Zoom, <code>[</code> <code>]</code>). The performance
+        readout states what only the viewport can: FPS (<code>idle</code> when nothing is drawing),
+        CPU time per frame, the render resolution, node count, and mesh elements and triangles once
+        a mesh is shown; sampled twice a second, never tweened. The hint bar names the mode as an
         inverse tag, then one sentence about what the pointer does now.
       </Rule>
     </Section>
@@ -1962,6 +1971,7 @@ function Behaviour() {
 function Language() {
   const rows = [
     ["furniture", "MESH · SOLVE · BOUNDARY CONDITION", "uppercase tracked mono"],
+    ["commands in a list", "Save as… · Show generated WGSL", "mono, sentence case, one line"],
     ["program strings", "fin comb · sink-conduction · base_l", "verbatim mono"],
     ["sentences", "Drag a swatch onto an object", "sans, sentence case, no period on one clause"],
     ["quantities", "1.00 m · 412.8 K · 2700 kg/m³", "SI, unit as a symbol after the value"],

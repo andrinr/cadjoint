@@ -51,14 +51,23 @@ export function ObjectTree() {
     setCollapsed(next);
   };
 
+  // One selection (guide F2): a row is either the selected object or the
+  // inspected element, never both, so each pick clears the other. Clicking
+  // the already-selected object used to leave an inspected operator lit,
+  // because the selection did not change and nothing cleared it.
   const selectRow = (row: SceneTreeRow) => {
     if (row.nodeId !== null) {
+      setInspected(null);
       setSelection({ nodeId: row.nodeId, vertexIndex: null });
       return;
     }
     // An operator or a boolean has no geometry to select; it points the
-    // properties window at its element instead.
-    if (row.elementId !== null) setInspected(row.elementId);
+    // properties window at its element instead, and the object selection
+    // steps aside.
+    if (row.elementId !== null) {
+      setSelection(null);
+      setInspected(row.elementId);
+    }
   };
 
   /** Roving arrow-key navigation over the visible rows. */
