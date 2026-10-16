@@ -60,9 +60,27 @@ def _isolated_registry():
         os.environ["CADJOINT_PLUGINS"] = saved
 
 
+def _worker_ports() -> range:
+    """This process's share of :data:`_PORT_RANGE`.
+
+    ``_free_port`` probes a port and releases it before the server binds, so
+    two pytest-xdist workers probing the same range could both pick it.
+    Each worker (``PYTEST_XDIST_WORKER`` = ``gw0``, ``gw1``, ...) takes its
+    own slice; without xdist the whole range is this process's.
+    """
+    worker = os.environ.get("PYTEST_XDIST_WORKER", "")
+    count = int(os.environ.get("PYTEST_XDIST_WORKER_COUNT", "1") or 1)
+    if not worker.startswith("gw") or count <= 1:
+        return _PORT_RANGE
+    index = int(worker[2:]) % count
+    width = len(_PORT_RANGE) // count
+    start = _PORT_RANGE.start + index * width
+    return range(start, start + width)
+
+
 def _free_port() -> int:
-    """A free port from the range this suite is allowed to bind."""
-    for port in _PORT_RANGE:
+    """A free port from the share of the range this process may bind."""
+    for port in _worker_ports():
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
             probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             try:
@@ -70,7 +88,8 @@ def _free_port() -> int:
             except OSError:
                 continue
             return port
-    raise RuntimeError(f"no free port in {_PORT_RANGE.start}-{_PORT_RANGE.stop - 1}")
+    ports = _worker_ports()
+    raise RuntimeError(f"no free port in {ports.start}-{ports.stop - 1}")
 
 
 class ServedTesseract:
