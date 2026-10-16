@@ -16,7 +16,7 @@
 /* One space between the right-hung count and the control that follows it;
    `.section-head` closes with `gap: 0`, which leaves them touching. */
 .proc-panel .section-head {
-  gap: var(--space-4);
+  gap: var(--inset);
 }
 
 .proc-list {
@@ -31,13 +31,13 @@
 /* Rows of one list are separated by the weakest rule in the system: they are
    one table, not a stack of cards. */
 .proc-row + .proc-row {
-  border-top: var(--hairline) solid var(--divider);
+  border-top: var(--line-rule);
 }
 
 .proc-line {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--gap);
   min-width: 0;
 }
 
@@ -47,7 +47,7 @@
   flex: 1 1 auto;
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--gap);
   min-width: 0;
   height: var(--control-sm);
   padding: 0;
@@ -58,13 +58,16 @@
 
 .proc-open:hover:not(:disabled) {
   border-color: transparent;
-  background: var(--surface-bar-alt);
+  background: var(--plane-step);
 }
 
 .proc-open strong {
   overflow: hidden;
   min-width: 0;
-  font: var(--type-mono-strong);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -77,15 +80,17 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: var(--space-4);
+  gap: var(--inset);
   color: var(--ink-2);
 }
 
 .proc-figures b {
   min-width: calc(var(--unit) * 11);
   color: var(--ink);
-  font: var(--type-mono-strong);
-  font-variant-numeric: tabular-nums;
+  font: var(--text-value);
+  letter-spacing: var(--track-value);
+  text-transform: var(--case-value);
+  font-variant-numeric: var(--numeric-value);
   text-align: right;
 }
 
@@ -94,11 +99,12 @@
 .proc-status {
   min-width: calc(var(--unit) * 15);
   color: var(--ink-3);
-  font: var(--type-mono);
+  font: var(--text-label);
+  letter-spacing: var(--track-label);
+  text-transform: var(--case-label);
+  font-variant-numeric: var(--numeric-label);
   font-style: normal;
-  letter-spacing: var(--tracking-2xs);
   text-align: right;
-  text-transform: uppercase;
 }
 
 .proc-status[data-status="failed"] {
@@ -106,16 +112,21 @@
 }
 
 .proc-progress {
-  margin: 0 0 var(--space-2);
-  padding-left: var(--space-6);
+  margin: 0 0 var(--gap);
+  padding-left: var(--section);
   color: var(--ink-2);
-  font: var(--type-mono);
-  font-variant-numeric: tabular-nums;
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 
 .proc-progress b {
   color: var(--ink);
-  font: var(--type-mono-strong);
+  font: var(--text-value);
+  letter-spacing: var(--track-value);
+  text-transform: var(--case-value);
+  font-variant-numeric: var(--numeric-value);
 }
 
 /* An expanded row indents under its own name, so the sample chart reads as
@@ -123,16 +134,18 @@
 .proc-detail {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  margin-bottom: var(--space-3);
-  padding-left: var(--space-6);
+  gap: var(--gap);
+  margin-bottom: var(--gap);
+  padding-left: var(--section);
 }
 
 .proc-budget {
   margin: 0;
   color: var(--ink-3);
-  font: var(--type-mono);
-  font-variant-numeric: tabular-nums;
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 
 /*

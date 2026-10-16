@@ -13,7 +13,7 @@
 
 .export-form {
   display: grid;
-  gap: var(--space-5);
+  gap: var(--stack);
 }
 
 /* Two fields on one line when they are short: format beside its option,
@@ -21,18 +21,19 @@
 .export-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: var(--space-4);
+  gap: var(--inset);
   align-items: end;
 }
 
 .export-field {
   display: grid;
-  gap: var(--space-2);
+  gap: var(--gap);
   min-width: 0;
   color: var(--ink-3);
-  font-size: var(--text-xs);
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-xs);
+  font: var(--text-label);
+  letter-spacing: var(--track-label);
+  text-transform: var(--case-label);
+  font-variant-numeric: var(--numeric-label);
 }
 
 /* The controls share the shared chrome's edge: a control's edge is
@@ -42,31 +43,28 @@
 .export-field select {
   width: 100%;
   height: var(--control-md);
-  padding: 0 var(--space-4);
-  border: var(--hairline) solid var(--rule-strong);
-  background: var(--surface-float);
+  padding: 0 var(--inset);
+  border: var(--line-edge);
+  background: var(--plane-sheet);
   color: var(--ink);
-  font: var(--weight-semibold) var(--text-sm) / var(--leading-flat) var(--font-mono);
 }
 
 /* The name is a string the program wrote: quoted, never restyled. */
 .export-field input[type="text"] {
-  text-transform: none;
-  letter-spacing: var(--tracking-lg);
 }
 
 /* The resolution is a number the user reads: tabular and right-hung, with
    its unit on the same baseline in the label's ink. */
 .export-field input[type="number"] {
   text-align: right;
-  font-variant-numeric: tabular-nums;
 }
 
 .export-field .export-unit {
   color: var(--ink-3);
-  font-size: var(--text-2xs);
-  text-transform: none;
-  letter-spacing: 0;
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 
 /* The one option a format has sits where a second field would, on the
@@ -80,7 +78,7 @@
 .export-actions {
   display: flex;
   align-items: center;
-  gap: var(--space-4);
+  gap: var(--inset);
 }
 
 /* Progress is a sentence, not a bar: the job chip beside the mode switcher
@@ -89,7 +87,8 @@
 .export-progress {
   margin: 0;
   color: var(--ink-2);
-  font-size: var(--text-xs);
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
+  font: var(--text-prose);
+  letter-spacing: var(--track-prose);
+  text-transform: var(--case-prose);
+  font-variant-numeric: var(--numeric-prose);
 }

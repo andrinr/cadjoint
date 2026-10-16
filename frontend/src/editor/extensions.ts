@@ -318,10 +318,18 @@ const dismissOnBlur = EditorView.domEventHandlers({
  * theme paints with `#d11` and `orange` baked into SVG data URIs, so both the
  * gutter markers and the underlines are replaced outright rather than tinted.
  */
+/** A text role, applied whole: the four declarations a `t-<role>` class sets. */
+const role = (name: "label" | "control" | "body" | "value" | "prose") => ({
+  font: `var(--text-${name})`,
+  letterSpacing: `var(--track-${name})`,
+  textTransform: `var(--case-${name})`,
+  fontVariantNumeric: `var(--numeric-${name})`,
+});
+
 const intelligenceTheme = EditorView.theme({
   // Gutter markers: replace the packaged SVG images with token-coloured shapes.
   ".cm-gutter-lint": { width: "1.2em" },
-  ".cm-gutter-lint .cm-gutterElement": { padding: "0 var(--space-1)" },
+  ".cm-gutter-lint .cm-gutterElement": { padding: "0 var(--nudge)" },
   ".cm-lint-marker": {
     content: "none",
     width: "calc(var(--unit) * 2)",
@@ -346,7 +354,7 @@ const intelligenceTheme = EditorView.theme({
     paddingBottom: "0",
     textDecorationLine: "underline",
     textDecorationSkipInk: "none",
-    textUnderlineOffset: "var(--space-1)",
+    textUnderlineOffset: "var(--nudge)",
   },
   ".cm-lintRange-error": {
     textDecorationStyle: "wavy",
@@ -358,12 +366,12 @@ const intelligenceTheme = EditorView.theme({
   },
   ".cm-lintRange-info": {
     textDecorationStyle: "dotted",
-    textDecorationThickness: "var(--space-1)",
+    textDecorationThickness: "var(--stroke-active)",
     textDecorationColor: "var(--ink-3)",
   },
   // The traceback of a compile that actually failed, drawn heavier than the
   // suspicions around it.
-  ".cm-lint-runtime": { textDecorationThickness: "var(--space-1)" },
+  ".cm-lint-runtime": { textDecorationThickness: "var(--stroke-active)" },
   ".cm-lintRange-active": { backgroundColor: "var(--surface-bar-alt)" },
 
   ".cm-tooltip-lint": {
@@ -374,37 +382,34 @@ const intelligenceTheme = EditorView.theme({
     maxWidth: "44em",
   },
   ".cm-diagnostic": {
-    padding: "var(--space-3) var(--space-4)",
-    font: "var(--weight-regular) var(--text-sm) / var(--leading-snug) var(--font-sans)",
+    padding: "var(--inset)",
+    ...role("prose"),
   },
   ".cm-diagnostic-error": { borderLeft: "var(--stroke-active) solid var(--danger)" },
   ".cm-diagnostic-warning": { borderLeft: "var(--stroke-active) solid var(--warn)" },
   ".cm-diagnostic-info": { borderLeft: "var(--stroke-active) solid var(--ink-3)" },
   ".cm-diagnostic-note": {
-    margin: "var(--space-2) 0 0",
+    margin: "var(--gap) 0 0",
     color: "var(--ink-2)",
   },
   ".cm-diagnostic-link": {
     display: "inline-block",
-    marginTop: "var(--space-2)",
+    marginTop: "var(--gap)",
     // A link, not a free parameter, so it takes no hue.
     color: "var(--ink-3)",
     textDecoration: "underline",
   },
   ".cm-diagnosticSource": {
     color: "var(--ink-3)",
-    fontFamily: "var(--font-mono)",
-    fontSize: "var(--text-2xs)",
-    letterSpacing: "var(--tracking-2xs)",
+    ...role("label"),
     opacity: "1",
   },
   ".cm-diagnosticAction": {
     backgroundColor: "var(--accent)",
     color: "var(--ink-on-accent)",
     borderRadius: "var(--radius)",
-    fontFamily: "var(--font-mono)",
-    fontSize: "var(--text-2xs)",
-    padding: "var(--space-1) var(--space-3)",
+    ...role("control"),
+    padding: "var(--nudge) var(--inset)",
   },
   ".cm-panel.cm-panel-lint": {
     backgroundColor: "var(--surface-panel)",
@@ -417,8 +422,8 @@ const intelligenceTheme = EditorView.theme({
     borderRadius: "var(--radius)",
   },
   ".cm-tooltip.cm-tooltip-autocomplete > ul > li": {
-    padding: "var(--space-1) var(--space-3)",
-    font: "var(--weight-regular) var(--text-sm) / var(--leading-tight) var(--font-mono)",
+    padding: "var(--nudge) var(--inset)",
+    ...role("body"),
     color: "var(--ink)",
   },
   ".cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected]": {
@@ -427,16 +432,15 @@ const intelligenceTheme = EditorView.theme({
   },
   ".cm-completionDetail": {
     color: "var(--ink-3)",
-    fontSize: "var(--text-2xs)",
     fontStyle: "normal",
-    marginLeft: "var(--space-3)",
+    marginLeft: "var(--gap)",
   },
   ".cm-completionInfo": {
     backgroundColor: "var(--surface-float)",
     border: "var(--hairline) solid var(--rule-strong)",
     borderRadius: "var(--radius)",
     color: "var(--ink-2)",
-    padding: "var(--space-3) var(--space-4)",
+    padding: "var(--inset)",
     maxWidth: "34em",
     // A docstring is a hint, not the manual: bounded and scrolled, or a long
     // one becomes a column of prose down the whole window.
@@ -446,7 +450,7 @@ const intelligenceTheme = EditorView.theme({
   ".cm-completionInfo-doc": {
     margin: "0",
     whiteSpace: "pre-wrap",
-    font: "var(--weight-regular) var(--text-xs) / var(--leading-snug) var(--font-mono)",
+    ...role("prose"),
   },
 
   ".cm-signature-tooltip": {
@@ -454,21 +458,20 @@ const intelligenceTheme = EditorView.theme({
     border: "var(--hairline) solid var(--rule-strong)",
     borderRadius: "var(--radius)",
     color: "var(--ink-2)",
-    padding: "var(--space-3) var(--space-4)",
+    padding: "var(--inset)",
     maxWidth: "44em",
   },
   ".cm-signature-label": {
-    font: "var(--weight-regular) var(--text-sm) / var(--leading-tight) var(--font-mono)",
+    ...role("body"),
     color: "var(--ink-2)",
   },
   ".cm-signature-param-active": {
     color: "var(--ink)",
-    fontWeight: "var(--weight-bold)",
   },
   ".cm-signature-doc": {
-    margin: "var(--space-3) 0 0",
+    margin: "var(--gap) 0 0",
     whiteSpace: "pre-wrap",
-    font: "var(--weight-regular) var(--text-xs) / var(--leading-snug) var(--font-mono)",
+    ...role("prose"),
     color: "var(--ink-3)",
     maxHeight: "16em",
     overflow: "auto",

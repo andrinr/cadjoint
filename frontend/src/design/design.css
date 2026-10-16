@@ -22,8 +22,10 @@ html:has(.dl-body),
 .dl-body {
   background: var(--surface-base);
   color: var(--ink);
-  font: var(--weight-regular) var(--text-sm) / var(--leading-normal)
-    var(--font-mono);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 
 /* ── page frame ─────────────────────────────────────────────────────────── */
@@ -34,10 +36,10 @@ html:has(.dl-body),
   z-index: 3;
   display: flex;
   align-items: center;
-  gap: var(--space-4);
+  gap: var(--inset);
   height: calc(var(--unit) * 9);
-  padding: 0 var(--space-5);
-  border-bottom: var(--hairline) solid var(--rule-strong);
+  padding: 0 var(--stack);
+  border-bottom: var(--line-edge);
   background: var(--surface-base);
 }
 .dl-top b {
@@ -47,21 +49,23 @@ html:has(.dl-body),
   height: calc(var(--unit) * 6);
   background: var(--accent);
   color: var(--ink-on-accent);
-  font: var(--weight-bold) var(--text-xs) / var(--leading-flat) var(--font-mono);
-  letter-spacing: var(--tracking-xs);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 .dl-top strong {
-  font: var(--weight-semibold) var(--text-sm) / var(--leading-flat)
-    var(--font-mono);
-  letter-spacing: var(--tracking-sm);
-  text-transform: uppercase;
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 .dl-top span {
   color: var(--ink-3);
-  font: var(--weight-medium) var(--text-xs) / var(--leading-flat)
-    var(--font-mono);
-  letter-spacing: var(--tracking-xs);
-  text-transform: uppercase;
+  font: var(--text-control);
+  letter-spacing: var(--track-control);
+  text-transform: var(--case-control);
+  font-variant-numeric: var(--numeric-control);
 }
 .dl-top a {
   margin-left: auto;
@@ -71,8 +75,8 @@ html:has(.dl-body),
 .dl {
   display: grid;
   grid-template-columns: calc(var(--unit) * 52) minmax(0, calc(var(--unit) * 230));
-  gap: 0 var(--space-7);
-  padding: 0 var(--space-5) calc(var(--unit) * 24);
+  gap: 0 var(--section);
+  padding: 0 var(--stack) calc(var(--unit) * 24);
 }
 
 /* The section index: furniture, so tracked uppercase mono. The section in
@@ -83,34 +87,36 @@ html:has(.dl-body),
   align-self: start;
   max-height: calc(100vh - var(--unit) * 9);
   overflow: auto;
-  padding: var(--space-6) 0;
+  padding: var(--section) 0;
 }
 .dl-nav ol {
   margin: 0;
   padding: 0;
   list-style: none;
-  border-top: var(--hairline) solid var(--rule);
+  border-top: var(--line-rule);
 }
 .dl-nav li {
-  border-bottom: var(--hairline) solid var(--rule);
+  border-bottom: var(--line-rule);
 }
 .dl-nav a {
   display: grid;
   grid-template-columns: calc(var(--unit) * 7) 1fr;
   align-items: center;
   min-height: calc(var(--unit) * 6);
-  padding: 0 var(--space-2);
+  padding: 0 var(--gap);
   color: var(--ink-2);
-  font: var(--weight-medium) var(--text-xs) / var(--leading-flat)
-    var(--font-mono);
-  letter-spacing: var(--tracking-xs);
+  font: var(--text-control);
+  letter-spacing: var(--track-control);
+  text-transform: var(--case-control);
+  font-variant-numeric: var(--numeric-control);
   text-decoration: none;
-  text-transform: uppercase;
 }
 .dl-nav a small {
   color: var(--ink-3);
-  font-size: var(--text-3xs);
-  letter-spacing: var(--tracking-3xs);
+  font: var(--text-label);
+  letter-spacing: var(--track-label);
+  text-transform: var(--case-label);
+  font-variant-numeric: var(--numeric-label);
 }
 .dl-nav a:hover {
   background: var(--surface-bar-alt);
@@ -127,15 +133,15 @@ html:has(.dl-body),
 /* ── prose and headings ────────────────────────────────────────────────── */
 
 .dl-main > header {
-  padding: calc(var(--unit) * 10) 0 var(--space-7);
-  border-bottom: var(--hairline) solid var(--rule-strong);
+  padding: calc(var(--unit) * 10) 0 var(--section);
+  border-bottom: var(--line-edge);
 }
 .dl-main > header h1 {
-  margin: 0 0 var(--space-4);
-  font: var(--weight-semibold) var(--text-lg) / var(--leading-tight)
-    var(--font-mono);
-  letter-spacing: var(--tracking-lg);
-  text-transform: uppercase;
+  margin: 0 0 var(--inset);
+  font: var(--text-title);
+  letter-spacing: var(--track-title);
+  text-transform: var(--case-title);
+  font-variant-numeric: var(--numeric-title);
 }
 
 /* Sentences are sans: the one place it is set on this page. */
@@ -145,18 +151,22 @@ html:has(.dl-body),
 .dl-plate figcaption,
 .dl-note {
   max-width: 72ch;
-  font-family: var(--font-sans);
-  font-size: var(--text-md);
-  line-height: var(--leading-normal);
+  font: var(--text-prose);
+  letter-spacing: var(--track-prose);
+  text-transform: var(--case-prose);
+  font-variant-numeric: var(--numeric-prose);
 }
 .dl-prose {
-  margin: 0 0 var(--space-5);
+  margin: 0 0 var(--stack);
   color: var(--ink-2);
 }
 .dl-note {
-  margin: var(--space-4) 0 0;
+  margin: var(--inset) 0 0;
   color: var(--ink-3);
-  font-size: var(--text-sm);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 
 .dl-section {
@@ -166,34 +176,34 @@ html:has(.dl-body),
 .dl-section > h2 {
   display: flex;
   align-items: baseline;
-  gap: var(--space-4);
-  margin: 0 0 var(--space-5);
-  padding-bottom: var(--space-4);
-  border-bottom: var(--hairline) solid var(--rule-strong);
-  font: var(--weight-semibold) var(--text-lg) / var(--leading-tight)
-    var(--font-mono);
-  letter-spacing: var(--tracking-lg);
-  text-transform: uppercase;
+  gap: var(--inset);
+  margin: 0 0 var(--stack);
+  padding-bottom: var(--inset);
+  border-bottom: var(--line-edge);
+  font: var(--text-title);
+  letter-spacing: var(--track-title);
+  text-transform: var(--case-title);
+  font-variant-numeric: var(--numeric-title);
 }
 .dl-section h3 {
-  margin: var(--space-7) 0 var(--space-4);
+  margin: var(--section) 0 var(--inset);
   color: var(--ink-2);
-  font: var(--weight-semibold) var(--text-xs) / var(--leading-flat)
-    var(--font-mono);
-  letter-spacing: var(--tracking-xs);
-  text-transform: uppercase;
+  font: var(--text-control);
+  letter-spacing: var(--track-control);
+  text-transform: var(--case-control);
+  font-variant-numeric: var(--numeric-control);
 }
 
 /* A label of kind: inverse ink (role: none — kind is not *current*). */
 .dl-kicker {
   display: inline-block;
-  padding: var(--space-1) var(--space-2);
+  padding: var(--nudge) var(--gap);
   background: var(--ink);
   color: var(--surface-float);
-  font: var(--weight-semibold) var(--text-3xs) / var(--leading-flat)
-    var(--font-mono);
-  letter-spacing: var(--tracking-3xs);
-  text-transform: uppercase;
+  font: var(--text-label);
+  letter-spacing: var(--track-label);
+  text-transform: var(--case-label);
+  font-variant-numeric: var(--numeric-label);
   vertical-align: middle;
 }
 
@@ -204,26 +214,31 @@ html:has(.dl-body),
 .dl-rule {
   display: grid;
   grid-template-columns: calc(var(--unit) * 12) minmax(0, 1fr);
-  gap: 0 var(--space-4);
-  padding: var(--space-5) 0;
-  border-top: var(--hairline) solid var(--rule);
+  gap: 0 var(--inset);
+  padding: var(--stack) 0;
+  border-top: var(--line-rule);
 }
 .dl-rule > code {
-  padding-top: var(--space-1);
+  padding-top: var(--nudge);
   color: var(--ink-3);
-  font: var(--weight-semibold) var(--text-xs) / var(--leading-snug)
-    var(--font-mono);
-  letter-spacing: var(--tracking-xs);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 .dl-rule > div > p {
   margin: 0;
   color: var(--ink);
 }
+/* A rule's name is the instrument's label for it: mono, as written (A8). */
 .dl-rule > div > p b {
-  font-weight: var(--weight-semibold);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  color: var(--ink);
 }
 .dl-rule > div > p + p {
-  margin-top: var(--space-2);
+  margin-top: var(--gap);
   color: var(--ink-2);
 }
 .dl-rule p code,
@@ -231,14 +246,14 @@ html:has(.dl-body),
 .dl-note code,
 .dl-plate figcaption code {
   font-family: var(--font-mono);
-  font-size: 0.92em;
+
 }
 
 .dl-examples {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(calc(var(--unit) * 64), 1fr));
-  gap: var(--space-4);
-  margin-top: var(--space-5);
+  gap: var(--inset);
+  margin-top: var(--stack);
 }
 .dl-examples.single {
   grid-template-columns: minmax(0, 1fr);
@@ -250,22 +265,22 @@ html:has(.dl-body),
   display: flex;
   flex-direction: column;
   margin: 0;
-  border: var(--hairline) solid var(--rule-strong);
+  border: var(--line-edge);
   background: var(--surface-float);
 }
 .dl-plate > header {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--inset);
   min-height: calc(var(--unit) * 6);
-  padding: 0 var(--space-4);
-  border-bottom: var(--hairline) solid var(--rule);
+  padding: 0 var(--inset);
+  border-bottom: var(--line-rule);
   color: var(--ink-3);
-  font: var(--weight-medium) var(--text-2xs) / var(--leading-snug)
-    var(--font-mono);
-  letter-spacing: var(--tracking-2xs);
-  text-transform: uppercase;
-  padding-block: var(--space-3);
+  font: var(--text-label);
+  letter-spacing: var(--track-label);
+  text-transform: var(--case-label);
+  font-variant-numeric: var(--numeric-label);
+  padding-block: var(--inset);
 }
 .dl-plate > header > span:first-child {
   flex: 0 0 auto;
@@ -274,11 +289,9 @@ html:has(.dl-body),
 /* DO and DON'T carry the word and the role: done and error (A4). */
 .dl-plate > header .do {
   color: var(--ok);
-  font-weight: var(--weight-semibold);
 }
 .dl-plate > header .dont {
   color: var(--danger);
-  font-weight: var(--weight-semibold);
 }
 .dl-plate > header .do::before {
   content: "● ";
@@ -288,16 +301,19 @@ html:has(.dl-body),
 }
 .dl-plate > .dl-stage {
   flex: 1;
-  padding: var(--space-5);
+  padding: var(--stack);
 }
 .dl-plate > .dl-stage.ground {
   background: var(--surface-base);
 }
 .dl-plate figcaption {
-  padding: var(--space-3) var(--space-4) var(--space-4);
-  border-top: var(--hairline) solid var(--rule);
+  padding: var(--inset) var(--inset) var(--inset);
+  border-top: var(--line-rule);
   color: var(--ink-2);
-  font-size: var(--text-sm);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 
 /* ── swatches and tables ────────────────────────────────────────────────── */
@@ -305,54 +321,61 @@ html:has(.dl-body),
 .dl-swatches {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(calc(var(--unit) * 40), 1fr));
-  gap: var(--space-4);
+  gap: var(--inset);
 }
 .dl-swatch {
   display: grid;
   grid-template-rows: calc(var(--unit) * 12) auto;
-  border: var(--hairline) solid var(--rule);
+  border: var(--line-rule);
   background: var(--surface-float);
 }
 .dl-swatch > i {
   display: grid;
   place-items: end start;
-  padding: var(--space-2);
-  border-bottom: var(--hairline) solid var(--rule);
-  font: var(--weight-semibold) var(--text-md) / var(--leading-flat)
-    var(--font-mono);
+  padding: var(--gap);
+  border-bottom: var(--line-rule);
+  font: var(--text-value);
+  letter-spacing: var(--track-value);
+  text-transform: var(--case-value);
+  font-variant-numeric: var(--numeric-value);
   font-style: normal;
 }
 .dl-swatch > div {
   display: grid;
-  gap: var(--space-1);
-  padding: var(--space-3) var(--space-3) var(--space-4);
+  gap: var(--nudge);
+  padding: var(--inset) var(--inset) var(--inset);
 }
 .dl-swatch b {
-  font-weight: var(--weight-semibold);
 }
 .dl-swatch small {
   color: var(--ink-3);
-  font-size: var(--text-2xs);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 
 .dl-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: var(--text-sm);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 .dl-table th {
-  padding: var(--space-3) var(--space-3);
-  border-bottom: var(--hairline) solid var(--rule-strong);
+  padding: var(--inset) var(--inset);
+  border-bottom: var(--line-edge);
   color: var(--ink-3);
-  font: var(--weight-semibold) var(--text-3xs) / var(--leading-flat)
-    var(--font-mono);
-  letter-spacing: var(--tracking-3xs);
+  font: var(--text-label);
+  letter-spacing: var(--track-label);
+  text-transform: var(--case-label);
+  font-variant-numeric: var(--numeric-label);
   text-align: left;
-  text-transform: uppercase;
 }
 .dl-table td {
-  padding: var(--space-3) var(--space-3);
-  border-bottom: var(--hairline) solid var(--rule);
+  padding: var(--inset) var(--inset);
+  border-bottom: var(--line-rule);
   vertical-align: top;
 }
 .dl-table td:first-child {
@@ -365,14 +388,17 @@ html:has(.dl-body),
 }
 .dl-table td.prose {
   color: var(--ink-2);
-  font-family: var(--font-sans);
+  font: var(--text-prose);
+  letter-spacing: var(--track-prose);
+  text-transform: var(--case-prose);
+  font-variant-numeric: var(--numeric-prose);
 }
 .dl-table td i.dl-dot {
   display: inline-block;
   width: calc(var(--unit) * 3);
   height: calc(var(--unit) * 3);
-  margin-right: var(--space-3);
-  vertical-align: calc(var(--space-1) * -1);
+  margin-right: var(--inset);
+  vertical-align: calc(var(--nudge) * -1);
 }
 
 /* A measured ratio, with its verdict as a word (A4, A5). */
@@ -381,11 +407,12 @@ html:has(.dl-body),
   white-space: nowrap;
 }
 .dl-ratio em {
-  margin-left: var(--space-2);
+  margin-left: var(--gap);
   font-style: normal;
-  font-size: var(--text-3xs);
-  font-weight: var(--weight-semibold);
-  letter-spacing: var(--tracking-3xs);
+  font: var(--text-label);
+  letter-spacing: var(--track-label);
+  text-transform: var(--case-label);
+  font-variant-numeric: var(--numeric-label);
 }
 .dl-ratio em.pass {
   color: var(--ok);
@@ -403,28 +430,28 @@ html:has(.dl-body),
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-4);
+  gap: var(--inset);
 }
 .dl-stack {
   display: grid;
-  gap: var(--space-4);
+  gap: var(--inset);
 }
 
 .dl-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-3);
+  gap: var(--inset);
   height: calc(var(--unit) * 7);
-  padding: 0 var(--space-5);
-  border: var(--hairline) solid var(--rule-strong);
+  padding: 0 var(--stack);
+  border: var(--line-edge);
   border-radius: var(--radius);
   background: var(--surface-float);
   color: var(--ink-2);
-  font: var(--weight-medium) var(--text-xs) / var(--leading-flat)
-    var(--font-mono);
-  letter-spacing: var(--tracking-xs);
-  text-transform: uppercase;
+  font: var(--text-control);
+  letter-spacing: var(--track-control);
+  text-transform: var(--case-control);
+  font-variant-numeric: var(--numeric-control);
   cursor: pointer;
   transition: background var(--dur-fast) var(--ease),
     border-color var(--dur-fast) var(--ease);
@@ -448,7 +475,6 @@ html:has(.dl-body),
   border-color: var(--accent);
   background: var(--accent);
   color: var(--ink-on-accent);
-  font-weight: var(--weight-bold);
 }
 .dl-btn.primary:hover,
 .dl-btn.primary:active {
@@ -459,7 +485,6 @@ html:has(.dl-body),
   border-color: var(--surface-bar-alt);
   background: var(--surface-bar-alt);
   color: var(--ink-3);
-  font-weight: var(--weight-medium);
 }
 .dl-btn.quiet {
   border-color: transparent;
@@ -480,7 +505,7 @@ html:has(.dl-body),
 }
 .dl-btn.h-sm {
   height: calc(var(--unit) * 6);
-  padding: 0 var(--space-4);
+  padding: 0 var(--inset);
 }
 .dl-btn.h-lg {
   height: calc(var(--unit) * 8);
@@ -494,7 +519,7 @@ html:has(.dl-body),
 
 /* Keyboard focus: one visible ring, everywhere. */
 .dl-body :focus-visible {
-  outline: var(--stroke-active) solid var(--ink);
+  outline: var(--line-active);
   outline-offset: var(--hairline);
 }
 
@@ -502,36 +527,40 @@ html:has(.dl-body),
   display: grid;
   grid-template-columns: minmax(calc(var(--unit) * 20), 1fr) calc(var(--unit) * 32) calc(var(--unit) * 10);
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--inset);
   min-height: calc(var(--unit) * 7);
 }
 .dl-field > label {
   color: var(--ink-3);
-  font: var(--weight-semibold) var(--text-3xs) / var(--leading-flat)
-    var(--font-mono);
-  letter-spacing: var(--tracking-3xs);
-  text-transform: uppercase;
+  font: var(--text-label);
+  letter-spacing: var(--track-label);
+  text-transform: var(--case-label);
+  font-variant-numeric: var(--numeric-label);
 }
 .dl-field > small {
   color: var(--ink-3);
-  font-size: var(--text-xs);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 .dl-input {
   box-sizing: border-box;
   width: 100%;
   height: calc(var(--unit) * 7);
-  padding: 0 var(--space-3);
-  border: var(--hairline) solid var(--rule-strong);
+  padding: 0 var(--inset);
+  border: var(--line-edge);
   border-radius: var(--radius);
   background: var(--surface-float);
   color: var(--ink);
-  font: var(--weight-medium) var(--text-md) / var(--leading-flat)
-    var(--font-mono);
-  font-variant-numeric: tabular-nums;
+  font: var(--text-value);
+  letter-spacing: var(--track-value);
+  text-transform: var(--case-value);
+  font-variant-numeric: var(--numeric-value);
   text-align: right;
 }
 .dl-input:focus {
-  outline: var(--stroke-active) solid var(--ink);
+  outline: var(--line-active);
   outline-offset: calc(var(--hairline) * -1);
 }
 .dl-input.invalid {
@@ -554,22 +583,22 @@ html:has(.dl-body),
 
 .dl-seg {
   display: inline-flex;
-  border: var(--hairline) solid var(--rule-strong);
+  border: var(--line-edge);
 }
 .dl-seg button {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--inset);
   height: calc(var(--unit) * 8);
-  padding: 0 var(--space-5);
+  padding: 0 var(--stack);
   border: 0;
-  border-right: var(--hairline) solid var(--rule-strong);
+  border-right: var(--line-edge);
   background: var(--surface-float);
   color: var(--ink-2);
-  font: var(--weight-semibold) var(--text-xs) / var(--leading-flat)
-    var(--font-mono);
-  letter-spacing: var(--tracking-xs);
-  text-transform: uppercase;
+  font: var(--text-control);
+  letter-spacing: var(--track-control);
+  text-transform: var(--case-control);
+  font-variant-numeric: var(--numeric-control);
   cursor: pointer;
 }
 .dl-seg button:last-child {
@@ -586,14 +615,16 @@ html:has(.dl-body),
 .dl-chip {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--gap);
   height: calc(var(--unit) * 6);
-  padding: 0 var(--space-1) 0 var(--space-3);
-  border: var(--hairline) solid var(--rule);
+  padding: 0 var(--nudge) 0 var(--inset);
+  border: var(--line-rule);
   background: var(--surface-float);
   color: var(--ink);
-  font: var(--weight-medium) var(--text-2xs) / var(--leading-flat)
-    var(--font-mono);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 .dl-chip button {
   display: grid;
@@ -618,25 +649,26 @@ html:has(.dl-body),
   display: inline-flex;
   align-items: center;
   height: calc(var(--unit) * 5);
-  padding: 0 var(--space-2);
+  padding: 0 var(--gap);
   background: var(--ink);
   color: var(--surface-float);
-  font: var(--weight-semibold) var(--text-3xs) / var(--leading-flat)
-    var(--font-mono);
-  letter-spacing: var(--tracking-3xs);
-  text-transform: uppercase;
+  font: var(--text-label);
+  letter-spacing: var(--track-label);
+  text-transform: var(--case-label);
+  font-variant-numeric: var(--numeric-label);
 }
 .dl-badge {
   display: inline-grid;
   place-items: center;
   min-width: calc(var(--unit) * 5);
   height: calc(var(--unit) * 5);
-  padding: 0 var(--space-2);
+  padding: 0 var(--gap);
   background: var(--surface-bar-alt);
   color: var(--ink);
-  font: var(--weight-semibold) var(--text-2xs) / var(--leading-flat)
-    var(--font-mono);
-  font-variant-numeric: tabular-nums;
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 .dl-badge.free {
   background: var(--param);
@@ -645,26 +677,27 @@ html:has(.dl-body),
 
 /* Panel: a dock window's tab strip, then the sheet body with its header. */
 .dl-panel {
-  border: var(--hairline) solid var(--rule-strong);
+  border: var(--line-edge);
   background: var(--surface-float);
 }
 .dl-panel > nav {
   display: flex;
   height: calc(var(--unit) * 8);
-  border-bottom: var(--hairline) solid var(--rule-strong);
+  border-bottom: var(--line-edge);
   background: var(--surface-base);
 }
 .dl-panel > nav button {
-  padding: 0 var(--space-4);
+  padding: 0 var(--inset);
   border: 0;
-  border-right: var(--hairline) solid var(--rule);
-  border-bottom: var(--stroke-active) solid transparent;
+  border-right: var(--line-rule);
+  border-bottom: var(--line-active);
+  border-bottom-color: transparent;
   background: transparent;
   color: var(--ink-3);
-  font: var(--weight-medium) var(--text-xs) / var(--leading-flat)
-    var(--font-mono);
-  letter-spacing: var(--tracking-xs);
-  text-transform: uppercase;
+  font: var(--text-control);
+  letter-spacing: var(--track-control);
+  text-transform: var(--case-control);
+  font-variant-numeric: var(--numeric-control);
   cursor: pointer;
 }
 .dl-panel > nav button.active {
@@ -673,18 +706,18 @@ html:has(.dl-body),
   color: var(--ink);
 }
 .dl-panel > div {
-  padding: var(--space-4);
+  padding: var(--inset);
 }
 .dl-panel-head {
   display: grid;
-  gap: var(--space-2);
-  margin-bottom: var(--space-4);
+  gap: var(--gap);
+  margin-bottom: var(--inset);
 }
 .dl-panel-head strong {
-  font: var(--weight-semibold) var(--text-lg) / var(--leading-tight)
-    var(--font-mono);
-  letter-spacing: var(--tracking-lg);
-  text-transform: uppercase;
+  font: var(--text-title);
+  letter-spacing: var(--track-title);
+  text-transform: var(--case-title);
+  font-variant-numeric: var(--numeric-title);
 }
 .dl-panel-head > span {
   justify-self: start;
@@ -693,33 +726,37 @@ html:has(.dl-body),
 /* Rows: label | value unit, on one baseline, values right-hung. */
 .dl-rows {
   display: grid;
-  border-top: var(--hairline) solid var(--rule);
+  border-top: var(--line-rule);
 }
 .dl-rows > div {
   display: grid;
   grid-template-columns: 1fr auto calc(var(--unit) * 10);
   align-items: baseline;
-  gap: var(--space-3);
+  gap: var(--inset);
   min-height: calc(var(--unit) * 6);
-  padding: var(--space-2) 0;
-  border-bottom: var(--hairline) solid var(--rule);
+  padding: var(--gap) 0;
+  border-bottom: var(--line-rule);
 }
 .dl-rows span {
   color: var(--ink-3);
-  font: var(--weight-semibold) var(--text-3xs) / var(--leading-flat)
-    var(--font-mono);
-  letter-spacing: var(--tracking-3xs);
-  text-transform: uppercase;
+  font: var(--text-label);
+  letter-spacing: var(--track-label);
+  text-transform: var(--case-label);
+  font-variant-numeric: var(--numeric-label);
 }
 .dl-rows b {
-  font: var(--weight-medium) var(--text-md) / var(--leading-flat)
-    var(--font-mono);
-  font-variant-numeric: tabular-nums;
+  font: var(--text-value);
+  letter-spacing: var(--track-value);
+  text-transform: var(--case-value);
+  font-variant-numeric: var(--numeric-value);
   text-align: right;
 }
 .dl-rows small {
   color: var(--ink-3);
-  font-size: var(--text-xs);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 .dl-rows .free b {
   color: var(--param);
@@ -727,7 +764,10 @@ html:has(.dl-body),
 .dl-rows sub {
   grid-column: 2 / 4;
   color: var(--ink-3);
-  font-size: var(--text-2xs);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
   text-align: right;
   vertical-align: baseline;
 }
@@ -736,8 +776,8 @@ html:has(.dl-body),
 .dl-menu {
   display: grid;
   width: calc(var(--unit) * 64);
-  padding: var(--space-2) 0;
-  border: var(--hairline) solid var(--rule-strong);
+  padding: var(--gap) 0;
+  border: var(--line-edge);
   background: var(--surface-float);
 }
 /* Items are commands read down a list: mono, sentence case, one line (K5). */
@@ -746,15 +786,15 @@ html:has(.dl-body),
   grid-template-columns: calc(var(--unit) * 6) 1fr auto;
   align-items: center;
   height: calc(var(--unit) * 6);
-  padding: 0 var(--space-4) 0 0;
+  padding: 0 var(--inset) 0 0;
   border: 0;
   background: transparent;
   color: var(--ink);
-  font: var(--weight-regular) var(--text-sm) / var(--leading-flat)
-    var(--font-mono);
-  letter-spacing: normal;
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
   text-align: left;
-  text-transform: none;
   white-space: nowrap;
   cursor: pointer;
 }
@@ -776,9 +816,9 @@ html:has(.dl-body),
 }
 .dl-menu > hr {
   width: 100%;
-  margin: var(--space-2) 0;
+  margin: var(--gap) 0;
   border: 0;
-  border-top: var(--hairline) solid var(--rule);
+  border-top: var(--line-rule);
 }
 /* The bar's items fill its height, so the open title's accent block is
    exactly the bar's cell; its dropdown hangs from that cell's left edge and
@@ -788,20 +828,20 @@ html:has(.dl-body),
   display: flex;
   align-items: stretch;
   height: calc(var(--unit) * 7);
-  border-bottom: var(--hairline) solid var(--rule-strong);
+  border-bottom: var(--line-edge);
 }
 .dl-menubar > button,
 .dl-menubar-item > button {
   height: 100%;
   margin: 0;
-  padding: 0 var(--space-4);
+  padding: 0 var(--inset);
   border: 0;
   background: transparent;
   color: var(--ink-2);
-  font: var(--weight-semibold) var(--text-xs) / var(--leading-flat)
-    var(--font-mono);
-  letter-spacing: var(--tracking-xs);
-  text-transform: uppercase;
+  font: var(--text-control);
+  letter-spacing: var(--track-control);
+  text-transform: var(--case-control);
+  font-variant-numeric: var(--numeric-control);
 }
 .dl-menubar-item {
   position: relative;
@@ -826,36 +866,39 @@ html:has(.dl-body),
   display: grid;
   place-items: center;
   min-height: calc(var(--unit) * 56);
-  padding: var(--space-6);
+  padding: var(--section);
   background: var(--scrim);
 }
 .dl-dialog {
   width: min(100%, calc(var(--unit) * 100));
-  border: var(--hairline) solid var(--rule-strong);
+  border: var(--line-edge);
   background: var(--surface-float);
 }
 /* The title names the program's own file, so it is not uppercased (T2). */
 .dl-dialog > h4 {
   margin: 0;
-  padding: var(--space-4) var(--space-5);
-  border-bottom: var(--hairline) solid var(--rule);
-  font: var(--weight-semibold) var(--text-md) / var(--leading-flat)
-    var(--font-mono);
-  letter-spacing: var(--tracking-lg);
+  padding: var(--inset) var(--stack);
+  border-bottom: var(--line-rule);
+  font: var(--text-value);
+  letter-spacing: var(--track-value);
+  text-transform: var(--case-value);
+  font-variant-numeric: var(--numeric-value);
 }
 .dl-dialog > p {
   margin: 0;
-  padding: var(--space-5);
+  padding: var(--stack);
   color: var(--ink-2);
-  font: var(--weight-regular) var(--text-md) / var(--leading-normal)
-    var(--font-sans);
+  font: var(--text-prose);
+  letter-spacing: var(--track-prose);
+  text-transform: var(--case-prose);
+  font-variant-numeric: var(--numeric-prose);
 }
 .dl-dialog > footer {
   display: flex;
   justify-content: flex-end;
-  gap: var(--space-4);
-  padding: var(--space-4) var(--space-5);
-  border-top: var(--hairline) solid var(--rule);
+  gap: var(--inset);
+  padding: var(--inset) var(--stack);
+  border-top: var(--line-rule);
 }
 
 /* Notices: in place, the status line, or the viewport's notice bar. */
@@ -863,16 +906,16 @@ html:has(.dl-body),
   display: grid;
   grid-template-columns: auto 1fr;
   align-items: baseline;
-  gap: var(--space-3) var(--space-4);
-  padding: var(--space-4) var(--space-5);
-  border: var(--hairline) solid var(--rule-strong);
+  gap: var(--inset) var(--inset);
+  padding: var(--inset) var(--stack);
+  border: var(--line-edge);
   background: var(--surface-float);
 }
 .dl-notice > b {
-  font: var(--weight-semibold) var(--text-3xs) / var(--leading-snug)
-    var(--font-mono);
-  letter-spacing: var(--tracking-3xs);
-  text-transform: uppercase;
+  font: var(--text-label);
+  letter-spacing: var(--track-label);
+  text-transform: var(--case-label);
+  font-variant-numeric: var(--numeric-label);
 }
 .dl-notice.error > b {
   color: var(--danger);
@@ -889,8 +932,10 @@ html:has(.dl-body),
 .dl-notice p {
   margin: 0;
   color: var(--ink);
-  font: var(--weight-regular) var(--text-sm) / var(--leading-snug)
-    var(--font-sans);
+  font: var(--text-prose);
+  letter-spacing: var(--track-prose);
+  text-transform: var(--case-prose);
+  font-variant-numeric: var(--numeric-prose);
 }
 .dl-notice p code {
   font-family: var(--font-mono);
@@ -901,29 +946,32 @@ html:has(.dl-body),
 /* A quiet action hangs on the text's left edge, not on its own padding. */
 .dl-notice > .dl-btn.quiet {
   justify-self: start;
-  margin-left: calc(var(--space-4) * -1);
+  margin-left: calc(var(--inset) * -1);
 }
 .dl-notice > span:empty {
   display: none;
 }
 .dl-notice details {
   color: var(--ink-3);
-  font-size: var(--text-2xs);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 .dl-notice details pre {
-  margin: var(--space-2) 0 0;
+  margin: var(--gap) 0 0;
   white-space: pre-wrap;
 }
 
 .dl-status {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--inset);
   color: var(--ink-2);
-  font: var(--weight-medium) var(--text-2xs) / var(--leading-flat)
-    var(--font-mono);
-  letter-spacing: var(--tracking-2xs);
-  text-transform: uppercase;
+  font: var(--text-label);
+  letter-spacing: var(--track-label);
+  text-transform: var(--case-label);
+  font-variant-numeric: var(--numeric-label);
 }
 .dl-status i {
   width: calc(var(--unit) * 2);
@@ -944,19 +992,20 @@ html:has(.dl-body),
 .dl-stages {
   display: flex;
   align-items: stretch;
-  border: var(--hairline) solid var(--rule-strong);
+  border: var(--line-edge);
   background: var(--surface-float);
 }
 .dl-stages > span {
   display: grid;
   place-items: center;
   height: calc(var(--unit) * 7);
-  padding: 0 var(--space-4);
-  border-right: var(--hairline) solid var(--rule);
+  padding: 0 var(--inset);
+  border-right: var(--line-rule);
   color: var(--ink-3);
-  font: var(--weight-semibold) var(--text-3xs) / var(--leading-flat)
-    var(--font-mono);
-  letter-spacing: var(--tracking-3xs);
+  font: var(--text-label);
+  letter-spacing: var(--track-label);
+  text-transform: var(--case-label);
+  font-variant-numeric: var(--numeric-label);
 }
 .dl-stages > span.done {
   color: var(--ink);
@@ -974,11 +1023,12 @@ html:has(.dl-body),
   flex: 1 1 auto;
   align-items: center;
   min-width: calc(var(--unit) * 36);
-  padding: 0 var(--space-4);
+  padding: 0 var(--inset);
   color: var(--ink-2);
-  font: var(--weight-medium) var(--text-2xs) / var(--leading-flat)
-    var(--font-mono);
-  font-variant-numeric: tabular-nums;
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 .dl-stages > .dl-btn {
   flex: 0 0 calc(var(--unit) * 28);
@@ -990,14 +1040,16 @@ html:has(.dl-body),
 /* Empty state: the precondition, the action. */
 .dl-empty {
   display: grid;
-  gap: var(--space-3);
-  padding: var(--space-6) 0;
+  gap: var(--inset);
+  padding: var(--section) 0;
 }
 .dl-empty p {
   margin: 0;
   color: var(--ink-2);
-  font: var(--weight-regular) var(--text-sm) / var(--leading-snug)
-    var(--font-sans);
+  font: var(--text-prose);
+  letter-spacing: var(--track-prose);
+  text-transform: var(--case-prose);
+  font-variant-numeric: var(--numeric-prose);
 }
 .dl-empty p code {
   color: var(--ink);
@@ -1007,26 +1059,28 @@ html:has(.dl-body),
 /* A source excerpt, as the editor shows it: achromatic syntax. */
 .dl-code {
   margin: 0;
-  padding: var(--space-4) 0;
-  border: var(--hairline) solid var(--rule);
+  padding: var(--inset) 0;
+  border: var(--line-rule);
   background: var(--surface-float);
   color: var(--ink);
-  font: var(--weight-regular) var(--text-sm) / var(--leading-normal)
-    var(--font-mono);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
   overflow-x: auto;
 }
 .dl-code > div {
   display: grid;
   grid-template-columns: calc(var(--unit) * 10) 1fr;
-  padding-right: var(--space-4);
+  padding-right: var(--inset);
 }
 .dl-code > div > span:first-child {
-  padding-right: var(--space-4);
+  padding-right: var(--inset);
   color: var(--ink-3);
   text-align: right;
 }
 .dl-code .kw {
-  font-weight: var(--weight-semibold);
+  color: var(--ink-2);
 }
 .dl-code .str {
   color: var(--ink-2);
@@ -1047,17 +1101,17 @@ html:has(.dl-body),
 }
 .dl-code .err {
   text-decoration: underline wavy var(--danger);
-  text-underline-offset: var(--space-1);
+  text-underline-offset: var(--nudge);
 }
 
 /* Specimens of the old values, shown only in the "what changes" plates. */
 .dl-before-chip {
   display: inline-block;
-  padding: var(--space-1) var(--space-2);
-  font: var(--weight-semibold) var(--text-3xs) / var(--leading-flat)
-    var(--font-mono);
-  letter-spacing: var(--tracking-3xs);
-  text-transform: uppercase;
+  padding: var(--nudge) var(--gap);
+  font: var(--text-label);
+  letter-spacing: var(--track-label);
+  text-transform: var(--case-label);
+  font-variant-numeric: var(--numeric-label);
 }
 
 /* Type specimen rows. */
@@ -1065,25 +1119,28 @@ html:has(.dl-body),
   display: grid;
   grid-template-columns: calc(var(--unit) * 34) calc(var(--unit) * 10) 1fr;
   align-items: baseline;
-  gap: var(--space-4);
-  padding: var(--space-3) 0;
-  border-bottom: var(--hairline) solid var(--rule);
+  gap: var(--inset);
+  padding: var(--inset) 0;
+  border-bottom: var(--line-rule);
 }
 .dl-type code {
   color: var(--ink-3);
-  font-size: var(--text-2xs);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 
 /* Space ruler. */
 .dl-ruler {
   display: grid;
-  gap: var(--space-2);
+  gap: var(--gap);
 }
 .dl-ruler > div {
   display: grid;
   grid-template-columns: calc(var(--unit) * 22) calc(var(--unit) * 10) 1fr;
   align-items: center;
-  gap: var(--space-4);
+  gap: var(--inset);
 }
 .dl-ruler i {
   display: block;
@@ -1092,11 +1149,16 @@ html:has(.dl-body),
 }
 .dl-ruler code {
   color: var(--ink-3);
-  font-size: var(--text-2xs);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 .dl-ruler b {
-  font-variant-numeric: tabular-nums;
-  font-weight: var(--weight-medium);
+  font: var(--text-value);
+  letter-spacing: var(--track-value);
+  text-transform: var(--case-value);
+  font-variant-numeric: var(--numeric-value);
   text-align: right;
 }
 
@@ -1120,7 +1182,7 @@ html:has(.dl-body),
 .dl-track {
   position: relative;
   height: calc(var(--unit) * 10);
-  border-bottom: var(--hairline) solid var(--rule-strong);
+  border-bottom: var(--line-edge);
   touch-action: none;
   cursor: ew-resize;
   user-select: none;
@@ -1142,7 +1204,8 @@ html:has(.dl-body),
   width: calc(var(--unit) * 4);
   height: calc(var(--unit) * 4);
   margin-left: calc(var(--unit) * -2);
-  border: var(--stroke-active) solid var(--ink-2);
+  border: var(--line-active);
+  border-color: var(--ink-2);
   border-radius: 50%;
   background: var(--surface-float);
 }
@@ -1162,15 +1225,15 @@ html:has(.dl-body),
   margin: 0;
   padding: 0;
   list-style: none;
-  border-top: var(--hairline) solid var(--rule);
+  border-top: var(--line-rule);
 }
 .dl-ladder li {
   display: grid;
   grid-template-columns: calc(var(--unit) * 6) 1fr auto;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--inset);
   min-height: calc(var(--unit) * 6);
-  border-bottom: var(--hairline) solid var(--rule);
+  border-bottom: var(--line-rule);
   color: var(--ink-3);
 }
 .dl-ladder li.held {
@@ -1181,7 +1244,10 @@ html:has(.dl-body),
 }
 .dl-ladder li code {
   color: var(--ink-3);
-  font-size: var(--text-2xs);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
   text-align: right;
 }
 .dl-ladder li > span:first-child {
@@ -1192,7 +1258,7 @@ html:has(.dl-body),
 /* The viewport specimen. */
 .dl-viewport {
   position: relative;
-  border: var(--hairline) solid var(--rule-heavy);
+  border: var(--line-frame);
   background: var(--surface-viewport);
 }
 .dl-viewport svg {
@@ -1203,66 +1269,75 @@ html:has(.dl-body),
 .dl-viewport .hint {
   position: absolute;
   left: 50%;
-  bottom: var(--space-4);
+  bottom: var(--inset);
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--inset);
   transform: translateX(-50%);
   color: var(--viewport-ink-2);
-  font: var(--weight-regular) var(--text-xs) / var(--leading-flat)
-    var(--font-sans);
+  font: var(--text-prose);
+  letter-spacing: var(--track-prose);
+  text-transform: var(--case-prose);
+  font-variant-numeric: var(--numeric-prose);
   white-space: nowrap;
 }
 .dl-viewport .readout {
   position: absolute;
-  top: var(--space-4);
-  left: var(--space-4);
+  top: var(--inset);
+  left: var(--inset);
   color: var(--viewport-ink-2);
-  font: var(--weight-medium) var(--text-2xs) / var(--leading-flat)
-    var(--font-mono);
-  letter-spacing: var(--tracking-2xs);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 .dl-viewport .readout b {
   color: var(--viewport-ink);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-semibold);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 .dl-viewport .titleblock {
   position: absolute;
-  right: var(--space-4);
+  right: var(--inset);
   bottom: calc(var(--unit) * 10);
   display: grid;
   grid-template-columns: auto calc(var(--unit) * 28);
-  border: var(--hairline) solid var(--rule-heavy);
+  border: var(--line-frame);
   background: var(--surface-float);
-  font: var(--weight-medium) var(--text-2xs) / var(--leading-flat)
-    var(--font-mono);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 .dl-viewport .titleblock > span {
-  padding: var(--space-1) var(--space-3);
-  border-bottom: var(--hairline) solid var(--rule);
+  padding: var(--nudge) var(--inset);
+  border-bottom: var(--line-rule);
 }
 .dl-viewport .titleblock > span:nth-child(odd) {
-  border-right: var(--hairline) solid var(--rule);
+  border-right: var(--line-rule);
   color: var(--ink-3);
-  font-size: var(--text-3xs);
-  font-weight: var(--weight-semibold);
-  letter-spacing: var(--tracking-3xs);
+  font: var(--text-label);
+  letter-spacing: var(--track-label);
+  text-transform: var(--case-label);
+  font-variant-numeric: var(--numeric-label);
 }
 .dl-viewport .legend {
   position: absolute;
-  left: var(--space-4);
+  left: var(--inset);
   bottom: calc(var(--unit) * 10);
   display: grid;
   grid-template-columns: auto calc(var(--unit) * 40) auto;
   align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-2) var(--space-3);
-  border: var(--hairline) solid var(--rule);
+  gap: var(--inset);
+  padding: var(--gap) var(--inset);
+  border: var(--line-rule);
   background: var(--surface-float);
-  font: var(--weight-medium) var(--text-2xs) / var(--leading-flat)
-    var(--font-mono);
-  font-variant-numeric: tabular-nums;
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 .dl-viewport .legend i {
   height: calc(var(--unit) * 2);
@@ -1272,9 +1347,9 @@ html:has(.dl-body),
   display: grid;
   grid-template-columns: calc(var(--unit) * 16) calc(var(--unit) * 14) 1fr calc(var(--unit) * 14);
   align-items: center;
-  gap: var(--space-4);
-  padding: var(--space-3) 0;
-  border-bottom: var(--hairline) solid var(--rule);
+  gap: var(--inset);
+  padding: var(--inset) 0;
+  border-bottom: var(--line-rule);
   font-variant-numeric: tabular-nums;
 }
 .dl-legend > i {
@@ -1285,17 +1360,20 @@ html:has(.dl-body),
 }
 .dl-legend > b {
   color: var(--ink-3);
-  font: var(--weight-semibold) var(--text-3xs) / var(--leading-flat)
-    var(--font-mono);
-  letter-spacing: var(--tracking-3xs);
-  text-transform: uppercase;
+  font: var(--text-label);
+  letter-spacing: var(--track-label);
+  text-transform: var(--case-label);
+  font-variant-numeric: var(--numeric-label);
 }
 .dl-bc {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
-  margin: 0 var(--space-4) var(--space-2) 0;
-  font-size: var(--text-2xs);
+  gap: var(--gap);
+  margin: 0 var(--inset) var(--gap) 0;
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 .dl-bc i {
   width: calc(var(--unit) * 2);
@@ -1305,20 +1383,23 @@ html:has(.dl-body),
 .dl-icons {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(calc(var(--unit) * 28), 1fr));
-  border-top: var(--hairline) solid var(--rule);
-  border-left: var(--hairline) solid var(--rule);
+  border-top: var(--line-rule);
+  border-left: var(--line-rule);
 }
 .dl-icons > div {
   display: grid;
   grid-template-columns: calc(var(--unit) * 4) 1fr;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--inset);
   min-height: calc(var(--unit) * 8);
-  padding: 0 var(--space-3);
-  border-right: var(--hairline) solid var(--rule);
-  border-bottom: var(--hairline) solid var(--rule);
+  padding: 0 var(--inset);
+  border-right: var(--line-rule);
+  border-bottom: var(--line-rule);
   color: var(--ink-2);
-  font-size: var(--text-2xs);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 
 @media (max-width: 960px) {
@@ -1342,7 +1423,7 @@ html:has(.dl-body),
 }
 /* A note that follows a rule hangs on the rule's text column. */
 .dl-section > .dl-note {
-  margin: 0 0 var(--space-5) calc(var(--unit) * 12 + var(--space-4));
+  margin: 0 0 var(--stack) calc(var(--unit) * 12 + var(--inset));
 }
 
 /* The current row and the armed tool are the accent block (role: current). */
@@ -1371,7 +1452,10 @@ html:has(.dl-body),
 }
 .dl-hint {
   color: var(--ink-2);
-  font-family: var(--font-sans);
+  font: var(--text-prose);
+  letter-spacing: var(--track-prose);
+  text-transform: var(--case-prose);
+  font-variant-numeric: var(--numeric-prose);
 }
 
 /* ── the desk map ──────────────────────────────────────────────────────── */
@@ -1387,7 +1471,7 @@ html:has(.dl-body),
     "modes program program"
     "editor viewport column"
     "tray tray tray";
-  border: var(--hairline) solid var(--rule-strong);
+  border: var(--line-edge);
   background: var(--surface-base);
 }
 .dl-map-region {
@@ -1395,14 +1479,18 @@ html:has(.dl-body),
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: var(--space-1);
-  padding: 0 var(--space-4);
-  border-right: var(--hairline) solid var(--rule);
-  border-bottom: var(--hairline) solid var(--rule);
-  outline: var(--stroke-active) solid transparent;
+  gap: var(--nudge);
+  padding: 0 var(--inset);
+  border-right: var(--line-rule);
+  border-bottom: var(--line-rule);
+  outline: var(--line-active);
+  outline-color: transparent;
   outline-offset: calc(var(--stroke-active) * -1);
   color: var(--ink-3);
-  font-size: var(--text-2xs);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
   cursor: default;
   transition: outline-color var(--dur-fast) var(--ease);
 }
@@ -1413,10 +1501,10 @@ html:has(.dl-body),
 }
 .dl-map-region b {
   color: var(--ink);
-  font: var(--weight-semibold) var(--text-xs) / var(--leading-flat)
-    var(--font-mono);
-  letter-spacing: var(--tracking-xs);
-  text-transform: uppercase;
+  font: var(--text-control);
+  letter-spacing: var(--track-control);
+  text-transform: var(--case-control);
+  font-variant-numeric: var(--numeric-control);
 }
 .dl-map-region.sheet {
   background: var(--surface-float);
@@ -1429,30 +1517,30 @@ html:has(.dl-body),
   position: absolute;
 }
 .dl-map-region .tl {
-  top: var(--space-3);
-  left: var(--space-4);
+  top: var(--inset);
+  left: var(--inset);
 }
 .dl-map-region .tr {
-  top: var(--space-3);
-  right: var(--space-4);
+  top: var(--inset);
+  right: var(--inset);
 }
 .dl-map-region .bl {
-  bottom: var(--space-3);
-  left: var(--space-4);
+  bottom: var(--inset);
+  left: var(--inset);
 }
 .dl-map-region .br {
-  bottom: var(--space-3);
-  right: var(--space-4);
+  bottom: var(--inset);
+  right: var(--inset);
 }
 .dl-map-region .bc {
-  bottom: var(--space-3);
+  bottom: var(--inset);
   left: 50%;
   transform: translateX(-50%);
 }
 .dl-map-modes {
   display: flex;
   width: max-content;
-  border: var(--hairline) solid var(--rule-strong);
+  border: var(--line-edge);
 }
 .dl-map-region.bar {
   flex-direction: row;
@@ -1460,14 +1548,14 @@ html:has(.dl-body),
   justify-content: space-between;
 }
 .dl-map-modes button {
-  padding: var(--space-1) var(--space-3);
+  padding: var(--nudge) var(--inset);
   border: 0;
   background: var(--surface-float);
   color: var(--ink-2);
-  font: var(--weight-semibold) var(--text-3xs) / var(--leading-snug)
-    var(--font-mono);
-  letter-spacing: var(--tracking-3xs);
-  text-transform: uppercase;
+  font: var(--text-label);
+  letter-spacing: var(--track-label);
+  text-transform: var(--case-label);
+  font-variant-numeric: var(--numeric-label);
   cursor: pointer;
 }
 .dl-map-modes button:hover {
@@ -1478,13 +1566,13 @@ html:has(.dl-body),
   color: var(--ink-on-accent);
 }
 .dl-map-group i {
-  padding: var(--space-1) var(--space-3);
+  padding: var(--nudge) var(--inset);
   color: var(--ink-3);
-  font: var(--weight-semibold) var(--text-3xs) / var(--leading-snug)
-    var(--font-mono);
+  font: var(--text-label);
+  letter-spacing: var(--track-label);
+  text-transform: var(--case-label);
+  font-variant-numeric: var(--numeric-label);
   font-style: normal;
-  letter-spacing: var(--tracking-3xs);
-  text-transform: uppercase;
 }
 .dl-map-region.column {
   justify-content: stretch;
@@ -1493,8 +1581,8 @@ html:has(.dl-body),
 }
 .dl-map-group {
   flex: 1;
-  padding: var(--space-3) var(--space-3) 0;
-  border-bottom: var(--hairline) solid var(--rule);
+  padding: var(--inset) var(--inset) 0;
+  border-bottom: var(--line-rule);
 }
 .dl-map-group:last-child {
   border-bottom: 0;
@@ -1502,48 +1590,57 @@ html:has(.dl-body),
 .dl-map-group > span {
   display: flex;
   flex-wrap: wrap;
-  border-bottom: var(--hairline) solid var(--rule);
+  border-bottom: var(--line-rule);
 }
 .dl-map-group i.on {
   color: var(--ink);
-  border-bottom: var(--stroke-active) solid var(--ink);
+  border-bottom: var(--line-active);
 }
 /* The region's name in mono, what it answers in sans (A8). */
 .dl-map-answer {
   display: grid;
   grid-template-columns: calc(var(--unit) * 40) 1fr;
-  gap: var(--space-4);
+  gap: var(--inset);
   min-height: calc(var(--unit) * 10);
   margin: 0;
   color: var(--ink-2);
-  font: var(--weight-regular) var(--text-sm) / var(--leading-snug)
-    var(--font-sans);
+  font: var(--text-prose);
+  letter-spacing: var(--track-prose);
+  text-transform: var(--case-prose);
+  font-variant-numeric: var(--numeric-prose);
 }
 .dl-map-answer b {
   color: var(--ink);
-  font: var(--weight-semibold) var(--text-3xs) / var(--leading-snug)
-    var(--font-mono);
-  letter-spacing: var(--tracking-3xs);
-  text-transform: uppercase;
+  font: var(--text-label);
+  letter-spacing: var(--track-label);
+  text-transform: var(--case-label);
+  font-variant-numeric: var(--numeric-label);
 }
 
 /* ── the feature index ─────────────────────────────────────────────────── */
 .dl-features td {
-  font-size: var(--text-2xs);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 .dl-features td:first-child {
   white-space: normal;
   color: var(--ink);
-  font-size: var(--text-xs);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 .dl-features td small {
   color: var(--ink-3);
-  font-size: var(--text-3xs);
-  letter-spacing: var(--tracking-3xs);
-  text-transform: uppercase;
+  font: var(--text-label);
+  letter-spacing: var(--track-label);
+  text-transform: var(--case-label);
+  font-variant-numeric: var(--numeric-label);
 }
 .dl-features tr.group th {
-  padding-top: var(--space-6);
+  padding-top: var(--section);
   color: var(--ink);
   border-bottom-color: var(--rule-strong);
 }
@@ -1555,20 +1652,22 @@ html:has(.dl-body),
 .dl-features .moved {
   display: block;
   color: var(--ink);
-  font-weight: var(--weight-semibold);
 }
 .dl-features em.gone {
+  font: var(--text-label);
+  letter-spacing: var(--track-label);
+  text-transform: var(--case-label);
   display: block;
   color: var(--ink-3);
   font-style: normal;
-  letter-spacing: var(--tracking-3xs);
-  text-transform: uppercase;
 }
 .dl-features tr.issue td {
   padding-top: 0;
   color: var(--warn);
-  font-family: var(--font-sans);
-  font-size: var(--text-xs);
+  font: var(--text-prose);
+  letter-spacing: var(--track-prose);
+  text-transform: var(--case-prose);
+  font-variant-numeric: var(--numeric-prose);
 }
 .dl-features tr:has(+ tr.issue) td {
   border-bottom: 0;
@@ -1577,22 +1676,166 @@ html:has(.dl-body),
 /* The proposed menu bar: a stage tall enough for the longest menu. */
 .dl-menu-stage {
   min-height: calc(var(--unit) * 156);
-  border: var(--hairline) solid var(--rule-strong);
+  border: var(--line-edge);
   background: var(--surface-base);
 }
 .dl-menu-stage .dl-menubar > .dl-menubar-item > button {
-  padding: 0 var(--space-3);
+  padding: 0 var(--inset);
 }
 .dl-menu-label {
-  padding: var(--space-3) var(--space-4) var(--space-1) calc(var(--unit) * 6);
+  padding: var(--inset) var(--inset) var(--nudge) calc(var(--unit) * 6);
   color: var(--ink-3);
-  font: var(--weight-semibold) var(--text-3xs) / var(--leading-flat)
-    var(--font-mono);
-  letter-spacing: var(--tracking-3xs);
-  text-transform: uppercase;
+  font: var(--text-label);
+  letter-spacing: var(--track-label);
+  text-transform: var(--case-label);
+  font-variant-numeric: var(--numeric-label);
 }
 .dl-features tr.issue .decision {
   display: block;
-  margin-top: var(--space-1);
+  margin-top: var(--nudge);
   color: var(--ok);
+}
+
+/* A12 specimen: a rail column and a flyout, attached or detached. */
+.dl-rail-demo {
+  position: relative;
+  display: inline-grid;
+  gap: var(--gap);
+  padding: var(--gap);
+  border: var(--line-edge);
+  background: var(--surface-float);
+}
+.dl-rail-cell {
+  display: block;
+  width: var(--control-lg);
+  height: var(--control-lg);
+}
+.dl-rail-cell.open,
+.dl-rail-flyout {
+  border: var(--line-edge);
+}
+.dl-rail-cell i,
+.dl-rail-flyout i {
+  display: block;
+  width: var(--control-lg);
+  height: var(--control-lg);
+  background:
+    linear-gradient(var(--ink-2), var(--ink-2)) center / calc(var(--unit) * 3) var(--hairline) no-repeat,
+    linear-gradient(var(--ink-2), var(--ink-2)) center / var(--hairline) calc(var(--unit) * 3) no-repeat;
+}
+.dl-rail-cell.open i {
+  width: calc(var(--control-lg) - var(--hairline) * 2);
+  height: calc(var(--control-lg) - var(--hairline) * 2);
+}
+.dl-rail-flyout {
+  position: absolute;
+  top: calc(var(--gap) + var(--control-lg) + var(--gap));
+  left: calc(100% - var(--hairline));
+  display: flex;
+  border-left: 0;
+  background: var(--surface-float);
+}
+.dl-rail-flyout.detached {
+  top: calc(var(--gap) + var(--control-lg) + var(--gap) - var(--unit) * 2);
+  left: calc(100% + var(--section));
+  padding: var(--gap);
+  gap: var(--gap);
+  border-left: var(--line-rule);
+  border-color: var(--rule);
+}
+.dl-rail-flyout.detached i {
+  width: calc(var(--control-lg) + var(--inset));
+  height: calc(var(--control-lg) + var(--inset));
+}
+
+/* C9 specimen: the editor's ink structure. */
+.dl-code .num {
+  color: var(--ink);
+}
+.dl-code .kwarg,
+.dl-code .punct {
+  color: var(--ink-3);
+}
+
+/* Building-block specimens (B2-B4, P1, L1). */
+.dl-cluster-demo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--inset);
+}
+.dl-plane {
+  display: grid;
+  gap: var(--gap);
+  width: calc(var(--unit) * 48);
+  padding: var(--inset);
+  border: var(--line-edge);
+}
+.dl-blk {
+  display: inline-flex;
+  align-items: center;
+  height: var(--control-sm);
+  padding: 0 var(--inset);
+}
+.dl-blk.current {
+  background: var(--block-current);
+  color: var(--block-current-ink);
+}
+.dl-blk.kind {
+  height: var(--control-tag);
+  background: var(--block-kind);
+  color: var(--block-kind-ink);
+}
+.dl-marks {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(calc(var(--unit) * 40), 1fr));
+  gap: var(--inset);
+}
+.dl-marks > span {
+  display: grid;
+  grid-template-columns: calc(var(--unit) * 4) calc(var(--unit) * 16) 1fr;
+  align-items: center;
+  gap: var(--inset);
+}
+.dl-mark {
+  display: block;
+  width: calc(var(--unit) * 2);
+  height: calc(var(--unit) * 2);
+}
+.dl-mark.dot {
+  border-radius: 50%;
+  background: var(--ink);
+}
+.dl-mark.ring {
+  border: var(--line-active);
+  border-color: var(--ink-2);
+  border-radius: 50%;
+  width: calc(var(--unit) * 3);
+  height: calc(var(--unit) * 3);
+}
+.dl-mark.square {
+  background: var(--ink-3);
+}
+.dl-mark.triangle {
+  background: var(--warn);
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+  width: calc(var(--unit) * 3);
+  height: calc(var(--unit) * 3);
+}
+.dl-sheet-demo {
+  width: calc(var(--unit) * 48);
+  min-height: calc(var(--unit) * 8);
+  border: var(--line-edge);
+  background: var(--plane-sheet);
+}
+.dl-bar-demo {
+  display: block;
+  width: calc(var(--unit) * 48);
+  height: calc(var(--unit) * 4);
+  background: var(--plane-step);
+  border: var(--line-rule);
+}
+.dl-ruled-row {
+  display: flex;
+  align-items: center;
+  min-height: var(--control-sm);
 }

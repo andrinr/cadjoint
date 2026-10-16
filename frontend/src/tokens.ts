@@ -639,6 +639,113 @@ export const AXIS_RGB: [Rgb, Rgb, Rgb] = [
   hexToRgb(CHROME["axis-z"]),
 ];
 
+// ── text roles ────────────────────────────────────────────────────────────
+
+/**
+ * The only seven ways text is set (guide T0). Every piece of text in the app
+ * is one of these, whole: a stylesheet picks a role, it does not mix a size
+ * from one with a weight from another. The scale, weights and trackings above
+ * are the raw material these are cut from; components never use them
+ * directly.
+ *
+ *   label    9px  600 tracked capitals  furniture labels, kickers, column heads
+ *   control  11px 600 tracked capitals  buttons, tabs, menu titles, the modes
+ *   body     12px 400 as written        lists, menu items, names, details
+ *   value    13px 500 tabular           numbers and the fields that hold them
+ *   title    15px 600 tracked capitals  a panel's title, and nothing else
+ *   prose    12px 400 sans              sentences: hints, help, empty states
+ *   code     13px 400                   the editor
+ *
+ * Colour is not part of a role: ink level is chosen separately (ink, ink-2,
+ * ink-3), so a unit is `body` in ink-3, a kicker is `label` on an ink block.
+ *
+ * Leadings are whole units (12, 16, 20px), not ratios: a line box of 16.8px
+ * puts every row that holds one off the 4px grid, and the error accumulates
+ * down a panel. On units, a stack of rows is a stack of grid lines.
+ */
+export const TEXT_ROLES = {
+  label: { size: 9, weight: 600, leading: "12px", family: "mono", tracking: "0.16em", case: "uppercase", numeric: "normal" },
+  control: { size: 11, weight: 600, leading: "12px", family: "mono", tracking: "0.1em", case: "uppercase", numeric: "normal" },
+  body: { size: 12, weight: 400, leading: "16px", family: "mono", tracking: "normal", case: "none", numeric: "normal" },
+  value: { size: 13, weight: 500, leading: "16px", family: "mono", tracking: "normal", case: "none", numeric: "tabular-nums" },
+  title: { size: 15, weight: 600, leading: "20px", family: "mono", tracking: "0.04em", case: "uppercase", numeric: "normal" },
+  prose: { size: 12, weight: 400, leading: "20px", family: "sans", tracking: "normal", case: "none", numeric: "normal" },
+  code: { size: 13, weight: 400, leading: "20px", family: "mono", tracking: "normal", case: "none", numeric: "normal" },
+} as const;
+
+export type TextRole = keyof typeof TEXT_ROLES;
+
+// ── layout distances ──────────────────────────────────────────────────────
+
+/**
+ * The only distances layout uses (guide S0), each named by its job. The
+ * spacing scale is the raw material; components use these.
+ *
+ *   nudge    2   inside a control: an icon to its caret, a glyph to its edge
+ *   gap      4   between controls of one group: chips, segmented cells, a rail
+ *   inset    8   inside a sheet: panel, popover, card, row ends
+ *   stack    12  between blocks of one panel: field groups, a list and its head
+ *   section  16  between sections; the viewport's furniture from its edges
+ */
+export const LAYOUT = {
+  nudge: 2,
+  gap: 4,
+  inset: 8,
+  stack: 12,
+  section: 16,
+} as const;
+
+// ── atoms: lines, planes, blocks ──────────────────────────────────────────
+
+/**
+ * The five lines everything is drawn with (guide B1). A border or outline
+ * anywhere in the app is one of these, whole: weight, style and colour
+ * together, named by job.
+ *
+ *   rule     1px rule         separates rows and sections inside a sheet
+ *   edge     1px rule-strong  the outline of a sheet, field or cell; the seam
+ *   frame    1px rule-heavy   the viewport's frame
+ *   active   2px ink          this is the active one: tab, focus, selection
+ *   pending  1px dashed       not yet: an add button, a drop target, an expression
+ */
+export const LINE_ATOMS = {
+  rule: "var(--hairline) solid var(--rule)",
+  edge: "var(--hairline) solid var(--rule-strong)",
+  frame: "var(--hairline) solid var(--rule-heavy)",
+  active: "var(--stroke-active) solid var(--ink)",
+  pending: "var(--hairline) dashed var(--rule-strong)",
+} as const;
+
+/**
+ * The three planes (guide B2): what a thing is drawn on.
+ *
+ *   ground  the page and the viewport
+ *   sheet   panels, popovers, fields, cards: one step up
+ *   step    hover, and sub-bars: one step down from the sheet
+ */
+export const PLANE_ATOMS = {
+  ground: "var(--surface-base)",
+  sheet: "var(--surface-float)",
+  step: "var(--surface-bar-alt)",
+} as const;
+
+/**
+ * The two blocks (guide B3): a filled cell that says something by its fill.
+ *
+ *   current  the accent, with ink-on-accent type: the thing you act in or on
+ *   kind     ink, with sheet type: a label of what something is
+ */
+export const BLOCK_ATOMS = {
+  current: { fill: "var(--accent)", ink: "var(--ink-on-accent)" },
+  kind: { fill: "var(--ink)", ink: "var(--surface-float)" },
+} as const;
+
+/** Layout columns shared across panels so value columns line up (row). */
+export const COLUMNS = {
+  "col-label": 112,
+  "col-unit": 40,
+} as const;
+
 // ── derived CSS values ────────────────────────────────────────────────────
 // The stylesheet's non-scale custom properties: alpha ladders and the rgb
 // triples a rule tints with. Each is a function of a token above, so none
@@ -714,14 +821,83 @@ export function cssProperties(): [string, string][] {
     ...Object.entries(DURATIONS).map(([k, v]) => [k, ms(v)] as [string, string]),
     ...Object.entries(EASINGS),
     ...Object.entries(ALPHAS).map(([k, v]) => [k, String(v)] as [string, string]),
+    ...Object.entries(LAYOUT).map(([k, v]) => [k, px(v)] as [string, string]),
+    ...Object.entries(COLUMNS).map(([k, v]) => [k, px(v)] as [string, string]),
+    ...Object.entries(LINE_ATOMS).map(([k, v]) => [`line-${k}`, v] as [string, string]),
+    ...Object.entries(PLANE_ATOMS).map(([k, v]) => [`plane-${k}`, v] as [string, string]),
+    ...Object.entries(BLOCK_ATOMS).flatMap(([k, v]) => [
+      [`block-${k}`, v.fill] as [string, string],
+      [`block-${k}-ink`, v.ink] as [string, string],
+    ]),
+    ...Object.entries(TEXT_ROLES).flatMap(([role, r]) => [
+      [
+        `text-${role}`,
+        `${r.weight} ${r.size}px / ${r.leading} var(--font-${r.family})`,
+      ] as [string, string],
+      [`track-${role}`, r.tracking] as [string, string],
+      [`case-${role}`, r.case] as [string, string],
+      [`numeric-${role}`, r.numeric] as [string, string],
+    ]),
     ...Object.entries(DERIVED),
   ];
 }
 
-/** The `:root` block the stylesheet imports. */
+/**
+ * One class per text role, so markup can take a role whole (`class="t-label"`)
+ * and a stylesheet rule can take it with three declarations.
+ */
+function roleClasses(): string {
+  return Object.keys(TEXT_ROLES)
+    .map(
+      (role) =>
+        `.t-${role} {\n  font: var(--text-${role});\n  letter-spacing: var(--track-${role});\n  text-transform: var(--case-${role});\n  font-variant-numeric: var(--numeric-${role});\n}`,
+    )
+    .join("\n");
+}
+
+/**
+ * The layout primitives (guide L1), as classes: every arrangement in the app
+ * is one of these, so a distance is chosen by naming the arrangement.
+ */
+const LAYOUT_CLASSES = `/* Layout primitives (guide L1). */
+.l-inset {
+  padding: var(--inset);
+}
+.l-stack {
+  display: grid;
+  align-content: start;
+  gap: var(--stack);
+}
+.l-ruled {
+  display: grid;
+}
+.l-ruled > * + * {
+  border-top: var(--line-rule);
+}
+.l-cluster {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--gap);
+}
+.l-row {
+  display: grid;
+  grid-template-columns: var(--col-label) minmax(0, 1fr) var(--col-unit);
+  align-items: baseline;
+  gap: var(--inset);
+  min-height: var(--control-sm);
+}
+.l-split {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--inset);
+}`;
+
+/** The `:root` block the stylesheet imports, the role and layout classes. */
 export function tokensCss(): string {
   const lines = cssProperties().map(([name, value]) => `  --${name}: ${value};`);
-  return `/* ${GENERATED} */\n\n:root {\n${lines.join("\n")}\n  color-scheme: light;\n}\n`;
+  return `/* ${GENERATED} */\n\n:root {\n${lines.join("\n")}\n  color-scheme: light;\n}\n\n${roleClasses()}\n\n${LAYOUT_CLASSES}\n`;
 }
 
 /** The same values as Sass variables, for the Quarto docs theme. */

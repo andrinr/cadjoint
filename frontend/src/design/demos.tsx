@@ -8,6 +8,7 @@
  */
 
 import { For, Show, createSignal, onCleanup, type JSX } from "solid-js";
+import { Select } from "../components/ui/Select";
 import { Cross } from "./kit";
 
 // ── A2 / A9: a panel edits a literal, and the edit propagates ─────────────
@@ -622,6 +623,29 @@ export function ModeDemo() {
         <span class="dl-tag">{mode()}</span>
         <span class="dl-hint">{HINTS[tool()]}</span>
       </div>
+    </div>
+  );
+}
+
+// ── K9: the playground's own Select, live ─────────────────────────────────
+
+export function SelectSpecimen() {
+  const [material, setMaterial] = createSignal("aluminium_6061");
+  return (
+    <div class="dl-field">
+      <label>material</label>
+      <Select
+        value={material()}
+        options={[
+          { value: "aluminium_6061" },
+          { value: "copper_c11000" },
+          { value: "steel_1018" },
+          { value: "titanium_ti6al4v" },
+          { value: "fr4" },
+        ]}
+        onChange={setMaterial}
+      />
+      <small />
     </div>
   );
 }

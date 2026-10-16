@@ -384,3 +384,51 @@ describe("chrome stays clear of the data palette", () => {
     expect(chromeContrast("rule-strong", "surface-viewport")).toBeGreaterThanOrEqual(3);
   });
 });
+
+describe("text is set only in the seven roles, spaced only by the layout distances", () => {
+  // Every app stylesheet; the design page's own sheet and the fenced artwork
+  // (pictures of materials and render modes) are held to the same rules.
+  const sheets = stylesheets.map(({ path, text }) => ({
+    name: path.split("/src/")[1],
+    text: text
+      .replace(/\/\* @artwork[\s\S]*?\/\* @end-artwork \*\//g, "")
+      .replace(/\/\*[\s\S]*?\*\//g, ""),
+  }));
+  const offenders = (pattern: RegExp, allowed: RegExp) => {
+    const found: string[] = [];
+    for (const { name, text } of sheets) {
+      for (const match of text.matchAll(pattern)) {
+        const value = match[1].trim();
+        if (!allowed.test(value)) found.push(`${name}: ${match[0].trim()}`);
+      }
+    }
+    return [...new Set(found)];
+  };
+
+  it("sets font only through a text role", () => {
+    expect(offenders(/\bfont:\s*([^;]+);/g, /^(var\(--text-[a-z]+\)|inherit)$/)).toEqual([]);
+  });
+
+  it("never sets size, weight, tracking or case outside a role", () => {
+    expect(offenders(/\bfont-size:\s*([^;]+);/g, /^(inherit|var\(--text-[a-z]+\))$/)).toEqual([]);
+    expect(offenders(/\bfont-weight:\s*([^;]+);/g, /^inherit$/)).toEqual([]);
+    expect(offenders(/\bletter-spacing:\s*([^;]+);/g, /^(normal|inherit|var\(--track-[a-z]+\))$/)).toEqual([]);
+    expect(offenders(/\btext-transform:\s*([^;]+);/g, /^(none|inherit|var\(--case-[a-z]+\))$/)).toEqual([]);
+  });
+
+  it("draws every border and outline with one of the five lines", () => {
+    // A line is weight, style and colour together (rule, edge, frame, active,
+    // pending); a state may recolour an edge with border-color, but a new kind
+    // of line is not written inline.
+    expect(
+      offenders(
+        /\b(?:border(?:-top|-right|-bottom|-left)?|outline):\s*([^;]+);/g,
+        /^(var\(--line-[a-z]+\)|0|none|0 none)$/,
+      ),
+    ).toEqual([]);
+  });
+
+  it("spaces layout with the named distances, not the raw scale", () => {
+    expect(offenders(/(var\(--space-\d\))/g, /^$/)).toEqual([]);
+  });
+});

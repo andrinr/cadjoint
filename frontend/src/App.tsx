@@ -30,6 +30,9 @@ import { SketchPanel } from "./components/SketchPanel";
 import { ToolRail } from "./components/ToolRail";
 import { Toolbar } from "./components/Toolbar";
 import { ProjectionToggle, ViewCube } from "./components/ViewCube";
+import { LayoutGrid } from "./shell/layoutGrid";
+import { removalLabel } from "./shell/removal";
+import "./shell/layoutGrid.css";
 import { RenderSettingsButton } from "./components/viewer/RenderSettingsButton";
 import { ViewerPane } from "./components/ViewerPane";
 import { createCompileCycle } from "./shell/compileCycle";
@@ -62,6 +65,10 @@ import {
   setSource,
   reportViewerError,
   setStatus,
+  studies,
+  simMeshes,
+  optimizations,
+  source,
 } from "./state";
 import { transformState, vertexState, type BindingState } from "./viewer/dragBinding";
 import { Renderer, type ShaderStats } from "./viewer/renderer";
@@ -140,7 +147,30 @@ export function App() {
     history,
     display: render.display,
   });
-  const ops = createPatchOperations(compile.applyPatch);
+  /**
+   * The last removal, while the program is still the one it produced (F7).
+   *
+   * Every edit goes through `applyPatch`, so this is the one place a removal
+   * can be named: from the state as it was before the patch landed, then
+   * shown in the status line with Undo until the source moves on — the next
+   * edit, or the undo itself.
+   */
+  const [lastRemoval, setLastRemoval] = createSignal<{ label: string; source: string } | null>(null);
+  const applyPatch = async (body: Record<string, unknown>) => {
+    const label = removalLabel(body, {
+      nodes: nodes(),
+      studies: studies(),
+      meshes: simMeshes(),
+      optimizations: optimizations(),
+    });
+    await compile.applyPatch(body);
+    if (label) setLastRemoval({ label, source: source() });
+  };
+  const removal = () => {
+    const last = lastRemoval();
+    return last && last.source === source() ? last.label : null;
+  };
+  const ops = createPatchOperations(applyPatch);
   /**
    * One simulation controller for four windows.
    *
@@ -152,7 +182,7 @@ export function App() {
    */
   const sim = createSimulateController({
     renderer,
-    onPatch: compile.applyPatch,
+    onPatch: applyPatch,
     onAdoptSource: compile.adoptSource,
     onGhostCompile: compile.ghostCompile,
   });
@@ -403,7 +433,7 @@ export function App() {
       case "optimize":
         return (
           <OptimizePanel
-            onPatch={compile.applyPatch}
+            onPatch={applyPatch}
             onAdoptSource={compile.adoptSource}
             onGhostCompile={compile.ghostCompile}
           />
@@ -432,8 +462,11 @@ export function App() {
     // the switcher, rail, dock, hint bar, and viewport border stay in step.
     <div class="app" data-mode={editingMode()}>
       <MenuBar />
+      <LayoutGrid />
       <Toolbar
         onRun={() => void compile.run()}
+        removal={removal()}
+        onUndo={actions.undo}
       />
 
       <WindowLayout renderWindow={renderWindow} />

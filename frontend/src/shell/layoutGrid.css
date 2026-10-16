@@ -1,0 +1,74 @@
+/* The layout grid (shell/layoutGrid.tsx): a measuring tool over the UI.
+   The unit every 4px, a firmer line every 16px (the section distance), and a
+   danger outline on whatever is off it. Never takes the pointer except on
+   its own counter. */
+.layout-grid {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  pointer-events: none;
+  background-image:
+    linear-gradient(90deg, rgba(var(--param-rgb), 0.18) var(--hairline), transparent var(--hairline)),
+    linear-gradient(rgba(var(--param-rgb), 0.18) var(--hairline), transparent var(--hairline)),
+    linear-gradient(90deg, rgba(var(--param-rgb), 0.06) var(--hairline), transparent var(--hairline)),
+    linear-gradient(rgba(var(--param-rgb), 0.06) var(--hairline), transparent var(--hairline));
+  background-size:
+    var(--section) var(--section),
+    var(--section) var(--section),
+    var(--unit) var(--unit),
+    var(--unit) var(--unit);
+}
+
+.layout-grid-off {
+  position: fixed;
+  outline: var(--line-edge);
+  outline-color: var(--danger);
+  outline-offset: calc(var(--hairline) * -1);
+  background: rgba(var(--danger-rgb), var(--alpha-wash));
+}
+
+.layout-grid-count {
+  position: fixed;
+  left: var(--stack);
+  bottom: calc(var(--control-sm) + var(--stack));
+  z-index: 9001;
+  display: grid;
+  gap: var(--gap);
+  max-width: calc(var(--unit) * 120);
+}
+
+.layout-grid-count button {
+  justify-self: start;
+  height: var(--control-sm);
+  padding: 0 var(--inset);
+  border: var(--line-edge);
+  border-color: var(--danger);
+  background: var(--surface-float);
+  color: var(--danger-ink);
+  font: var(--text-label);
+  letter-spacing: var(--track-label);
+  text-transform: var(--case-label);
+}
+
+.layout-grid-count ol {
+  display: grid;
+  margin: 0;
+  padding: var(--gap) 0;
+  list-style: none;
+  border: var(--line-edge);
+  background: var(--surface-float);
+}
+
+.layout-grid-count li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--inset);
+  padding: var(--nudge) var(--inset);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+}
+
+.layout-grid-count li small {
+  color: var(--danger-ink);
+}

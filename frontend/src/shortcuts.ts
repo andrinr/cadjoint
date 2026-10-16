@@ -86,6 +86,7 @@ export const SHORTCUTS: Shortcut[] = [
   { command: "grid-finer", key: "[", label: "[", action: "Zoom in one grid step", group: "View" },
   { command: "grid-coarser", key: "]", label: "]", action: "Zoom out one grid step", group: "View" },
   { command: "show-construction", key: "c", shift: true, label: "⇧C", action: "Toggle the construction overlay", group: "View" },
+  { command: "show-layout-grid", key: "g", shift: true, label: "⇧G", action: "Toggle the layout grid", group: "View" },
 
   // ── Viewport ─────────────────────────────────────────────────────────
   { command: "pan-hold", key: " ", label: "Space (hold)", action: "Pan while dragging", group: "Viewport", dispatch: false },

@@ -36,11 +36,11 @@ import { BC_TYPE_COLORS, PROPOSAL_COLOR, cssColor, fieldRampCss, qualityRampCss 
 import {
   CHROME,
   COLOR_ROLES,
+  LAYOUT,
+  TEXT_ROLES,
+  type TextRole,
   DURATIONS,
   GRID_CONTROL_HEIGHTS,
-  SPACE,
-  TRACKING,
-  TYPE_SCALE,
   UNIT,
   type ChromeToken,
 } from "../tokens";
@@ -60,6 +60,7 @@ import {
 } from "./demos";
 import { Cross, Plate, Ratio, Rule, Section, Swatch, v } from "./kit";
 import { DeskMap } from "./DeskMap";
+import { SelectSpecimen } from "./demos";
 import { FeatureIndex, ProposedMenuBar } from "./FeatureIndex";
 import { ViewportSpecimen } from "./ViewportSpecimen";
 
@@ -67,17 +68,19 @@ const SECTIONS = [
   { id: "axioms", num: "1", title: "Axioms" },
   { id: "colour", num: "2", title: "Colour" },
   { id: "type", num: "3", title: "Type" },
-  { id: "space", num: "4", title: "Space and size" },
-  { id: "shape", num: "5", title: "Shape and elevation" },
+  { id: "language", num: "4", title: "Language" },
+  { id: "space", num: "5", title: "Space and size" },
   { id: "icons", num: "6", title: "Iconography" },
   { id: "motion", num: "7", title: "Motion" },
-  { id: "components", num: "8", title: "Components" },
-  { id: "layout", num: "9", title: "Where things are" },
-  { id: "features", num: "10", title: "Every feature" },
-  { id: "viewport", num: "11", title: "Viewport" },
-  { id: "behaviour", num: "12", title: "Behaviour" },
-  { id: "language", num: "13", title: "Language" },
-  { id: "changes", num: "14", title: "What changes" },
+  { id: "shape", num: "8", title: "Building blocks" },
+  { id: "primitives", num: "9", title: "Primitives" },
+  { id: "layout-primitives", num: "10", title: "Layout" },
+  { id: "components", num: "11", title: "Components" },
+  { id: "viewport", num: "12", title: "Viewport" },
+  { id: "layout", num: "13", title: "Where things are" },
+  { id: "features", num: "14", title: "Every feature" },
+  { id: "behaviour", num: "15", title: "Behaviour" },
+  { id: "changes", num: "16", title: "Record" },
 ];
 
 /**
@@ -168,9 +171,9 @@ function Axioms() {
       title="Axioms"
       intro={
         <>
-          Eleven sentences. Everything after this section is derived from them, and each
+          Thirteen sentences. Everything after this section is derived from them, and each
           derived rule names the axiom it comes from. When two rules conflict, the one from the
-          earlier axiom wins.
+          earlier axiom wins. A1–A9 govern how things look, A2 and A10–A13 how they behave.
         </>
       }
     >
@@ -411,7 +414,7 @@ function Axioms() {
         single
         examples={
           <Plate label="a row on the unit grid">
-            <div class="dl-unit-grid" style={{ padding: "var(--space-6)" }}>
+            <div class="dl-unit-grid" style={{ padding: "var(--section)" }}>
               <div class="dl-row-of">
                 <button type="button" class="dl-btn">Button · 28</button>
                 <input class="dl-input" style={{ width: "calc(var(--unit) * 20)" }} value="0.75" />
@@ -458,7 +461,7 @@ function Axioms() {
                       style={{
                         display: "flex",
                         "justify-content": "space-between",
-                        padding: "var(--space-3) var(--space-4)",
+                        padding: "var(--inset) var(--inset)",
                         "border-radius": "8px",
                         background: v("surface-float"),
                         "box-shadow": "0 2px 6px rgba(0,0,0,.18)",
@@ -494,7 +497,9 @@ function Axioms() {
         }
       >
         <b>Two voices.</b> What the program says (names, values, units, the instrument's labels) is
-        mono. What a person says (sentences) is sans.
+        mono, and a string from the program is set exactly as written. What a person says
+        (sentences) is sans. Capitals are for labels of a word or two, never for a list or a
+        sentence.
       </Rule>
 
       <Rule id="A9" why="So movement carries information. The demos are in §7.">
@@ -528,6 +533,83 @@ function Axioms() {
       >
         <b>Every step can be taken back.</b> An edit is undoable, a gesture abandonable, a mode
         escapable, one step at a time.
+      </Rule>
+
+      <Rule
+        id="A12"
+        why="So the hand learns the screen. A control that moves, grows into a different size when it opens, or slides under another one has to be found again every time."
+        examples={
+          <>
+            <Plate kind="do" label="it opens from where it is, at its own size" ground>
+              <div class="dl-rail-demo">
+                <span class="dl-rail-cell" />
+                <span class="dl-rail-cell open">
+                  <i />
+                </span>
+                <span class="dl-rail-flyout">
+                  <i />
+                  <i />
+                  <i />
+                </span>
+                <span class="dl-rail-cell" />
+              </div>
+            </Plate>
+            <Plate kind="dont" label="a second card, somewhere near" ground>
+              <div class="dl-rail-demo">
+                <span class="dl-rail-cell" />
+                <span class="dl-rail-cell open">
+                  <i />
+                </span>
+                <span class="dl-rail-flyout detached">
+                  <i />
+                  <i />
+                  <i />
+                </span>
+                <span class="dl-rail-cell" />
+              </div>
+            </Plate>
+          </>
+        }
+      >
+        <b>Things stay where they are.</b> An element keeps its place and its size when it opens,
+        changes state, or the mode changes, and it opens from where it is. Space for what will
+        arrive is reserved, and nothing covers what it does not own.
+      </Rule>
+
+      <Rule
+        id="A13"
+        why="So what is on screen is worth reading. A fact shown twice is one fact and one distraction, and the two copies can disagree."
+        examples={
+          <>
+            <Plate kind="do" label="the mode is said by the switcher alone">
+              <div class="dl-stack">
+                <div class="dl-seg">
+                  <button type="button">Model</button>
+                  <button type="button" class="active">Sketch</button>
+                  <button type="button">Simulate</button>
+                </div>
+                <span class="dl-hint">Distance: choose a second point in the same sketch</span>
+              </div>
+            </Plate>
+            <Plate kind="dont" label="said again at the foot of the viewport">
+              <div class="dl-stack">
+                <div class="dl-seg">
+                  <button type="button">Model</button>
+                  <button type="button" class="active">Sketch</button>
+                  <button type="button">Simulate</button>
+                </div>
+                <span class="dl-row-of">
+                  <span class="dl-tag">sketch</span>
+                  <span class="dl-hint">Drag handles or the gizmo · Drag to orbit · Right-drag to pan</span>
+                </span>
+              </div>
+            </Plate>
+          </>
+        }
+      >
+        <b>Say it once.</b> Each fact is stated in one place, the place that owns it. A command may
+        have several ways in (menu, rail, key) but it has one name; a state has one display; a
+        resting instruction is not shown at all.
       </Rule>
     </Section>
   );
@@ -681,7 +763,7 @@ function Colour() {
             <i style={{ background: sdfRampCss() }} />
             <span>+0.25 m</span>
           </div>
-          <div style={{ "padding-top": "var(--space-4)" }}>
+          <div style={{ "padding-top": "var(--inset)" }}>
             <For each={bcEntries}>
               {([name, color]) => (
                 <span class="dl-bc">
@@ -727,7 +809,7 @@ function Colour() {
             <Plate kind="dont" label="accent as ink or outline">
               <div class="dl-row-of">
                 <span style={{ color: v("accent"), "font-weight": "var(--weight-semibold)" }}>SELECTION</span>
-                <span style={{ padding: "var(--space-3)", border: `var(--hairline) solid ${v("accent")}` }}>aluminium</span>
+                <span style={{ padding: "var(--inset)", border: `var(--hairline) solid ${v("accent")}` }}>aluminium</span>
               </div>
               <p class="dl-note">
                 accent on ground: <Ratio fg="accent" bg="surface-base" need={3} />
@@ -824,6 +906,68 @@ function Colour() {
         ramp in a panel is a legend at most 8px tall with both ends labelled. Hover and selection
         over a field are outlines. No text sits on a data-dependent backdrop.
       </Rule>
+      <h3>The editor</h3>
+      <Rule
+        id="C9"
+        why="Syntax highlighting is not a role, so it has no hue (A3). The program's values are the subject (A1), so they carry the weight, and the names around them recede."
+        examples={
+          <>
+            <Plate kind="do" label="values carry the line; one hue for free">
+              <pre class="dl-code">
+                <div>
+                  <span>79</span>
+                  <span>
+                    <span class="kwarg">density</span>
+                    <span class="punct">=</span>
+                    <span class="num">8940.0</span>
+                    <span class="punct">,</span>
+                  </span>
+                </div>
+                <div>
+                  <span>116</span>
+                  <span>
+                    base_l <span class="punct">=</span> Vector2<span class="punct">(</span>
+                    <span class="kwarg">value</span>
+                    <span class="punct">=[</span>
+                    <span class="num">-0.9</span>
+                    <span class="punct">,</span> <span class="num">0.0</span>
+                    <span class="punct">],</span> <span class="free">free=True</span>
+                    <span class="punct">)</span>
+                  </span>
+                </div>
+                <div>
+                  <span>117</span>
+                  <span class="com"># the deck stays level</span>
+                </div>
+              </pre>
+            </Plate>
+            <Plate kind="dont" label="one ink for everything">
+              <pre class="dl-code">
+                <div>
+                  <span>79</span>
+                  <span>density=8940.0,</span>
+                </div>
+                <div>
+                  <span>116</span>
+                  <span>base_l = Vector2(value=[-0.9, 0.0], free=True)</span>
+                </div>
+                <div>
+                  <span>117</span>
+                  <span># the deck stays level</span>
+                </div>
+              </pre>
+            </Plate>
+          </>
+        }
+      >
+        Numbers and booleans are semibold <code>ink</code>; declared names <code>ink</code>;
+        strings <code>ink-2</code>; keyword-argument names, punctuation and comments{" "}
+        <code>ink-3</code> (comments italic). The editor's hues are its roles:{" "}
+        <code>free=True</code> in <code>param</code>, diagnostics in <code>danger</code> and{" "}
+        <code>warn</code> with a gutter shape, and the accent veil behind the span a viewport edit
+        is rewriting.
+      </Rule>
+
       <Rule id="C8" why="ok and axis-y are both green, traction and axis-x both red: they never label the same thing in the same place.">
         Two roles may share a hue family only across zones or modes.
       </Rule>
@@ -832,42 +976,38 @@ function Colour() {
 }
 
 function Type() {
-  const sizes = Object.entries(TYPE_SCALE) as [string, number][];
-  const jobs: Record<string, string> = {
-    "text-3xs": "tracked uppercase labels and kickers",
-    "text-2xs": "dense secondary text, selector expressions",
-    "text-xs": "control labels, tabs, menu items",
-    "text-sm": "body; the default",
-    "text-md": "values the user reads",
-    "text-lg": "panel titles, and nothing else",
+  const jobs: Record<TextRole, string> = {
+    label: "furniture labels, kickers, column heads, readout names",
+    control: "buttons, tabs, menu titles, the mode switcher",
+    body: "list rows, menu items, names from the program, units",
+    value: "numbers, and the fields that hold them",
+    title: "a panel's title, and nothing else",
+    prose: "Sentences: hints, help, empty states, dialog text.",
+    code: "the editor: base_l = Vector2(value=[-0.9, 0.0])",
   };
-  const tracking = Object.values(TRACKING);
+  const roles = Object.entries(TEXT_ROLES) as [TextRole, (typeof TEXT_ROLES)[TextRole]][];
   return (
-    <Section id="type" num="3" title="Type" intro="System mono and system sans, six sizes, three weights.">
+    <Section
+      id="type"
+      num="3"
+      title="Type"
+      intro="Seven text roles, and no other way to set text. A role is a whole style — size, weight, leading, tracking, case and figures — taken together; hierarchy inside a component comes from choosing a role and an ink level, never from adjusting one property."
+    >
       <Rule
-        id="T1"
-        why="Between 9 and 13px a 1px step is about 10% of the size, just above the visible threshold. Then one jump, to the single title size."
+        id="T0"
+        why="Fewer ways to set text means each one is recognisable: a 9px tracked capital is always a label, 13px tabular is always a value. A component that needed an eighth style is a component that has not decided what its text is. test/tokens.test.ts fails on any font, size, weight, tracking or case set outside a role."
         single
         examples={
-          <Plate label="the scale, with its tracking">
+          <Plate label="the seven roles, as the app sets them">
             <div class="dl-type">
-              <For each={sizes}>
-                {([token, px], index) => (
+              <For each={roles}>
+                {([role, spec]) => (
                   <div>
+                    <code>{role}</code>
                     <code>
-                      {token} · {tracking[index()]}
+                      {spec.size} · {spec.weight}
                     </code>
-                    <code>{px}px</code>
-                    <span
-                      style={{
-                        "font-size": `var(--${token})`,
-                        "letter-spacing": `var(--tracking-${token.replace("text-", "")})`,
-                        "text-transform": index() === 0 ? "uppercase" : "none",
-                        "font-weight": index() === 5 ? "var(--weight-semibold)" : "var(--weight-medium)",
-                      }}
-                    >
-                      {jobs[token]}
-                    </span>
+                    <span class={`t-${role}`}>{jobs[role]}</span>
                   </div>
                 )}
               </For>
@@ -875,8 +1015,16 @@ function Type() {
           </Plate>
         }
       >
-        Six sizes: 9, 10, 11, 12, 13 and 15px. Tracking is a function of size, from 0.16em at 9px
-        down to 0.04em at 15px. Weights 400, 500, 600; 700 only on an accent block.
+        <b>label</b> 9px tracked capitals · <b>control</b> 11px tracked capitals · <b>body</b> 12px as
+        written · <b>value</b> 13px tabular · <b>title</b> 15px tracked capitals · <b>prose</b> 12px
+        sans · <b>code</b> 13px. Five sizes (9, 11, 12, 13, 15), three weights (400, 500, 600).
+      </Rule>
+      <Rule
+        id="T1"
+        why="Between 9 and 13px a 1px step is about 10% of the size, just above the visible threshold; the roles skip 10px because a step that small between two roles reads as an accident. Tracking opens as the size falls, and only capitals are tracked."
+      >
+        The raw scale (six sizes, four weights, six trackings in tokens.ts) is what the roles are
+        cut from. Components never use it directly.
       </Rule>
       <Rule
         id="T2"
@@ -886,7 +1034,7 @@ function Type() {
             <Plate kind="do" label="furniture tracked, names verbatim">
               <div class="dl-row-of">
                 <span class="dl-tag">thermal</span>
-                <span style={{ "font-weight": "var(--weight-semibold)" }}>sink-conduction</span>
+                <span class="t-body">sink-conduction</span>
               </div>
             </Plate>
             <Plate kind="dont" label="the program's name restyled">
@@ -922,12 +1070,12 @@ function Type() {
               </div>
             </Plate>
             <Plate kind="dont" label="proportional, left-aligned, unit in label">
-              <div class="dl-stack" style={{ gap: "var(--space-2)", "font-family": "var(--font-sans)" }}>
+              <div class="dl-stack" style={{ gap: "var(--gap)", "font-family": "var(--font-sans)" }}>
                 <For each={[["peak (K)", "412.80"], ["mean (K)", "338.07"], ["min (K)", "293.21"], ["Δ (K)", "119.59"]]}>
                   {([label, value]) => (
                     <div>
                       <span style={{ color: v("ink-3") }}>{label}: </span>
-                      <b style={{ "font-weight": "var(--weight-medium)" }}>{value}</b>
+                      <b class="t-prose">{value}</b>
                     </div>
                   )}
                 </For>
@@ -944,7 +1092,6 @@ function Type() {
 }
 
 function Space() {
-  const spaces = Object.entries(SPACE) as [string, number][];
   const heights = Object.entries(GRID_CONTROL_HEIGHTS) as [string, number][];
   const jobs: Record<string, string> = {
     "control-tag": "non-interactive tags",
@@ -954,29 +1101,35 @@ function Space() {
     "control-xl": "the top bar",
   };
   return (
-    <Section id="space" num="4" title="Space and size" intro={`Every length is a multiple of ${UNIT}px (A6).`}>
+    <Section id="space" num="5" title="Space and size" intro={`Every length is a multiple of ${UNIT}px (A6).`}>
       <Rule
-        id="S1"
-        why="When a panel runs out of room, density comes from type (a 9px label over a 13px value), not from tighter gaps. Padding under 8px reads as a mistake."
+        id="S0"
+        why="A distance named by its job is the same everywhere that job recurs, so two panels built months apart still line up. Turn on View › Show › Layout grid (⇧G) in the playground: it draws the unit over the whole UI and outlines whatever is off it."
         single
         examples={
-          <Plate label="the spacing scale, bars drawn at 4×">
+          <Plate label="the five layout distances, bars drawn at 4×">
             <div class="dl-ruler">
-              <For each={spaces}>
-                {([token, px]) => (
+              <For each={Object.entries(LAYOUT) as [string, number][]}>
+                {([name, px]) => (
                   <div>
-                    <code>{token}</code>
+                    <code>{name}</code>
                     <b>{px}px</b>
                     <i style={{ width: `${px * 4}px` }} />
                   </div>
                 )}
               </For>
             </div>
+            <p class="dl-note">
+              nudge — inside a control only · gap — between controls of one group · inset — inside
+              a sheet · stack — between blocks of one panel · section — between sections, and the
+              viewport's furniture from its edges.
+            </p>
           </Plate>
         }
       >
-        Spacing is 2 · 4 · 6 · 8 · 12 · 16 · 24, half a unit to six units. The half-unit steps live
-        inside controls.
+        Layout uses five distances and no others: <b>nudge</b> 2, <b>gap</b> 4, <b>inset</b> 8,{" "}
+        <b>stack</b> 12, <b>section</b> 16. The spacing scale they are cut from is not used by
+        components; the test fails on it.
       </Rule>
       <Rule
         id="S2"
@@ -1029,7 +1182,7 @@ function Space() {
               </div>
             </Plate>
             <Plate kind="dont" label="2px for emphasis">
-              <div style={{ padding: "var(--space-4)", border: "var(--stroke-active) solid var(--rule-heavy)" }}>
+              <div style={{ padding: "var(--inset)", border: "var(--stroke-active) solid var(--rule-heavy)" }}>
                 Important settings
               </div>
             </Plate>
@@ -1045,7 +1198,130 @@ function Space() {
 
 function Shape() {
   return (
-    <Section id="shape" num="5" title="Shape and elevation" intro="Derived from A7: things are drawn, not stacked.">
+    <Section
+      id="shape"
+      num="8"
+      title="Building blocks"
+      intro="The atoms everything is drawn with: five lines, three planes, two blocks, a handful of marks, and the seven text roles (T0). Each is a token, whole; the primitives in the next section are formulas of these and nothing else. Derived from A7: things are drawn, not stacked."
+    >
+      <Rule
+        id="B1"
+        why="A line is weight, style and colour together, named by its job, so the same job always draws the same line. A border written any other way fails test/tokens.test.ts."
+        single
+        examples={
+          <Plate label="the five lines">
+            <table class="dl-table">
+              <tbody>
+                <For
+                  each={[
+                    ["line-rule", "separates rows and sections inside a sheet"],
+                    ["line-edge", "the outline of a sheet, a field, a cell; the viewport seam"],
+                    ["line-frame", "the viewport's frame"],
+                    ["line-active", "this is the active one: a tab, focus, the selected edge"],
+                    ["line-pending", "not yet: an add button, a drop target, an expression"],
+                  ]}
+                >
+                  {([token, job]) => (
+                    <tr>
+                      <td>{token}</td>
+                      <td style={{ width: "calc(var(--unit) * 40)" }}>
+                        <div style={{ "border-top": `var(--${token})` }} />
+                      </td>
+                      <td class="prose">{job}</td>
+                    </tr>
+                  )}
+                </For>
+              </tbody>
+            </table>
+          </Plate>
+        }
+      >
+        <b>rule</b>, <b>edge</b>, <b>frame</b>, <b>active</b>, <b>pending</b>. One hairline weight; the
+        2px line means only <i>active</i>; dashed means only <i>not yet</i>.
+      </Rule>
+      <Rule
+        id="B2"
+        why="Elevation is a lighter sheet, never a shadow; hover is a step down, because pressure darkens paper."
+        single
+        examples={
+          <Plate label="the three planes" ground>
+            <div class="dl-cluster-demo">
+              <For each={[["plane-ground", "ground: page, viewport"], ["plane-sheet", "sheet: panels, popovers, fields"], ["plane-step", "step: hover, sub-bars"]]}>
+                {([token, job]) => (
+                  <div class="dl-plane" style={{ background: `var(--${token})` }}>
+                    <span class="t-label">{token}</span>
+                    <span class="t-prose">{job}</span>
+                  </div>
+                )}
+              </For>
+            </div>
+          </Plate>
+        }
+      >
+        <b>ground</b>, <b>sheet</b>, <b>step</b>. Nothing is drawn on a fourth.
+      </Rule>
+      <Rule
+        id="B3"
+        why="A block says something by its fill, so there are exactly as many as there are things to say: current, and kind."
+        single
+        examples={
+          <Plate label="the two blocks">
+            <div class="l-cluster">
+              <span class="dl-blk current t-control">Sketch</span>
+              <span class="dl-blk current t-control">Run</span>
+              <span class="dl-blk kind t-label">thermal</span>
+              <span class="dl-blk kind t-label">library</span>
+            </div>
+          </Plate>
+        }
+      >
+        <b>current</b>: the accent with ink-on-accent type, the thing you act in or on. <b>kind</b>:
+        ink with sheet type, a label of what something is.
+      </Rule>
+      <Rule
+        id="B4"
+        why="A mark is a shape that says a state without a word or a hue (A4). Circles mean a point; squares mean held; a triangle warns."
+        single
+        examples={
+          <Plate label="the marks">
+            <div class="dl-marks">
+              <span>
+                <i class="dl-mark dot" />
+                <small class="t-label">dot</small>
+                <small class="t-prose">done, a status</small>
+              </span>
+              <span>
+                <i class="dl-mark ring" />
+                <small class="t-label">ring</small>
+                <small class="t-prose">a free point</small>
+              </span>
+              <span>
+                <i class="dl-mark square" />
+                <small class="t-label">square</small>
+                <small class="t-prose">held, an error</small>
+              </span>
+              <span>
+                <i class="dl-mark triangle" />
+                <small class="t-label">triangle</small>
+                <small class="t-prose">a warning</small>
+              </span>
+              <span>
+                <b class="t-body">✓</b>
+                <small class="t-label">check</small>
+                <small class="t-prose">on, current value</small>
+              </span>
+              <span>
+                <b class="t-body">›</b>
+                <small class="t-label">chevron</small>
+                <small class="t-prose">opens to the side</small>
+              </span>
+            </div>
+          </Plate>
+        }
+      >
+        <b>dot</b>, <b>ring</b>, <b>square</b>, <b>triangle</b>, <b>check</b>, <b>chevron</b>, and the
+        corner caret that says a tool has more behind it.
+      </Rule>
       <Rule
         id="E1"
         why="Elevation is a lighter sheet and an edge. A shadow on paper is a picture of a card on a desk."
@@ -1071,10 +1347,10 @@ function Shape() {
               </div>
             </Plate>
             <Plate kind="dont" label="a floating card" ground>
-              <div style={{ width: "calc(var(--unit) * 64)", padding: "var(--space-3)", background: v("surface-float"), "border-radius": "10px", "box-shadow": "0 8px 24px rgba(0,0,0,.2)" }}>
-                <div style={{ padding: "var(--space-2)" }}>✓ Editor</div>
-                <div style={{ padding: "var(--space-2)" }}>✓ Object tree</div>
-                <div style={{ padding: "var(--space-2)" }}>Meshes</div>
+              <div style={{ width: "calc(var(--unit) * 64)", padding: "var(--inset)", background: v("surface-float"), "border-radius": "10px", "box-shadow": "0 8px 24px rgba(0,0,0,.2)" }}>
+                <div style={{ padding: "var(--gap)" }}>✓ Editor</div>
+                <div style={{ padding: "var(--gap)" }}>✓ Object tree</div>
+                <div style={{ padding: "var(--gap)" }}>Meshes</div>
               </div>
             </Plate>
           </>
@@ -1128,7 +1404,7 @@ function Shape() {
           <Plate label="dashed: an add button, a drop target, a read-only expression">
             <div class="dl-row-of">
               <button type="button" class="dl-btn add">+ Boundary condition</button>
-              <div style={{ padding: "var(--space-4) var(--space-6)", border: "var(--hairline) dashed var(--rule-strong)", color: v("ink-3") }}>
+              <div style={{ padding: "var(--inset) var(--section)", border: "var(--hairline) dashed var(--rule-strong)", color: v("ink-3") }}>
                 Drop a material here
               </div>
               <input class="dl-input" readonly value="0.5 * base_w" style={{ width: "calc(var(--unit) * 32)" }} />
@@ -1174,7 +1450,7 @@ function Icons() {
         why="The stroke matches the hairline in feel, so an icon and a rule look drawn by one pen. Colour is not available to icons (A3): an icon that needs a colour needs a word."
         single
         examples={
-          <Plate label="the set as shipped; its round caps are Δ9">
+          <Plate label="the set as shipped, ink-2">
             <div class="dl-icons">
               <For each={icons}>
                 {([name, Icon]) => (
@@ -1274,9 +1550,168 @@ function Motion() {
   );
 }
 
+function Primitives() {
+  const formulas: [string, string, () => JSX.Element][] = [
+    ["sheet", "plane-sheet + line-edge + inset", () => <div class="dl-sheet-demo" />],
+    ["rule", "line-rule, full width of the sheet's inset", () => <div style={{ width: "calc(var(--unit) * 40)", "border-top": "var(--line-rule)" }} />],
+    ["cell", "a control height + control text; edge when it can be pressed, block when current", () => (
+      <span class="l-cluster">
+        <button type="button" class="dl-btn h-sm">Mesh</button>
+        <button type="button" class="dl-btn h-sm primary">Run</button>
+      </span>
+    )],
+    ["field", "sheet at a control height + value text, right-hung", () => <input class="dl-input" value="0.75" style={{ width: "calc(var(--unit) * 24)" }} />],
+    ["chip", "tag height + body text on a sheet with line-rule; or a kind block with label text", () => (
+      <span class="l-cluster">
+        <span class="dl-chip">fix · P1</span>
+        <span class="dl-tag">thermal</span>
+      </span>
+    )],
+    ["row", "l-row: label text | value text | body unit, on the shared columns", () => (
+      <div class="dl-rows" style={{ width: "calc(var(--unit) * 64)" }}>
+        <div>
+          <span>density</span>
+          <b>2700</b>
+          <small>kg/m³</small>
+        </div>
+      </div>
+    )],
+    ["menu", "sheet + 24px body rows + a check column + a key column", () => (
+      <div class="dl-menu" style={{ width: "calc(var(--unit) * 40)" }}>
+        <button type="button">
+          <span>✓</span>
+          <span>Editor</span>
+          <kbd />
+        </button>
+      </div>
+    )],
+  ];
+  return (
+    <Section
+      id="primitives"
+      num="9"
+      title="Primitives"
+      intro="Seven primitives, each a formula of the building blocks (§8). Every component is a composition of these; a component that seems to need an eighth is the place to stop and ask whether it is really new."
+    >
+      <Rule
+        id="P1"
+        why="Composition instead of invention: a panel is a sheet of ruled rows; a toolbar is cells; a chip list is chips in a cluster. Two things that look alike are the same primitive, so they behave alike."
+        single
+        examples={
+          <Plate label="each primitive, and what it is made of" ground>
+            <table class="dl-table">
+              <thead>
+                <tr>
+                  <th>primitive</th>
+                  <th>made of</th>
+                  <th>specimen</th>
+                </tr>
+              </thead>
+              <tbody>
+                <For each={formulas}>
+                  {([name, recipe, specimen]) => (
+                    <tr>
+                      <td>{name}</td>
+                      <td class="prose">{recipe}</td>
+                      <td>{specimen()}</td>
+                    </tr>
+                  )}
+                </For>
+              </tbody>
+            </table>
+          </Plate>
+        }
+      >
+        <b>sheet</b>, <b>rule</b>, <b>cell</b>, <b>field</b>, <b>chip</b>, <b>row</b>, <b>menu</b>.
+        None has a variant that carries no meaning.
+      </Rule>
+    </Section>
+  );
+}
+
+function Layout0() {
+  const shapes: [string, string, () => JSX.Element][] = [
+    ["inset", "padding inset inside a sheet", () => (
+      <div class="dl-sheet-demo l-inset">
+        <span class="t-body">content sits one inset from the edge</span>
+      </div>
+    )],
+    ["stack", "blocks of one panel, a stack apart", () => (
+      <div class="l-stack">
+        <span class="dl-bar-demo" />
+        <span class="dl-bar-demo" />
+        <span class="dl-bar-demo" />
+      </div>
+    )],
+    ["ruled", "rows of one list, a rule between, no gap", () => (
+      <div class="l-ruled" style={{ width: "calc(var(--unit) * 48)" }}>
+        <span class="t-body dl-ruled-row">fin comb</span>
+        <span class="t-body dl-ruled-row">slug section</span>
+        <span class="t-body dl-ruled-row">bush_a</span>
+      </div>
+    )],
+    ["cluster", "controls of one group, a gap apart, wrapping", () => (
+      <div class="l-cluster">
+        <span class="dl-chip">fix · P1</span>
+        <span class="dl-chip">horiz · P1–P2</span>
+        <span class="dl-chip">vert · P2–P3</span>
+      </div>
+    )],
+    ["row", "label | value | unit on the shared columns (96 · 1fr · 40)", () => (
+      <div class="l-row" style={{ width: "calc(var(--unit) * 64)" }}>
+        <span class="t-label" style={{ color: "var(--ink-3)" }}>density</span>
+        <span class="t-value" style={{ "text-align": "right" }}>2700</span>
+        <span class="t-body" style={{ color: "var(--ink-3)" }}>kg/m³</span>
+      </div>
+    )],
+    ["split", "a head: title at the start, actions at the end", () => (
+      <div class="l-split" style={{ width: "calc(var(--unit) * 64)" }}>
+        <span class="t-title">Studies</span>
+        <button type="button" class="dl-btn h-sm add">+ Study</button>
+      </div>
+    )],
+  ];
+  return (
+    <Section
+      id="layout-primitives"
+      num="10"
+      title="Layout"
+      intro="Six arrangements, and every layout is one of them or a nesting of them. Each fixes its own distance (S0), so choosing an arrangement chooses the spacing; nothing is spaced by eye. They are classes (l-inset, l-stack, l-ruled, l-cluster, l-row, l-split) generated from tokens.ts."
+    >
+      <Rule
+        id="L1"
+        why="A distance chosen by naming an arrangement is the same wherever that arrangement recurs, so two panels built months apart line up, and the layout grid (⇧G) shows at once whatever does not."
+        single
+        examples={
+          <Plate label="the six, drawn over the unit grid">
+            <div class="dl-unit-grid" style={{ padding: "var(--section)" }}>
+              <table class="dl-table">
+                <tbody>
+                  <For each={shapes}>
+                    {([name, job, specimen]) => (
+                      <tr>
+                        <td>{name}</td>
+                        <td class="prose">{job}</td>
+                        <td>{specimen()}</td>
+                      </tr>
+                    )}
+                  </For>
+                </tbody>
+              </table>
+            </div>
+          </Plate>
+        }
+      >
+        <b>inset</b>, <b>stack</b>, <b>ruled</b>, <b>cluster</b>, <b>row</b>, <b>split</b>. A panel is a
+        sheet with an inset, holding a split head and a stack of ruled lists, clusters and rows.
+      </Rule>
+    </Section>
+  );
+}
+
 function Components() {
   return (
-    <Section id="components" num="8" title="Components" intro="Each component is made only of the tokens above. These are the guide's primitives; the playground adopts them.">
+    <Section id="components" num="11" title="Components" intro="Each component is a composition of the primitives (§9), arranged by the layout primitives (§10), set in the text roles (T0).">
       <h3>Panel</h3>
       <Rule
         id="K1"
@@ -1502,9 +1937,9 @@ function Components() {
               </div>
             </Plate>
             <Plate kind="dont" label="a toast with a traceback">
-              <div style={{ padding: "var(--space-4)", background: v("ink"), color: v("surface-float"), "border-radius": "6px", "font-size": "var(--text-2xs)" }}>
+              <div style={{ padding: "var(--inset)", background: v("ink"), color: v("surface-float"), "border-radius": "6px", "font-size": "var(--text-2xs)" }}>
                 Traceback (most recent call last): File "worker.py", line 88, in compile … NameError: name 'Solidd' is not defined
-                <div style={{ "margin-top": "var(--space-2)", color: v("ink-3") }}>disappears in 4 s</div>
+                <div style={{ "margin-top": "var(--gap)", color: v("ink-3") }}>disappears in 4 s</div>
               </div>
             </Plate>
           </>
@@ -1548,6 +1983,72 @@ function Components() {
         The status line says whether the screen matches the code. An empty state names the missing
         precondition in the program's terms and offers the action.
       </Rule>
+
+      <h3>Flyouts and submenus</h3>
+      <Rule
+        id="K8"
+        why="A12: an expansion is its parent opening, so it keeps the parent's size, starts at the parent's edge and shares it; a second card floating nearby makes you find where it came from."
+        single
+        examples={
+          <Plate label="a menu with a submenu open beside its parent" ground>
+            <div class="dl-row-of" style={{ "align-items": "flex-start", gap: "0" }}>
+              <div class="dl-menu" style={{ width: "calc(var(--unit) * 52)" }}>
+                <button type="button">
+                  <span />
+                  <span>Create</span>
+                  <kbd>›</kbd>
+                </button>
+                <button type="button" style={{ background: "var(--surface-bar-alt)" }}>
+                  <span />
+                  <span>Shape</span>
+                  <kbd>›</kbd>
+                </button>
+                <button type="button">
+                  <span />
+                  <span>Constrain</span>
+                  <kbd>›</kbd>
+                </button>
+              </div>
+              <div class="dl-menu" style={{ width: "calc(var(--unit) * 44)", "margin-top": "calc(var(--unit) * 6)" }}>
+                <button type="button">
+                  <span />
+                  <span>Extrude</span>
+                  <kbd>E</kbd>
+                </button>
+                <button type="button">
+                  <span />
+                  <span>Revolve</span>
+                  <kbd />
+                </button>
+                <button type="button">
+                  <span />
+                  <span>Loft</span>
+                  <kbd />
+                </button>
+              </div>
+            </div>
+          </Plate>
+        }
+      >
+        A tool flyout is the same 32px cells as its parent, at the parent's height, flush against the
+        rail and sharing the open parent's edge. A submenu opens to the side of its parent item, top
+        edge on the parent's row, with a › where the parent's shortcut would be.
+      </Rule>
+
+      <h3>Platform controls</h3>
+      <Rule
+        id="K9"
+        why="A native select's open list is the operating system's menu: system font, system highlight, no token reaches it. An unmeasurable surface is outside A3 and A5, so the control is rebuilt from the primitives."
+        single
+        examples={
+          <Plate kind="try" label="the playground's Select">
+            <SelectSpecimen />
+          </Plate>
+        }
+      >
+        Every control is built from the primitives. A platform control whose look the tokens cannot
+        reach (a select's list, a colour picker, a date field) is replaced, not themed.
+      </Rule>
     </Section>
   );
 }
@@ -1556,7 +2057,7 @@ function Layout() {
   return (
     <Section
       id="layout"
-      num="9"
+      num="13"
       title="Where things are"
       intro="Navigation is a map you learn once. Every region answers one question, every window has one name, and every action has one home."
     >
@@ -1691,7 +2192,7 @@ function Features() {
   return (
     <Section
       id="features"
-      num="10"
+      num="14"
       title="Every feature"
       intro="Every feature of the playground, everywhere it can be reached today, and where these rules put it. The table and the menu bar below are rendered from one list, design/features.ts."
     >
@@ -1706,16 +2207,17 @@ function Features() {
       </Rule>
       <Rule
         id="N10"
-        why="Grouping follows N5: by what the command acts on. File for the document, Edit for the selection, View for the picture, Create, Shape and Constrain for geometry, Simulate for studies and their outcomes, Program for the run, Window for the desk."
+        why="Grouping follows N5: by what the command acts on. File for the document and the run, Edit for the selection, View for the picture, Model for geometry, Simulate for studies and their outcomes, Window for the desk, Help for the rest. Breadth is spent sparingly (A13): the rail's groups nest as Model's submenus rather than taking three titles of their own."
         single
         examples={
-          <Plate kind="try" label="the menu bar, settled 16 Oct 2026; switch the mode and open the menus">
+          <Plate kind="try" label="the menu bar as shipped; switch the mode and open the menus">
             <ProposedMenuBar />
           </Plate>
         }
       >
-        Menus are grouped by what their commands act on, in the order you work: file, selection,
-        picture, geometry, physics, run, desk, help.
+        Seven menus, grouped by what their commands act on, in the order you work: file, selection,
+        picture, geometry, physics, desk, help. A section that is a set of one kind (Camera, Create,
+        Constrain) is a submenu that opens to the side; a short section is a labelled block.
       </Rule>
       <Rule
         id="N11"
@@ -1736,7 +2238,7 @@ function Features() {
 
 function Viewport() {
   return (
-    <Section id="viewport" num="11" title="Viewport" intro="The viewport is an instrument face (A1). Its overlays are achromatic unless they are data or direction (C7).">
+    <Section id="viewport" num="12" title="Viewport" intro="The viewport is an instrument face (A1). Its overlays are achromatic unless they are data or direction (C7).">
       <Rule
         id="V1"
         why="Free versus held is shape, so the free-parameter hue stays in the chrome and the viewport keeps its colour for readings."
@@ -1749,7 +2251,7 @@ function Viewport() {
       >
         A free vertex is a hollow circle; a held vertex is a filled square; the selected vertex is a
         filled <code>ink</code> circle. Edges go <code>ink-3</code> → <code>ink-2</code> (hover) →{" "}
-        <code>ink</code> (selected, 2px); a locked edge is a dashed <code>rule</code>. Dimension
+        <code>ink</code> (selected, 2px); a locked edge is <code>rule</code> (solid: dashed means <i>not yet</i>, E4). Dimension
         labels are <code>ink</code> on an opaque tab, and a violated one is <code>danger</code> and
         says by how much. The gizmo and the triad are the only other hues.
       </Rule>
@@ -1783,7 +2285,7 @@ function Viewport() {
 
 function Behaviour() {
   return (
-    <Section id="behaviour" num="12" title="Behaviour" intro="The functional rules. They come from A2 (the program is the truth), A10 (every action answers) and A11 (every step can be taken back).">
+    <Section id="behaviour" num="15" title="Behaviour" intro="The functional rules. They come from A2 (the program is the truth), A10 (every action answers) and A11 (every step can be taken back).">
       <h3>The program is the truth</h3>
       <Rule id="F1" why="An expression is not a number: overwriting it with one would silently break the program.">
         Every panel is an editor of literals. An argument written as an expression is shown as
@@ -1967,6 +2469,15 @@ function Behaviour() {
         always restores a working default. Closing a window loses nothing. Space for arriving data is
         reserved.
       </Rule>
+
+      <h3>Defaults</h3>
+      <Rule
+        id="F12"
+        why="A1: the first picture someone sees is the part. A default they have to raise to see it properly is a default that hid it; a slower machine can step down, and the performance readout says when to."
+      >
+        Defaults are the best the machine can sustain: the Ultra tier, rendered at device resolution.
+        A user lowers a setting; they never have to discover that they could raise it.
+      </Rule>
     </Section>
   );
 }
@@ -1981,7 +2492,7 @@ function Language() {
     ["empty", "—", "an em dash; never 0, N/A or blank"],
   ];
   return (
-    <Section id="language" num="13" title="Language" intro="Words are part of the interface, and they follow A8.">
+    <Section id="language" num="4" title="Language" intro="Words are part of the interface, and they follow A8.">
       <Rule
         id="L1"
         single
@@ -2064,9 +2575,9 @@ function Changes() {
   return (
     <Section
       id="changes"
-      num="14"
-      title="What changes"
-      intro="What the playground does today that these rules retire. Each pair is now, then the rule."
+      num="16"
+      title="Record"
+      intro="What the playground did before this language, and what it does now. Each pair is the old behaviour, then the rule as shipped; together they are the reasons the rules above read as they do."
     >
       <Change
         n={1}
@@ -2226,7 +2737,7 @@ function Changes() {
           </>
         }
         before={
-          <div style={{ display: "inline-block", padding: "var(--space-4)", border: `var(--hairline) solid ${v("accent")}` }}>
+          <div style={{ display: "inline-block", padding: "var(--inset)", border: `var(--hairline) solid ${v("accent")}` }}>
             aluminium
             <br />
             <small style={{ color: v("ink-3") }}>1 applied</small>
@@ -2234,10 +2745,10 @@ function Changes() {
         }
         after={
           <div style={{ display: "inline-grid", border: `var(--hairline) solid ${v("rule-strong")}` }}>
-            <span style={{ padding: "var(--space-4)" }}>
+            <span style={{ padding: "var(--inset)" }}>
               <small style={{ color: v("ink-3") }}>1 applied</small>
             </span>
-            <span style={{ padding: "var(--space-2) var(--space-4)", background: v("accent"), color: v("ink-on-accent"), "font-weight": "var(--weight-bold)" }}>
+            <span style={{ padding: "var(--gap) var(--inset)", background: v("accent"), color: v("ink-on-accent"), "font-weight": "var(--weight-bold)" }}>
               aluminium
             </span>
           </div>
@@ -2288,18 +2799,15 @@ function Changes() {
         why="The shipped set uses round caps and joins and filled dots, against I1."
         before={
           <div class="dl-row-of">
-            <PolygonIcon size={16} />
-            <MoveIcon size={16} />
-            <DistanceIcon size={16} />
-            <span style={{ color: v("ink-3") }}>round caps, filled handles</span>
+            <span style={{ color: v("ink-3") }}>round caps and joins, filled handles, a 24-unit box</span>
           </div>
         }
         after={
           <div class="dl-row-of">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="square" stroke-linejoin="miter">
-              <path d="M3.5 12.5 L2.5 6.5 L8 2.5 L13.5 6.5 L12.5 12.5 Z" />
-            </svg>
-            <span style={{ color: v("ink-3") }}>to be redrawn</span>
+            <PolygonIcon size={16} />
+            <MoveIcon size={16} />
+            <DistanceIcon size={16} />
+            <span style={{ color: v("ink-3") }}>redrawn: 16px, 1.25 stroke, square caps, hollow points</span>
           </div>
         }
       />
@@ -2347,8 +2855,85 @@ function Changes() {
           </div>
         }
       />
+      <Change
+        n={12}
+        title="The tool rail is a narrow card"
+        why="Words beside the icons made the card three times as wide and pushed it over the readout (A12)."
+        before={<p class="dl-note" style={{ margin: "0" }}>A 170px column of icon-over-word cards, covering the GRID readout</p>}
+        after={<p class="dl-note" style={{ margin: "0" }}>A 42px card of centred 32px icons, the words in tooltips, the readout beside it</p>}
+      />
+      <Change
+        n={13}
+        title="Tool flyouts open from their parent"
+        why="The flyout was a second card at a different size, a gap away (A12, K8)."
+        before={<p class="dl-note" style={{ margin: "0" }}>A padded card 16px to the side, larger cells</p>}
+        after={<p class="dl-note" style={{ margin: "0" }}>The parent's row continued: same cells, flush, sharing the open parent's edge</p>}
+      />
+      <Change
+        n={14}
+        title="The hint line says only what is not said elsewhere"
+        why="The mode was named twice and the orbit instructions shown forever (A13)."
+        before={<p class="dl-note" style={{ margin: "0" }}>SKETCH · Drag handles or the gizmo · Drag to orbit · Right-drag to pan</p>}
+        after={<p class="dl-note" style={{ margin: "0" }}>Silent at rest; the next step of a command, or the name of what is hovered</p>}
+      />
+      <Change
+        n={15}
+        title="The title block becomes a performance readout"
+        why="SCENE, STUDY, MESH, SOLVER and REV were all stated elsewhere (A13); what only the viewport knows is what drawing costs."
+        before={<p class="dl-note" style={{ margin: "0" }}>SCENE untitled · STUDY — · MESH — · SOLVER — · REV unsaved</p>}
+        after={<p class="dl-note" style={{ margin: "0" }}>FPS idle · CPU — · RES 1696 × 1104 px · NODES 12</p>}
+      />
+      <Change
+        n={16}
+        title="Selects are built, not themed"
+        why="A native select's open list is the system menu, out of reach of every token (K9)."
+        before={<p class="dl-note" style={{ margin: "0" }}>The OS dropdown: system font, blue highlight, uppercase value</p>}
+        after={<p class="dl-note" style={{ margin: "0" }}>The menu primitive: sheet, 24px options, a check on the current value</p>}
+      />
+      <Change
+        n={17}
+        title="Seven menus, with submenus"
+        why="Ten titles spent a row on commands the rail and keys already reach (A13, N10)."
+        before={<p class="dl-note" style={{ margin: "0" }}>File Edit View Create Shape Constrain Simulate Program Window Help</p>}
+        after={<p class="dl-note" style={{ margin: "0" }}>File Edit View Model Simulate Window Help — Model › Create, Shape, Constrain</p>}
+      />
+      <Change
+        n={18}
+        title="One selection in the tree"
+        why="An inspected operator and a selected object could both be lit (F2, C6)."
+        before={<p class="dl-note" style={{ margin: "0" }}>revolve line 203 and bush_a both accent blocks</p>}
+        after={<p class="dl-note" style={{ margin: "0" }}>Picking either clears the other</p>}
+      />
+      <Change
+        n={19}
+        title="The tree's root is the file"
+        why="Two rows called scene meant two different things (A13)."
+        before={<p class="dl-note" style={{ margin: "0" }}>scene · 12 objects … scene · Union · 7 operands</p>}
+        after={<p class="dl-note" style={{ margin: "0" }}>scene.py · 12 objects … scene · Union · 7 operands</p>}
+      />
+      <Change
+        n={20}
+        title="42 ways to set text become 7"
+        why="The audit counted 42 distinct size/weight/leading combinations (T0)."
+        before={<p class="dl-note" style={{ margin: "0" }}>9, 10, 11, 12, 13 and 15px at 400, 500, 600 and 700, freely combined</p>}
+        after={<p class="dl-note" style={{ margin: "0" }}>label · control · body · value · title · prose · code</p>}
+      />
+      <Change
+        n={21}
+        title="Spacing becomes five named distances"
+        why="Seven raw steps were picked per rule, so the same job got different gaps (S0)."
+        before={<p class="dl-note" style={{ margin: "0" }}>2 · 4 · 6 · 8 · 12 · 16 · 24, chosen case by case</p>}
+        after={<p class="dl-note" style={{ margin: "0" }}>nudge 2 · gap 4 · inset 8 · stack 12 · section 16, by job</p>}
+      />
+      <Change
+        n={22}
+        title="Ultra renders at device resolution"
+        why="The default tier's budget halved the pixels of a Retina viewport (F12)."
+        before={<p class="dl-note" style={{ margin: "0" }}>1.6 M pixels: soft on a 2× screen</p>}
+        after={<p class="dl-note" style={{ margin: "0" }}>4.2 M pixels: device resolution, about 10 ms a frame</p>}
+      />
       <p class="dl-note">
-        {`Also: the docs site moves off its stock theme onto these tokens, and the playground adopts the dl- primitives on this page as its components.`}
+        {`Also: the docs site moved off its stock theme onto these tokens.`}
       </p>
     </Section>
   );
@@ -2371,8 +2956,8 @@ export function DesignPage() {
           <header>
             <h1>Design language</h1>
             <p>
-              The rules the playground is built from: eleven axioms, and everything derived from
-              them. A rule that cannot be traced to an axiom is a bug in this page; a screen that
+              The rules the playground is built from: thirteen axioms, and everything derived
+              from them. A rule that cannot be traced to an axiom is a bug in this page; a screen that
               contradicts a rule is a bug in the screen. This page is drawn with the same tokens and
               obeys the same rules. The measurements behind the choices are in{" "}
               <code>research/design-language.md</code>.
@@ -2381,16 +2966,18 @@ export function DesignPage() {
           <Axioms />
           <Colour />
           <Type />
+          <Language />
           <Space />
-          <Shape />
           <Icons />
           <Motion />
+          <Shape />
+          <Primitives />
+          <Layout0 />
           <Components />
+          <Viewport />
           <Layout />
           <Features />
-          <Viewport />
           <Behaviour />
-          <Language />
           <Changes />
         </main>
       </div>

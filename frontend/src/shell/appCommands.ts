@@ -57,6 +57,7 @@ import {
   toggleConstraintTool,
   toggleLoft,
 } from "./toolActions";
+import { layoutGridOn, setLayoutGridOn } from "./layoutGrid";
 
 export interface AppCommandDeps {
   renderer: Renderer;
@@ -245,6 +246,10 @@ export function createAppCommands(deps: AppCommandDeps): void {
     "grid-coarser": { run: () => stepGrid(1) },
     "render-preset": { run: () => setRenderPopoverOpen(true) },
     "render-settings": { run: () => setRenderPopoverOpen(true) },
+    "show-layout-grid": {
+      run: () => setLayoutGridOn(!layoutGridOn()),
+      checked: layoutGridOn,
+    },
     "show-construction": toggle(
       () => display().showOverlays,
       (next) => ({ showOverlays: next }),

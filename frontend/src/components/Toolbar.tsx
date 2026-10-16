@@ -225,6 +225,9 @@ function JobChip() {
 
 export interface ToolbarProps {
   onRun: () => void;
+  /** What the last removal took out, while undo would bring it back (F7). */
+  removal?: string | null;
+  onUndo?: () => void;
 }
 
 export function Toolbar(props: ToolbarProps) {
@@ -264,8 +267,20 @@ export function Toolbar(props: ToolbarProps) {
         </Show>
       </span>
 
-      {/* Render settings moved into the viewport bar, beside the projection
-          toggle: it changes the picture, so it lives with the picture. */}
+      {/* F7: a removal is not confirmed, so undo is in front of you right
+          after one, in the line that says what the program is. It stays
+          while the program is still the one the removal produced. */}
+      <Show when={props.removal}>
+        <span class="removal" data-testid="removal">
+          {props.removal}
+          <button type="button" onClick={() => props.onUndo?.()} data-testid="removal-undo">
+            Undo <kbd>⌘Z</kbd>
+          </button>
+        </span>
+      </Show>
+
+      {/* Render settings moved into the viewport, beside the projection
+          toggle over the cube: it changes the picture, so it lives with it. */}
       {/* Reset and the WGSL view used to sit here, beside Run. New is a file
           command (File › New) and the generated shader is a developer view
           (Program › Show generated WGSL): neither is the program's verb, and

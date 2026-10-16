@@ -130,7 +130,7 @@ export const FEATURES: Feature[] = [
     now: { toolbar: "Run", key: "⌘↵" },
     rule: { menu: "File › Program › Run", toolbar: "Run", key: "⌘↵" },
     issue: "No menu home.",
-    decision: "Program › Run (menu structure, settled).",
+    decision: "File › Program › Run (menu structure, settled).",
   },
   {
     name: "Stop the compile",
@@ -144,7 +144,7 @@ export const FEATURES: Feature[] = [
     now: { toolbar: "<> (icon only)" },
     rule: { menu: "Help › Developer › Show generated WGSL" },
     issue: "A developer view holds a primary toolbar slot beside Run.",
-    decision: "Moves to Program › Show generated WGSL; the toolbar slot goes.",
+    decision: "Moves to Help › Developer › Show generated WGSL; the toolbar slot goes.",
   },
   {
     name: "Undo",
@@ -248,6 +248,12 @@ export const FEATURES: Feature[] = [
     group: "View",
     now: { toolbar: "Render settings › Annotations" },
     rule: { menu: "View › Show › Construction", viewport: "beside the cube › Render settings › Annotations", key: "⇧C" },
+  },
+  {
+    name: "Layout grid",
+    group: "View",
+    now: {},
+    rule: { menu: "View › Show › Layout grid", key: "⇧G" },
   },
   {
     name: "Feature edges, mesh wireframe",

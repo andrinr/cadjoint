@@ -62,24 +62,26 @@ const highlightField = StateField.define<DecorationSet>({
  * The mapping is achromatic, because hue is meaning and syntax has none to
  * carry: a class name is not an error, a string is not a success and a number
  * is not a warning. What the reader needs while editing a scene is the shape
- * of the program, and weight and ink level give it — keywords semibold,
- * strings and punctuation one ink step down, comments two steps down and
- * italic, `self` italic. The accent stays out entirely except as the veil
+ * of the program, and ink level alone gives it — the code role is one
+ * weight. Values at full ink; declarations, keywords and strings one step
+ * down; argument names, punctuation and comments two steps down (comments
+ * and `self` italic). The accent stays out entirely except as the veil
  * behind the span a viewport edit is rewriting.
  */
 const highlightStyle = HighlightStyle.define([
   // The values are the subject (A1): numbers and booleans are the literals a
-  // panel, a drag or the optimiser rewrites, so they carry the weight.
-  { tag: [tags.number, tags.bool, tags.null], color: "var(--ink)", fontWeight: "var(--weight-semibold)" },
-  // Names of things the program declares read at full ink.
-  { tag: tags.definition(tags.variableName), color: "var(--ink)" },
-  { tag: tags.function(tags.variableName), color: "var(--ink)" },
-  { tag: [tags.className, tags.typeName, tags.namespace], color: "var(--ink)" },
-  { tag: [tags.keyword, tags.controlKeyword, tags.moduleKeyword], color: "var(--ink)", fontWeight: "var(--weight-semibold)" },
-  { tag: tags.self, color: "var(--ink)", fontStyle: "italic" },
-  // Strings one step down; argument names, punctuation and comments recede,
-  // so `density=8940.0` reads as its number.
+  // panel, a drag or the optimiser rewrites, so they alone take full ink.
+  { tag: [tags.number, tags.bool, tags.null], color: "var(--ink)" },
+  // The program's structure — what it declares and the words it is built
+  // from — one ink step down.
+  { tag: tags.definition(tags.variableName), color: "var(--ink-2)" },
+  { tag: tags.function(tags.variableName), color: "var(--ink-2)" },
+  { tag: [tags.className, tags.typeName, tags.namespace], color: "var(--ink-2)" },
+  { tag: [tags.keyword, tags.controlKeyword, tags.moduleKeyword], color: "var(--ink-2)" },
+  { tag: tags.self, color: "var(--ink-2)", fontStyle: "italic" },
   { tag: [tags.string, tags.special(tags.string)], color: "var(--ink-2)" },
+  // Argument names, punctuation and comments recede, so `density=8940.0`
+  // reads as its number.
   { tag: [tags.propertyName, tags.attributeName], color: "var(--ink-3)" },
   { tag: tags.variableName, color: "var(--ink)" },
   { tag: [tags.operator, tags.punctuation, tags.separator, tags.paren, tags.squareBracket, tags.brace], color: "var(--ink-3)" },
@@ -137,10 +139,13 @@ const theme = EditorView.theme(
   {
     "&": {
       height: "100%",
-      fontSize: "var(--text-md)",
+      font: "var(--text-code)",
+      letterSpacing: "var(--track-code)",
+      textTransform: "var(--case-code)",
+      fontVariantNumeric: "var(--numeric-code)",
       backgroundColor: "var(--surface-panel)",
     },
-    ".cm-scroller": { fontFamily: "var(--font-mono)", lineHeight: "var(--leading-normal)" },
+    ".cm-scroller": { font: "inherit" },
     ".cm-content": { caretColor: "var(--ink)" },
     ".cm-gutters": {
       backgroundColor: "var(--surface-panel)",

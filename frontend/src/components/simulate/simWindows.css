@@ -19,23 +19,24 @@
 .sim-failure {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--space-4);
-  border: var(--hairline) solid var(--danger);
-  background: var(--surface-float);
+  gap: var(--gap);
+  padding: var(--inset);
+  border: var(--line-edge);
+  border-color: var(--danger);
+  background: var(--plane-sheet);
 }
 
 /*
  * The message itself: the solver's words, in the solver's own shape.
  *
- * The type is the one the generated-WGSL dialog already uses for machine
- * text a human has to read — regular, `--text-sm`, `--leading-normal`, mono.
- * Reusing it rather than inventing an eleventh mono size is the whole point
- * of having a scale.
+ * The body role: the one every program string in the chrome is set in, so
+ * machine text a human has to read gets no type of its own.
  */
 .sim-failure .sim-error {
-  font: var(--weight-regular) var(--text-sm) / var(--leading-normal)
-    var(--font-mono);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -45,8 +46,11 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-3);
+  gap: var(--gap);
   margin: 0;
-  font: var(--type-mono);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
   color: var(--ink-3);
 }

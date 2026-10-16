@@ -23,7 +23,7 @@
  * same baseline, in this panel only.
  */
 .scenes-panel .section-head {
-  gap: var(--space-4);
+  gap: var(--inset);
 }
 
 /*
@@ -47,12 +47,12 @@
 }
 
 .scene-card + .scene-card {
-  border-top: var(--hairline) solid var(--divider);
+  border-top: var(--line-rule);
 }
 
 .scene-card {
   flex: 0 0 auto;
-  padding: var(--space-4) 0;
+  padding: var(--inset) 0;
   min-width: 0;
 }
 
@@ -65,8 +65,8 @@
  * 2px orange bar down the side of a card is exactly the mark it is not.
  */
 .scene-card.current {
-  border-left: var(--stroke-active) solid var(--ink);
-  padding-left: var(--space-4);
+  border-left: var(--line-active);
+  padding-left: var(--inset);
 }
 
 /* Picture plus caption is one target: clicking anywhere in it opens the
@@ -75,7 +75,7 @@
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: var(--space-3);
+  gap: var(--gap);
   width: 100%;
   /* The shared `button` rule fixes every button to one control height.
      That is right for a control and wrong for a picture: it squeezed the
@@ -94,10 +94,11 @@
    own case — the same exemption `.sim-study-head strong` has for a study's
    declared name. */
 .scene-open strong {
-  font: var(--type-mono);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
   color: var(--ink-2);
-  letter-spacing: var(--tracking-xs);
-  text-transform: none;
 }
 
 /* Hover darkens the caption and firms up the frame's rule — an ink change,
@@ -121,8 +122,8 @@
   aspect-ratio: 16 / 10;
   flex: 0 0 auto;
   overflow: hidden;
-  border: var(--hairline) solid var(--rule);
-  background: var(--surface-bar-alt);
+  border: var(--line-rule);
+  background: var(--plane-step);
 }
 
 .scene-frame img {
@@ -146,7 +147,7 @@
   justify-content: center;
   width: 100%;
   height: 100%;
-  padding: var(--space-4);
+  padding: var(--inset);
   background-image: repeating-linear-gradient(
     45deg,
     transparent,
@@ -157,7 +158,10 @@
 }
 
 .scene-frame-empty span {
-  font: var(--type-mono);
+  font: var(--text-label);
+  letter-spacing: var(--track-label);
+  text-transform: var(--case-label);
+  font-variant-numeric: var(--numeric-label);
   color: var(--ink-3);
   text-align: center;
   overflow: hidden;
@@ -167,33 +171,29 @@
 }
 
 .scene-summary {
-  margin: var(--space-3) 0 0;
-  font-size: var(--text-xs);
-  line-height: var(--leading-snug);
+  margin: var(--gap) 0 0;
+  font: var(--text-prose);
+  letter-spacing: var(--track-prose);
+  text-transform: var(--case-prose);
+  font-variant-numeric: var(--numeric-prose);
   color: var(--ink-2);
 }
 
 .scene-materials {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2);
-  margin: var(--space-3) 0 0;
+  gap: var(--gap);
+  margin: var(--gap) 0 0;
 }
 
 /* A material name is a string from scene.py, not a label of kind: it wears
-   the plain chip — hairline, paper, its own case — rather than the
-   inverse-ink tag the shared `.sim-kind` class draws. */
-.scene-materials .sim-kind {
-  border: var(--hairline) solid var(--rule);
-  background: var(--surface-float);
-  color: var(--ink-2);
-  font: var(--type-mono);
-  letter-spacing: var(--tracking-lg);
-  text-transform: none;
-}
+   the value chip (styles.css) rather than the kind chip `.sim-kind` draws. */
 
 .scene-meta {
-  margin: var(--space-2) 0 0;
-  font: var(--type-mono);
+  margin: var(--gap) 0 0;
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
   color: var(--ink-3);
 }

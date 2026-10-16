@@ -35,36 +35,37 @@
    omitted here falls back to a vendor default, which is how a literal colour
    sneaks in — so the list is deliberately complete. */
 .win-theme {
-  --dv-group-view-background-color: var(--surface-panel);
-  --dv-tabs-and-actions-container-background-color: var(--surface-bar);
+  --dv-group-view-background-color: var(--plane-sheet);
+  --dv-tabs-and-actions-container-background-color: var(--plane-ground);
   /* One hairline plus a --control-sm cell: the strip's *content* box is then
      exactly a control, so the buttons in it are the same height as the menu
      bar's rather than a pixel short of it. */
   --dv-tabs-and-actions-container-height: calc(var(--control-sm) + var(--hairline));
-  --dv-tabs-and-actions-container-font-size: var(--text-2xs);
-  --dv-tab-font-size: var(--text-2xs);
-  --dv-tab-close-icon-size: var(--text-sm);
+  /* Type is never the library's: every tab, chip and action sets its own
+     text role below, so the library's size variables only inherit. */
+  --dv-tabs-and-actions-container-font-size: inherit;
+  --dv-tab-font-size: inherit;
+  --dv-tab-close-icon-size: calc(var(--unit) * 3);
 
   /* A tab is a label on paper. The active one is the sheet the panel is on,
      so it reads as continuous with the body below it; the inactive ones sit
      on the bar. No fills, no pills — the hairline does the separating. */
-  --dv-activegroup-visiblepanel-tab-background-color: var(--surface-panel);
-  --dv-activegroup-hiddenpanel-tab-background-color: var(--surface-bar);
-  --dv-inactivegroup-visiblepanel-tab-background-color: var(--surface-panel);
-  --dv-inactivegroup-hiddenpanel-tab-background-color: var(--surface-bar);
+  --dv-activegroup-visiblepanel-tab-background-color: var(--plane-sheet);
+  --dv-activegroup-hiddenpanel-tab-background-color: var(--plane-ground);
+  --dv-inactivegroup-visiblepanel-tab-background-color: var(--plane-sheet);
+  --dv-inactivegroup-hiddenpanel-tab-background-color: var(--plane-ground);
   --dv-activegroup-visiblepanel-tab-color: var(--ink);
   --dv-activegroup-hiddenpanel-tab-color: var(--ink-3);
   --dv-inactivegroup-visiblepanel-tab-color: var(--ink-2);
   --dv-inactivegroup-hiddenpanel-tab-color: var(--ink-3);
   --dv-tab-divider-color: var(--rule);
 
-  --dv-separator-border: var(--rule);
   --dv-paneview-header-border-color: var(--rule);
   --dv-paneview-active-outline-color: var(--rule-strong);
-  --dv-icon-hover-background-color: var(--surface-bar-alt);
+  --dv-icon-hover-background-color: var(--plane-step);
   --dv-scrollbar-background-color: var(--shade-soft);
   --dv-tabs-container-scrollbar-color: var(--rule);
-  --dv-context-menu-background-color: var(--surface-float);
+  --dv-context-menu-background-color: var(--plane-sheet);
   --dv-context-menu-color: var(--ink);
 
   /* The sash is invisible at rest and a hairline under the pointer: a
@@ -80,7 +81,7 @@
      outline, so it has no part in this. */
   --dv-drag-over-background-color: rgba(var(--ink-rgb), var(--alpha-wash));
   --dv-drag-over-border-color: var(--ink);
-  --dv-drag-over-border: var(--hairline) dashed var(--ink);
+  --dv-drag-over-border: var(--line-pending);
   --dv-edge-dock-indicator-color: var(--ink);
   --dv-dnd-compass-color: var(--rule-strong);
   --dv-dnd-compass-cell-color: rgba(var(--ink-rgb), var(--alpha-wash));
@@ -94,11 +95,11 @@
      Its tab strip is its only header and the handle you drag it by, so the
      library's separate floating title bar is collapsed to nothing. */
   --dv-floating-box-shadow: none;
-  --dv-floating-border: var(--hairline) solid var(--rule-strong);
-  --dv-floating-group-border: var(--hairline) solid var(--rule-strong);
+  --dv-floating-border: var(--line-edge);
+  --dv-floating-group-border: var(--line-edge);
   --dv-floating-group-dragging-opacity: 0.9;
   --dv-floating-titlebar-height: 0px;
-  --dv-floating-titlebar-background-color: var(--surface-float);
+  --dv-floating-titlebar-background-color: var(--plane-sheet);
   --dv-floating-titlebar-border-bottom: 0;
 
   --dv-overlay-z-index: 20;
@@ -112,23 +113,35 @@
   --dv-tab-margin-inline: 0;
   --dv-spacing-padding: 0;
   --dv-tab-group-line-opacity: 1;
-  --dv-tab-group-chip-font-size: var(--text-3xs);
-  --dv-tab-group-chip-padding: 0 var(--space-3);
+  --dv-tab-group-chip-font-size: inherit;
+  --dv-tab-group-chip-padding: 0 var(--gap);
   --dv-tab-group-line-height: var(--hairline);
+}
+
+/* The library's separator colour variable is a bare colour, not a line, so
+   the two places it draws are given the rule line directly instead. */
+.win-theme .dv-split-view-container.dv-separator-border .dv-view:not(:first-child)::before {
+  background-color: var(--rule);
+}
+
+.win-theme .dv-edge-peek,
+.win-theme .dv-edge-peek-header {
+  border: var(--line-rule);
 }
 
 /* ── tab strip ────────────────────────────────────────────────────────── */
 
 .win-theme .dv-tabs-and-actions-container {
-  border-bottom: var(--hairline) solid var(--rule);
+  border-bottom: var(--line-rule);
 }
 
 .win-theme .dv-tab {
-  padding: 0 var(--space-4);
-  border-right: var(--hairline) solid var(--rule);
-  font: var(--weight-regular) var(--text-2xs) / var(--leading-flat) var(--font-mono);
-  letter-spacing: var(--tracking-2xs);
-  text-transform: uppercase;
+  padding: 0 var(--inset);
+  border-right: var(--line-rule);
+  font: var(--text-control);
+  letter-spacing: var(--track-control);
+  text-transform: var(--case-control);
+  font-variant-numeric: var(--numeric-control);
 }
 
 /* The active tab is marked at its foot with the active stroke in ink — the
@@ -147,7 +160,7 @@
 .win-tab {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--gap);
   min-width: 0;
   height: 100%;
 }
@@ -162,25 +175,23 @@
 .win-tab-close {
   display: grid;
   place-items: center;
-  width: var(--space-6);
-  height: var(--space-6);
+  width: calc(var(--unit) * 4);
+  height: calc(var(--unit) * 4);
   padding: 0;
   border: 0;
   border-radius: var(--radius);
   background: transparent;
   color: var(--ink-3);
-  font-size: var(--text-sm);
-  line-height: var(--leading-flat);
   cursor: pointer;
 }
 
 .win-tab-close:hover {
   color: var(--ink);
-  background: var(--surface-bar-alt);
+  background: var(--plane-step);
 }
 
 .win-tab-close:focus-visible {
-  outline: var(--stroke-active) solid var(--ink);
+  outline: var(--line-active);
   outline-offset: calc(var(--stroke-active) * -1);
 }
 
@@ -191,7 +202,7 @@
 
 .win-theme .dv-tab .dv-default-tab-action:hover {
   color: var(--ink);
-  background: var(--surface-bar-alt);
+  background: var(--plane-step);
 }
 
 /* ── group header actions (minimise, float) ───────────────────────────── */
@@ -214,11 +225,14 @@
   height: 100%;
   padding: 0;
   border: 0;
-  border-left: var(--hairline) solid var(--rule);
+  border-left: var(--line-rule);
   border-radius: var(--radius);
   background: transparent;
   color: var(--ink-3);
-  font: var(--weight-regular) var(--text-2xs) / var(--leading-flat) var(--font-mono);
+  font: var(--text-control);
+  letter-spacing: var(--track-control);
+  text-transform: var(--case-control);
+  font-variant-numeric: var(--numeric-control);
   cursor: pointer;
 }
 
@@ -230,11 +244,11 @@
 
 .win-head-button:hover {
   color: var(--ink);
-  background: var(--surface-bar-alt);
+  background: var(--plane-step);
 }
 
 .win-head-button:focus-visible {
-  outline: var(--stroke-active) solid var(--ink);
+  outline: var(--line-active);
   outline-offset: calc(var(--stroke-active) * -1);
 }
 
@@ -248,7 +262,7 @@
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  background: var(--surface-panel);
+  background: var(--plane-sheet);
 }
 
 /* The panels were drawn for a dock that floated over the viewport: each
@@ -293,9 +307,9 @@
    own right edge; an outline paints the same hairline and costs no layout. */
 .win-theme .dv-resize-container {
   border: 0;
-  outline: var(--hairline) solid var(--rule-strong);
+  outline: var(--line-edge);
   outline-offset: calc(var(--hairline) * -1);
-  background: var(--surface-float);
+  background: var(--plane-sheet);
 }
 
 /* ── the tray ─────────────────────────────────────────────────────────── */
@@ -307,8 +321,8 @@
   align-items: stretch;
   gap: 0;
   height: calc(var(--control-sm) + var(--hairline));
-  border-top: var(--hairline) solid var(--rule);
-  background: var(--surface-bar);
+  border-top: var(--line-rule);
+  background: var(--plane-ground);
 }
 
 /* The label and the parked windows are one row of cells: same grid, same
@@ -319,14 +333,15 @@
   display: grid;
   place-items: center;
   height: 100%;
-  padding: 0 var(--space-4);
+  padding: 0 var(--inset);
   border: 0;
-  border-right: var(--hairline) solid var(--rule);
+  border-right: var(--line-rule);
   border-radius: var(--radius);
   background: transparent;
-  font: var(--weight-regular) var(--text-2xs) / var(--leading-flat) var(--font-mono);
-  letter-spacing: var(--tracking-2xs);
-  text-transform: uppercase;
+  font: var(--text-control);
+  letter-spacing: var(--track-control);
+  text-transform: var(--case-control);
+  font-variant-numeric: var(--numeric-control);
 }
 
 .win-tray-label {
@@ -340,16 +355,16 @@
 
 .win-tray-item:hover {
   color: var(--ink);
-  background: var(--surface-bar-alt);
+  background: var(--plane-step);
 }
 
 .win-tray-item:focus-visible {
-  outline: var(--stroke-active) solid var(--ink);
+  outline: var(--line-active);
   outline-offset: calc(var(--stroke-active) * -1);
 }
 
 /* ── watermark ────────────────────────────────────────────────────────── */
 
 .win-theme .dv-watermark-container {
-  background: var(--surface-panel);
+  background: var(--plane-sheet);
 }

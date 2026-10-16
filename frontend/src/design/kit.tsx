@@ -108,8 +108,8 @@ const PLATE_WORDS: Record<PlateKind, string> = {
   example: "Example",
   do: "Do",
   dont: "Don't",
-  before: "Now",
-  after: "Rule",
+  before: "Before",
+  after: "Now",
   try: "Try it",
 };
 

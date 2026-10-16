@@ -75,6 +75,7 @@ export const MENU_COMMANDS: Record<string, string> = {
   "View › Render › Preset…": "render-preset",
   "View › Render › Settings…": "render-settings",
   "View › Show › Construction": "show-construction",
+  "View › Show › Layout grid": "show-layout-grid",
   "View › Show › Feature edges": "show-edges",
   "View › Show › Wireframe": "show-wireframe",
   "View › Show › Solid": "show-solid",
