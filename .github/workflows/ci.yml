@@ -41,7 +41,7 @@ jobs:
         run: |
           pip install "jax[cpu]>=0.4.20"
           pip install -e ".[dev]" --no-deps
-          pip install pytest scikit-image matplotlib optax optimistix pydantic
+          pip install pytest pytest-xdist scikit-image matplotlib optax optimistix pydantic
 
       # `tests/conftest.py` turns JAX's persistent compilation cache on for
       # every session, but a fresh runner starts with nothing in it, so this
@@ -51,8 +51,15 @@ jobs:
       # between runs is safe, and a miss costs only what today already costs.
       # `github.run_id` makes every run save a fresh entry; `restore-keys`
       # picks up the newest earlier one.
+      #
+      # Restore and save are separate steps because `actions/cache` saves
+      # only after a successful job, and no run had succeeded: every one was
+      # cancelled at the timeout or by a newer push, so the cache was never
+      # written and every run started cold ("Cache not found", #53). The save
+      # below runs whatever the outcome, so even a failing run warms the next.
       - name: Restore the JAX compilation cache
-        uses: actions/cache@v4
+        id: jax-cache
+        uses: actions/cache/restore@v4
         with:
           path: ~/.cache/cadjoint/jax
           key: cadjoint-jax-${{ runner.os }}-py312-${{ hashFiles('pyproject.toml') }}-${{ github.run_id }}
@@ -74,9 +81,21 @@ jobs:
       # costs a few hundred kilobytes of log and means the last line names the
       # test that was running. `--durations` is so the cost stays visible
       # before it creeps back into another 50-minute job.
+      #
+      # `-n auto` runs one worker per core. The suite is CPU-bound -- 22 CPU
+      # minutes in 15.6 wall minutes on one process locally -- and the
+      # plugin tests give each worker its own port range
+      # (tests/plugins/conftest.py), so the workers do not collide.
       - name: Run tests
         run: |
-          pytest tests/ -v -m "not slow" --durations=25
+          pytest tests/ -v -m "not slow" -n auto --durations=25
+
+      - name: Save the JAX compilation cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/cadjoint/jax
+          key: ${{ steps.jax-cache.outputs.cache-primary-key }}
 
   lint:
     runs-on: ubuntu-latest

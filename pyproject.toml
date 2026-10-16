@@ -88,6 +88,8 @@ editor = [
 ]
 dev = [
     "pytest>=7.0.0",
+    # `pytest -n auto`: the suite is CPU-bound and CI runs it on every core.
+    "pytest-xdist>=3.5",
     "pre-commit>=3.0.0",
     "matplotlib>=3.7.0",
 ]
