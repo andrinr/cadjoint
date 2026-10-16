@@ -5,13 +5,16 @@
  * 2. grad of sum(field) w.r.t. the hub radius against a float64 central
  *    difference from Python
  * 3. time to sample a 160^3 grid, per backend
- * 4. surface nets on that grid -> watertight check, volume, STL download
+ * 4. cadjoint's dual contouring, ported (src/dc.ts) -> compared with
+ *    Python extract_mesh on the same lattice, STL download
  *
  * Results land in <pre id="out"> as JSON.
  */
 import { defaultDevice, grad, init, jit, numpy as np } from "@jax-js/jax";
 import { spaceFrameNode, type Pts } from "./sdf";
-import { badEdges, stl, surfaceNets, volume } from "./mesh";
+import { badEdges, badEdgesAfterWeld, stl, volume } from "./mesh";
+import { dualContour } from "./dc";
+import referenceMesh from "../reference_mesh.json";
 import reference from "../reference.json";
 
 const out = document.getElementById("out")!;
@@ -61,13 +64,19 @@ async function check(device: "wasm" | "webgpu") {
   r.grid_ms = Math.round(performance.now() - t0);
   show();
 
-  // 4. mesh and export
+  // 4. mesh with the dual-contouring port and export
   const t1 = performance.now();
-  const mesh = surfaceNets({ n: [n, n, n], origin: [lo, lo, lo], step, values: grid });
+  const mesh = dualContour(spaceFrameNode(), {
+    origin: [lo, lo, lo], spacing: step, cells: [n - 1, n - 1, n - 1], values: grid,
+  });
   r.mesh_ms = Math.round(performance.now() - t1);
+  r.vertices = mesh.vertices.length / 3;
   r.triangles = mesh.triangles.length / 3;
   r.bad_edges = badEdges(mesh.triangles);
-  r.volume_mm3 = Math.round(volume(mesh));
+  r.as_stl_reader_sees_it = badEdgesAfterWeld(mesh);
+  r.skipped_boundary_edges = mesh.skippedBoundary;
+  r.volume_mm3 = Math.round(volume(mesh) * 10) / 10;
+  r.python_extract_mesh = referenceMesh;
   const link = document.createElement("a");
   link.href = URL.createObjectURL(stl(mesh));
   link.download = `space_frame_node_${device}.stl`;
