@@ -848,39 +848,43 @@ input[type="checkbox"] {
 /* The flyout continues the parent's row: the same 32px cells, the parent's
    own height, flush against the rail's outer edge, so it reads as the
    parent opening sideways rather than as a second card floating nearby. */
-/* The flyout is the parent cell opening sideways: it starts at the parent's
-   own right edge (crossing the rail's padding and edge), is exactly the
-   parent's height, and the two share one outline — the parent's right edge
-   is opened, the flyout has no left edge (A12, K8). */
+/* The flyout (K8, variant D chosen 17 Oct 2026): a separate sheet a section
+   out from the rail's edge, its cells on the parent's row, with a notch
+   pointing back at the parent. The rail keeps its edge whole; the parent is
+   marked by its fill, not by a second box. */
 .tool-flyout {
   display: none;
   position: absolute;
-  top: 0;
-  left: 100%;
+  top: calc((var(--gap) + var(--hairline)) * -1);
+  left: calc(100% + var(--gap) + var(--hairline) + var(--section));
   z-index: 11;
-  height: var(--control-lg);
-  gap: 0;
-  padding: 0;
+  gap: var(--gap);
+  padding: var(--gap);
   border: var(--line);
-  border-left: 0;
   background: var(--plane-sheet);
+}
+
+.tool-flyout::before {
+  content: "";
+  position: absolute;
+  top: calc(50% - var(--gap));
+  left: calc(var(--gap) * -1 - var(--hairline));
+  width: var(--inset);
+  height: var(--inset);
+  border-left: var(--line);
+  border-bottom: var(--line);
+  background: var(--plane-sheet);
+  transform: rotate(45deg);
 }
 
 .tool-flyout button {
-  height: calc(var(--control-lg) - var(--hairline) * 2);
   border: 0;
 }
 
-/* The open parent takes the same edge, so parent and flyout are one shape. */
 .tool-group.open > .tool-group-parent:not(.active) {
-  border-color: var(--rule-strong);
-  border-right-color: transparent;
-  background: var(--plane-sheet);
+  border-color: transparent;
+  background: var(--plane-step);
   color: var(--ink);
-}
-
-.tool-group.open > .tool-group-parent.active {
-  border-right-color: var(--block-kind);
 }
 
 .tool-group.open .tool-flyout {
@@ -895,7 +899,7 @@ input[type="checkbox"] {
   position: absolute;
   top: 0;
   left: 100%;
-  width: var(--unit);
+  width: calc(var(--gap) + var(--hairline) + var(--section));
   height: 100%;
 }
 

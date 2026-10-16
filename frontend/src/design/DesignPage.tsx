@@ -765,8 +765,8 @@ function Axioms() {
         why="So the hand learns the screen. A control that moves, grows into a different size when it opens, or slides under another one has to be found again every time."
         examples={
           <>
-            <Plate kind="do" label="it opens from where it is, at its own size" ground>
-              <RailSpecimen attached />
+            <Plate kind="do" label="it opens at its parent's row, at its own size, pointing back" ground>
+              <FlyoutSpecimen variant="pointer" />
             </Plate>
             <Plate kind="dont" label="a second card, somewhere near" ground>
               <RailSpecimen />
@@ -2270,7 +2270,7 @@ function Components() {
       <h3>Flyouts and submenus</h3>
       <Rule
         id="K8a"
-        why="Open question (17 Oct): how the rail's group should open so it reads as the rail expanding. Each plate is the rail at its real geometry; the app follows the one chosen."
+        why="Chosen 17 Oct 2026: D. The rail keeps its edge whole, the flyout's cells sit on the parent's row at the parent's size, and the notch says where it came from. The other three are kept as the record of the choice."
         single
         examples={
           <div class="dl-fly-choices">
@@ -2284,12 +2284,12 @@ function Components() {
           </div>
         }
       >
-        <b>Four ways for a tool group to open.</b> A and B keep the rail's vertical edge the anchor;
-        C turns the group into a second rail; D is the conventional detached popover.
+        <b>A tool group opens as D:</b> a separate sheet a section out from the rail, its cells on the
+        parent's row, a notch pointing at the parent. A, B and C were the alternatives.
       </Rule>
       <Rule
         id="K8"
-        why="A12: an expansion is its parent opening, so it keeps the parent's size, starts at the parent's edge and shares it; a second card floating nearby makes you find where it came from."
+        why="A12: an expansion keeps its parent's size and its parent's row, and says where it came from; a second card floating nearby at another size makes you find its origin."
         single
         examples={
           <Plate label="a menu with a submenu open beside its parent" ground>
@@ -2332,9 +2332,10 @@ function Components() {
           </Plate>
         }
       >
-        A tool flyout is the same 32px cells as its parent, at the parent's height, flush against the
-        rail and sharing the open parent's edge. A submenu opens to the side of its parent item, top
-        edge on the parent's row, with a › where the parent's shortcut would be.
+        A tool flyout is a sheet a section out from the rail, the same 32px cells as its parent on the
+        parent's row, with a notch pointing back; the parent is marked by its fill. A submenu opens to
+        the side of its parent item, top edge on the parent's row, with a › where the parent's
+        shortcut would be.
       </Rule>
 
       <h3>Platform controls</h3>

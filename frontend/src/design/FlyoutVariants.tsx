@@ -12,7 +12,7 @@ export const FLYOUT_VARIANTS: { id: FlyoutVariant; name: string; idea: string }[
   { id: "flush", name: "A · flush at the edge", idea: "The rail's edge stays whole; the flyout butts against it at the parent's row. The parent is marked by its fill." },
   { id: "opened", name: "B · the edge opens", idea: "The rail's edge is cut exactly at the parent's row and the flyout continues the rail outward, like a drawer." },
   { id: "column", name: "C · a second column", idea: "A second rail beside the first, the same cells, starting at the parent's row and running down." },
-  { id: "pointer", name: "D · separate, pointing", idea: "A sheet a gap away with a notch at the parent. The conventional answer, for comparison." },
+  { id: "pointer", name: "D · separate, pointing · chosen", idea: "A sheet a section away with a notch at the parent, its cells on the parent's row. Chosen 17 Oct 2026." },
 ];
 
 export function FlyoutSpecimen(props: { variant: FlyoutVariant }) {
