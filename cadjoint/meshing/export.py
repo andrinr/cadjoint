@@ -281,9 +281,8 @@ def remove_slivers(mesh: Mesh) -> tuple[Mesh, int]:
         mesh: A dual-contour :class:`~cadjoint.meshing.dual_contouring.Mesh`.
 
     Returns:
-        ``(mesh, removed)``: the mesh with re-indexed ``faces`` (vertices,
-        normals, quads and cells untouched) and the number of triangles
-        dropped.
+        The mesh with re-indexed ``faces`` (vertices, normals, quads and
+        cells untouched), paired with the number of triangles dropped.
     """
     faces = np.asarray(mesh.faces, dtype=np.int64).reshape((-1, 3))
     welded = _welded_triangles(np.asarray(mesh.vertices), faces)
