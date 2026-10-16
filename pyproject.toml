@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Fully differentiable CAD software built with JAX"
 license = { text = "Apache-2.0" }
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 dependencies = [
     "imageio>=2.37.2",
     "jax>=0.4.20",
@@ -32,20 +32,18 @@ cadjoint-viewer = "cadjoint.viewer.playground:main"
 cuda = ["jax[cuda12]>=0.4.20"]
 # jax-fem 0.0.12 ships an empty install_requires, so its actual imports
 # (basix, meshio, gmsh, petsc4py, pyfiglet, scipy) are listed here explicitly.
-# The python_version markers keep uv's universal resolution working for the
-# project's full >=3.9 range: these solver stacks only support newer Pythons.
 fem = [
-    "jax-fem; python_version >= '3.11'",
-    "fenics-basix; python_version >= '3.11'",
-    "meshio; python_version >= '3.11'",
-    "gmsh; python_version >= '3.11'",
-    "petsc4py; python_version >= '3.11'",
-    "pyfiglet; python_version >= '3.11'",
-    "scipy; python_version >= '3.11'",
+    "jax-fem",
+    "fenics-basix",
+    "meshio",
+    "gmsh",
+    "petsc4py",
+    "pyfiglet",
+    "scipy",
 ]
 tesseract = [
-    "tesseract-core[runtime]; python_version >= '3.11'",
-    "tesseract-jax; python_version >= '3.11'",
+    "tesseract-core[runtime]",
+    "tesseract-jax",
 ]
 # The Gmsh tet mesher (cadjoint.fem.gmsh, and the cadjoint_tet_gmsh
 # Tesseract): HXT second-order tets sized by the part, from the dual-contour
@@ -62,12 +60,12 @@ tesseract = [
 # imports it. That is not a reason to drop it: this extra is what the tet
 # mesher declares it needs, and a caller who wants it should not have to
 # install a solver stack to get it (or discover the dependency by accident).
-gmsh = ["gmsh; python_version >= '3.11'"]
+gmsh = ["gmsh"]
 # Dev-only STEP validation: tests/meshing/test_step_kernel.py round-trips
 # save_step output through the OCCT kernel (importorskip'd when absent).
 # cadquery-ocp ships wheels for CPython 3.10-3.14 only, so the marker keeps
-# uv's universal resolution working for the project's full >=3.9 range.
-stepcheck = ["cadquery-ocp; python_version >= '3.10' and python_version < '3.15'"]
+# uv's universal resolution working on Pythons newer than that.
+stepcheck = ["cadquery-ocp; python_version < '3.15'"]
 # The playground server's process monitor (`/api/jobs`) samples each worker
 # subprocess's CPU and RSS through psutil. Without it the server still runs
 # and still registers every job — it degrades to `resource.getrusage`

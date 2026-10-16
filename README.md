@@ -119,7 +119,7 @@ prebuilt to GHCR for amd64 and arm64, so Docker is the only requirement
 | Linux x86_64 | yes | compiles PETSc |
 | Linux ARM64 | yes | no: gmsh has no Linux ARM wheel |
 | macOS arm64 | yes | compiles PETSc |
-| macOS x86_64 (Intel) | no on Python ≥ 3.10: jaxlib has no Intel-Mac wheel | no |
+| macOS x86_64 (Intel) | no: jaxlib has no Intel-Mac wheel for Python 3.11+ | no |
 | Windows x86_64 | yes | no: PETSc does not build natively |
 
 Every "yes" is a fresh `uv sync --locked` and `import cadjoint` in
