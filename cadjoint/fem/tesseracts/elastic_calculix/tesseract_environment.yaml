@@ -16,7 +16,12 @@ dependencies:
   - pip
   - calculix
   - numpy
-  - jax
+  # The same cap as cadjoint's own `jax` requirement in pyproject.toml.
+  # Uncapped here, conda installs the newest jaxlib and the pip step below
+  # then has to downgrade it to satisfy cadjoint, which pip cannot do to a
+  # conda-installed package ("Cannot uninstall jaxlib ... no RECORD file").
+  - jax<0.9
+  - jaxlib<0.9
   - optax
   - optimistix
   - imageio
