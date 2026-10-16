@@ -509,6 +509,14 @@ ul.task-list li input[type="checkbox"] {
 <td><a href="../reference/meshing.simplify.simplify_mesh.html#cadjoint.meshing.simplify.simplify_mesh">meshing.simplify.simplify_mesh</a></td>
 <td>Simplify a dual-contour mesh by error-bounded, feature-safe collapses.</td>
 </tr>
+<tr class="even">
+<td><a href="../reference/meshing.bounds.fit_bounds.html#cadjoint.meshing.bounds.fit_bounds">meshing.bounds.fit_bounds</a></td>
+<td><code>(origin, size)</code> of a box around the part, found at its own scale.</td>
+</tr>
+<tr class="odd">
+<td><a href="../reference/meshing.bounds.boundary_inside.html#cadjoint.meshing.bounds.boundary_inside">meshing.bounds.boundary_inside</a></td>
+<td>Whether any lattice vertex on the grid’s six faces lies inside the part.</td>
+</tr>
 </tbody>
 </table>
 </section>
@@ -525,26 +533,30 @@ ul.task-list li input[type="checkbox"] {
 <td>Write the mesh triangles as an STL file.</td>
 </tr>
 <tr class="odd">
+<td><a href="../reference/meshing.export.remove_slivers.html#cadjoint.meshing.export.remove_slivers">meshing.export.remove_slivers</a></td>
+<td>Weld coincident vertices and drop the triangles that collapse.</td>
+</tr>
+<tr class="even">
 <td><a href="../reference/meshing.export.save_step.html#cadjoint.meshing.export.save_step">meshing.export.save_step</a></td>
 <td>Write a minimal faceted STEP AP214 boundary representation.</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><a href="../reference/meshing.export.merge_planar_faces.html#cadjoint.meshing.export.merge_planar_faces">meshing.export.merge_planar_faces</a></td>
 <td>Merge coplanar mesh quads into large polygon faces.</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><a href="../reference/meshing.diagnostics.mesh_report.html#cadjoint.meshing.diagnostics.mesh_report">meshing.diagnostics.mesh_report</a></td>
 <td>Bundle every diagnostic into one report.</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><a href="../reference/meshing.diagnostics.surface_deviation.html#cadjoint.meshing.diagnostics.surface_deviation">meshing.diagnostics.surface_deviation</a></td>
 <td>Sampled one-sided deviation of the mesh from the implicit surface.</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><a href="../reference/meshing.diagnostics.triangle_quality.html#cadjoint.meshing.diagnostics.triangle_quality">meshing.diagnostics.triangle_quality</a></td>
 <td>Triangle shape statistics: minimum angles, aspect ratios, degeneracy.</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><a href="../reference/meshing.diagnostics.self_intersections.html#cadjoint.meshing.diagnostics.self_intersections">meshing.diagnostics.self_intersections</a></td>
 <td>Sampled self-intersection test over non-adjacent triangle pairs.</td>
 </tr>

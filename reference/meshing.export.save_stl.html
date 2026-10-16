@@ -337,7 +337,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </tr>
 </tbody>
 </table>
-<p>Triangle normals are computed from the counterclockwise winding, so they point outward for a well-oriented mesh. The output is deterministic.</p>
+<p>Triangle normals are computed from the counterclockwise winding, so they point outward for a well-oriented mesh. Triangles that collapse when coincident vertices are merged — which every STL reader does — are left out (:func:<code>remove_slivers</code>). The output is deterministic.</p>
 
 
 </section>
