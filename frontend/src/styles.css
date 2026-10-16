@@ -650,63 +650,66 @@ input[type="checkbox"] {
 
 /* Viewport overlays ---------------------------------------------------- */
 
-/* The viewport bar: one strip across the top of the viewport. The picture's
-   tools on the left, how it is drawn (projection, render settings) on the
-   right. A bar, not a floating card, so the readout and the cube sit under it
-   instead of being covered by it (guide N6). */
-.viewport-bar {
+/* The tool rail: a narrow floating card in the viewport's top-left corner,
+   one 32px cell per tool, icons centred, the word in each tooltip and the
+   armed tool named in the hint bar. Words beside the icons made the card
+   three times as wide and pushed it over the readout. */
+.tool-rail {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
+  top: var(--space-5);
+  left: var(--space-5);
   z-index: 10;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: var(--space-4);
-  height: calc(var(--unit) * 10);
-  padding: 0 var(--space-4);
-  border-bottom: var(--hairline) solid var(--rule-strong);
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: var(--hairline) solid var(--rule-strong);
   background: var(--surface-float);
 }
 
-.viewport-bar-end {
+.tool-rail .rail-word {
+  display: none;
+}
+
+/* How the picture is drawn: projection and render settings, a pair over the
+   view cube in the top-right corner. */
+.view-controls {
+  position: absolute;
+  top: var(--space-5);
+  right: var(--space-5);
+  z-index: 11;
   display: flex;
-  align-items: center;
   gap: var(--space-2);
-  margin-left: auto;
 }
 
 .viewport-bar-button {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-3);
+  display: grid;
+  place-items: center;
+  width: var(--control-lg);
   height: var(--control-lg);
-  padding: 0 var(--space-3);
-  border-color: transparent;
-  background: transparent;
+  padding: 0;
+  border: var(--hairline) solid var(--rule-strong);
+  background: var(--surface-float);
   color: var(--ink-2);
 }
 
+.viewport-bar-button .rail-word {
+  display: none;
+}
+
 .viewport-bar-button:hover:not(:disabled) {
-  border-color: var(--rule);
   background: var(--surface-raised-hover);
   color: var(--ink);
 }
 
-/* Projection and the open render popover are states, not the current tool:
-   an ink edge, not the accent. */
+/* Projection and the open popover are states, not the current tool: an ink
+   edge, not the accent. */
 .viewport-bar-button.active,
 .viewport-bar-button.active:hover:not(:disabled) {
   border-color: var(--ink);
   background: var(--surface-float);
   color: var(--ink);
-}
-
-.tool-rail {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: var(--space-2);
 }
 
 .tool-rail button {
@@ -717,7 +720,7 @@ input[type="checkbox"] {
   padding: 0;
   border-color: transparent;
   background: transparent;
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 
 .tool-rail button:hover:not(:disabled) {
@@ -743,9 +746,9 @@ input[type="checkbox"] {
 }
 
 .tool-rail hr {
-  width: var(--hairline);
-  height: var(--control-md);
-  margin: 0 var(--space-2);
+  width: var(--space-7);
+  height: var(--hairline);
+  margin: var(--space-1) 0;
   border: 0;
   background: var(--rule);
 }
@@ -792,8 +795,8 @@ input[type="checkbox"] {
 .tool-flyout {
   display: none;
   position: absolute;
-  top: calc(100% + var(--space-3));
-  left: calc(var(--hairline) * -1);
+  top: calc(var(--hairline) * -1);
+  left: calc(100% + var(--space-4));
   z-index: 11;
   gap: var(--space-2);
   padding: var(--space-2);
@@ -811,20 +814,19 @@ input[type="checkbox"] {
 .tool-group.open::after {
   content: "";
   position: absolute;
-  top: 100%;
-  left: 0;
-  width: 100%;
-  height: var(--space-3);
+  top: 0;
+  left: 100%;
+  width: var(--space-4);
+  height: 100%;
 }
 
 /* Sketch-plane quick picks, shown while the sketch tool is armed. */
 .plane-picks {
   display: flex;
-  flex-direction: row;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   gap: var(--space-1);
-  padding-left: var(--space-3);
-  border-left: var(--hairline) solid var(--rule);
+  padding-top: var(--space-1);
 }
 
 .plane-picks-label {
@@ -837,7 +839,7 @@ input[type="checkbox"] {
 
 .tool-rail .plane-picks button {
   width: var(--control-lg);
-  height: var(--control-md);
+  height: var(--control-sm);
   font: var(--type-kicker);
   letter-spacing: var(--tracking-md);
 }
@@ -1860,7 +1862,7 @@ input[type="checkbox"] {
 
 .view-cube {
   position: absolute;
-  top: calc(var(--unit) * 10 + var(--space-4));
+  top: calc(var(--space-5) + var(--control-lg) + var(--space-3));
   right: var(--space-5);
   z-index: 10;
   display: flex;
@@ -2724,8 +2726,8 @@ button.icon {
    it. No plate: it sits where the tool rail already holds the field back. */
 .graticule-gain {
   position: absolute;
-  top: calc(var(--unit) * 10 + var(--space-4));
-  left: var(--space-5);
+  top: var(--space-5);
+  left: calc(var(--unit) * 16);
   z-index: 5;
   display: flex;
   /* Every cell is given the same line box, so centring them also lands their

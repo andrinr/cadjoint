@@ -311,22 +311,20 @@ export function App() {
             onAssignMaterial={ops.assignMaterial}
             overlay={
               <>
-                {/* The viewport bar: the picture's tools on the left, how it is
-                    drawn (projection, render settings) on the right. */}
-                <div class="viewport-bar" data-testid="viewport-bar">
-                  <ToolRail
-                    onDelete={deleteSelection}
-                    onExtrude={ops.extrudeSelection}
-                    onRevolve={ops.revolveSelection}
-                    onFix={() => fixSelectedPoint(ops.addConstraint)}
+                <ToolRail
+                  onDelete={deleteSelection}
+                  onExtrude={ops.extrudeSelection}
+                  onRevolve={ops.revolveSelection}
+                  onFix={() => fixSelectedPoint(ops.addConstraint)}
+                />
+                {/* How the picture is drawn, beside the control for which way it
+                    faces: projection and render settings over the view cube. */}
+                <div class="view-controls" data-testid="view-controls">
+                  <ProjectionToggle
+                    projection={render.display().projection}
+                    onProjection={(projection) => render.applyDisplay({ projection })}
                   />
-                  <div class="viewport-bar-end">
-                    <ProjectionToggle
-                      projection={render.display().projection}
-                      onProjection={(projection) => render.applyDisplay({ projection })}
-                    />
-                    <RenderSettingsButton render={renderPanelProps()} />
-                  </div>
+                  <RenderSettingsButton render={renderPanelProps()} />
                 </div>
                 <ViewCube
                   yaw={cameraAngles().yaw}

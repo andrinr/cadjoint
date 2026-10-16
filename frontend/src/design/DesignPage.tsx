@@ -1217,8 +1217,10 @@ function Icons() {
           </>
         }
       >
-        Every tool-rail icon has a text label at 1280px and wider. A destructive action always
-        carries the word. Icons never appear inside the viewport: gizmos and handles are geometry.
+        The tool rail is icons only, so it stays a narrow card beside the model: each icon's word
+        is in its tooltip, and the hint bar names the armed tool. A destructive action carries the
+        word unless undo reaches it (A11); the rail's Delete is undoable, so it is an icon there and
+        a word in the Edit menu. Gizmos and handles are geometry, not icons.
       </Rule>
     </Section>
   );
@@ -1665,11 +1667,10 @@ function Layout() {
         id="N6"
         why="Corners are learned once. A readout that moves is a readout you have to look for."
       >
-        The viewport's furniture has fixed places. Across the top, the viewport bar: the picture's
-        tools on the left, how it is drawn (projection, render settings) on the right. Under it,
-        the readout top-left and the view cube top-right; the legend bottom-left, the performance
-        readout bottom-right, the hint bottom-centre (V3). Nothing else is pinned there, and
-        nothing covers anything else.
+        The viewport's furniture has fixed places: the tool rail, a narrow floating card,
+        top-left with the readout beside it; projection and render settings over the view cube,
+        top-right; the legend bottom-left, the performance readout bottom-right, the hint
+        bottom-centre (V3). Nothing else is pinned there, and nothing covers anything else.
       </Rule>
       <Rule
         id="N7"
