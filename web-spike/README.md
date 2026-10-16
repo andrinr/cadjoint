@@ -59,20 +59,36 @@ the generated formulas:
   booleans (clevis compile 163 ms -> 66 s, then OOM), so the fix belongs in
   jax-js's JVP rule.
 
-## Performance
+## Performance: fused scene kernel vs per-node kernels
 
-| | Wasm (Node) | Wasm (browser) | WebGPU (browser) |
-| --- | --- | --- | --- |
-| clevis field, first jitted call (compile) | 153 ms | 178 ms | see below |
-| 1 M points, warm | 342 ms | | |
-| node: sample 160^3 / mesh | 0.6 s / 1.1 s | 1.7 s / 1.8 s | 0.4 s / 0.6 s |
-| clevis: sample 1.1 M / mesh | 0.4 s / 0.8 s | 2.2 s / 3.2 s | |
+`src/runtime.ts` composes a scene two ways:
 
-WebGPU compiles the node scene's fused kernel in ~0.1 s but the 40-node
-clevis kernel takes far longer (still compiling after a minute in this
-pane); Wasm is the dependable backend for export today, and per-node
-kernels instead of one fused scene kernel are the obvious next step for
-WebGPU.
+- **fused** (`field`): `jit(vmap(scene))`, the whole scene one program.
+- **per-node** (`fieldPerNode`): `jit(vmap(kernel))` once per node *type*
+  (at most 15, shared by every node of that type), composed at batch level:
+  one dispatch per node.
+
+Clevis bracket (40 nodes), browser pane (Chromium 152), Apple Silicon:
+
+| | Wasm fused | Wasm per-node | WebGPU fused | WebGPU per-node |
+| --- | --- | --- | --- | --- |
+| first call, 256 points (compile + run) | 190 ms | 91 ms | did not finish in 15+ min | blocked, see below |
+| second call, 256 points | 7 ms | 3 ms | | |
+| first call, 1 M points | 1528 ms | 367 ms | | |
+| warm, 1 M points | 394 ms | 209 ms | | |
+
+Per-node is the better default on Wasm too. Headless (Node, Wasm) it gives
+the same values within 1.1e-5 and the same blend gradient within 4.7e-7;
+its mesh is watertight, and differs from Python's only through 533 lattice
+signs where cadjoint's own value is within 2e-6 of zero: the comparison
+lattice was chosen to align with the clevis's faces, so 10,909 lattice
+points sit exactly on a face and the sign at zero is rounding. A real export
+fits its grid to the part with padding and almost never lands on a face.
+
+The fused WebGPU compile is worse than slow: shader compilation runs in the
+browser's single GPU process, so one huge fused shader stalls WebGPU for
+every tab until it finishes. That is why the per-node WebGPU run is still
+unmeasured here; the GPU process has to be restarted first.
 
 ## Files
 

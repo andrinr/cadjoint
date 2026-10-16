@@ -3,7 +3,7 @@
  * the page runs, for each exported scene. Usage: npx tsx check.mts [scene...]
  */
 import { init, defaultDevice, numpy as np, grad } from "@jax-js/jax";
-import { field, totalOverFree, type SceneNode } from "./src/runtime.ts";
+import { field, fieldPerNode, totalOverFree, totalOverFreePerNode, type SceneNode } from "./src/runtime.ts";
 import { dualContour } from "./src/dc.ts";
 import { badEdges, badEdgesAfterWeld, volume } from "./src/mesh.ts";
 import { readFileSync } from "node:fs";
@@ -22,18 +22,23 @@ function firstBlend(node: SceneNode): number | null {
 
 await init("wasm");
 defaultDevice("wasm");
-for (const name of process.argv.slice(2).length ? process.argv.slice(2) : ["node", "clevis"]) {
+const perNode = process.argv.includes("--per-node");
+const names = process.argv.slice(2).filter((a) => !a.startsWith("--"));
+console.log(perNode ? "mode: per-node kernels" : "mode: fused scene kernel");
+for (const name of names.length ? names : ["node", "clevis"]) {
   const scene = JSON.parse(readFileSync(`${name}.scene.json`, "utf8")) as SceneNode;
   const ref = JSON.parse(readFileSync(`${name}.reference.json`, "utf8"));
   const refMesh = JSON.parse(readFileSync(`${name}.mesh.json`, "utf8"));
   const r: Record<string, unknown> = {};
-  const f = field(scene);
+  let t0 = performance.now();
+  const f = perNode ? fieldPerNode(scene) : field(scene);
   const pts = Float32Array.from(ref.points);
   const values = f(columns(pts)).dataSync() as Float32Array;
+  r.first_call_ms = Math.round(performance.now() - t0);
   r.max_abs_error = Math.max(...ref.values.map((v: number, i: number) => Math.abs(values[i] - v)));
   const k0 = firstBlend(scene);
   if (ref.grad && k0 !== null) {
-    const total = totalOverFree(scene, { type: "union", name: "smoothness" }, () => np.array(pts).reshape([pts.length / 3, 3]));
+    const total = (perNode ? totalOverFreePerNode : totalOverFree)(scene, { type: "union", name: "smoothness" }, () => np.array(pts).reshape([pts.length / 3, 3]));
     const g = (grad(total)(np.array(k0)).dataSync() as Float32Array)[0];
     r.grad_blend = g;
     r.grad_python = ref.grad.d_sum;

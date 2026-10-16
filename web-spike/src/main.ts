@@ -12,8 +12,8 @@
  * emit_kernels.py generates from cadjoint's own Python through StableHLO.
  * Results land in <pre id="out"> as JSON.
  */
-import { defaultDevice, grad, init, jit, vmap, numpy as np } from "@jax-js/jax";
-import { field, perPoint, totalOverFree, type SceneNode } from "./runtime";
+import { defaultDevice, grad, init, numpy as np } from "@jax-js/jax";
+import { field, fieldPerNode, totalOverFree, type SceneNode } from "./runtime";
 import { spaceFrameNode } from "./sdf";
 import { dualContour } from "./dc";
 import { badEdges, badEdgesAfterWeld, stl, volume } from "./mesh";
@@ -149,33 +149,32 @@ async function quick() {
 }
 
 async function split() {
-  // ?split[=node][&webgpu]: where the browser spends the time on a scene.
+  // ?split[=node][&webgpu][&pernode]: compile and run times for one scene,
+  // fused (one jitted scene kernel) or per-node (one jitted kernel per type).
   const device = location.search.includes("webgpu") ? "webgpu" : "wasm";
+  const mode = location.search.includes("pernode") ? "per-node" : "fused";
   await init(device);
   defaultDevice(device);
-  const r: Record<string, unknown> = { device };
+  const which = location.search.includes("node") && !location.search.includes("pernode") ? "node"
+    : location.search.includes("split=node") ? "node" : "clevis";
+  const r: Record<string, unknown> = { device, mode, scene: which };
   results.split = r;
-  const which = location.search.includes("node") ? "node" : "clevis";
-  r.scene = which;
-  r.user_agent = navigator.userAgent;
-  const one = perPoint((which === "node" ? nodeScene : clevisScene) as unknown as SceneNode);
+  const scene = (which === "node" ? nodeScene : clevisScene) as unknown as SceneNode;
   const ref = which === "node" ? nodeReference : clevisReference;
-  const n = 256;
-  const pts = () => np.array(Float32Array.from(ref.points.slice(0, 3 * n))).reshape([n, 3]);
-  let t = performance.now();
-  vmap((p: np.Array) => one(p, null))(pts()).dataSync();
-  r.eager_vmap_ms = Math.round(performance.now() - t);
-  console.log("[spike] split", JSON.stringify(r));
-  show(); await new Promise((go) => setTimeout(go, 0));
-  const j = jit(vmap((p: np.Array) => one(p, null)));
-  t = performance.now();
-  j(pts()).dataSync();
-  r.jit_first_call_ms = Math.round(performance.now() - t);
-  console.log("[spike] split", JSON.stringify(r));
-  show(); await new Promise((go) => setTimeout(go, 0));
-  t = performance.now();
-  j(pts()).dataSync();
-  r.jit_second_call_ms = Math.round(performance.now() - t);
+  const f = mode === "per-node" ? fieldPerNode(scene) : field(scene);
+  const log = () => { console.log("[spike] split", JSON.stringify(r)); show(); return new Promise((go) => setTimeout(go, 0)); };
+  const time = async (key: string, pts: Float32Array) => {
+    const t = performance.now();
+    await f(columns(pts)).data();
+    r[key] = Math.round(performance.now() - t);
+    await log();
+  };
+  const small = Float32Array.from(ref.points.slice(0, 3 * 256));
+  await time("first_call_256_ms", small);
+  await time("second_call_256_ms", small);
+  const big = new Float32Array(3 * 1_000_000).map((_, i) => ((i * 7919) % 1000) / 10 - 50);
+  await time("first_call_1M_ms", big);
+  await time("second_call_1M_ms", big);
   (results as Record<string, unknown>).done = true;
   show();
 }

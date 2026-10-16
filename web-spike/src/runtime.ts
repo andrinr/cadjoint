@@ -88,3 +88,76 @@ export function totalOverFree(scene: SceneNode, free: Free, points: () => np.Arr
     return np.sum(batched(pts, np.broadcastTo(k, [n])));
   };
 }
+
+// ---------------------------------------------------------------------------
+// Per-node mode: one jitted, batched kernel per node *type*, composed at the
+// batch level. The fused mode above hands jit the whole scene as one
+// program, which WebGPU compiles very slowly for a 40-node scene; here the
+// GPU compiles at most one small kernel per type (shared by every node of
+// that type) and the scene costs one dispatch per node.
+
+type Batched = (P: np.Array, free: np.Array | null) => np.Array;
+
+const batchedKernels = new Map<string, (...args: np.Array[]) => np.Array>();
+
+/** jit(vmap(kernel)) with points (or distances) batched and params not. */
+function batchedKernel(type: string) {
+  let fn = batchedKernels.get(type);
+  if (!fn) {
+    const kernel = kernels[type];
+    const params = kernel.params.map(() => null);
+    const axes = kernel.kind === "boolean" ? [0, 0, ...params] : [0, ...params];
+    fn = jit(vmap(kernel.fn, axes)) as (...args: np.Array[]) => np.Array;
+    batchedKernels.set(type, fn);
+  }
+  return fn;
+}
+
+function composeBatched(node: SceneNode, free: Free | null, claimed: { done: boolean }): Batched {
+  const kernel = kernels[node.type];
+  if (!kernel) throw new Error(`no generated kernel for ${node.type}`);
+  const run = batchedKernel(node.type);
+  const isFree =
+    free !== null && !claimed.done && node.type === free.type && Number(node.params[free.name]) > 0;
+  if (isFree) claimed.done = true;
+  const params = (f: np.Array | null) =>
+    kernel.params.map((name) =>
+      isFree && name === free!.name ? f!.ref : np.array(node.params[name] as number | number[]),
+    );
+  const children = node.children.map((child) => composeBatched(child, free, claimed));
+
+  switch (kernel.kind) {
+    case "primitive":
+      return (P, f) => run(P, ...params(f));
+    case "transform":
+      return (P, f) => children[0](run(P, ...params(f)), f);
+    case "field":
+      return (P, f) => run(children[0](P, f), ...params(f));
+    case "boolean":
+      return (P, f) => {
+        let acc = children[0](P.ref, f);
+        children.slice(1).forEach((child, i) => {
+          const last = i === children.length - 2;
+          acc = run(acc, child(last ? P : P.ref, f), ...params(f));
+        });
+        if (children.length === 1) P.dispose();
+        return acc;
+      };
+  }
+}
+
+/** The per-node counterpart of `field`. */
+export function fieldPerNode(scene: SceneNode): Field {
+  const fn = composeBatched(scene, null, { done: false });
+  return ({ x, y, z }: Pts) => fn(np.stack([x, y, z], 1), null);
+}
+
+/** The per-node counterpart of `totalOverFree`. */
+export function totalOverFreePerNode(scene: SceneNode, free: Free, points: () => np.Array) {
+  const fn = composeBatched(scene, free, { done: false });
+  return (k: np.Array) => {
+    const d = fn(points(), k.ref);
+    k.dispose();
+    return np.sum(d);
+  };
+}
