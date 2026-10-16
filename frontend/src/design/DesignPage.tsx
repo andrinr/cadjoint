@@ -60,6 +60,7 @@ import {
 } from "./demos";
 import { Cross, Plate, Ratio, Rule, Section, Swatch, v } from "./kit";
 import { DeskMap } from "./DeskMap";
+import { FLYOUT_VARIANTS, FlyoutSpecimen } from "./FlyoutVariants";
 import { Variations } from "./Variations";
 import { AnchorsDrawing, DeskDrawing, LevelsDrawing, PanelAnatomy } from "./LayoutDrawings";
 import { SelectSpecimen } from "./demos";
@@ -2267,6 +2268,25 @@ function Components() {
       </Rule>
 
       <h3>Flyouts and submenus</h3>
+      <Rule
+        id="K8a"
+        why="Open question (17 Oct): how the rail's group should open so it reads as the rail expanding. Each plate is the rail at its real geometry; the app follows the one chosen."
+        single
+        examples={
+          <div class="dl-fly-choices">
+            <For each={FLYOUT_VARIANTS}>
+              {(variant) => (
+                <Plate label={variant.name} ground caption={variant.idea}>
+                  <FlyoutSpecimen variant={variant.id} />
+                </Plate>
+              )}
+            </For>
+          </div>
+        }
+      >
+        <b>Four ways for a tool group to open.</b> A and B keep the rail's vertical edge the anchor;
+        C turns the group into a second rail; D is the conventional detached popover.
+      </Rule>
       <Rule
         id="K8"
         why="A12: an expansion is its parent opening, so it keeps the parent's size, starts at the parent's edge and shares it; a second card floating nearby makes you find where it came from."

@@ -2125,3 +2125,80 @@ html:has(.dl-body),
   width: 100%;
   height: auto;
 }
+
+/* Flyout variants (K8): the rail at its real geometry, four ways to open. */
+.dl-fly {
+  min-height: calc(var(--unit) * 48);
+}
+.dl-fly-rail {
+  position: relative;
+  display: inline-grid;
+  gap: var(--gap);
+  padding: var(--gap);
+  border: var(--line);
+  background: var(--plane-sheet);
+}
+.dl-fly-cell {
+  display: grid;
+  place-items: center;
+  width: var(--control-lg);
+  height: var(--control-lg);
+  color: var(--ink-2);
+}
+.dl-fly-cell.parent {
+  background: var(--plane-step);
+  color: var(--ink);
+}
+/* The flyout's cells sit on the parent's row: the parent's top inside the
+   rail's padding box is gap + cell + gap; the flyout starts one gap and one
+   hairline above that, so its own padding puts its cells on the same line. */
+.dl-fly-out {
+  position: absolute;
+  top: calc(var(--gap) + var(--control-lg) + var(--gap) - var(--gap) - var(--hairline));
+  left: calc(100% + var(--hairline));
+  display: flex;
+  gap: var(--gap);
+  padding: var(--gap);
+  border: var(--line);
+  border-left: 0;
+  background: var(--plane-sheet);
+}
+.dl-fly-cut {
+  display: none;
+}
+/* B: the rail's edge is cut at the parent's row. */
+.dl-fly-opened .dl-fly-cut {
+  position: absolute;
+  display: block;
+  top: calc(var(--gap) + var(--control-lg));
+  left: 100%;
+  width: var(--hairline);
+  height: calc(var(--control-lg) + var(--gap) * 2);
+  background: var(--plane-sheet);
+}
+/* C: a second column, running down from the parent's row. */
+.dl-fly-column .dl-fly-out {
+  flex-direction: column;
+}
+/* D: a separate sheet with a notch at the parent. */
+.dl-fly-pointer .dl-fly-out {
+  left: calc(100% + var(--hairline) + var(--section));
+  border-left: var(--line);
+}
+.dl-fly-pointer .dl-fly-out::before {
+  content: "";
+  position: absolute;
+  top: calc(50% - var(--gap));
+  left: calc(var(--gap) * -1 - var(--hairline));
+  width: var(--inset);
+  height: var(--inset);
+  border-left: var(--line);
+  border-bottom: var(--line);
+  background: var(--plane-sheet);
+  transform: rotate(45deg);
+}
+.dl-fly-choices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--inset);
+}
