@@ -1,14 +1,29 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "cadjoint"
 version = "0.1.0"
 description = "Fully differentiable CAD software built with JAX"
-license = { text = "Apache-2.0" }
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 readme = "README.md"
 requires-python = ">=3.11"
+authors = [{ name = "Andrin Rehmann" }]
+keywords = ["cad", "jax", "sdf", "differentiable", "optimization", "fem"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Physics",
+]
 dependencies = [
     "imageio>=2.37.2",
     "jax>=0.4.20",
@@ -16,6 +31,12 @@ dependencies = [
     "optax>=0.2.4",
     "optimistix>=0.0.10",
 ]
+
+[project.urls]
+Homepage = "https://github.com/andrinr/cadjoint"
+Documentation = "https://andrinr.github.io/cadjoint/"
+Source = "https://github.com/andrinr/cadjoint"
+Issues = "https://github.com/andrinr/cadjoint/issues"
 
 [project.scripts]
 cadjoint-viewer = "cadjoint.viewer.playground:main"
@@ -103,9 +124,13 @@ where = ["."]
 include = ["cadjoint*"]
 
 # The playground UI is built from frontend/ into cadjoint/viewer/static and
-# committed, so installing cadjoint needs no Node toolchain.
+# committed, so installing cadjoint needs no Node toolchain. The Tesseract
+# packages ship their config and environment files because the plugin
+# registry reads each built-in's version from tesseract_config.yaml.
 [tool.setuptools.package-data]
 "cadjoint.viewer" = ["static/*", "static/**/*"]
+"cadjoint.viewer.schema" = ["payloads.d.ts"]
+"cadjoint.fem.tesseracts" = ["*/tesseract_config.yaml", "*/tesseract_environment.yaml", "*/tesseract_requirements.txt"]
 
 # petsc4py (fem extra) publishes only an sdist, and uv resolves every extra
 # universally, so without this a plain `uv sync` or `uv lock` builds
