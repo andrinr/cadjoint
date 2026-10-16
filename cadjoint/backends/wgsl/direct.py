@@ -225,9 +225,38 @@ _EXTRUDED = """fn prim_extrudedpolygon(
     return sqrt(a * a + b * b);
 }"""
 
+#: ``profile_distance`` for a revolved profile: an edge with both ends on
+#: the axis (profile x = ``axis``) is interior to the solid, so it counts
+#: for the sign and not for the distance — ``_polygon_distance(..., axis=)``.
+_PROFILE_DISTANCE_REVOLVED = """fn on_axis(x: f32, axis: f32) -> bool {
+    return abs(x - axis) <= 1e-6 * (1.0 + abs(x) + abs(axis));
+}
+
+fn profile_distance_revolved(p: vec2<f32>, offset: u32, count: u32, axis: f32) -> f32 {
+    var d = 1e30;
+    var s = 1.0;
+    for (var i: u32 = 0u; i < count; i = i + 1u) {
+        let j = (i + count - 1u) % count;
+        let vi = profile_vertex(offset + i);
+        let vj = profile_vertex(offset + j);
+        let e = vj - vi;
+        let w = p - vi;
+        if (!(on_axis(vi.x, axis) && on_axis(vj.x, axis))) {
+            let t = clamp(dot(w, e) / dot(e, e), 0.0, 1.0);
+            let b = w - e * t;
+            d = min(d, dot(b, b));
+        }
+        let c1 = p.y >= vi.y;
+        let c2 = p.y < vj.y;
+        let c3 = (e.x * w.y) > (e.y * w.x);
+        if ((c1 == c2) && (c2 == c3)) { s = -s; }
+    }
+    return s * sqrt(d);
+}"""
+
 _REVOLVED = """fn prim_revolvedpolygon(p: vec3<f32>, offset: u32, count: u32, radial: f32) -> f32 {
     let r = sqrt(p.x * p.x + p.z * p.z + 1e-20) - radial;
-    return profile_distance(vec2<f32>(r, p.y), offset, count);
+    return profile_distance_revolved(vec2<f32>(r, p.y), offset, count, -radial);
 }"""
 
 #: Rodrigues, with the angle a runtime value so a polar pattern can loop.
@@ -317,6 +346,7 @@ _BOOLEANS = frozenset({"Union", "Intersection", "Difference"})
 _SHARED.update(
     {
         "profile_distance": _PROFILE_DISTANCE,
+        "profile_distance_revolved": _PROFILE_DISTANCE_REVOLVED,
         "profile_vertex": _PROFILE_FROM_BUFFER,
         "profile_distance_lerped": _PROFILE_LERPED,
         "prim_loftedpolygon": _LOFTED,
@@ -698,7 +728,7 @@ class _Emitter:
                 raise UnsupportedNode("A loft needs both profiles to have the same vertex count.")
             height = self.read(node, "height", 1)
             return f"    return prim_loftedpolygon(p, {a}u, {b}u, {count_a}u, {height});"
-        self._need("profile_vertex", "profile_distance", "prim_revolvedpolygon")
+        self._need("profile_vertex", "profile_distance_revolved", "prim_revolvedpolygon")
         offset, count = self.profile_slice(node)
         radial_offset = self.read(node, "offset", 1)
         return f"    return prim_revolvedpolygon(p, {offset}u, {count}u, {radial_offset});"

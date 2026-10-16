@@ -99,12 +99,13 @@ caller can substitute or instrument any of them.
 
 | Stage | Module | Key entry points |
 |---|---|---|
+| Lattice fitting | `meshing.bounds` | `fit_bounds`, `boundary_inside` |
 | Hermite edge detection | `meshing.edge_detection` | `sample_grid`, `find_crossing_edges`, `edge_hermite_data`, `detect_edges` |
 | Feature classification | `meshing.features` | `manifold_cell_incidence`, `classify_feature_cells`, `active_branches`, `detect_branch_changes` |
 | Dual contouring | `meshing.dual_contouring` | `qef_vertices`, `sharp_qef_vertices`, `dual_faces`, `extract_mesh` |
 | Adaptive octree | `meshing.adaptive` | `surface_cells`, `sparse_crossing_edges` |
 | Simplification | `meshing.simplify` | `simplify_mesh` |
-| Export | `meshing.export` | `save_obj`, `save_stl`, `save_step`, `merge_planar_faces` |
+| Export | `meshing.export` | `save_obj`, `save_stl`, `save_step`, `merge_planar_faces`, `remove_slivers` |
 | Diagnostics | `meshing.diagnostics` | `mesh_report`, `surface_deviation`, `triangle_quality` |
 
 Features are classified two ways. `classify_feature_cells` measures normal

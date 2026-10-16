@@ -154,10 +154,13 @@ quartodoc:
         - meshing.adaptive.surface_cells
         - meshing.adaptive.sparse_crossing_edges
         - meshing.simplify.simplify_mesh
+        - meshing.bounds.fit_bounds
+        - meshing.bounds.boundary_inside
     - title: Meshing — export and diagnostics
       contents:
         - meshing.export.save_obj
         - meshing.export.save_stl
+        - meshing.export.remove_slivers
         - meshing.export.save_step
         - meshing.export.merge_planar_faces
         - meshing.diagnostics.mesh_report

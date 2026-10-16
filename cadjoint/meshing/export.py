@@ -10,6 +10,10 @@ writers then serialize that mixed polygon/triangle representation:
 - :func:`save_stl` — binary (default) or ASCII STL triangles.
 - :func:`save_step` — minimal STEP AP214 boundary representation.
 
+:func:`remove_slivers` welds coincident vertices and drops the zero-area
+triangles that sharp concave creases leave behind; the OBJ and STL writers
+apply it, since index-free readers merge coincident points anyway.
+
 Everything here is concrete host-side numpy + stdlib; export happens after
 extraction, outside any differentiation path.
 """
@@ -226,6 +230,67 @@ def merge_planar_faces(
     return polygons, _quad_triangle_rows(mesh, sorted(leftover_ids))
 
 
+#: Vertices closer than this fraction of the mesh's extent are one point.
+#: Coincident rows from sharp placement differ by ~1e-15 of the extent;
+#: genuine neighbours at any resolution the lattice allows are far apart.
+_COINCIDENT_TOLERANCE = 1e-9
+
+
+def _coincident_representatives(vertices: np.ndarray) -> np.ndarray:
+    """For each vertex row, the lowest row at the same position.
+
+    Positions are compared after rounding to :data:`_COINCIDENT_TOLERANCE`
+    of the mesh's largest extent, which is what every index-free reader
+    (STL above all) does implicitly when it rebuilds connectivity.
+    """
+    vertices = np.asarray(vertices, dtype=np.float64)
+    if vertices.shape[0] == 0:
+        return np.zeros(0, dtype=np.int64)
+    scale = max(float(np.ptp(vertices, axis=0).max()), 1e-12)
+    keys = np.round(vertices / (_COINCIDENT_TOLERANCE * scale))
+    _, first, inverse = np.unique(keys, axis=0, return_index=True, return_inverse=True)
+    return first[inverse.reshape(-1)]
+
+
+def _welded_triangles(vertices: np.ndarray, triangles: np.ndarray) -> np.ndarray:
+    """*triangles* re-indexed onto coincident-vertex representatives, slivers dropped."""
+    triangles = np.asarray(triangles, dtype=np.int64).reshape((-1, 3))
+    welded = _coincident_representatives(vertices)[triangles]
+    distinct = (
+        (welded[:, 0] != welded[:, 1])
+        & (welded[:, 1] != welded[:, 2])
+        & (welded[:, 0] != welded[:, 2])
+    )
+    return welded[distinct]
+
+
+def remove_slivers(mesh: Mesh) -> tuple[Mesh, int]:
+    """Weld coincident vertices and drop the triangles that collapse.
+
+    At a sharp concave crease dual contouring can emit triangles whose
+    corners are distinct vertex rows at one position (about 1e-15 apart).
+    The index graph is manifold, but a file without indices is not: an STL
+    reader merges coincident points, those triangles then have no area,
+    and their edges are used a third and fourth time — the file is not
+    watertight (issue #52).  This does that merge first, keeps the faces
+    on the lowest row of each coincident group, and drops every triangle
+    that no longer has three distinct corners.  ``save_stl`` and
+    ``save_obj`` apply it; ``save_step`` has its own edge weld.
+
+    Args:
+        mesh: A dual-contour :class:`~cadjoint.meshing.dual_contouring.Mesh`.
+
+    Returns:
+        ``(mesh, removed)``: the mesh with re-indexed ``faces`` (vertices,
+        normals, quads and cells untouched) and the number of triangles
+        dropped.
+    """
+    faces = np.asarray(mesh.faces, dtype=np.int64).reshape((-1, 3))
+    welded = _welded_triangles(np.asarray(mesh.vertices), faces)
+    removed = int(faces.shape[0] - welded.shape[0])
+    return mesh._replace(faces=welded.astype(np.asarray(mesh.faces).dtype)), removed
+
+
 def save_obj(mesh: Mesh, path: str | Path, *, merge_planar: bool = True) -> None:
     """Write a Wavefront OBJ file with merged planar n-gon faces.
 
@@ -237,8 +302,11 @@ def save_obj(mesh: Mesh, path: str | Path, *, merge_planar: bool = True) -> None
             ``mesh.faces`` is written unmerged.
 
     All mesh vertices are written (1-based OBJ indexing keeps the original
-    row order), so faces of either kind index the same vertex list.  The
-    output is deterministic for a given mesh.
+    row order), so faces of either kind index the same vertex list.  Faces
+    index the lowest of any coincident rows and triangles that collapse
+    there are dropped (:func:`remove_slivers`), so a reader that merges
+    coincident points sees the same closed surface.  The output is
+    deterministic for a given mesh.
     """
     vertices = np.asarray(mesh.vertices, dtype=np.float64)
     if merge_planar:
@@ -246,6 +314,16 @@ def save_obj(mesh: Mesh, path: str | Path, *, merge_planar: bool = True) -> None
     else:
         polygons = []
         triangles = np.asarray(mesh.faces, dtype=np.int32).reshape((-1, 3))
+    representative = _coincident_representatives(vertices)
+    polygons = [
+        collapsed
+        for collapsed in (
+            [v for i, v in enumerate(mapped) if v != mapped[i - 1]]
+            for mapped in ([int(representative[index]) for index in loop] for loop in polygons)
+        )
+        if len(collapsed) >= 3
+    ]
+    triangles = _welded_triangles(vertices, triangles)
     lines = ["# cadjoint mesh export"]
     lines.extend(f"v {x:.8f} {y:.8f} {z:.8f}" for x, y, z in vertices)
     for loop in polygons:
@@ -275,10 +353,12 @@ def save_stl(mesh: Mesh, path: str | Path, *, binary: bool = True) -> None:
             writes the ASCII ``solid`` format instead.
 
     Triangle normals are computed from the counterclockwise winding, so they
-    point outward for a well-oriented mesh.  The output is deterministic.
+    point outward for a well-oriented mesh.  Triangles that collapse when
+    coincident vertices are merged — which every STL reader does — are
+    left out (:func:`remove_slivers`).  The output is deterministic.
     """
     vertices = np.asarray(mesh.vertices, dtype=np.float64)
-    triangles = np.asarray(mesh.faces, dtype=np.int64).reshape((-1, 3))
+    triangles = _welded_triangles(vertices, np.asarray(mesh.faces))
     normals = _triangle_normals(vertices, triangles)
     corners = vertices[triangles]  # (t, 3, 3)
     if binary:

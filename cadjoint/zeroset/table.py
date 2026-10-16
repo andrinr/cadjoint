@@ -271,14 +271,31 @@ class Table:
 
     # -- composite fields ----------------------------------------------------
 
-    def polygon2(self, px: Index, py: Index, verts: list[tuple[Index, Index]]) -> Index:
-        """cadjoint's ``_polygon_distance``: even-odd sign times the distance to the nearest edge."""
+    def _on_axis(self, x: Index, axis: Index) -> Index:
+        """1 where profile x lies on the revolution axis, as the kernel's ``_on_axis``."""
+        tolerance = self.mul(
+            self.lit(1e-6), self.add_(self.lit(1), self.add_(self.abs_(x), self.abs_(axis)))
+        )
+        # step is strict; the kernel's <= differs only on a measure-zero set.
+        return self.step(self.sub(tolerance, self.abs_(self.sub(x, axis))))
+
+    def polygon2(
+        self, px: Index, py: Index, verts: list[tuple[Index, Index]], axis: Index | None = None
+    ) -> Index:
+        """cadjoint's ``_polygon_distance``: even-odd sign times the distance to the nearest edge.
+
+        With ``axis`` (a revolved profile), an edge with both ends on
+        ``x = axis`` is left out of the distance, exactly as the kernel does.
+        """
         n = len(verts)
         v0x, v0y = verts[0]
-        d = self.add_(
-            self.mul(self.sub(px, v0x), self.sub(px, v0x)),
-            self.mul(self.sub(py, v0y), self.sub(py, v0y)),
-        )
+        if axis is None:
+            d = self.add_(
+                self.mul(self.sub(px, v0x), self.sub(px, v0x)),
+                self.mul(self.sub(py, v0y), self.sub(py, v0y)),
+            )
+        else:
+            d = self.lit(1e30)
         s = self.lit(1)
         for i in range(n):
             j = (i + n - 1) % n
@@ -292,7 +309,11 @@ class Table:
                 )
             )
             bx, by = self.sub(wx, self.mul(ex, t)), self.sub(wy, self.mul(ey, t))
-            d = self.mn(d, self.add_(self.mul(bx, bx), self.mul(by, by)))
+            squared = self.add_(self.mul(bx, bx), self.mul(by, by))
+            if axis is not None:
+                on_axis = self.mul(self._on_axis(vix, axis), self._on_axis(vjx, axis))
+                squared = self.where(on_axis, self.lit(1e30), squared)
+            d = self.mn(d, squared)
             c1 = self.step(self.sub(py, viy))  # py >= vi.y
             c2 = self.step(self.sub(vjy, py))  # py <  vj.y
             c3 = self.step(self.sub(self.mul(ex, wy), self.mul(ey, wx)))
@@ -449,7 +470,7 @@ class _Lowering:
         if name == "RevolvedPolygon":
             vs, off = self.verts(p, "v"), self.scalar(p["offset"])
             radial = t.sub(t.sqrt(t.add_(t.mul(X, X), t.mul(Z, Z))), off)
-            return t.patch(t.polygon2(radial, Y, vs))
+            return t.patch(t.polygon2(radial, Y, vs, axis=t.neg(off)))
         if name == "LoftedPolygon":
             vb, vt, height = self.verts(p, "v"), self.verts(p, "w"), self.scalar(p["height"])
             tt = t.clamp01(t.add_(t.div(Z, height), t.lit(0.5)))

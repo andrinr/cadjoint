@@ -35,8 +35,23 @@ from cadjoint.sdf.primitives.base import Primitive
 #: coincident vertex.  That is the right answer, not merely a safe one.
 _MIN_EDGE_SQUARED = 1e-24
 
+#: A revolved profile's vertex lies on the axis when ``|x - axis|`` is below
+#: this fraction of ``1 + |x| + |axis|`` — f32 rounding of a vertex that a
+#: constraint or an offset put on the axis, with room to spare.
+_AXIS_TOLERANCE = 1e-6
 
-def _polygon_distance_scalar(p: Array, vertices: list[Array]) -> Array:
+#: The squared distance an excluded edge contributes: never the minimum, and
+#: finite, so a multiply-by-mask form (the zero-set table's ``where``) does
+#: not turn it into ``0 · inf``.
+_FAR_SQUARED = 1e30
+
+
+def _on_axis(x: Array, axis: Array) -> Array:
+    """Whether profile x coordinate(s) *x* lie on the revolution axis ``x = axis``."""
+    return jnp.abs(x - axis) <= _AXIS_TOLERANCE * (1.0 + jnp.abs(x) + jnp.abs(axis))
+
+
+def _polygon_distance_scalar(p: Array, vertices: list[Array], axis: Array | None = None) -> Array:
     """Polygon distance over a Python list of ``(2,)`` vertices, unrolled.
 
     Keeping the vertices in a list rather than one ``(N, 2)`` array matters for
@@ -47,7 +62,12 @@ def _polygon_distance_scalar(p: Array, vertices: list[Array]) -> Array:
     is given instead.
     """
     num = len(vertices)
-    d = jnp.sum((p - vertices[0]) ** 2, axis=-1)
+    # With an axis, vertex 0 may be an end of two axis edges, so the seed is
+    # left to the edges; vertex 0 is still reached by any edge it ends.
+    if axis is None:
+        d = jnp.sum((p - vertices[0]) ** 2, axis=-1)
+    else:
+        d = jnp.full(p.shape[:-1], _FAR_SQUARED)
     s = jnp.ones(p.shape[:-1])
     for i in range(num):
         j = (i + num - 1) % num
@@ -60,7 +80,11 @@ def _polygon_distance_scalar(p: Array, vertices: list[Array]) -> Array:
             1.0,
         )
         b = w - e * t[..., None]
-        d = jnp.minimum(d, jnp.sum(b * b, axis=-1))
+        squared = jnp.sum(b * b, axis=-1)
+        if axis is not None:
+            on_axis = _on_axis(vertices[i][0], axis) & _on_axis(vertices[j][0], axis)
+            squared = jnp.where(on_axis, _FAR_SQUARED, squared)
+        d = jnp.minimum(d, squared)
         # Even-odd crossing test; flips sign once per boundary crossing. Written
         # as pairwise equality (rather than negating each term) to stay within
         # the operations the shader backends implement.
@@ -79,7 +103,7 @@ def _polygon_distance_scalar(p: Array, vertices: list[Array]) -> Array:
     return s * jnp.where(positive, jnp.sqrt(safe), 0.0)
 
 
-def _polygon_distance_stacked(p: Array, stacked: Array) -> Array:
+def _polygon_distance_stacked(p: Array, stacked: Array, axis: Array | None = None) -> Array:
     """Polygon distance over one ``(N, ..., 2)`` vertex array.
 
     Same arithmetic as :func:`_polygon_distance_scalar`, with the per-edge loop
@@ -92,6 +116,7 @@ def _polygon_distance_stacked(p: Array, stacked: Array) -> Array:
         p: Query point(s) in profile coordinates, shape ``(..., 2)``.
         stacked: Ordered vertices, shape ``(N, 2)`` — or ``(N, ..., 2)`` when
             the loop itself varies with the query, as it does in a loft.
+        axis: See :func:`_polygon_distance`.
 
     Returns:
         Signed distance, shape ``(...)``. Negative inside.
@@ -113,9 +138,13 @@ def _polygon_distance_stacked(p: Array, stacked: Array) -> Array:
         1.0,
     )
     b = w - e * t[..., None]
+    squared = jnp.sum(b * b, axis=-1)
+    if axis is not None:
+        on_axis = _on_axis(stacked[..., 0], axis) & _on_axis(previous[..., 0], axis)
+        squared = jnp.where(on_axis, _FAR_SQUARED, squared)
     # ``d`` starts at the distance to vertex 0 in the unrolled form; that value
     # is attained by edge 0 at t = 0, so the reduction alone already covers it.
-    d = jnp.min(jnp.sum(b * b, axis=-1), axis=0)
+    d = jnp.min(squared, axis=0)
 
     c1 = p[..., 1] >= stacked[..., 1]
     c2 = p[..., 1] < previous[..., 1]
@@ -130,7 +159,7 @@ def _polygon_distance_stacked(p: Array, stacked: Array) -> Array:
     return s * jnp.where(positive, jnp.sqrt(safe), 0.0)
 
 
-def _polygon_distance(p: Array, vertices: list[Array]) -> Array:
+def _polygon_distance(p: Array, vertices: list[Array], axis: Array | None = None) -> Array:
     """Signed distance to a closed profile, in whichever form the consumer needs.
 
     Under :func:`~cadjoint.sdf._lowering.scalar_lowering` — which the WGSL
@@ -144,13 +173,19 @@ def _polygon_distance(p: Array, vertices: list[Array]) -> Array:
         p: Query point(s) in profile coordinates, shape ``(..., 2)``.
         vertices: Ordered vertices, each ``(2,)`` (or broadcastable against
             ``p``'s batch shape, as in a loft).
+        axis: For a revolved profile, the x coordinate of the revolution
+            axis.  An edge with both ends on it sweeps no surface — it lies
+            inside the solid of revolution — so it is left out of the
+            distance and kept in the sign.  The distance to the remaining
+            edges is then the 3D distance, provided the profile stays on
+            one side of the axis (issue #50).
 
     Returns:
         Signed distance, shape ``(...)``. Negative inside.
     """
     if is_scalar_lowering():
-        return _polygon_distance_scalar(p, vertices)
-    return _polygon_distance_stacked(p, jnp.stack(jnp.broadcast_arrays(*vertices)))
+        return _polygon_distance_scalar(p, vertices, axis)
+    return _polygon_distance_stacked(p, jnp.stack(jnp.broadcast_arrays(*vertices)), axis)
 
 
 def polygon_sdf_2d(p: Array, vertices: Array) -> Array:
@@ -426,8 +461,10 @@ class RevolvedPolygon(Primitive):
 
     Profile coordinates are (radial, height): the profile's X coordinate is the
     distance from the revolution axis (plus ``offset``), and its Y coordinate
-    runs along the axis. The profile should stay at positive radius
-    (``x + offset > 0``) for the distance to remain exact.
+    runs along the axis. The profile should stay at non-negative radius
+    (``x + offset >= 0``) for the distance to remain exact.  An edge lying
+    on the axis (``x + offset == 0`` at both ends, as in a cup's section)
+    is interior to the solid and is not counted as surface.
 
     Args:
         vertices: Ordered profile vertices — Vector2 parameters (or raw (2,)
@@ -467,7 +504,9 @@ class RevolvedPolygon(Primitive):
         verts = _ordered_vertices(vertices)
         radial = jnp.sqrt(p[..., 0] ** 2 + p[..., 2] ** 2 + 1e-20) - offset
         q = jnp.stack([radial, p[..., 1]], axis=-1)
-        return _polygon_distance(q, verts)
+        # The axis sits at radial 0, i.e. at profile x = -offset.  A profile
+        # edge there is interior to the solid, not boundary.
+        return _polygon_distance(q, verts, axis=-jnp.asarray(offset))
 
     def __call__(self, p: Array) -> Array:
         values = {k: v.value for k, v in self.params.items() if k != "offset"}
