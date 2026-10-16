@@ -21,7 +21,7 @@
   flex-direction: column;
   gap: var(--gap);
   padding: var(--inset);
-  border: var(--line-edge);
+  border: var(--line);
   border-color: var(--danger);
   background: var(--plane-sheet);
 }

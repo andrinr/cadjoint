@@ -9,15 +9,15 @@
   --surface-panel: #f8f7f8;
   --surface-raised: #f8f7f8;
   --surface-raised-hover: #edecee;
-  --ink: #18161a;
-  --ink-2: #48464d;
-  --ink-3: #605e65;
+  --ink: #1c1814;
+  --ink-2: #4b4642;
+  --ink-3: #635e5a;
   --ink-on-accent: #0a0a0c;
-  --rule: #9f9da5;
-  --rule-strong: #747278;
-  --rule-heavy: #36343b;
-  --accent: #f87318;
-  --accent-press: #c85d00;
+  --rule: #b4b2b9;
+  --rule-strong: #848289;
+  --rule-heavy: #4a484f;
+  --accent: #ffb000;
+  --accent-press: #a87400;
   --danger: #a8341c;
   --danger-ink: #8a1f10;
   --warn: #8a5a00;
@@ -27,14 +27,14 @@
   --axis-x: #c81e2a;
   --axis-y: #17742a;
   --axis-z: #1f5fd2;
-  --viewport-ink: #18161a;
+  --viewport-ink: #1c1814;
   --viewport-ink-2: #605e65;
   --viewport-mark: #48464d;
   --viewport-mode: #605e65;
   --graticule-line: #adadb3;
   --graticule-axis: #9c9ca2;
   --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   --text-3xs: 9px;
   --text-2xs: 10px;
   --text-xs: 11px;
@@ -66,11 +66,10 @@
   --space-6: 16px;
   --space-7: 24px;
   --radius: 0px;
-  --control-tag: 20px;
+  --control-tag: 16px;
   --control-sm: 24px;
-  --control-md: 28px;
   --control-lg: 32px;
-  --control-xl: 36px;
+  --control-xl: 40px;
   --dur-fast: 90ms;
   --dur-base: 160ms;
   --dur-slow: 260ms;
@@ -82,16 +81,12 @@
   --alpha-veil: 0.28;
   --alpha-edge: 0.55;
   --alpha-mark: 0.85;
-  --nudge: 2px;
   --gap: 4px;
   --inset: 8px;
-  --stack: 12px;
   --section: 16px;
-  --col-label: 112px;
+  --col-label: 96px;
   --col-unit: 40px;
-  --line-rule: var(--hairline) solid var(--rule);
-  --line-edge: var(--hairline) solid var(--rule-strong);
-  --line-frame: var(--hairline) solid var(--rule-heavy);
+  --line: var(--hairline) solid var(--rule-strong);
   --line-active: var(--stroke-active) solid var(--ink);
   --line-pending: var(--hairline) dashed var(--rule-strong);
   --plane-ground: var(--surface-base);
@@ -101,22 +96,14 @@
   --block-current-ink: var(--ink-on-accent);
   --block-kind: var(--ink);
   --block-kind-ink: var(--surface-float);
-  --text-label: 600 9px / 12px var(--font-mono);
-  --track-label: 0.16em;
-  --case-label: uppercase;
-  --numeric-label: normal;
-  --text-control: 600 11px / 12px var(--font-mono);
-  --track-control: 0.1em;
-  --case-control: uppercase;
-  --numeric-control: normal;
+  --text-caps: 600 11px / 12px var(--font-mono);
+  --track-caps: 0.08em;
+  --case-caps: uppercase;
+  --numeric-caps: normal;
   --text-body: 400 12px / 16px var(--font-mono);
   --track-body: normal;
   --case-body: none;
-  --numeric-body: normal;
-  --text-value: 500 13px / 16px var(--font-mono);
-  --track-value: normal;
-  --case-value: none;
-  --numeric-value: tabular-nums;
+  --numeric-body: tabular-nums;
   --text-title: 600 15px / 20px var(--font-mono);
   --track-title: 0.04em;
   --case-title: uppercase;
@@ -125,21 +112,17 @@
   --track-prose: normal;
   --case-prose: none;
   --numeric-prose: normal;
-  --text-code: 400 13px / 20px var(--font-mono);
-  --track-code: normal;
-  --case-code: none;
-  --numeric-code: normal;
   --surface-viewport-94: rgba(230, 230, 233, 0.94);
   --surface-viewport-70: rgba(230, 230, 233, 0.7);
   --surface-float-00: rgba(248, 247, 248, 0);
-  --shade-none: rgba(24, 22, 26, 0);
-  --shade-soft: rgba(24, 22, 26, 0.1);
-  --shade-strong: rgba(24, 22, 26, 0.16);
-  --shade-scroll: rgba(24, 22, 26, 0.22);
-  --scrim: rgba(24, 22, 26, 0.42);
-  --divider: rgba(24, 22, 26, 0.09);
-  --accent-rgb: 248, 115, 24;
-  --ink-rgb: 24, 22, 26;
+  --shade-none: rgba(28, 24, 20, 0);
+  --shade-soft: rgba(28, 24, 20, 0.1);
+  --shade-strong: rgba(28, 24, 20, 0.16);
+  --shade-scroll: rgba(28, 24, 20, 0.22);
+  --scrim: rgba(28, 24, 20, 0.42);
+  --divider: rgba(28, 24, 20, 0.09);
+  --accent-rgb: 255, 176, 0;
+  --ink-rgb: 28, 24, 20;
   --danger-rgb: 168, 52, 28;
   --param-rgb: 0, 101, 180;
   --ok-rgb: 0, 115, 76;
@@ -152,29 +135,17 @@
   color-scheme: light;
 }
 
-.t-label {
-  font: var(--text-label);
-  letter-spacing: var(--track-label);
-  text-transform: var(--case-label);
-  font-variant-numeric: var(--numeric-label);
-}
-.t-control {
-  font: var(--text-control);
-  letter-spacing: var(--track-control);
-  text-transform: var(--case-control);
-  font-variant-numeric: var(--numeric-control);
+.t-caps {
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 .t-body {
   font: var(--text-body);
   letter-spacing: var(--track-body);
   text-transform: var(--case-body);
   font-variant-numeric: var(--numeric-body);
-}
-.t-value {
-  font: var(--text-value);
-  letter-spacing: var(--track-value);
-  text-transform: var(--case-value);
-  font-variant-numeric: var(--numeric-value);
 }
 .t-title {
   font: var(--text-title);
@@ -188,12 +159,6 @@
   text-transform: var(--case-prose);
   font-variant-numeric: var(--numeric-prose);
 }
-.t-code {
-  font: var(--text-code);
-  letter-spacing: var(--track-code);
-  text-transform: var(--case-code);
-  font-variant-numeric: var(--numeric-code);
-}
 
 /* Layout primitives (guide L1). */
 .l-inset {
@@ -202,13 +167,13 @@
 .l-stack {
   display: grid;
   align-content: start;
-  gap: var(--stack);
+  gap: var(--section);
 }
 .l-ruled {
   display: grid;
 }
 .l-ruled > * + * {
-  border-top: var(--line-rule);
+  border-top: var(--line);
 }
 .l-cluster {
   display: flex;

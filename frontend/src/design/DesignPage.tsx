@@ -61,6 +61,7 @@ import {
 import { Cross, Plate, Ratio, Rule, Section, Swatch, v } from "./kit";
 import { DeskMap } from "./DeskMap";
 import { Variations } from "./Variations";
+import { AnchorsDrawing, DeskDrawing, LevelsDrawing, PanelAnatomy } from "./LayoutDrawings";
 import { SelectSpecimen } from "./demos";
 import { FeatureIndex, ProposedMenuBar } from "./FeatureIndex";
 import { ViewportSpecimen } from "./ViewportSpecimen";
@@ -196,9 +197,8 @@ function RailSpecimen(props: { attached?: boolean }) {
 }
 
 /**
- * The proposed system: every size derived from the unit and the line box.
- * Page-local until it is agreed; tokens.ts then takes these values and the
- * app follows.
+ * The system: every size derived from the unit and the line box. tokens.ts
+ * carries the same values; this table is the page's reading of them.
  */
 const SYSTEM = {
   unit: 4,
@@ -216,11 +216,9 @@ const SYSTEM = {
   ],
   type: [
     { role: "caps", size: 11, weight: 600, job: "every label of the instrument: tabs, buttons, column heads, kickers" },
-    { role: "body", size: 12, weight: 400, job: "names, list rows, menu items, units — text as written" },
-    { role: "value", size: 12, weight: 500, job: "numbers: tabular, a weight above body, never a size" },
+    { role: "body", size: 12, weight: 400, job: "names, values 2700.0, units, menu items, the editor" },
     { role: "title", size: 15, weight: 600, job: "a panel's title, on a 20px line box" },
     { role: "prose", size: 12, weight: 400, job: "sentences, in sans, on a 20px line box" },
-    { role: "code", size: 12, weight: 400, job: "the editor, on a 20px line box" },
   ],
 } as const;
 
@@ -230,7 +228,7 @@ function System() {
       id="system"
       num="1"
       title="System"
-      intro="One unit and one line box, and every other size is derived from them. Nothing below is chosen per component: a height is a line box plus a distance on each side, a distance is a multiple of the unit, a text size is whatever sits on the line box. This is the proposal; the app is rebuilt on it once it is agreed."
+      intro="One unit and one line box, and every other size is derived from them. Nothing below is chosen per component: a height is a line box plus a distance on each side, a distance is a multiple of the unit, a text size is whatever sits on the line box. Adopted on 17 Oct 2026, with the choices from the Variations drawer: IBM Plex Mono, amber, warm ink, light lines."
     >
       <Rule
         id="Y1"
@@ -290,7 +288,7 @@ function System() {
                 {(d) => (
                   <div>
                     <code>{d.name}</code>
-                    <b class="t-value">{d.px}px</b>
+                    <b class="t-body">{d.px}px</b>
                     <span class="dl-sys-dist">
                       <i style={{ width: `${d.px * 4}px` }} />
                       <span class="t-prose">
@@ -308,10 +306,10 @@ function System() {
       </Rule>
       <Rule
         id="Y4"
-        why="Three sizes, all of which sit on the line box (11 and 12) or on the one taller box (15 on 20). A value is told from a name by weight and tabular figures, never by being bigger, so a row of label, value and unit is one size."
+        why="Three sizes, on the line box (11 and 12) or the one taller box (15 on 20). A value and a name are the same role: a row of label, value and unit is told apart by caps and ink, not by size."
         single
         examples={
-          <Plate label="six roles, three sizes, on the line box">
+          <Plate label="four roles, three sizes, on the line box">
             <div class="dl-sys-type">
               <For each={SYSTEM.type}>
                 {(t) => (
@@ -327,7 +325,7 @@ function System() {
                         "font-weight": String(t.weight),
                       }}
                     >
-                      {t.role === "value" ? "2700.0  1.25e-6" : t.job}
+                      {t.job}
                     </span>
                   </div>
                 )}
@@ -336,8 +334,7 @@ function System() {
           </Plate>
         }
       >
-        <b>caps</b> 11 · <b>body</b> 12 · <b>value</b> 12 tabular · <b>title</b> 15 · <b>prose</b> 12
-        sans · <b>code</b> 12.
+        <b>caps</b> 11 · <b>body</b> 12 · <b>title</b> 15 · <b>prose</b> 12 sans.
       </Rule>
       <Rule
         id="Y5"
@@ -1182,13 +1179,10 @@ function Colour() {
 
 function Type() {
   const jobs: Record<TextRole, string> = {
-    label: "furniture labels, kickers, column heads, readout names",
-    control: "buttons, tabs, menu titles, the mode switcher",
-    body: "list rows, menu items, names from the program, units",
-    value: "numbers, and the fields that hold them",
+    caps: "labels, kickers, tabs, buttons, menu titles",
+    body: "names, values 2700.0, units, list rows, the editor",
     title: "a panel's title, and nothing else",
     prose: "Sentences: hints, help, empty states, dialog text.",
-    code: "the editor: base_l = Vector2(value=[-0.9, 0.0])",
   };
   const roles = Object.entries(TEXT_ROLES) as [TextRole, (typeof TEXT_ROLES)[TextRole]][];
   return (
@@ -1196,14 +1190,14 @@ function Type() {
       id="type"
       num="7"
       title="Type"
-      intro="Seven text roles, and no other way to set text. A role is a whole style — size, weight, leading, tracking, case and figures — taken together; hierarchy inside a component comes from choosing a role and an ink level, never from adjusting one property."
+      intro="Four text roles, and no other way to set text. A role is a whole style — size, weight, leading, tracking, case and figures — taken together; hierarchy inside a component comes from choosing a role and an ink level, never from adjusting one property."
     >
       <Rule
         id="T0"
-        why="Fewer ways to set text means each one is recognisable: a 9px tracked capital is always a label, 13px tabular is always a value. A component that needed an eighth style is a component that has not decided what its text is. test/tokens.test.ts fails on any font, size, weight, tracking or case set outside a role."
+        why="Each role looks different from every other at a glance; two that did not were merged (label and control into caps; value and code into body, since a monospace face already sets digits on one width). A component that needs a fifth is a component that has not decided what its text is. test/tokens.test.ts fails on any font, size, weight, tracking or case set outside a role."
         single
         examples={
-          <Plate label="the seven roles, as the app sets them">
+          <Plate label="the four roles, as the app sets them">
             <div class="dl-type">
               <For each={roles}>
                 {([role, spec]) => (
@@ -1220,9 +1214,7 @@ function Type() {
           </Plate>
         }
       >
-        <b>label</b> 9px tracked capitals · <b>control</b> 11px tracked capitals · <b>body</b> 12px as
-        written · <b>value</b> 13px tabular · <b>title</b> 15px tracked capitals · <b>prose</b> 12px
-        sans · <b>code</b> 13px. Five sizes (9, 11, 12, 13, 15), three weights (400, 500, 600).
+        <b>caps</b> 11px tracked capitals · <b>body</b> 12px as written (names, values, the editor) · <b>title</b> 15px tracked capitals · <b>prose</b> 12px sans. Three sizes, two weights (400, 600).
       </Rule>
       <Rule
         id="T1"
@@ -1312,7 +1304,7 @@ function Space() {
         why="A distance named by its job is the same everywhere that job recurs, so two panels built months apart still line up. Turn on View › Show › Layout grid (⇧G) in the playground: it draws the unit over the whole UI and outlines whatever is off it."
         single
         examples={
-          <Plate label="the five layout distances, bars drawn at 4×">
+          <Plate label="the three layout distances, bars drawn at 4×">
             <div class="dl-ruler">
               <For each={Object.entries(LAYOUT) as [string, number][]}>
                 {([name, px]) => (
@@ -1325,15 +1317,13 @@ function Space() {
               </For>
             </div>
             <p class="dl-note">
-              nudge — inside a control only · gap — between controls of one group · inset — inside
-              a sheet · stack — between blocks of one panel · section — between sections, and the
-              viewport's furniture from its edges.
+              gap — between cells of one group · inset — inside a sheet · section — between
+              blocks, and the viewport's furniture from its edges.
             </p>
           </Plate>
         }
       >
-        Layout uses five distances and no others: <b>nudge</b> 2, <b>gap</b> 4, <b>inset</b> 8,{" "}
-        <b>stack</b> 12, <b>section</b> 16. The spacing scale they are cut from is not used by
+        Layout uses three distances and no others: <b>gap</b> 4, <b>inset</b> 8, <b>section</b> 16. The spacing scale they are cut from is not used by
         components; the test fails on it.
       </Rule>
       <Rule
@@ -1407,7 +1397,7 @@ function Shape() {
       id="shape"
       num="2"
       title="Building blocks"
-      intro="The atoms everything is drawn with: five lines, three planes, two blocks, a handful of marks, the seven text roles and the five distances. Each is a token, whole, generated from tokens.ts; the primitives in the next section are formulas of these and nothing else. Derived from A7: things are drawn, not stacked."
+      intro="The atoms everything is drawn with: three lines, three planes, two blocks, a handful of marks, four text roles and three distances; no two of them look alike. Each is a token, whole, generated from tokens.ts; the primitives in the next section are formulas of these and nothing else. Derived from A7: things are drawn, not stacked."
     >
       <Rule
         id="B0"
@@ -1417,18 +1407,18 @@ function Shape() {
           <Plate label="the atlas: every atom, side by side">
             <div class="dl-atlas">
               <section>
-                <span class="t-label">lines</span>
-                <For each={["rule", "edge", "frame", "active", "pending"]}>
+                <span class="t-caps">lines</span>
+                <For each={["line", "active", "pending"]}>
                   {(name) => (
                     <div class="dl-atlas-line">
-                      <i style={{ "border-top": `var(--line-${name})` }} />
+                      <i style={{ "border-top": name === "line" ? "var(--line)" : `var(--line-${name})` }} />
                       <span class="t-body">{name}</span>
                     </div>
                   )}
                 </For>
               </section>
               <section>
-                <span class="t-label">planes</span>
+                <span class="t-caps">planes</span>
                 <For each={["ground", "sheet", "step"]}>
                   {(name) => (
                     <div class="dl-atlas-plane" style={{ background: `var(--plane-${name})` }}>
@@ -1438,12 +1428,12 @@ function Shape() {
                 </For>
               </section>
               <section>
-                <span class="t-label">blocks</span>
-                <span class="dl-blk current t-control">current</span>
-                <span class="dl-blk kind t-label">kind</span>
+                <span class="t-caps">blocks</span>
+                <span class="dl-blk current t-caps">current</span>
+                <span class="dl-blk kind t-caps">kind</span>
               </section>
               <section>
-                <span class="t-label">marks</span>
+                <span class="t-caps">marks</span>
                 <div class="dl-atlas-marks">
                   <i class="dl-mark dot" />
                   <i class="dl-mark ring" />
@@ -1454,17 +1444,14 @@ function Shape() {
                 </div>
               </section>
               <section>
-                <span class="t-label">text</span>
-                <span class="t-label">label</span>
-                <span class="t-control">control</span>
-                <span class="t-body">body</span>
-                <span class="t-value">1.250</span>
+                <span class="t-caps">text</span>
+                <span class="t-caps">caps</span>
+                <span class="t-body">body 2700.0</span>
                 <span class="t-title">title</span>
                 <span class="t-prose">Prose sentence.</span>
-                <span class="t-code">code()</span>
               </section>
               <section>
-                <span class="t-label">distances</span>
+                <span class="t-caps">distances</span>
                 <For each={Object.entries(LAYOUT) as [string, number][]}>
                   {([name, px]) => (
                     <div class="dl-atlas-line">
@@ -1480,23 +1467,21 @@ function Shape() {
           </Plate>
         }
       >
-        Six kinds of atom: <b>lines</b>, <b>planes</b>, <b>blocks</b>, <b>marks</b>, the seven{" "}
-        <b>text</b> roles and the five <b>distances</b>. The rules below define each kind; the
+        Six kinds of atom: three <b>lines</b>, three <b>planes</b>, two <b>blocks</b>, the{" "}
+        <b>marks</b>, four <b>text</b> roles and three <b>distances</b>. The rules below define each kind; the
         sections after build from them.
       </Rule>
       <Rule
         id="B1"
-        why="A line is weight, style and colour together, named by its job, so the same job always draws the same line. A border written any other way fails test/tokens.test.ts."
+        why="Three lines because there are three things a line can say: here is an edge, this is the active one, this is not there yet. Separators, edges and the viewport frame were once three greys nobody could tell apart; they are one line now. A border written any other way fails test/tokens.test.ts."
         single
         examples={
-          <Plate label="the five lines">
+          <Plate label="the three lines">
             <table class="dl-table">
               <tbody>
                 <For
                   each={[
-                    ["line-rule", "separates rows and sections inside a sheet"],
-                    ["line-edge", "the outline of a sheet, a field, a cell; the viewport seam"],
-                    ["line-frame", "the viewport's frame"],
+                    ["line", "every structural line: separators, the edge of a sheet, a field, a cell, the viewport's frame"],
                     ["line-active", "this is the active one: a tab, focus, the selected edge"],
                     ["line-pending", "not yet: an add button, a drop target, an expression"],
                   ]}
@@ -1516,8 +1501,8 @@ function Shape() {
           </Plate>
         }
       >
-        <b>rule</b>, <b>edge</b>, <b>frame</b>, <b>active</b>, <b>pending</b>. One hairline weight; the
-        2px line means only <i>active</i>; dashed means only <i>not yet</i>.
+        <b>line</b>, <b>active</b>, <b>pending</b>. One hairline for all structure; the 2px line means
+        only <i>active</i>; dashed means only <i>not yet</i>.
       </Rule>
       <Rule
         id="B2"
@@ -1529,7 +1514,7 @@ function Shape() {
               <For each={[["plane-ground", "ground: page, viewport"], ["plane-sheet", "sheet: panels, popovers, fields"], ["plane-step", "step: hover, sub-bars"]]}>
                 {([token, job]) => (
                   <div class="dl-plane" style={{ background: `var(--${token})` }}>
-                    <span class="t-label">{token}</span>
+                    <span class="t-caps">{token}</span>
                     <span class="t-prose">{job}</span>
                   </div>
                 )}
@@ -1547,10 +1532,10 @@ function Shape() {
         examples={
           <Plate label="the two blocks">
             <div class="l-cluster">
-              <span class="dl-blk current t-control">Sketch</span>
-              <span class="dl-blk current t-control">Run</span>
-              <span class="dl-blk kind t-label">thermal</span>
-              <span class="dl-blk kind t-label">library</span>
+              <span class="dl-blk current t-caps">Sketch</span>
+              <span class="dl-blk current t-caps">Run</span>
+              <span class="dl-blk kind t-caps">thermal</span>
+              <span class="dl-blk kind t-caps">library</span>
             </div>
           </Plate>
         }
@@ -1567,32 +1552,32 @@ function Shape() {
             <div class="dl-marks">
               <span>
                 <i class="dl-mark dot" />
-                <small class="t-label">dot</small>
+                <small class="t-caps">dot</small>
                 <small class="t-prose">done, a status</small>
               </span>
               <span>
                 <i class="dl-mark ring" />
-                <small class="t-label">ring</small>
+                <small class="t-caps">ring</small>
                 <small class="t-prose">a free point</small>
               </span>
               <span>
                 <i class="dl-mark square" />
-                <small class="t-label">square</small>
+                <small class="t-caps">square</small>
                 <small class="t-prose">held, an error</small>
               </span>
               <span>
                 <i class="dl-mark triangle" />
-                <small class="t-label">triangle</small>
+                <small class="t-caps">triangle</small>
                 <small class="t-prose">a warning</small>
               </span>
               <span>
                 <b class="t-body">✓</b>
-                <small class="t-label">check</small>
+                <small class="t-caps">check</small>
                 <small class="t-prose">on, current value</small>
               </span>
               <span>
                 <b class="t-body">›</b>
-                <small class="t-label">chevron</small>
+                <small class="t-caps">chevron</small>
                 <small class="t-prose">opens to the side</small>
               </span>
             </div>
@@ -1832,22 +1817,22 @@ function Motion() {
 
 function Primitives() {
   const formulas: [string, string, () => JSX.Element][] = [
-    ["sheet", "plane-sheet + line-edge + inset", () => <div class="dl-sheet-demo" />],
-    ["rule", "line-rule, full width of the sheet's inset", () => <div style={{ width: "calc(var(--unit) * 40)", "border-top": "var(--line-rule)" }} />],
-    ["cell", "a control height + control text; edge when it can be pressed, block when current", () => (
+    ["sheet", "plane-sheet + line + inset", () => <div class="dl-sheet-demo" />],
+    ["rule", "line, full width inside the sheet's inset", () => <div style={{ width: "calc(var(--unit) * 40)", "border-top": "var(--line)" }} />],
+    ["cell", "a cell height + caps text; a line when it can be pressed, a block when current", () => (
       <span class="l-cluster">
         <button type="button" class="dl-btn h-sm">Mesh</button>
         <button type="button" class="dl-btn h-sm primary">Run</button>
       </span>
     )],
-    ["field", "sheet at a control height + value text, right-hung", () => <input class="dl-input" value="0.75" style={{ width: "calc(var(--unit) * 24)" }} />],
-    ["chip", "tag height + body text on a sheet with line-rule; or a kind block with label text", () => (
+    ["field", "a sheet at cell height + body text, right-hung", () => <input class="dl-input" value="0.75" style={{ width: "calc(var(--unit) * 24)" }} />],
+    ["chip", "tag height + body text on a sheet with a line; or a kind block with caps text", () => (
       <span class="l-cluster">
         <span class="dl-chip">fix · P1</span>
         <span class="dl-tag">thermal</span>
       </span>
     )],
-    ["row", "l-row: label text | value text | body unit, on the shared columns", () => (
+    ["row", "l-row: caps label | body value | body unit, on the panel tracks", () => (
       <div class="dl-rows" style={{ width: "calc(var(--unit) * 64)" }}>
         <div>
           <span>density</span>
@@ -1910,80 +1895,97 @@ function Primitives() {
 }
 
 function Layout0() {
-  const shapes: [string, string, () => JSX.Element][] = [
-    ["inset", "padding inset inside a sheet", () => (
-      <div class="dl-sheet-demo l-inset">
-        <span class="t-body">content sits one inset from the edge</span>
-      </div>
-    )],
-    ["stack", "blocks of one panel, a stack apart", () => (
-      <div class="l-stack">
-        <span class="dl-bar-demo" />
-        <span class="dl-bar-demo" />
-        <span class="dl-bar-demo" />
-      </div>
-    )],
-    ["ruled", "rows of one list, a rule between, no gap", () => (
-      <div class="l-ruled" style={{ width: "calc(var(--unit) * 48)" }}>
-        <span class="t-body dl-ruled-row">fin comb</span>
-        <span class="t-body dl-ruled-row">slug section</span>
-        <span class="t-body dl-ruled-row">bush_a</span>
-      </div>
-    )],
-    ["cluster", "controls of one group, a gap apart, wrapping", () => (
-      <div class="l-cluster">
-        <span class="dl-chip">fix · P1</span>
-        <span class="dl-chip">horiz · P1–P2</span>
-        <span class="dl-chip">vert · P2–P3</span>
-      </div>
-    )],
-    ["row", "label | value | unit on the shared columns (96 · 1fr · 40)", () => (
-      <div class="l-row" style={{ width: "calc(var(--unit) * 64)" }}>
-        <span class="t-label" style={{ color: "var(--ink-3)" }}>density</span>
-        <span class="t-value" style={{ "text-align": "right" }}>2700</span>
-        <span class="t-body" style={{ color: "var(--ink-3)" }}>kg/m³</span>
-      </div>
-    )],
-    ["split", "a head: title at the start, actions at the end", () => (
-      <div class="l-split" style={{ width: "calc(var(--unit) * 64)" }}>
-        <span class="t-title">Studies</span>
-        <button type="button" class="dl-btn h-sm add">+ Study</button>
-      </div>
-    )],
-  ];
   return (
     <Section
       id="layout-primitives"
       num="4"
       title="Layout"
-      intro="Six arrangements, and every layout is one of them or a nesting of them. Each fixes its own distance (S0), so choosing an arrangement chooses the spacing; nothing is spaced by eye. They are classes (l-inset, l-stack, l-ruled, l-cluster, l-row, l-split) generated from tokens.ts."
+      intro="Where things go, at every scale, and why. Each rule is a drawing, dimensioned in the system's numbers (§1) and generated from them, so a change to the module redraws the page."
     >
       <Rule
         id="L1"
-        why="A distance chosen by naming an arrangement is the same wherever that arrangement recurs, so two panels built months apart line up, and the layout grid (⇧G) shows at once whatever does not."
+        why="One way to separate siblings per level means you can tell the level of anything by how it is separated: a line between rows, space between blocks, an edge between windows. Two ways at one level (a rule and a gap) is the commonest way a panel starts to look busy."
         single
         examples={
-          <Plate label="the six, drawn over the unit grid">
-            <div class="dl-unit-grid" style={{ padding: "var(--section)" }}>
-              <table class="dl-table">
-                <tbody>
-                  <For each={shapes}>
-                    {([name, job, specimen]) => (
-                      <tr>
-                        <td>{name}</td>
-                        <td class="prose">{job}</td>
-                        <td>{specimen()}</td>
-                      </tr>
-                    )}
-                  </For>
-                </tbody>
-              </table>
-            </div>
+          <Plate label="the six levels, each separated in one way" ground>
+            <LevelsDrawing />
           </Plate>
         }
       >
-        <b>inset</b>, <b>stack</b>, <b>ruled</b>, <b>cluster</b>, <b>row</b>, <b>split</b>. A panel is a
-        sheet with an inset, holding a split head and a stack of ruled lists, clusters and rows.
+        Six levels — <b>desk</b>, <b>window</b>, <b>sheet</b>, <b>block</b>, <b>list</b>, <b>row</b> — and
+        each separates its children in exactly one way: windows share an edge, a sheet has an inset,
+        blocks are a section of space apart, list rows have a line between them, a row is a cell
+        high. Space never separates rows; a line never separates blocks.
+      </Rule>
+      <Rule
+        id="L2"
+        why="Shared tracks make every value in the app sit on one column, so two panels side by side, or one above the other, read as one table. A component chooses which tracks it spans; it does not choose widths."
+        single
+        examples={
+          <Plate label="a panel on the panel grid, with its rhythm" ground>
+            <PanelAnatomy />
+          </Plate>
+        }
+      >
+        Every sheet has the same four tracks inside its inset: <b>label</b> 96 · <b>value</b> the rest ·{" "}
+        <b>unit</b> 40 · <b>action</b> 24, an inset apart. Rows take label | value | unit (| action);
+        heads, prose and chip clusters span all four; a sheet's own actions end-align on the action
+        track.
+      </Rule>
+      <Rule
+        id="L3"
+        why="If every block is a sum of line boxes and distances, every panel is a whole number of units tall, and the layout grid (⇧G) can show at once anything that is not."
+        single
+      >
+        <b>Vertical rhythm.</b> Every height is a sum of line boxes and distances: a head is 16 + 4 +
+        20 = 40, a row 24, a block apart 16, a bar 32. Text sits on its line box; a line box sits a gap
+        inside its cell.
+      </Rule>
+      <Rule
+        id="L4"
+        why="Edges are what the eye uses to group; one left and one right edge per sheet means everything inside belongs to the sheet. Centring breaks edges, so it is kept for a label inside its own cell."
+        single
+      >
+        <b>Alignment.</b> One left edge and one right edge per sheet, an inset in. Names and labels
+        hang left; values and actions hang right; numbers align on their last digit. Nothing is
+        centred except a label in its own cell.
+      </Rule>
+      <Rule
+        id="L5"
+        why="Reading order is causal order (A2), and the same columns in every mode keep the model under the pointer when the mode changes (N2)."
+        single
+        examples={
+          <Plate label="the desk at its default proportions" ground>
+            <DeskDrawing />
+          </Plate>
+        }
+      >
+        <b>The desk.</b> Three columns — the program 460, the viewport the rest, the column 320 — and
+        four rows: the menu bar (a bar, 32), the toolbar (40), the desk, the tray (a cell, 24).
+      </Rule>
+      <Rule
+        id="L6"
+        why="The centre third is the part's; furniture that drifts toward it competes with the subject (A1). Anchoring each piece to a corner and stacking it inward means a new readout has a place before it is drawn."
+        single
+        examples={
+          <Plate label="the viewport's anchors" ground>
+            <AnchorsDrawing />
+          </Plate>
+        }
+      >
+        <b>The viewport.</b> Six anchors a section in from the edges — top-left, top-right,
+        bottom-left, bottom-centre, bottom-right — and each piece of furniture stacks inward from its
+        anchor. The centre third is kept for the part.
+      </Rule>
+      <Rule
+        id="L7"
+        why="The rules above, as the classes that implement them: choosing an arrangement chooses its distance."
+        single
+      >
+        <b>The arrangements</b>, generated as classes from tokens.ts: <b>l-inset</b> (a sheet's inset),{" "}
+        <b>l-stack</b> (blocks a section apart), <b>l-ruled</b> (rows with a line between),{" "}
+        <b>l-cluster</b> (cells a gap apart, wrapping), <b>l-row</b> (the panel tracks), <b>l-split</b>{" "}
+        (a head: start and end).
       </Rule>
     </Section>
   );

@@ -95,8 +95,8 @@
      Its tab strip is its only header and the handle you drag it by, so the
      library's separate floating title bar is collapsed to nothing. */
   --dv-floating-box-shadow: none;
-  --dv-floating-border: var(--line-edge);
-  --dv-floating-group-border: var(--line-edge);
+  --dv-floating-border: var(--line);
+  --dv-floating-group-border: var(--line);
   --dv-floating-group-dragging-opacity: 0.9;
   --dv-floating-titlebar-height: 0px;
   --dv-floating-titlebar-background-color: var(--plane-sheet);
@@ -126,22 +126,22 @@
 
 .win-theme .dv-edge-peek,
 .win-theme .dv-edge-peek-header {
-  border: var(--line-rule);
+  border: var(--line);
 }
 
 /* ── tab strip ────────────────────────────────────────────────────────── */
 
 .win-theme .dv-tabs-and-actions-container {
-  border-bottom: var(--line-rule);
+  border-bottom: var(--line);
 }
 
 .win-theme .dv-tab {
   padding: 0 var(--inset);
-  border-right: var(--line-rule);
-  font: var(--text-control);
-  letter-spacing: var(--track-control);
-  text-transform: var(--case-control);
-  font-variant-numeric: var(--numeric-control);
+  border-right: var(--line);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 
 /* The active tab is marked at its foot with the active stroke in ink — the
@@ -225,14 +225,14 @@
   height: 100%;
   padding: 0;
   border: 0;
-  border-left: var(--line-rule);
+  border-left: var(--line);
   border-radius: var(--radius);
   background: transparent;
   color: var(--ink-3);
-  font: var(--text-control);
-  letter-spacing: var(--track-control);
-  text-transform: var(--case-control);
-  font-variant-numeric: var(--numeric-control);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
   cursor: pointer;
 }
 
@@ -307,7 +307,7 @@
    own right edge; an outline paints the same hairline and costs no layout. */
 .win-theme .dv-resize-container {
   border: 0;
-  outline: var(--line-edge);
+  outline: var(--line);
   outline-offset: calc(var(--hairline) * -1);
   background: var(--plane-sheet);
 }
@@ -321,7 +321,7 @@
   align-items: stretch;
   gap: 0;
   height: calc(var(--control-sm) + var(--hairline));
-  border-top: var(--line-rule);
+  border-top: var(--line);
   background: var(--plane-ground);
 }
 
@@ -335,13 +335,13 @@
   height: 100%;
   padding: 0 var(--inset);
   border: 0;
-  border-right: var(--line-rule);
+  border-right: var(--line);
   border-radius: var(--radius);
   background: transparent;
-  font: var(--text-control);
-  letter-spacing: var(--track-control);
-  text-transform: var(--case-control);
-  font-variant-numeric: var(--numeric-control);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 
 .win-tray-label {

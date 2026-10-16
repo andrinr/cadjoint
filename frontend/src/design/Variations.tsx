@@ -45,11 +45,11 @@ const inkOn = (hex: string) =>
     : LIGHT_INK;
 const ratioOn = (hex: string) => contrastRatio(hexToRgb(inkOn(hex)), hexToRgb(hex));
 
-const accent = (hex: string): Vars => {
+const accent = (hex: string, press?: string): Vars => {
   const ink = inkOn(hex);
   return {
     accent: hex,
-    "accent-press": darken(hex, 0.2),
+    "accent-press": press ?? darken(hex, 0.2),
     "ink-on-accent": ink,
     "block-current": hex,
     "block-current-ink": ink,
@@ -91,7 +91,6 @@ const lines = (rule: string, strong: string, heavy: string): Vars => ({
 const module = (line: number, label: string): Vars => ({
   "control-tag": `${line}px`,
   "control-sm": `${line + 8}px`,
-  "control-md": `${line + 8}px`,
   "control-lg": `${line + 16}px`,
   "control-xl": `${line + 24}px`,
   "--line-box": `${line}px`,
@@ -100,13 +99,10 @@ const module = (line: number, label: string): Vars => ({
 
 /** Type scale: three sizes; leadings come from the module's line box. */
 const typeScale = (caps: number, text: number, title: number) => (line: number): Vars => ({
-  "text-label": `600 ${caps}px / ${line - 4}px var(--font-mono)`,
-  "text-control": `600 ${caps}px / ${line - 4}px var(--font-mono)`,
+  "text-caps": `600 ${caps}px / ${line - 4}px var(--font-mono)`,
   "text-body": `400 ${text}px / ${line}px var(--font-mono)`,
-  "text-value": `500 ${text}px / ${line}px var(--font-mono)`,
   "text-title": `600 ${title}px / ${line + 4}px var(--font-mono)`,
   "text-prose": `400 ${text}px / ${line + 4}px var(--font-sans)`,
-  "text-code": `400 ${text}px / ${line + 4}px var(--font-mono)`,
 });
 
 const MONO_FALLBACK = "ui-monospace, SFMono-Regular, Menlo, monospace";
@@ -119,7 +115,7 @@ const AXES: Axis[] = [
     choices: [
       { id: "system", label: "System", note: "SF Mono, Menlo", vars: () => ({ "font-mono": MONO_FALLBACK }) },
       { id: "jetbrains", label: "JetBrains Mono", font: "JetBrains+Mono:wght@400;500;600", vars: () => ({ "font-mono": `"JetBrains Mono", ${MONO_FALLBACK}` }) },
-      { id: "plex-mono", label: "IBM Plex Mono", font: "IBM+Plex+Mono:wght@400;500;600", vars: () => ({ "font-mono": `"IBM Plex Mono", ${MONO_FALLBACK}` }) },
+      { id: "plex-mono", label: "IBM Plex Mono", note: "adopted; bundled with the app", vars: () => ({ "font-mono": `"IBM Plex Mono", ${MONO_FALLBACK}` }) },
       { id: "space-mono", label: "Space Mono", font: "Space+Mono:wght@400;700", vars: () => ({ "font-mono": `"Space Mono", ${MONO_FALLBACK}` }) },
       { id: "fira-code", label: "Fira Code", font: "Fira+Code:wght@400;500;600", vars: () => ({ "font-mono": `"Fira Code", ${MONO_FALLBACK}` }) },
     ],
@@ -138,9 +134,9 @@ const AXES: Axis[] = [
     id: "accent",
     title: "Accent",
     choices: [
-      { id: "orange", label: "Orange", vars: () => accent(CHROME.accent) },
+      { id: "orange", label: "Orange", vars: () => accent("#f87318", "#c85d00") },
       { id: "vermilion", label: "Vermilion", vars: () => accent("#ff5a1f") },
-      { id: "amber", label: "Amber", vars: () => accent("#ffb000") },
+      { id: "amber", label: "Amber", note: "adopted", vars: () => accent("#ffb000", "#a87400") },
       { id: "magenta", label: "Magenta", vars: () => accent("#e5007d") },
     ],
   },
@@ -157,8 +153,8 @@ const AXES: Axis[] = [
     id: "ink",
     title: "Ink",
     choices: [
-      { id: "neutral", label: "Neutral", vars: () => inks(CHROME.ink, CHROME["ink-2"], CHROME["ink-3"]) },
-      { id: "warm", label: "Warm", vars: () => inks("#1c1712", "#4d453d", "#665d54") },
+      { id: "neutral", label: "Neutral", vars: () => inks("#18161a", "#48464d", "#605e65") },
+      { id: "warm", label: "Warm", note: "adopted; held under 0.04 chroma", vars: () => inks(CHROME.ink, CHROME["ink-2"], CHROME["ink-3"]) },
       { id: "cool", label: "Cool", vars: () => inks("#12161c", "#3f4752", "#59616d") },
     ],
   },
@@ -166,8 +162,8 @@ const AXES: Axis[] = [
     id: "lines",
     title: "Lines",
     choices: [
-      { id: "light", label: "Light", vars: () => lines("#b4b2b9", "#8a888f", "#4a484f") },
-      { id: "standard", label: "Standard", vars: () => lines(CHROME.rule, CHROME["rule-strong"], CHROME["rule-heavy"]) },
+      { id: "light", label: "Light", note: "adopted; edge held at 3:1", vars: () => lines(CHROME.rule, CHROME["rule-strong"], CHROME["rule-heavy"]) },
+      { id: "standard", label: "Standard", vars: () => lines("#9f9da5", "#747278", "#36343b") },
       { id: "strong", label: "Strong", vars: () => lines("#86848c", "#5c5a61", "#242228") },
     ],
   },
@@ -177,7 +173,7 @@ const AXES: Axis[] = [
     choices: [
       { id: "l16", label: "16 · 24 · 32 · 40", note: "proposed: line box 16", vars: () => module(16, "l16") },
       { id: "l20", label: "20 · 28 · 36 · 44", note: "roomier: line box 20", vars: () => module(20, "l20") },
-      { id: "current", label: "20 · 24 · 28 · 32 · 36", note: "the app today", vars: () => ({ "control-tag": "20px", "control-sm": "24px", "control-md": "28px", "control-lg": "32px", "control-xl": "36px", "--line-box": "16px", "--module": "current" }) },
+      { id: "current", label: "20 · 28 · 32 · 36", note: "the app before the system", vars: () => ({ "control-tag": "20px", "control-sm": "28px", "control-lg": "32px", "control-xl": "36px", "--line-box": "16px", "--module": "current" }) },
     ],
   },
   {
@@ -206,19 +202,20 @@ const TYPE_SCALES: Record<string, [number, number, number]> = {
   large: [12, 13, 16],
 };
 
+/** The adopted selection (17 Oct 2026): what tokens.ts now carries. */
 const DEFAULTS: Record<string, string> = {
-  mono: "system",
+  mono: "plex-mono",
   sans: "system",
-  accent: "orange",
+  accent: "amber",
   ground: "cool-paper",
-  ink: "neutral",
-  lines: "standard",
+  ink: "warm",
+  lines: "light",
   module: "l16",
   type: "proposed",
   corners: "square",
 };
 
-const STORAGE_KEY = "cadjoint.design.variations.v1";
+const STORAGE_KEY = "cadjoint.design.variations.v2";
 
 function load(): Record<string, string> {
   try {
@@ -310,10 +307,8 @@ export function Variations() {
       type: {
         caps: { size: caps, weight: 600, leading: line - 4 },
         body: { size: text, weight: 400, leading: line },
-        value: { size: text, weight: 500, leading: line, numeric: "tabular-nums" },
         title: { size: title, weight: 600, leading: line + 4 },
         prose: { size: text, weight: 400, leading: line + 4, family: "sans" },
-        code: { size: text, weight: 400, leading: line + 4 },
       },
       radius: values.radius,
       cssVariables: Object.fromEntries(
@@ -357,7 +352,7 @@ export function Variations() {
           <For each={AXES}>
             {(axis) => (
               <section class="dl-variations-axis">
-                <span class="t-label" style={{ color: "var(--ink-3)" }}>
+                <span class="t-caps" style={{ color: "var(--ink-3)" }}>
                   {axis.title}
                 </span>
                 <div class="dl-variations-choices">
@@ -373,7 +368,7 @@ export function Variations() {
                           <i style={{ background: c.vars().accent }} />
                         </Show>
                         <Show when={axis.id === "ground"}>
-                          <i style={{ background: c.vars()["surface-float"], outline: "var(--line-edge)" }} />
+                          <i style={{ background: c.vars()["surface-float"], outline: "var(--line)" }} />
                         </Show>
                         {c.label}
                       </button>

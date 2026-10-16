@@ -31,7 +31,7 @@
 /* Rows of one list are separated by the weakest rule in the system: they are
    one table, not a stack of cards. */
 .proc-row + .proc-row {
-  border-top: var(--line-rule);
+  border-top: var(--line);
 }
 
 .proc-line {
@@ -87,10 +87,10 @@
 .proc-figures b {
   min-width: calc(var(--unit) * 11);
   color: var(--ink);
-  font: var(--text-value);
-  letter-spacing: var(--track-value);
-  text-transform: var(--case-value);
-  font-variant-numeric: var(--numeric-value);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
   text-align: right;
 }
 
@@ -99,10 +99,10 @@
 .proc-status {
   min-width: calc(var(--unit) * 15);
   color: var(--ink-3);
-  font: var(--text-label);
-  letter-spacing: var(--track-label);
-  text-transform: var(--case-label);
-  font-variant-numeric: var(--numeric-label);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
   font-style: normal;
   text-align: right;
 }
@@ -123,10 +123,10 @@
 
 .proc-progress b {
   color: var(--ink);
-  font: var(--text-value);
-  letter-spacing: var(--track-value);
-  text-transform: var(--case-value);
-  font-variant-numeric: var(--numeric-value);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 
 /* An expanded row indents under its own name, so the sample chart reads as

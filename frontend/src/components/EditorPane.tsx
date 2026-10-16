@@ -139,10 +139,10 @@ const theme = EditorView.theme(
   {
     "&": {
       height: "100%",
-      font: "var(--text-code)",
-      letterSpacing: "var(--track-code)",
-      textTransform: "var(--case-code)",
-      fontVariantNumeric: "var(--numeric-code)",
+      font: "var(--text-body)",
+      letterSpacing: "var(--track-body)",
+      textTransform: "var(--case-body)",
+      fontVariantNumeric: "var(--numeric-body)",
       backgroundColor: "var(--surface-panel)",
     },
     ".cm-scroller": { font: "inherit" },

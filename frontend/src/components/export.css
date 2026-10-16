@@ -13,7 +13,7 @@
 
 .export-form {
   display: grid;
-  gap: var(--stack);
+  gap: var(--section);
 }
 
 /* Two fields on one line when they are short: format beside its option,
@@ -30,10 +30,10 @@
   gap: var(--gap);
   min-width: 0;
   color: var(--ink-3);
-  font: var(--text-label);
-  letter-spacing: var(--track-label);
-  text-transform: var(--case-label);
-  font-variant-numeric: var(--numeric-label);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 
 /* The controls share the shared chrome's edge: a control's edge is
@@ -42,9 +42,9 @@
 .export-field input[type="number"],
 .export-field select {
   width: 100%;
-  height: var(--control-md);
+  height: var(--control-sm);
   padding: 0 var(--inset);
-  border: var(--line-edge);
+  border: var(--line);
   background: var(--plane-sheet);
   color: var(--ink);
 }
@@ -70,7 +70,7 @@
 /* The one option a format has sits where a second field would, on the
    control's baseline, so the row stays one row. */
 .export-option {
-  min-height: var(--control-md);
+  min-height: var(--control-sm);
   display: flex;
   align-items: center;
 }

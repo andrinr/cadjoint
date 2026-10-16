@@ -38,8 +38,8 @@ html:has(.dl-body),
   align-items: center;
   gap: var(--inset);
   height: calc(var(--unit) * 9);
-  padding: 0 var(--stack);
-  border-bottom: var(--line-edge);
+  padding: 0 var(--section);
+  border-bottom: var(--line);
   background: var(--surface-base);
 }
 .dl-top b {
@@ -55,17 +55,17 @@ html:has(.dl-body),
   font-variant-numeric: var(--numeric-body);
 }
 .dl-top strong {
-  font: var(--text-control);
-  letter-spacing: var(--track-control);
-  text-transform: var(--case-control);
-  font-variant-numeric: var(--numeric-control);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 .dl-top span {
   color: var(--ink-3);
-  font: var(--text-control);
-  letter-spacing: var(--track-control);
-  text-transform: var(--case-control);
-  font-variant-numeric: var(--numeric-control);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 .dl-top-end {
   display: flex;
@@ -81,7 +81,7 @@ html:has(.dl-body),
   display: grid;
   grid-template-columns: calc(var(--unit) * 52) minmax(0, calc(var(--unit) * 230));
   gap: 0 var(--section);
-  padding: 0 var(--stack) calc(var(--unit) * 24);
+  padding: 0 var(--section) calc(var(--unit) * 24);
 }
 
 /* The section index: furniture, so tracked uppercase mono. The section in
@@ -98,10 +98,10 @@ html:has(.dl-body),
   margin: 0;
   padding: 0;
   list-style: none;
-  border-top: var(--line-rule);
+  border-top: var(--line);
 }
 .dl-nav li {
-  border-bottom: var(--line-rule);
+  border-bottom: var(--line);
 }
 .dl-nav a {
   display: grid;
@@ -110,18 +110,18 @@ html:has(.dl-body),
   min-height: calc(var(--unit) * 6);
   padding: 0 var(--gap);
   color: var(--ink-2);
-  font: var(--text-control);
-  letter-spacing: var(--track-control);
-  text-transform: var(--case-control);
-  font-variant-numeric: var(--numeric-control);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
   text-decoration: none;
 }
 .dl-nav a small {
   color: var(--ink-3);
-  font: var(--text-label);
-  letter-spacing: var(--track-label);
-  text-transform: var(--case-label);
-  font-variant-numeric: var(--numeric-label);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 .dl-nav a:hover {
   background: var(--surface-bar-alt);
@@ -139,7 +139,7 @@ html:has(.dl-body),
 
 .dl-main > header {
   padding: calc(var(--unit) * 10) 0 var(--section);
-  border-bottom: var(--line-edge);
+  border-bottom: var(--line);
 }
 .dl-main > header h1 {
   margin: 0 0 var(--inset);
@@ -162,7 +162,7 @@ html:has(.dl-body),
   font-variant-numeric: var(--numeric-prose);
 }
 .dl-prose {
-  margin: 0 0 var(--stack);
+  margin: 0 0 var(--section);
   color: var(--ink-2);
 }
 .dl-note {
@@ -182,9 +182,9 @@ html:has(.dl-body),
   display: flex;
   align-items: baseline;
   gap: var(--inset);
-  margin: 0 0 var(--stack);
+  margin: 0 0 var(--section);
   padding-bottom: var(--inset);
-  border-bottom: var(--line-edge);
+  border-bottom: var(--line);
   font: var(--text-title);
   letter-spacing: var(--track-title);
   text-transform: var(--case-title);
@@ -193,22 +193,22 @@ html:has(.dl-body),
 .dl-section h3 {
   margin: var(--section) 0 var(--inset);
   color: var(--ink-2);
-  font: var(--text-control);
-  letter-spacing: var(--track-control);
-  text-transform: var(--case-control);
-  font-variant-numeric: var(--numeric-control);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 
 /* A label of kind: inverse ink (role: none — kind is not *current*). */
 .dl-kicker {
   display: inline-block;
-  padding: var(--nudge) var(--gap);
+  padding: var(--gap) var(--gap);
   background: var(--ink);
   color: var(--surface-float);
-  font: var(--text-label);
-  letter-spacing: var(--track-label);
-  text-transform: var(--case-label);
-  font-variant-numeric: var(--numeric-label);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
   vertical-align: middle;
 }
 
@@ -220,11 +220,11 @@ html:has(.dl-body),
   display: grid;
   grid-template-columns: calc(var(--unit) * 12) minmax(0, 1fr);
   gap: 0 var(--inset);
-  padding: var(--stack) 0;
-  border-top: var(--line-rule);
+  padding: var(--section) 0;
+  border-top: var(--line);
 }
 .dl-rule > code {
-  padding-top: var(--nudge);
+  padding-top: var(--gap);
   color: var(--ink-3);
   font: var(--text-body);
   letter-spacing: var(--track-body);
@@ -258,7 +258,7 @@ html:has(.dl-body),
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(calc(var(--unit) * 64), 1fr));
   gap: var(--inset);
-  margin-top: var(--stack);
+  margin-top: var(--section);
 }
 .dl-examples.single {
   grid-template-columns: minmax(0, 1fr);
@@ -270,7 +270,7 @@ html:has(.dl-body),
   display: flex;
   flex-direction: column;
   margin: 0;
-  border: var(--line-edge);
+  border: var(--line);
   background: var(--surface-float);
 }
 .dl-plate > header {
@@ -279,12 +279,12 @@ html:has(.dl-body),
   gap: var(--inset);
   min-height: calc(var(--unit) * 6);
   padding: 0 var(--inset);
-  border-bottom: var(--line-rule);
+  border-bottom: var(--line);
   color: var(--ink-3);
-  font: var(--text-label);
-  letter-spacing: var(--track-label);
-  text-transform: var(--case-label);
-  font-variant-numeric: var(--numeric-label);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
   padding-block: var(--inset);
 }
 .dl-plate > header > span:first-child {
@@ -306,14 +306,14 @@ html:has(.dl-body),
 }
 .dl-plate > .dl-stage {
   flex: 1;
-  padding: var(--stack);
+  padding: var(--section);
 }
 .dl-plate > .dl-stage.ground {
   background: var(--surface-base);
 }
 .dl-plate figcaption {
   padding: var(--inset) var(--inset) var(--inset);
-  border-top: var(--line-rule);
+  border-top: var(--line);
   color: var(--ink-2);
   font: var(--text-body);
   letter-spacing: var(--track-body);
@@ -331,23 +331,23 @@ html:has(.dl-body),
 .dl-swatch {
   display: grid;
   grid-template-rows: calc(var(--unit) * 12) auto;
-  border: var(--line-rule);
+  border: var(--line);
   background: var(--surface-float);
 }
 .dl-swatch > i {
   display: grid;
   place-items: end start;
   padding: var(--gap);
-  border-bottom: var(--line-rule);
-  font: var(--text-value);
-  letter-spacing: var(--track-value);
-  text-transform: var(--case-value);
-  font-variant-numeric: var(--numeric-value);
+  border-bottom: var(--line);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
   font-style: normal;
 }
 .dl-swatch > div {
   display: grid;
-  gap: var(--nudge);
+  gap: var(--gap);
   padding: var(--inset) var(--inset) var(--inset);
 }
 .dl-swatch b {
@@ -370,17 +370,17 @@ html:has(.dl-body),
 }
 .dl-table th {
   padding: var(--inset) var(--inset);
-  border-bottom: var(--line-edge);
+  border-bottom: var(--line);
   color: var(--ink-3);
-  font: var(--text-label);
-  letter-spacing: var(--track-label);
-  text-transform: var(--case-label);
-  font-variant-numeric: var(--numeric-label);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
   text-align: left;
 }
 .dl-table td {
   padding: var(--inset) var(--inset);
-  border-bottom: var(--line-rule);
+  border-bottom: var(--line);
   vertical-align: middle;
 }
 .dl-table td:first-child {
@@ -403,7 +403,7 @@ html:has(.dl-body),
   width: calc(var(--unit) * 3);
   height: calc(var(--unit) * 3);
   margin-right: var(--inset);
-  vertical-align: calc(var(--nudge) * -1);
+  vertical-align: calc(var(--gap) * -1);
 }
 
 /* A measured ratio, with its verdict as a word (A4, A5). */
@@ -414,10 +414,10 @@ html:has(.dl-body),
 .dl-ratio em {
   margin-left: var(--gap);
   font-style: normal;
-  font: var(--text-label);
-  letter-spacing: var(--track-label);
-  text-transform: var(--case-label);
-  font-variant-numeric: var(--numeric-label);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 .dl-ratio em.pass {
   color: var(--ok);
@@ -448,15 +448,15 @@ html:has(.dl-body),
   justify-content: center;
   gap: var(--inset);
   height: calc(var(--unit) * 7);
-  padding: 0 var(--stack);
-  border: var(--line-edge);
+  padding: 0 var(--section);
+  border: var(--line);
   border-radius: var(--radius);
   background: var(--surface-float);
   color: var(--ink-2);
-  font: var(--text-control);
-  letter-spacing: var(--track-control);
-  text-transform: var(--case-control);
-  font-variant-numeric: var(--numeric-control);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
   cursor: pointer;
   transition: background var(--dur-fast) var(--ease),
     border-color var(--dur-fast) var(--ease);
@@ -537,10 +537,10 @@ html:has(.dl-body),
 }
 .dl-field > label {
   color: var(--ink-3);
-  font: var(--text-label);
-  letter-spacing: var(--track-label);
-  text-transform: var(--case-label);
-  font-variant-numeric: var(--numeric-label);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 .dl-field > small {
   color: var(--ink-3);
@@ -554,14 +554,14 @@ html:has(.dl-body),
   width: 100%;
   height: calc(var(--unit) * 7);
   padding: 0 var(--inset);
-  border: var(--line-edge);
+  border: var(--line);
   border-radius: var(--radius);
   background: var(--surface-float);
   color: var(--ink);
-  font: var(--text-value);
-  letter-spacing: var(--track-value);
-  text-transform: var(--case-value);
-  font-variant-numeric: var(--numeric-value);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
   text-align: right;
 }
 .dl-input:focus {
@@ -588,22 +588,22 @@ html:has(.dl-body),
 
 .dl-seg {
   display: inline-flex;
-  border: var(--line-edge);
+  border: var(--line);
 }
 .dl-seg button {
   display: inline-flex;
   align-items: center;
   gap: var(--inset);
   height: calc(var(--unit) * 8);
-  padding: 0 var(--stack);
+  padding: 0 var(--section);
   border: 0;
-  border-right: var(--line-edge);
+  border-right: var(--line);
   background: var(--surface-float);
   color: var(--ink-2);
-  font: var(--text-control);
-  letter-spacing: var(--track-control);
-  text-transform: var(--case-control);
-  font-variant-numeric: var(--numeric-control);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
   cursor: pointer;
 }
 .dl-seg button:last-child {
@@ -622,8 +622,8 @@ html:has(.dl-body),
   align-items: center;
   gap: var(--gap);
   height: calc(var(--unit) * 6);
-  padding: 0 var(--nudge) 0 var(--inset);
-  border: var(--line-rule);
+  padding: 0 var(--gap) 0 var(--inset);
+  border: var(--line);
   background: var(--surface-float);
   color: var(--ink);
   font: var(--text-body);
@@ -657,10 +657,10 @@ html:has(.dl-body),
   padding: 0 var(--gap);
   background: var(--ink);
   color: var(--surface-float);
-  font: var(--text-label);
-  letter-spacing: var(--track-label);
-  text-transform: var(--case-label);
-  font-variant-numeric: var(--numeric-label);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 .dl-badge {
   display: inline-grid;
@@ -682,27 +682,27 @@ html:has(.dl-body),
 
 /* Panel: a dock window's tab strip, then the sheet body with its header. */
 .dl-panel {
-  border: var(--line-edge);
+  border: var(--line);
   background: var(--surface-float);
 }
 .dl-panel > nav {
   display: flex;
   height: calc(var(--unit) * 8);
-  border-bottom: var(--line-edge);
+  border-bottom: var(--line);
   background: var(--surface-base);
 }
 .dl-panel > nav button {
   padding: 0 var(--inset);
   border: 0;
-  border-right: var(--line-rule);
+  border-right: var(--line);
   border-bottom: var(--line-active);
   border-bottom-color: transparent;
   background: transparent;
   color: var(--ink-3);
-  font: var(--text-control);
-  letter-spacing: var(--track-control);
-  text-transform: var(--case-control);
-  font-variant-numeric: var(--numeric-control);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
   cursor: pointer;
 }
 .dl-panel > nav button.active {
@@ -731,7 +731,7 @@ html:has(.dl-body),
 /* Rows: label | value unit, on one baseline, values right-hung. */
 .dl-rows {
   display: grid;
-  border-top: var(--line-rule);
+  border-top: var(--line);
 }
 .dl-rows > div {
   display: grid;
@@ -740,20 +740,20 @@ html:has(.dl-body),
   gap: var(--inset);
   min-height: calc(var(--unit) * 6);
   padding: var(--gap) 0;
-  border-bottom: var(--line-rule);
+  border-bottom: var(--line);
 }
 .dl-rows span {
   color: var(--ink-3);
-  font: var(--text-label);
-  letter-spacing: var(--track-label);
-  text-transform: var(--case-label);
-  font-variant-numeric: var(--numeric-label);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 .dl-rows b {
-  font: var(--text-value);
-  letter-spacing: var(--track-value);
-  text-transform: var(--case-value);
-  font-variant-numeric: var(--numeric-value);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
   text-align: right;
 }
 .dl-rows small {
@@ -782,7 +782,7 @@ html:has(.dl-body),
   display: grid;
   width: calc(var(--unit) * 64);
   padding: var(--gap) 0;
-  border: var(--line-edge);
+  border: var(--line);
   background: var(--surface-float);
 }
 /* Items are commands read down a list: mono, sentence case, one line (K5). */
@@ -823,7 +823,7 @@ html:has(.dl-body),
   width: 100%;
   margin: var(--gap) 0;
   border: 0;
-  border-top: var(--line-rule);
+  border-top: var(--line);
 }
 /* The bar's items fill its height, so the open title's accent block is
    exactly the bar's cell; its dropdown hangs from that cell's left edge and
@@ -833,7 +833,7 @@ html:has(.dl-body),
   display: flex;
   align-items: stretch;
   height: calc(var(--unit) * 7);
-  border-bottom: var(--line-edge);
+  border-bottom: var(--line);
 }
 .dl-menubar > button,
 .dl-menubar-item > button {
@@ -843,10 +843,10 @@ html:has(.dl-body),
   border: 0;
   background: transparent;
   color: var(--ink-2);
-  font: var(--text-control);
-  letter-spacing: var(--track-control);
-  text-transform: var(--case-control);
-  font-variant-numeric: var(--numeric-control);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 .dl-menubar-item {
   position: relative;
@@ -876,22 +876,22 @@ html:has(.dl-body),
 }
 .dl-dialog {
   width: min(100%, calc(var(--unit) * 100));
-  border: var(--line-edge);
+  border: var(--line);
   background: var(--surface-float);
 }
 /* The title names the program's own file, so it is not uppercased (T2). */
 .dl-dialog > h4 {
   margin: 0;
-  padding: var(--inset) var(--stack);
-  border-bottom: var(--line-rule);
-  font: var(--text-value);
-  letter-spacing: var(--track-value);
-  text-transform: var(--case-value);
-  font-variant-numeric: var(--numeric-value);
+  padding: var(--inset) var(--section);
+  border-bottom: var(--line);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 .dl-dialog > p {
   margin: 0;
-  padding: var(--stack);
+  padding: var(--section);
   color: var(--ink-2);
   font: var(--text-prose);
   letter-spacing: var(--track-prose);
@@ -902,8 +902,8 @@ html:has(.dl-body),
   display: flex;
   justify-content: flex-end;
   gap: var(--inset);
-  padding: var(--inset) var(--stack);
-  border-top: var(--line-rule);
+  padding: var(--inset) var(--section);
+  border-top: var(--line);
 }
 
 /* Notices: in place, the status line, or the viewport's notice bar. */
@@ -912,15 +912,15 @@ html:has(.dl-body),
   grid-template-columns: auto 1fr;
   align-items: baseline;
   gap: var(--inset) var(--inset);
-  padding: var(--inset) var(--stack);
-  border: var(--line-edge);
+  padding: var(--inset) var(--section);
+  border: var(--line);
   background: var(--surface-float);
 }
 .dl-notice > b {
-  font: var(--text-label);
-  letter-spacing: var(--track-label);
-  text-transform: var(--case-label);
-  font-variant-numeric: var(--numeric-label);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 .dl-notice.error > b {
   color: var(--danger);
@@ -973,10 +973,10 @@ html:has(.dl-body),
   align-items: center;
   gap: var(--inset);
   color: var(--ink-2);
-  font: var(--text-label);
-  letter-spacing: var(--track-label);
-  text-transform: var(--case-label);
-  font-variant-numeric: var(--numeric-label);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 .dl-status i {
   width: calc(var(--unit) * 2);
@@ -997,7 +997,7 @@ html:has(.dl-body),
 .dl-stages {
   display: flex;
   align-items: stretch;
-  border: var(--line-edge);
+  border: var(--line);
   background: var(--surface-float);
 }
 .dl-stages > span {
@@ -1005,12 +1005,12 @@ html:has(.dl-body),
   place-items: center;
   height: calc(var(--unit) * 7);
   padding: 0 var(--inset);
-  border-right: var(--line-rule);
+  border-right: var(--line);
   color: var(--ink-3);
-  font: var(--text-label);
-  letter-spacing: var(--track-label);
-  text-transform: var(--case-label);
-  font-variant-numeric: var(--numeric-label);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 .dl-stages > span.done {
   color: var(--ink);
@@ -1065,7 +1065,7 @@ html:has(.dl-body),
 .dl-code {
   margin: 0;
   padding: var(--inset) 0;
-  border: var(--line-rule);
+  border: var(--line);
   background: var(--surface-float);
   color: var(--ink);
   font: var(--text-body);
@@ -1106,17 +1106,17 @@ html:has(.dl-body),
 }
 .dl-code .err {
   text-decoration: underline wavy var(--danger);
-  text-underline-offset: var(--nudge);
+  text-underline-offset: var(--gap);
 }
 
 /* Specimens of the old values, shown only in the "what changes" plates. */
 .dl-before-chip {
   display: inline-block;
-  padding: var(--nudge) var(--gap);
-  font: var(--text-label);
-  letter-spacing: var(--track-label);
-  text-transform: var(--case-label);
-  font-variant-numeric: var(--numeric-label);
+  padding: var(--gap) var(--gap);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 
 /* Type specimen rows. */
@@ -1126,7 +1126,7 @@ html:has(.dl-body),
   align-items: baseline;
   gap: var(--inset);
   padding: var(--inset) 0;
-  border-bottom: var(--line-rule);
+  border-bottom: var(--line);
 }
 .dl-type code {
   color: var(--ink-3);
@@ -1160,10 +1160,10 @@ html:has(.dl-body),
   font-variant-numeric: var(--numeric-body);
 }
 .dl-ruler b {
-  font: var(--text-value);
-  letter-spacing: var(--track-value);
-  text-transform: var(--case-value);
-  font-variant-numeric: var(--numeric-value);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
   text-align: right;
 }
 
@@ -1187,7 +1187,7 @@ html:has(.dl-body),
 .dl-track {
   position: relative;
   height: calc(var(--unit) * 10);
-  border-bottom: var(--line-edge);
+  border-bottom: var(--line);
   touch-action: none;
   cursor: ew-resize;
   user-select: none;
@@ -1230,7 +1230,7 @@ html:has(.dl-body),
   margin: 0;
   padding: 0;
   list-style: none;
-  border-top: var(--line-rule);
+  border-top: var(--line);
 }
 .dl-ladder li {
   display: grid;
@@ -1238,7 +1238,7 @@ html:has(.dl-body),
   align-items: center;
   gap: var(--inset);
   min-height: calc(var(--unit) * 6);
-  border-bottom: var(--line-rule);
+  border-bottom: var(--line);
   color: var(--ink-3);
 }
 .dl-ladder li.held {
@@ -1263,7 +1263,7 @@ html:has(.dl-body),
 /* The viewport specimen. */
 .dl-viewport {
   position: relative;
-  border: var(--line-frame);
+  border: var(--line);
   background: var(--surface-viewport);
 }
 .dl-viewport svg {
@@ -1309,7 +1309,7 @@ html:has(.dl-body),
   bottom: calc(var(--unit) * 10);
   display: grid;
   grid-template-columns: auto calc(var(--unit) * 28);
-  border: var(--line-frame);
+  border: var(--line);
   background: var(--surface-float);
   font: var(--text-body);
   letter-spacing: var(--track-body);
@@ -1317,16 +1317,16 @@ html:has(.dl-body),
   font-variant-numeric: var(--numeric-body);
 }
 .dl-viewport .titleblock > span {
-  padding: var(--nudge) var(--inset);
-  border-bottom: var(--line-rule);
+  padding: var(--gap) var(--inset);
+  border-bottom: var(--line);
 }
 .dl-viewport .titleblock > span:nth-child(odd) {
-  border-right: var(--line-rule);
+  border-right: var(--line);
   color: var(--ink-3);
-  font: var(--text-label);
-  letter-spacing: var(--track-label);
-  text-transform: var(--case-label);
-  font-variant-numeric: var(--numeric-label);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 .dl-viewport .legend {
   position: absolute;
@@ -1337,7 +1337,7 @@ html:has(.dl-body),
   align-items: center;
   gap: var(--inset);
   padding: var(--gap) var(--inset);
-  border: var(--line-rule);
+  border: var(--line);
   background: var(--surface-float);
   font: var(--text-body);
   letter-spacing: var(--track-body);
@@ -1354,7 +1354,7 @@ html:has(.dl-body),
   align-items: center;
   gap: var(--inset);
   padding: var(--inset) 0;
-  border-bottom: var(--line-rule);
+  border-bottom: var(--line);
   font-variant-numeric: tabular-nums;
 }
 .dl-legend > i {
@@ -1365,10 +1365,10 @@ html:has(.dl-body),
 }
 .dl-legend > b {
   color: var(--ink-3);
-  font: var(--text-label);
-  letter-spacing: var(--track-label);
-  text-transform: var(--case-label);
-  font-variant-numeric: var(--numeric-label);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 .dl-bc {
   display: inline-flex;
@@ -1388,8 +1388,8 @@ html:has(.dl-body),
 .dl-icons {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(calc(var(--unit) * 28), 1fr));
-  border-top: var(--line-rule);
-  border-left: var(--line-rule);
+  border-top: var(--line);
+  border-left: var(--line);
 }
 .dl-icons > div {
   display: grid;
@@ -1398,8 +1398,8 @@ html:has(.dl-body),
   gap: var(--inset);
   min-height: calc(var(--unit) * 8);
   padding: 0 var(--inset);
-  border-right: var(--line-rule);
-  border-bottom: var(--line-rule);
+  border-right: var(--line);
+  border-bottom: var(--line);
   color: var(--ink-2);
   font: var(--text-body);
   letter-spacing: var(--track-body);
@@ -1428,7 +1428,7 @@ html:has(.dl-body),
 }
 /* A note that follows a rule hangs on the rule's text column. */
 .dl-section > .dl-note {
-  margin: 0 0 var(--stack) calc(var(--unit) * 12 + var(--inset));
+  margin: 0 0 var(--section) calc(var(--unit) * 12 + var(--inset));
 }
 
 /* The current row and the armed tool are the accent block (role: current). */
@@ -1476,7 +1476,7 @@ html:has(.dl-body),
     "modes program program"
     "editor viewport column"
     "tray tray tray";
-  border: var(--line-edge);
+  border: var(--line);
   background: var(--surface-base);
 }
 .dl-map-region {
@@ -1484,10 +1484,10 @@ html:has(.dl-body),
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: var(--nudge);
+  gap: var(--gap);
   padding: 0 var(--inset);
-  border-right: var(--line-rule);
-  border-bottom: var(--line-rule);
+  border-right: var(--line);
+  border-bottom: var(--line);
   outline: var(--line-active);
   outline-color: transparent;
   outline-offset: calc(var(--stroke-active) * -1);
@@ -1506,10 +1506,10 @@ html:has(.dl-body),
 }
 .dl-map-region b {
   color: var(--ink);
-  font: var(--text-control);
-  letter-spacing: var(--track-control);
-  text-transform: var(--case-control);
-  font-variant-numeric: var(--numeric-control);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 .dl-map-region.sheet {
   background: var(--surface-float);
@@ -1545,7 +1545,7 @@ html:has(.dl-body),
 .dl-map-modes {
   display: flex;
   width: max-content;
-  border: var(--line-edge);
+  border: var(--line);
 }
 .dl-map-region.bar {
   flex-direction: row;
@@ -1553,14 +1553,14 @@ html:has(.dl-body),
   justify-content: space-between;
 }
 .dl-map-modes button {
-  padding: var(--nudge) var(--inset);
+  padding: var(--gap) var(--inset);
   border: 0;
   background: var(--surface-float);
   color: var(--ink-2);
-  font: var(--text-label);
-  letter-spacing: var(--track-label);
-  text-transform: var(--case-label);
-  font-variant-numeric: var(--numeric-label);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
   cursor: pointer;
 }
 .dl-map-modes button:hover {
@@ -1571,12 +1571,12 @@ html:has(.dl-body),
   color: var(--ink-on-accent);
 }
 .dl-map-group i {
-  padding: var(--nudge) var(--inset);
+  padding: var(--gap) var(--inset);
   color: var(--ink-3);
-  font: var(--text-label);
-  letter-spacing: var(--track-label);
-  text-transform: var(--case-label);
-  font-variant-numeric: var(--numeric-label);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
   font-style: normal;
 }
 .dl-map-region.column {
@@ -1587,7 +1587,7 @@ html:has(.dl-body),
 .dl-map-group {
   flex: 1;
   padding: var(--inset) var(--inset) 0;
-  border-bottom: var(--line-rule);
+  border-bottom: var(--line);
 }
 .dl-map-group:last-child {
   border-bottom: 0;
@@ -1595,7 +1595,7 @@ html:has(.dl-body),
 .dl-map-group > span {
   display: flex;
   flex-wrap: wrap;
-  border-bottom: var(--line-rule);
+  border-bottom: var(--line);
 }
 .dl-map-group i.on {
   color: var(--ink);
@@ -1616,10 +1616,10 @@ html:has(.dl-body),
 }
 .dl-map-answer b {
   color: var(--ink);
-  font: var(--text-label);
-  letter-spacing: var(--track-label);
-  text-transform: var(--case-label);
-  font-variant-numeric: var(--numeric-label);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 
 /* ── the feature index ─────────────────────────────────────────────────── */
@@ -1639,10 +1639,10 @@ html:has(.dl-body),
 }
 .dl-features td small {
   color: var(--ink-3);
-  font: var(--text-label);
-  letter-spacing: var(--track-label);
-  text-transform: var(--case-label);
-  font-variant-numeric: var(--numeric-label);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 .dl-features tr.group th {
   padding-top: var(--section);
@@ -1659,9 +1659,9 @@ html:has(.dl-body),
   color: var(--ink);
 }
 .dl-features em.gone {
-  font: var(--text-label);
-  letter-spacing: var(--track-label);
-  text-transform: var(--case-label);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
   display: block;
   color: var(--ink-3);
   font-style: normal;
@@ -1681,23 +1681,23 @@ html:has(.dl-body),
 /* The proposed menu bar: a stage tall enough for the longest menu. */
 .dl-menu-stage {
   min-height: calc(var(--unit) * 156);
-  border: var(--line-edge);
+  border: var(--line);
   background: var(--surface-base);
 }
 .dl-menu-stage .dl-menubar > .dl-menubar-item > button {
   padding: 0 var(--inset);
 }
 .dl-menu-label {
-  padding: var(--inset) var(--inset) var(--nudge) calc(var(--unit) * 6);
+  padding: var(--inset) var(--inset) var(--gap) calc(var(--unit) * 6);
   color: var(--ink-3);
-  font: var(--text-label);
-  letter-spacing: var(--track-label);
-  text-transform: var(--case-label);
-  font-variant-numeric: var(--numeric-label);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 .dl-features tr.issue .decision {
   display: block;
-  margin-top: var(--nudge);
+  margin-top: var(--gap);
   color: var(--ok);
 }
 
@@ -1707,7 +1707,7 @@ html:has(.dl-body),
   display: inline-grid;
   gap: var(--gap);
   padding: var(--gap);
-  border: var(--line-edge);
+  border: var(--line);
   background: var(--plane-sheet);
 }
 .dl-rail-cell {
@@ -1721,7 +1721,7 @@ html:has(.dl-body),
   position: relative;
 }
 .dl-rail-cell.open {
-  border: var(--line-edge);
+  border: var(--line);
   color: var(--ink);
 }
 .dl-rail-group.attached .dl-rail-cell.open {
@@ -1733,7 +1733,7 @@ html:has(.dl-body),
   left: 100%;
   display: flex;
   height: var(--control-lg);
-  border: var(--line-edge);
+  border: var(--line);
   border-left: 0;
   background: var(--plane-sheet);
 }
@@ -1746,7 +1746,7 @@ html:has(.dl-body),
   height: auto;
   gap: var(--gap);
   padding: var(--inset);
-  border: var(--line-rule);
+  border: var(--line);
 }
 .dl-rail-flyout.detached .dl-rail-cell {
   width: calc(var(--control-lg) + var(--inset));
@@ -1764,7 +1764,7 @@ html:has(.dl-body),
   gap: var(--gap);
   width: calc(var(--unit) * 48);
   padding: var(--inset);
-  border: var(--line-edge);
+  border: var(--line);
 }
 .dl-blk {
   display: inline-flex;
@@ -1820,7 +1820,7 @@ html:has(.dl-body),
 .dl-sheet-demo {
   width: calc(var(--unit) * 48);
   min-height: calc(var(--unit) * 8);
-  border: var(--line-edge);
+  border: var(--line);
   background: var(--plane-sheet);
 }
 .dl-bar-demo {
@@ -1828,7 +1828,7 @@ html:has(.dl-body),
   width: calc(var(--unit) * 48);
   height: calc(var(--unit) * 4);
   background: var(--plane-step);
-  border: var(--line-rule);
+  border: var(--line);
 }
 .dl-ruled-row {
   display: flex;
@@ -1848,9 +1848,9 @@ html:has(.dl-body),
   justify-items: start;
   gap: var(--inset);
   padding-top: var(--inset);
-  border-top: var(--line-edge);
+  border-top: var(--line);
 }
-.dl-atlas > section > .t-label:first-child {
+.dl-atlas > section > .t-caps:first-child {
   color: var(--ink-3);
 }
 .dl-atlas-line {
@@ -1869,12 +1869,12 @@ html:has(.dl-body),
 .dl-atlas-plane {
   width: 100%;
   padding: var(--inset);
-  border: var(--line-edge);
+  border: var(--line);
 }
 .dl-atlas-marks {
   display: flex;
   align-items: center;
-  gap: var(--stack);
+  gap: var(--section);
 }
 
 /* §1 System specimens: drawn from the proposed module, with their own
@@ -1896,8 +1896,8 @@ html:has(.dl-body),
   height: calc(var(--unit) * 4);
   padding: 0 var(--inset);
   background: rgba(var(--param-rgb), var(--alpha-tint));
-  border-top: var(--line-rule);
-  border-bottom: var(--line-rule);
+  border-top: var(--line);
+  border-bottom: var(--line);
 }
 .dl-sys-heights {
   display: grid;
@@ -1912,7 +1912,7 @@ html:has(.dl-body),
 .dl-sys-box {
   display: flex;
   align-items: center;
-  border: var(--line-edge);
+  border: var(--line);
   background: var(--plane-sheet);
 }
 .dl-sys-text {
@@ -1936,7 +1936,7 @@ html:has(.dl-body),
   grid-template-columns: calc(var(--unit) * 16) calc(var(--unit) * 16) 1fr;
   align-items: center;
   min-height: calc(var(--unit) * 6);
-  border-bottom: var(--line-rule);
+  border-bottom: var(--line);
 }
 .dl-sys-sample {
   font-family: var(--font-mono);
@@ -1945,8 +1945,8 @@ html:has(.dl-body),
 }
 .dl-sys-sample.caps,
 .dl-sys-sample.title {
-  text-transform: var(--case-label);
-  letter-spacing: var(--track-control);
+  text-transform: var(--case-caps);
+  letter-spacing: var(--track-caps);
 }
 .dl-sys-sample.title,
 .dl-sys-sample.prose,
@@ -1962,25 +1962,25 @@ html:has(.dl-body),
 /* The specimen panel: the module, applied. */
 .dl-sys-panel {
   width: calc(var(--unit) * 80);
-  border: var(--line-edge);
+  border: var(--line);
   background: var(--plane-sheet);
 }
 .dl-sys-tabs {
   display: flex;
   height: calc(var(--unit) * 8);
-  border-bottom: var(--line-edge);
+  border-bottom: var(--line);
   background: var(--plane-ground);
 }
 .dl-sys-tabs span {
   display: flex;
   align-items: center;
   padding: 0 var(--inset);
-  border-right: var(--line-rule);
+  border-right: var(--line);
   color: var(--ink-3);
   font-family: var(--font-mono);
   line-height: calc(var(--unit) * 4);
-  text-transform: var(--case-label);
-  letter-spacing: var(--track-control);
+  text-transform: var(--case-caps);
+  letter-spacing: var(--track-caps);
 }
 .dl-sys-tabs span.active {
   border-bottom: var(--line-active);
@@ -2005,18 +2005,18 @@ html:has(.dl-body),
   background: var(--block-kind);
   color: var(--block-kind-ink);
   font-family: var(--font-mono);
-  text-transform: var(--case-label);
-  letter-spacing: var(--track-control);
+  text-transform: var(--case-caps);
+  letter-spacing: var(--track-caps);
 }
 .dl-sys-title {
   font-family: var(--font-mono);
   line-height: calc(var(--unit) * 5);
-  text-transform: var(--case-label);
+  text-transform: var(--case-caps);
   letter-spacing: var(--track-title);
 }
 .dl-sys-rows {
   display: grid;
-  border-top: var(--line-rule);
+  border-top: var(--line);
 }
 .dl-sys-rows > div {
   display: grid;
@@ -2024,13 +2024,13 @@ html:has(.dl-body),
   align-items: center;
   gap: var(--inset);
   height: calc(var(--unit) * 6);
-  border-bottom: var(--line-rule);
+  border-bottom: var(--line);
 }
 .dl-sys-label {
   color: var(--ink-3);
   font-family: var(--font-mono);
-  text-transform: var(--case-label);
-  letter-spacing: var(--track-control);
+  text-transform: var(--case-caps);
+  letter-spacing: var(--track-caps);
 }
 .dl-sys-val {
   font-family: var(--font-mono);
@@ -2053,10 +2053,10 @@ html:has(.dl-body),
   align-items: center;
   height: calc(var(--unit) * 6);
   padding: 0 var(--inset);
-  border: var(--line-edge);
+  border: var(--line);
   font-family: var(--font-mono);
-  text-transform: var(--case-label);
-  letter-spacing: var(--track-control);
+  text-transform: var(--case-caps);
+  letter-spacing: var(--track-caps);
 }
 .dl-sys-cell.primary {
   border-color: var(--block-current);
@@ -2077,7 +2077,7 @@ html:has(.dl-body),
   width: calc(var(--unit) * 96);
   padding: var(--section);
   overflow-y: auto;
-  border-left: var(--line-edge);
+  border-left: var(--line);
   background: var(--plane-sheet);
 }
 .dl-variations-axis {
@@ -2095,7 +2095,7 @@ html:has(.dl-body),
   gap: var(--gap);
   height: var(--control-sm);
   padding: 0 var(--inset);
-  border: var(--line-edge);
+  border: var(--line);
   border-radius: var(--radius);
   background: var(--plane-sheet);
   color: var(--ink-2);
@@ -2117,4 +2117,11 @@ html:has(.dl-body),
   display: block;
   width: calc(var(--unit) * 3);
   height: calc(var(--unit) * 3);
+}
+
+/* L1-L6 drawings: generated SVG, drawn at the column's width. */
+.dl-drawing {
+  display: block;
+  width: 100%;
+  height: auto;
 }

@@ -329,7 +329,7 @@ const role = (name: "label" | "control" | "body" | "value" | "prose") => ({
 const intelligenceTheme = EditorView.theme({
   // Gutter markers: replace the packaged SVG images with token-coloured shapes.
   ".cm-gutter-lint": { width: "1.2em" },
-  ".cm-gutter-lint .cm-gutterElement": { padding: "0 var(--nudge)" },
+  ".cm-gutter-lint .cm-gutterElement": { padding: "0 var(--gap)" },
   ".cm-lint-marker": {
     content: "none",
     width: "calc(var(--unit) * 2)",
@@ -354,7 +354,7 @@ const intelligenceTheme = EditorView.theme({
     paddingBottom: "0",
     textDecorationLine: "underline",
     textDecorationSkipInk: "none",
-    textUnderlineOffset: "var(--nudge)",
+    textUnderlineOffset: "var(--gap)",
   },
   ".cm-lintRange-error": {
     textDecorationStyle: "wavy",
@@ -409,7 +409,7 @@ const intelligenceTheme = EditorView.theme({
     color: "var(--ink-on-accent)",
     borderRadius: "var(--radius)",
     ...role("control"),
-    padding: "var(--nudge) var(--inset)",
+    padding: "var(--gap) var(--inset)",
   },
   ".cm-panel.cm-panel-lint": {
     backgroundColor: "var(--surface-panel)",
@@ -422,7 +422,7 @@ const intelligenceTheme = EditorView.theme({
     borderRadius: "var(--radius)",
   },
   ".cm-tooltip.cm-tooltip-autocomplete > ul > li": {
-    padding: "var(--nudge) var(--inset)",
+    padding: "var(--gap) var(--inset)",
     ...role("body"),
     color: "var(--ink)",
   },

@@ -47,7 +47,7 @@
 }
 
 .scene-card + .scene-card {
-  border-top: var(--line-rule);
+  border-top: var(--line);
 }
 
 .scene-card {
@@ -122,7 +122,7 @@
   aspect-ratio: 16 / 10;
   flex: 0 0 auto;
   overflow: hidden;
-  border: var(--line-rule);
+  border: var(--line);
   background: var(--plane-step);
 }
 
@@ -158,10 +158,10 @@
 }
 
 .scene-frame-empty span {
-  font: var(--text-label);
-  letter-spacing: var(--track-label);
-  text-transform: var(--case-label);
-  font-variant-numeric: var(--numeric-label);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
   color: var(--ink-3);
   text-align: center;
   overflow: hidden;

@@ -21,7 +21,7 @@
 
 .layout-grid-off {
   position: fixed;
-  outline: var(--line-edge);
+  outline: var(--line);
   outline-color: var(--danger);
   outline-offset: calc(var(--hairline) * -1);
   background: rgba(var(--danger-rgb), var(--alpha-wash));
@@ -29,8 +29,8 @@
 
 .layout-grid-count {
   position: fixed;
-  left: var(--stack);
-  bottom: calc(var(--control-sm) + var(--stack));
+  left: var(--section);
+  bottom: calc(var(--control-sm) + var(--section));
   z-index: 9001;
   display: grid;
   gap: var(--gap);
@@ -41,13 +41,13 @@
   justify-self: start;
   height: var(--control-sm);
   padding: 0 var(--inset);
-  border: var(--line-edge);
+  border: var(--line);
   border-color: var(--danger);
   background: var(--surface-float);
   color: var(--danger-ink);
-  font: var(--text-label);
-  letter-spacing: var(--track-label);
-  text-transform: var(--case-label);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
 }
 
 .layout-grid-count ol {
@@ -55,7 +55,7 @@
   margin: 0;
   padding: var(--gap) 0;
   list-style: none;
-  border: var(--line-edge);
+  border: var(--line);
   background: var(--surface-float);
 }
 
@@ -63,7 +63,7 @@
   display: grid;
   grid-template-columns: 1fr auto;
   gap: var(--inset);
-  padding: var(--nudge) var(--inset);
+  padding: var(--gap) var(--inset);
   font: var(--text-body);
   letter-spacing: var(--track-body);
   text-transform: var(--case-body);

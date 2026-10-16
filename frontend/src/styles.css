@@ -163,7 +163,8 @@ body {
 
 .app {
   display: grid;
-  grid-template-rows: calc(var(--unit) * 7) calc(var(--unit) * 13) 1fr;
+  /* The desk's rows (L5): the menu bar a bar, the toolbar a toolbar height. */
+  grid-template-rows: var(--control-lg) var(--control-xl) 1fr;
   height: 100%;
 }
 
@@ -179,11 +180,11 @@ body {
   position: relative;
   z-index: 1000;
   display: flex;
-  height: var(--control-md);
+  height: var(--control-lg);
   align-items: stretch;
   gap: var(--gap);
   padding: 0 var(--inset);
-  border-bottom: var(--line-rule);
+  border-bottom: var(--line);
   background: var(--plane-ground);
 }
 
@@ -201,10 +202,10 @@ body {
   border: 0;
   background: transparent;
   color: var(--ink-2);
-  font: var(--text-control);
-  letter-spacing: var(--track-control);
-  text-transform: var(--case-control);
-  font-variant-numeric: var(--numeric-control);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
   transition:
     background-color var(--dur-fast) var(--ease),
     color var(--dur-fast) var(--ease);
@@ -225,14 +226,14 @@ body {
 
 .menu-dropdown {
   position: absolute;
-  top: calc(100% + var(--nudge));
+  top: calc(100% + var(--gap));
   left: 0;
   z-index: 60;
   display: flex;
   flex-direction: column;
   min-width: calc(var(--unit) * 52);
   padding: var(--gap) 0;
-  border: var(--line-rule);
+  border: var(--line);
   background: var(--plane-sheet);
   animation: pop-in var(--dur-base) var(--ease);
   transform-origin: top left;
@@ -314,10 +315,10 @@ body {
   overflow: hidden;
   max-width: 32ch;
   color: var(--ink-3);
-  font: var(--text-label);
-  letter-spacing: var(--track-label);
-  text-transform: var(--case-label);
-  font-variant-numeric: var(--numeric-label);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -328,9 +329,9 @@ body {
   position: relative;
   display: flex;
   align-items: center;
-  gap: var(--stack);
+  gap: var(--section);
   padding: 0 var(--inset);
-  border-bottom: var(--line-rule);
+  border-bottom: var(--line);
   background: var(--plane-step);
 }
 
@@ -392,10 +393,10 @@ body {
   display: flex;
   align-items: center;
   gap: var(--inset);
-  font: var(--text-control);
-  letter-spacing: var(--track-control);
-  text-transform: var(--case-control);
-  font-variant-numeric: var(--numeric-control);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 
 .brand .mark {
@@ -418,7 +419,7 @@ body {
 .mode-switcher {
   display: flex;
   margin-left: var(--inset);
-  border: var(--line-edge);
+  border: var(--line);
 }
 
 .mode-switcher button {
@@ -428,13 +429,13 @@ body {
   height: var(--control-xl);
   padding: 0 var(--inset);
   border: 0;
-  border-left: var(--line-rule);
+  border-left: var(--line);
   background: transparent;
   color: var(--ink-2);
-  font: var(--text-control);
-  letter-spacing: var(--track-control);
-  text-transform: var(--case-control);
-  font-variant-numeric: var(--numeric-control);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
   transition:
     background-color var(--dur-base) var(--ease),
     border-color var(--dur-base) var(--ease),
@@ -466,15 +467,15 @@ body {
    panel into cells, which nobody has to find because they are the grid. */
 button,
 select {
-  height: var(--control-md);
+  height: var(--control-sm);
   padding: 0 var(--inset);
-  border: var(--line-edge);
+  border: var(--line);
   background: var(--plane-sheet);
   color: var(--ink);
-  font: var(--text-control);
-  letter-spacing: var(--track-control);
-  text-transform: var(--case-control);
-  font-variant-numeric: var(--numeric-control);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
   cursor: pointer;
   transition:
     background-color var(--dur-fast) var(--ease),
@@ -500,9 +501,9 @@ button:disabled {
 select {
   appearance: none;
   -webkit-appearance: none;
-  height: var(--control-md);
+  height: var(--control-sm);
   padding: 0 calc(var(--unit) * 7) 0 var(--inset);
-  border: var(--line-edge);
+  border: var(--line);
   border-radius: var(--radius);
   background-color: var(--plane-sheet);
   background-image:
@@ -514,10 +515,10 @@ select {
   background-size: var(--unit) var(--unit);
   background-repeat: no-repeat;
   color: var(--ink);
-  font: var(--text-value);
-  letter-spacing: var(--track-value);
-  text-transform: var(--case-value);
-  font-variant-numeric: var(--numeric-value);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 
 select:hover:not(:disabled) {
@@ -567,16 +568,16 @@ button.primary:hover:not(:disabled),
    baseline inside a row. */
 input[type="number"],
 input[type="text"] {
-  height: var(--control-md);
+  height: var(--control-sm);
   min-width: 0;
   padding: 0 var(--inset);
-  border: var(--line-edge);
+  border: var(--line);
   background: var(--plane-sheet);
   color: var(--ink);
-  font: var(--text-value);
-  letter-spacing: var(--track-value);
-  text-transform: var(--case-value);
-  font-variant-numeric: var(--numeric-value);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
   transition: border-color var(--dur-fast) var(--ease);
 }
 
@@ -605,7 +606,7 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 input[type="range"] {
-  height: var(--control-md);
+  height: var(--control-sm);
   /* Chrome's UA sheet gives this a 0 2px margin, which pushed it past the
      right edge of every fixed-width column it sat in. */
   margin: 0;
@@ -658,10 +659,10 @@ input[type="checkbox"] {
   padding: 0 var(--gap);
   background: var(--block-kind);
   color: var(--block-kind-ink);
-  font: var(--text-label);
-  letter-spacing: var(--track-label);
-  text-transform: var(--case-label);
-  font-variant-numeric: var(--numeric-label);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
   white-space: nowrap;
 }
 
@@ -681,7 +682,7 @@ input[type="checkbox"] {
   align-items: center;
   height: var(--control-tag);
   padding: 0 var(--gap);
-  border: var(--line-rule);
+  border: var(--line);
   background: var(--plane-sheet);
   color: var(--ink-2);
   font: var(--text-body);
@@ -707,7 +708,7 @@ input[type="checkbox"] {
   align-items: center;
   gap: var(--gap);
   padding: var(--gap);
-  border: var(--line-edge);
+  border: var(--line);
   background: var(--plane-sheet);
 }
 
@@ -736,7 +737,7 @@ input[type="checkbox"] {
   width: var(--control-lg);
   height: var(--control-lg);
   padding: 0;
-  border: var(--line-edge);
+  border: var(--line);
   background: var(--plane-sheet);
   color: var(--ink-2);
 }
@@ -776,10 +777,12 @@ input[type="checkbox"] {
   background: var(--plane-step);
 }
 
+/* The rail sits inside the viewport rectangle, where no chrome hue goes
+   (C7): its current cell is the ink block, not the accent. */
 .tool-rail button.active {
-  border-color: var(--accent);
-  background: var(--block-current);
-  color: var(--block-current-ink);
+  border-color: var(--block-kind);
+  background: var(--block-kind);
+  color: var(--block-kind-ink);
 }
 
 .tool-rail button:disabled {
@@ -804,10 +807,10 @@ input[type="checkbox"] {
 
 .rail-hint {
   color: var(--ink-2);
-  font: var(--text-label);
-  letter-spacing: var(--track-label);
-  text-transform: var(--case-label);
-  font-variant-numeric: var(--numeric-label);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 
 /* Grouped tool clusters: the parent shows the last-used child and expands
@@ -828,8 +831,8 @@ input[type="checkbox"] {
 
 .tool-group-caret {
   position: absolute;
-  right: var(--nudge);
-  bottom: var(--nudge);
+  right: var(--gap);
+  bottom: var(--gap);
   width: var(--unit);
   height: var(--unit);
   background: var(--ink-3);
@@ -839,7 +842,7 @@ input[type="checkbox"] {
 /* The caret is a 4px mark on a filled cell, so it is drawn in the ink that
    cell carries. The accent itself is 2.26:1 on paper and can never be a mark. */
 .tool-group-parent.active .tool-group-caret {
-  background: var(--block-current-ink);
+  background: var(--block-kind-ink);
 }
 
 /* The flyout continues the parent's row: the same 32px cells, the parent's
@@ -858,7 +861,7 @@ input[type="checkbox"] {
   height: var(--control-lg);
   gap: 0;
   padding: 0;
-  border: var(--line-edge);
+  border: var(--line);
   border-left: 0;
   background: var(--plane-sheet);
 }
@@ -877,7 +880,7 @@ input[type="checkbox"] {
 }
 
 .tool-group.open > .tool-group-parent.active {
-  border-right-color: var(--accent);
+  border-right-color: var(--block-kind);
 }
 
 .tool-group.open .tool-flyout {
@@ -902,15 +905,15 @@ input[type="checkbox"] {
   flex-direction: column;
   align-items: stretch;
   gap: var(--gap);
-  padding-top: var(--nudge);
+  padding-top: var(--gap);
 }
 
 .plane-picks-label {
   color: var(--ink-3);
-  font: var(--text-label);
-  letter-spacing: var(--track-label);
-  text-transform: var(--case-label);
-  font-variant-numeric: var(--numeric-label);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
   text-align: center;
 }
 
@@ -970,14 +973,14 @@ input[type="checkbox"] {
 .history-chips .chip-label.editable {
   cursor: pointer;
   text-decoration: underline dotted var(--ink-3);
-  text-underline-offset: var(--nudge);
+  text-underline-offset: var(--gap);
 }
 
 .history-chips .chip-value {
   width: calc(var(--unit) * 12);
   height: auto;
-  padding: 0 var(--nudge);
-  border: var(--line-edge);
+  padding: 0 var(--gap);
+  border: var(--line);
   background: var(--plane-sheet);
   color: inherit;
   font: inherit;
@@ -1025,9 +1028,9 @@ input[type="checkbox"] {
 .solver-panel {
   display: grid;
   gap: var(--inset);
-  margin-top: var(--stack);
-  padding-top: var(--stack);
-  border-top: var(--line-rule);
+  margin-top: var(--section);
+  padding-top: var(--section);
+  border-top: var(--line);
 }
 
 .solver-controls {
@@ -1045,10 +1048,10 @@ input[type="checkbox"] {
 
 .solver-controls label > span {
   color: var(--ink-3);
-  font: var(--text-label);
-  letter-spacing: var(--track-label);
-  text-transform: var(--case-label);
-  font-variant-numeric: var(--numeric-label);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 
 .solver-controls select,
@@ -1076,7 +1079,7 @@ input[type="checkbox"] {
    parameter, so its line is ink: hue is meaning, and this one has none. */
 .solver-chart {
   padding: var(--inset);
-  border: var(--line-rule);
+  border: var(--line);
   background: var(--plane-step);
 }
 
@@ -1091,25 +1094,25 @@ input[type="checkbox"] {
 .solver-chart > div span,
 .solver-chart footer {
   color: var(--ink-3);
-  font: var(--text-label);
-  letter-spacing: var(--track-label);
-  text-transform: var(--case-label);
-  font-variant-numeric: var(--numeric-label);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 
 .solver-chart > div b {
   color: var(--ink);
-  font: var(--text-value);
-  letter-spacing: var(--track-value);
-  text-transform: var(--case-value);
-  font-variant-numeric: var(--numeric-value);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 
 .solver-chart svg {
   display: block;
   width: 100%;
   height: calc(var(--unit) * 16);
-  margin: var(--gap) 0 var(--nudge);
+  margin: var(--gap) 0 var(--gap);
   overflow: visible;
 }
 
@@ -1142,7 +1145,7 @@ input[type="checkbox"] {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: var(--stack);
+  gap: var(--section);
   width: calc(var(--unit) * 73);
   pointer-events: none;
 }
@@ -1221,7 +1224,7 @@ input[type="checkbox"] {
 .sketch-panel,
 .render-panel {
   width: 100%;
-  border: var(--line-edge);
+  border: var(--line);
   background: var(--plane-sheet);
   animation: panel-in var(--dur-slow) var(--ease);
 }
@@ -1263,7 +1266,7 @@ input[type="checkbox"] {
   gap: 0;
   margin: 0;
   padding-bottom: var(--gap);
-  border-bottom: var(--line-edge);
+  border-bottom: var(--line);
 }
 
 /* Every section is named the same way, wherever it is: the label role in
@@ -1276,10 +1279,10 @@ input[type="checkbox"] {
 .sim-section-head b,
 .material-section-head {
   color: var(--ink-2);
-  font: var(--text-label);
-  letter-spacing: var(--track-label);
-  text-transform: var(--case-label);
-  font-variant-numeric: var(--numeric-label);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 
 .section-head b {
@@ -1291,10 +1294,10 @@ input[type="checkbox"] {
 .section-count {
   flex: 0 0 auto;
   color: var(--ink-3);
-  font: var(--text-value);
-  letter-spacing: var(--track-value);
-  text-transform: var(--case-value);
-  font-variant-numeric: var(--numeric-value);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 
 .section {
@@ -1416,10 +1419,10 @@ input[type="checkbox"] {
 
 .object-tree-row.operator {
   color: var(--ink);
-  font: var(--text-label);
-  letter-spacing: var(--track-label);
-  text-transform: var(--case-label);
-  font-variant-numeric: var(--numeric-label);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 
 .tree-caret {
@@ -1525,10 +1528,10 @@ input[type="checkbox"] {
 .material-panel-title b {
   flex: 0 0 auto;
   color: var(--ink-3);
-  font: var(--text-value);
-  letter-spacing: var(--track-value);
-  text-transform: var(--case-value);
-  font-variant-numeric: var(--numeric-value);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 
 .material-add {
@@ -1593,7 +1596,7 @@ input[type="checkbox"] {
   /* A fixed height on the grid: swatch, name and use count were 106px. */
   height: calc(var(--unit) * 27);
   padding: var(--inset) var(--gap);
-  border: var(--line-rule);
+  border: var(--line);
   background: var(--plane-sheet);
   cursor: grab;
   outline: none;
@@ -1694,7 +1697,7 @@ input[type="checkbox"] {
 
 .material-name {
   margin: 0 calc(var(--gap) * -1);
-  padding: var(--nudge) var(--gap);
+  padding: var(--gap) var(--gap);
   color: var(--ink);
   font: var(--text-body);
   letter-spacing: var(--track-body);
@@ -1714,7 +1717,7 @@ input[type="checkbox"] {
   display: grid;
   gap: var(--gap);
   padding: var(--inset);
-  border-top: var(--line-rule);
+  border-top: var(--line);
   background: var(--plane-step);
 }
 
@@ -1728,7 +1731,7 @@ input[type="checkbox"] {
   gap: var(--gap);
   margin-top: var(--gap);
   padding-top: var(--inset);
-  border-top: var(--line-rule);
+  border-top: var(--line);
 }
 
 /* Physical properties: label · value · unit, one row per property whether the
@@ -1751,10 +1754,10 @@ input[type="checkbox"] {
 
 .material-physical-row dt {
   color: var(--ink-2);
-  font: var(--text-label);
-  letter-spacing: var(--track-label);
-  text-transform: var(--case-label);
-  font-variant-numeric: var(--numeric-label);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 
 /* The value column is sized for the widest thing that can honestly appear in
@@ -1774,10 +1777,10 @@ input[type="checkbox"] {
    "Young's modulus" are the labels, and half a label is not one. */
 .material-physical-row dt {
   white-space: normal;
-  font: var(--text-label);
-  letter-spacing: var(--track-label);
-  text-transform: var(--case-label);
-  font-variant-numeric: var(--numeric-label);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 
 .material-physical-row input[type="number"] {
@@ -1851,8 +1854,8 @@ input[type="checkbox"] {
 .material-physical-error {
   grid-column: 1 / -1;
   margin: 0;
-  padding: var(--nudge) 0 var(--gap);
-  border-top: var(--line-rule);
+  padding: var(--gap) 0 var(--gap);
+  border-top: var(--line);
   color: var(--ink-2);
   font: var(--text-prose);
   letter-spacing: var(--track-prose);
@@ -1892,17 +1895,17 @@ input[type="checkbox"] {
 .material-inspector-head label {
   flex: 0 0 auto;
   color: var(--ink-3);
-  font: var(--text-label);
-  letter-spacing: var(--track-label);
-  text-transform: var(--case-label);
-  font-variant-numeric: var(--numeric-label);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 
 .material-inspector input[type="color"] {
-  width: var(--control-md);
+  width: var(--control-sm);
   height: var(--control-sm);
-  padding: var(--nudge);
-  border: var(--line-edge);
+  padding: var(--gap);
+  border: var(--line);
   background: var(--plane-sheet);
 }
 
@@ -1910,18 +1913,18 @@ input[type="checkbox"] {
   display: grid;
   grid-template-columns: var(--col-label) minmax(0, 1fr);
   color: var(--ink-3);
-  font: var(--text-label);
-  letter-spacing: var(--track-label);
-  text-transform: var(--case-label);
-  font-variant-numeric: var(--numeric-label);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 
 .material-inspector label b {
   color: var(--ink);
-  font: var(--text-value);
-  letter-spacing: var(--track-value);
-  text-transform: var(--case-value);
-  font-variant-numeric: var(--numeric-value);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 
 .material-inspector > label > * {
@@ -1941,7 +1944,7 @@ input[type="checkbox"] {
 .material-empty {
   margin: 0;
   padding: var(--inset);
-  border-top: var(--line-rule);
+  border-top: var(--line);
   color: var(--ink-3);
   font: var(--text-prose);
   letter-spacing: var(--track-prose);
@@ -1988,10 +1991,10 @@ input[type="checkbox"] {
    family, tracking and case. */
 .cube-stage,
 .cube-triad {
-  font: var(--text-label);
-  letter-spacing: var(--track-label);
-  text-transform: var(--case-label);
-  font-variant-numeric: var(--numeric-label);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 
 .cube-stage:active {
@@ -2095,7 +2098,7 @@ input[type="checkbox"] {
   top: 0;
   display: grid;
   place-items: center;
-  width: var(--control-md);
+  width: var(--control-sm);
   height: var(--control-sm);
   padding: 0;
   background: var(--plane-sheet);
@@ -2115,7 +2118,7 @@ input[type="checkbox"] {
 button.icon {
   display: grid;
   place-items: center;
-  width: var(--control-md);
+  width: var(--control-sm);
   padding: 0;
 }
 
@@ -2205,7 +2208,7 @@ button.icon {
 .render-sdf {
   gap: var(--gap);
   padding-top: var(--inset);
-  border-top: var(--line-rule);
+  border-top: var(--line);
 }
 
 .render-sdf .sim-legend-values {
@@ -2232,10 +2235,10 @@ button.icon {
 .render-sdf-zero {
   height: var(--control-sm);
   padding: 0 var(--inset);
-  font: var(--text-value);
-  letter-spacing: var(--track-value);
-  text-transform: var(--case-value);
-  font-variant-numeric: var(--numeric-value);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 
 .render-preset-card {
@@ -2269,7 +2272,7 @@ button.icon {
 
 .render-preset-card.active strong {
   margin: 0 calc(var(--gap) * -1);
-  padding: var(--nudge) var(--gap);
+  padding: var(--gap) var(--gap);
   background: var(--block-current);
   color: var(--block-current-ink);
 }
@@ -2364,7 +2367,7 @@ button.icon {
 }
 
 .render-preset-card small {
-  margin-top: var(--nudge);
+  margin-top: var(--gap);
   color: var(--ink-3);
   font: var(--text-prose);
   letter-spacing: var(--track-prose);
@@ -2417,9 +2420,9 @@ button.icon {
 .render-preset-editor {
   display: flex;
   flex-direction: column;
-  gap: var(--stack);
-  padding-top: var(--stack);
-  border-top: var(--line-rule);
+  gap: var(--section);
+  padding-top: var(--section);
+  border-top: var(--line);
 }
 
 .render-preset-actions {
@@ -2451,8 +2454,8 @@ button.icon {
 .segmented,
 .sim-tabs {
   display: flex;
-  padding: var(--nudge);
-  border: var(--line-rule);
+  padding: var(--gap);
+  border: var(--line);
   background: var(--plane-sheet);
 }
 
@@ -2497,7 +2500,7 @@ button.icon {
 
 .switch input {
   flex: 0 0 auto;
-  margin-top: var(--nudge);
+  margin-top: var(--gap);
   accent-color: var(--ink);
 }
 
@@ -2506,10 +2509,10 @@ button.icon {
   flex-direction: column;
   gap: var(--gap);
   min-width: 0;
-  font: var(--text-control);
-  letter-spacing: var(--track-control);
-  text-transform: var(--case-control);
-  font-variant-numeric: var(--numeric-control);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 
 .switch small {
@@ -2526,7 +2529,7 @@ button.icon {
   gap: 0;
   margin-left: var(--section);
   padding-left: var(--inset);
-  border-left: var(--line-rule);
+  border-left: var(--line);
 }
 
 .annotation-options.disabled {
@@ -2535,7 +2538,7 @@ button.icon {
 
 .switch.compact {
   min-height: var(--control-sm);
-  padding-block: var(--nudge);
+  padding-block: var(--gap);
 }
 
 .switch.compact span {
@@ -2552,10 +2555,10 @@ button.icon {
   max-width: 46ch;
   overflow: hidden;
   color: var(--ink-2);
-  font: var(--text-label);
-  letter-spacing: var(--track-label);
-  text-transform: var(--case-label);
-  font-variant-numeric: var(--numeric-label);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2603,7 +2606,7 @@ button.icon {
   display: flex;
   align-items: stretch;
   height: calc(var(--control-sm) + var(--hairline) * 2);
-  border: var(--line-rule);
+  border: var(--line);
   animation: pop-in var(--dur-base) var(--ease);
 }
 
@@ -2633,7 +2636,7 @@ button.icon {
 .job-chip-cancel {
   width: var(--control-sm);
   padding: 0;
-  border-left: var(--line-rule);
+  border-left: var(--line);
 }
 
 .job-chip-open:hover,
@@ -2647,10 +2650,10 @@ button.icon {
    it (§4). The clock is tabular so the digits do not shuffle as it counts. */
 .job-chip-open b {
   color: var(--ink);
-  font: var(--text-label);
-  letter-spacing: var(--track-label);
-  text-transform: var(--case-label);
-  font-variant-numeric: var(--numeric-label);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 
 .job-chip-open span {
@@ -2686,10 +2689,10 @@ button.icon {
 
 .job-chip-open time {
   color: var(--ink);
-  font: var(--text-value);
-  letter-spacing: var(--track-value);
-  text-transform: var(--case-value);
-  font-variant-numeric: var(--numeric-value);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 
 /* The one coloured mark in the chip. It pulses while work is alive, which is
@@ -2755,7 +2758,7 @@ button.icon {
   /* The source is authoritative. Keep it above any viewer/tool popover that
      grows across the pane boundary on a narrow window. */
   z-index: 30;
-  border-right: var(--line-rule);
+  border-right: var(--line);
   background: var(--plane-sheet);
 }
 
@@ -2766,7 +2769,7 @@ button.icon {
   gap: var(--inset);
   height: calc(var(--unit) * 10);
   padding: 0 var(--inset);
-  border-bottom: var(--line-rule);
+  border-bottom: var(--line);
 }
 
 .pane-title {
@@ -2789,10 +2792,10 @@ button.icon {
 
 .pane-hint {
   color: var(--ink-3);
-  font: var(--text-label);
-  letter-spacing: var(--track-label);
-  text-transform: var(--case-label);
-  font-variant-numeric: var(--numeric-label);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
   white-space: nowrap;
 }
 
@@ -2807,7 +2810,7 @@ button.icon {
   margin: 0;
   padding: var(--inset);
   overflow: auto;
-  border-top: var(--line-rule);
+  border-top: var(--line);
   background: var(--plane-ground);
   color: var(--danger-ink);
   font: var(--text-body);
@@ -2832,7 +2835,7 @@ button.icon {
   position: absolute;
   inset: 0;
   z-index: 6;
-  border: var(--line-frame);
+  border: var(--line);
   pointer-events: none;
 }
 
@@ -2872,22 +2875,22 @@ button.icon {
 
 .graticule-gain > span {
   color: var(--viewport-ink-2);
-  font: var(--text-label);
-  letter-spacing: var(--track-label);
-  text-transform: var(--case-label);
-  font-variant-numeric: var(--numeric-label);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 
 .graticule-gain > span:not(:first-child) {
-  margin-left: var(--stack);
+  margin-left: var(--section);
 }
 
 .graticule-gain b {
   color: var(--viewport-ink);
-  font: var(--text-value);
-  letter-spacing: var(--track-value);
-  text-transform: var(--case-value);
-  font-variant-numeric: var(--numeric-value);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 
 .graticule-gain i {
@@ -2913,15 +2916,15 @@ button.icon {
    left and the type disappears into whatever the shader happened to draw. The
    title block already solves this the same way, for the same reason. */
 .graticule-gain.plated {
-  padding: var(--nudge) var(--inset);
+  padding: var(--gap) var(--inset);
   background: var(--surface-viewport);
-  outline: var(--line-rule);
+  outline: var(--line);
 }
 
 .sdf-key {
   padding: var(--gap) var(--inset);
   background: var(--surface-viewport);
-  outline: var(--line-rule);
+  outline: var(--line);
 }
 
 /* The slice's key: the ramp itself, with the value at each end.
@@ -2941,19 +2944,19 @@ button.icon {
    draws with; only the box is described here. */
 .sdf-key-ramp {
   height: calc(var(--unit) * 2.5);
-  border: var(--line-rule);
+  border: var(--line);
 }
 
 .sdf-key-values {
   display: flex;
   justify-content: space-between;
   gap: var(--gap);
-  margin-top: var(--nudge);
+  margin-top: var(--gap);
   color: var(--viewport-ink-2);
-  font: var(--text-value);
-  letter-spacing: var(--track-value);
-  text-transform: var(--case-value);
-  font-variant-numeric: var(--numeric-value);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 
 /* The title block, ASME Y14.100's lower-right corner: five rows of what is on
@@ -2970,7 +2973,7 @@ button.icon {
   display: grid;
   grid-template-columns: calc(var(--unit) * 16) calc(var(--unit) * 34);
   margin: 0;
-  border: var(--line-frame);
+  border: var(--line);
   background: var(--surface-viewport);
   pointer-events: none;
 }
@@ -2978,7 +2981,7 @@ button.icon {
 .title-block dt,
 .title-block dd {
   margin: 0;
-  padding: var(--nudge) var(--inset);
+  padding: var(--gap) var(--inset);
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -2987,25 +2990,25 @@ button.icon {
 /* Same two cells as the gain readout, on the same 12px line box: two labels
    of one instrument should not be two type variants. */
 .title-block dt {
-  border-right: var(--line-rule);
+  border-right: var(--line);
   color: var(--viewport-ink-2);
-  font: var(--text-label);
-  letter-spacing: var(--track-label);
-  text-transform: var(--case-label);
-  font-variant-numeric: var(--numeric-label);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 
 .title-block dd {
   color: var(--viewport-ink);
-  font: var(--text-value);
-  letter-spacing: var(--track-value);
-  text-transform: var(--case-value);
-  font-variant-numeric: var(--numeric-value);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 
 .title-block dt:nth-of-type(n + 2),
 .title-block dd:nth-of-type(n + 2) {
-  border-top: var(--line-rule);
+  border-top: var(--line);
 }
 
 /* The hint bar is left alone: the title block sits 40px up from the bottom
@@ -3078,7 +3081,7 @@ button.icon {
 }
 
 .properties-section + .properties-section {
-  border-top: var(--line-rule);
+  border-top: var(--line);
   padding-top: var(--inset);
 }
 
@@ -3094,10 +3097,10 @@ button.icon {
 
 .properties-section h3 i {
   margin-left: auto;
-  font: var(--text-label);
-  letter-spacing: var(--track-label);
-  text-transform: var(--case-label);
-  font-variant-numeric: var(--numeric-label);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
   font-style: normal;
   color: var(--ink-3, var(--ink-2));
 }
@@ -3111,10 +3114,10 @@ button.icon {
 }
 
 .properties-row > span {
-  font: var(--text-label);
-  letter-spacing: var(--track-label);
-  text-transform: var(--case-label);
-  font-variant-numeric: var(--numeric-label);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
   color: var(--ink-2);
 }
 
@@ -3216,10 +3219,10 @@ button.icon {
   stroke: var(--surface-viewport-94);
   stroke-width: 5px;
   paint-order: stroke fill;
-  font: var(--text-value);
-  letter-spacing: var(--track-value);
-  text-transform: var(--case-value);
-  font-variant-numeric: var(--numeric-value);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
   text-anchor: middle;
 }
 
@@ -3268,9 +3271,9 @@ button.icon {
 .viewer-pane.sdf-data .viewer-hint {
   left: auto;
   max-width: calc(100% - var(--unit) * 19);
-  padding: var(--nudge) var(--inset);
+  padding: var(--gap) var(--inset);
   background: var(--surface-viewport);
-  outline: var(--line-rule);
+  outline: var(--line);
 }
 
 /* Active editing mode, leading the hint bar: a stamped block. The word is the
@@ -3295,7 +3298,7 @@ button.icon {
   left: calc(var(--unit) * 16);
   z-index: 12;
   padding: var(--inset);
-  border: var(--line-edge);
+  border: var(--line);
   border-color: rgba(var(--danger-rgb), var(--alpha-edge));
   background: var(--plane-sheet);
   color: var(--danger-ink);
@@ -3331,7 +3334,7 @@ button.icon {
   min-height: 0;
   width: min(calc(var(--unit) * 220), calc(100% - var(--unit) * 12));
   height: min(calc(var(--unit) * 170), calc(100% - var(--unit) * 12));
-  border: var(--line-edge);
+  border: var(--line);
   background: var(--plane-sheet);
   animation: rise-in var(--dur-slow) var(--ease);
 }
@@ -3342,7 +3345,7 @@ button.icon {
   justify-content: space-between;
   gap: var(--inset);
   padding: var(--inset);
-  border-bottom: var(--line-rule);
+  border-bottom: var(--line);
   font: var(--text-title);
   letter-spacing: var(--track-title);
   text-transform: var(--case-title);
@@ -3355,10 +3358,10 @@ button.icon {
   margin: 0;
   padding: var(--inset);
   overflow: auto;
-  font: var(--text-code);
-  letter-spacing: var(--track-code);
-  text-transform: var(--case-code);
-  font-variant-numeric: var(--numeric-code);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 
 /* Menu-bar dialogs (open, save-as, shortcuts) -------------------------- */
@@ -3415,7 +3418,7 @@ button.icon {
 
 .scene-list button {
   width: 100%;
-  height: var(--control-md);
+  height: var(--control-sm);
   text-align: left;
   font: var(--text-body);
   letter-spacing: var(--track-body);
@@ -3427,16 +3430,16 @@ button.icon {
   display: grid;
   gap: var(--gap);
   color: var(--ink-3);
-  font: var(--text-label);
-  letter-spacing: var(--track-label);
-  text-transform: var(--case-label);
-  font-variant-numeric: var(--numeric-label);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 
 .save-as-form input[type="text"] {
-  height: var(--control-md);
+  height: var(--control-sm);
   padding: 0 var(--inset);
-  border: var(--line-edge);
+  border: var(--line);
   background: var(--plane-sheet);
   color: var(--ink);
 }
@@ -3496,7 +3499,7 @@ button.icon {
   overflow: auto;
   display: flex;
   flex-direction: column;
-  gap: var(--stack);
+  gap: var(--section);
   padding: var(--inset);
 }
 
@@ -3522,10 +3525,10 @@ button.icon {
   gap: var(--gap);
   min-width: 0;
   color: var(--ink-3);
-  font: var(--text-label);
-  letter-spacing: var(--track-label);
-  text-transform: var(--case-label);
-  font-variant-numeric: var(--numeric-label);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 .sim-row input[type="number"],
 .sim-row select {
@@ -3553,7 +3556,7 @@ button.icon {
   flex-direction: column;
   gap: var(--gap);
   padding: var(--inset);
-  border: var(--line-rule);
+  border: var(--line);
   background: var(--plane-sheet);
 }
 .sim-study-head {
@@ -3600,10 +3603,10 @@ button.icon {
   gap: var(--gap);
   min-width: 0;
   color: var(--ink-2);
-  font: var(--text-label);
-  letter-spacing: var(--track-label);
-  text-transform: var(--case-label);
-  font-variant-numeric: var(--numeric-label);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 .sim-args input[type="number"] {
   width: calc(var(--unit) * 18);
@@ -3626,7 +3629,7 @@ button.icon {
   gap: var(--gap);
   min-width: 0;
   padding: var(--gap) var(--inset);
-  border: var(--line-rule);
+  border: var(--line);
   background: var(--plane-sheet);
   transition: background-color var(--dur-fast) var(--ease);
 }
@@ -3647,10 +3650,10 @@ button.icon {
 .sim-bc-type {
   display: flex;
   align-items: center;
-  font: var(--text-label);
-  letter-spacing: var(--track-label);
-  text-transform: var(--case-label);
-  font-variant-numeric: var(--numeric-label);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 .sim-bc-main code {
   max-width: 100%;
@@ -3722,10 +3725,10 @@ button.icon {
   gap: var(--gap);
   min-width: 0;
   color: var(--ink-2);
-  font: var(--text-label);
-  letter-spacing: var(--track-label);
-  text-transform: var(--case-label);
-  font-variant-numeric: var(--numeric-label);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
   flex: 1;
 }
 .sim-sides {
@@ -3752,10 +3755,10 @@ button.icon {
    it, and it drops the furniture tracking that a dense cell cannot afford. */
 .sim-builder-vector > span {
   flex: 0 0 auto;
-  font: var(--text-label);
-  letter-spacing: var(--track-label);
-  text-transform: var(--case-label);
-  font-variant-numeric: var(--numeric-label);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
   width: var(--col-label);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3789,17 +3792,17 @@ button.icon {
    panel, so the chrome around it stays neutral. */
 .sim-ramp {
   height: calc(var(--unit) * 2.5);
-  border: var(--line-rule);
+  border: var(--line);
 }
 .sim-legend-values {
   display: flex;
   justify-content: space-between;
   gap: var(--inset);
   color: var(--ink-2);
-  font: var(--text-value);
-  letter-spacing: var(--track-value);
-  text-transform: var(--case-value);
-  font-variant-numeric: var(--numeric-value);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 /* Viewport master switch (Scene | Mesh) + the element-edge toggle. */
 .sim-view-control {
@@ -3883,7 +3886,7 @@ button.icon {
   justify-content: space-between;
   gap: var(--inset);
   min-width: 0;
-  padding: var(--nudge) var(--inset);
+  padding: var(--gap) var(--inset);
   background: var(--plane-step);
   font: var(--text-body);
   letter-spacing: var(--track-body);
@@ -3911,10 +3914,10 @@ button.icon {
   align-items: center;
   gap: var(--gap);
   color: var(--ink);
-  font: var(--text-value);
-  letter-spacing: var(--track-value);
-  text-transform: var(--case-value);
-  font-variant-numeric: var(--numeric-value);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 
 .opt-parameter-values i {
@@ -3932,7 +3935,7 @@ button.icon {
   display: block;
   width: 100%;
   height: calc(var(--unit) * 11);
-  border: var(--line-rule);
+  border: var(--line);
   background: var(--plane-sheet);
 }
 
@@ -3966,10 +3969,10 @@ button.icon {
 }
 
 .opt-summary b {
-  font: var(--text-value);
-  letter-spacing: var(--track-value);
-  text-transform: var(--case-value);
-  font-variant-numeric: var(--numeric-value);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
   color: var(--ink);
 }
 
@@ -4082,10 +4085,10 @@ button.icon {
 }
 
 .opt-live-stats b {
-  font: var(--text-value);
-  letter-spacing: var(--track-value);
-  text-transform: var(--case-value);
-  font-variant-numeric: var(--numeric-value);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
   color: var(--ink);
 }
 
@@ -4134,17 +4137,17 @@ button.icon {
 }
 
 .sim-stats span {
-  font: var(--text-label);
-  letter-spacing: var(--track-label);
-  text-transform: var(--case-label);
-  font-variant-numeric: var(--numeric-label);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
 }
 
 .sim-stats b {
-  font: var(--text-value);
-  letter-spacing: var(--track-value);
-  text-transform: var(--case-value);
-  font-variant-numeric: var(--numeric-value);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
   color: var(--ink);
 }
 
@@ -4154,7 +4157,7 @@ button.icon {
   display: block;
   width: 100%;
   height: calc(var(--unit) * 10);
-  border: var(--line-rule);
+  border: var(--line);
   background: var(--plane-sheet);
 }
 
@@ -4177,22 +4180,22 @@ button.icon {
 .sim-field-table th {
   text-align: left;
   color: var(--ink-3);
-  font: var(--text-label);
-  letter-spacing: var(--track-label);
-  text-transform: var(--case-label);
-  font-variant-numeric: var(--numeric-label);
-  padding: var(--nudge) var(--gap);
-  border-bottom: var(--line-rule);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
+  padding: var(--gap) var(--gap);
+  border-bottom: var(--line);
 }
 
 .sim-field-table td {
-  padding: var(--nudge) var(--gap);
+  padding: var(--gap) var(--gap);
   color: var(--ink-2);
-  font: var(--text-value);
-  letter-spacing: var(--track-value);
-  text-transform: var(--case-value);
-  font-variant-numeric: var(--numeric-value);
-  border-bottom: var(--line-rule);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
+  border-bottom: var(--line);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -4266,7 +4269,7 @@ button.icon {
   flex-direction: column;
   gap: var(--gap);
   padding: var(--gap) var(--inset);
-  border: var(--line-rule);
+  border: var(--line);
   background: var(--plane-sheet);
   pointer-events: none;
   animation: fade-in var(--dur-fast) var(--ease);
@@ -4274,10 +4277,10 @@ button.icon {
 
 /* Inside the viewport: viewport ink, never a chrome hue. */
 .sim-probe b {
-  font: var(--text-value);
-  letter-spacing: var(--track-value);
-  text-transform: var(--case-value);
-  font-variant-numeric: var(--numeric-value);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
   color: var(--viewport-ink);
 }
 
@@ -4313,8 +4316,8 @@ button.icon {
 
 .sim-tab-badge {
   position: absolute;
-  top: var(--nudge);
-  right: var(--nudge);
+  top: var(--gap);
+  right: var(--gap);
   width: var(--unit);
   height: var(--unit);
   background: var(--ink);
@@ -4350,12 +4353,12 @@ button.icon {
   border: none;
   background: transparent;
   color: var(--ink-3);
-  font: var(--text-control);
-  letter-spacing: var(--track-control);
-  text-transform: var(--case-control);
-  font-variant-numeric: var(--numeric-control);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
   text-align: left;
-  padding: 0 var(--nudge);
+  padding: 0 var(--gap);
 }
 
 .opt-parameters-toggle:hover {

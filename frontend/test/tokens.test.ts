@@ -385,7 +385,7 @@ describe("chrome stays clear of the data palette", () => {
   });
 });
 
-describe("text is set only in the seven roles, spaced only by the layout distances", () => {
+describe("text is set only in the four roles, spaced only by the three distances", () => {
   // Every app stylesheet; the design page's own sheet and the fenced artwork
   // (pictures of materials and render modes) are held to the same rules.
   const sheets = stylesheets.map(({ path, text }) => ({
@@ -416,14 +416,14 @@ describe("text is set only in the seven roles, spaced only by the layout distanc
     expect(offenders(/\btext-transform:\s*([^;]+);/g, /^(none|inherit|var\(--case-[a-z]+\))$/)).toEqual([]);
   });
 
-  it("draws every border and outline with one of the five lines", () => {
+  it("draws every border and outline with one of the three lines", () => {
     // A line is weight, style and colour together (rule, edge, frame, active,
     // pending); a state may recolour an edge with border-color, but a new kind
     // of line is not written inline.
     expect(
       offenders(
         /\b(?:border(?:-top|-right|-bottom|-left)?|outline):\s*([^;]+);/g,
-        /^(var\(--line-[a-z]+\)|0|none|0 none)$/,
+        /^(var\(--line(-[a-z]+)?\)|0|none|0 none)$/,
       ),
     ).toEqual([]);
   });

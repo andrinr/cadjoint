@@ -91,9 +91,9 @@ export const CHROME = {
   // Ink. Three levels, and nothing else: text is never faded with `opacity`,
   // because an opacity fade has no assertable contrast ratio. 14.4 / 7.5 / 5.1
   // against the darkest ground, so even `ink-3` clears AA on every surface.
-  ink: "#18161a",
-  "ink-2": "#48464d",
-  "ink-3": "#605e65",
+  ink: "#1c1814",
+  "ink-2": "#4b4642",
+  "ink-3": "#635e5a",
   // The one ink that is drawn on the accent rather than on paper: 7.02:1 on
   // `accent`, which is the number the whole accent rule turns on.
   "ink-on-accent": "#0a0a0c",
@@ -109,9 +109,9 @@ export const CHROME = {
   // resting hairline inside a panel is structure, not state. `rule-strong` is
   // the one that has to be found — it is what says "the viewport starts here"
   // when there is no luminance step to say it — so it clears the non-text bar.
-  rule: "#9f9da5",
-  "rule-strong": "#747278",
-  "rule-heavy": "#36343b",
+  rule: "#b4b2b9",
+  "rule-strong": "#848289",
+  "rule-heavy": "#4a484f",
 
   // The accent. One hue, and it has exactly one job: **a fill behind near-black
   // type.** It measures 7.02:1 as a ground under `ink-on-accent` and 2.26:1 as
@@ -123,11 +123,11 @@ export const CHROME = {
   // three worlds (design-language.md §6): which mode you are in is read from
   // the position of the filled cell in the switcher and from the word in the
   // hint bar, both of which survive greyscale and colour-blindness.
-  accent: "#f87318",
+  accent: "#ffb000",
   // Pressed and hovered accent fills, and the only tone allowed to draw an
   // accent-coloured *mark*: 3.36:1 on paper, so it clears the non-text bar the
   // accent itself cannot.
-  "accent-press": "#c85d00",
+  "accent-press": "#a87400",
 
   // Status and taxonomy, re-authored for paper: on a light ground a tone has
   // to be darkened, not brightened, to be read. Four tones total; the kind
@@ -166,7 +166,7 @@ export const CHROME = {
   // **inside the rectangle, nothing is coloured.** The field ramp is the only
   // hue in the viewport, which is what `measurements.txt` scores as
   // "FIELD WINS", and an achromatic annotation cannot be mistaken for a value.
-  "viewport-ink": "#18161a",
+  "viewport-ink": "#1c1814",
   "viewport-ink-2": "#605e65",
   "viewport-mark": "#48464d",
   // The mode cue drawn on the viewport border. One tone for all three modes:
@@ -366,11 +366,11 @@ export const RADII = {
  * cannot be clicked and everything clickable is `control-sm` or taller.
  */
 export const CONTROL_HEIGHTS = {
-  "control-tag": 20,
+  // The system's four heights (§1): each a line box plus a distance each side.
+  "control-tag": 16,
   "control-sm": 24,
-  "control-md": 28,
   "control-lg": 32,
-  "control-xl": 36,
+  "control-xl": 40,
 } as const;
 
 /** Durations, in ms: a tint, a state change, a layout move. */
@@ -400,7 +400,9 @@ export const LINES = {
 
 export const FONTS = {
   "font-sans": 'system-ui, -apple-system, "Segoe UI", sans-serif',
-  "font-mono": "ui-monospace, SFMono-Regular, Menlo, monospace",
+  // IBM Plex Mono, bundled with the app (@fontsource, OFL): the playground
+  // runs locally and cannot count on a font CDN.
+  "font-mono": '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
 } as const;
 
 /** A `#rrggbb` string as the normalized triple the contrast math wants. */
@@ -664,13 +666,14 @@ export const AXIS_RGB: [Rgb, Rgb, Rgb] = [
  * down a panel. On units, a stack of rows is a stack of grid lines.
  */
 export const TEXT_ROLES = {
-  label: { size: 9, weight: 600, leading: "12px", family: "mono", tracking: "0.16em", case: "uppercase", numeric: "normal" },
-  control: { size: 11, weight: 600, leading: "12px", family: "mono", tracking: "0.1em", case: "uppercase", numeric: "normal" },
-  body: { size: 12, weight: 400, leading: "16px", family: "mono", tracking: "normal", case: "none", numeric: "normal" },
-  value: { size: 13, weight: 500, leading: "16px", family: "mono", tracking: "normal", case: "none", numeric: "tabular-nums" },
+  // Four, and each looks different from the others at a glance. Values are
+  // body: in a monospace face every digit is already one width, so a
+  // separate tabular role added a name and no difference. Code is body on the
+  // editor's taller line, a property of the editor rather than a role.
+  caps: { size: 11, weight: 600, leading: "12px", family: "mono", tracking: "0.08em", case: "uppercase", numeric: "normal" },
+  body: { size: 12, weight: 400, leading: "16px", family: "mono", tracking: "normal", case: "none", numeric: "tabular-nums" },
   title: { size: 15, weight: 600, leading: "20px", family: "mono", tracking: "0.04em", case: "uppercase", numeric: "normal" },
   prose: { size: 12, weight: 400, leading: "20px", family: "sans", tracking: "normal", case: "none", numeric: "normal" },
-  code: { size: 13, weight: 400, leading: "20px", family: "mono", tracking: "normal", case: "none", numeric: "normal" },
 } as const;
 
 export type TextRole = keyof typeof TEXT_ROLES;
@@ -681,37 +684,29 @@ export type TextRole = keyof typeof TEXT_ROLES;
  * The only distances layout uses (guide S0), each named by its job. The
  * spacing scale is the raw material; components use these.
  *
- *   nudge    2   inside a control: an icon to its caret, a glyph to its edge
- *   gap      4   between controls of one group: chips, segmented cells, a rail
- *   inset    8   inside a sheet: panel, popover, card, row ends
- *   stack    12  between blocks of one panel: field groups, a list and its head
- *   section  16  between sections; the viewport's furniture from its edges
+ *   gap      4   between cells of one group; a line box to its cell's edge
+ *   inset    8   inside a sheet; a cell's text to its edge, horizontally
+ *   section  16  between blocks and sections; the viewport's furniture from its edges
  */
 export const LAYOUT = {
-  nudge: 2,
+  // The system's three distances (§1), doubling: gap u, inset 2u, section 4u.
   gap: 4,
   inset: 8,
-  stack: 12,
   section: 16,
 } as const;
 
 // ── atoms: lines, planes, blocks ──────────────────────────────────────────
 
 /**
- * The five lines everything is drawn with (guide B1). A border or outline
- * anywhere in the app is one of these, whole: weight, style and colour
- * together, named by job.
- *
- *   rule     1px rule         separates rows and sections inside a sheet
- *   edge     1px rule-strong  the outline of a sheet, field or cell; the seam
- *   frame    1px rule-heavy   the viewport's frame
- *   active   2px ink          this is the active one: tab, focus, selection
- *   pending  1px dashed       not yet: an add button, a drop target, an expression
+ * The three lines everything is drawn with (guide B1): the hairline, the
+ * active line, the pending line.
  */
 export const LINE_ATOMS = {
-  rule: "var(--hairline) solid var(--rule)",
-  edge: "var(--hairline) solid var(--rule-strong)",
-  frame: "var(--hairline) solid var(--rule-heavy)",
+  // One hairline for all structure: separators, edges and the viewport frame
+  // were three greys nobody could tell apart. It clears 3:1, so an edge can
+  // be found; the other two lines look different because they mean different
+  // things.
+  line: "var(--hairline) solid var(--rule-strong)",
   active: "var(--stroke-active) solid var(--ink)",
   pending: "var(--hairline) dashed var(--rule-strong)",
 } as const;
@@ -742,7 +737,7 @@ export const BLOCK_ATOMS = {
 
 /** Layout columns shared across panels so value columns line up (row). */
 export const COLUMNS = {
-  "col-label": 112,
+  "col-label": 96,
   "col-unit": 40,
 } as const;
 
@@ -823,7 +818,7 @@ export function cssProperties(): [string, string][] {
     ...Object.entries(ALPHAS).map(([k, v]) => [k, String(v)] as [string, string]),
     ...Object.entries(LAYOUT).map(([k, v]) => [k, px(v)] as [string, string]),
     ...Object.entries(COLUMNS).map(([k, v]) => [k, px(v)] as [string, string]),
-    ...Object.entries(LINE_ATOMS).map(([k, v]) => [`line-${k}`, v] as [string, string]),
+    ...Object.entries(LINE_ATOMS).map(([k, v]) => [k === "line" ? "line" : `line-${k}`, v] as [string, string]),
     ...Object.entries(PLANE_ATOMS).map(([k, v]) => [`plane-${k}`, v] as [string, string]),
     ...Object.entries(BLOCK_ATOMS).flatMap(([k, v]) => [
       [`block-${k}`, v.fill] as [string, string],
@@ -866,13 +861,13 @@ const LAYOUT_CLASSES = `/* Layout primitives (guide L1). */
 .l-stack {
   display: grid;
   align-content: start;
-  gap: var(--stack);
+  gap: var(--section);
 }
 .l-ruled {
   display: grid;
 }
 .l-ruled > * + * {
-  border-top: var(--line-rule);
+  border-top: var(--line);
 }
 .l-cluster {
   display: flex;
