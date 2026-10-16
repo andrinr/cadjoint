@@ -261,16 +261,15 @@ html:has(.dl-body),
   padding: 0 var(--space-4);
   border-bottom: var(--hairline) solid var(--rule);
   color: var(--ink-3);
-  font: var(--weight-medium) var(--text-2xs) / var(--leading-flat)
+  font: var(--weight-medium) var(--text-2xs) / var(--leading-snug)
     var(--font-mono);
   letter-spacing: var(--tracking-2xs);
   text-transform: uppercase;
-  white-space: nowrap;
-  overflow: hidden;
+  padding-block: var(--space-3);
 }
-.dl-plate > header > span:last-child {
-  overflow: hidden;
-  text-overflow: ellipsis;
+.dl-plate > header > span:first-child {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 /* DO and DON'T carry the word and the role: done and error (A4). */
 .dl-plate > header .do {
@@ -743,10 +742,10 @@ html:has(.dl-body),
 }
 .dl-menu > button {
   display: grid;
-  grid-template-columns: calc(var(--unit) * 5) 1fr auto;
+  grid-template-columns: calc(var(--unit) * 6) 1fr auto;
   align-items: center;
   height: calc(var(--unit) * 6);
-  padding: 0 var(--space-4) 0 var(--space-2);
+  padding: 0 var(--space-4) 0 0;
   border: 0;
   background: transparent;
   color: var(--ink);
@@ -759,6 +758,9 @@ html:has(.dl-body),
 }
 .dl-menu > button:hover {
   background: var(--surface-bar-alt);
+}
+.dl-menu > button > span:first-child {
+  text-align: center;
 }
 .dl-menu > button:disabled {
   color: var(--ink-3);
@@ -776,12 +778,20 @@ html:has(.dl-body),
   border: 0;
   border-top: var(--hairline) solid var(--rule);
 }
+/* The bar's items fill its height, so the open title's accent block is
+   exactly the bar's cell; its dropdown hangs from that cell's left edge and
+   shares the bar's bottom rule. */
 .dl-menubar {
+  position: relative;
   display: flex;
+  align-items: stretch;
   height: calc(var(--unit) * 7);
   border-bottom: var(--hairline) solid var(--rule-strong);
 }
-.dl-menubar button {
+.dl-menubar > button,
+.dl-menubar-item > button {
+  height: 100%;
+  margin: 0;
   padding: 0 var(--space-4);
   border: 0;
   background: transparent;
@@ -791,11 +801,24 @@ html:has(.dl-body),
   letter-spacing: var(--tracking-xs);
   text-transform: uppercase;
 }
-.dl-menubar button.open {
+.dl-menubar-item {
+  position: relative;
+  display: flex;
+}
+.dl-menubar-item > button.open {
   background: var(--accent);
   color: var(--ink-on-accent);
 }
-
+.dl-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 1;
+  margin-top: var(--hairline);
+}
+.dl-stage.with-menu {
+  min-height: calc(var(--unit) * 60);
+}
 /* Dialog: a scrim, then a sheet with an edge; no shadow. */
 .dl-scrim {
   display: grid;
@@ -836,9 +859,9 @@ html:has(.dl-body),
 /* Notices: in place, the status line, or the viewport's notice bar. */
 .dl-notice {
   display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: start;
-  gap: var(--space-4);
+  grid-template-columns: auto 1fr;
+  align-items: baseline;
+  gap: var(--space-3) var(--space-4);
   padding: var(--space-4) var(--space-5);
   border: var(--hairline) solid var(--rule-strong);
   background: var(--surface-float);
@@ -870,8 +893,18 @@ html:has(.dl-body),
 .dl-notice p code {
   font-family: var(--font-mono);
 }
+.dl-notice > :not(b) {
+  grid-column: 2;
+}
+/* A quiet action hangs on the text's left edge, not on its own padding. */
+.dl-notice > .dl-btn.quiet {
+  justify-self: start;
+  margin-left: calc(var(--space-4) * -1);
+}
+.dl-notice > span:empty {
+  display: none;
+}
 .dl-notice details {
-  grid-column: 2 / 3;
   color: var(--ink-3);
   font-size: var(--text-2xs);
 }
@@ -933,8 +966,10 @@ html:has(.dl-body),
 .dl-stages > span.failed {
   color: var(--danger);
 }
+/* The readout takes the slack, so the action sits at the strip's end. */
 .dl-stages > output {
   display: flex;
+  flex: 1 1 auto;
   align-items: center;
   min-width: calc(var(--unit) * 36);
   padding: 0 var(--space-4);
@@ -944,8 +979,10 @@ html:has(.dl-body),
   font-variant-numeric: tabular-nums;
 }
 .dl-stages > .dl-btn {
+  flex: 0 0 calc(var(--unit) * 28);
   height: auto;
   border-width: 0 0 0 var(--hairline);
+  border-left-color: var(--rule-strong);
 }
 
 /* Empty state: the precondition, the action. */

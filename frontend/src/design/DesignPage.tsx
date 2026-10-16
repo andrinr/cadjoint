@@ -500,7 +500,7 @@ function Axioms() {
 
       <Rule
         id="A10"
-        why="So you never wonder whether something is happening. Press Solve, and Stop while it runs."
+        why="So you never wonder whether something is happening. Press Run study, and Stop while it runs."
         single
         examples={
           <Plate kind="try" label="a job that answers">
@@ -1398,7 +1398,7 @@ function Components() {
                 </button>
               </span>
               <span class="dl-chip violated">
-                equal · P1P15–P2P4 ≠
+                equal · P1P15–P2P4 ≠ 0.02
                 <button type="button">
                   <Cross />
                 </button>
@@ -1420,46 +1420,50 @@ function Components() {
         why="A fixed leading column keeps every label aligned whether or not it carries a check or a dot."
         single
         examples={
-          <Plate label="a menu, opened from the bar" ground>
+          <Plate label="a menu, opened from the bar" ground menu>
             <div class="dl-menubar">
               <button type="button">File</button>
               <button type="button">Edit</button>
-              <button type="button" class="open">Window</button>
+              <div class="dl-menubar-item">
+                <button type="button" class="open" aria-expanded="true">
+                  Window
+                </button>
+                <div class="dl-menu dl-dropdown" role="menu">
+                  <button type="button">
+                    <span>●</span>
+                    <span>Model mode</span>
+                    <kbd>Esc</kbd>
+                  </button>
+                  <button type="button">
+                    <span />
+                    <span>Sketch mode</span>
+                    <kbd>M</kbd>
+                  </button>
+                  <hr />
+                  <button type="button">
+                    <span>✓</span>
+                    <span>Editor</span>
+                    <kbd />
+                  </button>
+                  <button type="button">
+                    <span />
+                    <span>Processes</span>
+                    <kbd />
+                  </button>
+                  <button type="button" disabled title="Results has nothing to show until a study is solved">
+                    <span />
+                    <span>Float results</span>
+                    <kbd />
+                  </button>
+                  <hr />
+                  <button type="button">
+                    <span />
+                    <span>Reset layout</span>
+                    <kbd />
+                  </button>
+                </div>
+              </div>
               <button type="button">Help</button>
-            </div>
-            <div class="dl-menu" style={{ "margin-left": "calc(var(--unit) * 26)" }}>
-              <button type="button">
-                <span>●</span>
-                <span>Model mode</span>
-                <kbd>Esc</kbd>
-              </button>
-              <button type="button">
-                <span />
-                <span>Sketch mode</span>
-                <kbd>M</kbd>
-              </button>
-              <hr />
-              <button type="button">
-                <span>✓</span>
-                <span>Editor</span>
-                <kbd />
-              </button>
-              <button type="button">
-                <span />
-                <span>Processes</span>
-                <kbd />
-              </button>
-              <button type="button" disabled title="Results has nothing to show until a study is solved">
-                <span />
-                <span>Float results</span>
-                <kbd />
-              </button>
-              <hr />
-              <button type="button">
-                <span />
-                <span>Reset layout</span>
-                <kbd />
-              </button>
             </div>
           </Plate>
         }
@@ -1474,7 +1478,7 @@ function Components() {
         why="A timer decides when you have read something. Feedback goes where its cause is, and stays until the cause is gone."
         examples={
           <>
-            <Plate kind="do" label="in place, in the program's language">
+            <Plate kind="do" label="in place, in the program's words">
               <div class="dl-notice error">
                 <b>Error</b>
                 <p>

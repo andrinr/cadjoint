@@ -119,6 +119,8 @@ export function Plate(props: {
   label?: string;
   caption?: JSX.Element;
   ground?: boolean;
+  /** Reserve room under a menu bar for an open dropdown. */
+  menu?: boolean;
   children: JSX.Element;
 }) {
   const kind = () => props.kind ?? "example";
@@ -136,7 +138,7 @@ export function Plate(props: {
           <span>· {props.label}</span>
         </Show>
       </header>
-      <div class={props.ground ? "dl-stage ground" : "dl-stage"}>{props.children}</div>
+      <div classList={{ "dl-stage": true, ground: !!props.ground, "with-menu": !!props.menu }}>{props.children}</div>
       <Show when={props.caption}>
         <figcaption>{props.caption}</figcaption>
       </Show>

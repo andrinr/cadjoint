@@ -140,7 +140,7 @@ export function JobDemo(props: { fail?: boolean }) {
           when={state() === "running"}
           fallback={
             <button type="button" class="dl-btn primary" onClick={run}>
-              Solve
+              {state() === "idle" ? "Run study" : "Run again"}
             </button>
           }
         >
