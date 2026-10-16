@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
+import { pickOption } from "./helpers/select";
 
 /**
  * File → Export…, end to end: the starter scene leaves the browser as a file.
@@ -47,10 +48,10 @@ test("File → Export… downloads the starter scene as a binary STL", async ({ 
   // each format says what it will write.
   await expect(page.getByTestId("export-name")).toHaveValue("scene");
   await expect(page.getByTestId("export-resolution")).toHaveValue("64");
-  await page.getByTestId("export-format").selectOption("step");
+  await pickOption(page, "export-format", "step");
   await expect(page.getByTestId("export-note")).toContainText("B-rep");
   await expect(page.getByTestId("export-option-analytic")).toBeChecked();
-  await page.getByTestId("export-format").selectOption("stl");
+  await pickOption(page, "export-format", "stl");
   await expect(page.getByTestId("export-option-binary")).toBeChecked();
 
   // Coarse on purpose: the point is the file, not its fidelity.

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { expectValue, pickOption } from "./helpers/select";
 
 /**
  * Sketch planes as viewport elements, and the properties window.
@@ -299,7 +300,7 @@ test("the properties window shows an extrusion's depth and writes it back", asyn
   await expect(depth).toHaveValue("1.2");
   // The depth is the named parameter fin_depth, and the window says so.
   await expect(section).toContainText("fin_depth");
-  await expect(page.getByTestId("prop-feature-material")).toHaveValue("aluminum");
+  await expectValue(page.getByTestId("prop-feature-material"), "aluminum");
 
   await depth.fill("1.5");
   await depth.press("Enter");
@@ -313,7 +314,7 @@ test("the properties window shows an extrusion's depth and writes it back", asyn
   await expect(page.getByTestId("prop-feature-depth")).toHaveValue("1.5");
 
   // A material choice goes through assign_material.
-  await page.getByTestId("prop-feature-material").selectOption("copper");
+  await pickOption(page, "prop-feature-material", "copper");
   await expect
     .poll(async () => (await editorText(page)).includes("sink = extrude(comb_profile, depth=fin_depth, material=copper)"), {
       timeout: 45_000,

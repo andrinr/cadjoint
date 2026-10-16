@@ -152,7 +152,12 @@ export function Select(props: SelectProps) {
                 classList={{ cursor: index() === cursor(), disabled: !!option.disabled }}
                 data-testid={props.testId ? `${props.testId}-option-${option.value}` : undefined}
                 onPointerEnter={() => !option.disabled && setCursor(index())}
-                onClick={() => pick(option)}
+                onClick={(event) => {
+                  // A field is often wrapped in its <label>; left uncancelled,
+                  // the click would reach the label and re-open the list.
+                  event.preventDefault();
+                  pick(option);
+                }}
               >
                 <i>{option.value === props.value ? "✓" : ""}</i>
                 <span>{option.label ?? option.value}</span>

@@ -53,7 +53,7 @@ test("the duct scene's conditions read in the Studies window", async ({ page }) 
   expect(rows).toContain("lattice inlet face");
   expect(rows).toContain("lattice outlet face");
   expect(rows).toContain("duct walls");
-  expect(rows).toContain("box [-0.14, -0.18, -0.4]");
+  expect(rows).toContain("box [-0.14, -0.18, -0.42] → [0.14, 0.18, -0.18]");
   expect(errors, errors.join("\n")).toEqual([]);
 });
 

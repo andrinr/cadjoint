@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { pickOption } from "./helpers/select";
 
 /**
  * The window system: move, tab, park, close, float, remember.
@@ -701,7 +702,7 @@ test("a failed solve shows the solver's message in the Results window", async ({
   // A boundary condition that selects nothing: a millimetre sphere fifty
   // metres away from the part. The declaration is valid, the solve is not.
   await page.getByTestId("simulate-add-bc-sink-conduction").click();
-  await page.getByTestId("simulate-builder-selection").selectOption("sphere");
+  await pickOption(page, "simulate-builder-selection", "sphere");
   for (const component of [0, 1, 2]) {
     const field = page.getByTestId(`simulate-builder-center-${component}`);
     await field.fill("50");
