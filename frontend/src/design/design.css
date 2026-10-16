@@ -1524,3 +1524,68 @@ html:has(.dl-body),
   letter-spacing: var(--tracking-3xs);
   text-transform: uppercase;
 }
+
+/* ── the feature index ─────────────────────────────────────────────────── */
+.dl-features td {
+  font-size: var(--text-2xs);
+}
+.dl-features td:first-child {
+  white-space: normal;
+  color: var(--ink);
+  font-size: var(--text-xs);
+}
+.dl-features td small {
+  color: var(--ink-3);
+  font-size: var(--text-3xs);
+  letter-spacing: var(--tracking-3xs);
+  text-transform: uppercase;
+}
+.dl-features tr.group th {
+  padding-top: var(--space-6);
+  color: var(--ink);
+  border-bottom-color: var(--rule-strong);
+}
+/* Today's home is struck through in ink-3; the rule's home follows it. */
+.dl-features s {
+  display: block;
+  color: var(--ink-3);
+}
+.dl-features .moved {
+  display: block;
+  color: var(--ink);
+  font-weight: var(--weight-semibold);
+}
+.dl-features em.gone {
+  display: block;
+  color: var(--ink-3);
+  font-style: normal;
+  letter-spacing: var(--tracking-3xs);
+  text-transform: uppercase;
+}
+.dl-features tr.issue td {
+  padding-top: 0;
+  color: var(--warn);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+}
+.dl-features tr:has(+ tr.issue) td {
+  border-bottom: 0;
+}
+
+/* The proposed menu bar: a stage tall enough for the longest menu. */
+.dl-menu-stage {
+  min-height: calc(var(--unit) * 156);
+  border: var(--hairline) solid var(--rule-strong);
+  background: var(--surface-base);
+}
+.dl-menu-stage .dl-menubar > .dl-menubar-item > button {
+  padding: 0 var(--space-3);
+}
+.dl-menu-label {
+  padding: var(--space-3) var(--space-4) var(--space-1) calc(var(--unit) * 6);
+  color: var(--ink-3);
+  font: var(--weight-semibold) var(--text-3xs) / var(--leading-flat)
+    var(--font-mono);
+  letter-spacing: var(--tracking-3xs);
+  text-transform: uppercase;
+}

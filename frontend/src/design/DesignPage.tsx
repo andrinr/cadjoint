@@ -60,6 +60,7 @@ import {
 } from "./demos";
 import { Cross, Plate, Ratio, Rule, Section, Swatch, v } from "./kit";
 import { DeskMap } from "./DeskMap";
+import { FeatureIndex, ProposedMenuBar } from "./FeatureIndex";
 import { ViewportSpecimen } from "./ViewportSpecimen";
 
 const SECTIONS = [
@@ -72,10 +73,11 @@ const SECTIONS = [
   { id: "motion", num: "7", title: "Motion" },
   { id: "components", num: "8", title: "Components" },
   { id: "layout", num: "9", title: "Where things are" },
-  { id: "viewport", num: "10", title: "Viewport" },
-  { id: "behaviour", num: "11", title: "Behaviour" },
-  { id: "language", num: "12", title: "Language" },
-  { id: "changes", num: "13", title: "What changes" },
+  { id: "features", num: "10", title: "Every feature" },
+  { id: "viewport", num: "11", title: "Viewport" },
+  { id: "behaviour", num: "12", title: "Behaviour" },
+  { id: "language", num: "13", title: "Language" },
+  { id: "changes", num: "14", title: "What changes" },
 ];
 
 /**
@@ -1678,9 +1680,56 @@ function Layout() {
   );
 }
 
+function Features() {
+  return (
+    <Section
+      id="features"
+      num="10"
+      title="Every feature"
+      intro="Every feature of the playground, everywhere it can be reached today, and where these rules put it. The table and the menu bar below are rendered from one list, design/features.ts."
+    >
+      <Rule
+        id="N9"
+        why="The menu bar is where you look when you do not know where to look. If a command is only on a rail, a gesture or a key, the only way to find it is to already know it."
+      >
+        The menu bar is the complete index. Every command has a menu home; the toolbar, the rail,
+        the panels and the keys are shortcuts to it, and the menu shows the key. A command that does
+        not apply in the current mode is shown disabled, with the reason; the rail and the panels
+        show only what applies.
+      </Rule>
+      <Rule
+        id="N10"
+        why="Grouping follows N5: by what the command acts on. File for the document, Edit for the selection, View for the picture, Create, Shape and Constrain for geometry, Simulate for studies and their outcomes, Program for the run, Window for the desk."
+        single
+        examples={
+          <Plate kind="try" label="the proposed menu bar; switch the mode and open the menus">
+            <ProposedMenuBar />
+          </Plate>
+        }
+      >
+        Menus are grouped by what their commands act on, in the order you work: file, selection,
+        picture, geometry, physics, run, desk, help.
+      </Rule>
+      <Rule
+        id="N11"
+        why="Read down a column to see a kind of home; read along a row to see every way to one feature."
+        single
+        examples={
+          <Plate label="the feature index">
+            <FeatureIndex />
+          </Plate>
+        }
+      >
+        One name per command in every home, at least one keyboard path for every frequent command,
+        and no command reachable only by a gesture.
+      </Rule>
+    </Section>
+  );
+}
+
 function Viewport() {
   return (
-    <Section id="viewport" num="10" title="Viewport" intro="The viewport is an instrument face (A1). Its overlays are achromatic unless they are data or direction (C7).">
+    <Section id="viewport" num="11" title="Viewport" intro="The viewport is an instrument face (A1). Its overlays are achromatic unless they are data or direction (C7).">
       <Rule
         id="V1"
         why="Free versus held is shape, so the free-parameter hue stays in the chrome and the viewport keeps its colour for readings."
@@ -1722,7 +1771,7 @@ function Viewport() {
 
 function Behaviour() {
   return (
-    <Section id="behaviour" num="11" title="Behaviour" intro="The functional rules. They come from A2 (the program is the truth), A10 (every action answers) and A11 (every step can be taken back).">
+    <Section id="behaviour" num="12" title="Behaviour" intro="The functional rules. They come from A2 (the program is the truth), A10 (every action answers) and A11 (every step can be taken back).">
       <h3>The program is the truth</h3>
       <Rule id="F1" why="An expression is not a number: overwriting it with one would silently break the program.">
         Every panel is an editor of literals. An argument written as an expression is shown as
@@ -1919,7 +1968,7 @@ function Language() {
     ["empty", "—", "an em dash; never 0, N/A or blank"],
   ];
   return (
-    <Section id="language" num="12" title="Language" intro="Words are part of the interface, and they follow A8.">
+    <Section id="language" num="13" title="Language" intro="Words are part of the interface, and they follow A8.">
       <Rule
         id="L1"
         single
@@ -2002,7 +2051,7 @@ function Changes() {
   return (
     <Section
       id="changes"
-      num="13"
+      num="14"
       title="What changes"
       intro="What the playground does today that these rules retire. Each pair is now, then the rule."
     >
@@ -2325,6 +2374,7 @@ export function DesignPage() {
           <Motion />
           <Components />
           <Layout />
+          <Features />
           <Viewport />
           <Behaviour />
           <Language />
