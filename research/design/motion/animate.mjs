@@ -845,7 +845,13 @@ const CLIPS = [
       const choose = async (id, value) => {
         const field = tid(page, id).first();
         await point(page, field, { steps: 14 });
-        await field.selectOption(value);
+        // A Select is a field and a listbox, not a native <select>: open it,
+        // let the list be seen, then point at the option and pick it.
+        await field.click();
+        await wait(500);
+        const option = tid(page, `${id}-option-${value}`).first();
+        await point(page, option, { steps: 10 });
+        await option.click();
         await waitForCompile(page);
         await wait(1200);
       };
