@@ -348,7 +348,6 @@ cuda = [
     { name = "jax", extra = ["cuda12"] },
 ]
 dev = [
-    { name = "filelock" },
     { name = "matplotlib" },
     { name = "pre-commit" },
     { name = "pytest" },
@@ -404,7 +403,6 @@ requires-dist = [
     { name = "anywidget", marker = "extra == 'viewer'", specifier = ">=0.9.21" },
     { name = "cadquery-ocp", marker = "python_full_version < '3.15' and extra == 'stepcheck'" },
     { name = "fenics-basix", marker = "extra == 'fem'" },
-    { name = "filelock", marker = "extra == 'dev'", specifier = ">=3.12" },
     { name = "gmsh", marker = "extra == 'fem'" },
     { name = "gmsh", marker = "extra == 'gmsh'" },
     { name = "griffe", marker = "extra == 'docs'", specifier = "<1.0" },
