@@ -444,6 +444,7 @@ def test_both_backends_agree_on_the_material_field(label, scene):
     np.testing.assert_allclose(direct, traced, rtol=2e-5, atol=2e-6)
 
 
+@pytest.mark.sweep
 @pytest.mark.parametrize("stem", _SHIPPED)
 def test_a_shipped_scene_agrees_field_for_field(stem):
     """The comparison that matters: real geometry, not a synthetic ring.
