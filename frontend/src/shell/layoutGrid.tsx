@@ -110,7 +110,9 @@ function measure(): Offender[] {
     // things are: a cell sized by its own text and a pane as wide as the user
     // dragged it are not measured across (guide S0).
     const fixedWidth = element.matches(FIXED_WIDTH);
-    const fixedX = fixedWidth && !element.matches("[class*=badge]");
+    // A badge follows its text and a field its track: their widths are
+    // fixed, their x is not theirs to choose.
+    const fixedX = fixedWidth && !element.matches("[class*=badge], input, .ui-select");
     // Furniture anchored to a pane's right edge is on the grid from that
     // edge: either side counts.
     const x = box.left - origin.left;

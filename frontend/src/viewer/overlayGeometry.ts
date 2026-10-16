@@ -56,10 +56,18 @@ const INK = hexToRgb(CHROME.ink);
 const HANDLE_HELD: Rgba = [...hexToRgb(CHROME[VIEWPORT_STATES.rest]), 1];
 
 /**
+ * A free vertex's ring: the free-parameter blue, the same hue `free=True`
+ * takes in the editor, so blue means "the optimiser or a drag may move
+ * this" on both sides of the window. Hover keeps the hue and gains weight
+ * through the emphasis flag.
+ */
+const HANDLE_FREE: Rgba = [...hexToRgb(CHROME.param), 1];
+
+/**
  * Handle shapes, the instance's last float (see `fs_handle`). Free versus
- * held is told apart by shape rather than hue (V1), so the free-parameter
- * colour stays in the chrome: a free vertex is a hollow circle, a held one a
- * filled square, and the selected vertex a filled circle whatever it is.
+ * held is told by shape and hue together, so it survives a colour-blind
+ * reading: a free vertex is a hollow ring in param blue, a held one a filled
+ * ink square, and the selected vertex a filled ink circle whatever it is.
  */
 export const HANDLE_SHAPE = { free: 0, held: 1, selected: 2 } as const;
 
@@ -119,10 +127,12 @@ export function packConstructionOverlay(
         : isSelected
           ? COLORS.handleSelected
           : isHovered
-            ? COLORS.handleHover
+            ? held
+              ? COLORS.handleHover
+              : HANDLE_FREE
             : held
               ? HANDLE_HELD
-              : COLORS.handle;
+              : HANDLE_FREE;
       const position = node.vertices[index].world;
       handles.push(
         position[0],

@@ -9,7 +9,7 @@
  * library sits on top; Customize expands the per-setting editor.
  */
 
-import { For, Show, createMemo, createSignal } from "solid-js";
+import { For, Show, createMemo, createSignal, type JSX } from "solid-js";
 import {
   renderPresetMatches,
   type RenderPreset,
@@ -28,6 +28,14 @@ import {
 import { sdfRampCss } from "../viewer/sdfRamp";
 import { MM_PER_UNIT, formatDistance } from "../viewer/graticule";
 import { Segmented, ToggleSwitch, type SegmentedOption } from "./ui";
+import { BoxIcon, StudioIcon, WireIcon, XrayIcon } from "./icons";
+
+/** Each built-in preset's glyph, drawn in the icon set's own pen (I1). */
+const PRESET_ICONS: Record<string, (props: { size?: number }) => JSX.Element> = {
+  xray: XrayIcon,
+  studio: StudioIcon,
+  wire: WireIcon,
+};
 
 const SHADOWS: SegmentedOption<ShadowMode>[] = [
   {
@@ -235,8 +243,7 @@ export function RenderPanel(props: RenderPanelProps) {
                     data-testid={`render-preset-${preset.id}`}
                   >
                     <span class="render-preset-preview" aria-hidden="true">
-                      <i />
-                      <i />
+                      {(PRESET_ICONS[preset.id] ?? BoxIcon)({ size: 24 })}
                     </span>
                     <strong>{preset.name}</strong>
                     <small>{preset.hint}</small>

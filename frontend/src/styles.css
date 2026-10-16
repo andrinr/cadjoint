@@ -552,13 +552,10 @@ button.primary,
   color: var(--block-current-ink);
 }
 
-button.active:hover:not(:disabled),
-button.primary:hover:not(:disabled),
-.sim-run:hover:not(:disabled),
-.opt-player button.opt-replay:hover:not(:disabled) {
-  border-color: var(--accent-press);
-  background: var(--accent-press);
-}
+/* The block does not move under the pointer. A state that is on stays the
+   one amber whatever the pointer does: a darker press shade read as a second
+   accent, and hovering a thing that is already on has nothing to say. The
+   pointer cursor is the hover feedback. */
 
 /* ── form controls ────────────────────────────────────────────────────── */
 
@@ -2038,7 +2035,12 @@ input[type="checkbox"] {
   stroke-width: 2;
 }
 
+/* Tracking is set again on the label itself: an em length computes to an
+   absolute one where it is declared and is inherited as that, so the stage's
+   0.08em of 11px (0.88px) arrived here as 0.88 cube units against a 0.26-unit
+   glyph and pulled each face name apart into scattered letters. */
 .cube-label {
+  letter-spacing: var(--track-caps);
   fill: var(--ink-3);
   pointer-events: none;
   user-select: none;
@@ -2270,79 +2272,45 @@ button.icon {
    cards. No edge and no dot: the accent is only ever a fill under type. */
 /* On the accent block every line takes the block's own ink (B3); ink-3 on
    the accent measured 2.27:1. */
-.render-preset-card.active small {
-  color: var(--block-current-ink);
+/* The card itself stays a sheet: the generic button.active fill would
+   paint the whole card amber, which is the material card's rule broken. */
+.render-preset-card.active,
+.render-preset-card.active:hover {
+  border-color: var(--rule-strong);
+  background: var(--plane-sheet);
+  color: var(--ink);
+}
+
+/* Every name sits in the same box, so turning one on fills it and moves
+   nothing. */
+.render-preset-card strong {
+  margin: 0 calc(var(--gap) * -1);
+  padding: var(--gap) var(--gap);
 }
 
 .render-preset-card.active strong {
-  margin: 0 calc(var(--gap) * -1);
-  padding: var(--gap) var(--gap);
   background: var(--block-current);
   color: var(--block-current-ink);
 }
 
-/* @artwork — the three preset thumbnails are pictures of render modes. */
-
+/* The preset's glyph, on a strip of viewport ground: an icon from the
+   rail's own set (I1) rather than a painted thumbnail, so the three cards
+   read as three tools of one kit. The ground is the viewport's, because the
+   glyph says what the viewport will look like. */
 .render-preset-preview {
-  position: relative;
-  height: 43px;
-  margin-bottom: 6px;
-  overflow: hidden;
-  border: var(--hairline) solid rgba(255, 255, 255, 0.055);
-  background:
-    linear-gradient(160deg, rgba(255, 255, 255, 0.055), transparent 52%),
-    #0b0e0c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--control-xl);
+  margin-bottom: var(--gap);
+  border: var(--line);
+  background: var(--plane-ground);
+  color: var(--ink-2);
 }
 
-.render-preset-preview i:first-child {
-  position: absolute;
-  top: 7px;
-  left: 50%;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  transform: translateX(-50%);
-  background:
-    radial-gradient(circle at 34% 27%, rgba(255, 255, 255, 0.88), transparent 10%),
-    radial-gradient(circle at 42% 36%, #89ad9f, #283832 57%, #080a09 80%);
-  box-shadow: 0 6px 10px rgba(0, 0, 0, 0.65);
+.render-preset-card.active .render-preset-preview {
+  color: var(--ink);
 }
-
-.render-preset-preview i:last-child {
-  position: absolute;
-  right: 8px;
-  bottom: 5px;
-  left: 8px;
-  height: 8px;
-  border-top: var(--hairline) solid rgba(255, 255, 255, 0.12);
-  transform: skewX(-28deg);
-}
-
-.render-preset-card[data-preset="xray"] .render-preset-preview i:first-child {
-  border: var(--hairline) solid rgba(217, 255, 87, 0.8);
-  background:
-    linear-gradient(90deg, transparent 47%, rgba(217, 255, 87, 0.55) 50%, transparent 53%),
-    linear-gradient(transparent 47%, rgba(217, 255, 87, 0.55) 50%, transparent 53%),
-    rgba(111, 145, 93, 0.24);
-  box-shadow: 0 0 12px rgba(217, 255, 87, 0.12);
-}
-
-.render-preset-card[data-preset="studio"] .render-preset-preview i:first-child {
-  background:
-    radial-gradient(circle at 32% 25%, #fff6df 0 4%, transparent 13%),
-    radial-gradient(circle at 38% 34%, #d2b474, #6b4f28 52%, #15100a 78%);
-}
-
-.render-preset-card[data-preset="wire"] .render-preset-preview i:first-child {
-  border: var(--hairline) solid #78c6e7;
-  background:
-    linear-gradient(45deg, transparent 48%, rgba(120, 198, 231, 0.7) 50%, transparent 52%),
-    linear-gradient(-45deg, transparent 48%, rgba(120, 198, 231, 0.7) 50%, transparent 52%);
-  box-shadow: none;
-  transform: translateX(-50%) rotate(8deg);
-}
-
-/* @end-artwork */
 
 .render-preset-card strong {
   overflow: hidden;
@@ -3555,11 +3523,13 @@ button.icon {
   flex-direction: column;
   gap: var(--inset);
 }
+/* The hairline is inside the inset, so the card's rows land on the panel's
+   tracks rather than a pixel below them. */
 .sim-study {
   display: flex;
   flex-direction: column;
   gap: var(--gap);
-  padding: var(--inset);
+  padding: calc(var(--inset) - var(--hairline));
   border: var(--line);
   background: var(--plane-sheet);
 }
@@ -3596,24 +3566,30 @@ button.icon {
   border-color: var(--danger);
   color: var(--danger-ink);
 }
+/* A study's arguments are rows on the panel tracks (L2): label | value |
+   unit, a cell high, a line between, so their fields share one column with
+   every other value in the app. */
 .sim-args {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--gap);
+  display: grid;
 }
 .sim-args label {
-  display: flex;
-  flex-direction: column;
-  gap: var(--gap);
+  display: grid;
+  grid-template-columns: var(--col-label) minmax(0, 1fr) var(--col-unit);
+  align-items: center;
+  gap: var(--inset);
   min-width: 0;
+  min-height: calc(var(--control-sm) + var(--gap) * 2);
+  border-bottom: var(--line);
   color: var(--ink-2);
   font: var(--text-caps);
   letter-spacing: var(--track-caps);
   text-transform: var(--case-caps);
   font-variant-numeric: var(--numeric-caps);
 }
-.sim-args input[type="number"] {
-  width: calc(var(--unit) * 18);
+.sim-args input[type="number"],
+.sim-args select,
+.sim-args .ui-select {
+  width: 100%;
 }
 .sim-bcs {
   margin: 0;
@@ -3627,12 +3603,19 @@ button.icon {
    the only elastic cell (min-width:0 lets it ellipsis), and the value box
    and the delete button hold their size beside it. Wrapping used to drop
    the delete button onto a second line of its own. */
+/* A boundary condition is a row on the panel tracks: its description spans
+   label and value, its number sits in the unit…action span, the delete in
+   the action track. Aligned to the top so a row's height is its line boxes
+   plus a gap each side (L3). */
 .sim-bcs li {
-  display: flex;
-  align-items: center;
-  gap: var(--gap);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto var(--control-sm);
+  align-items: start;
+  gap: var(--inset);
   min-width: 0;
-  padding: var(--gap) var(--inset);
+  /* The row's own edge is inside its rhythm: padding is a gap less a hairline,
+     so a bordered row is the same height as an unbordered one. */
+  padding: calc(var(--gap) - var(--hairline)) var(--inset);
   border: var(--line);
   background: var(--plane-sheet);
   transition: background-color var(--dur-fast) var(--ease);

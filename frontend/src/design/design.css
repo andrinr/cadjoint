@@ -481,11 +481,6 @@ html:has(.dl-body),
   background: var(--accent);
   color: var(--ink-on-accent);
 }
-.dl-btn.primary:hover,
-.dl-btn.primary:active {
-  border-color: var(--accent-press);
-  background: var(--accent-press);
-}
 .dl-btn.primary:disabled {
   border-color: var(--surface-bar-alt);
   background: var(--surface-bar-alt);

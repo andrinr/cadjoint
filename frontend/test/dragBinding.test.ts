@@ -36,6 +36,7 @@ import {
   packConstructionOverlay,
   vertexHeld,
 } from "../src/viewer/overlayGeometry";
+import { CHROME, hexToRgb } from "../src/tokens";
 import type { ShaderProgramPayload } from "../src/viewer/shaderProgram";
 import type { ConstructionNode, ConstructionTransform, ConstructionVertex } from "../src/types";
 
@@ -269,15 +270,15 @@ describe("packConstructionOverlay shapes handles", () => {
     }
   });
 
-  it("keeps every handle tone achromatic", () => {
+  it("draws a held handle in ink and a free one in param blue", () => {
     const profile = node([
       { free: false, binding: null },
       { free: true, binding: null },
     ]);
     const { handles } = packConstructionOverlay([profile], null, null);
-    for (let index = 0; index < 2; index++) {
-      const [r, g, b] = handles.slice(index * floats + 3, index * floats + 6);
-      expect(Math.max(r, g, b) - Math.min(r, g, b)).toBeLessThan(0.04);
-    }
+    const [hr, hg, hb] = handles.slice(3, 6);
+    expect(Math.max(hr, hg, hb) - Math.min(hr, hg, hb)).toBeLessThan(0.04);
+    const [fr, fg, fb] = handles.slice(floats + 3, floats + 6);
+    expect([fr, fg, fb]).toEqual(hexToRgb(CHROME.param));
   });
 });

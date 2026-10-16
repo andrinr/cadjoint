@@ -455,3 +455,35 @@ export function PerpendicularIcon(props: IconProps) {
     </svg>
   );
 }
+
+/** The cube's three hidden edges, meeting at the far corner behind the near one. */
+const CUBE_HIDDEN = "M8.5 8.5L2.5 12M8.5 8.5L14.5 12M8.5 8.5V1.5";
+
+/** X-Ray: the solid's outline with its hidden edges shown through, dashed. */
+export function XrayIcon(props: IconProps) {
+  return (
+    <svg {...base(props.size ?? BOX)}>
+      <path d={CUBE} />
+      <path d={CUBE_HIDDEN} stroke-dasharray="1.5 1.5" stroke-linecap="butt" />
+    </svg>
+  );
+}
+
+/** Studio: the lit solid, its shadow side hatched. */
+export function StudioIcon(props: IconProps) {
+  return (
+    <svg {...base(props.size ?? BOX)}>
+      <path d={CUBE} />
+      <path d="M10.5 8.6V13.6M12.5 7.4V12.4" />
+    </svg>
+  );
+}
+
+/** Wire: every edge, hidden or not, drawn alike. */
+export function WireIcon(props: IconProps) {
+  return (
+    <svg {...base(props.size ?? BOX)}>
+      <path d={CUBE + CUBE_HIDDEN} />
+    </svg>
+  );
+}

@@ -615,16 +615,19 @@ export const OVERLAY_TONES: Record<string, { token: ChromeToken; alpha: number }
   faceFill: { token: "ink", alpha: 0.12 },
   faceOutlineLocked: { token: "ink", alpha: 0.45 },
   faceFillLocked: { token: "ink", alpha: 0.05 },
-  planeFill: { token: "ink-3", alpha: 0.08 },
-  planeOutline: { token: "ink-3", alpha: 0.65 },
-  planeFillHover: { token: "ink-2", alpha: 0.12 },
-  planeOutlineHover: { token: "ink-2", alpha: 0.9 },
-  planeFillSelected: { token: "ink", alpha: 0.12 },
+  // The plane is the ground a sketch is drawn on, so it has to read against
+  // the grey model behind it: a fill a step heavier than a face highlight and
+  // a frame in ink-2. Hover and selection still step up from there.
+  planeFill: { token: "ink-3", alpha: 0.14 },
+  planeOutline: { token: "ink-2", alpha: 0.9 },
+  planeFillHover: { token: "ink-2", alpha: 0.18 },
+  planeOutlineHover: { token: "ink", alpha: 0.95 },
+  planeFillSelected: { token: "ink", alpha: 0.2 },
   planeOutlineSelected: { token: "ink", alpha: 1 },
-  planeFillLocked: { token: "rule", alpha: 0.06 },
-  planeOutlineLocked: { token: "rule", alpha: 0.5 },
-  planeFillPreview: { token: "ink-2", alpha: 0.1 },
-  planeOutlinePreview: { token: "ink-2", alpha: 0.85 },
+  planeFillLocked: { token: "rule-strong", alpha: 0.1 },
+  planeOutlineLocked: { token: "rule-strong", alpha: 0.8 },
+  planeFillPreview: { token: "ink-2", alpha: 0.16 },
+  planeOutlinePreview: { token: "ink-2", alpha: 0.95 },
 };
 
 /** An overlay tone as the renderer's straight-alpha rgba. */

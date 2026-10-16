@@ -83,8 +83,7 @@
   min-width: calc(var(--unit) * 60);
 }
 
-/* The open title is the accent fill whatever the pointer does; the generic
-   button.active:hover rule would otherwise press it to accent-press. */
+/* The open title is the accent fill whatever the pointer does. */
 .menu-bar .menu-title.active,
 .menu-bar .menu-title.active:hover:not(:disabled) {
   background: var(--block-current);

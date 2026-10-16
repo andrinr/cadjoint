@@ -1023,7 +1023,9 @@ function Colour() {
       >
         The accent means <i>current</i>: the active mode, the selected row, the primary action, the
         source span being edited. It is a fill with <code>ink-on-accent</code> type, never ink.{" "}
-        <code>accent-press</code> is its pressed state and the only accent-coloured mark.
+        The block does not change under the pointer: a state that is on is one amber, never a
+        darker press shade. <code>accent-press</code> survives only as the one accent-coloured mark
+        on paper, where the fill itself fails 3:1.
       </Rule>
       <Rule
         id="C6"
@@ -2068,7 +2070,7 @@ function Components() {
                         <button type="button" class={`dl-btn ${cls}`}>{label}</button>
                       </td>
                       <td>
-                        <button type="button" class={`dl-btn ${cls} pressed`} style={cls === "primary" ? { background: v("accent-press"), "border-color": v("accent-press") } : undefined}>
+                        <button type="button" class={`dl-btn ${cls} pressed`}>
                           {label}
                         </button>
                       </td>
@@ -2544,7 +2546,7 @@ function Viewport() {
     <Section id="viewport" num="12" title="Viewport" intro="The viewport is an instrument face (A1). Its overlays are achromatic unless they are data or direction (C7).">
       <Rule
         id="V1"
-        why="Free versus held is shape, so the free-parameter hue stays in the chrome and the viewport keeps its colour for readings."
+        why="Free versus held is told by shape and by the one hue that means free everywhere: the blue free=True takes in the editor is the blue of a vertex a drag or the optimiser may move."
         single
         examples={
           <Plate label="sketch mode" ground>
@@ -2552,7 +2554,7 @@ function Viewport() {
           </Plate>
         }
       >
-        A free vertex is a hollow circle; a held vertex is a filled square; the selected vertex is a
+        A free vertex is a hollow <code>param</code> ring; a held vertex is a filled square; the selected vertex is a
         filled <code>ink</code> circle. Edges go <code>ink-3</code> → <code>ink-2</code> (hover) →{" "}
         <code>ink</code> (selected, 2px); a locked edge is <code>rule</code> (solid: dashed means <i>not yet</i>, E4). Dimension
         labels are <code>ink</code> on an opaque tab, and a violated one is <code>danger</code> and
