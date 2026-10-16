@@ -1,0 +1,8 @@
+{
+  "name": "cadjoint-jaxjs-spike",
+  "private": true,
+  "type": "module",
+  "scripts": { "dev": "vite --port 5191 --strictPort", "build": "tsc --noEmit && vite build" },
+  "dependencies": { "@jax-js/jax": "0.1.26" },
+  "devDependencies": { "typescript": "5.6.3", "vite": "5.4.10" }
+}
