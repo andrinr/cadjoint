@@ -23,7 +23,7 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          pip install "jax[cpu]>=0.4.20" imageio numpy
+          pip install "jax[cpu]>=0.4.20,<0.9" imageio numpy
           pip install -e . --no-deps
           pip install optax optimistix
           pip install "quartodoc>=0.7" "griffe<1.0"

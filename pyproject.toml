@@ -26,7 +26,10 @@ classifiers = [
 ]
 dependencies = [
     "imageio>=2.37.2",
-    "jax>=0.4.20",
+    # Capped at the series CI and uv.lock test: jax 0.11 changed behaviour
+    # under six cadjoint tests (x64 handling, compile errors, seam projection).
+    # Raise the cap together with the lock once the suite passes on the new one.
+    "jax>=0.4.20,<0.9",
     "numpy>=1.24.0",
     "optax>=0.2.4",
     "optimistix>=0.0.10",
@@ -50,7 +53,7 @@ cadjoint-viewer = "cadjoint.viewer.playground:main"
 [project.optional-dependencies]
 # CPU JAX is the default so the package installs on macOS and CPU-only Linux.
 # Install this extra on a Linux box with an NVIDIA GPU (no macOS wheels exist).
-cuda = ["jax[cuda12]>=0.4.20"]
+cuda = ["jax[cuda12]>=0.4.20,<0.9"]
 # jax-fem 0.0.12 ships an empty install_requires, so its actual imports
 # (basix, meshio, gmsh, petsc4py, pyfiglet, scipy) are listed here explicitly.
 fem = [

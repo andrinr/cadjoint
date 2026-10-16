@@ -27,7 +27,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install "jax[cpu]>=0.4.20"
+          pip install "jax[cpu]>=0.4.20,<0.9"
           pip install -e ".[dev]" --no-deps
           pip install pytest scikit-image matplotlib optax optimistix pydantic
 

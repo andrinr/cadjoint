@@ -39,7 +39,10 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install "jax[cpu]>=0.4.20"
+          # The same series pyproject.toml caps at. Unbounded, this pulled
+          # jax 0.11 the day it appeared and turned main red on six tests that
+          # pass on the locked 0.8.2.
+          pip install "jax[cpu]>=0.4.20,<0.9"
           pip install -e ".[dev]" --no-deps
           pip install pytest pytest-xdist scikit-image matplotlib optax optimistix pydantic
 
