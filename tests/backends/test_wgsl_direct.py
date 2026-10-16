@@ -370,7 +370,27 @@ def _scenes() -> list[tuple[str, object]]:
     ]
 
 
-@pytest.mark.parametrize(("label", "scene"), _scenes(), ids=[name for name, _ in _scenes()])
+#: The parity cases that cost seconds each on a CPU runner, against well
+#: under one for the rest, so they run nightly. Profiles, linear patterns
+#: and revolves keep a cheaper case in the fast loop; the polar pattern does
+#: not, so a push that breaks only that is caught by nightly.yml.
+_HEAVY = {
+    "linear pattern of a profile, with a skip",
+    "polar pattern",
+    "polar pattern about a tilted axis, with a skip",
+    "two profiles share one buffer",
+    "revolve",
+}
+
+
+def _parity_cases() -> list:
+    return [
+        pytest.param(label, scene, id=label, marks=[pytest.mark.slow] if label in _HEAVY else [])
+        for label, scene in _scenes()
+    ]
+
+
+@pytest.mark.parametrize(("label", "scene"), _parity_cases())
 def test_both_backends_agree_with_the_python_field(label, scene):
     """The claim the direct backend has to earn, on a real device.
 
