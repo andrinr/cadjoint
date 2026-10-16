@@ -72,10 +72,13 @@ Clevis bracket (40 nodes), browser pane (Chromium 152), Apple Silicon:
 
 | | Wasm fused | Wasm per-node | WebGPU fused | WebGPU per-node |
 | --- | --- | --- | --- | --- |
-| first call, 256 points (compile + run) | 190 ms | 91 ms | did not finish in 15+ min | blocked, see below |
+| first call, 256 points (compile + run) | 190 ms | 91 ms | did not finish in 15+ min | did not finish in 1+ min |
 | second call, 256 points | 7 ms | 3 ms | | |
 | first call, 1 M points | 1528 ms | 367 ms | | |
 | warm, 1 M points | 394 ms | 209 ms | | |
+
+Per-kernel compile + run on Wasm (`?kernels`, 256 points): every node type
+takes 2-69 ms; the extruded polygons are the largest at ~60 ms.
 
 Per-node is the better default on Wasm too. Headless (Node, Wasm) it gives
 the same values within 1.1e-5 and the same blend gradient within 4.7e-7;
@@ -85,17 +88,35 @@ lattice was chosen to align with the clevis's faces, so 10,909 lattice
 points sit exactly on a face and the sign at zero is rounding. A real export
 fits its grid to the part with padding and almost never lands on a face.
 
+### WebGPU: unresolved
+
 The fused WebGPU compile is worse than slow: shader compilation runs in the
-browser's single GPU process, so one huge fused shader stalls WebGPU for
-every tab until it finishes. That is why the per-node WebGPU run is still
-unmeasured here; the GPU process has to be restarted first.
+browser's single GPU process, so one stalled shader blocks WebGPU in every
+tab until the app is restarted.
+
+Per-node mode did not fix it. After a restart, per-node on WebGPU stalled
+too, which means one *kernel type* is the problem rather than the size of
+the fused scene. The suspects, from what did and did not run:
+
+- On WebGPU the space-frame node ran fused in 106 ms, so sphere, cylinder,
+  rotate, translate, union, intersection and shell are fine there.
+- The clevis adds box, round_box, extruded_polygon_4, difference and offset.
+  Box and round_box are the only kernels with reductions along an axis
+  (`np.max`, `np.sum` over the 3-vector) inside the `vmap`, and per-node
+  composition reaches round_box first.
+
+Next step: after an app restart, run `?kernels&webgpu` before anything else.
+It compiles each kernel alone, the known-good ones first and the suspects
+last, and logs `compiling X` before each, so the stalling kernel is named.
+If it is the reductions, emitting the 3-vector `max`/`sum` as unrolled
+pairwise ops (which StableHLO lets the emitter do) is a likely fix.
 
 ## Files
 
 `emit_kernels.py`, `export_scene.py`, `check.mts`, `src/kernels.gen.ts`
 (generated), `src/runtime.ts`, `src/dc.ts`, `src/mesh.ts` (checks, STL),
-`src/main.ts` (the page; `?quick`, `?split[=node][&webgpu]` time single
-steps), `src/sdf.ts` (the earlier hand-written node port, kept for
+`src/main.ts` (the page; `?quick`, `?split[=node][&webgpu][&pernode]` and
+`?kernels[&webgpu]` time single steps), `src/sdf.ts` (the earlier hand-written node port, kept for
 comparison), `make_reference*.py` (the first, hand-port references).
 
 Run: `npm install && npm run dev`, open http://localhost:5191/.

@@ -13,7 +13,8 @@
  * Results land in <pre id="out"> as JSON.
  */
 import { defaultDevice, grad, init, numpy as np } from "@jax-js/jax";
-import { field, fieldPerNode, totalOverFree, type SceneNode } from "./runtime";
+import { batchedKernel, field, fieldPerNode, totalOverFree, type SceneNode } from "./runtime";
+import { kernels } from "./kernels.gen";
 import { spaceFrameNode } from "./sdf";
 import { dualContour } from "./dc";
 import { badEdges, badEdgesAfterWeld, stl, volume } from "./mesh";
@@ -179,7 +180,48 @@ async function split() {
   show();
 }
 
+async function kernelTimes() {
+  // ?kernels[&webgpu]: compile and run each node type's batched kernel on
+  // its own, logging before each one, so a kernel that stalls is named.
+  const device = location.search.includes("webgpu") ? "webgpu" : "wasm";
+  await init(device);
+  defaultDevice(device);
+  const r: Record<string, unknown> = { device };
+  results.kernels = r;
+  const types = new Set<string>();
+  const walk = (n: SceneNode) => { types.add(n.type); n.children.forEach(walk); };
+  walk(clevisScene as unknown as SceneNode);
+  walk(nodeScene as unknown as SceneNode);
+  const n = 256;
+  // Kernels the node scene already ran on WebGPU first; the clevis-only
+  // ones (reductions in box/round_box, the polygon) last, so a stall is
+  // reached only after everything else has been timed.
+  const order = ["sphere", "translate", "rotate", "cylinder", "union", "intersection", "shell",
+    "difference", "offset", "extruded_polygon_3", "extruded_polygon_4", "round_box", "box"];
+  for (const type of order.filter((t) => types.has(t))) {
+    const kernel = kernels[type];
+    const sample = (name: string) =>
+      name.startsWith("v") ? [1, 2] : ["size", "offset", "axis"].includes(name) ? [1, 2, 3] : 1;
+    const params = kernel.params.map((name) => np.array(sample(name) as number | number[]));
+    const pts = np.array(Float32Array.from(clevisReference.points.slice(0, 3 * n))).reshape([n, 3]);
+    const args = kernel.kind === "boolean" || kernel.kind === "field"
+      ? kernel.kind === "boolean" ? [np.ones([n]), np.zeros([n]), ...params] : [np.ones([n]), ...params]
+      : [pts, ...params];
+    if (kernel.kind !== "primitive" && kernel.kind !== "transform") pts.dispose();
+    console.log(`[spike] compiling ${type} on ${device}`);
+    const t = performance.now();
+    await batchedKernel(type)(...args).data();
+    r[type] = Math.round(performance.now() - t);
+    console.log(`[spike] done ${type}: ${r[type]} ms`);
+    show();
+    await new Promise((go) => setTimeout(go, 0));
+  }
+  (results as Record<string, unknown>).done = true;
+  show();
+}
+
 (async () => {
+  if (location.search.includes("kernels")) return kernelTimes();
   if (location.search.includes("split")) return split();
   if (location.search.includes("quick")) return quick();
   const available = await init();

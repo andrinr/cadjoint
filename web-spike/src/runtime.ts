@@ -101,7 +101,7 @@ type Batched = (P: np.Array, free: np.Array | null) => np.Array;
 const batchedKernels = new Map<string, (...args: np.Array[]) => np.Array>();
 
 /** jit(vmap(kernel)) with points (or distances) batched and params not. */
-function batchedKernel(type: string) {
+export function batchedKernel(type: string) {
   let fn = batchedKernels.get(type);
   if (!fn) {
     const kernel = kernels[type];
