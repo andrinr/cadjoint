@@ -1702,7 +1702,7 @@ function Features() {
         why="Grouping follows N5: by what the command acts on. File for the document, Edit for the selection, View for the picture, Create, Shape and Constrain for geometry, Simulate for studies and their outcomes, Program for the run, Window for the desk."
         single
         examples={
-          <Plate kind="try" label="the proposed menu bar; switch the mode and open the menus">
+          <Plate kind="try" label="the menu bar, settled 16 Oct 2026; switch the mode and open the menus">
             <ProposedMenuBar />
           </Plate>
         }

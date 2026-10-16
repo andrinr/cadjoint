@@ -7,6 +7,11 @@
  * proposal. The design page renders both the index and the proposed menu
  * bar from this list, so the menus it shows are exactly the commands here.
  *
+ * The menu structure `rule.menu` describes was agreed with Andrin on
+ * 2026-10-16 as proposed: ten menus, Create / Shape / Constrain kept apart to
+ * match the rail, Program as its own menu, modes under Window, mode-only
+ * commands shown disabled with the reason.
+ *
  * The placement rules this list applies (N5, N9 on the page):
  *
  * - A command lives on what it acts on: a declaration's card, the toolbar
