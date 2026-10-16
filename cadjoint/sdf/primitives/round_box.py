@@ -6,7 +6,7 @@ import jax.numpy as jnp
 from jax import Array
 
 from cadjoint.geometry.parameters import Scalar, Vector
-from cadjoint.sdf.primitives.base import Primitive
+from cadjoint.sdf.primitives.base import Primitive, safe_norm
 
 
 class RoundBox(Primitive):
@@ -39,11 +39,7 @@ class RoundBox(Primitive):
             Signed distance to rounded box
         """
         q = jnp.abs(p) - size
-        return (
-            jnp.linalg.norm(jnp.maximum(q, 0.0), axis=-1)
-            + jnp.minimum(jnp.max(q, axis=-1), 0.0)
-            - radius
-        )
+        return safe_norm(jnp.maximum(q, 0.0)) + jnp.minimum(jnp.max(q, axis=-1), 0.0) - radius
 
     def __call__(self, p: Array) -> Array:
         """Evaluate SDF at point(s) p."""

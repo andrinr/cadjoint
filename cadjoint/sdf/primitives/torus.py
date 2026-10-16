@@ -6,7 +6,7 @@ import jax.numpy as jnp
 from jax import Array
 
 from cadjoint.geometry.parameters import Scalar
-from cadjoint.sdf.primitives.base import Primitive
+from cadjoint.sdf.primitives.base import Primitive, safe_norm
 
 
 class Torus(Primitive):
@@ -38,9 +38,9 @@ class Torus(Primitive):
         Returns:
             Signed distance to torus surface
         """
-        q_xy = jnp.linalg.norm(p[..., :2], axis=-1) - major_radius
+        q_xy = safe_norm(p[..., :2]) - major_radius
         q = jnp.stack([q_xy, p[..., 2]], axis=-1)
-        return jnp.linalg.norm(q, axis=-1) - minor_radius
+        return safe_norm(q) - minor_radius
 
     def __call__(self, p: Array) -> Array:
         """Evaluate SDF at point(s) p."""
