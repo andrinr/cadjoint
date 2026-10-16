@@ -37,10 +37,9 @@ Homepage = "https://github.com/andrinr/cadjoint"
 Documentation = "https://andrinr.github.io/cadjoint/"
 Source = "https://github.com/andrinr/cadjoint"
 Issues = "https://github.com/andrinr/cadjoint/issues"
-Changelog = "https://github.com/andrinr/cadjoint/blob/main/CHANGELOG.md"
 
 [project.scripts]
-cadjoint-viewer = "cadjoint.viewer.cli:main"
+cadjoint-viewer = "cadjoint.viewer.playground:main"
 
 # Third-party solvers, meshers and other components register here: expose an
 # object that is a cadjoint.plugins.PluginSpec, a mapping in the plugins.toml

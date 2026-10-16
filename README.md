@@ -84,12 +84,10 @@ surface is derived from it at a resolution you choose.
 ## Install
 
 ```bash
-pip install cadjoint                    # CPU JAX — macOS, Linux, Windows
-pip install "cadjoint[viewer,editor]"   # plus the playground
+pip install cadjoint         # pin an exact version: the API is not stable
 ```
 
-The API is not stable before 1.0: a minor release may break it, so pin an
-exact version. To work on cadjoint itself, from a checkout:
+From a checkout:
 
 ```bash
 git clone https://github.com/andrinr/cadjoint

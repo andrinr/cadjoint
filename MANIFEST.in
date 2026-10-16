@@ -1,5 +1,0 @@
-# The sdist is the package, its metadata and the licence. setuptools adds
-# tests/test*.py by default, a subset that cannot run without the rest of
-# tests/ (conftest, fixtures), so none of it ships.
-prune tests
-include CHANGELOG.md

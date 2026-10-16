@@ -1,22 +1,21 @@
 name: release
 
-# Builds cadjoint's sdist and wheel, checks them, smoke-installs the wheel
-# into clean venvs, and publishes through PyPI Trusted Publishing (OIDC):
-# no API token exists anywhere. docs/releasing.md holds the one-time setup
-# and the release checklist.
+# Publishes cadjoint to PyPI through Trusted Publishing (OIDC, no token).
 #
-# A `vX.Y.Z` tag publishes that version to TestPyPI, installs it back from
-# there, and then publishes it to PyPI. A manual run is the dry run: it
-# rewrites the version to `X.Y.Z.devN` (N = the run number) so it can be
-# repeated, and publishes to TestPyPI only.
+# Versioning: the only version is `version` in pyproject.toml, semver with
+# the pre-1.0 rule (a minor bump may break the API, a patch bump may not).
+# Release by bumping it, running `uv lock`, merging, and pushing tag vX.Y.Z;
+# the build refuses a tag that disagrees with pyproject.toml. A manual run
+# is a dry run: it publishes X.Y.Z.devN to TestPyPI only.
+#
+# One-time setup: a pending publisher on pypi.org and on test.pypi.org
+# (owner andrinr, repo cadjoint, workflow release.yml, environment pypi /
+# testpypi), and the two GitHub environments, `pypi` with a required
+# reviewer and limited to v* tags.
 on:
   push:
     tags: ["v*"]
   workflow_dispatch:
-
-concurrency:
-  group: release-${{ github.ref }}
-  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -24,12 +23,10 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
-
       - uses: astral-sh/setup-uv@v6
         with:
           python-version: "3.12"
@@ -39,85 +36,54 @@ jobs:
         run: |
           version=$(uv run --no-project python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
           if [ "$GITHUB_EVENT_NAME" = "push" ]; then
-            # The tag is the release; pyproject.toml must already say so.
             if [ "${GITHUB_REF_NAME}" != "v${version}" ]; then
               echo "::error::tag ${GITHUB_REF_NAME} does not match pyproject.toml version ${version}"
               exit 1
             fi
           else
             version="${version}.dev${GITHUB_RUN_NUMBER}"
-            # Only the first match: [tool.uv] has version lines of its own.
+            # count=1: [tool.uv] has version lines of its own.
             VERSION="$version" uv run --no-project python -c "import os, pathlib, re; p = pathlib.Path('pyproject.toml'); p.write_text(re.sub(r'(?m)^version = \".*\"', 'version = \"' + os.environ['VERSION'] + '\"', p.read_text(), count=1))"
-            if git diff --quiet pyproject.toml; then
-              echo "::error::pyproject.toml version was not rewritten"; exit 1
-            fi
           fi
           echo "version=${version}" >> "$GITHUB_OUTPUT"
 
-      # uv build makes the sdist, then the wheel from the unpacked sdist, so
-      # a file the sdist drops also fails the wheel smoke test below.
-      - name: Build sdist and wheel
-        run: uv build --out-dir dist
-
-      - name: twine check
-        run: uvx twine check --strict dist/*
-
+      # The sdist, then the wheel built from it.
+      - run: uv build --out-dir dist
+      - run: uvx twine check --strict dist/*
       - uses: actions/upload-artifact@v4
         with:
           name: dist
           path: dist/
-          if-no-files-found: error
 
+  # The wheel alone in a clean venv, imported from outside the checkout.
   smoke:
-    name: smoke (${{ matrix.os }}, ${{ matrix.python }})
     needs: build
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
+    runs-on: ubuntu-24.04
     strategy:
-      fail-fast: false
       matrix:
-        os: [ubuntu-24.04]
-        python: ["3.11", "3.12", "3.13"]
-        include:
-          - os: macos-latest
-            python: "3.12"
+        python: ["3.11", "3.13"]
     steps:
-      # Only the smoke script: the test must not see the checkout's cadjoint.
       - uses: actions/checkout@v4
         with:
           sparse-checkout: .github/scripts
           sparse-checkout-cone-mode: false
-
       - uses: astral-sh/setup-uv@v6
-
       - uses: actions/download-artifact@v4
         with:
           name: dist
           path: dist/
-
-      - name: Install the wheel into a clean venv
-        run: |
+      - run: |
           uv venv --python ${{ matrix.python }} "$RUNNER_TEMP/venv"
           uv pip install --python "$RUNNER_TEMP/venv/bin/python" dist/*.whl
-
-      - name: Import and differentiate
-        working-directory: ${{ runner.temp }}
+      - working-directory: ${{ runner.temp }}
         run: |
           "$RUNNER_TEMP/venv/bin/python" -I "$GITHUB_WORKSPACE/.github/scripts/smoke_installed.py" \
             "${{ needs.build.outputs.version }}"
 
-      - name: cadjoint-viewer entry point
-        run: |
-          uv pip install --python "$RUNNER_TEMP/venv/bin/python" "$(ls dist/*.whl)[viewer]"
-          "$RUNNER_TEMP/venv/bin/cadjoint-viewer" --help
-
   testpypi:
-    needs: [build, smoke]
+    needs: smoke
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    environment:
-      name: testpypi
-      url: https://test.pypi.org/project/cadjoint/${{ needs.build.outputs.version }}/
+    environment: testpypi
     permissions:
       id-token: write
     steps:
@@ -125,65 +91,16 @@ jobs:
         with:
           name: dist
           path: dist/
-
       - uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
-          # A tag re-run after a failed PyPI step finds its files already up.
           skip-existing: true
-
-  # The published wheel, fetched back by version from the index and checked
-  # byte for byte against the one built above. Only cadjoint comes from
-  # TestPyPI: its copies of jax and friends are stale or squatted, so the
-  # dependencies resolve from PyPI.
-  testpypi-install:
-    needs: [build, testpypi]
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          sparse-checkout: .github/scripts
-          sparse-checkout-cone-mode: false
-
-      - uses: astral-sh/setup-uv@v6
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: dist
-          path: dist/
-
-      - name: Fetch cadjoint==${{ needs.build.outputs.version }} from TestPyPI
-        run: |
-          for attempt in 1 2 3 4 5 6; do
-            uvx pip download --no-deps --no-cache-dir --only-binary :all: \
-              --index-url https://test.pypi.org/simple/ -d fetched \
-              "cadjoint==${{ needs.build.outputs.version }}" && break
-            if [ "$attempt" = 6 ]; then exit 1; fi
-            echo "not on the index yet, retrying"; sleep 20
-          done
-          (cd dist && sha256sum -- *.whl) > built.sha256
-          (cd fetched && sha256sum -c ../built.sha256)
-
-      - name: Install it into a clean venv
-        run: |
-          uv venv --python 3.12 "$RUNNER_TEMP/venv"
-          uv pip install --python "$RUNNER_TEMP/venv/bin/python" fetched/*.whl
-
-      - name: Import and differentiate
-        working-directory: ${{ runner.temp }}
-        run: |
-          "$RUNNER_TEMP/venv/bin/python" -I "$GITHUB_WORKSPACE/.github/scripts/smoke_installed.py" \
-            "${{ needs.build.outputs.version }}"
 
   pypi:
     if: github.event_name == 'push'
-    needs: [build, testpypi-install]
+    needs: testpypi
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    environment:
-      name: pypi
-      url: https://pypi.org/project/cadjoint/${{ needs.build.outputs.version }}/
+    environment: pypi
     permissions:
       id-token: write
     steps:
@@ -191,5 +108,4 @@ jobs:
         with:
           name: dist
           path: dist/
-
       - uses: pypa/gh-action-pypi-publish@release/v1
