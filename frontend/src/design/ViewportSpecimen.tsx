@@ -295,10 +295,9 @@ export function ViewportSpecimen(props: { field?: boolean }) {
         <span>12</span>
       </div>
       <div class="hint">
-        <span class="dl-tag">{props.field ? "SIMULATE" : "SKETCH"}</span>
         {props.field
-          ? "Hover a face to probe it · Click to pick it for a boundary condition"
-          : "Drag a free vertex · G moves the selection · Esc steps back"}
+          ? "Pick BC: click the mesh → sphere · Shift-drag → box"
+          : "Distance: choose a second point in the same sketch"}
       </div>
     </div>
   );

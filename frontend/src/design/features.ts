@@ -8,9 +8,10 @@
  * bar from this list, so the menus it shows are exactly the commands here.
  *
  * The menu structure `rule.menu` describes was agreed with Andrin on
- * 2026-10-16 as proposed: ten menus, Create / Shape / Constrain kept apart to
- * match the rail, Program as its own menu, modes under Window, mode-only
- * commands shown disabled with the reason.
+ * 2026-10-16 as ten menus, then cut to seven the same day at his request:
+ * Create / Shape / Constrain nest under Model as submenus, Run and Stop are a
+ * section of File, the WGSL view is Help › Developer. Modes stay under
+ * Window; mode-only commands are shown disabled with the reason.
  *
  * The placement rules this list applies (N5, N9 on the page):
  *
@@ -127,7 +128,7 @@ export const FEATURES: Feature[] = [
     name: "Run",
     group: "Program",
     now: { toolbar: "Run", key: "⌘↵" },
-    rule: { menu: "Program › Run", toolbar: "Run", key: "⌘↵" },
+    rule: { menu: "File › Program › Run", toolbar: "Run", key: "⌘↵" },
     issue: "No menu home.",
     decision: "Program › Run (menu structure, settled).",
   },
@@ -135,13 +136,13 @@ export const FEATURES: Feature[] = [
     name: "Stop the compile",
     group: "Program",
     now: { toolbar: "job chip ×", panel: "Processes" },
-    rule: { menu: "Program › Stop", toolbar: "job chip ×", key: "⌘." , panel: "Processes" },
+    rule: { menu: "File › Program › Stop", toolbar: "job chip ×", key: "⌘." , panel: "Processes" },
   },
   {
     name: "Show generated WGSL",
     group: "Program",
     now: { toolbar: "<> (icon only)" },
-    rule: { menu: "Program › Show generated WGSL" },
+    rule: { menu: "Help › Developer › Show generated WGSL" },
     issue: "A developer view holds a primary toolbar slot beside Run.",
     decision: "Moves to Program › Show generated WGSL; the toolbar slot goes.",
   },
@@ -285,28 +286,28 @@ export const FEATURES: Feature[] = [
     group: "Create",
     modes: MODEL_SKETCH,
     now: { rail: "Create › Sketch" },
-    rule: { menu: "Create › Sketch", rail: "Create › Sketch", key: "K" },
+    rule: { menu: "Model › Create › Sketch", rail: "Create › Sketch", key: "K" },
   },
   {
     name: "Sketch on a face",
     group: "Create",
     modes: MODEL_SKETCH,
     now: { rail: "Create › Sketch on face" },
-    rule: { menu: "Create › Sketch on face", rail: "Create › Sketch on face" },
+    rule: { menu: "Model › Create › Sketch on face", rail: "Create › Sketch on face" },
   },
   {
     name: "Point",
     group: "Create",
     modes: MODEL_SKETCH,
     now: { rail: "Create › Point", key: "P" },
-    rule: { menu: "Create › Point", rail: "Create › Point", key: "P" },
+    rule: { menu: "Model › Create › Point", rail: "Create › Point", key: "P" },
   },
   {
     name: "Box, sphere, cylinder",
     group: "Create",
     modes: ["model"],
     now: { rail: "Create › Box, Sphere, Cylinder", key: "B S C" },
-    rule: { menu: "Create › Box, Sphere, Cylinder", rail: "Create › Box, Sphere, Cylinder", key: "B S C" },
+    rule: { menu: "Model › Create › Box, Sphere, Cylinder", rail: "Create › Box, Sphere, Cylinder", key: "B S C" },
   },
 
   // ── Shape ───────────────────────────────────────────────────────────────
@@ -315,7 +316,7 @@ export const FEATURES: Feature[] = [
     group: "Shape",
     modes: MODEL_SKETCH,
     now: { rail: "Modify › Extrude, Revolve, Loft" },
-    rule: { menu: "Shape › Extrude, Revolve, Loft", rail: "Shape › Extrude, Revolve, Loft", key: "E" },
+    rule: { menu: "Model › Shape › Extrude, Revolve, Loft", rail: "Shape › Extrude, Revolve, Loft", key: "E" },
     issue: "The rail calls the group Modify; what it does is turn a sketch into a solid.",
     decision: "Rename the rail group Shape.",
   },
@@ -324,7 +325,7 @@ export const FEATURES: Feature[] = [
     group: "Shape",
     modes: MODEL_SKETCH,
     now: { rail: "Transform › Move, Rotate, Scale", key: "G R" },
-    rule: { menu: "Shape › Move, Rotate, Scale", rail: "Transform › Move, Rotate, Scale", key: "G R T" },
+    rule: { menu: "Model › Shape › Move, Rotate, Scale", rail: "Transform › Move, Rotate, Scale", key: "G R T" },
     issue: "Scale has no key.",
     decision: "Scale on T.",
   },
@@ -335,7 +336,7 @@ export const FEATURES: Feature[] = [
     group: "Constrain",
     modes: ["sketch"],
     now: { rail: "Annotate › Distance, Horizontal, Vertical, Coincident", panel: "Sketch › Distance, Horiz, Vert, Coinc" },
-    rule: { menu: "Constrain › Distance, Horizontal, Vertical, Coincident", rail: "Constrain › Distance, Horizontal, Vertical, Coincident", panel: "Sketch (list only)" },
+    rule: { menu: "Model › Constrain › Distance, Horizontal, Vertical, Coincident", rail: "Constrain › Distance, Horizontal, Vertical, Coincident", panel: "Sketch (list only)" },
     issue: "Two homes with two sets of names (Coincident / Coinc); the rail group is called Annotate.",
     decision: "The rail (and Constrain menu) adds, the Sketch panel lists and removes; the rail group is renamed Constrain.",
   },
@@ -344,7 +345,7 @@ export const FEATURES: Feature[] = [
     group: "Constrain",
     modes: ["sketch"],
     now: { rail: "Annotate › Parallel, Perpendicular", panel: "Sketch › ∥ Edges, ⊥ Edges" },
-    rule: { menu: "Constrain › Parallel, Perpendicular", rail: "Constrain › Parallel, Perpendicular", panel: "Sketch (list only)" },
+    rule: { menu: "Model › Constrain › Parallel, Perpendicular", rail: "Constrain › Parallel, Perpendicular", panel: "Sketch (list only)" },
     issue: "Glyph labels in the panel, words on the rail.",
     decision: "Words everywhere; the panel no longer adds.",
   },
@@ -353,7 +354,7 @@ export const FEATURES: Feature[] = [
     group: "Constrain",
     modes: ["sketch"],
     now: { panel: "Sketch › anchor" },
-    rule: { menu: "Constrain › Fix", rail: "Constrain › Fix", panel: "Sketch › anchor" },
+    rule: { menu: "Model › Constrain › Fix", rail: "Constrain › Fix", panel: "Sketch › anchor" },
     issue: "Only in the panel, unlike every other constraint.",
     decision: "Fix joins the rail's Constrain group. No letter key: F stays free for framing the selection.",
   },
@@ -378,7 +379,7 @@ export const FEATURES: Feature[] = [
     group: "Materials",
     modes: ["model"],
     now: { panel: "Materials › +" },
-    rule: { menu: "Create › Material", panel: "Materials › +" },
+    rule: { menu: "Model › Create › Material", panel: "Materials › +" },
   },
   {
     name: "Assign a material",
@@ -438,7 +439,7 @@ export const FEATURES: Feature[] = [
     group: "Simulate",
     modes: ["simulate"],
     now: { panel: "Studies › card › Stop", toolbar: "job chip ×" },
-    rule: { menu: "Program › Stop", panel: "Studies › card › Stop", toolbar: "job chip ×", key: "⌘." },
+    rule: { menu: "File › Program › Stop", panel: "Studies › card › Stop", toolbar: "job chip ×", key: "⌘." },
   },
   {
     name: "Probe the field",
@@ -533,9 +534,33 @@ export interface MenuItem {
 export interface MenuSection {
   title: string | null;
   items: MenuItem[];
+  /** Drawn as a submenu (SUBMENUS) rather than an inline labelled section. */
+  submenu: boolean;
 }
 
-export const MENU_ORDER = ["File", "Edit", "View", "Create", "Shape", "Constrain", "Simulate", "Program", "Window", "Help"];
+/**
+ * Seven menus. The bar was ten (Create, Shape, Constrain and Program each had
+ * one), which spent a row of width on commands the rail, the keys and the
+ * panels already reach; every command keeps one menu home (N9), but the
+ * homes nest: the rail's three groups are Model's submenus, Run and Stop are
+ * File's program section, and the generated WGSL is a developer view under
+ * Help.
+ */
+export const MENU_ORDER = ["File", "Edit", "View", "Model", "Simulate", "Window", "Help"];
+
+/** Sections drawn as a submenu that opens to the side, rather than inline. */
+export const SUBMENUS = new Set([
+  "Edit › Select",
+  "View › Camera",
+  "View › Zoom",
+  "View › Show",
+  "View › Inspect",
+  "Model › Create",
+  "Model › Shape",
+  "Model › Constrain",
+  "Simulate › New study",
+  "Help › Developer",
+]);
 
 export function proposedMenus(): Map<string, MenuSection[]> {
   const menus = new Map<string, MenuSection[]>(MENU_ORDER.map((name) => [name, []]));
@@ -550,7 +575,7 @@ export function proposedMenus(): Map<string, MenuSection[]> {
     if (!sections) continue;
     let target = sections.find((s) => s.title === section);
     if (!target) {
-      target = { title: section, items: [] };
+      target = { title: section, items: [], submenu: section !== null && SUBMENUS.has(`${menu} › ${section}`) };
       sections.push(target);
     }
     // "Front, Right, Top…" and "Box, Sphere, Cylinder" are several items.

@@ -680,7 +680,11 @@ input[type="checkbox"] {
   right: var(--space-5);
   z-index: 11;
   display: flex;
+  justify-content: center;
   gap: var(--space-2);
+  /* The cube stage's own width, so the pair is centred over the cube and
+     the buttons, the cube and the triad read as one column. */
+  width: calc(var(--unit) * 31);
 }
 
 .viewport-bar-button {
@@ -792,16 +796,31 @@ input[type="checkbox"] {
   border-bottom-color: var(--ink-on-accent);
 }
 
+/* The flyout continues the parent's row: the same 32px cells, the parent's
+   own height, flush against the rail's outer edge, so it reads as the
+   parent opening sideways rather than as a second card floating nearby. */
 .tool-flyout {
   display: none;
   position: absolute;
   top: calc(var(--hairline) * -1);
-  left: calc(100% + var(--space-4));
+  left: calc(100% + var(--space-2));
   z-index: 11;
-  gap: var(--space-2);
-  padding: var(--space-2);
-  border: var(--hairline) solid var(--rule);
+  gap: 0;
+  padding: 0;
+  border: var(--hairline) solid var(--rule-strong);
+  border-left: 0;
   background: var(--surface-float);
+}
+
+.tool-flyout button {
+  border: 0;
+}
+
+/* The open parent takes the same edge, so parent and flyout are one shape. */
+.tool-group.open > .tool-group-parent:not(.active) {
+  border-color: var(--rule-strong);
+  background: var(--surface-float);
+  color: var(--ink);
 }
 
 .tool-group.open .tool-flyout {
@@ -816,7 +835,7 @@ input[type="checkbox"] {
   position: absolute;
   top: 0;
   left: 100%;
-  width: var(--space-4);
+  width: var(--space-2);
   height: 100%;
 }
 
@@ -1862,7 +1881,7 @@ input[type="checkbox"] {
 
 .view-cube {
   position: absolute;
-  top: calc(var(--space-5) + var(--control-lg) + var(--space-3));
+  top: calc(var(--space-5) + var(--control-lg) + var(--space-2));
   right: var(--space-5);
   z-index: 10;
   display: flex;

@@ -1772,8 +1772,10 @@ function Viewport() {
         grid steps are a detented zoom (View › Zoom, <code>[</code> <code>]</code>). The performance
         readout states what only the viewport can: FPS (<code>idle</code> when nothing is drawing),
         CPU time per frame, the render resolution, node count, and mesh elements and triangles once
-        a mesh is shown; sampled twice a second, never tweened. The hint bar names the mode as an
-        inverse tag, then one sentence about what the pointer does now.
+        a mesh is shown; sampled twice a second, never tweened. The hint line speaks only for a step in
+        progress (the second pick of a constraint, the face a sketch will land on, why that face
+        cannot be used) or to name the hovered handle or plane; at rest it is empty, because the
+        mode switcher already names the mode.
       </Rule>
     </Section>
   );

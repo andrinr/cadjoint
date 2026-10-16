@@ -14,7 +14,7 @@ const chord = (key: string, mods: Partial<KeyChord> = {}): KeyChord => ({
 });
 
 describe("the menu bar is the agreed one", () => {
-  it("has the ten menus in order", () => {
+  it("has the seven menus in order", () => {
     expect(menuModel().map((menu) => menu.name)).toEqual(MENU_ORDER);
   });
 

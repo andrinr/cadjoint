@@ -50,6 +50,8 @@ const MENUS = menuModel();
 
 export function MenuBar() {
   const [openMenu, setOpenMenu] = createSignal<string | null>(null);
+  /** The open submenu, as "menu:section", or null. */
+  const [openSub, setOpenSub] = createSignal<string | null>(null);
   const [dialog, setDialog] = createSignal<DialogId | null>(null);
   const [saveAsName, setSaveAsName] = createSignal("");
   const [saveAsError, setSaveAsError] = createSignal("");
@@ -286,15 +288,75 @@ export function MenuBar() {
                   <For each={menu.groups}>
                     {(group, index) => (
                       <>
-                        <Show when={index() > 0}>
+                        <Show when={index() > 0 && !(group.submenu && menu.groups[index() - 1].submenu)}>
                           <hr />
                         </Show>
-                        <Show when={group.title}>
-                          <div class="menu-section" role="presentation">
-                            {group.title}
+                        <Show
+                          when={group.submenu}
+                          fallback={
+                            <>
+                              <Show when={group.title}>
+                                <div class="menu-section" role="presentation">
+                                  {group.title}
+                                </div>
+                              </Show>
+                              <For each={group.entries}>{entryView}</For>
+                            </>
+                          }
+                        >
+                          {/* A submenu: one parent item that opens its entries to
+                              the side, on hover or on click / ArrowRight. */}
+                          <div
+                            class="menu-sub-anchor"
+                            onPointerEnter={() => setOpenSub(`${menu.id}:${group.title}`)}
+                            onPointerLeave={() => setOpenSub(null)}
+                          >
+                            <button
+                              type="button"
+                              role="menuitem"
+                              aria-haspopup="menu"
+                              aria-expanded={openSub() === `${menu.id}:${group.title}`}
+                              class="menu-sub-parent"
+                              onClick={() => setOpenSub(`${menu.id}:${group.title}`)}
+                              onKeyDown={(event) => {
+                                if (event.key === "ArrowRight") {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                  setOpenSub(`${menu.id}:${group.title}`);
+                                  queueMicrotask(() =>
+                                    (event.currentTarget.parentElement?.querySelector(
+                                      ".menu-sub button:not([aria-disabled=true])",
+                                    ) as HTMLElement | null)?.focus(),
+                                  );
+                                } else onMenuKeyDown(event);
+                              }}
+                              data-testid={`menu-sub-${menu.id}-${(group.title ?? "").toLowerCase().replace(/\s+/g, "-")}`}
+                            >
+                              <i class="menu-check" />
+                              <span>{group.title}</span>
+                              <small>›</small>
+                            </button>
+                            <Show when={openSub() === `${menu.id}:${group.title}`}>
+                              <div
+                                class="menu-dropdown menu-sub"
+                                role="menu"
+                                aria-label={group.title ?? ""}
+                                onKeyDown={(event) => {
+                                  if (event.key === "ArrowLeft") {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    setOpenSub(null);
+                                    (event.currentTarget.parentElement?.querySelector(
+                                      ".menu-sub-parent",
+                                    ) as HTMLElement | null)?.focus();
+                                  }
+                                }}
+                              >
+                                <For each={group.entries}>{entryView}</For>
+                              </div>
+                            </Show>
                           </div>
                         </Show>
-                        <For each={group.entries}>{entryView}</For>
                       </>
                     )}
                   </For>

@@ -33,6 +33,8 @@ export interface MenuEntry {
 export interface MenuGroup {
   title: string | null;
   entries: MenuEntry[];
+  /** Opens to the side from one parent item instead of listing inline. */
+  submenu: boolean;
 }
 
 export interface MenuModel {
@@ -52,9 +54,9 @@ export const MENU_COMMANDS: Record<string, string> = {
   "File › Download scene.py": "file-download",
   "File › Export…": "file-export",
 
-  "Program › Run": "program-run",
-  "Program › Stop": "program-stop",
-  "Program › Show generated WGSL": "program-wgsl",
+  "File › Program › Run": "program-run",
+  "File › Program › Stop": "program-stop",
+  "Help › Developer › Show generated WGSL": "program-wgsl",
 
   "Edit › Undo": "edit-undo",
   "Edit › Redo": "edit-redo",
@@ -80,28 +82,28 @@ export const MENU_COMMANDS: Record<string, string> = {
   "View › Inspect › Normals": "inspect-normals",
   "View › Inspect › Depth": "inspect-depth",
 
-  "Create › Sketch": "tool-sketch",
-  "Create › Sketch on face": "tool-face",
-  "Create › Point": "tool-polygon",
-  "Create › Box": "tool-box",
-  "Create › Sphere": "tool-sphere",
-  "Create › Cylinder": "tool-cylinder",
-  "Create › Material": "create-material",
+  "Model › Create › Sketch": "tool-sketch",
+  "Model › Create › Sketch on face": "tool-face",
+  "Model › Create › Point": "tool-polygon",
+  "Model › Create › Box": "tool-box",
+  "Model › Create › Sphere": "tool-sphere",
+  "Model › Create › Cylinder": "tool-cylinder",
+  "Model › Create › Material": "create-material",
 
-  "Shape › Extrude": "shape-extrude",
-  "Shape › Revolve": "shape-revolve",
-  "Shape › Loft": "shape-loft",
-  "Shape › Move": "gizmo-translate",
-  "Shape › Rotate": "gizmo-rotate",
-  "Shape › Scale": "gizmo-scale",
+  "Model › Shape › Extrude": "shape-extrude",
+  "Model › Shape › Revolve": "shape-revolve",
+  "Model › Shape › Loft": "shape-loft",
+  "Model › Shape › Move": "gizmo-translate",
+  "Model › Shape › Rotate": "gizmo-rotate",
+  "Model › Shape › Scale": "gizmo-scale",
 
-  "Constrain › Distance": "constrain-distance",
-  "Constrain › Horizontal": "constrain-horizontal",
-  "Constrain › Vertical": "constrain-vertical",
-  "Constrain › Coincident": "constrain-coincident",
-  "Constrain › Parallel": "constrain-parallel",
-  "Constrain › Perpendicular": "constrain-perpendicular",
-  "Constrain › Fix": "constrain-fix",
+  "Model › Constrain › Distance": "constrain-distance",
+  "Model › Constrain › Horizontal": "constrain-horizontal",
+  "Model › Constrain › Vertical": "constrain-vertical",
+  "Model › Constrain › Coincident": "constrain-coincident",
+  "Model › Constrain › Parallel": "constrain-parallel",
+  "Model › Constrain › Perpendicular": "constrain-perpendicular",
+  "Model › Constrain › Fix": "constrain-fix",
 
   "Simulate › New mesh": "sim-new-mesh",
   "Simulate › New study › Thermal": "sim-study-thermal",
@@ -165,7 +167,7 @@ export function testidFor(command: string): string {
   return `menu-${command}`;
 }
 
-/** The ten menus, in order, every leaf bound to its command. */
+/** The seven menus, in order, every leaf bound to its command. */
 export function menuModel(): MenuModel[] {
   const proposed = proposedMenus();
   return MENU_ORDER.map((name) => ({
@@ -173,6 +175,7 @@ export function menuModel(): MenuModel[] {
     id: name.toLowerCase(),
     groups: (proposed.get(name) ?? []).map((section) => ({
       title: section.title,
+      submenu: section.submenu,
       entries: section.items.map((item) => {
         const path = menuPath(name, section.title, item.label);
         const command = MENU_COMMANDS[path] ?? "";

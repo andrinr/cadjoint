@@ -68,6 +68,12 @@ export function dimensionSummary(node: ConstructionNode): string | null {
 export function buildSceneTree(
   nodes: ConstructionNode[],
   elements: readonly ConstructionElement[] = [],
+  /**
+   * The root row's label: the file the program lives in. It was the word
+   * "scene", which collided with the starter's own `scene = Union(...)` and
+   * showed two rows called scene that meant different things.
+   */
+  fileName = "scene.py",
 ): SceneTreeRow[] {
   const booleans = elements.filter((element) => element.kind === "boolean");
   const count = nodes.length + booleans.length;
@@ -78,7 +84,7 @@ export function buildSceneTree(
       elementId: null,
       depth: 0,
       kind: "scene",
-      label: "scene",
+      label: fileName,
       detail: count > 0 ? `${count} object${count === 1 ? "" : "s"}` : "empty",
       material: null,
       constraintCount: 0,

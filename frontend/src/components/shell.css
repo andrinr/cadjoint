@@ -224,3 +224,31 @@
   font-style: normal;
   text-align: center;
 }
+
+/* Submenus ------------------------------------------------------------- */
+/* A section that nests (design/features.ts SUBMENUS): one parent item with
+   a › in the shortcut column, its entries in a second sheet to the side. */
+.menu-sub-anchor {
+  position: relative;
+}
+
+.menu-bar .menu-dropdown .menu-sub-parent > small {
+  color: var(--ink-3);
+}
+
+.menu-sub-anchor:hover > .menu-sub-parent {
+  background: var(--surface-raised-hover);
+}
+
+.menu-bar .menu-dropdown.menu-sub {
+  top: calc(var(--space-2) * -1 - var(--hairline));
+  left: 100%;
+  animation: none;
+}
+
+/* A scrolling menu would clip its submenus; menus with submenus are short
+   enough not to need the scroll. */
+.menu-bar .menu-dropdown:has(.menu-sub-anchor) {
+  max-height: none;
+  overflow: visible;
+}

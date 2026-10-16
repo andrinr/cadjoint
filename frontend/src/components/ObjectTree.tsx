@@ -18,8 +18,7 @@ import {
   selection,
   setHover,
   setInspected,
-  setSelection,
-} from "../state";
+  setSelection, sceneName } from "../state";
 import { buildSceneTree, visibleRows, type SceneTreeRow } from "../objectTree";
 import {
   BoxIcon,
@@ -41,7 +40,7 @@ const KIND_ICONS: Record<SceneTreeRow["kind"], Component | null> = {
 
 export function ObjectTree() {
   const [collapsed, setCollapsed] = createSignal<ReadonlySet<string>>(new Set());
-  const rows = createMemo(() => buildSceneTree(nodes(), elements()));
+  const rows = createMemo(() => buildSceneTree(nodes(), elements(), sceneName() ?? "scene.py"));
   const shown = createMemo(() => visibleRows(rows(), collapsed()));
 
   const toggleGroup = (key: string) => {
