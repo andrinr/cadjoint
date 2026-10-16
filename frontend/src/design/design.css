@@ -1371,3 +1371,156 @@ html:has(.dl-body),
   color: var(--ink-2);
   font-family: var(--font-sans);
 }
+
+/* ── the desk map ──────────────────────────────────────────────────────── */
+/* The playground's regions at the default desk's proportions: editor 460,
+   column 320, the viewport the rest. Pointing at a region names the
+   question it answers; the focused region takes the ink edge (2px = active). */
+.dl-map {
+  display: grid;
+  grid-template-columns: 23fr 41fr 16fr;
+  grid-template-rows: calc(var(--unit) * 6) calc(var(--unit) * 8) calc(var(--unit) * 60) calc(var(--unit) * 6);
+  grid-template-areas:
+    "menu menu menu"
+    "modes program program"
+    "editor viewport column"
+    "tray tray tray";
+  border: var(--hairline) solid var(--rule-strong);
+  background: var(--surface-base);
+}
+.dl-map-region {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-1);
+  padding: 0 var(--space-4);
+  border-right: var(--hairline) solid var(--rule);
+  border-bottom: var(--hairline) solid var(--rule);
+  outline: var(--stroke-active) solid transparent;
+  outline-offset: calc(var(--stroke-active) * -1);
+  color: var(--ink-3);
+  font-size: var(--text-2xs);
+  cursor: default;
+  transition: outline-color var(--dur-fast) var(--ease);
+}
+.dl-map-region:focus-visible,
+.dl-map-region.focus {
+  outline-color: var(--ink);
+  color: var(--ink-2);
+}
+.dl-map-region b {
+  color: var(--ink);
+  font: var(--weight-semibold) var(--text-xs) / var(--leading-flat)
+    var(--font-mono);
+  letter-spacing: var(--tracking-xs);
+  text-transform: uppercase;
+}
+.dl-map-region.sheet {
+  background: var(--surface-float);
+}
+.dl-map-region.viewport {
+  align-items: center;
+  border-color: var(--rule-heavy);
+}
+.dl-map-region.viewport small {
+  position: absolute;
+}
+.dl-map-region .tl {
+  top: var(--space-3);
+  left: var(--space-4);
+}
+.dl-map-region .tr {
+  top: var(--space-3);
+  right: var(--space-4);
+}
+.dl-map-region .bl {
+  bottom: var(--space-3);
+  left: var(--space-4);
+}
+.dl-map-region .br {
+  bottom: var(--space-3);
+  right: var(--space-4);
+}
+.dl-map-region .bc {
+  bottom: var(--space-3);
+  left: 50%;
+  transform: translateX(-50%);
+}
+.dl-map-modes {
+  display: flex;
+  width: max-content;
+  border: var(--hairline) solid var(--rule-strong);
+}
+.dl-map-region.bar {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+.dl-map-modes button {
+  padding: var(--space-1) var(--space-3);
+  border: 0;
+  background: var(--surface-float);
+  color: var(--ink-2);
+  font: var(--weight-semibold) var(--text-3xs) / var(--leading-snug)
+    var(--font-mono);
+  letter-spacing: var(--tracking-3xs);
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.dl-map-modes button:hover {
+  background: var(--surface-bar-alt);
+}
+.dl-map-modes button.on {
+  background: var(--accent);
+  color: var(--ink-on-accent);
+}
+.dl-map-group i {
+  padding: var(--space-1) var(--space-3);
+  color: var(--ink-3);
+  font: var(--weight-semibold) var(--text-3xs) / var(--leading-snug)
+    var(--font-mono);
+  font-style: normal;
+  letter-spacing: var(--tracking-3xs);
+  text-transform: uppercase;
+}
+.dl-map-region.column {
+  justify-content: stretch;
+  gap: 0;
+  padding: 0;
+}
+.dl-map-group {
+  flex: 1;
+  padding: var(--space-3) var(--space-3) 0;
+  border-bottom: var(--hairline) solid var(--rule);
+}
+.dl-map-group:last-child {
+  border-bottom: 0;
+}
+.dl-map-group > span {
+  display: flex;
+  flex-wrap: wrap;
+  border-bottom: var(--hairline) solid var(--rule);
+}
+.dl-map-group i.on {
+  color: var(--ink);
+  border-bottom: var(--stroke-active) solid var(--ink);
+}
+/* The region's name in mono, what it answers in sans (A8). */
+.dl-map-answer {
+  display: grid;
+  grid-template-columns: calc(var(--unit) * 40) 1fr;
+  gap: var(--space-4);
+  min-height: calc(var(--unit) * 10);
+  margin: 0;
+  color: var(--ink-2);
+  font: var(--weight-regular) var(--text-sm) / var(--leading-snug)
+    var(--font-sans);
+}
+.dl-map-answer b {
+  color: var(--ink);
+  font: var(--weight-semibold) var(--text-3xs) / var(--leading-snug)
+    var(--font-mono);
+  letter-spacing: var(--tracking-3xs);
+  text-transform: uppercase;
+}

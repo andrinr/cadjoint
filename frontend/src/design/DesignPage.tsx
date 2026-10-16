@@ -59,6 +59,7 @@ import {
   UndoDemo,
 } from "./demos";
 import { Cross, Plate, Ratio, Rule, Section, Swatch, v } from "./kit";
+import { DeskMap } from "./DeskMap";
 import { ViewportSpecimen } from "./ViewportSpecimen";
 
 const SECTIONS = [
@@ -70,10 +71,11 @@ const SECTIONS = [
   { id: "icons", num: "6", title: "Iconography" },
   { id: "motion", num: "7", title: "Motion" },
   { id: "components", num: "8", title: "Components" },
-  { id: "viewport", num: "9", title: "Viewport" },
-  { id: "behaviour", num: "10", title: "Behaviour" },
-  { id: "language", num: "11", title: "Language" },
-  { id: "changes", num: "12", title: "What changes" },
+  { id: "layout", num: "9", title: "Where things are" },
+  { id: "viewport", num: "10", title: "Viewport" },
+  { id: "behaviour", num: "11", title: "Behaviour" },
+  { id: "language", num: "12", title: "Language" },
+  { id: "changes", num: "13", title: "What changes" },
 ];
 
 /**
@@ -1542,9 +1544,143 @@ function Components() {
   );
 }
 
+function Layout() {
+  return (
+    <Section
+      id="layout"
+      num="9"
+      title="Where things are"
+      intro="Navigation is a map you learn once. Every region answers one question, every window has one name, and every action has one home."
+    >
+      <Rule
+        id="N1"
+        why="Reading order is causal order (A2): the program on the left makes the picture in the middle, and the right column shows what follows from what you selected in it."
+        single
+        examples={
+          <Plate kind="try" label="the default desk; pick a mode in it, point at a region">
+            <DeskMap />
+          </Plate>
+        }
+      >
+        The desk has fixed regions. From top to bottom: the menu bar, the toolbar (mode on the left,
+        program status and Run on the right), the desk, and the tray. Left to right across the desk:
+        the program, the picture, the consequences.
+      </Rule>
+      <Rule
+        id="N2"
+        why="Selecting a sketch enters Sketch mode under the pointer; if the viewport moved when the mode changed, the model would jump away from the click that caused it."
+      >
+        The columns are the same in every mode. A mode changes what is in the right column, not
+        where the viewport is.
+      </Rule>
+      <Rule id="N3" why="Top to bottom is cause to effect, the same order as left to right.">
+        The right column runs from what to what follows: the selection (Objects), then its arguments
+        (Properties), then what depends on it. In Simulate: setup (Studies, Meshes) above outcomes
+        (Results, Optimize).
+      </Rule>
+      <Rule
+        id="N4"
+        why="A thing with two names is two things to a newcomer. The Window menu is the index of the desk, so it uses the tab's own words."
+        examples={
+          <>
+            <Plate kind="do" label="one name per place">
+              <div class="dl-menu flush">
+                <For each={["scene.py", "Objects", "Properties", "Sketch"]}>
+                  {(name) => (
+                    <button type="button">
+                      <span>✓</span>
+                      <span style={{ "text-transform": "none" }}>{name}</span>
+                      <kbd>tab: {name}</kbd>
+                    </button>
+                  )}
+                </For>
+              </div>
+            </Plate>
+            <Plate kind="dont" label="the menu and the tab disagree">
+              <div class="dl-menu flush">
+                <For each={[["Editor", "scene.py"], ["Object tree", "Objects"], ["Properties", "Properties"], ["Sketch panel", "Sketch"]]}>
+                  {([menu, tab]) => (
+                    <button type="button">
+                      <span>✓</span>
+                      <span style={{ "text-transform": "none" }}>{menu}</span>
+                      <kbd>tab: {tab}</kbd>
+                    </button>
+                  )}
+                </For>
+              </div>
+            </Plate>
+          </>
+        }
+      >
+        Every window is reachable from the Window menu by the name on its tab, and nothing is lost
+        by closing it.
+      </Rule>
+      <Rule
+        id="N5"
+        why="You find an action by asking what it acts on. Two homes for one action, or one action under two names, makes both harder to find."
+        single
+        examples={
+          <Plate label="where an action lives">
+            <table class="dl-table">
+              <thead>
+                <tr>
+                  <th>it acts on</th>
+                  <th>it lives</th>
+                  <th>for example</th>
+                </tr>
+              </thead>
+              <tbody>
+                <For
+                  each={[
+                    ["one declaration", "on its card or row", "× on a constraint chip, Delete study, Solve on a study card"],
+                    ["the whole program", "the toolbar, right", "Run, Reset, render settings"],
+                    ["the application", "the menu bar", "Save as, Reset layout, Keyboard shortcuts"],
+                    ["the picture", "the tool rail, the keyboard", "Polygon (P), Move (G), views (1 3 7)"],
+                    ["the pipeline", "the toolbar, left", "Model · Sketch · Simulate (M)"],
+                  ]}
+                >
+                  {([what, where, example]) => (
+                    <tr>
+                      <td>{what}</td>
+                      <td>{where}</td>
+                      <td class="prose">{example}</td>
+                    </tr>
+                  )}
+                </For>
+              </tbody>
+            </table>
+          </Plate>
+        }
+      >
+        An action lives on what it acts on. A menu item shows its shortcut, so the menu teaches the
+        keyboard.
+      </Rule>
+      <Rule
+        id="N6"
+        why="Corners are learned once. A readout that moves is a readout you have to look for."
+      >
+        The viewport's furniture has fixed places: readout and tool rail top-left, view cube
+        top-right, legend bottom-left, title block bottom-right, hint bottom-centre (V3). Nothing
+        else is pinned there.
+      </Rule>
+      <Rule
+        id="N7"
+        why="You should always be able to answer where am I, and how do I get back, without trying something."
+      >
+        You always know where you are and how to get back: the mode is named in the switcher and in
+        the hint bar, the selection is named in the toolbar, Escape walks back one step (F6), and
+        Reset layout restores the desk (F11).
+      </Rule>
+      <Rule id="N8" why="A monitor that takes a column by default is a monitor in the way, but it must be one click away, because a solve keeps running while you model.">
+        Monitors and browsers (Processes, Scenes) are parked in the tray, named, one click away.
+      </Rule>
+    </Section>
+  );
+}
+
 function Viewport() {
   return (
-    <Section id="viewport" num="9" title="Viewport" intro="The viewport is an instrument face (A1). Its overlays are achromatic unless they are data or direction (C7).">
+    <Section id="viewport" num="10" title="Viewport" intro="The viewport is an instrument face (A1). Its overlays are achromatic unless they are data or direction (C7).">
       <Rule
         id="V1"
         why="Free versus held is shape, so the free-parameter hue stays in the chrome and the viewport keeps its colour for readings."
@@ -1586,7 +1722,7 @@ function Viewport() {
 
 function Behaviour() {
   return (
-    <Section id="behaviour" num="10" title="Behaviour" intro="The functional rules. They come from A2 (the program is the truth), A10 (every action answers) and A11 (every step can be taken back).">
+    <Section id="behaviour" num="11" title="Behaviour" intro="The functional rules. They come from A2 (the program is the truth), A10 (every action answers) and A11 (every step can be taken back).">
       <h3>The program is the truth</h3>
       <Rule id="F1" why="An expression is not a number: overwriting it with one would silently break the program.">
         Every panel is an editor of literals. An argument written as an expression is shown as
@@ -1783,7 +1919,7 @@ function Language() {
     ["empty", "—", "an em dash; never 0, N/A or blank"],
   ];
   return (
-    <Section id="language" num="11" title="Language" intro="Words are part of the interface, and they follow A8.">
+    <Section id="language" num="12" title="Language" intro="Words are part of the interface, and they follow A8.">
       <Rule
         id="L1"
         single
@@ -1866,7 +2002,7 @@ function Changes() {
   return (
     <Section
       id="changes"
-      num="12"
+      num="13"
       title="What changes"
       intro="What the playground does today that these rules retire. Each pair is now, then the rule."
     >
@@ -2118,6 +2254,37 @@ function Changes() {
         }
         after={<span style={{ color: v("ink-3") }}>only tokens</span>}
       />
+      <Change
+        n={11}
+        title="The Window menu uses the tabs' names"
+        why="The menu toggles Editor, Object tree and Sketch panel; the tabs say scene.py, Objects and Sketch; the Float items in the same menu already use the tab names (N4)."
+        before={
+          <div class="dl-menu flush">
+            <For each={["Editor", "Object tree", "Sketch panel", "Float scene.py", "Float objects"]}>
+              {(name) => (
+                <button type="button">
+                  <span />
+                  <span>{name}</span>
+                  <kbd />
+                </button>
+              )}
+            </For>
+          </div>
+        }
+        after={
+          <div class="dl-menu flush">
+            <For each={["scene.py", "Objects", "Sketch"]}>
+              {(name) => (
+                <button type="button">
+                  <span>✓</span>
+                  <span style={{ "text-transform": "none" }}>{name}</span>
+                  <kbd>float</kbd>
+                </button>
+              )}
+            </For>
+          </div>
+        }
+      />
       <p class="dl-note">
         {`Also: the docs site moves off its stock theme onto these tokens, and the playground adopts the dl- primitives on this page as its components.`}
       </p>
@@ -2157,6 +2324,7 @@ export function DesignPage() {
           <Icons />
           <Motion />
           <Components />
+          <Layout />
           <Viewport />
           <Behaviour />
           <Language />
