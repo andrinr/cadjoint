@@ -115,7 +115,7 @@ const AXES: Axis[] = [
     choices: [
       { id: "system", label: "System", note: "SF Mono, Menlo", vars: () => ({ "font-mono": MONO_FALLBACK }) },
       { id: "jetbrains", label: "JetBrains Mono", font: "JetBrains+Mono:wght@400;500;600", vars: () => ({ "font-mono": `"JetBrains Mono", ${MONO_FALLBACK}` }) },
-      { id: "plex-mono", label: "IBM Plex Mono", note: "adopted; bundled with the app", vars: () => ({ "font-mono": `"IBM Plex Mono", ${MONO_FALLBACK}` }) },
+      { id: "plex-mono", label: "IBM Plex Mono", note: "the system's; bundled with the app", vars: () => ({ "font-mono": `"IBM Plex Mono", ${MONO_FALLBACK}` }) },
       { id: "space-mono", label: "Space Mono", font: "Space+Mono:wght@400;700", vars: () => ({ "font-mono": `"Space Mono", ${MONO_FALLBACK}` }) },
       { id: "fira-code", label: "Fira Code", font: "Fira+Code:wght@400;500;600", vars: () => ({ "font-mono": `"Fira Code", ${MONO_FALLBACK}` }) },
     ],
@@ -136,7 +136,7 @@ const AXES: Axis[] = [
     choices: [
       { id: "orange", label: "Orange", vars: () => accent("#f87318", "#c85d00") },
       { id: "vermilion", label: "Vermilion", vars: () => accent("#ff5a1f") },
-      { id: "amber", label: "Amber", note: "adopted", vars: () => accent("#ffb000", "#a87400") },
+      { id: "amber", label: "Amber", note: "the system's", vars: () => accent("#ffb000", "#a87400") },
       { id: "magenta", label: "Magenta", vars: () => accent("#e5007d") },
     ],
   },
@@ -154,7 +154,7 @@ const AXES: Axis[] = [
     title: "Ink",
     choices: [
       { id: "neutral", label: "Neutral", vars: () => inks("#18161a", "#48464d", "#605e65") },
-      { id: "warm", label: "Warm", note: "adopted; held under 0.04 chroma", vars: () => inks(CHROME.ink, CHROME["ink-2"], CHROME["ink-3"]) },
+      { id: "warm", label: "Warm", note: "the system's; held under 0.04 chroma", vars: () => inks(CHROME.ink, CHROME["ink-2"], CHROME["ink-3"]) },
       { id: "cool", label: "Cool", vars: () => inks("#12161c", "#3f4752", "#59616d") },
     ],
   },
@@ -162,7 +162,7 @@ const AXES: Axis[] = [
     id: "lines",
     title: "Lines",
     choices: [
-      { id: "light", label: "Light", note: "adopted; edge held at 3:1", vars: () => lines(CHROME.rule, CHROME["rule-strong"], CHROME["rule-heavy"]) },
+      { id: "light", label: "Light", note: "the system's; edge held at 3:1", vars: () => lines(CHROME.rule, CHROME["rule-strong"], CHROME["rule-heavy"]) },
       { id: "standard", label: "Standard", vars: () => lines("#9f9da5", "#747278", "#36343b") },
       { id: "strong", label: "Strong", vars: () => lines("#86848c", "#5c5a61", "#242228") },
     ],
@@ -171,9 +171,9 @@ const AXES: Axis[] = [
     id: "module",
     title: "Module",
     choices: [
-      { id: "l16", label: "16 · 24 · 32 · 40", note: "proposed: line box 16", vars: () => module(16, "l16") },
+      { id: "l16", label: "16 · 24 · 32 · 40", note: "the system: line box 16", vars: () => module(16, "l16") },
       { id: "l20", label: "20 · 28 · 36 · 44", note: "roomier: line box 20", vars: () => module(20, "l20") },
-      { id: "current", label: "20 · 28 · 32 · 36", note: "the app before the system", vars: () => ({ "control-tag": "20px", "control-sm": "28px", "control-lg": "32px", "control-xl": "36px", "--line-box": "16px", "--module": "current" }) },
+      { id: "current", label: "20 · 28 · 32 · 36", note: "off the module: 28 and 36 are not a line box plus a distance", vars: () => ({ "control-tag": "20px", "control-sm": "28px", "control-lg": "32px", "control-xl": "36px", "--line-box": "16px", "--module": "current" }) },
     ],
   },
   {
@@ -202,7 +202,7 @@ const TYPE_SCALES: Record<string, [number, number, number]> = {
   large: [12, 13, 16],
 };
 
-/** The adopted selection (17 Oct 2026): what tokens.ts now carries. */
+/** The system's selection: what tokens.ts carries. */
 const DEFAULTS: Record<string, string> = {
   mono: "plex-mono",
   sans: "system",

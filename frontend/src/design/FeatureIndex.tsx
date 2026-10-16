@@ -1,11 +1,10 @@
 /**
- * The feature index and the proposed menu bar, both rendered from
- * `features.ts`.
+ * The feature index and the menu bar, both rendered from `features.ts`.
  */
 
-import { For, Show, createMemo, createSignal, onCleanup, onMount } from "solid-js";
+import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
 import { EDITING_MODES, type EditingMode } from "../editingMode";
-import { FEATURES, FEATURE_GROUPS, MENU_ORDER, proposedMenus, type Feature, type Homes } from "./features";
+import { FEATURES, FEATURE_GROUPS, MENU_ORDER, proposedMenus, type Homes } from "./features";
 
 type Column = { title: string; fields: (keyof Homes)[] };
 
@@ -22,100 +21,48 @@ const join = (homes: Homes, fields: (keyof Homes)[]) =>
     .filter(Boolean)
     .join(" · ");
 
-/** One cell: unchanged, added, removed or moved, each said in words and shape. */
-function Cell(props: { feature: Feature; column: Column }) {
-  const now = () => join(props.feature.now, props.column.fields);
-  const rule = () => join(props.feature.rule, props.column.fields);
-  return (
-    <td>
-      <Show when={now() !== rule()} fallback={<span>{rule() || "—"}</span>}>
-        <Show when={now()}>
-          <s>{now()}</s>
-        </Show>
-        <Show when={rule()} fallback={<em class="gone">removed</em>}>
-          <span class="moved">
-            <Show when={now()}>→ </Show>
-            {rule()}
-          </span>
-        </Show>
-      </Show>
-    </td>
-  );
-}
-
 export function FeatureIndex() {
-  const [onlyIssues, setOnlyIssues] = createSignal(false);
-  const issues = FEATURES.filter((feature) => feature.issue).length;
-  const visible = (feature: Feature) => !onlyIssues() || Boolean(feature.issue);
   return (
-    <div class="dl-stack">
-      <div class="dl-row-of">
-        <div class="dl-seg">
-          <button type="button" class={onlyIssues() ? "" : "active"} onClick={() => setOnlyIssues(false)}>
-            All {FEATURES.length}
-          </button>
-          <button type="button" class={onlyIssues() ? "active" : ""} onClick={() => setOnlyIssues(true)}>
-            With an issue {issues}
-          </button>
-        </div>
-        <span class="dl-status">
-          <s>struck</s>&nbsp;today · → bold: the rule · ▲ what is wrong · ● decided
-        </span>
-      </div>
-      <table class="dl-table dl-features">
-        <thead>
-          <tr>
-            <th>feature</th>
-            <For each={COLUMNS}>{(column) => <th>{column.title}</th>}</For>
-          </tr>
-        </thead>
-        <For each={FEATURE_GROUPS}>
-          {(group) => {
-            const rows = createMemo(() => FEATURES.filter((f) => f.group === group && visible(f)));
-            return (
-              <Show when={rows().length}>
-                <tbody>
-                  <tr class="group">
-                    <th colSpan={COLUMNS.length + 1}>{group}</th>
-                  </tr>
-                  <For each={rows()}>
-                    {(feature) => (
-                      <>
-                        <tr>
-                          <td>
-                            {feature.name}
-                            <Show when={feature.modes}>
-                              <small> {feature.modes!.join(" · ")}</small>
-                            </Show>
-                          </td>
-                          <For each={COLUMNS}>{(column) => <Cell feature={feature} column={column} />}</For>
-                        </tr>
-                        <Show when={feature.issue}>
-                          <tr class="issue">
-                            <td />
-                            <td colSpan={COLUMNS.length}>
-                              ▲ {feature.issue}
-                              <Show when={feature.decision}>
-                                <span class="decision">● Decided: {feature.decision}</span>
-                              </Show>
-                            </td>
-                          </tr>
+    <table class="dl-table dl-features">
+      <thead>
+        <tr>
+          <th>feature</th>
+          <For each={COLUMNS}>{(column) => <th>{column.title}</th>}</For>
+        </tr>
+      </thead>
+      <For each={FEATURE_GROUPS}>
+        {(group) => {
+          const rows = FEATURES.filter((feature) => feature.group === group);
+          return (
+            <Show when={rows.length}>
+              <tbody>
+                <tr class="group">
+                  <th colSpan={COLUMNS.length + 1}>{group}</th>
+                </tr>
+                <For each={rows}>
+                  {(feature) => (
+                    <tr>
+                      <td>
+                        {feature.name}
+                        <Show when={feature.modes}>
+                          <small> {feature.modes!.join(" · ")}</small>
                         </Show>
-                      </>
-                    )}
-                  </For>
-                </tbody>
-              </Show>
-            );
-          }}
-        </For>
-      </table>
-    </div>
+                      </td>
+                      <For each={COLUMNS}>{(column) => <td>{join(feature.rule, column.fields) || "—"}</td>}</For>
+                    </tr>
+                  )}
+                </For>
+              </tbody>
+            </Show>
+          );
+        }}
+      </For>
+    </table>
   );
 }
 
-/** The proposed menu bar: every command, with its key, disabled outside its mode. */
-export function ProposedMenuBar() {
+/** The menu bar: every command, with its key, disabled outside its mode. */
+export function MenuBarSpecimen() {
   const menus = proposedMenus();
   const [open, setOpen] = createSignal<string | null>("View");
   const [mode, setMode] = createSignal<EditingMode>("sketch");

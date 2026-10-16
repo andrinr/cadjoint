@@ -102,14 +102,12 @@ export function Rule(props: {
   );
 }
 
-export type PlateKind = "example" | "do" | "dont" | "before" | "after" | "try";
+export type PlateKind = "example" | "do" | "dont" | "try";
 
 const PLATE_WORDS: Record<PlateKind, string> = {
   example: "Example",
   do: "Do",
   dont: "Don't",
-  before: "Before",
-  after: "Now",
   try: "Try it",
 };
 
@@ -124,12 +122,7 @@ export function Plate(props: {
   children: JSX.Element;
 }) {
   const kind = () => props.kind ?? "example";
-  const wordClass = () =>
-    kind() === "do" || kind() === "after"
-      ? "do"
-      : kind() === "dont" || kind() === "before"
-        ? "dont"
-        : undefined;
+  const wordClass = () => (kind() === "do" ? "do" : kind() === "dont" ? "dont" : undefined);
   return (
     <figure class="dl-plate">
       <header>

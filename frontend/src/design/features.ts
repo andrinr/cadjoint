@@ -1,17 +1,14 @@
 /**
- * Every feature of the playground, where it is reachable today, and where
- * the guide puts it.
+ * Every feature of the playground and where the rules put it.
  *
- * One record per feature. `now` is read off the shipped app (MenuBar.tsx,
- * Toolbar.tsx, ToolRail.tsx, shortcuts.ts and the windows); `rule` is the
- * proposal. The design page renders both the index and the proposed menu
- * bar from this list, so the menus it shows are exactly the commands here.
+ * One record per feature. The design page renders both the feature index and
+ * the menu bar from this list, so the menus it shows are exactly the commands
+ * here.
  *
- * The menu structure `rule.menu` describes was agreed with Andrin on
- * 2026-10-16 as ten menus, then cut to seven the same day at his request:
- * Create / Shape / Constrain nest under Model as submenus, Run and Stop are a
- * section of File, the WGSL view is Help › Developer. Modes stay under
- * Window; mode-only commands are shown disabled with the reason.
+ * Seven menus carry `rule.menu`: Create / Shape / Constrain nest under Model
+ * as submenus, Run and Stop are a section of File, the WGSL view is Help ›
+ * Developer. Modes live under Window; a mode-only command is shown disabled
+ * with the reason.
  *
  * The placement rules this list applies (N5, N9 on the page):
  *
@@ -48,12 +45,8 @@ export interface Feature {
   group: FeatureGroup;
   /** Modes it applies in; absent means every mode. */
   modes?: EditingMode[];
-  now: Homes;
+  /** Where the rules put it. */
   rule: Homes;
-  /** What is wrong with `now`, when something is. */
-  issue?: string;
-  /** How the issue was settled, once it has been. */
-  decision?: string;
 }
 
 export const FEATURE_GROUPS = [
@@ -79,47 +72,36 @@ export const FEATURES: Feature[] = [
   {
     name: "New from the starter",
     group: "File",
-    now: { menu: "File › New", toolbar: "Reset (icon only, beside Run)" },
     rule: { menu: "File › New" },
-    issue: "Two homes, two names (New, Reset); the toolbar copy is a destructive icon-only button next to Run.",
-    decision: "Remove the toolbar Reset; File › New is the only home.",
   },
   {
     name: "Open a scene",
     group: "File",
-    now: { menu: "File › Open…", panel: "Scenes (parked)" },
     rule: { menu: "File › Open…", key: "⌘O", panel: "Scenes (parked)" },
   },
   {
     name: "Save",
     group: "File",
-    now: { menu: "File › Save" },
     rule: { menu: "File › Save", key: "⌘S" },
-    issue: "No shortcut for the most frequent file command.",
-    decision: "⌘S, with preventDefault so the browser does not save the page.",
   },
   {
     name: "Save as",
     group: "File",
-    now: { menu: "File › Save As…" },
     rule: { menu: "File › Save As…", key: "⇧⌘S" },
   },
   {
     name: "Download scene.py",
     group: "File",
-    now: { menu: "File › Download scene.py" },
     rule: { menu: "File › Download scene.py" },
   },
   {
     name: "Export mesh or STEP",
     group: "File",
-    now: { menu: "File › Export…" },
     rule: { menu: "File › Export…", key: "⌘E" },
   },
   {
     name: "Refresh the scene list",
     group: "File",
-    now: { panel: "Scenes › Refresh" },
     rule: { panel: "Scenes › Refresh" },
   },
 
@@ -127,35 +109,26 @@ export const FEATURES: Feature[] = [
   {
     name: "Run",
     group: "Program",
-    now: { toolbar: "Run", key: "⌘↵" },
     rule: { menu: "File › Program › Run", toolbar: "Run", key: "⌘↵" },
-    issue: "No menu home.",
-    decision: "File › Program › Run (menu structure, settled).",
   },
   {
     name: "Stop the compile",
     group: "Program",
-    now: { toolbar: "job chip ×", panel: "Processes" },
     rule: { menu: "File › Program › Stop", toolbar: "job chip ×", key: "⌘." , panel: "Processes" },
   },
   {
     name: "Show generated WGSL",
     group: "Program",
-    now: { toolbar: "<> (icon only)" },
     rule: { menu: "Help › Developer › Show generated WGSL" },
-    issue: "A developer view holds a primary toolbar slot beside Run.",
-    decision: "Moves to Help › Developer › Show generated WGSL; the toolbar slot goes.",
   },
   {
     name: "Undo",
     group: "Program",
-    now: { menu: "Edit › Undo", key: "⌘Z" },
     rule: { menu: "Edit › Undo", key: "⌘Z" },
   },
   {
     name: "Redo",
     group: "Program",
-    now: { menu: "Edit › Redo", key: "⇧⌘Z" },
     rule: { menu: "Edit › Redo", key: "⇧⌘Z" },
   },
 
@@ -164,41 +137,33 @@ export const FEATURES: Feature[] = [
     name: "Select whole objects",
     group: "Edit and selection",
     modes: MODEL_SKETCH,
-    now: { rail: "Select › Object", key: "O" },
     rule: { menu: "Edit › Select › Objects", rail: "Select › Object", key: "O" },
   },
   {
     name: "Select sketch vertices",
     group: "Edit and selection",
     modes: MODEL_SKETCH,
-    now: { rail: "Select › Vertex", key: "V" },
     rule: { menu: "Edit › Select › Vertices", rail: "Select › Vertex", key: "V" },
   },
   {
     name: "Delete the selection",
     group: "Edit and selection",
     modes: MODEL_SKETCH,
-    now: { rail: "Delete (icon only)", key: "⌫" },
     rule: { menu: "Edit › Delete", rail: "Delete", key: "⌫" },
-    issue: "The rail's delete is icon-only (I2).",
-    decision: "The rail stays icons only, a narrow card; Delete is undoable (A11), so it may be an icon there, with the word in Edit › Delete and the tooltip.",
   },
   {
     name: "Clear the selection",
     group: "Edit and selection",
-    now: { key: "Esc", viewport: "click empty space" },
     rule: { menu: "Edit › Select › None", key: "Esc", viewport: "click empty space" },
   },
   {
     name: "Edit an argument",
     group: "Edit and selection",
-    now: { panel: "Properties", viewport: "drag a handle" },
     rule: { panel: "Properties", viewport: "drag a handle" },
   },
   {
     name: "Follow the selection again",
     group: "Edit and selection",
-    now: { panel: "Properties › back" },
     rule: { panel: "Properties › back" },
   },
 
@@ -206,83 +171,66 @@ export const FEATURES: Feature[] = [
   {
     name: "Standard views",
     group: "View",
-    now: { key: "1 3 7", viewport: "view cube faces, ⌃ for the opposite" },
     rule: { menu: "View › Camera › Front, Right, Top", key: "1 3 7", viewport: "view cube faces, ⌃ for the opposite" },
-    issue: "No menu home: there is no View menu.",
-    decision: "A View menu (menu structure, settled).",
   },
   {
     name: "Turn to the opposite side",
     group: "View",
-    now: { key: "9" },
     rule: { menu: "View › Camera › Opposite side", key: "9" },
   },
   {
     name: "Orthographic / perspective",
     group: "View",
-    now: { key: "5", viewport: "view cube toggle" },
     rule: { menu: "View › Camera › Orthographic", key: "5", viewport: "beside the cube › projection" },
   },
   {
     name: "Orbit, pan, zoom",
     group: "View",
-    now: { viewport: "drag, Shift/Space + drag, wheel" },
     rule: { viewport: "drag, Shift/Space + drag, wheel" },
   },
   {
     name: "Zoom one grid step",
     group: "View",
-    now: { viewport: "Alt + wheel" },
     rule: { menu: "View › Zoom › In one grid step, Out one grid step", key: "[ ]", viewport: "Alt + wheel" },
-    issue: "Reachable only by a gesture nobody can discover.",
-    decision: "View › Zoom › In / Out one grid step, on [ and ]. The grid's spacing follows the zoom (its 1-2-5 rung is a function of camera distance), so this is a detented zoom, named as one.",
   },
   {
     name: "Render preset",
     group: "View",
-    now: { toolbar: "Render settings › presets" },
     rule: { menu: "View › Render › Preset…", viewport: "beside the cube › Render settings › presets" },
   },
   {
     name: "Construction overlay",
     group: "View",
-    now: { toolbar: "Render settings › Annotations" },
     rule: { menu: "View › Show › Construction", viewport: "beside the cube › Render settings › Annotations", key: "⇧C" },
   },
   {
     name: "Layout grid",
     group: "View",
-    now: {},
     rule: { menu: "View › Show › Layout grid", key: "⇧G" },
   },
   {
     name: "Feature edges, mesh wireframe",
     group: "View",
-    now: { toolbar: "Render settings › Annotations" },
     rule: { menu: "View › Show › Feature edges, Wireframe", viewport: "beside the cube › Render settings › Annotations" },
   },
   {
     name: "Hide the solid",
     group: "View",
-    now: { toolbar: "Render settings › Annotations" },
     rule: { menu: "View › Show › Solid", viewport: "beside the cube › Render settings › Annotations" },
   },
   {
     name: "Distance-field slice",
     group: "View",
-    now: { toolbar: "Render settings › Distance field" },
     rule: { menu: "View › Inspect › Distance slice", viewport: "beside the cube › Render settings › Distance field" },
   },
   {
     name: "Normals, depth",
     group: "View",
-    now: { toolbar: "Render settings › Diagnostics" },
     rule: { menu: "View › Inspect › Normals, Depth", viewport: "beside the cube › Render settings › Diagnostics" },
   },
   {
     name: "Shading, shadows, reflections, quality",
     group: "View",
-    now: { toolbar: "Render settings › Shading, Effects, Marching" },
     rule: { viewport: "beside the cube › Render settings › Shading, Effects, Marching", menu: "View › Render › Settings…" },
   },
 
@@ -291,28 +239,24 @@ export const FEATURES: Feature[] = [
     name: "Sketch",
     group: "Create",
     modes: MODEL_SKETCH,
-    now: { rail: "Create › Sketch" },
     rule: { menu: "Model › Create › Sketch", rail: "Create › Sketch", key: "K" },
   },
   {
     name: "Sketch on a face",
     group: "Create",
     modes: MODEL_SKETCH,
-    now: { rail: "Create › Sketch on face" },
     rule: { menu: "Model › Create › Sketch on face", rail: "Create › Sketch on face" },
   },
   {
     name: "Point",
     group: "Create",
     modes: MODEL_SKETCH,
-    now: { rail: "Create › Point", key: "P" },
     rule: { menu: "Model › Create › Point", rail: "Create › Point", key: "P" },
   },
   {
     name: "Box, sphere, cylinder",
     group: "Create",
     modes: ["model"],
-    now: { rail: "Create › Box, Sphere, Cylinder", key: "B S C" },
     rule: { menu: "Model › Create › Box, Sphere, Cylinder", rail: "Create › Box, Sphere, Cylinder", key: "B S C" },
   },
 
@@ -321,19 +265,13 @@ export const FEATURES: Feature[] = [
     name: "Extrude, revolve, loft",
     group: "Shape",
     modes: MODEL_SKETCH,
-    now: { rail: "Modify › Extrude, Revolve, Loft" },
     rule: { menu: "Model › Shape › Extrude, Revolve, Loft", rail: "Shape › Extrude, Revolve, Loft", key: "E" },
-    issue: "The rail calls the group Modify; what it does is turn a sketch into a solid.",
-    decision: "Rename the rail group Shape.",
   },
   {
     name: "Move, rotate, scale",
     group: "Shape",
     modes: MODEL_SKETCH,
-    now: { rail: "Transform › Move, Rotate, Scale", key: "G R" },
     rule: { menu: "Model › Shape › Move, Rotate, Scale", rail: "Transform › Move, Rotate, Scale", key: "G R T" },
-    issue: "Scale has no key.",
-    decision: "Scale on T.",
   },
 
   // ── Constrain ───────────────────────────────────────────────────────────
@@ -341,41 +279,30 @@ export const FEATURES: Feature[] = [
     name: "Distance, horizontal, vertical, coincident",
     group: "Constrain",
     modes: ["sketch"],
-    now: { rail: "Annotate › Distance, Horizontal, Vertical, Coincident", panel: "Sketch › Distance, Horiz, Vert, Coinc" },
     rule: { menu: "Model › Constrain › Distance, Horizontal, Vertical, Coincident", rail: "Constrain › Distance, Horizontal, Vertical, Coincident", panel: "Sketch (list only)" },
-    issue: "Two homes with two sets of names (Coincident / Coinc); the rail group is called Annotate.",
-    decision: "The rail (and Constrain menu) adds, the Sketch panel lists and removes; the rail group is renamed Constrain.",
   },
   {
     name: "Parallel, perpendicular",
     group: "Constrain",
     modes: ["sketch"],
-    now: { rail: "Annotate › Parallel, Perpendicular", panel: "Sketch › ∥ Edges, ⊥ Edges" },
     rule: { menu: "Model › Constrain › Parallel, Perpendicular", rail: "Constrain › Parallel, Perpendicular", panel: "Sketch (list only)" },
-    issue: "Glyph labels in the panel, words on the rail.",
-    decision: "Words everywhere; the panel no longer adds.",
   },
   {
     name: "Fix a point",
     group: "Constrain",
     modes: ["sketch"],
-    now: { panel: "Sketch › anchor" },
     rule: { menu: "Model › Constrain › Fix", rail: "Constrain › Fix", panel: "Sketch › anchor" },
-    issue: "Only in the panel, unlike every other constraint.",
-    decision: "Fix joins the rail's Constrain group. No letter key: F stays free for framing the selection.",
   },
   {
     name: "Remove a constraint",
     group: "Constrain",
     modes: ["sketch"],
-    now: { panel: "Sketch › chip ×" },
     rule: { panel: "Sketch › chip ×", key: "⌫ on a selected chip" },
   },
   {
     name: "Constraint solver settings",
     group: "Constrain",
     modes: ["sketch"],
-    now: { panel: "Sketch › solver" },
     rule: { panel: "Sketch › solver" },
   },
 
@@ -384,21 +311,16 @@ export const FEATURES: Feature[] = [
     name: "New material",
     group: "Materials",
     modes: ["model"],
-    now: { panel: "Materials › +" },
     rule: { menu: "Model › Create › Material", panel: "Materials › +" },
   },
   {
     name: "Assign a material",
     group: "Materials",
-    now: { panel: "Materials (drag a swatch onto an object)" },
     rule: { panel: "Properties › material · Materials (drag)", viewport: "drop" },
-    issue: "Drag is the only way: no keyboard or selection-based path.",
-    decision: "Properties gains a material field that rewrites the source; drag stays as the shortcut.",
   },
   {
     name: "Edit a material",
     group: "Materials",
-    now: { panel: "Materials › inspector" },
     rule: { panel: "Materials › inspector" },
   },
 
@@ -407,58 +329,48 @@ export const FEATURES: Feature[] = [
     name: "New mesh",
     group: "Simulate",
     modes: ["simulate"],
-    now: { panel: "Meshes › +" },
     rule: { menu: "Simulate › New mesh", panel: "Meshes › +" },
   },
   {
     name: "Build a mesh",
     group: "Simulate",
     modes: ["simulate"],
-    now: { panel: "Meshes › card" },
     rule: { panel: "Meshes › card" },
   },
   {
     name: "New study",
     group: "Simulate",
     modes: ["simulate"],
-    now: { panel: "Studies › + Thermal, + Elastic, + Flow" },
     rule: { menu: "Simulate › New study › Thermal, Elastic, Flow", panel: "Studies › + Study (kind menu)" },
-    issue: "Three add buttons side by side truncate in a 320px column.",
-    decision: "One dashed + Study button opening the three kinds, as in Simulate › New study.",
   },
   {
     name: "Add a boundary condition",
     group: "Simulate",
     modes: ["simulate"],
-    now: { panel: "Studies › card › + Boundary condition", viewport: "pick faces" },
     rule: { panel: "Studies › card › + Boundary condition", viewport: "pick faces" },
   },
   {
     name: "Solve",
     group: "Simulate",
     modes: ["simulate"],
-    now: { panel: "Studies › card › Solve" },
     rule: { menu: "Simulate › Solve", panel: "Studies › card › Solve", key: "⇧⌘↵" },
   },
   {
     name: "Stop a solve",
     group: "Simulate",
     modes: ["simulate"],
-    now: { panel: "Studies › card › Stop", toolbar: "job chip ×" },
     rule: { menu: "File › Program › Stop", panel: "Studies › card › Stop", toolbar: "job chip ×", key: "⌘." },
   },
   {
     name: "Probe the field",
     group: "Simulate",
     modes: ["simulate"],
-    now: { viewport: "hover the field", panel: "Results › probe" },
     rule: { viewport: "hover the field", panel: "Results › probe" },
   },
   {
     name: "Deformation scale",
     group: "Simulate",
     modes: ["simulate"],
-    now: { panel: "Results › warp" },
     rule: { panel: "Results › warp" },
   },
 
@@ -466,13 +378,11 @@ export const FEATURES: Feature[] = [
   {
     name: "Run an optimization",
     group: "Optimize",
-    now: { panel: "Optimize › card › Run" },
     rule: { menu: "Simulate › Optimize", panel: "Optimize › card › Run" },
   },
   {
     name: "Replay a trajectory",
     group: "Optimize",
-    now: { panel: "Optimize › trajectory" },
     rule: { panel: "Optimize › trajectory", key: "← → on the tape" },
   },
 
@@ -480,33 +390,26 @@ export const FEATURES: Feature[] = [
   {
     name: "Switch mode",
     group: "Desk",
-    now: { toolbar: "mode switcher", menu: "Window › Model mode…", key: "M / ⇧M", viewport: "selecting a sketch" },
     rule: { toolbar: "mode switcher", menu: "Window › Mode › Model, Sketch, Simulate", key: "M cycles", viewport: "selecting a sketch" },
   },
   {
     name: "Show or hide a window",
     group: "Desk",
-    now: { menu: "Window › Editor, Object tree, Sketch panel…" },
     rule: { menu: "Window › Windows › scene.py, Objects, Properties, Sketch, Materials, Meshes, Studies, Results, Optimize, Scenes, Processes" },
-    issue: "The menu names differ from the tab names (N4).",
-    decision: "The menu uses the tab names (menu structure, settled).",
   },
   {
     name: "Float a window",
     group: "Desk",
-    now: { menu: "Window › Float …", panel: "tab › float" },
     rule: { menu: "Window › Float the focused window", panel: "tab › float" },
   },
   {
     name: "Reset layout",
     group: "Desk",
-    now: { menu: "Window › Reset layout" },
     rule: { menu: "Window › Reset layout" },
   },
   {
     name: "Running work",
     group: "Desk",
-    now: { toolbar: "job chip", panel: "Processes (parked)" },
     rule: { toolbar: "job chip", panel: "Processes (parked)" },
   },
 
@@ -514,24 +417,21 @@ export const FEATURES: Feature[] = [
   {
     name: "Keyboard shortcuts",
     group: "Help",
-    now: { menu: "Help › Keyboard shortcuts" },
     rule: { menu: "Help › Keyboard shortcuts", key: "?" },
   },
   {
     name: "Design language",
     group: "Help",
-    now: {},
     rule: { menu: "Help › Design language" },
   },
   {
     name: "README",
     group: "Help",
-    now: { menu: "Help › CADJOINT README" },
     rule: { menu: "Help › README" },
   },
 ];
 
-/** The proposed menu bar, derived from the features' `rule.menu` homes. */
+/** The menu bar, derived from the features' `rule.menu` homes. */
 export interface MenuItem {
   label: string;
   key?: string;
@@ -545,12 +445,10 @@ export interface MenuSection {
 }
 
 /**
- * Seven menus. The bar was ten (Create, Shape, Constrain and Program each had
- * one), which spent a row of width on commands the rail, the keys and the
- * panels already reach; every command keeps one menu home (N9), but the
- * homes nest: the rail's three groups are Model's submenus, Run and Stop are
- * File's program section, and the generated WGSL is a developer view under
- * Help.
+ * Seven menus. Every command has one menu home (N9), and the homes nest so the
+ * bar spends no width on commands the rail, the keys and the panels already
+ * reach: the rail's three groups are Model's submenus, Run and Stop are File's
+ * program section, and the generated WGSL is a developer view under Help.
  */
 export const MENU_ORDER = ["File", "Edit", "View", "Model", "Simulate", "Window", "Help"];
 
