@@ -27,6 +27,11 @@ jobs:
 
       - name: Install dependencies
         run: |
+          # A constraint, not just a specifier on this line: the later
+          # `pip install optax optimistix` resolves on its own and upgraded
+          # jax past the cap (to 0.11.2) when it was only stated here.
+          printf 'jax<0.9\njaxlib<0.9\n' > "$RUNNER_TEMP/jax-cap.txt"
+          export PIP_CONSTRAINT="$RUNNER_TEMP/jax-cap.txt"
           pip install "jax[cpu]>=0.4.20,<0.9"
           pip install -e ".[dev]" --no-deps
           pip install pytest scikit-image matplotlib optax optimistix pydantic

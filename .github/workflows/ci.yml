@@ -42,6 +42,11 @@ jobs:
           # The same series pyproject.toml caps at. Unbounded, this pulled
           # jax 0.11 the day it appeared and turned main red on six tests that
           # pass on the locked 0.8.2.
+          # A constraint, not just a specifier on this line: the later
+          # `pip install optax optimistix` resolves on its own and upgraded
+          # jax past the cap (to 0.11.2) when it was only stated here.
+          printf 'jax<0.9\njaxlib<0.9\n' > "$RUNNER_TEMP/jax-cap.txt"
+          export PIP_CONSTRAINT="$RUNNER_TEMP/jax-cap.txt"
           pip install "jax[cpu]>=0.4.20,<0.9"
           pip install -e ".[dev]" --no-deps
           pip install pytest pytest-xdist scikit-image matplotlib optax optimistix pydantic
