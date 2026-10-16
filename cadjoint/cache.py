@@ -29,13 +29,40 @@ every process (``research/performance.md`` §15).
 
 from __future__ import annotations
 
+import contextlib
 import os
+import time
 from pathlib import Path
 
-__all__ = ["cache_directory", "enable_compilation_cache", "min_compile_seconds"]
+__all__ = [
+    "cache_directory",
+    "enable_compilation_cache",
+    "min_compile_seconds",
+    "prune_compilation_cache",
+]
 
-#: Cap the on-disk cache. Entries are evicted least-recently-used above it.
+#: Cap the on-disk cache. :func:`prune_compilation_cache` removes the oldest
+#: entries above it.
+#:
+#: The cap is enforced here, not by JAX's ``jax_compilation_cache_max_size``
+#: (issue #53).  With that option set, JAX evicts on *every* write: under a
+#: file lock it globs the whole directory, stats every entry and reads a
+#: per-entry access-time file, so each new program costs O(entries).  At
+#: 75,000 entries -- a few weeks of test runs -- that measured 2-8 s per
+#: write, and a test session that compiles a few hundred new programs spent
+#: over ten minutes in ``readdir``.  The directory was 697 MB, under the 2 GB
+#: cap, so the scan had never evicted anything.  Without the option JAX
+#: writes an entry and nothing else; a torn entry read by a concurrent
+#: process is a warning and a recompile, never a wrong result.
 _MAX_BYTES = 2 * 1024**3
+
+#: How often :func:`prune_compilation_cache` walks the directory.  One walk
+#: of 75,000 entries is a few seconds; once a day it is noise, while the
+#: check itself is one ``stat`` of :data:`_PRUNE_STAMP`.
+_PRUNE_INTERVAL_SECONDS = 24 * 3600
+
+#: Marker whose mtime records the last prune.
+_PRUNE_STAMP = ".cadjoint-pruned"
 
 #: Cache every compilation. JAX's own default (1 s) is tuned for a few large
 #: model programs; a scene compiles as hundreds of sub-second programs whose
@@ -97,6 +124,74 @@ def cache_directory() -> Path:
     return Path(base).expanduser() / "cadjoint" / "jax"
 
 
+def prune_compilation_cache(
+    directory: str | os.PathLike[str] | None = None,
+    max_bytes: int = _MAX_BYTES,
+    *,
+    force: bool = False,
+) -> int:
+    """Delete the oldest cache entries until the directory fits *max_bytes*.
+
+    Runs at most once per :data:`_PRUNE_INTERVAL_SECONDS` unless *force*:
+    the check is one ``stat`` of a stamp file, cheap enough for every worker
+    process to make.  Age is the later of an entry's access and modification
+    time, so on a filesystem that records reads it is least-recently-used,
+    and least-recently-written otherwise.  It also removes the ``-atime``
+    files JAX's own eviction left beside every entry; nothing reads them
+    once that eviction is off.
+
+    Args:
+        directory: The cache; defaults to :func:`cache_directory`.
+        max_bytes: Size budget for the ``-cache`` entries.
+        force: Prune even if the last prune was recent.
+
+    Returns:
+        The number of entries removed (stale ``-atime`` files not counted).
+    """
+    path = Path(directory) if directory is not None else cache_directory()
+    stamp = path / _PRUNE_STAMP
+    now = time.time()
+    try:
+        if not force and now - stamp.stat().st_mtime < _PRUNE_INTERVAL_SECONDS:
+            return 0
+    except OSError:
+        pass  # never pruned, or no directory yet
+
+    entries: list[tuple[float, int, str]] = []
+    total = 0
+    try:
+        with os.scandir(path) as listing:
+            for item in listing:
+                if item.name.endswith("-atime"):
+                    _unlink(item.path)
+                elif item.name.endswith("-cache") and item.is_file():
+                    info = item.stat()
+                    entries.append((max(info.st_atime, info.st_mtime), info.st_size, item.path))
+                    total += info.st_size
+    except OSError:
+        return 0
+
+    removed = 0
+    for _age, size, entry in sorted(entries):
+        if total <= max_bytes:
+            break
+        if _unlink(entry):
+            total -= size
+            removed += 1
+    with contextlib.suppress(OSError):
+        stamp.touch()
+    return removed
+
+
+def _unlink(path: str) -> bool:
+    """Remove *path*; another process may have removed it first."""
+    try:
+        os.unlink(path)
+    except OSError:
+        return False
+    return True
+
+
 def enable_compilation_cache(directory: str | os.PathLike[str] | None = None) -> Path | None:
     """Point JAX's persistent compilation cache at a stable directory.
 
@@ -124,7 +219,9 @@ def enable_compilation_cache(directory: str | os.PathLike[str] | None = None) ->
         jax.config.update("jax_compilation_cache_dir", str(path))
         jax.config.update("jax_persistent_cache_min_compile_time_secs", min_compile_seconds())
         jax.config.update("jax_persistent_cache_min_entry_size_bytes", 0)
-        jax.config.update("jax_compilation_cache_max_size", _MAX_BYTES)
+        # No jax_compilation_cache_max_size: see _MAX_BYTES for why the cap
+        # is enforced by the prune below instead of on every write.
+        prune_compilation_cache(path)
     except Exception:
         # A cache is an optimisation: a read-only home directory or a JAX
         # build without these knobs must not stop the worker from running.
