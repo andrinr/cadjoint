@@ -55,10 +55,10 @@ html:has(.dl-body),
   font-variant-numeric: var(--numeric-body);
 }
 .dl-top strong {
-  font: var(--text-body);
-  letter-spacing: var(--track-body);
-  text-transform: var(--case-body);
-  font-variant-numeric: var(--numeric-body);
+  font: var(--text-control);
+  letter-spacing: var(--track-control);
+  text-transform: var(--case-control);
+  font-variant-numeric: var(--numeric-control);
 }
 .dl-top span {
   color: var(--ink-3);
@@ -376,7 +376,7 @@ html:has(.dl-body),
 .dl-table td {
   padding: var(--inset) var(--inset);
   border-bottom: var(--line-rule);
-  vertical-align: top;
+  vertical-align: middle;
 }
 .dl-table td:first-child {
   white-space: nowrap;
@@ -1696,65 +1696,56 @@ html:has(.dl-body),
   color: var(--ok);
 }
 
-/* A12 specimen: a rail column and a flyout, attached or detached. */
+/* A12 specimen: the rail column, its open group, and the flyout — attached
+   as the app draws it (K8), or detached as it must not be. */
 .dl-rail-demo {
-  position: relative;
   display: inline-grid;
   gap: var(--gap);
   padding: var(--gap);
   border: var(--line-edge);
-  background: var(--surface-float);
+  background: var(--plane-sheet);
 }
 .dl-rail-cell {
-  display: block;
+  display: grid;
+  place-items: center;
   width: var(--control-lg);
   height: var(--control-lg);
+  color: var(--ink-2);
 }
-.dl-rail-cell.open,
-.dl-rail-flyout {
+.dl-rail-group {
+  position: relative;
+}
+.dl-rail-cell.open {
   border: var(--line-edge);
+  color: var(--ink);
 }
-.dl-rail-cell i,
-.dl-rail-flyout i {
-  display: block;
-  width: var(--control-lg);
-  height: var(--control-lg);
-  background:
-    linear-gradient(var(--ink-2), var(--ink-2)) center / calc(var(--unit) * 3) var(--hairline) no-repeat,
-    linear-gradient(var(--ink-2), var(--ink-2)) center / var(--hairline) calc(var(--unit) * 3) no-repeat;
-}
-.dl-rail-cell.open i {
-  width: calc(var(--control-lg) - var(--hairline) * 2);
-  height: calc(var(--control-lg) - var(--hairline) * 2);
+.dl-rail-group.attached .dl-rail-cell.open {
+  border-right-color: transparent;
 }
 .dl-rail-flyout {
   position: absolute;
-  top: calc(var(--gap) + var(--control-lg) + var(--gap));
-  left: calc(100% - var(--hairline));
+  top: 0;
+  left: 100%;
   display: flex;
+  height: var(--control-lg);
+  border: var(--line-edge);
   border-left: 0;
-  background: var(--surface-float);
+  background: var(--plane-sheet);
+}
+.dl-rail-flyout .dl-rail-cell {
+  height: calc(var(--control-lg) - var(--hairline) * 2);
 }
 .dl-rail-flyout.detached {
-  top: calc(var(--gap) + var(--control-lg) + var(--gap) - var(--unit) * 2);
-  left: calc(100% + var(--section));
-  padding: var(--gap);
+  top: calc(var(--unit) * -2);
+  left: calc(100% + var(--gap) + var(--section));
+  height: auto;
   gap: var(--gap);
-  border-left: var(--line-rule);
-  border-color: var(--rule);
+  padding: var(--inset);
+  border: var(--line-rule);
 }
-.dl-rail-flyout.detached i {
+.dl-rail-flyout.detached .dl-rail-cell {
   width: calc(var(--control-lg) + var(--inset));
   height: calc(var(--control-lg) + var(--inset));
-}
-
-/* C9 specimen: the editor's ink structure. */
-.dl-code .num {
-  color: var(--ink);
-}
-.dl-code .kwarg,
-.dl-code .punct {
-  color: var(--ink-3);
 }
 
 /* Building-block specimens (B2-B4, P1, L1). */
@@ -1838,4 +1829,45 @@ html:has(.dl-body),
   display: flex;
   align-items: center;
   min-height: var(--control-sm);
+}
+
+/* B0 atlas: every atom on one plate. */
+.dl-atlas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(calc(var(--unit) * 44), 1fr));
+  gap: var(--section);
+}
+.dl-atlas > section {
+  display: grid;
+  align-content: start;
+  justify-items: start;
+  gap: var(--inset);
+  padding-top: var(--inset);
+  border-top: var(--line-edge);
+}
+.dl-atlas > section > .t-label:first-child {
+  color: var(--ink-3);
+}
+.dl-atlas-line {
+  display: grid;
+  grid-template-columns: calc(var(--unit) * 16) 1fr;
+  align-items: center;
+  gap: var(--inset);
+}
+.dl-atlas-line > i {
+  display: block;
+}
+.dl-atlas-dist {
+  height: var(--unit);
+  background: var(--ink);
+}
+.dl-atlas-plane {
+  width: 100%;
+  padding: var(--inset);
+  border: var(--line-edge);
+}
+.dl-atlas-marks {
+  display: flex;
+  align-items: center;
+  gap: var(--stack);
 }

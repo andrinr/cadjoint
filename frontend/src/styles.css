@@ -845,12 +845,17 @@ input[type="checkbox"] {
 /* The flyout continues the parent's row: the same 32px cells, the parent's
    own height, flush against the rail's outer edge, so it reads as the
    parent opening sideways rather than as a second card floating nearby. */
+/* The flyout is the parent cell opening sideways: it starts at the parent's
+   own right edge (crossing the rail's padding and edge), is exactly the
+   parent's height, and the two share one outline — the parent's right edge
+   is opened, the flyout has no left edge (A12, K8). */
 .tool-flyout {
   display: none;
   position: absolute;
-  top: calc(var(--hairline) * -1);
-  left: calc(100% + var(--gap));
+  top: 0;
+  left: 100%;
   z-index: 11;
+  height: var(--control-lg);
   gap: 0;
   padding: 0;
   border: var(--line-edge);
@@ -859,14 +864,20 @@ input[type="checkbox"] {
 }
 
 .tool-flyout button {
+  height: calc(var(--control-lg) - var(--hairline) * 2);
   border: 0;
 }
 
 /* The open parent takes the same edge, so parent and flyout are one shape. */
 .tool-group.open > .tool-group-parent:not(.active) {
   border-color: var(--rule-strong);
+  border-right-color: transparent;
   background: var(--plane-sheet);
   color: var(--ink);
+}
+
+.tool-group.open > .tool-group-parent.active {
+  border-right-color: var(--accent);
 }
 
 .tool-group.open .tool-flyout {

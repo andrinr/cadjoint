@@ -66,16 +66,16 @@ import { ViewportSpecimen } from "./ViewportSpecimen";
 
 const SECTIONS = [
   { id: "axioms", num: "1", title: "Axioms" },
-  { id: "colour", num: "2", title: "Colour" },
-  { id: "type", num: "3", title: "Type" },
-  { id: "language", num: "4", title: "Language" },
-  { id: "space", num: "5", title: "Space and size" },
-  { id: "icons", num: "6", title: "Iconography" },
-  { id: "motion", num: "7", title: "Motion" },
-  { id: "shape", num: "8", title: "Building blocks" },
-  { id: "primitives", num: "9", title: "Primitives" },
-  { id: "layout-primitives", num: "10", title: "Layout" },
-  { id: "components", num: "11", title: "Components" },
+  { id: "shape", num: "2", title: "Building blocks" },
+  { id: "primitives", num: "3", title: "Primitives" },
+  { id: "layout-primitives", num: "4", title: "Layout" },
+  { id: "components", num: "5", title: "Components" },
+  { id: "colour", num: "6", title: "Colour" },
+  { id: "type", num: "7", title: "Type" },
+  { id: "language", num: "8", title: "Language" },
+  { id: "space", num: "9", title: "Space and size" },
+  { id: "icons", num: "10", title: "Iconography" },
+  { id: "motion", num: "11", title: "Motion" },
   { id: "viewport", num: "12", title: "Viewport" },
   { id: "layout", num: "13", title: "Where things are" },
   { id: "features", num: "14", title: "Every feature" },
@@ -163,6 +163,36 @@ function MiniPanel(props: { kicker: string; title: string; children: JSX.Element
   );
 }
 
+/** A12/K8: a tool rail with its middle group open, attached or not. */
+function RailSpecimen(props: { attached?: boolean }) {
+  return (
+    <div class="dl-rail-demo">
+      <span class="dl-rail-cell">
+        <CursorIcon size={16} />
+      </span>
+      <span class={props.attached ? "dl-rail-group attached" : "dl-rail-group"}>
+        <span class="dl-rail-cell open">
+          <BoxIcon size={16} />
+        </span>
+        <span class={props.attached ? "dl-rail-flyout" : "dl-rail-flyout detached"}>
+          <span class="dl-rail-cell">
+            <BoxIcon size={16} />
+          </span>
+          <span class="dl-rail-cell">
+            <SphereIcon size={16} />
+          </span>
+          <span class="dl-rail-cell">
+            <CylinderIcon size={16} />
+          </span>
+        </span>
+      </span>
+      <span class="dl-rail-cell">
+        <MoveIcon size={16} />
+      </span>
+    </div>
+  );
+}
+
 function Axioms() {
   return (
     <Section
@@ -172,7 +202,9 @@ function Axioms() {
       intro={
         <>
           Thirteen sentences. Everything after this section is derived from them, and each
-          derived rule names the axiom it comes from. When two rules conflict, the one from the
+          derived rule names the axiom it comes from. The page then builds in order: the atoms
+          (§2), the primitives made of them (§3), the arrangements they are placed in (§4), and the
+          components composed from those (§5); the sections after are the detail. When two rules conflict, the one from the
           earlier axiom wins. A1–A9 govern how things look, A2 and A10–A13 how they behave.
         </>
       }
@@ -261,7 +293,7 @@ function Axioms() {
 
       <Rule
         id="A3"
-        why="So a reader can trust a hue: if it is coloured, it means something, and it means one thing. The table is in §2."
+        why="So a reader can trust a hue: if it is coloured, it means something, and it means one thing. The table is in §6."
         examples={
           <>
             <Plate kind="do" label="hue only where a role is">
@@ -502,7 +534,7 @@ function Axioms() {
         sentence.
       </Rule>
 
-      <Rule id="A9" why="So movement carries information. The demos are in §7.">
+      <Rule id="A9" why="So movement carries information. The demos are in §11.">
         <b>Motion shows causality.</b> Something moves only to show that one thing happened because
         of another. Anything else is still.
       </Rule>
@@ -541,32 +573,10 @@ function Axioms() {
         examples={
           <>
             <Plate kind="do" label="it opens from where it is, at its own size" ground>
-              <div class="dl-rail-demo">
-                <span class="dl-rail-cell" />
-                <span class="dl-rail-cell open">
-                  <i />
-                </span>
-                <span class="dl-rail-flyout">
-                  <i />
-                  <i />
-                  <i />
-                </span>
-                <span class="dl-rail-cell" />
-              </div>
+              <RailSpecimen attached />
             </Plate>
             <Plate kind="dont" label="a second card, somewhere near" ground>
-              <div class="dl-rail-demo">
-                <span class="dl-rail-cell" />
-                <span class="dl-rail-cell open">
-                  <i />
-                </span>
-                <span class="dl-rail-flyout detached">
-                  <i />
-                  <i />
-                  <i />
-                </span>
-                <span class="dl-rail-cell" />
-              </div>
+              <RailSpecimen />
             </Plate>
           </>
         }
@@ -620,7 +630,7 @@ function Colour() {
   return (
     <Section
       id="colour"
-      num="2"
+      num="6"
       title="Colour"
       intro="Paper, three inks, three rules, and a closed table of roles. Ratios are measured live against the ground (#e6e6e9) and the sheet (#f8f7f8)."
     >
@@ -989,7 +999,7 @@ function Type() {
   return (
     <Section
       id="type"
-      num="3"
+      num="7"
       title="Type"
       intro="Seven text roles, and no other way to set text. A role is a whole style — size, weight, leading, tracking, case and figures — taken together; hierarchy inside a component comes from choosing a role and an ink level, never from adjusting one property."
     >
@@ -1101,7 +1111,7 @@ function Space() {
     "control-xl": "the top bar",
   };
   return (
-    <Section id="space" num="5" title="Space and size" intro={`Every length is a multiple of ${UNIT}px (A6).`}>
+    <Section id="space" num="9" title="Space and size" intro={`Every length is a multiple of ${UNIT}px (A6).`}>
       <Rule
         id="S0"
         why="A distance named by its job is the same everywhere that job recurs, so two panels built months apart still line up. Turn on View › Show › Layout grid (⇧G) in the playground: it draws the unit over the whole UI and outlines whatever is off it."
@@ -1200,10 +1210,85 @@ function Shape() {
   return (
     <Section
       id="shape"
-      num="8"
+      num="2"
       title="Building blocks"
-      intro="The atoms everything is drawn with: five lines, three planes, two blocks, a handful of marks, and the seven text roles (T0). Each is a token, whole; the primitives in the next section are formulas of these and nothing else. Derived from A7: things are drawn, not stacked."
+      intro="The atoms everything is drawn with: five lines, three planes, two blocks, a handful of marks, the seven text roles and the five distances. Each is a token, whole, generated from tokens.ts; the primitives in the next section are formulas of these and nothing else. Derived from A7: things are drawn, not stacked."
     >
+      <Rule
+        id="B0"
+        why="Everything on screen is drawn with these and nothing else. Learn this plate and every panel, menu and overlay in the app is one of its combinations; a thing that cannot be described with it is a bug."
+        single
+        examples={
+          <Plate label="the atlas: every atom, side by side">
+            <div class="dl-atlas">
+              <section>
+                <span class="t-label">lines</span>
+                <For each={["rule", "edge", "frame", "active", "pending"]}>
+                  {(name) => (
+                    <div class="dl-atlas-line">
+                      <i style={{ "border-top": `var(--line-${name})` }} />
+                      <span class="t-body">{name}</span>
+                    </div>
+                  )}
+                </For>
+              </section>
+              <section>
+                <span class="t-label">planes</span>
+                <For each={["ground", "sheet", "step"]}>
+                  {(name) => (
+                    <div class="dl-atlas-plane" style={{ background: `var(--plane-${name})` }}>
+                      <span class="t-body">{name}</span>
+                    </div>
+                  )}
+                </For>
+              </section>
+              <section>
+                <span class="t-label">blocks</span>
+                <span class="dl-blk current t-control">current</span>
+                <span class="dl-blk kind t-label">kind</span>
+              </section>
+              <section>
+                <span class="t-label">marks</span>
+                <div class="dl-atlas-marks">
+                  <i class="dl-mark dot" />
+                  <i class="dl-mark ring" />
+                  <i class="dl-mark square" />
+                  <i class="dl-mark triangle" />
+                  <b class="t-body">✓</b>
+                  <b class="t-body">›</b>
+                </div>
+              </section>
+              <section>
+                <span class="t-label">text</span>
+                <span class="t-label">label</span>
+                <span class="t-control">control</span>
+                <span class="t-body">body</span>
+                <span class="t-value">1.250</span>
+                <span class="t-title">title</span>
+                <span class="t-prose">Prose sentence.</span>
+                <span class="t-code">code()</span>
+              </section>
+              <section>
+                <span class="t-label">distances</span>
+                <For each={Object.entries(LAYOUT) as [string, number][]}>
+                  {([name, px]) => (
+                    <div class="dl-atlas-line">
+                      <i class="dl-atlas-dist" style={{ width: `${px * 2}px` }} />
+                      <span class="t-body">
+                        {name} {px}
+                      </span>
+                    </div>
+                  )}
+                </For>
+              </section>
+            </div>
+          </Plate>
+        }
+      >
+        Six kinds of atom: <b>lines</b>, <b>planes</b>, <b>blocks</b>, <b>marks</b>, the seven{" "}
+        <b>text</b> roles and the five <b>distances</b>. The rules below define each kind; the
+        sections after build from them.
+      </Rule>
       <Rule
         id="B1"
         why="A line is weight, style and colour together, named by its job, so the same job always draws the same line. A border written any other way fails test/tokens.test.ts."
@@ -1444,7 +1529,7 @@ function Icons() {
     ["delete", TrashIcon],
   ];
   return (
-    <Section id="icons" num="6" title="Iconography" intro="The playground's icon set, as shipped, at 16px.">
+    <Section id="icons" num="10" title="Iconography" intro="The playground's icon set, as shipped, at 16px.">
       <Rule
         id="I1"
         why="The stroke matches the hairline in feel, so an icon and a rule look drawn by one pen. Colour is not available to icons (A3): an icon that needs a colour needs a word."
@@ -1504,7 +1589,7 @@ function Icons() {
 
 function Motion() {
   return (
-    <Section id="motion" num="7" title="Motion" intro="Derived from A9. Three durations, named by what they mean, and one easing family.">
+    <Section id="motion" num="11" title="Motion" intro="Derived from A9. Three durations, named by what they mean, and one easing family.">
       <Rule
         id="M1"
         why={`${DURATIONS["dur-fast"]} ms acknowledges the pointer, ${DURATIONS["dur-base"]} ms shows a state you caused, ${DURATIONS["dur-slow"]} ms shows something that changed because something else did.`}
@@ -1589,9 +1674,9 @@ function Primitives() {
   return (
     <Section
       id="primitives"
-      num="9"
+      num="3"
       title="Primitives"
-      intro="Seven primitives, each a formula of the building blocks (§8). Every component is a composition of these; a component that seems to need an eighth is the place to stop and ask whether it is really new."
+      intro="Seven primitives, each a formula of the building blocks (§2). Every component is a composition of these; a component that seems to need an eighth is the place to stop and ask whether it is really new."
     >
       <Rule
         id="P1"
@@ -1674,7 +1759,7 @@ function Layout0() {
   return (
     <Section
       id="layout-primitives"
-      num="10"
+      num="4"
       title="Layout"
       intro="Six arrangements, and every layout is one of them or a nesting of them. Each fixes its own distance (S0), so choosing an arrangement chooses the spacing; nothing is spaced by eye. They are classes (l-inset, l-stack, l-ruled, l-cluster, l-row, l-split) generated from tokens.ts."
     >
@@ -1711,7 +1796,7 @@ function Layout0() {
 
 function Components() {
   return (
-    <Section id="components" num="11" title="Components" intro="Each component is a composition of the primitives (§9), arranged by the layout primitives (§10), set in the text roles (T0).">
+    <Section id="components" num="5" title="Components" intro="Each component is a composition of the primitives (§3), arranged by the layout primitives (§4), set in the text roles (T0).">
       <h3>Panel</h3>
       <Rule
         id="K1"
@@ -2492,7 +2577,7 @@ function Language() {
     ["empty", "—", "an em dash; never 0, N/A or blank"],
   ];
   return (
-    <Section id="language" num="4" title="Language" intro="Words are part of the interface, and they follow A8.">
+    <Section id="language" num="8" title="Language" intro="Words are part of the interface, and they follow A8.">
       <Rule
         id="L1"
         single
@@ -2964,16 +3049,16 @@ export function DesignPage() {
             </p>
           </header>
           <Axioms />
+          <Shape />
+          <Primitives />
+          <Layout0 />
+          <Components />
           <Colour />
           <Type />
           <Language />
           <Space />
           <Icons />
           <Motion />
-          <Shape />
-          <Primitives />
-          <Layout0 />
-          <Components />
           <Viewport />
           <Layout />
           <Features />
