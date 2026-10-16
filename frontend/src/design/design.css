@@ -67,8 +67,13 @@ html:has(.dl-body),
   text-transform: var(--case-control);
   font-variant-numeric: var(--numeric-control);
 }
-.dl-top a {
+.dl-top-end {
+  display: flex;
+  align-items: center;
+  gap: var(--gap);
   margin-left: auto;
+}
+.dl-top a {
   text-decoration: none;
 }
 
@@ -1870,4 +1875,246 @@ html:has(.dl-body),
   display: flex;
   align-items: center;
   gap: var(--stack);
+}
+
+/* §1 System specimens: drawn from the proposed module, with their own
+   values, so the proposal can be judged before tokens.ts takes it. */
+.dl-sys-row {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  align-items: center;
+  gap: var(--section);
+}
+.dl-sys-unit {
+  width: var(--unit);
+  height: var(--unit);
+  background: var(--ink);
+}
+.dl-sys-line {
+  display: flex;
+  align-items: center;
+  height: calc(var(--unit) * 4);
+  padding: 0 var(--inset);
+  background: rgba(var(--param-rgb), var(--alpha-tint));
+  border-top: var(--line-rule);
+  border-bottom: var(--line-rule);
+}
+.dl-sys-heights {
+  display: grid;
+  gap: var(--inset);
+}
+.dl-sys-height {
+  display: grid;
+  grid-template-columns: calc(var(--unit) * 16) calc(var(--unit) * 8) calc(var(--unit) * 16) calc(var(--unit) * 28) 1fr;
+  align-items: center;
+  gap: var(--inset);
+}
+.dl-sys-box {
+  display: flex;
+  align-items: center;
+  border: var(--line-edge);
+  background: var(--plane-sheet);
+}
+.dl-sys-text {
+  display: block;
+  width: 100%;
+  height: calc(var(--unit) * 4);
+  background: rgba(var(--param-rgb), var(--alpha-tint));
+}
+.dl-sys-dist {
+  display: flex;
+  align-items: center;
+  gap: var(--inset);
+}
+.dl-sys-dist > i {
+  display: block;
+  height: calc(var(--unit) * 3);
+  background: var(--ink);
+}
+.dl-sys-type > div {
+  display: grid;
+  grid-template-columns: calc(var(--unit) * 16) calc(var(--unit) * 16) 1fr;
+  align-items: center;
+  min-height: calc(var(--unit) * 6);
+  border-bottom: var(--line-rule);
+}
+.dl-sys-sample {
+  font-family: var(--font-mono);
+  line-height: calc(var(--unit) * 4);
+  background: rgba(var(--param-rgb), var(--alpha-wash));
+}
+.dl-sys-sample.caps,
+.dl-sys-sample.title {
+  text-transform: var(--case-label);
+  letter-spacing: var(--track-control);
+}
+.dl-sys-sample.title,
+.dl-sys-sample.prose,
+.dl-sys-sample.code {
+  line-height: calc(var(--unit) * 5);
+}
+.dl-sys-sample.prose {
+  font-family: var(--font-sans);
+}
+.dl-sys-sample.value {
+  font-variant-numeric: tabular-nums;
+}
+/* The specimen panel: the module, applied. */
+.dl-sys-panel {
+  width: calc(var(--unit) * 80);
+  border: var(--line-edge);
+  background: var(--plane-sheet);
+}
+.dl-sys-tabs {
+  display: flex;
+  height: calc(var(--unit) * 8);
+  border-bottom: var(--line-edge);
+  background: var(--plane-ground);
+}
+.dl-sys-tabs span {
+  display: flex;
+  align-items: center;
+  padding: 0 var(--inset);
+  border-right: var(--line-rule);
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  line-height: calc(var(--unit) * 4);
+  text-transform: var(--case-label);
+  letter-spacing: var(--track-control);
+}
+.dl-sys-tabs span.active {
+  border-bottom: var(--line-active);
+  background: var(--plane-sheet);
+  color: var(--ink);
+}
+.dl-sys-body {
+  display: grid;
+  gap: var(--section);
+  padding: var(--inset);
+}
+.dl-sys-head {
+  display: grid;
+  justify-items: start;
+  gap: var(--gap);
+}
+.dl-sys-kind {
+  display: inline-flex;
+  align-items: center;
+  height: calc(var(--unit) * 4);
+  padding: 0 var(--gap);
+  background: var(--block-kind);
+  color: var(--block-kind-ink);
+  font-family: var(--font-mono);
+  text-transform: var(--case-label);
+  letter-spacing: var(--track-control);
+}
+.dl-sys-title {
+  font-family: var(--font-mono);
+  line-height: calc(var(--unit) * 5);
+  text-transform: var(--case-label);
+  letter-spacing: var(--track-title);
+}
+.dl-sys-rows {
+  display: grid;
+  border-top: var(--line-rule);
+}
+.dl-sys-rows > div {
+  display: grid;
+  grid-template-columns: calc(var(--unit) * 24) 1fr calc(var(--unit) * 10);
+  align-items: center;
+  gap: var(--inset);
+  height: calc(var(--unit) * 6);
+  border-bottom: var(--line-rule);
+}
+.dl-sys-label {
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  text-transform: var(--case-label);
+  letter-spacing: var(--track-control);
+}
+.dl-sys-val {
+  font-family: var(--font-mono);
+  text-align: right;
+}
+.dl-sys-val.num {
+  font-variant-numeric: tabular-nums;
+}
+.dl-sys-unit-t {
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+}
+.dl-sys-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--gap);
+}
+.dl-sys-cell {
+  display: inline-flex;
+  align-items: center;
+  height: calc(var(--unit) * 6);
+  padding: 0 var(--inset);
+  border: var(--line-edge);
+  font-family: var(--font-mono);
+  text-transform: var(--case-label);
+  letter-spacing: var(--track-control);
+}
+.dl-sys-cell.primary {
+  border-color: var(--block-current);
+  background: var(--block-current);
+  color: var(--block-current-ink);
+}
+
+/* Variations drawer: a sheet on the right edge, under the top bar. */
+.dl-variations {
+  position: fixed;
+  top: calc(var(--unit) * 9);
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  display: grid;
+  align-content: start;
+  gap: var(--section);
+  width: calc(var(--unit) * 96);
+  padding: var(--section);
+  overflow-y: auto;
+  border-left: var(--line-edge);
+  background: var(--plane-sheet);
+}
+.dl-variations-axis {
+  display: grid;
+  gap: var(--gap);
+}
+.dl-variations-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gap);
+}
+.dl-variations-choices button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gap);
+  height: var(--control-sm);
+  padding: 0 var(--inset);
+  border: var(--line-edge);
+  border-radius: var(--radius);
+  background: var(--plane-sheet);
+  color: var(--ink-2);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  cursor: pointer;
+}
+.dl-variations-choices button:hover {
+  background: var(--plane-step);
+  color: var(--ink);
+}
+.dl-variations-choices button.active {
+  border-color: var(--block-current);
+  background: var(--block-current);
+  color: var(--block-current-ink);
+}
+.dl-variations-choices button i {
+  display: block;
+  width: calc(var(--unit) * 3);
+  height: calc(var(--unit) * 3);
 }

@@ -60,12 +60,13 @@ import {
 } from "./demos";
 import { Cross, Plate, Ratio, Rule, Section, Swatch, v } from "./kit";
 import { DeskMap } from "./DeskMap";
+import { Variations } from "./Variations";
 import { SelectSpecimen } from "./demos";
 import { FeatureIndex, ProposedMenuBar } from "./FeatureIndex";
 import { ViewportSpecimen } from "./ViewportSpecimen";
 
 const SECTIONS = [
-  { id: "axioms", num: "1", title: "Axioms" },
+  { id: "system", num: "1", title: "System" },
   { id: "shape", num: "2", title: "Building blocks" },
   { id: "primitives", num: "3", title: "Primitives" },
   { id: "layout-primitives", num: "4", title: "Layout" },
@@ -80,7 +81,8 @@ const SECTIONS = [
   { id: "layout", num: "13", title: "Where things are" },
   { id: "features", num: "14", title: "Every feature" },
   { id: "behaviour", num: "15", title: "Behaviour" },
-  { id: "changes", num: "16", title: "Record" },
+  { id: "axioms", num: "16", title: "Principles" },
+  { id: "changes", num: "17", title: "Record" },
 ];
 
 /**
@@ -193,19 +195,212 @@ function RailSpecimen(props: { attached?: boolean }) {
   );
 }
 
+/**
+ * The proposed system: every size derived from the unit and the line box.
+ * Page-local until it is agreed; tokens.ts then takes these values and the
+ * app follows.
+ */
+const SYSTEM = {
+  unit: 4,
+  line: 16,
+  heights: [
+    { name: "tag", px: 16, formula: "L", job: "kind chips, marks that are not pressed" },
+    { name: "cell", px: 24, formula: "L + 2 × gap", job: "the one interactive height: buttons, fields, menu items, rows, chips" },
+    { name: "bar", px: 32, formula: "L + 2 × inset", job: "strips: tab strips, the tool rail, the viewport controls" },
+    { name: "toolbar", px: 40, formula: "bar + 2 × gap", job: "the app toolbar, which holds bars" },
+  ],
+  distances: [
+    { name: "gap", px: 4, formula: "u", job: "between cells of one group; text to its cell's edge, vertically" },
+    { name: "inset", px: 8, formula: "2u", job: "inside a sheet; a cell's text to its edge, horizontally" },
+    { name: "section", px: 16, formula: "4u = L", job: "between sections; the viewport's furniture from its edges" },
+  ],
+  type: [
+    { role: "caps", size: 11, weight: 600, job: "every label of the instrument: tabs, buttons, column heads, kickers" },
+    { role: "body", size: 12, weight: 400, job: "names, list rows, menu items, units — text as written" },
+    { role: "value", size: 12, weight: 500, job: "numbers: tabular, a weight above body, never a size" },
+    { role: "title", size: 15, weight: 600, job: "a panel's title, on a 20px line box" },
+    { role: "prose", size: 12, weight: 400, job: "sentences, in sans, on a 20px line box" },
+    { role: "code", size: 12, weight: 400, job: "the editor, on a 20px line box" },
+  ],
+} as const;
+
+function System() {
+  return (
+    <Section
+      id="system"
+      num="1"
+      title="System"
+      intro="One unit and one line box, and every other size is derived from them. Nothing below is chosen per component: a height is a line box plus a distance on each side, a distance is a multiple of the unit, a text size is whatever sits on the line box. This is the proposal; the app is rebuilt on it once it is agreed."
+    >
+      <Rule
+        id="Y1"
+        why="One number to remember (4) and one to see (16). A layout built from them lines up without being told to, because there is nothing else it could be."
+        single
+        examples={
+          <Plate label="the unit and the line box">
+            <div class="dl-sys-row">
+              <div class="dl-sys-unit" />
+              <span class="t-body">u = 4px</span>
+              <div class="dl-sys-line">
+                <span class="t-body">a line of text, in its 16px box</span>
+              </div>
+              <span class="t-body">L = 4u = 16px</span>
+            </div>
+          </Plate>
+        }
+      >
+        <b>u = 4px</b>, the unit. <b>L = 16px</b>, the line box: every single line of text sits in
+        one, and an icon is one line box square.
+      </Rule>
+      <Rule
+        id="Y2"
+        why="Four heights, each a line box plus padding of one distance: so a cell, a bar and a toolbar hold the same text on the same baseline, and a bar holds a cell with a gap to spare."
+        single
+        examples={
+          <Plate label="the heights, built from the line box" ground>
+            <div class="dl-sys-heights">
+              <For each={SYSTEM.heights}>
+                {(h) => (
+                  <div class="dl-sys-height">
+                    <div class="dl-sys-box" style={{ height: `${h.px}px` }}>
+                      <span class="dl-sys-text" />
+                    </div>
+                    <code>{h.px}</code>
+                    <span class="t-body">{h.name}</span>
+                    <span class="t-body" style={{ color: "var(--ink-3)" }}>{h.formula}</span>
+                    <span class="t-prose">{h.job}</span>
+                  </div>
+                )}
+              </For>
+            </div>
+          </Plate>
+        }
+      >
+        <b>tag</b> 16 · <b>cell</b> 24 · <b>bar</b> 32 · <b>toolbar</b> 40. Anything clickable is a
+        cell or larger (24 is the WCAG 2.2 minimum target).
+      </Rule>
+      <Rule
+        id="Y3"
+        why="Three distances that double: the gap between things in a group, the inset inside a sheet, the section between groups. A 2px nudge and a 12px stack were the old system's hesitations."
+        single
+        examples={
+          <Plate label="the three distances">
+            <div class="dl-ruler">
+              <For each={SYSTEM.distances}>
+                {(d) => (
+                  <div>
+                    <code>{d.name}</code>
+                    <b class="t-value">{d.px}px</b>
+                    <span class="dl-sys-dist">
+                      <i style={{ width: `${d.px * 4}px` }} />
+                      <span class="t-prose">
+                        {d.formula} · {d.job}
+                      </span>
+                    </span>
+                  </div>
+                )}
+              </For>
+            </div>
+          </Plate>
+        }
+      >
+        <b>gap</b> 4 · <b>inset</b> 8 · <b>section</b> 16.
+      </Rule>
+      <Rule
+        id="Y4"
+        why="Three sizes, all of which sit on the line box (11 and 12) or on the one taller box (15 on 20). A value is told from a name by weight and tabular figures, never by being bigger, so a row of label, value and unit is one size."
+        single
+        examples={
+          <Plate label="six roles, three sizes, on the line box">
+            <div class="dl-sys-type">
+              <For each={SYSTEM.type}>
+                {(t) => (
+                  <div>
+                    <code>{t.role}</code>
+                    <code>
+                      {t.size} · {t.weight}
+                    </code>
+                    <span
+                      class={`dl-sys-sample ${t.role}`}
+                      style={{
+                        "font-size": `${t.size}px`,
+                        "font-weight": String(t.weight),
+                      }}
+                    >
+                      {t.role === "value" ? "2700.0  1.25e-6" : t.job}
+                    </span>
+                  </div>
+                )}
+              </For>
+            </div>
+          </Plate>
+        }
+      >
+        <b>caps</b> 11 · <b>body</b> 12 · <b>value</b> 12 tabular · <b>title</b> 15 · <b>prose</b> 12
+        sans · <b>code</b> 12.
+      </Rule>
+      <Rule
+        id="Y5"
+        why="The whole system on one object: tab strip a bar, rows cells, the head a title line box, sections a section apart, an inset all round. Every edge falls on the 4px grid behind it."
+        single
+        examples={
+          <Plate label="a panel, built from nothing but the module">
+            <div class="dl-unit-grid" style={{ padding: "var(--section)" }}>
+              <div class="dl-sys-panel">
+                <div class="dl-sys-tabs">
+                  <span class="active">studies</span>
+                  <span>meshes</span>
+                </div>
+                <div class="dl-sys-body">
+                  <div class="dl-sys-head">
+                    <span class="dl-sys-kind">fem</span>
+                    <span class="dl-sys-title">studies</span>
+                  </div>
+                  <div class="dl-sys-rows">
+                    <div>
+                      <span class="dl-sys-label">mesh</span>
+                      <span class="dl-sys-val">sink-mesh</span>
+                      <span />
+                    </div>
+                    <div>
+                      <span class="dl-sys-label">conductivity</span>
+                      <span class="dl-sys-val num">401.0</span>
+                      <span class="dl-sys-unit-t">W/mK</span>
+                    </div>
+                    <div>
+                      <span class="dl-sys-label">source</span>
+                      <span class="dl-sys-val num">12.5</span>
+                      <span class="dl-sys-unit-t">W</span>
+                    </div>
+                  </div>
+                  <div class="dl-sys-actions">
+                    <span class="dl-sys-cell">mesh</span>
+                    <span class="dl-sys-cell primary">solve</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Plate>
+        }
+      >
+        A panel: a <b>bar</b> of tabs, an <b>inset</b>, a head on a title line box, a{" "}
+        <b>section</b>, <b>cell</b> rows, a <b>section</b>, a row of cells a <b>gap</b> apart.
+      </Rule>
+    </Section>
+  );
+}
+
 function Axioms() {
   return (
     <Section
       id="axioms"
-      num="1"
-      title="Axioms"
+      num="16"
+      title="Principles"
       intro={
         <>
-          Thirteen sentences. Everything after this section is derived from them, and each
-          derived rule names the axiom it comes from. The page then builds in order: the atoms
-          (§2), the primitives made of them (§3), the arrangements they are placed in (§4), and the
-          components composed from those (§5); the sections after are the detail. When two rules conflict, the one from the
-          earlier axiom wins. A1–A9 govern how things look, A2 and A10–A13 how they behave.
+          Thirteen sentences: the reasons behind the system. Every rule on this page names the
+          principle it comes from, and when two rules conflict, the one from the earlier principle
+          wins. A1–A9 are about how things look, A2 and A10–A13 about how they behave.
         </>
       }
     >
@@ -2660,7 +2855,7 @@ function Changes() {
   return (
     <Section
       id="changes"
-      num="16"
+      num="17"
       title="Record"
       intro="What the playground did before this language, and what it does now. Each pair is the old behaviour, then the rule as shipped; together they are the reasons the rules above read as they do."
     >
@@ -3031,9 +3226,12 @@ export function DesignPage() {
         <b>CJ</b>
         <strong>cadjoint</strong>
         <span>Design language · draft</span>
-        <a class="dl-btn quiet h-sm" href="/">
-          Playground
-        </a>
+        <span class="dl-top-end">
+          <Variations />
+          <a class="dl-btn quiet h-sm" href="/">
+            Playground
+          </a>
+        </span>
       </header>
       <div class="dl">
         <Nav />
@@ -3041,14 +3239,15 @@ export function DesignPage() {
           <header>
             <h1>Design language</h1>
             <p>
-              The rules the playground is built from: thirteen axioms, and everything derived
-              from them. A rule that cannot be traced to an axiom is a bug in this page; a screen that
+              The system the playground is built from: one unit and one line box from which every
+              size is derived, the atoms drawn with them, the primitives and arrangements made of
+              the atoms, and the components made of those. The principles behind it come last. A rule that cannot be traced to an axiom is a bug in this page; a screen that
               contradicts a rule is a bug in the screen. This page is drawn with the same tokens and
               obeys the same rules. The measurements behind the choices are in{" "}
               <code>research/design-language.md</code>.
             </p>
           </header>
-          <Axioms />
+          <System />
           <Shape />
           <Primitives />
           <Layout0 />
@@ -3063,6 +3262,7 @@ export function DesignPage() {
           <Layout />
           <Features />
           <Behaviour />
+          <Axioms />
           <Changes />
         </main>
       </div>
