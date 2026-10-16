@@ -1,0 +1,515 @@
+---
+title: "Design language"
+subtitle: "The rules the playground and these docs are built from"
+toc: true
+toc-depth: 3
+---
+
+This page is the specification of cadjoint's interface: how it looks and how it
+behaves. It is written as a short list of axioms followed by everything derived
+from them. A rule below that cannot be traced to an axiom is a bug in this page;
+a screen that contradicts a rule is a bug in the screen.
+
+The measurements behind the choices (contrast ratios, ramp distances, the glass
+and motion-blur studies) are in [the design-language research
+note](../research/design-language.md). This page states the result; that note
+argues for it.
+
+## Axioms
+
+**A1 — The part and its numbers are the subject.** The interface is the sheet
+they are printed on. Nothing in the chrome may be more salient than the geometry
+or a measured value.
+
+**A2 — The program is the truth.** Every edit made anywhere in the interface is
+an edit to the source text, and the screen is a rendering of that text. There is
+no state the program does not hold, apart from the view (camera, layout,
+selection).
+
+**A3 — Hue is meaning.** Every hue on screen belongs to exactly one role in a
+closed table ([Colour roles](#colour-roles)). Anything without a role is drawn
+without hue: ink on paper.
+
+**A4 — Never by hue alone.** Every role also has a carrier that survives
+greyscale and colour-blindness: a word, a shape, a position or a weight.
+
+**A5 — Contrast is a number.** Text clears 4.5:1 against its ground. A mark
+that carries meaning clears 3:1. Furniture (grids, resting hairlines) sits in a
+band below that, so it is visible without competing.
+
+**A6 — One unit.** Every length is a multiple of the unit `u = 4px`. Half a unit
+(2px) is allowed inside a control. The one sub-unit length is the hairline, 1px.
+
+**A7 — Structure is drawn, not stacked.** Things are separated by rules and
+grouped by shared edges. There is no shadow, no radius and no translucency
+behind text.
+
+**A8 — Two voices.** What the program says (names, values, units, labels of the
+instrument) is set in mono. What a person says (sentences) is set in sans.
+
+**A9 — Motion shows causality.** Something moves only to show that one thing
+happened because of another. Anything else is still.
+
+**A10 — Every action answers.** An action is acknowledged within 100 ms, says
+what it is doing while it runs, and ends in a visible state: done, failed (with
+the reason), or cancelled.
+
+**A11 — Every step can be taken back.** An edit is undoable, a gesture is
+abandonable, a mode is escapable, one step at a time.
+
+A1–A9 govern appearance, A2, A10 and A11 govern behaviour. They are ordered: when
+two rules conflict, the one derived from the earlier axiom wins.
+
+## Colour
+
+### The ground and the ink
+
+From A1 and A7: the ground is paper, and the chrome and the viewport share it.
+The seam between them is a rule, not a step in brightness.
+
+| token | value | on paper | job |
+|---|---|---|---|
+| `ground` | `#e6e6e9` | — | the page and the viewport |
+| `ground-step` | `#edecee` | 1.06:1 | sub-bars; hover (a step *down* from `sheet`) |
+| `sheet` | `#f8f7f8` | 1.17:1 | panels, popovers, dialogs |
+| `ink` | `#18161a` | 14.4:1 | primary text, selection |
+| `ink-2` | `#48464d` | 7.5:1 | secondary text, icons, hover |
+| `ink-3` | `#605e65` | 5.1:1 | labels, units, construction geometry |
+| `rule` | `#9f9da5` | 2.2:1 | hairlines inside a panel (furniture) |
+| `rule-strong` | `#747278` | 3.8:1 | control edges, section breaks, the viewport seam |
+| `rule-heavy` | `#36343b` | 9.9:1 | the viewport frame, the active indicator |
+
+There are three ink levels and no fourth. Text is never faded with `opacity`,
+because a faded text has no contrast ratio that can be asserted (A5). A
+disabled control uses `ink-3` and loses its edge, and it does not fade.
+
+There are two sheets above the ground, and no third. A proposed surface less than
+3 ΔOKLab from an existing one is that surface.
+
+### Colour roles
+
+From A3. This table is closed: a new hue needs a new row here first.
+
+| role | token | value | means | carrier (A4) | zone |
+|---|---|---|---|---|---|
+| **current** | `accent` | `#f87318` | the thing you are acting on or in: the active mode, the selected row, the primary action, the source span being edited | a filled block; position | chrome |
+| **free** | `param` | `#0065b4` | a free parameter: a value the optimiser or a drag may move, through which gradients flow | the word *free*; a count | chrome, editor |
+| **error** | `danger` | `#a8341c` | failed, violated, destructive | the word; ✕ / filled square | chrome, editor |
+| **warning** | `warn` | `#8a5a00` | stale, approximate, needs attention | the word; triangle | chrome, editor |
+| **done** | `ok` | `#00734c` | converged, satisfied, connected | the word; ● | chrome |
+| **direction** | `axis-x/y/z` | `#c81e2a` `#17742a` `#1f5fd2` | world X, Y, Z | the letter | viewport, view cube |
+| **field** | viridis | ramp | a solved nodal field (temperature, displacement, stress) | legend with labelled ends | viewport, legend |
+| **quality** | magma | ramp | mesh quality | legend with labelled ends | viewport, legend |
+| **distance** | `sdf-inside/outside` | `#6400fd` / `#8a5601` | signed distance, inside / outside | zero isoline; legend | viewport, legend |
+| **boundary** | `bc-*` | nine hues | the boundary condition of each kind | swatch beside its name | viewport, BC list |
+| **proposal** | `proposal` | `#1b7987` | the builder's live selection preview | appears only while building | viewport |
+
+Everything else is achromatic, and that includes four things that are often
+coloured elsewhere:
+
+- **Selection** is `ink`, the heaviest tone, so it reads over any field value.
+- **Hover** is `ink-2`.
+- **Constraints** are `ink`. A constraint holds geometry still, and in this
+  table stillness has no hue. A *violated* constraint is `danger`.
+- **Construction geometry** (sketch edges, planes, mesh wire) is `ink-3`,
+  `rule` when locked.
+
+**The accent is a fill, never ink.** As a ground under `ink-on-accent`
+(`#0a0a0c`) it measures 7.0:1; as text or a hairline on paper it measures 2.3:1.
+The first passes and the second fails, so the accent appears only as a block
+with near-black type on it. `accent-press` (`#c85d00`, 3.4:1) is the pressed
+fill and the only accent-coloured mark. Because the accent means *current*, at
+most a few accent blocks are on screen at once: the mode, the primary action of
+the focused panel, and the selection.
+
+**A label of kind is inverse ink, not accent.** Section kickers (`LIBRARY`,
+`FEM`, `READ-ONLY`) and kind chips (`THERMAL`, `ELASTIC`) are `sheet` type on an
+`ink` block. They say what something *is*, and *current* is the accent's one
+meaning.
+
+### Zones
+
+1. **Chrome hue stays outside the viewport rectangle.** Inside it the only hues
+   are the data roles (field, quality, distance, boundary, proposal) and
+   direction.
+2. **A role may share a hue family with another only across zones.** `ok` and
+   `axis-y` are both green; one is a status in a panel and the other a direction
+   in the viewport, and they never label the same thing. The traction BC and
+   `axis-x` are both red, and they never share a mode, because BCs show in
+   Simulate and the gizmo shows in Model and Sketch.
+3. **A ramp appears in a panel only as a legend**: a bar at most 8px tall with
+   both ends labelled in units. A ramp without numbers is decoration.
+4. **Nothing marks a reading by recolouring it.** Hover and selection over a
+   field are drawn as an outline; the field pixels keep their true value.
+5. **No text sits on a backdrop that depends on the data.** A surface carrying
+   glyphs or a legend is opaque.
+
+### The editor
+
+From A3: syntax highlighting is not a role, so it is achromatic. Keywords are
+`ink` semibold, names `ink`, strings `ink-2`, comments `ink-3` italic,
+punctuation `ink-2`. The editor's hues are its roles: `danger` and `warn` for
+diagnostics, `param` for the gutter mark on lines that carry a free parameter,
+and the accent for the span the viewport selection points at.
+
+## Type
+
+From A8. Mono is the house face: labels, tabs, menus, values, units, names from
+the program. Sans is for sentences: hints, help, warnings, dialog text, and the
+prose of these docs.
+
+| token | px | job |
+|---|---|---|
+| `text-3xs` | 9 | tracked uppercase labels and kickers |
+| `text-2xs` | 10 | dense secondary text, selector expressions |
+| `text-xs` | 11 | control labels, tabs, menu items, hints |
+| `text-sm` | 12 | body; the default |
+| `text-md` | 13 | values the user reads |
+| `text-lg` | 15 | panel titles, and nothing else |
+
+The scale is steps of 1px between 9 and 13, where each step is about 10 % of the
+size (just above the visible threshold), and then one jump to the single title
+size. Weights are 400, 500 and 600; 700 only on an accent block.
+
+**Tracking is a function of size**: 0.16em at 9px, falling to 0.04em at 15px.
+Uppercase is for furniture only. A string that came from the program (`fin
+comb`, `sink-conduction`) is quoted as written: never uppercased, never
+restyled.
+
+**Numbers** are tabular, right-aligned on a shared column, and one size above
+their label. The unit follows the value in `ink-3`, one size smaller, on the
+same baseline, and disappears with the value. Decimal places are the tolerance,
+so precision is chosen per quantity and never padded.
+
+## Space and size
+
+From A6, every length is a multiple of 4px.
+
+**Spacing.** `2 · 4 · 6 · 8 · 12 · 16 · 24` (½ to 6 units). The two half-unit
+steps live inside controls. Padding inside a panel is at least 8px; when a panel
+runs out of room, density comes from type (a 9px label over a 13px value) and
+not from smaller gaps.
+
+**Control heights.** `20 · 24 · 28 · 32 · 36`, five to nine units.
+
+| token | px | job |
+|---|---|---|
+| `control-tag` | 20 | non-interactive tags and chips |
+| `control-sm` | 24 | the smallest thing you can click: dense rows, inline buttons |
+| `control-md` | 28 | inputs, selects, buttons in panels |
+| `control-lg` | 32 | the toolbar, tool-rail cells |
+| `control-xl` | 36 | the top bar |
+
+24px is the floor for anything interactive because it is the minimum target
+size in WCAG 2.2 (2.5.8). Every control in a row picks the same height, so
+labels, inputs and icons share a baseline.
+
+**Lines.** `hairline` is 1px and is the only border weight. `stroke-active` is
+2px and means one thing: *this is the active one* (the active tab, the focused
+input's edge). A 2px line used for emphasis is wrong.
+
+## Shape and elevation
+
+From A7.
+
+- **Radius is zero.** Circles appear only where roundness means *a point, not a
+  region*: status dots and vertex handles.
+- **No shadow.** Elevation is a lighter sheet plus a `rule-strong` edge. A
+  popover is a `sheet` with a hairline, and a modal dialog adds a scrim of `ink`
+  at 42 %.
+- **Hairlines over boxes.** The default separator is a 1px `rule` that runs the
+  full width of the container's padding. A filled box needs a reason, and *it is
+  a card* is not one.
+- **No inset control.** A field drawn darker than its sheet reads as disabled.
+  Inputs are `sheet` with a `rule-strong` edge.
+- **Dashed means *not yet*.** A dashed edge marks something that does not exist
+  yet: an *add* button, a drop target, a plane label being placed.
+
+## Iconography
+
+- 16px box, 1.25px stroke, no fills, miter joins, square caps, drawn on the
+  half pixel so a vertical stroke lands on a device pixel.
+- Icons are `ink-2`, and `ink` when active. Icons have no hue (A3): an icon that
+  needs a colour needs a word instead.
+- Every tool-rail icon has a text label at widths of 1280px and above.
+  Destructive actions always carry the word.
+- Icons do not appear inside the viewport. Gizmos and handles are geometry,
+  drawn by the renderer.
+
+## Motion
+
+From A9. Three durations, named by what they mean.
+
+| token | ms | meaning | example |
+|---|---|---|---|
+| `dur-fast` | 90 | acknowledgement: the pointer's own feedback | hover, press |
+| `dur-base` | 160 | state: something you directly caused | tab switch, toggle, popover |
+| `dur-slow` | 260 | propagation: something changed *because* something else did | the source span lights, then the geometry updates |
+
+One easing family: `ease` (`cubic-bezier(0.2, 0, 0, 1)`) for arrivals,
+`ease-inout` for things that move and settle.
+
+Causal pairs are sequenced, never simultaneous: when a drag rewrites the source,
+the changed span highlights first and the geometry follows. **Never animated**:
+digits (a tweened number shows values that were never true), the camera under
+direct manipulation, layout on data arrival. Replaying a recorded optimisation
+trajectory is not animation, because every frame is a state the optimiser held.
+Under `prefers-reduced-motion`, `dur-fast` and `dur-base` become 0 and
+propagation becomes a two-frame highlight.
+
+## Components
+
+Every component below is built only from the tokens above.
+
+### Panels
+
+A panel is a dock window: a tab strip (`control-lg`, `ground`), then a `sheet`
+body with 8px padding. The body opens with a **header**: an inverse-ink kicker
+naming the panel's kind, then the title in `text-lg` tracked mono. Sections
+below are separated by a `rule`, each introduced by a 9px tracked label. Panels
+are docked, not floated over the viewport, unless the user floats them.
+
+### Rows
+
+A row is `label | … | value` on one baseline at `control-sm` or `control-md`.
+The label is `ink-3` 9–11px uppercase; the value is `ink` 13px tabular,
+right-aligned. Value columns line up across rows and across panels side by
+side. A row that needs a second line hangs a 10px `ink-3` sub-line under the
+value.
+
+### Controls
+
+| control | rest | hover | active / pressed | disabled |
+|---|---|---|---|---|
+| **primary button** (one per panel) | `accent` fill, `ink-on-accent` 700 | — | `accent-press` | `ground-step` fill, `ink-3`, no edge |
+| **button** | `sheet`, `rule-strong` edge, `ink-2` | `ground-step` | `ink` edge | `ink-3`, `rule` edge |
+| **quiet button** (icon, tab) | no edge, `ink-2` | `ground-step` | `ink`, `stroke-active` underline for tabs | `ink-3` |
+| **destructive** | button with the word, `danger` text | `danger` edge | — | — |
+| **segmented** (mode switcher) | cells share edges | `ground-step` | the active cell is an `accent` block | — |
+| **input** | `sheet`, `rule-strong` edge | — | focus: `stroke-active` `ink` edge | `ink-3`, `rule` edge |
+| **invalid input** | `danger` edge, the text kept as typed | | | |
+
+Focus is always visible as a 2px `ink` ring offset 1px, for keyboard focus
+(`:focus-visible`).
+
+### Chips and badges
+
+- **Kind chip**: inverse ink, 9px tracked uppercase, `control-tag`.
+- **Value chip** (a constraint `distance · P1–P2 = 1.8`, a material name):
+  `sheet`, `rule` edge, mono as written, with a × that removes it.
+- **Count badge**: tabular figure in `ink` on `ground-step`. The free-parameter
+  count is the one badge that takes a hue, `param`.
+
+### Menus, popovers and dialogs
+
+- **Menu**: a `sheet` with a `rule-strong` edge. Items are `control-sm`,
+  left-aligned in one column, the shortcut right-aligned in `ink-3`. A check or
+  dot sits in a fixed leading column, so labels stay aligned whether or not they
+  carry one. The highlighted item is `ground-step`; the open menu's title in the
+  bar is the accent block.
+- **Popover**: a menu that holds controls. It opens next to its trigger, closes
+  on Escape and on a click outside, and never covers its trigger.
+- **Dialog**: only for a decision that blocks everything else (an overwrite
+  without undo, export settings). It has a scrim, a title, sans prose, and the
+  buttons bottom-right with the primary last. Escape is Cancel.
+
+### Notices
+
+There are no transient toasts that disappear on a timer, because a timer decides
+when you have read something. Feedback goes in one of three places:
+
+- **in place**, beside the thing it is about (an invalid input, a failed study
+  card), and this is the default;
+- **the status line**, for the state of the whole program (compiling, compiled,
+  out of date);
+- **a notice bar** at the top of the viewport for a failure of the whole
+  picture (a compile error). It is opaque, `danger` text on `sheet`, names the
+  line, and stays until the cause is fixed or it is dismissed.
+
+### Status and work
+
+The toolbar's job chip names the running job that decides whether the screen
+matches the code (the compile), and then how many others run. The Processes
+window lists them all. A running job states its stage in words (`MESH`,
+`SOLVE`) and any quantity that is genuinely known, and has a stop control.
+There is no indeterminate spinner over content that is already legible, and no
+percentage of an unknown total.
+
+### Viewport overlays
+
+The viewport is an instrument face (A1). Its overlays are achromatic unless they
+are data or direction.
+
+| overlay | rest | hover | selected | locked |
+|---|---|---|---|---|
+| sketch edge | `ink-3` | `ink-2` | `ink` | `rule` |
+| vertex handle: free | hollow ● `ink-2` | `ink` | filled ● `ink` | — |
+| vertex handle: held | filled ■ `ink-3` with lock | `ink-2` | `ink` | `rule` |
+| face | — | `ink` outline, 12 % fill | `ink` outline | 45 % outline |
+| sketch plane | `ink-3` outline, 8 % fill | `ink-2` | `ink` | `rule` |
+| mesh wire / feature edge | `ink-3` 30 % / `ink` | | | |
+| gizmo | `axis-x/y/z` arrows and rings | thicker | — | — |
+
+- **Free versus held is shape**: a free vertex is a hollow circle and a held one
+  a filled square. In the viewport this replaces the free hue (`param`), which
+  stays in the chrome.
+- **Dimension and constraint labels** are `ink` mono on an opaque `sheet` tab.
+  A violated constraint's label is `danger` and says by how much.
+- **The graticule** is furniture held to 1.4–2.8:1 on paper. It rules the world
+  plane the camera most nearly faces and states its spacing (`GRID 1.00 m · XY`)
+  on a 1-2-5 ladder, prefixed `>` when the view is not to scale.
+- **The view cube and axis triad** use the direction tones and the letters.
+- **The title block** (bottom right) lists SCENE / STUDY / MESH / SOLVER / REV,
+  with `—` where a field is empty.
+- **The hint bar** (bottom) names the mode as an inverse-ink block, followed by
+  one line of sans saying what the pointer does now.
+- **Legends** are opaque, at most 8px tall, with both ends labelled in units.
+
+## Functional rules
+
+### The program is the truth (A2)
+
+- **Every panel is an editor of literals.** Changing a number in a panel, or
+  dragging a handle, rewrites that literal in the source. An argument written as
+  an expression is shown as written and is read-only; the panel says so instead
+  of offering a field that would overwrite it.
+- **Selecting reveals the source.** A precise selection (a vertex) scrolls the
+  editor to its literal; a whole object scrolls to its declaration. The editor
+  does not take focus when it does so.
+- **One selection.** Viewport, object tree, properties and editor show the same
+  selection. Selecting in any of them selects in all.
+- **The screen says whether it matches the code.** While the program is
+  compiling, or the picture is older than the text, the status line says so. A
+  stale value is marked in place, never silently kept.
+- **The newest edit wins.** A new edit supersedes the work of an older one; the
+  older answer is discarded even if it arrives later.
+
+### Direct manipulation
+
+- **Preview while dragging, commit on release.** A drag shows its effect live
+  and writes the source once, when the pointer comes up. One gesture is one
+  undo step.
+- **Escape during a gesture abandons it.** The value returns to what it was
+  before the pointer went down, in the viewport and in the source.
+- **Snapping is visible.** When a drag snaps (to a grid rung, an axis, a
+  detent), the snapped-to thing is drawn for as long as the snap holds.
+
+### Modes and tools
+
+- **Modes are a pipeline**: Model → Sketch → Simulate. A mode changes the tool
+  set, the panels and the shortcuts wholesale. It is named in the switcher (the
+  accent cell) and in the hint bar.
+- **One armed tool.** The armed tool is the accent cell in the rail, and the
+  hint bar says what clicking will do. Finishing or cancelling a tool returns to
+  Select.
+- **A grouped tool remembers its last choice**, and shows it on the group.
+
+### Escape and undo (A11)
+
+- **Escape cancels one thing per press**, most specific first: a gesture in
+  flight, then a half-finished command, then the armed tool, then the
+  selection, then the mode (back to Model). When nothing applies, Escape does
+  nothing.
+- **Undo is over the source.** `Ctrl/⌘ Z` restores the previous program text;
+  inside the editor it is the editor's own history. Each run, patch and gesture
+  is one step.
+- **Undo replaces confirmation.** A deletion that can be undone is not
+  confirmed. Confirmation is only for what undo cannot reach: overwriting a file
+  on disk, discarding unsaved work.
+
+### Feedback and long work (A10)
+
+- **Within 100 ms**: the pressed control changes state.
+- **After about a second**: the work appears as a job, in the job chip and in
+  Processes, with its stage in words and a stop control.
+- **A result outlives its panel.** Closing a panel or switching mode does not
+  lose a solve; reopening shows it again.
+- **Failure is said in the program's language**: what failed, at which line or
+  declaration, and what to do next. Raw tracebacks are behind a disclosure, not
+  the first thing shown.
+- **Empty states name the missing precondition and the action** (*No results
+  yet: solve a study or run a study-backed optimisation*). An empty view still
+  draws its frame: graticule, title block with `—`, legend with `—` ends.
+
+### Inputs
+
+- **A value commits on Enter or blur**, and only if it is valid. An invalid entry
+  keeps its text, marks the field `danger`, and changes nothing.
+- **Units are shown, never typed.** The field holds the number; the unit sits
+  after it.
+- **Numbers keep their written precision.** A panel does not reformat `0.75` as
+  `0.7500`.
+- **A disabled control says why** in its tooltip. A control that cannot apply in
+  the current mode is not shown at all.
+
+### Keyboard
+
+- **Every action is reachable from the keyboard**, and every shortcut appears in
+  the Help sheet, which is generated from the same table the handlers use.
+- **Single-key shortcuts act only when the viewport has focus.** In a text field
+  the keys type.
+- **Focus order follows reading order**: menu bar, toolbar, editor, viewport,
+  panels left to right, top to bottom.
+
+### Layout
+
+- **Windows dock, tab, float and minimise.** The layout is remembered per mode,
+  and *Reset layout* always restores a working default.
+- **Nothing is lost by closing a window.** A closed window is reopened from the
+  Window menu with its state intact.
+- **Space for arriving data is reserved.** A panel does not grow or shift when a
+  result arrives; the slot exists, empty, beforehand.
+
+### Language
+
+- Furniture is uppercase tracked mono (`MESH`, `SOLVE`). Program strings are
+  verbatim. Sentences are sans, sentence case, without a trailing period when
+  they are a single clause.
+- Quantities are SI with the unit spelled as a symbol (`1.00 m`, `412.8 K`).
+- An empty field is `—`, never `0`, `N/A` or blank.
+
+## The docs site
+
+These docs are set in the same language: paper ground, `ink` text, sans prose,
+mono for code, headings, tables of values and navigation; zero radius, no
+shadow; links in `ink` with an `accent-press` underline (the accent is never
+ink). Code blocks are `sheet` with a `rule` edge, highlighted achromatically.
+
+## Tokens: one source
+
+All of the values on this page live in one file,
+`frontend/src/tokens.ts`. The stylesheet's custom properties, the docs theme
+and the constants the WebGPU shaders use are generated from it, and
+`frontend/test/tokens.test.ts` fails when a generated file is out of date, when
+a raw colour or length appears outside the token layer, or when a contrast in
+this page stops holding.
+
+## What changes in the current playground
+
+Adopting the rules above changes the following in the current playground.
+
+1. **Viewport overlays become achromatic.** Sketch edges were olive, handles
+   red, selected edges brown and planes blue; they become the ink ladder, with
+   free and held vertices told apart by shape. The orange hover tint over a
+   simulated field becomes an outline.
+2. **Kickers and kind chips become inverse ink.** `READ-ONLY`, `SELECTION`,
+   `LIBRARY`, `FEM`, `THERMAL` were accent blocks, so the accent was on screen
+   six or more times and stopped meaning *current*.
+3. **The editor's syntax colours go.** Class names were drawn in error red,
+   strings in success green, numbers in warning amber.
+4. **`info` becomes `param`.** The blue now means only *free parameter*. The
+   constraint-count badge, the solver residual line, the plane label and the
+   elastic kind chip, which used it for other things, become achromatic.
+5. **One set of axis colours.** The gizmo and the view-cube triad drew
+   different reds, greens and blues; both use `axis-x/y/z`, darkened so the
+   letters clear 4.5:1.
+6. **Control heights move onto the 4px grid** (22/26/30/34 → 24/28/32 and a
+   20px tag), and interactive targets are never below 24px.
+7. **Accent never draws an outline.** The selected material card's orange
+   border (2.3:1) becomes an accent block on its label.
+8. **Menus align in one column** with a fixed leading column for checks and
+   dots (the mode items were centred).
+9. **The docs theme moves off Cosmo** onto these tokens.
+10. **Leftover dark-theme values are removed** (white-alpha fills, the lime and
+    cyan rgba, the bluish element-edge tone), along with an undefined
+    `--type-body-small`.

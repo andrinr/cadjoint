@@ -29,7 +29,11 @@ website:
           - text: Forward Renderer
             href: docs/rendering.qmd
       - text: Playground
-        href: docs/viewer.qmd
+        menu:
+          - text: Using the playground
+            href: docs/viewer.qmd
+          - text: Design language
+            href: docs/design.qmd
       - text: Examples
         menu:
           - text: Basics
