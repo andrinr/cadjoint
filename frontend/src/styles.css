@@ -2514,10 +2514,13 @@ button.icon {
   color: var(--ink);
 }
 
+/* A block, not a flex row: text-overflow only ellipsises an inline run,
+   and as a flex item the readout was cut mid-word ("APPL") the moment a
+   removal notice took room beside it. */
 .status {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--gap);
+  display: block;
+  flex: 0 1 auto;
+  min-width: 0;
   max-width: 46ch;
   overflow: hidden;
   color: var(--ink-2);
@@ -2530,7 +2533,9 @@ button.icon {
 }
 
 .status .dot {
-  flex: 0 0 auto;
+  display: inline-block;
+  margin-right: var(--gap);
+  vertical-align: middle;
   width: calc(var(--unit) * 2);
   height: calc(var(--unit) * 2);
   border-radius: 50%;

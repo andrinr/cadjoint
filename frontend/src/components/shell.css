@@ -238,9 +238,13 @@
 }
 
 /* The removal notice beside the status (F7): body text, a quiet Undo cell. */
+/* One line that never gives way: the notice is the latest result and the
+   status beside it is what yields. */
 .toolbar .removal {
   display: inline-flex;
+  flex: none;
   align-items: center;
+  white-space: nowrap;
   gap: var(--inset);
   color: var(--ink-2);
   font: var(--text-body);
