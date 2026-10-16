@@ -729,7 +729,9 @@ export function tokensScss(): string {
   const lines = cssProperties()
     .filter(([, value]) => !value.includes("var("))
     .map(([name, value]) => `$cj-${name}: ${value};`);
-  return `// ${GENERATED}\n\n${lines.join("\n")}\n`;
+  // A Quarto theme layer: listed after docs/assets/cadjoint.scss in
+  // _quarto.yml, so its defaults are emitted ahead of the theme that reads them.
+  return `/*-- scss:defaults --*/\n// ${GENERATED}\n\n${lines.join("\n")}\n`;
 }
 
 const vec3 = (rgb: Rgb) => `vec3<f32>(${rgb.map((c) => Number(c.toFixed(10))).join(", ")})`;

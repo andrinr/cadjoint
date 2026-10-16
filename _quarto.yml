@@ -76,7 +76,8 @@ website:
 
 format:
   html:
-    theme: cosmo
+    theme: [cosmo, docs/assets/cadjoint.scss, docs/assets/tokens.scss]
+    highlight-style: none
     toc: true
     toc-depth: 3
     code-copy: true
