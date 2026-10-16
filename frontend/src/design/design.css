@@ -1,0 +1,1336 @@
+/* The design-language page, set in the language it states.
+ *
+ * Every value is a token from styles.css's :root block (mirrored from
+ * src/tokens.ts). Lengths are multiples of --unit, the hairline is the only
+ * sub-unit, and the accent appears only as a filled block with near-black
+ * type on it. If this page needs a value the tokens do not have, the tokens
+ * are missing something; the page does not invent it.
+ *
+ * Primitives are prefixed `dl-`. They are the guide's components as the rules
+ * define them, so the playground can adopt them once the guide is settled.
+ */
+
+/* styles.css pins the playground to the window; this page scrolls. The
+   viewport is the scroll container, so the index and top bar can stick. */
+html:has(.dl-body),
+.dl-body,
+.dl-body > #root {
+  height: auto;
+  overflow: visible;
+}
+
+.dl-body {
+  background: var(--surface-base);
+  color: var(--ink);
+  font: var(--weight-regular) var(--text-sm) / var(--leading-normal)
+    var(--font-mono);
+}
+
+/* ── page frame ─────────────────────────────────────────────────────────── */
+
+.dl-top {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  height: calc(var(--unit) * 9);
+  padding: 0 var(--space-5);
+  border-bottom: var(--hairline) solid var(--rule-strong);
+  background: var(--surface-base);
+}
+.dl-top b {
+  display: grid;
+  place-items: center;
+  width: calc(var(--unit) * 6);
+  height: calc(var(--unit) * 6);
+  background: var(--accent);
+  color: var(--ink-on-accent);
+  font: var(--weight-bold) var(--text-xs) / var(--leading-flat) var(--font-mono);
+  letter-spacing: var(--tracking-xs);
+}
+.dl-top strong {
+  font: var(--weight-semibold) var(--text-sm) / var(--leading-flat)
+    var(--font-mono);
+  letter-spacing: var(--tracking-sm);
+  text-transform: uppercase;
+}
+.dl-top span {
+  color: var(--ink-3);
+  font: var(--weight-medium) var(--text-xs) / var(--leading-flat)
+    var(--font-mono);
+  letter-spacing: var(--tracking-xs);
+  text-transform: uppercase;
+}
+.dl-top a {
+  margin-left: auto;
+  text-decoration: none;
+}
+
+.dl {
+  display: grid;
+  grid-template-columns: calc(var(--unit) * 52) minmax(0, calc(var(--unit) * 230));
+  gap: 0 var(--space-7);
+  padding: 0 var(--space-5) calc(var(--unit) * 24);
+}
+
+/* The section index: furniture, so tracked uppercase mono. The section in
+   view is the *current* thing, so it is the accent block (role: current). */
+.dl-nav {
+  position: sticky;
+  top: calc(var(--unit) * 9);
+  align-self: start;
+  max-height: calc(100vh - var(--unit) * 9);
+  overflow: auto;
+  padding: var(--space-6) 0;
+}
+.dl-nav ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: var(--hairline) solid var(--rule);
+}
+.dl-nav li {
+  border-bottom: var(--hairline) solid var(--rule);
+}
+.dl-nav a {
+  display: grid;
+  grid-template-columns: calc(var(--unit) * 7) 1fr;
+  align-items: center;
+  min-height: calc(var(--unit) * 6);
+  padding: 0 var(--space-2);
+  color: var(--ink-2);
+  font: var(--weight-medium) var(--text-xs) / var(--leading-flat)
+    var(--font-mono);
+  letter-spacing: var(--tracking-xs);
+  text-decoration: none;
+  text-transform: uppercase;
+}
+.dl-nav a small {
+  color: var(--ink-3);
+  font-size: var(--text-3xs);
+  letter-spacing: var(--tracking-3xs);
+}
+.dl-nav a:hover {
+  background: var(--surface-bar-alt);
+  color: var(--ink);
+}
+.dl-nav a.current {
+  background: var(--accent);
+  color: var(--ink-on-accent);
+}
+.dl-nav a.current small {
+  color: var(--ink-on-accent);
+}
+
+/* ── prose and headings ────────────────────────────────────────────────── */
+
+.dl-main > header {
+  padding: calc(var(--unit) * 10) 0 var(--space-7);
+  border-bottom: var(--hairline) solid var(--rule-strong);
+}
+.dl-main > header h1 {
+  margin: 0 0 var(--space-4);
+  font: var(--weight-semibold) var(--text-lg) / var(--leading-tight)
+    var(--font-mono);
+  letter-spacing: var(--tracking-lg);
+  text-transform: uppercase;
+}
+
+/* Sentences are sans: the one place it is set on this page. */
+.dl-prose,
+.dl-rule p,
+.dl-main > header p,
+.dl-plate figcaption,
+.dl-note {
+  max-width: 72ch;
+  font-family: var(--font-sans);
+  font-size: var(--text-md);
+  line-height: var(--leading-normal);
+}
+.dl-prose {
+  margin: 0 0 var(--space-5);
+  color: var(--ink-2);
+}
+.dl-note {
+  margin: var(--space-4) 0 0;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+}
+
+.dl-section {
+  padding: calc(var(--unit) * 10) 0 0;
+  scroll-margin-top: calc(var(--unit) * 9);
+}
+.dl-section > h2 {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-4);
+  margin: 0 0 var(--space-5);
+  padding-bottom: var(--space-4);
+  border-bottom: var(--hairline) solid var(--rule-strong);
+  font: var(--weight-semibold) var(--text-lg) / var(--leading-tight)
+    var(--font-mono);
+  letter-spacing: var(--tracking-lg);
+  text-transform: uppercase;
+}
+.dl-section h3 {
+  margin: var(--space-7) 0 var(--space-4);
+  color: var(--ink-2);
+  font: var(--weight-semibold) var(--text-xs) / var(--leading-flat)
+    var(--font-mono);
+  letter-spacing: var(--tracking-xs);
+  text-transform: uppercase;
+}
+
+/* A label of kind: inverse ink (role: none — kind is not *current*). */
+.dl-kicker {
+  display: inline-block;
+  padding: var(--space-1) var(--space-2);
+  background: var(--ink);
+  color: var(--surface-float);
+  font: var(--weight-semibold) var(--text-3xs) / var(--leading-flat)
+    var(--font-mono);
+  letter-spacing: var(--tracking-3xs);
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+/* ── rules and examples ─────────────────────────────────────────────────── */
+
+/* A rule: its id in the margin column, the sentence beside it, and the
+   examples hung under the sentence on the same left edge. */
+.dl-rule {
+  display: grid;
+  grid-template-columns: calc(var(--unit) * 12) minmax(0, 1fr);
+  gap: 0 var(--space-4);
+  padding: var(--space-5) 0;
+  border-top: var(--hairline) solid var(--rule);
+}
+.dl-rule > code {
+  padding-top: var(--space-1);
+  color: var(--ink-3);
+  font: var(--weight-semibold) var(--text-xs) / var(--leading-snug)
+    var(--font-mono);
+  letter-spacing: var(--tracking-xs);
+}
+.dl-rule > div > p {
+  margin: 0;
+  color: var(--ink);
+}
+.dl-rule > div > p b {
+  font-weight: var(--weight-semibold);
+}
+.dl-rule > div > p + p {
+  margin-top: var(--space-2);
+  color: var(--ink-2);
+}
+.dl-rule p code,
+.dl-prose code,
+.dl-note code,
+.dl-plate figcaption code {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+}
+
+.dl-examples {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(calc(var(--unit) * 64), 1fr));
+  gap: var(--space-4);
+  margin-top: var(--space-5);
+}
+.dl-examples.single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* An example plate is a sheet with an edge: the one boxed thing on the page,
+   because an example is a separate surface the reader works in. */
+.dl-plate {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  border: var(--hairline) solid var(--rule-strong);
+  background: var(--surface-float);
+}
+.dl-plate > header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: calc(var(--unit) * 6);
+  padding: 0 var(--space-4);
+  border-bottom: var(--hairline) solid var(--rule);
+  color: var(--ink-3);
+  font: var(--weight-medium) var(--text-2xs) / var(--leading-flat)
+    var(--font-mono);
+  letter-spacing: var(--tracking-2xs);
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.dl-plate > header > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* DO and DON'T carry the word and the role: done and error (A4). */
+.dl-plate > header .do {
+  color: var(--ok);
+  font-weight: var(--weight-semibold);
+}
+.dl-plate > header .dont {
+  color: var(--danger);
+  font-weight: var(--weight-semibold);
+}
+.dl-plate > header .do::before {
+  content: "● ";
+}
+.dl-plate > header .dont::before {
+  content: "✕ ";
+}
+.dl-plate > .dl-stage {
+  flex: 1;
+  padding: var(--space-5);
+}
+.dl-plate > .dl-stage.ground {
+  background: var(--surface-base);
+}
+.dl-plate figcaption {
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  border-top: var(--hairline) solid var(--rule);
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+}
+
+/* ── swatches and tables ────────────────────────────────────────────────── */
+
+.dl-swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(calc(var(--unit) * 40), 1fr));
+  gap: var(--space-4);
+}
+.dl-swatch {
+  display: grid;
+  grid-template-rows: calc(var(--unit) * 12) auto;
+  border: var(--hairline) solid var(--rule);
+  background: var(--surface-float);
+}
+.dl-swatch > i {
+  display: grid;
+  place-items: end start;
+  padding: var(--space-2);
+  border-bottom: var(--hairline) solid var(--rule);
+  font: var(--weight-semibold) var(--text-md) / var(--leading-flat)
+    var(--font-mono);
+  font-style: normal;
+}
+.dl-swatch > div {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-3) var(--space-4);
+}
+.dl-swatch b {
+  font-weight: var(--weight-semibold);
+}
+.dl-swatch small {
+  color: var(--ink-3);
+  font-size: var(--text-2xs);
+}
+
+.dl-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+.dl-table th {
+  padding: var(--space-3) var(--space-3);
+  border-bottom: var(--hairline) solid var(--rule-strong);
+  color: var(--ink-3);
+  font: var(--weight-semibold) var(--text-3xs) / var(--leading-flat)
+    var(--font-mono);
+  letter-spacing: var(--tracking-3xs);
+  text-align: left;
+  text-transform: uppercase;
+}
+.dl-table td {
+  padding: var(--space-3) var(--space-3);
+  border-bottom: var(--hairline) solid var(--rule);
+  vertical-align: top;
+}
+.dl-table td:first-child {
+  white-space: nowrap;
+}
+.dl-table td.num,
+.dl-table th.num {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.dl-table td.prose {
+  color: var(--ink-2);
+  font-family: var(--font-sans);
+}
+.dl-table td i.dl-dot {
+  display: inline-block;
+  width: calc(var(--unit) * 3);
+  height: calc(var(--unit) * 3);
+  margin-right: var(--space-3);
+  vertical-align: calc(var(--space-1) * -1);
+}
+
+/* A measured ratio, with its verdict as a word (A4, A5). */
+.dl-ratio {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.dl-ratio em {
+  margin-left: var(--space-2);
+  font-style: normal;
+  font-size: var(--text-3xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-3xs);
+}
+.dl-ratio em.pass {
+  color: var(--ok);
+}
+.dl-ratio em.fail {
+  color: var(--danger);
+}
+.dl-ratio em.band {
+  color: var(--ink-3);
+}
+
+/* ── primitives: the guide's components ─────────────────────────────────── */
+
+.dl-row-of {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+}
+.dl-stack {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.dl-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  height: calc(var(--unit) * 7);
+  padding: 0 var(--space-5);
+  border: var(--hairline) solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--surface-float);
+  color: var(--ink-2);
+  font: var(--weight-medium) var(--text-xs) / var(--leading-flat)
+    var(--font-mono);
+  letter-spacing: var(--tracking-xs);
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
+}
+.dl-btn:hover {
+  background: var(--surface-bar-alt);
+  color: var(--ink);
+}
+.dl-btn:active,
+.dl-btn.pressed {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+.dl-btn:disabled {
+  border-color: var(--rule);
+  background: var(--surface-float);
+  color: var(--ink-3);
+  cursor: default;
+}
+.dl-btn.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--ink-on-accent);
+  font-weight: var(--weight-bold);
+}
+.dl-btn.primary:hover,
+.dl-btn.primary:active {
+  border-color: var(--accent-press);
+  background: var(--accent-press);
+}
+.dl-btn.primary:disabled {
+  border-color: var(--surface-bar-alt);
+  background: var(--surface-bar-alt);
+  color: var(--ink-3);
+  font-weight: var(--weight-medium);
+}
+.dl-btn.quiet {
+  border-color: transparent;
+  background: transparent;
+}
+.dl-btn.quiet:hover {
+  background: var(--surface-bar-alt);
+}
+.dl-btn.destructive {
+  color: var(--danger);
+}
+.dl-btn.destructive:hover {
+  border-color: var(--danger);
+  color: var(--danger-ink);
+}
+.dl-btn.add {
+  border-style: dashed;
+}
+.dl-btn.h-sm {
+  height: calc(var(--unit) * 6);
+  padding: 0 var(--space-4);
+}
+.dl-btn.h-lg {
+  height: calc(var(--unit) * 8);
+}
+.dl-btn.h-xl {
+  height: calc(var(--unit) * 9);
+}
+.dl-btn svg {
+  flex: 0 0 auto;
+}
+
+/* Keyboard focus: one visible ring, everywhere. */
+.dl-body :focus-visible {
+  outline: var(--stroke-active) solid var(--ink);
+  outline-offset: var(--hairline);
+}
+
+.dl-field {
+  display: grid;
+  grid-template-columns: minmax(calc(var(--unit) * 20), 1fr) calc(var(--unit) * 32) calc(var(--unit) * 10);
+  align-items: center;
+  gap: var(--space-3);
+  min-height: calc(var(--unit) * 7);
+}
+.dl-field > label {
+  color: var(--ink-3);
+  font: var(--weight-semibold) var(--text-3xs) / var(--leading-flat)
+    var(--font-mono);
+  letter-spacing: var(--tracking-3xs);
+  text-transform: uppercase;
+}
+.dl-field > small {
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+}
+.dl-input {
+  box-sizing: border-box;
+  width: 100%;
+  height: calc(var(--unit) * 7);
+  padding: 0 var(--space-3);
+  border: var(--hairline) solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--surface-float);
+  color: var(--ink);
+  font: var(--weight-medium) var(--text-md) / var(--leading-flat)
+    var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.dl-input:focus {
+  outline: var(--stroke-active) solid var(--ink);
+  outline-offset: calc(var(--hairline) * -1);
+}
+.dl-input.invalid {
+  border-color: var(--danger);
+  color: var(--danger-ink);
+}
+.dl-input.invalid:focus {
+  outline-color: var(--danger);
+}
+.dl-input:disabled {
+  border-color: var(--rule);
+  color: var(--ink-3);
+}
+.dl-input[readonly] {
+  border-style: dashed;
+  border-color: var(--rule);
+  color: var(--ink-2);
+  text-align: left;
+}
+
+.dl-seg {
+  display: inline-flex;
+  border: var(--hairline) solid var(--rule-strong);
+}
+.dl-seg button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: calc(var(--unit) * 8);
+  padding: 0 var(--space-5);
+  border: 0;
+  border-right: var(--hairline) solid var(--rule-strong);
+  background: var(--surface-float);
+  color: var(--ink-2);
+  font: var(--weight-semibold) var(--text-xs) / var(--leading-flat)
+    var(--font-mono);
+  letter-spacing: var(--tracking-xs);
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.dl-seg button:last-child {
+  border-right: 0;
+}
+.dl-seg button:hover {
+  background: var(--surface-bar-alt);
+}
+.dl-seg button.active {
+  background: var(--accent);
+  color: var(--ink-on-accent);
+}
+
+.dl-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: calc(var(--unit) * 6);
+  padding: 0 var(--space-1) 0 var(--space-3);
+  border: var(--hairline) solid var(--rule);
+  background: var(--surface-float);
+  color: var(--ink);
+  font: var(--weight-medium) var(--text-2xs) / var(--leading-flat)
+    var(--font-mono);
+}
+.dl-chip button {
+  display: grid;
+  place-items: center;
+  width: calc(var(--unit) * 5);
+  height: calc(var(--unit) * 5);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink-3);
+  cursor: pointer;
+}
+.dl-chip button:hover {
+  background: var(--surface-bar-alt);
+  color: var(--ink);
+}
+.dl-chip.violated {
+  border-color: var(--danger);
+  color: var(--danger-ink);
+}
+.dl-tag {
+  display: inline-flex;
+  align-items: center;
+  height: calc(var(--unit) * 5);
+  padding: 0 var(--space-2);
+  background: var(--ink);
+  color: var(--surface-float);
+  font: var(--weight-semibold) var(--text-3xs) / var(--leading-flat)
+    var(--font-mono);
+  letter-spacing: var(--tracking-3xs);
+  text-transform: uppercase;
+}
+.dl-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: calc(var(--unit) * 5);
+  height: calc(var(--unit) * 5);
+  padding: 0 var(--space-2);
+  background: var(--surface-bar-alt);
+  color: var(--ink);
+  font: var(--weight-semibold) var(--text-2xs) / var(--leading-flat)
+    var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.dl-badge.free {
+  background: var(--param);
+  color: var(--surface-float);
+}
+
+/* Panel: a dock window's tab strip, then the sheet body with its header. */
+.dl-panel {
+  border: var(--hairline) solid var(--rule-strong);
+  background: var(--surface-float);
+}
+.dl-panel > nav {
+  display: flex;
+  height: calc(var(--unit) * 8);
+  border-bottom: var(--hairline) solid var(--rule-strong);
+  background: var(--surface-base);
+}
+.dl-panel > nav button {
+  padding: 0 var(--space-4);
+  border: 0;
+  border-right: var(--hairline) solid var(--rule);
+  border-bottom: var(--stroke-active) solid transparent;
+  background: transparent;
+  color: var(--ink-3);
+  font: var(--weight-medium) var(--text-xs) / var(--leading-flat)
+    var(--font-mono);
+  letter-spacing: var(--tracking-xs);
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.dl-panel > nav button.active {
+  border-bottom-color: var(--ink);
+  background: var(--surface-float);
+  color: var(--ink);
+}
+.dl-panel > div {
+  padding: var(--space-4);
+}
+.dl-panel-head {
+  display: grid;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+.dl-panel-head strong {
+  font: var(--weight-semibold) var(--text-lg) / var(--leading-tight)
+    var(--font-mono);
+  letter-spacing: var(--tracking-lg);
+  text-transform: uppercase;
+}
+.dl-panel-head > span {
+  justify-self: start;
+}
+
+/* Rows: label | value unit, on one baseline, values right-hung. */
+.dl-rows {
+  display: grid;
+  border-top: var(--hairline) solid var(--rule);
+}
+.dl-rows > div {
+  display: grid;
+  grid-template-columns: 1fr auto calc(var(--unit) * 10);
+  align-items: baseline;
+  gap: var(--space-3);
+  min-height: calc(var(--unit) * 6);
+  padding: var(--space-2) 0;
+  border-bottom: var(--hairline) solid var(--rule);
+}
+.dl-rows span {
+  color: var(--ink-3);
+  font: var(--weight-semibold) var(--text-3xs) / var(--leading-flat)
+    var(--font-mono);
+  letter-spacing: var(--tracking-3xs);
+  text-transform: uppercase;
+}
+.dl-rows b {
+  font: var(--weight-medium) var(--text-md) / var(--leading-flat)
+    var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.dl-rows small {
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+}
+.dl-rows .free b {
+  color: var(--param);
+}
+.dl-rows sub {
+  grid-column: 2 / 4;
+  color: var(--ink-3);
+  font-size: var(--text-2xs);
+  text-align: right;
+  vertical-align: baseline;
+}
+
+/* Menus: one column, a fixed leading column for checks and dots. */
+.dl-menu {
+  display: grid;
+  width: calc(var(--unit) * 64);
+  padding: var(--space-2) 0;
+  border: var(--hairline) solid var(--rule-strong);
+  background: var(--surface-float);
+}
+.dl-menu > button {
+  display: grid;
+  grid-template-columns: calc(var(--unit) * 5) 1fr auto;
+  align-items: center;
+  height: calc(var(--unit) * 6);
+  padding: 0 var(--space-4) 0 var(--space-2);
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: var(--weight-medium) var(--text-xs) / var(--leading-flat)
+    var(--font-mono);
+  letter-spacing: var(--tracking-xs);
+  text-align: left;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.dl-menu > button:hover {
+  background: var(--surface-bar-alt);
+}
+.dl-menu > button:disabled {
+  color: var(--ink-3);
+  cursor: default;
+}
+.dl-menu > button kbd {
+  color: var(--ink-3);
+  font: inherit;
+  letter-spacing: normal;
+  text-transform: none;
+}
+.dl-menu > hr {
+  width: 100%;
+  margin: var(--space-2) 0;
+  border: 0;
+  border-top: var(--hairline) solid var(--rule);
+}
+.dl-menubar {
+  display: flex;
+  height: calc(var(--unit) * 7);
+  border-bottom: var(--hairline) solid var(--rule-strong);
+}
+.dl-menubar button {
+  padding: 0 var(--space-4);
+  border: 0;
+  background: transparent;
+  color: var(--ink-2);
+  font: var(--weight-semibold) var(--text-xs) / var(--leading-flat)
+    var(--font-mono);
+  letter-spacing: var(--tracking-xs);
+  text-transform: uppercase;
+}
+.dl-menubar button.open {
+  background: var(--accent);
+  color: var(--ink-on-accent);
+}
+
+/* Dialog: a scrim, then a sheet with an edge; no shadow. */
+.dl-scrim {
+  display: grid;
+  place-items: center;
+  min-height: calc(var(--unit) * 56);
+  padding: var(--space-6);
+  background: var(--scrim);
+}
+.dl-dialog {
+  width: min(100%, calc(var(--unit) * 100));
+  border: var(--hairline) solid var(--rule-strong);
+  background: var(--surface-float);
+}
+/* The title names the program's own file, so it is not uppercased (T2). */
+.dl-dialog > h4 {
+  margin: 0;
+  padding: var(--space-4) var(--space-5);
+  border-bottom: var(--hairline) solid var(--rule);
+  font: var(--weight-semibold) var(--text-md) / var(--leading-flat)
+    var(--font-mono);
+  letter-spacing: var(--tracking-lg);
+}
+.dl-dialog > p {
+  margin: 0;
+  padding: var(--space-5);
+  color: var(--ink-2);
+  font: var(--weight-regular) var(--text-md) / var(--leading-normal)
+    var(--font-sans);
+}
+.dl-dialog > footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border-top: var(--hairline) solid var(--rule);
+}
+
+/* Notices: in place, the status line, or the viewport's notice bar. */
+.dl-notice {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: start;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border: var(--hairline) solid var(--rule-strong);
+  background: var(--surface-float);
+}
+.dl-notice > b {
+  font: var(--weight-semibold) var(--text-3xs) / var(--leading-snug)
+    var(--font-mono);
+  letter-spacing: var(--tracking-3xs);
+  text-transform: uppercase;
+}
+.dl-notice.error > b {
+  color: var(--danger);
+}
+.dl-notice.error > b::before {
+  content: "■ ";
+}
+.dl-notice.warn > b {
+  color: var(--warn);
+}
+.dl-notice.warn > b::before {
+  content: "▲ ";
+}
+.dl-notice p {
+  margin: 0;
+  color: var(--ink);
+  font: var(--weight-regular) var(--text-sm) / var(--leading-snug)
+    var(--font-sans);
+}
+.dl-notice p code {
+  font-family: var(--font-mono);
+}
+.dl-notice details {
+  grid-column: 2 / 3;
+  color: var(--ink-3);
+  font-size: var(--text-2xs);
+}
+.dl-notice details pre {
+  margin: var(--space-2) 0 0;
+  white-space: pre-wrap;
+}
+
+.dl-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--ink-2);
+  font: var(--weight-medium) var(--text-2xs) / var(--leading-flat)
+    var(--font-mono);
+  letter-spacing: var(--tracking-2xs);
+  text-transform: uppercase;
+}
+.dl-status i {
+  width: calc(var(--unit) * 2);
+  height: calc(var(--unit) * 2);
+  border-radius: 50%;
+  background: var(--ok);
+}
+.dl-status.stale i {
+  border-radius: 0;
+  background: var(--warn);
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+.dl-status.stale {
+  color: var(--warn);
+}
+
+/* The annunciator strip: every stage allocated, so nothing reflows. */
+.dl-stages {
+  display: flex;
+  align-items: stretch;
+  border: var(--hairline) solid var(--rule-strong);
+  background: var(--surface-float);
+}
+.dl-stages > span {
+  display: grid;
+  place-items: center;
+  height: calc(var(--unit) * 7);
+  padding: 0 var(--space-4);
+  border-right: var(--hairline) solid var(--rule);
+  color: var(--ink-3);
+  font: var(--weight-semibold) var(--text-3xs) / var(--leading-flat)
+    var(--font-mono);
+  letter-spacing: var(--tracking-3xs);
+}
+.dl-stages > span.done {
+  color: var(--ink);
+}
+.dl-stages > span.current {
+  background: var(--accent);
+  color: var(--ink-on-accent);
+}
+.dl-stages > span.failed {
+  color: var(--danger);
+}
+.dl-stages > output {
+  display: flex;
+  align-items: center;
+  min-width: calc(var(--unit) * 36);
+  padding: 0 var(--space-4);
+  color: var(--ink-2);
+  font: var(--weight-medium) var(--text-2xs) / var(--leading-flat)
+    var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.dl-stages > .dl-btn {
+  height: auto;
+  border-width: 0 0 0 var(--hairline);
+}
+
+/* Empty state: the precondition, the action. */
+.dl-empty {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-6) 0;
+}
+.dl-empty p {
+  margin: 0;
+  color: var(--ink-2);
+  font: var(--weight-regular) var(--text-sm) / var(--leading-snug)
+    var(--font-sans);
+}
+.dl-empty p code {
+  color: var(--ink);
+  font-family: var(--font-mono);
+}
+
+/* A source excerpt, as the editor shows it: achromatic syntax. */
+.dl-code {
+  margin: 0;
+  padding: var(--space-4) 0;
+  border: var(--hairline) solid var(--rule);
+  background: var(--surface-float);
+  color: var(--ink);
+  font: var(--weight-regular) var(--text-sm) / var(--leading-normal)
+    var(--font-mono);
+  overflow-x: auto;
+}
+.dl-code > div {
+  display: grid;
+  grid-template-columns: calc(var(--unit) * 10) 1fr;
+  padding-right: var(--space-4);
+}
+.dl-code > div > span:first-child {
+  padding-right: var(--space-4);
+  color: var(--ink-3);
+  text-align: right;
+}
+.dl-code .kw {
+  font-weight: var(--weight-semibold);
+}
+.dl-code .str {
+  color: var(--ink-2);
+}
+.dl-code .com {
+  color: var(--ink-3);
+  font-style: italic;
+}
+.dl-code .lit {
+  transition: background var(--dur-slow) var(--ease);
+}
+.dl-code .lit.lit-on {
+  background: var(--accent);
+  color: var(--ink-on-accent);
+}
+.dl-code .free {
+  color: var(--param);
+}
+.dl-code .err {
+  text-decoration: underline wavy var(--danger);
+  text-underline-offset: var(--space-1);
+}
+
+/* Specimens of the old values, shown only in the "what changes" plates. */
+.dl-before-chip {
+  display: inline-block;
+  padding: var(--space-1) var(--space-2);
+  font: var(--weight-semibold) var(--text-3xs) / var(--leading-flat)
+    var(--font-mono);
+  letter-spacing: var(--tracking-3xs);
+  text-transform: uppercase;
+}
+
+/* Type specimen rows. */
+.dl-type > div {
+  display: grid;
+  grid-template-columns: calc(var(--unit) * 34) calc(var(--unit) * 10) 1fr;
+  align-items: baseline;
+  gap: var(--space-4);
+  padding: var(--space-3) 0;
+  border-bottom: var(--hairline) solid var(--rule);
+}
+.dl-type code {
+  color: var(--ink-3);
+  font-size: var(--text-2xs);
+}
+
+/* Space ruler. */
+.dl-ruler {
+  display: grid;
+  gap: var(--space-2);
+}
+.dl-ruler > div {
+  display: grid;
+  grid-template-columns: calc(var(--unit) * 22) calc(var(--unit) * 10) 1fr;
+  align-items: center;
+  gap: var(--space-4);
+}
+.dl-ruler i {
+  display: block;
+  height: calc(var(--unit) * 3);
+  background: var(--ink);
+}
+.dl-ruler code {
+  color: var(--ink-3);
+  font-size: var(--text-2xs);
+}
+.dl-ruler b {
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--weight-medium);
+  text-align: right;
+}
+
+/* A grid backdrop that shows the unit, for the A6 plate. */
+.dl-unit-grid {
+  background-image: linear-gradient(var(--graticule-line) var(--hairline), transparent var(--hairline)),
+    linear-gradient(90deg, var(--graticule-line) var(--hairline), transparent var(--hairline)),
+    linear-gradient(var(--surface-float), var(--surface-float));
+  background-size: var(--unit) var(--unit);
+  background-blend-mode: normal;
+}
+
+/* Motion demo: the geometry bar settles; the digits never tween. */
+.dl-bar {
+  height: calc(var(--unit) * 3);
+  background: var(--ink);
+  transition: width var(--dur-slow) var(--ease-inout);
+}
+
+/* Drag demo: a machinist's rule with a detented handle. */
+.dl-track {
+  position: relative;
+  height: calc(var(--unit) * 10);
+  border-bottom: var(--hairline) solid var(--rule-strong);
+  touch-action: none;
+  cursor: ew-resize;
+  user-select: none;
+}
+.dl-track > i {
+  position: absolute;
+  bottom: 0;
+  width: var(--hairline);
+  height: calc(var(--unit) * 2);
+  background: var(--rule-strong);
+}
+.dl-track > i.major {
+  height: calc(var(--unit) * 4);
+  background: var(--ink-3);
+}
+.dl-track > b {
+  position: absolute;
+  bottom: calc(var(--unit) * -2);
+  width: calc(var(--unit) * 4);
+  height: calc(var(--unit) * 4);
+  margin-left: calc(var(--unit) * -2);
+  border: var(--stroke-active) solid var(--ink-2);
+  border-radius: 50%;
+  background: var(--surface-float);
+}
+.dl-track.dragging > b {
+  border-color: var(--ink);
+  background: var(--ink);
+}
+.dl-track > b.origin {
+  border-style: dashed;
+  border-color: var(--rule-strong);
+  background: transparent;
+}
+
+/* Escape-ladder demo. */
+.dl-ladder {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: var(--hairline) solid var(--rule);
+}
+.dl-ladder li {
+  display: grid;
+  grid-template-columns: calc(var(--unit) * 6) 1fr auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: calc(var(--unit) * 6);
+  border-bottom: var(--hairline) solid var(--rule);
+  color: var(--ink-3);
+}
+.dl-ladder li.held {
+  color: var(--ink);
+}
+.dl-ladder li.next {
+  background: var(--surface-bar-alt);
+}
+.dl-ladder li code {
+  color: var(--ink-3);
+  font-size: var(--text-2xs);
+  text-align: right;
+}
+.dl-ladder li > span:first-child {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The viewport specimen. */
+.dl-viewport {
+  position: relative;
+  border: var(--hairline) solid var(--rule-heavy);
+  background: var(--surface-viewport);
+}
+.dl-viewport svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.dl-viewport .hint {
+  position: absolute;
+  left: 50%;
+  bottom: var(--space-4);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  transform: translateX(-50%);
+  color: var(--viewport-ink-2);
+  font: var(--weight-regular) var(--text-xs) / var(--leading-flat)
+    var(--font-sans);
+  white-space: nowrap;
+}
+.dl-viewport .readout {
+  position: absolute;
+  top: var(--space-4);
+  left: var(--space-4);
+  color: var(--viewport-ink-2);
+  font: var(--weight-medium) var(--text-2xs) / var(--leading-flat)
+    var(--font-mono);
+  letter-spacing: var(--tracking-2xs);
+}
+.dl-viewport .readout b {
+  color: var(--viewport-ink);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+.dl-viewport .titleblock {
+  position: absolute;
+  right: var(--space-4);
+  bottom: calc(var(--unit) * 10);
+  display: grid;
+  grid-template-columns: auto calc(var(--unit) * 28);
+  border: var(--hairline) solid var(--rule-heavy);
+  background: var(--surface-float);
+  font: var(--weight-medium) var(--text-2xs) / var(--leading-flat)
+    var(--font-mono);
+}
+.dl-viewport .titleblock > span {
+  padding: var(--space-1) var(--space-3);
+  border-bottom: var(--hairline) solid var(--rule);
+}
+.dl-viewport .titleblock > span:nth-child(odd) {
+  border-right: var(--hairline) solid var(--rule);
+  color: var(--ink-3);
+  font-size: var(--text-3xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-3xs);
+}
+.dl-viewport .legend {
+  position: absolute;
+  left: var(--space-4);
+  bottom: calc(var(--unit) * 10);
+  display: grid;
+  grid-template-columns: auto calc(var(--unit) * 40) auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: var(--hairline) solid var(--rule);
+  background: var(--surface-float);
+  font: var(--weight-medium) var(--text-2xs) / var(--leading-flat)
+    var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.dl-viewport .legend i {
+  height: calc(var(--unit) * 2);
+}
+
+.dl-legend {
+  display: grid;
+  grid-template-columns: calc(var(--unit) * 16) calc(var(--unit) * 14) 1fr calc(var(--unit) * 14);
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) 0;
+  border-bottom: var(--hairline) solid var(--rule);
+  font-variant-numeric: tabular-nums;
+}
+.dl-legend > i {
+  height: calc(var(--unit) * 2);
+}
+.dl-legend > span:nth-child(2) {
+  text-align: right;
+}
+.dl-legend > b {
+  color: var(--ink-3);
+  font: var(--weight-semibold) var(--text-3xs) / var(--leading-flat)
+    var(--font-mono);
+  letter-spacing: var(--tracking-3xs);
+  text-transform: uppercase;
+}
+.dl-bc {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 var(--space-4) var(--space-2) 0;
+  font-size: var(--text-2xs);
+}
+.dl-bc i {
+  width: calc(var(--unit) * 2);
+  height: calc(var(--unit) * 2);
+}
+
+.dl-icons {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(calc(var(--unit) * 28), 1fr));
+  border-top: var(--hairline) solid var(--rule);
+  border-left: var(--hairline) solid var(--rule);
+}
+.dl-icons > div {
+  display: grid;
+  grid-template-columns: calc(var(--unit) * 4) 1fr;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: calc(var(--unit) * 8);
+  padding: 0 var(--space-3);
+  border-right: var(--hairline) solid var(--rule);
+  border-bottom: var(--hairline) solid var(--rule);
+  color: var(--ink-2);
+  font-size: var(--text-2xs);
+}
+
+@media (max-width: 960px) {
+  .dl {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .dl-nav {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dl-body * {
+    transition-duration: 0ms !important;
+  }
+}
+
+/* Source excerpts wrap rather than scroll: a plate is read, not panned. */
+.dl-code > div > span:last-child {
+  white-space: pre-wrap;
+}
+/* A note that follows a rule hangs on the rule's text column. */
+.dl-section > .dl-note {
+  margin: 0 0 var(--space-5) calc(var(--unit) * 12 + var(--space-4));
+}
+
+/* The current row and the armed tool are the accent block (role: current). */
+.dl-menu.flush {
+  width: 100%;
+  padding: 0;
+  border: 0;
+}
+.dl-menu > button.selected,
+.dl-menu > button.selected:hover {
+  background: var(--accent);
+  color: var(--ink-on-accent);
+  text-transform: none;
+}
+.dl-menu.flush > button {
+  text-transform: none;
+}
+.dl-menu > button.selected kbd {
+  color: var(--ink-on-accent);
+}
+.dl-btn.armed,
+.dl-btn.armed:hover {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--ink-on-accent);
+}
+.dl-hint {
+  color: var(--ink-2);
+  font-family: var(--font-sans);
+}

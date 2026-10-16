@@ -119,6 +119,18 @@ export const CHROME = {
   info: "#0065b4",
   "info-ink": "#004a85",
   ok: "#00734c",
+  // The free-parameter role (design page §Colour roles): the same blue as
+  // `info`, named for the one thing it is to mean once the guide is adopted.
+  param: "#0065b4",
+  "param-ink": "#004a85",
+
+  // ── direction ───────────────────────────────────────────────────────────
+  // World X, Y, Z. One set for the gizmo and the view-cube triad, darkened
+  // until the letters clear 4.5:1 on paper and the strokes 3:1 on the
+  // lightest SDF facet (`#c8c8cb`).
+  "axis-x": "#c81e2a",
+  "axis-y": "#17742a",
+  "axis-z": "#1f5fd2",
 
   // ── viewport ink ────────────────────────────────────────────────────────
   // Everything drawn *inside* the viewport rectangle by the DOM: dimension
@@ -366,3 +378,110 @@ export function hexToRgb(hex: string): Rgb {
 /** WCAG contrast between two chrome tokens. */
 export const chromeContrast = (a: ChromeToken, b: ChromeToken): number =>
   contrastRatio(hexToRgb(CHROME[a]), hexToRgb(CHROME[b]));
+
+// ── the guide's tables ────────────────────────────────────────────────────
+// What `design.html` renders. Kept here, beside the values, so the page that
+// states a rule and the code that obeys it read one record.
+
+/** The unit every length is a multiple of (axiom A6). */
+export const UNIT = 4;
+
+/**
+ * Control heights on the 4px grid, five to nine units. Proposed by the guide
+ * to replace CONTROL_HEIGHTS (22 · 26 · 30 · 34 · 36); 24px is the WCAG 2.2
+ * 2.5.8 minimum target, so it is the smallest height anything clickable takes.
+ */
+export const GRID_CONTROL_HEIGHTS = {
+  "control-tag": 20,
+  "control-sm": 24,
+  "control-md": 28,
+  "control-lg": 32,
+  "control-xl": 36,
+} as const;
+
+/** Where a role's hue may appear. */
+export type RoleZone = "chrome" | "editor" | "viewport" | "legend";
+
+export interface ColorRole {
+  role: string;
+  /** Chrome token, or null for a data palette that lives in simColors.ts. */
+  token: ChromeToken | null;
+  means: string;
+  /** The non-hue carrier that says the same thing (axiom A4). */
+  carrier: string;
+  zones: RoleZone[];
+}
+
+/**
+ * The closed table of hues (axiom A3). A hue that is not on this list is a
+ * bug; a new hue needs a new row first.
+ */
+export const COLOR_ROLES: ColorRole[] = [
+  {
+    role: "current",
+    token: "accent",
+    means: "the thing you are acting on or in: the active mode, the selected row, the primary action, the source span being edited",
+    carrier: "a filled block, and its position",
+    zones: ["chrome", "editor"],
+  },
+  {
+    role: "free",
+    token: "param",
+    means: "a free parameter: a value the optimiser or a drag may move, through which gradients flow",
+    carrier: "the word free, a count",
+    zones: ["chrome", "editor"],
+  },
+  {
+    role: "error",
+    token: "danger",
+    means: "failed, violated, destructive",
+    carrier: "the word, a filled square",
+    zones: ["chrome", "editor", "viewport"],
+  },
+  {
+    role: "warning",
+    token: "warn",
+    means: "stale, approximate, needs attention",
+    carrier: "the word, a triangle",
+    zones: ["chrome", "editor"],
+  },
+  {
+    role: "done",
+    token: "ok",
+    means: "converged, satisfied, connected",
+    carrier: "the word, a dot",
+    zones: ["chrome"],
+  },
+  {
+    role: "direction x",
+    token: "axis-x",
+    means: "world X",
+    carrier: "the letter X",
+    zones: ["viewport"],
+  },
+  {
+    role: "direction y",
+    token: "axis-y",
+    means: "world Y",
+    carrier: "the letter Y",
+    zones: ["viewport"],
+  },
+  {
+    role: "direction z",
+    token: "axis-z",
+    means: "world Z",
+    carrier: "the letter Z",
+    zones: ["viewport"],
+  },
+];
+
+/**
+ * Overlay tones the renderer draws inside the viewport, as the guide
+ * proposes them: the ink ladder for state, shape for free versus held.
+ */
+export const VIEWPORT_STATES = {
+  rest: "ink-3",
+  hover: "ink-2",
+  selected: "ink",
+  locked: "rule",
+} as const satisfies Record<string, ChromeToken>;

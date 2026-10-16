@@ -104,6 +104,11 @@
   --info: #0065b4;
   --info-ink: #004a85;
   --ok: #00734c;
+  --param: #0065b4;
+  --param-ink: #004a85;
+  --axis-x: #c81e2a;
+  --axis-y: #17742a;
+  --axis-z: #1f5fd2;
 
   /* ── colour: viewport ink ──────────────────────────────────────────── */
   /* Ink drawn inside the viewport rectangle. Now the same values chrome uses,
@@ -191,6 +196,11 @@
     var(--leading-tight) var(--font-mono);
 
   /* ── space ─────────────────────────────────────────────────────────── */
+  /* The unit every length is a multiple of (design.html, axiom A6), and the
+     two line weights: the hairline, and the 2px line that means "active". */
+  --unit: 4px;
+  --hairline: 1px;
+  --stroke-active: 2px;
   --space-1: 2px;
   --space-2: 4px;
   --space-3: 6px;
