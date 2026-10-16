@@ -324,8 +324,8 @@ const intelligenceTheme = EditorView.theme({
   ".cm-gutter-lint .cm-gutterElement": { padding: "0 var(--space-1)" },
   ".cm-lint-marker": {
     content: "none",
-    width: "9px",
-    height: "9px",
+    width: "calc(var(--unit) * 2)",
+    height: "calc(var(--unit) * 2)",
     margin: "auto",
     backgroundColor: "transparent",
   },
@@ -336,7 +336,7 @@ const intelligenceTheme = EditorView.theme({
   },
   ".cm-lint-marker-info": {
     backgroundColor: "transparent",
-    border: "1.5px solid var(--ink-3)",
+    border: "var(--hairline) solid var(--ink-3)",
   },
 
   // Underlines: a text decoration rather than a background image, so the
@@ -346,7 +346,7 @@ const intelligenceTheme = EditorView.theme({
     paddingBottom: "0",
     textDecorationLine: "underline",
     textDecorationSkipInk: "none",
-    textUnderlineOffset: "3px",
+    textUnderlineOffset: "var(--space-1)",
   },
   ".cm-lintRange-error": {
     textDecorationStyle: "wavy",
@@ -358,17 +358,17 @@ const intelligenceTheme = EditorView.theme({
   },
   ".cm-lintRange-info": {
     textDecorationStyle: "dotted",
-    textDecorationThickness: "2px",
+    textDecorationThickness: "var(--space-1)",
     textDecorationColor: "var(--ink-3)",
   },
   // The traceback of a compile that actually failed, drawn heavier than the
   // suspicions around it.
-  ".cm-lint-runtime": { textDecorationThickness: "2px" },
-  ".cm-lintRange-active": { backgroundColor: "var(--surface-inset-hover)" },
+  ".cm-lint-runtime": { textDecorationThickness: "var(--space-1)" },
+  ".cm-lintRange-active": { backgroundColor: "var(--surface-bar-alt)" },
 
   ".cm-tooltip-lint": {
     backgroundColor: "var(--surface-float)",
-    border: "1px solid var(--rule-strong)",
+    border: "var(--hairline) solid var(--rule-strong)",
     borderRadius: "var(--radius)",
     color: "var(--ink)",
     maxWidth: "44em",
@@ -377,9 +377,9 @@ const intelligenceTheme = EditorView.theme({
     padding: "var(--space-3) var(--space-4)",
     font: "var(--weight-regular) var(--text-sm) / var(--leading-snug) var(--font-sans)",
   },
-  ".cm-diagnostic-error": { borderLeft: "3px solid var(--danger)" },
-  ".cm-diagnostic-warning": { borderLeft: "3px solid var(--warn)" },
-  ".cm-diagnostic-info": { borderLeft: "3px solid var(--ink-3)" },
+  ".cm-diagnostic-error": { borderLeft: "var(--stroke-active) solid var(--danger)" },
+  ".cm-diagnostic-warning": { borderLeft: "var(--stroke-active) solid var(--warn)" },
+  ".cm-diagnostic-info": { borderLeft: "var(--stroke-active) solid var(--ink-3)" },
   ".cm-diagnostic-note": {
     margin: "var(--space-2) 0 0",
     color: "var(--ink-2)",
@@ -387,7 +387,9 @@ const intelligenceTheme = EditorView.theme({
   ".cm-diagnostic-link": {
     display: "inline-block",
     marginTop: "var(--space-2)",
-    color: "var(--info)",
+    // A link, not a free parameter, so it takes no hue.
+    color: "var(--ink-3)",
+    textDecoration: "underline",
   },
   ".cm-diagnosticSource": {
     color: "var(--ink-3)",
@@ -406,12 +408,12 @@ const intelligenceTheme = EditorView.theme({
   },
   ".cm-panel.cm-panel-lint": {
     backgroundColor: "var(--surface-panel)",
-    borderTop: "1px solid var(--rule-strong)",
+    borderTop: "var(--hairline) solid var(--rule-strong)",
   },
 
   ".cm-tooltip.cm-tooltip-autocomplete": {
     backgroundColor: "var(--surface-float)",
-    border: "1px solid var(--rule-strong)",
+    border: "var(--hairline) solid var(--rule-strong)",
     borderRadius: "var(--radius)",
   },
   ".cm-tooltip.cm-tooltip-autocomplete > ul > li": {
@@ -431,7 +433,7 @@ const intelligenceTheme = EditorView.theme({
   },
   ".cm-completionInfo": {
     backgroundColor: "var(--surface-float)",
-    border: "1px solid var(--rule-strong)",
+    border: "var(--hairline) solid var(--rule-strong)",
     borderRadius: "var(--radius)",
     color: "var(--ink-2)",
     padding: "var(--space-3) var(--space-4)",
@@ -449,7 +451,7 @@ const intelligenceTheme = EditorView.theme({
 
   ".cm-signature-tooltip": {
     backgroundColor: "var(--surface-float)",
-    border: "1px solid var(--rule-strong)",
+    border: "var(--hairline) solid var(--rule-strong)",
     borderRadius: "var(--radius)",
     color: "var(--ink-2)",
     padding: "var(--space-3) var(--space-4)",

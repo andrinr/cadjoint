@@ -25,6 +25,18 @@ import {
 import GRATICULE_WGSL from "./graticule.wgsl?raw";
 import OVERLAY_WGSL from "./overlay.wgsl?raw";
 import SIMULATION_WGSL from "./simulation.wgsl?raw";
+import { wgslTokens } from "../tokens";
+
+/**
+ * A WGSL module's source with the design tokens prepended.
+ *
+ * The .wgsl files name colours by role (`INK`, `SHEET`, `VIRIDIS_C3`) and
+ * declare none of them: `wgslTokens()` emits the `const` block from
+ * `tokens.ts`, so a shader colour cannot drift from the one source.
+ */
+export function withTokens(code: string): string {
+  return `${wgslTokens()}\n${code}`;
+}
 
 export const DEPTH_FORMAT: GPUTextureFormat = "depth32float";
 
@@ -109,7 +121,7 @@ export function createOverlayPipelines(
   overlayBuffer: GPUBuffer,
   meshOverlayBuffer: GPUBuffer,
 ): OverlayPipelines {
-  const module = device.createShaderModule({ code: OVERLAY_WGSL, label: "Overlay WGSL" });
+  const module = device.createShaderModule({ code: withTokens(OVERLAY_WGSL), label: "Overlay WGSL" });
   const { bindGroupLayout, pipelineLayout } = sharedLayout(device, "Overlay bindings", [0]);
   const blend: GPUBlendState = {
     color: { srcFactor: "src-alpha", dstFactor: "one-minus-src-alpha", operation: "add" },
@@ -214,7 +226,7 @@ export function createOverlayPipelines(
               { shaderLocation: 0, offset: 0, format: "float32x3" },
               { shaderLocation: 1, offset: 12, format: "float32x4" },
               { shaderLocation: 2, offset: 28, format: "float32" },
-              // 1 when the point is a free design parameter — a filled disc.
+              // HANDLE_SHAPE: free (hollow circle), held (square), selected.
               { shaderLocation: 3, offset: 32, format: "float32" },
             ],
           },
@@ -339,7 +351,7 @@ export function createGraticulePipeline(
   uniformBuffer: GPUBuffer,
 ): GraticulePipeline {
   const module = device.createShaderModule({
-    code: GRATICULE_WGSL,
+    code: withTokens(GRATICULE_WGSL),
     label: "Graticule WGSL",
   });
   const { bindGroupLayout, pipelineLayout } = sharedLayout(
@@ -410,7 +422,7 @@ export function createSimulationPipelines(
   createUniform: (size: number) => GPUBuffer,
 ): SimulationPipelines {
   const module = device.createShaderModule({
-    code: SIMULATION_WGSL,
+    code: withTokens(SIMULATION_WGSL),
     label: "Simulation WGSL",
   });
   const { bindGroupLayout, pipelineLayout } = sharedLayout(

@@ -40,7 +40,7 @@
   /* One hairline plus a --control-sm cell: the strip's *content* box is then
      exactly a control, so the buttons in it are the same height as the menu
      bar's rather than a pixel short of it. */
-  --dv-tabs-and-actions-container-height: calc(var(--control-sm) + 1px);
+  --dv-tabs-and-actions-container-height: calc(var(--control-sm) + var(--hairline));
   --dv-tabs-and-actions-container-font-size: var(--text-2xs);
   --dv-tab-font-size: var(--text-2xs);
   --dv-tab-close-icon-size: var(--text-sm);
@@ -61,81 +61,83 @@
   --dv-separator-border: var(--rule);
   --dv-paneview-header-border-color: var(--rule);
   --dv-paneview-active-outline-color: var(--rule-strong);
-  --dv-icon-hover-background-color: var(--surface-inset-hover);
+  --dv-icon-hover-background-color: var(--surface-bar-alt);
   --dv-scrollbar-background-color: var(--shade-soft);
   --dv-tabs-container-scrollbar-color: var(--rule);
-  --dv-context-menu-background-color: var(--surface-float-96);
+  --dv-context-menu-background-color: var(--surface-float);
   --dv-context-menu-color: var(--ink);
 
   /* The sash is invisible at rest and a hairline under the pointer: a
      splitter that is always drawn would add a second rule beside the one the
-     panel already has. */
+     panel already has. Achromatic, because the accent never draws a line. */
   --dv-sash-color: transparent;
-  --dv-active-sash-color: var(--accent);
+  --dv-active-sash-color: var(--rule-strong);
   --dv-active-sash-transition-duration: var(--dur-fast);
   --dv-active-sash-transition-delay: 0s;
 
-  /* A drop target is a wash plus the drawn edge — the same vocabulary the
-     viewport uses for a pick rectangle. */
-  --dv-drag-over-background-color: rgba(var(--accent-rgb), var(--alpha-wash));
-  --dv-drag-over-border-color: var(--accent);
-  --dv-drag-over-border: 1px solid var(--accent);
-  --dv-edge-dock-indicator-color: var(--accent);
+  /* A drop target is "not yet": an ink wash plus a dashed edge — the same
+     vocabulary the viewport uses for a pick rectangle. The accent is never an
+     outline, so it has no part in this. */
+  --dv-drag-over-background-color: rgba(var(--ink-rgb), var(--alpha-wash));
+  --dv-drag-over-border-color: var(--ink);
+  --dv-drag-over-border: var(--hairline) dashed var(--ink);
+  --dv-edge-dock-indicator-color: var(--ink);
   --dv-dnd-compass-color: var(--rule-strong);
-  --dv-dnd-compass-cell-color: rgba(var(--accent-rgb), var(--alpha-wash));
-  --dv-dnd-compass-edge-cell-color: rgba(var(--accent-rgb), var(--alpha-wash));
-  --dv-dnd-compass-active-cell-color: rgba(var(--accent-rgb), var(--alpha-tint));
-  --dv-smart-guides-color: var(--accent);
+  --dv-dnd-compass-cell-color: rgba(var(--ink-rgb), var(--alpha-wash));
+  --dv-dnd-compass-edge-cell-color: rgba(var(--ink-rgb), var(--alpha-wash));
+  --dv-dnd-compass-active-cell-color: rgba(var(--ink-rgb), var(--alpha-tint));
+  --dv-smart-guides-color: var(--ink);
   --dv-smart-guides-preview-color: var(--rule-strong);
 
   /* A floating window is the same furniture lifted off the sheet. It is told
      apart by a heavier rule, not by a shadow — this system has none. */
   --dv-floating-box-shadow: none;
-  --dv-floating-border: 1px solid var(--rule-heavy);
-  --dv-floating-group-border: 1px solid var(--rule-heavy);
+  --dv-floating-border: var(--hairline) solid var(--rule-heavy);
+  --dv-floating-group-border: var(--hairline) solid var(--rule-heavy);
   --dv-floating-group-dragging-opacity: 0.9;
   --dv-floating-titlebar-height: var(--space-6);
   --dv-floating-titlebar-background-color: var(--surface-bar-alt);
-  --dv-floating-titlebar-border-bottom: 1px solid var(--rule);
+  --dv-floating-titlebar-border-bottom: var(--hairline) solid var(--rule);
 
   --dv-overlay-z-index: 20;
-  --dv-border-radius: 0px;
-  --dv-tab-border-radius: 0px;
-  --dv-sash-border-radius: 0px;
-  --dv-dropdown-border-radius: 0px;
-  --dv-tab-group-chip-border-radius: 0px;
+  --dv-border-radius: var(--radius);
+  --dv-tab-border-radius: var(--radius);
+  --dv-sash-border-radius: var(--radius);
+  --dv-dropdown-border-radius: var(--radius);
+  --dv-tab-group-chip-border-radius: var(--radius);
   --dv-tab-margin: 0;
   --dv-tab-margin-block: 0;
   --dv-tab-margin-inline: 0;
-  --dv-spacing-padding: 0px;
+  --dv-spacing-padding: 0;
   --dv-tab-group-line-opacity: 1;
   --dv-tab-group-chip-font-size: var(--text-3xs);
   --dv-tab-group-chip-padding: 0 var(--space-3);
-  --dv-tab-group-line-height: 1px;
+  --dv-tab-group-line-height: var(--hairline);
 }
 
 /* ── tab strip ────────────────────────────────────────────────────────── */
 
 .win-theme .dv-tabs-and-actions-container {
-  border-bottom: 1px solid var(--rule);
+  border-bottom: var(--hairline) solid var(--rule);
 }
 
 .win-theme .dv-tab {
   padding: 0 var(--space-4);
-  border-right: 1px solid var(--rule);
+  border-right: var(--hairline) solid var(--rule);
   font: var(--weight-regular) var(--text-2xs) / var(--leading-flat) var(--font-mono);
   letter-spacing: var(--tracking-2xs);
   text-transform: uppercase;
 }
 
-/* The active tab is marked at the top edge — the same 2px accent strip the
-   panel shell used before it had a tab bar to carry it. */
+/* The active tab is marked at its foot with the active stroke in ink — the
+   2px line that means "this is the active one". Drawn as an inset stroke
+   rather than a border so the tab keeps the strip's height. */
 .win-theme .dv-groupview.dv-active-group > .dv-tabs-and-actions-container .dv-tab.dv-active-tab {
-  box-shadow: inset 0 2px 0 0 var(--accent);
+  box-shadow: inset 0 calc(var(--stroke-active) * -1) 0 0 var(--ink);
 }
 
 .win-theme .dv-groupview.dv-inactive-group > .dv-tabs-and-actions-container .dv-tab.dv-active-tab {
-  box-shadow: inset 0 2px 0 0 var(--rule-strong);
+  box-shadow: inset 0 calc(var(--stroke-active) * -1) 0 0 var(--rule-strong);
 }
 
 /* Our own tab content: a tracked mono label, and a close control that only
@@ -158,36 +160,36 @@
 .win-tab-close {
   display: grid;
   place-items: center;
-  width: 14px;
-  height: 14px;
+  width: var(--space-6);
+  height: var(--space-6);
   padding: 0;
   border: 0;
-  border-radius: 0;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--ink-3);
   font-size: var(--text-sm);
-  line-height: 1;
+  line-height: var(--leading-flat);
   cursor: pointer;
 }
 
 .win-tab-close:hover {
   color: var(--ink);
-  background: var(--surface-inset-hover);
+  background: var(--surface-bar-alt);
 }
 
 .win-tab-close:focus-visible {
-  outline: 1px solid var(--accent);
-  outline-offset: -1px;
+  outline: var(--stroke-active) solid var(--ink);
+  outline-offset: calc(var(--stroke-active) * -1);
 }
 
 .win-theme .dv-tab .dv-default-tab-action {
-  border-radius: 0;
+  border-radius: var(--radius);
   color: var(--ink-3);
 }
 
 .win-theme .dv-tab .dv-default-tab-action:hover {
   color: var(--ink);
-  background: var(--surface-inset-hover);
+  background: var(--surface-bar-alt);
 }
 
 /* ── group header actions (minimise, float) ───────────────────────────── */
@@ -198,20 +200,20 @@
 }
 
 /* `height` is set explicitly because the shell gives every bare `button` the
-   30px `--control-md` box. That is right for a control on a panel and wrong
-   for one in a 26px tab bar: the button overflowed its own strip, which is
+   `--control-md` box. That is right for a control on a panel and wrong
+   for one in the tab bar: the button overflowed its own strip, which is
    what put the strip's two halves 2.5px off a shared baseline and pushed the
    tray's controls past the bottom of the window. Chrome furniture fills the
    bar it is in and takes its line box from the bar's own type. */
 .win-head-button {
   display: grid;
   place-items: center;
-  width: 24px;
+  width: var(--control-sm);
   height: 100%;
   padding: 0;
   border: 0;
-  border-left: 1px solid var(--rule);
-  border-radius: 0;
+  border-left: var(--hairline) solid var(--rule);
+  border-radius: var(--radius);
   background: transparent;
   color: var(--ink-3);
   font: var(--weight-regular) var(--text-2xs) / var(--leading-flat) var(--font-mono);
@@ -226,12 +228,12 @@
 
 .win-head-button:hover {
   color: var(--ink);
-  background: var(--surface-inset-hover);
+  background: var(--surface-bar-alt);
 }
 
 .win-head-button:focus-visible {
-  outline: 1px solid var(--accent);
-  outline-offset: -1px;
+  outline: var(--stroke-active) solid var(--ink);
+  outline-offset: calc(var(--stroke-active) * -1);
 }
 
 /* ── panel bodies ─────────────────────────────────────────────────────── */
@@ -289,8 +291,8 @@
    own right edge; an outline paints the same hairline and costs no layout. */
 .win-theme .dv-resize-container {
   border: 0;
-  outline: 1px solid var(--rule-heavy);
-  outline-offset: -1px;
+  outline: var(--hairline) solid var(--rule-heavy);
+  outline-offset: calc(var(--hairline) * -1);
 }
 
 /* ── the tray ─────────────────────────────────────────────────────────── */
@@ -301,14 +303,14 @@
   display: flex;
   align-items: stretch;
   gap: 0;
-  height: calc(var(--control-xs) + 1px);
-  border-top: 1px solid var(--rule);
+  height: calc(var(--control-sm) + var(--hairline));
+  border-top: var(--hairline) solid var(--rule);
   background: var(--surface-bar);
 }
 
 /* The label and the parked windows are one row of cells: same grid, same
    line box, same size. A kicker a size smaller read as a second register in a
-   22px strip, and it put the two on different baselines. */
+   strip this short, and it put the two on different baselines. */
 .win-tray-label,
 .win-tray-item {
   display: grid;
@@ -316,8 +318,8 @@
   height: 100%;
   padding: 0 var(--space-4);
   border: 0;
-  border-right: 1px solid var(--rule);
-  border-radius: 0;
+  border-right: var(--hairline) solid var(--rule);
+  border-radius: var(--radius);
   background: transparent;
   font: var(--weight-regular) var(--text-2xs) / var(--leading-flat) var(--font-mono);
   letter-spacing: var(--tracking-2xs);
@@ -335,12 +337,12 @@
 
 .win-tray-item:hover {
   color: var(--ink);
-  background: var(--surface-inset-hover);
+  background: var(--surface-bar-alt);
 }
 
 .win-tray-item:focus-visible {
-  outline: 1px solid var(--accent);
-  outline-offset: -1px;
+  outline: var(--stroke-active) solid var(--ink);
+  outline-offset: calc(var(--stroke-active) * -1);
 }
 
 /* ── watermark ────────────────────────────────────────────────────────── */

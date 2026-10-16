@@ -31,7 +31,7 @@
 /* Rows of one list are separated by the weakest rule in the system: they are
    one table, not a stack of cards. */
 .proc-row + .proc-row {
-  border-top: 1px solid var(--divider);
+  border-top: var(--hairline) solid var(--divider);
 }
 
 .proc-line {
@@ -58,7 +58,7 @@
 
 .proc-open:hover:not(:disabled) {
   border-color: transparent;
-  background: var(--surface-inset);
+  background: var(--surface-bar-alt);
 }
 
 .proc-open strong {
@@ -82,7 +82,7 @@
 }
 
 .proc-figures b {
-  min-width: 44px;
+  min-width: calc(var(--unit) * 11);
   color: var(--ink);
   font: var(--type-mono-strong);
   font-variant-numeric: tabular-nums;
@@ -92,7 +92,7 @@
 /* Status is a word, not a colour: cancelled and failed differ from done by
    what they say. Only failure earns ink, and it earns the system's own. */
 .proc-status {
-  min-width: 60px;
+  min-width: calc(var(--unit) * 15);
   color: var(--ink-3);
   font: var(--type-mono);
   font-style: normal;
@@ -138,14 +138,12 @@
 /*
  * The sparklines here are data, not emphasis.
  *
- * `.opt-spark` draws its polyline in the accent because on an optimization
- * card the line *is* the subject of the card. In the monitor it is a
- * background reading — one of six figures about a job — and the design
- * language keeps the accent as a fill behind type rather than as a mark or a
- * data line (`research/design-language.md`, "Colour"). So the trace is drawn
- * in ink and the frame's bottom edge does duty as its baseline; the kind
- * chips stay accent fills, because a chip is exactly the fill-behind-type
- * case the rule is written for.
+ * `.opt-spark` draws its polyline in ink, because the accent is a fill behind
+ * type and never a mark or a data line. On an optimization card the line is
+ * the subject; in the monitor it is a background reading — one of six figures
+ * about a job — so it steps down to ink-2 and the frame's bottom edge does
+ * duty as its baseline. The kind chips are inverse ink, the shape every label
+ * of kind takes.
  */
 .proc-panel .opt-spark polyline {
   stroke: var(--ink-2);

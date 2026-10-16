@@ -8,8 +8,8 @@
  * A solver's refusal is a paragraph, not a status line — "TetGen rejected the
  * surface: the input surface mesh contains self-intersections…" tells you
  * exactly what to change, and only if you can read all of it. So it is set in
- * mono at the panel's own size, wrapped rather than clipped, and marked down
- * the side in the danger ink; and it sits in front of whatever the window was
+ * mono at the panel's own size, wrapped rather than clipped, and edged in
+ * the danger tone the way an invalid input is; and it sits in front of whatever the window was
  * already showing, so the previous result stays legible behind it instead of
  * being cleared or quietly re-labelled.
  *
@@ -21,8 +21,8 @@
   flex-direction: column;
   gap: var(--space-2);
   padding: var(--space-3) var(--space-4);
-  border-left: 2px solid var(--danger-ink);
-  background: var(--surface-inset);
+  border: var(--hairline) solid var(--danger);
+  background: var(--surface-float);
 }
 
 /*

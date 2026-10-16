@@ -43,8 +43,8 @@
   width: 100%;
   height: var(--control-md);
   padding: 0 var(--space-4);
-  border: 1px solid var(--rule-strong);
-  background: var(--surface-raised);
+  border: var(--hairline) solid var(--rule-strong);
+  background: var(--surface-float);
   color: var(--ink);
   font: var(--weight-semibold) var(--text-sm) / var(--leading-flat) var(--font-mono);
 }

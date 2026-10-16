@@ -1299,7 +1299,9 @@ test("sketch constraints and extrusion are represented in UI and code", async ({
   await waitForCompile(page);
   await expect(page.getByTestId("sketch-panel")).toContainText("fix · P1");
 
-  await page.getByTestId("constraint-distance").click();
+  // The panel lists constraints; adding one is the rail's (and the
+  // Constrain menu's) job.
+  await railTool(page, "annotate", "annotate-distance");
   await expect(page.getByTestId("status")).toContainText("choose the second point");
   metrics = await canvasMetrics(page);
   await page.mouse.click(metrics.left + second.x, metrics.top + second.y);
@@ -1315,7 +1317,7 @@ test("sketch constraints and extrusion are represented in UI and code", async ({
   // point, arm the tool (which adopts the selection), then pick the second.
   metrics = await canvasMetrics(page);
   await page.mouse.click(metrics.left + first.x, metrics.top + first.y);
-  await page.getByTestId("constraint-horizontal").click();
+  await railTool(page, "annotate", "annotate-horizontal");
   await page.mouse.click(metrics.left + second.x, metrics.top + second.y);
   await expect(page.getByTestId("sketch-panel")).toContainText("horiz · P1–P2", {
     timeout: 45_000,
@@ -1573,6 +1575,7 @@ test("studies are declared, edited, and deleted through source patches", async (
   await expect(page.getByTestId("simulate-empty")).toBeVisible();
 
   // Adding a study writes a ThermalStudy declaration into the program.
+  await page.getByTestId("simulate-add-study").click();
   await page.getByTestId("simulate-add-thermal").click();
   await editorHas("ThermalStudy(");
   const card = page.locator("[data-testid^=simulate-study-]").first();

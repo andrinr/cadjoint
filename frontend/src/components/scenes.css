@@ -47,7 +47,7 @@
 }
 
 .scene-card + .scene-card {
-  border-top: 1px solid var(--divider);
+  border-top: var(--hairline) solid var(--divider);
 }
 
 .scene-card {
@@ -59,13 +59,13 @@
 /*
  * The card the current document was loaded from is marked, not coloured.
  *
- * A rule at the head of the block, in the heaviest structural ink the system
- * has. Not the accent: the accent in this design language is a fill behind
- * type — a chip, a pressed control — and never a mark or a data line, and a
+ * The active stroke at the head of the block, in ink: 2px is the one weight
+ * that means "this is the active one". Not the accent: the accent is a fill
+ * behind type — a chip, a pressed control — and never a mark or a line, and a
  * 2px orange bar down the side of a card is exactly the mark it is not.
  */
 .scene-card.current {
-  border-left: 2px solid var(--rule-heavy);
+  border-left: var(--stroke-active) solid var(--ink);
   padding-left: var(--space-4);
 }
 
@@ -121,8 +121,8 @@
   aspect-ratio: 16 / 10;
   flex: 0 0 auto;
   overflow: hidden;
-  border: 1px solid var(--rule);
-  background: var(--surface-inset);
+  border: var(--hairline) solid var(--rule);
+  background: var(--surface-bar-alt);
 }
 
 .scene-frame img {
@@ -150,9 +150,9 @@
   background-image: repeating-linear-gradient(
     45deg,
     transparent,
-    transparent 5px,
-    var(--divider) 5px,
-    var(--divider) 6px
+    transparent var(--unit),
+    var(--divider) var(--unit),
+    var(--divider) calc(var(--unit) + var(--hairline))
   );
 }
 
@@ -178,6 +178,18 @@
   flex-wrap: wrap;
   gap: var(--space-2);
   margin: var(--space-3) 0 0;
+}
+
+/* A material name is a string from scene.py, not a label of kind: it wears
+   the plain chip — hairline, paper, its own case — rather than the
+   inverse-ink tag the shared `.sim-kind` class draws. */
+.scene-materials .sim-kind {
+  border: var(--hairline) solid var(--rule);
+  background: var(--surface-float);
+  color: var(--ink-2);
+  font: var(--type-mono);
+  letter-spacing: var(--tracking-lg);
+  text-transform: none;
 }
 
 .scene-meta {

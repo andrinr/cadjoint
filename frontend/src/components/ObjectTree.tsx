@@ -112,7 +112,7 @@ export function ObjectTree() {
                 aria-selected={row.nodeId !== null && selection()?.nodeId === row.nodeId}
                 aria-expanded={row.group ? !collapsed().has(row.key) : undefined}
                 tabIndex={index() === 0 ? 0 : -1}
-                style={{ "padding-left": `${6 + row.depth * 14}px` }}
+                style={{ "padding-left": `calc(var(--space-3) + var(--unit) * ${4 * row.depth})` }}
                 onClick={() => selectRow(row)}
                 onKeyDown={(event) => {
                   if (event.key === "Enter" || event.key === " ") {

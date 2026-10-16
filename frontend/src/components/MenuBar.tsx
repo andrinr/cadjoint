@@ -1,78 +1,55 @@
 /**
- * Slim application menu bar: File / Edit / Window / Help.
+ * The application menu bar: File, Edit, View, Create, Shape, Constrain,
+ * Simulate, Program, Window, Help.
  *
- * Menus follow the native pattern — click (or ArrowDown) opens, arrows move,
- * Escape or a click elsewhere closes. Everything acts on the shared state
- * signals; file operations go through the server's `scenes` workspace, and
- * Export… through `/api/export`.
+ * Nothing here lists a command by hand. The menus are `shell/menuModel.ts`,
+ * which is the design page's agreed menu bar (`design/features.ts`) with each
+ * leaf bound to a command; each item runs that command through the registry
+ * (`shell/commands.ts`) — the very call its key, rail button or panel button
+ * makes — and quotes the key `shortcuts.ts` binds to it.
+ *
+ * An item that does not apply in the current mode is shown disabled with the
+ * reason in its title ("Only in sketch mode"); so is one that cannot run on
+ * the current selection. Menus follow the native pattern — click (or
+ * ArrowDown) opens, arrows move, Escape or a click elsewhere closes.
+ *
+ * The menu bar owns the dialogs its File and Help items open (Save As…,
+ * Export…, Keyboard shortcuts) and registers those commands itself.
  */
 
+import "./shell.css";
 import { For, Show, createSignal, onCleanup } from "solid-js";
 import * as api from "../api";
 import { sanitizeSceneName } from "../scenes";
 import { SHORTCUT_GROUPS } from "../shortcuts";
+import { dirty, editingMode, sceneName, setSceneName, setStatus, source } from "../state";
+import { command, commandBlocked, registerCommands, runCommand } from "../shell/commands";
 import {
-  dirty,
-  editingMode,
-  panels,
-  sceneName,
-  setEditingMode,
-  setPanelVisible,
-  setSceneName,
-  setStatus,
-  source,
-  type PanelVisibility,
-} from "../state";
-import { EDITING_MODES } from "../editingMode";
+  MENU_IDS,
+  menuModel,
+  modeReason,
+  windowOfCommand,
+  type MenuEntry,
+} from "../shell/menuModel";
 import { windowManager } from "../windows/manager";
-import type { WindowId } from "../windows/panels";
 import { ExportDialog } from "./ExportDialog";
 
-export interface MenuBarProps {
-  canUndo: boolean;
-  canRedo: boolean;
-  onUndo: () => void;
-  onRedo: () => void;
-  /** Reset to the starter example (App confirms when the buffer is dirty). */
-  onNew: () => void;
-  /** Adopt a loaded scene file as the current program and recompile. */
-  onAdoptScene: (name: string, source: string) => void;
-}
-
-type MenuId = "file" | "edit" | "window" | "help";
 type DialogId = "saveAs" | "export" | "help";
 
-const PANEL_ITEMS: { key: keyof PanelVisibility; label: string }[] = [
-  { key: "editor", label: "Editor" },
-  { key: "objectTree", label: "Object tree" },
-  { key: "materials", label: "Materials" },
-  { key: "sketch", label: "Sketch panel" },
-];
-
-/**
- * The windows the coarse `panels()` record does not cover.
- *
- * `PANEL_ITEMS` above is the older, four-key vocabulary the shell still
- * mirrors; everything else is addressed by window id straight through the
- * dock's manager. That is the whole list of what the Window menu can open:
- * the four simulation windows (which used to be tabs inside one panel and so
- * had no way in at all), the scene browser and the process monitor — the two
- * that are parked in every desk rather than docked in any.
- */
-const WINDOW_ITEMS: { id: WindowId; label: string }[] = [
-  { id: "properties", label: "Properties" },
-  { id: "meshes", label: "Meshes" },
-  { id: "studies", label: "Studies" },
-  { id: "optimize", label: "Optimize" },
-  { id: "results", label: "Results" },
-  { id: "scenes", label: "Scenes" },
-  { id: "processes", label: "Processes" },
-];
-
 const REPO_README_URL = "https://github.com/andrinr/cadjoint#readme";
+/** The design language: the second page of this app. */
+const DESIGN_URL = "/design.html";
 
-export function MenuBar(props: MenuBarProps) {
-  const [openMenu, setOpenMenu] = createSignal<MenuId | null>(null);
+/** Items that are links rather than commands, so they open like links. */
+const LINKS: Record<string, string> = {
+  "help-readme": REPO_README_URL,
+  "help-design": DESIGN_URL,
+};
+
+const MENUS = menuModel();
+
+export function MenuBar() {
+  const [openMenu, setOpenMenu] = createSignal<string | null>(null);
   const [dialog, setDialog] = createSignal<DialogId | null>(null);
   const [saveAsName, setSaveAsName] = createSignal("");
   const [saveAsError, setSaveAsError] = createSignal("");
@@ -101,9 +78,9 @@ export function MenuBar(props: MenuBarProps) {
   document.addEventListener("keydown", closeOnEscape, true);
   onCleanup(() => document.removeEventListener("keydown", closeOnEscape, true));
 
-  const toggleMenu = (id: MenuId) => setOpenMenu(openMenu() === id ? null : id);
+  const toggleMenu = (id: string) => setOpenMenu(openMenu() === id ? null : id);
   /** An open menubar behaves like hover navigation between its menus. */
-  const glideTo = (id: MenuId) => {
+  const glideTo = (id: string) => {
     if (openMenu() !== null && openMenu() !== id) setOpenMenu(id);
   };
 
@@ -117,10 +94,7 @@ export function MenuBar(props: MenuBarProps) {
    * version of it in a dialog. It is parked in every desk, so this is
    * usually one click and no layout change.
    */
-  const showScenes = () => {
-    setOpenMenu(null);
-    windowManager()?.open("scenes");
-  };
+  const showScenes = () => windowManager()?.open("scenes");
 
   const saveAs = async (rawName: string): Promise<void> => {
     const name = sanitizeSceneName(rawName);
@@ -146,8 +120,13 @@ export function MenuBar(props: MenuBarProps) {
     }
   };
 
+  const showSaveAsDialog = () => {
+    setSaveAsName(sceneName() ?? "scene.py");
+    setSaveAsError("");
+    setDialog("saveAs");
+  };
+
   const save = () => {
-    setOpenMenu(null);
     const name = sceneName();
     if (name === null) {
       showSaveAsDialog();
@@ -156,26 +135,7 @@ export function MenuBar(props: MenuBarProps) {
     void saveAs(name);
   };
 
-  const showSaveAsDialog = () => {
-    setOpenMenu(null);
-    setSaveAsName(sceneName() ?? "scene.py");
-    setSaveAsError("");
-    setDialog("saveAs");
-  };
-
-  /**
-   * Export… is a dialog, not a window: it asks four things and produces one
-   * file, and a form that is answered and dismissed has no business in the
-   * dock. The work it starts is a job, so it is watched — and cancelled —
-   * from the chip and the Processes window like a solve.
-   */
-  const showExportDialog = () => {
-    setOpenMenu(null);
-    setDialog("export");
-  };
-
   const download = () => {
-    setOpenMenu(null);
     const blob = new Blob([source()], { type: "text/x-python" });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
@@ -185,13 +145,37 @@ export function MenuBar(props: MenuBarProps) {
     URL.revokeObjectURL(url);
   };
 
+  /**
+   * Export… is a dialog, not a window: it asks four things and produces one
+   * file, and a form that is answered and dismissed has no business in the
+   * dock. The work it starts is a job, so it is watched — and cancelled —
+   * from the chip and the Processes window like a solve.
+   */
+  onCleanup(
+    registerCommands({
+      "file-open": { run: showScenes },
+      "file-save": { run: save },
+      "file-save-as": { run: showSaveAsDialog },
+      "file-export": { run: () => setDialog("export") },
+      "file-download": { run: download },
+      "help-shortcuts": {
+        run: () => setDialog(dialog() === "help" ? null : "help"),
+      },
+      "help-readme": { run: () => void window.open(REPO_README_URL, "_blank", "noreferrer") },
+    }),
+  );
+
+  /** Why an item is off right now — its mode first, then the command's own. */
+  const reasonFor = (entry: MenuEntry): string | null =>
+    modeReason(entry.modes, editingMode()) ?? commandBlocked(entry.command);
+
   /** Arrow-key navigation between the items of an open dropdown. */
   const onMenuKeyDown = (event: KeyboardEvent) => {
     const menu = (event.currentTarget as HTMLElement).closest(".menu");
     if (!menu) return;
     const items = [
       ...menu.querySelectorAll<HTMLElement>(
-        ".menu-dropdown button:not(:disabled), .menu-dropdown a",
+        ".menu-dropdown button:not([aria-disabled=true]), .menu-dropdown a",
       ),
     ];
     const index = items.indexOf(document.activeElement as HTMLElement);
@@ -206,20 +190,18 @@ export function MenuBar(props: MenuBarProps) {
       setOpenMenu(null);
       menu.querySelector<HTMLElement>(".menu-title")?.focus();
     } else if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
-      const order: MenuId[] = ["file", "edit", "window", "help"];
       const active = openMenu();
       if (!active) return;
       event.preventDefault();
       const step = event.key === "ArrowRight" ? 1 : -1;
-      const next = order[(order.indexOf(active) + step + order.length) % order.length];
+      const next =
+        MENU_IDS[(MENU_IDS.indexOf(active) + step + MENU_IDS.length) % MENU_IDS.length];
       setOpenMenu(next);
-      document
-        .querySelector<HTMLElement>(`[data-testid=menu-${next}]`)
-        ?.focus();
+      document.querySelector<HTMLElement>(`[data-testid=menu-${next}]`)?.focus();
     }
   };
 
-  const menuTitle = (id: MenuId, label: string) => (
+  const menuTitle = (id: string, label: string) => (
     <button
       type="button"
       class="menu-title"
@@ -242,203 +224,85 @@ export function MenuBar(props: MenuBarProps) {
     </button>
   );
 
-  const item = (
-    label: string,
-    action: () => void,
-    options: { shortcut?: string; disabled?: boolean; testid?: string } = {},
-  ) => (
-    <button
-      type="button"
-      role="menuitem"
-      disabled={options.disabled}
-      onClick={action}
-      onKeyDown={onMenuKeyDown}
-      data-testid={options.testid}
-    >
-      <span>{label}</span>
-      <Show when={options.shortcut}>
-        <small>{options.shortcut}</small>
-      </Show>
-    </button>
-  );
+  /** One item: the mark column, the label, the key hung right. */
+  const entryView = (entry: MenuEntry) => {
+    const impl = () => command(entry.command);
+    const checked = () => impl()?.checked?.() ?? false;
+    const reason = () => reasonFor(entry);
+    const link = LINKS[entry.command];
+    if (link) {
+      return (
+        <a
+          href={link}
+          target="_blank"
+          rel="noreferrer"
+          role="menuitem"
+          onClick={() => setOpenMenu(null)}
+          onKeyDown={onMenuKeyDown}
+          data-testid={entry.testid}
+        >
+          <i class="menu-check" />
+          <span>{entry.label}</span>
+          <small>↗</small>
+        </a>
+      );
+    }
+    // Window visibility leaves the menu open, so the way back from closing
+    // one is the same item; everything else is done and dismisses it.
+    const staysOpen = windowOfCommand(entry.command) !== null;
+    return (
+      <button
+        type="button"
+        role={entry.radio ? "menuitemradio" : impl()?.checked ? "menuitemcheckbox" : "menuitem"}
+        aria-checked={impl()?.checked || entry.radio ? checked() : undefined}
+        aria-disabled={reason() !== null}
+        title={reason() ?? undefined}
+        onClick={() => {
+          if (reason() !== null) return;
+          if (!staysOpen) setOpenMenu(null);
+          runCommand(entry.command);
+        }}
+        onKeyDown={onMenuKeyDown}
+        data-testid={entry.testid}
+      >
+        <i class="menu-check">{checked() ? (entry.radio ? "•" : "✓") : ""}</i>
+        <span>{entry.label}</span>
+        <Show when={entry.key}>
+          <small>{entry.key}</small>
+        </Show>
+      </button>
+    );
+  };
 
   return (
     <>
       <nav class="menu-bar" aria-label="Application menu" data-testid="menu-bar">
-        <div class="menu">
-          {menuTitle("file", "File")}
-          <Show when={openMenu() === "file"}>
-            <div class="menu-dropdown" role="menu">
-              {item("New", () => (setOpenMenu(null), props.onNew()), {
-                testid: "menu-file-new",
-              })}
-              {item("Open…", showScenes, { testid: "menu-file-open" })}
-              <hr />
-              {item("Save", save, { testid: "menu-file-save" })}
-              {item("Save As…", showSaveAsDialog, { testid: "menu-file-save-as" })}
-              <hr />
-              {item("Export…", showExportDialog, { testid: "menu-file-export" })}
-              {item("Download scene.py", download, { testid: "menu-file-download" })}
-            </div>
-          </Show>
-        </div>
-
-        <div class="menu">
-          {menuTitle("edit", "Edit")}
-          <Show when={openMenu() === "edit"}>
-            <div class="menu-dropdown" role="menu">
-              {item("Undo", () => (setOpenMenu(null), props.onUndo()), {
-                shortcut: "⌘Z",
-                disabled: !props.canUndo,
-                testid: "menu-edit-undo",
-              })}
-              {item("Redo", () => (setOpenMenu(null), props.onRedo()), {
-                shortcut: "⇧⌘Z",
-                disabled: !props.canRedo,
-                testid: "menu-edit-redo",
-              })}
-            </div>
-          </Show>
-        </div>
-
-        <div class="menu">
-          {menuTitle("window", "Window")}
-          <Show when={openMenu() === "window"}>
-            <div class="menu-dropdown" role="menu">
-              <For each={EDITING_MODES}>
-                {(mode) => (
-                  <button
-                    type="button"
-                    role="menuitemradio"
-                    aria-checked={editingMode() === mode}
-                    onClick={() => {
-                      setEditingMode(mode);
-                      setOpenMenu(null);
-                    }}
-                    onKeyDown={onMenuKeyDown}
-                    data-testid={`menu-window-mode-${mode}`}
-                  >
-                    <i class="menu-check">{editingMode() === mode ? "•" : ""}</i>
-                    <span>
-                      {mode.charAt(0).toUpperCase() + mode.slice(1)} mode
-                    </span>
-                    <Show when={mode === "model"}>
-                      <small>Esc</small>
-                    </Show>
-                  </button>
-                )}
-              </For>
-              <hr />
-              <For each={PANEL_ITEMS}>
-                {(panel) => (
-                  <button
-                    type="button"
-                    role="menuitemcheckbox"
-                    aria-checked={panels()[panel.key]}
-                    onClick={() => setPanelVisible(panel.key, !panels()[panel.key])}
-                    onKeyDown={onMenuKeyDown}
-                    data-testid={`menu-window-${panel.key}`}
-                  >
-                    <i class="menu-check">{panels()[panel.key] ? "✓" : ""}</i>
-                    <span>{panel.label}</span>
-                  </button>
-                )}
-              </For>
-              {/* The simulation windows, the scene browser and the process
-                  monitor. The last two are parked in every desk rather than
-                  docked, so this is where they are opened from — and where a
-                  user who has never seen the tray finds out they exist. */}
-              <Show when={windowManager()}>
-                {(manager) => (
-                  <For each={WINDOW_ITEMS}>
-                    {(entry) => (
-                      <button
-                        type="button"
-                        role="menuitemcheckbox"
-                        aria-checked={manager().status(entry.id) === "open"}
-                        onClick={() => manager().toggle(entry.id)}
-                        onKeyDown={onMenuKeyDown}
-                        data-testid={`menu-window-${entry.id}`}
-                      >
-                        <i class="menu-check">
-                          {manager().status(entry.id) === "open" ? "✓" : ""}
-                        </i>
-                        <span>{entry.label}</span>
-                      </button>
+        <For each={MENUS}>
+          {(menu) => (
+            <div class="menu">
+              {menuTitle(menu.id, menu.name)}
+              <Show when={openMenu() === menu.id}>
+                <div class="menu-dropdown" role="menu" aria-label={menu.name}>
+                  <For each={menu.groups}>
+                    {(group, index) => (
+                      <>
+                        <Show when={index() > 0}>
+                          <hr />
+                        </Show>
+                        <Show when={group.title}>
+                          <div class="menu-section" role="presentation">
+                            {group.title}
+                          </div>
+                        </Show>
+                        <For each={group.entries}>{entryView}</For>
+                      </>
                     )}
                   </For>
-                )}
-              </Show>
-              {/* Float and dock, and the way back from both. The dock owns
-                  the arrangement and publishes this manager on mount, so the
-                  section simply is not there before it exists — which is also
-                  the case in a unit test, where no dock is ever built. */}
-              <Show when={windowManager()}>
-                {(manager) => (
-                  <>
-                    <hr />
-                    <For each={manager().windows}>
-                      {(window) => (
-                        <button
-                          type="button"
-                          role="menuitemcheckbox"
-                          aria-checked={manager().isFloating(window.id)}
-                          disabled={manager().status(window.id) === "closed"}
-                          onClick={() => {
-                            // Unlike the visibility checks above, this one
-                            // closes the menu: the window it moves lands over
-                            // the dropdown, and a menu underneath a floating
-                            // panel is a menu you cannot click.
-                            setOpenMenu(null);
-                            if (manager().isFloating(window.id)) manager().dock(window.id);
-                            else manager().float(window.id);
-                          }}
-                          onKeyDown={onMenuKeyDown}
-                          data-testid={`menu-window-float-${window.id}`}
-                        >
-                          <i class="menu-check">
-                            {manager().isFloating(window.id) ? "✓" : ""}
-                          </i>
-                          <span>Float {window.title}</span>
-                        </button>
-                      )}
-                    </For>
-                    <hr />
-                    {item(
-                      "Reset layout",
-                      () => (setOpenMenu(null), manager().resetLayout()),
-                      { testid: "menu-window-reset" },
-                    )}
-                  </>
-                )}
+                </div>
               </Show>
             </div>
-          </Show>
-        </div>
-
-        <div class="menu">
-          {menuTitle("help", "Help")}
-          <Show when={openMenu() === "help"}>
-            <div class="menu-dropdown" role="menu">
-              {item(
-                "Keyboard shortcuts",
-                () => (setOpenMenu(null), setDialog("help")),
-                { testid: "menu-help-shortcuts" },
-              )}
-              <a
-                href={REPO_README_URL}
-                target="_blank"
-                rel="noreferrer"
-                role="menuitem"
-                onKeyDown={onMenuKeyDown}
-                data-testid="menu-help-readme"
-              >
-                <span>CADJOINT README</span>
-                <small>↗</small>
-              </a>
-            </div>
-          </Show>
-        </div>
+          )}
+        </For>
 
         <span class="menu-scene" data-testid="menu-scene-name">
           {sceneName() ?? "unsaved scene"}

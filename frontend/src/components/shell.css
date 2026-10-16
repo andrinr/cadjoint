@@ -1,0 +1,111 @@
+/* The shell's chrome added with the design-language rollout: the menu bar's
+   dropdowns, the rail's words, and the Studies window's "+ Study" menu.
+   Tokens only (src/tokens.css); the look follows the dl- primitives in
+   src/design/design.css. Imported from MenuBar.tsx. */
+
+/* Menus ---------------------------------------------------------------- */
+
+/* A menu is a float surface with the strong rule for its edge. */
+.menu-bar .menu-dropdown,
+.study-kinds.menu-dropdown {
+  max-height: calc(100vh - var(--control-xl) * 2);
+  overflow-y: auto;
+  border-color: var(--rule-strong);
+  background: var(--surface-float);
+}
+
+/* 24px items in one column; the leading cell holds the check or the dot. */
+.menu-bar .menu-dropdown button,
+.menu-bar .menu-dropdown a,
+.study-kinds.menu-dropdown button {
+  height: calc(var(--unit) * 6);
+  font: var(--weight-medium) var(--text-xs) / var(--leading-flat) var(--font-mono);
+}
+
+.menu-bar .menu-dropdown button > small,
+.menu-bar .menu-dropdown a > small {
+  color: var(--ink-3);
+  font: var(--weight-regular) var(--text-2xs) / var(--leading-flat) var(--font-mono);
+  text-align: right;
+}
+
+/* Disabled stays focusable and keeps its title (the reason): ink-3, no
+   hover, never a pointer. */
+.menu-bar .menu-dropdown button[aria-disabled="true"] {
+  color: var(--ink-3);
+  cursor: default;
+}
+
+.menu-bar .menu-dropdown button[aria-disabled="true"]:hover {
+  background: transparent;
+}
+
+/* A section heading: the kicker, indented to the label column. */
+.menu-section {
+  display: flex;
+  align-items: end;
+  height: calc(var(--unit) * 5);
+  padding: 0 var(--space-4) var(--space-1) calc(var(--unit) * 6);
+  color: var(--ink-3);
+  font: var(--type-kicker);
+  letter-spacing: var(--tracking-3xs);
+  text-transform: uppercase;
+}
+
+/* Tool rail words (design language I2) -------------------------------- */
+
+.tool-rail .rail-word {
+  display: none;
+}
+
+@media (min-width: 1280px) {
+  .tool-rail {
+    align-items: stretch;
+  }
+
+  .tool-rail > button,
+  .tool-rail .tool-group-parent,
+  .tool-rail .tool-flyout button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-1);
+    width: auto;
+    min-width: var(--control-lg);
+    height: auto;
+    min-height: var(--control-lg);
+    padding: var(--space-2) var(--space-2);
+  }
+
+  .tool-rail .rail-word {
+    display: block;
+    font: var(--type-kicker);
+    letter-spacing: var(--tracking-3xs);
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .tool-rail hr {
+    align-self: center;
+  }
+}
+
+/* Studies: one "+ Study" with the kinds behind it ---------------------- */
+
+.sim-add-study-anchor {
+  position: relative;
+  display: flex;
+}
+
+.sim-add-study-toggle {
+  flex: 1;
+  width: 100%;
+}
+
+.study-kinds.menu-dropdown {
+  top: calc(100% + var(--space-1));
+  left: 0;
+  right: 0;
+  min-width: 0;
+}

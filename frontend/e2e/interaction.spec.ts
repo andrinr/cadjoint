@@ -133,7 +133,7 @@ test("Escape cancels one thing per press, starting with the pending command", as
     if (request.url().includes("/api/patch")) patches.push(request.url());
   });
 
-  // Arm a loft: select a sketch, open the rail's Modify flyout (only its
+  // Arm a loft: select a sketch, open the rail's Shape flyout (only its
   // parent entry is on the rail at rest), then Loft.
   await page.getByTestId("tree-row-profile_0").click();
   await expect

@@ -97,8 +97,9 @@ function faceSentence(): string {
 /**
  * What dragging the hovered handle will cost.
  *
- * The one line that says out loud what the filled and hollow handles mean, at
- * the moment it matters — pointing at one — rather than as a standing legend.
+ * The handle's shape says whether the point is free (hollow circle) or held
+ * (filled square); this line says what a drag of it will cost, at the moment
+ * it matters — pointing at one — rather than as a standing legend.
  * A free parameter has a slot in the shader's uniform buffer, so the solid
  * follows the pointer; anything else is a literal in the program text, and
  * the solid only catches up when the rewritten source recompiles.

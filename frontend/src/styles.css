@@ -125,11 +125,11 @@ select option {
 
 /* ── shared chrome behaviour ──────────────────────────────────────────── */
 
-/* One focus ring for the whole app, drawn in the active mode's accent so
-   keyboard focus is legible without adding a fifth accent colour. */
+/* One focus ring for the whole app: the 2px ink edge, the weight that means
+   "this is the active one". The accent is a fill and never draws a line. */
 :focus-visible {
-  outline: 2px solid var(--mode-accent, var(--accent));
-  outline-offset: 1px;
+  outline: var(--stroke-active) solid var(--ink);
+  outline-offset: var(--hairline);
 }
 
 /* Scrollbars are chrome, so they get chrome's restraint: a hairline-width
@@ -140,8 +140,8 @@ select option {
 }
 
 ::-webkit-scrollbar {
-  width: 9px;
-  height: 9px;
+  width: calc(var(--unit) * 2);
+  height: calc(var(--unit) * 2);
 }
 
 ::-webkit-scrollbar-track {
@@ -149,7 +149,7 @@ select option {
 }
 
 ::-webkit-scrollbar-thumb {
-  border: 3px solid transparent;
+  border: var(--space-1) solid transparent;
   background: var(--rule-strong);
   background-clip: content-box;
 }
@@ -187,7 +187,7 @@ select option {
 
 .app {
   display: grid;
-  grid-template-rows: 30px 52px 1fr;
+  grid-template-rows: calc(var(--unit) * 7) calc(var(--unit) * 13) 1fr;
   height: 100%;
 }
 
@@ -206,7 +206,7 @@ select option {
   align-items: stretch;
   gap: var(--space-1);
   padding: 0 var(--space-4);
-  border-bottom: 1px solid var(--rule);
+  border-bottom: var(--hairline) solid var(--rule);
   background: var(--surface-bar);
 }
 
@@ -231,8 +231,15 @@ select option {
     color var(--dur-fast) var(--ease);
 }
 
-.menu-title:hover,
-.menu-title.active {
+/* Hover is a step, not a state: only the open menu is current, and only the
+   current thing takes the accent. */
+.menu-title:hover {
+  background: var(--surface-bar-alt);
+  color: var(--ink);
+}
+
+.menu-title.active,
+.menu-title.active:hover {
   background: var(--accent);
   color: var(--ink-on-accent);
 }
@@ -244,24 +251,27 @@ select option {
   z-index: 60;
   display: flex;
   flex-direction: column;
-  gap: 1px;
-  min-width: 208px;
-  padding: var(--space-2);
-  border: 1px solid var(--rule);
+  min-width: calc(var(--unit) * 52);
+  padding: var(--space-2) 0;
+  border: var(--hairline) solid var(--rule);
   background: var(--surface-panel);
   animation: pop-in var(--dur-base) var(--ease);
   transform-origin: top left;
 }
 
+/* One column, everywhere: a fixed leading cell for the check or the dot
+   (empty on plain items), the label, then the shortcut hung right. The mode
+   items used to centre because they alone had a mark and no column for it. */
 .menu-dropdown button,
 .menu-dropdown a {
-  display: flex;
+  display: grid;
+  grid-template-columns: calc(var(--unit) * 6) minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-6);
+  gap: 0 var(--space-6);
   width: 100%;
   height: var(--control-sm);
-  padding: 0 var(--space-4);
+  padding: 0 var(--space-4) 0 0;
+
   border: 0;
   background: transparent;
   color: var(--ink);
@@ -292,22 +302,28 @@ select option {
 }
 
 .menu-dropdown hr {
-  height: 1px;
-  margin: var(--space-2) var(--space-1);
+  height: var(--hairline);
+  margin: var(--space-2) 0;
   border: 0;
-  background: var(--divider);
+  background: var(--rule);
 }
 
-.menu-dropdown [role="menuitemcheckbox"] {
-  justify-content: flex-start;
-  gap: var(--space-3);
+.menu-dropdown button > span,
+.menu-dropdown a > span {
+  grid-column: 2;
+}
+
+.menu-dropdown button > small,
+.menu-dropdown a > small {
+  grid-column: 3;
 }
 
 .menu-check {
-  width: 13px;
+  grid-column: 1;
   color: var(--ink);
   font-size: var(--text-2xs);
   font-style: normal;
+  text-align: center;
 }
 
 .menu-scene {
@@ -331,7 +347,7 @@ select option {
   align-items: center;
   gap: var(--space-5);
   padding: 0 var(--space-5);
-  border-bottom: 1px solid var(--rule);
+  border-bottom: var(--hairline) solid var(--rule);
   background: var(--surface-bar-alt);
 }
 
@@ -340,18 +356,19 @@ select option {
 /* A compile of a real scene is twenty-five seconds during which the viewport
    is showing the *previous* program, and a chip is a small mark in a bar the
    eye skips. So the bar's own bottom rule — the line between the chrome and
-   the work — doubles to 2px and fills with the accent while that is true. It
-   is 1900px long and it costs no space: the rule is there either way, and 2px
-   is the language's reserved weight for an active state (§5). The accent is a
-   ground here and carries no type, which is the only shape it is allowed. */
+   the work — doubles to the active stroke and fills with ink while that is
+   true. It is the width of the window and it costs no space: the rule is
+   there either way, and 2px is the language's reserved weight for an active
+   state. Ink, not the accent: the accent is only a fill behind type, and a
+   compile in flight is not the *current* thing, it is work. */
 .toolbar-busy {
   position: absolute;
   right: 0;
-  bottom: -1px;
+  bottom: calc(var(--hairline) * -1);
   left: 0;
-  height: 2px;
+  height: var(--stroke-active);
   overflow: hidden;
-  background: var(--accent);
+  background: var(--ink);
 }
 
 /* The travelling segment, in the one darker tone of the same hue. The solid
@@ -366,7 +383,8 @@ select option {
   top: 0;
   bottom: 0;
   width: 22%;
-  background: var(--accent-press);
+  background: var(--ink-3);
+
   animation: toolbar-busy-sweep 1.4s var(--ease-inout) infinite;
 }
 
@@ -400,8 +418,8 @@ select option {
 .brand .mark {
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
+  width: calc(var(--unit) * 6);
+  height: calc(var(--unit) * 6);
   background: var(--accent);
   color: var(--ink-on-accent);
   font-size: var(--text-sm);
@@ -420,7 +438,7 @@ select option {
 .mode-switcher {
   display: flex;
   margin-left: var(--space-4);
-  border: 1px solid var(--rule-strong);
+  border: var(--hairline) solid var(--rule-strong);
 }
 
 .mode-switcher button {
@@ -430,7 +448,7 @@ select option {
   height: var(--control-xl);
   padding: 0 var(--space-6);
   border: 0;
-  border-left: 1px solid var(--rule);
+  border-left: var(--hairline) solid var(--rule);
   background: transparent;
   color: var(--ink-2);
   font: var(--weight-semibold) var(--text-xs) / var(--leading-flat)
@@ -444,8 +462,8 @@ select option {
 }
 
 .mode-switcher button svg {
-  width: 15px;
-  height: 15px;
+  width: calc(var(--unit) * 4);
+  height: calc(var(--unit) * 4);
 }
 
 .mode-switcher button:hover:not(.active) {
@@ -470,7 +488,7 @@ button,
 select {
   height: var(--control-md);
   padding: 0 var(--space-5);
-  border: 1px solid var(--rule-strong);
+  border: var(--hairline) solid var(--rule-strong);
   background: var(--surface-raised);
   color: var(--ink);
   font: inherit;
@@ -503,7 +521,7 @@ button:disabled {
    of the block is the signal, not its hue. */
 button.active,
 button.primary {
-  border-color: var(--accent-press);
+  border-color: var(--accent);
   background: var(--accent);
   color: var(--ink-on-accent);
 }
@@ -525,8 +543,8 @@ input[type="text"] {
   height: var(--control-md);
   min-width: 0;
   padding: 0 var(--space-3);
-  border: 1px solid var(--rule-strong);
-  background: var(--surface-raised);
+  border: var(--hairline) solid var(--rule-strong);
+  background: var(--surface-float);
   color: var(--ink);
   font: var(--type-mono);
   font-size: var(--text-xs);
@@ -566,8 +584,8 @@ input[type="range"] {
 }
 
 input[type="checkbox"] {
-  width: 13px;
-  height: 13px;
+  width: calc(var(--unit) * 3);
+  height: calc(var(--unit) * 3);
   accent-color: var(--ink);
 }
 
@@ -602,8 +620,8 @@ input[type="checkbox"] {
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-3);
-  border: 1px solid var(--rule);
-  background: var(--surface-float-80);
+  border: var(--hairline) solid var(--rule);
+  background: var(--surface-float);
 }
 
 .tool-rail button {
@@ -624,7 +642,7 @@ input[type="checkbox"] {
 }
 
 .tool-rail button.active {
-  border-color: var(--accent-press);
+  border-color: var(--accent);
   background: var(--accent);
   color: var(--ink-on-accent);
 }
@@ -640,11 +658,11 @@ input[type="checkbox"] {
 }
 
 .tool-rail hr {
-  width: 22px;
-  height: 1px;
+  width: var(--space-7);
+  height: var(--hairline);
   margin: var(--space-1) 0;
   border: 0;
-  background: var(--divider);
+  background: var(--rule);
 }
 
 .rail-hint {
@@ -672,8 +690,8 @@ input[type="checkbox"] {
 
 .tool-group-caret {
   position: absolute;
-  right: 3px;
-  bottom: 3px;
+  right: var(--space-1);
+  bottom: var(--space-1);
   width: 0;
   height: 0;
   border-left: var(--space-2) solid transparent;
@@ -689,13 +707,13 @@ input[type="checkbox"] {
 .tool-flyout {
   display: none;
   position: absolute;
-  top: -1px;
+  top: calc(var(--hairline) * -1);
   left: calc(100% + var(--space-5));
   z-index: 11;
   gap: var(--space-2);
   padding: var(--space-2);
-  border: 1px solid var(--rule);
-  background: var(--surface-float-96);
+  border: var(--hairline) solid var(--rule);
+  background: var(--surface-float);
 }
 
 .tool-group.open .tool-flyout {
@@ -733,9 +751,9 @@ input[type="checkbox"] {
 
 .tool-rail .plane-picks button {
   width: var(--control-lg);
-  height: var(--control-xs);
+  height: var(--control-sm);
   font: var(--type-kicker);
-  letter-spacing: 0.05em;
+  letter-spacing: var(--tracking-md);
 }
 
 /* Sketch history (a dock section; the shell comes from the dock rules). */
@@ -761,7 +779,7 @@ input[type="checkbox"] {
 }
 
 .sketch-panel header small b {
-  color: var(--ink-on-accent);
+  color: inherit;
   font: inherit;
 }
 
@@ -774,7 +792,7 @@ input[type="checkbox"] {
 
 .history-chips span {
   padding: var(--space-1) var(--space-3);
-  border: 1px solid var(--rule);
+  border: var(--hairline) solid var(--rule);
   color: var(--ink-2);
   background: rgba(
     var(--ink-rgb),
@@ -798,16 +816,16 @@ input[type="checkbox"] {
 
 .history-chips .chip-label.editable {
   cursor: pointer;
-  text-decoration: underline dotted var(--accent-press);
-  text-underline-offset: 2px;
+  text-decoration: underline dotted var(--ink-3);
+  text-underline-offset: var(--space-1);
 }
 
 .history-chips .chip-value {
-  width: 46px;
+  width: calc(var(--unit) * 12);
   height: auto;
   padding: 0 var(--space-1);
-  border: 1px solid var(--rule-strong);
-  background: var(--surface-raised);
+  border: var(--hairline) solid var(--rule-strong);
+  background: var(--surface-float);
   color: inherit;
   font: inherit;
 }
@@ -857,12 +875,12 @@ input[type="checkbox"] {
   gap: var(--space-4);
   margin-top: var(--space-5);
   padding-top: var(--space-5);
-  border-top: 1px solid var(--divider);
+  border-top: var(--hairline) solid var(--divider);
 }
 
 .solver-controls {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 72px 48px;
+  grid-template-columns: minmax(0, 1fr) calc(var(--unit) * 18) calc(var(--unit) * 12);
   align-items: end;
   gap: var(--space-3);
 }
@@ -893,18 +911,18 @@ input[type="checkbox"] {
 .solver-empty {
   margin: 0;
   padding: var(--space-4);
-  background: var(--surface-inset);
+  border: var(--hairline) dashed var(--rule);
   color: var(--ink-3);
   font-size: var(--text-2xs);
   text-align: center;
 }
 
-/* The constraint solver's residual chart: the one place the info tone is
-   allowed to carry a line, because the line *is* the datum. */
+/* The constraint solver's residual chart. The residual is not a free
+   parameter, so its line is ink: hue is meaning, and this one has none. */
 .solver-chart {
   padding: var(--space-4) var(--space-4) var(--space-3);
-  border: 1px solid rgba(var(--info-rgb), var(--alpha-tint-strong));
-  background: var(--shade-soft);
+  border: var(--hairline) solid var(--rule);
+  background: var(--surface-bar-alt);
 }
 
 .solver-chart > div,
@@ -924,29 +942,29 @@ input[type="checkbox"] {
 }
 
 .solver-chart > div b {
-  color: var(--info-ink);
+  color: var(--ink);
   font: var(--type-kicker);
 }
 
 .solver-chart svg {
   display: block;
   width: 100%;
-  height: 66px;
+  height: calc(var(--unit) * 16);
   margin: var(--space-2) 0 var(--space-1);
   overflow: visible;
 }
 
 .solver-chart line {
-  stroke: var(--divider);
+  stroke: var(--rule);
   stroke-width: 1;
 }
 
 .solver-chart polyline {
   fill: none;
-  stroke: var(--info);
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+  stroke: var(--ink);
+  stroke-width: 1.5;
+  stroke-linecap: square;
+  stroke-linejoin: miter;
   vector-effect: non-scaling-stroke;
 }
 
@@ -958,15 +976,15 @@ input[type="checkbox"] {
    the hint bar below, and never runs off-screen. */
 .dock {
   position: absolute;
-  top: 150px;
+  top: calc(var(--unit) * 38);
   right: var(--space-5);
-  bottom: 40px;
+  bottom: calc(var(--unit) * 10);
   z-index: 9;
   display: flex;
   flex-direction: column;
   align-items: stretch;
   gap: var(--space-3);
-  width: 292px;
+  width: calc(var(--unit) * 73);
   pointer-events: none;
 }
 
@@ -984,19 +1002,19 @@ input[type="checkbox"] {
    small minimum (header plus a couple of rows) and scrolls internally. The
    minimums sum well below the dock height at 800px-tall viewports. */
 .dock .object-tree-panel {
-  min-height: 132px;
+  min-height: calc(var(--unit) * 33);
 }
 
 .dock .sketch-panel {
-  min-height: 118px;
+  min-height: calc(var(--unit) * 30);
 }
 
 .dock .material-panel {
-  min-height: 118px;
+  min-height: calc(var(--unit) * 30);
 }
 
 .dock .sim-panel {
-  min-height: 150px;
+  min-height: calc(var(--unit) * 38);
 }
 
 /* Render settings popover: anchored to the toolbar's eye icon, openable
@@ -1011,13 +1029,13 @@ input[type="checkbox"] {
   top: calc(100% + var(--space-5));
   right: 0;
   z-index: 40;
-  width: 300px;
+  width: calc(var(--unit) * 75);
   animation: pop-in var(--dur-base) var(--ease);
   transform-origin: top right;
 }
 
 .render-popover .render-panel {
-  max-height: min(72vh, 640px);
+  max-height: min(72vh, calc(var(--unit) * 160));
   border-top-color: var(--rule);
 }
 
@@ -1044,8 +1062,8 @@ input[type="checkbox"] {
 .sketch-panel,
 .render-panel {
   width: 100%;
-  border: 1px solid var(--rule-strong);
-  background: var(--surface-float-90);
+  border: var(--hairline) solid var(--rule-strong);
+  background: var(--surface-float);
   animation: panel-in var(--dur-slow) var(--ease);
 }
 
@@ -1082,7 +1100,7 @@ input[type="checkbox"] {
   gap: 0;
   margin: 0;
   padding-bottom: var(--space-2);
-  border-bottom: 1px solid var(--rule-strong);
+  border-bottom: var(--hairline) solid var(--rule-strong);
 }
 
 .section-head b,
@@ -1111,8 +1129,8 @@ input[type="checkbox"] {
 }
 
 /* One panel header, everywhere: the kicker, then the section's name. The
-   kicker used to be accent-coloured *text*, which measures 2.26:1 on paper;
-   it is now the same filled cell the section numbers use. The components
+   kicker is a label of kind, so it is inverse ink — ink ground, paper type —
+   and never the accent, which means *current* and nothing else. The components
    emit <small> first so the kicker is always the top line — see
    ObjectTree/RenderPanel/MaterialPanel. */
 .object-tree-panel > header > span,
@@ -1145,8 +1163,8 @@ input[type="checkbox"] {
 .render-panel header small,
 .render-panel header small * {
   padding: 0 var(--space-2);
-  background: var(--accent);
-  color: var(--ink-on-accent);
+  background: var(--ink);
+  color: var(--surface-float);
   font: var(--type-kicker);
   letter-spacing: var(--tracking-3xs);
   text-transform: uppercase;
@@ -1180,14 +1198,14 @@ input[type="checkbox"] {
   gap: var(--space-4);
   flex: 0 0 auto;
   padding: var(--space-4) var(--space-3) var(--space-3) var(--space-5);
-  background: var(--surface-float-96);
+  background: var(--surface-float);
 }
 
 
 .object-tree-rows {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 0;
   min-height: 0;
   padding: 0 var(--space-3) var(--space-4);
   overflow: auto;
@@ -1218,7 +1236,7 @@ input[type="checkbox"] {
 
 .object-tree-row:hover,
 .object-tree-row.hovered {
-  background: var(--surface-inset-hover);
+  background: var(--surface-bar-alt);
 }
 
 .object-tree-row.active {
@@ -1246,8 +1264,8 @@ input[type="checkbox"] {
   display: grid;
   place-items: center;
   flex: 0 0 auto;
-  width: 14px;
-  height: 14px;
+  width: var(--space-6);
+  height: var(--space-6);
   padding: 0;
   border: 0;
   background: none;
@@ -1258,7 +1276,7 @@ input[type="checkbox"] {
 
 .tree-caret-space {
   flex: 0 0 auto;
-  width: 14px;
+  width: var(--space-6);
 }
 
 .tree-icon {
@@ -1269,8 +1287,8 @@ input[type="checkbox"] {
 }
 
 .tree-icon svg {
-  width: 13px;
-  height: 13px;
+  width: calc(var(--unit) * 3);
+  height: calc(var(--unit) * 3);
 }
 
 /* The name is the only elastic cell in the row; min-width:0 is what lets it
@@ -1291,14 +1309,16 @@ input[type="checkbox"] {
   white-space: nowrap;
 }
 
+/* A count, not a kind and not a parameter: ink on the alternate bar. */
 .tree-badge {
   flex: 0 0 auto;
-  min-width: 16px;
+  min-width: var(--space-6);
   margin-left: auto;
   padding: var(--space-1) var(--space-2);
-  background: var(--info);
-  color: var(--surface-float);
+  background: var(--surface-bar-alt);
+  color: var(--ink);
   font: var(--type-kicker);
+  font-variant-numeric: tabular-nums;
   text-align: center;
 }
 
@@ -1308,10 +1328,11 @@ input[type="checkbox"] {
 
 .tree-material {
   flex: 0 1 auto;
-  max-width: 74px;
+  max-width: calc(var(--unit) * 18);
+
   margin-left: auto;
   padding: var(--space-1) var(--space-2);
-  border: 1px solid var(--rule);
+  border: var(--hairline) solid var(--rule);
   background: rgba(var(--ink-rgb), var(--alpha-wash));
   color: var(--ink-2);
   font: var(--type-kicker);
@@ -1335,7 +1356,7 @@ input[type="checkbox"] {
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-3);
-  background: var(--surface-float-96);
+  background: var(--surface-float);
 }
 
 .material-panel-title {
@@ -1415,8 +1436,8 @@ input[type="checkbox"] {
 .material-card {
   min-width: 0;
   padding: var(--space-3) var(--space-2);
-  border: 1px solid transparent;
-  background: var(--surface-inset);
+  border: var(--hairline) solid var(--rule);
+  background: var(--surface-float);
   cursor: grab;
   outline: none;
   text-align: center;
@@ -1428,15 +1449,19 @@ input[type="checkbox"] {
 .material-card:hover,
 .material-card:focus-visible {
   border-color: var(--rule-strong);
-  background: var(--surface-inset-hover);
+  background: var(--surface-bar-alt);
 }
 
+/* The current material: an accent block behind its name, never an orange
+   edge around the card (the accent is a fill and never draws a line). */
 .material-card.active {
-  border-color: var(--accent-press);
-  background: rgba(
-    var(--accent-rgb),
-    var(--alpha-wash)
-  );
+  border-color: var(--rule-strong);
+}
+
+.material-card.active .material-name {
+  background: var(--accent);
+  color: var(--ink-on-accent);
+  font-weight: var(--weight-bold);
 }
 
 .material-card:active {
@@ -1451,7 +1476,7 @@ input[type="checkbox"] {
   flex: 0 0 auto;
   width: 18px;
   height: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.28);
+  border: var(--hairline) solid rgba(255, 255, 255, 0.28);
   border-radius: 50%;
   background:
     radial-gradient(circle at 32% 25%, white 0 4%, transparent 15%),
@@ -1512,6 +1537,8 @@ input[type="checkbox"] {
 }
 
 .material-name {
+  margin: 0 calc(var(--space-2) * -1);
+  padding: var(--space-1) var(--space-2);
   color: var(--ink);
   font-size: var(--text-2xs);
   font-weight: var(--weight-semibold);
@@ -1526,8 +1553,8 @@ input[type="checkbox"] {
   display: grid;
   gap: var(--space-2);
   padding: var(--space-4) var(--space-5) var(--space-4);
-  border-top: 1px solid var(--divider);
-  background: var(--shade-soft);
+  border-top: var(--hairline) solid var(--divider);
+  background: var(--surface-bar-alt);
 }
 
 /* The inspector is two sections, because a Material answers to two readers:
@@ -1540,7 +1567,7 @@ input[type="checkbox"] {
   gap: var(--space-3);
   margin-top: var(--space-3);
   padding-top: var(--space-3);
-  border-top: 1px solid var(--divider);
+  border-top: var(--hairline) solid var(--divider);
   color: var(--ink-2);
   font: var(--type-kicker);
   letter-spacing: var(--tracking-3xs);
@@ -1578,7 +1605,7 @@ input[type="checkbox"] {
    recoverable from a truncated `W/(m…` in a way an elided magnitude is not. */
 .material-physical-row dd {
   display: grid;
-  grid-template-columns: 96px var(--control-sm) minmax(0, 52px);
+  grid-template-columns: calc(var(--unit) * 24) var(--control-sm) minmax(0, calc(var(--unit) * 13));
   align-items: center;
   gap: var(--space-2);
   margin: 0;
@@ -1609,9 +1636,12 @@ input[type="checkbox"] {
 /* An expression, not a literal: the value is in the program and this row will
    not pretend to own it. Sits in the box's own column, without the box. */
 .material-physical-row dd em {
-  color: var(--ink-3);
+  padding: 0 var(--space-2);
+  border: var(--hairline) dashed var(--rule);
+  color: var(--ink-2);
   font: var(--type-mono);
   font-style: normal;
+  line-height: calc(var(--control-sm) - var(--hairline) * 2);
   text-align: right;
 }
 
@@ -1656,7 +1686,7 @@ input[type="checkbox"] {
   grid-column: 1 / -1;
   margin: 0;
   padding: var(--space-1) 0 var(--space-2);
-  border-top: 1px solid var(--rule);
+  border-top: var(--hairline) solid var(--rule);
   color: var(--ink-2);
   font-family: var(--font-sans);
   font-size: var(--text-2xs);
@@ -1698,16 +1728,16 @@ input[type="checkbox"] {
 }
 
 .material-inspector input[type="color"] {
-  width: 28px;
-  height: var(--control-xs);
+  width: var(--control-md);
+  height: var(--control-sm);
   padding: var(--space-1);
-  border: 1px solid var(--rule);
-  background: var(--surface-raised);
+  border: var(--hairline) solid var(--rule-strong);
+  background: var(--surface-float);
 }
 
 .material-inspector > label {
   display: grid;
-  grid-template-columns: 92px minmax(0, 1fr);
+  grid-template-columns: calc(var(--unit) * 23) minmax(0, 1fr);
   color: var(--ink-3);
   font-size: var(--text-3xs);
 }
@@ -1735,7 +1765,7 @@ input[type="checkbox"] {
 .material-empty {
   margin: 0;
   padding: var(--space-5);
-  border-top: 1px solid var(--divider);
+  border-top: var(--hairline) solid var(--divider);
   color: var(--ink-3);
   font-size: var(--text-2xs);
 }
@@ -1765,8 +1795,8 @@ input[type="checkbox"] {
 .cube-stage {
   /* Smaller than it was: the cube is a control, not an ornament, and at 168
      it took a corner of the viewport away from the model it describes. */
-  width: 124px;
-  height: 124px;
+  width: calc(var(--unit) * 31);
+  height: calc(var(--unit) * 31);
   cursor: grab;
   touch-action: none;
   overflow: visible;
@@ -1832,8 +1862,8 @@ input[type="checkbox"] {
    the screen. It is a legend and not a control: no pointer events, so the
    canvas underneath still orbits where the triad is drawn over it. */
 .cube-triad {
-  width: 64px;
-  height: 64px;
+  width: calc(var(--unit) * 16);
+  height: calc(var(--unit) * 16);
   overflow: visible;
   pointer-events: none;
   /* Pulled up into the stage's own bottom margin. The cube's silhouette stops
@@ -1842,35 +1872,33 @@ input[type="checkbox"] {
      floating in the viewport. −20 (net −14 after the gap) closes it to 14px
      at the tightest standpoint of 360 swept — the one that aims the cube's
      furthest point and an axis label at each other — and to more elsewhere. */
-  margin-top: -20px;
+  margin-top: calc(var(--unit) * -5);
 }
 
-/* @artwork — the axis triad is a reading of orientation, not chrome.
-   X-red, Y-green, Z-blue is the convention every CAD and DCC application
-   shares, and it is the reason this is the one saturated hue allowed inside
-   the viewport rectangle: three achromatic hairlines would be three identical
-   lines, which is not a triad, it is a scribble. */
+/* The axis triad is a reading of orientation, and X-red, Y-green, Z-blue is
+   the convention every CAD application shares: the one saturated hue allowed
+   inside the viewport rectangle. It draws the same axis-x/y/z the transform
+   gizmo does, dark enough that the letters clear 4.5:1. */
 .cube-axis {
-  stroke-width: 1.6;
-  stroke-linecap: round;
+  stroke-width: 1.5;
+  stroke-linecap: square;
 }
 
-.cube-axis.axis-x { stroke: #d21f2b; }
-.cube-axis.axis-y { stroke: #1f8a2e; }
-.cube-axis.axis-z { stroke: #1f5fd2; }
+.cube-axis.axis-x { stroke: var(--axis-x); }
+.cube-axis.axis-y { stroke: var(--axis-y); }
+.cube-axis.axis-z { stroke: var(--axis-z); }
 
 .cube-axis-label {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: var(--text-3xs);
   font-weight: var(--weight-semibold);
   pointer-events: none;
   user-select: none;
 }
 
-.cube-axis-label.axis-x { fill: #d21f2b; }
-.cube-axis-label.axis-y { fill: #1f8a2e; }
-.cube-axis-label.axis-z { fill: #1f5fd2; }
-/* @end-artwork */
+.cube-axis-label.axis-x { fill: var(--axis-x); }
+.cube-axis-label.axis-y { fill: var(--axis-y); }
+.cube-axis-label.axis-z { fill: var(--axis-z); }
 
 /* The projection toggle takes the cube stage's top-right corner. However the
    cube is turned its silhouette reaches less than half the way from the
@@ -1882,7 +1910,7 @@ input[type="checkbox"] {
   top: 0;
   display: grid;
   place-items: center;
-  width: 28px;
+  width: var(--control-md);
   height: var(--control-sm);
   padding: 0;
   background: var(--surface-float);
@@ -1906,10 +1934,10 @@ button.icon {
   padding: 0;
 }
 
-/* The eye is active exactly while its popover is open; it glows in the
-   current mode's accent rather than the default lime. */
+/* The eye is active exactly while its popover is open: the accent fill, the
+   same "this is current" block every other control uses. */
 .toolbar button.icon.active {
-  border-color: var(--accent-press);
+  border-color: var(--accent);
   background: var(--accent);
   color: var(--ink-on-accent);
 }
@@ -1994,7 +2022,7 @@ button.icon {
 .render-sdf {
   gap: var(--space-3);
   padding-top: var(--space-4);
-  border-top: 1px solid var(--divider);
+  border-top: var(--hairline) solid var(--divider);
 }
 
 .render-sdf .sim-legend-values {
@@ -2019,7 +2047,7 @@ button.icon {
 /* "Return to the real surface" — a text button rather than a switch, because
    it has one state worth naming and it is the value it returns to. */
 .render-sdf-zero {
-  height: var(--control-xs);
+  height: var(--control-sm);
   padding: 0 var(--space-3);
   font: var(--type-mono);
   letter-spacing: var(--tracking-sm);
@@ -2033,33 +2061,27 @@ button.icon {
   height: auto;
   min-width: 0;
   padding: var(--space-2);
-  border-color: transparent;
-  background: var(--surface-inset);
+  border-color: var(--rule);
+  background: var(--surface-float);
   text-align: left;
 }
 
 .render-preset-card:hover {
-  background: var(--surface-inset-hover);
+  background: var(--surface-bar-alt);
 }
 
 .render-preset-card.selected {
   border-color: var(--rule-strong);
 }
 
-.render-preset-card.active {
-  border-color: var(--accent-press);
-  background: rgba(var(--accent-rgb), var(--alpha-wash));
-}
-
-.render-preset-card.active::after {
-  position: absolute;
-  top: var(--space-4);
-  right: var(--space-4);
-  width: var(--space-3);
-  height: var(--space-3);
-  border-radius: 50%;
-  background: var(--accent-press);
-  content: "";
+/* The preset in use: the accent block behind its name, as on the material
+   cards. No edge and no dot: the accent is only ever a fill under type. */
+.render-preset-card.active strong {
+  margin: 0 calc(var(--space-2) * -1);
+  padding: var(--space-1) var(--space-2);
+  background: var(--accent);
+  color: var(--ink-on-accent);
+  font-weight: var(--weight-bold);
 }
 
 /* @artwork — the three preset thumbnails are pictures of render modes. */
@@ -2069,7 +2091,7 @@ button.icon {
   height: 43px;
   margin-bottom: 6px;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.055);
+  border: var(--hairline) solid rgba(255, 255, 255, 0.055);
   background:
     linear-gradient(160deg, rgba(255, 255, 255, 0.055), transparent 52%),
     #0b0e0c;
@@ -2095,12 +2117,12 @@ button.icon {
   bottom: 5px;
   left: 8px;
   height: 8px;
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  border-top: var(--hairline) solid rgba(255, 255, 255, 0.12);
   transform: skewX(-28deg);
 }
 
 .render-preset-card[data-preset="xray"] .render-preset-preview i:first-child {
-  border: 1px solid rgba(217, 255, 87, 0.8);
+  border: var(--hairline) solid rgba(217, 255, 87, 0.8);
   background:
     linear-gradient(90deg, transparent 47%, rgba(217, 255, 87, 0.55) 50%, transparent 53%),
     linear-gradient(transparent 47%, rgba(217, 255, 87, 0.55) 50%, transparent 53%),
@@ -2115,7 +2137,7 @@ button.icon {
 }
 
 .render-preset-card[data-preset="wire"] .render-preset-preview i:first-child {
-  border: 1px solid #78c6e7;
+  border: var(--hairline) solid #78c6e7;
   background:
     linear-gradient(45deg, transparent 48%, rgba(120, 198, 231, 0.7) 50%, transparent 52%),
     linear-gradient(-45deg, transparent 48%, rgba(120, 198, 231, 0.7) 50%, transparent 52%);
@@ -2155,8 +2177,8 @@ button.icon {
   gap: var(--space-4);
   height: var(--control-lg);
   padding: 0 var(--space-4);
-  border-color: transparent;
-  background: var(--surface-inset);
+  border-color: var(--rule-strong);
+  background: var(--surface-float);
   text-align: left;
 }
 
@@ -2196,7 +2218,7 @@ button.icon {
   flex-direction: column;
   gap: var(--space-5);
   padding-top: var(--space-5);
-  border-top: 1px solid var(--divider);
+  border-top: var(--hairline) solid var(--divider);
 }
 
 .render-preset-actions {
@@ -2216,7 +2238,7 @@ button.icon {
 }
 
 .render-preset-actions button {
-  height: var(--control-xs);
+  height: var(--control-sm);
   padding: 0 var(--space-3);
   font-size: var(--text-3xs);
 }
@@ -2224,7 +2246,7 @@ button.icon {
 .segmented {
   display: flex;
   padding: var(--space-1);
-  border: 1px solid var(--rule);
+  border: var(--hairline) solid var(--rule);
   background: var(--surface-float);
 }
 
@@ -2262,7 +2284,7 @@ button.icon {
 }
 
 .switch:hover {
-  background: var(--surface-inset-hover);
+  background: var(--surface-bar-alt);
 }
 
 .switch input {
@@ -2287,10 +2309,10 @@ button.icon {
 .annotation-options {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 1px;
+  gap: 0;
   margin-left: var(--space-7);
   padding-left: var(--space-3);
-  border-left: 1px solid var(--divider);
+  border-left: var(--hairline) solid var(--divider);
 }
 
 .annotation-options.disabled {
@@ -2308,7 +2330,7 @@ button.icon {
 
 .selection-chip {
   padding: var(--space-1) var(--space-4);
-  border: 1px solid var(--rule-strong);
+  border: var(--hairline) solid var(--rule-strong);
   color: var(--ink);
   font: var(--weight-semibold) var(--text-xs) / var(--leading-snug)
     var(--font-mono);
@@ -2347,14 +2369,13 @@ button.icon {
 }
 
 /* Stopped while working — a compile somebody cancelled, so the view is older
-   than the code. It takes the one tone the accent family is allowed to draw a
-   *mark* in (--accent-press, 3.36:1 on paper, where --accent itself measures
-   2.26:1 and may only ever be a ground), because it belongs to the compile
-   pipeline; and it is still rather than pulsing, because nothing is running.
-   There is no `busy` status: while work is in flight the status line is
-   silent and the toolbar's chip is the one indicator. */
+   than the code. That is a warning, so it takes the warn tone: the accent
+   family never draws a mark, only a fill under type. It is still rather than
+   pulsing, because nothing is running. There is no `busy` status: while work
+   is in flight the status line is silent and the toolbar's chip is the one
+   indicator. */
 .status.stale .dot {
-  background: var(--accent-press);
+  background: var(--warn);
 }
 
 /* The running-work chip, beside the mode switcher ---------------------- */
@@ -2365,13 +2386,13 @@ button.icon {
    whole thing is ink on paper apart from the dot — a chip that changed colour
    would compete with the status line for the same job. */
 /* The border is the chip's, so the buttons inside it come out two pixels
-   short of a control unless the box is two pixels taller — and a button that
-   is 24px next to the panels' 26px reads as sloppy rather than deliberate. */
+   short of a control unless the box is two hairlines taller. */
+
 .job-chip {
   display: flex;
   align-items: stretch;
-  height: calc(var(--control-sm) + 2px);
-  border: 1px solid var(--rule);
+  height: calc(var(--control-sm) + var(--hairline) * 2);
+  border: var(--hairline) solid var(--rule);
   animation: pop-in var(--dur-base) var(--ease);
 }
 
@@ -2401,7 +2422,7 @@ button.icon {
 .job-chip-cancel {
   width: var(--control-sm);
   padding: 0;
-  border-left: 1px solid var(--rule);
+  border-left: var(--hairline) solid var(--rule);
   font-size: var(--text-sm);
 }
 
@@ -2495,8 +2516,8 @@ button.icon {
 .editor-collapse {
   display: grid;
   place-items: center;
-  width: var(--control-xs);
-  height: var(--control-xs);
+  width: var(--control-sm);
+  height: var(--control-sm);
   padding: 0;
   border-color: transparent;
   background: transparent;
@@ -2521,7 +2542,7 @@ button.icon {
   /* The source is authoritative. Keep it above any viewer/tool popover that
      grows across the pane boundary on a narrow window. */
   z-index: 30;
-  border-right: 1px solid var(--rule);
+  border-right: var(--hairline) solid var(--rule);
   background: var(--surface-panel);
 }
 
@@ -2530,9 +2551,9 @@ button.icon {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
-  height: 38px;
+  height: calc(var(--unit) * 10);
   padding: 0 var(--space-5);
-  border-bottom: 1px solid var(--rule);
+  border-bottom: var(--hairline) solid var(--rule);
 }
 
 .pane-title {
@@ -2569,7 +2590,7 @@ button.icon {
   margin: 0;
   padding: var(--space-4) var(--space-5);
   overflow: auto;
-  border-top: 1px solid var(--rule);
+  border-top: var(--hairline) solid var(--rule);
   background: var(--surface-bar);
   color: var(--danger-ink);
   font: var(--weight-regular) var(--text-sm) / var(--leading-normal)
@@ -2592,7 +2613,7 @@ button.icon {
   position: absolute;
   inset: 0;
   z-index: 6;
-  border: 1px solid var(--rule-heavy);
+  border: var(--hairline) solid var(--rule-heavy);
   pointer-events: none;
 }
 
@@ -2605,9 +2626,10 @@ button.icon {
   touch-action: none;
 }
 
+/* A drop target is "not yet": dashed, at the active weight while armed. */
 .viewer-canvas.material-drop-active {
-  outline: 2px solid var(--viewport-ink);
-  outline-offset: -7px;
+  outline: var(--stroke-active) dashed var(--viewport-ink);
+  outline-offset: calc(var(--unit) * -2);
 }
 
 /* The gain readout: what one graticule division is worth, and where the
@@ -2617,7 +2639,7 @@ button.icon {
 .graticule-gain {
   position: absolute;
   top: var(--space-5);
-  left: 62px;
+  left: calc(var(--unit) * 16);
   z-index: 5;
   display: flex;
   /* Every cell is given the same line box, so centring them also lands their
@@ -2657,7 +2679,7 @@ button.icon {
    what it states is a property of the slice — but the interval it states is
    the floor grid's, which is the point. */
 .graticule-contour {
-  top: 32px;
+  top: calc(var(--unit) * 8);
 }
 
 /* A paper plate under a readout that is standing on data.
@@ -2668,13 +2690,13 @@ button.icon {
 .graticule-gain.plated {
   padding: var(--space-1) var(--space-3);
   background: var(--surface-viewport);
-  outline: 1px solid var(--rule);
+  outline: var(--hairline) solid var(--rule);
 }
 
 .sdf-key {
   padding: var(--space-2) var(--space-3);
   background: var(--surface-viewport);
-  outline: 1px solid var(--rule);
+  outline: var(--hairline) solid var(--rule);
 }
 
 /* The slice's key: the ramp itself, with the value at each end.
@@ -2683,10 +2705,10 @@ button.icon {
    functions of the camera. */
 .sdf-key {
   position: absolute;
-  top: 58px;
-  left: 62px;
+  top: calc(var(--unit) * 14);
+  left: calc(var(--unit) * 16);
   z-index: 5;
-  width: 200px;
+  width: calc(var(--unit) * 50);
   pointer-events: none;
 }
 
@@ -2694,7 +2716,7 @@ button.icon {
    draws with; only the box is described here. */
 .sdf-key-ramp {
   height: var(--text-2xs);
-  border: 1px solid var(--rule);
+  border: var(--hairline) solid var(--rule);
 }
 
 .sdf-key-values {
@@ -2715,13 +2737,13 @@ button.icon {
   position: absolute;
   /* Inside the drawing frame, not on it: the corner brackets reach 36px in
      from each edge, and a title block belongs within the border it labels. */
-  right: 40px;
-  bottom: 40px;
+  right: calc(var(--unit) * 10);
+  bottom: calc(var(--unit) * 10);
   z-index: 5;
   display: grid;
-  grid-template-columns: 62px 136px;
+  grid-template-columns: calc(var(--unit) * 16) calc(var(--unit) * 34);
   margin: 0;
-  border: 1px solid var(--rule-heavy);
+  border: var(--hairline) solid var(--rule-heavy);
   background: var(--surface-viewport);
   pointer-events: none;
 }
@@ -2738,7 +2760,7 @@ button.icon {
 /* Same two cells as the gain readout, on the same 12px line box: two labels
    of one instrument should not be two type variants. */
 .title-block dt {
-  border-right: 1px solid var(--rule);
+  border-right: var(--hairline) solid var(--rule);
   color: var(--viewport-ink-2);
   font: var(--type-kicker);
   line-height: var(--text-sm);
@@ -2755,7 +2777,7 @@ button.icon {
 
 .title-block dt:nth-of-type(n + 2),
 .title-block dd:nth-of-type(n + 2) {
-  border-top: 1px solid var(--rule);
+  border-top: var(--hairline) solid var(--rule);
 }
 
 /* The hint bar is left alone: the title block sits 40px up from the bottom
@@ -2803,12 +2825,12 @@ button.icon {
   gap: var(--space-4);
   flex: 0 0 auto;
   padding: var(--space-4) var(--space-3) var(--space-3) var(--space-5);
-  background: var(--surface-float-96);
+  background: var(--surface-float);
 }
 
 .properties-follow {
   padding: var(--space-1) var(--space-2);
-  border: 1px solid var(--rule);
+  border: var(--hairline) solid var(--rule);
   background: transparent;
   color: var(--ink-2);
   font: var(--type-kicker);
@@ -2829,7 +2851,7 @@ button.icon {
 }
 
 .properties-section + .properties-section {
-  border-top: 1px solid var(--rule);
+  border-top: var(--hairline) solid var(--rule);
   padding-top: var(--space-4);
 }
 
@@ -2841,15 +2863,18 @@ button.icon {
   font: inherit;
 }
 
+/* The element's kind is a label of kind: inverse ink. */
 .properties-section h3 small {
+  padding: var(--space-1) var(--space-2);
+  background: var(--ink);
+  color: var(--surface-float);
   font: var(--type-kicker);
-  color: var(--ink-2);
-  letter-spacing: 0.06em;
+  letter-spacing: var(--tracking-3xs);
   text-transform: uppercase;
 }
 
 .properties-section h3 b {
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
 }
 
 .properties-section h3 i {
@@ -2861,7 +2886,7 @@ button.icon {
 
 .properties-row {
   display: grid;
-  grid-template-columns: 72px 1fr;
+  grid-template-columns: calc(var(--unit) * 18) 1fr;
   align-items: center;
   gap: var(--space-2);
   margin-bottom: var(--space-2);
@@ -2880,7 +2905,7 @@ button.icon {
 }
 
 .properties-vector {
-  grid-template-columns: 72px 1fr 1fr 1fr;
+  grid-template-columns: calc(var(--unit) * 18) 1fr 1fr 1fr;
 }
 
 .properties-parameter {
@@ -2889,21 +2914,24 @@ button.icon {
   color: var(--ink-2);
 }
 
+/* A read-only expression is "not yet" a value: a dashed edge, no fill. */
 .properties-readonly code {
   overflow: hidden;
+  padding: 0 var(--space-3);
+  border: var(--hairline) dashed var(--rule);
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--ink-2);
   font: var(--type-mono);
+  line-height: calc(var(--control-sm) - var(--hairline) * 2);
 }
 
 .object-tree-row.boolean .tree-label {
   color: var(--ink-2);
 }
 
-/* Sketch-plane name tags: DOM text at the frame's +u,+v corner, in the same
-   cool ink the GPU draws the frame with, so the tag reads as part of the
-   plane and not as a second annotation about it. */
+/* Sketch-plane name tags: DOM text at the frame's +u,+v corner, in viewport
+   ink. A plane is not a free parameter, so it carries no hue. */
 .plane-labels {
   position: absolute;
   inset: 0;
@@ -2914,28 +2942,28 @@ button.icon {
 
 .plane-label {
   position: absolute;
-  transform: translate(4px, -100%);
-  padding: 1px var(--space-2);
-  border: 1px solid rgba(51, 96, 143, 0.55);
-  border-radius: 2px;
-  background: rgba(230, 230, 233, 0.82);
-  color: var(--info-ink);
+  transform: translate(var(--unit), -100%);
+  padding: var(--space-1) var(--space-2);
+  border: var(--hairline) solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--surface-viewport-94);
+  color: var(--viewport-ink);
   font: var(--type-kicker);
   line-height: var(--leading-tight);
-  letter-spacing: 0.04em;
+  letter-spacing: var(--tracking-lg);
   white-space: nowrap;
   cursor: pointer;
   pointer-events: auto;
 }
 
 .plane-label:hover {
-  background: rgba(51, 96, 143, 0.12);
+  background: var(--surface-float);
 }
 
 .plane-label.derived {
   border-style: dashed;
-  color: var(--ink-3);
-  border-color: rgba(90, 90, 96, 0.5);
+  color: var(--viewport-ink-2);
+  border-color: var(--rule);
 }
 
 .plane-label.preview {
@@ -2971,7 +2999,7 @@ button.icon {
   paint-order: stroke fill;
   font: var(--type-mono-strong);
   line-height: var(--leading-flat);
-  letter-spacing: 0.03em;
+  letter-spacing: var(--tracking-lg);
   text-anchor: middle;
 }
 
@@ -2997,7 +3025,7 @@ button.icon {
   position: absolute;
   right: var(--space-5);
   bottom: var(--space-5);
-  left: 62px;
+  left: calc(var(--unit) * 16);
   z-index: 5;
   margin: 0;
   overflow: hidden;
@@ -3016,10 +3044,10 @@ button.icon {
    picture. */
 .viewer-pane.sdf-data .viewer-hint {
   left: auto;
-  max-width: calc(100% - 74px);
+  max-width: calc(100% - var(--unit) * 19);
   padding: var(--space-1) var(--space-3);
   background: var(--surface-viewport);
-  outline: 1px solid var(--rule);
+  outline: var(--hairline) solid var(--rule);
 }
 
 /* Active editing mode, leading the hint bar: a stamped block. The word is the
@@ -3043,13 +3071,13 @@ button.icon {
 
 .viewer-error {
   position: absolute;
-  bottom: 40px;
+  bottom: calc(var(--unit) * 10);
   right: var(--space-5);
-  left: 62px;
+  left: calc(var(--unit) * 16);
   z-index: 12;
   padding: var(--space-5);
-  border: 1px solid rgba(var(--danger-rgb), var(--alpha-edge));
-  background: var(--surface-float-96);
+  border: var(--hairline) solid rgba(var(--danger-rgb), var(--alpha-edge));
+  background: var(--surface-float);
   color: var(--danger-ink);
   font-size: var(--text-sm);
   animation: rise-in var(--dur-slow) var(--ease);
@@ -3078,9 +3106,9 @@ button.icon {
   /* Without min-height the flex item takes its content's full height, and a
      shader thousands of lines long pushes the whole dialog off screen. */
   min-height: 0;
-  width: min(880px, calc(100% - 48px));
-  height: min(680px, calc(100% - 48px));
-  border: 1px solid var(--rule-strong);
+  width: min(calc(var(--unit) * 220), calc(100% - var(--unit) * 12));
+  height: min(calc(var(--unit) * 170), calc(100% - var(--unit) * 12));
+  border: var(--hairline) solid var(--rule-strong);
   background: var(--surface-panel);
   animation: rise-in var(--dur-slow) var(--ease);
 }
@@ -3091,7 +3119,7 @@ button.icon {
   justify-content: space-between;
   gap: var(--space-4);
   padding: var(--space-5) var(--space-5) var(--space-5) var(--space-6);
-  border-bottom: 1px solid var(--rule);
+  border-bottom: var(--hairline) solid var(--rule);
   font-size: var(--text-md);
   font-weight: var(--weight-semibold);
 }
@@ -3109,9 +3137,9 @@ button.icon {
 /* Menu-bar dialogs (open, save-as, shortcuts) -------------------------- */
 
 .dialog-compact {
-  width: min(460px, calc(100% - 48px));
+  width: min(calc(var(--unit) * 115), calc(100% - var(--unit) * 12));
   height: auto;
-  max-height: min(580px, calc(100% - 48px));
+  max-height: min(calc(var(--unit) * 145), calc(100% - var(--unit) * 12));
 }
 
 .dialog-body {
@@ -3167,8 +3195,8 @@ button.icon {
 .save-as-form input[type="text"] {
   height: var(--control-md);
   padding: 0 var(--space-4);
-  border: 1px solid var(--rule);
-  background: var(--surface-raised);
+  border: var(--hairline) solid var(--rule-strong);
+  background: var(--surface-float);
   color: var(--ink);
   font: var(--weight-semibold) var(--text-sm) / var(--leading-flat)
     var(--font-mono);
@@ -3220,9 +3248,8 @@ button.icon {
 .shortcut-groups kbd {
   flex: 0 0 auto;
   padding: var(--space-1) var(--space-3);
-  border: 1px solid var(--rule);
-  border-bottom-width: 2px;
-  background: var(--surface-raised);
+  border: var(--hairline) solid var(--rule-strong);
+  background: var(--surface-float);
   color: var(--ink);
   font: var(--type-mono-strong);
   white-space: nowrap;
@@ -3269,7 +3296,7 @@ button.icon {
 }
 .sim-row input[type="number"],
 .sim-row select {
-  width: 76px;
+  width: calc(var(--unit) * 19);
 }
 .sim-help {
   margin: 0;
@@ -3291,8 +3318,8 @@ button.icon {
   flex-direction: column;
   gap: var(--space-3);
   padding: var(--space-4);
-  border: 1px solid var(--rule);
-  background: var(--surface-inset);
+  border: var(--hairline) solid var(--rule);
+  background: var(--surface-float);
 }
 .sim-study-head {
   display: flex;
@@ -3309,31 +3336,27 @@ button.icon {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* Kind chips are taxonomy, not status: three tones drawn from the same
-   token set the rest of the chrome uses, never new hues. */
+/* Kind chips are taxonomy, not status and not *current*: every kind is the
+   same inverse-ink tag, and the word says which kind it is. The modifier
+   classes (thermal, elastic, mesh, opt) stay as hooks and add no hue. */
 .sim-kind {
   flex: 0 0 auto;
-  padding: var(--space-1) var(--space-3);
-  font: var(--type-kicker);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-/* Kind chips are filled cells, like every other taxonomy mark here: the ink
-   on them is near-black, never the chip's own hue at reading weight. */
-.sim-kind-thermal {
-  background: var(--accent);
-  color: var(--ink-on-accent);
-}
-.sim-kind-elastic {
-  background: var(--info);
+  display: inline-flex;
+  align-items: center;
+  height: var(--control-tag);
+  padding: 0 var(--space-2);
+  background: var(--ink);
   color: var(--surface-float);
+  font: var(--type-kicker);
+  letter-spacing: var(--tracking-3xs);
+  text-transform: uppercase;
 }
 .sim-delete {
   flex: 0 0 auto;
   display: grid;
   place-items: center;
-  width: var(--control-xs);
-  height: var(--control-xs);
+  width: var(--control-sm);
+  height: var(--control-sm);
   padding: 0;
   border-color: transparent;
   background: transparent;
@@ -3344,7 +3367,7 @@ button.icon {
   line-height: var(--leading-flat);
 }
 .sim-delete:hover:not(:disabled) {
-  border-color: rgba(var(--danger-rgb), var(--alpha-edge));
+  border-color: var(--danger);
   color: var(--danger-ink);
 }
 .sim-args {
@@ -3361,7 +3384,7 @@ button.icon {
   font-size: var(--text-2xs);
 }
 .sim-args input[type="number"] {
-  width: 72px;
+  width: calc(var(--unit) * 18);
 }
 .sim-bcs {
   margin: 0;
@@ -3381,11 +3404,16 @@ button.icon {
   gap: var(--space-3);
   min-width: 0;
   padding: var(--space-2) var(--space-3);
-  background: var(--surface-inset);
+  border: var(--hairline) solid var(--rule);
+  background: var(--surface-float);
   transition: background-color var(--dur-fast) var(--ease);
 }
 .sim-bcs li:hover {
-  background: var(--surface-inset-hover);
+  background: var(--surface-bar-alt);
+}
+/* A condition the code states as an expression: read-only, so dashed. */
+.sim-bcs li.sim-bc-readonly {
+  border-style: dashed;
 }
 .sim-bc-main {
   display: flex;
@@ -3411,10 +3439,10 @@ button.icon {
 }
 .sim-bcs li input[type="number"] {
   flex: 0 0 auto;
-  width: 56px;
+  width: calc(var(--unit) * 14);
 }
 .sim-bcs li .sim-vector input[type="number"] {
-  width: 40px;
+  width: calc(var(--unit) * 10);
 }
 /* A boundary condition's cell is a stack — type over selection — so the
    controls beside it follow the panel headers' rule: full height for the
@@ -3459,7 +3487,7 @@ button.icon {
   flex-direction: column;
   gap: var(--space-3);
   padding: var(--space-3);
-  border: 1px dashed var(--rule-strong);
+  border: var(--hairline) dashed var(--rule-strong);
   animation: rise-in var(--dur-base) var(--ease);
 }
 .sim-builder-row {
@@ -3481,7 +3509,7 @@ button.icon {
   gap: var(--space-2);
 }
 .sim-sides button {
-  height: var(--control-xs);
+  height: var(--control-sm);
   min-width: 0;
   padding: 0;
   font: var(--type-mono-strong);
@@ -3504,7 +3532,7 @@ button.icon {
   flex: 0 0 auto;
   text-transform: none;
   letter-spacing: normal;
-  width: 66px;
+  width: calc(var(--unit) * 17);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -3531,7 +3559,7 @@ button.icon {
 }
 .sim-run {
   height: var(--control-md);
-  border-color: var(--accent-press);
+  border-color: var(--accent);
   background: var(--accent);
   color: var(--ink-on-accent);
   font-size: var(--text-sm);
@@ -3553,7 +3581,7 @@ button.icon {
    panel, so the chrome around it stays neutral. */
 .sim-ramp {
   height: var(--text-2xs);
-  border: 1px solid var(--divider);
+  border: var(--hairline) solid var(--divider);
 }
 .sim-legend-values {
   display: flex;
@@ -3582,7 +3610,7 @@ button.icon {
 
 .sim-slice input[type="range"] {
   flex: 1;
-  min-width: 60px;
+  min-width: calc(var(--unit) * 15);
   accent-color: var(--ink);
 }
 .sim-slice-toggle {
@@ -3606,12 +3634,7 @@ button.icon {
 /* ── Optimize panel (a Model-mode dock section) ────────────────────────── */
 
 .dock .optimize-panel {
-  min-height: 118px;
-}
-
-.opt-kind {
-  background: var(--accent);
-  color: var(--ink-on-accent);
+  min-height: calc(var(--unit) * 30);
 }
 
 .opt-objective {
@@ -3643,15 +3666,16 @@ button.icon {
   gap: var(--space-4);
   min-width: 0;
   padding: var(--space-1) var(--space-3);
-  background: var(--surface-inset);
+  background: var(--surface-bar-alt);
   font-size: var(--text-2xs);
 }
 
+/* These are the run's free parameters: the one thing the param hue means. */
 .opt-parameters code {
   flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
-  color: var(--ink-2);
+  color: var(--param-ink);
   font: var(--type-mono-strong);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -3680,17 +3704,18 @@ button.icon {
 .opt-spark svg {
   display: block;
   width: 100%;
-  height: 44px;
-  border: 1px solid var(--rule);
-  background: var(--surface-inset);
+  height: calc(var(--unit) * 11);
+  border: var(--hairline) solid var(--rule);
+  background: var(--surface-float);
 }
 
+/* The objective's trace is ink: the accent is a fill and never a line. */
 .opt-spark polyline {
   fill: none;
-  stroke: var(--mode-accent, var(--accent));
-  stroke-width: 1.6;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+  stroke: var(--ink);
+  stroke-width: 1.5;
+  stroke-linecap: square;
+  stroke-linejoin: miter;
   vector-effect: non-scaling-stroke;
 }
 
@@ -3725,15 +3750,15 @@ button.icon {
   flex: 0 0 auto;
   display: grid;
   place-items: center;
-  width: var(--control-xs);
-  height: var(--control-xs);
+  width: var(--control-sm);
+  height: var(--control-sm);
   padding: 0;
   font-size: var(--text-2xs);
 }
 
 .opt-player input[type="range"] {
   flex: 1;
-  min-width: 50px;
+  min-width: calc(var(--unit) * 12);
   accent-color: var(--ink);
 }
 
@@ -3775,13 +3800,13 @@ button.icon {
   position: relative;
   height: var(--space-3);
   overflow: hidden;
-  background: var(--surface-inset-hover);
+  background: var(--surface-bar-alt);
 }
 
 .opt-progress i {
   display: block;
   height: 100%;
-  background: var(--mode-accent, var(--accent));
+  background: var(--ink);
   transition: width var(--dur-slow) var(--ease);
 }
 
@@ -3850,17 +3875,13 @@ button.icon {
 
 .sim-add-inline {
   flex: 0 0 auto;
-  height: var(--control-xs);
+  height: var(--control-sm);
   padding: 0 var(--space-4);
   border-style: dashed;
   color: var(--ink-2);
   font-size: var(--text-2xs);
 }
 
-.sim-kind-mesh {
-  background: rgba(var(--ok-rgb), var(--alpha-tint-strong));
-  color: var(--ok);
-}
 
 .sim-inspect {
   display: flex;
@@ -3886,9 +3907,9 @@ button.icon {
 .sim-histogram {
   display: block;
   width: 100%;
-  height: 42px;
-  border: 1px solid var(--rule);
-  background: var(--surface-inset);
+  height: calc(var(--unit) * 10);
+  border: var(--hairline) solid var(--rule);
+  background: var(--surface-float);
 }
 
 .sim-histogram rect {
@@ -3913,14 +3934,14 @@ button.icon {
   color: var(--ink-3);
   font-weight: var(--weight-semibold);
   padding: var(--space-1) var(--space-2);
-  border-bottom: 1px solid var(--rule);
+  border-bottom: var(--hairline) solid var(--rule);
 }
 
 .sim-field-table td {
   padding: var(--space-1) var(--space-2);
   color: var(--ink-2);
   font: var(--type-mono);
-  border-bottom: 1px solid var(--divider);
+  border-bottom: var(--hairline) solid var(--divider);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -3932,7 +3953,7 @@ button.icon {
 
 .sim-deform input[type="range"] {
   flex: 1;
-  min-width: 50px;
+  min-width: calc(var(--unit) * 12);
   accent-color: var(--ink);
 }
 
@@ -3969,7 +3990,7 @@ button.icon {
 }
 
 .sim-pick {
-  height: var(--control-xs);
+  height: var(--control-sm);
   font-size: var(--text-2xs);
 }
 
@@ -3977,7 +3998,7 @@ button.icon {
 .bc-pick-rect {
   position: absolute;
   z-index: 6;
-  border: 1px dashed rgba(var(--viewport-accent-rgb, var(--viewport-mode-rgb)), var(--alpha-mark));
+  border: var(--hairline) dashed rgba(var(--viewport-accent-rgb, var(--viewport-mode-rgb)), var(--alpha-mark));
   background: rgba(var(--viewport-accent-rgb, var(--viewport-mode-rgb)), var(--alpha-tint));
   pointer-events: none;
 }
@@ -3986,13 +4007,13 @@ button.icon {
 .sim-probe {
   position: absolute;
   z-index: 7;
-  transform: translate(10px, -100%);
+  transform: translate(calc(var(--unit) * 2), -100%);
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
   padding: var(--space-2) var(--space-4);
-  border: 1px solid var(--rule);
-  background: var(--surface-float-96);
+  border: var(--hairline) solid var(--rule);
+  background: var(--surface-float);
   pointer-events: none;
   font-size: var(--text-2xs);
   animation: fade-in var(--dur-fast) var(--ease);
@@ -4029,7 +4050,7 @@ button.icon {
   display: flex;
   gap: var(--space-1);
   padding: var(--space-1);
-  border: 1px solid var(--rule);
+  border: var(--hairline) solid var(--rule);
   background: var(--surface-float);
 }
 
@@ -4066,7 +4087,13 @@ button.icon {
   right: var(--space-1);
   width: var(--space-2);
   height: var(--space-2);
-  background: var(--mode-accent, var(--accent));
+  background: var(--ink);
+}
+
+/* On the active tab the mark sits on the accent fill, so it takes that
+   fill's ink. */
+.sim-tabs button.active .sim-tab-badge {
+  background: var(--ink-on-accent);
 }
 
 .sim-help {
@@ -4081,11 +4108,11 @@ button.icon {
 
 .sim-probe-row {
   padding: var(--space-2) var(--space-3);
-  background: var(--surface-inset);
+  background: var(--surface-bar-alt);
 }
 
 .opt-parameters-toggle {
-  height: var(--control-xs);
+  height: var(--control-sm);
   border: none;
   background: transparent;
   color: var(--ink-3);
@@ -4107,8 +4134,8 @@ button.icon {
 }
 
 .opt-spark .opt-cursor-point {
-  fill: var(--mode-accent, var(--accent));
-  stroke: var(--shade-strong);
+  fill: var(--ink);
+  stroke: var(--surface-float);
   stroke-width: 1;
 }
 
@@ -4132,13 +4159,13 @@ button.icon {
 .dialog pre {
   background:
     linear-gradient(var(--surface-float), var(--surface-float-00)) local top /
-      100% 16px no-repeat,
+      100% var(--space-6) no-repeat,
     linear-gradient(var(--surface-float-00), var(--surface-float)) local bottom /
-      100% 16px no-repeat,
+      100% var(--space-6) no-repeat,
     linear-gradient(var(--shade-scroll), var(--shade-none)) scroll top / 100%
-      20px no-repeat,
+      calc(var(--unit) * 5) no-repeat,
     linear-gradient(var(--shade-none), var(--shade-scroll)) scroll bottom / 100%
-      20px no-repeat,
+      calc(var(--unit) * 5) no-repeat,
     var(--scroll-base, transparent);
 }
 
@@ -4147,7 +4174,7 @@ button.icon {
 .material-panel,
 .sim-panel,
 .sketch-panel {
-  --scroll-base: var(--surface-float-90);
+  --scroll-base: var(--surface-float);
 }
 
 .dialog-body,
@@ -4161,7 +4188,7 @@ button.icon {
 .sim-panel > .sim-tabs {
   position: sticky;
   z-index: 3;
-  background: var(--surface-float-96);
+  background: var(--surface-float);
 }
 
 .sim-panel > header {
@@ -4171,7 +4198,7 @@ button.icon {
 }
 
 .sim-panel > .sim-tabs {
-  top: 44px;
+  top: calc(var(--unit) * 11);
 }
 
 /* ── motion primitives ─────────────────────────────────────────────────── */

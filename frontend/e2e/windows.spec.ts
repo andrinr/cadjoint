@@ -327,7 +327,9 @@ test("the viewer canvas survives everything the dock does to it", async ({ page 
 test("the Window menu floats a window, docks it again, and resets the layout", async ({
   page,
 }) => {
-  const float = () => page.getByTestId("menu-window-float-objects");
+  // Window › Float acts on the focused window: click into Objects first.
+  const float = () => page.getByTestId("menu-window-float");
+  await page.getByTestId("window-tab-objects").click();
   await page.getByTestId("menu-window").click();
   await expect(float()).toHaveAttribute("aria-checked", "false");
   await float().click();

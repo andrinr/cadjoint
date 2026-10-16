@@ -22,6 +22,7 @@ import {
   type View,
 } from "./math";
 import { projectPoint } from "./math";
+import { AXIS_RGB } from "../tokens";
 
 export type AxisIndex = 0 | 1 | 2;
 
@@ -32,15 +33,13 @@ export const AXES: Vec3[] = [
 ];
 
 /**
- * Crisp CAD axis colours: X red, Y green, Z blue — at the weight the paper
- * viewport needs. Against `#e6e6e9` they measure 3.44 / 3.44 / 3.45; the
- * green this replaces (`#4dcc66`) measured 1.84 and read as a pale smear.
+ * World X, Y, Z: the `axis-x/y/z` tokens, the one direction set the gizmo and
+ * the view-cube triad share. Direction is one of the two things allowed a hue
+ * inside the viewport (C7); tokens.ts holds the measured contrasts.
  */
-export const AXIS_COLORS: [number, number, number][] = [
-  [0.922, 0.153, 0.247],
-  [0.118, 0.553, 0.224],
-  [0.192, 0.451, 0.961],
-];
+export const AXIS_COLORS: [number, number, number][] = AXIS_RGB.map(
+  (rgb) => [rgb[0], rgb[1], rgb[2]] as [number, number, number],
+);
 
 const RING_SEGMENTS = 40;
 

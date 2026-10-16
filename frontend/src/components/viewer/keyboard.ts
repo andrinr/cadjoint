@@ -14,31 +14,40 @@
 
 import {
   bcPickArmed,
-  cycleMode,
   editingMode,
   nodeById,
   pendingLoft,
   selection,
   setBcPickArmed,
   setEditingMode,
-  setGizmoMode,
   setPendingLoft,
   setSelection,
-  setSelectionMode,
   setSimProbe,
   setTool,
   simProbe,
   tool,
 } from "../../state";
-import { VIEWER_TOOL_KEYS, type ViewerToolAction } from "../../shortcuts";
+import { matchShortcut } from "../../shortcuts";
+import { runCommand } from "../../shell/commands";
 import { escapeLevel } from "./escape";
 import type { ViewerPaneProps } from "./props";
 
-/** True while focus is in the code editor or another text surface. */
+/**
+ * True while focus is in the code editor or another field that takes keys.
+ *
+ * A number box, a select and a text input own their letters, digits,
+ * Backspace and space as much as the editor does: B typed into a file name
+ * is a B, not a box.
+ */
 function isTypingTarget(): boolean {
-  const target = document.activeElement;
+  const target = document.activeElement as HTMLElement | null;
   return Boolean(
-    target && (target.tagName === "TEXTAREA" || target.closest(".cm-editor")),
+    target &&
+      (target.tagName === "TEXTAREA" ||
+        target.tagName === "INPUT" ||
+        target.tagName === "SELECT" ||
+        target.isContentEditable ||
+        target.closest(".cm-editor")),
   );
 }
 
@@ -99,25 +108,17 @@ export function createViewerKeyboard(context: ViewerKeyboardContext) {
         }
       }
     }
-    if (!typing && !event.metaKey && !event.ctrlKey && !event.altKey) {
-      // Key→action table shared with the Help dialog (src/shortcuts.ts).
-      // Placement shortcuts for solid primitives imply model mode, so the
-      // keys keep working from any mode without leaving a hidden tool armed.
-      const actions: Record<ViewerToolAction, () => void> = {
-        "select-object": () => (setTool("select"), setSelectionMode("object")),
-        "select-vertex": () => (setTool("select"), setSelectionMode("vertex")),
-        "tool-polygon": () => setTool("polygon"),
-        "tool-box": () => (setEditingMode("model"), setTool("box")),
-        "tool-sphere": () => (setEditingMode("model"), setTool("sphere")),
-        "tool-cylinder": () => (setEditingMode("model"), setTool("cylinder")),
-        "gizmo-translate": () => setGizmoMode("translate"),
-        "gizmo-rotate": () => setGizmoMode("rotate"),
-        "cycle-mode": () => cycleMode(event.shiftKey ? -1 : 1),
-      };
-      const action = VIEWER_TOOL_KEYS[event.key.toLowerCase()];
-      if (action) {
+    if (!typing) {
+      // The bare-key table shared with the menu bar and the Help sheet
+      // (src/shortcuts.ts); each key runs its command through the registry,
+      // so K here and Create › Sketch are one call. Placement keys for solid
+      // primitives imply model mode, so they keep working from any mode
+      // without leaving a hidden tool armed (see shell/toolActions.ts).
+      const shortcut = matchShortcut(event, "viewport");
+      if (shortcut) {
         event.preventDefault();
-        actions[action]();
+        runCommand(shortcut.command);
+        return;
       }
     }
     const active = selection();

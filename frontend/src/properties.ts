@@ -144,3 +144,25 @@ export function runtimePlaneRows(
   }
   return rows;
 }
+
+/**
+ * The source line a material field should assign at, for a section that has
+ * no `material=` argument of its own yet — or null when none should show.
+ *
+ * Dropping a swatch on an object sends `assign_material` for the picked
+ * node's line; the field is the keyboard-and-selection way to the same patch,
+ * so it is offered exactly where the drop would land: the section built by
+ * the selected, editable node. A section that already carries a material
+ * argument edits that argument instead (its own row), so it gets no second
+ * field.
+ */
+export function materialTargetLine(
+  elements: readonly ConstructionElement[],
+  node: ConstructionNode | undefined,
+  element: ConstructionElement,
+): number | null {
+  if (!node?.editable || node.line === null) return null;
+  if (elementForNode(elements, node)?.id !== element.id) return null;
+  if (element.arguments.some((argument) => argument.patch?.op === "assign_material")) return null;
+  return node.line;
+}

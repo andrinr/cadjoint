@@ -1,42 +1,57 @@
 /**
- * The window-level keys the shell owns, as opposed to the viewport's.
+ * The window-level ⌘ keys the shell owns, as opposed to the viewport's.
  *
- * Two rules, both about staying out of the way: Ctrl/Cmd+Z is undo/redo
- * everywhere *except* inside a text field, where CodeMirror's own history is
- * the right one; and Escape closes the WGSL dialog in the capture phase, so
- * the viewer's global Escape — which cancels one thing per press, down the
- * ladder in `components/viewer/escape.ts` — does not also fire underneath it.
+ * Every chord is a row of `shortcuts.ts` and runs its command through the
+ * registry (`commands.ts`), so ⌘S here and File › Save are the same call.
+ * Every matched chord is `preventDefault`ed — whether or not the command can
+ * run right now — so ⌘S never falls through to the browser's Save Page and
+ * ⌘O never to its file picker.
  *
- * Tool and mode keys are not here — they belong to the viewport and live in
- * `shortcuts.ts` with the Help dialog's table.
+ * Two keys stay out of the way of the code editor: ⌘Z / ⇧⌘Z are CodeMirror's
+ * own history inside any text field, and ⌘↵ inside the editor is the
+ * editor's own Run binding (so one press is one run). Escape closes the WGSL
+ * dialog in the capture phase, so the viewer's global Escape — which cancels
+ * one thing per press, down the ladder in `components/viewer/escape.ts` —
+ * does not also fire underneath it.
+ *
+ * Bare-key tool and mode shortcuts belong to the viewport and are dispatched
+ * from `components/viewer/keyboard.ts`, from the same table.
  */
 
 import { onCleanup, onMount, type Accessor } from "solid-js";
+import { matchShortcut } from "../shortcuts";
+import { runCommand } from "./commands";
 
 export interface ShellShortcutOptions {
-  undo: () => void;
-  redo: () => void;
   /** Whether the generated-WGSL dialog is open. */
   wgslOpen: Accessor<boolean>;
   closeWgsl: () => void;
 }
 
+/** Focus is in a text field or the code editor. */
+function typingTarget(): Element | null {
+  const target = document.activeElement;
+  if (!target) return null;
+  return target.tagName === "TEXTAREA" ||
+    target.tagName === "INPUT" ||
+    target.closest(".cm-editor")
+    ? target
+    : null;
+}
+
+/** Commands whose chord a text surface keeps for itself. */
+const TEXT_OWNS = new Set(["edit-undo", "edit-redo"]);
+
 export function createShellShortcuts(options: ShellShortcutOptions): void {
   onMount(() => {
-    // Undo/redo shortcuts, kept away from the editor: while typing there,
-    // CodeMirror's own history owns Ctrl/Cmd+Z. The menu items always work.
     const onKeyDown = (event: KeyboardEvent) => {
-      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "z") return;
-      const target = document.activeElement;
-      const typing =
-        target &&
-        (target.tagName === "TEXTAREA" ||
-          target.tagName === "INPUT" ||
-          target.closest(".cm-editor"));
-      if (typing) return;
+      const shortcut = matchShortcut(event, "app");
+      if (!shortcut) return;
+      const typing = typingTarget();
+      if (typing && TEXT_OWNS.has(shortcut.command)) return;
+      if (shortcut.command === "program-run" && typing?.closest(".cm-editor")) return;
       event.preventDefault();
-      if (event.shiftKey) options.redo();
-      else options.undo();
+      runCommand(shortcut.command);
     };
     window.addEventListener("keydown", onKeyDown);
     onCleanup(() => window.removeEventListener("keydown", onKeyDown));

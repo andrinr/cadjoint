@@ -34,7 +34,9 @@ import { ViewerPane } from "./components/ViewerPane";
 import { createCompileCycle } from "./shell/compileCycle";
 import { createPatchOperations } from "./shell/patchOperations";
 import { createRenderState } from "./shell/renderState";
+import { createAppCommands } from "./shell/appCommands";
 import { createShellShortcuts } from "./shell/shellShortcuts";
+import { fixSelectedPoint } from "./shell/toolActions";
 import { createSourceActions, createSourceHistory } from "./shell/sourceHistory";
 import { WindowLayout } from "./windows/WindowLayout";
 import type { WindowId } from "./windows/panels";
@@ -159,9 +161,38 @@ export function App() {
     example,
   });
 
-  createShellShortcuts({
+  /** Delete the selection: the rail's Delete, ⌫ and Edit › Delete. */
+  const deleteSelection = () => {
+    const active = selection();
+    const node = active && nodeById(active.nodeId);
+    if (!node?.editable || node.line === null) return;
+    if (active!.vertexIndex !== null) {
+      void ops.patch("delete_vertex", node.line, active!.vertexIndex);
+    } else {
+      void ops.deleteObject(node.line);
+    }
+    setSelection(null);
+  };
+
+  // Every command the menu bar and the keys reach, in one registry; the
+  // menu bar adds its own dialogs' commands when it mounts.
+  createAppCommands({
+    renderer,
+    render,
+    ops,
+    sim,
+    run: () => void compile.run(),
+    wgslReady: () => compile.wgsl() !== null,
+    showWgsl: () => setWgslOpen(true),
     undo: actions.undo,
     redo: actions.redo,
+    canUndo: history.canUndo,
+    canRedo: history.canRedo,
+    newScene: actions.newScene,
+    deleteSelection,
+  });
+
+  createShellShortcuts({
     wgslOpen,
     closeWgsl: () => setWgslOpen(false),
   });
@@ -263,19 +294,10 @@ export function App() {
             overlay={
               <>
                 <ToolRail
-                  onDelete={() => {
-                    const active = selection();
-                    const node = active && nodeById(active.nodeId);
-                    if (!node?.editable || node.line === null) return;
-                    if (active!.vertexIndex !== null) {
-                      void ops.patch("delete_vertex", node.line, active!.vertexIndex);
-                    } else {
-                      void ops.deleteObject(node.line);
-                    }
-                    setSelection(null);
-                  }}
+                  onDelete={deleteSelection}
                   onExtrude={ops.extrudeSelection}
                   onRevolve={ops.revolveSelection}
+                  onFix={() => fixSelectedPoint(ops.addConstraint)}
                 />
                 <ViewCube
                   yaw={cameraAngles().yaw}
@@ -313,6 +335,7 @@ export function App() {
           <PropertiesPanel
             onSetValue={ops.setValueAt}
             onAssignMaterial={ops.assignMaterialAt}
+            onAssignMaterialToLine={ops.assignMaterial}
           />
         );
 
@@ -330,25 +353,7 @@ export function App() {
       case "sketch":
         return (
           <SketchPanel
-            onFix={() => {
-              const active = selection();
-              const node = active && nodeById(active.nodeId);
-              if (
-                !node ||
-                node.kind !== "profile" ||
-                node.line === null ||
-                active!.vertexIndex === null
-              ) {
-                return;
-              }
-              const vertex = node.vertices[active!.vertexIndex];
-              void ops.addConstraint(
-                node.line,
-                "fixed",
-                [active!.vertexIndex],
-                vertex.uv,
-              );
-            }}
+            onFix={() => fixSelectedPoint(ops.addConstraint)}
             onSolve={(method, iterations) => {
               const active = selection();
               const node = active && nodeById(active.nodeId);
@@ -399,23 +404,9 @@ export function App() {
     // data-mode drives the per-mode accent variables in the stylesheet, so
     // the switcher, rail, dock, hint bar, and viewport border stay in step.
     <div class="app" data-mode={editingMode()}>
-      <MenuBar
-        canUndo={history.canUndo()}
-        canRedo={history.canRedo()}
-        onUndo={actions.undo}
-        onRedo={actions.redo}
-        onNew={actions.newScene}
-        onAdoptScene={actions.adoptScene}
-      />
+      <MenuBar />
       <Toolbar
         onRun={() => void compile.run()}
-        onReset={() => {
-          setSource(example());
-          setSelection(null);
-          void compile.run();
-        }}
-        onShowWgsl={() => setWgslOpen(true)}
-        wgslReady={compile.wgsl() !== null}
         render={{
           display: render.display(),
           presets: render.presets(),

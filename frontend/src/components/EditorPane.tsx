@@ -56,28 +56,29 @@ const highlightField = StateField.define<DecorationSet>({
  * the source pane and the panels around it are painted from one system, and
  * every one of them clears WCAG AA on --surface-panel.
  *
- * The mapping is deliberate rather than decorative. There is one accent in
- * this design and its only legal use is a fill behind near-black type, so
- * syntax cannot be painted with it: what is left is the status family, and it
- * is spent on the distinction the reader actually needs while editing a scene
- * — is this the language, or is it a value? Keywords take --info because they
- * are the language's own vocabulary, literals take --ok and --warn because
- * they are the numbers and strings the viewport tools rewrite, names that
- * denote a type take --danger, and comments drop to the muted ink every
- * de-emphasised label in the app uses.
+ * The mapping is achromatic, because hue is meaning and syntax has none to
+ * carry: a class name is not an error, a string is not a success and a number
+ * is not a warning. What the reader needs while editing a scene is the shape
+ * of the program, and weight and ink level give it — keywords semibold,
+ * strings and punctuation one ink step down, comments two steps down and
+ * italic, `self` italic. The accent stays out entirely except as the veil
+ * behind the span a viewport edit is rewriting.
  */
 const highlightStyle = HighlightStyle.define([
   { tag: tags.comment, color: "var(--ink-3)", fontStyle: "italic" },
-  { tag: tags.keyword, color: "var(--info)" },
-  { tag: [tags.controlKeyword, tags.moduleKeyword], color: "var(--info-ink)" },
-  { tag: [tags.string, tags.special(tags.string)], color: "var(--ok)" },
-  { tag: [tags.number, tags.bool, tags.null], color: "var(--warn)" },
-  { tag: [tags.className, tags.typeName, tags.namespace], color: "var(--danger)" },
+  {
+    tag: [tags.keyword, tags.controlKeyword, tags.moduleKeyword],
+    color: "var(--ink)",
+    fontWeight: "var(--weight-semibold)",
+  },
+  { tag: [tags.string, tags.special(tags.string)], color: "var(--ink-2)" },
+  { tag: [tags.number, tags.bool, tags.null], color: "var(--ink)" },
+  { tag: [tags.className, tags.typeName, tags.namespace], color: "var(--ink)" },
   { tag: tags.function(tags.variableName), color: "var(--ink)" },
   { tag: tags.definition(tags.variableName), color: "var(--ink)" },
-  { tag: tags.propertyName, color: "var(--ink-2)" },
+  { tag: tags.propertyName, color: "var(--ink)" },
   { tag: [tags.operator, tags.punctuation, tags.separator], color: "var(--ink-2)" },
-  { tag: tags.self, color: "var(--danger)", fontStyle: "italic" },
+  { tag: tags.self, color: "var(--ink)", fontStyle: "italic" },
 ]);
 
 const theme = EditorView.theme(
@@ -88,17 +89,17 @@ const theme = EditorView.theme(
       backgroundColor: "var(--surface-panel)",
     },
     ".cm-scroller": { fontFamily: "var(--font-mono)", lineHeight: "var(--leading-normal)" },
-    ".cm-content": { caretColor: "var(--mode-accent, var(--accent))" },
+    ".cm-content": { caretColor: "var(--ink)" },
     ".cm-gutters": {
       backgroundColor: "var(--surface-panel)",
       border: "none",
       color: "var(--ink-3)",
     },
-    ".cm-activeLine": { backgroundColor: "var(--surface-inset)" },
+    ".cm-activeLine": { backgroundColor: "var(--surface-bar-alt)" },
     ".cm-activeLineGutter": { backgroundColor: "transparent" },
     ".cm-vertex-highlight": {
+      // The edited span: the accent as a veil behind the type, never an edge.
       backgroundColor: "rgba(var(--mode-accent-rgb, var(--accent-rgb)), var(--alpha-veil))",
-      outline: "1px solid rgba(var(--mode-accent-rgb, var(--accent-rgb)), var(--alpha-mark))",
       borderRadius: "var(--radius)",
     },
     "&.cm-focused": { outline: "none" },

@@ -11,7 +11,9 @@ struct SimUniforms {
   view_proj : mat4x4<f32>,
   // Clip plane: fragments with dot(world, xyz) > w are discarded.
   clip      : vec4<f32>,
-  // min scalar, 1 / (max - min), hover tint strength, clip enabled flag.
+  // min scalar, 1 / (max - min), outline offset, clip enabled flag.
+  // z is 0 for every pass but the hover outline, where it is the size of one
+  // framebuffer pixel in NDC (see vs_sim_edge).
   params    : vec4<f32>,
   // x: ramp selector (0 = field/viridis, 1 = quality/magma).
   // yzw: camera position in world space. The facet normal comes from
@@ -44,28 +46,17 @@ fn vs_sim(
 }
 
 // Polynomial fits of the matplotlib colormaps (degree 6, per channel). The
-// same coefficient tables drive the legends in src/simColors.ts — keep the
-// lists in sync. viridis is the FIELD ramp, magma the QUALITY ramp.
+// coefficients are the VIRIDIS_C* / MAGMA_C* constants `wgslTokens()` prepends
+// from tokens.ts — the same tables the legends in src/simColors.ts evaluate.
+// viridis is the FIELD ramp, magma the QUALITY ramp.
 fn viridis(t: f32) -> vec3<f32> {
-  let c0 = vec3<f32>(0.2744554245, 0.0057679624, 0.3326638811);
-  let c1 = vec3<f32>(0.1077083262, 1.3964696839, 1.3867705979);
-  let c2 = vec3<f32>(-0.3272410968, 0.2148135645, 0.0919768808);
-  let c3 = vec3<f32>(-4.5999315182, -5.7582381893, -19.2918089503);
-  let c4 = vec3<f32>(6.2037359013, 14.1539649474, 56.6562995652);
-  let c5 = vec3<f32>(4.7517868889, -13.7494394044, -65.3209678276);
-  let c6 = vec3<f32>(-5.4320771710, 4.6415713160, 26.2721076045);
-  return c0 + t * (c1 + t * (c2 + t * (c3 + t * (c4 + t * (c5 + t * c6)))));
+  return VIRIDIS_C0 + t * (VIRIDIS_C1 + t * (VIRIDIS_C2 + t * (VIRIDIS_C3
+    + t * (VIRIDIS_C4 + t * (VIRIDIS_C5 + t * VIRIDIS_C6)))));
 }
 
 fn magma(t: f32) -> vec3<f32> {
-  let c0 = vec3<f32>(-0.0020666453, -0.0006875655, -0.0095482507);
-  let c1 = vec3<f32>(0.2504864448, 0.6944550333, 2.4952869139);
-  let c2 = vec3<f32>(8.3459009063, -3.5960313696, 0.3290570684);
-  let c3 = vec3<f32>(-27.6669694889, 14.2538530831, -13.6465831585);
-  let c4 = vec3<f32>(52.1706837385, -27.9445843529, 12.8810906346);
-  let c5 = vec3<f32>(-50.7585722964, 29.0538803789, 4.2699357345);
-  let c6 = vec3<f32>(18.6642528253, -11.4900266123, -5.5707689618);
-  return c0 + t * (c1 + t * (c2 + t * (c3 + t * (c4 + t * (c5 + t * c6)))));
+  return MAGMA_C0 + t * (MAGMA_C1 + t * (MAGMA_C2 + t * (MAGMA_C3
+    + t * (MAGMA_C4 + t * (MAGMA_C5 + t * MAGMA_C6)))));
 }
 
 @fragment
@@ -80,10 +71,13 @@ fn fs_sim(input: SimVertex) -> @location(0) vec4<f32> {
   } else {
     color = clamp(viridis(t), vec3<f32>(0.0), vec3<f32>(1.0));
   }
-  // BC-preview tint, blended over the field per vertex before highlights.
+  // BC-preview tint, blended over the field per vertex. That one is data (a
+  // BC hue or the proposal), so it may colour the surface; hover may not.
+  // Over a solved field, hover and selection are drawn, not tinted (V2): the
+  // hovered face group gets an ink outline from the edge pipeline below
+  // instead of a warm wash, so the field value under the pointer is the one
+  // the ramp says it is.
   color = mix(color, input.overlay.rgb, clamp(input.overlay.a, 0.0, 1.0));
-  // Hover highlight: pull the group's faces toward a warm tint.
-  color = mix(color, vec3<f32>(1.0, 0.62, 0.25), s.params.z);
   // Flat facet shading from screen-space derivatives; clipped cross sections
   // keep their facet normal too, which reads like a real cut.
   //
@@ -127,6 +121,7 @@ struct SimEdgeVertex {
 
 @vertex
 fn vs_sim_edge(
+  @builtin(instance_index) instance : u32,
   @location(0) position : vec3<f32>,
   @location(1) scalar   : f32,
 ) -> SimEdgeVertex {
@@ -135,6 +130,15 @@ fn vs_sim_edge(
   // A larger nudge than the faces get: hairlines that z-fight with their
   // own surface read as dashed, which looks like missing elements.
   out.position.z = out.position.z - 0.004 * out.position.w;
+  // The hover outline is the same line list drawn three times, each copy
+  // shifted one pixel (params.z, in NDC): WebGPU lines are always one pixel
+  // wide, and a one-pixel outline is indistinguishable from an element edge.
+  // Instance 0 is unshifted, so the element-edge pass (one instance) is not.
+  var shift = array<vec2<f32>, 3>(vec2<f32>(0.0, 0.0), vec2<f32>(1.0, 0.0), vec2<f32>(0.0, 1.0));
+  out.position = vec4<f32>(
+    out.position.xy + shift[min(instance, 2u)] * s.params.z * out.position.w,
+    out.position.zw,
+  );
   out.world = position;
   out.scalar = scalar;
   return out;
@@ -149,6 +153,11 @@ fn fs_sim_edge(input: SimEdgeVertex) -> @location(0) vec4<f32> {
   // charcoal vanishes in viridis' dark end, white vanishes in its bright
   // end. Evaluate the same ramp the surface uses and pick whichever of the
   // two edge tones contrasts with it.
+  // The hover outline (params.z > 0) runs through here too: the boundary of
+  // the hovered face group, three pixels wide, in the same achromatic pair —
+  // ink over the bright end of the ramp, sheet over the dark end, where ink
+  // would vanish into viridis' near-black purple. It is the edge of the
+  // region, not a recolouring of it; the field inside keeps its ramp value.
   let t = clamp((input.scalar - s.params.x) * s.params.y, 0.0, 1.0);
   var under = viridis(t);
   if (s.extra.x > 0.5) {
@@ -156,10 +165,10 @@ fn fs_sim_edge(input: SimEdgeVertex) -> @location(0) vec4<f32> {
   }
   let luminance = dot(clamp(under, vec3<f32>(0.0), vec3<f32>(1.0)),
                       vec3<f32>(0.2126, 0.7152, 0.0722));
-  // ELEMENT_EDGE_COLOR / ELEMENT_EDGE_COLOR_LIGHT — keep in sync with
-  // src/simColors.ts.
+  // ELEMENT_EDGE_COLOR / ELEMENT_EDGE_COLOR_LIGHT from tokens.ts: ink over
+  // the bright end of the ramp, the sheet over the dark end. Both achromatic.
   if (luminance > 0.32) {
-    return vec4<f32>(0.05, 0.05, 0.06, 1.0);
+    return vec4<f32>(EDGE_DARK, 1.0);
   }
-  return vec4<f32>(0.86, 0.90, 0.94, 1.0);
+  return vec4<f32>(EDGE_LIGHT, 1.0);
 }

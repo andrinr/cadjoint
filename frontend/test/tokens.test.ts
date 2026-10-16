@@ -52,6 +52,7 @@ import {
   hexToRgb,
   tokensCss,
   tokensScss,
+  wgslTokens,
   type ChromeToken,
 } from "../src/tokens";
 import { MODE_ACCENTS as EDITING_MODE_ACCENTS } from "../src/editingMode";
@@ -99,6 +100,11 @@ describe("the generated files are current", () => {
   it("docs/assets/tokens.scss is what tokensScss() emits", () => {
     const scss = readFileSync(join(here, "../../docs/assets/tokens.scss"), "utf8");
     expect(scss, "run `npm run tokens`").toBe(tokensScss());
+  });
+
+  it("src/viewer/tokens.wgsl is what wgslTokens() emits", () => {
+    const wgsl = readFileSync(join(here, "../src/viewer/tokens.wgsl"), "utf8");
+    expect(wgsl, "run `npm run tokens`").toBe(wgslTokens());
   });
 
   it("styles.css declares no token of its own", () => {
