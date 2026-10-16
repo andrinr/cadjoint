@@ -68,20 +68,22 @@ const highlightField = StateField.define<DecorationSet>({
  * behind the span a viewport edit is rewriting.
  */
 const highlightStyle = HighlightStyle.define([
-  { tag: tags.comment, color: "var(--ink-3)", fontStyle: "italic" },
-  {
-    tag: [tags.keyword, tags.controlKeyword, tags.moduleKeyword],
-    color: "var(--ink)",
-    fontWeight: "var(--weight-semibold)",
-  },
-  { tag: [tags.string, tags.special(tags.string)], color: "var(--ink-2)" },
-  { tag: [tags.number, tags.bool, tags.null], color: "var(--ink)" },
-  { tag: [tags.className, tags.typeName, tags.namespace], color: "var(--ink)" },
-  { tag: tags.function(tags.variableName), color: "var(--ink)" },
+  // The values are the subject (A1): numbers and booleans are the literals a
+  // panel, a drag or the optimiser rewrites, so they carry the weight.
+  { tag: [tags.number, tags.bool, tags.null], color: "var(--ink)", fontWeight: "var(--weight-semibold)" },
+  // Names of things the program declares read at full ink.
   { tag: tags.definition(tags.variableName), color: "var(--ink)" },
-  { tag: tags.propertyName, color: "var(--ink)" },
-  { tag: [tags.operator, tags.punctuation, tags.separator], color: "var(--ink-2)" },
+  { tag: tags.function(tags.variableName), color: "var(--ink)" },
+  { tag: [tags.className, tags.typeName, tags.namespace], color: "var(--ink)" },
+  { tag: [tags.keyword, tags.controlKeyword, tags.moduleKeyword], color: "var(--ink)", fontWeight: "var(--weight-semibold)" },
   { tag: tags.self, color: "var(--ink)", fontStyle: "italic" },
+  // Strings one step down; argument names, punctuation and comments recede,
+  // so `density=8940.0` reads as its number.
+  { tag: [tags.string, tags.special(tags.string)], color: "var(--ink-2)" },
+  { tag: [tags.propertyName, tags.attributeName], color: "var(--ink-3)" },
+  { tag: tags.variableName, color: "var(--ink)" },
+  { tag: [tags.operator, tags.punctuation, tags.separator, tags.paren, tags.squareBracket, tags.brace], color: "var(--ink-3)" },
+  { tag: tags.comment, color: "var(--ink-3)", fontStyle: "italic" },
 ]);
 
 /**
@@ -107,6 +109,30 @@ const freeParameters = ViewPlugin.fromClass(
   { decorations: (plugin) => plugin.decorations },
 );
 
+/**
+ * Keyword-argument names (`density=` in `Material(density=8940.0)`) recede to
+ * ink-3 so the value after them carries the line. The Python grammar tags
+ * them as plain variables, so they are found by shape instead: a name glued
+ * to a single `=`, after `(`, `,` or indentation. An assignment (`x = 1`)
+ * has spaces around its `=` and is not matched.
+ */
+const kwargMatcher = new MatchDecorator({
+  regexp: /(?<=[(,]\s*|^\s+)([A-Za-z_]\w*)(?==(?!=))/gm,
+  decoration: Decoration.mark({ class: "cm-kwarg" }),
+});
+const keywordArguments = ViewPlugin.fromClass(
+  class {
+    decorations: DecorationSet;
+    constructor(view: EditorView) {
+      this.decorations = kwargMatcher.createDeco(view);
+    }
+    update(update: ViewUpdate) {
+      this.decorations = kwargMatcher.updateDeco(update, this.decorations);
+    }
+  },
+  { decorations: (plugin) => plugin.decorations },
+);
+
 const theme = EditorView.theme(
   {
     "&": {
@@ -122,6 +148,7 @@ const theme = EditorView.theme(
       color: "var(--ink-3)",
     },
     ".cm-activeLine": { backgroundColor: "var(--surface-bar-alt)" },
+    ".cm-kwarg, .cm-kwarg *": { color: "var(--ink-3)" },
     ".cm-free-param, .cm-free-param *": { color: "var(--param)" },
     ".cm-activeLineGutter": { backgroundColor: "transparent" },
     ".cm-vertex-highlight": {
@@ -154,6 +181,7 @@ export function EditorPane(props: EditorPaneProps) {
       history(),
       python(),
       syntaxHighlighting(highlightStyle),
+      keywordArguments,
       freeParameters,
       highlightField,
       theme,

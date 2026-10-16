@@ -47,3 +47,4 @@ export {
 } from "./Section";
 export { Segmented, type SegmentedOption, type SegmentedProps } from "./Segmented";
 export { SPARK_HEIGHT, SPARK_WIDTH, Sparkline, type SparklineProps } from "./Sparkline";
+export { Select, type SelectOption, type SelectProps } from "./Select";

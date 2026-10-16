@@ -16,6 +16,7 @@ import {
   createMemo,
   createSignal,
 } from "solid-js";
+import { Select } from "./ui";
 import {
   busy,
   nodeById,
@@ -289,19 +290,16 @@ export function SketchPanel(props: SketchPanelProps) {
               <div class="solver-controls">
                 <label>
                   <span>Optimizer</span>
-                  <select
+                  <Select
                     value={solverMethod()}
-                    onChange={(event) =>
-                      setSolverMethod(
-                        event.currentTarget.value as ConstraintSolverMethod,
-                      )
-                    }
-                    data-testid="solver-method"
-                  >
-                    <option value="newton">Newton projection</option>
-                    <option value="adam">Adam</option>
-                    <option value="sgd">SGD</option>
-                  </select>
+                    options={[
+                      { value: "newton", label: "Newton projection" },
+                      { value: "adam", label: "Adam" },
+                      { value: "sgd", label: "SGD" },
+                    ]}
+                    onChange={(value) => setSolverMethod(value as ConstraintSolverMethod)}
+                    testId="solver-method"
+                  />
                 </label>
                 <label>
                   <span>Iterations</span>

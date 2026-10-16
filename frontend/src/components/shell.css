@@ -123,3 +123,104 @@
   user-select: none;
   -webkit-user-select: none;
 }
+
+/* Select ---------------------------------------------------------------- */
+/* components/ui/Select.tsx: the field is the same plane as an input, and the
+   list is drawn like a menu (K5), because a native select's list is the
+   operating system's and no token reaches it. */
+.ui-select {
+  position: relative;
+  display: inline-flex;
+  min-width: 0;
+}
+
+.ui-select-field {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  height: var(--control-md);
+  padding: 0 calc(var(--unit) * 7) 0 var(--space-3);
+  border: var(--hairline) solid var(--rule-strong);
+  border-radius: var(--radius);
+  background-color: var(--surface-float);
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--ink-2) 50%),
+    linear-gradient(135deg, var(--ink-2) 50%, transparent 50%);
+  background-position:
+    calc(100% - var(--space-5)) 50%,
+    calc(100% - var(--space-4)) 50%;
+  background-size: var(--space-2) var(--space-2);
+  background-repeat: no-repeat;
+  color: var(--ink);
+  font: var(--weight-medium) var(--text-sm) / var(--leading-flat) var(--font-mono);
+  letter-spacing: normal;
+  text-align: left;
+  text-transform: none;
+  cursor: pointer;
+}
+
+.ui-select-field > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ui-select-field:hover:not(:disabled) {
+  background-color: var(--surface-raised-hover);
+}
+
+.ui-select.open .ui-select-field,
+.ui-select-field:focus-visible {
+  outline: var(--stroke-active) solid var(--ink);
+  outline-offset: calc(var(--hairline) * -1);
+}
+
+.ui-select-field:disabled {
+  border-color: var(--rule);
+  color: var(--ink-3);
+  cursor: default;
+}
+
+.ui-select-list {
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  left: 0;
+  z-index: 70;
+  min-width: 100%;
+  max-height: calc(var(--control-sm) * 12);
+  margin: 0;
+  padding: var(--space-2) 0;
+  overflow-y: auto;
+  list-style: none;
+  border: var(--hairline) solid var(--rule-strong);
+  background: var(--surface-float);
+}
+
+.ui-select-list li {
+  display: grid;
+  grid-template-columns: calc(var(--unit) * 6) minmax(0, 1fr);
+  align-items: center;
+  height: var(--control-sm);
+  padding-right: var(--space-4);
+  color: var(--ink);
+  font: var(--weight-regular) var(--text-sm) / var(--leading-flat) var(--font-mono);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ui-select-list li.cursor {
+  background: var(--surface-bar-alt);
+}
+
+.ui-select-list li.disabled {
+  color: var(--ink-3);
+  cursor: default;
+}
+
+.ui-select-list li > i {
+  color: var(--ink);
+  font-size: var(--text-2xs);
+  font-style: normal;
+  text-align: center;
+}

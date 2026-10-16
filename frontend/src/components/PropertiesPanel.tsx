@@ -30,7 +30,7 @@ import {
   resolveSections,
   runtimePlaneRows,
 } from "../properties";
-import { NumberInput } from "./ui";
+import { NumberInput, Select } from "./ui";
 import type { ConstructionArgument, ConstructionElement, PatchAddress } from "../types";
 
 export interface PropertiesPanelProps {
@@ -121,19 +121,12 @@ export function PropertiesPanel(props: PropertiesPanelProps) {
     return (
       <label class="properties-row">
         <span>material</span>
-        <select
-          data-testid={testId(element, "material")}
+        <Select
+          testId={testId(element, "material")}
           value={String(argument.value ?? "")}
-          onChange={(event) => void props.onAssignMaterial(patch, event.currentTarget.value)}
-        >
-          <For each={materials()}>
-            {(material) => (
-              <option value={material.name} selected={material.name === argument.value}>
-                {material.name}
-              </option>
-            )}
-          </For>
-        </select>
+          options={materials().map((material) => ({ value: material.name }))}
+          onChange={(value) => void props.onAssignMaterial(patch, value)}
+        />
       </label>
     );
   };
@@ -142,21 +135,15 @@ export function PropertiesPanel(props: PropertiesPanelProps) {
   const newMaterialRow = (element: ConstructionElement, line: number) => (
     <label class="properties-row">
       <span>material</span>
-      <select
-        data-testid={testId(element, "material")}
+      <Select
+        testId={testId(element, "material")}
         title="Assign a material from the library (or drag a swatch onto the object)"
-        onChange={(event) => {
-          const name = event.currentTarget.value;
+        value=""
+        options={[{ value: "", label: "default" }, ...materials().map((material) => ({ value: material.name }))]}
+        onChange={(name) => {
           if (name) void props.onAssignMaterialToLine(line, name);
         }}
-      >
-        <option value="" selected>
-          default
-        </option>
-        <For each={materials()}>
-          {(material) => <option value={material.name}>{material.name}</option>}
-        </For>
-      </select>
+      />
     </label>
   );
 

@@ -22,7 +22,7 @@ import {
   setArgumentRequest,
   studyArguments,
 } from "../../studies";
-import { Card, CardHeader, CardList, NumberField, ToggleSwitch } from "../ui";
+import { Card, CardHeader, CardList, NumberField, Select, ToggleSwitch } from "../ui";
 import { BcBuilder } from "./BcBuilder";
 import { BcList } from "./BcList";
 import { bcSwatch } from "./colors";
@@ -117,48 +117,38 @@ export function StudiesTab(props: StudiesTabProps) {
                     <Show when={simMeshes().length > 0 && study.kind !== "flow"}>
                       <label>
                         <span>mesh</span>
-                        <select
+                        <Select
                           value={study.mesh ?? ""}
                           disabled={sim().solving() !== null}
-                          onChange={(event) => {
-                            const value = event.currentTarget.value;
+                          options={[
+                            ...(study.mesh === null ? [{ value: "", label: "(implicit)" }] : []),
+                            ...simMeshes().map((mesh) => ({ value: mesh.name })),
+                          ]}
+                          onChange={(value) => {
                             if (value) void sim().patch(setStudyMeshRequest(study, value));
                           }}
-                          data-testid={`simulate-mesh-${study.name}`}
-                        >
-                          <Show when={study.mesh === null}>
-                            <option value="">(implicit)</option>
-                          </Show>
-                          <For each={simMeshes()}>
-                            {(mesh) => <option value={mesh.name}>{mesh.name}</option>}
-                          </For>
-                        </select>
+                          testId={`simulate-mesh-${study.name}`}
+                        />
                       </label>
                     </Show>
                     <Show when={study.mesh === null && sim().namedObjects().length > 0}>
                       <label>
                         <span>domain</span>
-                        <select
+                        <Select
                           value={study.domain?.name ?? ""}
                           disabled={sim().solving() !== null}
-                          onChange={(event) => {
-                            const value = event.currentTarget.value;
-                            if (value) {
-                              void sim().patch(setStudyDomainRequest(study, value));
-                            }
+                          options={[
+                            ...(study.domain === null ? [{ value: "", label: "(whole scene)" }] : []),
+                            ...(study.domain && study.domain.name === null
+                              ? [{ value: "", label: `(${study.domain.type})` }]
+                              : []),
+                            ...sim().domainOptions(study.domain?.name).map((name) => ({ value: name })),
+                          ]}
+                          onChange={(value) => {
+                            if (value) void sim().patch(setStudyDomainRequest(study, value));
                           }}
-                          data-testid={`simulate-domain-${study.name}`}
-                        >
-                          <Show when={study.domain === null}>
-                            <option value="">(whole scene)</option>
-                          </Show>
-                          <Show when={study.domain && study.domain.name === null}>
-                            <option value="">{`(${study.domain!.type})`}</option>
-                          </Show>
-                          <For each={sim().domainOptions(study.domain?.name)}>
-                            {(name) => <option value={name}>{name}</option>}
-                          </For>
-                        </select>
+                          testId={`simulate-domain-${study.name}`}
+                        />
                       </label>
                     </Show>
                   </div>

@@ -1,3 +1,4 @@
+import { Show } from "solid-js";
 /**
  * The one-line status bar under the viewport.
  *
@@ -14,7 +15,6 @@ import {
   nodeById,
   pendingLoft,
   selection,
-  simView,
   sketchPlane,
   tool,
 } from "../../state";
@@ -111,19 +111,20 @@ function handleSentence(handle: { name: string | null; state: BindingState }): s
     : `${label} · fixed value: the solid follows on release, after a recompile`;
 }
 
+/**
+ * The hint line speaks only when there is a step to prompt or a hovered
+ * thing to name. It used to open with the mode as a tag and to say how to
+ * orbit at rest; the mode switcher already says the mode, and a resting
+ * instruction nobody needs after the first minute is noise on the
+ * instrument face (A1). A multi-step command's next step is not noise: it
+ * is the only place that step is stated.
+ */
 export function ViewerHint(props: ViewerHintProps) {
-  return (
-    <p class="viewer-hint" data-testid="viewer-hint">
-      <b class="hint-mode" data-testid="hint-mode">
-        {editingMode()}
-      </b>
-      {" · "}
-      {editingMode() === "simulate"
+  const sentence = (): string | null =>
+      editingMode() === "simulate"
         ? bcPickArmed()
           ? "Pick BC: click the mesh → sphere · Shift-drag → box · confirm in the builder"
-          : simView()
-            ? "Click the mesh to probe values · pick BC regions from the study builder · Esc steps back to model"
-            : "Simulation setup · M cycles modes · Esc steps back to model"
+          : null
         : pendingLoft()
         ? "Loft: click the second sketch in the viewport · Esc to cancel"
         : tool() === "sketch"
@@ -148,7 +149,14 @@ export function ViewerHint(props: ViewerHintProps) {
               ? handleSentence(props.handle)
               : props.plane
                 ? planeSentence(props.plane)
-                : "Drag handles or the gizmo · Drag to orbit · Right-drag to pan"}
-    </p>
+                : null;
+  return (
+    <Show when={sentence()}>
+      {(text) => (
+        <p class="viewer-hint" data-testid="viewer-hint">
+          {text()}
+        </p>
+      )}
+    </Show>
   );
 }

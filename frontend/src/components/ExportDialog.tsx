@@ -29,7 +29,7 @@ import {
 import { formatBytes } from "../jobs";
 import { sceneName, setStatus, source, studies } from "../state";
 import type { ExportFormat } from "../types";
-import { ToggleSwitch } from "./ui";
+import { Select, ToggleSwitch } from "./ui";
 import "./export.css";
 
 export interface ExportDialogProps {
@@ -137,16 +137,13 @@ export function ExportDialog(props: ExportDialogProps) {
           <div class="export-row">
             <label class="export-field">
               Format
-              <select
+              <Select
                 value={format()}
-                onChange={(event) => pickFormat(event.currentTarget.value as ExportFormat)}
+                options={EXPORT_FORMATS.map((entry) => ({ value: entry.value, label: entry.label }))}
+                onChange={(value) => pickFormat(value as ExportFormat)}
                 disabled={busy()}
-                data-testid="export-format"
-              >
-                <For each={EXPORT_FORMATS}>
-                  {(entry) => <option value={entry.value}>{entry.label}</option>}
-                </For>
-              </select>
+                testId="export-format"
+              />
             </label>
             <div class="export-option">
               <Show when={info().option}>
@@ -180,14 +177,13 @@ export function ExportDialog(props: ExportDialogProps) {
               <Show
                 when={info().takes === "object"}
                 fallback={
-                  <select
+                  <Select
                     value={name()}
-                    onChange={(event) => setName(event.currentTarget.value)}
+                    options={targets().map((entry) => ({ value: entry }))}
+                    onChange={setName}
                     disabled={busy() || nothingToExport()}
-                    data-testid="export-name"
-                  >
-                    <For each={targets()}>{(entry) => <option value={entry}>{entry}</option>}</For>
-                  </select>
+                    testId="export-name"
+                  />
                 }
               >
                 <input
