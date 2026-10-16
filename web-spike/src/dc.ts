@@ -312,10 +312,15 @@ function dualFaces(l: Lattice, e: Edges, inc: Incidence, vertices: Float32Array)
 
 /** extract_mesh(sdf, grid, sharp=True) on a lattice already sampled. */
 export function dualContour(field: Field, l: Lattice): Mesh {
+  return dualContourStages(field, l).mesh;
+}
+
+/** The same, with every intermediate stage, for comparing against Python. */
+export function dualContourStages(field: Field, l: Lattice) {
   const edges = crossingEdges(l);
   const incidence = manifoldIncidence(l, edges);
   const h = hermite(field, l, edges);
   const vertices = sharpQefVertices(l, incidence, h);
   const { triangles, skipped } = dualFaces(l, edges, incidence, vertices);
-  return { vertices, triangles, skippedBoundary: skipped };
+  return { edges, incidence, hermite: h, mesh: { vertices, triangles, skippedBoundary: skipped } };
 }
