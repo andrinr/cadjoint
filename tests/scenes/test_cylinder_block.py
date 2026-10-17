@@ -285,6 +285,7 @@ class TestTheCastingIsHollow:
         chunks = [np.asarray(jax.vmap(blk.block)(c)) for c in jnp.array_split(points, 40)]
         return np.concatenate(chunks) / blk.MM
 
+    @pytest.mark.slow  # the lattice fixture samples the whole block: ~15 s
     def test_nothing_in_the_casting_is_far_from_a_surface(self, blk, lattice):
         """The real part's mean wall is 2V/A = 6.6 mm; this model's is similar.
 
@@ -294,6 +295,7 @@ class TestTheCastingIsHollow:
         """
         assert lattice.min() > -20.0, f"deepest interior point {lattice.min():.1f} mm"
 
+    @pytest.mark.slow  # the lattice fixture samples the whole block: ~15 s
     def test_it_is_mostly_air(self, blk, lattice):
         fraction = float((lattice < 0).mean())
         assert 0.06 < fraction < 0.22, f"solid fraction {fraction:.3f} of the envelope box"

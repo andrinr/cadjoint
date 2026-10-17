@@ -193,6 +193,7 @@ def test_parameters_are_read_from_the_buffer_not_passed_down():
     assert worst < len(program.parameters)
 
 
+@pytest.mark.sweep(keep="motor_shield")
 @pytest.mark.parametrize("stem", ["starter", "end_cap", "motor_shield"])
 def test_shipped_scenes_stay_inside_the_wgsl_parameter_limit(stem):
     """The scenes that broke this, at their real size."""
@@ -302,6 +303,7 @@ def test_an_unknown_scope_is_refused():
         compile_scene_with_uniforms(_scene(), scope="some")
 
 
+@pytest.mark.sweep
 @pytest.mark.parametrize("stem", ["starter", "end_cap"])
 def test_the_free_scope_keeps_the_buffer_small_on_a_shipped_scene(stem):
     """The buffer a drag writes is hundreds of bytes, not thousands.

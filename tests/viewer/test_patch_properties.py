@@ -691,6 +691,7 @@ def _step(source: str, request: dict[str, Any]) -> tuple[bool, str]:
     return True, patched
 
 
+@pytest.mark.sweep
 @pytest.mark.parametrize("scene", sorted(SCENES))
 @pytest.mark.parametrize("seed", [SEED, SEED + 1])
 def test_a_sequence_of_operations_keeps_every_invariant(scene: str, seed: int) -> None:

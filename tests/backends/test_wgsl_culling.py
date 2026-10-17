@@ -288,6 +288,7 @@ def test_an_infinite_margin_is_the_flat_field(name, scene):
     assert float(np.max(np.abs(np.asarray(flat) - np.asarray(off)))) <= TOLERANCE
 
 
+@pytest.mark.sweep
 @pytest.mark.parametrize("stem", ["starter", "end_cap"])
 def test_both_switch_positions_agree_on_a_shipped_scene(stem):
     """On and off are the same field, at 100k points of a real part."""

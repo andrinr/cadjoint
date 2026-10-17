@@ -23,6 +23,8 @@ CI could not run the suite at all.
 
 from __future__ import annotations
 
+import pytest
+
 
 def pytest_configure(config):
     """Turn the cache on before anything is collected, and register ``slow``.
@@ -45,6 +47,38 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "slow: minutes-long (a real mesh extraction, solve or descent)"
     )
+    config.addinivalue_line(
+        "markers",
+        "sweep(keep=None): a check repeated over shipped scenes or seeds; one "
+        "case stays in the fast loop, the rest are slow",
+    )
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_collection_modifyitems(config, items):
+    """Mark every case of a ``sweep`` but one as ``slow``.
+
+    A check parametrized over the shipped scenes runs the same code path once
+    per scene, and the scenes are the expensive part: each one compiles a
+    whole field.  One scene proves the path on every push; the rest are
+    coverage of the scenes themselves, which ``nightly.yml`` runs.  ``keep``
+    names the case to keep (a substring of its id) when the first is not the
+    one that exercises the check hardest -- the largest scene for a size
+    limit, say.  ``tryfirst`` so the marks exist before ``-m`` deselects.
+    """
+    kept: dict[str, bool] = {}
+    for item in items:
+        sweep = item.get_closest_marker("sweep")
+        callspec = getattr(item, "callspec", None)
+        if sweep is None or callspec is None:
+            continue
+        function = item.nodeid.split("[", 1)[0]
+        keep = sweep.kwargs.get("keep")
+        chosen = keep in callspec.id if keep is not None else not kept.get(function)
+        if chosen and not kept.get(function):
+            kept[function] = True
+        else:
+            item.add_marker(pytest.mark.slow)
 
 
 def pytest_sessionstart(session):
