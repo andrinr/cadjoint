@@ -2,838 +2,838 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://andrinr.github.io/cadjoint/research/tet-vs-hex.html</loc>
-    <lastmod>2026-10-17T07:38:25.936Z</lastmod>
+    <lastmod>2026-10-17T07:43:44.558Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/research/path-tracing.html</loc>
-    <lastmod>2026-10-17T07:38:25.920Z</lastmod>
+    <lastmod>2026-10-17T07:43:44.547Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/research/fem-integration.html</loc>
-    <lastmod>2026-10-17T07:38:25.919Z</lastmod>
+    <lastmod>2026-10-17T07:43:44.547Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/research/performance.html</loc>
-    <lastmod>2026-10-17T07:38:25.920Z</lastmod>
+    <lastmod>2026-10-17T07:43:44.548Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/research/end-to-end-optimization.html</loc>
-    <lastmod>2026-10-17T07:38:25.919Z</lastmod>
+    <lastmod>2026-10-17T07:43:44.547Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/research/complex-scene-2.html</loc>
-    <lastmod>2026-10-17T07:38:25.829Z</lastmod>
+    <lastmod>2026-10-17T07:43:44.489Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/research/design-language.html</loc>
-    <lastmod>2026-10-17T07:38:25.837Z</lastmod>
+    <lastmod>2026-10-17T07:43:44.494Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/docs/materials.html</loc>
-    <lastmod>2026-10-17T07:38:25.788Z</lastmod>
+    <lastmod>2026-10-17T07:43:44.458Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/docs/simulation.html</loc>
-    <lastmod>2026-10-17T07:38:25.789Z</lastmod>
+    <lastmod>2026-10-17T07:43:44.458Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/docs/rendering.html</loc>
-    <lastmod>2026-10-17T07:38:25.788Z</lastmod>
+    <lastmod>2026-10-17T07:43:44.458Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/docs/meshing.html</loc>
-    <lastmod>2026-10-17T07:38:25.788Z</lastmod>
+    <lastmod>2026-10-17T07:43:44.458Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/meshing.adaptive.sparse_crossing_edges.html</loc>
-    <lastmod>2026-10-17T07:39:06.325Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.611Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/enums.MeshMethod.html</loc>
-    <lastmod>2026-10-17T07:39:06.404Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.686Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/constraints.solve.solve_constraints.html</loc>
-    <lastmod>2026-10-17T07:39:06.287Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.574Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/fem.properties.total_mass.html</loc>
-    <lastmod>2026-10-17T07:39:06.516Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.791Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/enums.parse.html</loc>
-    <lastmod>2026-10-17T07:39:06.423Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.705Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/fem.properties.maybe_sample_cell_property.html</loc>
-    <lastmod>2026-10-17T07:39:06.509Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.784Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/plugins.contracts.DragOutcome.html</loc>
-    <lastmod>2026-10-17T07:39:06.403Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.685Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/viewer.schema.payloads.StudyPayload.html</loc>
-    <lastmod>2026-10-17T07:39:06.651Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.917Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/plugins.registry.available_plugins.html</loc>
-    <lastmod>2026-10-17T07:39:06.579Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.850Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/plugins.contracts.OwnedNodes.html</loc>
-    <lastmod>2026-10-17T07:39:06.395Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.677Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/meshing.diagnostics.mesh_report.html</loc>
-    <lastmod>2026-10-17T07:39:06.342Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.627Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/materials.fr4.html</loc>
-    <lastmod>2026-10-17T07:39:06.626Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.893Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/plugins.spec.PluginSpec.html</loc>
-    <lastmod>2026-10-17T07:39:06.563Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.835Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/parametrization.to_normalized.html</loc>
-    <lastmod>2026-10-17T07:39:06.259Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.548Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/meshing.export.save_step.html</loc>
-    <lastmod>2026-10-17T07:39:06.337Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.623Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/functionalize.functionalize_scene.html</loc>
-    <lastmod>2026-10-17T07:39:06.249Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.539Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/flow.objectives.pressure_drop.html</loc>
-    <lastmod>2026-10-17T07:39:06.608Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.877Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/meshing.dual_contouring.sharp_qef_vertices.html</loc>
-    <lastmod>2026-10-17T07:39:06.319Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.605Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/fem.backends.register_backend.html</loc>
-    <lastmod>2026-10-17T07:39:06.524Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.798Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/flow.steady.SteadyOptions.html</loc>
-    <lastmod>2026-10-17T07:39:06.605Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.874Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/studies.selection.Nodes.html</loc>
-    <lastmod>2026-10-17T07:39:06.487Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.764Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/fem.properties.quantize_to_materials.html</loc>
-    <lastmod>2026-10-17T07:39:06.518Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.793Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/constraints.types.angle.AngleConstraint.html</loc>
-    <lastmod>2026-10-17T07:39:06.276Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.564Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/render.raymarch.render.render_scene.html</loc>
-    <lastmod>2026-10-17T07:39:06.643Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.909Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/flow.domain.solid_fraction.html</loc>
-    <lastmod>2026-10-17T07:39:06.592Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.861Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/sdf.measure.volume.volume.html</loc>
-    <lastmod>2026-10-17T07:39:06.632Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.899Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/fem.study.ThermalStudy.html</loc>
-    <lastmod>2026-10-17T07:39:06.463Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.741Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/flow.domain.sample_solid_fraction.html</loc>
-    <lastmod>2026-10-17T07:39:06.589Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.859Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/optimize.OptimizationRun.html</loc>
-    <lastmod>2026-10-17T07:39:06.536Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.809Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/functionalize.functionalize_scene_parametric.html</loc>
-    <lastmod>2026-10-17T07:39:06.250Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.540Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/fem.backends.SolverBackend.html</loc>
-    <lastmod>2026-10-17T07:39:06.522Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.796Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/materials.titanium_ti6al4v.html</loc>
-    <lastmod>2026-10-17T07:39:06.625Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.892Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/plugins.plugin.PluginMismatch.html</loc>
-    <lastmod>2026-10-17T07:39:06.555Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.827Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/parametrization.from_normalized.html</loc>
-    <lastmod>2026-10-17T07:39:06.261Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.550Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/enums.GradientPath.html</loc>
-    <lastmod>2026-10-17T07:39:06.411Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.693Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/enums.either.html</loc>
-    <lastmod>2026-10-17T07:39:06.421Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.703Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/plugins.contracts.EdgeSet.html</loc>
-    <lastmod>2026-10-17T07:39:06.399Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.681Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/plugins.registry.load_config.html</loc>
-    <lastmod>2026-10-17T07:39:06.582Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.853Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/fem.result.SimulationResult.html</loc>
-    <lastmod>2026-10-17T07:39:06.478Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.756Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/flow.solver.convergence.html</loc>
-    <lastmod>2026-10-17T07:39:06.601Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.870Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/materials.steel_1018.html</loc>
-    <lastmod>2026-10-17T07:39:06.623Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.891Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/fem.gmsh.tet_mesh_from_gmsh.html</loc>
-    <lastmod>2026-10-17T07:39:06.362Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.646Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/plugins.contracts.BRepExtractor.html</loc>
-    <lastmod>2026-10-17T07:39:06.386Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.668Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/fem.properties.cell_centroids.html</loc>
-    <lastmod>2026-10-17T07:39:06.513Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.788Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/fem.gmsh.patch_table.html</loc>
-    <lastmod>2026-10-17T07:39:06.366Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.650Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/tier.message.html</loc>
-    <lastmod>2026-10-17T07:39:06.375Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.659Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/enums.BoundaryConditionType.html</loc>
-    <lastmod>2026-10-17T07:39:06.406Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.688Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/fem.tetmesh.sdf_to_tet_mesh.html</loc>
-    <lastmod>2026-10-17T07:39:06.456Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.735Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/enums.ObjectiveMetric.html</loc>
-    <lastmod>2026-10-17T07:39:06.408Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.690Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/meshing.edge_detection.detect_edges.html</loc>
-    <lastmod>2026-10-17T07:39:06.312Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.599Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/flow.steady.steady_populations.html</loc>
-    <lastmod>2026-10-17T07:39:06.607Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.876Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/constraints.solve.satisfy_constraints.html</loc>
-    <lastmod>2026-10-17T07:39:06.289Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.576Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/sdf.measure.mass.material_mass.html</loc>
-    <lastmod>2026-10-17T07:39:06.635Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.902Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/fem.gmsh.gmsh_available.html</loc>
-    <lastmod>2026-10-17T07:39:06.350Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.635Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/constraints.types.distance.DistanceConstraint.html</loc>
-    <lastmod>2026-10-17T07:39:06.271Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.560Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/plugins.plugin.TesseractPlugin.html</loc>
-    <lastmod>2026-10-17T07:39:06.549Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.822Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/flow.solver.solve.html</loc>
-    <lastmod>2026-10-17T07:39:06.599Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.868Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/plugins.contracts.Drag.html</loc>
-    <lastmod>2026-10-17T07:39:06.389Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.672Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/geometry.parameters.Scalar.html</loc>
-    <lastmod>2026-10-17T07:39:06.299Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.585Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/cache.enable_compilation_cache.html</loc>
-    <lastmod>2026-10-17T07:39:06.252Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.542Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/render.raymarch.render.raymarch.html</loc>
-    <lastmod>2026-10-17T07:39:06.646Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.912Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/fem.study.Traction.html</loc>
-    <lastmod>2026-10-17T07:39:06.503Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.779Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/meshing.diagnostics.surface_deviation.html</loc>
-    <lastmod>2026-10-17T07:39:06.345Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.630Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/meshing.export.merge_planar_faces.html</loc>
-    <lastmod>2026-10-17T07:39:06.340Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.625Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/meshing.bounds.fit_bounds.html</loc>
-    <lastmod>2026-10-17T07:39:06.330Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.616Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/constraints.types.perpendicular.PerpendicularConstraint.html</loc>
-    <lastmod>2026-10-17T07:39:06.285Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.572Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/studies.capture.capture_studies.html</loc>
-    <lastmod>2026-10-17T07:39:06.495Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.771Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/enums.OptimizerMethod.html</loc>
-    <lastmod>2026-10-17T07:39:06.409Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.691Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/meshing.simplify.simplify_mesh.html</loc>
-    <lastmod>2026-10-17T07:39:06.328Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.614Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/plugins.plugin.PluginProbe.html</loc>
-    <lastmod>2026-10-17T07:39:06.554Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.827Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/optimize.capture_optimizations.html</loc>
-    <lastmod>2026-10-17T07:39:06.536Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.810Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/fem.properties.cell_volumes.html</loc>
-    <lastmod>2026-10-17T07:39:06.514Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.789Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/index.html</loc>
-    <lastmod>2026-10-17T07:39:06.228Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.520Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/meshing.export.save_stl.html</loc>
-    <lastmod>2026-10-17T07:39:06.335Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.620Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/materials.pla.html</loc>
-    <lastmod>2026-10-17T07:39:06.629Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.896Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/flow.solver.FlowResult.html</loc>
-    <lastmod>2026-10-17T07:39:06.596Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.866Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/fem.gmsh.sdf_gmsh_tet_mesh.html</loc>
-    <lastmod>2026-10-17T07:39:06.360Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.644Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/meshing.export.remove_slivers.html</loc>
-    <lastmod>2026-10-17T07:39:06.336Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.621Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/backends.wgsl.codegen.compile_sdf_to_wgsl.html</loc>
-    <lastmod>2026-10-17T07:39:06.255Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.544Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/viewer.schema.payloads.ConstructionNode.html</loc>
-    <lastmod>2026-10-17T07:39:06.649Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.914Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/fem.hexmesh.sdf_to_hex_mesh.html</loc>
-    <lastmod>2026-10-17T07:39:06.444Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.724Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/fem.properties.sample_material_field.html</loc>
-    <lastmod>2026-10-17T07:39:06.511Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.786Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/viewer.schema.payloads.SimMeshPayload.html</loc>
-    <lastmod>2026-10-17T07:39:06.651Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.917Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/meshing.edge_detection.edge_hermite_data.html</loc>
-    <lastmod>2026-10-17T07:39:06.311Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.598Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/tier.absent.html</loc>
-    <lastmod>2026-10-17T07:39:06.377Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.660Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/plugins.spec.runtime_scratch.html</loc>
-    <lastmod>2026-10-17T07:39:06.564Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.836Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/render.material.Material.html</loc>
-    <lastmod>2026-10-17T07:39:06.620Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.888Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/render.scene.Scene.html</loc>
-    <lastmod>2026-10-17T07:39:06.638Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.904Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/constraints.types.base.Constraint.html</loc>
-    <lastmod>2026-10-17T07:39:06.267Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.556Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/studies.selection.NodeSelection.html</loc>
-    <lastmod>2026-10-17T07:39:06.492Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.769Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/index.html</loc>
-    <lastmod>2026-10-17T07:38:25.811Z</lastmod>
+    <lastmod>2026-10-17T07:43:44.478Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/examples/sketch_construction.html</loc>
-    <lastmod>2026-10-17T07:38:25.796Z</lastmod>
+    <lastmod>2026-10-17T07:43:44.463Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/examples/constraints.html</loc>
-    <lastmod>2026-10-17T07:38:25.792Z</lastmod>
+    <lastmod>2026-10-17T07:43:44.460Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/examples/basics.html</loc>
-    <lastmod>2026-10-17T07:38:25.790Z</lastmod>
+    <lastmod>2026-10-17T07:43:44.459Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/examples/optimization.html</loc>
-    <lastmod>2026-10-17T07:38:25.792Z</lastmod>
+    <lastmod>2026-10-17T07:43:44.461Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/examples/constrained_optimization.html</loc>
-    <lastmod>2026-10-17T07:38:25.791Z</lastmod>
+    <lastmod>2026-10-17T07:43:44.460Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/examples/rendering.html</loc>
-    <lastmod>2026-10-17T07:38:25.794Z</lastmod>
+    <lastmod>2026-10-17T07:43:44.462Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/enums.StudyKind.html</loc>
-    <lastmod>2026-10-17T07:39:06.405Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.687Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/constraints.solve.constraint_residuals.html</loc>
-    <lastmod>2026-10-17T07:39:06.293Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.580Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/optimize.Optimization.html</loc>
-    <lastmod>2026-10-17T07:39:06.533Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.806Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/fem.backends.available_backends.html</loc>
-    <lastmod>2026-10-17T07:39:06.525Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.799Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/plugins.contracts.StepExporter.html</loc>
-    <lastmod>2026-10-17T07:39:06.387Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.670Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/enums.listed.html</loc>
-    <lastmod>2026-10-17T07:39:06.420Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.701Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/viewer.schema.payloads.CompilePayload.html</loc>
-    <lastmod>2026-10-17T07:39:06.648Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.914Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/fem.gmsh.assign_ownership.html</loc>
-    <lastmod>2026-10-17T07:39:06.364Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.648Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/meshing.diagnostics.triangle_quality.html</loc>
-    <lastmod>2026-10-17T07:39:06.347Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.632Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/meshing.features.classify_feature_cells.html</loc>
-    <lastmod>2026-10-17T07:39:06.316Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.602Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/viewer.schema.payloads.MaterialDefinition.html</loc>
-    <lastmod>2026-10-17T07:39:06.650Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.916Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/geometry.parameters.Vector.html</loc>
-    <lastmod>2026-10-17T07:39:06.297Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.584Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/tier.report.html</loc>
-    <lastmod>2026-10-17T07:39:06.376Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.659Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/enums.Side.html</loc>
-    <lastmod>2026-10-17T07:39:06.407Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.689Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/plugins.registry.register_plugin.html</loc>
-    <lastmod>2026-10-17T07:39:06.578Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.849Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/enums.OptimizationArgument.html</loc>
-    <lastmod>2026-10-17T07:39:06.410Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.692Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/plugins.registry.plugin_for_kind.html</loc>
-    <lastmod>2026-10-17T07:39:06.577Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.848Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/fem.simmesh.SimMesh.html</loc>
-    <lastmod>2026-10-17T07:39:06.435Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.716Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/constraints.types.parallel.ParallelConstraint.html</loc>
-    <lastmod>2026-10-17T07:39:06.280Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.568Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/enums.ConstraintKind.html</loc>
-    <lastmod>2026-10-17T07:39:06.412Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.694Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/tier.component.html</loc>
-    <lastmod>2026-10-17T07:39:06.374Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.657Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/meshing.bounds.boundary_inside.html</loc>
-    <lastmod>2026-10-17T07:39:06.331Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.617Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/functionalize.functionalize_parametric.html</loc>
-    <lastmod>2026-10-17T07:39:06.248Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.538Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/materials.aluminium_6061.html</loc>
-    <lastmod>2026-10-17T07:39:06.621Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.889Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/plugins.registry.PluginRegistry.html</loc>
-    <lastmod>2026-10-17T07:39:06.576Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.847Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/tier.status.html</loc>
-    <lastmod>2026-10-17T07:39:06.371Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.654Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/plugins.contracts.NodeMap.html</loc>
-    <lastmod>2026-10-17T07:39:06.381Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.664Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/extraction.extract_parameters.html</loc>
-    <lastmod>2026-10-17T07:39:06.244Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.534Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/meshing.adaptive.surface_cells.html</loc>
-    <lastmod>2026-10-17T07:39:06.322Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.608Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/fem.study.HeatFlux.html</loc>
-    <lastmod>2026-10-17T07:39:06.501Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.777Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/materials.copper_c11000.html</loc>
-    <lastmod>2026-10-17T07:39:06.622Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.890Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/tier.available.html</loc>
-    <lastmod>2026-10-17T07:39:06.371Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.655Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/constraints.solve.make_manifold_projection.html</loc>
-    <lastmod>2026-10-17T07:39:06.295Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.581Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/fem.study.Dirichlet.html</loc>
-    <lastmod>2026-10-17T07:39:06.499Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.775Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/viewer.schema.payloads.MeshEdgePayload.html</loc>
-    <lastmod>2026-10-17T07:39:06.653Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.919Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/plugins.contracts.FeatureEdges.html</loc>
-    <lastmod>2026-10-17T07:39:06.384Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.667Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/meshing.dual_contouring.dual_faces.html</loc>
-    <lastmod>2026-10-17T07:39:06.321Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.607Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/materials.thermal_pad.html</loc>
-    <lastmod>2026-10-17T07:39:06.628Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.895Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/backends.wgsl.codegen.compile_scene_to_wgsl.html</loc>
-    <lastmod>2026-10-17T07:39:06.257Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.546Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/render.settings.RenderSettings.html</loc>
-    <lastmod>2026-10-17T07:39:06.642Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.908Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/constraints.solve.project_to_manifold.html</loc>
-    <lastmod>2026-10-17T07:39:06.291Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.578Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/meshing.diagnostics.self_intersections.html</loc>
-    <lastmod>2026-10-17T07:39:06.349Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.634Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/viewer.schema.payloads.ConstructionFace.html</loc>
-    <lastmod>2026-10-17T07:39:06.649Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.915Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/viewer.schema.requests.validate_patch_request.html</loc>
-    <lastmod>2026-10-17T07:39:06.655Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.921Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/enums.PluginTransport.html</loc>
-    <lastmod>2026-10-17T07:39:06.416Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.698Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/render.raymarch.render.render_raymarched.html</loc>
-    <lastmod>2026-10-17T07:39:06.647Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.913Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/flow.objectives.heat_transfer_proxy.html</loc>
-    <lastmod>2026-10-17T07:39:06.610Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.879Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/fem.gmsh.owned_nodes.html</loc>
-    <lastmod>2026-10-17T07:39:06.365Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.649Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/viewer.schema.payloads.OptimizationPayload.html</loc>
-    <lastmod>2026-10-17T07:39:06.652Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.918Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/meshing.edge_detection.GridSpec.html</loc>
-    <lastmod>2026-10-17T07:39:06.302Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.589Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/render.scene.Camera.html</loc>
-    <lastmod>2026-10-17T07:39:06.637Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.903Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/tier.require.html</loc>
-    <lastmod>2026-10-17T07:39:06.373Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.656Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/fem.backends.get_backend.html</loc>
-    <lastmod>2026-10-17T07:39:06.523Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.797Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/fem.gmsh.gmsh_version.html</loc>
-    <lastmod>2026-10-17T07:39:06.351Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.636Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/meshing.dual_contouring.qef_vertices.html</loc>
-    <lastmod>2026-10-17T07:39:06.318Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.604Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/fem.study.Fixed.html</loc>
-    <lastmod>2026-10-17T07:39:06.502Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.778Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/fem.study.ElasticStudy.html</loc>
-    <lastmod>2026-10-17T07:39:06.470Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.748Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/enums.FemBackend.html</loc>
-    <lastmod>2026-10-17T07:39:06.414Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.696Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/parametrization.compute_param_scales.html</loc>
-    <lastmod>2026-10-17T07:39:06.262Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.551Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/plugins.registry.get_plugin.html</loc>
-    <lastmod>2026-10-17T07:39:06.577Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.848Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/meshing.export.save_obj.html</loc>
-    <lastmod>2026-10-17T07:39:06.333Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.618Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/fem.tetmesh.TetMesh.html</loc>
-    <lastmod>2026-10-17T07:39:06.452Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.731Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/meshing.dual_contouring.Mesh.html</loc>
-    <lastmod>2026-10-17T07:39:06.304Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.591Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/plugins.plugin.Plugin.html</loc>
-    <lastmod>2026-10-17T07:39:06.540Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.814Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/materials.silicon.html</loc>
-    <lastmod>2026-10-17T07:39:06.627Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.894Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/meshing.dual_contouring.extract_mesh.html</loc>
-    <lastmod>2026-10-17T07:39:06.305Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.592Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/flow.solver.recommended_alpha_max.html</loc>
-    <lastmod>2026-10-17T07:39:06.602Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.871Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/fem.properties.sample_cell_property.html</loc>
-    <lastmod>2026-10-17T07:39:06.506Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.782Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/flow.domain.FlowGrid.html</loc>
-    <lastmod>2026-10-17T07:39:06.587Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.857Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/cache.cache_directory.html</loc>
-    <lastmod>2026-10-17T07:39:06.253Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.542Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/fem.gmsh.GmshMesh.html</loc>
-    <lastmod>2026-10-17T07:39:06.369Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.653Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/studies.selection.selection_from_description.html</loc>
-    <lastmod>2026-10-17T07:39:06.494Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.770Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/plugins.plugin.Capabilities.html</loc>
-    <lastmod>2026-10-17T07:39:06.552Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.824Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/meshing.features.manifold_cell_incidence.html</loc>
-    <lastmod>2026-10-17T07:39:06.314Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.601Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/flow.solver.FlowConfig.html</loc>
-    <lastmod>2026-10-17T07:39:06.594Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.864Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/meshing.edge_detection.find_crossing_edges.html</loc>
-    <lastmod>2026-10-17T07:39:06.309Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.595Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/fem.gmsh.dc_surface_stl.html</loc>
-    <lastmod>2026-10-17T07:39:06.353Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.638Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/fem.hexmesh.HexMesh.html</loc>
-    <lastmod>2026-10-17T07:39:06.442Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.722Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/materials.catalogue.html</loc>
-    <lastmod>2026-10-17T07:39:06.630Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.897Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/fem.gmsh.gmsh_tet_mesh.html</loc>
-    <lastmod>2026-10-17T07:39:06.358Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.642Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/enums.ConstraintSolveMethod.html</loc>
-    <lastmod>2026-10-17T07:39:06.413Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.695Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/studies.capture.declared_studies.html</loc>
-    <lastmod>2026-10-17T07:39:06.496Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.772Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/enums.values.html</loc>
-    <lastmod>2026-10-17T07:39:06.418Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.700Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/plugins.registry.build_registry.html</loc>
-    <lastmod>2026-10-17T07:39:06.581Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.851Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/functionalize.functionalize.html</loc>
-    <lastmod>2026-10-17T07:39:06.246Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.536Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/tier.TierUnavailable.html</loc>
-    <lastmod>2026-10-17T07:39:06.378Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.662Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/meshing.edge_detection.sample_grid.html</loc>
-    <lastmod>2026-10-17T07:39:06.307Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.594Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/viewer.schema.emit.typescript_source.html</loc>
-    <lastmod>2026-10-17T07:39:06.656Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.922Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/enums.PluginKind.html</loc>
-    <lastmod>2026-10-17T07:39:06.415Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.697Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/reference/studies.capture.register_study.html</loc>
-    <lastmod>2026-10-17T07:39:06.497Z</lastmod>
+    <lastmod>2026-10-17T07:44:28.773Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/docs/flow.html</loc>
-    <lastmod>2026-10-17T07:38:25.788Z</lastmod>
+    <lastmod>2026-10-17T07:43:44.458Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/docs/viewer.html</loc>
-    <lastmod>2026-10-17T07:38:25.789Z</lastmod>
+    <lastmod>2026-10-17T07:43:44.458Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/docs/getting-started.html</loc>
-    <lastmod>2026-10-17T07:38:25.788Z</lastmod>
+    <lastmod>2026-10-17T07:43:44.458Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/docs/plugins.html</loc>
-    <lastmod>2026-10-17T07:38:25.788Z</lastmod>
+    <lastmod>2026-10-17T07:43:44.458Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/docs/optimization.html</loc>
-    <lastmod>2026-10-17T07:38:25.788Z</lastmod>
+    <lastmod>2026-10-17T07:43:44.458Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/research/flow-solver.html</loc>
-    <lastmod>2026-10-17T07:38:25.920Z</lastmod>
+    <lastmod>2026-10-17T07:43:44.547Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/research/simulator-ecosystem.html</loc>
-    <lastmod>2026-10-17T07:38:25.936Z</lastmod>
+    <lastmod>2026-10-17T07:43:44.558Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/research/constraints.html</loc>
-    <lastmod>2026-10-17T07:38:25.836Z</lastmod>
+    <lastmod>2026-10-17T07:43:44.493Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/research/complex-scene.html</loc>
-    <lastmod>2026-10-17T07:38:25.829Z</lastmod>
+    <lastmod>2026-10-17T07:43:44.489Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/research/editing-operations.html</loc>
-    <lastmod>2026-10-17T07:38:25.919Z</lastmod>
+    <lastmod>2026-10-17T07:43:44.547Z</lastmod>
   </url>
   <url>
     <loc>https://andrinr.github.io/cadjoint/research/differentiable-meshing-pipeline.html</loc>
-    <lastmod>2026-10-17T07:38:25.914Z</lastmod>
+    <lastmod>2026-10-17T07:43:44.543Z</lastmod>
   </url>
 </urlset>
