@@ -6,24 +6,12 @@
  * mode. The signals live in `state.ts`; the DOM lives in `ToolRail.tsx`.
  */
 
-import { MODE_ACCENTS as DESIGN_MODE_ACCENTS } from "./tokens";
 import type { ConstructionNode } from "./types";
 
 export type EditingMode = "model" | "sketch" | "simulate";
 
 /** Switcher order, also the keyboard cycling order. */
 export const EDITING_MODES: EditingMode[] = ["model", "sketch", "simulate"];
-
-/**
- * Per-mode accent, threaded through the mode switcher, tool rail, dock
- * headers, hint bar and viewport border.
- *
- * The values live in the design system (src/tokens.ts), which the stylesheet
- * mirrors as `--accent-model` / `--accent-sketch` / `--accent-simulate` and
- * `.app[data-mode=…]` binds to `--mode-accent`. Re-exported here so mode code
- * keeps reading a mode-shaped record.
- */
-export const MODE_ACCENTS: Record<EditingMode, string> = DESIGN_MODE_ACCENTS;
 
 /** The next mode when cycling with the keyboard (wraps around). */
 export function cycleEditingMode(mode: EditingMode, step: 1 | -1 = 1): EditingMode {
@@ -42,7 +30,9 @@ export type RailGroupId =
   | "delete";
 
 const GROUPS_BY_MODE: Record<EditingMode, RailGroupId[]> = {
-  model: ["select", "create", "transform", "delete"],
+  // Shape is in Model as well: a sketch is extruded from Model as often as from
+  // Sketch, and its tools disable with the reason until a sketch is selected.
+  model: ["select", "create", "modify", "transform", "delete"],
   sketch: ["select", "create", "modify", "transform", "annotate", "delete"],
   simulate: [],
 };

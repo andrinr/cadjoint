@@ -1,9 +1,9 @@
 /**
  * Which handles drag live, and which cost a recompile.
  *
- * The classification is the whole decision the drag path makes and the whole
- * meaning of the filled-versus-hollow handle in the viewport, so it is worth
- * pinning on its own: it is pure, it has three outcomes, and two of them are
+ * The classification is the whole decision the drag path makes, and the hint
+ * line says it in words when a handle is hovered, so it is worth pinning on
+ * its own: it is pure, it has three outcomes, and two of them are
  * easy to conflate.
  *
  * - `free` — the payload names a parameter and the installed shader has its
@@ -29,7 +29,14 @@ import {
   transformState,
   vertexState,
 } from "../src/viewer/dragBinding";
-import { HANDLE_STRIDE, packConstructionOverlay } from "../src/viewer/overlayGeometry";
+import {
+  COLORS,
+  HANDLE_SHAPE,
+  HANDLE_STRIDE,
+  packConstructionOverlay,
+  vertexHeld,
+} from "../src/viewer/overlayGeometry";
+import { CHROME, hexToRgb } from "../src/tokens";
 import type { ShaderProgramPayload } from "../src/viewer/shaderProgram";
 import type { ConstructionNode, ConstructionTransform, ConstructionVertex } from "../src/types";
 
@@ -181,27 +188,35 @@ describe("argumentValue", () => {
 });
 
 /**
- * The mark and the decision are the same function.
+ * The handle's shape says free versus held (V1), not live versus recompile.
  *
- * The handle instance's last float is what the fragment shader fills or
- * hollows, and the drag path asks `vertexState` whether to write the buffer.
- * If those two ever came from different code the viewport could promise a
- * live drag it does not give, so this asserts they are one answer.
+ * The instance's last float is the shape `fs_handle` draws: a free vertex is
+ * a hollow circle, a held one — written `free=False`, or pinned by a `fixed`
+ * constraint — a filled square, and the selected vertex a filled circle. The
+ * drag cost is said in words by the hint (`vertexState`), so a free vertex
+ * whose slot the shader lacks is still drawn free.
  */
-describe("packConstructionOverlay marks handles", () => {
-  const node = (vertices: ConstructionVertex["binding"][]) =>
+describe("packConstructionOverlay shapes handles", () => {
+  const node = (
+    vertices: { free: boolean; binding: ConstructionVertex["binding"] }[],
+    constraints: { kind: string; vertices: number[] }[] = [],
+  ) =>
     ({
       id: "profile_0",
       kind: "profile",
       editable: true,
       edges: [],
       faces: [],
-      constraints: [],
+      constraints: constraints.map((constraint, index) => ({
+        ...constraint,
+        index,
+        stableId: null,
+      })),
       operators: [],
-      vertices: vertices.map((binding, index) => ({
+      vertices: vertices.map(({ free, binding }, index) => ({
         stableId: null,
         name: `v${index}`,
-        free: binding !== null,
+        free,
         uv: [0, 0],
         world: [index, 0, 0],
         span: null,
@@ -209,26 +224,61 @@ describe("packConstructionOverlay marks handles", () => {
       })),
     }) as unknown as ConstructionNode;
 
-  it("fills exactly the handles a drag can write live", () => {
-    const profile = node([
-      { name: "fin1_tip_r", components: 2 },
-      null,
-      { name: "slug_rim_low", components: 2 },
+  const floats = HANDLE_STRIDE / 4;
+  const shapes = (handles: number[]) =>
+    Array.from({ length: handles.length / floats }, (_, index) => handles[index * floats + floats - 1]);
+
+  it("draws free vertices hollow and held ones square", () => {
+    const profile = node(
+      [
+        { free: true, binding: { name: "fin1_tip_r", components: 2 } },
+        { free: false, binding: null },
+        { free: true, binding: { name: "slug_rim_low", components: 2 } },
+        { free: true, binding: null },
+      ],
+      [{ kind: "fixed", vertices: [3] }, { kind: "horizontal", vertices: [0, 2] }],
+    );
+    const { handles } = packConstructionOverlay([profile], null, null);
+    expect(handles.length).toBe(4 * floats);
+    expect(shapes(handles)).toEqual([
+      HANDLE_SHAPE.free,
+      HANDLE_SHAPE.held,
+      HANDLE_SHAPE.free,
+      HANDLE_SHAPE.held,
     ]);
-    const { handles } = packConstructionOverlay([profile], null, null, program);
-    const floats = HANDLE_STRIDE / 4;
-    expect(handles.length).toBe(3 * floats);
-    const fill = [0, 1, 2].map((index) => handles[index * floats + floats - 1]);
-    expect(fill).toEqual([1, 0, 0]);
-    // …and it is the same answer the drag path acts on.
-    expect(
-      profile.vertices.map((vertex) => (vertexState(vertex, program) === "free" ? 1 : 0)),
-    ).toEqual(fill);
+    expect(profile.vertices.map((_, index) => vertexHeld(profile, index))).toEqual([
+      false,
+      true,
+      false,
+      true,
+    ]);
   });
 
-  it("hollows every handle in the literal form, where nothing is live", () => {
-    const profile = node([{ name: "fin1_tip_r", components: 2 }]);
-    const { handles } = packConstructionOverlay([profile], null, null, null);
-    expect(handles[HANDLE_STRIDE / 4 - 1]).toBe(0);
+  it("draws the selected vertex as a filled ink circle, held or not", () => {
+    const profile = node([
+      { free: false, binding: null },
+      { free: true, binding: null },
+    ]);
+    for (const index of [0, 1]) {
+      const { handles } = packConstructionOverlay(
+        [profile],
+        { nodeId: "profile_0", vertexIndex: index } as never,
+        null,
+      );
+      expect(shapes(handles)[index]).toBe(HANDLE_SHAPE.selected);
+      expect(handles.slice(index * floats + 3, index * floats + 7)).toEqual(COLORS.handleSelected);
+    }
+  });
+
+  it("draws a held handle in ink and a free one in param blue", () => {
+    const profile = node([
+      { free: false, binding: null },
+      { free: true, binding: null },
+    ]);
+    const { handles } = packConstructionOverlay([profile], null, null);
+    const [hr, hg, hb] = handles.slice(3, 6);
+    expect(Math.max(hr, hg, hb) - Math.min(hr, hg, hb)).toBeLessThan(0.04);
+    const [fr, fg, fb] = handles.slice(floats + 3, floats + 6);
+    expect([fr, fg, fb]).toEqual(hexToRgb(CHROME.param));
   });
 });

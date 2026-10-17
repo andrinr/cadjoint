@@ -19,6 +19,7 @@ import {
   setHover,
   setInspected,
   setSelection,
+  sceneName,
 } from "../state";
 import { buildSceneTree, visibleRows, type SceneTreeRow } from "../objectTree";
 import {
@@ -28,6 +29,7 @@ import {
   PolygonIcon,
   SphereIcon,
 } from "./icons";
+import { PanelHeader } from "./ui";
 
 const KIND_ICONS: Record<SceneTreeRow["kind"], Component | null> = {
   scene: ObjectSelectIcon,
@@ -41,7 +43,7 @@ const KIND_ICONS: Record<SceneTreeRow["kind"], Component | null> = {
 
 export function ObjectTree() {
   const [collapsed, setCollapsed] = createSignal<ReadonlySet<string>>(new Set());
-  const rows = createMemo(() => buildSceneTree(nodes(), elements()));
+  const rows = createMemo(() => buildSceneTree(nodes(), elements(), sceneName() ?? "scene.py"));
   const shown = createMemo(() => visibleRows(rows(), collapsed()));
 
   const toggleGroup = (key: string) => {
@@ -51,14 +53,20 @@ export function ObjectTree() {
     setCollapsed(next);
   };
 
+  // One selection (guide F2): a row is either the selected object or the
+  // inspected element, never both, so each pick clears the other.
   const selectRow = (row: SceneTreeRow) => {
     if (row.nodeId !== null) {
+      setInspected(null);
       setSelection({ nodeId: row.nodeId, vertexIndex: null });
       return;
     }
     // An operator or a boolean has no geometry to select; it points the
     // properties window at its element instead.
-    if (row.elementId !== null) setInspected(row.elementId);
+    if (row.elementId !== null) {
+      setSelection(null);
+      setInspected(row.elementId);
+    }
   };
 
   /** Roving arrow-key navigation over the visible rows. */
@@ -86,14 +94,7 @@ export function ObjectTree() {
 
   return (
     <aside class="object-tree-panel" data-testid="object-tree-panel">
-        <header>
-          {/* Kicker first, title second — the same order every dock panel
-              header uses, so the eyebrow line is always the top line. */}
-          <span>
-            <small>read-only</small>
-            Object tree
-          </span>
-        </header>
+        <PanelHeader kicker="read-only" title="Object tree" />
         <div class="object-tree-rows" role="tree" aria-label="Scene composition">
           <For each={shown()}>
             {(row, index) => (
@@ -112,7 +113,7 @@ export function ObjectTree() {
                 aria-selected={row.nodeId !== null && selection()?.nodeId === row.nodeId}
                 aria-expanded={row.group ? !collapsed().has(row.key) : undefined}
                 tabIndex={index() === 0 ? 0 : -1}
-                style={{ "padding-left": `${6 + row.depth * 14}px` }}
+                style={{ "padding-left": `calc(var(--inset) + var(--unit) * ${4 * row.depth})` }}
                 onClick={() => selectRow(row)}
                 onKeyDown={(event) => {
                   if (event.key === "Enter" || event.key === " ") {

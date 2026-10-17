@@ -19,6 +19,15 @@ import { Index, type JSX } from "solid-js";
 /** Axis suffixes for the triplet rows' per-component tooltips. */
 export const AXIS_LABELS = ["X", "Y", "Z"] as const;
 
+/** X, Y and Z as Segmented options; each button's testid is `${prefix}-x` and so on. */
+export const axisOptions = (prefix: string, title?: (label: string) => string) =>
+  ([0, 1, 2] as const).map((value) => ({
+    value,
+    label: AXIS_LABELS[value],
+    title: title?.(AXIS_LABELS[value]),
+    testId: `${prefix}-${AXIS_LABELS[value].toLowerCase()}`,
+  }));
+
 /** Commit only finite values; anything else leaves the model untouched. */
 export const parseNumber = (raw: string): number | null => {
   const value = Number(raw);

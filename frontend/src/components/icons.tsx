@@ -4,77 +4,125 @@
  * Inline rather than an icon font or sprite sheet: the playground ships under a
  * strict CSP with no external requests, and these are a handful of glyphs.
  *
- * ── The grid contract ────────────────────────────────────────────────────
- * Every icon draws on a 24×24 viewBox, inherits `currentColor`, and obeys
- * four rules so a rail of them reads as one set:
+ * ── The grid contract (design language I1) ───────────────────────────────
+ * Every icon draws on a 16×16 viewBox, inherits `currentColor`, and obeys
+ * five rules so a rail of them reads as one set, drawn by the same pen as
+ * the hairlines around it:
  *
- *   1. One stroke weight on screen. `strokeWidth` is scaled against the
- *      reference size, so a 16px icon and an 18px icon put the same number
- *      of device pixels on the hairline instead of the smaller one looking
- *      thinner than its neighbours.
- *   2. Round caps and joins, always.
- *   3. Solid nodes come from `<Dot>` / `<Handle>`, never a hand-written
- *      circle: a filled circle that also inherits the stroke renders a
- *      radius bigger than it claims, which is why the old dots varied in
- *      weight from icon to icon.
- *   4. One corner radius (`CORNER`) on rectangles.
- *
- * Artwork stays inside roughly 3 → 21 on both axes, so nothing sits optically
- * larger than the rest at the same nominal size.
+ *   1. One stroke weight on screen: 1.25 device px. `stroke-width` is scaled
+ *      against the 16px box, so an icon rendered at another size still puts
+ *      1.25px on the line instead of growing or thinning with the box.
+ *   2. No fills. A point is a small hollow circle (`<Pt>`), a grabbable
+ *      handle a small hollow square (`<Grip>`); the lines that meet them stop
+ *      at their rim (`link`) rather than running through the hole.
+ *   3. Square caps and miter joins, always; no rounded rectangles.
+ *   4. Drawn on the half pixel: every horizontal or vertical stroke sits on
+ *      an x.5 coordinate, so at 16px it covers whole device pixels.
+ *   5. Artwork stays inside roughly 1.5 → 14.5 on both axes.
  */
 
 import type { JSX } from "solid-js";
 
 type IconProps = { size?: number };
 
-/** The size the stroke weight is tuned for; other sizes compensate. */
-const REFERENCE_SIZE = 18;
-/** Stroke weight in viewBox units at the reference size. */
-const REFERENCE_STROKE = 1.6;
+/** The box the artwork is drawn in, and the default rendered size. */
+const BOX = 16;
+/** Stroke weight in device px, at any rendered size. */
+const STROKE = 1.25;
 /** Radius of a point node. */
-const DOT = 1.7;
-/** Radius of a draggable handle — a point you can grab, so it reads bigger. */
-const HANDLE = 2.3;
-/** The one corner radius rectangles use. */
-const CORNER = 1;
+const POINT = 1.5;
+/** Half side of a handle square — a point you can grab. */
+const GRIP = 1.5;
 
 const base = (size: number): JSX.SvgSVGAttributes<SVGSVGElement> => ({
   width: size,
   height: size,
-  viewBox: "0 0 24 24",
+  viewBox: `0 0 ${BOX} ${BOX}`,
   fill: "none",
   stroke: "currentColor",
-  // Hold the rendered hairline constant across icon sizes.
-  "stroke-width": (REFERENCE_STROKE * REFERENCE_SIZE) / size,
-  "stroke-linecap": "round" as const,
-  "stroke-linejoin": "round" as const,
+  // Hold the rendered line at STROKE device px across icon sizes.
+  "stroke-width": (STROKE * BOX) / size,
+  "stroke-linecap": "square" as const,
+  "stroke-linejoin": "miter" as const,
 });
 
-/** A solid point. `stroke="none"` keeps it at the radius it declares. */
-const Dot = (props: { cx: number; cy: number }) => (
-  <circle cx={props.cx} cy={props.cy} r={DOT} fill="currentColor" stroke="none" />
+/** A hollow point. */
+const Pt = (props: { x: number; y: number }) => <circle cx={props.x} cy={props.y} r={POINT} />;
+
+/** A hollow grabbable handle, centred on whole units so its sides land on x.5. */
+const Grip = (props: { x: number; y: number }) => (
+  <rect x={props.x - GRIP} y={props.y - GRIP} width={GRIP * 2} height={GRIP * 2} />
 );
 
-/** A solid grabbable handle, one step larger than a point. */
-const Handle = (props: { cx: number; cy: number }) => (
-  <circle cx={props.cx} cy={props.cy} r={HANDLE} fill="currentColor" stroke="none" />
-);
+type Node = "point" | "grip" | null;
+type P = readonly [number, number];
+
+/**
+ * How far to pull a line end back from a node's centre so its square cap
+ * stops on the node's stroke: to the rim along the line's direction, plus
+ * half a stroke for the cap.
+ */
+function pullback(node: Node, ux: number, uy: number): number {
+  if (node === "point") return POINT + STROKE / 2;
+  if (node === "grip") return GRIP / Math.max(Math.abs(ux), Math.abs(uy)) + STROKE / 2;
+  return 0;
+}
+
+const n = (v: number) => +v.toFixed(3);
+
+/** A polyline through `pts` whose ends stop short of the nodes they meet. */
+function link(pts: readonly P[], start: Node = null, end: Node = null): string {
+  const out = pts.map((p) => [p[0], p[1]] as [number, number]);
+  const trim = (i: number, j: number, node: Node) => {
+    const dx = out[j][0] - out[i][0];
+    const dy = out[j][1] - out[i][1];
+    const len = Math.hypot(dx, dy);
+    const d = pullback(node, dx / len, dy / len);
+    out[i] = [out[i][0] + (dx / len) * d, out[i][1] + (dy / len) * d];
+  };
+  trim(0, 1, start);
+  trim(out.length - 1, out.length - 2, end);
+  return "M" + out.map((p) => `${n(p[0])} ${n(p[1])}`).join("L");
+}
+
+/** A closed polygon whose every vertex is a node: one trimmed edge per side. */
+function ring(pts: readonly P[], node: Node): string {
+  return pts.map((p, i) => link([p, pts[(i + 1) % pts.length]], node, node)).join("");
+}
+
+/** The isometric cube shared by the box, iso-view and model-mode icons. */
+const CUBE = "M8.5 1.5L14.5 5V12L8.5 15.5L2.5 12V5Z" + "M2.5 5L8.5 8.5L14.5 5M8.5 8.5V15.5";
 
 export function CursorIcon(props: IconProps) {
   return (
-    <svg {...base(props.size ?? REFERENCE_SIZE)}>
-      <path d="M5 3l6.5 16 2.2-6.3 6.3-2.2z" />
+    <svg {...base(props.size ?? BOX)}>
+      <path d="M3.5 2.5L8 13.5L9.5 9L14 7.5Z" />
     </svg>
   );
 }
 
+const POLYGON: readonly P[] = [
+  [8, 2.5],
+  [13.5, 6.5],
+  [11, 13.5],
+  [5, 13.5],
+  [2.5, 6.5],
+];
+
 export function PolygonIcon(props: IconProps) {
+  const [top, right, br, bl, left] = POLYGON;
   return (
-    <svg {...base(props.size ?? REFERENCE_SIZE)}>
-      <path d="M12 3l8 6-3 10H7L4 9z" />
-      <Dot cx={12} cy={3} />
-      <Dot cx={20} cy={9} />
-      <Dot cx={4} cy={9} />
+    <svg {...base(props.size ?? BOX)}>
+      <path
+        d={
+          link([left, top], "point", "point") +
+          link([top, right], "point", "point") +
+          link([right, br, bl, left], "point", "point")
+        }
+      />
+      <Pt x={top[0]} y={top[1]} />
+      <Pt x={right[0]} y={right[1]} />
+      <Pt x={left[0]} y={left[1]} />
     </svg>
   );
 }
@@ -82,159 +130,164 @@ export function PolygonIcon(props: IconProps) {
 /**
  * Sketch on a face: a plane seen at an angle, with a profile drawn on it.
  *
- * The face is the parallelogram — the same read as the box's top facet, so
- * the two icons agree about what "a flat face" looks like — and the open
+ * The face is the trapezoid — a flat face seen in perspective — and the open
  * polyline with a node at each end is the same mark PolygonIcon uses for a
  * sketch. The tool is the composition of those two, and so is its glyph.
  */
 export function FaceSketchIcon(props: IconProps) {
+  const a: P = [5.5, 10];
+  const b: P = [10.5, 10];
   return (
-    <svg {...base(props.size ?? REFERENCE_SIZE)}>
-      <path d="M3.5 13.5l8-4.8 9 3.2-8 4.8z" />
-      <path d="M8.6 13.1l3.4-2 3.9 1.4" />
-      <Dot cx={8.6} cy={13.1} />
-      <Dot cx={15.9} cy={12.5} />
+    <svg {...base(props.size ?? BOX)}>
+      <path d="M1.5 13.5L3.5 3.5H12.5L14.5 13.5Z" />
+      <path d={link([a, [8, 6], b], "point", "point")} />
+      <Pt x={a[0]} y={a[1]} />
+      <Pt x={b[0]} y={b[1]} />
     </svg>
   );
 }
 
 export function PointAddIcon(props: IconProps) {
+  const a: P = [3, 12.5];
+  const b: P = [6, 3.5];
   return (
-    <svg {...base(props.size ?? REFERENCE_SIZE)}>
-      <path d="M4 17L9 6l9 6" />
-      <Dot cx={4} cy={17} />
-      <Dot cx={9} cy={6} />
-      <path d="M17.5 15v6M14.5 18h6" />
+    <svg {...base(props.size ?? BOX)}>
+      <path d={link([a, b], "point", "point") + link([b, [12.5, 7.5]], "point")} />
+      <Pt x={a[0]} y={a[1]} />
+      <Pt x={b[0]} y={b[1]} />
+      <path d="M11.5 10V15M9 12.5H14" />
     </svg>
   );
 }
 
 export function BoxIcon(props: IconProps) {
   return (
-    <svg {...base(props.size ?? REFERENCE_SIZE)}>
-      <path d="M12 2.6l8 4.2v9L12 20l-8-4.2v-9z" />
-      <path d="M4 6.8l8 4.2 8-4.2" />
-      <path d="M12 11v9" />
+    <svg {...base(props.size ?? BOX)}>
+      <path d={CUBE} />
     </svg>
   );
 }
 
 export function SphereIcon(props: IconProps) {
   return (
-    <svg {...base(props.size ?? REFERENCE_SIZE)}>
-      <circle cx="12" cy="12" r="8.5" />
-      <ellipse cx="12" cy="12" rx="8.5" ry="3.4" />
+    <svg {...base(props.size ?? BOX)}>
+      <circle cx="8.5" cy="8.5" r="6.5" />
+      <ellipse cx="8.5" cy="8.5" rx="6.5" ry="2.5" />
     </svg>
   );
 }
 
 export function CylinderIcon(props: IconProps) {
   return (
-    <svg {...base(props.size ?? REFERENCE_SIZE)}>
-      <ellipse cx="12" cy="6" rx="7" ry="3" />
-      <path d="M5 6v12M19 6v12" />
-      <path d="M5 18c0 1.7 3.1 3 7 3s7-1.3 7-3" />
+    <svg {...base(props.size ?? BOX)}>
+      <path d="M2.5 4.5A6 2 0 0 1 14.5 4.5V12.5A6 2 0 0 1 2.5 12.5Z" />
+      <path d="M2.5 4.5A6 2 0 0 0 14.5 4.5" />
     </svg>
   );
 }
 
 export function MoveIcon(props: IconProps) {
   return (
-    <svg {...base(props.size ?? REFERENCE_SIZE)}>
-      <path d="M12 3v18M3 12h18" />
-      <path d="M12 3l-2.4 2.4M12 3l2.4 2.4M12 21l-2.4-2.4M12 21l2.4-2.4" />
-      <path d="M3 12l2.4-2.4M3 12l2.4 2.4M21 12l-2.4-2.4M21 12l-2.4 2.4" />
+    <svg {...base(props.size ?? BOX)}>
+      <path d="M8.5 3V14M3 8.5H14" />
+      <path d="M6.5 4L8.5 2L10.5 4M6.5 13L8.5 15L10.5 13" />
+      <path d="M4 6.5L2 8.5L4 10.5M13 6.5L15 8.5L13 10.5" />
     </svg>
   );
 }
 
 export function RotateIcon(props: IconProps) {
   return (
-    <svg {...base(props.size ?? REFERENCE_SIZE)}>
-      <path d="M20 12a8 8 0 1 1-2.6-5.9" />
-      <path d="M20 3.5V8h-4.5" />
+    <svg {...base(props.size ?? BOX)}>
+      <path d="M14 8.5A5.5 5.5 0 1 1 12.4 4.6" />
+      <path d="M13.5 2V5.5H10" />
     </svg>
   );
 }
 
 export function ScaleIcon(props: IconProps) {
   return (
-    <svg {...base(props.size ?? REFERENCE_SIZE)}>
-      <path d="M5 19L19 5M10 5h9v9" />
-      <rect x="3.5" y="15.5" width="5" height="5" rx={CORNER} />
-      <rect x="15.5" y="3.5" width="5" height="5" rx={CORNER} />
+    <svg {...base(props.size ?? BOX)}>
+      <rect x="1.5" y="9.5" width="5" height="5" />
+      <path d="M8.5 7.5L13.5 2.5M9.5 2.5H13.5V6.5" />
     </svg>
   );
 }
 
 export function DisplayIcon(props: IconProps) {
   return (
-    <svg {...base(props.size ?? REFERENCE_SIZE)}>
-      <path d="M2.5 12s3.6-6 9.5-6 9.5 6 9.5 6-3.6 6-9.5 6-9.5-6-9.5-6z" />
-      <circle cx="12" cy="12" r="2.6" />
+    <svg {...base(props.size ?? BOX)}>
+      <path d="M1.5 8.5C3.5 5.2 5.8 3.5 8.5 3.5S13.5 5.2 15.5 8.5C13.5 11.8 11.2 13.5 8.5 13.5S3.5 11.8 1.5 8.5Z" />
+      <circle cx="8.5" cy="8.5" r="2.25" />
     </svg>
   );
 }
 
 export function PlayIcon(props: IconProps) {
   return (
-    <svg {...base(props.size ?? REFERENCE_SIZE)}>
-      <path d="M7 4.5l12 7.5-12 7.5z" />
+    <svg {...base(props.size ?? BOX)}>
+      <path d="M4.5 2.5L13.5 8L4.5 13.5Z" />
     </svg>
   );
 }
 
 export function ResetIcon(props: IconProps) {
   return (
-    <svg {...base(props.size ?? REFERENCE_SIZE)}>
-      <path d="M4 12a8 8 0 1 0 2.6-5.9" />
-      <path d="M4 3.5V8h4.5" />
+    <svg {...base(props.size ?? BOX)}>
+      <path d="M3 8.5A5.5 5.5 0 1 0 4.6 4.6" />
+      <path d="M3.5 2V5.5H7" />
     </svg>
   );
 }
 
 export function CodeIcon(props: IconProps) {
   return (
-    <svg {...base(props.size ?? REFERENCE_SIZE)}>
-      <path d="M9 7l-5 5 5 5M15 7l5 5-5 5" />
+    <svg {...base(props.size ?? BOX)}>
+      <path d="M5.5 4.5L1.5 8.5L5.5 12.5M10.5 4.5L14.5 8.5L10.5 12.5" />
     </svg>
   );
 }
 
 export function TraceIcon(props: IconProps) {
   return (
-    <svg {...base(props.size ?? REFERENCE_SIZE)}>
-      <circle cx="12" cy="12" r="3.4" />
-      <path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2.1 2.1M16.9 16.9L19 19M19 5l-2.1 2.1M7.1 16.9L5 19" />
+    <svg {...base(props.size ?? BOX)}>
+      <circle cx="8.5" cy="8.5" r="2.5" />
+      <path d="M8.5 1.5V3M8.5 14V15.5M1.5 8.5H3M14 8.5H15.5" />
+      <path d="M4 4L4.6 4.6M12.4 12.4L13 13M13 4L12.4 4.6M4.6 12.4L4 13" />
     </svg>
   );
 }
 
 export function ObjectSelectIcon(props: IconProps) {
   return (
-    <svg {...base(props.size ?? REFERENCE_SIZE)}>
-      <path d="M12 3.2l7.2 3.8v8L12 18.8 4.8 15V7z" />
-      <path d="M4.8 7l7.2 3.8L19.2 7" />
+    <svg {...base(props.size ?? BOX)}>
+      <path d="M8.5 2.5L13.5 5.5V11.5L8.5 14.5L3.5 11.5V5.5Z" />
+      <path d="M3.5 5.5L8.5 8.5L13.5 5.5" />
     </svg>
   );
 }
 
 export function VertexSelectIcon(props: IconProps) {
+  const pts: readonly P[] = [
+    [3, 13],
+    [6, 3],
+    [13, 9],
+  ];
   return (
-    <svg {...base(props.size ?? REFERENCE_SIZE)}>
-      <path d="M5 18L9.5 6l9 5.5z" />
-      <Handle cx={5} cy={18} />
-      <Handle cx={9.5} cy={6} />
-      <Handle cx={18.5} cy={11.5} />
+    <svg {...base(props.size ?? BOX)}>
+      <path d={ring(pts, "grip")} />
+      {pts.map((p) => (
+        <Grip x={p[0]} y={p[1]} />
+      ))}
     </svg>
   );
 }
 
 export function TrashIcon(props: IconProps) {
   return (
-    <svg {...base(props.size ?? REFERENCE_SIZE)}>
-      <path d="M4 6.5h16M9.5 6.5V4.5h5v2M6.5 6.5l1 13h9l1-13" />
-      <path d="M10.5 10v6M13.5 10v6" />
+    <svg {...base(props.size ?? BOX)}>
+      <path d="M2.5 4.5H13.5M6.5 4.5V2.5H9.5V4.5M3.5 4.5L4.5 14.5H11.5L12.5 4.5" />
+      <path d="M6.5 7.5V11.5M9.5 7.5V11.5" />
     </svg>
   );
 }
@@ -242,9 +295,9 @@ export function TrashIcon(props: IconProps) {
 /** Converging lines: a perspective frustum. */
 export function PerspectiveIcon(props: IconProps) {
   return (
-    <svg {...base(props.size ?? REFERENCE_SIZE)}>
-      <path d="M4 4.5l16 3.2v8.6L4 19.5z" />
-      <path d="M4 4.5v15M20 7.7v8.6" />
+    <svg {...base(props.size ?? BOX)}>
+      <path d="M2.5 2.5L13.5 5.5V11.5L2.5 14.5Z" />
+      <path d="M2.5 8.5H13.5" />
     </svg>
   );
 }
@@ -252,9 +305,9 @@ export function PerspectiveIcon(props: IconProps) {
 /** Parallel lines: an orthographic box. */
 export function OrthographicIcon(props: IconProps) {
   return (
-    <svg {...base(props.size ?? REFERENCE_SIZE)}>
-      <rect x="4" y="5" width="16" height="14" rx={CORNER} />
-      <path d="M4 9h16M8 5v14" />
+    <svg {...base(props.size ?? BOX)}>
+      <path d="M2.5 3.5H13.5V13.5H2.5Z" />
+      <path d="M2.5 8.5H13.5" />
     </svg>
   );
 }
@@ -262,9 +315,8 @@ export function OrthographicIcon(props: IconProps) {
 /** A corner-on cube: the isometric home view. */
 export function IsoIcon(props: IconProps) {
   return (
-    <svg {...base(props.size ?? REFERENCE_SIZE)}>
-      <path d="M12 3l8 4.6v8.8L12 21l-8-4.6V7.6z" />
-      <path d="M4 7.6l8 4.6 8-4.6M12 12.2V21" />
+    <svg {...base(props.size ?? BOX)}>
+      <path d={CUBE} />
     </svg>
   );
 }
@@ -272,33 +324,34 @@ export function IsoIcon(props: IconProps) {
 /** Solid cube: the model editing mode. */
 export function ModelModeIcon(props: IconProps) {
   return (
-    <svg {...base(props.size ?? REFERENCE_SIZE)}>
-      <path d="M12 3l7.5 4.3v8.4L12 20l-7.5-4.3V7.3z" />
-      <path d="M4.5 7.3l7.5 4.3 7.5-4.3M12 11.6V20" />
+    <svg {...base(props.size ?? BOX)}>
+      <path d={CUBE} />
     </svg>
   );
 }
 
 /** Pencil over a corner: the sketch editing mode. */
 export function SketchModeIcon(props: IconProps) {
+  const a: P = [2.5, 13.5];
+  const b: P = [2.5, 7.5];
+  const c: P = [7.5, 2.5];
   return (
-    <svg {...base(props.size ?? REFERENCE_SIZE)}>
-      <path d="M4 20V9l6-5" />
-      <path d="M13.2 15.6l6.4-6.4 2.1 2.1-6.4 6.4-2.9.8z" />
-      <Dot cx={4} cy={20} />
-      <Dot cx={4} cy={9} />
-      <Dot cx={10} cy={4} />
+    <svg {...base(props.size ?? BOX)}>
+      <path d={link([a, b], "point", "point") + link([b, c], "point", "point")} />
+      <path d="M7.5 14.5L8.5 11.5L13 7L15 9L10.5 13.5Z" />
+      <Pt x={a[0]} y={a[1]} />
+      <Pt x={b[0]} y={b[1]} />
+      <Pt x={c[0]} y={c[1]} />
     </svg>
   );
 }
 
 /** Field lines through a part: the simulate editing mode. */
 export function SimulateModeIcon(props: IconProps) {
+  const wave = (y: number) => `M1.5 ${y}C3.5 ${y - 1.6} 5.5 ${y - 1.6} 8 ${y}S12.5 ${y + 1.6} 14.5 ${y}`;
   return (
-    <svg {...base(props.size ?? REFERENCE_SIZE)}>
-      <path d="M3 8c3-3.4 6-3.4 9 0s6 3.4 9 0" />
-      <path d="M3 13c3-3.4 6-3.4 9 0s6 3.4 9 0" />
-      <path d="M3 18c3-3.4 6-3.4 9 0s6 3.4 9 0" />
+    <svg {...base(props.size ?? BOX)}>
+      <path d={wave(4) + wave(8.5) + wave(13)} />
     </svg>
   );
 }
@@ -306,9 +359,9 @@ export function SimulateModeIcon(props: IconProps) {
 /** Profile pushed upward: extrude. */
 export function ExtrudeIcon(props: IconProps) {
   return (
-    <svg {...base(props.size ?? REFERENCE_SIZE)}>
-      <path d="M5 17.5l7 3.5 7-3.5-7-3.5z" />
-      <path d="M12 12V4M9 7l3-3 3 3" />
+    <svg {...base(props.size ?? BOX)}>
+      <path d="M2.5 11.5L8.5 14.5L14.5 11.5L8.5 8.5Z" />
+      <path d="M8.5 6.5V3M6 4L8.5 1.5L11 4" />
     </svg>
   );
 }
@@ -316,11 +369,11 @@ export function ExtrudeIcon(props: IconProps) {
 /** Profile swung around an axis: revolve. */
 export function RevolveIcon(props: IconProps) {
   return (
-    <svg {...base(props.size ?? REFERENCE_SIZE)}>
-      <path d="M12 3v18" stroke-dasharray="2.4 2.4" />
-      <path d="M14.5 6.5h4v5h-4z" />
-      <path d="M5 16.5c0 1.9 3.1 3.5 7 3.5s7-1.6 7-3.5" />
-      <path d="M17.6 18.9l1.4 1.1-1.8.6" />
+    <svg {...base(props.size ?? BOX)}>
+      <path d="M8.5 1.5V15" stroke-dasharray="1 2.5" />
+      <path d="M10.5 2.5H13.5V6.5H10.5Z" />
+      <path d="M3.5 11A5 2.5 0 0 0 13.5 11V10.5" />
+      <path d="M11.5 11.5L13.5 9.5L15.5 11.5" />
     </svg>
   );
 }
@@ -328,10 +381,10 @@ export function RevolveIcon(props: IconProps) {
 /** Two sections joined by walls: loft. */
 export function LoftIcon(props: IconProps) {
   return (
-    <svg {...base(props.size ?? REFERENCE_SIZE)}>
-      <ellipse cx="12" cy="5.5" rx="6" ry="2.4" />
-      <ellipse cx="12" cy="18.5" rx="8" ry="2.8" />
-      <path d="M6 5.8L4 18.2M18 5.8l2 12.4" />
+    <svg {...base(props.size ?? BOX)}>
+      <ellipse cx="8.5" cy="3.5" rx="4" ry="1.5" />
+      <ellipse cx="8.5" cy="12.5" rx="6" ry="2" />
+      <path d="M4.5 3.5L2.5 12.5M12.5 3.5L14.5 12.5" />
     </svg>
   );
 }
@@ -339,32 +392,36 @@ export function LoftIcon(props: IconProps) {
 /** Two points with a dimension between them: distance constraint. */
 export function DistanceIcon(props: IconProps) {
   return (
-    <svg {...base(props.size ?? REFERENCE_SIZE)}>
-      <Dot cx={4.5} cy={12} />
-      <Dot cx={19.5} cy={12} />
-      <path d="M7 12h10M9 9.5L7 12l2 2.5M15 9.5l2 2.5-2 2.5" />
+    <svg {...base(props.size ?? BOX)}>
+      <Pt x={2.5} y={11.5} />
+      <Pt x={13.5} y={11.5} />
+      <path d="M2.5 2.5V6.5M13.5 2.5V6.5M2.5 4.5H13.5" />
     </svg>
   );
 }
 
 /** Level points: horizontal constraint. */
 export function HorizontalIcon(props: IconProps) {
+  const a: P = [3, 8.5];
+  const b: P = [13, 8.5];
   return (
-    <svg {...base(props.size ?? REFERENCE_SIZE)}>
-      <path d="M4 12h16" />
-      <Dot cx={7} cy={12} />
-      <Dot cx={17} cy={12} />
+    <svg {...base(props.size ?? BOX)}>
+      <path d={link([a, b], "point", "point")} />
+      <Pt x={a[0]} y={a[1]} />
+      <Pt x={b[0]} y={b[1]} />
     </svg>
   );
 }
 
 /** Stacked points: vertical constraint. */
 export function VerticalIcon(props: IconProps) {
+  const a: P = [8.5, 3];
+  const b: P = [8.5, 13];
   return (
-    <svg {...base(props.size ?? REFERENCE_SIZE)}>
-      <path d="M12 4v16" />
-      <Dot cx={12} cy={7} />
-      <Dot cx={12} cy={17} />
+    <svg {...base(props.size ?? BOX)}>
+      <path d={link([a, b], "point", "point")} />
+      <Pt x={a[0]} y={a[1]} />
+      <Pt x={b[0]} y={b[1]} />
     </svg>
   );
 }
@@ -372,10 +429,10 @@ export function VerticalIcon(props: IconProps) {
 /** Two points collapsing into one: coincident constraint. */
 export function CoincidentIcon(props: IconProps) {
   return (
-    <svg {...base(props.size ?? REFERENCE_SIZE)}>
-      <Dot cx={12} cy={12} />
-      <circle cx="12" cy="12" r="5.5" />
-      <path d="M3.5 12h3M17.5 12h3" />
+    <svg {...base(props.size ?? BOX)}>
+      <Pt x={8.5} y={8.5} />
+      <circle cx="8.5" cy="8.5" r="4.5" />
+      <path d="M1.5 8.5H2.5M14.5 8.5H15.5" />
     </svg>
   );
 }
@@ -383,8 +440,8 @@ export function CoincidentIcon(props: IconProps) {
 /** Two edges that never meet: parallel constraint. */
 export function ParallelIcon(props: IconProps) {
   return (
-    <svg {...base(props.size ?? REFERENCE_SIZE)}>
-      <path d="M8 4L5 20M19 4l-3 16" />
+    <svg {...base(props.size ?? BOX)}>
+      <path d="M6.5 2.5L3.5 13.5M12.5 2.5L9.5 13.5" />
     </svg>
   );
 }
@@ -392,9 +449,53 @@ export function ParallelIcon(props: IconProps) {
 /** Edges at a right angle: perpendicular constraint. */
 export function PerpendicularIcon(props: IconProps) {
   return (
-    <svg {...base(props.size ?? REFERENCE_SIZE)}>
-      <path d="M6 4v16M6 20h14" />
-      <path d="M6 14h6v6" />
+    <svg {...base(props.size ?? BOX)}>
+      <path d="M3.5 2.5V13.5H14.5" />
+      <path d="M3.5 9.5H7.5V13.5" />
+    </svg>
+  );
+}
+
+/** The cube's three hidden edges, meeting at the far corner behind the near one. */
+const CUBE_HIDDEN = "M8.5 8.5L2.5 12M8.5 8.5L14.5 12M8.5 8.5V1.5";
+
+/** X-Ray: the solid's outline with its hidden edges shown through, dashed. */
+export function XrayIcon(props: IconProps) {
+  return (
+    <svg {...base(props.size ?? BOX)}>
+      <path d={CUBE} />
+      <path d={CUBE_HIDDEN} stroke-dasharray="1.5 1.5" stroke-linecap="butt" />
+    </svg>
+  );
+}
+
+/** Studio: the lit solid, its shadow side hatched. */
+export function StudioIcon(props: IconProps) {
+  return (
+    <svg {...base(props.size ?? BOX)}>
+      <path d={CUBE} />
+      <path d="M10.5 8.6V13.6M12.5 7.4V12.4" />
+    </svg>
+  );
+}
+
+/** Wire: every edge, hidden or not, drawn alike. */
+export function WireIcon(props: IconProps) {
+  return (
+    <svg {...base(props.size ?? BOX)}>
+      <path d={CUBE + CUBE_HIDDEN} />
+    </svg>
+  );
+}
+
+/** A point pinned to ground: the Fix (anchor) constraint. */
+export function FixIcon(props: IconProps) {
+  return (
+    <svg {...base(props.size ?? BOX)}>
+      <circle cx="8.5" cy="4.5" r="1.5" />
+      <path d="M8.5 6.625V10.5" />
+      <path d="M3.5 10.5H13.5" />
+      <path d="M4.5 13.5L6.5 11.5M7.5 13.5L9.5 11.5M10.5 13.5L12.5 11.5" />
     </svg>
   );
 }

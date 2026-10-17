@@ -1,0 +1,1794 @@
+/* The design-language page, set in the language it states.
+ *
+ * Every value is a token from tokens.css. Text roles and the current block
+ * are assigned once, in the two tables below; component blocks carry only
+ * layout, lines and inks. Classes are prefixed `dl-`.
+ */
+
+/* styles.css pins the playground to the window; this page scrolls. */
+html:has(.dl-body),
+.dl-body,
+.dl-body > #root {
+  height: auto;
+  overflow: visible;
+}
+
+.dl-body {
+  /* The top bar is a bar (Y2); the index and the drawer hang under it. */
+  --dl-top: var(--control-lg);
+  background: var(--surface-base);
+  color: var(--ink);
+}
+
+/* ── text roles (T0): every selector that sets text, by role ────────────── */
+
+.dl-top > span,
+.dl-top strong,
+.dl-nav a,
+.dl-nav a small,
+.dl-section h3,
+.dl-kicker,
+.dl-dont-chip,
+.dl-tag,
+.dl-plate > header,
+.dl-table th,
+.dl-ratio em,
+.dl-btn,
+.dl-field > label,
+.dl-seg button,
+.dl-panel > nav button,
+.dl-rows span,
+.dl-menubar > button,
+.dl-menubar-item > button,
+.dl-menu-label,
+.dl-notice > b,
+.dl-status,
+.dl-stages > span,
+.dl-legend > b,
+.dl-viewport .titleblock > span:nth-child(odd),
+.dl-map-region b,
+.dl-map-modes button,
+.dl-map-group i,
+.dl-map-answer b,
+.dl-features td small {
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
+}
+
+.dl-body,
+.dl-top b,
+.dl-note,
+.dl-rule > code,
+.dl-rule > div > p b,
+.dl-swatch > i,
+.dl-swatch small,
+.dl-table,
+.dl-field > small,
+.dl-input,
+.dl-chip,
+.dl-badge,
+.dl-rows b,
+.dl-rows small,
+.dl-rows sub,
+.dl-menu > button,
+.dl-dialog > h4,
+.dl-notice details,
+.dl-stages > output,
+.dl-code,
+.dl-type code,
+.dl-ruler code,
+.dl-ruler b,
+.dl-ladder li code,
+.dl-viewport .readout,
+.dl-viewport .readout b,
+.dl-viewport .titleblock,
+.dl-viewport .legend,
+.dl-bc,
+.dl-icons > div,
+.dl-map-region,
+.dl-features td,
+.dl-variations-choices button {
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
+}
+
+.dl-main > header h1,
+.dl-section > h2,
+.dl-panel-head strong {
+  font: var(--text-title);
+  letter-spacing: var(--track-title);
+  text-transform: var(--case-title);
+  font-variant-numeric: var(--numeric-title);
+}
+
+.dl-prose,
+.dl-rule p,
+.dl-main > header p,
+.dl-table td.prose,
+.dl-dialog > p,
+.dl-notice p,
+.dl-empty p,
+.dl-hint,
+.dl-viewport .hint,
+.dl-map-answer {
+  font: var(--text-prose);
+  letter-spacing: var(--track-prose);
+  text-transform: var(--case-prose);
+  font-variant-numeric: var(--numeric-prose);
+}
+
+/* Program text inside a sentence stays mono (A8). */
+.dl-rule p code,
+.dl-main > header code,
+.dl-prose code,
+.dl-note code,
+.dl-notice p code,
+.dl-empty p code {
+  font-family: var(--font-mono);
+}
+
+/* ── page frame ─────────────────────────────────────────────────────────── */
+
+.dl-top {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: var(--inset);
+  height: var(--dl-top);
+  padding: 0 var(--section);
+  border-bottom: var(--line);
+  background: var(--surface-base);
+}
+.dl-top b {
+  display: grid;
+  place-items: center;
+  width: var(--control-sm);
+  height: var(--control-sm);
+}
+.dl-top > span {
+  color: var(--ink-3);
+}
+.dl-top-end {
+  display: flex;
+  align-items: center;
+  gap: var(--gap);
+  margin-left: auto;
+}
+.dl-top a {
+  text-decoration: none;
+}
+
+.dl {
+  display: grid;
+  grid-template-columns: calc(var(--unit) * 52) minmax(0, calc(var(--unit) * 230));
+  gap: 0 var(--section);
+  padding: 0 var(--section) calc(var(--unit) * 24);
+}
+
+.dl-nav {
+  position: sticky;
+  top: var(--dl-top);
+  align-self: start;
+  max-height: calc(100vh - var(--dl-top));
+  overflow: auto;
+  padding: var(--section) 0;
+}
+.dl-nav ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: var(--line);
+}
+.dl-nav li {
+  border-bottom: var(--line);
+}
+.dl-nav a {
+  display: grid;
+  grid-template-columns: calc(var(--unit) * 7) 1fr;
+  align-items: center;
+  min-height: var(--control-sm);
+  padding: 0 var(--gap);
+  color: var(--ink-2);
+  text-decoration: none;
+}
+.dl-nav a small {
+  color: var(--ink-3);
+}
+.dl-nav a:hover {
+  background: var(--surface-bar-alt);
+  color: var(--ink);
+}
+.dl-nav a.current small {
+  color: var(--ink-on-accent);
+}
+
+/* ── prose and headings ────────────────────────────────────────────────── */
+
+.dl-main > header {
+  padding: calc(var(--unit) * 10) 0 var(--section);
+  border-bottom: var(--line);
+}
+.dl-main > header h1 {
+  margin: 0 0 var(--inset);
+}
+.dl-prose,
+.dl-rule p,
+.dl-main > header p,
+.dl-note {
+  max-width: 72ch;
+}
+.dl-prose {
+  margin: 0 0 var(--section);
+  color: var(--ink-2);
+}
+.dl-note {
+  margin: var(--inset) 0 0;
+  color: var(--ink-3);
+}
+
+.dl-section {
+  padding: calc(var(--unit) * 10) 0 0;
+  scroll-margin-top: var(--dl-top);
+}
+.dl-section > h2 {
+  display: flex;
+  align-items: baseline;
+  gap: var(--inset);
+  margin: 0 0 var(--section);
+  padding-bottom: var(--inset);
+  border-bottom: var(--line);
+}
+.dl-section h3 {
+  margin: var(--section) 0 var(--inset);
+  color: var(--ink-2);
+}
+
+/* ── rules and plates ───────────────────────────────────────────────────── */
+
+/* A rule: its id in the margin, the sentence beside it, the plates under. */
+.dl-rule {
+  display: grid;
+  grid-template-columns: calc(var(--unit) * 12) minmax(0, 1fr);
+  gap: 0 var(--inset);
+  padding: var(--section) 0;
+  border-top: var(--line);
+}
+.dl-rule > code {
+  padding-top: var(--gap);
+  color: var(--ink-3);
+}
+.dl-rule > div > p {
+  margin: 0;
+  color: var(--ink);
+}
+.dl-rule > div > p b {
+  color: var(--ink);
+}
+.dl-rule > div > p + p {
+  margin-top: var(--gap);
+  color: var(--ink-2);
+}
+
+.dl-examples {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(calc(var(--unit) * 64), 1fr));
+  gap: var(--inset);
+  margin-top: var(--section);
+}
+.dl-examples.single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* A plate is the one boxed thing on the page: a surface the reader works in. */
+.dl-plate {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  border: var(--line);
+  background: var(--surface-float);
+}
+.dl-plate > header {
+  display: flex;
+  align-items: center;
+  gap: var(--inset);
+  min-height: var(--control-sm);
+  padding: var(--gap) var(--inset);
+  border-bottom: var(--line);
+  color: var(--ink-3);
+}
+.dl-plate > header > span:first-child {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+/* Do and Don't carry a word and a shape as well as a hue (A4). */
+.dl-plate > header .do {
+  color: var(--ok);
+}
+.dl-plate > header .dont {
+  color: var(--danger);
+}
+.dl-plate > header .do::before {
+  content: "● ";
+}
+.dl-plate > header .dont::before {
+  content: "✕ ";
+}
+.dl-plate > .dl-stage {
+  flex: 1;
+  padding: var(--section);
+}
+.dl-plate > .dl-stage.ground {
+  background: var(--surface-base);
+}
+.dl-stage.with-menu {
+  min-height: calc(var(--unit) * 60);
+}
+
+/* ── swatches, tables, ratios ───────────────────────────────────────────── */
+
+.dl-swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(calc(var(--unit) * 40), 1fr));
+  gap: var(--inset);
+}
+.dl-swatch {
+  display: grid;
+  grid-template-rows: calc(var(--unit) * 12) auto;
+  border: var(--line);
+  background: var(--surface-float);
+}
+.dl-swatch > i {
+  display: grid;
+  place-items: end start;
+  padding: var(--gap);
+  border-bottom: var(--line);
+}
+.dl-swatch > div {
+  display: grid;
+  gap: var(--gap);
+  padding: var(--inset);
+}
+.dl-swatch small {
+  color: var(--ink-3);
+}
+
+.dl-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.dl-table th,
+.dl-table td {
+  padding: var(--inset);
+  border-bottom: var(--line);
+}
+.dl-table th {
+  color: var(--ink-3);
+  text-align: left;
+}
+.dl-table td {
+  vertical-align: middle;
+}
+.dl-table td:first-child {
+  white-space: nowrap;
+}
+.dl-table td.num,
+.dl-table th.num {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.dl-table td.prose {
+  color: var(--ink-2);
+}
+.dl-table td i.dl-dot {
+  display: inline-block;
+  width: calc(var(--unit) * 3);
+  height: calc(var(--unit) * 3);
+  margin-right: var(--inset);
+  vertical-align: calc(var(--gap) * -1);
+}
+
+/* A measured ratio, with its verdict as a word (A4, A5). */
+.dl-ratio {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.dl-ratio em {
+  margin-left: var(--gap);
+}
+.dl-ratio em.pass {
+  color: var(--ok);
+}
+.dl-ratio em.fail {
+  color: var(--danger);
+}
+.dl-ratio em.band {
+  color: var(--ink-3);
+}
+
+/* ── specimens of the app's components ──────────────────────────────────── */
+
+.dl-row-of {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--inset);
+}
+.dl-stack {
+  display: grid;
+  gap: var(--inset);
+}
+
+.dl-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--inset);
+  height: var(--control-lg);
+  padding: 0 var(--section);
+  border: var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-float);
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
+}
+.dl-btn:hover {
+  background: var(--surface-bar-alt);
+  color: var(--ink);
+}
+.dl-btn:active,
+.dl-btn.pressed {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+.dl-btn:disabled {
+  border-color: var(--rule);
+  background: var(--surface-float);
+  color: var(--ink-3);
+  cursor: default;
+}
+.dl-btn.primary,
+.dl-btn.armed {
+  border-color: var(--accent);
+}
+.dl-btn.quiet {
+  border-color: transparent;
+  background: transparent;
+}
+.dl-btn.quiet:hover {
+  background: var(--surface-bar-alt);
+}
+.dl-btn.destructive {
+  color: var(--danger);
+}
+.dl-btn.destructive:hover {
+  border-color: var(--danger);
+  color: var(--danger-ink);
+}
+.dl-btn.add {
+  border-style: dashed;
+}
+.dl-btn.h-sm {
+  height: var(--control-sm);
+  padding: 0 var(--inset);
+}
+.dl-btn.h-xl {
+  height: var(--control-xl);
+}
+.dl-btn svg {
+  flex: 0 0 auto;
+}
+
+/* Keyboard focus: one visible ring, everywhere. */
+.dl-body :focus-visible {
+  outline: var(--line-active);
+  outline-offset: var(--hairline);
+}
+
+.dl-field {
+  display: grid;
+  grid-template-columns: minmax(calc(var(--unit) * 20), 1fr) calc(var(--unit) * 32) calc(var(--unit) * 10);
+  align-items: center;
+  gap: var(--inset);
+  min-height: var(--control-sm);
+}
+.dl-field > label,
+.dl-field > small {
+  color: var(--ink-3);
+}
+.dl-input {
+  box-sizing: border-box;
+  width: 100%;
+  height: var(--control-sm);
+  padding: 0 var(--inset);
+  border: var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-float);
+  color: var(--ink);
+  text-align: right;
+}
+.dl-input:focus {
+  outline: var(--line-active);
+  outline-offset: calc(var(--hairline) * -1);
+}
+.dl-input.invalid {
+  border-color: var(--danger);
+  color: var(--danger-ink);
+}
+.dl-input.invalid:focus {
+  outline-color: var(--danger);
+}
+.dl-input:disabled {
+  border-color: var(--rule);
+  color: var(--ink-3);
+}
+.dl-input[readonly] {
+  border-style: dashed;
+  border-color: var(--rule);
+  color: var(--ink-2);
+  text-align: left;
+}
+
+.dl-seg {
+  display: inline-flex;
+  border: var(--line);
+}
+.dl-seg button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--inset);
+  height: var(--control-lg);
+  padding: 0 var(--section);
+  border: 0;
+  border-right: var(--line);
+  background: var(--surface-float);
+  color: var(--ink-2);
+  cursor: pointer;
+}
+.dl-seg button:last-child {
+  border-right: 0;
+}
+.dl-seg button:hover {
+  background: var(--surface-bar-alt);
+}
+
+.dl-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gap);
+  height: var(--control-tag);
+  padding: 0 var(--gap);
+  border: var(--line);
+  background: var(--surface-float);
+  color: var(--ink);
+}
+.dl-chip button {
+  display: grid;
+  place-items: center;
+  width: var(--control-tag);
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink-3);
+  cursor: pointer;
+}
+.dl-chip button:hover {
+  background: var(--surface-bar-alt);
+  color: var(--ink);
+}
+.dl-chip.violated {
+  border-color: var(--danger);
+  color: var(--danger-ink);
+}
+
+/* Labels of kind: the kind block at tag height (B3). A Don't chip takes
+   the same shape in a forbidden fill. */
+.dl-tag,
+.dl-kicker,
+.dl-dont-chip {
+  display: inline-flex;
+  align-items: center;
+  height: var(--control-tag);
+  padding: 0 var(--gap);
+  background: var(--block-kind);
+  color: var(--block-kind-ink);
+}
+.dl-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: var(--control-tag);
+  height: var(--control-tag);
+  padding: 0 var(--gap);
+  background: var(--surface-bar-alt);
+  color: var(--ink);
+}
+.dl-badge.free {
+  background: var(--param);
+  color: var(--surface-float);
+}
+
+/* Panel: a tab strip, then the sheet with its head. */
+.dl-panel {
+  border: var(--line);
+  background: var(--surface-float);
+}
+.dl-panel > nav {
+  display: flex;
+  height: var(--control-lg);
+  border-bottom: var(--line);
+  background: var(--surface-base);
+}
+.dl-panel > nav button {
+  padding: 0 var(--inset);
+  border: 0;
+  border-right: var(--line);
+  border-bottom: var(--line-active);
+  border-bottom-color: transparent;
+  background: transparent;
+  color: var(--ink-3);
+  cursor: pointer;
+}
+.dl-panel > nav button.active {
+  border-bottom-color: var(--ink);
+  background: var(--surface-float);
+  color: var(--ink);
+}
+.dl-panel > div {
+  padding: var(--inset);
+}
+.dl-panel-head {
+  display: grid;
+  gap: var(--gap);
+  margin-bottom: var(--inset);
+}
+.dl-panel-head > span {
+  justify-self: start;
+}
+
+/* Rows: label | value unit, on one baseline, values right-hung. */
+.dl-rows {
+  display: grid;
+  border-top: var(--line);
+}
+.dl-rows > div {
+  display: grid;
+  grid-template-columns: 1fr auto calc(var(--unit) * 10);
+  align-items: baseline;
+  gap: var(--inset);
+  min-height: var(--control-sm);
+  padding: var(--gap) 0;
+  border-bottom: var(--line);
+}
+.dl-rows span,
+.dl-rows small,
+.dl-rows sub {
+  color: var(--ink-3);
+}
+.dl-rows b,
+.dl-rows sub {
+  text-align: right;
+}
+.dl-rows .free b {
+  color: var(--param);
+}
+.dl-rows sub {
+  grid-column: 2 / 4;
+  vertical-align: baseline;
+}
+
+/* Menus: one column, a fixed leading column for checks and dots (K5). */
+.dl-menu {
+  display: grid;
+  width: calc(var(--unit) * 64);
+  padding: var(--gap) 0;
+  border: var(--line);
+  background: var(--surface-float);
+}
+.dl-menu > button {
+  display: grid;
+  grid-template-columns: calc(var(--unit) * 6) 1fr auto;
+  align-items: center;
+  height: var(--control-sm);
+  padding: 0 var(--inset) 0 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.dl-menu > button:hover {
+  background: var(--surface-bar-alt);
+}
+.dl-menu > button > span:first-child {
+  text-align: center;
+}
+.dl-menu > button:disabled {
+  color: var(--ink-3);
+  cursor: default;
+}
+.dl-menu > button kbd {
+  color: var(--ink-3);
+  font: inherit;
+  letter-spacing: normal;
+  text-transform: none;
+}
+.dl-menu > button.selected kbd {
+  color: var(--ink-on-accent);
+}
+.dl-menu > hr {
+  width: 100%;
+  margin: var(--gap) 0;
+  border: 0;
+  border-top: var(--line);
+}
+.dl-menu.flush {
+  width: 100%;
+  padding: 0;
+  border: 0;
+}
+.dl-menu-label {
+  padding: var(--inset) var(--inset) var(--gap) calc(var(--unit) * 6);
+  color: var(--ink-3);
+}
+/* The open title's block is exactly the bar's cell; its dropdown hangs from
+   that cell and shares the bar's bottom line. */
+.dl-menubar {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  height: var(--control-lg);
+  border-bottom: var(--line);
+}
+.dl-menubar > button,
+.dl-menubar-item > button {
+  height: 100%;
+  margin: 0;
+  padding: 0 var(--inset);
+  border: 0;
+  background: transparent;
+  color: var(--ink-2);
+}
+.dl-menubar-item {
+  position: relative;
+  display: flex;
+}
+.dl-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 1;
+  margin-top: var(--hairline);
+}
+.dl-menu-stage {
+  min-height: calc(var(--unit) * 156);
+  border: var(--line);
+  background: var(--surface-base);
+}
+
+/* Dialog: a scrim, then a sheet with an edge (E2). */
+.dl-scrim {
+  display: grid;
+  place-items: center;
+  min-height: calc(var(--unit) * 56);
+  padding: var(--section);
+  background: var(--scrim);
+}
+.dl-dialog {
+  width: min(100%, calc(var(--unit) * 100));
+  border: var(--line);
+  background: var(--surface-float);
+}
+/* The title names the program's own file, so it is not uppercased (T2). */
+.dl-dialog > h4 {
+  margin: 0;
+  padding: var(--inset) var(--section);
+  border-bottom: var(--line);
+}
+.dl-dialog > p {
+  margin: 0;
+  padding: var(--section);
+  color: var(--ink-2);
+}
+.dl-dialog > footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--inset);
+  padding: var(--inset) var(--section);
+  border-top: var(--line);
+}
+
+/* Notices: in place, in the program's words (K6). */
+.dl-notice {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: baseline;
+  gap: var(--inset);
+  padding: var(--inset) var(--section);
+  border: var(--line);
+  background: var(--surface-float);
+}
+.dl-notice.error > b {
+  color: var(--danger);
+}
+.dl-notice.error > b::before {
+  content: "■ ";
+}
+.dl-notice p {
+  margin: 0;
+  color: var(--ink);
+}
+.dl-notice > :not(b) {
+  grid-column: 2;
+}
+/* A quiet action hangs on the text's left edge, not on its own padding. */
+.dl-notice > .dl-btn.quiet {
+  justify-self: start;
+  margin-left: calc(var(--inset) * -1);
+}
+.dl-notice > span:empty {
+  display: none;
+}
+.dl-notice details {
+  color: var(--ink-3);
+}
+.dl-notice details pre {
+  margin: var(--gap) 0 0;
+  white-space: pre-wrap;
+}
+
+.dl-status {
+  display: flex;
+  align-items: center;
+  gap: var(--inset);
+  color: var(--ink-2);
+}
+.dl-status i {
+  width: calc(var(--unit) * 2);
+  height: calc(var(--unit) * 2);
+  border-radius: 50%;
+  background: var(--ok);
+}
+.dl-status.stale {
+  color: var(--warn);
+}
+.dl-status.stale i {
+  border-radius: 0;
+  background: var(--warn);
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+
+/* The annunciator strip: every stage allocated, so nothing reflows. */
+.dl-stages {
+  display: flex;
+  align-items: stretch;
+  border: var(--line);
+  background: var(--surface-float);
+}
+.dl-stages > span {
+  display: grid;
+  place-items: center;
+  height: var(--control-lg);
+  padding: 0 var(--inset);
+  border-right: var(--line);
+  color: var(--ink-3);
+}
+.dl-stages > span.done {
+  color: var(--ink);
+}
+.dl-stages > span.failed {
+  color: var(--danger);
+}
+.dl-stages > output {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  min-width: calc(var(--unit) * 36);
+  padding: 0 var(--inset);
+  color: var(--ink-2);
+}
+.dl-stages > .dl-btn {
+  flex: 0 0 calc(var(--unit) * 28);
+  height: auto;
+  border-width: 0 0 0 var(--hairline);
+  border-left-color: var(--rule-strong);
+}
+
+.dl-empty {
+  display: grid;
+  gap: var(--inset);
+  padding: var(--section) 0;
+}
+.dl-empty p {
+  margin: 0;
+  color: var(--ink-2);
+}
+.dl-empty p code {
+  color: var(--ink);
+}
+
+.dl-hint {
+  color: var(--ink-2);
+}
+
+/* A source excerpt, as the editor shows it (C9). */
+.dl-code {
+  margin: 0;
+  padding: var(--inset) 0;
+  border: var(--line);
+  background: var(--surface-float);
+  color: var(--ink);
+  overflow-x: auto;
+}
+.dl-code > div {
+  display: grid;
+  grid-template-columns: calc(var(--unit) * 10) 1fr;
+  padding-right: var(--inset);
+}
+.dl-code > div > span:first-child {
+  padding-right: var(--inset);
+  color: var(--ink-3);
+  text-align: right;
+}
+/* A plate is read, not panned: source wraps. */
+.dl-code > div > span:last-child {
+  white-space: pre-wrap;
+}
+.dl-code .kw,
+.dl-code .str {
+  color: var(--ink-2);
+}
+.dl-code .kwarg,
+.dl-code .punct {
+  color: var(--ink-3);
+}
+.dl-code .com {
+  color: var(--ink-3);
+  font-style: italic;
+}
+.dl-code .lit {
+  transition: background var(--dur-slow) var(--ease);
+}
+.dl-code .free {
+  color: var(--param);
+}
+.dl-code .err {
+  text-decoration: underline wavy var(--danger);
+  text-underline-offset: var(--gap);
+}
+
+/* ── specimens of the system ─────────────────────────────────────────────── */
+
+.dl-type > div {
+  display: grid;
+  grid-template-columns: calc(var(--unit) * 34) calc(var(--unit) * 10) 1fr;
+  align-items: baseline;
+  gap: var(--inset);
+  padding: var(--inset) 0;
+  border-bottom: var(--line);
+}
+.dl-type code,
+.dl-ruler code {
+  color: var(--ink-3);
+}
+
+.dl-ruler {
+  display: grid;
+  gap: var(--gap);
+}
+.dl-ruler > div {
+  display: grid;
+  grid-template-columns: calc(var(--unit) * 22) calc(var(--unit) * 10) 1fr;
+  align-items: center;
+  gap: var(--inset);
+}
+.dl-ruler i,
+.dl-sys-dist > i {
+  display: block;
+  height: calc(var(--unit) * 3);
+  background: var(--ink);
+}
+.dl-ruler b {
+  text-align: right;
+}
+
+/* The unit, drawn as a grid behind a plate (A6). */
+.dl-unit-grid {
+  background-image: linear-gradient(var(--graticule-line) var(--hairline), transparent var(--hairline)),
+    linear-gradient(90deg, var(--graticule-line) var(--hairline), transparent var(--hairline)),
+    linear-gradient(var(--surface-float), var(--surface-float));
+  background-size: var(--unit) var(--unit);
+}
+
+.dl-legend {
+  display: grid;
+  grid-template-columns: calc(var(--unit) * 16) calc(var(--unit) * 14) 1fr calc(var(--unit) * 14);
+  align-items: center;
+  gap: var(--inset);
+  padding: var(--inset) 0;
+  border-bottom: var(--line);
+  font-variant-numeric: tabular-nums;
+}
+.dl-legend > i,
+.dl-viewport .legend i {
+  height: calc(var(--unit) * 2);
+}
+.dl-legend > span:nth-child(2) {
+  text-align: right;
+}
+.dl-legend > b {
+  color: var(--ink-3);
+}
+.dl-bc {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gap);
+  margin: 0 var(--inset) var(--gap) 0;
+}
+.dl-bc i {
+  width: calc(var(--unit) * 2);
+  height: calc(var(--unit) * 2);
+}
+
+.dl-icons {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(calc(var(--unit) * 28), 1fr));
+  border-top: var(--line);
+  border-left: var(--line);
+}
+.dl-icons > div {
+  display: grid;
+  grid-template-columns: calc(var(--unit) * 4) 1fr;
+  align-items: center;
+  gap: var(--inset);
+  min-height: var(--control-lg);
+  padding: 0 var(--inset);
+  border-right: var(--line);
+  border-bottom: var(--line);
+  color: var(--ink-2);
+}
+
+/* B0-B4: the atlas, planes, blocks and marks. */
+.dl-atlas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(calc(var(--unit) * 44), 1fr));
+  gap: var(--section);
+}
+.dl-atlas > section {
+  display: grid;
+  align-content: start;
+  justify-items: start;
+  gap: var(--inset);
+  padding-top: var(--inset);
+  border-top: var(--line);
+}
+.dl-atlas > section > .t-caps:first-child {
+  color: var(--ink-3);
+}
+.dl-atlas-line {
+  display: grid;
+  grid-template-columns: calc(var(--unit) * 16) 1fr;
+  align-items: center;
+  gap: var(--inset);
+}
+.dl-atlas-line > i {
+  display: block;
+}
+.dl-atlas-dist {
+  height: var(--unit);
+  background: var(--ink);
+}
+.dl-atlas-plane {
+  width: 100%;
+  padding: var(--inset);
+  border: var(--line);
+}
+.dl-atlas-marks {
+  display: flex;
+  align-items: center;
+  gap: var(--section);
+}
+.dl-cluster-demo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--inset);
+}
+.dl-plane {
+  display: grid;
+  gap: var(--gap);
+  width: calc(var(--unit) * 48);
+  padding: var(--inset);
+  border: var(--line);
+}
+.dl-sheet-demo {
+  width: calc(var(--unit) * 48);
+  min-height: calc(var(--unit) * 8);
+  border: var(--line);
+  background: var(--plane-sheet);
+}
+.dl-blk {
+  display: inline-flex;
+  align-items: center;
+  height: var(--control-sm);
+  padding: 0 var(--inset);
+}
+.dl-blk.kind {
+  height: var(--control-tag);
+  background: var(--block-kind);
+  color: var(--block-kind-ink);
+}
+.dl-marks {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(calc(var(--unit) * 40), 1fr));
+  gap: var(--inset);
+}
+.dl-marks > span {
+  display: grid;
+  grid-template-columns: calc(var(--unit) * 4) calc(var(--unit) * 16) 1fr;
+  align-items: center;
+  gap: var(--inset);
+}
+.dl-mark {
+  display: block;
+  width: calc(var(--unit) * 2);
+  height: calc(var(--unit) * 2);
+}
+.dl-mark.ring,
+.dl-mark.triangle {
+  width: calc(var(--unit) * 3);
+  height: calc(var(--unit) * 3);
+}
+.dl-mark.dot {
+  border-radius: 50%;
+  background: var(--ink);
+}
+.dl-mark.ring {
+  border: var(--line-active);
+  border-color: var(--ink-2);
+  border-radius: 50%;
+}
+.dl-mark.square {
+  background: var(--ink-3);
+}
+.dl-mark.triangle {
+  background: var(--warn);
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+
+/* §1 specimens: drawn with the module's own numbers, independent of the
+   text roles, so the page states the system rather than quoting it. */
+.dl-sys-row {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  align-items: center;
+  gap: var(--section);
+}
+.dl-sys-unit {
+  width: var(--unit);
+  height: var(--unit);
+  background: var(--ink);
+}
+.dl-sys-line {
+  display: flex;
+  align-items: center;
+  height: calc(var(--unit) * 4);
+  padding: 0 var(--inset);
+  background: rgba(var(--param-rgb), var(--alpha-tint));
+  border-top: var(--line);
+  border-bottom: var(--line);
+}
+.dl-sys-heights {
+  display: grid;
+  gap: var(--inset);
+}
+.dl-sys-height {
+  display: grid;
+  grid-template-columns: calc(var(--unit) * 16) calc(var(--unit) * 8) calc(var(--unit) * 16) calc(var(--unit) * 28) 1fr;
+  align-items: center;
+  gap: var(--inset);
+}
+.dl-sys-box {
+  display: flex;
+  align-items: center;
+  border: var(--line);
+  background: var(--plane-sheet);
+}
+.dl-sys-text {
+  display: block;
+  width: 100%;
+  height: calc(var(--unit) * 4);
+  background: rgba(var(--param-rgb), var(--alpha-tint));
+}
+.dl-sys-dist {
+  display: flex;
+  align-items: center;
+  gap: var(--inset);
+}
+.dl-sys-type > div {
+  display: grid;
+  grid-template-columns: calc(var(--unit) * 16) calc(var(--unit) * 16) 1fr;
+  align-items: center;
+  min-height: calc(var(--unit) * 6);
+  border-bottom: var(--line);
+}
+.dl-sys-sample {
+  font-family: var(--font-mono);
+  line-height: calc(var(--unit) * 4);
+  background: rgba(var(--param-rgb), var(--alpha-wash));
+}
+.dl-sys-sample.caps,
+.dl-sys-sample.title {
+  text-transform: var(--case-caps);
+  letter-spacing: var(--track-caps);
+}
+.dl-sys-sample.title,
+.dl-sys-sample.prose {
+  line-height: calc(var(--unit) * 5);
+}
+.dl-sys-sample.prose {
+  font-family: var(--font-sans);
+}
+.dl-sys-panel {
+  width: calc(var(--unit) * 80);
+  border: var(--line);
+  background: var(--plane-sheet);
+}
+.dl-sys-tabs {
+  display: flex;
+  height: calc(var(--unit) * 8);
+  border-bottom: var(--line);
+  background: var(--plane-ground);
+}
+.dl-sys-tabs span {
+  display: flex;
+  align-items: center;
+  padding: 0 var(--inset);
+  border-right: var(--line);
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  line-height: calc(var(--unit) * 4);
+  text-transform: var(--case-caps);
+  letter-spacing: var(--track-caps);
+}
+.dl-sys-tabs span.active {
+  border-bottom: var(--line-active);
+  background: var(--plane-sheet);
+  color: var(--ink);
+}
+.dl-sys-body {
+  display: grid;
+  gap: var(--section);
+  padding: var(--inset);
+}
+.dl-sys-head {
+  display: grid;
+  justify-items: start;
+  gap: var(--gap);
+}
+.dl-sys-kind {
+  display: inline-flex;
+  align-items: center;
+  height: calc(var(--unit) * 4);
+  padding: 0 var(--gap);
+  background: var(--block-kind);
+  color: var(--block-kind-ink);
+  font-family: var(--font-mono);
+  text-transform: var(--case-caps);
+  letter-spacing: var(--track-caps);
+}
+.dl-sys-title {
+  font-family: var(--font-mono);
+  line-height: calc(var(--unit) * 5);
+  text-transform: var(--case-caps);
+  letter-spacing: var(--track-title);
+}
+.dl-sys-rows {
+  display: grid;
+  border-top: var(--line);
+}
+.dl-sys-rows > div {
+  display: grid;
+  grid-template-columns: calc(var(--unit) * 24) 1fr calc(var(--unit) * 10);
+  align-items: center;
+  gap: var(--inset);
+  height: calc(var(--unit) * 6);
+  border-bottom: var(--line);
+}
+.dl-sys-label {
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  text-transform: var(--case-caps);
+  letter-spacing: var(--track-caps);
+}
+.dl-sys-val {
+  font-family: var(--font-mono);
+  text-align: right;
+}
+.dl-sys-val.num {
+  font-variant-numeric: tabular-nums;
+}
+.dl-sys-unit-t {
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+}
+.dl-sys-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--gap);
+}
+.dl-sys-cell {
+  display: inline-flex;
+  align-items: center;
+  height: calc(var(--unit) * 6);
+  padding: 0 var(--inset);
+  border: var(--line);
+  font-family: var(--font-mono);
+  text-transform: var(--case-caps);
+  letter-spacing: var(--track-caps);
+}
+.dl-sys-cell.primary {
+  border-color: var(--block-current);
+}
+
+/* L1-L6: generated SVG, drawn at the column's width. */
+.dl-drawing {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* ── behaviour demos ─────────────────────────────────────────────────────── */
+
+/* The geometry bar settles; the digits never tween (M2, M3). */
+.dl-bar {
+  height: calc(var(--unit) * 3);
+  background: var(--ink);
+  transition: width var(--dur-slow) var(--ease-inout);
+}
+
+/* A machinist's rule with a detented handle (F4). */
+.dl-track {
+  position: relative;
+  height: calc(var(--unit) * 10);
+  border-bottom: var(--line);
+  touch-action: none;
+  cursor: ew-resize;
+  user-select: none;
+}
+.dl-track > i {
+  position: absolute;
+  bottom: 0;
+  width: var(--hairline);
+  height: calc(var(--unit) * 2);
+  background: var(--rule-strong);
+}
+.dl-track > i.major {
+  height: calc(var(--unit) * 4);
+  background: var(--ink-3);
+}
+.dl-track > b {
+  position: absolute;
+  bottom: calc(var(--unit) * -2);
+  width: calc(var(--unit) * 4);
+  height: calc(var(--unit) * 4);
+  margin-left: calc(var(--unit) * -2);
+  border: var(--line-active);
+  border-color: var(--ink-2);
+  border-radius: 50%;
+  background: var(--surface-float);
+}
+.dl-track.dragging > b {
+  border-color: var(--ink);
+  background: var(--ink);
+}
+.dl-track > b.origin {
+  border-style: dashed;
+  border-color: var(--rule-strong);
+  background: transparent;
+}
+
+/* The escape ladder (A11, F6). */
+.dl-ladder {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: var(--line);
+}
+.dl-ladder li {
+  display: grid;
+  grid-template-columns: calc(var(--unit) * 6) 1fr auto;
+  align-items: center;
+  gap: var(--inset);
+  min-height: var(--control-sm);
+  border-bottom: var(--line);
+  color: var(--ink-3);
+}
+.dl-ladder li.held {
+  color: var(--ink);
+}
+.dl-ladder li.next {
+  background: var(--surface-bar-alt);
+}
+.dl-ladder li code {
+  color: var(--ink-3);
+  text-align: right;
+}
+.dl-ladder li > span:first-child {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── the viewport specimen (V1-V3) ──────────────────────────────────────── */
+
+.dl-viewport {
+  position: relative;
+  border: var(--line);
+  background: var(--surface-viewport);
+}
+.dl-viewport svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.dl-viewport .hint {
+  position: absolute;
+  left: 50%;
+  bottom: var(--inset);
+  display: flex;
+  align-items: center;
+  gap: var(--inset);
+  transform: translateX(-50%);
+  color: var(--viewport-ink-2);
+  white-space: nowrap;
+}
+.dl-viewport .readout {
+  position: absolute;
+  top: var(--inset);
+  left: var(--inset);
+  color: var(--viewport-ink-2);
+}
+.dl-viewport .readout b {
+  color: var(--viewport-ink);
+}
+.dl-viewport .titleblock,
+.dl-viewport .legend {
+  position: absolute;
+  bottom: calc(var(--unit) * 10);
+  border: var(--line);
+  background: var(--surface-float);
+}
+.dl-viewport .titleblock {
+  right: var(--inset);
+  display: grid;
+  grid-template-columns: auto calc(var(--unit) * 28);
+}
+.dl-viewport .titleblock > span {
+  padding: var(--gap) var(--inset);
+  border-bottom: var(--line);
+}
+.dl-viewport .titleblock > span:nth-child(odd) {
+  border-right: var(--line);
+  color: var(--ink-3);
+}
+.dl-viewport .legend {
+  left: var(--inset);
+  display: grid;
+  grid-template-columns: auto calc(var(--unit) * 40) auto;
+  align-items: center;
+  gap: var(--inset);
+  padding: var(--gap) var(--inset);
+}
+
+/* ── the desk map (N1) ───────────────────────────────────────────────────── */
+
+.dl-map {
+  display: grid;
+  grid-template-columns: 23fr 41fr 16fr;
+  grid-template-rows: calc(var(--unit) * 6) calc(var(--unit) * 8) calc(var(--unit) * 60) calc(var(--unit) * 6);
+  grid-template-areas:
+    "menu menu menu"
+    "modes program program"
+    "editor viewport column"
+    "tray tray tray";
+  border: var(--line);
+  background: var(--surface-base);
+}
+.dl-map-region {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--gap);
+  padding: 0 var(--inset);
+  border-right: var(--line);
+  border-bottom: var(--line);
+  outline: var(--line-active);
+  outline-color: transparent;
+  outline-offset: calc(var(--stroke-active) * -1);
+  color: var(--ink-3);
+  cursor: default;
+  transition: outline-color var(--dur-fast) var(--ease);
+}
+.dl-map-region:focus-visible,
+.dl-map-region.focus {
+  outline-color: var(--ink);
+  color: var(--ink-2);
+}
+.dl-map-region b {
+  color: var(--ink);
+}
+.dl-map-region.sheet {
+  background: var(--surface-float);
+}
+.dl-map-region.bar {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+.dl-map-region.viewport {
+  align-items: center;
+  border-color: var(--rule-heavy);
+}
+.dl-map-region.viewport small {
+  position: absolute;
+}
+.dl-map-region .tl {
+  top: var(--inset);
+  left: var(--inset);
+}
+.dl-map-region .tr {
+  top: var(--inset);
+  right: var(--inset);
+}
+.dl-map-region .bl {
+  bottom: var(--inset);
+  left: var(--inset);
+}
+.dl-map-region .br {
+  bottom: var(--inset);
+  right: var(--inset);
+}
+.dl-map-region .bc {
+  bottom: var(--inset);
+  left: 50%;
+  transform: translateX(-50%);
+}
+.dl-map-region.column {
+  justify-content: stretch;
+  gap: 0;
+  padding: 0;
+}
+.dl-map-modes {
+  display: flex;
+  width: max-content;
+  border: var(--line);
+}
+.dl-map-modes button {
+  padding: var(--gap) var(--inset);
+  border: 0;
+  background: var(--surface-float);
+  color: var(--ink-2);
+  cursor: pointer;
+}
+.dl-map-modes button:hover {
+  background: var(--surface-bar-alt);
+}
+.dl-map-group {
+  flex: 1;
+  padding: var(--inset) var(--inset) 0;
+  border-bottom: var(--line);
+}
+.dl-map-group:last-child {
+  border-bottom: 0;
+}
+.dl-map-group > span {
+  display: flex;
+  flex-wrap: wrap;
+  border-bottom: var(--line);
+}
+.dl-map-group i {
+  padding: var(--gap) var(--inset);
+  color: var(--ink-3);
+}
+.dl-map-group i.on {
+  color: var(--ink);
+  border-bottom: var(--line-active);
+}
+/* The region's name in mono, what it answers in sans (A8). */
+.dl-map-answer {
+  display: grid;
+  grid-template-columns: calc(var(--unit) * 40) 1fr;
+  gap: var(--inset);
+  min-height: calc(var(--unit) * 10);
+  margin: 0;
+  color: var(--ink-2);
+}
+.dl-map-answer b {
+  color: var(--ink);
+}
+
+/* ── the feature index (N9-N11) ─────────────────────────────────────────── */
+
+.dl-features td:first-child {
+  white-space: normal;
+  color: var(--ink);
+}
+.dl-features td small {
+  color: var(--ink-3);
+}
+.dl-features tr.group th {
+  padding-top: var(--section);
+  color: var(--ink);
+  border-bottom-color: var(--rule-strong);
+}
+
+/* ── tool rail and flyout (A12, K8a) ────────────────────────────────────── */
+
+.dl-fly {
+  min-height: calc(var(--unit) * 48);
+}
+.dl-fly-rail {
+  position: relative;
+  display: inline-grid;
+  gap: var(--gap);
+  padding: var(--gap);
+  border: var(--line);
+  background: var(--plane-sheet);
+}
+.dl-fly-cell {
+  display: grid;
+  place-items: center;
+  width: var(--control-lg);
+  height: var(--control-lg);
+  color: var(--ink-2);
+}
+.dl-fly-cell.parent {
+  background: var(--plane-step);
+  color: var(--ink);
+}
+/* A separate sheet a section out from the rail, its padding putting its
+   cells on the parent's row; the notch points back at the parent. */
+.dl-fly-out {
+  position: absolute;
+  top: calc(var(--gap) + var(--control-lg) + var(--gap) - var(--gap) - var(--hairline));
+  left: calc(100% + var(--hairline) + var(--section));
+  display: flex;
+  gap: var(--gap);
+  padding: var(--gap);
+  border: var(--line);
+  background: var(--plane-sheet);
+}
+.dl-fly-out::before {
+  content: "";
+  position: absolute;
+  top: calc(50% - var(--gap));
+  left: calc(var(--gap) * -1 - var(--hairline));
+  width: var(--inset);
+  height: var(--inset);
+  border-left: var(--line);
+  border-bottom: var(--line);
+  background: var(--plane-sheet);
+  transform: rotate(45deg);
+}
+/* The Don't: an open group as a second card, larger, off its parent's row. */
+.dl-fly-group {
+  position: relative;
+}
+.dl-fly-cell.open {
+  border: var(--line);
+  color: var(--ink);
+}
+.dl-fly-detached {
+  position: absolute;
+  top: calc(var(--unit) * -2);
+  left: calc(100% + var(--gap) + var(--section));
+  display: flex;
+  gap: var(--gap);
+  padding: var(--inset);
+  border: var(--line);
+  background: var(--plane-sheet);
+}
+.dl-fly-detached .dl-fly-cell {
+  width: calc(var(--control-lg) + var(--inset));
+  height: calc(var(--control-lg) + var(--inset));
+}
+
+/* ── the Variations drawer ──────────────────────────────────────────────── */
+
+.dl-variations {
+  position: fixed;
+  top: var(--dl-top);
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  display: grid;
+  align-content: start;
+  gap: var(--section);
+  width: calc(var(--unit) * 96);
+  padding: var(--section);
+  overflow-y: auto;
+  border-left: var(--line);
+  background: var(--plane-sheet);
+}
+.dl-variations-axis {
+  display: grid;
+  gap: var(--gap);
+}
+.dl-variations-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gap);
+}
+.dl-variations-choices button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gap);
+  height: var(--control-sm);
+  padding: 0 var(--inset);
+  border: var(--line);
+  border-radius: var(--radius);
+  background: var(--plane-sheet);
+  color: var(--ink-2);
+  cursor: pointer;
+}
+.dl-variations-choices button:hover {
+  background: var(--plane-step);
+  color: var(--ink);
+}
+.dl-variations-choices button.active {
+  border-color: var(--block-current);
+}
+.dl-variations-choices button i {
+  display: block;
+  width: calc(var(--unit) * 3);
+  height: calc(var(--unit) * 3);
+}
+
+/* ── the current block (B3, C5): one fill, assigned once ────────────────── */
+
+/* Last in the sheet so a current thing never changes under the pointer. */
+.dl-top b,
+.dl-nav a.current,
+.dl-btn.primary,
+.dl-btn.armed,
+.dl-seg button.active,
+.dl-menubar-item > button.open,
+.dl-menu > button.selected,
+.dl-stages > span.current,
+.dl-code .lit.lit-on,
+.dl-blk.current,
+.dl-sys-cell.primary,
+.dl-map-modes button.on,
+.dl-variations-choices button.active {
+  background: var(--block-current);
+  color: var(--block-current-ink);
+}
+.dl-btn.primary:disabled {
+  border-color: var(--surface-bar-alt);
+  background: var(--surface-bar-alt);
+  color: var(--ink-3);
+}
+
+@media (max-width: 960px) {
+  .dl {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .dl-nav {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dl-body * {
+    transition-duration: 0ms !important;
+  }
+}

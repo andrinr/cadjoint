@@ -36,6 +36,7 @@ import { busy, materials, nodes, source } from "../state";
 import { NumberInput } from "./ui";
 import { hasPhysicalBlock, physicalRows, type PhysicalRow } from "../materialProperties";
 import type { MaterialDefinition } from "../types";
+import { materialPreviewUrl } from "./materialPreview";
 
 export const MATERIAL_DRAG_TYPE = "application/x-cadjoint-material";
 
@@ -106,18 +107,6 @@ function colorRgb(hex: string): [number, number, number] {
     number,
     number,
   ];
-}
-
-function previewStyle(material: MaterialDefinition): string {
-  const [red, green, blue] = material.color.map((value) =>
-    Math.round(Math.max(0, Math.min(1, value)) * 255),
-  );
-  return [
-    `--material-rgb: ${red}, ${green}, ${blue}`,
-    `--material-roughness: ${material.roughness}`,
-    `--material-metallic: ${material.metallic}`,
-    `--material-opacity: ${Math.max(0.16, material.opacity)}`,
-  ].join(";");
 }
 
 export function MaterialPanel(props: MaterialPanelProps) {
@@ -201,7 +190,9 @@ export function MaterialPanel(props: MaterialPanelProps) {
     <aside class="material-panel" data-testid="material-panel">
         <header>
           <div class="material-panel-title">
-            <span class="material-panel-icon" aria-hidden="true" />
+            <span class="material-panel-icon" aria-hidden="true">
+              <Show when={active() && materialPreviewUrl(active()!)}>{(url) => <img src={url()} alt="" />}</Show>
+            </span>
             <span>
               <small>Library</small>
               Materials
@@ -245,8 +236,10 @@ export function MaterialPanel(props: MaterialPanelProps) {
                   setActiveId(material.id);
                 }}
               >
-                <div class="material-preview" style={previewStyle(material)}>
-                  <span />
+                <div class="material-preview">
+                  <Show when={materialPreviewUrl(material)}>
+                    {(url) => <img src={url()} alt="" draggable={false} />}
+                  </Show>
                 </div>
                 <span class="material-name">{material.name.replaceAll("_", " ")}</span>
                 <small>

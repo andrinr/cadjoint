@@ -17,9 +17,12 @@ import {
   keymap,
   lineNumbers,
   type DecorationSet,
+  MatchDecorator,
+  ViewPlugin,
+  type ViewUpdate,
 } from "@codemirror/view";
 import { createEffect, onCleanup, onMount } from "solid-js";
-import { intelligenceExtensions } from "../editor/extensions";
+import { intelligenceExtensions, textRole } from "../editor/extensions";
 import { minimalChange } from "../editor/minimalChange";
 import type { FocusSpan } from "../editorFocus";
 import { consoleText, sceneName, setDirty, setSource, source } from "../state";
@@ -56,49 +59,82 @@ const highlightField = StateField.define<DecorationSet>({
  * the source pane and the panels around it are painted from one system, and
  * every one of them clears WCAG AA on --surface-panel.
  *
- * The mapping is deliberate rather than decorative. There is one accent in
- * this design and its only legal use is a fill behind near-black type, so
- * syntax cannot be painted with it: what is left is the status family, and it
- * is spent on the distinction the reader actually needs while editing a scene
- * — is this the language, or is it a value? Keywords take --info because they
- * are the language's own vocabulary, literals take --ok and --warn because
- * they are the numbers and strings the viewport tools rewrite, names that
- * denote a type take --danger, and comments drop to the muted ink every
- * de-emphasised label in the app uses.
+ * The mapping is achromatic — hue is meaning, and syntax has none to carry —
+ * so ink level alone gives the program's shape: values at full ink;
+ * declarations, keywords and strings one step down; argument names,
+ * punctuation and comments two steps down.
  */
 const highlightStyle = HighlightStyle.define([
+  // The values are the subject (A1): numbers and booleans are the literals a
+  // panel, a drag or the optimiser rewrites, so they alone take full ink.
+  { tag: [tags.number, tags.bool, tags.null], color: "var(--ink)" },
+  // The program's structure — what it declares and the words it is built
+  // from — one ink step down.
+  { tag: tags.definition(tags.variableName), color: "var(--ink-2)" },
+  { tag: tags.function(tags.variableName), color: "var(--ink-2)" },
+  { tag: [tags.className, tags.typeName, tags.namespace], color: "var(--ink-2)" },
+  { tag: [tags.keyword, tags.controlKeyword, tags.moduleKeyword], color: "var(--ink-2)" },
+  { tag: tags.self, color: "var(--ink-2)", fontStyle: "italic" },
+  { tag: [tags.string, tags.special(tags.string)], color: "var(--ink-2)" },
+  // Argument names, punctuation and comments recede, so `density=8940.0`
+  // reads as its number.
+  { tag: [tags.propertyName, tags.attributeName], color: "var(--ink-3)" },
+  { tag: tags.variableName, color: "var(--ink)" },
+  { tag: [tags.operator, tags.punctuation, tags.separator, tags.paren, tags.squareBracket, tags.brace], color: "var(--ink-3)" },
   { tag: tags.comment, color: "var(--ink-3)", fontStyle: "italic" },
-  { tag: tags.keyword, color: "var(--info)" },
-  { tag: [tags.controlKeyword, tags.moduleKeyword], color: "var(--info-ink)" },
-  { tag: [tags.string, tags.special(tags.string)], color: "var(--ok)" },
-  { tag: [tags.number, tags.bool, tags.null], color: "var(--warn)" },
-  { tag: [tags.className, tags.typeName, tags.namespace], color: "var(--danger)" },
-  { tag: tags.function(tags.variableName), color: "var(--ink)" },
-  { tag: tags.definition(tags.variableName), color: "var(--ink)" },
-  { tag: tags.propertyName, color: "var(--ink-2)" },
-  { tag: [tags.operator, tags.punctuation, tags.separator], color: "var(--ink-2)" },
-  { tag: tags.self, color: "var(--danger)", fontStyle: "italic" },
 ]);
+
+/** A view plugin that marks every match of `regexp` with `className`. */
+function markMatches(regexp: RegExp, className: string) {
+  const matcher = new MatchDecorator({ regexp, decoration: Decoration.mark({ class: className }) });
+  return ViewPlugin.fromClass(
+    class {
+      decorations: DecorationSet;
+      constructor(view: EditorView) {
+        this.decorations = matcher.createDeco(view);
+      }
+      update(update: ViewUpdate) {
+        this.decorations = matcher.updateDeco(update, this.decorations);
+      }
+    },
+    { decorations: (plugin) => plugin.decorations },
+  );
+}
+
+/**
+ * The editor's one hue besides diagnostics: `free=True` in the free-parameter
+ * blue (token `param`), the literal a drag or the optimiser may rewrite.
+ */
+const freeParameters = markMatches(/\bfree\s*=\s*True\b/g, "cm-free-param");
+
+/**
+ * Keyword-argument names (`density=`) recede to ink-3. The Python grammar
+ * tags them as plain variables, so they are found by shape: a name glued to a
+ * single `=` after `(`, `,` or indentation (an assignment has spaces).
+ */
+const keywordArguments = markMatches(/(?<=[(,]\s*|^\s+)([A-Za-z_]\w*)(?==(?!=))/gm, "cm-kwarg");
 
 const theme = EditorView.theme(
   {
     "&": {
       height: "100%",
-      fontSize: "var(--text-md)",
+      ...textRole("body"),
       backgroundColor: "var(--surface-panel)",
     },
-    ".cm-scroller": { fontFamily: "var(--font-mono)", lineHeight: "var(--leading-normal)" },
-    ".cm-content": { caretColor: "var(--mode-accent, var(--accent))" },
+    ".cm-scroller": { font: "inherit" },
+    ".cm-content": { caretColor: "var(--ink)" },
     ".cm-gutters": {
       backgroundColor: "var(--surface-panel)",
       border: "none",
       color: "var(--ink-3)",
     },
-    ".cm-activeLine": { backgroundColor: "var(--surface-inset)" },
+    ".cm-activeLine": { backgroundColor: "var(--surface-bar-alt)" },
+    ".cm-kwarg, .cm-kwarg *": { color: "var(--ink-3)" },
+    ".cm-free-param, .cm-free-param *": { color: "var(--param)" },
     ".cm-activeLineGutter": { backgroundColor: "transparent" },
     ".cm-vertex-highlight": {
+      // The edited span: the accent as a veil behind the type, never an edge.
       backgroundColor: "rgba(var(--mode-accent-rgb, var(--accent-rgb)), var(--alpha-veil))",
-      outline: "1px solid rgba(var(--mode-accent-rgb, var(--accent-rgb)), var(--alpha-mark))",
       borderRadius: "var(--radius)",
     },
     "&.cm-focused": { outline: "none" },
@@ -126,6 +162,8 @@ export function EditorPane(props: EditorPaneProps) {
       history(),
       python(),
       syntaxHighlighting(highlightStyle),
+      keywordArguments,
+      freeParameters,
       highlightField,
       theme,
       // ruff diagnostics, jedi completion, and signature help — all three

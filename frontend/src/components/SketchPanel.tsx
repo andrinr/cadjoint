@@ -1,7 +1,9 @@
 /**
- * Contextual sketch history and constraint controls.
+ * The selected sketch's constraints and operators, and its solver.
  *
- * The source remains authoritative: every button inserts a readable Python
+ * The panel lists constraints (× removes, a distance's number edits); adding
+ * is the Constrain rail and menu's job, except Fix, which acts on the selected
+ * point. The source remains authoritative: every button inserts a readable Python
  * operation, then the normal compile cycle rebuilds this panel from metadata.
  */
 
@@ -12,6 +14,7 @@ import {
   createMemo,
   createSignal,
 } from "solid-js";
+import { Select } from "./ui";
 import {
   busy,
   nodeById,
@@ -19,12 +22,11 @@ import {
   selection,
   setPendingLoft,
   setSelectionMode,
-  setTool,
   solverRuns,
-  tool,
 } from "../state";
-import type { ConstraintSolverMethod, ToolMode } from "../types";
-import { constraintLabel, isEdgeConstraintTool } from "../constraints";
+import type { ConstraintSolverMethod } from "../types";
+import { constraintLabel } from "../constraints";
+import { fixBlocked } from "../shell/toolActions";
 
 export interface SketchPanelProps {
   onFix: () => void;
@@ -37,24 +39,6 @@ export interface SketchPanelProps {
   onSetConstraintValue: (line: number, index: number, value: number) => void;
 }
 
-/** Two-click constraint tools offered in the panel's constraint row. */
-const CONSTRAINT_TOOLS: { key: ToolMode; label: string; hint: string }[] = [
-  {
-    key: "distance",
-    label: "Distance",
-    hint: "Choose two points to preserve their current distance",
-  },
-  { key: "horizontal", label: "Horiz", hint: "Choose two points to keep level" },
-  { key: "vertical", label: "Vert", hint: "Choose two points to keep stacked" },
-  { key: "coincident", label: "Coinc", hint: "Choose two points to join" },
-  { key: "parallel", label: "∥ Edges", hint: "Choose two edges to keep parallel" },
-  {
-    key: "perpendicular",
-    label: "⊥ Edges",
-    hint: "Choose two edges to keep perpendicular",
-  },
-];
-
 export function SketchPanel(props: SketchPanelProps) {
   const [solverOpen, setSolverOpen] = createSignal(false);
   const [solverMethod, setSolverMethod] =
@@ -66,7 +50,6 @@ export function SketchPanel(props: SketchPanelProps) {
     const node = nodeById(active.nodeId);
     return node?.kind === "profile" ? node : null;
   });
-  const selectedVertex = () => selection()?.vertexIndex;
   const hasExtrusion = () => profile()?.operators.some((item) => item.kind === "extrude");
   const hasOperator = () => (profile()?.operators.length ?? 0) > 0;
   /** Distance chip currently open for numeric editing, by constraint identity. */
@@ -236,32 +219,13 @@ export function SketchPanel(props: SketchPanelProps) {
           <div class="sketch-actions">
             <button
               type="button"
-              disabled={busy() || selectedVertex() == null}
+              disabled={fixBlocked() !== null}
               onClick={props.onFix}
-              title="Anchor the selected point"
+              title={fixBlocked() ?? "Anchor the selected point where it is"}
               data-testid="constraint-fix"
             >
-              Fix point
+              Fix
             </button>
-            <For each={CONSTRAINT_TOOLS}>
-              {(entry) => (
-                <button
-                  type="button"
-                  class={tool() === entry.key ? "active" : ""}
-                  disabled={busy()}
-                  onClick={() => {
-                    if (!isEdgeConstraintTool(entry.key)) {
-                      setSelectionMode("vertex");
-                    }
-                    setTool(tool() === entry.key ? "select" : entry.key);
-                  }}
-                  title={entry.hint}
-                  data-testid={`constraint-${entry.key}`}
-                >
-                  {entry.label}
-                </button>
-              )}
-            </For>
             <button
               type="button"
               class={solverOpen() ? "active" : ""}
@@ -324,19 +288,16 @@ export function SketchPanel(props: SketchPanelProps) {
               <div class="solver-controls">
                 <label>
                   <span>Optimizer</span>
-                  <select
+                  <Select
                     value={solverMethod()}
-                    onChange={(event) =>
-                      setSolverMethod(
-                        event.currentTarget.value as ConstraintSolverMethod,
-                      )
-                    }
-                    data-testid="solver-method"
-                  >
-                    <option value="newton">Newton projection</option>
-                    <option value="adam">Adam</option>
-                    <option value="sgd">SGD</option>
-                  </select>
+                    options={[
+                      { value: "newton", label: "Newton projection" },
+                      { value: "adam", label: "Adam" },
+                      { value: "sgd", label: "SGD" },
+                    ]}
+                    onChange={(value) => setSolverMethod(value as ConstraintSolverMethod)}
+                    testId="solver-method"
+                  />
                 </label>
                 <label>
                   <span>Iterations</span>

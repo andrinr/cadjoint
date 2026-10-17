@@ -28,6 +28,14 @@ from cadjoint.viewer._webgpu import build_viewer_shader  # noqa: E402
 OVERLAY_WGSL = Path(__file__).resolve().parents[2] / "frontend/src/viewer/overlay.wgsl"
 SIMULATION_WGSL = Path(__file__).resolve().parents[2] / "frontend/src/viewer/simulation.wgsl"
 GRATICULE_WGSL = Path(__file__).resolve().parents[2] / "frontend/src/viewer/graticule.wgsl"
+# The design tokens the frontend prepends to every module (pipelines.ts
+# withTokens); generated from frontend/src/tokens.ts by `npm run tokens`.
+TOKENS_WGSL = Path(__file__).resolve().parents[2] / "frontend/src/viewer/tokens.wgsl"
+
+
+def shader_source(path: Path) -> str:
+    """A frontend shader as the renderer compiles it: tokens first."""
+    return TOKENS_WGSL.read_text() + path.read_text()
 
 
 @pytest.fixture(scope="module")
@@ -64,7 +72,7 @@ def test_present_shader_compiles(device):
 
 @pytest.mark.skipif(not OVERLAY_WGSL.is_file(), reason="frontend sources not present")
 def test_overlay_shader_compiles(device):
-    compile_wgsl(device, OVERLAY_WGSL.read_text(), "overlay")
+    compile_wgsl(device, shader_source(OVERLAY_WGSL), "overlay")
 
 
 def test_sketch_scene_shader_compiles(device):
@@ -83,7 +91,7 @@ def test_sketch_scene_shader_compiles(device):
 
 @pytest.mark.skipif(not SIMULATION_WGSL.is_file(), reason="frontend sources not present")
 def test_simulation_shader_compiles(device):
-    compile_wgsl(device, SIMULATION_WGSL.read_text(), "simulation")
+    compile_wgsl(device, shader_source(SIMULATION_WGSL), "simulation")
 
 
 @pytest.mark.skipif(not GRATICULE_WGSL.is_file(), reason="frontend sources not present")
@@ -94,7 +102,7 @@ def test_graticule_shader_compiles(device):
     lands on is chosen per draw — so the one thing that can go wrong here is
     invisible in a unit test and shows up as a compile failure in a browser.
     """
-    compile_wgsl(device, GRATICULE_WGSL.read_text(), "graticule")
+    compile_wgsl(device, shader_source(GRATICULE_WGSL), "graticule")
 
 
 def test_invalid_wgsl_is_actually_rejected(device):
@@ -234,7 +242,7 @@ def test_overlay_pipelines_match_the_renderer(
     device, shader, entry_vertex, entry_fragment, stride, step_mode, blend, attributes
 ):
     path = OVERLAY_WGSL.parent / shader
-    module = device.create_shader_module(code=path.read_text())
+    module = device.create_shader_module(code=shader_source(path))
     target = {"format": COLOR_FORMAT}
     if blend is not None:
         target["blend"] = blend
@@ -386,7 +394,7 @@ def test_preview_and_overlay_draw_in_one_pass(device, scene_code):
     )
 
     # Overlay: edge and handle pipelines share one bind group.
-    overlay_module = device.create_shader_module(code=OVERLAY_WGSL.read_text())
+    overlay_module = device.create_shader_module(code=shader_source(OVERLAY_WGSL))
     overlay_bgl, overlay_pl = shared_layout(device, [0])
     blend = {
         "color": {

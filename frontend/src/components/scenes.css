@@ -11,7 +11,7 @@
  * it as a caption, the way a plate is captioned in a drawing sheet, and
  * everything else is the same right-hung mono the rest of the instrument
  * uses. No colours, radii, shadows, sizes or spacings are invented: every
- * value is a token from styles.css, and the corners stay square.
+ * value is a token from src/tokens.css, and the corners stay square.
  */
 
 /*
@@ -23,7 +23,7 @@
  * same baseline, in this panel only.
  */
 .scenes-panel .section-head {
-  gap: var(--space-4);
+  gap: var(--inset);
 }
 
 /*
@@ -36,37 +36,33 @@
  * ended up sitting on top of the second card's date. The list scrolls; the
  * rows keep their size.
  */
+/*
+ * A grid of cards no narrower than 60 units and no wider than the space
+ * shares out: one column in a narrow window, as many as fit in a wide one,
+ * so the 320x200 thumbnail is never upscaled far. The frames outline the
+ * cards; rows are a section apart.
+ */
 .scene-cards {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(calc(var(--unit) * 60), 1fr));
+  align-items: start;
   flex: 0 0 auto;
-  gap: 0;
+  gap: var(--section);
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.scene-card + .scene-card {
-  border-top: 1px solid var(--divider);
-}
-
 .scene-card {
-  flex: 0 0 auto;
-  padding: var(--space-4) 0;
   min-width: 0;
 }
 
-/*
- * The card the current document was loaded from is marked, not coloured.
- *
- * A rule at the head of the block, in the heaviest structural ink the system
- * has. Not the accent: the accent in this design language is a fill behind
- * type — a chip, a pressed control — and never a mark or a data line, and a
- * 2px orange bar down the side of a card is exactly the mark it is not.
- */
-.scene-card.current {
-  border-left: 2px solid var(--rule-heavy);
-  padding-left: var(--space-4);
+/* The card the current document was loaded from: its frame takes the active
+   line, 2px ink, the one weight that means "this one". Not the accent, which
+   is only ever a fill behind type. */
+.scene-card.current .scene-frame,
+.scene-card.current .scene-open:hover .scene-frame {
+  border: var(--line-active);
 }
 
 /* Picture plus caption is one target: clicking anywhere in it opens the
@@ -75,7 +71,7 @@
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: var(--space-3);
+  gap: var(--gap);
   width: 100%;
   /* The shared `button` rule fixes every button to one control height.
      That is right for a control and wrong for a picture: it squeezed the
@@ -94,10 +90,11 @@
    own case — the same exemption `.sim-study-head strong` has for a study's
    declared name. */
 .scene-open strong {
-  font: var(--type-mono);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
   color: var(--ink-2);
-  letter-spacing: var(--tracking-xs);
-  text-transform: none;
 }
 
 /* Hover darkens the caption and firms up the frame's rule — an ink change,
@@ -121,8 +118,8 @@
   aspect-ratio: 16 / 10;
   flex: 0 0 auto;
   overflow: hidden;
-  border: 1px solid var(--rule);
-  background: var(--surface-inset);
+  border: var(--line);
+  background: var(--plane-step);
 }
 
 .scene-frame img {
@@ -146,18 +143,21 @@
   justify-content: center;
   width: 100%;
   height: 100%;
-  padding: var(--space-4);
+  padding: var(--inset);
   background-image: repeating-linear-gradient(
     45deg,
     transparent,
-    transparent 5px,
-    var(--divider) 5px,
-    var(--divider) 6px
+    transparent var(--unit),
+    var(--divider) var(--unit),
+    var(--divider) calc(var(--unit) + var(--hairline))
   );
 }
 
 .scene-frame-empty span {
-  font: var(--type-mono);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
   color: var(--ink-3);
   text-align: center;
   overflow: hidden;
@@ -167,21 +167,26 @@
 }
 
 .scene-summary {
-  margin: var(--space-3) 0 0;
-  font-size: var(--text-xs);
-  line-height: var(--leading-snug);
+  margin: var(--gap) 0 0;
+  font: var(--text-prose);
+  letter-spacing: var(--track-prose);
+  text-transform: var(--case-prose);
+  font-variant-numeric: var(--numeric-prose);
   color: var(--ink-2);
 }
 
 .scene-materials {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2);
-  margin: var(--space-3) 0 0;
+  gap: var(--gap);
+  margin: var(--gap) 0 0;
 }
 
 .scene-meta {
-  margin: var(--space-2) 0 0;
-  font: var(--type-mono);
+  margin: var(--gap) 0 0;
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
   color: var(--ink-3);
 }

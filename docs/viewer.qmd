@@ -19,7 +19,20 @@ built in a loop, or from a variable — still renders, but is read-only.
 
 ## Start it
 
+The playground is part of the `cadjoint` package: the built UI ships as
+package data and `cadjoint-viewer` is its console script. It needs the
+`viewer` extra (the request schema is pydantic); `editor` adds lint,
+completion and signature help.
+
 ```bash
+uvx --from "cadjoint[viewer,editor]" cadjoint-viewer --open   # no checkout, no environment
+pip install "cadjoint[viewer,editor]" && cadjoint-viewer --open
+```
+
+From a checkout:
+
+```bash
+uv sync --extra viewer --extra editor
 uv run cadjoint-viewer --open      # serves http://127.0.0.1:8765/ and opens a browser
 ```
 
@@ -31,8 +44,11 @@ uv run cadjoint-viewer --port 9000            # pick a different port
 uv run cadjoint-viewer --help
 ```
 
-No extra dependencies are needed — the server is stdlib-only — but the viewport
-needs a WebGPU-capable browser. Stop with `Ctrl+C`.
+Scenes open from and save to `./scenes` under the directory the server was
+started in, or `CADJOINT_SCENES_DIR`. In a checkout that is the example
+scenes; anywhere else it starts empty and the playground opens on its
+built-in starter. The viewport needs a WebGPU-capable browser. Stop with
+`Ctrl+C`.
 
 The starter program is a **parametric heat sink**: a fin comb extruded from one
 constrained sketch profile, a revolved copper heat slug under the die, and two
@@ -678,6 +694,10 @@ when no adapter is available.
 **The command is not found.** Run `python -m cadjoint.viewer.playground --open`,
 or reinstall the current checkout so the `cadjoint-viewer` console script is
 created.
+
+**It stops at startup with `No module named 'pydantic'`.** The `viewer` extra
+is missing: `pip install "cadjoint[viewer,editor]"`, or
+`uv sync --extra viewer --extra editor` in a checkout.
 
 **A scene does not compile.** Confirm the program assigns an SDF to a variable
 named `scene`. The error panel carries the Python traceback or WGSL compiler

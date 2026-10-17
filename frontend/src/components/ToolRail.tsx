@@ -1,9 +1,15 @@
 /**
  * Vertical tool rail: grouped tool clusters, scoped by the editing mode.
  *
+ * The groups are the menu bar's: Create, Shape, Transform, Constrain — one
+ * name per command in every home. What a tool *does* lives in
+ * `../shell/toolActions`, shared with the menus and the keys; the rail only
+ * decides how it looks. Every item carries its word at 1280px and wider
+ * (design language I2), the icon alone below that.
+ *
  * The mode switcher itself lives in the toolbar (`ModeSwitcher`); the rail
  * only shows the clusters the active mode offers, and disappears entirely in
- * tool-less modes (Simulate, Render). Tools sit in expandable clusters: a
+ * tool-less modes (Simulate). Tools sit in expandable clusters: a
  * parent icon shows the group's last-used child and expands — on hover dwell
  * or click — into a horizontal flyout of the children, like Photoshop's
  * nested tools. Flyouts close on selection, Escape, or a mouse-leave delay;
@@ -16,17 +22,12 @@
 import { Dynamic } from "solid-js/web";
 import { For, Show, createEffect, createSignal, onCleanup, onMount, type Component } from "solid-js";
 import {
-  busy,
   editingMode,
   gizmoMode,
-  nodeById,
   pendingLoft,
   selection,
   selectionMode,
   setGizmoMode,
-  setPendingLoft,
-  setSelection,
-  setSelectionMode,
   setSketchPlane,
   setTool,
   sketchPlane,
@@ -39,7 +40,21 @@ import {
 } from "../editingMode";
 import { FlyoutController, loadLastUsed, persistLastUsed } from "../flyout";
 import { SKETCH_PLANE_CHOICES } from "../sketchPlanes";
-import { isEdgeConstraintTool } from "../constraints";
+import { shortcutLabel } from "../shortcuts";
+import {
+  constraintBlocked,
+  fixBlocked,
+  gizmoBlocked,
+  modifyProfile,
+  setSelectKind,
+  shapeBlocked,
+  supportsGizmo,
+  toggleConstraintTool,
+  type ShapeKey,
+  toggleCreateTool,
+  toggleLoft,
+  transformable,
+} from "../shell/toolActions";
 import type { GizmoMode, SelectionMode, ToolMode } from "../types";
 import {
   BoxIcon,
@@ -47,6 +62,7 @@ import {
   CylinderIcon,
   DistanceIcon,
   ExtrudeIcon,
+  FixIcon,
   FaceSketchIcon,
   HorizontalIcon,
   LoftIcon,
@@ -65,9 +81,15 @@ import {
   VerticalIcon,
 } from "./icons";
 
+/** "Move along an axis  (G)" — the hint, with the key the table binds. */
+const withKey = (hint: string, command: string) => {
+  const key = shortcutLabel(command);
+  return key ? `${hint}  (${key})` : hint;
+};
+
 const SELECT_MODES: { key: SelectionMode; label: string; hint: string; icon: Component }[] = [
-  { key: "object", label: "Object", hint: "Select whole objects  (O)", icon: ObjectSelectIcon },
-  { key: "vertex", label: "Vertex", hint: "Select sketch vertices  (V)", icon: VertexSelectIcon },
+  { key: "object", label: "Object", hint: withKey("Select whole objects", "select-object"), icon: ObjectSelectIcon },
+  { key: "vertex", label: "Vertex", hint: withKey("Select sketch vertices", "select-vertex"), icon: VertexSelectIcon },
 ];
 
 interface ToolEntry {
@@ -79,41 +101,44 @@ interface ToolEntry {
 }
 
 const CREATE: ToolEntry[] = [
-  { key: "sketch", label: "Sketch", hint: "Place a new 2D sketch", icon: PolygonIcon, testid: "tool-sketch" },
+  { key: "sketch", label: "Sketch", hint: withKey("Place a new 2D sketch", "tool-sketch"), icon: PolygonIcon, testid: "tool-sketch" },
   { key: "face", label: "Sketch on face", hint: "Place a sketch on a solid's face", icon: FaceSketchIcon, testid: "tool-face" },
-  { key: "polygon", label: "Point", hint: "Add a point to a sketch  (P)", icon: PointAddIcon, testid: "tool-polygon" },
-  { key: "box", label: "Box", hint: "Place a box  (B)", icon: BoxIcon, testid: "tool-box" },
-  { key: "sphere", label: "Sphere", hint: "Place a sphere  (S)", icon: SphereIcon, testid: "tool-sphere" },
-  { key: "cylinder", label: "Cylinder", hint: "Place a cylinder  (C)", icon: CylinderIcon, testid: "tool-cylinder" },
+  { key: "polygon", label: "Point", hint: withKey("Add a point to a sketch", "tool-polygon"), icon: PointAddIcon, testid: "tool-polygon" },
+  { key: "box", label: "Box", hint: withKey("Place a box", "tool-box"), icon: BoxIcon, testid: "tool-box" },
+  { key: "sphere", label: "Sphere", hint: withKey("Place a sphere", "tool-sphere"), icon: SphereIcon, testid: "tool-sphere" },
+  { key: "cylinder", label: "Cylinder", hint: withKey("Place a cylinder", "tool-cylinder"), icon: CylinderIcon, testid: "tool-cylinder" },
 ];
 
-const MODIFY: ToolEntry[] = [
-  { key: "extrude", label: "Extrude", hint: "Extrude the selected sketch", icon: ExtrudeIcon, testid: "modify-extrude" },
+// Test ids keep the `modify-` / `annotate-` prefixes the e2e specs address.
+const SHAPE: ToolEntry[] = [
+  { key: "extrude", label: "Extrude", hint: withKey("Extrude the selected sketch", "shape-extrude"), icon: ExtrudeIcon, testid: "modify-extrude" },
   { key: "revolve", label: "Revolve", hint: "Revolve the selected sketch", icon: RevolveIcon, testid: "modify-revolve" },
   { key: "loft", label: "Loft", hint: "Loft the selected sketch to a second one", icon: LoftIcon, testid: "modify-loft" },
 ];
 
 const TRANSFORMS: ToolEntry[] = [
-  { key: "translate", label: "Move", hint: "Move along an axis  (G)", icon: MoveIcon, testid: "gizmo-translate" },
-  { key: "rotate", label: "Rotate", hint: "Rotate about an axis  (R)", icon: RotateIcon, testid: "gizmo-rotate" },
-  { key: "scale", label: "Scale", hint: "Scale along an axis", icon: ScaleIcon, testid: "gizmo-scale" },
+  { key: "translate", label: "Move", hint: withKey("Move along an axis", "gizmo-translate"), icon: MoveIcon, testid: "gizmo-translate" },
+  { key: "rotate", label: "Rotate", hint: withKey("Rotate about an axis", "gizmo-rotate"), icon: RotateIcon, testid: "gizmo-rotate" },
+  { key: "scale", label: "Scale", hint: withKey("Scale along an axis", "gizmo-scale"), icon: ScaleIcon, testid: "gizmo-scale" },
 ];
 
-const ANNOTATE: ToolEntry[] = [
+const CONSTRAIN: ToolEntry[] = [
   { key: "distance", label: "Distance", hint: "Choose two points to preserve their distance", icon: DistanceIcon, testid: "annotate-distance" },
   { key: "horizontal", label: "Horizontal", hint: "Choose two points to keep level", icon: HorizontalIcon, testid: "annotate-horizontal" },
   { key: "vertical", label: "Vertical", hint: "Choose two points to keep stacked", icon: VerticalIcon, testid: "annotate-vertical" },
   { key: "coincident", label: "Coincident", hint: "Choose two points to join", icon: CoincidentIcon, testid: "annotate-coincident" },
   { key: "parallel", label: "Parallel", hint: "Choose two edges to keep parallel", icon: ParallelIcon, testid: "annotate-parallel" },
   { key: "perpendicular", label: "Perpendicular", hint: "Choose two edges to keep perpendicular", icon: PerpendicularIcon, testid: "annotate-perpendicular" },
+  // An act, not a tool: it anchors the point that is already selected.
+  { key: "fix", label: "Fix", hint: "Anchor the selected point where it is", icon: FixIcon, testid: "annotate-fix" },
 ];
 
 /** Known children per group, for validating persisted last-used entries. */
 const GROUP_CHILDREN: Record<string, string[]> = {
   create: CREATE.map((entry) => entry.key),
-  modify: MODIFY.map((entry) => entry.key),
+  modify: SHAPE.map((entry) => entry.key),
   transform: TRANSFORMS.map((entry) => entry.key),
-  annotate: ANNOTATE.map((entry) => entry.key),
+  annotate: CONSTRAIN.map((entry) => entry.key),
 };
 
 export interface ToolRailProps {
@@ -121,7 +146,17 @@ export interface ToolRailProps {
   /** Extrude the selected sketch (App resolves the profile and patches). */
   onExtrude: () => void;
   onRevolve: () => void;
+  /** Anchor the selected sketch point. */
+  onFix: () => void;
 }
+
+/** The icon, and the word that rides with it at 1280px and wider. */
+const Face = (props: { icon: Component; word: string }) => (
+  <>
+    <Dynamic component={props.icon} />
+    <span class="rail-word">{props.word}</span>
+  </>
+);
 
 export function ToolRail(props: ToolRailProps) {
   const [openGroup, setOpenGroup] = createSignal<string | null>(null);
@@ -137,56 +172,22 @@ export function ToolRail(props: ToolRailProps) {
     flyouts.select();
   };
 
-  /** A whole object is selected, so the transform gizmo applies. */
-  const transformable = () => selection() !== null && selection()!.vertexIndex === null;
-  const supports = (mode: GizmoMode) => {
-    if (!transformable()) return false;
-    const node = nodeById(selection()!.nodeId);
-    if (!node?.transform) return false;
-    if (mode === "rotate") return node.transform.canRotate;
-    if (mode === "scale") return node.kind !== "profile";
-    return true;
-  };
-  const activeTransform = () => (supports(gizmoMode()) ? gizmoMode() : "translate");
+  const activeTransform = () => (supportsGizmo(gizmoMode()) ? gizmoMode() : "translate");
 
-  /** Selected sketch profile eligible for the modify operators. */
-  const modifyProfile = () => {
-    const active = selection();
-    const node = active && nodeById(active.nodeId);
-    return node?.kind === "profile" && node.line !== null ? node : null;
-  };
-  const hasOperator = () => (modifyProfile()?.operators.length ?? 0) > 0;
-  const modifyEnabled = (key: string) => {
-    const profile = modifyProfile();
-    if (!profile || busy()) return false;
-    if (key === "extrude") {
-      return !profile.operators.some((item) => item.kind === "extrude");
-    }
-    return !hasOperator();
-  };
+  /** Enabled and hint for a group whose entries can be refused with a reason. */
+  const refusable = (blocked: (entry: ToolEntry) => string | null) => ({
+    isEnabled: (entry: ToolEntry) => blocked(entry) === null,
+    hint: (entry: ToolEntry) => {
+      const reason = blocked(entry);
+      return reason ? `${entry.label} — ${reason.toLowerCase()}` : entry.hint;
+    },
+  });
 
-  const activateCreate = (key: string) => {
-    setTool(tool() === key ? "select" : (key as ToolMode));
-  };
-
-  const activateAnnotate = (key: string) => {
-    if (!isEdgeConstraintTool(key as ToolMode)) setSelectionMode("vertex");
-    setTool(tool() === key ? "select" : (key as ToolMode));
-  };
-
-  const activateModify = (key: string) => {
-    const profile = modifyProfile();
-    if (!profile) return;
+  const activateShape = (key: string) => {
+    if (!modifyProfile()) return;
     if (key === "extrude") props.onExtrude();
     else if (key === "revolve") props.onRevolve();
-    else if (key === "loft") {
-      if (pendingLoft()?.nodeId === profile.id) {
-        setPendingLoft(null);
-        return;
-      }
-      setSelectionMode("object");
-      setPendingLoft({ nodeId: profile.id, line: profile.line! });
-    }
+    else if (key === "loft") toggleLoft();
   };
 
   // A mode switch drops tools that no longer exist in the new mode and
@@ -257,7 +258,7 @@ export function ToolRail(props: ToolRailProps) {
           aria-expanded={openGroup() === id}
           data-testid={`tool-group-${id}`}
         >
-          <Dynamic component={parentEntry().icon} />
+          <Face icon={parentEntry().icon} word={label} />
           <i class="tool-group-caret" aria-hidden="true" />
         </button>
         <div class="tool-flyout" role="menu" aria-label={`${label} tools`}>
@@ -276,7 +277,7 @@ export function ToolRail(props: ToolRailProps) {
                 aria-label={entry.label}
                 data-testid={entry.testid}
               >
-                <Dynamic component={entry.icon} />
+                <Face icon={entry.icon} word={entry.label} />
               </button>
             )}
           </For>
@@ -286,8 +287,8 @@ export function ToolRail(props: ToolRailProps) {
   };
 
   return (
-    // Tool-less modes (Simulate, Render) hide the rail entirely — their dock
-    // panel is the whole workspace, and an empty rail would read as broken.
+    // Tool-less modes (Simulate) hide the rail entirely — their dock panel is
+    // the whole workspace, and an empty rail would read as broken.
     <Show when={railGroupsForMode(editingMode()).length > 0}>
     <nav class="tool-rail" aria-label="Tools">
       <Show when={groupVisibleInMode("select", editingMode())}>
@@ -296,22 +297,12 @@ export function ToolRail(props: ToolRailProps) {
             <button
               type="button"
               class={tool() === "select" && selectionMode() === mode.key ? "active" : ""}
-              onClick={() => {
-                setTool("select");
-                setSelectionMode(mode.key);
-                const active = selection();
-                if (mode.key === "object" && active && active.vertexIndex !== null) {
-                  setSelection({ nodeId: active.nodeId, vertexIndex: null });
-                  if (nodeById(active.nodeId)?.kind === "profile") {
-                    setGizmoMode("translate");
-                  }
-                }
-              }}
+              onClick={() => setSelectKind(mode.key)}
               title={mode.hint}
               aria-label={mode.label}
               data-testid={`mode-${mode.key}`}
             >
-              <Dynamic component={mode.icon} />
+              <Face icon={mode.icon} word={mode.label} />
             </button>
           )}
         </For>
@@ -322,43 +313,37 @@ export function ToolRail(props: ToolRailProps) {
         {group("create", "Create", CREATE, {
           isVisible: (entry) => createToolVisibleInMode(entry.key, editingMode()),
           isActive: (entry) => tool() === entry.key,
-          activate: (entry) => activateCreate(entry.key),
+          activate: (entry) => toggleCreateTool(entry.key as ToolMode),
         })}
       </Show>
 
       <Show when={groupVisibleInMode("modify", editingMode())}>
-        {group("modify", "Modify", MODIFY, {
+        {group("modify", "Shape", SHAPE, {
           isActive: (entry) =>
-            entry.key === "loft" && pendingLoft()?.nodeId === modifyProfile()?.id,
-          isEnabled: (entry) => modifyEnabled(entry.key),
-          hint: (entry) =>
-            modifyProfile() === null
-              ? `${entry.label} — select a sketch first`
-              : entry.hint,
-          activate: (entry) => activateModify(entry.key),
+            // Guard null: with no profile selected both ids are undefined.
+            entry.key === "loft" &&
+            pendingLoft() !== null &&
+            pendingLoft()?.nodeId === modifyProfile()?.id,
+          ...refusable((entry) => shapeBlocked(entry.key as ShapeKey)),
+          activate: (entry) => activateShape(entry.key),
         })}
       </Show>
 
       <Show when={groupVisibleInMode("transform", editingMode())}>
         {group("transform", "Transform", TRANSFORMS, {
           isActive: (entry) =>
-            supports(entry.key as GizmoMode) && gizmoMode() === entry.key,
-          isEnabled: (entry) => supports(entry.key as GizmoMode),
-          hint: (entry) =>
-            supports(entry.key as GizmoMode)
-              ? entry.hint
-              : entry.key === "scale" && transformable()
-                ? "Scale — select a solid primitive"
-                : `${entry.label} — select a compatible object first`,
+            supportsGizmo(entry.key as GizmoMode) && gizmoMode() === entry.key,
+          ...refusable((entry) => gizmoBlocked(entry.key as GizmoMode)),
           activate: (entry) => setGizmoMode(entry.key as GizmoMode),
         })}
       </Show>
 
       <Show when={groupVisibleInMode("annotate", editingMode())}>
-        {group("annotate", "Annotate", ANNOTATE, {
+        {group("annotate", "Constrain", CONSTRAIN, {
           isActive: (entry) => tool() === entry.key,
-          isEnabled: () => !busy(),
-          activate: (entry) => activateAnnotate(entry.key),
+          ...refusable((entry) => (entry.key === "fix" ? fixBlocked() : constraintBlocked())),
+          activate: (entry) =>
+            entry.key === "fix" ? props.onFix() : toggleConstraintTool(entry.key as ToolMode),
         })}
       </Show>
 
@@ -369,11 +354,11 @@ export function ToolRail(props: ToolRailProps) {
           class="danger"
           disabled={selection() === null}
           onClick={props.onDelete}
-          title="Delete the selection  (Del)"
+          title={withKey("Delete the selection", "edit-delete")}
           aria-label="Delete"
           data-testid="delete-selection"
         >
-          <TrashIcon />
+          <Face icon={TrashIcon} word="Delete" />
         </button>
       </Show>
 

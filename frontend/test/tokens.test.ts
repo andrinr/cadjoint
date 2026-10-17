@@ -1,10 +1,9 @@
 /**
  * The design system held to numbers.
  *
- * src/tokens.ts is the source of truth and src/styles.css is its mirror, so
- * the first job here is proving the two cannot drift: every token declared in
- * TypeScript must appear in the stylesheet's :root block with the same value,
- * and the stylesheet must not reintroduce the literals the tokens replaced.
+ * src/tokens.ts is the source of truth and src/tokens.css its generated
+ * mirror, so the first job here is proving the two cannot drift, and that no
+ * stylesheet reintroduces the literals the tokens replaced.
  *
  * The second job is legibility. simColors.test.ts already covers the data
  * palette (the ramps, the BC hues, the element edges); this file covers the
@@ -14,7 +13,7 @@
  * the field ramp.
  */
 
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -36,7 +35,6 @@ import {
   EASINGS,
   LEADING,
   MEANINGFUL_NON_TEXT,
-  MODE_ACCENTS,
   RADII,
   SPACE,
   TEXT_SURFACES,
@@ -47,19 +45,33 @@ import {
   TYPE_SCALE,
   WEIGHTS,
   chromeContrast,
+  cssProperties,
   hexToRgb,
+  tokensCss,
+  tokensScss,
+  wgslTokens,
   type ChromeToken,
 } from "../src/tokens";
-import { MODE_ACCENTS as EDITING_MODE_ACCENTS } from "../src/editingMode";
+import { EDITING_MODES } from "../src/editingMode";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const css = readFileSync(join(here, "../src/styles.css"), "utf8");
 
-/** The stylesheet's :root declaration block, where every token is defined. */
-const rootBlock = (() => {
-  const match = css.match(/^:root \{[\s\S]*?\n\}/m);
-  if (!match) throw new Error("styles.css has no :root token block");
-  return match[0];
+/** The generated token block. */
+const rootBlock = readFileSync(join(here, "../src/tokens.css"), "utf8");
+
+/** Every stylesheet in src/, generated block excluded. */
+const stylesheets = (() => {
+  const files: string[] = [];
+  const walk = (dir: string) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) walk(path);
+      else if (entry.name.endsWith(".css") && entry.name !== "tokens.css") files.push(path);
+    }
+  };
+  walk(join(here, "../src"));
+  return files.map((path) => ({ path, text: readFileSync(path, "utf8") }));
 })();
 
 /**
@@ -71,14 +83,50 @@ const rootBlock = (() => {
  * chrome, so they keep literal colours on purpose.
  */
 const ruleBody = css
-  .replace(rootBlock, "")
   .replace(/\/\* @artwork[\s\S]*?\/\* @end-artwork \*\//g, "");
 
 /** Value declared for `--name` in :root, or undefined. */
 const token = (name: string): string | undefined =>
   rootBlock.match(new RegExp(`--${name}:\\s*([^;]+);`))?.[1].trim();
 
-describe("styles.css mirrors src/tokens.ts", () => {
+describe("the generated files are current", () => {
+  it("src/tokens.css is what tokensCss() emits", () => {
+    expect(rootBlock, "run `npm run tokens`").toBe(tokensCss());
+  });
+
+  it("docs/assets/tokens.scss is what tokensScss() emits", () => {
+    const scss = readFileSync(join(here, "../../docs/assets/tokens.scss"), "utf8");
+    expect(scss, "run `npm run tokens`").toBe(tokensScss());
+  });
+
+  it("src/viewer/tokens.wgsl is what wgslTokens() emits", () => {
+    const wgsl = readFileSync(join(here, "../src/viewer/tokens.wgsl"), "utf8");
+    expect(wgsl, "run `npm run tokens`").toBe(wgslTokens());
+  });
+
+  it("styles.css declares no token of its own", () => {
+    expect(css).not.toMatch(/^:root \{/m);
+  });
+
+  it("uses no custom property that the token layer does not declare", () => {
+    // A var() of an undeclared name falls back silently to nothing. Local
+    // properties a stylesheet declares itself (--mode-accent and friends) are
+    // allowed.
+    const declared = new Set(cssProperties().map(([name]) => name));
+    for (const { text } of stylesheets) {
+      for (const match of text.matchAll(/--([\w-]+)\s*:/g)) declared.add(match[1]);
+    }
+    const unknown: string[] = [];
+    for (const { path, text } of stylesheets) {
+      for (const match of text.matchAll(/var\(--([\w-]+)/g)) {
+        if (!declared.has(match[1])) unknown.push(`${path.split("/src/")[1]}: --${match[1]}`);
+      }
+    }
+    expect([...new Set(unknown)]).toEqual([]);
+  });
+});
+
+describe("tokens.css mirrors src/tokens.ts", () => {
   it("declares every chrome colour with the same value", () => {
     for (const [name, value] of Object.entries(CHROME)) {
       expect(token(name), `--${name}`).toBe(value);
@@ -115,24 +163,16 @@ describe("styles.css mirrors src/tokens.ts", () => {
   });
 
   it("binds every editing mode to the one accent token", () => {
-    // Was: three modes, three hues, one `--accent-<mode>` token each. The
-    // light direction has a single accent — mode is read from the position of
-    // the filled cell and from the word in the hint bar (§6) — so what is
-    // asserted now is that each mode selector still resolves `--mode-accent`,
-    // and that all three resolve it to the same fill.
-    for (const mode of Object.keys(MODE_ACCENTS)) {
+    // Mode is read from the position of the filled cell and the word in the
+    // hint bar, not from a hue, so every mode resolves the same fill.
+    for (const mode of EDITING_MODES) {
       const selector = css.match(
         new RegExp(`\\.app\\[data-mode="${mode}"\\][,\\s][\\s\\S]*?\\n\\}`),
       );
       expect(selector, mode).not.toBeNull();
-      expect(selector![0]).toContain("--mode-accent: var(--accent)");
+      expect(selector![0]).toContain("--mode-accent-rgb: var(--accent-rgb)");
     }
-    expect(new Set(Object.values(MODE_ACCENTS)).size).toBe(1);
     expect(token("accent")).toBe(CHROME.accent);
-  });
-
-  it("is the same record editingMode.ts hands the rest of the app", () => {
-    expect(EDITING_MODE_ACCENTS).toEqual(MODE_ACCENTS);
   });
 });
 
@@ -162,15 +202,11 @@ describe("no design value escapes the token layer", () => {
   });
 
   it("names one radius, and it is zero", () => {
-    // Was implicit in a four-step radius scale. Radius 0 is the shape rule of
-    // this direction, so it is asserted rather than left to a convention.
     expect(Object.values(RADII)).toEqual([0]);
     expect(token("radius")).toBe("0px");
   });
 
   it("keeps tracking a function of size, not one global value", () => {
-    // Was a single --tracking-caps. A 9px label and a 15px title cannot share
-    // a tracking, so the scale is asserted to descend with size.
     const values = Object.values(TRACKING).map((em) => parseFloat(em));
     expect(values.length).toBeGreaterThanOrEqual(5);
     expect([...values].sort((a, b) => b - a)).toEqual(values);
@@ -233,11 +269,8 @@ describe("chrome legibility", () => {
   });
 
   it("makes the accent a fill and refuses to make it a mark", () => {
-    // Was: "the on-accent ink is readable on every mode accent" — three
-    // accents, one assertion each. There is one accent now, and the pair of
-    // numbers below is the whole reason it is used the way it is: as a ground
-    // it clears AAA, as ink on paper it fails even the 3:1 a non-text mark
-    // owes. The design is not preferring one; one passes and one fails.
+    // As a ground it clears AAA; as ink on paper it fails even the 3:1 a
+    // non-text mark owes.
     expect(chromeContrast(ACCENT_FILL.ink, ACCENT_FILL.ground)).toBeGreaterThanOrEqual(7);
     expect(chromeContrast("accent", "surface-viewport")).toBeLessThan(3);
     expect(chromeContrast("accent", "surface-base")).toBeLessThan(3);
@@ -252,13 +285,8 @@ describe("chrome legibility", () => {
   });
 
   it("draws nothing coloured inside the viewport rectangle", () => {
-    // Replaces "keeps chrome ink off the paper viewport", which asserted that
-    // --ink measured under 3:1 on paper. That was true only because chrome was
-    // dark; with one paper ground for both, chrome ink is perfectly legible in
-    // there and the old bound is meaningless. What still has to hold is the
-    // §3.7 zoning rule, and it was always the real one: the *field* owns colour,
-    // so every DOM tone drawn inside the rectangle is achromatic and the ramp
-    // is the only hue a reader can see there.
+    // The field owns colour (§3.7), so every DOM tone drawn inside the
+    // rectangle is achromatic and the ramp is the only hue there.
     for (const tone of [...VIEWPORT_TONES, ...GRATICULE_TONES]) {
       const [r, g, b] = hexToRgb(CHROME[tone]);
       expect(Math.max(r, g, b) - Math.min(r, g, b), `${tone} chroma`).toBeLessThan(0.04);
@@ -274,7 +302,7 @@ const distance = (a: Rgb, b: Rgb): number =>
   Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 
 describe("chrome stays clear of the data palette", () => {
-  const chromeAccents: ChromeToken[] = ["accent", "danger", "info", "ok", "warn"];
+  const chromeAccents: ChromeToken[] = ["accent", "danger", "param", "ok", "warn"];
 
   it("puts no chrome accent on either ramp's reserved high end", () => {
     for (const name of chromeAccents) {
@@ -301,15 +329,9 @@ describe("chrome stays clear of the data palette", () => {
   });
 
   it("puts the chrome on the same sheet as the viewport", () => {
-    // Was: "keeps every chrome surface below the viewport's paper ground" —
-    // chrome darker than paper by more than 10:1, which is what a dark shell
-    // around a light viewport means. The light direction removes the step
-    // entirely (measurements.txt: "dL 0.0000 · contrast 1.00:1"), so the
-    // assertion inverts: no chrome surface is *darker* than the viewport, the
-    // base sheet is the same value, and the seam is therefore something that
-    // has to be drawn rather than something you can see for free.
-    // simColors stores the paper as a 3-decimal triple, so compare against the
-    // token itself and hold the two to agreement separately.
+    // No chrome surface is darker than the viewport and the base sheet is the
+    // same value, so the seam has to be drawn. simColors stores the paper as a
+    // 3-decimal triple, so it is held to the token separately.
     const paper = relativeLuminance(hexToRgb(CHROME["surface-viewport"]));
     expect(relativeLuminance(VIEWPORT_BACKGROUND)).toBeCloseTo(paper, 3);
     for (const surface of TEXT_SURFACES) {
@@ -327,5 +349,53 @@ describe("chrome stays clear of the data palette", () => {
     // against both sides of it.
     expect(chromeContrast("rule-strong", "surface-base")).toBeGreaterThanOrEqual(3);
     expect(chromeContrast("rule-strong", "surface-viewport")).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe("text is set only in the four roles, spaced only by the three distances", () => {
+  // Every app stylesheet; the design page's own sheet and the fenced artwork
+  // (pictures of materials and render modes) are held to the same rules.
+  const sheets = stylesheets.map(({ path, text }) => ({
+    name: path.split("/src/")[1],
+    text: text
+      .replace(/\/\* @artwork[\s\S]*?\/\* @end-artwork \*\//g, "")
+      .replace(/\/\*[\s\S]*?\*\//g, ""),
+  }));
+  const offenders = (pattern: RegExp, allowed: RegExp) => {
+    const found: string[] = [];
+    for (const { name, text } of sheets) {
+      for (const match of text.matchAll(pattern)) {
+        const value = match[1].trim();
+        if (!allowed.test(value)) found.push(`${name}: ${match[0].trim()}`);
+      }
+    }
+    return [...new Set(found)];
+  };
+
+  it("sets font only through a text role", () => {
+    expect(offenders(/\bfont:\s*([^;]+);/g, /^(var\(--text-[a-z]+\)|inherit)$/)).toEqual([]);
+  });
+
+  it("never sets size, weight, tracking or case outside a role", () => {
+    expect(offenders(/\bfont-size:\s*([^;]+);/g, /^(inherit|var\(--text-[a-z]+\))$/)).toEqual([]);
+    expect(offenders(/\bfont-weight:\s*([^;]+);/g, /^inherit$/)).toEqual([]);
+    expect(offenders(/\bletter-spacing:\s*([^;]+);/g, /^(normal|inherit|var\(--track-[a-z]+\))$/)).toEqual([]);
+    expect(offenders(/\btext-transform:\s*([^;]+);/g, /^(none|inherit|var\(--case-[a-z]+\))$/)).toEqual([]);
+  });
+
+  it("draws every border and outline with one of the three lines", () => {
+    // A line is weight, style and colour together (rule, edge, frame, active,
+    // pending); a state may recolour an edge with border-color, but a new kind
+    // of line is not written inline.
+    expect(
+      offenders(
+        /\b(?:border(?:-top|-right|-bottom|-left)?|outline):\s*([^;]+);/g,
+        /^(var\(--line(-[a-z]+)?\)|0|none|0 none)$/,
+      ),
+    ).toEqual([]);
+  });
+
+  it("spaces layout with the named distances, not the raw scale", () => {
+    expect(offenders(/(var\(--space-\d\))/g, /^$/)).toEqual([]);
   });
 });

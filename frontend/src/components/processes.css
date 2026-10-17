@@ -10,13 +10,13 @@
  * the end of the line.
  *
  * No colours, sizes or spacings are invented here; every value is a token
- * declared in styles.css.
+ * from src/tokens.css.
  */
 
 /* One space between the right-hung count and the control that follows it;
    `.section-head` closes with `gap: 0`, which leaves them touching. */
 .proc-panel .section-head {
-  gap: var(--space-4);
+  gap: var(--inset);
 }
 
 .proc-list {
@@ -31,13 +31,13 @@
 /* Rows of one list are separated by the weakest rule in the system: they are
    one table, not a stack of cards. */
 .proc-row + .proc-row {
-  border-top: 1px solid var(--divider);
+  border-top: var(--line);
 }
 
 .proc-line {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--gap);
   min-width: 0;
 }
 
@@ -47,7 +47,7 @@
   flex: 1 1 auto;
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--gap);
   min-width: 0;
   height: var(--control-sm);
   padding: 0;
@@ -58,13 +58,16 @@
 
 .proc-open:hover:not(:disabled) {
   border-color: transparent;
-  background: var(--surface-inset);
+  background: var(--plane-step);
 }
 
 .proc-open strong {
   overflow: hidden;
   min-width: 0;
-  font: var(--type-mono-strong);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -77,28 +80,31 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: var(--space-4);
+  gap: var(--inset);
   color: var(--ink-2);
 }
 
 .proc-figures b {
-  min-width: 44px;
+  min-width: calc(var(--unit) * 11);
   color: var(--ink);
-  font: var(--type-mono-strong);
-  font-variant-numeric: tabular-nums;
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
   text-align: right;
 }
 
 /* Status is a word, not a colour: cancelled and failed differ from done by
    what they say. Only failure earns ink, and it earns the system's own. */
 .proc-status {
-  min-width: 60px;
+  min-width: calc(var(--unit) * 15);
   color: var(--ink-3);
-  font: var(--type-mono);
+  font: var(--text-caps);
+  letter-spacing: var(--track-caps);
+  text-transform: var(--case-caps);
+  font-variant-numeric: var(--numeric-caps);
   font-style: normal;
-  letter-spacing: var(--tracking-2xs);
   text-align: right;
-  text-transform: uppercase;
 }
 
 .proc-status[data-status="failed"] {
@@ -106,16 +112,21 @@
 }
 
 .proc-progress {
-  margin: 0 0 var(--space-2);
-  padding-left: var(--space-6);
+  margin: 0 0 var(--gap);
+  padding-left: var(--section);
   color: var(--ink-2);
-  font: var(--type-mono);
-  font-variant-numeric: tabular-nums;
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 
 .proc-progress b {
   color: var(--ink);
-  font: var(--type-mono-strong);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 
 /* An expanded row indents under its own name, so the sample chart reads as
@@ -123,29 +134,29 @@
 .proc-detail {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  margin-bottom: var(--space-3);
-  padding-left: var(--space-6);
+  gap: var(--gap);
+  margin-bottom: var(--gap);
+  padding-left: var(--section);
 }
 
 .proc-budget {
   margin: 0;
   color: var(--ink-3);
-  font: var(--type-mono);
-  font-variant-numeric: tabular-nums;
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
 }
 
 /*
  * The sparklines here are data, not emphasis.
  *
- * `.opt-spark` draws its polyline in the accent because on an optimization
- * card the line *is* the subject of the card. In the monitor it is a
- * background reading — one of six figures about a job — and the design
- * language keeps the accent as a fill behind type rather than as a mark or a
- * data line (`research/design-language.md`, "Colour"). So the trace is drawn
- * in ink and the frame's bottom edge does duty as its baseline; the kind
- * chips stay accent fills, because a chip is exactly the fill-behind-type
- * case the rule is written for.
+ * `.opt-spark` draws its polyline in ink, because the accent is a fill behind
+ * type and never a mark or a data line. On an optimization card the line is
+ * the subject; in the monitor it is a background reading — one of six figures
+ * about a job — so it steps down to ink-2 and the frame's bottom edge does
+ * duty as its baseline. The kind chips are inverse ink, the shape every label
+ * of kind takes.
  */
 .proc-panel .opt-spark polyline {
   stroke: var(--ink-2);

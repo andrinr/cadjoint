@@ -68,6 +68,7 @@ import { buildConstraintOverlay } from "./viewer/constraintMarks";
 import { ConstraintOverlay } from "./viewer/ConstraintOverlay";
 import { buildPlaneMarks } from "./viewer/planeMarks";
 import { PlaneLabels } from "./viewer/PlaneLabels";
+import { PerfReadout } from "./viewer/PerfReadout";
 import { Graticule } from "./viewer/Graticule";
 import { createGizmoDrag } from "./viewer/gizmoDrag";
 import { createSimInteraction } from "./viewer/simInteraction";
@@ -884,6 +885,7 @@ export function ViewerPane(props: ViewerPaneProps) {
         sdfAxis={props.display.sdfAxis}
         sdfFraction={props.display.sdfFraction}
       />
+      <PerfReadout renderer={props.renderer} show={props.display.showGraticule} />
       <PlaneLabels show={props.display.showOverlays} geometry={planeMarks()} />
       <ViewerOverlays pickRect={props.display.showOverlays ? pickRect() : null} />
       <ViewerHint

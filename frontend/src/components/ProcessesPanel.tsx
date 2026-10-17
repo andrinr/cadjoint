@@ -45,7 +45,7 @@ import {
 import { editingMode, setEditingMode } from "../state";
 import { windowManager } from "../windows/manager";
 import type { WindowId } from "../windows/panels";
-import { Section, Sparkline, Stat, StatRow } from "./ui";
+import { PanelHeader, Section, Sparkline, Stat, StatRow } from "./ui";
 import "./processes.css";
 
 /** Kinds whose stored result a panel elsewhere knows how to re-open. */
@@ -198,12 +198,7 @@ export function ProcessesPanel() {
 
   return (
     <aside class="sim-panel proc-panel" data-testid="processes-panel">
-      <header>
-        <span>
-          <small>SERVER</small>
-          Processes
-        </span>
-      </header>
+      <PanelHeader kicker="SERVER" title="Processes" />
 
       <Section
         title="Running"

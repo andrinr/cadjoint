@@ -133,7 +133,7 @@ test("Escape cancels one thing per press, starting with the pending command", as
     if (request.url().includes("/api/patch")) patches.push(request.url());
   });
 
-  // Arm a loft: select a sketch, open the rail's Modify flyout (only its
+  // Arm a loft: select a sketch, open the rail's Shape flyout (only its
   // parent entry is on the rail at rest), then Loft.
   await page.getByTestId("tree-row-profile_0").click();
   await expect
@@ -146,7 +146,10 @@ test("Escape cancels one thing per press, starting with the pending command", as
   // ── rung 1: the pending command, and nothing below it ────────────────
   await page.locator("canvas").first().hover();
   await page.keyboard.press("Escape");
-  await expect(page.getByTestId("viewer-hint")).not.toContainText("Loft:");
+  // The hint shows only while a step is in progress (or something is
+  // hovered), so with the loft cancelled it is either gone or says something
+  // else.
+  await expect(page.getByTestId("viewer-hint").filter({ hasText: "Loft:" })).toHaveCount(0);
   // The selection survives — cancelling a command is not a reset. The editor
   // is still showing the sketch's declaration, which is how we can see it.
   expect(await highlighted(page)).toContain("lower = PolygonProfile(");
@@ -156,15 +159,16 @@ test("Escape cancels one thing per press, starting with the pending command", as
   await page.keyboard.press("Escape");
   await expect.poll(() => highlighted(page), { timeout: 10_000 }).toBe("");
 
-  // ── rung 3: the mode, which is the promise the hint bar makes ────────
+  // ── rung 3: the mode, as the mode switcher shows it ──────────────────
   await page.getByTestId("editmode-simulate").click();
-  await expect(page.getByTestId("hint-mode")).toHaveText("simulate");
+  await expect(page.getByTestId("editmode-simulate")).toHaveClass(/active/);
   await page.keyboard.press("Escape");
-  await expect(page.getByTestId("hint-mode")).toHaveText("model");
+  await expect(page.getByTestId("editmode-model")).toHaveClass(/active/);
+  await expect(page.getByTestId("editmode-simulate")).not.toHaveClass(/active/);
 
   // ── and a press with nothing pending changes nothing ─────────────────
   await page.keyboard.press("Escape");
-  await expect(page.getByTestId("hint-mode")).toHaveText("model");
+  await expect(page.getByTestId("editmode-model")).toHaveClass(/active/);
   expect(patches, "no rung of the ladder edits the program").toHaveLength(0);
 });
 

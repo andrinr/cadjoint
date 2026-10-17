@@ -64,7 +64,7 @@ import {
 } from "../viewer/navCube";
 import { VIEW_PRESETS, sameView } from "../viewer/display";
 import type { Projection } from "../viewer/math";
-import { VIEW_KEYS } from "../shortcuts";
+import { VIEW_KEYS, typingTarget } from "../shortcuts";
 import { PITCH_LIMIT } from "./viewer/camera";
 import { OrthographicIcon, PerspectiveIcon } from "./icons";
 
@@ -98,17 +98,6 @@ const ORBIT_SPEED = 0.011;
 
 const path = (points: [number, number][]): string =>
   points.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(" ");
-
-/** True while focus is in the code editor or another text surface. */
-function isTypingTarget(): boolean {
-  const target = document.activeElement;
-  return Boolean(
-    target &&
-      (target.tagName === "TEXTAREA" ||
-        target.tagName === "INPUT" ||
-        target.closest(".cm-editor")),
-  );
-}
 
 const titleCase = (key: string) =>
   key
@@ -270,7 +259,7 @@ export function ViewCube(props: ViewCubeProps) {
    * text surface's.
    */
   const onKeyDown = (event: KeyboardEvent) => {
-    if (event.metaKey || event.altKey || isTypingTarget()) return;
+    if (event.metaKey || event.altKey || typingTarget()) return;
     const binding = VIEW_KEYS[event.code];
     if (!binding) return;
     if (binding.projection) {
@@ -297,6 +286,7 @@ export function ViewCube(props: ViewCubeProps) {
   });
 
   return (
+    <>
     <div class="view-cube" data-testid="view-cube">
       <svg
         class="cube-stage"
@@ -346,12 +336,11 @@ export function ViewCube(props: ViewCubeProps) {
           )}
         </For>
       </svg>
+    </div>
 
-      {/* The world axes, turning with the cube, in a square of their own
-          directly under it. The origin is that square's centre, because the
-          arms sweep a full circle as the camera turns and any other origin
-          would put one of them off the edge at some standpoint — which is
-          exactly what happened while this lived in the cube's own square. */}
+      {/* The world axes, turning with the cube, in their own square in the
+          viewport's bottom-left corner. The origin is the square's centre
+          because the arms sweep a full circle as the camera turns. */}
       <svg
         class="cube-triad"
         viewBox={`${-TRIAD_EXTENT} ${-TRIAD_EXTENT} ${TRIAD_EXTENT * 2} ${TRIAD_EXTENT * 2}`}
@@ -389,28 +378,35 @@ export function ViewCube(props: ViewCubeProps) {
           )}
         </For>
       </svg>
+    </>
+  );
+}
 
-      {/* The projection toggle: a glyph, not a facet, because it is not a
-          direction. It sits in the stage's top-right corner, which the cube's
-          silhouette never reaches, so the widget stays one block instead of a
-          square with a button hung under it — which is where it was. */}
-      <button
-        type="button"
-        class="cube-projection"
-        classList={{ active: props.projection === "orthographic" }}
-        onClick={toggleProjection}
-        title={
-          props.projection === "orthographic"
-            ? "Orthographic — click for perspective  (5)"
-            : "Perspective — click for orthographic  (5)"
-        }
-        aria-label="Toggle projection"
-        data-testid="projection-toggle"
-      >
-        <Show when={props.projection === "orthographic"} fallback={<PerspectiveIcon />}>
-          <OrthographicIcon />
-        </Show>
-      </button>
-    </div>
+/**
+ * The projection toggle, in the viewport bar beside render settings:
+ * projection is how the picture is drawn, not a direction. Key 5 stays with
+ * the cube's handler.
+ */
+export function ProjectionToggle(props: {
+  projection: Projection;
+  onProjection: (projection: Projection) => void;
+}) {
+  const ortho = () => props.projection === "orthographic";
+  return (
+    <button
+      type="button"
+      class="viewport-bar-button"
+      classList={{ active: ortho() }}
+      onClick={() => props.onProjection(ortho() ? "perspective" : "orthographic")}
+      title={ortho() ? "Orthographic — click for perspective  (5)" : "Perspective — click for orthographic  (5)"}
+      aria-label="Toggle projection"
+      aria-pressed={ortho()}
+      data-testid="projection-toggle"
+    >
+      <Show when={ortho()} fallback={<PerspectiveIcon size={16} />}>
+        <OrthographicIcon size={16} />
+      </Show>
+      <span class="rail-word">{ortho() ? "Ortho" : "Persp"}</span>
+    </button>
   );
 }

@@ -1,42 +1,38 @@
 /**
- * The window-level keys the shell owns, as opposed to the viewport's.
+ * The window-level ⌘ chords the shell owns; bare keys belong to the viewport
+ * (`components/viewer/keyboard.ts`). Both dispatch from `shortcuts.ts`
+ * through the command registry.
  *
- * Two rules, both about staying out of the way: Ctrl/Cmd+Z is undo/redo
- * everywhere *except* inside a text field, where CodeMirror's own history is
- * the right one; and Escape closes the WGSL dialog in the capture phase, so
- * the viewer's global Escape — which cancels one thing per press, down the
- * ladder in `components/viewer/escape.ts` — does not also fire underneath it.
- *
- * Tool and mode keys are not here — they belong to the viewport and live in
- * `shortcuts.ts` with the Help dialog's table.
+ * Every matched chord is `preventDefault`ed, runnable or not, so ⌘S never
+ * falls through to the browser's Save Page. Inside a text field ⌘Z / ⇧⌘Z are
+ * CodeMirror's history, and ⌘↵ in the editor is its own Run binding. Escape
+ * closes the WGSL dialog in the capture phase so the viewer's Escape ladder
+ * does not also fire.
  */
 
 import { onCleanup, onMount, type Accessor } from "solid-js";
+import { matchShortcut, typingTarget } from "../shortcuts";
+import { runCommand } from "./commands";
 
 export interface ShellShortcutOptions {
-  undo: () => void;
-  redo: () => void;
   /** Whether the generated-WGSL dialog is open. */
   wgslOpen: Accessor<boolean>;
   closeWgsl: () => void;
 }
 
+/** Commands whose chord a text surface keeps for itself. */
+const TEXT_OWNS = new Set(["edit-undo", "edit-redo"]);
+
 export function createShellShortcuts(options: ShellShortcutOptions): void {
   onMount(() => {
-    // Undo/redo shortcuts, kept away from the editor: while typing there,
-    // CodeMirror's own history owns Ctrl/Cmd+Z. The menu items always work.
     const onKeyDown = (event: KeyboardEvent) => {
-      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "z") return;
-      const target = document.activeElement;
-      const typing =
-        target &&
-        (target.tagName === "TEXTAREA" ||
-          target.tagName === "INPUT" ||
-          target.closest(".cm-editor"));
-      if (typing) return;
+      const shortcut = matchShortcut(event, "app");
+      if (!shortcut) return;
+      const typing = typingTarget();
+      if (typing && TEXT_OWNS.has(shortcut.command)) return;
+      if (shortcut.command === "program-run" && typing?.closest(".cm-editor")) return;
       event.preventDefault();
-      if (event.shiftKey) options.redo();
-      else options.undo();
+      runCommand(shortcut.command);
     };
     window.addEventListener("keydown", onKeyDown);
     onCleanup(() => window.removeEventListener("keydown", onKeyDown));

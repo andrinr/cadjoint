@@ -16,7 +16,6 @@
  */
 
 import { Show, createMemo } from "solid-js";
-import { dirty, sceneName, simView, studies } from "../../state";
 import {
   GRID_MAJOR_EVERY,
   MM_PER_UNIT,
@@ -49,27 +48,10 @@ export interface GraticuleProps {
   sdfFraction: number;
 }
 
-/** One title-block row; an absent value is stated, never omitted. */
-function Row(props: { label: string; value: string | null }) {
-  return (
-    <>
-      <dt>{props.label}</dt>
-      <dd>{props.value ?? "—"}</dd>
-    </>
-  );
-}
-
 export function Graticule(props: GraticuleProps) {
   const gain = createMemo(() => {
     const { mm, calibrated } = gainOf(props.camera.distance, props.camera.projection);
     return formatGain(mm, calibrated);
-  });
-
-  /** The study whose result the viewport is showing, if any. */
-  const study = createMemo(() => {
-    const name = simView()?.studyName;
-    if (!name) return null;
-    return studies().find((entry) => entry.name === name) ?? null;
   });
 
   /**
@@ -110,12 +92,6 @@ export function Graticule(props: GraticuleProps) {
     axis: ["X", "Y", "Z"][props.sdfAxis],
     at: formatDistance(slicePosition(props.sdfFraction) * MM_PER_UNIT),
   }));
-
-  const mesh = createMemo(() => {
-    const info = simView()?.info;
-    if (!info) return null;
-    return info.method ? `${info.name} · ${info.method}` : info.name;
-  });
 
   return (
     <>
@@ -200,21 +176,6 @@ export function Graticule(props: GraticuleProps) {
           <b>n × 0.5 + 0.5</b>
           <i>· +X red · +Y green · +Z blue</i>
         </div>
-      </Show>
-      <Show when={props.show}>
-        <dl class="title-block" data-testid="title-block">
-          <Row label="SCENE" value={sceneName() ?? "untitled"} />
-          <Row label="STUDY" value={study()?.name ?? null} />
-          <Row label="MESH" value={mesh()} />
-          {/* The program names the solver: a ThermalStudy is solved by the
-              thermal path, an ElasticStudy by the elastic one. The frontend is
-              not told which backend ran it, so it does not claim one. */}
-          <Row label="SOLVER" value={study()?.kind ?? null} />
-          <Row
-            label="REV"
-            value={sceneName() ? (dirty() ? "modified" : "saved") : "unsaved"}
-          />
-        </dl>
       </Show>
     </>
   );

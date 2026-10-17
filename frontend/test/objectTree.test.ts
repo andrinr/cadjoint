@@ -50,7 +50,7 @@ describe("buildSceneTree", () => {
       node({ id: "sphere_1", kind: "sphere", name: "glass" }),
     ]);
 
-    expect(rows.map((row) => row.label)).toEqual(["scene", "house", "glass"]);
+    expect(rows.map((row) => row.label)).toEqual(["scene.py", "house", "glass"]);
     expect(rows[0]).toMatchObject({ kind: "scene", depth: 0, group: true, nodeId: null });
     expect(rows[0].detail).toBe("2 objects");
     expect(rows[1]).toMatchObject({ kind: "profile", depth: 1, nodeId: "profile_0" });
@@ -71,7 +71,7 @@ describe("buildSceneTree", () => {
     ]);
 
     expect(rows.map((row) => [row.label, row.depth])).toEqual([
-      ["scene", 0],
+      ["scene.py", 0],
       ["section", 1],
       ["extrude", 2],
       ["loft", 2],
@@ -146,11 +146,11 @@ describe("visibleRows", () => {
 
   it("hides descendants of a collapsed group", () => {
     const visible = visibleRows(rows, new Set(["profile_0"]));
-    expect(visible.map((row) => row.label)).toEqual(["scene", "profile", "sphere"]);
+    expect(visible.map((row) => row.label)).toEqual(["scene.py", "profile", "sphere"]);
   });
 
   it("collapsing the root hides all rows below it", () => {
     const visible = visibleRows(rows, new Set(["scene"]));
-    expect(visible.map((row) => row.label)).toEqual(["scene"]);
+    expect(visible.map((row) => row.label)).toEqual(["scene.py"]);
   });
 });

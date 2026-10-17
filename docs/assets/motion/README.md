@@ -12,9 +12,9 @@ Do not hand-edit anything in this directory.
 
 | clip | played | frames | delivered | bytes |
 | --- | ---: | ---: | ---: | ---: |
-| `bracket-orbit-drag.webp` | 5.9s | 94 | 1120px wide | 1246 KB |
-| `end-cap-solve.webp` | 8.7s | 139 | 1440px wide | 1261 KB |
-| `heat-sink-optimize.webp` | 10.8s | 173 | 980px wide | 544 KB |
-| `properties-window.webp` | 6.8s | 109 | 980px wide | 288 KB |
-| `sketch-planes.webp` | 9.9s (22s wall) | 159 | 1120px wide | 768 KB |
-| **total** | | | | **4.01 MB** |
+| `bracket-orbit-drag.webp` | 6.3s | 101 | 1120px wide | 1164 KB |
+| `end-cap-solve.webp` | 8.8s | 141 | 1440px wide | 1168 KB |
+| `heat-sink-optimize.webp` | 6.6s | 105 | 980px wide | 275 KB |
+| `properties-window.webp` | 5.9s | 94 | 980px wide | 237 KB |
+| `sketch-planes.webp` | 11.6s | 185 | 1120px wide | 783 KB |
+| **total** | | | | **3.54 MB** |

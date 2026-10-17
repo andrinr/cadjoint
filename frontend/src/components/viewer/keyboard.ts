@@ -14,33 +14,23 @@
 
 import {
   bcPickArmed,
-  cycleMode,
   editingMode,
   nodeById,
   pendingLoft,
   selection,
   setBcPickArmed,
   setEditingMode,
-  setGizmoMode,
   setPendingLoft,
   setSelection,
-  setSelectionMode,
   setSimProbe,
   setTool,
   simProbe,
   tool,
 } from "../../state";
-import { VIEWER_TOOL_KEYS, type ViewerToolAction } from "../../shortcuts";
+import { matchShortcut, typingTarget } from "../../shortcuts";
+import { runCommand } from "../../shell/commands";
 import { escapeLevel } from "./escape";
 import type { ViewerPaneProps } from "./props";
-
-/** True while focus is in the code editor or another text surface. */
-function isTypingTarget(): boolean {
-  const target = document.activeElement;
-  return Boolean(
-    target && (target.tagName === "TEXTAREA" || target.closest(".cm-editor")),
-  );
-}
 
 export interface ViewerKeyboardContext {
   props: ViewerPaneProps;
@@ -59,7 +49,7 @@ export interface ViewerKeyboardContext {
 
 export function createViewerKeyboard(context: ViewerKeyboardContext) {
   const onKeyDown = (event: KeyboardEvent) => {
-    const typing = isTypingTarget();
+    const typing = typingTarget() !== null;
     if (event.key === "Escape") {
       // Overlays own their Escape (dialogs, menus, popovers, flyouts close
       // themselves in the capture phase); only a bare viewport Escape backs
@@ -99,25 +89,13 @@ export function createViewerKeyboard(context: ViewerKeyboardContext) {
         }
       }
     }
-    if (!typing && !event.metaKey && !event.ctrlKey && !event.altKey) {
-      // Key→action table shared with the Help dialog (src/shortcuts.ts).
-      // Placement shortcuts for solid primitives imply model mode, so the
-      // keys keep working from any mode without leaving a hidden tool armed.
-      const actions: Record<ViewerToolAction, () => void> = {
-        "select-object": () => (setTool("select"), setSelectionMode("object")),
-        "select-vertex": () => (setTool("select"), setSelectionMode("vertex")),
-        "tool-polygon": () => setTool("polygon"),
-        "tool-box": () => (setEditingMode("model"), setTool("box")),
-        "tool-sphere": () => (setEditingMode("model"), setTool("sphere")),
-        "tool-cylinder": () => (setEditingMode("model"), setTool("cylinder")),
-        "gizmo-translate": () => setGizmoMode("translate"),
-        "gizmo-rotate": () => setGizmoMode("rotate"),
-        "cycle-mode": () => cycleMode(event.shiftKey ? -1 : 1),
-      };
-      const action = VIEWER_TOOL_KEYS[event.key.toLowerCase()];
-      if (action) {
+    if (!typing) {
+      // Bare keys from src/shortcuts.ts, run through the command registry.
+      const shortcut = matchShortcut(event, "viewport");
+      if (shortcut) {
         event.preventDefault();
-        actions[action]();
+        runCommand(shortcut.command);
+        return;
       }
     }
     const active = selection();
@@ -138,7 +116,7 @@ export function createViewerKeyboard(context: ViewerKeyboardContext) {
 
   const onPanKey = (event: KeyboardEvent) => {
     if (event.code !== "Space") return;
-    if (isTypingTarget()) return;
+    if (typingTarget()) return;
     // Stop the page scrolling or a focused button firing.
     event.preventDefault();
     context.setPanHeld(event.type === "keydown");
