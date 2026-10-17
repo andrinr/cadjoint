@@ -116,10 +116,6 @@ describe("the generated files are current", () => {
     // how --type-body-small went unnoticed. Local properties a stylesheet
     // declares itself (--mode-accent and friends) are allowed.
     const declared = new Set(cssProperties().map(([name]) => name));
-    // Set at runtime by MaterialPanel's previewStyle(), per swatch.
-    for (const name of ["material-rgb", "material-opacity", "material-roughness", "material-metallic"]) {
-      declared.add(name);
-    }
     for (const { text } of stylesheets) {
       for (const match of text.matchAll(/--([\w-]+)\s*:/g)) declared.add(match[1]);
     }

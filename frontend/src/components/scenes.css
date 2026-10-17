@@ -36,37 +36,33 @@
  * ended up sitting on top of the second card's date. The list scrolls; the
  * rows keep their size.
  */
+/*
+ * A grid of cards no narrower than 60 units and no wider than the space
+ * shares out: one column in a narrow window, as many as fit in a wide one,
+ * so the 320x200 thumbnail is never upscaled far. The frames outline the
+ * cards; rows are a section apart.
+ */
 .scene-cards {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(calc(var(--unit) * 60), 1fr));
+  align-items: start;
   flex: 0 0 auto;
-  gap: 0;
+  gap: var(--section);
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.scene-card + .scene-card {
-  border-top: var(--line);
-}
-
 .scene-card {
-  flex: 0 0 auto;
-  padding: var(--inset) 0;
   min-width: 0;
 }
 
-/*
- * The card the current document was loaded from is marked, not coloured.
- *
- * The active stroke at the head of the block, in ink: 2px is the one weight
- * that means "this is the active one". Not the accent: the accent is a fill
- * behind type — a chip, a pressed control — and never a mark or a line, and a
- * 2px orange bar down the side of a card is exactly the mark it is not.
- */
-.scene-card.current {
-  border-left: var(--line-active);
-  padding-left: var(--inset);
+/* The card the current document was loaded from: its frame takes the active
+   line, 2px ink, the one weight that means "this one". Not the accent, which
+   is only ever a fill behind type. */
+.scene-card.current .scene-frame,
+.scene-card.current .scene-open:hover .scene-frame {
+  border: var(--line-active);
 }
 
 /* Picture plus caption is one target: clicking anywhere in it opens the
