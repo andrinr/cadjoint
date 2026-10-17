@@ -10,7 +10,7 @@
  * the end of the line.
  *
  * No colours, sizes or spacings are invented here; every value is a token
- * declared in styles.css.
+ * from src/tokens.css.
  */
 
 /* One space between the right-hung count and the control that follows it;

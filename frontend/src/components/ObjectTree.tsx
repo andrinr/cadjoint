@@ -18,7 +18,9 @@ import {
   selection,
   setHover,
   setInspected,
-  setSelection, sceneName } from "../state";
+  setSelection,
+  sceneName,
+} from "../state";
 import { buildSceneTree, visibleRows, type SceneTreeRow } from "../objectTree";
 import {
   BoxIcon,
@@ -27,6 +29,7 @@ import {
   PolygonIcon,
   SphereIcon,
 } from "./icons";
+import { PanelHeader } from "./ui";
 
 const KIND_ICONS: Record<SceneTreeRow["kind"], Component | null> = {
   scene: ObjectSelectIcon,
@@ -51,9 +54,7 @@ export function ObjectTree() {
   };
 
   // One selection (guide F2): a row is either the selected object or the
-  // inspected element, never both, so each pick clears the other. Clicking
-  // the already-selected object used to leave an inspected operator lit,
-  // because the selection did not change and nothing cleared it.
+  // inspected element, never both, so each pick clears the other.
   const selectRow = (row: SceneTreeRow) => {
     if (row.nodeId !== null) {
       setInspected(null);
@@ -61,8 +62,7 @@ export function ObjectTree() {
       return;
     }
     // An operator or a boolean has no geometry to select; it points the
-    // properties window at its element instead, and the object selection
-    // steps aside.
+    // properties window at its element instead.
     if (row.elementId !== null) {
       setSelection(null);
       setInspected(row.elementId);
@@ -94,14 +94,7 @@ export function ObjectTree() {
 
   return (
     <aside class="object-tree-panel" data-testid="object-tree-panel">
-        <header>
-          {/* Kicker first, title second — the same order every dock panel
-              header uses, so the eyebrow line is always the top line. */}
-          <span>
-            <small>read-only</small>
-            Object tree
-          </span>
-        </header>
+        <PanelHeader kicker="read-only" title="Object tree" />
         <div class="object-tree-rows" role="tree" aria-label="Scene composition">
           <For each={shown()}>
             {(row, index) => (

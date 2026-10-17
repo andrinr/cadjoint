@@ -27,7 +27,7 @@ import {
 } from "../viewer/renderer";
 import { sdfRampCss } from "../viewer/sdfRamp";
 import { MM_PER_UNIT, formatDistance } from "../viewer/graticule";
-import { Segmented, ToggleSwitch, type SegmentedOption } from "./ui";
+import { PanelHeader, Segmented, ToggleSwitch, axisOptions, type SegmentedOption } from "./ui";
 import { BoxIcon, StudioIcon, WireIcon, XrayIcon } from "./icons";
 
 /** Each built-in preset's glyph, drawn in the icon set's own pen (I1). */
@@ -118,11 +118,7 @@ const SDF_VIEWS: SegmentedOption<SdfView>[] = [
   },
 ];
 
-const SLICE_AXES: SegmentedOption<0 | 1 | 2>[] = [
-  { value: 0, label: "X", testId: "sdf-axis-x" },
-  { value: 1, label: "Y", testId: "sdf-axis-y" },
-  { value: 2, label: "Z", testId: "sdf-axis-z" },
-];
+const SLICE_AXES = axisOptions("sdf-axis");
 
 /** A world distance, spoken the way the graticule's readout speaks one. */
 const distanceLabel = (units: number): string => {
@@ -206,13 +202,7 @@ export function RenderPanel(props: RenderPanelProps) {
 
   return (
     <aside class="render-panel" data-testid="render-panel">
-      <header>
-        {/* Kicker first, title second — see ObjectTree. */}
-        <span>
-          <small>presets &amp; display</small>
-          Render
-        </span>
-      </header>
+      <PanelHeader kicker="presets & display" title="Render" />
       <div class="render-settings">
         <section class="render-preset-library">
           <div class="render-preset-heading">

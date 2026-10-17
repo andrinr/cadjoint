@@ -64,7 +64,7 @@ import {
 } from "../viewer/navCube";
 import { VIEW_PRESETS, sameView } from "../viewer/display";
 import type { Projection } from "../viewer/math";
-import { VIEW_KEYS } from "../shortcuts";
+import { VIEW_KEYS, typingTarget } from "../shortcuts";
 import { PITCH_LIMIT } from "./viewer/camera";
 import { OrthographicIcon, PerspectiveIcon } from "./icons";
 
@@ -98,17 +98,6 @@ const ORBIT_SPEED = 0.011;
 
 const path = (points: [number, number][]): string =>
   points.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(" ");
-
-/** True while focus is in the code editor or another text surface. */
-function isTypingTarget(): boolean {
-  const target = document.activeElement;
-  return Boolean(
-    target &&
-      (target.tagName === "TEXTAREA" ||
-        target.tagName === "INPUT" ||
-        target.closest(".cm-editor")),
-  );
-}
 
 const titleCase = (key: string) =>
   key
@@ -270,7 +259,7 @@ export function ViewCube(props: ViewCubeProps) {
    * text surface's.
    */
   const onKeyDown = (event: KeyboardEvent) => {
-    if (event.metaKey || event.altKey || isTypingTarget()) return;
+    if (event.metaKey || event.altKey || typingTarget()) return;
     const binding = VIEW_KEYS[event.code];
     if (!binding) return;
     if (binding.projection) {
@@ -349,11 +338,9 @@ export function ViewCube(props: ViewCubeProps) {
       </svg>
     </div>
 
-      {/* The world axes, turning with the cube, in a square of their own in
-          the viewport's bottom-left corner, out of the cube's way and clear
-          of the dock and the hint. The origin is that square's centre,
-          because the arms sweep a full circle as the camera turns and any
-          other origin would put one of them off the edge at some standpoint. */}
+      {/* The world axes, turning with the cube, in their own square in the
+          viewport's bottom-left corner. The origin is the square's centre
+          because the arms sweep a full circle as the camera turns. */}
       <svg
         class="cube-triad"
         viewBox={`${-TRIAD_EXTENT} ${-TRIAD_EXTENT} ${TRIAD_EXTENT * 2} ${TRIAD_EXTENT * 2}`}
@@ -396,11 +383,9 @@ export function ViewCube(props: ViewCubeProps) {
 }
 
 /**
- * The projection toggle, in the viewport bar beside render settings.
- *
- * It used to sit in the cube stage's corner. Projection is not a direction,
- * and the cube is the direction control, so the toggle joins the other
- * controls of how the picture is drawn. Key 5 stays with the cube's handler.
+ * The projection toggle, in the viewport bar beside render settings:
+ * projection is how the picture is drawn, not a direction. Key 5 stays with
+ * the cube's handler.
  */
 export function ProjectionToggle(props: {
   projection: Projection;

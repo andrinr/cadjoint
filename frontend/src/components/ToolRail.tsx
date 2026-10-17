@@ -9,7 +9,7 @@
  *
  * The mode switcher itself lives in the toolbar (`ModeSwitcher`); the rail
  * only shows the clusters the active mode offers, and disappears entirely in
- * tool-less modes (Simulate, Render). Tools sit in expandable clusters: a
+ * tool-less modes (Simulate). Tools sit in expandable clusters: a
  * parent icon shows the group's last-used child and expands — on hover dwell
  * or click — into a horizontal flyout of the children, like Photoshop's
  * nested tools. Flyouts close on selection, Escape, or a mouse-leave delay;
@@ -50,18 +50,19 @@ import {
   shapeBlocked,
   supportsGizmo,
   toggleConstraintTool,
+  type ShapeKey,
   toggleCreateTool,
   toggleLoft,
   transformable,
 } from "../shell/toolActions";
 import type { GizmoMode, SelectionMode, ToolMode } from "../types";
-import { FixIcon } from "./FixIcon";
 import {
   BoxIcon,
   CoincidentIcon,
   CylinderIcon,
   DistanceIcon,
   ExtrudeIcon,
+  FixIcon,
   FaceSketchIcon,
   HorizontalIcon,
   LoftIcon,
@@ -108,8 +109,7 @@ const CREATE: ToolEntry[] = [
   { key: "cylinder", label: "Cylinder", hint: withKey("Place a cylinder", "tool-cylinder"), icon: CylinderIcon, testid: "tool-cylinder" },
 ];
 
-// Test ids keep their old `modify-` / `annotate-` prefixes: the end-to-end
-// specs address them, and a test id is not a name anybody reads.
+// Test ids keep the `modify-` / `annotate-` prefixes the e2e specs address.
 const SHAPE: ToolEntry[] = [
   { key: "extrude", label: "Extrude", hint: withKey("Extrude the selected sketch", "shape-extrude"), icon: ExtrudeIcon, testid: "modify-extrude" },
   { key: "revolve", label: "Revolve", hint: "Revolve the selected sketch", icon: RevolveIcon, testid: "modify-revolve" },
@@ -173,6 +173,15 @@ export function ToolRail(props: ToolRailProps) {
   };
 
   const activeTransform = () => (supportsGizmo(gizmoMode()) ? gizmoMode() : "translate");
+
+  /** Enabled and hint for a group whose entries can be refused with a reason. */
+  const refusable = (blocked: (entry: ToolEntry) => string | null) => ({
+    isEnabled: (entry: ToolEntry) => blocked(entry) === null,
+    hint: (entry: ToolEntry) => {
+      const reason = blocked(entry);
+      return reason ? `${entry.label} — ${reason.toLowerCase()}` : entry.hint;
+    },
+  });
 
   const activateShape = (key: string) => {
     if (!modifyProfile()) return;
@@ -311,16 +320,11 @@ export function ToolRail(props: ToolRailProps) {
       <Show when={groupVisibleInMode("modify", editingMode())}>
         {group("modify", "Shape", SHAPE, {
           isActive: (entry) =>
-            // Both sides are undefined when nothing is pending and no profile is
-            // selected, which lit the group as current beside Object.
+            // Guard null: with no profile selected both ids are undefined.
             entry.key === "loft" &&
             pendingLoft() !== null &&
             pendingLoft()?.nodeId === modifyProfile()?.id,
-          isEnabled: (entry) => shapeBlocked(entry.key as "extrude") === null,
-          hint: (entry) => {
-            const reason = shapeBlocked(entry.key as "extrude");
-            return reason ? `${entry.label} — ${reason.toLowerCase()}` : entry.hint;
-          },
+          ...refusable((entry) => shapeBlocked(entry.key as ShapeKey)),
           activate: (entry) => activateShape(entry.key),
         })}
       </Show>
@@ -329,11 +333,7 @@ export function ToolRail(props: ToolRailProps) {
         {group("transform", "Transform", TRANSFORMS, {
           isActive: (entry) =>
             supportsGizmo(entry.key as GizmoMode) && gizmoMode() === entry.key,
-          isEnabled: (entry) => supportsGizmo(entry.key as GizmoMode),
-          hint: (entry) => {
-            const reason = gizmoBlocked(entry.key as GizmoMode);
-            return reason ? `${entry.label} — ${reason.toLowerCase()}` : entry.hint;
-          },
+          ...refusable((entry) => gizmoBlocked(entry.key as GizmoMode)),
           activate: (entry) => setGizmoMode(entry.key as GizmoMode),
         })}
       </Show>
@@ -341,12 +341,7 @@ export function ToolRail(props: ToolRailProps) {
       <Show when={groupVisibleInMode("annotate", editingMode())}>
         {group("annotate", "Constrain", CONSTRAIN, {
           isActive: (entry) => tool() === entry.key,
-          isEnabled: (entry) =>
-            (entry.key === "fix" ? fixBlocked() : constraintBlocked()) === null,
-          hint: (entry) => {
-            const reason = entry.key === "fix" ? fixBlocked() : constraintBlocked();
-            return reason ? `${entry.label} — ${reason.toLowerCase()}` : entry.hint;
-          },
+          ...refusable((entry) => (entry.key === "fix" ? fixBlocked() : constraintBlocked())),
           activate: (entry) =>
             entry.key === "fix" ? props.onFix() : toggleConstraintTool(entry.key as ToolMode),
         })}

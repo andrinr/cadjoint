@@ -5,18 +5,14 @@
  */
 
 import { OptimizeCards, type OptimizeCardsProps } from "./OptimizeCards";
+import { PanelHeader } from "./ui";
 
 export type OptimizePanelProps = OptimizeCardsProps;
 
 export function OptimizePanel(props: OptimizePanelProps) {
   return (
     <aside class="sim-panel optimize-panel" data-testid="optimize-panel">
-      <header>
-        <span>
-          <small>Adjoint</small>
-          Optimize
-        </span>
-      </header>
+      <PanelHeader kicker="Adjoint" title="Optimize" />
       <OptimizeCards
         onPatch={props.onPatch}
         onAdoptSource={props.onAdoptSource}

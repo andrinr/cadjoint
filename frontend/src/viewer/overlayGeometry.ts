@@ -36,15 +36,9 @@ export const FACE_STRIDE = 28;
 export type Rgba = readonly [number, number, number, number];
 
 /**
- * Construction-overlay ink: every tone is a role from `tokens.ts`.
- *
- * Inside the viewport the overlays are achromatic (C7) — the field ramp, the
- * BC hues and the proposal own colour there, and the axes own direction — so
- * state is carried by the ink ladder alone (V1): rest `ink-3`, hover `ink-2`,
- * selected `ink`, locked `rule`. Planes and the face highlight sit on the same
- * ladder at lower alphas, because what makes them read as surfaces is that
- * they are filled, not that they are tinted. `OVERLAY_TONES` names the token
- * and alpha of each key; this table only evaluates it.
+ * Construction-overlay ink, evaluated from `OVERLAY_TONES` in tokens.ts.
+ * Achromatic inside the viewport (C7): state is the ink ladder (V1) — rest
+ * `ink-3`, hover `ink-2`, selected `ink`, locked `rule`.
  */
 export const COLORS: Record<string, Rgba> = Object.fromEntries(
   Object.keys(OVERLAY_TONES).map((name) => [name, overlayRgba(name)]),
@@ -55,19 +49,13 @@ const INK = hexToRgb(CHROME.ink);
 /** A held vertex's square at rest: the rest step of the ink ladder. */
 const HANDLE_HELD: Rgba = [...hexToRgb(CHROME[VIEWPORT_STATES.rest]), 1];
 
-/**
- * A free vertex's ring: the free-parameter blue, the same hue `free=True`
- * takes in the editor, so blue means "the optimiser or a drag may move
- * this" on both sides of the window. Hover keeps the hue and gains weight
- * through the emphasis flag.
- */
+/** A free vertex's ring: the free-parameter blue `free=True` takes in the editor. */
 const HANDLE_FREE: Rgba = [...hexToRgb(CHROME.param), 1];
 
 /**
- * Handle shapes, the instance's last float (see `fs_handle`). Free versus
- * held is told by shape and hue together, so it survives a colour-blind
- * reading: a free vertex is a hollow ring in param blue, a held one a filled
- * ink square, and the selected vertex a filled ink circle whatever it is.
+ * Handle shapes, the instance's last float (see `fs_handle`): free is a
+ * hollow param-blue ring, held a filled ink square, selected a filled ink
+ * circle. Shape and hue together survive a colour-blind reading.
  */
 export const HANDLE_SHAPE = { free: 0, held: 1, selected: 2 } as const;
 
@@ -117,22 +105,22 @@ export function packConstructionOverlay(
       const isSelected = selection?.nodeId === node.id && selection.vertexIndex === index;
       const isHovered = hover?.nodeId === node.id && hover.vertexIndex === index;
       const held = vertexHeld(node, index);
-      const shape = isSelected && node.editable
-        ? HANDLE_SHAPE.selected
-        : held
-          ? HANDLE_SHAPE.held
-          : HANDLE_SHAPE.free;
+      const shape =
+        isSelected && node.editable
+          ? HANDLE_SHAPE.selected
+          : held
+            ? HANDLE_SHAPE.held
+            : HANDLE_SHAPE.free;
+      // A free handle keeps its hue on hover and gains weight via the emphasis flag.
       const handleColor = !node.editable
         ? COLORS.handleLocked
         : isSelected
           ? COLORS.handleSelected
-          : isHovered
-            ? held
+          : !held
+            ? HANDLE_FREE
+            : isHovered
               ? COLORS.handleHover
-              : HANDLE_FREE
-            : held
-              ? HANDLE_HELD
-              : HANDLE_FREE;
+              : HANDLE_HELD;
       const position = node.vertices[index].world;
       handles.push(
         position[0],

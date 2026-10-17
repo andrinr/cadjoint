@@ -23,7 +23,7 @@
  * everything the stylesheet needs is mirrored as a custom property with the
  * same name.
  *
- * Scales are deliberately short. Six type sizes, five trackings, seven spacing
+ * Scales are deliberately short. Six type sizes, six trackings, seven spacing
  * steps, one radius, four control heights: if a value is not on a scale it is
  * a bug, not a nuance.
  */
@@ -66,11 +66,8 @@ export function contrastRatio(a: Rgb, b: Rgb): number {
  */
 export const CHROME = {
   // The viewport is paper, and so is the chrome around it: one ground, one
-  // value, measured off the all-light study (since deleted; the numbers it
-  // settled are quoted here) where it covers 83% of the frame: it recorded
-  // the seam as
-  // "dL 0.0000 · contrast 1.00:1" — the viewport is not a darker or lighter
-  // well, it is the same sheet, and what marks its edge is a rule.
+  // value. The viewport is not a darker or lighter well, it is the same
+  // sheet, and what marks its edge is a rule.
   "surface-viewport": "#e6e6e9",
 
   // Surfaces. Not a depth ladder — a paper ladder: the page is the ground and
@@ -89,21 +86,21 @@ export const CHROME = {
   "surface-raised-hover": "#edecee",
 
   // Ink. Three levels, and nothing else: text is never faded with `opacity`,
-  // because an opacity fade has no assertable contrast ratio. 14.4 / 7.5 / 5.1
+  // because an opacity fade has no assertable contrast ratio. 14.2 / 7.5 / 5.1
   // against the darkest ground, so even `ink-3` clears AA on every surface.
   ink: "#1c1814",
   "ink-2": "#4b4642",
   "ink-3": "#635e5a",
-  // The one ink that is drawn on the accent rather than on paper: 7.02:1 on
+  // The one ink that is drawn on the accent rather than on paper: 10.8:1 on
   // `accent`, which is the number the whole accent rule turns on.
   "ink-on-accent": "#0a0a0c",
 
   // Rules. One weight — 1px, always — and three contrasts, because on a sheet
   // the hierarchy is carried by how dark a line is, not by how thick it is:
   //
-  //   rule         2.15:1 on paper — separation *within* a panel
-  //   rule-strong  3.81:1          — between sections, and the viewport seam
-  //   rule-heavy   9.85:1          — the viewport frame and its corner marks
+  //   rule         1.7:1 on paper — separation *within* a panel
+  //   rule-strong  3.1:1          — between sections, and the viewport seam
+  //   rule-heavy   7.2:1          — the viewport frame and its corner marks
   //
   // `rule` is deliberately under 3:1 and is absent from MEANINGFUL_NON_TEXT: a
   // resting hairline inside a panel is structure, not state. `rule-strong` is
@@ -114,7 +111,7 @@ export const CHROME = {
   "rule-heavy": "#4a484f",
 
   // The accent. One hue, and it has exactly one job: **a fill behind near-black
-  // type.** It measures 7.02:1 as a ground under `ink-on-accent` and 2.26:1 as
+  // type.** It measures 10.8:1 as a ground under `ink-on-accent` and 1.5:1 as
   // ink on paper, so the two uses are not a preference — one passes and one
   // fails. Where another design would draw accent-coloured text or an accent
   // hairline, this one draws a filled block instead.
@@ -125,7 +122,7 @@ export const CHROME = {
   // hint bar, both of which survive greyscale and colour-blindness.
   accent: "#ffb000",
   // Pressed and hovered accent fills, and the only tone allowed to draw an
-  // accent-coloured *mark*: 3.36:1 on paper, so it clears the non-text bar the
+  // accent-coloured *mark*: 3.3:1 on paper, so it clears the non-text bar the
   // accent itself cannot.
   "accent-press": "#a87400",
 
@@ -134,19 +131,14 @@ export const CHROME = {
   // chips reuse them rather than inventing hues of their own.
   danger: "#a8341c",
   "danger-ink": "#8a1f10",
-  // The editor's warning severity, and the only tone added for it. Derived
-  // from the accent family rather than invented: `accent` is the family's
-  // fill (2.26:1 on paper, unusable as a mark), `accent-press` is the same
-  // hue darkened until it just clears the non-text bar (3.36:1), and `warn`
-  // carries that one step further and shifts toward amber so it cannot be
-  // read as `danger`'s red. It measures **4.76:1 on paper** — comfortably
-  // past the 3:1 a non-text mark owes, and past AA as well, which is what
-  // lets the same tone label a diagnostic and underline it.
+  // The editor's warning severity: the accent family darkened past
+  // `accent-press` and shifted toward amber so it cannot be read as
+  // `danger`'s red. 4.76:1 on paper clears AA, so the same tone can label a
+  // diagnostic and underline it.
   warn: "#8a5a00",
   ok: "#00734c",
   // The free-parameter role, and nothing else: a value the optimiser or a
-  // drag may move. Was `info`, which also meant a constraint count, a
-  // residual line, a plane label and the elastic chip.
+  // drag may move.
   param: "#0065b4",
   "param-ink": "#004a85",
 
@@ -160,12 +152,11 @@ export const CHROME = {
 
   // ── viewport ink ────────────────────────────────────────────────────────
   // Everything drawn *inside* the viewport rectangle by the DOM: dimension
-  // labels, the hint bar, the mode cue on the viewport border. These are now
-  // the same values chrome uses, because chrome and viewport share a ground —
-  // but they stay a separate list because they owe a separate rule:
+  // labels, the hint bar, the mode cue on the viewport border. They stay a
+  // separate list from the chrome inks because they owe a separate rule:
   // **inside the rectangle, nothing is coloured.** The field ramp is the only
-  // hue in the viewport, which is what `measurements.txt` scores as
-  // "FIELD WINS", and an achromatic annotation cannot be mistaken for a value.
+  // hue in the viewport, so an achromatic annotation cannot be mistaken for a
+  // value.
   "viewport-ink": "#1c1814",
   "viewport-ink-2": "#605e65",
   "viewport-mark": "#48464d",
@@ -209,25 +200,10 @@ export const VIEWPORT_TONES: ChromeToken[] = [
 export const GRATICULE_TONES: ChromeToken[] = ["graticule-line", "graticule-axis"];
 
 /**
- * Editing modes, in switcher and keyboard-cycling order.
- *
- * All three name the same accent, on purpose. Colour is not how this UI says
- * which mode you are in — the filled cell's *position* in the switcher is, and
- * the word in the hint bar is (design-language.md §6). The record keeps its
- * mode-shaped signature so `editingMode.ts` and the CSS mode blocks are
- * unchanged; what changed is that there is nothing left to tell apart.
- */
-export const MODE_ACCENTS = {
-  model: CHROME.accent,
-  sketch: CHROME.accent,
-  simulate: CHROME.accent,
-} as const;
-
-/**
  * Chrome tones that carry meaning rather than decoration, so they owe ≥3:1
  * against the surface they sit on (WCAG non-text contrast).
  *
- * `accent` is absent, and that absence is the design: at 2.26:1 on paper it
+ * `accent` is absent, and that absence is the design: at 1.5:1 on paper it
  * cannot be a mark, which is why it is only ever a *fill* — see ACCENT_FILL
  * below, and the assertion in test/tokens.test.ts that holds both halves.
  * `rule` is absent for the same kind of reason, stated above its declaration.
@@ -249,8 +225,8 @@ export const MEANINGFUL_NON_TEXT: ChromeToken[] = [
  * The accent's only legal composition: `ink-on-accent` printed on `accent`.
  *
  * Stated as a pair rather than a tone because the accent has no meaning on its
- * own — it is a ground, and the test asserts the pair clears AA (7.02:1) while
- * the same hue used as ink on paper does not (2.26:1).
+ * own — it is a ground, and the test asserts the pair clears AAA while the
+ * same hue used as ink on paper fails even the non-text bar.
  */
 export const ACCENT_FILL: { ground: ChromeToken; ink: ChromeToken } = {
   ground: "accent",
@@ -275,9 +251,8 @@ export const TEXT_TONES: ChromeToken[] = [
  *
  * On paper the worst case inverts: ink loses contrast on the *darkest* sheet,
  * not the brightest, so the list ends where the assertions bite.
- * `surface-viewport` is deliberately absent — it is the viewport's own ground
- * and VIEWPORT_TONES is measured against it separately — even though it now
- * carries the same value as `surface-base`.
+ * `surface-viewport` is absent: VIEWPORT_TONES are measured against it
+ * separately.
  */
 export const TEXT_SURFACES: ChromeToken[] = [
   "surface-float",
@@ -360,13 +335,12 @@ export const RADII = {
 } as const;
 
 /**
- * Control heights, five to nine units. Every box picks one, which is what
- * keeps labels, inputs and icons on a shared baseline inside a row. 24px is
- * the WCAG 2.2 (2.5.8) minimum target, so `control-tag` is for things that
- * cannot be clicked and everything clickable is `control-sm` or taller.
+ * Control heights, four to ten units: each a line box plus a distance each
+ * side. 24px is the WCAG 2.2 (2.5.8) minimum target, so `control-tag` is for
+ * things that cannot be clicked and everything clickable is `control-sm` or
+ * taller.
  */
 export const CONTROL_HEIGHTS = {
-  // The system's four heights (§1): each a line box plus a distance each side.
   "control-tag": 16,
   "control-sm": 24,
   "control-lg": 32,
@@ -647,32 +621,23 @@ export const AXIS_RGB: [Rgb, Rgb, Rgb] = [
 // ── text roles ────────────────────────────────────────────────────────────
 
 /**
- * The only seven ways text is set (guide T0). Every piece of text in the app
+ * The only four ways text is set (guide T0). Every piece of text in the app
  * is one of these, whole: a stylesheet picks a role, it does not mix a size
- * from one with a weight from another. The scale, weights and trackings above
- * are the raw material these are cut from; components never use them
- * directly.
+ * from one with a weight from another.
  *
- *   label    9px  600 tracked capitals  furniture labels, kickers, column heads
- *   control  11px 600 tracked capitals  buttons, tabs, menu titles, the modes
- *   body     12px 400 as written        lists, menu items, names, details
- *   value    13px 500 tabular           numbers and the fields that hold them
- *   title    15px 600 tracked capitals  a panel's title, and nothing else
- *   prose    12px 400 sans              sentences: hints, help, empty states
- *   code     13px 400                   the editor
+ *   caps   11px 600 tracked capitals  buttons, tabs, labels, column heads
+ *   body   12px 400 as written        lists, names, values, details
+ *   title  15px 600 tracked capitals  a panel's title, and nothing else
+ *   prose  12px 400 sans              sentences: hints, help, empty states
  *
- * Colour is not part of a role: ink level is chosen separately (ink, ink-2,
- * ink-3), so a unit is `body` in ink-3, a kicker is `label` on an ink block.
+ * Values are body: in a monospace face every digit is already one width. Code
+ * is body on the editor's taller line. Colour is not part of a role: ink level
+ * is chosen separately (ink, ink-2, ink-3).
  *
- * Leadings are whole units (12, 16, 20px), not ratios: a line box of 16.8px
- * puts every row that holds one off the 4px grid, and the error accumulates
- * down a panel. On units, a stack of rows is a stack of grid lines.
+ * Leadings are whole units (12, 16, 20px), not ratios, so a stack of rows is
+ * a stack of grid lines.
  */
 export const TEXT_ROLES = {
-  // Four, and each looks different from the others at a glance. Values are
-  // body: in a monospace face every digit is already one width, so a
-  // separate tabular role added a name and no difference. Code is body on the
-  // editor's taller line, a property of the editor rather than a role.
   caps: { size: 11, weight: 600, leading: "12px", family: "mono", tracking: "0.08em", case: "uppercase", numeric: "normal" },
   body: { size: 12, weight: 400, leading: "16px", family: "mono", tracking: "normal", case: "none", numeric: "tabular-nums" },
   title: { size: 15, weight: 600, leading: "20px", family: "mono", tracking: "0.04em", case: "uppercase", numeric: "normal" },
@@ -692,7 +657,6 @@ export type TextRole = keyof typeof TEXT_ROLES;
  *   section  16  between blocks and sections; the viewport's furniture from its edges
  */
 export const LAYOUT = {
-  // The system's three distances (§1), doubling: gap u, inset 2u, section 4u.
   gap: 4,
   inset: 8,
   section: 16,
@@ -705,10 +669,8 @@ export const LAYOUT = {
  * active line, the pending line.
  */
 export const LINE_ATOMS = {
-  // One hairline for all structure: separators, edges and the viewport frame
-  // were three greys nobody could tell apart. It clears 3:1, so an edge can
-  // be found; the other two lines look different because they mean different
-  // things.
+  // One hairline for all structure (separators, edges, the viewport frame).
+  // It clears 3:1, so an edge can be found.
   line: "var(--hairline) solid var(--rule-strong)",
   active: "var(--stroke-active) solid var(--ink)",
   pending: "var(--hairline) dashed var(--rule-strong)",
@@ -771,12 +733,10 @@ export const DERIVED: Record<string, string> = {
   // Chrome floating over the viewport: opaque at rest (no text on a
   // data-dependent backdrop), with a transparent end for fades.
   "surface-viewport-94": rgba("surface-viewport", 0.94),
-  "surface-viewport-70": rgba("surface-viewport", 0.7),
   "surface-float-00": rgba("surface-float", 0),
   // Shade is a fade of ink, never of black.
   "shade-none": rgba("ink", 0),
   "shade-soft": rgba("ink", 0.1),
-  "shade-strong": rgba("ink", 0.16),
   "shade-scroll": rgba("ink", 0.22),
   scrim: rgba("ink", 0.42),
   // Separation between rows of one list: weaker than `rule`.
@@ -788,16 +748,11 @@ export const DERIVED: Record<string, string> = {
   "ok-rgb": triple("ok"),
   "viewport-mark-rgb": triple("viewport-mark"),
   "viewport-mode-rgb": triple("viewport-mode"),
-  // Type composites for the combinations that repeat everywhere.
-  "type-kicker": "var(--weight-semibold) var(--text-3xs) / var(--leading-flat) var(--font-mono)",
-  "type-mono": "var(--weight-medium) var(--text-2xs) / var(--leading-tight) var(--font-mono)",
-  "type-mono-strong": "var(--weight-semibold) var(--text-2xs) / var(--leading-tight) var(--font-mono)",
-  "type-body-small": "var(--weight-regular) var(--text-xs) / var(--leading-snug) var(--font-sans)",
 };
 
 // ── emitters ──────────────────────────────────────────────────────────────
-// `npm run tokens` writes these to src/tokens.css and docs/assets/tokens.scss;
-// test/tokens.test.ts fails when either file differs from what they return.
+// `npm run tokens` writes these to src/tokens.css, docs/assets/tokens.scss and
+// src/viewer/tokens.wgsl; test/tokens.test.ts fails when any differs.
 
 const GENERATED = "Generated from frontend/src/tokens.ts by `npm run tokens`. Do not edit.";
 
@@ -840,10 +795,7 @@ export function cssProperties(): [string, string][] {
   ];
 }
 
-/**
- * One class per text role, so markup can take a role whole (`class="t-label"`)
- * and a stylesheet rule can take it with three declarations.
- */
+/** One class per text role, so markup can take a role whole (`class="t-caps"`). */
 function roleClasses(): string {
   return Object.keys(TEXT_ROLES)
     .map(

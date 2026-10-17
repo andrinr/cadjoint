@@ -1,13 +1,15 @@
-/* The shell's chrome added with the design-language rollout: the menu bar's
-   dropdowns, the rail's words, and the Studies window's "+ Study" menu.
-   Tokens only (src/tokens.css); the look follows the dl- primitives in
-   src/design/design.css. Imported from MenuBar.tsx. */
+/* Shell chrome: the menu bar's dropdowns and submenus, the Studies window's
+   "+ Study" menu, the Select listbox and the removal notice. Imported from
+   MenuBar.tsx. */
 
 /* Menus ---------------------------------------------------------------- */
 
-/* A menu is a float surface with the strong rule for its edge. */
+/* A menu is a float surface with the strong rule for its edge. Items are the
+   body role in sentence case — window names include program strings that are
+   never restyled (T2) — with shortcuts in ink-3. */
 .menu-bar .menu-dropdown,
 .study-kinds.menu-dropdown {
+  min-width: calc(var(--unit) * 60);
   max-height: calc(100vh - var(--control-xl) * 2);
   overflow-y: auto;
   border-color: var(--rule-strong);
@@ -68,33 +70,11 @@
   top: calc(100% + var(--gap));
   left: 0;
   right: 0;
-  min-width: 0;
-}
-
-/* Menu type ------------------------------------------------------------ */
-/* The bar's titles are furniture (tracked uppercase, like tabs); the items
-   are commands read down a list, so they are mono in sentence case: a list
-   of tracked capitals reads slower than the same list as words, and the
-   window names include program strings (scene.py) that are never restyled
-   (T2): the items are the body role, their shortcuts body in ink-3, and the
-   section names the label role on the items' left edge. */
-.menu-bar .menu-dropdown,
-.study-kinds.menu-dropdown {
-  min-width: calc(var(--unit) * 60);
-}
-
-/* The open title is the accent fill whatever the pointer does. */
-.menu-bar .menu-title.active,
-.menu-bar .menu-title.active:hover:not(:disabled) {
-  background: var(--block-current);
-  color: var(--block-current-ink);
 }
 
 /* Chrome is not text to select ---------------------------------------- */
-/* A quick multi-click or a shift-click on a bar used to extend the page's
-   text selection across the editor beside it, which read as "clicking the
-   mode selects the whole code". Furniture is pressed, not selected; the
-   editor, panels' values and the tree's names stay selectable. */
+/* Furniture is pressed, not selected, so a multi-click on a bar does not
+   extend a selection into the editor; values and names stay selectable. */
 .menu-bar,
 .toolbar,
 .tool-rail,
@@ -237,9 +217,8 @@
   overflow: visible;
 }
 
-/* The removal notice beside the status (F7): body text, a quiet Undo cell. */
-/* One line that never gives way: the notice is the latest result and the
-   status beside it is what yields. */
+/* The removal notice beside the status (F7): one line that never gives way,
+   since the notice is the latest result and the status is what yields. */
 .toolbar .removal {
   display: inline-flex;
   flex: none;

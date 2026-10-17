@@ -41,6 +41,7 @@ import { StudiesTab } from "./StudiesTab";
 import { ViewControls } from "./ViewControls";
 import type { SimulateController } from "./controller";
 import "./simWindows.css";
+import { PanelHeader } from "../ui";
 
 export interface SimWindowProps {
   sim: SimulateController;
@@ -117,12 +118,7 @@ export function MeshesWindow(props: SimWindowProps) {
   onCleanup(props.sim.attach("meshes"));
   return (
     <aside class="sim-panel" data-testid="meshes-panel">
-      <header>
-        <span>
-          <small>FEM</small>
-          Meshes
-        </span>
-      </header>
+      <PanelHeader kicker="FEM" title="Meshes" />
       <MeshesTab sim={props.sim} />
       <Show when={props.sim.inspected()}>
         <ViewControls sim={props.sim} />
@@ -144,12 +140,7 @@ export function StudiesWindow(props: SimWindowProps) {
   return (
     <div class="mode-simulate-slot" data-testid="mode-simulate">
       <aside class="sim-panel" data-testid="simulate-panel">
-        <header>
-          <span>
-            <small>FEM</small>
-            Studies
-          </span>
-        </header>
+        <PanelHeader kicker="FEM" title="Studies" />
         <StudiesTab sim={props.sim} />
         <SimNotices sim={props.sim} prefix="simulate" />
       </aside>
@@ -162,12 +153,7 @@ export function ResultsWindow(props: SimWindowProps) {
   onCleanup(props.sim.attach("results"));
   return (
     <aside class="sim-panel" data-testid="results-panel">
-      <header>
-        <span>
-          <small>FEM</small>
-          Results
-        </span>
-      </header>
+      <PanelHeader kicker="FEM" title="Results" />
       {/* In front of the result, not after it: a solve that failed while an
           older one is on screen has to say so above the field it is not. */}
       <SimNotices sim={props.sim} prefix="results" />

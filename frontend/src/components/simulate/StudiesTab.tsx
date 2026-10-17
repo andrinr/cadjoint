@@ -11,7 +11,7 @@
  * and its builder live inside the card rather than in a tab of their own.
  */
 
-import { For, Show, createSignal, onCleanup } from "solid-js";
+import { For, Show, createSignal } from "solid-js";
 import { setStudyDomainRequest, setStudyMeshRequest } from "../../meshes";
 import { simMeshes, simView, studies } from "../../state";
 import {
@@ -22,7 +22,16 @@ import {
   setArgumentRequest,
   studyArguments,
 } from "../../studies";
-import { Card, CardHeader, CardList, NumberField, Select, ToggleSwitch } from "../ui";
+import {
+  Card,
+  CardHeader,
+  CardList,
+  MenuItem,
+  NumberField,
+  Select,
+  ToggleSwitch,
+  createDismiss,
+} from "../ui";
 import { BcBuilder } from "./BcBuilder";
 import { BcList } from "./BcList";
 import { bcSwatch } from "./colors";
@@ -43,23 +52,11 @@ export function StudiesTab(props: StudiesTabProps) {
   const sim = () => props.sim;
   const [kindsOpen, setKindsOpen] = createSignal(false);
   let anchor: HTMLDivElement | undefined;
-
-  // A small menu closes like any other: a click elsewhere, or Escape —
-  // which it claims in the capture phase so the viewport's Escape ladder
-  // does not also fire underneath it.
-  const onPointerDown = (event: PointerEvent) => {
-    if (kindsOpen() && anchor && !anchor.contains(event.target as Node)) setKindsOpen(false);
-  };
-  const onKeyDown = (event: KeyboardEvent) => {
-    if (event.key !== "Escape" || !kindsOpen()) return;
-    event.stopPropagation();
-    setKindsOpen(false);
-  };
-  window.addEventListener("pointerdown", onPointerDown, true);
-  document.addEventListener("keydown", onKeyDown, true);
-  onCleanup(() => {
-    window.removeEventListener("pointerdown", onPointerDown, true);
-    document.removeEventListener("keydown", onKeyDown, true);
+  createDismiss({
+    open: kindsOpen,
+    close: () => setKindsOpen(false),
+    within: () => anchor,
+    escape: true,
   });
 
   return (
@@ -243,9 +240,7 @@ export function StudiesTab(props: StudiesTabProps) {
         </CardList>
       </Show>
 
-      {/* One add button, the kinds behind it — the same three as
-          Simulate › New study. Three buttons side by side truncated in a
-          320px column. */}
+      {/* One add button, the kinds behind it — the same three as Simulate › New study. */}
       <div class="sim-add-study-anchor" ref={anchor}>
         <button
           type="button"
@@ -262,19 +257,15 @@ export function StudiesTab(props: StudiesTabProps) {
           <div class="menu-dropdown study-kinds" role="menu" aria-label="Study kind">
             <For each={STUDY_KINDS}>
               {(entry) => (
-                <button
-                  type="button"
-                  role="menuitem"
+                <MenuItem
                   onClick={() => {
                     setKindsOpen(false);
                     void sim().patch(addStudyRequest(entry.kind));
                   }}
                   title={entry.hint}
                   data-testid={`simulate-add-${entry.kind}`}
-                >
-                  <i class="menu-check" />
-                  <span>{entry.label}</span>
-                </button>
+                  label={entry.label}
+                />
               )}
             </For>
           </div>

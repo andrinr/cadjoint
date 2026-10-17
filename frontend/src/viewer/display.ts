@@ -95,9 +95,8 @@ export const QUALITY_PRESETS: Record<string, QualityPreset> = {
     samples: 512,
     marchSteps: MARCH_STEPS_TIER,
   },
-  // Device resolution on a Retina viewport: a ~1100 × 800 CSS-px viewport at
-  // 2× is 3.5 M pixels, which the old 1.6 M budget halved. Cost scales with
-  // pixels (3.9 ms at 1.6 M above), so 4.2 M is about 10 ms: inside a frame.
+  // Device resolution on a Retina viewport (~1100 × 800 CSS px at 2× is
+  // 3.5 M pixels); cost scales with pixels, so 4.2 M is about 10 ms.
   ultra: {
     label: "Ultra",
     pixelBudget: 4_200_000,

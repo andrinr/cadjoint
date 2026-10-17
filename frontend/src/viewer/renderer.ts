@@ -718,11 +718,9 @@ export class Renderer {
   }
 
   /**
-   * Outline one face group's triangle range on hover (null clears it).
-   *
-   * Over a solved field hover is drawn, not tinted (V2): the group's
-   * boundary edges go into an index buffer the element-edge pipeline draws
-   * three pixels wide, and the surface itself is never redrawn.
+   * Outline one face group's triangle range on hover (null clears it). Over a
+   * solved field hover is drawn, not tinted (V2): the boundary edges go to an
+   * index buffer the element-edge pipeline draws three pixels wide.
    */
   setSimulationHighlight(range: { start: number; count: number } | null): void {
     this.simHighlight = range;
@@ -1607,9 +1605,8 @@ export class Renderer {
       pass.setIndexBuffer(this.simEdgeIndexBuffer, "uint32");
       pass.drawIndexed(this.simEdgeIndexCount);
     }
-    // The hover outline is a mark on the surface, not part of the field, so
-    // it goes with the rest of the construction overlay — and it is drawn
-    // after the element edges, so it lands on top of them.
+    // The hover outline is construction overlay, not field; drawn after the
+    // element edges so it lands on top.
     if (
       this.display.showOverlays &&
       this.simHighlight &&
@@ -1757,14 +1754,11 @@ export class Renderer {
   private cpuLog: number[] = [];
 
   /**
-   * What the last second of drawing cost, for the performance readout.
-   *
-   * The renderer draws on demand, so a still picture draws nothing: `fps` is
-   * null when no frame has been drawn for a second, which the readout states
-   * as idle rather than as zero. `cpuMs` is the time to encode and submit a
-   * frame on the CPU, not GPU time, and is labelled as such.
+   * What the last second of drawing cost, for the performance readout. `fps`
+   * is null when nothing was drawn for a second (rendering is on demand);
+   * `cpuMs` is CPU encode-and-submit time, not GPU time.
    */
-  get frameStats(): { fps: number | null; cpuMs: number | null; width: number; height: number; samples: number } {
+  get frameStats(): { fps: number | null; cpuMs: number | null; width: number; height: number } {
     const now = performance.now();
     const recent = this.frameLog.filter((time) => now - time <= 1000);
     const cpu = this.cpuLog.length
@@ -1776,7 +1770,6 @@ export class Renderer {
       // Before the viewport mounts there is no canvas to measure.
       width: this.canvas?.width ?? 0,
       height: this.canvas?.height ?? 0,
-      samples: this.sampleCount,
     };
   }
 
@@ -1929,7 +1922,7 @@ export class Renderer {
  * each hex face in two — and an edge only one of them has is the group's
  * outline, which is all the hover draws.
  */
-export function groupOutline(
+function groupOutline(
   indices: ArrayLike<number>,
   start: number,
   count: number,

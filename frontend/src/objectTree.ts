@@ -68,11 +68,7 @@ export function dimensionSummary(node: ConstructionNode): string | null {
 export function buildSceneTree(
   nodes: ConstructionNode[],
   elements: readonly ConstructionElement[] = [],
-  /**
-   * The root row's label: the file the program lives in. It was the word
-   * "scene", which collided with the starter's own `scene = Union(...)` and
-   * showed two rows called scene that meant different things.
-   */
+  /** The root row's label: the program's file name (not "scene", which the starter also binds). */
   fileName = "scene.py",
 ): SceneTreeRow[] {
   const booleans = elements.filter((element) => element.kind === "boolean");

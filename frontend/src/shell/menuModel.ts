@@ -1,16 +1,8 @@
 /**
- * The menu bar, as data.
- *
- * The structure is not written here: it is `proposedMenus()` from the design
- * page's feature index (`design/features.ts`), the list that was agreed as the
- * menu bar. Every leaf there is bound below to a command id, so the menu the
- * app shows is exactly the menu the design page shows, and a feature added to
- * the index without a command fails `test/menuModel.test.ts` rather than
- * appearing as a dead item.
- *
- * Keys come from `shortcuts.ts` — the table the handlers dispatch from — not
- * from the index's prose, so the key a menu item quotes is the key that runs
- * it.
+ * The menu bar, as data: the structure is `proposedMenus()` from the design
+ * page's feature index, with every leaf bound below to a command id (an
+ * unbound leaf fails `test/menuModel.test.ts`). Keys come from `shortcuts.ts`,
+ * the table the handlers dispatch from.
  */
 
 import { MENU_ORDER, proposedMenus } from "../design/features";
@@ -130,10 +122,7 @@ export const MENU_COMMANDS: Record<string, string> = {
   "Help › README": "help-readme",
 };
 
-/**
- * Test ids the end-to-end specs already address, kept so the menu could be
- * regenerated without rewriting them. Everything else is `menu-<command>`.
- */
+/** Test ids the e2e specs address; everything else is `menu-<command>`. */
 const LEGACY_TESTIDS: Record<string, string> = {
   "file-new": "menu-file-new",
   "file-open": "menu-file-open",
@@ -151,7 +140,7 @@ const LEGACY_TESTIDS: Record<string, string> = {
   "help-readme": "menu-help-readme",
 };
 
-export function menuPath(menu: string, section: string | null, label: string): string {
+function menuPath(menu: string, section: string | null, label: string): string {
   return section ? `${menu} › ${section} › ${label}` : `${menu} › ${label}`;
 }
 
@@ -162,10 +151,8 @@ export function windowOfCommand(command: string): WindowId | null {
   return WINDOW_DEFS.some((def) => def.id === id) ? (id as WindowId) : null;
 }
 
-export function testidFor(command: string): string {
-  if (LEGACY_TESTIDS[command]) return LEGACY_TESTIDS[command];
-  // Windows keep the Window menu's `menu-window-<id>` the specs open them by.
-  return `menu-${command}`;
+function testidFor(command: string): string {
+  return LEGACY_TESTIDS[command] ?? `menu-${command}`;
 }
 
 /** The seven menus, in order, every leaf bound to its command. */

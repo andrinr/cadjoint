@@ -39,8 +39,7 @@
 /* The controls share the shared chrome's edge: a control's edge is
    something you must find, so it is `rule-strong`, not the panel hairline. */
 .export-field input[type="text"],
-.export-field input[type="number"],
-.export-field select {
+.export-field input[type="number"] {
   width: 100%;
   height: var(--control-sm);
   padding: 0 var(--inset);

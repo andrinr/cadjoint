@@ -9,7 +9,7 @@
 
 import { For, Show, createSignal, onCleanup, type JSX } from "solid-js";
 import { Select } from "../components/ui/Select";
-import { Cross } from "./kit";
+import { Chip, Rows } from "./kit";
 
 // ── A2 / A9: a panel edits a literal, and the edit propagates ─────────────
 
@@ -60,13 +60,7 @@ export function LiteralDemo() {
           </span>
         </div>
       </pre>
-      <div class="dl-rows">
-        <div>
-          <span>geometry · fin height</span>
-          <b>{geometry().toFixed(2)}</b>
-          <small>m</small>
-        </div>
-      </div>
+      <Rows rows={[["geometry · fin height", geometry().toFixed(2), "m"]]} />
       <div class="dl-bar" style={{ width: `${Math.min(100, Math.max(0, geometry() * 100))}%` }} />
     </div>
   );
@@ -86,9 +80,10 @@ export function JobDemo(props: { fail?: boolean }) {
   onCleanup(() => clearInterval(timer));
   const run = () => {
     clearInterval(timer);
-    setState("running");
+    // Stage before state: the readout reads STAGES[stage()] once running.
     setStage(0);
     setResidual(null);
+    setState("running");
     let tick = 0;
     timer = window.setInterval(() => {
       tick += 1;
@@ -284,13 +279,7 @@ export function DragDemo() {
         </Show>
         <b style={{ left: `${shown() * 100}%` }} />
       </div>
-      <div class="dl-rows">
-        <div>
-          <span>{preview() === null ? "value" : "preview · release to write · Esc to abandon"}</span>
-          <b>{shown().toFixed(2)}</b>
-          <small>m</small>
-        </div>
-      </div>
+      <Rows rows={[[preview() === null ? "value" : "preview · release to write · Esc to abandon", shown().toFixed(2), "m"]]} />
       <pre class="dl-code">
         <div>
           <span>58</span>
@@ -371,12 +360,9 @@ export function UndoDemo() {
       <div class="dl-row-of">
         <For each={items()}>
           {(item, index) => (
-            <span class="dl-chip">
+            <Chip title={`Remove ${item}`} onRemove={() => remove(index())}>
               {item}
-              <button type="button" title={`Remove ${item}`} onClick={() => remove(index())}>
-                <Cross />
-              </button>
-            </span>
+            </Chip>
           )}
         </For>
       </div>
@@ -440,7 +426,7 @@ export function SelectionDemo() {
                   y="30"
                   width="60"
                   height="60"
-                  fill={selected() === index() ? "var(--ink)" : "var(--ink)"}
+                  fill="var(--ink)"
                   fill-opacity={selected() === index() ? "0.14" : "0.05"}
                   stroke={selected() === index() ? "var(--ink)" : "var(--ink-3)"}
                   stroke-width={selected() === index() ? 2 : 1}
@@ -547,13 +533,7 @@ export function TweenDemo(props: { tween: boolean }) {
   };
   return (
     <div class="dl-stack">
-      <div class="dl-rows">
-        <div>
-          <span>peak temperature</span>
-          <b>{shown().toFixed(2)}</b>
-          <small>K</small>
-        </div>
-      </div>
+      <Rows rows={[["peak temperature", shown().toFixed(2), "K"]]} />
       <div class="dl-row-of">
         <button type="button" class="dl-btn h-sm" onClick={next}>
           New result

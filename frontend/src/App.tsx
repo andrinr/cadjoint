@@ -148,12 +148,8 @@ export function App() {
     display: render.display,
   });
   /**
-   * The last removal, while the program is still the one it produced (F7).
-   *
-   * Every edit goes through `applyPatch`, so this is the one place a removal
-   * can be named: from the state as it was before the patch landed, then
-   * shown in the status line with Undo until the source moves on — the next
-   * edit, or the undo itself.
+   * The last removal, while the source is still the one it produced (F7).
+   * Named here because every edit goes through `applyPatch`.
    */
   const [lastRemoval, setLastRemoval] = createSignal<{ label: string; source: string } | null>(null);
   const applyPatch = async (body: Record<string, unknown>) => {
@@ -299,14 +295,6 @@ export function App() {
     await ops.setSketchPlane(line, reference);
   };
 
-  /**
-   * One window's contents.
-   *
-   * Each of these is mounted into its own Solid root by the dock, so a window
-   * that is closed takes its effects with it. Nothing here knows where its
-   * window is: docked, tabbed behind another, floating or parked all render
-   * the same tree.
-   */
   /** Everything the render-settings popover forwards to RenderPanel. */
   const renderPanelProps = () => ({
     display: render.display(),
@@ -322,6 +310,14 @@ export function App() {
     onPathTracingChange: render.applyPathTracing,
   });
 
+  /**
+   * One window's contents.
+   *
+   * Each of these is mounted into its own Solid root by the dock, so a window
+   * that is closed takes its effects with it. Nothing here knows where its
+   * window is: docked, tabbed behind another, floating or parked all render
+   * the same tree.
+   */
   const renderWindow = (id: WindowId) => {
     switch (id) {
       case "viewport":
@@ -347,8 +343,7 @@ export function App() {
                   onRevolve={ops.revolveSelection}
                   onFix={() => fixSelectedPoint(ops.addConstraint)}
                 />
-                {/* How the picture is drawn, beside the control for which way it
-                    faces: projection and render settings over the view cube. */}
+                {/* Projection and render settings, over the view cube. */}
                 <div class="view-controls" data-testid="view-controls">
                   <ProjectionToggle
                     projection={render.display().projection}

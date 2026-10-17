@@ -11,7 +11,7 @@
  * it as a caption, the way a plate is captioned in a drawing sheet, and
  * everything else is the same right-hung mono the rest of the instrument
  * uses. No colours, radii, shadows, sizes or spacings are invented: every
- * value is a token from styles.css, and the corners stay square.
+ * value is a token from src/tokens.css, and the corners stay square.
  */
 
 /*
@@ -181,9 +181,6 @@
   gap: var(--gap);
   margin: var(--gap) 0 0;
 }
-
-/* A material name is a string from scene.py, not a label of kind: it wears
-   the value chip (styles.css) rather than the kind chip `.sim-kind` draws. */
 
 .scene-meta {
   margin: var(--gap) 0 0;

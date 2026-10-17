@@ -307,6 +307,14 @@ const dismissOnBlur = EditorView.domEventHandlers({
 
 // ── paint ───────────────────────────────────────────────────────────────────
 
+/** A text role, applied whole: the four declarations a `t-<role>` class sets. */
+export const textRole = (name: "label" | "control" | "body" | "value" | "prose") => ({
+  font: `var(--text-${name})`,
+  letterSpacing: `var(--track-${name})`,
+  textTransform: `var(--case-${name})`,
+  fontVariantNumeric: `var(--numeric-${name})`,
+});
+
 /**
  * Everything the three features draw, on design tokens.
  *
@@ -318,14 +326,6 @@ const dismissOnBlur = EditorView.domEventHandlers({
  * theme paints with `#d11` and `orange` baked into SVG data URIs, so both the
  * gutter markers and the underlines are replaced outright rather than tinted.
  */
-/** A text role, applied whole: the four declarations a `t-<role>` class sets. */
-const role = (name: "label" | "control" | "body" | "value" | "prose") => ({
-  font: `var(--text-${name})`,
-  letterSpacing: `var(--track-${name})`,
-  textTransform: `var(--case-${name})`,
-  fontVariantNumeric: `var(--numeric-${name})`,
-});
-
 const intelligenceTheme = EditorView.theme({
   // Gutter markers: replace the packaged SVG images with token-coloured shapes.
   ".cm-gutter-lint": { width: "1.2em" },
@@ -383,7 +383,7 @@ const intelligenceTheme = EditorView.theme({
   },
   ".cm-diagnostic": {
     padding: "var(--inset)",
-    ...role("prose"),
+    ...textRole("prose"),
   },
   ".cm-diagnostic-error": { borderLeft: "var(--stroke-active) solid var(--danger)" },
   ".cm-diagnostic-warning": { borderLeft: "var(--stroke-active) solid var(--warn)" },
@@ -401,14 +401,14 @@ const intelligenceTheme = EditorView.theme({
   },
   ".cm-diagnosticSource": {
     color: "var(--ink-3)",
-    ...role("label"),
+    ...textRole("label"),
     opacity: "1",
   },
   ".cm-diagnosticAction": {
     backgroundColor: "var(--accent)",
     color: "var(--ink-on-accent)",
     borderRadius: "var(--radius)",
-    ...role("control"),
+    ...textRole("control"),
     padding: "var(--gap) var(--inset)",
   },
   ".cm-panel.cm-panel-lint": {
@@ -423,7 +423,7 @@ const intelligenceTheme = EditorView.theme({
   },
   ".cm-tooltip.cm-tooltip-autocomplete > ul > li": {
     padding: "var(--gap) var(--inset)",
-    ...role("body"),
+    ...textRole("body"),
     color: "var(--ink)",
   },
   ".cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected]": {
@@ -450,7 +450,7 @@ const intelligenceTheme = EditorView.theme({
   ".cm-completionInfo-doc": {
     margin: "0",
     whiteSpace: "pre-wrap",
-    ...role("prose"),
+    ...textRole("prose"),
   },
 
   ".cm-signature-tooltip": {
@@ -462,7 +462,7 @@ const intelligenceTheme = EditorView.theme({
     maxWidth: "44em",
   },
   ".cm-signature-label": {
-    ...role("body"),
+    ...textRole("body"),
     color: "var(--ink-2)",
   },
   ".cm-signature-param-active": {
@@ -471,7 +471,7 @@ const intelligenceTheme = EditorView.theme({
   ".cm-signature-doc": {
     margin: "var(--gap) 0 0",
     whiteSpace: "pre-wrap",
-    ...role("prose"),
+    ...textRole("prose"),
     color: "var(--ink-3)",
     maxHeight: "16em",
     overflow: "auto",

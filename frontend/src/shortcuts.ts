@@ -1,22 +1,16 @@
 /**
  * Keyboard shortcut vocabulary: the one table the handlers, the menu bar and
- * the Help dialog read.
+ * the Help dialog read. Every row binds a key to a command id
+ * (`shell/commands.ts`). Two families:
  *
- * Every row binds a key to a *command id* (see `shell/commands.ts`), so the
- * key, the menu item and the Help sheet are three views of one record and
- * cannot drift apart. Two families:
+ * - **viewport keys** — a bare key, ignored while typing, dispatched by
+ *   `components/viewer/keyboard.ts`;
+ * - **application keys** — ⌘ (Ctrl off the Mac) plus a key, dispatched by
+ *   `shell/shellShortcuts.ts`.
  *
- * - **viewport keys** — a bare letter or symbol. They act only while nobody
- *   is typing (the editor, a text field, a select own their keys first) and
- *   are dispatched by `components/viewer/keyboard.ts`;
- * - **application keys** — ⌘ (Ctrl off the Mac) plus a key. They work from
- *   anywhere, always call `preventDefault` so the browser does not also save
- *   or open the page, and are dispatched by `shell/shellShortcuts.ts`.
- *
- * A few rows are *display-only* (`dispatch: false`): the view rose's digits,
- * which ViewCube matches by `KeyboardEvent.code` (see `VIEW_KEYS`), Escape's
- * ladder, Delete, and gestures. They are here so the menu and the sheet can
- * quote them; their handlers live with the thing they act on.
+ * Rows with `dispatch: false` are display-only (the view digits, which
+ * ViewCube matches by `code`; Escape; Delete; gestures): their handlers live
+ * with the thing they act on.
  */
 
 /** One binding. */
@@ -208,3 +202,16 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = SHORTCUT_GROUP_TITLES.map((title
     action: shortcut.action,
   })),
 }));
+
+/** The focused field that owns its own keys (the code editor, an input), or null. */
+export function typingTarget(): HTMLElement | null {
+  const target = document.activeElement as HTMLElement | null;
+  if (!target) return null;
+  const typing =
+    target.tagName === "TEXTAREA" ||
+    target.tagName === "INPUT" ||
+    target.tagName === "SELECT" ||
+    target.isContentEditable ||
+    target.closest(".cm-editor") !== null;
+  return typing ? target : null;
+}

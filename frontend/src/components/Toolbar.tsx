@@ -1,9 +1,6 @@
 /**
  * Top bar: brand, the mode switcher, the running-work chip, status, the
- * render-settings popover anchored to the eye icon, and Run.
- * Rendering (presets, shading, quality, annotations) is orthogonal to what
- * you are editing, so the popover opens from any mode rather than being a
- * mode itself.
+ * removal notice, and Run.
  */
 
 import { Show, createEffect, createSignal, onCleanup, untrack } from "solid-js";
@@ -19,15 +16,7 @@ import { CHIP_KINDS, cancelLabel, chipJobs, othersLabel } from "./jobChip";
 import { windowManager } from "../windows/manager";
 import { ModeSwitcher } from "./ModeSwitcher";
 import { PlayIcon } from "./icons";
-
-/**
- * Whether the render-settings popover is open.
- *
- * Module state rather than the toolbar's own, because View › Render opens it
- * from the menu bar too: the popover is the one home of those settings, and
- * the menu item is a way to it.
- */
-export const [renderPopoverOpen, setRenderPopoverOpen] = createSignal(false);
+import { shortcutLabel } from "../shortcuts";
 
 /** How long a failure keeps the dot after the job has gone. */
 const FAILURE_LINGER_MS = 6_000;
@@ -267,24 +256,16 @@ export function Toolbar(props: ToolbarProps) {
         </Show>
       </span>
 
-      {/* F7: a removal is not confirmed, so undo is in front of you right
-          after one, in the line that says what the program is. It stays
-          while the program is still the one the removal produced. */}
+      {/* F7: a removal is not confirmed, so Undo is offered right after it. */}
       <Show when={props.removal}>
         <span class="removal" data-testid="removal">
           {props.removal}
           <button type="button" onClick={() => props.onUndo?.()} data-testid="removal-undo">
-            Undo <kbd>⌘Z</kbd>
+            Undo <kbd>{shortcutLabel("edit-undo")}</kbd>
           </button>
         </span>
       </Show>
 
-      {/* Render settings moved into the viewport, beside the projection
-          toggle over the cube: it changes the picture, so it lives with it. */}
-      {/* Reset and the WGSL view used to sit here, beside Run. New is a file
-          command (File › New) and the generated shader is a developer view
-          (Program › Show generated WGSL): neither is the program's verb, and
-          the one beside Run was destructive and wordless. */}
       {/* Run is a verb, not an indicator: it no longer relabels itself
           "Compiling…" — the chip says that, once. It is refused only while
           pressing it would do nothing, which is a compile of text that is

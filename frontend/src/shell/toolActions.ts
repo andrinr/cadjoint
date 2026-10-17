@@ -1,11 +1,7 @@
 /**
- * What the rail's tools do, written once for the rail, the menu and the keys.
- *
- * The rail used to hold these rules inline, which meant the Constrain menu or
- * the E key would have had to copy them — and a copy is a second answer to
- * "can I extrude this?". Each tool here comes as a pair: the act, and the
- * reason it cannot act right now (null when it can), the sentence a disabled
- * menu item or rail button puts in its title.
+ * What the rail's tools do, shared by the rail, the menu and the keys. Each
+ * comes as a pair: the act, and why it cannot act now (null when it can), the
+ * sentence a disabled item puts in its title.
  */
 
 import {
@@ -32,8 +28,10 @@ export function modifyProfile(): ConstructionNode | null {
   return node?.kind === "profile" && node.line !== null ? node : null;
 }
 
+export type ShapeKey = "extrude" | "revolve" | "loft";
+
 /** Why Extrude / Revolve / Loft cannot run on the selection, or null. */
-export function shapeBlocked(key: "extrude" | "revolve" | "loft"): string | null {
+export function shapeBlocked(key: ShapeKey): string | null {
   const profile = modifyProfile();
   if (!profile) return "Select a sketch first";
   if (busy()) return "Wait for the compile to finish";
@@ -85,11 +83,8 @@ export function toggleCreateTool(key: ToolMode): void {
 }
 
 /**
- * Arm a create tool from a key or the menu.
- *
- * Solids are placed in Model mode, so their keys switch there first, as B, S
- * and C always have; a sketch tool leaves Simulate for Model, where the rail
- * that shows it is.
+ * Arm a create tool from a key or the menu. Solids are placed in Model mode,
+ * and a sketch tool leaves Simulate for Model, where the rail shows it.
  */
 export function armCreateTool(key: ToolMode): void {
   const solid = key === "box" || key === "sphere" || key === "cylinder";

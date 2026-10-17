@@ -1,20 +1,13 @@
 /**
- * The layout grid: a guide drawn over the whole UI, to see whether things
- * sit on the unit (guide A6, S0) and to find the ones that do not.
+ * The layout grid (View › Show › Layout grid, ⇧G): a debugging overlay that
+ * draws the 4px unit and a firmer 16px line (guide A6, S0), and outlines in
+ * `danger` every placed box more than a hairline (1px) off the grid. The
+ * counter lists the first offenders by selector.
  *
- * Toggled by View › Show › Layout grid (⇧G). It draws the 4px unit, a firmer
- * line every 16px (the section distance), and outlines in `danger` every
- * control, row and sheet whose box is off the grid by more than a hairline —
- * a 1px rule between rows shifts what follows by 1px, which is the hairline
- * the rules allow, so the tolerance is one pixel. The count sits in the
- * corner; clicking it lists the first offenders by selector, so a fix can
- * start from the stylesheet rule that placed them.
- *
- * It is a measuring tool, not part of the interface: it never takes pointer
- * events except on its own counter, and it costs nothing while off.
+ * Takes no pointer events except on its counter, and costs nothing while off.
  */
 
-import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
+import { For, Show, createEffect, createSignal, onCleanup } from "solid-js";
 import { UNIT } from "../tokens";
 
 export const [layoutGridOn, setLayoutGridOn] = createSignal(false);
@@ -138,15 +131,19 @@ function measure(): Offender[] {
 export function LayoutGrid() {
   const [offenders, setOffenders] = createSignal<Offender[]>([]);
   const [listOpen, setListOpen] = createSignal(false);
-  let timer: number | undefined;
-  const refresh = () => setOffenders(layoutGridOn() ? measure() : []);
-  onMount(() => {
-    timer = window.setInterval(() => layoutGridOn() && refresh(), 700);
+  createEffect(() => {
+    if (!layoutGridOn()) {
+      setOffenders([]);
+      return;
+    }
+    const refresh = () => setOffenders(measure());
+    refresh();
+    const timer = window.setInterval(refresh, 700);
     window.addEventListener("resize", refresh);
-  });
-  onCleanup(() => {
-    clearInterval(timer);
-    window.removeEventListener("resize", refresh);
+    onCleanup(() => {
+      clearInterval(timer);
+      window.removeEventListener("resize", refresh);
+    });
   });
 
   return (

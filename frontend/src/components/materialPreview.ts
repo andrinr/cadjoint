@@ -1,18 +1,12 @@
 /**
- * A material's swatch, rendered rather than painted.
+ * A material's swatch, ray-marched on the CPU: a small flanged part (boss,
+ * bore, bolt holes) rather than a ball, so flats, fillets and edges show what
+ * the material does to a CAD solid.
  *
- * The swatch is a small part, not a ball: a flange with a raised boss, a
- * through-bore and four bolt holes. A sphere shows one highlight and one
- * terminator; a part with flats, fillets, a bore and edges shows what a
- * material does to a CAD solid, which is the question the library answers.
- *
- * It is ray-marched on the CPU into a canvas, once per material appearance,
- * and cached by that appearance. At 96 px square it is ~9k rays, a few
- * milliseconds; the browser's downscale to the 48 px tile is the anti-alias.
- * The shading is the viewport's in miniature: GGX specular with Schlick
- * Fresnel over a metallic/roughness base, a key and fill light, a studio
- * environment for the reflections, and the part standing on the viewport's
- * own ground with a soft contact shadow, so a swatch reads as the part will.
+ * 96 px square (~9k rays, a few ms), downscaled by the browser to the 48 px
+ * tile as anti-aliasing, and cached per appearance. Shading is the viewport's
+ * in miniature: GGX + Schlick over metallic/roughness, key and fill lights, a
+ * studio environment, and the viewport's ground with a contact shadow.
  */
 
 import { VIEWPORT_BACKGROUND } from "../tokens";

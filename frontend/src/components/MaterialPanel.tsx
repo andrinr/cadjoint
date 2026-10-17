@@ -109,7 +109,6 @@ function colorRgb(hex: string): [number, number, number] {
   ];
 }
 
-
 export function MaterialPanel(props: MaterialPanelProps) {
   const [activeId, setActiveId] = createSignal<string | null>(null);
   const active = createMemo(

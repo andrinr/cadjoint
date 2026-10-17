@@ -1,18 +1,12 @@
 /**
- * The command registry: one implementation per command, every home calls it.
+ * The command registry: one implementation per command id, run by the menu
+ * bar, the keys and the rail alike. A module singleton, so a key handler deep
+ * in the viewport can run a command without a callback threaded to it;
+ * implementations are registered by whoever owns the state they act on.
  *
- * The menu bar, the keyboard and (where it is the same act) the rail all run
- * a command by id, so a command does the same thing from wherever it is
- * reached. Implementations are registered by whoever owns the state they act
- * on — the shell for patches, camera and windows, the menu bar for its own
- * dialogs — and the registry is a module singleton so a key handler deep in
- * the viewport can run one without the shell threading a callback to it.
- *
- * `blocked` says why a command cannot run right now (a sentence the menu puts
- * in the item's title), or null when it can. Mode scoping is separate
- * (`menuModel.ts`): the menu disables an item outside its modes, while a key
- * may still carry the command into the mode it needs, as B has always
- * switched to Model mode to place a box.
+ * `blocked` is why a command cannot run now (the menu item's title), or null.
+ * Mode scoping is separate (`menuModel.ts`): a key may carry its command into
+ * the mode it needs, as B switches to Model to place a box.
  */
 
 import { createSignal } from "solid-js";

@@ -21,22 +21,10 @@
  *   ranges (where nearly all pixels of a well-formed mesh sit); over the
  *   darkest field regions edge legibility falls back to facet shading.
  *
- * The two ramp polynomials are duplicated as WGSL constants in
- * viewer/simulation.wgsl — keep the tables in sync.
+ * The WGSL shaders get the ramp polynomials from `wgslTokens()` (tokens.ts).
  */
 
-import {
-  BC_TYPE_COLORS,
-  ELEMENT_EDGE_COLOR,
-  ELEMENT_EDGE_COLOR_LIGHT,
-  MAGMA_COEFFICIENTS,
-  PROPOSAL_COLOR,
-  VIEWPORT_BACKGROUND,
-  VIRIDIS_COEFFICIENTS,
-  contrastRatio,
-  relativeLuminance,
-  type Rgb,
-} from "./tokens";
+import { MAGMA_COEFFICIENTS, VIRIDIS_COEFFICIENTS, type Rgb } from "./tokens";
 
 // The values live in tokens.ts, the one source; this module evaluates them.
 export {
@@ -50,7 +38,7 @@ export {
   contrastRatio,
   relativeLuminance,
   type Rgb,
-};
+} from "./tokens";
 
 /** Evaluate a ramp polynomial at t ∈ [0, 1] (clamped, channels clamped). */
 function evaluateRamp(coefficients: readonly Rgb[], t: number): [number, number, number] {
@@ -89,11 +77,6 @@ function rampGradient(ramp: (t: number) => [number, number, number], stops = 12)
 
 export const fieldRampCss = (stops = 12): string => rampGradient(fieldRamp, stops);
 export const qualityRampCss = (stops = 12): string => rampGradient(qualityRamp, stops);
-
-
-
-
-
 
 /** Quality accent for panel chrome tied to the quality ramp (histogram). */
 export const QUALITY_ACCENT: Rgb = qualityRamp(0.75);

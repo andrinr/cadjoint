@@ -1,17 +1,10 @@
 /**
- * The application menu bar: File, Edit, View, Create, Shape, Constrain,
- * Simulate, Program, Window, Help.
- *
- * Nothing here lists a command by hand. The menus are `shell/menuModel.ts`,
- * which is the design page's agreed menu bar (`design/features.ts`) with each
- * leaf bound to a command; each item runs that command through the registry
- * (`shell/commands.ts`) — the very call its key, rail button or panel button
- * makes — and quotes the key `shortcuts.ts` binds to it.
- *
- * An item that does not apply in the current mode is shown disabled with the
- * reason in its title ("Only in sketch mode"); so is one that cannot run on
- * the current selection. Menus follow the native pattern — click (or
- * ArrowDown) opens, arrows move, Escape or a click elsewhere closes.
+ * The application menu bar, rendered from `shell/menuModel.ts`: each item
+ * runs its command through the registry (`shell/commands.ts`) and quotes the
+ * key `shortcuts.ts` binds to it. An item outside its modes, or blocked on the
+ * current selection, is disabled with the reason as its title. Menus follow
+ * the native pattern — click (or ArrowDown) opens, arrows move, Escape or a
+ * click elsewhere closes.
  *
  * The menu bar owns the dialogs its File and Help items open (Save As…,
  * Export…, Keyboard shortcuts) and registers those commands itself.
@@ -30,9 +23,12 @@ import {
   modeReason,
   windowOfCommand,
   type MenuEntry,
+  type MenuGroup,
+  type MenuModel,
 } from "../shell/menuModel";
 import { windowManager } from "../windows/manager";
 import { ExportDialog } from "./ExportDialog";
+import { DialogHeader, MenuItem } from "./ui";
 
 type DialogId = "saveAs" | "export" | "help";
 
@@ -147,12 +143,7 @@ export function MenuBar() {
     URL.revokeObjectURL(url);
   };
 
-  /**
-   * Export… is a dialog, not a window: it asks four things and produces one
-   * file, and a form that is answered and dismissed has no business in the
-   * dock. The work it starts is a job, so it is watched — and cancelled —
-   * from the chip and the Processes window like a solve.
-   */
+  // Export… is a dialog, not a window: a form answered once has no place in the dock.
   onCleanup(
     registerCommands({
       "file-open": { run: showScenes },
@@ -253,8 +244,7 @@ export function MenuBar() {
     // one is the same item; everything else is done and dismisses it.
     const staysOpen = windowOfCommand(entry.command) !== null;
     return (
-      <button
-        type="button"
+      <MenuItem
         role={entry.radio ? "menuitemradio" : impl()?.checked ? "menuitemcheckbox" : "menuitem"}
         aria-checked={impl()?.checked || entry.radio ? checked() : undefined}
         aria-disabled={reason() !== null}
@@ -266,13 +256,65 @@ export function MenuBar() {
         }}
         onKeyDown={onMenuKeyDown}
         data-testid={entry.testid}
+        mark={checked() ? (entry.radio ? "•" : "✓") : ""}
+        label={entry.label}
+        aside={entry.key}
+      />
+    );
+  };
+
+  /** A submenu: one parent item that opens its entries to the side, on hover or click / ArrowRight. */
+  const submenuView = (menu: MenuModel, group: MenuGroup) => {
+    const key = `${menu.id}:${group.title}`;
+    return (
+      <div
+        class="menu-sub-anchor"
+        onPointerEnter={() => setOpenSub(key)}
+        onPointerLeave={() => setOpenSub(null)}
       >
-        <i class="menu-check">{checked() ? (entry.radio ? "•" : "✓") : ""}</i>
-        <span>{entry.label}</span>
-        <Show when={entry.key}>
-          <small>{entry.key}</small>
+        <MenuItem
+          aria-haspopup="menu"
+          aria-expanded={openSub() === key}
+          class="menu-sub-parent"
+          onClick={() => setOpenSub(key)}
+          onKeyDown={(event) => {
+            if (event.key === "ArrowRight") {
+              event.preventDefault();
+              event.stopPropagation();
+              setOpenSub(key);
+              // Read currentTarget now: it is not the button once dispatch ends.
+              const anchor = event.currentTarget.parentElement;
+              queueMicrotask(() =>
+                anchor
+                  ?.querySelector<HTMLElement>(".menu-sub button:not([aria-disabled=true])")
+                  ?.focus(),
+              );
+            } else onMenuKeyDown(event);
+          }}
+          data-testid={`menu-sub-${menu.id}-${(group.title ?? "").toLowerCase().replace(/\s+/g, "-")}`}
+          label={group.title}
+          aside="›"
+        />
+        <Show when={openSub() === key}>
+          <div
+            class="menu-dropdown menu-sub"
+            role="menu"
+            aria-label={group.title ?? ""}
+            onKeyDown={(event) => {
+              if (event.key === "ArrowLeft") {
+                event.preventDefault();
+                event.stopPropagation();
+                setOpenSub(null);
+                event.currentTarget.parentElement
+                  ?.querySelector<HTMLElement>(".menu-sub-parent")
+                  ?.focus();
+              }
+            }}
+          >
+            <For each={group.entries}>{entryView}</For>
+          </div>
         </Show>
-      </button>
+      </div>
     );
   };
 
@@ -304,58 +346,7 @@ export function MenuBar() {
                             </>
                           }
                         >
-                          {/* A submenu: one parent item that opens its entries to
-                              the side, on hover or on click / ArrowRight. */}
-                          <div
-                            class="menu-sub-anchor"
-                            onPointerEnter={() => setOpenSub(`${menu.id}:${group.title}`)}
-                            onPointerLeave={() => setOpenSub(null)}
-                          >
-                            <button
-                              type="button"
-                              role="menuitem"
-                              aria-haspopup="menu"
-                              aria-expanded={openSub() === `${menu.id}:${group.title}`}
-                              class="menu-sub-parent"
-                              onClick={() => setOpenSub(`${menu.id}:${group.title}`)}
-                              onKeyDown={(event) => {
-                                if (event.key === "ArrowRight") {
-                                  event.preventDefault();
-                                  event.stopPropagation();
-                                  setOpenSub(`${menu.id}:${group.title}`);
-                                  queueMicrotask(() =>
-                                    (event.currentTarget.parentElement?.querySelector(
-                                      ".menu-sub button:not([aria-disabled=true])",
-                                    ) as HTMLElement | null)?.focus(),
-                                  );
-                                } else onMenuKeyDown(event);
-                              }}
-                              data-testid={`menu-sub-${menu.id}-${(group.title ?? "").toLowerCase().replace(/\s+/g, "-")}`}
-                            >
-                              <i class="menu-check" />
-                              <span>{group.title}</span>
-                              <small>›</small>
-                            </button>
-                            <Show when={openSub() === `${menu.id}:${group.title}`}>
-                              <div
-                                class="menu-dropdown menu-sub"
-                                role="menu"
-                                aria-label={group.title ?? ""}
-                                onKeyDown={(event) => {
-                                  if (event.key === "ArrowLeft") {
-                                    event.preventDefault();
-                                    event.stopPropagation();
-                                    setOpenSub(null);
-                                    (event.currentTarget.parentElement?.querySelector(
-                                      ".menu-sub-parent",
-                                    ) as HTMLElement | null)?.focus();
-                                  }
-                                }}
-                              >
-                                <For each={group.entries}>{entryView}</For>
-                              </div>
-                            </Show>
-                          </div>
+                          {submenuView(menu, group)}
                         </Show>
                       </>
                     )}
@@ -380,12 +371,7 @@ export function MenuBar() {
             aria-label="Save the scene as"
             onClick={(event) => event.stopPropagation()}
           >
-            <header>
-              <span>Save scene as</span>
-              <button type="button" onClick={() => setDialog(null)}>
-                Close
-              </button>
-            </header>
+            <DialogHeader title="Save scene as" onClose={() => setDialog(null)} />
             <form
               class="dialog-body save-as-form"
               onSubmit={(event) => {
@@ -434,12 +420,7 @@ export function MenuBar() {
             aria-label="Keyboard shortcuts"
             onClick={(event) => event.stopPropagation()}
           >
-            <header>
-              <span>Keyboard shortcuts</span>
-              <button type="button" onClick={() => setDialog(null)}>
-                Close
-              </button>
-            </header>
+            <DialogHeader title="Keyboard shortcuts" onClose={() => setDialog(null)} />
             <div class="dialog-body shortcut-groups" data-testid="shortcut-dialog">
               <For each={SHORTCUT_GROUPS}>
                 {(group) => (

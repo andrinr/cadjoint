@@ -27,29 +27,10 @@ import {
   simProbe,
   tool,
 } from "../../state";
-import { matchShortcut } from "../../shortcuts";
+import { matchShortcut, typingTarget } from "../../shortcuts";
 import { runCommand } from "../../shell/commands";
 import { escapeLevel } from "./escape";
 import type { ViewerPaneProps } from "./props";
-
-/**
- * True while focus is in the code editor or another field that takes keys.
- *
- * A number box, a select and a text input own their letters, digits,
- * Backspace and space as much as the editor does: B typed into a file name
- * is a B, not a box.
- */
-function isTypingTarget(): boolean {
-  const target = document.activeElement as HTMLElement | null;
-  return Boolean(
-    target &&
-      (target.tagName === "TEXTAREA" ||
-        target.tagName === "INPUT" ||
-        target.tagName === "SELECT" ||
-        target.isContentEditable ||
-        target.closest(".cm-editor")),
-  );
-}
 
 export interface ViewerKeyboardContext {
   props: ViewerPaneProps;
@@ -68,7 +49,7 @@ export interface ViewerKeyboardContext {
 
 export function createViewerKeyboard(context: ViewerKeyboardContext) {
   const onKeyDown = (event: KeyboardEvent) => {
-    const typing = isTypingTarget();
+    const typing = typingTarget() !== null;
     if (event.key === "Escape") {
       // Overlays own their Escape (dialogs, menus, popovers, flyouts close
       // themselves in the capture phase); only a bare viewport Escape backs
@@ -109,11 +90,7 @@ export function createViewerKeyboard(context: ViewerKeyboardContext) {
       }
     }
     if (!typing) {
-      // The bare-key table shared with the menu bar and the Help sheet
-      // (src/shortcuts.ts); each key runs its command through the registry,
-      // so K here and Create › Sketch are one call. Placement keys for solid
-      // primitives imply model mode, so they keep working from any mode
-      // without leaving a hidden tool armed (see shell/toolActions.ts).
+      // Bare keys from src/shortcuts.ts, run through the command registry.
       const shortcut = matchShortcut(event, "viewport");
       if (shortcut) {
         event.preventDefault();
@@ -139,7 +116,7 @@ export function createViewerKeyboard(context: ViewerKeyboardContext) {
 
   const onPanKey = (event: KeyboardEvent) => {
     if (event.code !== "Space") return;
-    if (isTypingTarget()) return;
+    if (typingTarget()) return;
     // Stop the page scrolling or a focused button firing.
     event.preventDefault();
     context.setPanHeld(event.type === "keydown");

@@ -9,11 +9,11 @@
  * surface: the input surface mesh contains self-intersections…" tells you
  * exactly what to change, and only if you can read all of it. So it is set in
  * mono at the panel's own size, wrapped rather than clipped, and edged in
- * the danger tone the way an invalid input is; and it sits in front of whatever the window was
- * already showing, so the previous result stays legible behind it instead of
+ * the danger tone the way an invalid input is; and it sits in front of
+ * whatever the window was already showing, so the previous result stays legible behind it instead of
  * being cleared or quietly re-labelled.
  *
- * Every value is a token from styles.css. Square corners, no shadow.
+ * Every value is a token from src/tokens.css. Square corners, no shadow.
  */
 
 .sim-failure {

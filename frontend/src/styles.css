@@ -24,19 +24,14 @@
 /* The token block lives in tokens.css, generated from src/tokens.ts and
    imported ahead of this file (main.tsx). Nothing here declares a value. */
 
-/* Per-mode accent. All three modes name the same fill, because the mode is
-   read from *where* the filled cell sits in the switcher and from the word in
-   the hint bar, not from a hue (design-language.md §6). The three selectors
-   stay because MODE_ACCENTS in src/tokens.ts is still mode-shaped and
-   test/tokens.test.ts asserts each binding; --viewport-accent is its
-   achromatic twin for the mode cue drawn inside the viewport rectangle,
-   where no chrome hue is allowed to go. */
+/* Per-mode accent. All three modes name the same fill: the mode is read from
+   which switcher cell is filled and the word in the hint bar, not from a hue
+   (design-language.md §6). --viewport-accent-rgb is the achromatic twin for
+   marks inside the viewport, where no chrome hue goes. */
 .app[data-mode="model"],
 .app[data-mode="sketch"],
 .app[data-mode="simulate"] {
-  --mode-accent: var(--accent);
   --mode-accent-rgb: var(--accent-rgb);
-  --viewport-accent: var(--viewport-mode);
   --viewport-accent-rgb: var(--viewport-mode-rgb);
 }
 
@@ -66,24 +61,14 @@ small {
 
 /* ── text ─────────────────────────────────────────────────────────────── */
 
-/* Text is set in exactly seven roles (src/tokens.ts TEXT_ROLES), each
-   applied whole — font, tracking, case and figures together — and nowhere
-   else does a rule touch size, weight, tracking or case:
-
-     label    furniture labels, kickers on an ink block, column heads,
-              readout labels, status words
-     control  buttons, tabs, menu-bar titles, the mode switcher, tray items
-     body     list rows, menu items, tree names, program strings, units
-     value    numbers, and the fields and selects that hold them
-     title    a panel's title, and nothing else
-     prose    sentences: hints, help, empty states, dialog text
-     code     the editor
+/* Text is set in four roles (src/tokens.ts TEXT_ROLES: caps, body, title,
+   prose), each applied whole — font, tracking, case and figures together —
+   and nowhere else does a rule touch size, weight, tracking or case.
 
    Body is the default. A program string keeps the case the program wrote
    (§4), which is why tree names, study names and menu items are body and
    never tracked capitals. Hierarchy inside a component comes from the role
-   and the ink level (ink, ink-2, ink-3) — there is no other size and no
-   other weight. */
+   and the ink level (ink, ink-2, ink-3). */
 body {
   background: var(--plane-ground);
   color: var(--ink);
@@ -461,12 +446,10 @@ body {
   color: var(--block-current-ink);
 }
 
-/* A control's edge is something you have to find, so it clears the 3:1 a
-   meaningful non-text mark owes (--rule-strong, 3.8:1 on paper). --rule is
-   one step weaker and belongs to *structure* — the hairlines that divide a
-   panel into cells, which nobody has to find because they are the grid. */
-button,
-select {
+/* A control's edge is something you have to find, so it uses --rule-strong
+   (≥3:1 on paper). --rule is weaker and belongs to structure: the hairlines
+   that divide a panel into cells. */
+button {
   height: var(--control-sm);
   padding: 0 var(--inset);
   border: var(--line);
@@ -484,8 +467,7 @@ select {
     opacity var(--dur-fast) var(--ease);
 }
 
-button:hover:not(:disabled),
-select:hover {
+button:hover:not(:disabled) {
   border-color: var(--rule-strong);
 }
 
@@ -494,55 +476,9 @@ button:disabled {
   cursor: default;
 }
 
-/* A select is an input, not a button: the sheet with a rule-strong edge, the
-   value in mono exactly as the program writes it (a material name, a mesh
-   name — never uppercased, T2), and a drawn ink chevron in place of the
-   platform's arrow, which ignores every token. */
-select {
-  appearance: none;
-  -webkit-appearance: none;
-  height: var(--control-sm);
-  padding: 0 calc(var(--unit) * 7) 0 var(--inset);
-  border: var(--line);
-  border-radius: var(--radius);
-  background-color: var(--plane-sheet);
-  background-image:
-    linear-gradient(45deg, transparent 50%, var(--ink-2) 50%),
-    linear-gradient(135deg, var(--ink-2) 50%, transparent 50%);
-  background-position:
-    calc(100% - calc(var(--unit) * 3)) 50%,
-    calc(100% - calc(var(--unit) * 2)) 50%;
-  background-size: var(--unit) var(--unit);
-  background-repeat: no-repeat;
-  color: var(--ink);
-  font: var(--text-body);
-  letter-spacing: var(--track-body);
-  text-transform: var(--case-body);
-  font-variant-numeric: var(--numeric-body);
-}
-
-select:hover:not(:disabled) {
-  background-color: var(--plane-step);
-}
-
-select:focus-visible {
-  outline: var(--line-active);
-  outline-offset: calc(var(--hairline) * -1);
-}
-
-select:disabled {
-  border-color: var(--rule);
-  color: var(--ink-3);
-  cursor: default;
-}
-
 /* One "this control is on" treatment for the whole app: the accent as a solid
-   fill with near-black type on it, and that is the only shape the accent is
-   allowed to take anywhere. As a fill it measures 7.02:1 under
-   --ink-on-accent; as a label on paper it measures 2.26:1 and fails, which is
-   what the previous tint-plus-accent-text version was doing in thirty places.
-   A filled cell is also how a mode is read off the switcher — the *position*
-   of the block is the signal, not its hue. */
+   fill with near-black type on it, the only shape the accent takes. As ink on
+   paper it fails contrast, so it is never text or a line. */
 button.active,
 button.primary,
 .sim-run,
@@ -552,17 +488,9 @@ button.primary,
   color: var(--block-current-ink);
 }
 
-/* The block does not move under the pointer. A state that is on stays the
-   one amber whatever the pointer does: a darker press shade read as a second
-   accent, and hovering a thing that is already on has nothing to say. The
-   pointer cursor is the hover feedback. */
-
 /* ── form controls ────────────────────────────────────────────────────── */
 
-/* Inputs used to fall back to the browser's own box — roughly 23px tall next
-   to 30px buttons, with grey native spin arrows leaking through. Giving them
-   a scale height is what puts a label, its box and its button on one
-   baseline inside a row. */
+/* A scale height puts a label, its box and its button on one baseline. */
 input[type="number"],
 input[type="text"] {
   height: var(--control-sm);
@@ -616,22 +544,12 @@ input[type="checkbox"] {
   accent-color: var(--ink);
 }
 
-/* Dense panel rows run one step shorter than the toolbar's controls. */
+/* Panel-row inputs (checkboxes included) take the row's control height. */
 .sim-row input,
-.sim-row select,
 .sim-args input,
 .sim-builder-vector input[type="number"],
-.sim-builder-vector select,
 .sim-bcs li input[type="number"],
-.solver-controls input,
-.solver-controls select {
-  height: var(--control-sm);
-}
-
-.sim-row input[type="range"],
-.sim-slice input[type="range"],
-.sim-deform input[type="range"],
-.opt-player input[type="range"] {
+.solver-controls input {
   height: var(--control-sm);
 }
 
@@ -647,8 +565,7 @@ input[type="checkbox"] {
 .material-panel-title small,
 .sim-panel header small,
 .render-panel header small,
-.properties-section h3 small,
-.viewer-hint .hint-mode {
+.properties-section h3 small {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
@@ -664,9 +581,7 @@ input[type="checkbox"] {
 }
 
 /* The value chip: a string or a count from the program, on a sheet with a
-   hairline edge. Same height and padding as the kind chip; only the fill and
-   the role differ, which is the whole difference between "this is a kind of
-   thing" and "this is a thing". */
+   hairline edge. Same box as the kind chip; only the fill and role differ. */
 .history-chips > span,
 .tree-badge,
 .tree-material,
@@ -692,9 +607,8 @@ input[type="checkbox"] {
 /* Viewport overlays ---------------------------------------------------- */
 
 /* The tool rail: a narrow floating card in the viewport's top-left corner,
-   one 32px cell per tool, icons centred, the word in each tooltip and the
-   armed tool named in the hint bar. Words beside the icons made the card
-   three times as wide and pushed it over the readout. */
+   one 32px cell per tool; the word is in each tooltip and the armed tool is
+   named in the hint bar. */
 .tool-rail {
   position: absolute;
   top: var(--section);
@@ -811,12 +725,7 @@ input[type="checkbox"] {
 }
 
 /* Grouped tool clusters: the parent shows the last-used child and expands
-   into a horizontal flyout of children beside the rail.
- *
- * A group is exactly as wide as the button inside it — it used to inherit a
- * toolbar rule (padding-left + border-left) that nothing in the toolbar
- * actually used, which pushed grouped tools 2.5px off the rail's other
- * buttons and drew a stray hairline down the column. */
+   into a horizontal flyout of children beside the rail. */
 .tool-group {
   position: relative;
   display: flex;
@@ -836,19 +745,13 @@ input[type="checkbox"] {
   clip-path: polygon(100% 0, 100% 100%, 0 100%);
 }
 
-/* The caret is a 4px mark on a filled cell, so it is drawn in the ink that
-   cell carries. The accent itself is 2.26:1 on paper and can never be a mark. */
+/* On a filled cell the caret takes that cell's ink. */
 .tool-group-parent.active .tool-group-caret {
   background: var(--block-kind-ink);
 }
 
-/* The flyout continues the parent's row: the same 32px cells, the parent's
-   own height, flush against the rail's outer edge, so it reads as the
-   parent opening sideways rather than as a second card floating nearby. */
-/* The flyout (K8, variant D chosen 17 Oct 2026): a separate sheet a section
-   out from the rail's edge, its cells on the parent's row, with a notch
-   pointing back at the parent. The rail keeps its edge whole; the parent is
-   marked by its fill, not by a second box. */
+/* The flyout (K8): a separate sheet a section out from the rail's edge, its
+   cells on the parent's row, with a notch pointing back at the parent. */
 .tool-flyout {
   display: none;
   position: absolute;
@@ -1055,7 +958,6 @@ input[type="checkbox"] {
   font-variant-numeric: var(--numeric-caps);
 }
 
-.solver-controls select,
 .solver-controls input,
 .solver-controls button {
   width: 100%;
@@ -1202,23 +1104,7 @@ input[type="checkbox"] {
   border-top-color: var(--rule);
 }
 
-/* Panel and section headers used to open with a filled accent cell carrying a
-   number — 01, 02, 03 — from a CSS counter, on the reasoning that a panel is a
-   zone of a drawing and a drawing numbers its zones.
- *
- * They are gone. A drawing numbers its zones so that a *written* reference can
- * point at one ("see zone 03"), and nothing in this app ever does: no label,
- * no message and no document refers to a panel or a section by number. What
- * was left was a counter counting itself — three of the loudest blocks on the
- * screen, in the one colour the design reserves for state, carrying no state
- * and naming nothing. The kicker chips beside them (LIBRARY, SERVER, FEM) do
- * name something and stay.
- *
- * The counters themselves stay reset and incremented nowhere: with the two
- * `::before` rules removed there is nothing left to increment. */
-
-/* Expanded sections: one shared panel shell with the mode-accent header
-   strip along the top edge. */
+/* Expanded sections: one shared panel shell. */
 .object-tree-panel,
 .material-panel,
 .sim-panel,
@@ -1230,8 +1116,6 @@ input[type="checkbox"] {
   animation: panel-in var(--dur-slow) var(--ease);
 }
 
-/* The panel's own header carries the zone number in the same cell the
-   launcher does, so opening a section does not renumber the dock. */
 .object-tree-panel > header,
 .material-panel > header,
 .sim-panel > header,
@@ -1240,14 +1124,20 @@ input[type="checkbox"] {
   padding-left: 0;
 }
 
-/* The title stack takes the slack, so the head reads left to right —
-   number, kicker, name — instead of drifting to the right edge. */
+/* One panel header, everywhere: the kicker (a kind chip, emitted first as
+   <small>), then the section's name. The title stack takes the slack, so the
+   head reads left to right instead of drifting to the right edge. */
 .object-tree-panel > header > span,
 .properties-panel > header > span,
 .sim-panel header span,
 .sketch-panel header > span,
 .render-panel > header > span,
 .material-panel-title > span:not(.material-panel-icon) {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--gap);
+  min-width: 0;
   margin-right: auto;
   font: var(--text-title);
   letter-spacing: var(--track-title);
@@ -1255,12 +1145,10 @@ input[type="checkbox"] {
   font-variant-numeric: var(--numeric-title);
 }
 
-/* ── numbered sections ─────────────────────────────────────────────────── */
+/* ── sections ──────────────────────────────────────────────────────────── */
 
-/* A section is announced by its name in tracked uppercase mono and closed by
-   a rule, with whatever it counts hung right. See the note above the panel
-   headers for why the numbers that used to lead it are gone. */
-
+/* A section is announced by its name and closed by a rule, with whatever it
+   counts hung right. */
 .section-head {
   display: flex;
   align-items: center;
@@ -1270,10 +1158,7 @@ input[type="checkbox"] {
   border-bottom: var(--line);
 }
 
-/* Every section is named the same way, wherever it is: the label role in
-   ink-2. Section heads, the render popover's groups, the shortcut sheet's
-   groups, the Simulate panel's sub-sections and the material inspector's
-   halves used to be five type variants of one idea. */
+/* Every section is named the same way, wherever it is: caps in ink-2. */
 .section-head b,
 .render-settings h4,
 .shortcut-groups h4,
@@ -1307,30 +1192,6 @@ input[type="checkbox"] {
   gap: var(--gap);
 }
 
-/* One panel header, everywhere: the kicker, then the section's name. The
-   kicker is a label of kind, so it is inverse ink — ink ground, paper type —
-   and never the accent, which means *current* and nothing else. The components
-   emit <small> first so the kicker is always the top line — see
-   ObjectTree/RenderPanel/MaterialPanel. */
-.object-tree-panel > header > span,
-.properties-panel > header > span,
-.sim-panel header span,
-.sketch-panel header > span,
-.render-panel > header > span,
-.material-panel-title > span:not(.material-panel-icon) {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--gap);
-  min-width: 0;
-  font: var(--text-title);
-  letter-spacing: var(--track-title);
-  text-transform: var(--case-title);
-  font-variant-numeric: var(--numeric-title);
-}
-
-/* The kicker is a kind chip; see .sim-kind for the primitive. */
-
 /* Object tree ----------------------------------------------------------- */
 
 .object-tree-panel {
@@ -1339,16 +1200,10 @@ input[type="checkbox"] {
   overflow: hidden;
 }
 
-/* Panel headers stick while their list scrolls under them, so the section
-   you are reading always says what it is. */
-/* A panel header is a title block: the kicker is its first line, and the
-   controls beside it belong to that line. A control only as tall as its own
-   glyph cannot both share the block's centre and sit on its first line —
-   centred, the audit measured the park control 12.9px below the line it
-   reads with; baseline-aligned, its box left the block's centre by 12.1px.
-   So a header control takes the block's full height, which settles the
-   centres, and draws its glyph in the block's own first line box, which
-   settles the baselines. The shared rule is below, next to .material-help. */
+/* Panel headers stick while their list scrolls under them. A header control
+   takes the title block's full height and draws its glyph in the kicker's
+   line box, so it shares both the block's centre and its first baseline (the
+   shared rule is next to .material-add). */
 .object-tree-panel > header {
   position: sticky;
   top: 0;
@@ -1361,7 +1216,6 @@ input[type="checkbox"] {
   padding: var(--inset);
   background: var(--plane-sheet);
 }
-
 
 .object-tree-rows {
   display: flex;
@@ -1409,8 +1263,7 @@ input[type="checkbox"] {
 }
 
 /* Everything on a selected row is ink on the accent fill, the caret and the
-   kind mark included: left at --ink-3 the caret measured 2.27:1 on the
-   orange, the one place in the tree where a mark was unreadable. */
+   kind mark included: --ink-3 is unreadable on the accent. */
 .object-tree-row.active .tree-detail,
 .object-tree-row.active .tree-material,
 .object-tree-row.active .tree-caret,
@@ -1535,24 +1388,21 @@ input[type="checkbox"] {
   font-variant-numeric: var(--numeric-body);
 }
 
+/* A mark, not a panel button: a drawn edge around a glyph on the title's
+   first line reads as an empty cell, so the step appears only under the
+   pointer. */
 .material-add {
   flex: 0 0 auto;
   width: var(--control-sm);
   padding: 0;
+  border-color: transparent;
+  background: transparent;
   color: var(--ink);
 }
 
 /* The control-on-the-title-line pattern (see the panel header note above):
-   the block's full height so the centres agree, the glyph in the kicker's own
-   9px line box so the baselines do, and the kicker's own size so the glyph
-   does not add a variant to the type census.
-
-   There is exactly one control here now. The two panels used to carry their
-   own em-dash beside it, wired to park the window — which is the job of the
-   frame's own minimise button two centimetres to the right, so every panel
-   showed the reader two identical controls doing one thing. The frame's is
-   the one that stays: it is on every window, docked or floating, and it is
-   where a window's own chrome belongs. */
+   the block's full height so the centres agree, the glyph in the kicker's
+   line box so the baselines do. */
 .material-add,
 .material-panel-title > b {
   align-self: stretch;
@@ -1560,14 +1410,6 @@ input[type="checkbox"] {
   align-content: start;
   justify-items: center;
   height: auto;
-}
-
-/* And they are marks, not panel buttons: a drawn edge around a glyph sitting
-   on the title's first line reads as an empty cell. The edge appears under
-   the pointer, the way the editor's and the study rows' own marks do. */
-.material-add {
-  border-color: transparent;
-  background: transparent;
 }
 
 .material-add:hover:not(:disabled) {
@@ -1594,7 +1436,6 @@ input[type="checkbox"] {
 
 .material-card {
   min-width: 0;
-  /* A fixed height on the grid: swatch, name and use count were 106px. */
   height: calc(var(--unit) * 27);
   padding: var(--inset) var(--gap);
   border: var(--line);
@@ -1613,10 +1454,8 @@ input[type="checkbox"] {
   background: var(--plane-step);
 }
 
-/* The current material: an accent block behind its name, never an orange
-   edge around the card (the accent is a fill and never draws a line). */
-/* The current card stays a sheet under the pointer too: only the name
-   carries the state. */
+/* The current material: an accent block behind its name, never an accent
+   edge around the card. The card stays a sheet under the pointer too. */
 .material-card.active,
 .material-card.active:hover {
   border-color: var(--rule-strong);
@@ -1631,7 +1470,6 @@ input[type="checkbox"] {
 .material-card:active {
   cursor: grabbing;
 }
-
 
 .material-panel-icon {
   flex: 0 0 auto;
@@ -1660,7 +1498,6 @@ input[type="checkbox"] {
   width: 100%;
   height: 100%;
 }
-
 
 .material-name,
 .material-card small {
@@ -1727,12 +1564,14 @@ input[type="checkbox"] {
   min-width: 0;
 }
 
+/* Two-word labels ("Thermal expansion") wrap rather than being cut. */
 .material-physical-row dt {
   color: var(--ink-2);
   font: var(--text-caps);
   letter-spacing: var(--track-caps);
   text-transform: var(--case-caps);
   font-variant-numeric: var(--numeric-caps);
+  white-space: normal;
 }
 
 /* The value column is sized for the widest thing that can honestly appear in
@@ -1746,16 +1585,6 @@ input[type="checkbox"] {
   gap: var(--gap);
   margin: 0;
   white-space: nowrap;
-}
-
-/* Two-word properties wrap rather than being cut: "Thermal expansion" and
-   "Young's modulus" are the labels, and half a label is not one. */
-.material-physical-row dt {
-  white-space: normal;
-  font: var(--text-caps);
-  letter-spacing: var(--track-caps);
-  text-transform: var(--case-caps);
-  font-variant-numeric: var(--numeric-caps);
 }
 
 .material-physical-row input[type="number"] {
@@ -1844,7 +1673,6 @@ input[type="checkbox"] {
   margin-top: var(--gap);
   padding: 0 var(--inset);
 }
-
 
 .material-inspector-head,
 .material-inspector label,
@@ -1947,8 +1775,6 @@ input[type="checkbox"] {
    else. It is projected in TypeScript (viewer/navCube.ts) rather than by CSS
    3D, so what is described here is only paint. */
 .cube-stage {
-  /* Smaller than it was: the cube is a control, not an ornament, and at 168
-     it took a corner of the viewport away from the model it describes. */
   width: calc(var(--unit) * 31);
   height: calc(var(--unit) * 31);
   cursor: grab;
@@ -1993,12 +1819,9 @@ input[type="checkbox"] {
   fill: var(--plane-step);
 }
 
-/* The camera is standing on this view.
-   Drawn as a heavier outline rather than a fill. A filled facet is fine on a
-   face, which has a label to reverse out of it, and wrong on a corner or a
-   bevel, which have none: a solid black triangle in the middle of the cube
-   reads as a hole punched through it rather than as "you are here". Viewport
-   ink, not the accent — no chrome hue crosses into the viewport (§3.7). */
+/* The camera is standing on this view: a heavier outline rather than a fill,
+   since a filled corner or bevel reads as a hole in the cube. Viewport ink,
+   not the accent — no chrome hue crosses into the viewport (§3.7). */
 .cube-facet.active,
 .cube-facet.active:hover {
   fill: var(--plane-step);
@@ -2006,10 +1829,9 @@ input[type="checkbox"] {
   stroke-width: 2;
 }
 
-/* Tracking is set again on the label itself: an em length computes to an
-   absolute one where it is declared and is inherited as that, so the stage's
-   0.08em of 11px (0.88px) arrived here as 0.88 cube units against a 0.26-unit
-   glyph and pulled each face name apart into scattered letters. */
+/* Tracking is set again on the label itself: an em length computes where it
+   is declared and is inherited as an absolute length, so the stage's 0.88px
+   would arrive here as 0.88 cube units and pull the face name apart. */
 .cube-label {
   letter-spacing: var(--track-caps);
   fill: var(--ink-3);
@@ -2017,10 +1839,7 @@ input[type="checkbox"] {
   user-select: none;
 }
 
-/* The facet the camera is standing on carries its name in full ink, matching
-   the heavier outline around it. It was reversed out in paper while the active
-   state was a solid black fill; against the light fill that replaced it, a
-   near-white label is an invisible one. */
+/* The active facet's name in full ink, matching its heavier outline. */
 .cube-label.active {
   fill: var(--viewport-ink);
 }
@@ -2062,31 +1881,6 @@ input[type="checkbox"] {
 .cube-axis-label.axis-y { fill: var(--axis-y); }
 .cube-axis-label.axis-z { fill: var(--axis-z); }
 
-/* The projection toggle takes the cube stage's top-right corner. However the
-   cube is turned its silhouette reaches less than half the way from the
-   centre to a corner of its own square, so the corners are free: the widget
-   stays one square instead of a square with a button under it. */
-.cube-projection {
-  position: absolute;
-  right: 0;
-  top: 0;
-  display: grid;
-  place-items: center;
-  width: var(--control-sm);
-  height: var(--control-sm);
-  padding: 0;
-  background: var(--plane-sheet);
-  pointer-events: auto;
-}
-
-/* This sits straight on the paper, so its active edge is drawn at viewport
-   weight; the shared control accent measures 1.04:1 there. */
-.cube-projection.active {
-  border-color: rgba(var(--viewport-accent-rgb, var(--viewport-mode-rgb)), var(--alpha-mark));
-  background: var(--plane-sheet);
-  color: var(--ink);
-}
-
 /* Render settings (the eye-icon popover in the toolbar) ----------------- */
 
 button.icon {
@@ -2105,8 +1899,7 @@ button.icon {
 }
 
 /* Icon + label buttons lay their two children out rather than stacking the
-   icon into the text's line box, which used to push the label 2.5px below
-   the rest of the toolbar. */
+   icon into the text's line box. */
 button.primary,
 button.icon {
   display: inline-flex;
@@ -2172,13 +1965,9 @@ button.icon {
   gap: var(--gap);
 }
 
-/* The distance-field views.
-   Above the preset editor rather than inside it: a preset says how the solid
-   is *drawn*, and these say whether the solid is what is drawn at all. The
-   slice controls borrow the Results tab's own row (.sim-slice) and legend
-   (.sim-legend) verbatim — the two are the same instrument reading two
-   different scalars over a plane, and giving them separate furniture would be
-   the app claiming a difference it does not have. */
+/* The distance-field views, above the preset editor: a preset says how the
+   solid is drawn, these say whether the solid is drawn at all. The slice
+   controls reuse the Results tab's row (.sim-slice) and legend (.sim-legend). */
 .render-sdf {
   gap: var(--gap);
   padding-top: var(--inset);
@@ -2237,11 +2026,8 @@ button.icon {
 }
 
 /* The preset in use: the accent block behind its name, as on the material
-   cards. No edge and no dot: the accent is only ever a fill under type. */
-/* On the accent block every line takes the block's own ink (B3); ink-3 on
-   the accent measured 2.27:1. */
-/* The card itself stays a sheet: the generic button.active fill would
-   paint the whole card amber, which is the material card's rule broken. */
+   cards. The card itself stays a sheet, overriding the generic button.active
+   fill. */
 .render-preset-card.active,
 .render-preset-card.active:hover {
   border-color: var(--rule-strong);
@@ -2254,6 +2040,14 @@ button.icon {
 .render-preset-card strong {
   margin: 0 calc(var(--gap) * -1);
   padding: var(--gap) var(--gap);
+  overflow: hidden;
+  color: var(--ink);
+  font: var(--text-body);
+  letter-spacing: var(--track-body);
+  text-transform: var(--case-body);
+  font-variant-numeric: var(--numeric-body);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .render-preset-card.active strong {
@@ -2280,34 +2074,9 @@ button.icon {
   color: var(--ink);
 }
 
-.render-preset-card strong {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font: var(--text-body);
-  letter-spacing: var(--track-body);
-  text-transform: var(--case-body);
-  font-variant-numeric: var(--numeric-body);
-}
-
-.render-preset-card small {
-  overflow-wrap: anywhere;
-  font: var(--text-prose);
-  letter-spacing: var(--track-prose);
-  text-transform: var(--case-prose);
-  font-variant-numeric: var(--numeric-prose);
-}
-
-.render-preset-card strong {
-  color: var(--ink);
-  font: var(--text-body);
-  letter-spacing: var(--track-body);
-  text-transform: var(--case-body);
-  font-variant-numeric: var(--numeric-body);
-}
-
 .render-preset-card small {
   margin-top: var(--gap);
+  overflow-wrap: anywhere;
   color: var(--ink-3);
   font: var(--text-prose);
   letter-spacing: var(--track-prose);
@@ -2389,18 +2158,15 @@ button.icon {
   padding: 0 var(--inset);
 }
 
-/* One segmented strip, wherever a choice of one is made: the render
-   popover's pickers and the Simulate panel's tabs are the same cells. */
-.segmented,
-.sim-tabs {
+/* One segmented strip, wherever a choice of one is made. */
+.segmented {
   display: flex;
   padding: var(--gap);
   border: var(--line);
   background: var(--plane-sheet);
 }
 
-.segmented button,
-.sim-tabs button {
+.segmented button {
   white-space: nowrap;
   flex: 1;
   min-width: 0;
@@ -2414,13 +2180,11 @@ button.icon {
     color var(--dur-base) var(--ease);
 }
 
-.segmented button:hover,
-.sim-tabs button:hover {
+.segmented button:hover {
   color: var(--ink);
 }
 
-.segmented button.active,
-.sim-tabs button.active {
+.segmented button.active {
   background: var(--block-current);
   color: var(--block-current-ink);
 }
@@ -2481,16 +2245,12 @@ button.icon {
   padding-block: var(--gap);
 }
 
-.switch.compact span {
-}
-
 .selection-chip {
   color: var(--ink);
 }
 
-/* A block, not a flex row: text-overflow only ellipsises an inline run,
-   and as a flex item the readout was cut mid-word ("APPL") the moment a
-   removal notice took room beside it. */
+/* A block, not a flex row: text-overflow only ellipsises an inline run, so
+   as a flex container the readout would be cut mid-word. */
 .status {
   display: block;
   flex: 0 1 auto;
@@ -2517,8 +2277,8 @@ button.icon {
   transition: background-color var(--dur-base) var(--ease);
 }
 
-/* Ready is a status, not the brand, so it takes the status tone — and the
-   accent could not carry an 8px dot anyway: it is 2.26:1 on paper. */
+/* Ready is a status, not the brand, so it takes the status tone; the accent
+   cannot carry a mark. */
 .status.ready .dot {
   background: var(--ok);
 }
@@ -2527,26 +2287,18 @@ button.icon {
   background: var(--danger);
 }
 
-/* Stopped while working — a compile somebody cancelled, so the view is older
-   than the code. That is a warning, so it takes the warn tone: the accent
-   family never draws a mark, only a fill under type. It is still rather than
-   pulsing, because nothing is running. There is no `busy` status: while work
-   is in flight the status line is silent and the toolbar's chip is the one
-   indicator. */
+/* Stopped while working (a cancelled compile, so the view is older than the
+   code): a still warn dot. There is no `busy` status; while work is in flight
+   the toolbar's chip is the one indicator. */
 .status.stale .dot {
   background: var(--warn);
 }
 
 /* The running-work chip, beside the mode switcher ---------------------- */
 
-/* One control's height so the toolbar's baseline row survives it, and no
-   width at all when nothing is running: this is drawn only while there is
-   something to say, so it never teaches the eye to skip its own spot. The
-   whole thing is ink on paper apart from the dot — a chip that changed colour
-   would compete with the status line for the same job. */
-/* The border is the chip's, so the buttons inside it come out two pixels
-   short of a control unless the box is two hairlines taller. */
-
+/* Drawn only while something runs, ink on paper apart from the dot. The box
+   is two hairlines taller than a control so the buttons inside its border
+   come out a full control high. */
 .job-chip {
   display: flex;
   align-items: stretch;
@@ -2563,11 +2315,8 @@ button.icon {
   color: var(--ink-2);
 }
 
-/* Capped short enough that the status line to its right still fits its own
-   sentence on a 1280-wide window: the chip is transient and the adapter
-   readout is permanent, and neither may push the other into an ellipsis. The
-   name is what gives when the cap bites, which is the right thing to lose —
-   the kind and the clock are the sentence. */
+/* Capped so the status line beside it still fits on a 1280-wide window; the
+   job name is what gives when the cap bites. */
 .job-chip-open {
   display: flex;
   align-items: center;
@@ -2612,11 +2361,7 @@ button.icon {
   text-overflow: ellipsis;
 }
 
-/* The overflow count is the one field that may never be shortened: it is the
-   whole answer to "is that everything that is running", and an ellipsis over
-   it would turn an accounting into a guess. So it keeps its width while the
-   job *name* beside it gives way — the name is recoverable from the Processes
-   window, the count is not recoverable from anywhere. */
+/* The overflow count never shortens; the job name beside it gives way. */
 [data-testid="job-chip-others"] {
   flex: 0 0 auto;
   overflow: visible;
@@ -2663,10 +2408,8 @@ button.icon {
   }
 }
 
-/* A pulse reports progress rather than decorating, so under a reduced-motion
-   preference it stops where it is defined rather than being swept away by the
-   global transition rule — the dot stays, fully opaque, and still says which
-   state the work is in. */
+/* A pulse reports progress, so reduced motion stops it here and the dot
+   stays, fully opaque. */
 @media (prefers-reduced-motion: reduce) {
   .job-chip .dot {
     animation: none;
@@ -2769,12 +2512,9 @@ button.icon {
   background: var(--surface-viewport);
 }
 
-/* The drawing frame. Chrome and viewport share one paper, so the rectangle
-   has no luminance step to announce it and the frame is what says where the
-   field begins — which is why it takes --rule-heavy (9.85:1) rather than the
-   hairline a panel uses. Achromatic, because nothing coloured crosses this
-   edge; the mode is named in words in the hint bar instead of tinted here.
-   Non-interactive; above the canvas, under every overlay. */
+/* The drawing frame. Chrome and viewport share one paper, so the frame is
+   what says where the field begins. Achromatic, because nothing coloured
+   crosses this edge. Non-interactive; above the canvas, under every overlay. */
 .viewer-pane::after {
   content: "";
   position: absolute;
@@ -2847,36 +2587,25 @@ button.icon {
   font-style: normal;
 }
 
-/* The contour readout, on the row under the gain: same instrument, second
-   scale. It appears with the slice rather than with the floor grid, because
-   what it states is a property of the slice — but the interval it states is
-   the floor grid's, which is the point. */
+/* The contour readout, on the row under the gain; shown with the slice. */
 .graticule-contour {
   top: calc(var(--unit) * 8);
 }
 
-/* A paper plate under a readout that is standing on data.
-   The gain and view fields are chrome, and chrome on this ground is dark ink
-   on paper — over a saturated slice or a black depth pass there is no paper
-   left and the type disappears into whatever the shader happened to draw. The
-   title block already solves this the same way, for the same reason. */
+/* A paper plate under a readout standing on data: over a saturated slice or
+   a black depth pass there is no paper left for dark ink to read on. */
 .graticule-gain.plated {
   padding: var(--gap) var(--inset);
   background: var(--surface-viewport);
   outline: var(--line);
 }
 
+/* The slice's key: the ramp itself, with the value at each end. Over the
+   viewport because both numbers on it are functions of the camera. */
 .sdf-key {
   padding: var(--gap) var(--inset);
   background: var(--surface-viewport);
   outline: var(--line);
-}
-
-/* The slice's key: the ramp itself, with the value at each end.
-   It answers "what am I looking at" without a trip to the panel, and it is
-   over the viewport rather than in one because both numbers on it are
-   functions of the camera. */
-.sdf-key {
   position: absolute;
   top: calc(var(--unit) * 14);
   left: calc(var(--unit) * 16);
@@ -2904,14 +2633,11 @@ button.icon {
   font-variant-numeric: var(--numeric-body);
 }
 
-/* The title block, ASME Y14.100's lower-right corner: five rows of what is on
-   screen, an em dash wherever the app cannot fill a field. Opaque paper, so a
-   part passing behind it never shows through the type; below the dock in
-   stacking order, because a panel someone opened outranks a caption. */
+/* The perf readout (PerfReadout.tsx), a title block in the lower-right
+   corner: label/value rows on opaque paper, so a part passing behind never
+   shows through; below the dock in stacking order. */
 .title-block {
   position: absolute;
-  /* Inside the drawing frame, not on it: the corner brackets reach 36px in
-     from each edge, and a title block belongs within the border it labels. */
   right: calc(var(--unit) * 10);
   bottom: calc(var(--unit) * 10);
   z-index: 5;
@@ -2955,22 +2681,6 @@ button.icon {
 .title-block dd:nth-of-type(n + 2) {
   border-top: var(--line);
 }
-
-/* The hint bar is left alone: the title block sits 40px up from the bottom
-   edge, so the two never share a line, and narrowing the hint to "clear" it
-   only truncated a sentence that already fits. */
-
-/* The dock keeps its full height. Shortening it to clear the title block was
-   tried and measured: the panels are already over-full at the height they
-   have (`scroll-content-hidden` fires on three of them today), so taking
-   100px away buried more controls and squeezed two panels into overlapping
-   hit boxes. A caption occasionally hidden behind a panel the user opened is
-   the cheaper failure, which is why the block sits below the dock in the
-   stacking order rather than pushing it around. */
-
-/* The viewport carried a "COMPILING" chip of its own here. It is gone: the
-   top bar's running-work chip says the same thing, names the work, counts its
-   seconds and can stop it, and one machine state deserves one indicator. */
 
 .constraint-overlay {
   position: absolute;
@@ -3047,7 +2757,7 @@ button.icon {
   text-transform: var(--case-caps);
   font-variant-numeric: var(--numeric-caps);
   font-style: normal;
-  color: var(--ink-3, var(--ink-2));
+  color: var(--ink-3);
 }
 
 .properties-row {
@@ -3066,8 +2776,7 @@ button.icon {
   color: var(--ink-2);
 }
 
-.properties-row input,
-.properties-row select {
+.properties-row input {
   min-width: 0;
   width: 100%;
 }
@@ -3139,9 +2848,8 @@ button.icon {
   pointer-events: none;
 }
 
-/* Dimensions on paper: the mark blue, and — the part that inverts with the
-   ground — a dark label inside a paper halo. Light-on-dark was the right way
-   round over a black viewport and is unreadable over this one. */
+/* Dimensions on paper: the viewport mark, and a dark label inside a paper
+   halo. */
 .constraint-distance {
   fill: var(--viewport-mark);
   stroke: rgba(var(--viewport-mark-rgb), var(--alpha-edge));
@@ -3208,27 +2916,14 @@ button.icon {
   pointer-events: none;
 }
 
-/* Same plate the readouts wear, for the same reason: while a distance-field
-   view is up the viewport is data end to end, and there is no paper left for
-   chrome to be dark ink on. The hint keeps its right alignment, so the plate
-   shrinks to the text rather than ruling a bar across the bottom of the
-   picture. */
+/* Same plate the readouts wear while a distance-field view is up. The hint
+   keeps its right alignment, so the plate shrinks to the text. */
 .viewer-pane.sdf-data .viewer-hint {
   left: auto;
   max-width: calc(100% - var(--unit) * 19);
   padding: var(--gap) var(--inset);
   background: var(--surface-viewport);
   outline: var(--line);
-}
-
-/* Active editing mode, leading the hint bar: a stamped block. The word is the
-   mode signal — it survives greyscale, colour-blindness and a screenshot — so
-   it is set in reversed ink rather than tinted, which also keeps the last
-   chrome hue out of the viewport rectangle. Opaque, so geometry passing
-   behind it never shows through the type. */
-.viewer-hint .hint-mode {
-  background: var(--viewport-ink);
-  color: var(--surface-viewport);
 }
 
 /* The simulate-mode slot only positions its owner's panel. */
@@ -3352,25 +3047,6 @@ button.icon {
   font-variant-numeric: var(--numeric-prose);
 }
 
-.scene-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--gap);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.scene-list button {
-  width: 100%;
-  height: var(--control-sm);
-  text-align: left;
-  font: var(--text-body);
-  letter-spacing: var(--track-body);
-  text-transform: var(--case-body);
-  font-variant-numeric: var(--numeric-body);
-}
-
 .save-as-form label {
   display: grid;
   gap: var(--gap);
@@ -3449,7 +3125,7 @@ button.icon {
 }
 
 /* When the dock shrinks the section, the panel scrolls — its rows must not
-   be flex-crushed to zero height (the face-group list used to vanish). */
+   be flex-crushed to zero height. */
 .sim-panel > * {
   flex: 0 0 auto;
 }
@@ -3475,11 +3151,13 @@ button.icon {
   text-transform: var(--case-caps);
   font-variant-numeric: var(--numeric-caps);
 }
-.sim-row input[type="number"],
-.sim-row select {
+.sim-row input[type="number"] {
   width: calc(var(--unit) * 19);
 }
 .sim-help {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
   margin: 0;
   color: var(--ink-2);
   font: var(--text-prose);
@@ -3560,7 +3238,6 @@ button.icon {
   font-variant-numeric: var(--numeric-caps);
 }
 .sim-args input[type="number"],
-.sim-args select,
 .sim-args .ui-select {
   width: 100%;
 }
@@ -3572,14 +3249,10 @@ button.icon {
   flex-direction: column;
   gap: var(--gap);
 }
-/* One line per boundary condition. The row never wraps: the selection is
-   the only elastic cell (min-width:0 lets it ellipsis), and the value box
-   and the delete button hold their size beside it. Wrapping used to drop
-   the delete button onto a second line of its own. */
-/* A boundary condition is a row on the panel tracks: its description spans
-   label and value, its number sits in the unit…action span, the delete in
-   the action track. Aligned to the top so a row's height is its line boxes
-   plus a gap each side (L3). */
+/* One line per boundary condition, on the panel tracks: the description is
+   the only elastic cell, the value box and the delete hold their size beside
+   it. Aligned to the top so a row's height is its line boxes plus a gap each
+   side (L3). */
 .sim-bcs li {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto var(--control-sm);
@@ -3634,8 +3307,7 @@ button.icon {
 }
 /* A boundary condition's cell is a stack — type over selection — so the
    controls beside it follow the panel headers' rule: full height for the
-   centres, glyph on the stack's first line for the baselines. Centred, the
-   delete mark measured 21.4px below the line it deletes. */
+   centres, glyph on the stack's first line for the baselines. */
 .sim-bcs li > .sim-delete,
 .sim-bcs li > small {
   align-self: stretch;
@@ -3710,9 +3382,7 @@ button.icon {
   min-width: 0;
   color: var(--ink-2);
 }
-/* Mono is wider than the sans this column was measured for, so the label
-   cell grew to fit its longest string ("resolution") rather than truncating
-   it, and it drops the furniture tracking that a dense cell cannot afford. */
+/* The shared label column, ellipsised if a label outgrows it. */
 .sim-builder-vector > span {
   flex: 0 0 auto;
   font: var(--text-caps);
@@ -3724,8 +3394,7 @@ button.icon {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.sim-builder-vector input[type="number"],
-.sim-builder-vector select {
+.sim-builder-vector input[type="number"] {
   flex: 1 1 0;
   min-width: 0;
 }
@@ -3769,27 +3438,28 @@ button.icon {
   align-items: center;
   justify-content: space-between;
 }
-.sim-view-control .switch {
+.sim-view-control .switch,
+.sim-slice .switch {
   flex-direction: row !important;
   align-items: center;
 }
-/* This row mixes a checkbox label, three axis buttons and a range slider —
-   three different intrinsic heights. Centring them is the only arrangement
-   in which they share an axis; flex-end left them 5.5px apart. */
+/* A switch, a segmented control and a range slider: three intrinsic
+   heights, centred on one axis. */
 .sim-slice,
 .sim-deform,
 .sim-view-control {
   align-items: center;
 }
 
+/* Single-letter axes: each cell at least square. */
+.sim-slice .segmented button {
+  min-width: var(--control-sm);
+}
+
 .sim-slice input[type="range"] {
   flex: 1;
   min-width: calc(var(--unit) * 15);
   accent-color: var(--ink);
-}
-.sim-slice-toggle {
-  flex-direction: row !important;
-  align-items: center;
 }
 .sim-note,
 .sim-error {
@@ -3929,10 +3599,6 @@ button.icon {
 }
 
 .opt-summary b {
-  font: var(--text-body);
-  letter-spacing: var(--track-body);
-  text-transform: var(--case-body);
-  font-variant-numeric: var(--numeric-body);
   color: var(--ink);
 }
 
@@ -4045,10 +3711,6 @@ button.icon {
 }
 
 .opt-live-stats b {
-  font: var(--text-body);
-  letter-spacing: var(--track-body);
-  text-transform: var(--case-body);
-  font-variant-numeric: var(--numeric-body);
   color: var(--ink);
 }
 
@@ -4077,7 +3739,6 @@ button.icon {
   border-style: dashed;
   color: var(--ink-2);
 }
-
 
 .sim-inspect {
   display: flex;
@@ -4267,38 +3928,6 @@ button.icon {
   font-variant-numeric: var(--numeric-prose);
 }
 
-/* ── Simulate panel tabs ───────────────────────────────────────────────── */
-
-/* The tab strip is the segmented control (above): one strip, one cell. */
-.sim-tabs button {
-  position: relative;
-}
-
-.sim-tab-badge {
-  position: absolute;
-  top: var(--gap);
-  right: var(--gap);
-  width: var(--unit);
-  height: var(--unit);
-  background: var(--ink);
-}
-
-/* On the active tab the mark sits on the accent fill, so it takes that
-   fill's ink. */
-.sim-tabs button.active .sim-tab-badge {
-  background: var(--block-current-ink);
-}
-
-.sim-help {
-  display: flex;
-  flex-direction: column;
-  gap: var(--gap);
-  font: var(--text-prose);
-  letter-spacing: var(--track-prose);
-  text-transform: var(--case-prose);
-  font-variant-numeric: var(--numeric-prose);
-}
-
 .sim-help p {
   margin: 0;
 }
@@ -4368,36 +3997,24 @@ button.icon {
     var(--scroll-base, transparent);
 }
 
-/* Panels that scroll their whole selves keep their translucent fill under
-   the shading. */
+/* Regions that scroll their whole selves keep their sheet fill under the
+   shading. */
 .material-panel,
 .sim-panel,
-.sketch-panel {
-  --scroll-base: var(--plane-sheet);
-}
-
+.sketch-panel,
 .dialog-body,
 .dialog pre {
   --scroll-base: var(--plane-sheet);
 }
 
-/* The Simulate panel scrolls as a whole, so its title and tab strip stay
-   pinned: the tab you are on is always visible, whatever you scrolled to. */
-.sim-panel > header,
-.sim-panel > .sim-tabs {
-  position: sticky;
-  z-index: 3;
-  background: var(--plane-sheet);
-}
-
+/* The Simulate panel scrolls as a whole, so its title stays pinned. */
 .sim-panel > header {
+  position: sticky;
   top: calc(var(--inset) * -1);
+  z-index: 3;
   margin: calc(var(--inset) * -1) calc(var(--inset) * -1) 0;
   padding: var(--inset);
-}
-
-.sim-panel > .sim-tabs {
-  top: calc(var(--unit) * 12.5);
+  background: var(--plane-sheet);
 }
 
 /* ── motion primitives ─────────────────────────────────────────────────── */

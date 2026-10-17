@@ -30,7 +30,7 @@ import {
   resolveSections,
   runtimePlaneRows,
 } from "../properties";
-import { NumberInput, Select } from "./ui";
+import { NumberInput, PanelHeader, Select } from "./ui";
 import type { ConstructionArgument, ConstructionElement, PatchAddress } from "../types";
 
 export interface PropertiesPanelProps {
@@ -38,10 +38,7 @@ export interface PropertiesPanelProps {
   onSetValue: (address: PatchAddress, value: number | number[]) => Promise<void>;
   /** Assign a named material at the published address. */
   onAssignMaterial: (address: PatchAddress, material: string) => Promise<void>;
-  /**
-   * Assign a material to the object declared at `line` — the very patch a
-   * swatch dropped on it sends, for a call that has no `material=` yet.
-   */
+  /** Assign a material to the object declared at `line` (the swatch-drop patch). */
   onAssignMaterialToLine: (line: number, material: string) => Promise<void>;
 }
 
@@ -182,11 +179,7 @@ export function PropertiesPanel(props: PropertiesPanelProps) {
 
   return (
     <aside class="properties-panel" data-testid="properties-panel">
-      <header>
-        <span>
-          <small>selection</small>
-          Properties
-        </span>
+      <PanelHeader kicker="selection" title="Properties">
         <Show when={inspected()}>
           <button
             type="button"
@@ -197,7 +190,7 @@ export function PropertiesPanel(props: PropertiesPanelProps) {
             follow selection
           </button>
         </Show>
-      </header>
+      </PanelHeader>
       <Show
         when={sections().length > 0}
         fallback={

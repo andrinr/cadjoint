@@ -8,7 +8,7 @@
  * this one — a tab is a mono tracked label on paper, a splitter is a
  * hairline, and nothing anywhere has a radius or a shadow.
  *
- * Read src/styles.css first: the tokens used below are defined there, and the
+ * Read src/styles.css first: the tokens used below (src/tokens.css) and the
  * rules about them apply here too. No literal colours, no literal radii.
  */
 
@@ -77,8 +77,7 @@
   --dv-active-sash-transition-delay: 0s;
 
   /* A drop target is "not yet": an ink wash plus a dashed edge — the same
-     vocabulary the viewport uses for a pick rectangle. The accent is never an
-     outline, so it has no part in this. */
+     vocabulary the viewport uses for a pick rectangle. */
   --dv-drag-over-background-color: rgba(var(--ink-rgb), var(--alpha-wash));
   --dv-drag-over-border-color: var(--ink);
   --dv-drag-over-border: var(--line-pending);
@@ -213,11 +212,8 @@
 }
 
 /* `height` is set explicitly because the shell gives every bare `button` the
-   `--control-md` box. That is right for a control on a panel and wrong
-   for one in the tab bar: the button overflowed its own strip, which is
-   what put the strip's two halves 2.5px off a shared baseline and pushed the
-   tray's controls past the bottom of the window. Chrome furniture fills the
-   bar it is in and takes its line box from the bar's own type. */
+   `--control-sm` box, which would overflow the tab strip. Chrome furniture
+   fills the bar it is in and takes its line box from the bar's own type. */
 .win-head-button {
   display: grid;
   place-items: center;

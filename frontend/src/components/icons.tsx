@@ -487,3 +487,15 @@ export function WireIcon(props: IconProps) {
     </svg>
   );
 }
+
+/** A point pinned to ground: the Fix (anchor) constraint. */
+export function FixIcon(props: IconProps) {
+  return (
+    <svg {...base(props.size ?? BOX)}>
+      <circle cx="8.5" cy="4.5" r="1.5" />
+      <path d="M8.5 6.625V10.5" />
+      <path d="M3.5 10.5H13.5" />
+      <path d="M4.5 13.5L6.5 11.5M7.5 13.5L9.5 11.5M10.5 13.5L12.5 11.5" />
+    </svg>
+  );
+}

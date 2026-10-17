@@ -43,9 +43,6 @@ import { SDF_CENTRE, SDF_INSIDE, SDF_OUTSIDE } from "../tokens";
 
 export { SDF_CENTRE, SDF_INSIDE, SDF_OUTSIDE };
 
-
-
-
 /**
  * The ramp at a normalized signed value, t ∈ [-1, 1].
  *

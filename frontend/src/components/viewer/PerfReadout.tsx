@@ -1,10 +1,6 @@
 /**
- * The viewport's bottom-right readout: what drawing the picture costs.
- *
- * It replaces the title block (SCENE / STUDY / MESH / SOLVER / REV), whose
- * fields the menu bar, the toolbar and the windows already state. What only
- * the viewport can say is how hard it is working: frames per second, CPU time
- * per frame, the resolution it renders at, and how much there is to draw.
+ * The viewport's bottom-right readout: what drawing the picture costs (FPS,
+ * CPU per frame, resolution, scene size).
  *
  * Sampled twice a second and replaced, never tweened (guide M3). An on-demand
  * renderer that is not drawing says `idle`, not `0`.

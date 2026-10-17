@@ -1,11 +1,9 @@
 /**
  * The selected sketch's constraints and operators, and its solver.
  *
- * The panel *lists*: each constraint is a chip with × to remove it (and a
- * distance's number to edit). It does not add — the Constrain rail group and
- * the Constrain menu do, under the same names — apart from Fix, which acts on
- * the point already selected and so sits beside the list it extends. The
- * source remains authoritative: every button inserts a readable Python
+ * The panel lists constraints (× removes, a distance's number edits); adding
+ * is the Constrain rail and menu's job, except Fix, which acts on the selected
+ * point. The source remains authoritative: every button inserts a readable Python
  * operation, then the normal compile cycle rebuilds this panel from metadata.
  */
 

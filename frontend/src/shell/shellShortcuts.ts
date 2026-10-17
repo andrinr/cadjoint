@@ -1,42 +1,23 @@
 /**
- * The window-level ⌘ keys the shell owns, as opposed to the viewport's.
+ * The window-level ⌘ chords the shell owns; bare keys belong to the viewport
+ * (`components/viewer/keyboard.ts`). Both dispatch from `shortcuts.ts`
+ * through the command registry.
  *
- * Every chord is a row of `shortcuts.ts` and runs its command through the
- * registry (`commands.ts`), so ⌘S here and File › Save are the same call.
- * Every matched chord is `preventDefault`ed — whether or not the command can
- * run right now — so ⌘S never falls through to the browser's Save Page and
- * ⌘O never to its file picker.
- *
- * Two keys stay out of the way of the code editor: ⌘Z / ⇧⌘Z are CodeMirror's
- * own history inside any text field, and ⌘↵ inside the editor is the
- * editor's own Run binding (so one press is one run). Escape closes the WGSL
- * dialog in the capture phase, so the viewer's global Escape — which cancels
- * one thing per press, down the ladder in `components/viewer/escape.ts` —
- * does not also fire underneath it.
- *
- * Bare-key tool and mode shortcuts belong to the viewport and are dispatched
- * from `components/viewer/keyboard.ts`, from the same table.
+ * Every matched chord is `preventDefault`ed, runnable or not, so ⌘S never
+ * falls through to the browser's Save Page. Inside a text field ⌘Z / ⇧⌘Z are
+ * CodeMirror's history, and ⌘↵ in the editor is its own Run binding. Escape
+ * closes the WGSL dialog in the capture phase so the viewer's Escape ladder
+ * does not also fire.
  */
 
 import { onCleanup, onMount, type Accessor } from "solid-js";
-import { matchShortcut } from "../shortcuts";
+import { matchShortcut, typingTarget } from "../shortcuts";
 import { runCommand } from "./commands";
 
 export interface ShellShortcutOptions {
   /** Whether the generated-WGSL dialog is open. */
   wgslOpen: Accessor<boolean>;
   closeWgsl: () => void;
-}
-
-/** Focus is in a text field or the code editor. */
-function typingTarget(): Element | null {
-  const target = document.activeElement;
-  if (!target) return null;
-  return target.tagName === "TEXTAREA" ||
-    target.tagName === "INPUT" ||
-    target.closest(".cm-editor")
-    ? target
-    : null;
 }
 
 /** Commands whose chord a text surface keeps for itself. */

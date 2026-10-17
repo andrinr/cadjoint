@@ -1,21 +1,14 @@
 /**
- * A select that obeys the design language all the way down.
+ * A select whose open list is drawn like the app's menus (K5); a native
+ * `<select>` opens the OS menu, which no token reaches.
  *
- * A native `<select>` can be styled closed but not open: its list is the
- * operating system's menu, in the system font with the system highlight, and
- * no token reaches it. This one is a field (the sheet, a rule-strong edge, the
- * value in mono as the program writes it, an ink chevron) that opens a list
- * drawn like every other menu here (K5): 24px options in one column, the
- * current one checked in the leading column, hover a step down to
- * surface-bar-alt.
- *
- * Keyboard: Enter, Space or ArrowDown opens; ArrowUp/ArrowDown move; Enter
- * picks; Escape closes without changing anything (and stops there, so the
- * viewer's Escape ladder does not also fire); typing a letter jumps to the
- * next option starting with it.
+ * Keyboard: Enter, Space or ArrowDown opens; arrows move; Enter picks; Escape
+ * closes and stops propagation (so the viewer's Escape ladder does not fire);
+ * a letter jumps to the next option starting with it.
  */
 
-import { For, Show, createMemo, createSignal, onCleanup, type JSX } from "solid-js";
+import { For, Show, createMemo, createSignal, type JSX } from "solid-js";
+import { createDismiss } from "./dismiss";
 
 export interface SelectOption {
   value: string;
@@ -49,10 +42,7 @@ export function Select(props: SelectProps) {
 
   const current = createMemo(() => props.options.find((option) => option.value === props.value));
   const indexOfValue = () =>
-    Math.max(
-      0,
-      props.options.findIndex((option) => option.value === props.value),
-    );
+    Math.max(0, props.options.findIndex((option) => option.value === props.value));
 
   const close = (refocus = true) => {
     setOpen(false);
@@ -79,11 +69,7 @@ export function Select(props: SelectProps) {
     setCursor(next);
   };
 
-  const onPointerDown = (event: PointerEvent) => {
-    if (open() && root && !root.contains(event.target as Node)) close(false);
-  };
-  window.addEventListener("pointerdown", onPointerDown, true);
-  onCleanup(() => window.removeEventListener("pointerdown", onPointerDown, true));
+  createDismiss({ open, close: () => close(false), within: () => root });
 
   const onKeyDown = (event: KeyboardEvent) => {
     if (!open()) {
@@ -139,7 +125,7 @@ export function Select(props: SelectProps) {
         onClick={() => (open() ? close() : show())}
         onKeyDown={onKeyDown}
       >
-        <span>{current() ? (current()!.label ?? current()!.value) : (props.placeholder ?? "—")}</span>
+        <span>{current()?.label ?? current()?.value ?? props.placeholder ?? "—"}</span>
       </button>
       <Show when={open()}>
         <ul class="ui-select-list" role="listbox" onKeyDown={onKeyDown}>

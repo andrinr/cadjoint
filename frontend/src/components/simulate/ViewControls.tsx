@@ -11,8 +11,9 @@
  * inside the opaque raymarched solid, so a composite would only hide it.)
  */
 
-import { For } from "solid-js";
-import { AXIS_LABELS, Segmented, ToggleSwitch } from "../ui";
+import { Segmented, ToggleSwitch, axisOptions } from "../ui";
+
+const SLICE_AXES = axisOptions("simulate-slice", (axis) => `Slice along ${axis}`);
 import type { SimulateController, ViewportMode } from "./controller";
 
 const VIEWPORTS = [
@@ -63,30 +64,19 @@ export function ViewControls(props: ViewControlsProps) {
         </ToggleSwitch>
       </div>
       <div class="sim-row sim-slice">
-        <label class="sim-slice-toggle">
-          <input
-            type="checkbox"
-            checked={sim().slice().enabled}
-            onChange={(event) =>
-              sim().applySlice({ enabled: event.currentTarget.checked })
-            }
-            data-testid="simulate-slice-enabled"
-          />
-          <span>Slice</span>
-        </label>
-        <For each={[0, 1, 2] as const}>
-          {(axis) => (
-            <button
-              type="button"
-              class={sim().slice().axis === axis ? "active" : ""}
-              onClick={() => sim().applySlice({ axis })}
-              title={`Slice along ${AXIS_LABELS[axis]}`}
-              data-testid={`simulate-slice-${AXIS_LABELS[axis].toLowerCase()}`}
-            >
-              {AXIS_LABELS[axis]}
-            </button>
-          )}
-        </For>
+        <ToggleSwitch
+          compact
+          checked={sim().slice().enabled}
+          onChange={(enabled) => sim().applySlice({ enabled })}
+          testId="simulate-slice-enabled"
+        >
+          Slice
+        </ToggleSwitch>
+        <Segmented
+          options={SLICE_AXES}
+          value={sim().slice().axis}
+          onSelect={(axis) => sim().applySlice({ axis })}
+        />
         <input
           type="range"
           min="0"

@@ -22,7 +22,7 @@ import {
   type ViewUpdate,
 } from "@codemirror/view";
 import { createEffect, onCleanup, onMount } from "solid-js";
-import { intelligenceExtensions } from "../editor/extensions";
+import { intelligenceExtensions, textRole } from "../editor/extensions";
 import { minimalChange } from "../editor/minimalChange";
 import type { FocusSpan } from "../editorFocus";
 import { consoleText, sceneName, setDirty, setSource, source } from "../state";
@@ -59,14 +59,10 @@ const highlightField = StateField.define<DecorationSet>({
  * the source pane and the panels around it are painted from one system, and
  * every one of them clears WCAG AA on --surface-panel.
  *
- * The mapping is achromatic, because hue is meaning and syntax has none to
- * carry: a class name is not an error, a string is not a success and a number
- * is not a warning. What the reader needs while editing a scene is the shape
- * of the program, and ink level alone gives it — the code role is one
- * weight. Values at full ink; declarations, keywords and strings one step
- * down; argument names, punctuation and comments two steps down (comments
- * and `self` italic). The accent stays out entirely except as the veil
- * behind the span a viewport edit is rewriting.
+ * The mapping is achromatic — hue is meaning, and syntax has none to carry —
+ * so ink level alone gives the program's shape: values at full ink;
+ * declarations, keywords and strings one step down; argument names,
+ * punctuation and comments two steps down.
  */
 const highlightStyle = HighlightStyle.define([
   // The values are the subject (A1): numbers and booleans are the literals a
@@ -88,61 +84,41 @@ const highlightStyle = HighlightStyle.define([
   { tag: tags.comment, color: "var(--ink-3)", fontStyle: "italic" },
 ]);
 
-/**
- * The editor's one hue besides diagnostics: `free=True` in the free-parameter
- * blue (role: free, token `param`). It marks the literal a drag or the
- * optimiser may rewrite, which is the one thing worth seeing in colour while
- * reading a scene. `free=False` is a held value and stays ink.
- */
-const freeMatcher = new MatchDecorator({
-  regexp: /\bfree\s*=\s*True\b/g,
-  decoration: Decoration.mark({ class: "cm-free-param" }),
-});
-const freeParameters = ViewPlugin.fromClass(
-  class {
-    decorations: DecorationSet;
-    constructor(view: EditorView) {
-      this.decorations = freeMatcher.createDeco(view);
-    }
-    update(update: ViewUpdate) {
-      this.decorations = freeMatcher.updateDeco(update, this.decorations);
-    }
-  },
-  { decorations: (plugin) => plugin.decorations },
-);
+/** A view plugin that marks every match of `regexp` with `className`. */
+function markMatches(regexp: RegExp, className: string) {
+  const matcher = new MatchDecorator({ regexp, decoration: Decoration.mark({ class: className }) });
+  return ViewPlugin.fromClass(
+    class {
+      decorations: DecorationSet;
+      constructor(view: EditorView) {
+        this.decorations = matcher.createDeco(view);
+      }
+      update(update: ViewUpdate) {
+        this.decorations = matcher.updateDeco(update, this.decorations);
+      }
+    },
+    { decorations: (plugin) => plugin.decorations },
+  );
+}
 
 /**
- * Keyword-argument names (`density=` in `Material(density=8940.0)`) recede to
- * ink-3 so the value after them carries the line. The Python grammar tags
- * them as plain variables, so they are found by shape instead: a name glued
- * to a single `=`, after `(`, `,` or indentation. An assignment (`x = 1`)
- * has spaces around its `=` and is not matched.
+ * The editor's one hue besides diagnostics: `free=True` in the free-parameter
+ * blue (token `param`), the literal a drag or the optimiser may rewrite.
  */
-const kwargMatcher = new MatchDecorator({
-  regexp: /(?<=[(,]\s*|^\s+)([A-Za-z_]\w*)(?==(?!=))/gm,
-  decoration: Decoration.mark({ class: "cm-kwarg" }),
-});
-const keywordArguments = ViewPlugin.fromClass(
-  class {
-    decorations: DecorationSet;
-    constructor(view: EditorView) {
-      this.decorations = kwargMatcher.createDeco(view);
-    }
-    update(update: ViewUpdate) {
-      this.decorations = kwargMatcher.updateDeco(update, this.decorations);
-    }
-  },
-  { decorations: (plugin) => plugin.decorations },
-);
+const freeParameters = markMatches(/\bfree\s*=\s*True\b/g, "cm-free-param");
+
+/**
+ * Keyword-argument names (`density=`) recede to ink-3. The Python grammar
+ * tags them as plain variables, so they are found by shape: a name glued to a
+ * single `=` after `(`, `,` or indentation (an assignment has spaces).
+ */
+const keywordArguments = markMatches(/(?<=[(,]\s*|^\s+)([A-Za-z_]\w*)(?==(?!=))/gm, "cm-kwarg");
 
 const theme = EditorView.theme(
   {
     "&": {
       height: "100%",
-      font: "var(--text-body)",
-      letterSpacing: "var(--track-body)",
-      textTransform: "var(--case-body)",
-      fontVariantNumeric: "var(--numeric-body)",
+      ...textRole("body"),
       backgroundColor: "var(--surface-panel)",
     },
     ".cm-scroller": { font: "inherit" },

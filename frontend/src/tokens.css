@@ -113,11 +113,9 @@
   --case-prose: none;
   --numeric-prose: normal;
   --surface-viewport-94: rgba(230, 230, 233, 0.94);
-  --surface-viewport-70: rgba(230, 230, 233, 0.7);
   --surface-float-00: rgba(248, 247, 248, 0);
   --shade-none: rgba(28, 24, 20, 0);
   --shade-soft: rgba(28, 24, 20, 0.1);
-  --shade-strong: rgba(28, 24, 20, 0.16);
   --shade-scroll: rgba(28, 24, 20, 0.22);
   --scrim: rgba(28, 24, 20, 0.42);
   --divider: rgba(28, 24, 20, 0.09);
@@ -128,10 +126,6 @@
   --ok-rgb: 0, 115, 76;
   --viewport-mark-rgb: 72, 70, 77;
   --viewport-mode-rgb: 96, 94, 101;
-  --type-kicker: var(--weight-semibold) var(--text-3xs) / var(--leading-flat) var(--font-mono);
-  --type-mono: var(--weight-medium) var(--text-2xs) / var(--leading-tight) var(--font-mono);
-  --type-mono-strong: var(--weight-semibold) var(--text-2xs) / var(--leading-tight) var(--font-mono);
-  --type-body-small: var(--weight-regular) var(--text-xs) / var(--leading-snug) var(--font-sans);
   color-scheme: light;
 }
 

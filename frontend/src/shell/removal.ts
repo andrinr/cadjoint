@@ -1,10 +1,6 @@
 /**
- * What the last removal took out, for the status line's "removed … · Undo".
- *
- * The guide's F7: a deletion that undo can reach is not confirmed, so undo
- * has to be in front of you right after one. Every removal goes through the
- * patch queue as a `delete_*` op; this names what it removed, in the
- * program's words, from the state as it was before the patch landed.
+ * What the last removal took out, for the status line's "removed … · Undo"
+ * (guide F7). Named in the program's words from the state before the patch.
  */
 
 export interface Named {

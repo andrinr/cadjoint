@@ -8,7 +8,7 @@
  *                             the app itself prepends wgslTokens() at runtime
  *
  * Run with `npm run tokens` (Node strips the types). test/tokens.test.ts
- * fails when either file is out of date.
+ * fails when any of them is out of date.
  */
 import { writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";

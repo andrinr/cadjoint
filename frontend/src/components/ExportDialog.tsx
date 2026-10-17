@@ -29,7 +29,7 @@ import {
 import { formatBytes } from "../jobs";
 import { sceneName, setStatus, source, studies } from "../state";
 import type { ExportFormat } from "../types";
-import { Select, ToggleSwitch } from "./ui";
+import { DialogHeader, Select, ToggleSwitch } from "./ui";
 import "./export.css";
 
 export interface ExportDialogProps {
@@ -121,12 +121,7 @@ export function ExportDialog(props: ExportDialogProps) {
         onClick={(event) => event.stopPropagation()}
         data-testid="export-dialog"
       >
-        <header>
-          <span>Export</span>
-          <button type="button" onClick={props.onClose} disabled={busy()}>
-            Close
-          </button>
-        </header>
+        <DialogHeader title="Export" onClose={props.onClose} closeDisabled={busy()} />
         <form
           class="dialog-body export-form"
           onSubmit={(event) => {

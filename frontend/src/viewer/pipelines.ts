@@ -28,13 +28,10 @@ import SIMULATION_WGSL from "./simulation.wgsl?raw";
 import { wgslTokens } from "../tokens";
 
 /**
- * A WGSL module's source with the design tokens prepended.
- *
- * The .wgsl files name colours by role (`INK`, `SHEET`, `VIRIDIS_C3`) and
- * declare none of them: `wgslTokens()` emits the `const` block from
- * `tokens.ts`, so a shader colour cannot drift from the one source.
+ * A WGSL module's source with the design tokens prepended: the .wgsl files
+ * name colours by role (`INK`, `VIRIDIS_C3`) and declare none of them.
  */
-export function withTokens(code: string): string {
+function withTokens(code: string): string {
   return `${wgslTokens()}\n${code}`;
 }
 

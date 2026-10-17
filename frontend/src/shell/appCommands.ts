@@ -1,15 +1,8 @@
 /**
- * The shell's commands: everything the menu bar and the keys can do that acts
- * on the program, the camera, the tools or the dock.
- *
- * Registered once by `App` into the registry (`commands.ts`). The file
- * commands that open the menu bar's own dialogs (Save As…, Export…,
- * Keyboard shortcuts) are registered by `MenuBar`, which owns them.
- *
- * Every implementation here is the same call another home already made —
- * the rail's Extrude, the cube's views, the swatch drop, the card's Solve —
- * so a command reached from the menu cannot behave differently from the
- * button it stands for.
+ * The shell's commands: what the menu bar and the keys can do to the program,
+ * camera, tools and dock. Registered once by `App`; the menu bar registers
+ * its own dialogs' commands. Each implementation is the same call the
+ * matching button makes, so the two cannot diverge.
  */
 
 import { createSignal, onCleanup, type Accessor } from "solid-js";
@@ -34,7 +27,7 @@ import {
   tool,
 } from "../state";
 import { CHIP_KINDS } from "../components/jobChip";
-import { setRenderPopoverOpen } from "../components/Toolbar";
+import { setRenderPopoverOpen } from "../components/viewer/RenderSettingsButton";
 import { detentZoomCamera } from "../components/viewer/camera";
 import { EDITING_MODES } from "../editingMode";
 import { windowManager } from "../windows/manager";
@@ -77,12 +70,8 @@ export interface AppCommandDeps {
 }
 
 /**
- * The window the user last clicked or focused into, for Window › Float.
- *
- * The dock does not publish a focused window, so this watches for it: the
- * nearest window body under a pointer press or a focus change. A press in the
- * menu bar is not a window choice, or opening the menu would always answer
- * "the menu".
+ * The window the user last clicked or focused into, for Window › Float. The
+ * dock does not publish one; presses in the menu bar are ignored.
  */
 function trackFocusedWindow(): Accessor<WindowId | null> {
   const [focused, setFocused] = createSignal<WindowId | null>(null);
@@ -105,7 +94,7 @@ function trackFocusedWindow(): Accessor<WindowId | null> {
 }
 
 /** Stop the work a person is waiting on: the compile first, then a solve. */
-export function stopTarget(sim: SimulateController): string | null {
+function stopTarget(sim: SimulateController): string | null {
   const running = runningJobs();
   if (busy()) {
     const compile = running.find((job) => job.kind === "compile");
@@ -136,8 +125,7 @@ export function createAppCommands(deps: AppCommandDeps): void {
   /** One detent of the grid: the Alt-wheel step, from a key or the menu. */
   const stepGrid = (direction: 1 | -1) => {
     renderer.camera = detentZoomCamera(renderer.camera, direction);
-    // A fresh object, so everything that reprojects on a camera move — the
-    // graticule readout, the DOM annotations — redraws for this one too.
+    // A fresh object, so everything that reprojects on a camera move redraws.
     setCameraAngles({ ...cameraAngles() });
     renderer.invalidate();
   };
@@ -164,8 +152,7 @@ export function createAppCommands(deps: AppCommandDeps): void {
   });
   const gizmo = (mode: GizmoMode): CommandImpl => ({
     run: () => setGizmoMode(mode),
-    // With nothing selected the key only sets which gizmo the next selection
-    // gets, as G and R always have; a selection that cannot take it refuses.
+    // With nothing selected the key only sets which gizmo the next selection gets.
     blocked: () => (selection() === null ? null : gizmoBlocked(mode)),
   });
   const view = (key: string): CommandImpl => ({ run: () => render.applyPreset(key) });
