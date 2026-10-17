@@ -26,41 +26,6 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
-/* CSS for syntax highlighting */
-html { -webkit-text-size-adjust: 100%; }
-pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
-pre > code.sourceCode > span:empty { height: 1.2em; }
-.sourceCode { overflow: visible; }
-code.sourceCode > span { color: inherit; text-decoration: inherit; }
-div.sourceCode { margin: 1em 0; }
-pre.sourceCode { margin: 0; }
-@media screen {
-div.sourceCode { overflow: auto; }
-}
-@media print {
-pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
-}
-pre.numberSource code
-  { counter-reset: source-line 0; }
-pre.numberSource code > span
-  { position: relative; left: -4em; counter-increment: source-line; }
-pre.numberSource code > span > a:first-child::before
-  { content: counter(source-line);
-    position: relative; left: -1em; text-align: right; vertical-align: baseline;
-    border: none; display: inline-block;
-    -webkit-touch-callout: none; -webkit-user-select: none;
-    -khtml-user-select: none; -moz-user-select: none;
-    -ms-user-select: none; user-select: none;
-    padding: 0 4px; width: 4em;
-  }
-pre.numberSource { margin-left: 3em;  padding-left: 4px; }
-div.sourceCode
-  {   }
-@media screen {
-pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
-}
 </style>
 
 
@@ -77,10 +42,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-bf27225e3a48a9273f3daa8f8e829971.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-e5d05eddbe2c608fb9c90784db6be0b0.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-f6e81f4864cb6d8b696b855696ff1c11.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-92bccf0354c8ed56982edb6814cc42fe.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -332,62 +297,62 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h2 class="anchored" data-anchor-id="forward-rendering">Forward rendering</h2>
 <p>A scene groups geometry, camera, lights, and environment. Quality lives in a separate <code>RenderSettings</code>, so the same scene can be drawn at any fidelity.</p>
 <div id="718e20bf" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:35:59.295956Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:35:59.295901Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:35:59.699172Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:35:59.698753Z&quot;}}" data-execution_count="1">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> time <span class="im">import</span> perf_counter</span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> jax.numpy <span class="im">as</span> jnp</span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.render <span class="im">import</span> Camera, Material, RenderSettings, Scene, make_gradient_sky, render_scene</span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf.boolean <span class="im">import</span> Union</span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf.primitives <span class="im">import</span> Plane, Sphere, Torus</span>
-<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf.transforms <span class="im">import</span> Rotate, Translate</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python cell-code"><code>from time import perf_counter
+
+import jax.numpy as jnp
+import matplotlib.pyplot as plt
+import numpy as np
+
+from cadjoint.render import Camera, Material, RenderSettings, Scene, make_gradient_sky, render_scene
+from cadjoint.sdf.boolean import Union
+from cadjoint.sdf.primitives import Plane, Sphere, Torus
+from cadjoint.sdf.transforms import Rotate, Translate</code></pre>
 </div>
 <div id="c27529d8" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:35:59.700871Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:35:59.700742Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:35:59.859379Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:35:59.859061Z&quot;}}" data-execution_count="2">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>ground_height <span class="op">=</span> <span class="op">-</span><span class="fl">0.92</span></span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>geometry <span class="op">=</span> Union(</span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>    Translate(</span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>        Sphere(<span class="fl">0.82</span>, material<span class="op">=</span>Material(color<span class="op">=</span>[<span class="fl">0.78</span>, <span class="fl">0.06</span>, <span class="fl">0.025</span>], roughness<span class="op">=</span><span class="fl">0.42</span>)),</span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>        [<span class="op">-</span><span class="fl">1.45</span>, <span class="op">-</span><span class="fl">0.098</span>, <span class="fl">0.0</span>],</span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>    ),</span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>    Translate(</span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>        Rotate(</span>
-<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>            Torus(</span>
-<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>                <span class="fl">0.62</span>,</span>
-<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>                <span class="fl">0.23</span>,</span>
-<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>                material<span class="op">=</span>Material(</span>
-<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>                    color<span class="op">=</span>[<span class="fl">1.0</span>, <span class="fl">0.58</span>, <span class="fl">0.08</span>], roughness<span class="op">=</span><span class="fl">0.28</span>, metallic<span class="op">=</span><span class="fl">0.8</span>, reflectivity<span class="op">=</span><span class="fl">0.35</span></span>
-<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>                ),</span>
-<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>            ),</span>
-<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>            axis<span class="op">=</span><span class="st">"y"</span>,</span>
-<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>            angle<span class="op">=</span><span class="fl">0.45</span>,</span>
-<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>        ),</span>
-<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a>        [<span class="fl">0.0</span>, <span class="op">-</span><span class="fl">0.068</span>, <span class="fl">0.0</span>],</span>
-<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a>    ),</span>
-<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a>    Translate(</span>
-<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a>        Sphere(<span class="fl">0.78</span>, material<span class="op">=</span>Material(color<span class="op">=</span>[<span class="fl">0.035</span>, <span class="fl">0.18</span>, <span class="fl">0.72</span>], roughness<span class="op">=</span><span class="fl">0.28</span>)),</span>
-<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a>        [<span class="fl">1.4</span>, <span class="op">-</span><span class="fl">0.138</span>, <span class="fl">0.0</span>],</span>
-<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a>    ),</span>
-<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a>    Plane(ground_height, material<span class="op">=</span>Material(color<span class="op">=</span>[<span class="fl">0.1</span>, <span class="fl">0.12</span>, <span class="fl">0.16</span>], roughness<span class="op">=</span><span class="fl">0.72</span>)),</span>
-<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a>    smoothness<span class="op">=</span><span class="fl">0.0</span>,</span>
-<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a>scene <span class="op">=</span> Scene(</span>
-<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a>    geometry,</span>
-<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a>    camera<span class="op">=</span>Camera(position<span class="op">=</span>(<span class="fl">4.4</span>, <span class="fl">3.5</span>, <span class="fl">7.5</span>), target<span class="op">=</span>(<span class="fl">0.0</span>, <span class="op">-</span><span class="fl">0.35</span>, <span class="fl">0.0</span>), fov<span class="op">=</span><span class="fl">0.38</span>),</span>
-<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a>    light_directions<span class="op">=</span>((<span class="fl">0.35</span>, <span class="fl">1.0</span>, <span class="fl">0.55</span>), (<span class="op">-</span><span class="fl">0.65</span>, <span class="fl">0.45</span>, <span class="op">-</span><span class="fl">0.2</span>), (<span class="fl">0.15</span>, <span class="fl">0.2</span>, <span class="fl">1.0</span>)),</span>
-<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a>    light_colors<span class="op">=</span>((<span class="fl">1.5</span>, <span class="fl">1.35</span>, <span class="fl">1.15</span>), (<span class="fl">0.22</span>, <span class="fl">0.3</span>, <span class="fl">0.5</span>), (<span class="fl">0.2</span>, <span class="fl">0.23</span>, <span class="fl">0.3</span>)),</span>
-<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a>    environment_map<span class="op">=</span>make_gradient_sky(</span>
-<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a>        sky_color<span class="op">=</span>(<span class="fl">0.7</span>, <span class="fl">0.76</span>, <span class="fl">0.88</span>),</span>
-<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a>        horizon_color<span class="op">=</span>(<span class="fl">0.18</span>, <span class="fl">0.27</span>, <span class="fl">0.44</span>),</span>
-<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a>        ground_color<span class="op">=</span>(<span class="fl">0.16</span>, <span class="fl">0.18</span>, <span class="fl">0.24</span>),</span>
-<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a>    ),</span>
-<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python cell-code"><code>ground_height = -0.92
+geometry = Union(
+    Translate(
+        Sphere(0.82, material=Material(color=[0.78, 0.06, 0.025], roughness=0.42)),
+        [-1.45, -0.098, 0.0],
+    ),
+    Translate(
+        Rotate(
+            Torus(
+                0.62,
+                0.23,
+                material=Material(
+                    color=[1.0, 0.58, 0.08], roughness=0.28, metallic=0.8, reflectivity=0.35
+                ),
+            ),
+            axis="y",
+            angle=0.45,
+        ),
+        [0.0, -0.068, 0.0],
+    ),
+    Translate(
+        Sphere(0.78, material=Material(color=[0.035, 0.18, 0.72], roughness=0.28)),
+        [1.4, -0.138, 0.0],
+    ),
+    Plane(ground_height, material=Material(color=[0.1, 0.12, 0.16], roughness=0.72)),
+    smoothness=0.0,
+)
+scene = Scene(
+    geometry,
+    camera=Camera(position=(4.4, 3.5, 7.5), target=(0.0, -0.35, 0.0), fov=0.38),
+    light_directions=((0.35, 1.0, 0.55), (-0.65, 0.45, -0.2), (0.15, 0.2, 1.0)),
+    light_colors=((1.5, 1.35, 1.15), (0.22, 0.3, 0.5), (0.2, 0.23, 0.3)),
+    environment_map=make_gradient_sky(
+        sky_color=(0.7, 0.76, 0.88),
+        horizon_color=(0.18, 0.27, 0.44),
+        ground_color=(0.16, 0.18, 0.24),
+    ),
+)</code></pre>
 </div>
 <div id="f76a95b0" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:35:59.860497Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:35:59.860443Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:36:00.683584Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:36:00.683165Z&quot;}}" data-execution_count="3">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>image <span class="op">=</span> render_scene(scene, RenderSettings.balanced((<span class="dv">240</span>, <span class="dv">320</span>)))</span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">8</span>, <span class="dv">6</span>))</span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>plt.imshow(image)</span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>plt.axis(<span class="st">"off"</span>)<span class="op">;</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python cell-code"><code>image = render_scene(scene, RenderSettings.balanced((240, 320)))
+plt.figure(figsize=(8, 6))
+plt.imshow(image)
+plt.axis("off");</code></pre>
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
@@ -401,27 +366,27 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h2 class="anchored" data-anchor-id="quality-presets">Quality presets</h2>
 <p>The named presets make the performance/fidelity trade-off explicit. <code>draft</code> uses direct lighting with a shorter trace budget, <code>balanced</code> enables soft shadows and 2×2 supersampling, and <code>high_quality</code> adds tighter precision and 3×3 supersampling. They are immutable dataclasses, so use <code>dataclasses.replace</code> for scene-specific changes. Each distinct static preset compiles once; the timings below are steady-state medians after that compile.</p>
 <div id="8164ea86" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:36:00.684871Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:36:00.684797Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:36:05.199821Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:36:05.199374Z&quot;}}" data-execution_count="4">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>presets <span class="op">=</span> {</span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>    <span class="st">"Draft"</span>: RenderSettings.draft((<span class="dv">180</span>, <span class="dv">240</span>)),</span>
-<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>    <span class="st">"Balanced"</span>: RenderSettings.balanced((<span class="dv">180</span>, <span class="dv">240</span>)),</span>
-<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>    <span class="st">"High quality"</span>: RenderSettings.high_quality((<span class="dv">180</span>, <span class="dv">240</span>)),</span>
-<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>}</span>
-<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>images, steady_ms <span class="op">=</span> {}, {}</span>
-<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> name, preset <span class="kw">in</span> presets.items():</span>
-<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>    images[name] <span class="op">=</span> render_scene(scene, preset)  <span class="co"># compile / warm up</span></span>
-<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>    timings <span class="op">=</span> []</span>
-<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> _ <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">5</span>):</span>
-<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>        start <span class="op">=</span> perf_counter()</span>
-<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>        images[name] <span class="op">=</span> render_scene(scene, preset)</span>
-<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>        timings.append((perf_counter() <span class="op">-</span> start) <span class="op">*</span> <span class="fl">1e3</span>)</span>
-<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>    steady_ms[name] <span class="op">=</span> np.median(timings)</span>
-<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a>fig, axes <span class="op">=</span> plt.subplots(<span class="dv">1</span>, <span class="dv">3</span>, figsize<span class="op">=</span>(<span class="dv">12</span>, <span class="dv">4</span>))</span>
-<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> axis, (name, rendered) <span class="kw">in</span> <span class="bu">zip</span>(axes, images.items()):</span>
-<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a>    axis.imshow(rendered)</span>
-<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a>    axis.set_title(<span class="ss">f"</span><span class="sc">{</span>name<span class="sc">}</span><span class="ch">\n</span><span class="sc">{</span>steady_ms[name]<span class="sc">:.1f}</span><span class="ss"> ms cached"</span>)</span>
-<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a>    axis.axis(<span class="st">"off"</span>)</span>
-<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python cell-code"><code>presets = {
+    "Draft": RenderSettings.draft((180, 240)),
+    "Balanced": RenderSettings.balanced((180, 240)),
+    "High quality": RenderSettings.high_quality((180, 240)),
+}
+images, steady_ms = {}, {}
+for name, preset in presets.items():
+    images[name] = render_scene(scene, preset)  # compile / warm up
+    timings = []
+    for _ in range(5):
+        start = perf_counter()
+        images[name] = render_scene(scene, preset)
+        timings.append((perf_counter() - start) * 1e3)
+    steady_ms[name] = np.median(timings)
+
+fig, axes = plt.subplots(1, 3, figsize=(12, 4))
+for axis, (name, rendered) in zip(axes, images.items()):
+    axis.imshow(rendered)
+    axis.set_title(f"{name}\n{steady_ms[name]:.1f} ms cached")
+    axis.axis("off")
+plt.tight_layout()</code></pre>
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
@@ -435,19 +400,19 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h2 class="anchored" data-anchor-id="compile-once-render-repeatedly">Compile once, render repeatedly</h2>
 <p>The first call includes JAX compilation. Later calls with the same scene, image shape, and static feature set reuse the module-level compiled renderer.</p>
 <div id="c3f02828" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:36:05.200979Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:36:05.200928Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:36:06.292101Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:36:06.291657Z&quot;}}" data-execution_count="5">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>settings <span class="op">=</span> RenderSettings.balanced((<span class="dv">128</span>, <span class="dv">160</span>))</span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>start <span class="op">=</span> perf_counter()</span>
-<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>render_scene(scene, settings)</span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>compile_and_render_ms <span class="op">=</span> (perf_counter() <span class="op">-</span> start) <span class="op">*</span> <span class="fl">1e3</span></span>
-<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>samples <span class="op">=</span> []</span>
-<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> _ <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">10</span>):</span>
-<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>    start <span class="op">=</span> perf_counter()</span>
-<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>    render_scene(scene, settings)</span>
-<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>    samples.append((perf_counter() <span class="op">-</span> start) <span class="op">*</span> <span class="fl">1e3</span>)</span>
-<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"first call: </span><span class="sc">{</span>compile_and_render_ms<span class="sc">:.1f}</span><span class="ss"> ms"</span>)</span>
-<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"cached median: </span><span class="sc">{</span>np<span class="sc">.</span>median(samples)<span class="sc">:.2f}</span><span class="ss"> ms"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python cell-code"><code>settings = RenderSettings.balanced((128, 160))
+start = perf_counter()
+render_scene(scene, settings)
+compile_and_render_ms = (perf_counter() - start) * 1e3
+
+samples = []
+for _ in range(10):
+    start = perf_counter()
+    render_scene(scene, settings)
+    samples.append((perf_counter() - start) * 1e3)
+
+print(f"first call: {compile_and_render_ms:.1f} ms")
+print(f"cached median: {np.median(samples):.2f} ms")</code></pre>
 <div class="cell-output cell-output-stdout">
 <pre><code>first call: 559.5 ms
 cached median: 52.77 ms</code></pre>
@@ -458,21 +423,21 @@ cached median: 52.77 ms</code></pre>
 <h2 class="anchored" data-anchor-id="early-termination">Early termination</h2>
 <p>A direct sphere hit should consume only a small fraction of the available step budget. Misses also stop at <code>max_distance</code> rather than evaluating the SDF for every configured step.</p>
 <div id="24caf669" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:36:06.293169Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:36:06.293111Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:36:06.393169Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:36:06.392800Z&quot;}}" data-execution_count="6">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.render.raymarch <span class="im">import</span> _sphere_trace</span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> sphere_sdf(point):</span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> jnp.linalg.norm(point) <span class="op">-</span> <span class="fl">1.0</span></span>
-<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>hit <span class="op">=</span> _sphere_trace(</span>
-<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>    sphere_sdf, jnp.array([<span class="fl">0.0</span>, <span class="fl">0.0</span>, <span class="fl">5.0</span>]), jnp.array([<span class="fl">0.0</span>, <span class="fl">0.0</span>, <span class="op">-</span><span class="fl">1.0</span>]), max_steps<span class="op">=</span><span class="dv">96</span></span>
-<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>miss <span class="op">=</span> _sphere_trace(</span>
-<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>    sphere_sdf, jnp.array([<span class="fl">0.0</span>, <span class="fl">5.0</span>, <span class="fl">0.0</span>]), jnp.array([<span class="fl">0.0</span>, <span class="fl">0.0</span>, <span class="fl">1.0</span>]), max_steps<span class="op">=</span><span class="dv">96</span></span>
-<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"hit: distance=</span><span class="sc">{</span><span class="bu">float</span>(hit.distance)<span class="sc">:.3f}</span><span class="ss">, steps=</span><span class="sc">{</span><span class="bu">int</span>(hit.steps)<span class="sc">}</span><span class="ss">, hit=</span><span class="sc">{</span><span class="bu">bool</span>(hit.hit)<span class="sc">}</span><span class="ss">"</span>)</span>
-<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"miss: distance=</span><span class="sc">{</span><span class="bu">float</span>(miss.distance)<span class="sc">:.3f}</span><span class="ss">, steps=</span><span class="sc">{</span><span class="bu">int</span>(miss.steps)<span class="sc">}</span><span class="ss">, hit=</span><span class="sc">{</span><span class="bu">bool</span>(miss.hit)<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python cell-code"><code>from cadjoint.render.raymarch import _sphere_trace
+
+
+def sphere_sdf(point):
+    return jnp.linalg.norm(point) - 1.0
+
+
+hit = _sphere_trace(
+    sphere_sdf, jnp.array([0.0, 0.0, 5.0]), jnp.array([0.0, 0.0, -1.0]), max_steps=96
+)
+miss = _sphere_trace(
+    sphere_sdf, jnp.array([0.0, 5.0, 0.0]), jnp.array([0.0, 0.0, 1.0]), max_steps=96
+)
+print(f"hit: distance={float(hit.distance):.3f}, steps={int(hit.steps)}, hit={bool(hit.hit)}")
+print(f"miss: distance={float(miss.distance):.3f}, steps={int(miss.steps)}, hit={bool(miss.hit)}")</code></pre>
 <div class="cell-output cell-output-stdout">
 <pre><code>hit: distance=4.000, steps=4, hit=True
 miss: distance=20.000, steps=4, hit=False</code></pre>
@@ -486,12 +451,12 @@ miss: distance=20.000, steps=4, hit=False</code></pre>
 <p>Needs the viewer extra (<code>uv sync --extra viewer</code>) and a WebGPU-capable browser (Chrome/Edge 113+).</p>
 <p><strong>Controls</strong> — left-drag: orbit · scroll: zoom · right-drag: pan · double-click: reset</p>
 <div id="cc0276ba" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:36:06.394353Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:36:06.394294Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:36:06.448730Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:36:06.448472Z&quot;}}" data-execution_count="7">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.backends.wgsl <span class="im">import</span> compile_sdf_to_wgsl</span>
-<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf.boolean <span class="im">import</span> Difference</span>
-<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf.primitives <span class="im">import</span> Box, Capsule</span>
-<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.viewer <span class="im">import</span> SDFViewer</span>
-<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>SDFViewer(Sphere(<span class="fl">1.0</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python cell-code"><code>from cadjoint.backends.wgsl import compile_sdf_to_wgsl
+from cadjoint.sdf.boolean import Difference
+from cadjoint.sdf.primitives import Box, Capsule
+from cadjoint.viewer import SDFViewer
+
+SDFViewer(Sphere(1.0))</code></pre>
 <div class="cell-output cell-output-display" data-execution_count="7">
 <script type="application/vnd.jupyter.widget-view+json">
 {"model_id":"52a1eb9ea1144cc89dd65790fe9cb4c3","version_major":2,"version_minor":1,"quarto_mimetype":"application/vnd.jupyter.widget-view+json"}
@@ -502,10 +467,10 @@ miss: distance=20.000, steps=4, hit=False</code></pre>
 <h3 class="anchored" data-anchor-id="boolean-operations">Boolean operations</h3>
 <p><code>smoothness</code> blends the operands instead of producing a hard seam.</p>
 <div id="8983e08f" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:36:06.449827Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:36:06.449776Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:36:06.490985Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:36:06.490650Z&quot;}}" data-execution_count="8">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>sphere <span class="op">=</span> Sphere(<span class="fl">1.0</span>)</span>
-<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>box <span class="op">=</span> Translate(Box([<span class="fl">1.3</span>, <span class="fl">1.3</span>, <span class="fl">1.3</span>]), offset<span class="op">=</span>jnp.array([<span class="fl">0.5</span>, <span class="fl">0.3</span>, <span class="fl">0.0</span>]))</span>
-<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>SDFViewer(Union(sphere, box, smoothness<span class="op">=</span><span class="fl">0.2</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python cell-code"><code>sphere = Sphere(1.0)
+box = Translate(Box([1.3, 1.3, 1.3]), offset=jnp.array([0.5, 0.3, 0.0]))
+
+SDFViewer(Union(sphere, box, smoothness=0.2))</code></pre>
 <div class="cell-output cell-output-display" data-execution_count="8">
 <script type="application/vnd.jupyter.widget-view+json">
 {"model_id":"5dff9edab0874bf88eb19ff13aaef6d8","version_major":2,"version_minor":1,"quarto_mimetype":"application/vnd.jupyter.widget-view+json"}
@@ -513,7 +478,7 @@ miss: distance=20.000, steps=4, hit=False</code></pre>
 </div>
 </div>
 <div id="c2217d71" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:36:06.492109Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:36:06.492052Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:36:06.535258Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:36:06.534848Z&quot;}}" data-execution_count="9">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>SDFViewer(Difference(sphere, box, smoothness<span class="op">=</span><span class="fl">0.05</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python cell-code"><code>SDFViewer(Difference(sphere, box, smoothness=0.05))</code></pre>
 <div class="cell-output cell-output-display" data-execution_count="9">
 <script type="application/vnd.jupyter.widget-view+json">
 {"model_id":"4655209dce9343079b57b912f3d47c62","version_major":2,"version_minor":1,"quarto_mimetype":"application/vnd.jupyter.widget-view+json"}
@@ -525,17 +490,17 @@ miss: distance=20.000, steps=4, hit=False</code></pre>
 <h3 class="anchored" data-anchor-id="complex-scene-blob-of-spheres">Complex scene — blob of spheres</h3>
 <p>The entire tree is compiled to a single WGSL function — the GPU evaluates the SDF directly with no intermediate mesh.</p>
 <div id="eef906fc" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:36:06.536343Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:36:06.536294Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:36:06.611379Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:36:06.611063Z&quot;}}" data-execution_count="10">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>blob <span class="op">=</span> Union(</span>
-<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>    Sphere(<span class="fl">0.80</span>),</span>
-<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>    Translate(Sphere(<span class="fl">0.70</span>), offset<span class="op">=</span>jnp.array([<span class="fl">1.2</span>, <span class="fl">0.2</span>, <span class="fl">0.0</span>])),</span>
-<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>    Translate(Sphere(<span class="fl">0.55</span>), offset<span class="op">=</span>jnp.array([<span class="fl">0.5</span>, <span class="fl">0.9</span>, <span class="op">-</span><span class="fl">0.7</span>])),</span>
-<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>    Translate(Sphere(<span class="fl">0.50</span>), offset<span class="op">=</span>jnp.array([<span class="op">-</span><span class="fl">1.0</span>, <span class="fl">0.4</span>, <span class="fl">0.5</span>])),</span>
-<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>    Translate(Sphere(<span class="fl">0.40</span>), offset<span class="op">=</span>jnp.array([<span class="fl">0.1</span>, <span class="fl">1.3</span>, <span class="fl">0.3</span>])),</span>
-<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>    smoothness<span class="op">=</span><span class="fl">0.30</span>,</span>
-<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a>cutter <span class="op">=</span> Translate(Box([<span class="fl">0.9</span>, <span class="fl">0.28</span>, <span class="fl">0.9</span>]), offset<span class="op">=</span>jnp.array([<span class="fl">0.9</span>, <span class="fl">1.0</span>, <span class="fl">0.4</span>]))</span>
-<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a>SDFViewer(Difference(blob, cutter, smoothness<span class="op">=</span><span class="fl">0.05</span>), height<span class="op">=</span><span class="dv">400</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python cell-code"><code>blob = Union(
+    Sphere(0.80),
+    Translate(Sphere(0.70), offset=jnp.array([1.2, 0.2, 0.0])),
+    Translate(Sphere(0.55), offset=jnp.array([0.5, 0.9, -0.7])),
+    Translate(Sphere(0.50), offset=jnp.array([-1.0, 0.4, 0.5])),
+    Translate(Sphere(0.40), offset=jnp.array([0.1, 1.3, 0.3])),
+    smoothness=0.30,
+)
+
+cutter = Translate(Box([0.9, 0.28, 0.9]), offset=jnp.array([0.9, 1.0, 0.4]))
+SDFViewer(Difference(blob, cutter, smoothness=0.05), height=400)</code></pre>
 <div class="cell-output cell-output-display" data-execution_count="10">
 <script type="application/vnd.jupyter.widget-view+json">
 {"model_id":"cfca7e5b10e5463eae7916f6fc266aa2","version_major":2,"version_minor":1,"quarto_mimetype":"application/vnd.jupyter.widget-view+json"}
@@ -547,8 +512,8 @@ miss: distance=20.000, steps=4, hit=False</code></pre>
 <h3 class="anchored" data-anchor-id="hot-reload-edit-the-scene-without-losing-camera-state">Hot-reload — edit the scene without losing camera state</h3>
 <p>Create a viewer once, then call <code>update_scene()</code> to swap in a new SDF. The camera stays where it is; only the shader recompiles.</p>
 <div id="55a7aa6d" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:36:06.612374Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:36:06.612320Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:36:06.635795Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:36:06.635361Z&quot;}}" data-execution_count="11">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>viewer <span class="op">=</span> SDFViewer(Sphere(<span class="fl">1.0</span>))</span>
-<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>viewer</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python cell-code"><code>viewer = SDFViewer(Sphere(1.0))
+viewer</code></pre>
 <div class="cell-output cell-output-display" data-execution_count="11">
 <script type="application/vnd.jupyter.widget-view+json">
 {"model_id":"08db78151776426788cfeccf6ab8e511","version_major":2,"version_minor":1,"quarto_mimetype":"application/vnd.jupyter.widget-view+json"}
@@ -556,14 +521,14 @@ miss: distance=20.000, steps=4, hit=False</code></pre>
 </div>
 </div>
 <div id="6c27edd9" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:36:06.636853Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:36:06.636796Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:36:06.676325Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:36:06.676045Z&quot;}}" data-execution_count="12">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Run this cell to swap the scene — the viewer above updates instantly</span></span>
-<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>viewer.update_scene(</span>
-<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>    Union(</span>
-<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>        Sphere(<span class="fl">0.9</span>),</span>
-<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>        Translate(Capsule(radius<span class="op">=</span><span class="fl">0.3</span>, height<span class="op">=</span><span class="fl">1.4</span>), offset<span class="op">=</span>jnp.array([<span class="fl">1.2</span>, <span class="fl">0.0</span>, <span class="fl">0.0</span>])),</span>
-<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>        smoothness<span class="op">=</span><span class="fl">0.15</span>,</span>
-<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python cell-code"><code># Run this cell to swap the scene — the viewer above updates instantly
+viewer.update_scene(
+    Union(
+        Sphere(0.9),
+        Translate(Capsule(radius=0.3, height=1.4), offset=jnp.array([1.2, 0.0, 0.0])),
+        smoothness=0.15,
+    )
+)</code></pre>
 </div>
 </section>
 </section>
@@ -571,7 +536,7 @@ miss: distance=20.000, steps=4, hit=False</code></pre>
 <h2 class="anchored" data-anchor-id="inspect-the-compiled-wgsl">Inspect the compiled WGSL</h2>
 <p><code>compile_sdf_to_wgsl</code> returns the raw shader source — useful for debugging or for exporting to a standalone WebGPU application.</p>
 <div id="d8d31f42" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:36:06.677506Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:36:06.677455Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:36:06.689941Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:36:06.689557Z&quot;}}" data-execution_count="13">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(compile_sdf_to_wgsl(Union(sphere, box, smoothness<span class="op">=</span><span class="fl">0.1</span>)))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python cell-code"><code>print(compile_sdf_to_wgsl(Union(sphere, box, smoothness=0.1)))</code></pre>
 <div class="cell-output cell-output-stdout">
 <pre><code>fn sdf___where_1(_arg0: bool, _arg1: f32, _arg2: f32) -&gt; f32 {
     let _v0: f32 = select(_arg2, _arg1, _arg0);

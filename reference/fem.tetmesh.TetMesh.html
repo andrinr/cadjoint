@@ -26,41 +26,6 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
-/* CSS for syntax highlighting */
-html { -webkit-text-size-adjust: 100%; }
-pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
-pre > code.sourceCode > span:empty { height: 1.2em; }
-.sourceCode { overflow: visible; }
-code.sourceCode > span { color: inherit; text-decoration: inherit; }
-div.sourceCode { margin: 1em 0; }
-pre.sourceCode { margin: 0; }
-@media screen {
-div.sourceCode { overflow: auto; }
-}
-@media print {
-pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
-}
-pre.numberSource code
-  { counter-reset: source-line 0; }
-pre.numberSource code > span
-  { position: relative; left: -4em; counter-increment: source-line; }
-pre.numberSource code > span > a:first-child::before
-  { content: counter(source-line);
-    position: relative; left: -1em; text-align: right; vertical-align: baseline;
-    border: none; display: inline-block;
-    -webkit-touch-callout: none; -webkit-user-select: none;
-    -khtml-user-select: none; -moz-user-select: none;
-    -ms-user-select: none; user-select: none;
-    padding: 0 4px; width: 4em;
-  }
-pre.numberSource { margin-left: 3em;  padding-left: 4px; }
-div.sourceCode
-  {   }
-@media screen {
-pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
-}
 </style>
 
 
@@ -77,10 +42,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-bf27225e3a48a9273f3daa8f8e829971.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-e5d05eddbe2c608fb9c90784db6be0b0.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-f6e81f4864cb6d8b696b855696ff1c11.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-92bccf0354c8ed56982edb6814cc42fe.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -306,19 +271,19 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 <section id="cadjoint.fem.tetmesh.TetMesh" class="level1">
 <h1>fem.tetmesh.TetMesh</h1>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>fem.tetmesh.TetMesh(</span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>    points,</span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>    cells,</span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    num_surface,</span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>    boundary_tris,</span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>    base_points,</span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>    max_step,</span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>    grid<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>    edge_parents<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>    refinement<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>    table<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>    incidence<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>fem.tetmesh.TetMesh(
+    points,
+    cells,
+    num_surface,
+    boundary_tris,
+    base_points,
+    max_step,
+    grid=None,
+    edge_parents=None,
+    refinement=None,
+    table=None,
+    incidence=None,
+)</code></pre>
 <p>A TET4/TET10 volume mesh whose boundary vertices are DC surface vertices.</p>
 <p>Duck-compatible with :class:<code>~cadjoint.studies.selection.NodeSelection</code> resolution (<code>num_points</code> / <code>points</code> / <code>all_boundary_faces</code> / <code>grid</code>), so <code>Nodes</code> selections resolve on tet meshes unchanged (selections resolve to the <em>corner</em> boundary nodes; TET10 midside completion happens at BC assembly via :func:<code>~cadjoint.fem.boundary.tet10_complete_nodes</code>).</p>
 <section id="attributes" class="level2 doc-section doc-section-attributes">
@@ -423,34 +388,34 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </table>
 <section id="cadjoint.fem.tetmesh.TetMesh.all_boundary_faces" class="level3">
 <h3 class="anchored" data-anchor-id="cadjoint.fem.tetmesh.TetMesh.all_boundary_faces">all_boundary_faces</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>fem.tetmesh.TetMesh.all_boundary_faces()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>fem.tetmesh.TetMesh.all_boundary_faces()</code></pre>
 <p>Boundary triangles as a :class:<code>FaceGroup</code> (nodes shaped <code>(M, 3)</code>).</p>
 </section>
 <section id="cadjoint.fem.tetmesh.TetMesh.elastic" class="level3">
 <h3 class="anchored" data-anchor-id="cadjoint.fem.tetmesh.TetMesh.elastic">elastic</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>fem.tetmesh.TetMesh.elastic(problem, <span class="op">*</span>, placement<span class="op">=</span><span class="va">None</span>, backend<span class="op">=</span><span class="va">None</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>fem.tetmesh.TetMesh.elastic(problem, *, placement=None, backend=None)</code></pre>
 <p>Linear elasticity on the direct jax-fem path, the only one that takes tets.</p>
 </section>
 <section id="cadjoint.fem.tetmesh.TetMesh.face_patch" class="level3">
 <h3 class="anchored" data-anchor-id="cadjoint.fem.tetmesh.TetMesh.face_patch">face_patch</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>fem.tetmesh.TetMesh.face_patch(selection)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>fem.tetmesh.TetMesh.face_patch(selection)</code></pre>
 <p><code>(nodes, faces)</code>: the spanning node set (midsides too on TET10) and the corner triangles.</p>
 <p>jax-fem selects a face for a surface map only when <em>all</em> its nodes are in the set, which is why the midsides come along.</p>
 </section>
 <section id="cadjoint.fem.tetmesh.TetMesh.moved" class="level3">
 <h3 class="anchored" data-anchor-id="cadjoint.fem.tetmesh.TetMesh.moved">moved</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>fem.tetmesh.TetMesh.moved(field, <span class="op">*</span>, smooth_passes<span class="op">=</span><span class="dv">0</span>, design<span class="op">=</span><span class="va">None</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>fem.tetmesh.TetMesh.moved(field, *, smooth_passes=0, design=None)</code></pre>
 <p>Node positions under <code>field</code>: surface vertices re-projected, the interior following.</p>
 <p>A Gmsh mesh’s nodes come from the <code>node_map</code> plugin kind instead, which needs the design itself (<code>design=(target, params)</code>); the refusal for an unfilled kind is at declaration, in the optimiser.</p>
 </section>
 <section id="cadjoint.fem.tetmesh.TetMesh.node_patch" class="level3">
 <h3 class="anchored" data-anchor-id="cadjoint.fem.tetmesh.TetMesh.node_patch">node_patch</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>fem.tetmesh.TetMesh.node_patch(selection)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>fem.tetmesh.TetMesh.node_patch(selection)</code></pre>
 <p>Corner boundary nodes, completed on TET10 with the midsides both of whose parents are in.</p>
 </section>
 <section id="cadjoint.fem.tetmesh.TetMesh.thermal" class="level3">
 <h3 class="anchored" data-anchor-id="cadjoint.fem.tetmesh.TetMesh.thermal">thermal</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>fem.tetmesh.TetMesh.thermal(problem, <span class="op">*</span>, placement<span class="op">=</span><span class="va">None</span>, backend<span class="op">=</span><span class="va">None</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>fem.tetmesh.TetMesh.thermal(problem, *, placement=None, backend=None)</code></pre>
 <p>Steady conduction on the direct jax-fem path, the only one that takes tets.</p>
 
 

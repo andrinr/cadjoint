@@ -1,0 +1,129 @@
+/*-- scss:defaults --*/
+// The docs theme, set in the playground's design language (frontend design
+// page, /design.html). Every value comes from tokens.scss, which is generated
+// from frontend/src/tokens.ts and listed after this file in _quarto.yml, so
+// Quarto emits its defaults first; this file only says which token does which job.
+
+// The ground and the ink (C1, C2).
+$body-bg: $cj-surface-base;
+$body-color: $cj-ink;
+$body-secondary-color: $cj-ink-2;
+$body-tertiary-color: $cj-ink-3;
+$border-color: $cj-rule;
+$hr-border-color: $cj-rule-strong;
+
+// The accent is a fill, never ink (C5): primary buttons and the current TOC
+// entry take it as a block; links are ink with an accent-press underline.
+$primary: $cj-accent;
+$secondary: $cj-ink-2;
+$success: $cj-ok;
+$warning: $cj-warn;
+$danger: $cj-danger;
+$info: $cj-param;
+$link-color: $cj-ink;
+$link-hover-color: $cj-ink;
+$link-decoration: underline;
+
+// Two voices (A8): sans for prose, mono for code, headings and navigation.
+$font-family-sans-serif: system-ui, -apple-system, "Segoe UI", sans-serif;
+$font-family-monospace: ui-monospace, SFMono-Regular, Menlo, monospace;
+$headings-font-family: $font-family-monospace;
+$headings-font-weight: $cj-weight-semibold;
+$code-color: $cj-ink;
+
+// Drawn, not stacked (A7): no radius, no shadow.
+$border-radius: 0;
+$border-radius-sm: 0;
+$border-radius-lg: 0;
+$enable-shadows: false;
+$box-shadow: none;
+$box-shadow-sm: none;
+$box-shadow-lg: none;
+
+$navbar-bg: $cj-surface-base;
+$navbar-fg: $cj-ink-2;
+$navbar-hl: $cj-ink;
+$footer-bg: $cj-surface-base;
+$toc-color: $cj-ink-2;
+
+$code-block-bg: $cj-surface-float;
+$code-block-border-left: $cj-rule;
+$table-border-color: $cj-rule;
+
+/*-- scss:rules --*/
+
+// Links: ink, underlined by the accent's one legal mark tone.
+a {
+  text-decoration-color: $cj-accent-press;
+  text-underline-offset: 2px;
+}
+
+// Headings: mono; the two top levels are tracked uppercase furniture.
+h1, h2,
+.title {
+  text-transform: uppercase;
+  letter-spacing: $cj-tracking-lg;
+}
+h2 {
+  padding-bottom: $cj-space-4;
+  border-bottom: $cj-hairline solid $cj-rule-strong;
+}
+
+// Navigation is furniture: tracked uppercase mono.
+.navbar {
+  border-bottom: $cj-hairline solid $cj-rule-strong;
+  font-family: $font-family-monospace;
+  font-size: $cj-text-xs;
+  letter-spacing: $cj-tracking-xs;
+  text-transform: uppercase;
+}
+.navbar .dropdown-menu {
+  border: $cj-hairline solid $cj-rule-strong;
+  background: $cj-surface-float;
+  font-size: $cj-text-xs;
+}
+.navbar .dropdown-item:hover {
+  background: $cj-surface-bar-alt;
+}
+
+// The current section in the table of contents is the accent block (current).
+#TOC .nav-link,
+#TOC a {
+  font-family: $font-family-monospace;
+  font-size: $cj-text-xs;
+}
+#TOC .nav-link.active {
+  background: $cj-accent;
+  color: $cj-ink-on-accent;
+  border-left-color: $cj-accent;
+}
+
+// Code: the sheet with a rule edge; highlighting is achromatic (A3).
+div.sourceCode,
+pre {
+  border: $cj-hairline solid $cj-rule;
+  background: $cj-surface-float;
+}
+code span.kw, code span.cf, code span.im { color: $cj-ink; font-weight: $cj-weight-semibold; }
+code span.st, code span.ch, code span.ss, code span.vs { color: $cj-ink-2; }
+code span.co, code span.do, code span.cv { color: $cj-ink-3; font-style: italic; }
+code span.dv, code span.fl, code span.bn, code span.dt, code span.fu,
+code span.bu, code span.cn, code span.va, code span.at, code span.op,
+code span.ot, code span.ex, code span.sc, code span.pp { color: $cj-ink; }
+code span.er, code span.al { color: $cj-danger; }
+
+// Tables of values: tabular figures, hairlines.
+table {
+  font-variant-numeric: tabular-nums;
+}
+
+// One title size, not a display headline (Δ "no cropped display headline").
+h1, .title {
+  font-size: 1.6rem;
+}
+h2 {
+  font-size: 1.15rem;
+}
+h3 {
+  font-size: 1rem;
+}

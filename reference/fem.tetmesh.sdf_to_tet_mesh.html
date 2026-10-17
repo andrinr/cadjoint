@@ -26,41 +26,6 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
-/* CSS for syntax highlighting */
-html { -webkit-text-size-adjust: 100%; }
-pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
-pre > code.sourceCode > span:empty { height: 1.2em; }
-.sourceCode { overflow: visible; }
-code.sourceCode > span { color: inherit; text-decoration: inherit; }
-div.sourceCode { margin: 1em 0; }
-pre.sourceCode { margin: 0; }
-@media screen {
-div.sourceCode { overflow: auto; }
-}
-@media print {
-pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
-}
-pre.numberSource code
-  { counter-reset: source-line 0; }
-pre.numberSource code > span
-  { position: relative; left: -4em; counter-increment: source-line; }
-pre.numberSource code > span > a:first-child::before
-  { content: counter(source-line);
-    position: relative; left: -1em; text-align: right; vertical-align: baseline;
-    border: none; display: inline-block;
-    -webkit-touch-callout: none; -webkit-user-select: none;
-    -khtml-user-select: none; -moz-user-select: none;
-    -ms-user-select: none; user-select: none;
-    padding: 0 4px; width: 4em;
-  }
-pre.numberSource { margin-left: 3em;  padding-left: 4px; }
-div.sourceCode
-  {   }
-@media screen {
-pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
-}
 </style>
 
 
@@ -77,10 +42,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-bf27225e3a48a9273f3daa8f8e829971.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-e5d05eddbe2c608fb9c90784db6be0b0.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-f6e81f4864cb6d8b696b855696ff1c11.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-92bccf0354c8ed56982edb6814cc42fe.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -299,15 +264,15 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 <section id="cadjoint.fem.tetmesh.sdf_to_tet_mesh" class="level1">
 <h1>fem.tetmesh.sdf_to_tet_mesh</h1>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>fem.tetmesh.sdf_to_tet_mesh(</span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>    sdf,</span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>    grid,</span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    <span class="op">*</span>,</span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>    sharp<span class="op">=</span><span class="va">True</span>,</span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>    min_ratio<span class="op">=</span><span class="fl">1.5</span>,</span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>    min_dihedral<span class="op">=</span><span class="fl">10.0</span>,</span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>    max_refinements<span class="op">=</span><span class="dv">2</span>,</span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>fem.tetmesh.sdf_to_tet_mesh(
+    sdf,
+    grid,
+    *,
+    sharp=True,
+    min_ratio=1.5,
+    min_dihedral=10.0,
+    max_refinements=2,
+)</code></pre>
 <p>Extract the DC surface of <code>sdf</code> on <code>grid</code> and tet-mesh its inside.</p>
 <p>The DC vertices are Newton-projected onto the zero set <em>before</em> tetrahedralization (QEF vertices sit near but not exactly on the surface), so the meshed boundary is the projected surface and :func:<code>~cadjoint.fem.motion.recompute_tet_points</code> — which runs the identical projection from the frozen raw DC positions — reproduces <code>mesh.points</code> exactly at the nominal design. Without this, re-projection at solve time would move the boundary of an already-meshed volume and collapse sliver tets.</p>
 <p><strong>Automatic refinement.</strong> Tets need a finer grid than hexes on thin features: the hex mesher only has to decide in/out per cell, while TetGen needs the DC surface to be a valid PLC, and a wall thinner than about two cells makes dual contouring fold that surface over itself. So this function walks a ladder of grids over the same box — the declared resolution, then <code>x1.5</code> and <code>x2.25</code> (rounded up per axis, see :data:<code>_REFINEMENT_FACTORS</code>) — and at each rung tries exact sharp-feature placement first and the more robust Tikhonov placement second, exactly as a caller would by hand. Before each TetGen call the projected surface goes through the sampled self-intersection diagnostic, so a rung it catches is recorded as folded, with a count, rather than as an opaque TetGen string (it is a sampled check, and cheap, but it is not a speed-up – see :data:<code>_DIAGNOSTIC_PAIRS_PER_TRIANGLE</code>). The first rung that TetGen accepts wins.</p>

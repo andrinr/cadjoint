@@ -27,41 +27,6 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
-/* CSS for syntax highlighting */
-html { -webkit-text-size-adjust: 100%; }
-pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
-pre > code.sourceCode > span:empty { height: 1.2em; }
-.sourceCode { overflow: visible; }
-code.sourceCode > span { color: inherit; text-decoration: inherit; }
-div.sourceCode { margin: 1em 0; }
-pre.sourceCode { margin: 0; }
-@media screen {
-div.sourceCode { overflow: auto; }
-}
-@media print {
-pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
-}
-pre.numberSource code
-  { counter-reset: source-line 0; }
-pre.numberSource code > span
-  { position: relative; left: -4em; counter-increment: source-line; }
-pre.numberSource code > span > a:first-child::before
-  { content: counter(source-line);
-    position: relative; left: -1em; text-align: right; vertical-align: baseline;
-    border: none; display: inline-block;
-    -webkit-touch-callout: none; -webkit-user-select: none;
-    -khtml-user-select: none; -moz-user-select: none;
-    -ms-user-select: none; user-select: none;
-    padding: 0 4px; width: 4em;
-  }
-pre.numberSource { margin-left: 3em;  padding-left: 4px; }
-div.sourceCode
-  {   }
-@media screen {
-pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
-}
 </style>
 
 
@@ -78,10 +43,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-bf27225e3a48a9273f3daa8f8e829971.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-e5d05eddbe2c608fb9c90784db6be0b0.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-f6e81f4864cb6d8b696b855696ff1c11.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-92bccf0354c8ed56982edb6814cc42fe.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -330,21 +295,21 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="scene-and-quality-settings" class="level2">
 <h2 class="anchored" data-anchor-id="scene-and-quality-settings">Scene and quality settings</h2>
 <p>Use <code>Scene</code> for camera, lights, and environment data and <code>RenderSettings</code> for the performance/fidelity trade-off:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> dataclasses <span class="im">import</span> replace</span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.render <span class="im">import</span> Camera, RenderSettings, Scene, render_scene</span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf.primitives <span class="im">import</span> Sphere</span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>scene <span class="op">=</span> Scene(</span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>    Sphere(<span class="fl">1.0</span>),</span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>    camera<span class="op">=</span>Camera(position<span class="op">=</span>(<span class="dv">0</span>, <span class="fl">1.5</span>, <span class="dv">5</span>), target<span class="op">=</span>(<span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">0</span>)),</span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>preview <span class="op">=</span> render_scene(scene, RenderSettings.draft((<span class="dv">240</span>, <span class="dv">320</span>)))</span>
-<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>final <span class="op">=</span> render_scene(scene, RenderSettings.high_quality((<span class="dv">480</span>, <span class="dv">640</span>)))</span>
-<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="co"># Presets are immutable; override only what a scene needs.</span></span>
-<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>mirror <span class="op">=</span> replace(RenderSettings.balanced(), reflect_steps<span class="op">=</span><span class="dv">64</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>from dataclasses import replace
+
+from cadjoint.render import Camera, RenderSettings, Scene, render_scene
+from cadjoint.sdf.primitives import Sphere
+
+scene = Scene(
+    Sphere(1.0),
+    camera=Camera(position=(0, 1.5, 5), target=(0, 0, 0)),
+)
+
+preview = render_scene(scene, RenderSettings.draft((240, 320)))
+final = render_scene(scene, RenderSettings.high_quality((480, 640)))
+
+# Presets are immutable; override only what a scene needs.
+mirror = replace(RenderSettings.balanced(), reflect_steps=64)</code></pre>
 <p><code>render_scene</code> returns a <code>(H, W, 3)</code> float array. The low-level <code>raymarch(sdf, ...)</code> function remains available for compact notebook calls, and <code>render_raymarched(...)</code> wraps it to display on a matplotlib axis.</p>
 <p>Each primary trace retains its closest approach to the scene. Rays that narrowly miss a surface receive screen-space coverage across <code>RenderSettings.silhouette_smoothing</code> pixels, which removes hard hit/miss outlines without restoring differentiable visibility or fixed-step tracing. Set the value to <code>0</code> when exact binary coverage is required.</p>
 </section>
@@ -418,44 +383,44 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="materials" class="level2">
 <h2 class="anchored" data-anchor-id="materials">Materials</h2>
 <p>Attach a <code>Material</code> to any primitive. It is queried per hit point during rendering, and <code>Union</code> blends materials smoothly across a blended boundary.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.render <span class="im">import</span> Material</span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf.primitives <span class="im">import</span> Sphere</span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>sphere <span class="op">=</span> Sphere(</span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>    radius<span class="op">=</span><span class="fl">1.0</span>,</span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>    material<span class="op">=</span>Material(</span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>        color<span class="op">=</span>[<span class="fl">0.22</span>, <span class="fl">0.50</span>, <span class="fl">0.95</span>],</span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>        roughness<span class="op">=</span><span class="fl">0.35</span>,</span>
-<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>        metallic<span class="op">=</span><span class="fl">0.0</span>,</span>
-<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>        opacity<span class="op">=</span><span class="fl">1.0</span>,</span>
-<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>        ior<span class="op">=</span><span class="fl">1.0</span>,</span>
-<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>    ),</span>
-<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>from cadjoint.render import Material
+from cadjoint.sdf.primitives import Sphere
+
+sphere = Sphere(
+    radius=1.0,
+    material=Material(
+        color=[0.22, 0.50, 0.95],
+        roughness=0.35,
+        metallic=0.0,
+        opacity=1.0,
+        ior=1.0,
+    ),
+)</code></pre>
 <section id="transparency-and-refraction" class="level3">
 <h3 class="anchored" data-anchor-id="transparency-and-refraction">Transparency and refraction</h3>
 <p>Set <code>opacity &lt; 1</code> for transparency. With <code>refract_steps=0</code> (the default) the surface simply fades toward the background. With <code>refract_steps &gt; 0</code> the renderer performs two-bounce Snell’s-law refraction: the primary ray bends into the material, an interior march finds the back face using <code>−sdf</code> as the distance field, and the ray bends back into air to continue through the rest of the scene. Schlick-Fresnel adds the edge highlight that brightens the rim of a glass sphere at grazing angles.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> jax.numpy <span class="im">as</span> jnp</span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.render <span class="im">import</span> Material, raymarch</span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf.boolean <span class="im">import</span> Union</span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf.primitives <span class="im">import</span> Sphere</span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf.transforms <span class="im">import</span> Translate</span>
-<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>glass <span class="op">=</span> Sphere(radius<span class="op">=</span><span class="fl">1.0</span>, material<span class="op">=</span>Material(</span>
-<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>    color<span class="op">=</span>[<span class="fl">0.92</span>, <span class="fl">0.97</span>, <span class="fl">1.0</span>], roughness<span class="op">=</span><span class="fl">0.05</span>, opacity<span class="op">=</span><span class="fl">0.04</span>, ior<span class="op">=</span><span class="fl">1.5</span>))</span>
-<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>red_ball <span class="op">=</span> Translate(</span>
-<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>    Sphere(radius<span class="op">=</span><span class="fl">0.65</span>, material<span class="op">=</span>Material(color<span class="op">=</span>[<span class="fl">0.93</span>, <span class="fl">0.26</span>, <span class="fl">0.22</span>])),</span>
-<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>    offset<span class="op">=</span>jnp.array([<span class="op">-</span><span class="fl">1.1</span>, <span class="fl">0.5</span>, <span class="op">-</span><span class="fl">3.0</span>]),</span>
-<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>image <span class="op">=</span> raymarch(</span>
-<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>    Union((glass, red_ball), smoothness<span class="op">=</span><span class="fl">0.0</span>),</span>
-<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>    camera_pos<span class="op">=</span>jnp.array([<span class="fl">0.0</span>, <span class="fl">0.5</span>, <span class="fl">5.5</span>]),</span>
-<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>    resolution<span class="op">=</span>(<span class="dv">400</span>, <span class="dv">400</span>),</span>
-<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>    background_color<span class="op">=</span>jnp.array([<span class="fl">0.07</span>, <span class="fl">0.09</span>, <span class="fl">0.16</span>]),</span>
-<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a>    refract_steps<span class="op">=</span><span class="dv">48</span>,</span>
-<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a>    max_steps<span class="op">=</span><span class="dv">80</span>,</span>
-<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a>    aa_samples<span class="op">=</span><span class="dv">2</span>,</span>
-<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>import jax.numpy as jnp
+from cadjoint.render import Material, raymarch
+from cadjoint.sdf.boolean import Union
+from cadjoint.sdf.primitives import Sphere
+from cadjoint.sdf.transforms import Translate
+
+glass = Sphere(radius=1.0, material=Material(
+    color=[0.92, 0.97, 1.0], roughness=0.05, opacity=0.04, ior=1.5))
+red_ball = Translate(
+    Sphere(radius=0.65, material=Material(color=[0.93, 0.26, 0.22])),
+    offset=jnp.array([-1.1, 0.5, -3.0]),
+)
+
+image = raymarch(
+    Union((glass, red_ball), smoothness=0.0),
+    camera_pos=jnp.array([0.0, 0.5, 5.5]),
+    resolution=(400, 400),
+    background_color=jnp.array([0.07, 0.09, 0.16]),
+    refract_steps=48,
+    max_steps=80,
+    aa_samples=2,
+)</code></pre>
 <table class="caption-top table">
 <thead>
 <tr class="header">
@@ -487,23 +452,23 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="shader-compilation" class="level2">
 <h2 class="anchored" data-anchor-id="shader-compilation">Shader compilation</h2>
 <p>The same scene compiles to a standalone shader function. JAX traces distance and material evaluation, lowers both to StableHLO, and cadjoint emits the shader source from there — so the browser renders the identical field the Python renderer does.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.backends <span class="im">import</span> compile_scene_to_wgsl, compile_sdf_to_wgsl</span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf.primitives <span class="im">import</span> Sphere</span>
-<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>wgsl <span class="op">=</span> compile_sdf_to_wgsl(Sphere(radius<span class="op">=</span><span class="fl">1.0</span>))          <span class="co"># just `fn sdf`</span></span>
-<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>scene_wgsl <span class="op">=</span> compile_scene_to_wgsl(Sphere(radius<span class="op">=</span><span class="fl">1.0</span>))  <span class="co"># + materials</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>from cadjoint.backends import compile_scene_to_wgsl, compile_sdf_to_wgsl
+from cadjoint.sdf.primitives import Sphere
+
+wgsl = compile_sdf_to_wgsl(Sphere(radius=1.0))          # just `fn sdf`
+scene_wgsl = compile_scene_to_wgsl(Sphere(radius=1.0))  # + materials</code></pre>
 <p><code>compile_scene_to_wgsl</code> emits <code>sdf</code>, <code>material_base</code> (RGB + roughness), and <code>material_optics</code> (metallic + opacity + IOR + reflectivity) from one scene snapshot, ready to embed in a WebGPU renderer. This is exactly what <a href="../docs/viewer.html">the playground</a> does on every run.</p>
 <section id="how-big-the-shader-gets" class="level3">
 <h3 class="anchored" data-anchor-id="how-big-the-shader-gets">How big the shader gets</h3>
 <p>A shader is one straight-line function per entry point, so its size is decided by how much of the tree the trace unrolls. Two things keep that in check. A node evaluated more than once — a pattern’s child, a subtree two booleans share — is lowered as its own StableHLO function, and the emitter turns each of those into one WGSL function called once per instance; a bearing housing with four polar patterns is 1.45 MB of WGSL rather than 2.42 MB. What is <em>not</em> shared is the vertex loop of a sketch profile: WGSL has no type wider than a <code>mat4</code>, so a profile’s vertices stay individual <code>vec2</code>s and its contribution grows with the vertex count. (Everything else traces the profile as one <code>(N, 2)</code> array; see <a href="../docs/meshing.html#program-size">the meshing notes</a>.)</p>
 <p>Design parameters are inlined as float literals by default, so editing one rewrites the whole module and the browser recompiles it. <code>uniforms=True</code> returns a <code>ShaderProgram</code> instead: the same source for every parameter value, plus a <code>vec4</code>-per-parameter uniform layout to write the values into.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.geometry <span class="im">import</span> Scalar</span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>sphere <span class="op">=</span> Sphere(radius<span class="op">=</span>Scalar(<span class="fl">1.0</span>, free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">"radius"</span>))</span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>program <span class="op">=</span> compile_scene_to_wgsl(sphere, uniforms<span class="op">=</span><span class="va">True</span>)</span>
-<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>program.wgsl                 <span class="co"># identical across every value edit</span></span>
-<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>program.parameters[<span class="dv">0</span>].name   <span class="co"># 'radius' — the name extract_parameters uses</span></span>
-<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>program.<span class="bu">buffer</span>()             <span class="co"># float32 array to upload at @group(3) @binding(0)</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>from cadjoint.geometry import Scalar
+
+sphere = Sphere(radius=Scalar(1.0, free=True, name="radius"))
+program = compile_scene_to_wgsl(sphere, uniforms=True)
+program.wgsl                 # identical across every value edit
+program.parameters[0].name   # 'radius' — the name extract_parameters uses
+program.buffer()             # float32 array to upload at @group(3) @binding(0)</code></pre>
 </section>
 </section>
 <section id="further-reading" class="level2">

@@ -26,41 +26,6 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
-/* CSS for syntax highlighting */
-html { -webkit-text-size-adjust: 100%; }
-pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
-pre > code.sourceCode > span:empty { height: 1.2em; }
-.sourceCode { overflow: visible; }
-code.sourceCode > span { color: inherit; text-decoration: inherit; }
-div.sourceCode { margin: 1em 0; }
-pre.sourceCode { margin: 0; }
-@media screen {
-div.sourceCode { overflow: auto; }
-}
-@media print {
-pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
-}
-pre.numberSource code
-  { counter-reset: source-line 0; }
-pre.numberSource code > span
-  { position: relative; left: -4em; counter-increment: source-line; }
-pre.numberSource code > span > a:first-child::before
-  { content: counter(source-line);
-    position: relative; left: -1em; text-align: right; vertical-align: baseline;
-    border: none; display: inline-block;
-    -webkit-touch-callout: none; -webkit-user-select: none;
-    -khtml-user-select: none; -moz-user-select: none;
-    -ms-user-select: none; user-select: none;
-    padding: 0 4px; width: 4em;
-  }
-pre.numberSource { margin-left: 3em;  padding-left: 4px; }
-div.sourceCode
-  {   }
-@media screen {
-pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
-}
 </style>
 
 
@@ -77,10 +42,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-bf27225e3a48a9273f3daa8f8e829971.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-e5d05eddbe2c608fb9c90784db6be0b0.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-f6e81f4864cb6d8b696b855696ff1c11.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-92bccf0354c8ed56982edb6814cc42fe.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -320,36 +285,36 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </ul>
 <p>The construction tree is never part of the SDF render; it is projected through the same camera and drawn as a wireframe overlay.</p>
 <div id="4ff1821a" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:35:49.865088Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:35:49.865030Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:35:50.252012Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:35:50.251565Z&quot;}}" data-execution_count="1">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> jax</span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> jax.numpy <span class="im">as</span> jnp</span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint <span class="im">import</span> apply_parameters, extract_parameters, functionalize</span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.constraints <span class="im">import</span> DistanceConstraint, FixedConstraint</span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.constraints.solve <span class="im">import</span> project_to_manifold, solve_constraints</span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.construction <span class="im">import</span> PolygonProfile, SketchPlane, extrude, revolve</span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.render <span class="im">import</span> (</span>
-<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>    Camera,</span>
-<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>    Material,</span>
-<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>    RenderSettings,</span>
-<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>    Scene,</span>
-<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>    draw_plane,</span>
-<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>    draw_profile,</span>
-<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>    render_scene,</span>
-<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf <span class="im">import</span> volume</span>
-<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf.primitives <span class="im">import</span> Plane</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python cell-code"><code>import jax
+import jax.numpy as jnp
+import matplotlib.pyplot as plt
+
+from cadjoint import apply_parameters, extract_parameters, functionalize
+from cadjoint.constraints import DistanceConstraint, FixedConstraint
+from cadjoint.constraints.solve import project_to_manifold, solve_constraints
+from cadjoint.construction import PolygonProfile, SketchPlane, extrude, revolve
+from cadjoint.render import (
+    Camera,
+    Material,
+    RenderSettings,
+    Scene,
+    draw_plane,
+    draw_profile,
+    render_scene,
+)
+from cadjoint.sdf import volume
+from cadjoint.sdf.primitives import Plane</code></pre>
 </div>
 <section id="sketch-a-profile" class="level2">
 <h2 class="anchored" data-anchor-id="sketch-a-profile">1. Sketch a profile</h2>
 <p>A <code>PolygonProfile</code> lives on a <code>SketchPlane</code>. Raw vertex arrays become <strong>free</strong> <code>Vector2</code> parameters (2 DOF each) — editable until constrained, like a CAD sketch.</p>
 <div id="d52a1c9f" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:35:50.253344Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:35:50.253257Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:35:50.285482Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:35:50.285061Z&quot;}}" data-execution_count="2">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>profile <span class="op">=</span> PolygonProfile(</span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    [[<span class="fl">0.1</span>, <span class="op">-</span><span class="fl">0.1</span>], [<span class="fl">1.9</span>, <span class="fl">0.2</span>], [<span class="fl">1.0</span>, <span class="fl">1.5</span>]],</span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>    plane<span class="op">=</span>SketchPlane(origin<span class="op">=</span>[<span class="fl">0.0</span>, <span class="op">-</span><span class="fl">0.5</span>, <span class="fl">0.0</span>], normal<span class="op">=</span>[<span class="fl">0.0</span>, <span class="fl">0.0</span>, <span class="fl">1.0</span>]),</span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>    name<span class="op">=</span><span class="st">"tri"</span>,</span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>profile.vertices</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python cell-code"><code>profile = PolygonProfile(
+    [[0.1, -0.1], [1.9, 0.2], [1.0, 1.5]],
+    plane=SketchPlane(origin=[0.0, -0.5, 0.0], normal=[0.0, 0.0, 1.0]),
+    name="tri",
+)
+profile.vertices</code></pre>
 <div class="cell-output cell-output-display" data-execution_count="2">
 <pre><code>[Vector2(value=Array([ 0.1, -0.1], dtype=float32), free=True, name='tri_v0', bounds=None),
  Vector2(value=Array([1.9, 0.2], dtype=float32), free=True, name='tri_v1', bounds=None),
@@ -361,15 +326,15 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h2 class="anchored" data-anchor-id="constrain-and-solve">2. Constrain and solve</h2>
 <p>Anchor two vertices and pin the apex with two distance constraints: 6 DOF, 6 constraint equations — exactly constrained. <code>solve_constraints</code> walks the construction tree, finds the constraints registered on its parameters, and solves with Levenberg–Marquardt. The solution lands on an equilateral triangle.</p>
 <div id="5d5c90b5" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:35:50.286533Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:35:50.286479Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:35:50.499746Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:35:50.499195Z&quot;}}" data-execution_count="3">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>v0, v1, v2 <span class="op">=</span> profile.vertices</span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>FixedConstraint(v0, [<span class="fl">0.0</span>, <span class="fl">0.0</span>])</span>
-<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>FixedConstraint(v1, [<span class="fl">2.0</span>, <span class="fl">0.0</span>])</span>
-<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>DistanceConstraint(v0, v2, <span class="fl">2.0</span>)</span>
-<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>DistanceConstraint(v1, v2, <span class="fl">2.0</span>)</span>
-<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>solved <span class="op">=</span> solve_constraints(profile)</span>
-<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> name, value <span class="kw">in</span> solved.items():</span>
-<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"</span><span class="sc">{</span>name<span class="sc">}</span><span class="ss">: </span><span class="sc">{</span>value<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python cell-code"><code>v0, v1, v2 = profile.vertices
+FixedConstraint(v0, [0.0, 0.0])
+FixedConstraint(v1, [2.0, 0.0])
+DistanceConstraint(v0, v2, 2.0)
+DistanceConstraint(v1, v2, 2.0)
+
+solved = solve_constraints(profile)
+for name, value in solved.items():
+    print(f"{name}: {value}")</code></pre>
 <div class="cell-output cell-output-stdout">
 <pre><code>tri_v0: [-9.3816510e-11 -1.6287771e-10]
 tri_v1: [2.000000e+00 1.165148e-10]
@@ -381,26 +346,26 @@ tri_v2: [1.        1.7320509]</code></pre>
 <h2 class="anchored" data-anchor-id="generate-a-solid-and-render-with-the-sketch-overlay">3. Generate a solid and render with the sketch overlay</h2>
 <p><code>extrude</code> produces an SDF primitive that <strong>shares</strong> the profile’s vertex parameters and places it on the sketch plane. We render the solid with the forward renderer, then draw the construction tree on top: dashed plane outline, profile edges, vertex handles.</p>
 <div id="47e6256b" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:35:50.500886Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:35:50.500787Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:35:51.755247Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:35:51.754913Z&quot;}}" data-execution_count="4">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>solid <span class="op">=</span> extrude(profile, depth<span class="op">=</span><span class="fl">0.6</span>, material<span class="op">=</span>Material(color<span class="op">=</span>[<span class="fl">0.9</span>, <span class="fl">0.55</span>, <span class="fl">0.08</span>], roughness<span class="op">=</span><span class="fl">0.35</span>))</span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>scene <span class="op">=</span> Scene(</span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>    solid <span class="op">|</span> Plane(<span class="op">-</span><span class="fl">1.2</span>, material<span class="op">=</span>Material(color<span class="op">=</span>[<span class="fl">0.12</span>, <span class="fl">0.14</span>, <span class="fl">0.18</span>], roughness<span class="op">=</span><span class="fl">0.8</span>)),</span>
-<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>    camera<span class="op">=</span>Camera(position<span class="op">=</span>(<span class="fl">3.2</span>, <span class="fl">2.4</span>, <span class="fl">4.6</span>), target<span class="op">=</span>(<span class="fl">0.9</span>, <span class="fl">0.2</span>, <span class="fl">0.0</span>), fov<span class="op">=</span><span class="fl">0.42</span>),</span>
-<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>    light_directions<span class="op">=</span>((<span class="fl">0.4</span>, <span class="fl">1.0</span>, <span class="fl">0.5</span>), (<span class="op">-</span><span class="fl">0.5</span>, <span class="fl">0.4</span>, <span class="op">-</span><span class="fl">0.3</span>)),</span>
-<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>    light_colors<span class="op">=</span>((<span class="fl">1.3</span>, <span class="fl">1.2</span>, <span class="fl">1.05</span>), (<span class="fl">0.25</span>, <span class="fl">0.3</span>, <span class="fl">0.45</span>)),</span>
-<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>settings <span class="op">=</span> RenderSettings.balanced((<span class="dv">240</span>, <span class="dv">320</span>))</span>
-<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a><span class="co"># write solved values back into the shared params: the render below uses</span></span>
-<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a><span class="co"># the constraint-solved sketch</span></span>
-<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>apply_parameters(profile, solved)</span>
-<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a>image <span class="op">=</span> render_scene(scene, settings)</span>
-<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="dv">8</span>, <span class="dv">6</span>))</span>
-<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a>ax.imshow(image)</span>
-<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a>draw_plane(ax, profile.plane, scene.camera, settings.resolution, extent<span class="op">=</span><span class="fl">1.8</span>)</span>
-<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a>draw_profile(ax, profile, scene.camera, settings.resolution)</span>
-<span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a>ax.axis(<span class="st">"off"</span>)<span class="op">;</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python cell-code"><code>solid = extrude(profile, depth=0.6, material=Material(color=[0.9, 0.55, 0.08], roughness=0.35))
+
+scene = Scene(
+    solid | Plane(-1.2, material=Material(color=[0.12, 0.14, 0.18], roughness=0.8)),
+    camera=Camera(position=(3.2, 2.4, 4.6), target=(0.9, 0.2, 0.0), fov=0.42),
+    light_directions=((0.4, 1.0, 0.5), (-0.5, 0.4, -0.3)),
+    light_colors=((1.3, 1.2, 1.05), (0.25, 0.3, 0.45)),
+)
+settings = RenderSettings.balanced((240, 320))
+
+# write solved values back into the shared params: the render below uses
+# the constraint-solved sketch
+apply_parameters(profile, solved)
+
+image = render_scene(scene, settings)
+fig, ax = plt.subplots(figsize=(8, 6))
+ax.imshow(image)
+draw_plane(ax, profile.plane, scene.camera, settings.resolution, extent=1.8)
+draw_profile(ax, profile, scene.camera, settings.resolution)
+ax.axis("off");</code></pre>
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
@@ -414,18 +379,18 @@ tri_v2: [1.        1.7320509]</code></pre>
 <h2 class="anchored" data-anchor-id="revolve">4. Revolve</h2>
 <p>The same profile machinery drives solids of revolution. Profile coordinates are (radial, height); the profile revolves around the sketch plane’s local Y axis.</p>
 <div id="f96bb098" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:35:51.757073Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:35:51.756993Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:35:52.403609Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:35:52.403166Z&quot;}}" data-execution_count="5">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>washer <span class="op">=</span> PolygonProfile([[<span class="fl">0.9</span>, <span class="op">-</span><span class="fl">0.18</span>], [<span class="fl">1.35</span>, <span class="op">-</span><span class="fl">0.28</span>], [<span class="fl">1.35</span>, <span class="fl">0.28</span>], [<span class="fl">0.9</span>, <span class="fl">0.18</span>]], name<span class="op">=</span><span class="st">"washer"</span>)</span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>ring <span class="op">=</span> revolve(washer, material<span class="op">=</span>Material(color<span class="op">=</span>[<span class="fl">0.78</span>, <span class="fl">0.08</span>, <span class="fl">0.05</span>], roughness<span class="op">=</span><span class="fl">0.4</span>))</span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>ring_scene <span class="op">=</span> Scene(</span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>    ring <span class="op">|</span> Plane(<span class="op">-</span><span class="fl">0.6</span>, material<span class="op">=</span>Material(color<span class="op">=</span>[<span class="fl">0.12</span>, <span class="fl">0.14</span>, <span class="fl">0.18</span>], roughness<span class="op">=</span><span class="fl">0.8</span>)),</span>
-<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>    camera<span class="op">=</span>Camera(position<span class="op">=</span>(<span class="fl">2.6</span>, <span class="fl">2.2</span>, <span class="fl">3.8</span>), target<span class="op">=</span>(<span class="fl">0.0</span>, <span class="fl">0.0</span>, <span class="fl">0.0</span>), fov<span class="op">=</span><span class="fl">0.5</span>),</span>
-<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>image <span class="op">=</span> render_scene(ring_scene, settings)</span>
-<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="dv">8</span>, <span class="dv">6</span>))</span>
-<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>ax.imshow(image)</span>
-<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>draw_profile(ax, washer, ring_scene.camera, settings.resolution)</span>
-<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>ax.axis(<span class="st">"off"</span>)<span class="op">;</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python cell-code"><code>washer = PolygonProfile([[0.9, -0.18], [1.35, -0.28], [1.35, 0.28], [0.9, 0.18]], name="washer")
+ring = revolve(washer, material=Material(color=[0.78, 0.08, 0.05], roughness=0.4))
+
+ring_scene = Scene(
+    ring | Plane(-0.6, material=Material(color=[0.12, 0.14, 0.18], roughness=0.8)),
+    camera=Camera(position=(2.6, 2.2, 3.8), target=(0.0, 0.0, 0.0), fov=0.5),
+)
+image = render_scene(ring_scene, settings)
+fig, ax = plt.subplots(figsize=(8, 6))
+ax.imshow(image)
+draw_profile(ax, washer, ring_scene.camera, settings.resolution)
+ax.axis("off");</code></pre>
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
@@ -439,41 +404,41 @@ tri_v2: [1.        1.7320509]</code></pre>
 <h2 class="anchored" data-anchor-id="constrained-optimization-through-the-generated-solid">5. Constrained optimization through the generated solid</h2>
 <p>The full differentiable-CAD loop: a quad sketch with one anchor and one pinned edge length (3 constraint equations on 8 DOF), extruded into a solid. We optimize the remaining sketch DOF so the solid’s volume hits a target, and project back onto the constraint manifold after every gradient step.</p>
 <div id="5a2e833c" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:35:52.404683Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:35:52.404629Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:35:55.834355Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:35:55.834033Z&quot;}}" data-execution_count="6">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>quad <span class="op">=</span> PolygonProfile([[<span class="fl">0.0</span>, <span class="fl">0.0</span>], [<span class="fl">2.0</span>, <span class="fl">0.0</span>], [<span class="fl">2.0</span>, <span class="fl">1.0</span>], [<span class="fl">0.0</span>, <span class="fl">1.0</span>]], name<span class="op">=</span><span class="st">"quad"</span>)</span>
-<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>q0, q1, q2, q3 <span class="op">=</span> quad.vertices</span>
-<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>FixedConstraint(q0, [<span class="fl">0.0</span>, <span class="fl">0.0</span>])</span>
-<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>DistanceConstraint(q0, q1, <span class="fl">2.0</span>)</span>
-<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>quad_solid <span class="op">=</span> extrude(quad, depth<span class="op">=</span><span class="fl">1.5</span>, material<span class="op">=</span>Material(color<span class="op">=</span>[<span class="fl">0.05</span>, <span class="fl">0.2</span>, <span class="fl">0.7</span>], roughness<span class="op">=</span><span class="fl">0.3</span>))</span>
-<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>free, fixed, meta <span class="op">=</span> extract_parameters(quad_solid)</span>
-<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>fn <span class="op">=</span> functionalize(quad_solid)</span>
-<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>target <span class="op">=</span> <span class="fl">6.0</span></span>
-<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> loss(params):</span>
-<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a>    vol <span class="op">=</span> volume(fn(params, fixed), bounds<span class="op">=</span>(<span class="op">-</span><span class="dv">1</span>, <span class="op">-</span><span class="dv">1</span>, <span class="op">-</span><span class="dv">1</span>), size<span class="op">=</span>(<span class="dv">4</span>, <span class="dv">4</span>, <span class="dv">2</span>), resolution<span class="op">=</span><span class="dv">32</span>)</span>
-<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> (vol <span class="op">-</span> target) <span class="op">**</span> <span class="dv">2</span></span>
-<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a>params <span class="op">=</span> <span class="bu">dict</span>(free)</span>
-<span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a>history <span class="op">=</span> []</span>
-<span id="cb8-19"><a href="#cb8-19" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> _ <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">40</span>):</span>
-<span id="cb8-20"><a href="#cb8-20" aria-hidden="true" tabindex="-1"></a>    value, grads <span class="op">=</span> jax.value_and_grad(loss)(params)</span>
-<span id="cb8-21"><a href="#cb8-21" aria-hidden="true" tabindex="-1"></a>    history.append(<span class="bu">float</span>(value))</span>
-<span id="cb8-22"><a href="#cb8-22" aria-hidden="true" tabindex="-1"></a>    params <span class="op">=</span> {k: v <span class="op">-</span> <span class="fl">0.05</span> <span class="op">*</span> grads[k] <span class="cf">for</span> k, v <span class="kw">in</span> params.items()}</span>
-<span id="cb8-23"><a href="#cb8-23" aria-hidden="true" tabindex="-1"></a>    params <span class="op">=</span> project_to_manifold(params, meta, steps<span class="op">=</span><span class="dv">2</span>)</span>
-<span id="cb8-24"><a href="#cb8-24" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-25"><a href="#cb8-25" aria-hidden="true" tabindex="-1"></a>vol <span class="op">=</span> volume(fn(params, fixed), bounds<span class="op">=</span>(<span class="op">-</span><span class="dv">1</span>, <span class="op">-</span><span class="dv">1</span>, <span class="op">-</span><span class="dv">1</span>), size<span class="op">=</span>(<span class="dv">4</span>, <span class="dv">4</span>, <span class="dv">2</span>), resolution<span class="op">=</span><span class="dv">64</span>)</span>
-<span id="cb8-26"><a href="#cb8-26" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"final volume: </span><span class="sc">{</span><span class="bu">float</span>(vol)<span class="sc">:.3f}</span><span class="ss"> (target </span><span class="sc">{</span>target<span class="sc">}</span><span class="ss">)"</span>)</span>
-<span id="cb8-27"><a href="#cb8-27" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(</span>
-<span id="cb8-28"><a href="#cb8-28" aria-hidden="true" tabindex="-1"></a>    <span class="ss">f"edge length: </span><span class="sc">{</span><span class="bu">float</span>(jnp.linalg.norm(params[<span class="st">'quad_v1'</span>] <span class="op">-</span> params[<span class="st">'quad_v0'</span>]))<span class="sc">:.4f}</span><span class="ss"> (pinned 2.0)"</span></span>
-<span id="cb8-29"><a href="#cb8-29" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb8-30"><a href="#cb8-30" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-31"><a href="#cb8-31" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">6</span>, <span class="dv">3</span>))</span>
-<span id="cb8-32"><a href="#cb8-32" aria-hidden="true" tabindex="-1"></a>plt.semilogy(history)</span>
-<span id="cb8-33"><a href="#cb8-33" aria-hidden="true" tabindex="-1"></a>plt.xlabel(<span class="st">"step"</span>)</span>
-<span id="cb8-34"><a href="#cb8-34" aria-hidden="true" tabindex="-1"></a>plt.ylabel(<span class="st">"loss"</span>)</span>
-<span id="cb8-35"><a href="#cb8-35" aria-hidden="true" tabindex="-1"></a>plt.title(<span class="st">"Volume target on the constraint manifold"</span>)<span class="op">;</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python cell-code"><code>quad = PolygonProfile([[0.0, 0.0], [2.0, 0.0], [2.0, 1.0], [0.0, 1.0]], name="quad")
+q0, q1, q2, q3 = quad.vertices
+FixedConstraint(q0, [0.0, 0.0])
+DistanceConstraint(q0, q1, 2.0)
+
+quad_solid = extrude(quad, depth=1.5, material=Material(color=[0.05, 0.2, 0.7], roughness=0.3))
+free, fixed, meta = extract_parameters(quad_solid)
+fn = functionalize(quad_solid)
+target = 6.0
+
+
+def loss(params):
+    vol = volume(fn(params, fixed), bounds=(-1, -1, -1), size=(4, 4, 2), resolution=32)
+    return (vol - target) ** 2
+
+
+params = dict(free)
+history = []
+for _ in range(40):
+    value, grads = jax.value_and_grad(loss)(params)
+    history.append(float(value))
+    params = {k: v - 0.05 * grads[k] for k, v in params.items()}
+    params = project_to_manifold(params, meta, steps=2)
+
+vol = volume(fn(params, fixed), bounds=(-1, -1, -1), size=(4, 4, 2), resolution=64)
+print(f"final volume: {float(vol):.3f} (target {target})")
+print(
+    f"edge length: {float(jnp.linalg.norm(params['quad_v1'] - params['quad_v0'])):.4f} (pinned 2.0)"
+)
+
+plt.figure(figsize=(6, 3))
+plt.semilogy(history)
+plt.xlabel("step")
+plt.ylabel("loss")
+plt.title("Volume target on the constraint manifold");</code></pre>
 <div class="cell-output cell-output-stdout">
 <pre><code>final volume: 6.278 (target 6.0)
 edge length: 2.0000 (pinned 2.0)</code></pre>
@@ -491,18 +456,18 @@ edge length: 2.0000 (pinned 2.0)</code></pre>
 <h2 class="anchored" data-anchor-id="optimized-solid-with-its-sketch">6. Optimized solid with its sketch</h2>
 <p><code>apply_parameters</code> is the inverse of <code>extract_parameters</code>: it writes a name-keyed value dict back into the tree’s free parameters. Since the solid and the sketch share their parameters, applying to either updates both — the overlay below shows the final constrained profile driving the solid.</p>
 <div id="e486d74a" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:35:55.835494Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:35:55.835444Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:35:56.371600Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:35:56.371262Z&quot;}}" data-execution_count="7">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>apply_parameters(quad, params)</span>
-<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>quad_scene <span class="op">=</span> Scene(</span>
-<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>    quad_solid <span class="op">|</span> Plane(<span class="op">-</span><span class="fl">1.0</span>, material<span class="op">=</span>Material(color<span class="op">=</span>[<span class="fl">0.12</span>, <span class="fl">0.14</span>, <span class="fl">0.18</span>], roughness<span class="op">=</span><span class="fl">0.8</span>)),</span>
-<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>    camera<span class="op">=</span>Camera(position<span class="op">=</span>(<span class="fl">3.6</span>, <span class="fl">2.8</span>, <span class="fl">5.0</span>), target<span class="op">=</span>(<span class="fl">1.0</span>, <span class="fl">0.6</span>, <span class="fl">0.0</span>), fov<span class="op">=</span><span class="fl">0.45</span>),</span>
-<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>image <span class="op">=</span> render_scene(quad_scene, settings)</span>
-<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="dv">8</span>, <span class="dv">6</span>))</span>
-<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>ax.imshow(image)</span>
-<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>draw_plane(ax, quad.plane, quad_scene.camera, settings.resolution, extent<span class="op">=</span><span class="fl">2.2</span>)</span>
-<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>draw_profile(ax, quad, quad_scene.camera, settings.resolution)</span>
-<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>ax.axis(<span class="st">"off"</span>)<span class="op">;</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python cell-code"><code>apply_parameters(quad, params)
+
+quad_scene = Scene(
+    quad_solid | Plane(-1.0, material=Material(color=[0.12, 0.14, 0.18], roughness=0.8)),
+    camera=Camera(position=(3.6, 2.8, 5.0), target=(1.0, 0.6, 0.0), fov=0.45),
+)
+image = render_scene(quad_scene, settings)
+fig, ax = plt.subplots(figsize=(8, 6))
+ax.imshow(image)
+draw_plane(ax, quad.plane, quad_scene.camera, settings.resolution, extent=2.2)
+draw_profile(ax, quad, quad_scene.camera, settings.resolution)
+ax.axis("off");</code></pre>
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">

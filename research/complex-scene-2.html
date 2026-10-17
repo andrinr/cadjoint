@@ -26,41 +26,6 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
-/* CSS for syntax highlighting */
-html { -webkit-text-size-adjust: 100%; }
-pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
-pre > code.sourceCode > span:empty { height: 1.2em; }
-.sourceCode { overflow: visible; }
-code.sourceCode > span { color: inherit; text-decoration: inherit; }
-div.sourceCode { margin: 1em 0; }
-pre.sourceCode { margin: 0; }
-@media screen {
-div.sourceCode { overflow: auto; }
-}
-@media print {
-pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
-}
-pre.numberSource code
-  { counter-reset: source-line 0; }
-pre.numberSource code > span
-  { position: relative; left: -4em; counter-increment: source-line; }
-pre.numberSource code > span > a:first-child::before
-  { content: counter(source-line);
-    position: relative; left: -1em; text-align: right; vertical-align: baseline;
-    border: none; display: inline-block;
-    -webkit-touch-callout: none; -webkit-user-select: none;
-    -khtml-user-select: none; -moz-user-select: none;
-    -ms-user-select: none; user-select: none;
-    padding: 0 4px; width: 4em;
-  }
-pre.numberSource { margin-left: 3em;  padding-left: 4px; }
-div.sourceCode
-  {   }
-@media screen {
-pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
-}
 </style>
 
 
@@ -77,10 +42,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-bf27225e3a48a9273f3daa8f8e829971.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-e5d05eddbe2c608fb9c90784db6be0b0.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-f6e81f4864cb6d8b696b855696ff1c11.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-92bccf0354c8ed56982edb6814cc42fe.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -495,8 +460,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p><strong>What happened.</strong> The coolant gallery is fed from a cast riser and runs radially inward to the helix. It therefore crosses the ring of gusset ribs. At 227° and 133° — stations 5 and 3 of an eight-way ring — the feed bore goes straight through a rib’s root, and a rib with a 0.22 hole in its root is not a rib. There is no phase of an eight-way ring that clears the schedule: the riser bores, the tie bolts and the encoder pocket between them forbid every residue mod 45°, and I checked all of them.</p>
 <p>Every CAD system has the answer — <em>suppress instance 3 and instance 5</em> — and this one did not. <code>PolarPattern</code> emitted <code>count</code> copies and that was the whole of its vocabulary. The alternatives were to abandon the pattern and write six ribs out by hand (six sketches, six sets of constraints, no shared <code>rib_thickness</code>) or to let the bore drill the rib and say nothing.</p>
 <p><strong>Fix.</strong> <code>skip=</code> on both patterns:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>ribs <span class="op">=</span> PolarPattern(rib, count<span class="op">=</span><span class="dv">8</span>, axis<span class="op">=</span>bore_axis, skip<span class="op">=</span>(<span class="dv">3</span>, <span class="dv">5</span>))</span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>holes <span class="op">=</span> LinearPattern(hole, direction<span class="op">=</span>[<span class="dv">1</span>, <span class="dv">0</span>, <span class="dv">0</span>], count<span class="op">=</span><span class="dv">6</span>, spacing<span class="op">=</span><span class="fl">0.2</span>, skip<span class="op">=</span>(<span class="dv">2</span>,))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>ribs = PolarPattern(rib, count=8, axis=bore_axis, skip=(3, 5))
+holes = LinearPattern(hole, direction=[1, 0, 0], count=6, spacing=0.2, skip=(2,))</code></pre>
 <p>The kept copies keep the angles and offsets they would have had — suppressing one leaves a gap rather than respacing the ring, which is the only behaviour that lets a suppressed station be <em>used</em> by something else. Instance 0 is the seed the child’s analytic faces are declared against and cannot be suppressed; the error says to rotate the seed instead.</p>
 <p><code>cadjoint/sdf/operations.py</code>, tests in <code>tests/sdf/test_operations.py</code> (<code>TestSuppressedInstances</code>) and <code>tests/scenes/test_motor_shield.py</code>.</p>
 <p><strong>The one ugly part</strong>, recorded here because it is a design smell rather than a bug: the suppressed set travels as a <strong>bit mask in one scalar parameter</strong> (<code>skip_mask</code>), because the parameter plumbing carries numbers and a set of indices is not one. <code>static_params</code> already had to exist so that <code>count</code> stays a Python int under <code>jit</code>; <code>skip_mask</code> rides the same rail. The cost is a cap at 24 instances when anything is suppressed (checked, with an error that says so). The real fix is a <em>structural parameter</em> kind that may hold any hashable Python value and is guaranteed never to be traced — see §2.19.</p>
@@ -533,13 +498,13 @@ domain a 'conductivity' value (see cadjoint.materials for a catalogue of real
 ones), or pass an explicit scalar to the study.</code></pre>
 <p>Every element. And the shield is a single casting of <code>aluminium_6061()</code>, whose conductivity is 167 W/m·K and is <em>stated</em>, in the one place a material is stated. The same message came back for <code>youngs_modulus</code> from the elastic study.</p>
 <p>The material field is sampled by walking the CSG tree, and at a boolean node the two children’s materials are lerped by a weight that comes from the distance field, so that a smooth CSG interface is a smooth (and differentiable) property interface. The lerp was <code>Material.blend</code>, which is</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>b <span class="op">*</span> (<span class="fl">1.0</span> <span class="op">-</span> t) <span class="op">+</span> a <span class="op">*</span> t</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>b * (1.0 - t) + a * t</code></pre>
 <p>An unspecified property is <code>nan</code>. IEEE 754 says <code>nan * 0.0 == nan</code>. So a child that specifies <em>nothing</em> poisons the result even where its weight is <strong>exactly zero</strong> — at the centre of the flange, a metre of nothing away from the hole in question.</p>
 <p>And every cut tool is such a child. A <code>Face.hole</code> is geometry, not a substance; it has no conductivity because the question is meaningless. Of the eighteen tools in this part’s top-level <code>Difference</code>, the ones that carry a material carry it only for the render. The consequence is not subtle and not local: <strong>any solid with a single hole in it reported <code>nan</code> for every physical property at every interior point</strong>, and no <code>FROM_MATERIAL</code> study over it could be assembled. This is not specific to the shield. <code>scenes/end_cap.py</code> has holes too; it survives because it happens to hand its studies explicit scalars.</p>
 <p>It is worth being clear about how invisible this was. The <em>render</em> was perfect: <code>color</code> is specified by every material, so the one property that reaches a pixel was the one property that never went <code>nan</code>. The shield looked right in the viewer for as long as it took to ask it a physical question.</p>
 <p><strong>Fix.</strong> <code>blend_materials</code> in <code>cadjoint/sdf/boolean/base.py</code>, shared by all three boolean nodes, adds one rule to the lerp: a property is unspecified only when <em>neither</em> side specifies it.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>lerp <span class="op">=</span> b <span class="op">*</span> (<span class="fl">1.0</span> <span class="op">-</span> weight) <span class="op">+</span> a <span class="op">*</span> weight</span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="cf">return</span> jnp.where(jnp.isnan(a), b, jnp.where(jnp.isnan(b), a, lerp))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>lerp = b * (1.0 - weight) + a * weight
+return jnp.where(jnp.isnan(a), b, jnp.where(jnp.isnan(b), a, lerp))</code></pre>
 <p>Two specified values still blend exactly as before — the smooth property interface is untouched, and it is still differentiable, because <code>jnp.where</code> on a <code>nan</code> <em>constant</em> is a select on a concrete predicate, not a branch on a traced value. A property neither side specifies stays <code>nan</code>, which is what lets the study’s error message keep working when it is telling the truth.</p>
 <p><code>Xor.material_at</code> had the same lerp at a <em>fixed</em> weight of 0.5, where the erasure is unconditional; it uses <code>blend_materials</code> now too.</p>
 <p><strong>And the fix had to be paid for twice.</strong> The single <code>jnp.where</code> above gives the right value and a <code>nan</code> <strong>gradient</strong>. The VJP of <code>jnp.where</code> multiplies the unselected branch’s cotangent by zero, <code>lerp</code>’s derivative in the blend weight is <code>a - b</code>, and <code>0.0 * nan</code> is <code>nan</code> — the double-<code>where</code> trap, which is a trap precisely because the primal is correct and nothing looks wrong until an optimiser stops five minutes in with</p>
@@ -552,17 +517,17 @@ rescale the objective.</code></pre>
 <section id="fixed-a-difference-took-its-material-from-the-first-tool-and-ignored-the-other-seventeen" class="level3">
 <h3 class="anchored" data-anchor-id="fixed-a-difference-took-its-material-from-the-first-tool-and-ignored-the-other-seventeen">2.7 FIXED — a <code>Difference</code> took its material from the first tool and ignored the other seventeen</h3>
 <p><strong>What happened.</strong> Found while fixing §2.6, in the same three lines. <code>Union.material_at</code> folds over every operand:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> child <span class="kw">in</span> <span class="va">self</span>.sdfs[<span class="dv">1</span>:]:</span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>    ...</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>for child in self.sdfs[1:]:
+    ...</code></pre>
 <p><code>Difference.material_at</code> and <code>Intersection.material_at</code> did not. They read <code>self.sdfs[0]</code> and <code>self.sdfs[1]</code>, blended those two, and returned — even though both nodes are variadic and this file’s <code>Difference</code> has <strong>a body and eighteen tools</strong>. So the material on seventeen of the eighteen cut walls was whatever the <em>bore</em> said, and the bore is the first tool only because it is written first. Reorder the argument list and the part’s material field changes.</p>
 <p>The same held for <code>Intersection</code>, where the shroud is built from more than two operands.</p>
 <p>Alone, this bug is milder than §2.6 — with the <code>nan</code> rule in place the body’s value survives the blend anyway, so the field is right almost everywhere. It bites exactly where the two rules interact: a tool that <em>does</em> carry a material (the shield has several, for the render) tints only the wall it cut if the fold reaches it, and before the fix, seventeen tools could not tint anything.</p>
 <p><strong>Fix.</strong> Fold, the way <code>Union</code> does, carrying the running distance so that each tool’s blend weight is measured against the shape as cut <em>so far</em>:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> tool <span class="kw">in</span> <span class="va">self</span>.sdfs[<span class="dv">1</span>:]:</span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>    d <span class="op">=</span> tool(p)</span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>    t <span class="op">=</span> jnp.clip(<span class="fl">0.5</span> <span class="op">+</span> <span class="fl">0.5</span> <span class="op">*</span> (result_d <span class="op">+</span> d) <span class="op">/</span> k, <span class="fl">0.0</span>, <span class="fl">1.0</span>)</span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>    result_m <span class="op">=</span> blend_materials(result_m, tool.material_at(p), t)</span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>    result_d <span class="op">=</span> jnp.maximum(result_d, <span class="op">-</span>d)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>for tool in self.sdfs[1:]:
+    d = tool(p)
+    t = jnp.clip(0.5 + 0.5 * (result_d + d) / k, 0.0, 1.0)
+    result_m = blend_materials(result_m, tool.material_at(p), t)
+    result_d = jnp.maximum(result_d, -d)</code></pre>
 <p>Test: <code>test_every_tool_is_folded_in_not_just_the_first</code> — a steel plate cut by two spheres, the second of which is copper, asserts the copper reaches the wall it cut. Before the fix that point read 52 W/m·K (steel); after it reads above 100.</p>
 <p><strong>Why the scene tests did not catch either.</strong> They asserted <em>geometry</em> — where the metal is — which is what §4.1 says is the only reliable evidence on a part this size. Neither reads the material field, because until the studies were run there was no reason to think a boolean touched it. The lesson is in the same direction as §4.1 and one step further: a scene test that means to stand in for the simulation has to assert the <em>field the simulation reads</em>, not only the surface.</p>
 </section>
@@ -570,14 +535,14 @@ rescale the objective.</code></pre>
 <h3 class="anchored" data-anchor-id="fixed-a-study-that-reads-the-scenes-materials-could-not-be-optimised">2.8 FIXED — a study that reads the scene’s materials could not be optimised</h3>
 <p><strong>What happened.</strong> With §2.6 and §2.7 in, both studies solved. The optimisation over the elastic one still did not, and it failed twice, in two different places, for the same underlying reason: <code>Optimization</code> calls a study along two paths and <strong>neither of them hands it the scene</strong>.</p>
 <p><em>During</em> the loop it builds the mesh once, to freeze the topology so the gradient is a gradient of the physics and not of the mesher, and then calls</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> study.solve(mesh<span class="op">=</span>mesh, points<span class="op">=</span>points)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>result = study.solve(mesh=mesh, points=points)</code></pre>
 <p><code>_solve_mesh</code> sees an already-extracted <code>HexMesh</code>, returns “no SimMesh attached”, and <code>_material_source</code> had exactly two rungs: the <code>sdf</code> argument (absent) and the built SimMesh’s domain (absent). So:</p>
 <pre><code>ValueError: Study 'belt-pull' derives 'youngs_modulus' from the scene's materials
 but got no SDF to sample: pass the scene to solve(sdf), give the study's SimMesh a
 domain=, or set an explicit youngs_modulus value on the study.</code></pre>
 <p>The scene had <em>taken that advice already</em> — <code>shield_mesh</code> is declared <code>domain=shield</code>, and it is the same object <code>study.mesh</code> points at. The error message was telling the author to do the thing they had done, because the lookup never asked the study what mesh it declared, only what mesh it was handed.</p>
 <p><em>After</em> the loop it writes the final parameters back with <code>apply_parameters</code>, re-extracts, and re-solves with the functionalized field:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> study.solve(final_field)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>result = study.solve(final_field)</code></pre>
 <p><code>final_field</code> is a bare closure. It has no <code>material_at</code>, so the sampler refused it — 300 seconds into a run, after every gradient step had already succeeded.</p>
 <p><strong>Fix.</strong> <code>_material_source</code> becomes a ladder, and skips a candidate that cannot answer <code>material_at</code>: the <code>solve</code> argument, then the built SimMesh’s domain, then <strong>the study’s declared SimMesh’s domain</strong>, then the study’s own <code>domain=</code>. If nothing carries materials, whatever was handed in is returned unchanged, so the sampler still raises the error that names what it got.</p>
 <p>The second rung of that ladder is not a mere tolerance. By the time <code>solve(final_field)</code> runs, the optimiser has already written the final parameters onto the scene object, so the declared domain <em>is</em> the geometry the callable describes — and it also knows what it is made of, which the callable never will.</p>
@@ -587,8 +552,8 @@ domain=, or set an explicit youngs_modulus value on the study.</code></pre>
 <h3 class="anchored" data-anchor-id="deferred-there-is-no-sweep-along-a-curve-and-twist-is-the-nearest-thing-to-one">2.9 DEFERRED — there is no sweep along a curve, and <code>twist</code> is the nearest thing to one</h3>
 <p><strong>What the part needs.</strong> A cast coolant jacket is a tube of circular section following a helix around the bearing tower. That is a sweep: a profile carried along a 3D path, kept normal to it.</p>
 <p><strong>What the language has.</strong> <code>extrude(profile, depth, twist=…)</code>, which rotates the <em>query point</em> about the extrusion’s local z by <code>twist · z / depth</code>. A circle drawn 0.75 off the axis and extruded with a full turn of twist does sweep a helix of radius 0.75, and that is what the part uses:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>channel_profile <span class="op">=</span> PolygonProfile.circle(radius<span class="op">=</span><span class="fl">0.11</span>, center<span class="op">=</span>(<span class="fl">0.75</span>, <span class="fl">0.0</span>), segments<span class="op">=</span><span class="dv">10</span>, …)</span>
-<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>channel <span class="op">=</span> extrude(channel_profile, depth<span class="op">=</span><span class="fl">0.44</span>, twist<span class="op">=</span>channel_turns.value <span class="op">*</span> <span class="fl">360.0</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>channel_profile = PolygonProfile.circle(radius=0.11, center=(0.75, 0.0), segments=10, …)
+channel = extrude(channel_profile, depth=0.44, twist=channel_turns.value * 360.0)</code></pre>
 <p>Four things are wrong with it and all four had to be designed around.</p>
 <ol type="1">
 <li><strong>The section is normal to z, not to the path.</strong> The tube’s cross-section in the plane perpendicular to the helix is an <em>ellipse</em> — stretched by <code>1/cos(λ)</code> where λ is the helix angle. Here λ = atan(0.44 / (2π·0.75)) = 5.3°, so the tube is 0.4 % out of round and nobody would notice. Double the turns and it is 1.7 % out; make it a real screw and it stops being a tube.</li>
@@ -645,8 +610,8 @@ domain=, or set an explicit youngs_modulus value on the study.</code></pre>
 <section id="deferred-an-optimisation-has-no-constraints-only-a-regularizer" class="level3">
 <h3 class="anchored" data-anchor-id="deferred-an-optimisation-has-no-constraints-only-a-regularizer">2.17 DEFERRED — an optimisation has no constraints, only a regularizer</h3>
 <p>Both manufacturing limits in this part — the casting must not grow past a mass budget, and the wall between the bearing seat and the coolant channel must not fall below 0.12 — are <em>constraints</em>, and <code>Optimization</code> takes a <code>regularizer</code>/<code>regularizer_weight</code> pair. So they are softplus hinges with hand-tuned scales:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>over_budget <span class="op">=</span> <span class="fl">20.0</span> <span class="op">*</span> jax.nn.softplus((shield_volume(parameters) <span class="op">-</span> volume_cap) <span class="op">/</span> <span class="fl">0.02</span>)</span>
-<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>thin_wall <span class="op">=</span> jax.nn.softplus((seat_radius <span class="op">-</span> (<span class="fl">0.64</span> <span class="op">-</span> min_wall)) <span class="op">/</span> <span class="fl">0.005</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>over_budget = 20.0 * jax.nn.softplus((shield_volume(parameters) - volume_cap) / 0.02)
+thin_wall = jax.nn.softplus((seat_radius - (0.64 - min_wall)) / 0.005)</code></pre>
 <p>The three magic numbers (20.0, 0.02, 0.005) exist only to make a penalty behave like a constraint, they interact with <code>learning_rate</code>, and a violated constraint is reported as a slightly higher objective rather than as a violated constraint.</p>
 <p><strong>Proposed:</strong> <code>Optimization(constraints=[LessThan(shield_volume, 4.40), GreaterThan(seat_wall_thickness, 0.12)])</code>, implemented as an augmented Lagrangian over the same gradient — the multipliers replace the hand-tuned scales, and the report can then say <em>which</em> constraint bound.</p>
 </section>
@@ -658,8 +623,8 @@ domain=, or set an explicit youngs_modulus value on the study.</code></pre>
 <section id="deferred-a-parameter-cannot-appear-in-an-expression-so-every-derived-dimension-is-dead" class="level3">
 <h3 class="anchored" data-anchor-id="deferred-a-parameter-cannot-appear-in-an-expression-so-every-derived-dimension-is-dead">2.19 DEFERRED — a parameter cannot appear in an expression, so every derived dimension is dead</h3>
 <p><strong>This is the largest gap the part found.</strong> <code>Scalar</code> has no arithmetic:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="op">&gt;&gt;&gt;</span> Scalar(<span class="fl">1.0</span>, name<span class="op">=</span><span class="st">"turns"</span>) <span class="op">*</span> <span class="fl">360.0</span></span>
-<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="pp">TypeError</span>: unsupported operand <span class="bu">type</span>(s) <span class="cf">for</span> <span class="op">*</span>: <span class="st">'Scalar'</span> <span class="kw">and</span> <span class="st">'float'</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>&gt;&gt;&gt; Scalar(1.0, name="turns") * 360.0
+TypeError: unsupported operand type(s) for *: 'Scalar' and 'float'</code></pre>
 <p>Any dimension that is a <em>function</em> of another dimension therefore has to be computed in Python, off <code>.value</code>, which severs both the live link and the gradient. Six places in this one file:</p>
 <table class="caption-top table">
 <colgroup>
@@ -721,7 +686,7 @@ domain=, or set an explicit youngs_modulus value on the study.</code></pre>
 </ul>
 <p>Only the last two are reachable today: the lowered <code>mat_eval</code> returns the six <em>render</em> properties (<code>color</code>, <code>roughness</code>, <code>metallic</code>, <code>opacity</code>, <code>ior</code>, <code>reflectivity</code>) and defaults each of them at the leaf, so no <code>nan</code> ever enters it. The visible consequence is mild and one-directional — inside a <code>Difference</code>, <code>d − d₀</code> is positive almost everywhere, so <code>t</code> saturates at 1 and the body’s material simply wins: a tool that carries a material to tint the wall it cut never tints it in the compiled render, while it does in the interpreted one. Nothing in this part looks wrong because of it. It is recorded because <em>two implementations of one rule</em> is the interesting fact, not the size of today’s discrepancy.</p>
 <p><strong>Proposed design.</strong> One fold, in <code>cadjoint/sdf/boolean/base.py</code>, over already-evaluated <code>(distance, material)</code> pairs:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> fold_materials(kind, first, rest, smoothness): ...</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>def fold_materials(kind, first, rest, smoothness): ...</code></pre>
 <p><code>Union.material_at</code>, <code>Difference.material_at</code>, <code>Intersection.material_at</code>, <code>Xor.material_at</code> and <code>functionalize</code>’s <code>mat_eval</code> all call it, the last one passing the node’s own <code>kind</code>, which it already has in hand as <code>obj</code>. Then a test can assert the two agree on the same tree — which is the test that does not exist and is the reason this drifted.</p>
 <hr>
 </section>

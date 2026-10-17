@@ -26,41 +26,6 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
-/* CSS for syntax highlighting */
-html { -webkit-text-size-adjust: 100%; }
-pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
-pre > code.sourceCode > span:empty { height: 1.2em; }
-.sourceCode { overflow: visible; }
-code.sourceCode > span { color: inherit; text-decoration: inherit; }
-div.sourceCode { margin: 1em 0; }
-pre.sourceCode { margin: 0; }
-@media screen {
-div.sourceCode { overflow: auto; }
-}
-@media print {
-pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
-}
-pre.numberSource code
-  { counter-reset: source-line 0; }
-pre.numberSource code > span
-  { position: relative; left: -4em; counter-increment: source-line; }
-pre.numberSource code > span > a:first-child::before
-  { content: counter(source-line);
-    position: relative; left: -1em; text-align: right; vertical-align: baseline;
-    border: none; display: inline-block;
-    -webkit-touch-callout: none; -webkit-user-select: none;
-    -khtml-user-select: none; -moz-user-select: none;
-    -ms-user-select: none; user-select: none;
-    padding: 0 4px; width: 4em;
-  }
-pre.numberSource { margin-left: 3em;  padding-left: 4px; }
-div.sourceCode
-  {   }
-@media screen {
-pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
-}
 </style>
 
 
@@ -77,10 +42,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-bf27225e3a48a9273f3daa8f8e829971.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-e5d05eddbe2c608fb9c90784db6be0b0.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-f6e81f4864cb6d8b696b855696ff1c11.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-92bccf0354c8ed56982edb6814cc42fe.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -304,33 +269,33 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 <p>cadjoint is a fully differentiable CAD system: every SDF is a pure JAX function, so gradients flow through geometry just like through any other computation. This makes it straightforward to optimize shape parameters directly with respect to any loss.</p>
 <div id="d7882962" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:35:34.441583Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:35:34.441524Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:35:34.735353Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:35:34.734930Z&quot;}}" data-execution_count="1">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> jax</span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> jax.numpy <span class="im">as</span> jnp</span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint <span class="im">import</span> extract_parameters, functionalize</span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.geometry <span class="im">import</span> Vector</span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.render <span class="im">import</span> render_raymarched</span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf <span class="im">import</span> SDF, Sphere, Translate, Union, volume</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python cell-code"><code>import jax
+import jax.numpy as jnp
+
+from cadjoint import extract_parameters, functionalize
+from cadjoint.geometry import Vector
+from cadjoint.render import render_raymarched
+from cadjoint.sdf import SDF, Sphere, Translate, Union, volume</code></pre>
 </div>
 <p>Because SDFs are plain JAX functions, we can differentiate through them out of the box. As a running example, we define a scene builder that places two unit spheres at positions <code>p1</code> and <code>p2</code> and returns their union.</p>
 <div id="c25af622" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:35:34.736532Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:35:34.736442Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:35:34.738173Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:35:34.737888Z&quot;}}" data-execution_count="2">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> double_sphere(p1: jax.Array, p2: jax.Array) <span class="op">-&gt;</span> SDF:</span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    radius <span class="op">=</span> <span class="fl">1.0</span></span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>    sphere1 <span class="op">=</span> Translate(Sphere(radius<span class="op">=</span>radius), offset<span class="op">=</span>p1)</span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>    sphere2 <span class="op">=</span> Translate(Sphere(radius<span class="op">=</span>radius), offset<span class="op">=</span>p2)</span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> jax.jit(Union(sphere1, sphere2))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python cell-code"><code>def double_sphere(p1: jax.Array, p2: jax.Array) -&gt; SDF:
+    radius = 1.0
+    sphere1 = Translate(Sphere(radius=radius), offset=p1)
+    sphere2 = Translate(Sphere(radius=radius), offset=p2)
+    return jax.jit(Union(sphere1, sphere2))</code></pre>
 </div>
 <div id="a35ea133" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:35:34.739058Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:35:34.739016Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:35:35.442130Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:35:35.441738Z&quot;}}" data-execution_count="3">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>p1 <span class="op">=</span> jnp.array([<span class="fl">0.0</span>, <span class="fl">0.0</span>, <span class="fl">0.0</span>])</span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>p2 <span class="op">=</span> jnp.array([<span class="fl">1.0</span>, <span class="fl">0.0</span>, <span class="fl">0.0</span>])</span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>render_raymarched(</span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>    double_sphere(p1, p2),</span>
-<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>    camera_pos<span class="op">=</span>jnp.array([<span class="fl">3.0</span>, <span class="fl">2.0</span>, <span class="fl">4.0</span>]),</span>
-<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>    look_at<span class="op">=</span>jnp.array([<span class="fl">0.5</span>, <span class="fl">0.0</span>, <span class="fl">0.0</span>]),</span>
-<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>    resolution<span class="op">=</span>(<span class="dv">300</span>, <span class="dv">300</span>),</span>
-<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>    aa_samples<span class="op">=</span><span class="dv">2</span>,</span>
-<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python cell-code"><code>p1 = jnp.array([0.0, 0.0, 0.0])
+p2 = jnp.array([1.0, 0.0, 0.0])
+
+render_raymarched(
+    double_sphere(p1, p2),
+    camera_pos=jnp.array([3.0, 2.0, 4.0]),
+    look_at=jnp.array([0.5, 0.0, 0.0]),
+    resolution=(300, 300),
+    aa_samples=2,
+)</code></pre>
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
@@ -341,15 +306,15 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </div>
 <p>cadjoint provides a <code>volume</code> function that integrates an SDF over a bounding volume. We can use it as a loss and differentiate with respect to the sphere positions using <code>jax.value_and_grad</code>.</p>
 <div id="41479e83" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:35:35.443348Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:35:35.443257Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:35:35.444880Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:35:35.444623Z&quot;}}" data-execution_count="4">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> loss(p1: jax.Array, p2: jax.Array) <span class="op">-&gt;</span> jax.Array:</span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> volume(double_sphere(p1, p2))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python cell-code"><code>def loss(p1: jax.Array, p2: jax.Array) -&gt; jax.Array:
+    return volume(double_sphere(p1, p2))</code></pre>
 </div>
 <div id="38461773" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:35:35.445659Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:35:35.445611Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:35:35.710274Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:35:35.709920Z&quot;}}" data-execution_count="5">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>grad <span class="op">=</span> jax.value_and_grad(loss, argnums<span class="op">=</span>(<span class="dv">0</span>, <span class="dv">1</span>))</span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>value, grads <span class="op">=</span> grad(p1, p2)</span>
-<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Loss value:"</span>, value)</span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Gradient w.r.t p1:"</span>, grads[<span class="dv">0</span>])</span>
-<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Gradient w.r.t p2:"</span>, grads[<span class="dv">1</span>])</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python cell-code"><code>grad = jax.value_and_grad(loss, argnums=(0, 1))
+value, grads = grad(p1, p2)
+print("Loss value:", value)
+print("Gradient w.r.t p1:", grads[0])
+print("Gradient w.r.t p2:", grads[1])</code></pre>
 <div class="cell-output cell-output-stdout">
 <pre><code>Loss value: 6.8726716
 Gradient w.r.t p1: [-1.8908138e+00  2.6635826e-07 -1.0745152e-06]
@@ -358,39 +323,39 @@ Gradient w.r.t p2: [1.9764323e+00 1.3652647e-06 9.5690950e-07]</code></pre>
 </div>
 <p>Passing positions explicitly works, but scales poorly: complex scenes may have dozens of parameters scattered across the tree. cadjoint lets you tag parameters as <em>free</em> directly on the geometry objects, then extract them automatically as a flat dictionary that JAX can differentiate through.</p>
 <div id="64c3eea2" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:35:35.711387Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:35:35.711341Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:35:35.713939Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:35:35.713551Z&quot;}}" data-execution_count="6">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>p1 <span class="op">=</span> Vector(jnp.array([<span class="fl">0.0</span>, <span class="fl">0.0</span>, <span class="fl">0.0</span>]), free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">"p1"</span>)</span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>p2 <span class="op">=</span> Vector(jnp.array([<span class="fl">1.0</span>, <span class="fl">0.0</span>, <span class="fl">0.0</span>]), free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">"p2"</span>)</span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>sphere1 <span class="op">=</span> Translate(Sphere(radius<span class="op">=</span><span class="fl">1.0</span>), offset<span class="op">=</span>p1)</span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>sphere2 <span class="op">=</span> Translate(Sphere(radius<span class="op">=</span><span class="fl">1.0</span>), offset<span class="op">=</span>p2)</span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>double_sphere_ <span class="op">=</span> Union(sphere1, sphere2)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python cell-code"><code>p1 = Vector(jnp.array([0.0, 0.0, 0.0]), free=True, name="p1")
+p2 = Vector(jnp.array([1.0, 0.0, 0.0]), free=True, name="p2")
+sphere1 = Translate(Sphere(radius=1.0), offset=p1)
+sphere2 = Translate(Sphere(radius=1.0), offset=p2)
+double_sphere_ = Union(sphere1, sphere2)</code></pre>
 </div>
 <p><code>extract_parameters</code> walks the SDF tree and returns three dictionaries: free (differentiable) parameters keyed by name, fixed parameters keyed by tree path, and metadata carrying the <code>Parameter</code> objects behind the free values.</p>
 <div id="b4247ab3" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:35:35.715015Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:35:35.714962Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:35:35.716703Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:35:35.716385Z&quot;}}" data-execution_count="7">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>free_params, fixed_params, metadata <span class="op">=</span> extract_parameters(double_sphere_)</span>
-<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Free parameters:"</span>, free_params)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python cell-code"><code>free_params, fixed_params, metadata = extract_parameters(double_sphere_)
+
+print("Free parameters:", free_params)</code></pre>
 <div class="cell-output cell-output-stdout">
 <pre><code>Free parameters: {'p1': Array([0., 0., 0.], dtype=float32), 'p2': Array([1., 0., 0.], dtype=float32)}</code></pre>
 </div>
 </div>
 <p><code>functionalize</code> compiles the SDF tree into a curried pure function: given parameter dictionaries it returns a callable <code>point → distance</code>. This separates the geometry structure (fixed at compile time) from the parameter values (free to vary).</p>
 <div id="143d8541" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:35:35.717564Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:35:35.717519Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:35:35.805860Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:35:35.805443Z&quot;}}" data-execution_count="8">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>double_sphere_functional <span class="op">=</span> functionalize(double_sphere_)</span>
-<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>double_sphere_functional(free_params, fixed_params)(jnp.array([<span class="fl">0.5</span>, <span class="dv">0</span>, <span class="dv">0</span>]))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python cell-code"><code>double_sphere_functional = functionalize(double_sphere_)
+double_sphere_functional(free_params, fixed_params)(jnp.array([0.5, 0, 0]))</code></pre>
 <div class="cell-output cell-output-display" data-execution_count="8">
 <pre><code>Array(-0.6, dtype=float32)</code></pre>
 </div>
 </div>
 <p>We can now differentiate the loss through the parameter dictionary directly.</p>
 <div id="e1faf9dd" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:35:35.806895Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:35:35.806837Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:35:35.808439Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:35:35.808099Z&quot;}}" data-execution_count="9">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> loss(params):</span>
-<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> volume(double_sphere_functional(params, fixed_params))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python cell-code"><code>def loss(params):
+    return volume(double_sphere_functional(params, fixed_params))</code></pre>
 </div>
 <div id="754df02e" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:35:35.809387Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:35:35.809338Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:35:36.066575Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:35:36.066146Z&quot;}}" data-execution_count="10">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>grad <span class="op">=</span> jax.value_and_grad(loss, argnums<span class="op">=</span>(<span class="dv">0</span>))</span>
-<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>value, grads <span class="op">=</span> grad(free_params)</span>
-<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Loss value:"</span>, value)</span>
-<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>grads</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python cell-code"><code>grad = jax.value_and_grad(loss, argnums=(0))
+value, grads = grad(free_params)
+print("Loss value:", value)
+grads</code></pre>
 <div class="cell-output cell-output-stdout">
 <pre><code>Loss value: 6.8726716</code></pre>
 </div>

@@ -26,41 +26,6 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
-/* CSS for syntax highlighting */
-html { -webkit-text-size-adjust: 100%; }
-pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
-pre > code.sourceCode > span:empty { height: 1.2em; }
-.sourceCode { overflow: visible; }
-code.sourceCode > span { color: inherit; text-decoration: inherit; }
-div.sourceCode { margin: 1em 0; }
-pre.sourceCode { margin: 0; }
-@media screen {
-div.sourceCode { overflow: auto; }
-}
-@media print {
-pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
-}
-pre.numberSource code
-  { counter-reset: source-line 0; }
-pre.numberSource code > span
-  { position: relative; left: -4em; counter-increment: source-line; }
-pre.numberSource code > span > a:first-child::before
-  { content: counter(source-line);
-    position: relative; left: -1em; text-align: right; vertical-align: baseline;
-    border: none; display: inline-block;
-    -webkit-touch-callout: none; -webkit-user-select: none;
-    -khtml-user-select: none; -moz-user-select: none;
-    -ms-user-select: none; user-select: none;
-    padding: 0 4px; width: 4em;
-  }
-pre.numberSource { margin-left: 3em;  padding-left: 4px; }
-div.sourceCode
-  {   }
-@media screen {
-pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
-}
 </style>
 
 
@@ -77,10 +42,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-bf27225e3a48a9273f3daa8f8e829971.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-e5d05eddbe2c608fb9c90784db6be0b0.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-f6e81f4864cb6d8b696b855696ff1c11.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-92bccf0354c8ed56982edb6814cc42fe.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -305,17 +270,17 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 <section id="cadjoint.fem.hexmesh.HexMesh" class="level1">
 <h1>fem.hexmesh.HexMesh</h1>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>fem.hexmesh.HexMesh(</span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>    points,</span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>    cells,</span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    boundary_faces,</span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>    base_points<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>    snap_mask<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>    max_step<span class="op">=</span><span class="fl">0.0</span>,</span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>    grid<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>    table<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>    incidence<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>fem.hexmesh.HexMesh(
+    points,
+    cells,
+    boundary_faces,
+    base_points=None,
+    snap_mask=None,
+    max_step=0.0,
+    grid=None,
+    table=None,
+    incidence=None,
+)</code></pre>
 <p>A HEX8 volume mesh extracted from an SDF.</p>
 <section id="attributes" class="level2 doc-section doc-section-attributes">
 <h2 class="doc-section doc-section-attributes anchored" data-anchor-id="attributes">Attributes</h2>
@@ -405,29 +370,29 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </table>
 <section id="cadjoint.fem.hexmesh.HexMesh.all_boundary_faces" class="level3">
 <h3 class="anchored" data-anchor-id="cadjoint.fem.hexmesh.HexMesh.all_boundary_faces">all_boundary_faces</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>fem.hexmesh.HexMesh.all_boundary_faces()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>fem.hexmesh.HexMesh.all_boundary_faces()</code></pre>
 <p>All boundary quads concatenated across gradient-axis groups.</p>
 </section>
 <section id="cadjoint.fem.hexmesh.HexMesh.elastic" class="level3">
 <h3 class="anchored" data-anchor-id="cadjoint.fem.hexmesh.HexMesh.elastic">elastic</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>fem.hexmesh.HexMesh.elastic(problem, <span class="op">*</span>, placement<span class="op">=</span><span class="va">None</span>, backend<span class="op">=</span><span class="va">None</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>fem.hexmesh.HexMesh.elastic(problem, *, placement=None, backend=None)</code></pre>
 <p>Linear elasticity through the backend registry (<code>jaxfem</code> by default).</p>
 </section>
 <section id="cadjoint.fem.hexmesh.HexMesh.face_patch" class="level3">
 <h3 class="anchored" data-anchor-id="cadjoint.fem.hexmesh.HexMesh.face_patch">face_patch</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>fem.hexmesh.HexMesh.face_patch(selection)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>fem.hexmesh.HexMesh.face_patch(selection)</code></pre>
 <p>The union of the corners of the boundary quads the selection spans, and no faces.</p>
 <p>A backend applies an area-integrated condition to exactly the faces all of whose corners are in the set.</p>
 </section>
 <section id="cadjoint.fem.hexmesh.HexMesh.moved" class="level3">
 <h3 class="anchored" data-anchor-id="cadjoint.fem.hexmesh.HexMesh.moved">moved</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>fem.hexmesh.HexMesh.moved(field, <span class="op">*</span>, smooth_passes<span class="op">=</span><span class="dv">0</span>, design<span class="op">=</span><span class="va">None</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>fem.hexmesh.HexMesh.moved(field, *, smooth_passes=0, design=None)</code></pre>
 <p>Node positions under the design: snapped vertices re-projected, the lattice frozen.</p>
 <p>With a table and the design’s parameters, each snapped vertex is solved onto the census surfaces it was classified on — a crease vertex onto both faces at once — which is the derivative a single field’s Newton gets wrong there. Without, the single field’s.</p>
 </section>
 <section id="cadjoint.fem.hexmesh.HexMesh.thermal" class="level3">
 <h3 class="anchored" data-anchor-id="cadjoint.fem.hexmesh.HexMesh.thermal">thermal</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>fem.hexmesh.HexMesh.thermal(problem, <span class="op">*</span>, placement<span class="op">=</span><span class="va">None</span>, backend<span class="op">=</span><span class="va">None</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>fem.hexmesh.HexMesh.thermal(problem, *, placement=None, backend=None)</code></pre>
 <p>Steady conduction through the backend registry (<code>jaxfem</code> by default).</p>
 
 

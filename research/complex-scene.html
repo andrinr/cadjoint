@@ -26,41 +26,6 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
-/* CSS for syntax highlighting */
-html { -webkit-text-size-adjust: 100%; }
-pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
-pre > code.sourceCode > span:empty { height: 1.2em; }
-.sourceCode { overflow: visible; }
-code.sourceCode > span { color: inherit; text-decoration: inherit; }
-div.sourceCode { margin: 1em 0; }
-pre.sourceCode { margin: 0; }
-@media screen {
-div.sourceCode { overflow: auto; }
-}
-@media print {
-pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
-}
-pre.numberSource code
-  { counter-reset: source-line 0; }
-pre.numberSource code > span
-  { position: relative; left: -4em; counter-increment: source-line; }
-pre.numberSource code > span > a:first-child::before
-  { content: counter(source-line);
-    position: relative; left: -1em; text-align: right; vertical-align: baseline;
-    border: none; display: inline-block;
-    -webkit-touch-callout: none; -webkit-user-select: none;
-    -khtml-user-select: none; -moz-user-select: none;
-    -ms-user-select: none; user-select: none;
-    padding: 0 4px; width: 4em;
-  }
-pre.numberSource { margin-left: 3em;  padding-left: 4px; }
-div.sourceCode
-  {   }
-@media screen {
-pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
-}
 </style>
 
 
@@ -77,10 +42,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-bf27225e3a48a9273f3daa8f8e829971.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-e5d05eddbe2c608fb9c90784db6be0b0.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-f6e81f4864cb6d8b696b855696ff1c11.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-92bccf0354c8ed56982edb6814cc42fe.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -388,8 +353,8 @@ peak temperature                       1.3067</code></pre>
 <section id="fixed-a-face-reference-did-not-survive-a-boolean" class="level3">
 <h3 class="anchored" data-anchor-id="fixed-a-face-reference-did-not-survive-a-boolean">2.1 FIXED — a face reference did not survive a boolean</h3>
 <p><strong>What was tried.</strong> Build the housing, then sketch the next feature on it:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>housing <span class="op">=</span> Difference(body, bore, bolt_holes)</span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>pad <span class="op">=</span> PolygonProfile(PAD, plane<span class="op">=</span>SketchPlane.on(housing.cap(<span class="st">"+"</span>)))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>housing = Difference(body, bore, bolt_holes)
+pad = PolygonProfile(PAD, plane=SketchPlane.on(housing.cap("+")))</code></pre>
 <p><strong>What happened.</strong> <code>AttributeError: 'Difference' object has no attribute 'cap'</code>. <code>attach_faces</code> binds <code>faces</code>/<code>face</code>/<code>cap</code>/<code>side</code>/<code>axis</code> onto the instance the <em>generator</em> returned, so the reference existed on <code>flange</code> and died the moment the flange was combined with anything. In practice that means: the instant a plate has a hole in it, it stops being something you can sketch on — which is most of what feature-based CAD is.</p>
 <p>The workaround is to keep a variable pointing at every pre-boolean feature and sketch on <em>that</em>, which is exactly the “stored surface” bookkeeping the face system exists to remove.</p>
 <p><strong>The fix.</strong> <code>SDF.__getattr__</code> forwards those five names to the node’s <em>first</em> child, gated on an opt-in <code>inherits_faces</code> class flag. <code>BooleanOp</code>, <code>LinearPattern</code> and <code>PolarPattern</code> set it; nothing else does.</p>
@@ -415,8 +380,8 @@ peak temperature                       1.3067</code></pre>
 <section id="fixed-a-pattern-and-a-mirror-could-only-address-the-world-origin" class="level3">
 <h3 class="anchored" data-anchor-id="fixed-a-pattern-and-a-mirror-could-only-address-the-world-origin">2.3 FIXED — a pattern and a mirror could only address the world origin</h3>
 <p><strong>What was tried.</strong> A bolt circle about the bearing’s axis, and three screws about the lubrication port’s horizontal axis:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>bolt_holes <span class="op">=</span> PolarPattern(bolt_hole, count<span class="op">=</span><span class="dv">4</span>, axis<span class="op">=</span>bore_axis)</span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>port_screws <span class="op">=</span> PolarPattern(port_screw, count<span class="op">=</span><span class="dv">3</span>, axis<span class="op">=</span>port_axis)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>bolt_holes = PolarPattern(bolt_hole, count=4, axis=bore_axis)
+port_screws = PolarPattern(port_screw, count=3, axis=port_axis)</code></pre>
 <p><strong>What happened.</strong> <code>PolarPattern only supports axis 'z'</code>, and <code>Mirror</code> took only <code>'x'</code>/<code>'y'</code>/<code>'z'</code>. Both meant the <em>world</em> coordinate plane or axis through the <em>world origin</em> — the one line a real part’s features are almost never on. The workaround is to wrap the child in <code>Translate</code>/<code>Rotate</code> to bring the feature to the origin, pattern it, and move it back, which puts the placement in two places at once and breaks as soon as the part moves.</p>
 <p><strong>The fix.</strong> <code>PolarPattern(..., axis=Axis(origin, direction))</code> and <code>Mirror(..., Face | SketchPlane)</code>. <code>PolarPattern</code>’s <em>string</em> form still accepts only <code>'z'</code>, deliberately: a letter can say which way an axis points but not <em>where it is</em>, and where it is happens to be most of what a bolt circle means, so a second spelling of the same underdetermined thing would be a trap. <code>Mirror</code> keeps its three letters because a coordinate plane through the origin is a real, common answer for a symmetric part.</p>
 <p>Both default paths are <strong>numerically identical</strong> to the previous implementations — bit-for-bit on sampled points — which the tests assert, because the general Rodrigues form folds to the old expression when the axis is <code>+z</code> through the origin and the angles are static.</p>
@@ -443,7 +408,7 @@ peak temperature                       1.3067</code></pre>
 <section id="deferred-every-extrusion-straddles-its-sketch-plane" class="level3">
 <h3 class="anchored" data-anchor-id="deferred-every-extrusion-straddles-its-sketch-plane">2.6 DEFERRED — every extrusion straddles its sketch plane</h3>
 <p><code>extrude(profile, depth)</code> spans <code>±depth/2</code> about the plane. There is no one-sided extrude, so a boss that should <em>sit on</em> a face has to be sketched on that face pushed up by half its own depth:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>boss_plane <span class="op">=</span> flange.cap(<span class="st">"+"</span>).plane(offset<span class="op">=</span>boss_height <span class="op">/</span> <span class="fl">2.0</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>boss_plane = flange.cap("+").plane(offset=boss_height / 2.0)</code></pre>
 <p>The offset must be kept in sync with the depth by hand, in two places. This is the single most repeated wart in the scene — it appears at every level of the face chain.</p>
 <p><strong>Why deferred.</strong> The fix (<code>extrude(..., symmetric=False)</code>, spanning <code>[0, depth]</code> above the plane) also has to reach <code>extrusion_faces</code>, which reads <code>profile.plane</code> directly to place the caps. Doing it properly means threading a placement plane through the generator and its face builder together, which changes what <code>profile.plane</code> <em>means</em> for every face consumer. That deserves its own change with its own tests, not a rider on this one.</p>
 <p><code>Face.plane(offset=...)</code> was added as the ergonomic half of it, so the idiom is at least one legible expression instead of a <code>SketchPlane.offset</code> call.</p>

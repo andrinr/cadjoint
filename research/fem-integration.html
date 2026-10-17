@@ -26,41 +26,6 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
-/* CSS for syntax highlighting */
-html { -webkit-text-size-adjust: 100%; }
-pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
-pre > code.sourceCode > span:empty { height: 1.2em; }
-.sourceCode { overflow: visible; }
-code.sourceCode > span { color: inherit; text-decoration: inherit; }
-div.sourceCode { margin: 1em 0; }
-pre.sourceCode { margin: 0; }
-@media screen {
-div.sourceCode { overflow: auto; }
-}
-@media print {
-pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
-}
-pre.numberSource code
-  { counter-reset: source-line 0; }
-pre.numberSource code > span
-  { position: relative; left: -4em; counter-increment: source-line; }
-pre.numberSource code > span > a:first-child::before
-  { content: counter(source-line);
-    position: relative; left: -1em; text-align: right; vertical-align: baseline;
-    border: none; display: inline-block;
-    -webkit-touch-callout: none; -webkit-user-select: none;
-    -khtml-user-select: none; -moz-user-select: none;
-    -ms-user-select: none; user-select: none;
-    padding: 0 4px; width: 4em;
-  }
-pre.numberSource { margin-left: 3em;  padding-left: 4px; }
-div.sourceCode
-  {   }
-@media screen {
-pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
-}
 </style>
 
 
@@ -77,10 +42,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-bf27225e3a48a9273f3daa8f8e829971.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-e5d05eddbe2c608fb9c90784db6be0b0.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-f6e81f4864cb6d8b696b855696ff1c11.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-92bccf0354c8ed56982edb6814cc42fe.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -527,11 +492,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="getting-the-binary-what-actually-worked" class="level3">
 <h3 class="anchored" data-anchor-id="getting-the-binary-what-actually-worked">Getting the binary (what actually worked)</h3>
 <p>No Homebrew formula exists (<code>brew search calculix</code> is empty) and no conda manager was installed, so: standalone micromamba + conda-forge, which ships a native arm64 <code>ccx</code> 2.23 for macOS:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode sh code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">mkdir</span> <span class="at">-p</span> ~/.local/share/cadjoint <span class="kw">&amp;&amp;</span> <span class="bu">cd</span> ~/.local/share/cadjoint</span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="ex">curl</span> <span class="at">-Ls</span> https://micro.mamba.pm/api/micromamba/osx-arm64/latest <span class="kw">|</span> <span class="fu">tar</span> <span class="at">-xj</span> bin/micromamba</span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="ex">./bin/micromamba</span> create <span class="at">-y</span> <span class="at">-p</span> ./ccx-env <span class="at">-c</span> conda-forge calculix</span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="ex">./ccx-env/bin/ccx</span> <span class="at">-v</span>   <span class="co"># "This is Version 2.23"</span></span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="bu">export</span> <span class="va">CADJOINT_CCX</span><span class="op">=</span>~/.local/share/cadjoint/ccx-env/bin/ccx</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="sh"><code>mkdir -p ~/.local/share/cadjoint &amp;&amp; cd ~/.local/share/cadjoint
+curl -Ls https://micro.mamba.pm/api/micromamba/osx-arm64/latest | tar -xj bin/micromamba
+./bin/micromamba create -y -p ./ccx-env -c conda-forge calculix
+./ccx-env/bin/ccx -v   # "This is Version 2.23"
+export CADJOINT_CCX=~/.local/share/cadjoint/ccx-env/bin/ccx</code></pre>
 <p><code>cadjoint.fem.calculix.find_ccx</code> resolves the binary via <code>CADJOINT_CCX</code> / <code>CCX</code> env vars or <code>PATH</code>; every live test skips cleanly when none is found. The env above lives under <code>~/.local/share/cadjoint</code> on this machine (a /tmp install evaporated once already — keep it somewhere durable).</p>
 </section>
 <section id="integration-shape" class="level3">
@@ -801,8 +766,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p><strong>Where the dead gradients come from.</strong> The same degeneracy <code>edge_detection._refine</code> already documents: a vertex lands bit-exactly on a wall of a polygon-derived SDF, where <code>ExtrudedPolygon.sdf</code>’s <code>jnp.maximum(d2, dz)</code> ties and JAX splits the subgradient evenly between two branches that cancel. On the starter heat sink at its declared 18x13x11 grid, 17 of the 860 DC surface vertices start with <code>|grad| == 0.0</code> exactly — nine on the fin-tip corner line (<code>z = 0.85</code>, a profile vertex of the comb) and eight on the slug-bottom rim (<code>z = -0.18</code>) — and 110 to 131 more join them after the first Newton iteration lands them on those same walls.</p>
 <p><strong>Why every shipped test missed it.</strong> At the freeze design (<code>fin_depth = 1.2</code>) those nodes carry <code>value == 0.0</code> exactly, so <code>value * Hessian / 1e-12</code> is zero and the measured maximum per-node amplification is the healthy 0.503 that <code>tests/fem/test_starter_tet.py</code> records. Step off the freeze design by any amount and the residual becomes ~1.2e-8 — small in the forward pass, 1.2e+4 after the floor.</p>
 <p><strong>The fix.</strong> The repo’s double-<code>where</code> idiom, applied so the <em>gradient</em> is also zero when the guard trips:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>usable <span class="op">=</span> jax.lax.stop_gradient(squared) <span class="op">&gt;</span> _MIN_GRADIENT_SQUARED   <span class="co"># 1e-8</span></span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>step <span class="op">=</span> jnp.where(usable, value[:, <span class="va">None</span>] <span class="op">*</span> gradient <span class="op">/</span> jnp.where(usable, squared, <span class="fl">1.0</span>), <span class="fl">0.0</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>usable = jax.lax.stop_gradient(squared) &gt; _MIN_GRADIENT_SQUARED   # 1e-8
+step = jnp.where(usable, value[:, None] * gradient / jnp.where(usable, squared, 1.0), 0.0)</code></pre>
 <p>The inner <code>where</code> keeps the suppressed division finite so no NaN can reach the cotangent; the outer one zeroes value and derivative together. The threshold is on <code>|grad|^2</code>, not on the step: a signed <em>distance</em> field has <code>|grad| = 1</code> almost everywhere, so <code>|grad| &lt; 1e-4</code> never means “a shallow field”, it means the linearization is float noise. That is 1e4 more margin than the old floor had, and the measured field has a clean gap — the starter’s surface nodes are either exactly 0 or above 0.195.</p>
 <p><strong>Before / after</strong>, starter heat sink, <code>fin_depth</code>, objective <code>sum(points**2)</code> through <code>recompute_tet_points(..., smooth_passes=2)</code> on the frozen 860-vertex DC surface:</p>
 <table class="caption-top table">

@@ -26,41 +26,6 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
-/* CSS for syntax highlighting */
-html { -webkit-text-size-adjust: 100%; }
-pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
-pre > code.sourceCode > span:empty { height: 1.2em; }
-.sourceCode { overflow: visible; }
-code.sourceCode > span { color: inherit; text-decoration: inherit; }
-div.sourceCode { margin: 1em 0; }
-pre.sourceCode { margin: 0; }
-@media screen {
-div.sourceCode { overflow: auto; }
-}
-@media print {
-pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
-}
-pre.numberSource code
-  { counter-reset: source-line 0; }
-pre.numberSource code > span
-  { position: relative; left: -4em; counter-increment: source-line; }
-pre.numberSource code > span > a:first-child::before
-  { content: counter(source-line);
-    position: relative; left: -1em; text-align: right; vertical-align: baseline;
-    border: none; display: inline-block;
-    -webkit-touch-callout: none; -webkit-user-select: none;
-    -khtml-user-select: none; -moz-user-select: none;
-    -ms-user-select: none; user-select: none;
-    padding: 0 4px; width: 4em;
-  }
-pre.numberSource { margin-left: 3em;  padding-left: 4px; }
-div.sourceCode
-  {   }
-@media screen {
-pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
-}
 </style>
 
 
@@ -77,10 +42,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-bf27225e3a48a9273f3daa8f8e829971.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-e5d05eddbe2c608fb9c90784db6be0b0.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-f6e81f4864cb6d8b696b855696ff1c11.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-92bccf0354c8ed56982edb6814cc42fe.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -311,7 +276,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 <section id="cadjoint.plugins.registry.PluginRegistry" class="level1">
 <h1>plugins.registry.PluginRegistry</h1>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>plugins.registry.PluginRegistry(specs<span class="op">=</span><span class="va">None</span>, defaults<span class="op">=</span><span class="va">None</span>, <span class="op">*</span>, source<span class="op">=</span><span class="va">None</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>plugins.registry.PluginRegistry(specs=None, defaults=None, *, source=None)</code></pre>
 <p>The plugins this process knows about, and the instances it has open.</p>
 <section id="parameters" class="level2 doc-section doc-section-parameters">
 <h2 class="doc-section doc-section-parameters anchored" data-anchor-id="parameters">Parameters</h2>
@@ -410,12 +375,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </table>
 <section id="cadjoint.plugins.registry.PluginRegistry.close" class="level3">
 <h3 class="anchored" data-anchor-id="cadjoint.plugins.registry.PluginRegistry.close">close</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>plugins.registry.PluginRegistry.close()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>plugins.registry.PluginRegistry.close()</code></pre>
 <p>Close every open instance (tearing down spawned containers).</p>
 </section>
 <section id="cadjoint.plugins.registry.PluginRegistry.default_for" class="level3">
 <h3 class="anchored" data-anchor-id="cadjoint.plugins.registry.PluginRegistry.default_for">default_for</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>plugins.registry.PluginRegistry.default_for(kind)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>plugins.registry.PluginRegistry.default_for(kind)</code></pre>
 <p>The plugin name filling <code>kind</code>.</p>
 <section id="raises" class="level4 doc-section doc-section-raises">
 <h4 class="doc-section doc-section-raises anchored" data-anchor-id="raises">Raises</h4>
@@ -444,27 +409,27 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="cadjoint.plugins.registry.PluginRegistry.for_kind" class="level3">
 <h3 class="anchored" data-anchor-id="cadjoint.plugins.registry.PluginRegistry.for_kind">for_kind</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>plugins.registry.PluginRegistry.for_kind(kind)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>plugins.registry.PluginRegistry.for_kind(kind)</code></pre>
 <p>The (cached) plugin instance currently filling <code>kind</code>.</p>
 </section>
 <section id="cadjoint.plugins.registry.PluginRegistry.kinds" class="level3">
 <h3 class="anchored" data-anchor-id="cadjoint.plugins.registry.PluginRegistry.kinds">kinds</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>plugins.registry.PluginRegistry.kinds()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>plugins.registry.PluginRegistry.kinds()</code></pre>
 <p>Registered plugin names grouped by kind.</p>
 </section>
 <section id="cadjoint.plugins.registry.PluginRegistry.names" class="level3">
 <h3 class="anchored" data-anchor-id="cadjoint.plugins.registry.PluginRegistry.names">names</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>plugins.registry.PluginRegistry.names()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>plugins.registry.PluginRegistry.names()</code></pre>
 <p>Registered plugin names, sorted.</p>
 </section>
 <section id="cadjoint.plugins.registry.PluginRegistry.plugin" class="level3">
 <h3 class="anchored" data-anchor-id="cadjoint.plugins.registry.PluginRegistry.plugin">plugin</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>plugins.registry.PluginRegistry.plugin(name)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>plugins.registry.PluginRegistry.plugin(name)</code></pre>
 <p>The (cached) plugin instance registered under <code>name</code>.</p>
 </section>
 <section id="cadjoint.plugins.registry.PluginRegistry.register" class="level3">
 <h3 class="anchored" data-anchor-id="cadjoint.plugins.registry.PluginRegistry.register">register</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>plugins.registry.PluginRegistry.register(spec, <span class="op">*</span>, default<span class="op">=</span><span class="va">None</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>plugins.registry.PluginRegistry.register(spec, *, default=None)</code></pre>
 <p>Add or replace a spec, closing any open instance under that name.</p>
 <section id="parameters-1" class="level4 doc-section doc-section-parameters">
 <h4 class="doc-section doc-section-parameters anchored" data-anchor-id="parameters-1">Parameters</h4>
@@ -502,7 +467,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="cadjoint.plugins.registry.PluginRegistry.set_default" class="level3">
 <h3 class="anchored" data-anchor-id="cadjoint.plugins.registry.PluginRegistry.set_default">set_default</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>plugins.registry.PluginRegistry.set_default(kind, name)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>plugins.registry.PluginRegistry.set_default(kind, name)</code></pre>
 <p>Point <code>kind</code> at the plugin registered as <code>name</code>.</p>
 <section id="raises-1" class="level4 doc-section doc-section-raises">
 <h4 class="doc-section doc-section-raises anchored" data-anchor-id="raises-1">Raises</h4>
@@ -526,7 +491,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="cadjoint.plugins.registry.PluginRegistry.spec" class="level3">
 <h3 class="anchored" data-anchor-id="cadjoint.plugins.registry.PluginRegistry.spec">spec</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>plugins.registry.PluginRegistry.spec(name)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>plugins.registry.PluginRegistry.spec(name)</code></pre>
 <p>The spec registered under <code>name</code>.</p>
 <section id="raises-2" class="level4 doc-section doc-section-raises">
 <h4 class="doc-section doc-section-raises anchored" data-anchor-id="raises-2">Raises</h4>
@@ -550,7 +515,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="cadjoint.plugins.registry.PluginRegistry.unregister" class="level3">
 <h3 class="anchored" data-anchor-id="cadjoint.plugins.registry.PluginRegistry.unregister">unregister</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>plugins.registry.PluginRegistry.unregister(name)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>plugins.registry.PluginRegistry.unregister(name)</code></pre>
 <p>Remove a spec (and its default, and any open instance).</p>
 <section id="returns" class="level4 doc-section doc-section-returns">
 <h4 class="doc-section doc-section-returns anchored" data-anchor-id="returns">Returns</h4>
@@ -584,7 +549,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="cadjoint.plugins.registry.PluginRegistry.without" class="level3">
 <h3 class="anchored" data-anchor-id="cadjoint.plugins.registry.PluginRegistry.without">without</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>plugins.registry.PluginRegistry.without(kinds)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>plugins.registry.PluginRegistry.without(kinds)</code></pre>
 <p>A copy of this registry with every plugin of <code>kinds</code> left out.</p>
 <p>What :func:<code>cadjoint.tier.absent</code> installs so the public tier’s degraded behaviour can be exercised with the private providers still present in the process.</p>
 

@@ -27,41 +27,6 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
-/* CSS for syntax highlighting */
-html { -webkit-text-size-adjust: 100%; }
-pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
-pre > code.sourceCode > span:empty { height: 1.2em; }
-.sourceCode { overflow: visible; }
-code.sourceCode > span { color: inherit; text-decoration: inherit; }
-div.sourceCode { margin: 1em 0; }
-pre.sourceCode { margin: 0; }
-@media screen {
-div.sourceCode { overflow: auto; }
-}
-@media print {
-pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
-}
-pre.numberSource code
-  { counter-reset: source-line 0; }
-pre.numberSource code > span
-  { position: relative; left: -4em; counter-increment: source-line; }
-pre.numberSource code > span > a:first-child::before
-  { content: counter(source-line);
-    position: relative; left: -1em; text-align: right; vertical-align: baseline;
-    border: none; display: inline-block;
-    -webkit-touch-callout: none; -webkit-user-select: none;
-    -khtml-user-select: none; -moz-user-select: none;
-    -ms-user-select: none; user-select: none;
-    padding: 0 4px; width: 4em;
-  }
-pre.numberSource { margin-left: 3em;  padding-left: 4px; }
-div.sourceCode
-  {   }
-@media screen {
-pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
-}
 </style>
 
 
@@ -78,10 +43,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-bf27225e3a48a9273f3daa8f8e829971.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-e5d05eddbe2c608fb9c90784db6be0b0.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-f6e81f4864cb6d8b696b855696ff1c11.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-92bccf0354c8ed56982edb6814cc42fe.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -349,12 +314,17 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </div>
 <section id="start-it" class="level2">
 <h2 class="anchored" data-anchor-id="start-it">Start it</h2>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run cadjoint-viewer <span class="at">--open</span>      <span class="co"># serves http://127.0.0.1:8765/ and opens a browser</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The playground is part of the <code>cadjoint</code> package: the built UI ships as package data and <code>cadjoint-viewer</code> is its console script. It needs the <code>viewer</code> extra (the request schema is pydantic); <code>editor</code> adds lint, completion and signature help.</p>
+<pre class="bash"><code>uvx --from "cadjoint[viewer,editor]" cadjoint-viewer --open   # no checkout, no environment
+pip install "cadjoint[viewer,editor]" &amp;&amp; cadjoint-viewer --open</code></pre>
+<p>From a checkout:</p>
+<pre class="bash"><code>uv sync --extra viewer --extra editor
+uv run cadjoint-viewer --open      # serves http://127.0.0.1:8765/ and opens a browser</code></pre>
 <p>Equivalent invocations, and the flags:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run python <span class="at">-m</span> cadjoint.viewer.playground   <span class="co"># same server, no browser launch</span></span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run cadjoint-viewer <span class="at">--port</span> 9000            <span class="co"># pick a different port</span></span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> run cadjoint-viewer <span class="at">--help</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>No extra dependencies are needed — the server is stdlib-only — but the viewport needs a WebGPU-capable browser. Stop with <code>Ctrl+C</code>.</p>
+<pre class="bash"><code>uv run python -m cadjoint.viewer.playground   # same server, no browser launch
+uv run cadjoint-viewer --port 9000            # pick a different port
+uv run cadjoint-viewer --help</code></pre>
+<p>Scenes open from and save to <code>./scenes</code> under the directory the server was started in, or <code>CADJOINT_SCENES_DIR</code>. In a checkout that is the example scenes; anywhere else it starts empty and the playground opens on its built-in starter. The viewport needs a WebGPU-capable browser. Stop with <code>Ctrl+C</code>.</p>
 <p>The starter program is a <strong>parametric heat sink</strong>: a fin comb extruded from one constrained sketch profile, a revolved copper heat slug under the die, and two press-fit steel bushings. It also declares a <code>SimMesh</code>, a thermal study, and an optimization over the whole thing, so every part of the app has something real to act on the moment it opens.</p>
 <div class="callout callout-style-default callout-warning callout-titled">
 <div class="callout-header d-flex align-content-center">
@@ -518,8 +488,8 @@ Warning
 <h2 class="anchored" data-anchor-id="materials">Materials</h2>
 <p>A <code>Material</code> carries two families of property in one object: the optical ones the renderer shades with (<code>color</code>, <code>roughness</code>, <code>metallic</code>, <code>opacity</code>, <code>ior</code>, <code>reflectivity</code>) and the physical ones the simulation solves with, in SI — <code>density</code>, <code>conductivity</code>, <code>specific_heat</code>, <code>youngs_modulus</code>, <code>poisson_ratio</code>, <code>thermal_expansion</code>, <code>yield_strength</code>. Optical properties always have a value; physical ones default to <em>unspecified</em>, so a scene that only cares about looks never has to invent a Young’s modulus.</p>
 <p>Both families are editable from the inspector through one operation, <code>set_material_property</code>, which names the material by its stable id, its payload index, or its name, and carries the property and a number:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode json code-with-copy"><code class="sourceCode json"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span><span class="dt">"op"</span><span class="fu">:</span> <span class="st">"set_material_property"</span><span class="fu">,</span> <span class="dt">"id"</span><span class="fu">:</span> <span class="st">"assign:copper"</span><span class="fu">,</span></span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a> <span class="dt">"property"</span><span class="fu">:</span> <span class="st">"youngs_modulus"</span><span class="fu">,</span> <span class="dt">"value"</span><span class="fu">:</span> <span class="fl">1.185e11</span><span class="fu">}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="json"><code>{"op": "set_material_property", "id": "assign:copper",
+ "property": "youngs_modulus", "value": 1.185e11}</code></pre>
 <p>The physical half is why the operation exists rather than reusing <code>set_value</code>. An unspecified property has no keyword in the call and therefore <strong>no span</strong> in the payload, so there is nothing for the inspector to drag — the material payload publishes <code>physical</code> (the value, or <code>null</code>), <code>units</code>, <code>free</code>, and a <code>spans</code> entry only for the properties actually stated. A row with no span is a row the inspector offers to <em>state</em>: the same request with a number adds the keyword to the call. Sending <code>"value": null</code> takes it back out, returning a physical property to unspecified and an optical one to its default.</p>
 <p>Values are checked against the same brackets <code>Material</code> enforces when <code>free=True</code>, so a number the viewer accepts is one the optimizer accepts, and a rejection names the unit it was measured in — <code>`density` must be a number from 1 to 25000 kg/m^3.</code></p>
 <table class="caption-top table">
@@ -695,7 +665,7 @@ Warning
 <section id="a-schema-and-types-generated-from-it" class="level3">
 <h3 class="anchored" data-anchor-id="a-schema-and-types-generated-from-it">A schema, and types generated from it</h3>
 <p>The payload is defined once, as pydantic models in <code>cadjoint/viewer/schema/</code>. The compile worker validates every payload against them before answering, and <code>cadjoint/viewer/schema/payloads.d.ts</code> is generated from the same models — one interface per payload shape, and one per <code>/patch</code> operation, discriminated on <code>op</code>. Regenerate it with:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> <span class="at">-m</span> cadjoint.viewer.schema.emit</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="bash"><code>python -m cadjoint.viewer.schema.emit</code></pre>
 <p>A test regenerates and diffs, so the models and the checked-in types cannot drift apart.</p>
 </section>
 <section id="the-round-trip-invariant" class="level3">
@@ -791,31 +761,32 @@ Drag to orbit · Scroll to zoom
 <section id="jupyter-widget" class="level2">
 <h2 class="anchored" data-anchor-id="jupyter-widget">Jupyter widget</h2>
 <p>For a compact viewer inside a notebook rather than a full application:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> sync <span class="at">--extra</span> viewer</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.sdf.primitives <span class="im">import</span> Sphere</span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.viewer <span class="im">import</span> SDFViewer</span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>viewer <span class="op">=</span> SDFViewer(Sphere(radius<span class="op">=</span><span class="fl">1.0</span>), height<span class="op">=</span><span class="dv">480</span>)</span>
-<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>viewer</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="bash"><code>uv sync --extra viewer</code></pre>
+<pre class="python"><code>from cadjoint.sdf.primitives import Sphere
+from cadjoint.viewer import SDFViewer
+
+viewer = SDFViewer(Sphere(radius=1.0), height=480)
+viewer</code></pre>
 <p>It supports orbit, zoom, pan, and camera reset. Recompile an existing widget after changing a scene without recreating its output cell:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>viewer.update_scene(new_scene)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>viewer.update_scene(new_scene)</code></pre>
 <p>See the <a href="../examples/rendering.html">rendering notebook</a> for a complete composition and hot-reload example.</p>
 </section>
 <section id="developing-the-ui" class="level2">
 <h2 class="anchored" data-anchor-id="developing-the-ui">Developing the UI</h2>
 <p>The app is a Solid + TypeScript project in <code>frontend/</code>, built into <code>cadjoint/viewer/static</code> and committed, so installing cadjoint needs no Node toolchain.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> frontend</span>
-<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="ex">npm</span> install</span>
-<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="ex">npm</span> run dev        <span class="co"># Vite on :5173, proxying the API to the Python server</span></span>
-<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a><span class="ex">npm</span> run build      <span class="co"># refresh cadjoint/viewer/static (commit the result)</span></span>
-<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a><span class="ex">npm</span> test           <span class="co"># projection and picking unit tests</span></span>
-<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a><span class="ex">npm</span> run e2e        <span class="co"># Playwright, drives the real server end to end</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="bash"><code>cd frontend
+npm install
+npm run dev        # Vite on :5173, proxying the API to the Python server
+npm run build      # refresh cadjoint/viewer/static (commit the result)
+npm test           # projection and picking unit tests
+npm run e2e        # Playwright, drives the real server end to end</code></pre>
 <p>Run <code>uv run cadjoint-viewer</code> alongside <code>npm run dev</code> so the dev server has an API to proxy to.</p>
 </section>
 <section id="troubleshooting" class="level2">
 <h2 class="anchored" data-anchor-id="troubleshooting">Troubleshooting</h2>
 <p><strong>WebGPU is unavailable.</strong> Use a WebGPU-capable browser with hardware acceleration enabled. The editor can still compile and show the generated WGSL when no adapter is available.</p>
 <p><strong>The command is not found.</strong> Run <code>python -m cadjoint.viewer.playground --open</code>, or reinstall the current checkout so the <code>cadjoint-viewer</code> console script is created.</p>
+<p><strong>It stops at startup with <code>No module named 'pydantic'</code>.</strong> The <code>viewer</code> extra is missing: <code>pip install "cadjoint[viewer,editor]"</code>, or <code>uv sync --extra viewer --extra editor</code> in a checkout.</p>
 <p><strong>A scene does not compile.</strong> Confirm the program assigns an SDF to a variable named <code>scene</code>. The error panel carries the Python traceback or WGSL compiler message.</p>
 
 

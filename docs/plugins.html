@@ -27,41 +27,6 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
-/* CSS for syntax highlighting */
-html { -webkit-text-size-adjust: 100%; }
-pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
-pre > code.sourceCode > span:empty { height: 1.2em; }
-.sourceCode { overflow: visible; }
-code.sourceCode > span { color: inherit; text-decoration: inherit; }
-div.sourceCode { margin: 1em 0; }
-pre.sourceCode { margin: 0; }
-@media screen {
-div.sourceCode { overflow: auto; }
-}
-@media print {
-pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
-}
-pre.numberSource code
-  { counter-reset: source-line 0; }
-pre.numberSource code > span
-  { position: relative; left: -4em; counter-increment: source-line; }
-pre.numberSource code > span > a:first-child::before
-  { content: counter(source-line);
-    position: relative; left: -1em; text-align: right; vertical-align: baseline;
-    border: none; display: inline-block;
-    -webkit-touch-callout: none; -webkit-user-select: none;
-    -khtml-user-select: none; -moz-user-select: none;
-    -ms-user-select: none; user-select: none;
-    padding: 0 4px; width: 4em;
-  }
-pre.numberSource { margin-left: 3em;  padding-left: 4px; }
-div.sourceCode
-  {   }
-@media screen {
-pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
-}
 </style>
 
 
@@ -78,10 +43,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-bf27225e3a48a9273f3daa8f8e829971.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-e5d05eddbe2c608fb9c90784db6be0b0.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-f6e81f4864cb6d8b696b855696ff1c11.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-92bccf0354c8ed56982edb6814cc42fe.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -367,7 +332,7 @@ window.Quarto = {
 
 <p>Real engineering pipelines die at tool boundaries — a Fortran solver here, a Rust kernel there, a mesher nobody can differentiate — and the gradients die with them. cadjoint calls those components <strong>plugins</strong>: a mesher, a tet filler, a solver, each reached through two operations, <code>apply</code> and <code>vjp</code>, and each declaring what it takes, what it returns, and which of its inputs carry a derivative.</p>
 <p>A plugin is <em>implemented</em> as a <a href="https://github.com/pasteurlabs/tesseract-core">Tesseract</a> — typed <code>apply</code> and <code>vector_jacobian_product</code> endpoints, lifted into a JAX primitive by <a href="https://github.com/pasteurlabs/tesseract-jax">tesseract-jax</a> — but that is an implementation choice, not the interface. What cadjoint’s own code sees is a <strong>kind</strong>: it asks for “whatever fills the <code>thermal_solver</code> slot” and never learns whether the answer is running in this process, in a container, or on a Kubernetes Service.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> sync <span class="at">--extra</span> tesseract</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="bash"><code>uv sync --extra tesseract</code></pre>
 <section id="what-a-plugin-is" class="level2">
 <h2 class="anchored" data-anchor-id="what-a-plugin-is">What a plugin is</h2>
 <table class="caption-top table">
@@ -406,14 +371,14 @@ window.Quarto = {
 </tr>
 </tbody>
 </table>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.plugins <span class="im">import</span> get_plugin, plugin_for_kind</span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>solver <span class="op">=</span> plugin_for_kind(<span class="st">"thermal_solver"</span>)</span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(solver.name, solver.version)             <span class="co"># thermal_jaxfem 0.1.0</span></span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="bu">sorted</span>(solver.capabilities.differentiable_inputs))</span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="co"># ['cell_conductivity', 'conductivity', 'points', 'source']</span></span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(solver.capabilities.supports(<span class="st">"per_element_properties"</span>))   <span class="co"># True</span></span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(solver.probe())</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>from cadjoint.plugins import get_plugin, plugin_for_kind
+
+solver = plugin_for_kind("thermal_solver")
+print(solver.name, solver.version)             # thermal_jaxfem 0.1.0
+print(sorted(solver.capabilities.differentiable_inputs))
+# ['cell_conductivity', 'conductivity', 'points', 'source']
+print(solver.capabilities.supports("per_element_properties"))   # True
+print(solver.probe())</code></pre>
 <p><code>cadjoint.plugins</code> is deliberately thin. It does not encode arrays, speak HTTP, declare schemas, or implement an autodiff primitive — tesseract-core and tesseract-jax do all of that. What is cadjoint’s is the <em>kind</em> vocabulary, the registry, and the configuration that maps a name to one <code>Tesseract.from_*</code> call. Anything not defined on a plugin is forwarded to the <code>Tesseract</code> itself, so <code>plugin.jacobian(...)</code>, <code>plugin.jacobian_vector_product(...)</code>, <code>plugin.abstract_eval(...)</code> and <code>plugin.server_logs()</code> work without a wrapper.</p>
 </section>
 <section id="the-plugins-that-ship" class="level2">
@@ -524,94 +489,94 @@ window.Quarto = {
 <li><code>runtime_scratch()</code> is one directory per process under <code>~/.cache/cadjoint/tesseract-runs</code> (override with <code>$CADJOINT_TESSERACT_RUNS</code>), removed at exit — so a thousand-call optimization does not outlive itself on disk;</li>
 <li>a <strong>server you start yourself</strong> needs the same thing from the other side: set <code>TESSERACT_OUTPUT_PATH</code> (or run it with a working directory outside the repository).</li>
 </ul>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="va">TESSERACT_API_PATH</span><span class="op">=</span>cadjoint/fem/tesseracts/mesher/tesseract_api.py <span class="dt">\</span></span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="va">TESSERACT_OUTPUT_PATH</span><span class="op">=</span><span class="st">"</span><span class="va">$HOME</span><span class="st">/.cache/cadjoint/tesseract-runs"</span> <span class="dt">\</span></span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="va">TESSERACT_NAME</span><span class="op">=</span>cadjoint_mesher <span class="va">TESSERACT_VERSION</span><span class="op">=</span>0.1.0 <span class="dt">\</span></span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="ex">tesseract-runtime</span> serve <span class="at">--port</span> 8000</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="bash"><code>TESSERACT_API_PATH=cadjoint/fem/tesseracts/mesher/tesseract_api.py \
+TESSERACT_OUTPUT_PATH="$HOME/.cache/cadjoint/tesseract-runs" \
+TESSERACT_NAME=cadjoint_mesher TESSERACT_VERSION=0.1.0 \
+tesseract-runtime serve --port 8000</code></pre>
 <p>There is no switch that turns the run logs off — the runtime’s file backend writes them unconditionally — so redirecting them is the whole of the fix. <code>tests/plugins/test_scratch.py</code> runs a plugin from an empty temporary working directory and asserts nothing is left in it.</p>
 </section>
 </section>
 <section id="configuring-plugins.toml" class="level2">
 <h2 class="anchored" data-anchor-id="configuring-plugins.toml">Configuring: <code>plugins.toml</code></h2>
 <p>Found at <code>$CADJOINT_PLUGINS</code> (a file, or a directory holding <code>plugins.toml</code>), else <code>~/.config/cadjoint/plugins.toml</code>. A <code>[plugins.&lt;name&gt;]</code> table for a name that already exists <strong>replaces</strong> its spec; a new name adds a plugin.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode toml code-with-copy"><code class="sourceCode toml"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Which plugin fills each slot when a caller asks by kind.</span></span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="kw">[defaults]</span></span>
-<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="dt">elastic_solver</span> <span class="op">=</span> <span class="st">"elastic_calculix"</span></span>
-<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="co"># The thermal solver moves to the cluster. Nothing in cadjoint changes.</span></span>
-<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a><span class="kw">[plugins.thermal_jaxfem]</span></span>
-<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a><span class="dt">kind</span> <span class="op">=</span> <span class="st">"thermal_solver"</span></span>
-<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a><span class="dt">transport</span> <span class="op">=</span> <span class="st">"remote"</span></span>
-<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a><span class="dt">url</span> <span class="op">=</span> <span class="st">"http://thermal.cadjoint.svc.cluster.local:8000"</span></span>
-<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a><span class="dt">schema_hash</span> <span class="op">=</span> <span class="st">"sha256:251b6bd67db3f..."</span>   <span class="co"># the staleness fence, see below</span></span>
-<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a><span class="dt">options</span> <span class="op">=</span> <span class="op">{ </span><span class="dt">timeout</span><span class="op"> =</span> <span class="fl">600.0</span><span class="op"> }</span></span>
-<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a><span class="co"># CalculiX stays on this machine, but in its own container.</span></span>
-<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a><span class="kw">[plugins.elastic_calculix]</span></span>
-<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a><span class="dt">kind</span> <span class="op">=</span> <span class="st">"elastic_solver"</span></span>
-<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a><span class="dt">transport</span> <span class="op">=</span> <span class="st">"container"</span></span>
-<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a><span class="dt">image</span> <span class="op">=</span> <span class="st">"cadjoint_elastic_calculix:latest"</span></span>
-<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a><span class="dt">options</span> <span class="op">=</span> <span class="op">{ </span><span class="dt">environment</span><span class="op"> =</span> <span class="op">{ </span><span class="dt">CADJOINT_CCX</span><span class="op"> =</span> <span class="st">"/python-env/bin/ccx"</span><span class="op"> } }</span></span>
-<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a><span class="co"># A third-party solver, added rather than replacing anything.</span></span>
-<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a><span class="kw">[plugins.acoustics]</span></span>
-<span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a><span class="dt">kind</span> <span class="op">=</span> <span class="st">"acoustic_solver"</span></span>
-<span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a><span class="dt">transport</span> <span class="op">=</span> <span class="st">"remote"</span></span>
-<span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a><span class="dt">url</span> <span class="op">=</span> <span class="st">"http://${ACOUSTICS_HOST}:8000"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="toml"><code># Which plugin fills each slot when a caller asks by kind.
+[defaults]
+elastic_solver = "elastic_calculix"
+
+# The thermal solver moves to the cluster. Nothing in cadjoint changes.
+[plugins.thermal_jaxfem]
+kind = "thermal_solver"
+transport = "remote"
+url = "http://thermal.cadjoint.svc.cluster.local:8000"
+schema_hash = "sha256:251b6bd67db3f..."   # the staleness fence, see below
+options = { timeout = 600.0 }
+
+# CalculiX stays on this machine, but in its own container.
+[plugins.elastic_calculix]
+kind = "elastic_solver"
+transport = "container"
+image = "cadjoint_elastic_calculix:latest"
+options = { environment = { CADJOINT_CCX = "/python-env/bin/ccx" } }
+
+# A third-party solver, added rather than replacing anything.
+[plugins.acoustics]
+kind = "acoustic_solver"
+transport = "remote"
+url = "http://${ACOUSTICS_HOST}:8000"</code></pre>
 <p><code>${VAR}</code> expands from the environment when the spec is built, and an unset variable is an error rather than an empty value. A distribution can also register plugins without a config file, through the <code>cadjoint.plugins</code> entry point group:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode toml code-with-copy"><code class="sourceCode toml"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># in the third party's pyproject.toml</span></span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="kw">[project.entry-points."</span><span class="dt">cadjoint.plugins"</span><span class="kw">]</span></span>
-<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="dt">acoustics</span> <span class="op">=</span> <span class="st">"my_package.plugins:SPEC"</span>       <span class="co"># a PluginSpec, a dict, or a callable</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="toml"><code># in the third party's pyproject.toml
+[project.entry-points."cadjoint.plugins"]
+acoustics = "my_package.plugins:SPEC"       # a PluginSpec, a dict, or a callable</code></pre>
 <p><strong>Authentication.</strong> tesseract-core 1.11’s <code>Tesseract.from_url</code> takes a URL, an output path and a timeout — there is no header or credential argument, and cadjoint deliberately does not reach into its HTTP session to add one. Put authentication in front of the Service (an ingress, a sidecar, a mesh) or reach it through <code>kubectl port-forward</code>.</p>
 </section>
 <section id="writing-one" class="level2">
 <h2 class="anchored" data-anchor-id="writing-one">Writing one</h2>
 <p>A plugin is a Tesseract package plus a spec. The package is a directory with <code>tesseract_api.py</code>, <code>tesseract_config.yaml</code> and a requirements or environment file — see any of <code>cadjoint/fem/tesseracts/*</code> for a worked example, and <code>tests/fem/test_tesseract_packaging.py</code> for what the SDK validates.</p>
 <p>The <code>tesseract_api.py</code> declares its schema; that declaration is what cadjoint reads back as <code>inputs</code>, <code>outputs</code> and <code>capabilities</code>:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pydantic <span class="im">import</span> BaseModel</span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> tesseract_core.runtime <span class="im">import</span> Array, Differentiable, Float64, Int32</span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> InputSchema(BaseModel):</span>
-<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>    points: Differentiable[Array[(<span class="va">None</span>, <span class="dv">3</span>), Float64]]</span>
-<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>    cells: Array[(<span class="va">None</span>, <span class="va">None</span>), Int32]</span>
-<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>    conductivity: Differentiable[Array[(), Float64]]</span>
-<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> OutputSchema(BaseModel):</span>
-<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>    temperature: Differentiable[Array[(<span class="va">None</span>,), Float64]]</span>
-<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> <span class="bu">apply</span>(inputs: InputSchema) <span class="op">-&gt;</span> OutputSchema: ...</span>
-<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> abstract_eval(abstract_inputs): ...</span>
-<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> vector_jacobian_product(inputs, vjp_inputs, vjp_outputs, cotangent_vector): ...</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>from pydantic import BaseModel
+from tesseract_core.runtime import Array, Differentiable, Float64, Int32
+
+class InputSchema(BaseModel):
+    points: Differentiable[Array[(None, 3), Float64]]
+    cells: Array[(None, None), Int32]
+    conductivity: Differentiable[Array[(), Float64]]
+
+class OutputSchema(BaseModel):
+    temperature: Differentiable[Array[(None,), Float64]]
+
+def apply(inputs: InputSchema) -&gt; OutputSchema: ...
+def abstract_eval(abstract_inputs): ...
+def vector_jacobian_product(inputs, vjp_inputs, vjp_outputs, cotangent_vector): ...</code></pre>
 <p>Then register it — permanently through <code>plugins.toml</code> or an entry point, or in one process:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.plugins <span class="im">import</span> PluginSpec, register_plugin</span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>register_plugin(</span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>    PluginSpec(</span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>        name<span class="op">=</span><span class="st">"my_thermal"</span>,</span>
-<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>        kind<span class="op">=</span><span class="st">"thermal_solver"</span>,</span>
-<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>        transport<span class="op">=</span><span class="st">"local"</span>,</span>
-<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>        api_path<span class="op">=</span><span class="st">"my_package/thermal/tesseract_api.py"</span>,</span>
-<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>    ),</span>
-<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>    default<span class="op">=</span><span class="va">True</span>,</span>
-<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>from cadjoint.plugins import PluginSpec, register_plugin
+
+register_plugin(
+    PluginSpec(
+        name="my_thermal",
+        kind="thermal_solver",
+        transport="local",
+        api_path="my_package/thermal/tesseract_api.py",
+    ),
+    default=True,
+)</code></pre>
 <p>To fill a <strong>cadjoint</strong> kind, the package must declare every input the frozen chain sends for that kind and the output it reads. The chain checks this up front and names the missing field, rather than letting a validation error surface from inside a traced call. <code>elastic_calculix</code> is the live example: it declares no <code>body_force</code>, so it cannot serve <code>elastic_solver</code> for the frozen chains (it is still a full backend for direct solves).</p>
 </section>
 <section id="building-and-serving" class="level2">
 <h2 class="anchored" data-anchor-id="building-and-serving">Building and serving</h2>
 <p><code>tesseract build</code> turns a package directory into a Docker image with no extra glue:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="ex">tesseract</span> build cadjoint/fem/tesseracts/mesher           <span class="co"># ~1 min</span></span>
-<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="ex">tesseract</span> build cadjoint/fem/tesseracts/elastic_calculix <span class="co"># ~1.5 min</span></span>
-<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="ex">tesseract</span> build cadjoint/fem/tesseracts/thermal_jaxfem   <span class="co"># ~3 min</span></span>
-<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a><span class="ex">tesseract</span> build cadjoint/fem/tesseracts/elastic_jaxfem   <span class="co"># ~3 min</span></span>
-<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a><span class="ex">tesseract</span> build cadjoint/fem/tesseracts/tet_gmsh         <span class="co"># Gmsh behind the GPL boundary</span></span>
-<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a><span class="ex">tesseract</span> build cadjoint/fem/tesseracts/flow_brinkman    <span class="co"># pure JAX, pip provider</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="bash"><code>tesseract build cadjoint/fem/tesseracts/mesher           # ~1 min
+tesseract build cadjoint/fem/tesseracts/elastic_calculix # ~1.5 min
+tesseract build cadjoint/fem/tesseracts/thermal_jaxfem   # ~3 min
+tesseract build cadjoint/fem/tesseracts/elastic_jaxfem   # ~3 min
+tesseract build cadjoint/fem/tesseracts/tet_gmsh         # Gmsh behind the GPL boundary
+tesseract build cadjoint/fem/tesseracts/flow_brinkman    # pure JAX, pip provider</code></pre>
 <section id="prebuilt-images" class="level3">
 <h3 class="anchored" data-anchor-id="prebuilt-images">Prebuilt images</h3>
 <p>Every push to <code>main</code> publishes the same images to GHCR (<code>.github/workflows/tesseract-images.yml</code>), so the build above is only needed for a modified package. A <code>container</code> spec that names one pulls it on first use — tesseract-core itself never pulls, so cadjoint does it before <code>Tesseract.from_image</code>:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode toml code-with-copy"><code class="sourceCode toml"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="kw">[plugins.thermal_jaxfem]</span></span>
-<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="dt">kind</span> <span class="op">=</span> <span class="st">"thermal_solver"</span></span>
-<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="dt">transport</span> <span class="op">=</span> <span class="st">"container"</span></span>
-<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="dt">image</span> <span class="op">=</span> <span class="st">"ghcr.io/andrinr/cadjoint_thermal_jaxfem:latest"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="toml"><code>[plugins.thermal_jaxfem]
+kind = "thermal_solver"
+transport = "container"
+image = "ghcr.io/andrinr/cadjoint_thermal_jaxfem:latest"</code></pre>
 <table class="caption-top table">
 <colgroup>
 <col style="width: 50%">
@@ -689,11 +654,11 @@ window.Quarto = {
 <section id="staleness-probe" class="level2">
 <h2 class="anchored" data-anchor-id="staleness-probe">Staleness: <code>probe()</code></h2>
 <p>A long-lived remote is the case where “which component am I actually talking to?” stops being rhetorical. <code>Plugin.probe()</code> calls the runtime’s <code>/health</code>, reads the version it advertises, and hashes the schema it publishes:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.plugins <span class="im">import</span> get_plugin</span>
-<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>probe <span class="op">=</span> get_plugin(<span class="st">"thermal_jaxfem"</span>).probe()</span>
-<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a><span class="co"># PluginProbe(name='thermal_jaxfem', kind='thermal_solver', transport='local',</span></span>
-<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a><span class="co">#             status='ok', version='0.1.0', schema_hash='sha256:251b6b…', …)</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>from cadjoint.plugins import get_plugin
+
+probe = get_plugin("thermal_jaxfem").probe()
+# PluginProbe(name='thermal_jaxfem', kind='thermal_solver', transport='local',
+#             status='ok', version='0.1.0', schema_hash='sha256:251b6b…', …)</code></pre>
 <p>Put that <code>schema_hash</code> in the spec, and a redeployed cluster that changed the component’s interface is refused <strong>before</strong> a run instead of failing inside a traced call. The hash covers the schema sections the runtime itself returns — field names, shapes, dtypes, <code>Differentiable</code> flags, requiredness — and is measured identical across the <code>local</code> and <code>remote</code> forms of the same package. It deliberately excludes the endpoint list: an in-process runtime serves a <code>test</code> endpoint that a served one does not.</p>
 </section>
 <section id="the-two-mesher-boundaries" class="level2">
@@ -768,41 +733,41 @@ window.Quarto = {
 </tbody>
 </table>
 <p><code>node_map</code> is the centrepiece and the reason the transport exists: it runs inside the jitted objective <code>Optimization</code> builds, so its <code>custom_vjp</code> has to be a primitive of the caller’s own program. Its input is <code>OwnedNodes</code> — per node a seed position, the global patch indices that own it, the arity, the Gmsh entity dimension, the midside block and the bar ownership was decided at — which <code>cadjoint.fem.gmsh.assign_ownership</code>, on this side of the interface, produces from a residual test against the scene’s own patch fields, no graph involved.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode toml code-with-copy"><code class="sourceCode toml"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="co"># what a distribution filling these kinds registers</span></span>
-<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="kw">[project.entry-points."</span><span class="dt">cadjoint.plugins"</span><span class="kw">]</span></span>
-<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="dt">node_map</span>      <span class="op">=</span> <span class="st">"my_package.plugins:NODE_MAP"</span>     <span class="co"># PluginSpec(transport="python", object=...)</span></span>
-<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a><span class="dt">feature_edges</span> <span class="op">=</span> <span class="st">"my_package.plugins:FEATURE_EDGES"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="toml"><code># what a distribution filling these kinds registers
+[project.entry-points."cadjoint.plugins"]
+node_map      = "my_package.plugins:NODE_MAP"     # PluginSpec(transport="python", object=...)
+feature_edges = "my_package.plugins:FEATURE_EDGES"</code></pre>
 <p><code>cadjoint.plugins.contracts.CONTRACT_VERSION</code> bumps whenever a Protocol or payload changes shape, and every component carries a <code>contract_version</code>, so a stale build is refused with a sentence rather than failing inside a trace.</p>
 <p>Installing a provider is all it takes — the entry points do the registration, and nothing in cadjoint changes. One provider for these kinds exists as a separate distribution outside this project; a component of your own, registered the same way, is indistinguishable to the registry.</p>
 <p>A <code>plugins.toml</code> is needed only to <em>override</em> what discovery found — to point one kind somewhere else, or to turn one off without uninstalling:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12"><pre class="sourceCode toml code-with-copy"><code class="sourceCode toml"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="co"># ~/.config/cadjoint/plugins.toml</span></span>
-<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a><span class="co"># The node map is a Tesseract on the cluster for a fully remote chain; every</span></span>
-<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a><span class="co"># other kind stays the in-process object the entry point registered.</span></span>
-<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a><span class="kw">[plugins.node_map]</span></span>
-<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a><span class="dt">kind</span>      <span class="op">=</span> <span class="st">"node_map"</span></span>
-<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a><span class="dt">transport</span> <span class="op">=</span> <span class="st">"remote"</span></span>
-<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a><span class="dt">url</span>       <span class="op">=</span> <span class="st">"http://node-map.cadjoint.svc.cluster.local:8000"</span></span>
-<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a><span class="co"># A second provider, chosen by name rather than by what happens to be installed.</span></span>
-<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a><span class="kw">[defaults]</span></span>
-<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a><span class="dt">feature_edges</span> <span class="op">=</span> <span class="st">"my_edges"</span></span>
-<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a><span class="kw">[plugins.my_edges]</span></span>
-<span id="cb12-15"><a href="#cb12-15" aria-hidden="true" tabindex="-1"></a><span class="dt">kind</span>      <span class="op">=</span> <span class="st">"feature_edges"</span></span>
-<span id="cb12-16"><a href="#cb12-16" aria-hidden="true" tabindex="-1"></a><span class="dt">transport</span> <span class="op">=</span> <span class="st">"python"</span></span>
-<span id="cb12-17"><a href="#cb12-17" aria-hidden="true" tabindex="-1"></a><span class="dt">object</span>    <span class="op">=</span> <span class="st">"my_package.edges:COMPONENT"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="toml"><code># ~/.config/cadjoint/plugins.toml
+
+# The node map is a Tesseract on the cluster for a fully remote chain; every
+# other kind stays the in-process object the entry point registered.
+[plugins.node_map]
+kind      = "node_map"
+transport = "remote"
+url       = "http://node-map.cadjoint.svc.cluster.local:8000"
+
+# A second provider, chosen by name rather than by what happens to be installed.
+[defaults]
+feature_edges = "my_edges"
+
+[plugins.my_edges]
+kind      = "feature_edges"
+transport = "python"
+object    = "my_package.edges:COMPONENT"</code></pre>
 </section>
 <section id="when-a-kind-is-unfilled" class="level3">
 <h3 class="anchored" data-anchor-id="when-a-kind-is-unfilled">When a kind is unfilled</h3>
 <p><code>cadjoint.tier</code> is the one module that answers “is anything filling this kind” and writes the one refusal message.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint <span class="im">import</span> tier</span>
-<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>tier.status().flags()      <span class="co"># {'node_map': False, 'feature_edges': False, ...}</span></span>
-<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>tier.available(<span class="st">"brep"</span>)     <span class="co"># False</span></span>
-<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>tier.component(<span class="st">"step_export"</span>)            <span class="co"># None — the caller degrades</span></span>
-<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>tier.require(<span class="st">"node_map"</span>)                 <span class="co"># raises TierUnavailable(&lt;one sentence&gt;)</span></span>
-<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>tier.report()                            <span class="co"># versions + status, for a bug report</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>from cadjoint import tier
+
+tier.status().flags()      # {'node_map': False, 'feature_edges': False, ...}
+tier.available("brep")     # False
+tier.component("step_export")            # None — the caller degrades
+tier.require("node_map")                 # raises TierUnavailable(&lt;one sentence&gt;)
+tier.report()                            # versions + status, for a bug report</code></pre>
 <p>Unfilled is how cadjoint ships and nothing breaks: it compiles, meshes with TetGen or Gmsh, solves, inspects, exports VTK and faceted STEP, and draws feature edges from the lattice classifier. What it refuses is a design derivative through a Gmsh mesh, which <code>Optimization</code> reports at declaration rather than discovering inside the trace. The compile payload carries a <code>tier</code> field and <code>GET /api/capabilities</code> returns <code>tier.status()</code>, so the viewer names the layer it is drawing rather than leaving you to guess.</p>
 </section>
 </section>

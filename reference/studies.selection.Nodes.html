@@ -26,41 +26,6 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
-/* CSS for syntax highlighting */
-html { -webkit-text-size-adjust: 100%; }
-pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
-pre > code.sourceCode > span:empty { height: 1.2em; }
-.sourceCode { overflow: visible; }
-code.sourceCode > span { color: inherit; text-decoration: inherit; }
-div.sourceCode { margin: 1em 0; }
-pre.sourceCode { margin: 0; }
-@media screen {
-div.sourceCode { overflow: auto; }
-}
-@media print {
-pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
-}
-pre.numberSource code
-  { counter-reset: source-line 0; }
-pre.numberSource code > span
-  { position: relative; left: -4em; counter-increment: source-line; }
-pre.numberSource code > span > a:first-child::before
-  { content: counter(source-line);
-    position: relative; left: -1em; text-align: right; vertical-align: baseline;
-    border: none; display: inline-block;
-    -webkit-touch-callout: none; -webkit-user-select: none;
-    -khtml-user-select: none; -moz-user-select: none;
-    -ms-user-select: none; user-select: none;
-    padding: 0 4px; width: 4em;
-  }
-pre.numberSource { margin-left: 3em;  padding-left: 4px; }
-div.sourceCode
-  {   }
-@media screen {
-pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
-}
 </style>
 
 
@@ -77,10 +42,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-bf27225e3a48a9273f3daa8f8e829971.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-e5d05eddbe2c608fb9c90784db6be0b0.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-f6e81f4864cb6d8b696b855696ff1c11.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-92bccf0354c8ed56982edb6814cc42fe.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -305,7 +270,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 <section id="cadjoint.studies.selection.Nodes" class="level1">
 <h1>studies.selection.Nodes</h1>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>studies.selection.Nodes()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>studies.selection.Nodes()</code></pre>
 <p>Factory namespace for :class:<code>NodeSelection</code> values.</p>
 <p>All constructors take plain floats and 3-lists so a UI can emit them as literal source text; the resulting selections are combined with <code>&amp;</code>, <code>|</code> and <code>~</code> and always resolve to boundary nodes.</p>
 <section id="methods" class="level2">
@@ -346,7 +311,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </table>
 <section id="cadjoint.studies.selection.Nodes.box" class="level3">
 <h3 class="anchored" data-anchor-id="cadjoint.studies.selection.Nodes.box">box</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>studies.selection.Nodes.box(min_corner, max_corner)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>studies.selection.Nodes.box(min_corner, max_corner)</code></pre>
 <p>Nodes inside the axis-aligned box <code>[min_corner, max_corner]</code>.</p>
 <section id="parameters" class="level4 doc-section doc-section-parameters">
 <h4 class="doc-section doc-section-parameters anchored" data-anchor-id="parameters">Parameters</h4>
@@ -384,14 +349,14 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="cadjoint.studies.selection.Nodes.cylinder" class="level3">
 <h3 class="anchored" data-anchor-id="cadjoint.studies.selection.Nodes.cylinder">cylinder</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>studies.selection.Nodes.cylinder(</span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>    center,</span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    axis,</span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>    radius,</span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>    <span class="op">*</span>,</span>
-<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>    inner<span class="op">=</span><span class="fl">0.0</span>,</span>
-<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>    half_length<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>studies.selection.Nodes.cylinder(
+    center,
+    axis,
+    radius,
+    *,
+    inner=0.0,
+    half_length=None,
+)</code></pre>
 <p>Nodes inside a (possibly hollow, possibly finite) cylinder about a line.</p>
 <p>The natural selector for anything on a part’s own axis of revolution — a bearing seat wall, a bore, a cooling jacket — where a box picks up the corners and a sphere the wrong height.</p>
 <section id="parameters-1" class="level4 doc-section doc-section-parameters">
@@ -448,7 +413,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="cadjoint.studies.selection.Nodes.halfspace" class="level3">
 <h3 class="anchored" data-anchor-id="cadjoint.studies.selection.Nodes.halfspace">halfspace</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>studies.selection.Nodes.halfspace(point, normal)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>studies.selection.Nodes.halfspace(point, normal)</code></pre>
 <p>Nodes on the <code>normal</code> side of the plane through <code>point</code>.</p>
 <p>Selects nodes <code>x</code> with <code>dot(x - point, normal) &gt;= 0</code>.</p>
 <section id="parameters-2" class="level4 doc-section doc-section-parameters">
@@ -487,7 +452,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="cadjoint.studies.selection.Nodes.predicate" class="level3">
 <h3 class="anchored" data-anchor-id="cadjoint.studies.selection.Nodes.predicate">predicate</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>studies.selection.Nodes.predicate(fn)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>studies.selection.Nodes.predicate(fn)</code></pre>
 <p>Escape hatch: select nodes by an arbitrary vectorized callable.</p>
 <p><code>fn</code> receives the <code>(N, 3)</code> array of all mesh node positions and returns a boolean mask of shape <code>(N,)</code>; the result is intersected with the boundary-node set like every other selection. Predicate selections are the one non-serializable kind: :meth:<code>~NodeSelection. describe</code> reports only the callable’s name.</p>
 <section id="parameters-3" class="level4 doc-section doc-section-parameters">
@@ -520,7 +485,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="cadjoint.studies.selection.Nodes.side" class="level3">
 <h3 class="anchored" data-anchor-id="cadjoint.studies.selection.Nodes.side">side</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>studies.selection.Nodes.side(side, tol<span class="op">=</span><span class="va">None</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>studies.selection.Nodes.side(side, tol=None)</code></pre>
 <p>Nodes on the axis-extreme boundary plane of the mesh.</p>
 <p><code>Nodes.side("+x")</code> selects boundary nodes whose x coordinate is within <code>tol</code> of the largest x over all boundary nodes — for a bar this is the end face; for curved geometry it is the extreme cap.</p>
 <section id="parameters-4" class="level4 doc-section doc-section-parameters">
@@ -559,7 +524,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="cadjoint.studies.selection.Nodes.sphere" class="level3">
 <h3 class="anchored" data-anchor-id="cadjoint.studies.selection.Nodes.sphere">sphere</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>studies.selection.Nodes.sphere(center, radius)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>studies.selection.Nodes.sphere(center, radius)</code></pre>
 <p>Nodes within <code>radius</code> of <code>center</code>.</p>
 <section id="parameters-5" class="level4 doc-section doc-section-parameters">
 <h4 class="doc-section doc-section-parameters anchored" data-anchor-id="parameters-5">Parameters</h4>

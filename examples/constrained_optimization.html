@@ -26,41 +26,6 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
-/* CSS for syntax highlighting */
-html { -webkit-text-size-adjust: 100%; }
-pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
-pre > code.sourceCode > span:empty { height: 1.2em; }
-.sourceCode { overflow: visible; }
-code.sourceCode > span { color: inherit; text-decoration: inherit; }
-div.sourceCode { margin: 1em 0; }
-pre.sourceCode { margin: 0; }
-@media screen {
-div.sourceCode { overflow: auto; }
-}
-@media print {
-pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
-}
-pre.numberSource code
-  { counter-reset: source-line 0; }
-pre.numberSource code > span
-  { position: relative; left: -4em; counter-increment: source-line; }
-pre.numberSource code > span > a:first-child::before
-  { content: counter(source-line);
-    position: relative; left: -1em; text-align: right; vertical-align: baseline;
-    border: none; display: inline-block;
-    -webkit-touch-callout: none; -webkit-user-select: none;
-    -khtml-user-select: none; -moz-user-select: none;
-    -ms-user-select: none; user-select: none;
-    padding: 0 4px; width: 4em;
-  }
-pre.numberSource { margin-left: 3em;  padding-left: 4px; }
-div.sourceCode
-  {   }
-@media screen {
-pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
-}
 </style>
 
 
@@ -77,10 +42,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-bf27225e3a48a9273f3daa8f8e829971.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-e5d05eddbe2c608fb9c90784db6be0b0.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-f6e81f4864cb6d8b696b855696ff1c11.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-92bccf0354c8ed56982edb6814cc42fe.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -315,44 +280,44 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 <p>Minimize ‖p − target‖² subject to |p| = 2 using five strategies.</p>
 <div id="23867a81" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:36:16.108176Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:36:16.108134Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:36:16.491463Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:36:16.491126Z&quot;}}" data-execution_count="1">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> time</span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> jax</span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> jax.numpy <span class="im">as</span> jnp</span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> optax</span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.constraints <span class="im">import</span> (</span>
-<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>    DistanceConstraint,</span>
-<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>    constraint_residuals,</span>
-<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>    make_manifold_projection,</span>
-<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>    null_space,</span>
-<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.extraction <span class="im">import</span> extract_parameters</span>
-<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> cadjoint.geometry <span class="im">import</span> Vector</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python cell-code"><code>import time
+
+import jax
+import jax.numpy as jnp
+import matplotlib.pyplot as plt
+import numpy as np
+import optax
+
+from cadjoint.constraints import (
+    DistanceConstraint,
+    constraint_residuals,
+    make_manifold_projection,
+    null_space,
+)
+from cadjoint.extraction import extract_parameters
+from cadjoint.geometry import Vector</code></pre>
 </div>
 <section id="setup" class="level2">
 <h2 class="anchored" data-anchor-id="setup">Setup</h2>
 <p>p₀ = (2, 0, 0), target = (1, 1.5, 0). <code>run</code> times N steps after a warm-up call to exclude JAX compilation.</p>
 <div id="fd48eb51" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:36:16.492731Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:36:16.492639Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:36:16.498147Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:36:16.497824Z&quot;}}" data-execution_count="2">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>anchor <span class="op">=</span> Vector(jnp.array([<span class="fl">0.0</span>, <span class="fl">0.0</span>, <span class="fl">0.0</span>]))</span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>p <span class="op">=</span> Vector(jnp.array([<span class="fl">2.0</span>, <span class="fl">0.0</span>, <span class="fl">0.0</span>]), free<span class="op">=</span><span class="va">True</span>, name<span class="op">=</span><span class="st">"p"</span>)</span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>distance_constraint <span class="op">=</span> DistanceConstraint(anchor, p, distance<span class="op">=</span><span class="fl">2.0</span>)</span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>target <span class="op">=</span> jnp.array([<span class="fl">1.0</span>, <span class="fl">1.5</span>, <span class="fl">0.0</span>])</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python cell-code"><code>anchor = Vector(jnp.array([0.0, 0.0, 0.0]))
+p = Vector(jnp.array([2.0, 0.0, 0.0]), free=True, name="p")
+
+distance_constraint = DistanceConstraint(anchor, p, distance=2.0)
+
+target = jnp.array([1.0, 1.5, 0.0])</code></pre>
 </div>
 <div id="04772075" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:36:16.499294Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:36:16.499240Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:36:16.555325Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:36:16.554960Z&quot;}}" data-execution_count="3">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>free_params, fixed_params, metadata <span class="op">=</span> extract_parameters(distance_constraint)</span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"free_params"</span>, free_params)</span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"fixed_params"</span>, fixed_params)</span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"metadata"</span>, metadata)</span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Optimal constrained solution: project target onto |p|=2 sphere</span></span>
-<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>p_star <span class="op">=</span> target <span class="op">*</span> (<span class="fl">2.0</span> <span class="op">/</span> jnp.linalg.norm(target))</span>
-<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>optimal_loss <span class="op">=</span> <span class="bu">float</span>(jnp.<span class="bu">sum</span>((p_star <span class="op">-</span> target) <span class="op">**</span> <span class="dv">2</span>))</span>
-<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"p_star ≈ </span><span class="sc">{</span>np<span class="sc">.</span>array(p_star)<span class="sc">.</span><span class="bu">round</span>(<span class="dv">3</span>)<span class="sc">}</span><span class="ss">,  optimal_loss = </span><span class="sc">{</span>optimal_loss<span class="sc">:.4f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python cell-code"><code>free_params, fixed_params, metadata = extract_parameters(distance_constraint)
+print("free_params", free_params)
+print("fixed_params", fixed_params)
+print("metadata", metadata)
+
+# Optimal constrained solution: project target onto |p|=2 sphere
+p_star = target * (2.0 / jnp.linalg.norm(target))
+optimal_loss = float(jnp.sum((p_star - target) ** 2))
+print(f"p_star ≈ {np.array(p_star).round(3)},  optimal_loss = {optimal_loss:.4f}")</code></pre>
 <div class="cell-output cell-output-stdout">
 <pre><code>free_params {'p': Array([2., 0., 0.], dtype=float32)}
 fixed_params {'distanceconstraint_0.param1': Array([0., 0., 0.], dtype=float32), 'distanceconstraint_0.distance': Array(2., dtype=float32, weak_type=True)}
@@ -361,63 +326,63 @@ p_star ≈ [1.109 1.664 0.   ],  optimal_loss = 0.0389</code></pre>
 </div>
 </div>
 <div id="cc85bbe1" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:36:16.556310Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:36:16.556255Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:36:16.560148Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:36:16.559930Z&quot;}}" data-execution_count="4">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>N_STEPS <span class="op">=</span> <span class="dv">40</span></span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>LAMBDA <span class="op">=</span> <span class="fl">25.0</span></span>
-<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> full_objective(full):</span>
-<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> jnp.<span class="bu">sum</span>((full[p.name] <span class="op">-</span> target) <span class="op">**</span> <span class="dv">2</span>)</span>
-<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> run(grad_fn, opt, full_init, n<span class="op">=</span>N_STEPS):</span>
-<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Run n gradient steps.</span></span>
-<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a><span class="co">    Always passes ``params=full`` to ``opt.update`` so transforms like</span></span>
-<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a><span class="co">    ``make_manifold_projection`` that need the current params work correctly.</span></span>
-<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a><span class="co">    Standard optax transforms (adam, etc.) simply ignore the extra kwarg.</span></span>
-<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
-<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>    opt_state <span class="op">=</span> opt.init(full_init)</span>
-<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a>    grad_fn(full_init)  <span class="co"># warm-up to exclude JAX compilation time</span></span>
-<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a>    hist <span class="op">=</span> {<span class="st">"loss"</span>: [], <span class="st">"violation"</span>: [], <span class="st">"cumtime"</span>: [], <span class="st">"traj"</span>: [np.array(full_init[<span class="st">"p"</span>])]}</span>
-<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a>    t0, full <span class="op">=</span> time.perf_counter(), full_init</span>
-<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(n):</span>
-<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a>        val, g <span class="op">=</span> grad_fn(full)</span>
-<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a>        updates, opt_state <span class="op">=</span> opt.update(g, opt_state, full)</span>
-<span id="cb5-24"><a href="#cb5-24" aria-hidden="true" tabindex="-1"></a>        full <span class="op">=</span> optax.apply_updates(full, updates)</span>
-<span id="cb5-25"><a href="#cb5-25" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-26"><a href="#cb5-26" aria-hidden="true" tabindex="-1"></a>        hist[<span class="st">"loss"</span>].append(<span class="bu">float</span>(val))</span>
-<span id="cb5-27"><a href="#cb5-27" aria-hidden="true" tabindex="-1"></a>        hist[<span class="st">"violation"</span>].append(<span class="bu">float</span>(jnp.linalg.norm(constraint_residuals(full, metadata))))</span>
-<span id="cb5-28"><a href="#cb5-28" aria-hidden="true" tabindex="-1"></a>        hist[<span class="st">"cumtime"</span>].append(time.perf_counter() <span class="op">-</span> t0)</span>
-<span id="cb5-29"><a href="#cb5-29" aria-hidden="true" tabindex="-1"></a>        hist[<span class="st">"traj"</span>].append(np.array(full[<span class="st">"p"</span>]))</span>
-<span id="cb5-30"><a href="#cb5-30" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-31"><a href="#cb5-31" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> i <span class="op">%</span> <span class="dv">5</span> <span class="op">==</span> <span class="dv">0</span>:</span>
-<span id="cb5-32"><a href="#cb5-32" aria-hidden="true" tabindex="-1"></a>            <span class="bu">print</span>(<span class="ss">f"Step </span><span class="sc">{</span>i<span class="sc">:2d}</span><span class="ss">, loss </span><span class="sc">{</span>val<span class="sc">:.4f}</span><span class="ss">, |r| </span><span class="sc">{</span>hist[<span class="st">'violation'</span>][<span class="op">-</span><span class="dv">1</span>]<span class="sc">:.4f}</span><span class="ss">"</span>)</span>
-<span id="cb5-33"><a href="#cb5-33" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-34"><a href="#cb5-34" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> hist, full</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python cell-code"><code>N_STEPS = 40
+LAMBDA = 25.0
+
+
+def full_objective(full):
+    return jnp.sum((full[p.name] - target) ** 2)
+
+
+def run(grad_fn, opt, full_init, n=N_STEPS):
+    """Run n gradient steps.
+
+    Always passes ``params=full`` to ``opt.update`` so transforms like
+    ``make_manifold_projection`` that need the current params work correctly.
+    Standard optax transforms (adam, etc.) simply ignore the extra kwarg.
+    """
+    opt_state = opt.init(full_init)
+    grad_fn(full_init)  # warm-up to exclude JAX compilation time
+
+    hist = {"loss": [], "violation": [], "cumtime": [], "traj": [np.array(full_init["p"])]}
+    t0, full = time.perf_counter(), full_init
+    for i in range(n):
+        val, g = grad_fn(full)
+        updates, opt_state = opt.update(g, opt_state, full)
+        full = optax.apply_updates(full, updates)
+
+        hist["loss"].append(float(val))
+        hist["violation"].append(float(jnp.linalg.norm(constraint_residuals(full, metadata))))
+        hist["cumtime"].append(time.perf_counter() - t0)
+        hist["traj"].append(np.array(full["p"]))
+
+        if i % 5 == 0:
+            print(f"Step {i:2d}, loss {val:.4f}, |r| {hist['violation'][-1]:.4f}")
+
+    return hist, full</code></pre>
 </div>
 </section>
 <section id="fixed-null-space-projection" class="level2">
 <h2 class="anchored" data-anchor-id="fixed-null-space-projection">Fixed null-space projection</h2>
 <p>N computed once at x₀; gradient projected onto NNᵀ each step.</p>
 <div id="807317ed" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:36:16.561071Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:36:16.561030Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:36:17.008323Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:36:17.008004Z&quot;}}" data-execution_count="5">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> loss_ns_fixed(reduced_vector, N):</span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> full_objective(N <span class="op">@</span> reduced_vector)</span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>value_and_grad_ns_fixed <span class="op">=</span> jax.value_and_grad(loss_ns_fixed)</span>
-<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>N_fixed <span class="op">=</span> null_space(free_params, metadata)</span>
-<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> grad_ns_fixed(full: <span class="bu">dict</span>):</span>
-<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>    reduced <span class="op">=</span> full <span class="op">@</span> N_fixed</span>
-<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>    loss, g_reduced <span class="op">=</span> value_and_grad_ns_fixed(reduced, N_fixed)</span>
-<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> loss, N_fixed <span class="op">@</span> g_reduced</span>
-<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a>optimizer <span class="op">=</span> optax.adam(learning_rate<span class="op">=</span><span class="fl">0.05</span>)</span>
-<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a>h_ns_fixed, end_ns_fixed <span class="op">=</span> run(grad_ns_fixed, opt<span class="op">=</span>optimizer, full_init<span class="op">=</span>free_params)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python cell-code"><code>def loss_ns_fixed(reduced_vector, N):
+    return full_objective(N @ reduced_vector)
+
+
+value_and_grad_ns_fixed = jax.value_and_grad(loss_ns_fixed)
+N_fixed = null_space(free_params, metadata)
+
+
+def grad_ns_fixed(full: dict):
+    reduced = full @ N_fixed
+    loss, g_reduced = value_and_grad_ns_fixed(reduced, N_fixed)
+    return loss, N_fixed @ g_reduced
+
+
+optimizer = optax.adam(learning_rate=0.05)
+
+h_ns_fixed, end_ns_fixed = run(grad_ns_fixed, opt=optimizer, full_init=free_params)</code></pre>
 <div class="cell-output cell-output-stdout">
 <pre><code>Step  0, loss 3.2500, |r| 0.0006
 Step  5, loss 2.5647, |r| 0.0221
@@ -434,18 +399,18 @@ Step 35, loss 1.0072, |r| 0.4619</code></pre>
 <h2 class="anchored" data-anchor-id="relinearized-null-space-projection">Relinearized null-space projection</h2>
 <p>N recomputed at the current point each step so the gradient is projected onto the tangent plane at the <em>current</em> position, not just the initial one. Plain SGD is used rather than Adam: Adam’s element-wise adaptive scaling distorts the step as the null space rotates (components that were zero acquire non-zero projections and get amplified). Violation still accumulates because steps along the tangent plane leave the curved manifold by O(lr²κ) with no correction.</p>
 <div id="d2f6e238" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:36:17.009453Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:36:17.009354Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:36:17.097360Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:36:17.096990Z&quot;}}" data-execution_count="6">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>value_and_grad_full <span class="op">=</span> jax.value_and_grad(full_objective)</span>
-<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> grad_ns_relin(full: <span class="bu">dict</span>):</span>
-<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>    N <span class="op">=</span> null_space(full, metadata)</span>
-<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>    loss, g <span class="op">=</span> value_and_grad_full(full)</span>
-<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> loss, N <span class="op">@</span> (g <span class="op">@</span> N)  <span class="co"># project gradient onto current tangent space</span></span>
-<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Use plain SGD, not Adam: Adam's element-wise adaptive scaling amplifies components</span></span>
-<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a><span class="co"># that are newly introduced as the null space rotates, pushing steps off the tangent plane.</span></span>
-<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a>h_ns_relin, end_ns_relin <span class="op">=</span> run(grad_ns_relin, opt<span class="op">=</span>optax.sgd(<span class="fl">0.15</span>), full_init<span class="op">=</span>free_params)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python cell-code"><code>value_and_grad_full = jax.value_and_grad(full_objective)
+
+
+def grad_ns_relin(full: dict):
+    N = null_space(full, metadata)
+    loss, g = value_and_grad_full(full)
+    return loss, N @ (g @ N)  # project gradient onto current tangent space
+
+
+# Use plain SGD, not Adam: Adam's element-wise adaptive scaling amplifies components
+# that are newly introduced as the null space rotates, pushing steps off the tangent plane.
+h_ns_relin, end_ns_relin = run(grad_ns_relin, opt=optax.sgd(0.15), full_init=free_params)</code></pre>
 <div class="cell-output cell-output-stdout">
 <pre><code>Step  0, loss 3.2500, |r| 0.0500
 Step  5, loss 0.3380, |r| 0.1287
@@ -462,16 +427,16 @@ Step 35, loss 0.1097, |r| 0.1340</code></pre>
 <h2 class="anchored" data-anchor-id="manifold-projection-via-make_manifold_projection">Manifold projection via <code>make_manifold_projection</code></h2>
 <p>Chain <code>make_manifold_projection(metadata)</code> after any optax optimizer. On each call to <code>optimizer.update(grads, state, params)</code> it computes <code>new_params = params + adam_update</code>, projects onto the constraint manifold via a Newton correction, then returns <code>projected − params</code> as the effective update — so <code>apply_updates(params, updates)</code> lands exactly on the manifold. The <code>run</code> loop passes <code>params=full</code> to every <code>opt.update</code> call, which is what activates the projection.</p>
 <div id="43ee783a" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:36:17.098305Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:36:17.098255Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:36:17.244814Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:36:17.244485Z&quot;}}" data-execution_count="7">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>optimizer_proj <span class="op">=</span> optax.chain(optax.adam(<span class="fl">0.05</span>), make_manifold_projection(metadata))</span>
-<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>value_and_grad_proj <span class="op">=</span> jax.value_and_grad(full_objective)</span>
-<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> grad_proj(full):</span>
-<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> value_and_grad_proj(full)</span>
-<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>h_proj, end_proj <span class="op">=</span> run(grad_proj, opt<span class="op">=</span>optimizer_proj, full_init<span class="op">=</span>free_params)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python cell-code"><code>optimizer_proj = optax.chain(optax.adam(0.05), make_manifold_projection(metadata))
+
+value_and_grad_proj = jax.value_and_grad(full_objective)
+
+
+def grad_proj(full):
+    return value_and_grad_proj(full)
+
+
+h_proj, end_proj = run(grad_proj, opt=optimizer_proj, full_init=free_params)</code></pre>
 <div class="cell-output cell-output-stdout">
 <pre><code>Step  0, loss 3.2500, |r| 0.0000
 Step  5, loss 2.4846, |r| 0.0000
@@ -488,9 +453,9 @@ Step 35, loss 0.0508, |r| 0.0000</code></pre>
 <h2 class="anchored" data-anchor-id="riemannian-gradient-descent-relinearized-projection">Riemannian gradient descent (relinearized + projection)</h2>
 <p>Combine both ideas: step along the <em>current</em> tangent plane (<code>grad_ns_relin</code>) then snap back to the manifold with <code>make_manifold_projection</code>. This is the hybrid — it gets the correct manifold-aware gradient direction <em>and</em> enforces the constraint exactly after every step. Chaining <code>optax.sgd</code> with <code>make_manifold_projection</code> requires no new code.</p>
 <div id="axjqtthexw" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:36:17.245818Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:36:17.245765Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:36:17.381651Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:36:17.381317Z&quot;}}" data-execution_count="8">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>optimizer_riem <span class="op">=</span> optax.chain(optax.sgd(<span class="fl">0.15</span>), make_manifold_projection(metadata))</span>
-<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>h_riem, end_riem <span class="op">=</span> run(grad_ns_relin, opt<span class="op">=</span>optimizer_riem, full_init<span class="op">=</span>free_params)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python cell-code"><code>optimizer_riem = optax.chain(optax.sgd(0.15), make_manifold_projection(metadata))
+
+h_riem, end_riem = run(grad_ns_relin, opt=optimizer_riem, full_init=free_params)</code></pre>
 <div class="cell-output cell-output-stdout">
 <pre><code>Step  0, loss 3.2500, |r| 0.0000
 Step  5, loss 0.2350, |r| 0.0000
@@ -507,25 +472,25 @@ Step 35, loss 0.0389, |r| 0.0000</code></pre>
 <h2 class="anchored" data-anchor-id="penalty-method">Penalty method</h2>
 <p>Augmented loss: ‖p − t‖² + λ‖r(p)‖². Penalty Hessian eigenvalue in the normal direction is 2 + 2λ; stable LR ≤ 1/(1 + 2λ).</p>
 <div id="572b58c9" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:36:17.382563Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:36:17.382515Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:36:17.580802Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:36:17.580420Z&quot;}}" data-execution_count="9">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>LR_PENALTY <span class="op">=</span> <span class="fl">2.5</span> <span class="op">/</span> (<span class="fl">1.0</span> <span class="op">+</span> <span class="fl">2.0</span> <span class="op">*</span> LAMBDA)</span>
-<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>optimizer_penalty <span class="op">=</span> optax.adam(learning_rate<span class="op">=</span>LR_PENALTY)</span>
-<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> loss_penalty(full):</span>
-<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> full_objective(full) <span class="op">+</span> LAMBDA <span class="op">*</span> jnp.<span class="bu">sum</span>(constraint_residuals(full, metadata) <span class="op">**</span> <span class="dv">2</span>)</span>
-<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a>value_and_grad_penalty <span class="op">=</span> jax.value_and_grad(loss_penalty)</span>
-<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-12"><a href="#cb14-12" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> grad_penalty(full):</span>
-<span id="cb14-13"><a href="#cb14-13" aria-hidden="true" tabindex="-1"></a>    val <span class="op">=</span> full_objective(full)</span>
-<span id="cb14-14"><a href="#cb14-14" aria-hidden="true" tabindex="-1"></a>    _, g <span class="op">=</span> value_and_grad_penalty(full)</span>
-<span id="cb14-15"><a href="#cb14-15" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> val, g</span>
-<span id="cb14-16"><a href="#cb14-16" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-17"><a href="#cb14-17" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-18"><a href="#cb14-18" aria-hidden="true" tabindex="-1"></a>h_penalty, end_penalty <span class="op">=</span> run(grad_penalty, opt<span class="op">=</span>optimizer_penalty, full_init<span class="op">=</span>free_params)</span>
-<span id="cb14-19"><a href="#cb14-19" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"final loss=</span><span class="sc">{</span>h_penalty[<span class="st">'loss'</span>][<span class="op">-</span><span class="dv">1</span>]<span class="sc">:.4f}</span><span class="ss">  violation=</span><span class="sc">{</span>h_penalty[<span class="st">'violation'</span>][<span class="op">-</span><span class="dv">1</span>]<span class="sc">:.2e}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python cell-code"><code>LR_PENALTY = 2.5 / (1.0 + 2.0 * LAMBDA)
+optimizer_penalty = optax.adam(learning_rate=LR_PENALTY)
+
+
+def loss_penalty(full):
+    return full_objective(full) + LAMBDA * jnp.sum(constraint_residuals(full, metadata) ** 2)
+
+
+value_and_grad_penalty = jax.value_and_grad(loss_penalty)
+
+
+def grad_penalty(full):
+    val = full_objective(full)
+    _, g = value_and_grad_penalty(full)
+    return val, g
+
+
+h_penalty, end_penalty = run(grad_penalty, opt=optimizer_penalty, full_init=free_params)
+print(f"final loss={h_penalty['loss'][-1]:.4f}  violation={h_penalty['violation'][-1]:.2e}")</code></pre>
 <div class="cell-output cell-output-stdout">
 <pre><code>Step  0, loss 3.2500, |r| 0.0484
 Step  5, loss 2.5040, |r| 0.0102
@@ -539,38 +504,38 @@ final loss=0.0511  violation=8.36e-03</code></pre>
 </div>
 </div>
 <div id="olm5410hykb" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:36:17.581742Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:36:17.581693Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:36:17.727013Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:36:17.726672Z&quot;}}" data-execution_count="10">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>STYLES <span class="op">=</span> {</span>
-<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>    <span class="st">"fixed null-space"</span>: (h_ns_fixed, <span class="st">"steelblue"</span>, <span class="st">"-"</span>, <span class="st">"o"</span>),</span>
-<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>    <span class="st">"relinearized null-space"</span>: (h_ns_relin, <span class="st">"darkorange"</span>, <span class="st">"--"</span>, <span class="st">"s"</span>),</span>
-<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>    <span class="st">"Riemannian GD"</span>: (h_riem, <span class="st">"mediumorchid"</span>, <span class="st">"--"</span>, <span class="st">"P"</span>),</span>
-<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>    <span class="st">"manifold projection"</span>: (h_proj, <span class="st">"seagreen"</span>, <span class="st">"-."</span>, <span class="st">"^"</span>),</span>
-<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a>    <span class="ss">f"penalty (λ=</span><span class="sc">{</span>LAMBDA<span class="sc">:.0f}</span><span class="ss">)"</span>: (h_penalty, <span class="st">"crimson"</span>, <span class="st">":"</span>, <span class="st">"D"</span>),</span>
-<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a>}</span>
-<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a>FLOOR <span class="op">=</span> <span class="fl">1e-10</span></span>
-<span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-11"><a href="#cb16-11" aria-hidden="true" tabindex="-1"></a>fig, axes <span class="op">=</span> plt.subplots(<span class="dv">1</span>, <span class="dv">2</span>, figsize<span class="op">=</span>(<span class="dv">13</span>, <span class="dv">4</span>))</span>
-<span id="cb16-12"><a href="#cb16-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-13"><a href="#cb16-13" aria-hidden="true" tabindex="-1"></a>ax <span class="op">=</span> axes[<span class="dv">0</span>]</span>
-<span id="cb16-14"><a href="#cb16-14" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> label, (h, color, ls, _) <span class="kw">in</span> STYLES.items():</span>
-<span id="cb16-15"><a href="#cb16-15" aria-hidden="true" tabindex="-1"></a>    ax.semilogy(h[<span class="st">"cumtime"</span>], h[<span class="st">"loss"</span>], color<span class="op">=</span>color, linestyle<span class="op">=</span>ls, lw<span class="op">=</span><span class="fl">1.8</span>, label<span class="op">=</span>label)</span>
-<span id="cb16-16"><a href="#cb16-16" aria-hidden="true" tabindex="-1"></a>ax.axhline(optimal_loss, color<span class="op">=</span><span class="st">"black"</span>, ls<span class="op">=</span><span class="st">"--"</span>, lw<span class="op">=</span><span class="dv">1</span>, alpha<span class="op">=</span><span class="fl">0.5</span>, label<span class="op">=</span><span class="st">"optimal loss"</span>)</span>
-<span id="cb16-17"><a href="#cb16-17" aria-hidden="true" tabindex="-1"></a>ax.set_xlabel(<span class="st">"wall-clock time  (s)"</span>)</span>
-<span id="cb16-18"><a href="#cb16-18" aria-hidden="true" tabindex="-1"></a>ax.set_ylabel(<span class="st">"loss"</span>)</span>
-<span id="cb16-19"><a href="#cb16-19" aria-hidden="true" tabindex="-1"></a>ax.set_title(<span class="st">"Convergence vs time"</span>)</span>
-<span id="cb16-20"><a href="#cb16-20" aria-hidden="true" tabindex="-1"></a>ax.legend(fontsize<span class="op">=</span><span class="dv">8</span>)</span>
-<span id="cb16-21"><a href="#cb16-21" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-22"><a href="#cb16-22" aria-hidden="true" tabindex="-1"></a>ax <span class="op">=</span> axes[<span class="dv">1</span>]</span>
-<span id="cb16-23"><a href="#cb16-23" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> label, (h, color, ls, _) <span class="kw">in</span> STYLES.items():</span>
-<span id="cb16-24"><a href="#cb16-24" aria-hidden="true" tabindex="-1"></a>    v <span class="op">=</span> [<span class="bu">max</span>(x, FLOOR) <span class="cf">for</span> x <span class="kw">in</span> h[<span class="st">"violation"</span>]]</span>
-<span id="cb16-25"><a href="#cb16-25" aria-hidden="true" tabindex="-1"></a>    ax.semilogy(<span class="bu">range</span>(<span class="dv">1</span>, <span class="bu">len</span>(v) <span class="op">+</span> <span class="dv">1</span>), v, color<span class="op">=</span>color, linestyle<span class="op">=</span>ls, lw<span class="op">=</span><span class="fl">1.8</span>, label<span class="op">=</span>label)</span>
-<span id="cb16-26"><a href="#cb16-26" aria-hidden="true" tabindex="-1"></a>ax.set_xlabel(<span class="st">"step"</span>)</span>
-<span id="cb16-27"><a href="#cb16-27" aria-hidden="true" tabindex="-1"></a>ax.set_ylabel(<span class="st">"‖r(p)‖"</span>)</span>
-<span id="cb16-28"><a href="#cb16-28" aria-hidden="true" tabindex="-1"></a>ax.set_title(<span class="st">"Constraint violation"</span>)</span>
-<span id="cb16-29"><a href="#cb16-29" aria-hidden="true" tabindex="-1"></a>ax.legend(fontsize<span class="op">=</span><span class="dv">8</span>)</span>
-<span id="cb16-30"><a href="#cb16-30" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-31"><a href="#cb16-31" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
-<span id="cb16-32"><a href="#cb16-32" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python cell-code"><code>STYLES = {
+    "fixed null-space": (h_ns_fixed, "steelblue", "-", "o"),
+    "relinearized null-space": (h_ns_relin, "darkorange", "--", "s"),
+    "Riemannian GD": (h_riem, "mediumorchid", "--", "P"),
+    "manifold projection": (h_proj, "seagreen", "-.", "^"),
+    f"penalty (λ={LAMBDA:.0f})": (h_penalty, "crimson", ":", "D"),
+}
+
+FLOOR = 1e-10
+
+fig, axes = plt.subplots(1, 2, figsize=(13, 4))
+
+ax = axes[0]
+for label, (h, color, ls, _) in STYLES.items():
+    ax.semilogy(h["cumtime"], h["loss"], color=color, linestyle=ls, lw=1.8, label=label)
+ax.axhline(optimal_loss, color="black", ls="--", lw=1, alpha=0.5, label="optimal loss")
+ax.set_xlabel("wall-clock time  (s)")
+ax.set_ylabel("loss")
+ax.set_title("Convergence vs time")
+ax.legend(fontsize=8)
+
+ax = axes[1]
+for label, (h, color, ls, _) in STYLES.items():
+    v = [max(x, FLOOR) for x in h["violation"]]
+    ax.semilogy(range(1, len(v) + 1), v, color=color, linestyle=ls, lw=1.8, label=label)
+ax.set_xlabel("step")
+ax.set_ylabel("‖r(p)‖")
+ax.set_title("Constraint violation")
+ax.legend(fontsize=8)
+
+plt.tight_layout()
+plt.show()</code></pre>
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
@@ -580,45 +545,45 @@ final loss=0.0511  violation=8.36e-03</code></pre>
 </div>
 </div>
 <div id="afgx3ub1qvj" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-09-01T09:36:17.727956Z&quot;,&quot;iopub.status.busy&quot;:&quot;2026-09-01T09:36:17.727899Z&quot;,&quot;iopub.status.idle&quot;:&quot;2026-09-01T09:36:17.769845Z&quot;,&quot;shell.execute_reply&quot;:&quot;2026-09-01T09:36:17.769447Z&quot;}}" data-execution_count="11">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>theta <span class="op">=</span> np.linspace(<span class="dv">0</span>, <span class="dv">2</span> <span class="op">*</span> np.pi, <span class="dv">300</span>)</span>
-<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="dv">5</span>, <span class="dv">5</span>))</span>
-<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>ax.plot(</span>
-<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>    <span class="dv">2</span> <span class="op">*</span> np.cos(theta),</span>
-<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a>    <span class="dv">2</span> <span class="op">*</span> np.sin(theta),</span>
-<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a>    <span class="st">"--"</span>,</span>
-<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a>    color<span class="op">=</span><span class="st">"gray"</span>,</span>
-<span id="cb17-9"><a href="#cb17-9" aria-hidden="true" tabindex="-1"></a>    alpha<span class="op">=</span><span class="fl">0.5</span>,</span>
-<span id="cb17-10"><a href="#cb17-10" aria-hidden="true" tabindex="-1"></a>    lw<span class="op">=</span><span class="fl">1.2</span>,</span>
-<span id="cb17-11"><a href="#cb17-11" aria-hidden="true" tabindex="-1"></a>    label<span class="op">=</span><span class="st">"constraint  |p|=2"</span>,</span>
-<span id="cb17-12"><a href="#cb17-12" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb17-13"><a href="#cb17-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-14"><a href="#cb17-14" aria-hidden="true" tabindex="-1"></a>x0_arr <span class="op">=</span> np.array(free_params[<span class="st">"p"</span>])</span>
-<span id="cb17-15"><a href="#cb17-15" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> label, (h, color, ls, marker) <span class="kw">in</span> STYLES.items():</span>
-<span id="cb17-16"><a href="#cb17-16" aria-hidden="true" tabindex="-1"></a>    traj <span class="op">=</span> np.array(h[<span class="st">"traj"</span>])</span>
-<span id="cb17-17"><a href="#cb17-17" aria-hidden="true" tabindex="-1"></a>    ax.plot(</span>
-<span id="cb17-18"><a href="#cb17-18" aria-hidden="true" tabindex="-1"></a>        traj[:, <span class="dv">0</span>],</span>
-<span id="cb17-19"><a href="#cb17-19" aria-hidden="true" tabindex="-1"></a>        traj[:, <span class="dv">1</span>],</span>
-<span id="cb17-20"><a href="#cb17-20" aria-hidden="true" tabindex="-1"></a>        color<span class="op">=</span>color,</span>
-<span id="cb17-21"><a href="#cb17-21" aria-hidden="true" tabindex="-1"></a>        linestyle<span class="op">=</span>ls,</span>
-<span id="cb17-22"><a href="#cb17-22" aria-hidden="true" tabindex="-1"></a>        marker<span class="op">=</span>marker,</span>
-<span id="cb17-23"><a href="#cb17-23" aria-hidden="true" tabindex="-1"></a>        markersize<span class="op">=</span><span class="dv">2</span>,</span>
-<span id="cb17-24"><a href="#cb17-24" aria-hidden="true" tabindex="-1"></a>        lw<span class="op">=</span><span class="fl">1.2</span>,</span>
-<span id="cb17-25"><a href="#cb17-25" aria-hidden="true" tabindex="-1"></a>        label<span class="op">=</span>label,</span>
-<span id="cb17-26"><a href="#cb17-26" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb17-27"><a href="#cb17-27" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-28"><a href="#cb17-28" aria-hidden="true" tabindex="-1"></a>ax.plot(<span class="op">*</span>x0_arr[:<span class="dv">2</span>], <span class="st">"s"</span>, color<span class="op">=</span><span class="st">"black"</span>, ms<span class="op">=</span><span class="dv">9</span>, zorder<span class="op">=</span><span class="dv">6</span>, label<span class="op">=</span><span class="st">"start"</span>)</span>
-<span id="cb17-29"><a href="#cb17-29" aria-hidden="true" tabindex="-1"></a>ax.plot(<span class="op">*</span>np.array(target)[:<span class="dv">2</span>], <span class="st">"*"</span>, color<span class="op">=</span><span class="st">"crimson"</span>, ms<span class="op">=</span><span class="dv">14</span>, zorder<span class="op">=</span><span class="dv">6</span>, label<span class="op">=</span><span class="st">"target"</span>)</span>
-<span id="cb17-30"><a href="#cb17-30" aria-hidden="true" tabindex="-1"></a>ax.plot(<span class="op">*</span>np.array(p_star)[:<span class="dv">2</span>], <span class="st">"^"</span>, color<span class="op">=</span><span class="st">"black"</span>, ms<span class="op">=</span><span class="dv">9</span>, zorder<span class="op">=</span><span class="dv">6</span>, label<span class="op">=</span><span class="st">"optimum"</span>)</span>
-<span id="cb17-31"><a href="#cb17-31" aria-hidden="true" tabindex="-1"></a>ax.set_xlim(<span class="op">-</span><span class="fl">0.3</span>, <span class="fl">2.8</span>)</span>
-<span id="cb17-32"><a href="#cb17-32" aria-hidden="true" tabindex="-1"></a>ax.set_ylim(<span class="op">-</span><span class="fl">0.4</span>, <span class="fl">2.5</span>)</span>
-<span id="cb17-33"><a href="#cb17-33" aria-hidden="true" tabindex="-1"></a>ax.set_aspect(<span class="st">"equal"</span>)</span>
-<span id="cb17-34"><a href="#cb17-34" aria-hidden="true" tabindex="-1"></a>ax.legend(fontsize<span class="op">=</span><span class="dv">8</span>)</span>
-<span id="cb17-35"><a href="#cb17-35" aria-hidden="true" tabindex="-1"></a>ax.set_title(<span class="st">"Optimization trajectories"</span>)</span>
-<span id="cb17-36"><a href="#cb17-36" aria-hidden="true" tabindex="-1"></a>ax.set_xlabel(<span class="st">"x"</span>)</span>
-<span id="cb17-37"><a href="#cb17-37" aria-hidden="true" tabindex="-1"></a>ax.set_ylabel(<span class="st">"y"</span>)</span>
-<span id="cb17-38"><a href="#cb17-38" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
-<span id="cb17-39"><a href="#cb17-39" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python cell-code"><code>theta = np.linspace(0, 2 * np.pi, 300)
+
+fig, ax = plt.subplots(figsize=(5, 5))
+ax.plot(
+    2 * np.cos(theta),
+    2 * np.sin(theta),
+    "--",
+    color="gray",
+    alpha=0.5,
+    lw=1.2,
+    label="constraint  |p|=2",
+)
+
+x0_arr = np.array(free_params["p"])
+for label, (h, color, ls, marker) in STYLES.items():
+    traj = np.array(h["traj"])
+    ax.plot(
+        traj[:, 0],
+        traj[:, 1],
+        color=color,
+        linestyle=ls,
+        marker=marker,
+        markersize=2,
+        lw=1.2,
+        label=label,
+    )
+
+ax.plot(*x0_arr[:2], "s", color="black", ms=9, zorder=6, label="start")
+ax.plot(*np.array(target)[:2], "*", color="crimson", ms=14, zorder=6, label="target")
+ax.plot(*np.array(p_star)[:2], "^", color="black", ms=9, zorder=6, label="optimum")
+ax.set_xlim(-0.3, 2.8)
+ax.set_ylim(-0.4, 2.5)
+ax.set_aspect("equal")
+ax.legend(fontsize=8)
+ax.set_title("Optimization trajectories")
+ax.set_xlabel("x")
+ax.set_ylabel("y")
+plt.tight_layout()
+plt.show()</code></pre>
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">

@@ -26,41 +26,6 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
-/* CSS for syntax highlighting */
-html { -webkit-text-size-adjust: 100%; }
-pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
-pre > code.sourceCode > span:empty { height: 1.2em; }
-.sourceCode { overflow: visible; }
-code.sourceCode > span { color: inherit; text-decoration: inherit; }
-div.sourceCode { margin: 1em 0; }
-pre.sourceCode { margin: 0; }
-@media screen {
-div.sourceCode { overflow: auto; }
-}
-@media print {
-pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
-}
-pre.numberSource code
-  { counter-reset: source-line 0; }
-pre.numberSource code > span
-  { position: relative; left: -4em; counter-increment: source-line; }
-pre.numberSource code > span > a:first-child::before
-  { content: counter(source-line);
-    position: relative; left: -1em; text-align: right; vertical-align: baseline;
-    border: none; display: inline-block;
-    -webkit-touch-callout: none; -webkit-user-select: none;
-    -khtml-user-select: none; -moz-user-select: none;
-    -ms-user-select: none; user-select: none;
-    padding: 0 4px; width: 4em;
-  }
-pre.numberSource { margin-left: 3em;  padding-left: 4px; }
-div.sourceCode
-  {   }
-@media screen {
-pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
-}
 </style>
 
 
@@ -77,10 +42,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-bf27225e3a48a9273f3daa8f8e829971.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-e5d05eddbe2c608fb9c90784db6be0b0.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-f6e81f4864cb6d8b696b855696ff1c11.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-92bccf0354c8ed56982edb6814cc42fe.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -307,7 +272,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 <section id="cadjoint.plugins.plugin.TesseractPlugin" class="level1">
 <h1>plugins.plugin.TesseractPlugin</h1>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>plugins.plugin.TesseractPlugin(spec)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>plugins.plugin.TesseractPlugin(spec)</code></pre>
 <p>A cadjoint kind, filled by a Tesseract over one of the transports.</p>
 <p>The client is opened on first use and kept warm for the life of the object: a <code>local</code> plugin imports its <code>tesseract_api.py</code> once, a <code>container</code> plugin spawns its container once (torn down by :meth:<code>close</code>), a <code>remote</code> plugin holds one session.</p>
 <section id="parameters" class="level2 doc-section doc-section-parameters">
@@ -420,7 +385,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </table>
 <section id="cadjoint.plugins.plugin.TesseractPlugin.apply" class="level3">
 <h3 class="anchored" data-anchor-id="cadjoint.plugins.plugin.TesseractPlugin.apply">apply</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>plugins.plugin.TesseractPlugin.<span class="bu">apply</span>(inputs<span class="op">=</span><span class="va">None</span>, <span class="op">**</span>kwargs)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>plugins.plugin.TesseractPlugin.apply(inputs=None, **kwargs)</code></pre>
 <p><code>Tesseract.apply</code>, callable with a mapping or with keywords.</p>
 <section id="parameters-1" class="level4 doc-section doc-section-parameters">
 <h4 class="doc-section doc-section-parameters anchored" data-anchor-id="parameters-1">Parameters</h4>
@@ -477,7 +442,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="cadjoint.plugins.plugin.TesseractPlugin.as_jax" class="level3">
 <h3 class="anchored" data-anchor-id="cadjoint.plugins.plugin.TesseractPlugin.as_jax">as_jax</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>plugins.plugin.TesseractPlugin.as_jax()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>plugins.plugin.TesseractPlugin.as_jax()</code></pre>
 <p><code>tesseract_jax.apply_tesseract</code> bound to this plugin’s client.</p>
 <p>That function <em>is</em> the JAX primitive — it carries the <code>custom_vjp</code> dispatching to the component’s <code>vector_jacobian_product</code> under <code>jax.grad</code>. Nothing is re-implemented here; this only supplies the client, so a caller composing a chain never handles one.</p>
 <section id="returns-1" class="level4 doc-section doc-section-returns">
@@ -526,12 +491,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="cadjoint.plugins.plugin.TesseractPlugin.close" class="level3">
 <h3 class="anchored" data-anchor-id="cadjoint.plugins.plugin.TesseractPlugin.close">close</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>plugins.plugin.TesseractPlugin.close()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>plugins.plugin.TesseractPlugin.close()</code></pre>
 <p>Release the instance, tearing down a container this object spawned.</p>
 </section>
 <section id="cadjoint.plugins.plugin.TesseractPlugin.probe" class="level3">
 <h3 class="anchored" data-anchor-id="cadjoint.plugins.plugin.TesseractPlugin.probe">probe</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>plugins.plugin.TesseractPlugin.probe(strict<span class="op">=</span><span class="va">True</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>plugins.plugin.TesseractPlugin.probe(strict=True)</code></pre>
 <p>Check the instance is up and is the component the spec expects.</p>
 <section id="parameters-2" class="level4 doc-section doc-section-parameters">
 <h4 class="doc-section doc-section-parameters anchored" data-anchor-id="parameters-2">Parameters</h4>
@@ -611,18 +576,18 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="cadjoint.plugins.plugin.TesseractPlugin.schema_hash" class="level3">
 <h3 class="anchored" data-anchor-id="cadjoint.plugins.plugin.TesseractPlugin.schema_hash">schema_hash</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>plugins.plugin.TesseractPlugin.schema_hash()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>plugins.plugin.TesseractPlugin.schema_hash()</code></pre>
 <p><code>sha256:</code> of the schema the runtime publishes, canonicalized.</p>
 <p>A hash of the runtime’s own document, not of a cadjoint restatement of it — and measured identical across the <code>local</code> and <code>remote</code> forms of one package (<code>tests/plugins/test_transport.py</code>), which is what makes it a usable staleness check for a cluster.</p>
 </section>
 <section id="cadjoint.plugins.plugin.TesseractPlugin.vjp" class="level3">
 <h3 class="anchored" data-anchor-id="cadjoint.plugins.plugin.TesseractPlugin.vjp">vjp</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>plugins.plugin.TesseractPlugin.vjp(</span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>    inputs,</span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>    vjp_inputs,</span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>    vjp_outputs,</span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>    cotangent_vector,</span>
-<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre class="python"><code>plugins.plugin.TesseractPlugin.vjp(
+    inputs,
+    vjp_inputs,
+    vjp_outputs,
+    cotangent_vector,
+)</code></pre>
 <p><code>Tesseract.vector_jacobian_product</code>, with list-coerced names.</p>
 
 
