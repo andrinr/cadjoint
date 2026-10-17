@@ -20,6 +20,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from cadjoint.enums import PluginKind
 from cadjoint.geometry.parameters import Vector
 from cadjoint.sdf import Box, Cylinder, Sphere, Translate, Union
 from cadjoint.viewer.worker.main import (
@@ -628,6 +629,29 @@ def _visible_runs(scene, entries) -> list[tuple[str, np.ndarray]]:
             hidden = hidden | (np.abs(fields[id(field)][start:stop]) < 0.75 * CELL)
         runs.extend(_split_runs(entry[0], samples[index], hidden))
     return runs
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _the_lattice_path():
+    """Measure the public overlay, whatever else is installed.
+
+    These metrics are of :func:`_lattice_layers` and its batched seam
+    projection.  With a ``feature_edges`` component installed (the private
+    tier's derived B-rep) ``_mesh_edge_payload`` takes the graph path
+    instead, so on such a machine the suite passed while measuring
+    something else, and CI, which has only public cadjoint, was the only
+    place the lattice path was tested at all.
+    """
+    from cadjoint import tier
+
+    real = tier.component
+
+    def public_only(kind, *, default=None):
+        return default if kind == PluginKind.FEATURE_EDGES.value else real(kind, default=default)
+
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(tier, "component", public_only)
+        yield
 
 
 @pytest.fixture(scope="module")

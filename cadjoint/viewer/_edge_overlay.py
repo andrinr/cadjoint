@@ -43,6 +43,7 @@ import numpy as np
 from cadjoint.enums import PluginKind
 from cadjoint.meshing import DEFAULT_BOUNDS, DEFAULT_SIZE
 from cadjoint.meshing.patch_fields import world_frame_leaves
+from cadjoint.zeroset.project import _MIN_GRADIENT_SQUARED
 
 #: The overlay's name for the leaf split it shares with the mesher and the
 #: graph: the design-subtree rule below is defined over exactly these
@@ -278,12 +279,23 @@ def _project_seam_groups(
             gram = gram + (1e-4 * trace + 1e-12)[..., None, None] * identity
             multipliers = jnp.linalg.solve(gram, residual[..., None])[..., 0]
             step = jnp.einsum("sij,si->sj", jacobian, multipliers)
-            length = jnp.linalg.norm(step, axis=-1, keepdims=True)
-            step = step * jnp.minimum(1.0, max_step / jnp.maximum(length, 1e-9))
+            # The rest is `cadjoint.zeroset.project._iterate`'s, which this
+            # must equal (the reference test compares them segment for
+            # segment): no step where the fields are flat or the step is not
+            # finite, and `max_step` bounds the *total* displacement from
+            # the start, not each step -- clamping per step let four steps
+            # walk four times as far as the reference allows.
+            usable = trace > _MIN_GRADIENT_SQUARED
+            step = jnp.where(usable[:, None] & jnp.isfinite(step), step, 0.0)
+            displacement = x - step - start
+            length = jnp.sqrt(
+                jnp.maximum(jnp.sum(displacement * displacement, axis=-1, keepdims=True), 1e-24)
+            )
+            moved = start + displacement * jnp.minimum(1.0, max_step / length)
             # Under x64 the leaves evaluate in float64, so the step does too;
             # the loop carry must keep its float32 type or fori_loop refuses
             # it, and the overlay -- which swallows errors -- draws nothing.
-            return (x - step).astype(x.dtype)
+            return moved.astype(x.dtype)
 
         x = jax.lax.fori_loop(0, 4, sweep, start)
         x = jnp.where(transversal[:, None], x, start)
@@ -379,8 +391,8 @@ def _lattice_layers(scene: Any, grid: Any) -> tuple[np.ndarray, np.ndarray, np.n
     # zero or exactly negated.  A cell whose crossings hit that locus
     # classifies as a maximally sharp crease in the middle of a flat
     # face and sheds orphan tick links.  True normals live a hair off
-    # the surface, so re-evaluate the gradient at +-h/4 along each
-    # incident edge and demote feature cells whose verified normal
+    # the surface, so re-evaluate the gradient h/4 off each
+    # incident crossing and demote feature cells whose verified normal
     # spread is face-like.  Genuine creases keep their fan: each
     # crossing edge pierces one smooth facet, and different edges
     # pierce different facets.
@@ -388,20 +400,32 @@ def _lattice_layers(scene: Any, grid: Any) -> tuple[np.ndarray, np.ndarray, np.n
     if feature_rows.size:
         cell_edges = incidence.edge_ids[feature_rows]
         used = np.unique(cell_edges[cell_edges >= 0])
-        axes = np.asarray(edges.axis)[used]
-        offsets = (0.25 * np.asarray(grid.spacing, dtype=np.float64)[axes])[:, None] * np.eye(3)[
-            axes
-        ]
+        # A quarter cell off every crossing along all three axes, not only
+        # along the crossing's own edge.  A crease that lies exactly in a
+        # lattice plane (the house's roof ridge at x = 0) puts most of its
+        # crossings *on* the crease, where the field's two facets tie; a
+        # probe along an edge that runs in that plane stays on the tie, and
+        # the gradient there is whichever facet the evaluation order picks
+        # -- the same one every time.  The cell then sees one facet's normal
+        # several times over the other's, its spread falls under the bar
+        # and a real crease is demoted.  Stepping off along every axis puts
+        # a probe on each side of any crease through the crossing.
+        offsets = 0.25 * np.asarray(grid.spacing, dtype=np.float64)[:, None] * np.eye(3)
         base = np.asarray(hermite.points, dtype=np.float64)[used]
-        probes = jnp.asarray(np.concatenate([base - offsets, base + offsets]), jnp.float32)
+        probes = jnp.asarray(
+            np.concatenate([base + sign * offset for offset in offsets for sign in (-1.0, 1.0)]),
+            jnp.float32,
+        )
         gradients = np.asarray(jax.jit(jax.vmap(jax.grad(sdf)))(probes), dtype=np.float64)
         scale = np.linalg.norm(gradients, axis=1, keepdims=True)
         probe_normals = np.where(scale > 1e-9, gradients / np.maximum(scale, 1e-12), 0.0)
         lookup = np.zeros(int(used.max()) + 1, dtype=np.int64)
         lookup[used] = np.arange(used.size)
         slots = lookup[np.maximum(cell_edges, 0)]
-        samples = np.concatenate([probe_normals[slots], probe_normals[slots + used.size]], axis=1)
-        sample_valid = np.concatenate([cell_edges >= 0] * 2, axis=1) & (
+        samples = np.concatenate(
+            [probe_normals[slots + block * used.size] for block in range(6)], axis=1
+        )
+        sample_valid = np.concatenate([cell_edges >= 0] * 6, axis=1) & (
             np.linalg.norm(samples, axis=-1) > 0.5
         )
         sample_counts = np.maximum(sample_valid.sum(axis=1), 1)
