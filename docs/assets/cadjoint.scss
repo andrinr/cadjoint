@@ -12,8 +12,8 @@ $body-tertiary-color: $cj-ink-3;
 $border-color: $cj-rule;
 $hr-border-color: $cj-rule-strong;
 
-// The accent is a fill, never ink (C5): primary buttons and the current TOC
-// entry take it as a block; links are ink with an accent-press underline.
+// The accent is a fill, never ink (C5): primary buttons take it as a block;
+// links are ink with an accent-press underline.
 $primary: $cj-accent;
 $secondary: $cj-ink-2;
 $success: $cj-ok;
@@ -45,6 +45,10 @@ $navbar-fg: $cj-ink-2;
 $navbar-hl: $cj-ink;
 $footer-bg: $cj-surface-base;
 $toc-color: $cj-ink-2;
+$toc-active-border: $cj-ink;
+$sidebar-color: $cj-ink-2;
+$sidebar-hover-color: $cj-ink;
+$sidebar-active-color: $cj-ink;
 
 $code-block-bg: $cj-surface-float;
 $code-block-border-left: $cj-rule;
@@ -86,16 +90,69 @@ h2 {
   background: $cj-surface-bar-alt;
 }
 
-// The current section in the table of contents is the accent block (current).
+// Table of contents: two levels told apart by role, ink and indent. Sections
+// are caps in ink; subsections are body text in ink-2, one inset in. The
+// current entry takes the 2px ink line at its left edge.
+#toc-title {
+  font-family: $font-family-monospace;
+  font-size: $cj-text-xs;
+  font-weight: $cj-weight-semibold;
+  letter-spacing: $cj-track-caps;
+  text-transform: uppercase;
+  color: $cj-ink-3;
+}
 #TOC .nav-link,
 #TOC a {
   font-family: $font-family-monospace;
-  font-size: $cj-text-xs;
+  border-left: 2px solid transparent;
 }
-#TOC .nav-link.active {
-  background: $cj-accent;
-  color: $cj-ink-on-accent;
-  border-left-color: $cj-accent;
+#TOC > ul > li > a {
+  font-size: $cj-text-xs;
+  font-weight: $cj-weight-semibold;
+  letter-spacing: $cj-track-caps;
+  text-transform: uppercase;
+  color: $cj-ink;
+  margin-top: $cj-inset;
+}
+#TOC ul ul {
+  padding-left: $cj-inset;
+}
+#TOC ul ul a {
+  font-size: $cj-text-xs;
+  font-weight: normal;
+  letter-spacing: normal;
+  text-transform: none;
+  color: $cj-ink-2;
+}
+#TOC .nav-link.active,
+#TOC a.active,
+#TOC > ul > li > a.active,
+#TOC ul ul a.active {
+  border-left-color: $cj-ink;
+  background: none;
+  // Quarto sets the active colour with !important from $toc-color.
+  color: $cj-ink !important;
+}
+
+// Site sidebar (guides, examples, reference): the same marks as the TOC.
+// The section head is caps; pages are body text; the current page is
+// semibold ink on the 2px ink line.
+#quarto-sidebar .sidebar-item .sidebar-link {
+  border-left: 2px solid transparent;
+  padding-left: $cj-inset;
+}
+#quarto-sidebar .sidebar-item-section > .sidebar-item-container .sidebar-item-text,
+#quarto-sidebar .sidebar-section-header {
+  font-family: $font-family-monospace;
+  font-size: $cj-text-xs;
+  font-weight: $cj-weight-semibold;
+  letter-spacing: $cj-track-caps;
+  text-transform: uppercase;
+}
+#quarto-sidebar .sidebar-link.active {
+  border-left-color: $cj-ink;
+  color: $cj-ink !important;
+  font-weight: $cj-weight-semibold;
 }
 
 // Code: the sheet with a rule edge; highlighting is achromatic (A3).
@@ -117,7 +174,7 @@ table {
   font-variant-numeric: tabular-nums;
 }
 
-// One title size, not a display headline (Δ "no cropped display headline").
+// One title size, not a display headline.
 h1, .title {
   font-size: 1.6rem;
 }

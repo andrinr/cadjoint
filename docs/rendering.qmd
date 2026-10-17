@@ -3,15 +3,14 @@ title: Forward Renderer
 description: Predictable sphere tracing for still images, and StableHLO compilation to WGSL.
 ---
 
-cadjoint's image renderer is designed for predictable forward rendering. It uses
-early-exit sphere tracing, screen-space silhouette reconstruction,
+The image renderer is a forward renderer. It uses early-exit sphere tracing, screen-space silhouette reconstruction,
 finite-difference normals, Cook–Torrance GGX materials, soft shadows, and
 optional reflection and refraction rays.
 
-Geometry and constraints remain JAX-native and differentiable. Rendered pixels
-are intentionally not an inverse-rendering or optimization API — the gradients
-this project cares about run through [meshing](meshing.qmd) and
-[simulation](simulation.qmd), not through visibility.
+Geometry and constraints are differentiable; rendered pixels are not an
+inverse-rendering or optimization API. Gradients run through
+[meshing](meshing.qmd) and [simulation](simulation.qmd), not through
+visibility.
 
 ## Scene and quality settings
 
@@ -37,14 +36,14 @@ mirror = replace(RenderSettings.balanced(), reflect_steps=64)
 ```
 
 `render_scene` returns a `(H, W, 3)` float array. The low-level
-`raymarch(sdf, ...)` function remains available for compact notebook calls, and
+`raymarch(sdf, ...)` function serves compact notebook calls, and
 `render_raymarched(...)` wraps it to display on a matplotlib axis.
 
 Each primary trace retains its closest approach to the scene. Rays that narrowly
 miss a surface receive screen-space coverage across
 `RenderSettings.silhouette_smoothing` pixels, which removes hard hit/miss
-outlines without restoring differentiable visibility or fixed-step tracing. Set
-the value to `0` when exact binary coverage is required.
+outlines without differentiable visibility or fixed-step tracing. Set it to `0`
+for exact binary coverage.
 
 ## Rendering modes
 
@@ -69,8 +68,8 @@ and must be asked for explicitly.
 
 ![Draft, balanced, and high-quality forward renders](assets/rendering-quality.png)
 
-The presets are starting points rather than hidden modes. Every field is public,
-validated, and can be changed with `dataclasses.replace`.
+Every preset field is public, validated, and can be changed with
+`dataclasses.replace`.
 
 ## Materials
 
@@ -96,7 +95,7 @@ sphere = Sphere(
 ### Transparency and refraction
 
 Set `opacity < 1` for transparency. With `refract_steps=0` (the default) the
-surface simply fades toward the background. With `refract_steps > 0` the
+surface fades toward the background. With `refract_steps > 0` the
 renderer performs two-bounce Snell's-law refraction: the primary ray bends into
 the material, an interior march finds the back face using `−sdf` as the distance
 field, and the ray bends back into air to continue through the rest of the
@@ -137,10 +136,9 @@ image = raymarch(
 
 ## Shader compilation
 
-The same scene compiles to a standalone shader function. JAX traces distance and
-material evaluation, lowers both to StableHLO, and cadjoint emits the shader
-source from there — so the browser renders the identical field the Python
-renderer does.
+A scene compiles to a standalone shader function. JAX traces distance and
+material evaluation and lowers both to StableHLO, from which cadjoint emits the
+shader source, so the browser renders the same field as the Python renderer.
 
 ```python
 from cadjoint.backends import compile_scene_to_wgsl, compile_sdf_to_wgsl
@@ -152,18 +150,17 @@ scene_wgsl = compile_scene_to_wgsl(Sphere(radius=1.0))  # + materials
 
 `compile_scene_to_wgsl` emits `sdf`, `material_base` (RGB + roughness), and
 `material_optics` (metallic + opacity + IOR + reflectivity) from one scene
-snapshot, ready to embed in a WebGPU renderer. This is exactly what
-[the playground](viewer.qmd) does on every run.
+snapshot, ready to embed in a WebGPU renderer; [the playground](viewer.qmd)
+does this on every run.
 
-### How big the shader gets
+### Shader size
 
-A shader is one straight-line function per entry point, so its size is decided
-by how much of the tree the trace unrolls. Two things keep that in check. A node
-evaluated more than once — a pattern's child, a subtree two booleans share — is
-lowered as its own StableHLO function, and the emitter turns each of those into
-one WGSL function called once per instance; a bearing housing with four polar
-patterns is 1.45 MB of WGSL rather than 2.42 MB. What is *not* shared is the
-vertex loop of a sketch profile: WGSL has no type wider than a `mat4`, so a
+A shader is one straight-line function per entry point, so its size depends on
+how much of the tree the trace unrolls. A node evaluated more than once (a
+pattern's child, a subtree two booleans share) is lowered as its own StableHLO
+function, which the emitter turns into one WGSL function called per instance; a
+bearing housing with four polar patterns is 1.45 MB of WGSL rather than
+2.42 MB. The vertex loop of a sketch profile is not shared: WGSL has no type wider than a `mat4`, so a
 profile's vertices stay individual `vec2`s and its contribution grows with the
 vertex count. (Everything else traces the profile as one `(N, 2)` array; see
 [the meshing notes](meshing.qmd#program-size).)
@@ -187,4 +184,4 @@ program.buffer()             # float32 array to upload at @group(3) @binding(0)
 
 - [Rendering notebook](../examples/rendering.ipynb) — composition, quality presets, and hot reload
 - [The playground](viewer.qmd) — the interactive WebGPU viewport, its progressive path tracer, and its views of the field itself (signed slice, gradient magnitude, iso-offset, normals, depth)
-- [WebGPU SDF path tracing](../research/path-tracing.md) — design and deliberate boundaries of the browser path tracer
+- [WebGPU SDF path tracing](https://github.com/andrinr/cadjoint/blob/main/research/path-tracing.md) — design and deliberate boundaries of the browser path tracer
