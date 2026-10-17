@@ -268,11 +268,12 @@ def main() -> None:
         "/* eslint-disable */",
         'import { numpy as np } from "@jax-js/jax";',
         "",
-        "// max/min follow jax-js's tie-gradient convention (all to the first",
-        "// argument); JAX splits a tie 0.5 / 0.5. Values are identical, gradients",
-        "// differ only at exact ties. A composite fix reuses its operands, which",
-        "// jax-js's jit fusion inlines exponentially on chained booleans, so the",
-        "// fix belongs in jax-js's JVP rule: ekzhang/jax-js#230.",
+        "// max/min follow jax-js's tie-gradient convention. Up to 0.1.26 that is",
+        "// all to the first argument; JAX splits a tie 0.5 / 0.5. Values are",
+        "// identical, gradients differ only at exact ties. ekzhang/jax-js#231",
+        "// (merged after 0.1.26) makes jax-js split like JAX. A composite",
+        "// min(a, b) + min(b, a) here would double the jit-fused expression per",
+        "// boolean: ekzhang/jax-js#233.",
         "",
     ]
     registry = []

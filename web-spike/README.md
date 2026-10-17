@@ -53,11 +53,15 @@ the generated formulas:
 - On creases (a pin bore meeting a lug face) cadjoint's sharp booleans are a
   smooth max with k floored at 1e-10, so which side's normal wins is decided
   by float noise: XLA and jax-js pick differently, both valid.
-- At exact max/min ties jax-js gives the gradient to the first argument, JAX
-  splits it 0.5 / 0.5 (ekzhang/jax-js#230). A composite workaround reuses its
-  operands, and jax-js's jit fusion inlines that exponentially on chained
-  booleans (clevis compile 163 ms -> 66 s, then OOM), so the fix belongs in
-  jax-js's JVP rule.
+- At exact max/min ties jax-js 0.1.26 gives the gradient to the first
+  argument, JAX splits it 0.5 / 0.5 (ekzhang/jax-js#230). jax-js's JVP rule
+  now splits it like JAX (ekzhang/jax-js#231, merged after 0.1.26). The
+  composite workaround tried before that, `0.5 * (min(a, b) + min(b, a))`,
+  raised the clevis's Wasm compile from 163 ms to 66 s, then ran out of
+  memory. jit fusion renumbers buffer ids per op in operand order, so an op
+  reading (b, a) after one reading (a, b) gets a separate copy of each
+  operand. Shared subexpressions stop being shared, and the expression
+  doubles with every boolean in the chain (ekzhang/jax-js#233).
 
 ## Performance: fused scene kernel vs per-node kernels
 
@@ -88,28 +92,27 @@ lattice was chosen to align with the clevis's faces, so 10,909 lattice
 points sit exactly on a face and the sign at zero is rounding. A real export
 fits its grid to the part with padding and almost never lands on a face.
 
-### WebGPU: unresolved
+### WebGPU: an infinite loop in jax-js's jit, fixed upstream
 
-The fused WebGPU compile is worse than slow: shader compilation runs in the
-browser's single GPU process, so one stalled shader blocks WebGPU in every
-tab until the app is restarted.
+The WebGPU stall is not shader compilation, and not box/round_box. While it
+hangs, the page's renderer sits at 100 % CPU and the GPU process is idle;
+every stack sample is in jax-js's jit, in the `maxArgs` pass of
+`splitGraphDataflow`.
 
-Per-node mode did not fix it. After a restart, per-node on WebGPU stalled
-too, which means one *kernel type* is the problem rather than the size of
-the fused scene. The suspects, from what did and did not run:
+A WebGPU kernel may bind at most `maxArgs` input buffers (7 on default
+limits: 8 storage buffers per stage, one for the output). When a fused op
+needs more, the pass marks the input with the most distinct dependencies as
+a kernel boundary and retries. It does not skip inputs it has already
+marked, so when the top pick is already marked, nothing changes and it
+loops forever. In extruded_polygon_4 an op reads three inputs with 1, 7 and
+7 dependencies (8 > 7), and the pass keeps re-picking the first.
 
-- On WebGPU the space-frame node ran fused in 106 ms, so sphere, cylinder,
-  rotate, translate, union, intersection and shell are fine there.
-- The clevis adds box, round_box, extruded_polygon_4, difference and offset.
-  Box and round_box are the only kernels with reductions along an axis
-  (`np.max`, `np.sum` over the 3-vector) inside the `vmap`, and per-node
-  composition reaches round_box first.
+It hits extruded_polygon_4, _5 and _6, and the fused clevis, which contains
+them. Every other kernel, box and round_box included, compiles. WebGL
+(`maxArgs` 8) can hit the same loop; Wasm (64) does not.
 
-Next step: after an app restart, run `?kernels&webgpu` before anything else.
-It compiles each kernel alone, the known-good ones first and the suspects
-last, and logs `compiling X` before each, so the stalling kernel is named.
-If it is the reductions, emitting the 3-vector `max`/`sum` as unrolled
-pairwise ops (which StableHLO lets the emitter do) is a likely fix.
+ekzhang/jax-js#234 (open) skips inputs already marked. With it,
+extruded_polygon_4/5/6 compile in 65-74 ms on headless WebGPU.
 
 ## Files
 
