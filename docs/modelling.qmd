@@ -1,0 +1,474 @@
+---
+title: Modelling
+description: Parameters, sketches, features, SDF solids, faces and constraints.
+---
+
+This guide covers building a parametric model: parameters, sketch planes and
+profiles, the features that turn profiles into solids, SDF primitives, face
+references and constraints. The result is an SDF tree that `functionalize`
+turns into a pure JAX function of its parameters.
+
+## Example
+
+```python
+import jax
+import jax.numpy as jnp
+from cadjoint import apply_parameters, extract_parameters, functionalize
+from cadjoint.constraints import DistanceConstraint, FixedConstraint, solve_constraints
+from cadjoint.construction import PolygonProfile, SketchPlane, extrude
+
+profile = PolygonProfile(
+    [[0.1, -0.1], [1.9, 0.2], [1.0, 1.5]],
+    plane=SketchPlane(origin=[0.0, -0.5, 0.0], normal=[0.0, 0.0, 1.0]),
+    name="tri",
+)
+v0, v1, v2 = profile.vertices
+FixedConstraint(v0, [0.0, 0.0])
+FixedConstraint(v1, [2.0, 0.0])
+DistanceConstraint(v0, v2, 2.0)
+DistanceConstraint(v1, v2, 2.0)
+
+solved = solve_constraints(profile)     # {'tri_v0': ..., 'tri_v1': ..., 'tri_v2': [1, 1.732]}
+apply_parameters(profile, solved)
+
+solid = extrude(profile, depth=0.6)
+free, fixed, _ = extract_parameters(solid)
+sdf = functionalize(solid)(free, fixed)
+sdf(jnp.array([1.0, 0.0, 0.0]))         # negative: inside the triangle prism
+```
+
+Six vertex DOF and six constraint equations make the system exactly
+determined; the solution is an equilateral triangle with apex at
+(1, √3).
+
+## Parameters
+
+Every number in a model is a parameter. A parameter carries a value, a `free`
+flag, an optional `name` and optional `bounds`.
+
+| Type | Value | Use |
+| --- | --- | --- |
+| `Scalar` | float | Depths, radii, angles, offsets. |
+| `Vector2` | 2-vector | Sketch vertices, in the coordinates of a sketch plane. |
+| `Vector` | 3-vector | World positions and directions. |
+
+`free=True` marks a parameter as a design variable: it is differentiated,
+optimized and moved by the constraint solver. `free=False` (the default) makes
+it a fixed constant. Names key the parameter dicts that
+`extract_parameters` returns, so give every free parameter a unique name.
+
+```python
+from cadjoint.geometry import Scalar, Vector, Vector2
+
+p = Vector(jnp.array([2.0, 0.0, 0.0]), free=True, name="p")
+depth = Scalar(0.8, free=True, name="depth", bounds=(0.2, 2.0))
+corner = Vector2([1.0, 0.0], free=True, name="corner")
+```
+
+Passing a plain number or array where a parameter is expected creates a fixed
+parameter. A `PolygonProfile` is the exception: its raw vertex arrays become
+free `Vector2` parameters named `<name>_v0`, `<name>_v1`, ….
+
+## Sketch planes
+
+A `SketchPlane` is a work plane: an origin, a normal and an in-plane x axis.
+Profile coordinates are 2D coordinates in that frame. `SketchPlane()` is the
+world XY plane at the origin.
+
+| Constructor | Plane |
+|---|---|
+| `SketchPlane(origin, normal, x_axis=None)` | Stated in world coordinates. `x_axis` pins the sketch's horizontal; omit it for the derivation from the normal alone. |
+| `SketchPlane.on(face, x_axis=None, flip=False)` | The face's own plane, inheriting the face's x axis: the profile's `u` for a cap, the swept edge direction for a side wall. |
+| `SketchPlane.offset(face_or_plane, distance)` | Pushed along the normal. `distance` may be a `Scalar`, so the clearance is a design variable. |
+| `SketchPlane.tangent(solid, near, x_axis=None)` | Tangent to the field at the surface point nearest `near`. Horizontal defaults to the world axis most nearly in-plane. |
+| `SketchPlane.midplane(face_a, face_b)` | Halfway between two faces. |
+
+The face-based constructors are described under [Faces](#faces).
+
+## Profiles
+
+A `PolygonProfile` is a closed polygon on a sketch plane. Its vertices are
+`Vector2` parameters, two DOF each.
+
+```python
+from cadjoint.construction import PolygonProfile, SketchPlane
+
+tri = PolygonProfile(
+    [[0.1, -0.1], [1.9, 0.2], [1.0, 1.5]],
+    plane=SketchPlane(origin=[0.0, -0.5, 0.0], normal=[0.0, 0.0, 1.0]),
+    name="tri",
+)
+tri.vertices    # [Vector2(..., free=True, name='tri_v0'), ..., name='tri_v2']
+```
+
+Vertices may also be existing `Vector2` objects, so two profiles, or a profile
+and a constraint, can share them. `free=False` creates fixed vertices.
+
+A profile belongs to the construction tree, not to the SDF. It is never
+rendered as geometry; `render.draw_plane` and `render.draw_profile` project the
+plane outline, the profile edges and the vertex handles through a render
+camera onto a matplotlib axis as a wireframe overlay.
+
+## Features
+
+A feature generates an SDF solid from one or two profiles. The solid holds
+references to the profile's vertex parameters, not copies, so the construction
+tree and the SDF tree share one parameter set: solving constraints on the
+sketch or differentiating through the solid acts on the same values.
+
+| Feature | Solid |
+| --- | --- |
+| `extrude(profile, depth, material=None, draft=0.0, twist=0.0)` | Prism spanning `±depth/2` around the sketch plane. `draft` (degrees) tapers the walls inward with increasing local z; the profile is exact at the bottom cap. `twist` (degrees over the full depth) rotates the section. |
+| `revolve(profile, offset=0.0, material=None)` | Solid of revolution about the sketch plane's local Y axis. Profile coordinates are (radial, height); `offset` is added to the radius. Keep the profile at positive radius. |
+| `loft(profile_a, profile_b, height, material=None)` | Ruled solid between two profiles with equal vertex counts. Placed on `profile_a`'s plane, A at `-height/2` and B at `+height/2`; vertex `i` of A connects to vertex `i` of B. Only `profile_b`'s 2D coordinates are used. |
+
+`depth`, `height`, `offset`, `draft` and `twist` accept a `Scalar`.
+
+```python
+from cadjoint.construction import revolve
+
+washer = PolygonProfile([[0.9, -0.18], [1.35, -0.28], [1.35, 0.28], [0.9, 0.18]], name="washer")
+ring = revolve(washer)
+ring.axis       # the world axis the profile was swept around
+```
+
+## SDF primitives
+
+Features produce SDF nodes; the same tree accepts standard primitives,
+booleans and transforms. Every node is differentiable in its parameters.
+
+| Group | Nodes |
+| --- | --- |
+| Primitives | `Sphere`, `Box`, `RoundBox`, `Capsule`, `Cylinder`, `Torus`, `Plane` |
+| Booleans | `Union`, `Intersection`, `Difference`, `Xor`; operators `a \| b` (or `a + b`), `a & b`, `a - b`, `a ^ b` |
+| Transforms | `Translate`, `Rotate`, `Scale`, `Twist` |
+| Field transforms and patterns | `Shell`, `Offset`, `Mirror`, `LinearPattern`, `PolarPattern` |
+| Measures | `volume`, `material_mass` |
+
+Booleans take a `smoothness` for a smooth blend (`smooth_min` / `smooth_max`).
+Each primitive takes an optional render `material`.
+
+```python
+from cadjoint.sdf import Capsule, Rotate, Sphere, Translate, Twist, Union
+from cadjoint.sdf.primitives import Box
+
+sphere = Translate(Sphere(radius=0.6), offset=jnp.array([-1.0, 0.0, 0.0]))
+box = Translate(Box(size=[0.7, 0.7, 1.0]), offset=jnp.array([0.0, 0.0, 0.8]))
+capsule = Translate(Capsule(radius=0.3, height=1.3), offset=jnp.array([1.0, 0.0, 0.0]))
+scene = Union((sphere, box, capsule), smoothness=0.05)
+
+turned = Rotate(scene, angle=jnp.pi / 2, axis=jnp.array([0.0, 1.0, 0.0]))
+twisted = Twist(scene, strength=1.0, axis=jnp.array([0.0, 1.0, 0.0]))
+```
+
+`Twist` is a deformation: its field is not 1-Lipschitz, so it is not an exact
+distance. `Solid.box`, `Solid.cylinder` and `Solid.sphere` build primitives
+that carry faces (next section).
+
+## Faces
+
+cadjoint stores no boundary representation. The dual-contoured mesh is
+extracted from the field at one resolution, so a work plane based on it would
+depend on the extraction grid.
+
+The construction tree carries the faces instead. `extrude` spans `±depth/2`
+around its sketch plane, so it knows where its caps are and which plane each
+profile edge swept; a box knows its six faces; a revolve knows its axis. These
+are `Face` objects, and every generated solid carries them.
+
+```python
+from cadjoint.construction import Solid
+
+depth = Scalar(0.8, free=True, name="depth")
+plate = PolygonProfile([[-1, -1], [1, -1], [1, 1], [-1, 1]], name="plate")
+body = extrude(plate, depth=depth)
+
+body.faces.keys()        # ['cap+', 'cap-', 'side0', 'side1', 'side2', 'side3']
+body.cap("+").origin     # [0, 0, 0.4]: depth/2 along the sketch normal
+body.side(0).normal      # [0, -1, 0]: the plane edge 0 swept
+
+Solid.box(size=[1, 1, 1], position=[0, 0, 0], name="block").face("+z")
+```
+
+A `Face` holds its plane (origin, normal and an in-plane x axis, so a sketch's
+horizontal is defined rather than derived from the normal), the polygon that
+bounds it, and a `contains(point)` test for world points.
+
+| Solid | Faces |
+| --- | --- |
+| `extrude` | `cap+`, `cap-`, `side0` … `sideN-1` |
+| `loft` | `cap-` (profile A), `cap+` (profile B); ruled side walls are not declared |
+| `revolve` | none; `solid.axis` is the reference |
+| `Solid.box` | `+x`, `-x`, `+y`, `-y`, `+z`, `-z` |
+| drafted or twisted `extrude` | none; only `SketchPlane.tangent` applies |
+
+### Work planes on faces
+
+`depth` above is a free `Scalar`, so `body.cap("+")` is not a stored plane at
+z = 0.4 but the expression `origin + (depth/2)·normal`. A sketch on it follows
+the depth:
+
+```python
+boss = PolygonProfile(
+    [[-0.4, -0.4], [0.4, -0.4], [0.4, 0.4], [-0.4, 0.4]],
+    plane=SketchPlane.on(body.cap("+")),
+    name="boss",
+)
+```
+
+The chain is differentiable:
+
+```python
+def stack(depth):
+    body = extrude(PolygonProfile([[-1, -1], [1, -1], [1, 1], [-1, 1]], name="p"), depth=depth)
+    top = PolygonProfile([[-0.4, -0.4], [0.4, -0.4], [0.4, 0.4], [-0.4, 0.4]],
+                         plane=SketchPlane.on(body.cap("+")), name="b")
+    return extrude(top, depth=0.5)
+
+probe = jnp.array([0.0, 0.0, 1.0])
+jax.grad(lambda d: stack(d)(probe))(1.0)   # -0.5, exactly
+```
+
+The cap sits at half the depth, so the boss on it moves at half the rate, and
+the distance at a probe above the boss falls at exactly that rate.
+
+In a B-rep CAD kernel a face is stored geometry that a rebuild replaces, and a
+downstream sketch is re-attached to it by a topological-naming heuristic, so
+reordering a feature can detach the sketch. Here the face is a function of the
+parent's parameters: the reference cannot go stale, and it carries a
+derivative, so an optimizer moving `depth` moves everything referenced off it
+in the same step.
+
+### Tangent planes
+
+Blends, fillets and revolved walls have no analytic face. A point projected
+onto the zero set gives a surface point, and the field gradient there is the
+normal:
+
+```python
+dome = Sphere(radius=1.0)
+pad = SketchPlane.tangent(dome, near=[0.0, 0.0, 0.9])   # plane at the north pole
+```
+
+The projection is a Newton iteration in JAX
+(`cadjoint.fem.motion.project_points`, the one-surface case of
+`cadjoint.zeroset.project.project`), so a tangent plane is differentiable with
+respect to the scene's parameters; the pad moves out as the sphere grows.
+
+Orientation is fixed when a solid is generated; `origin` is the
+differentiable part.
+
+## Functionalize
+
+`extract_parameters(tree)` returns three things: the free parameters and the
+fixed parameters, each a dict keyed by name, and metadata that carries the
+constraint system. `functionalize(tree)(free, fixed)` returns the field as a
+pure JAX function of points, so `jit`, `grad` and `vmap` apply directly.
+`apply_parameters(tree, values)` is the inverse of `extract_parameters`: it
+writes a name-keyed dict back into the tree's free parameters. A solid and its
+sketch share parameters, so applying to either updates both.
+
+```python
+from cadjoint.sdf import Sphere, Translate
+
+p = Vector(jnp.array([2.0, 0.0, 0.0]), free=True, name="p")
+scene = Translate(Sphere(radius=0.3), offset=p)
+free, fixed, metadata = extract_parameters(scene)
+field = functionalize(scene)(free, fixed)
+field(jnp.zeros(3))     # 1.7
+```
+
+### Compilation cache
+
+`functionalize(scene)(free, fixed)` closes over the parameter values, so
+`jax.jit` of it folds every value into the program as a literal: two designs
+that differ in one value compile twice. `functionalize_parametric` takes the
+parameter dicts as arguments, so the lowered program is identical for every
+value and one executable serves them all. With the persistent compilation
+cache, a re-dimensioned design compiles nothing, even in a fresh process.
+
+```python
+from cadjoint.cache import enable_compilation_cache
+from cadjoint.functionalize import functionalize_parametric
+
+enable_compilation_cache()      # ~/.cache/cadjoint/jax, or $CADJOINT_CACHE_DIR
+evaluate = jax.jit(functionalize_parametric(scene))
+
+evaluate(free, fixed, jnp.zeros(3))                                 # compiles once
+evaluate({"p": jnp.array([1.0, 0.0, 0.0])}, fixed, jnp.zeros(3))    # reuses it
+```
+
+The playground's compile worker enables the cache for every request;
+`CADJOINT_NO_COMPILATION_CACHE=1` opts out. The stored programs are structured
+rather than flattened (a sketch profile is one `(N, 2)` array, a pattern traces
+its child once, a shared subtree is emitted once), which keeps them small
+enough to compile in under a second; see
+[program size](meshing.qmd#program-size) and the
+[performance notes](https://github.com/andrinr/cadjoint/blob/main/research/performance.md).
+
+## Constraints
+
+A constraint is a relation between parameters. Constructing one registers it
+on its parameters; nothing is solved until a solver is called on a tree that
+contains them.
+
+### Constraint types
+
+| Constraint | Arguments | Equations |
+| --- | --- | --- |
+| `DistanceConstraint` | `param1, param2, distance` | 1 |
+| `AngleConstraint` | `vector1, vector2, angle` | 1 |
+| `ParallelConstraint` | `vector1, vector2` | 2 |
+| `PerpendicularConstraint` | `vector1, vector2` | 1 |
+| `FixedConstraint` | `param, target` | one per component |
+| `CoincidentConstraint` | `point1, point2` (`Vector2`) | 2 |
+| `HorizontalConstraint` | `point1, point2` (`Vector2`) | 1 |
+| `VerticalConstraint` | `point1, point2` (`Vector2`) | 1 |
+| `PointOnLineConstraint` | `point, line1, line2` (`Vector2`) | 1 |
+| `EqualLengthConstraint` | `a1, a2, b1, b2` (`Vector2` edges) | 1 |
+| `ParallelEdgesConstraint` | `a1, a2, b1, b2` (`Vector2` edges) | 1 |
+| `PerpendicularEdgesConstraint` | `a1, a2, b1, b2` (`Vector2` edges) | 1 |
+
+`distance` and `angle` accept a `Scalar`. Every constraint takes a keyword
+`weight` (default 1.0).
+
+### Degrees of freedom
+
+A free parameter contributes one DOF per component: 1 for a `Scalar`, 2 for a
+`Vector2`, 3 for a `Vector`. Each constraint equation removes one. A system is
+exactly determined when the two counts match.
+
+Trilateration: one free 3D point `p` (3 DOF) and three fixed anchors. One
+distance constraint leaves 2 DOF, and `solve_constraints` refuses it:
+
+```python
+anchor_a = Vector(jnp.array([0.0, 0.0, 0.0]), free=False, name="anchor_a")
+anchor_b = Vector(jnp.array([4.0, 0.0, 0.0]), free=False, name="anchor_b")
+anchor_c = Vector(jnp.array([2.0, 3.0, 0.0]), free=False, name="anchor_c")
+true_p = jnp.array([2.0, 1.0, 0.0])
+
+p = Vector(jnp.array([0.5, 0.5, 0.0]), free=True, name="p")     # wrong initial guess
+scene = Translate(Sphere(radius=0.5), offset=p)
+
+DistanceConstraint(p, anchor_a, float(jnp.linalg.norm(true_p - anchor_a.value)))
+try:
+    solve_constraints(scene)
+except ValueError as e:
+    print(e)    # Under-constrained: 2 DOF remaining. (3 parameter DOF, 1 constraint equations)
+```
+
+Each distance constraint is a sphere around its anchor; three of them meet at
+`true_p`. Adding the other two determines the system:
+
+```python
+DistanceConstraint(p, anchor_b, float(jnp.linalg.norm(true_p - anchor_b.value)))
+DistanceConstraint(p, anchor_c, float(jnp.linalg.norm(true_p - anchor_c.value)))
+
+solved = solve_constraints(scene, max_steps=10)
+solved["p"]     # [2.0, 1.0, 0.0], from the guess (0.5, 0.5, 0)
+
+_, fixed, _ = extract_parameters(scene)
+sdf = functionalize(scene)(solved, fixed)
+sdf(true_p)     # -0.5: the solved sphere is centred on the true point
+```
+
+### Solving
+
+| Function | Systems | Method | Writes back |
+| --- | --- | --- | --- |
+| `solve_constraints(tree, tol=1e-6, max_steps=256)` | Exactly determined only; raises `ValueError` otherwise | Levenberg–Marquardt (Optimistix) | No; returns the free-parameter dict, apply it with `apply_parameters` |
+| `satisfy_constraints(tree, steps=8, method="newton")` | Any, including under-determined | `"newton"`: minimum-norm projection onto the constraint manifold; `"adam"` / `"sgd"`: Optax residual minimization | Yes, in place, and returns the dict |
+
+`satisfy_constraints` suits a sketch that keeps design freedom: unconstrained
+DOF stay near their current values.
+
+```python
+from cadjoint.constraints import satisfy_constraints
+
+q = Vector(jnp.array([2.0, 0.0, 0.0]), free=True, name="q")
+origin = Vector(jnp.array([0.0, 0.0, 0.0]), free=False, name="origin")
+DistanceConstraint(q, origin, 3.0)       # q must lie on a sphere of radius 3
+
+satisfy_constraints(Translate(Sphere(radius=0.3), offset=q), steps=8)
+float(jnp.linalg.norm(q.value))          # 3.0
+```
+
+### Constraints during optimization
+
+The metadata from `extract_parameters` carries the constraint system.
+`project_to_manifold(params, metadata, steps)` projects a parameter dict back
+onto it, so a descent can step and project. The
+[optimizer](optimization.qmd) does this automatically.
+
+A quad with one anchored vertex and one pinned edge length (3 equations on
+8 DOF), extruded and optimized toward a target volume:
+
+```python
+from cadjoint.constraints import project_to_manifold
+from cadjoint.sdf import volume
+
+quad = PolygonProfile([[0.0, 0.0], [2.0, 0.0], [2.0, 1.0], [0.0, 1.0]], name="quad")
+q0, q1, q2, q3 = quad.vertices
+FixedConstraint(q0, [0.0, 0.0])
+DistanceConstraint(q0, q1, 2.0)
+
+quad_solid = extrude(quad, depth=1.5)
+free, fixed, meta = extract_parameters(quad_solid)
+fn = functionalize(quad_solid)
+target = 6.0
+
+def loss(params):
+    vol = volume(fn(params, fixed), bounds=(-1, -1, -1), size=(4, 4, 2), resolution=32)
+    return (vol - target) ** 2
+
+params = dict(free)
+for _ in range(40):
+    grads = jax.grad(loss)(params)
+    params = {k: v - 0.05 * grads[k] for k, v in params.items()}
+    params = project_to_manifold(params, meta, steps=2)
+
+apply_parameters(quad, params)
+float(jnp.linalg.norm(params["quad_v1"] - params["quad_v0"]))   # 2.0: still pinned
+```
+
+After 40 steps the volume, measured at resolution 64, is 6.28 against the
+target 6.0, and the pinned edge is still 2.0.
+
+## Limitations
+
+- Profiles are closed polygons. There are no arc or spline profile entities.
+- A drafted or twisted extrusion declares no analytic faces; a revolve
+  declares none and exposes only its axis; a loft's side walls are not
+  declared.
+- `Twist` and a twisted `extrude` produce fields that are not 1-Lipschitz.
+- `solve_constraints` accepts only exactly determined systems.
+
+## API
+
+- Parameters: [`geometry.Scalar`](../reference/geometry.Scalar.qmd),
+  [`geometry.Vector`](../reference/geometry.Vector.qmd),
+  [`geometry.Vector2`](../reference/geometry.Vector2.qmd),
+  [`extract_parameters`](../reference/extract_parameters.qmd),
+  [`apply_parameters`](../reference/apply_parameters.qmd),
+  [`functionalize`](../reference/functionalize.qmd),
+  [`functionalize.functionalize_parametric`](../reference/functionalize.functionalize_parametric.qmd),
+  [`cache.enable_compilation_cache`](../reference/cache.enable_compilation_cache.qmd)
+- Sketches and features: [`construction.SketchPlane`](../reference/construction.SketchPlane.qmd),
+  [`construction.PolygonProfile`](../reference/construction.PolygonProfile.qmd),
+  [`construction.extrude`](../reference/construction.extrude.qmd),
+  [`construction.revolve`](../reference/construction.revolve.qmd),
+  [`construction.loft`](../reference/construction.loft.qmd),
+  [`construction.Solid`](../reference/construction.Solid.qmd)
+- Faces: [`construction.Face`](../reference/construction.Face.qmd),
+  [`construction.FaceSet`](../reference/construction.FaceSet.qmd),
+  [`construction.Axis`](../reference/construction.Axis.qmd)
+- SDF nodes: [Solids](../reference/index.qmd#solids),
+  [`sdf.Union`](../reference/sdf.Union.qmd),
+  [`sdf.Twist`](../reference/sdf.Twist.qmd),
+  [`sdf.volume`](../reference/sdf.volume.qmd)
+- Constraints: [Constraints](../reference/index.qmd#constraints),
+  [`solve_constraints`](../reference/solve_constraints.qmd),
+  [`constraints.satisfy_constraints`](../reference/constraints.satisfy_constraints.qmd),
+  [`constraints.project_to_manifold`](../reference/constraints.project_to_manifold.qmd)
+- Overlays: [`render.draw_plane`](../reference/render.draw_plane.qmd),
+  [`render.draw_profile`](../reference/render.draw_profile.qmd)

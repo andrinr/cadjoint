@@ -1,22 +1,45 @@
 ---
 title: Materials
-description: One object that says both what a part looks like and what it is made of — and a simulation that reads it.
+description: One object for a part's optical and physical properties, read by the renderer and the solver.
 ---
 
-A `Material` in cadjoint carries two families of properties at once:
+A `Material` carries a part's optical properties, which the renderer shades
+with, and its physical properties, which the solver reads in SI units. This page
+covers stating them, the catalogue of sourced values, free properties, the
+material field of a multi-material scene, and mass.
+
+## Example
+
+```python
+import jax.numpy as jnp
+from cadjoint.materials import aluminium_6061, copper_c11000
+from cadjoint.sdf.boolean import Union
+from cadjoint.sdf.primitives import Box, Cylinder
+from cadjoint.sdf.transforms import Translate
+
+sink = Box([0.6, 0.6, 0.2], material=aluminium_6061())
+slug = Translate(Cylinder(radius=0.2, height=0.4, material=copper_c11000()),
+                 offset=jnp.array([0.0, 0.0, 0.1]))
+scene = Union((sink, slug), smoothness=0.03)
+
+print(slug.material_at(jnp.array([0.0, 0.0, 0.1])).get("conductivity"))  # 391.0
+```
+
+## Properties
+
+A `Material` has two families of properties:
 
 - **Optical** — `color`, `roughness`, `metallic`, `opacity`, `ior`,
-  `reflectivity`. What the renderer shades with. Every one has a default, so a
+  `reflectivity`. What the [renderer](rendering.qmd) shades with. Every one has a default, so a
   bare `Material()` is white matte plastic.
 - **Physical** — `density`, `conductivity`, `specific_heat`,
   `youngs_modulus`, `poisson_ratio`, `thermal_expansion`, `yield_strength`.
   What the solver solves with, in **SI units**. Every one defaults to `None`,
   meaning *not specified*.
 
-They live in one object because they describe one thing. A scene that says a
-slug is copper has already said it is orange, that it conducts 391 W/(m·K), and
-that it weighs 8940 kg/m³ — asking the author to say "copper" twice, once for
-the picture and once for the physics, is how the two drift apart.
+Both families live in one object, so a scene states a material once: a slug
+declared as copper is orange, conducts 391 W/(m·K) and has a density of
+8940 kg/m³.
 
 ```python
 from cadjoint.render import Material
@@ -30,17 +53,15 @@ copper = Material(
 )
 ```
 
-## Unspecified means unspecified
+## Unspecified properties
 
-A physical property you do not state stays unstated. It does not quietly become
-zero, or one, or "steel".
+A physical property that is not stated has no default value.
 
 ```python
 Material(color=[1.0, 0.0, 0.0]).get("density")   # None
 ```
 
-That matters when a study asks for it. Rather than solving with an invented
-number, the study fails and names what is missing:
+A study that needs a missing property fails and names it:
 
 ```
 ValueError: study 'sink-conduction': the scene's material field does not
@@ -49,29 +70,15 @@ simulated domain a 'conductivity' value (see cadjoint.materials for a
 catalogue of real ones), or pass an explicit scalar to the study.
 ```
 
-Internally an unstated property is carried as `NaN` in `as_dict()`, so the
-material dict keeps one static pytree structure across a whole scene, and
-blending an unstated value with a stated one yields `NaN` — still unknown,
-which is the honest answer.
+Internally an unstated property is `NaN` in `as_dict()`, so the material dict
+keeps one static pytree structure across a scene, and blending an unstated
+value with a stated one yields `NaN`.
 
-## The catalogue
+## Catalogue
 
-`cadjoint.materials` ships real values so a scene never has to invent one. Each
-entry is a **factory**, not a singleton, so marking one scene's copper
-`free` cannot leak into another scene:
-
-```python
-import jax.numpy as jnp
-from cadjoint.materials import aluminium_6061, copper_c11000
-from cadjoint.sdf.boolean import Union
-from cadjoint.sdf.primitives import Box, Cylinder
-from cadjoint.sdf.transforms import Translate
-
-sink = Box([0.6, 0.6, 0.2], material=aluminium_6061())
-slug = Translate(Cylinder(radius=0.2, height=0.4, material=copper_c11000()),
-                 offset=jnp.array([0.0, 0.0, 0.1]))
-scene = Union((sink, slug), smoothness=0.03)
-```
+`cadjoint.materials` ships sourced values. Each entry is a factory, not a
+singleton, so marking one scene's copper `free` does not affect another
+scene. The [example](#example) builds a scene from two of them.
 
 | Factory | Density (kg/m³) | k (W/(m·K)) | cₚ (J/(kg·K)) | E (GPa) | ν | α (1/K) | Yield (MPa) |
 |---|---|---|---|---|---|---|---|
@@ -89,25 +96,23 @@ metals, the CRC Handbook for the elements, NEMA/IPC and laminate datasheets for
 FR-4, Hopcroft *et al.* (JMEMS 2010) for silicon's modulus, NatureWorks and
 Farah *et al.* for PLA. `aluminum_6061` is a US-spelling alias.
 
-Three of them come with caveats you should read before trusting a number, and
-the docstrings say so plainly:
+Three entries have caveats, also stated in their docstrings:
 
 - **FR-4** is orthotropic. The entry takes the *through-thickness* conductivity
-  (0.29, versus ~0.8–1.0 in plane) and the *in-plane* elastic constants, because
-  those are the numbers that usually decide the answer. `yield_strength` holds
+  (0.29, versus ~0.8–1.0 in plane) and the *in-plane* elastic constants, the
+  values that usually govern the result. `yield_strength` holds
   the ultimate tensile strength — FR-4 is brittle and has no yield plateau.
 - **Silicon** is elastically anisotropic; the entry uses ⟨100⟩ (E = 130 GPa).
   Its `yield_strength` is a conservative practical *fracture* strength, which in
   reality is dominated by edge and surface damage.
-- **The thermal pad** has ν = 0.49. Elastomers really are that close to
-  incompressible, and linear HEX8/TET4 elements *lock* volumetrically there. Use
-  TET10, or drop the ratio deliberately, if the pad's compliance is what you are
-  solving for.
+- **The thermal pad** has ν = 0.49. Elastomers are nearly incompressible, and
+  linear HEX8/TET4 elements lock volumetrically there. Use TET10, or lower the
+  ratio, if the pad's compliance matters.
 
-## Properties can be free
+## Free properties
 
-Physical properties go through the same `Parameter` containers as colors, so an
-optimizer can tune one:
+Physical properties use the same `Parameter` containers as colors, so an
+optimizer can tune them:
 
 ```python
 tunable = Material("tim", conductivity=3.0, free=True)
@@ -115,28 +120,25 @@ tunable.params["conductivity"].free     # True
 tunable.params["conductivity"].bounds   # (0.001, 3000.0)
 ```
 
-`free=True` marks only the properties the material actually states — a *free*
-NaN would be meaningless — and the bounds are wide engineering brackets
-(aerogel to tungsten), there to keep a descent inside physical territory rather
-than to encode a material choice.
+`free=True` marks only the properties the material states. The bounds are wide
+engineering brackets (aerogel to tungsten) that keep a descent physical; they
+do not encode a material choice.
 
-## A scene is a material *field*
+## Material fields
 
 Every SDF node answers `material_at(p)`, and the smooth booleans blend the
-answers. So a scene assembled from several materials is already a continuous
-field of physical properties: copper's conductivity inside the slug,
-aluminium's outside, and a transition exactly as wide as the CSG blend that
-joins them.
+answers. A scene built from several materials is therefore a continuous field
+of physical properties: copper's conductivity inside the slug, aluminium's
+outside, and a transition as wide as the CSG blend between them.
 
-That is what the simulation layer samples, per element, at solve time — see
-[Simulation → Materials drive the solve](simulation.qmd#materials-drive-the-solve).
-It is also what makes the whole thing differentiable: moving the interface moves
-the property field smoothly, so a gradient flows through it.
+The simulation layer samples this field per element at solve time; see
+[material properties](simulation.qmd#materials-drive-the-solve). Moving the
+interface moves the property field smoothly, so the gradient flows through it.
 
 ## Mass
 
-With densities on the materials, mass becomes measurable — and differentiable,
-so it can regularize an optimization:
+With densities on the materials, mass is computable and differentiable, so it
+can regularize an [optimization](optimization.qmd):
 
 ```python
 from cadjoint.sdf import material_mass, volume
@@ -146,10 +148,10 @@ print(float(volume(scene, **lattice)))          # 0.609  m³, shape only
 print(float(material_mass(scene, **lattice)))   # 2074.6 kg, weighted by what each region is
 ```
 
-`material_mass` is the mass counterpart of `volume` and takes the same
-arguments — a sampling box and a resolution, and the `epsilon` of the sigmoid
-that softens the boundary. It also accepts an explicit sample lattice, which is
-the form a scene's own regularizer usually already has:
+`material_mass` takes the same arguments as `volume`: a sampling box, a
+resolution, and the `epsilon` of the sigmoid that softens the boundary. It also
+accepts an explicit sample lattice, the form a scene's regularizer usually
+has:
 
 ```python
 import jax
@@ -167,16 +169,15 @@ cell_volume * jnp.sum(jax.nn.sigmoid(-jax.vmap(sdf)(cells) / 0.03))
 material_mass(scene, cells, cell_volume, epsilon=0.03)
 ```
 
-For a single-material part the two differ only by a constant. As soon as a
-design can trade copper for aluminium, mass is the quantity that actually
-matters. On a mesh, `cadjoint.fem.properties.total_mass(points, cells, density)`
-gives the exact element-wise sum instead of a lattice estimate — and a solved
-study reports it directly as `result.mass`.
+For a single-material part the two differ by a constant factor; for a design
+that trades copper for aluminium only mass is meaningful. On a mesh, `cadjoint.fem.properties.total_mass(points, cells, density)`
+gives the exact element-wise sum instead of a lattice estimate, and a solved
+study reports it as `result.mass`.
 
-## Inspecting a material
+## Inspection
 
-`describe()` is the JSON-ready payload the playground's Materials window
-reads — and edits, physical properties included, as
+`describe()` returns the JSON payload the playground's Materials window reads
+and edits, physical properties included, as
 [source rewrites](viewer.qmd#materials):
 
 ```python
@@ -203,8 +204,9 @@ Material("al", color=[0.8, 0.8, 0.82], density=2700.0, conductivity=167.0).descr
 panel can label a field without hard-coding it; `free` flags which properties an
 optimizer controls.
 
-## Further reading
+## API
 
-- [Simulation](simulation.qmd) — how a study samples this field per element.
-- [Forward renderer](rendering.qmd) — the optical half of the same object.
-- [Optimization](optimization.qmd) — regularizing a descent by mass.
+- [`Material`](../reference/Material.qmd)
+- [`materials.catalogue`](../reference/materials.catalogue.qmd), [`materials.aluminium_6061`](../reference/materials.aluminium_6061.qmd), [`materials.copper_c11000`](../reference/materials.copper_c11000.qmd), [`materials.steel_1018`](../reference/materials.steel_1018.qmd), [`materials.titanium_ti6al4v`](../reference/materials.titanium_ti6al4v.qmd), [`materials.fr4`](../reference/materials.fr4.qmd), [`materials.silicon`](../reference/materials.silicon.qmd), [`materials.thermal_pad`](../reference/materials.thermal_pad.qmd), [`materials.pla`](../reference/materials.pla.qmd)
+- [`sdf.material_mass`](../reference/sdf.material_mass.qmd), [`sdf.volume`](../reference/sdf.volume.qmd)
+- [`fem.properties.total_mass`](../reference/fem.properties.total_mass.qmd)

@@ -75,6 +75,46 @@ async function attempt(name: string, steps: () => Promise<void>) {
   }
 }
 
+/**
+ * Park windows in the tray for the length of `steps`, then restore them.
+ *
+ * At 1400 the editor column takes a third of the width, and a shot of a
+ * solved field or a replayed optimization is a shot of the viewport: the
+ * editor goes to the tray while it is taken. The dock hands the freed width
+ * to the right-hand column, so the seam beside the viewport is dragged back
+ * out to `column` pixels from the right edge, and returned afterwards.
+ */
+async function parked(page: Page, ids: string[], steps: () => Promise<void>, column = 420) {
+  const restored: string[] = [];
+  for (const id of ids) {
+    const group = page.locator(`.dv-groupview:has([data-testid=window-tab-${id}])`).first();
+    if (!(await group.isVisible().catch(() => false))) continue;
+    await page.getByTestId(`window-tab-${id}`).click();
+    await group.getByTestId("window-minimise").click();
+    await expect(page.getByTestId(`window-tab-${id}`)).toHaveCount(0);
+    restored.push(id);
+  }
+  await page.waitForTimeout(400);
+  const viewport = page.locator(".dv-groupview:has([data-testid=window-tab-viewport])").first();
+  const box = (await viewport.boundingBox())!;
+  const seam = { x: box.x + box.width, y: box.y + box.height / 2 };
+  const drag = async (from: number, to: number) => {
+    await page.mouse.move(from, seam.y);
+    await page.mouse.down();
+    await page.mouse.move(to, seam.y, { steps: 8 });
+    await page.mouse.up();
+  };
+  const target = page.viewportSize()!.width - column;
+  const moved = seam.x < target - 4;
+  if (moved) await drag(seam.x, target);
+  try {
+    await steps();
+  } finally {
+    if (moved) await drag(target, seam.x).catch(() => {});
+    for (const id of restored) await page.getByTestId(`window-restore-${id}`).click().catch(() => {});
+  }
+}
+
 test("the docs screenshots", async () => {
   test.skip(!SHOTS, "set CADJOINT_DOCS_SCREENS to the output directory");
   test.setTimeout(1_800_000);
@@ -182,41 +222,45 @@ test("the docs screenshots", async () => {
   await attempt("simulate-meshes", async () => {
     await page.getByTestId("editmode-simulate").click();
     await page.waitForTimeout(500);
-    // The declared mesh inspected: quality heatmap and histogram.
-    await openWindow(page, "meshes", "mesh-sink-mesh");
-    await page.getByTestId("mesh-inspect-sink-mesh").click();
-    // The scalars land in the Results window, which carries the legend, and
-    // inspecting a tet10 mesh of the starter is a full extraction: minutes.
-    await page.getByTestId("window-tab-results").click({ force: true });
-    await expect(page.getByTestId("simulate-legend")).toBeVisible({ timeout: 900_000 });
-    await shot(page, "simulate-meshes", 1500);
+    // The declared mesh inspected: quality heatmap and histogram. Meshes is
+    // tabbed behind Studies in the Simulate desk; its tab raises it.
+    await page.getByTestId("window-tab-meshes").click();
+    await page.getByTestId("mesh-sink-mesh").waitFor({ state: "visible", timeout: 60_000 });
+    const inspect = page.getByTestId("mesh-inspect-sink-mesh");
+    await expect(inspect).toBeEnabled({ timeout: 120_000 });
+    await inspect.click();
+    // Inspecting the starter's tet10 mesh is a full extraction; the button
+    // reads "Regenerate" once the mesh and its stats are in.
+    await expect(inspect).toHaveText(/Regenerate/, { timeout: 900_000 });
+    await parked(page, ["editor"], () => shot(page, "simulate-meshes", 2500));
   });
-
 
   await attempt("simulate-results", async () => {
     await page.getByTestId("editmode-simulate").click();
     await page.waitForTimeout(500);
     // The study solved, clipped by the slice plane.
-    await openWindow(page, "studies", "simulate-run-sink-conduction");
+    await page.getByTestId("window-tab-studies").click();
     await page.getByTestId("simulate-run-sink-conduction").click();
     await expect(page.getByTestId("simulate-legend")).toContainText("temperature", { timeout: 600_000 });
     await page.waitForTimeout(1500);
     await page.getByTestId("simulate-slice-enabled").check();
     await page.getByTestId("simulate-slice-fraction").fill("0.45").catch(() => {});
-    await shot(page, "simulate-results", 2000);
+    await parked(page, ["editor"], () => shot(page, "simulate-results", 2500));
     await page.getByTestId("simulate-slice-enabled").uncheck();
   });
 
   await attempt("windows-float-stack", async () => {
     await page.getByTestId("editmode-simulate").click();
     await page.waitForTimeout(500);
-    // Windows floated, tabbed and stacked over the Simulate desk.
-    const group = page.locator(".dv-groupview:has([data-testid=window-tab-objects])").first();
-    if (await group.isVisible().catch(() => false)) {
-      await group.getByTestId("window-float").click();
-      await shot(page, "windows-float-stack");
-      await page.locator(".dv-groupview-floating").getByTestId("window-float").click().catch(() => {});
-    }
+    // Windows floated, tabbed and stacked over the Simulate desk: the
+    // Studies/Meshes group lifted out of the right-hand column.
+    await page.getByTestId("window-tab-studies").click();
+    const group = page.locator(".dv-groupview:has([data-testid=window-tab-studies])").first();
+    await group.getByTestId("window-float").click();
+    await expect(page.locator(".dv-groupview-floating")).toHaveCount(1);
+    await shot(page, "windows-float-stack");
+    await page.locator(".dv-groupview-floating").getByTestId("window-float").click();
+    await expect(page.locator(".dv-groupview-floating")).toHaveCount(0);
   });
 
   await attempt("optimize-replay", async () => {
@@ -236,8 +280,14 @@ test("the docs screenshots", async () => {
     }
     await page.getByTestId("optimize-run-cool-sink").click();
     await page.getByTestId("optimize-result-cool-sink").waitFor({ timeout: 1_800_000 });
-    await page.waitForTimeout(3000);
-    await shot(page, "optimize-replay");
+    // The end of a run replays its last design: wait for that compile too.
+    await waitForCompile(page);
+    // Objects and Properties go to the tray too, so the Optimize card has
+    // the column's height and its trajectory player is in view.
+    await parked(page, ["editor", "objects", "properties"], async () => {
+      await page.getByTestId("optimize-result-cool-sink").scrollIntoViewIfNeeded();
+      await shot(page, "optimize-replay", 3000);
+    });
   });
 
   await browser.close();
