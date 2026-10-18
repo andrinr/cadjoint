@@ -245,6 +245,8 @@ export class Renderer {
   private shaderModules = new ShaderModuleCache();
   /** The sources currently installed, or null before the first compile. */
   private installedShaders: Shaders | null = null;
+  /** The preview source the installed preview pipeline was built from. */
+  private installedPreview: string | null = null;
   /** The scene's uniform contract; null in the literal form. */
   private program: ShaderProgramPayload | null = null;
   private parameterBuffer: GPUBuffer | null = null;
@@ -841,6 +843,7 @@ export class Renderer {
     this.parameterOverrides = null;
     this.adoptParameterBuffer();
     this.previewPipeline = colorPipeline;
+    this.installedPreview = shaders.preview;
     this.previewDepthPipeline = depthOnlyPipeline;
     this.previewBindGroup = this.device.createBindGroup({
       layout: preview.bindGroupLayout,
@@ -1897,6 +1900,90 @@ export class Renderer {
         `${this.quality.label} preview · ${this.adapterLabel}${suffix}`,
       );
     }
+  }
+
+  /**
+   * Time the preview: `frames` redraws while the camera turns, each waited
+   * on until the GPU has finished it.
+   *
+   * Serialising on `onSubmittedWorkDone` costs the pipelining a live orbit
+   * would get, so the number is an upper bound on frame time — but it is the
+   * same bound before and after a change, which is what it is for. Published
+   * as `__cadjointBench` for the performance study and the e2e tests.
+   *
+   * @param frames Frames to time after two warm-up frames.
+   * @param interacting Draw as during a drag rather than at rest.
+   * @returns Per-frame milliseconds and the framebuffer they were drawn at.
+   */
+  async benchmark(
+    frames = 30,
+    interacting = false,
+  ): Promise<{ medianMs: number; meanMs: number; samples: number[]; width: number; height: number }> {
+    const device = this.device;
+    if (!device || !this.previewPipeline) {
+      return { medianMs: NaN, meanMs: NaN, samples: [], width: 0, height: 0 };
+    }
+    const wasInteracting = this.interacting;
+    const startYaw = this.camera.yaw;
+    this.interacting = interacting;
+    const samples: number[] = [];
+    let width = 0;
+    let height = 0;
+    for (let index = -2; index < frames; index++) {
+      this.camera = { ...this.camera, yaw: startYaw + (index + 2) * 0.01 };
+      this.sampleCount = 0;
+      const started = performance.now();
+      this.renderFrame();
+      await device.queue.onSubmittedWorkDone();
+      if (index >= 0) samples.push(performance.now() - started);
+      width = this.canvas.width;
+      height = this.canvas.height;
+    }
+    this.interacting = wasInteracting;
+    this.camera = { ...this.camera, yaw: startYaw };
+    this.invalidate();
+    const sorted = [...samples].sort((a, b) => a - b);
+    return {
+      medianMs: sorted[Math.floor(sorted.length / 2)],
+      meanMs: samples.reduce((sum, value) => sum + value, 0) / samples.length,
+      samples,
+      width,
+      height,
+    };
+  }
+
+  /**
+   * Time a cold compile of the installed scene: to the first preview frame
+   * finished on the GPU, and to the path tracer being ready.
+   *
+   * A comment unique to this call is appended to every source so neither
+   * this cache nor the browser's own shader cache can serve it.
+   */
+  async benchmarkCompile(): Promise<{ firstFrameMs: number; pathReadyMs: number }> {
+    const shaders = this.installedShaders;
+    const device = this.device;
+    if (!shaders || !device) return { firstFrameMs: NaN, pathReadyMs: NaN };
+    const salt = `\n// bench ${performance.now()} ${Math.random()}\n`;
+    const started = performance.now();
+    const done = this.setShaders({
+      ...shaders,
+      preview: shaders.preview + salt,
+      path: shaders.path + salt,
+      present: shaders.present + salt,
+    });
+    let firstFrameMs = NaN;
+    const firstFrame = (async () => {
+      while (this.installedPreview !== shaders.preview + salt) {
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+      }
+      this.renderFrame();
+      await device.queue.onSubmittedWorkDone();
+      firstFrameMs = performance.now() - started;
+    })();
+    await done;
+    const pathReadyMs = performance.now() - started;
+    await firstFrame;
+    return { firstFrameMs, pathReadyMs };
   }
 
   destroy(): void {
