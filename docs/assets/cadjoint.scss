@@ -154,8 +154,19 @@ h2 {
   color: $cj-ink-on-accent !important;
   font-weight: $cj-weight-semibold;
 }
-#quarto-sidebar .sidebar-item-container:has(> .sidebar-link.active) {
-  margin-right: $cj-gap;
+// Every collapse toggle (sections, the page outline, the standalone
+// outline) is one fixed square with its chevron centred, so the chevrons
+// line up down the panel whatever their rotation.
+.sidebar-item-toggle {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: calc(#{$cj-unit} * 5);
+  padding: 0;
+}
+.sidebar-item-toggle i {
+  margin: 0 !important;
 }
 // The standalone outline's head carries the same toggle as a section.
 #TOC .toc-head {
