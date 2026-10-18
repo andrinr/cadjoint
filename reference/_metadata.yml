@@ -1,0 +1,3 @@
+# Reference pages are browsed with the left sidebar (reference/_sidebar.yml);
+# a second "On this page" list would repeat it.
+toc: false

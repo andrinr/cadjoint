@@ -30,7 +30,8 @@ ENV/
 .ruff_cache/
 _site/
 /.quarto/
-/reference/
+/reference/*
+!/reference/_metadata.yml
 **/*.quarto_ipynb
 
 # Frontend (playground UI source; built output in cadjoint/viewer/static is committed)
