@@ -145,8 +145,10 @@ h2 {
 #quarto-sidebar .sidebar-item-section > .sidebar-item-container {
   margin-bottom: $cj-gap;
 }
+// The current page: semibold ink, no bar. The one vertical mark in the
+// panel is the outline's rail, and the current section's bar sits on it.
 #quarto-sidebar .sidebar-link.active {
-  border-left-color: $cj-ink;
+  border-left-color: transparent;
   color: $cj-ink !important;
   font-weight: $cj-weight-semibold;
 }
@@ -154,23 +156,45 @@ h2 {
 // The page outline nested in the sidebar under the current page
 // (docs/assets/nav.html): one step below the page names, body text in
 // ink-2, indented one inset; the current section on the 2px ink line.
+// The rail is the list's own left border; every entry's 2px bar is
+// centred on it (margin -1.5px), so the current section's bar lies on the
+// rail rather than beside it.
 #TOC.in-sidebar {
   margin: $cj-gap 0 $cj-inset calc(#{$cj-inset} + 2px);
+  padding: 0;
+  border: 0;
+}
+#TOC.in-sidebar ul {
+  margin: 0;
+  padding: 0;
   border-left: $cj-hairline solid $cj-rule;
+  list-style: none;
 }
-#TOC.in-sidebar > ul {
-  padding-left: 0;
+#TOC.in-sidebar ul ul {
+  border-left: 0;
 }
-#TOC.in-sidebar > ul > li > a,
-#TOC.in-sidebar ul ul a {
-  margin: 0 0 0 calc(-1 * #{$cj-hairline} - 1px);
-  padding: 1px 0 1px $cj-inset;
+#TOC.in-sidebar li {
+  margin: 0;
+  padding: 0;
+}
+#TOC.in-sidebar a,
+#TOC.in-sidebar .nav-link {
+  display: block;
+  margin: 0 0 0 -1.5px;
+  padding: 1px 0 1px calc(#{$cj-inset} + 1.5px);
+  border-left: 2px solid transparent;
   font-family: inherit;
   font-size: $cj-text-sm;
   font-weight: normal;
   letter-spacing: normal;
   text-transform: none;
   color: $cj-ink-2;
+}
+#TOC.in-sidebar a.active,
+#TOC.in-sidebar .nav-link.active {
+  border-left-color: $cj-ink;
+  font-weight: $cj-weight-semibold;
+  color: $cj-ink !important;
 }
 body.toc-in-sidebar #quarto-margin-sidebar {
   display: none;
