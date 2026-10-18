@@ -1,0 +1,15 @@
+---
+title: Guides
+description: One page per subsystem.
+---
+
+| Guide | Covers |
+| --- | --- |
+| [Modelling](modelling.qmd) | Parameters, sketch planes and profiles, extrude, revolve and loft, SDF solids, faces and constraints. |
+| [Meshing](meshing.qmd) | Dual contouring from an SDF to a surface mesh, sharp features, export and mesh checks. |
+| [Simulation](simulation.qmd) | Simulation meshes, thermal and elastic studies, node selections, results and solver backends. |
+| [Materials](materials.qmd) | The `Material` class, the material catalogue, material fields and mass. |
+| [Optimization](optimization.qmd) | `Optimization` declarations, objectives, gradient paths through mesh and solver, and constraints. |
+| [Rendering](rendering.qmd) | The JAX raymarcher, quality presets, materials, and compilation to WGSL. |
+| [Plugins](plugins.qmd) | The plugin contract, configuration in `plugins.toml`, and writing and serving a plugin. |
+| [Flow solver (prototype)](flow.qmd) | Lattice Boltzmann flow on the SDF, conjugate heat transfer, and gradients. |

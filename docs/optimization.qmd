@@ -1,24 +1,18 @@
 ---
 title: Optimization
-description: Declare a descent over named CAD parameters, with the simulation as its objective.
+description: Gradients through CAD parameters, constrained descent, and optimizations with a simulation as the objective.
 ---
 
-`Optimization` is a declaration, not a loop you write. It names the thing being
-minimized, the parameters that may move, and how far the gradient has to travel
-to get there — and the viewer, the CLI, and a plain script all run the same
-object.
+An `Optimization` minimizes a scalar over the free parameters of a scene: a pure
+function of the parameters, or a declared simulation study. It returns the
+optimized parameters, the per-step history and a replayable trajectory; the
+viewer, the CLI and a script run the same object. The optimizer is optax, a core
+dependency.
 
-```bash
-uv pip install optax   # the optimizer; a fallback exists but Adam wants optax
-```
+## Example
 
-## Two forms
-
-An `Optimization` is declared one of two ways, and they are mutually exclusive.
-
-The **objective form** minimizes any pure function of the free parameters of a
-piece of geometry. Nothing is simulated; this is the form for pure geometric
-targets.
+The objective form minimizes a pure function of the free parameters of a piece
+of geometry, with no simulation:
 
 ```python
 import jax.numpy as jnp
@@ -41,9 +35,68 @@ print(run.initial, "->", run.parameters)
 print(run.history[0]["objective"], "->", run.objective)  # 2.0 -> 0.0203
 ```
 
-The **study form** makes a declared `ThermalStudy` or `ElasticStudy` the
-objective. This is the form that runs the full differentiable chain: geometry →
-mesh → solve → scalar.
+## Gradients
+
+Every SDF is a pure JAX function, so `jax.grad` differentiates through geometry.
+Parameters can be passed as plain arrays:
+
+```python
+import jax
+import jax.numpy as jnp
+from cadjoint.sdf import Sphere, Translate, Union, volume
+
+def two_spheres(p1, p2):
+    return Union(Translate(Sphere(radius=1.0), offset=p1),
+                 Translate(Sphere(radius=1.0), offset=p2))
+
+def loss(p1, p2):
+    return volume(two_spheres(p1, p2))
+
+value, (g1, g2) = jax.value_and_grad(loss, argnums=(0, 1))(
+    jnp.array([0.0, 0.0, 0.0]), jnp.array([1.0, 0.0, 0.0]))
+print(value, g1, g2)  # 6.873 [-1.891 0 0] [1.976 0 0]
+```
+
+`volume` integrates the SDF's soft occupancy over a sampling box. Moving the
+spheres apart reduces their overlap, so the union's volume grows along ±x.
+
+Explicit arguments scale poorly once a scene has many parameters spread over its
+tree. Tagging parameters `free=True` on the geometry lets `extract_parameters`
+collect them, and `functionalize` turns the tree into a function of the
+parameter dictionaries:
+
+```python
+from cadjoint import extract_parameters, functionalize
+from cadjoint.geometry import Vector
+
+p1 = Vector(jnp.array([0.0, 0.0, 0.0]), free=True, name="p1")
+p2 = Vector(jnp.array([1.0, 0.0, 0.0]), free=True, name="p2")
+scene = Union(Translate(Sphere(radius=1.0), offset=p1),
+              Translate(Sphere(radius=1.0), offset=p2))
+
+free, fixed, metadata = extract_parameters(scene)
+sdf = functionalize(scene)
+
+value, grads = jax.value_and_grad(lambda params: volume(sdf(params, fixed)))(free)
+print(grads)  # {'p1': [-1.891, 0, 0], 'p2': [1.976, 0, 0]}
+```
+
+`extract_parameters` returns three dictionaries: free parameter values keyed by
+name, fixed values keyed by tree path (`union_0.smoothness`, `sphere_2.radius`,
+…), and metadata holding the `Parameter` object behind each free value.
+`functionalize(scene)(free, fixed)` is a callable `point → distance`; the tree
+structure is fixed when it is built and the parameter values vary. Both forms
+give the same gradient. With parameter extraction, any node can declare a
+parameter free without changing the loss or the optimizer.
+[Modelling](modelling.qmd) covers parameters, `functionalize` and
+`functionalize_parametric` in full.
+
+## Objective and study forms
+
+An `Optimization` takes one of two mutually exclusive forms: the objective form
+of the [example](#example), and the study form, which makes a declared
+`ThermalStudy` or `ElasticStudy` the objective, differentiating through
+geometry → mesh → solve → scalar:
 
 ```python
 from cadjoint.fem import Dirichlet, HeatFlux, Nodes, SimMesh, ThermalStudy
@@ -80,19 +133,18 @@ print(run.history[0]["objective"], "->", run.objective)  # 4.018 -> 2.964
 print(run.parameters)  # {'size': [0.970, 0.180, 0.179]}
 ```
 
-Three Adam steps thicken the bar and drop peak temperature from 4.018 to 2.964,
-against a volume penalty that stops it from simply growing without limit.
+Three Adam steps thicken the bar and lower peak temperature from 4.018 to
+2.964; the volume penalty keeps it from growing without limit.
 
-`study=` also accepts the *name* of a study, which is how scene files are
-written — but name resolution only works while a `capture_studies()` context is
-open, as it is when the playground executes a scene. In a standalone script,
-pass the study instance.
+`study=` also accepts the name of a study, as scene files use it. Names
+resolve only inside a `capture_studies()` context, which the playground opens
+when it executes a scene; a standalone script passes the study instance.
 
 Mixing the forms is refused: `metric`, `regularizer`, `remesh_every`, and a
 non-`direct` `gradient_path` all belong to the study form, and `objective` / `of`
 are rejected alongside `study`.
 
-## The metric
+## Metrics
 
 `metric` reduces the solved field to one number.
 
@@ -102,79 +154,27 @@ are rejected alongside `study`.
 | `"max"` | `ObjectiveMetric.MAX` | Its maximum |
 | `"compliance"` | `ObjectiveMetric.COMPLIANCE` | The work of the applied loads, `f·u` (twice the strain energy) |
 
-Every fixed option on `Optimization` has an enum in `cadjoint.enums` —
-`ObjectiveMetric`, `GradientPath`, `OptimizerMethod` (`"adam"` / `"sgd"`) —
-and the member and the string are interchangeable everywhere.
+Every fixed option on `Optimization` has an enum in `cadjoint.enums`
+(`ObjectiveMetric`, `GradientPath`, `OptimizerMethod` with `"adam"` / `"sgd"`),
+and the member and the string are interchangeable.
 
 `"compliance"` requires an elastic study with at least one `Traction` boundary
-condition; without loads there is no work to compute, and the declaration is
-rejected rather than silently returning zero.
+condition; without loads the declaration is rejected.
 
-Choosing between mean and max is a modelling decision with teeth. The starter
-scene's heat sink minimizes `"max"` deliberately: the die is the hot spot, and a
-mean-temperature objective degenerately rewards *deleting* hot material instead
-of cooling the chip.
+The starter scene's heat sink minimizes `"max"`: the die is the hot spot, and a
+mean-temperature objective rewards deleting hot material instead of cooling the
+chip.
 
-`regularizer` is any function of the parameters added as
-`objective + regularizer_weight * regularizer(params)`. It is a real reverse-mode
-path, not a penalty bolted on — in the starter scene it is a smoothed material
+`regularizer` is a function of the parameters, added as
+`objective + regularizer_weight * regularizer(params)` and differentiated in
+reverse mode with the objective. In the starter scene it is a smoothed material
 volume computed by evaluating the traced SDF on a lattice.
 
-## Frozen topology
-
-Meshing splits into a discrete half — which cells are inside, how they connect —
-and a continuous half, where the nodes sit. The discrete half cannot be
-differentiated. So the optimizer freezes topology and lets gradients flow
-through node positions only: each step re-projects the boundary nodes onto the
-current design's zero set, Newton-corrected against the true SDF, with total
-motion clamped to half a cell diagonal.
-
-That promise expires as the shape moves. `remesh_every` (default 6, `0` to never)
-re-extracts the mesh at the current design every so many steps. The small
-objective jumps at those steps are the discretization being refreshed, and they
-are not noise: on the bracket showcase the step-12 re-extraction raised the
-objective from 6.02 to 8.86 and the step-18 one lowered it from 7.99 to 5.53,
-because the web is only about two cells thick and a one-cell change in the
-loaded wall moves the discrete compliance substantially.
-
-For the same reason the *final* reported number is always evaluated on a freshly
-extracted mesh, so it does not depend on whichever topology happened to be
-frozen last.
-
-Freezing the topology also fixes every array shape in the objective, so the
-frozen objective is compiled once per topology with `jax.jit` and each step
-pays the solve rather than a re-trace of the scene — on the starter scene an
-optimizer step fell from ~11 s to 0.5–0.8 s with the objective identical to
-13 digits ([performance notes](../research/performance.md)).
-
-## Gradient paths
-
-`gradient_path` picks how far the derivative has to travel outside JAX.
-
-| Value | `GradientPath` | Chain |
-|---|---|---|
-| `"direct"` (default) | `GradientPath.DIRECT` | Everything in-process. Node positions re-projected onto the true SDF, solved by the chosen backend. |
-| `"tesseract"` | `GradientPath.TESSERACT` | Lattice samples → `mesher` Tesseract → solver Tesseract. Meshes the trilinear interpolant, so the gradient carries only normal boundary motion. |
-| `"tesseract-dc"` | `GradientPath.TESSERACT_DC` | Dual contouring stays in JAX on the true SDF; only TetGen is wrapped, by the `tetfill` Tesseract with its exact pass-through VJP. Tet meshes only. |
-
-The aliases `"plugins"` and `"plugins-dc"` name the same two chain paths and
-resolve to the canonical member on construction.
-
-`"tesseract-dc"` is the sharp path — keeping dual contouring in JAX against the
-real field is what preserves fin creases — and it is what the starter scene
-declares. Both Tesseract paths need the `tesseract` extra. Whichever path runs
-the descent, the final result is evaluated on the direct path.
-
-The stages behind both paths are [plugins](plugins.qmd) resolved by kind —
-`mesher`, `tetfill`, `thermal_solver`, `elastic_solver` — so where each one runs
-is configuration, not code. That page says what each boundary costs and why it
-exists.
-
-## Constraints come along
+## Constrained optimization {#constraints}
 
 Every update is projected back onto the constraint manifold. When
 `extract_parameters` reports a non-empty residual for the scene's parameters,
-the optimizer chains a Newton projection onto the optimizer transform:
+the optimizer chains a Newton projection after the optimizer transform:
 
 ```python
 import optax
@@ -195,11 +195,151 @@ transform = optax.chain(optax.adam(0.1),
                         make_manifold_projection(metadata, steps=2))
 ```
 
-No flag turns this on. A constrained sketch stays a constrained sketch through
-the descent — horizontals stay horizontal, pinned dimensions stay pinned, and
-the optimizer moves only inside the freedom the sketch actually has.
+`Optimization` does this automatically. Horizontals stay horizontal and
+pinned dimensions stay pinned; the optimizer moves only within the sketch's
+remaining degrees of freedom.
 
-## Reading a run
+The same descent can be written by hand. The block below minimizes
+‖p − target‖² subject to |p| = 2 from p₀ = (2, 0, 0) with target (1, 1.5, 0),
+whose optimum is p* = target · 2/|target| ≈ (1.109, 1.664, 0) at loss 0.0389,
+using five strategies for 40 steps each:
+
+```python
+import jax
+import jax.numpy as jnp
+import optax
+from cadjoint import extract_parameters
+from cadjoint.constraints import (
+    DistanceConstraint, constraint_residuals, make_manifold_projection, null_space,
+)
+from cadjoint.geometry import Vector
+
+anchor = Vector(jnp.array([0.0, 0.0, 0.0]))
+p = Vector(jnp.array([2.0, 0.0, 0.0]), free=True, name="p")
+constraint = DistanceConstraint(anchor, p, distance=2.0)
+free, fixed, metadata = extract_parameters(constraint)
+
+target = jnp.array([1.0, 1.5, 0.0])
+p_star = target * (2.0 / jnp.linalg.norm(target))       # optimum: (1.109, 1.664, 0)
+
+def objective(params):
+    return jnp.sum((params["p"] - target) ** 2)
+
+value_and_grad = jax.value_and_grad(objective)
+
+N0 = null_space(free, metadata)                          # tangent basis at the start
+def grad_fixed(params):                                  # 1. fixed null space
+    value, g = jax.value_and_grad(lambda z: objective(N0 @ z))(params @ N0)
+    return value, N0 @ g
+
+def grad_relin(params):                                  # 2./4. current null space
+    N = null_space(params, metadata)
+    value, g = value_and_grad(params)
+    return value, N @ (g @ N)
+
+LAMBDA = 25.0
+def grad_penalty(params):                                # 5. penalty
+    penalty = lambda q: objective(q) + LAMBDA * jnp.sum(constraint_residuals(q, metadata) ** 2)
+    return objective(params), jax.grad(penalty)(params)
+
+strategies = {
+    "fixed null-space": (grad_fixed, optax.adam(0.05)),
+    "relinearized null-space": (grad_relin, optax.sgd(0.15)),
+    "manifold projection": (value_and_grad,
+                            optax.chain(optax.adam(0.05), make_manifold_projection(metadata))),
+    "Riemannian GD": (grad_relin,
+                      optax.chain(optax.sgd(0.15), make_manifold_projection(metadata))),
+    "penalty": (grad_penalty, optax.adam(2.5 / (1.0 + 2.0 * LAMBDA))),
+}
+
+for label, (grad_fn, opt) in strategies.items():
+    params, state = free, opt.init(free)
+    for _ in range(40):
+        value, g = grad_fn(params)
+        updates, state = opt.update(g, state, params)    # params= activates the projection
+        params = optax.apply_updates(params, updates)
+    violation = jnp.linalg.norm(constraint_residuals(params, metadata))
+    print(f"{label:24s} loss {float(objective(params)):.4f}  |r| {float(violation):.1e}")
+```
+
+```
+fixed null-space         loss 1.0000  |r| 5.0e-01
+relinearized null-space  loss 0.1097  |r| 1.3e-01
+manifold projection      loss 0.0392  |r| 1.2e-07
+Riemannian GD            loss 0.0389  |r| 0.0e+00
+penalty                  loss 0.0450  |r| 8.4e-03
+```
+
+| Strategy | Step | Cost per step | Constraint after each step | Use when |
+|---|---|---|---|---|
+| Fixed null-space | Gradient projected onto `N Nᵀ`, `N = null_space(...)` computed once at x₀ | One gradient; `N` reused | Drifts: the step follows the tangent plane at x₀, not at the current point | Linear constraints, where the tangent plane does not rotate |
+| Relinearized null-space | `N` recomputed at the current point, gradient projected onto the current tangent plane | One gradient plus one `null_space` | Drifts by O(lr²κ) per step, with no correction | A cheap manifold-aware direction, followed by a projection |
+| Manifold projection | `optax.chain(opt, make_manifold_projection(metadata))` | One gradient plus a Newton correction | Exact | Any optax optimizer; what `Optimization` uses |
+| Riemannian GD | Relinearized direction, then `make_manifold_projection` | One gradient, one `null_space`, a Newton correction | Exact | Tangent-plane direction with exact feasibility; reached the optimum here |
+| Penalty | Loss ‖p − t‖² + λ‖r(p)‖² | One gradient | Approximate, error shrinks as λ grows | No projection available; soft constraints |
+
+`make_manifold_projection(metadata)` computes `params + update` from the chained
+optimizer, projects it onto the constraint manifold with a Newton correction,
+and returns `projected − params` as the effective update, so
+`optax.apply_updates(params, updates)` lands on the manifold. It needs the
+current parameters: `opt.update(grads, state, params)` activates it, and
+standard optax transforms ignore the extra argument.
+
+Relinearized steps use plain SGD rather than Adam: as the null space rotates,
+components that were zero acquire non-zero projections, and Adam's element-wise
+scaling amplifies them and pushes the step off the tangent plane.
+
+The penalty's Hessian eigenvalue in the normal direction is 2 + 2λ, so a stable
+learning rate is at most 1/(1 + 2λ).
+
+## Frozen topology
+
+Meshing has a discrete half (which cells are inside, how they connect) and a
+continuous half (where the nodes sit). Only the continuous half is
+differentiable, so the optimizer freezes topology and differentiates through
+node positions: each step re-projects the boundary nodes onto the current
+design's zero set, Newton-corrected against the true SDF, with total motion
+clamped to half a cell diagonal.
+
+`remesh_every` (default 6; `0` disables it) re-extracts the mesh at the current
+design every that many steps. The objective jumps at those steps are the
+discretization changing: on the bracket the step-12 re-extraction raised the
+objective from 6.02 to 8.86 and the step-18 one lowered it from 7.99 to 5.53,
+because the web is about two cells thick and a one-cell change in the loaded
+wall changes the discrete compliance substantially.
+
+The final reported objective is evaluated on a freshly extracted mesh, so it
+does not depend on the last frozen topology.
+
+A frozen topology also fixes every array shape, so the objective is compiled
+once per topology with `jax.jit` and each step costs a solve rather than a
+re-trace. On the starter scene this takes a step from ~11 s to 0.5–0.8 s, with
+the objective identical to 13 digits
+([performance notes](https://github.com/andrinr/cadjoint/blob/main/research/performance.md)).
+
+## Gradient paths
+
+`gradient_path` selects which stages run outside JAX.
+
+| Value | `GradientPath` | Chain |
+|---|---|---|
+| `"direct"` (default) | `GradientPath.DIRECT` | Everything in-process. Node positions re-projected onto the true SDF, solved by the chosen backend. |
+| `"tesseract"` | `GradientPath.TESSERACT` | Lattice samples → `mesher` Tesseract → solver Tesseract. Meshes the trilinear interpolant, so the gradient carries only normal boundary motion. |
+| `"tesseract-dc"` | `GradientPath.TESSERACT_DC` | Dual contouring stays in JAX on the true SDF; only TetGen is wrapped, by the `tetfill` Tesseract with its exact pass-through VJP. Tet meshes only. |
+
+The aliases `"plugins"` and `"plugins-dc"` name the same two chain paths and
+resolve to the canonical member on construction.
+
+`"tesseract-dc"` keeps dual contouring in JAX against the true field, which
+preserves fin creases; the starter scene declares it. Both Tesseract paths need
+the `tesseract` extra. Whichever path runs the descent, the final result is
+evaluated on the direct path.
+
+The stages behind both paths are [plugins](plugins.qmd) resolved by kind
+(`mesher`, `tetfill`, `thermal_solver`, `elastic_solver`), so where each runs
+is configuration. The plugins page gives the cost of each boundary.
+
+## Run results
 
 `run()` returns an `OptimizationRun`:
 
@@ -209,18 +349,18 @@ the optimizer moves only inside the freedom the sketch actually has.
 - `objective` — the final objective.
 - `result` — the concrete `SimulationResult` from the final evaluation (study form only).
 
-`run(callback=fn)` receives each history record as it is produced, which is how
-the playground streams progress. `method` is `"adam"` or `"sgd"`; without optax
+`run(callback=fn)` receives each history record as it is produced; the
+playground streams progress this way. `method` is `"adam"` or `"sgd"`; without optax
 it degrades to plain gradient descent and reports `"gradient-descent"`.
 
 Study runs execute inside an x64 scope, promote parameters to float64, and
 restore the target's original parameter values on exit — including on failure.
 
-![The finished optimization in the playground: convergence sparkline, trajectory scrubber, and each parameter's before and after value](assets/screens/optimize-replay.png)
+![A finished cool-sink run in the playground: the Results window replays the trajectory with its objective sparkline and scrubber (step 2 of 8), beside the Optimize window's step count and learning rate](assets/screens/optimize-replay.png)
 
-## The full chain, measured
+## Bracket example
 
-`examples/fem_bracket_optimization.py` runs the whole loop on the parametric
+`examples/fem_bracket_optimization.py` runs the full loop on the parametric
 L-bracket from `scenes/bracket.py`: three named CAD parameters
 (`web_thickness`, `rib_height`, `plate_thickness`) → bracket SDF → HEX8 mesh →
 linear elastic solve → compliance plus mass → Adam with box-bound projection.
@@ -234,12 +374,19 @@ uv run python examples/fem_bracket_optimization.py --backend calculix
 Over 30 steps the objective falls 17.44 → 4.69, a 73% reduction; compliance
 drops 81% while mass rises 27%. The adjoint is validated against central
 differences at the initial design to 2.3e-5, 2.0e-3, and 3.3e-7 relative on the
-three parameters. `--backend calculix` swaps a 1990s Fortran code into the same
-`jax.grad` call without changing a line of the objective. Convergence CSV, a
-figure, and before/after VTK files land in `examples/output/`.
+three parameters. `--backend calculix` runs CalculiX (Fortran) inside the same `jax.grad` call
+without changing the objective. Convergence CSV, a
+figure, and before/after VTK files land in `examples/output/`. The
+[run record](https://github.com/andrinr/cadjoint/blob/main/research/end-to-end-optimization.md)
+has the measured run, the rationale for the box bounds, and a known CalculiX
+deck fragility.
 
-## Further reading
+## API
 
-- [End-to-end optimization](../research/end-to-end-optimization.md) — the measured bracket run record, box-bound rationale, and a known CalculiX deck fragility.
-- [Simulation](simulation.qmd) — declaring the study this minimizes.
-- [Plugins](plugins.qmd) — the boundaries `gradient_path` crosses, and where each stage runs.
+- [`optimize.Optimization`](../reference/optimize.Optimization.qmd)
+- [`optimize.OptimizationRun`](../reference/optimize.OptimizationRun.qmd)
+- [`enums.ObjectiveMetric`](../reference/enums.ObjectiveMetric.qmd), [`enums.GradientPath`](../reference/enums.GradientPath.qmd), [`enums.OptimizerMethod`](../reference/enums.OptimizerMethod.qmd)
+- [`extract_parameters`](../reference/extract_parameters.qmd), [`functionalize`](../reference/functionalize.qmd)
+- [`sdf.volume`](../reference/sdf.volume.qmd)
+- [`constraints.DistanceConstraint`](../reference/constraints.DistanceConstraint.qmd)
+- [`constraints.make_manifold_projection`](../reference/constraints.make_manifold_projection.qmd), [`constraints.null_space`](../reference/constraints.null_space.qmd), [`constraints.constraint_residuals`](../reference/constraints.constraint_residuals.qmd)

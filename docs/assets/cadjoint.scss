@@ -12,8 +12,8 @@ $body-tertiary-color: $cj-ink-3;
 $border-color: $cj-rule;
 $hr-border-color: $cj-rule-strong;
 
-// The accent is a fill, never ink (C5): primary buttons and the current TOC
-// entry take it as a block; links are ink with an accent-press underline.
+// The accent is a fill, never ink (C5): primary buttons take it as a block;
+// links are ink with an accent-press underline.
 $primary: $cj-accent;
 $secondary: $cj-ink-2;
 $success: $cj-ok;
@@ -45,6 +45,10 @@ $navbar-fg: $cj-ink-2;
 $navbar-hl: $cj-ink;
 $footer-bg: $cj-surface-base;
 $toc-color: $cj-ink-2;
+$toc-active-border: $cj-ink;
+$sidebar-color: $cj-ink-2;
+$sidebar-hover-color: $cj-ink;
+$sidebar-active-color: $cj-ink;
 
 $code-block-bg: $cj-surface-float;
 $code-block-border-left: $cj-rule;
@@ -86,16 +90,203 @@ h2 {
   background: $cj-surface-bar-alt;
 }
 
-// The current section in the table of contents is the accent block (current).
-#TOC .nav-link,
-#TOC a {
+// Page outline on pages without a section sidebar (Get started,
+// Playground): the same marks as the sidebar. "On this page" is the caps
+// section head; entries are body 13px ink-2; the current one is semibold
+// ink on the 2px ink line.
+#toc-title {
   font-family: $font-family-monospace;
   font-size: $cj-text-xs;
+  font-weight: $cj-weight-semibold;
+  letter-spacing: $cj-track-caps;
+  text-transform: uppercase;
+  color: $cj-ink-3;
 }
-#TOC .nav-link.active {
+#TOC a,
+#TOC .nav-link {
+  border-left: 2px solid transparent;
+  padding: 2px 0 2px $cj-inset;
+  font-size: $cj-text-md;
+  font-weight: normal;
+  letter-spacing: normal;
+  text-transform: none;
+  color: $cj-ink-2;
+}
+#TOC .nav-link.active,
+#TOC a.active {
+  border-left-color: $cj-ink;
+  background: none;
+  font-weight: $cj-weight-semibold;
+  // Quarto sets the active colour with !important from $toc-color.
+  color: $cj-ink !important;
+}
+
+// Site sidebar (guides, reference): three levels, each one step quieter.
+//   section head  caps, ink-3            "GUIDES", "SOLIDS"
+//   page          body 13px, ink-2       "Meshing"; current: semibold ink
+//   page outline  body 12px, ink-2, on a hairline rail under its page
+// The current page and the current section carry the 2px ink line.
+#quarto-sidebar .sidebar-item .sidebar-link {
+  border-left: 2px solid transparent;
+  padding: 2px 0 2px $cj-inset;
+  font-size: $cj-text-md;
+  color: $cj-ink-2;
+}
+#quarto-sidebar .sidebar-item-section > .sidebar-item-container .sidebar-item-text,
+#quarto-sidebar .sidebar-item-section > .sidebar-item-container .sidebar-link,
+#quarto-sidebar .sidebar-section-header {
+  font-family: $font-family-monospace;
+  font-size: $cj-text-xs;
+  font-weight: $cj-weight-semibold;
+  letter-spacing: $cj-track-caps;
+  text-transform: uppercase;
+  color: $cj-ink-3;
+}
+#quarto-sidebar .sidebar-item-section > .sidebar-item-container {
+  margin-bottom: $cj-gap;
+}
+// The current page: the accent block behind its name (the accent is only
+// ever a fill under type). The one vertical mark in the panel is the
+// outline's rail, and the current section's bar sits on it.
+#quarto-sidebar .sidebar-link.active {
+  border-left-color: transparent;
   background: $cj-accent;
-  color: $cj-ink-on-accent;
-  border-left-color: $cj-accent;
+  color: $cj-ink-on-accent !important;
+  font-weight: $cj-weight-semibold;
+}
+// Every collapse toggle (sections, the page outline, the standalone
+// outline) is one fixed square with its chevron centred, so the chevrons
+// line up down the panel whatever their rotation.
+.sidebar-item-toggle {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: calc(#{$cj-unit} * 5);
+  padding: 0;
+}
+.sidebar-item-toggle i {
+  margin: 0 !important;
+}
+// The standalone outline's head carries the same toggle as a section.
+#TOC .toc-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+#TOC .toc-head #toc-title {
+  margin: 0;
+  border: 0;
+}
+// Quarto rotates a section chevron only inside the sidebar; the outline's
+// toggle turns the same way, with the same transition.
+#TOC .sidebar-item-toggle i {
+  display: inline-block;
+  transition: transform 0.2s ease;
+}
+#TOC .sidebar-item-toggle[aria-expanded="true"] i {
+  transform: rotate(90deg);
+}
+#TOC .sidebar-item-toggle {
+  color: $cj-ink-3;
+  text-decoration: none;
+}
+
+// Depth sets the mark, not the section: a top-level section's head is caps
+// (GUIDES, API REFERENCE); a nested section's head reads like a page
+// (Solids, Meshing); entries two levels in (sub-groups, objects) are body
+// 12px on a hairline rail, like a page outline.
+#quarto-sidebar ul.sidebar-section .sidebar-item-section > .sidebar-item-container .sidebar-link,
+#quarto-sidebar ul.sidebar-section .sidebar-item-section > .sidebar-item-container .sidebar-item-text {
+  font-family: inherit;
+  font-size: $cj-text-md;
+  font-weight: normal;
+  letter-spacing: normal;
+  text-transform: none;
+  color: $cj-ink-2;
+}
+#quarto-sidebar ul.sidebar-section.depth2 {
+  margin-left: calc(#{$cj-inset} + 2px);
+  padding-left: 0;
+  border-left: $cj-hairline solid $cj-rule;
+}
+#quarto-sidebar ul.sidebar-section.depth2 .sidebar-link,
+#quarto-sidebar ul.sidebar-section.depth2 .sidebar-item-section > .sidebar-item-container .sidebar-link {
+  font-size: $cj-text-sm;
+}
+#quarto-sidebar ul.sidebar-section.depth3 {
+  padding-left: $cj-inset;
+}
+#quarto-sidebar .sidebar-link.active,
+#quarto-sidebar .sidebar-item-section > .sidebar-item-container .sidebar-link.active {
+  color: $cj-ink-on-accent !important;
+}
+
+// The page outline nested in the sidebar under the current page
+// (docs/assets/nav.html): one step below the page names, body text in
+// ink-2, indented one inset; the current section on the 2px ink line.
+// The rail is the list's own left border; every entry's 2px bar is
+// centred on it (margin -1.5px), so the current section's bar lies on the
+// rail rather than beside it.
+#TOC.in-sidebar {
+  margin: $cj-gap 0 $cj-inset calc(#{$cj-inset} + 2px);
+  padding: 0;
+  border: 0;
+}
+#TOC.in-sidebar ul {
+  margin: 0;
+  padding: 0;
+  border-left: $cj-hairline solid $cj-rule;
+  list-style: none;
+}
+#TOC.in-sidebar ul ul {
+  border-left: 0;
+}
+#TOC.in-sidebar li {
+  margin: 0;
+  padding: 0;
+}
+#TOC.in-sidebar a,
+#TOC.in-sidebar .nav-link {
+  display: block;
+  margin: 0 0 0 -1.5px;
+  padding: 1px 0 1px calc(#{$cj-inset} + 1.5px);
+  border-left: 2px solid transparent;
+  font-family: inherit;
+  font-size: $cj-text-sm;
+  font-weight: normal;
+  letter-spacing: normal;
+  text-transform: none;
+  color: $cj-ink-2;
+}
+#TOC.in-sidebar a.active,
+#TOC.in-sidebar .nav-link.active {
+  border-left-color: $cj-ink;
+  font-weight: $cj-weight-semibold;
+  color: $cj-ink !important;
+}
+// quartodoc pages carry their title as the first body heading instead of
+// a title block; give it the title block's position so the title does not
+// drop when moving between a guide and a reference page.
+#title-block-header:not(:has(.quarto-title)) {
+  margin-block-end: 0;
+}
+main.content > header.quarto-title-block + section.level1 > h1:first-child {
+  margin-top: 0;
+}
+
+// Every page reserves the scrollbar's width, so a short page and a long
+// one put the content at the same x.
+html {
+  scrollbar-gutter: stable;
+}
+// The outline is moved into the sidebar after load (nav.html); hide it
+// until then so it does not flash in the margin.
+#TOC:not(.in-sidebar) {
+  visibility: hidden;
+}
+body.toc-in-sidebar #quarto-margin-sidebar {
+  display: none;
 }
 
 // Code: the sheet with a rule edge; highlighting is achromatic (A3).
@@ -117,7 +308,7 @@ table {
   font-variant-numeric: tabular-nums;
 }
 
-// One title size, not a display headline (Δ "no cropped display headline").
+// One title size, not a display headline.
 h1, .title {
   font-size: 1.6rem;
 }

@@ -1,26 +1,16 @@
 ---
-title: Forward Renderer
-description: Predictable sphere tracing for still images, and StableHLO compilation to WGSL.
+title: Rendering
+description: Sphere-traced still images in JAX, and the same scene compiled to WGSL for the browser.
 ---
 
-cadjoint's image renderer is designed for predictable forward rendering. It uses
-early-exit sphere tracing, screen-space silhouette reconstruction,
-finite-difference normals, Cook–Torrance GGX materials, soft shadows, and
-optional reflection and refraction rays.
+`cadjoint.render` draws an SDF scene to an `(H, W, 3)` float array with
+early-exit sphere tracing, finite-difference normals, Cook–Torrance GGX materials, soft shadows and
+optional reflection and refraction. The same scene compiles through StableHLO
+to a WGSL shader that the interactive viewer renders live.
 
-Geometry and constraints remain JAX-native and differentiable. Rendered pixels
-are intentionally not an inverse-rendering or optimization API — the gradients
-this project cares about run through [meshing](meshing.qmd) and
-[simulation](simulation.qmd), not through visibility.
-
-## Scene and quality settings
-
-Use `Scene` for camera, lights, and environment data and `RenderSettings` for
-the performance/fidelity trade-off:
+## Example
 
 ```python
-from dataclasses import replace
-
 from cadjoint.render import Camera, RenderSettings, Scene, render_scene
 from cadjoint.sdf.primitives import Sphere
 
@@ -28,33 +18,54 @@ scene = Scene(
     Sphere(1.0),
     camera=Camera(position=(0, 1.5, 5), target=(0, 0, 0)),
 )
-
-preview = render_scene(scene, RenderSettings.draft((240, 320)))
-final = render_scene(scene, RenderSettings.high_quality((480, 640)))
-
-# Presets are immutable; override only what a scene needs.
-mirror = replace(RenderSettings.balanced(), reflect_steps=64)
+image = render_scene(scene, RenderSettings.balanced((240, 320)))
+print(image.shape)   # (240, 320, 3)
 ```
 
-`render_scene` returns a `(H, W, 3)` float array. The low-level
-`raymarch(sdf, ...)` function remains available for compact notebook calls, and
-`render_raymarched(...)` wraps it to display on a matplotlib axis.
+## Scene
 
-Each primary trace retains its closest approach to the scene. Rays that narrowly
-miss a surface receive screen-space coverage across
-`RenderSettings.silhouette_smoothing` pixels, which removes hard hit/miss
-outlines without restoring differentiable visibility or fixed-step tracing. Set
-the value to `0` when exact binary coverage is required.
+`Scene` holds the geometry, the camera, the lights and the environment.
+`light_directions` and `light_colors` are matched tuples, one entry per light;
+`make_gradient_sky` builds an environment map from three colours.
 
-## Rendering modes
+```python
+from cadjoint.render import Material, make_gradient_sky
+from cadjoint.sdf.boolean import Union
+from cadjoint.sdf.primitives import Plane, Torus
+from cadjoint.sdf.transforms import Rotate, Translate
 
-All panels below are produced by the forward renderer. Soft shadows stop as
-soon as they find an occluder, and reflection and refraction rays are enabled
-only when requested.
+geometry = Union(
+    Translate(Sphere(0.82, material=Material(color=[0.78, 0.06, 0.03], roughness=0.42)),
+              [-1.45, -0.10, 0.0]),
+    Translate(Rotate(Torus(0.62, 0.23, material=Material(color=[1.0, 0.58, 0.08],
+                                                          roughness=0.28, metallic=0.8)),
+                     axis="y", angle=0.45),
+              [0.0, -0.07, 0.0]),
+    Plane(-0.92, material=Material(color=[0.10, 0.12, 0.16], roughness=0.72)),
+    smoothness=0.0,
+)
+lit = Scene(
+    geometry,
+    camera=Camera(position=(4.4, 3.5, 7.5), target=(0.0, -0.35, 0.0), fov=0.38),
+    light_directions=((0.35, 1.0, 0.55), (-0.65, 0.45, -0.2)),
+    light_colors=((1.5, 1.35, 1.15), (0.22, 0.3, 0.5)),
+    environment_map=make_gradient_sky(
+        sky_color=(0.7, 0.76, 0.88),
+        horizon_color=(0.18, 0.27, 0.44),
+        ground_color=(0.16, 0.18, 0.24),
+    ),
+)
+image = render_scene(lit, RenderSettings.balanced((180, 240)))
+```
 
-![Direct lighting, soft shadows, metal reflections, and glass refraction](assets/rendering-modes.png)
+The low-level `raymarch(sdf, ...)` takes the geometry and the settings as
+keyword arguments; `render_raymarched(...)` wraps it to draw on a matplotlib
+axis.
 
 ## Quality presets
+
+`RenderSettings` sets the performance/fidelity trade-off, separately from the
+scene.
 
 | Preset | Trace steps | Hit ε | Shadow steps | SSAA | Default resolution |
 |---|---|---|---|---|---|
@@ -62,25 +73,56 @@ only when requested.
 | `balanced` | 96 | 1e-3 | 32 | 2×2 | 200 × 200 |
 | `high_quality` | 160 | 5e-4 | 64 | 3×3 | 400 × 400 |
 
-`draft` is direct lighting with no secondary visibility; `balanced` adds soft
-shadows and reconstructed silhouettes; `high_quality` tightens surface precision
-and doubles the shadow budget. Reflection and refraction are off in all three
-and must be asked for explicitly.
+`draft` is direct lighting with no secondary visibility. `balanced` adds soft
+shadows and reconstructed silhouettes. `high_quality` tightens surface
+precision and doubles the shadow budget. Reflection and refraction are off in
+all three.
 
 ![Draft, balanced, and high-quality forward renders](assets/rendering-quality.png)
 
-The presets are starting points rather than hidden modes. Every field is public,
-validated, and can be changed with `dataclasses.replace`.
+Presets are immutable dataclasses. Every field is public and validated;
+override one with `dataclasses.replace`:
+
+```python
+from dataclasses import replace
+
+mirror = replace(RenderSettings.balanced(), reflect_steps=64)
+```
+
+A primary ray stops at the first hit or at `max_distance`, so a direct hit
+uses a small fraction of `max_steps` and a miss does not evaluate the field for
+every step. Soft-shadow rays stop at the first occluder.
+
+Each primary trace keeps its closest approach to the scene. A ray that narrowly
+misses a surface receives screen-space coverage across
+`silhouette_smoothing` pixels, which removes hard hit/miss outlines. Set it to
+`0` for exact binary coverage.
+
+## Compilation and caching
+
+The first `render_scene` call includes JAX compilation. The renderer is one
+module-level `jax.jit`: the scene tree, the image shape and the step counts
+(`max_steps`, `shadow_steps`, `reflect_steps`, `refract_steps`) are static, and
+the design parameter values are traced inputs. A later call that changes only
+parameter values, the camera or the lights reuses the compiled program; a new
+preset or resolution compiles once more.
+
+```python
+from time import perf_counter
+
+settings = RenderSettings.balanced((128, 160))
+render_scene(lit, settings)               # compiles
+start = perf_counter()
+render_scene(lit, settings)               # cached
+print(f"{(perf_counter() - start) * 1e3:.1f} ms")
+```
 
 ## Materials
 
-Attach a `Material` to any primitive. It is queried per hit point during
-rendering, and `Union` blends materials smoothly across a blended boundary.
+Attach a `Material` to any primitive. It is queried per hit point, and `Union`
+blends materials across a smooth boundary.
 
 ```python
-from cadjoint.render import Material
-from cadjoint.sdf.primitives import Sphere
-
 sphere = Sphere(
     radius=1.0,
     material=Material(
@@ -93,22 +135,19 @@ sphere = Sphere(
 )
 ```
 
+![Direct lighting, soft shadows, metal reflections, and glass refraction](assets/rendering-modes.png)
+
 ### Transparency and refraction
 
-Set `opacity < 1` for transparency. With `refract_steps=0` (the default) the
-surface simply fades toward the background. With `refract_steps > 0` the
-renderer performs two-bounce Snell's-law refraction: the primary ray bends into
-the material, an interior march finds the back face using `−sdf` as the distance
-field, and the ray bends back into air to continue through the rest of the
-scene. Schlick-Fresnel adds the edge highlight that brightens the rim of a glass
-sphere at grazing angles.
+`opacity < 1` makes a surface transparent. With `refract_steps=0` (the
+default) it fades toward the background. With `refract_steps > 0` the renderer
+refracts twice by Snell's law: the primary ray bends into the material, an
+interior march finds the back face using `−sdf` as the distance field, and the
+ray bends back into air. Schlick–Fresnel brightens the rim at grazing angles.
 
 ```python
 import jax.numpy as jnp
-from cadjoint.render import Material, raymarch
-from cadjoint.sdf.boolean import Union
-from cadjoint.sdf.primitives import Sphere
-from cadjoint.sdf.transforms import Translate
+from cadjoint.render import raymarch
 
 glass = Sphere(radius=1.0, material=Material(
     color=[0.92, 0.97, 1.0], roughness=0.05, opacity=0.04, ior=1.5))
@@ -120,7 +159,7 @@ red_ball = Translate(
 image = raymarch(
     Union((glass, red_ball), smoothness=0.0),
     camera_pos=jnp.array([0.0, 0.5, 5.5]),
-    resolution=(400, 400),
+    resolution=(200, 200),
     background_color=jnp.array([0.07, 0.09, 0.16]),
     refract_steps=48,
     max_steps=80,
@@ -137,54 +176,114 @@ image = raymarch(
 
 ## Shader compilation
 
-The same scene compiles to a standalone shader function. JAX traces distance and
-material evaluation, lowers both to StableHLO, and cadjoint emits the shader
-source from there — so the browser renders the identical field the Python
-renderer does.
+A scene compiles to a standalone WGSL shader. JAX traces distance and material
+evaluation and lowers both to StableHLO, from which cadjoint emits the shader
+source, so the browser renders the same field as the Python renderer:
+
+```
+JAX scene → jax.export → StableHLO MLIR → WGSL → WebGPU fragment shader
+```
 
 ```python
 from cadjoint.backends import compile_scene_to_wgsl, compile_sdf_to_wgsl
-from cadjoint.sdf.primitives import Sphere
 
-wgsl = compile_sdf_to_wgsl(Sphere(radius=1.0))          # just `fn sdf`
+wgsl = compile_sdf_to_wgsl(Sphere(radius=1.0))          # `fn sdf` only
 scene_wgsl = compile_scene_to_wgsl(Sphere(radius=1.0))  # + materials
+print(wgsl[:200])
 ```
 
-`compile_scene_to_wgsl` emits `sdf`, `material_base` (RGB + roughness), and
+`compile_scene_to_wgsl` emits `sdf`, `material_base` (RGB + roughness) and
 `material_optics` (metallic + opacity + IOR + reflectivity) from one scene
-snapshot, ready to embed in a WebGPU renderer. This is exactly what
-[the playground](viewer.qmd) does on every run.
+snapshot. The whole tree becomes one WGSL function per entry point; the GPU
+evaluates the field directly, with no intermediate mesh.
+[The playground](viewer.qmd) compiles on every run.
 
-### How big the shader gets
+### Shader size
 
-A shader is one straight-line function per entry point, so its size is decided
-by how much of the tree the trace unrolls. Two things keep that in check. A node
-evaluated more than once — a pattern's child, a subtree two booleans share — is
-lowered as its own StableHLO function, and the emitter turns each of those into
-one WGSL function called once per instance; a bearing housing with four polar
-patterns is 1.45 MB of WGSL rather than 2.42 MB. What is *not* shared is the
-vertex loop of a sketch profile: WGSL has no type wider than a `mat4`, so a
-profile's vertices stay individual `vec2`s and its contribution grows with the
-vertex count. (Everything else traces the profile as one `(N, 2)` array; see
-[the meshing notes](meshing.qmd#program-size).)
+A shader is one straight-line function per entry point, so its size depends on
+how much of the tree the trace unrolls. A node evaluated more than once (a
+pattern's child, a subtree two booleans share) is lowered as its own StableHLO
+function, which the emitter turns into one WGSL function called per instance; a
+bearing housing with four polar patterns is 1.45 MB of WGSL rather than
+2.42 MB. The vertex loop of a sketch profile is not shared: WGSL has no type
+wider than a `mat4`, so a profile's vertices stay individual `vec2`s and its
+contribution grows with the vertex count. Everything else traces the profile as
+one `(N, 2)` array; see [program size](meshing.qmd#program-size).
+
+### Uniform parameters
 
 Design parameters are inlined as float literals by default, so editing one
-rewrites the whole module and the browser recompiles it. `uniforms=True` returns
-a `ShaderProgram` instead: the same source for every parameter value, plus a
-`vec4`-per-parameter uniform layout to write the values into.
+rewrites the module and the browser recompiles it. `uniforms=True` returns a
+`ShaderProgram`: the same source for every parameter value, plus a
+`vec4`-per-parameter uniform layout.
 
 ```python
 from cadjoint.geometry import Scalar
 
-sphere = Sphere(radius=Scalar(1.0, free=True, name="radius"))
-program = compile_scene_to_wgsl(sphere, uniforms=True)
+sized = Sphere(radius=Scalar(1.0, free=True, name="radius"))
+program = compile_scene_to_wgsl(sized, uniforms=True)
 program.wgsl                 # identical across every value edit
-program.parameters[0].name   # 'radius' — the name extract_parameters uses
+program.parameters[0].name   # 'radius', the name extract_parameters uses
 program.buffer()             # float32 array to upload at @group(3) @binding(0)
 ```
 
-## Further reading
+## Notebook viewer
 
-- [Rendering notebook](../examples/rendering.ipynb) — composition, quality presets, and hot reload
-- [The playground](viewer.qmd) — the interactive WebGPU viewport, its progressive path tracer, and its views of the field itself (signed slice, gradient magnitude, iso-offset, normals, depth)
-- [WebGPU SDF path tracing](../research/path-tracing.md) — design and deliberate boundaries of the browser path tracer
+`SDFViewer` renders a compiled scene live in a Jupyter notebook. It needs the
+viewer extra (`uv sync --extra viewer`) and a WebGPU-capable browser
+(Chrome/Edge 113+).
+
+```python
+from cadjoint.sdf.boolean import Difference
+from cadjoint.sdf.primitives import Box, Capsule
+from cadjoint.viewer import SDFViewer
+
+box = Translate(Box([1.3, 1.3, 1.3]), offset=jnp.array([0.5, 0.3, 0.0]))
+viewer = SDFViewer(Difference(Sphere(1.0), box, smoothness=0.05), height=400)
+viewer
+```
+
+| Input | Action |
+|---|---|
+| left-drag | orbit |
+| scroll | zoom |
+| right-drag | pan |
+| double-click | reset |
+
+`update_scene` swaps in a new field. The camera keeps its position; only the
+shader recompiles.
+
+```python
+viewer.update_scene(
+    Union(
+        Sphere(0.9),
+        Translate(Capsule(radius=0.3, height=1.4), offset=jnp.array([1.2, 0.0, 0.0])),
+        smoothness=0.15,
+    )
+)
+```
+
+For the full scene editor, with path tracing and field views, see
+[the playground](viewer.qmd); its path tracer is described in
+[WebGPU SDF path tracing](https://github.com/andrinr/cadjoint/blob/main/research/path-tracing.md).
+
+## Limitations
+
+- Rendered pixels are not differentiable: visibility carries no gradient, and
+  the renderer is not an inverse-rendering or optimization interface. Gradients
+  run through [meshing](meshing.qmd) and [simulation](simulation.qmd).
+
+## API
+
+- [`render.Scene`](../reference/render.Scene.qmd)
+- [`render.Camera`](../reference/render.Camera.qmd)
+- [`render.RenderSettings`](../reference/render.RenderSettings.qmd)
+- [`render.render_scene`](../reference/render.render_scene.qmd)
+- [`render.raymarch`](../reference/render.raymarch.qmd)
+- [`render.render_raymarched`](../reference/render.render_raymarched.qmd)
+- [`render.make_gradient_sky`](../reference/render.make_gradient_sky.qmd)
+- [`Material`](../reference/Material.qmd)
+- [`backends.compile_scene_to_wgsl`](../reference/backends.compile_scene_to_wgsl.qmd)
+- [`backends.compile_sdf_to_wgsl`](../reference/backends.compile_sdf_to_wgsl.qmd)
+- [`backends.wgsl.ShaderProgram`](../reference/backends.wgsl.ShaderProgram.qmd)
+- [`viewer.widget.SDFViewer`](../reference/viewer.widget.SDFViewer.qmd)
