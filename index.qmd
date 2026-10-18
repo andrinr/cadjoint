@@ -2,37 +2,42 @@
 title: cadjoint
 ---
 
-**Differentiable code-first CAD.** Sketches, constraints, SDF geometry, meshing,
-and finite-element simulation compose into one function JAX can differentiate
-end to end — from the first named dimension to the last solver residual.
+cadjoint is differentiable code-first CAD. Sketches, constraints, SDF geometry,
+meshing and finite-element simulation compose into one function JAX can
+differentiate end to end.
 
 ::: {.callout-warning}
 The API is not stable. Expect breaking changes.
 :::
 
-[![The cadjoint playground: the scene program on the left, the parametric heat sink rendered live on the right, and the declared optimization in the side dock](docs/assets/screens/model-desk.png)](docs/viewer.qmd)
+[![The cadjoint playground on the Model desk: scene.py in the editor on the left, the parametric heat sink in the viewport with its blue sketch handles, and the object tree, properties and materials windows docked on the right](docs/assets/screens/model-desk.png)](docs/viewer.qmd)
 
-Everything above happens in the browser: model the part, mesh it, declare the
-physics, and descend the objective, with every edit written back into the Python
-source that produced it. [Open the playground guide](docs/viewer.qmd).
+The playground runs the whole chain in the browser (modelling, meshing,
+studies and optimization) and writes every edit back into the Python source.
 
-## The layers
+`pip install cadjoint` installs the library.
+[Getting started](docs/getting-started.qmd#install) covers installation,
+supported platforms and the playground command; the
+[playground guide](docs/viewer.qmd) covers the app.
+
+## Components
 
 | Layer | What it does |
 |---|---|
 | **Geometry** | Parametric `Vector` / `Scalar` carrying `free` / `fixed` flags |
-| **SDF** | Primitives, boolean ops, and transforms — all differentiable |
-| **Sketches** | 2D profiles on work planes, extruded or revolved into solids that share their parameters |
-| **Constraints** | Geometric relationships that reduce DOF, with Newton projection onto the constraint manifold |
+| **SDF** | Primitives, booleans and transforms, all differentiable |
+| **[Sketches](docs/modelling.qmd#profiles)** | 2D profiles on work planes, extruded or revolved into solids that share their parameters |
+| **[Constraints](docs/modelling.qmd#constraints)** | Geometric relationships that reduce DOF, with Newton projection onto the constraint manifold |
 | **Functionalize** | Convert a parametric scene to a pure JAX function for `jit` / `grad` / `vmap` |
 | **[Meshing](docs/meshing.qmd)** | Dual contouring built bottom-up in JAX; exact gradients through every continuous stage; OBJ / STL / STEP export |
 | **[Simulation](docs/simulation.qmd)** | Declared `SimMesh` and thermal/elastic studies, node selections, and pluggable solver backends |
+| **[Flow](docs/flow.qmd)** | A prototype lattice-Boltzmann conjugate heat-transfer solver on the scene's own field, with no mesh |
 | **[Optimization](docs/optimization.qmd)** | Declarative descent over named CAD parameters with the simulation as objective |
 | **[Plugins](docs/plugins.qmd)** | Meshers and solvers behind one `apply`/`vjp` contract, so one `jax.grad` crosses every tool boundary |
 | **[Rendering](docs/rendering.qmd)** | Forward sphere tracing, plus StableHLO → WGSL shader compilation |
 | **[The playground](docs/viewer.qmd)** | The whole toolchain as a browser app, with the Python source as its only state |
 
-## The chain
+## Pipeline
 
 ```
 CAD parameters θ  ──►  constraints ──► SDF        (JAX autodiff)
@@ -52,15 +57,15 @@ CAD parameters θ  ──►  constraints ──► SDF        (JAX autodiff)
         └──────────  ∂J/∂θ  ◄──  objective J      (JAX autodiff)
 ```
 
-No two stages agree on how to compute a derivative, and one of them cannot be
-differentiated at all. On the parametric L-bracket the composed loop drops the
-objective 73% in 30 steps, with the adjoint checked against finite differences
-at every boundary.
+No two stages compute their derivative the same way, and TetGen has none; the
+frozen-topology pass-through supplies it. On the parametric L-bracket the
+composed loop lowers the objective 73% in 30 steps, with the adjoint checked
+against finite differences at every boundary.
 
 ## Quick start
 
-Three distance constraints fully determine an unknown point, and the solved
-scene is an ordinary JAX function afterwards.
+Three distance constraints determine an unknown point; the solved scene is an
+ordinary JAX function.
 
 ```python
 import jax.numpy as jnp
@@ -90,4 +95,6 @@ sdf = functionalize(scene)(solved, fixed)
 print(sdf(true_p))  # ≈ -0.5 — the solved sphere is centred on the true point
 ```
 
-Then [get started](docs/getting-started.qmd) for the rest of the arc.
+[Modelling](docs/modelling.qmd) covers constraints and degrees of freedom; the
+[guides](docs/guides.qmd) continue through meshing, simulation and
+optimization.
