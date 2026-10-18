@@ -58,8 +58,9 @@ def project(
         The projected points as a JAX array, ``(N, 3)``; a refused point is
         returned where it started.
     """
-    import jax
     import jax.numpy as jnp
+
+    from cadjoint._compiled import call_jit
 
     if not 1 <= len(fields) <= 3:
         raise ValueError(f"a point lies on one to three surfaces, not {len(fields)}")
@@ -76,8 +77,10 @@ def project(
     # calls — a cached program would hold the first as a dead tracer and
     # bake the second in as a stale constant.  `project_table`, the caller
     # that runs this in a loop, takes the design as an *argument* and so
-    # can and does cache its program (:func:`_table_program`).
-    return jax.jit(run)(jnp.asarray(points))
+    # can and does cache its program (:func:`_table_program`).  A call
+    # whose program is byte for byte one already compiled reuses that
+    # executable (:func:`cadjoint._compiled.call_jit`).
+    return call_jit(run, jnp.asarray(points))
 
 
 def _system(fields: Sequence[Callable[[Any], Any]]) -> Callable[[Any], Any]:
