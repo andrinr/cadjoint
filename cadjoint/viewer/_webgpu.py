@@ -99,8 +99,17 @@ const DISPLAY_SECTION: u32 = 64u;
 /// How much a section cap is darkened against the surface it cuts through.
 const SECTION_CAP_TONE: f32 = 0.72;
 
-/// How much of the sky the ground half of the hemisphere returns.
-const GROUND_BOUNCE: f32 = 0.58;
+/// How much of the sky the ground half of the hemisphere returns. 0.40, down
+/// from 0.58, so a face pointing down reads darker than one pointing up.
+const GROUND_BOUNCE: f32 = 0.40;
+/// The key's gain in full shading, over the shared intensity the path tracer
+/// also reads: the preview's single shadowed lamp has to carry the form that
+/// the converged image gets from bounce light.
+const KEY_GAIN: f32 = 2.4;
+// Ambient occlusion: how hard a crowded sample darkens, and how dark a
+// cavity may go — a bore is darker than its rim, never a hole.
+const AO_STRENGTH: f32 = 6.0;
+const AO_FLOOR: f32 = 0.45;
 
 /// Half-width of the band the march accepts as "on the surface".
 const SURFACE_EPS: f32 = 0.001;
@@ -337,6 +346,24 @@ fn soft_shadow(ro: vec3<f32>, rd: vec3<f32>, k: f32) -> f32 {
   return clamp(visibility, 0.0, 1.0);
 }
 
+// Ambient occlusion, from the field itself.
+//
+// Four samples up the normal: where the field there is smaller than the
+// distance stepped, other surface is close by — a corner, a bore, the
+// underside of a deck — and the sky reaches it less. Four field reads per
+// shaded pixel against a march of dozens, so it is close to free, and it is
+// the one cue that says a cavity is a cavity rather than a dark face.
+fn ambient_occlusion(p: vec3<f32>, n: vec3<f32>) -> f32 {
+  var occlusion = 0.0;
+  var weight = 1.0;
+  for (var i = 1; i <= 4; i++) {
+    let h = 0.012 + 0.03 * f32(i);
+    occlusion += max(h - traced_field(p + n * h), 0.0) * weight;
+    weight *= 0.6;
+  }
+  return clamp(1.0 - AO_STRENGTH * occlusion, AO_FLOOR, 1.0);
+}
+
 // The viewport ground.
 //
 // `u.bg_color` is the ground colour in *linear radiance*: the caller has
@@ -442,6 +469,7 @@ fn shade_material(
   // the geometry, costing no value anywhere on the interior.
   let facing = abs(dot(normal, view_direction));
   let contour = mix(0.16, 1.0, smoothstep(0.0, 0.30, facing));
+  let occlusion = ambient_occlusion(shadow_origin, normal);
 
   // The cut face, darkened.
   //
@@ -493,8 +521,20 @@ fn shade_material(
     // carry 0.8 of their share — and the window opens to 0.11..0.52, which
     // separates faces at different angles by roughly a third more without
     // moving the part's mean tone.
-    let incidence = clamp(normal_dot_light * visibility + fill_incidence * 0.8, 0.0, 1.0);
-    return base_color * mix(0.11, 0.52, incidence) * contour * cut;
+    //
+    // Still too even in the shaded part: the deck, the walls and the skirt
+    // sat within a few steps. Now the key carries three quarters of the
+    // incidence, the fills half their share, and a quarter comes from which
+    // way the face points against world up — the deck lighter, the
+    // underside darker — over a window of 0.06..0.64. Occlusion darkens the
+    // whole of it in corners and bores.
+    let up = 0.5 + 0.5 * normal.z;
+    let incidence = clamp(
+      0.75 * normal_dot_light * visibility + 0.25 * up + fill_incidence * 0.5,
+      0.0,
+      1.0,
+    );
+    return base_color * mix(0.06, 0.64, incidence) * occlusion * contour * cut;
   }
   let intensity = max(u.light_dir.w, 1.0);
   // **White, not warm.** This used to be vec3(1.0, 0.92, 0.82), which tinted
@@ -504,7 +544,7 @@ fn shade_material(
   // model's own.
   let light_radiance = vec3<f32>(1.0) * intensity;
   let direct =
-    (diffuse + specular) * light_radiance * normal_dot_light * visibility;
+    (diffuse + specular) * light_radiance * normal_dot_light * visibility * KEY_GAIN;
 
   // Two fills, at a third and a fifth of the key.
   //
@@ -517,7 +557,11 @@ fn shade_material(
   // own shadow would put a second, contradictory shadow under the part, and
   // the cost of the extra marches is the whole reason the key is the only
   // one that gets them.
-  let fill = base_color * (1.0 - metallic) * intensity * fill_incidence;
+  //
+  // On the same footing as the key's diffuse (the Lambert 1/π), which they
+  // once lacked: unnormalised, the two fills together matched the key, and
+  // every face of a part came out the same grey whichever way it pointed.
+  let fill = base_color * (1.0 - metallic) / PI * intensity * fill_incidence;
 
   // A hemisphere rather than a constant.
   //
@@ -526,10 +570,13 @@ fn shade_material(
   // an upward face from a downward one. A sky/ground pair keyed on the
   // world's up axis costs one mix and gives the unlit side of a part its
   // shape back.
-  let ambient = base_color * hemisphere_radiance(normal) * 0.22;
+  //
+  // Occluded, so a bore or an inside corner falls off where the sky cannot
+  // reach it; the fills are shaded by the same factor.
+  let ambient = base_color * hemisphere_radiance(normal) * 0.15 * occlusion;
   let reflected = environment_radiance(reflect(ray_direction, normal));
   let mirror = select(0.0, reflectivity, display_flag(DISPLAY_REFLECTIONS));
-  let opaque = mix(direct + fill + ambient, reflected, mirror) * contour * cut;
+  let opaque = mix(direct + fill * occlusion + ambient, reflected, mirror) * contour * cut;
   let glass_fresnel = fresnel_schlick(
     max(dot(view_direction, normal), 0.0),
     vec3<f32>(0.04),
@@ -795,10 +842,10 @@ fn trace_pixel(frag_xy: vec2<f32>) -> TraceResult {
       // Fade faces that point at the viewer and keep grazing angles solid, so
       // silhouettes and creases stay legible while interiors turn translucent.
       let facing = 1.0 - abs(dot(normal, ray.direction));
-      // 0.70 at the floor, up from 0.62: the veil is mixed into every face
+      // 0.78 at the floor, up from 0.62: the veil is mixed into every face
       // alike, so the further it reaches the more it flattens the shading
       // between them.
-      let alpha = mix(0.70, 0.98, facing * facing);
+      let alpha = mix(0.78, 0.98, facing * facing);
       // On paper a face cannot fade toward the background: the ground is the
       // brightest thing on screen, so "transparent" and "absent" would be the
       // same pixel and an x-rayed solid disappears entirely (measured: sRGB
@@ -835,6 +882,13 @@ fn trace_pixel(frag_xy: vec2<f32>) -> TraceResult {
       // `viewer/pipelines.ts`), which is what the gizmos have always used. The
       // grid is not construction geometry — it is the ground the part stands
       // on — so it keeps testing depth and is occluded by every silhouette.
+    } else if (!sdf_view_shades_surface(view_mode)) {
+      // The same ink contour on an opaque part, lighter: the part is then
+      // parted from the ground by an outline in every preset, not by its
+      // shading alone, which on paper can land on the ground's own value.
+      let facing = 1.0 - abs(dot(normal, ray.direction));
+      let contour = smoothstep(0.82, 0.97, facing);
+      result.color = mix(result.color, vec3<f32>(0.110, 0.094, 0.078), contour * 0.45);
     }
   }
 
