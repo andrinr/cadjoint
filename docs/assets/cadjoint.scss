@@ -90,9 +90,10 @@ h2 {
   background: $cj-surface-bar-alt;
 }
 
-// Table of contents: two levels told apart by role, ink and indent. Sections
-// are caps in ink; subsections are body text in ink-2, one inset in. The
-// current entry takes the 2px ink line at its left edge.
+// Page outline on pages without a section sidebar (Get started,
+// Playground): the same marks as the sidebar. "On this page" is the caps
+// section head; entries are body 13px ink-2; the current one is semibold
+// ink on the 2px ink line.
 #toc-title {
   font-family: $font-family-monospace;
   font-size: $cj-text-xs;
@@ -101,53 +102,48 @@ h2 {
   text-transform: uppercase;
   color: $cj-ink-3;
 }
-#TOC .nav-link,
-#TOC a {
-  font-family: $font-family-monospace;
+#TOC a,
+#TOC .nav-link {
   border-left: 2px solid transparent;
-}
-#TOC > ul > li > a {
-  font-size: $cj-text-xs;
-  font-weight: $cj-weight-semibold;
-  letter-spacing: $cj-track-caps;
-  text-transform: uppercase;
-  color: $cj-ink;
-  margin-top: $cj-inset;
-}
-#TOC ul ul {
-  padding-left: $cj-inset;
-}
-#TOC ul ul a {
-  font-size: $cj-text-xs;
+  padding: 2px 0 2px $cj-inset;
+  font-size: $cj-text-md;
   font-weight: normal;
   letter-spacing: normal;
   text-transform: none;
   color: $cj-ink-2;
 }
 #TOC .nav-link.active,
-#TOC a.active,
-#TOC > ul > li > a.active,
-#TOC ul ul a.active {
+#TOC a.active {
   border-left-color: $cj-ink;
   background: none;
+  font-weight: $cj-weight-semibold;
   // Quarto sets the active colour with !important from $toc-color.
   color: $cj-ink !important;
 }
 
-// Site sidebar (guides, examples, reference): the same marks as the TOC.
-// The section head is caps; pages are body text; the current page is
-// semibold ink on the 2px ink line.
+// Site sidebar (guides, reference): three levels, each one step quieter.
+//   section head  caps, ink-3            "GUIDES", "SOLIDS"
+//   page          body 13px, ink-2       "Meshing"; current: semibold ink
+//   page outline  body 12px, ink-2, on a hairline rail under its page
+// The current page and the current section carry the 2px ink line.
 #quarto-sidebar .sidebar-item .sidebar-link {
   border-left: 2px solid transparent;
-  padding-left: $cj-inset;
+  padding: 2px 0 2px $cj-inset;
+  font-size: $cj-text-md;
+  color: $cj-ink-2;
 }
 #quarto-sidebar .sidebar-item-section > .sidebar-item-container .sidebar-item-text,
+#quarto-sidebar .sidebar-item-section > .sidebar-item-container .sidebar-link,
 #quarto-sidebar .sidebar-section-header {
   font-family: $font-family-monospace;
   font-size: $cj-text-xs;
   font-weight: $cj-weight-semibold;
   letter-spacing: $cj-track-caps;
   text-transform: uppercase;
+  color: $cj-ink-3;
+}
+#quarto-sidebar .sidebar-item-section > .sidebar-item-container {
+  margin-bottom: $cj-gap;
 }
 #quarto-sidebar .sidebar-link.active {
   border-left-color: $cj-ink;
@@ -159,17 +155,18 @@ h2 {
 // (docs/assets/nav.html): one step below the page names, body text in
 // ink-2, indented one inset; the current section on the 2px ink line.
 #TOC.in-sidebar {
-  margin: $cj-gap 0 $cj-inset $cj-inset;
+  margin: $cj-gap 0 $cj-inset calc(#{$cj-inset} + 2px);
+  border-left: $cj-hairline solid $cj-rule;
 }
 #TOC.in-sidebar > ul {
   padding-left: 0;
 }
 #TOC.in-sidebar > ul > li > a,
 #TOC.in-sidebar ul ul a {
-  margin-top: 0;
-  padding: 2px 0 2px $cj-inset;
+  margin: 0 0 0 calc(-1 * #{$cj-hairline} - 1px);
+  padding: 1px 0 1px $cj-inset;
   font-family: inherit;
-  font-size: $cj-text-xs;
+  font-size: $cj-text-sm;
   font-weight: normal;
   letter-spacing: normal;
   text-transform: none;

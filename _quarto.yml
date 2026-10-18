@@ -45,15 +45,17 @@ website:
       title: Guides
       style: floating
       contents:
-        - docs/guides.qmd
-        - docs/modelling.qmd
-        - docs/meshing.qmd
-        - docs/simulation.qmd
-        - docs/materials.qmd
-        - docs/optimization.qmd
-        - docs/rendering.qmd
-        - docs/plugins.qmd
-        - docs/flow.qmd
+        - section: Guides
+          href: docs/guides.qmd
+          contents:
+            - docs/modelling.qmd
+            - docs/meshing.qmd
+            - docs/simulation.qmd
+            - docs/materials.qmd
+            - docs/optimization.qmd
+            - docs/rendering.qmd
+            - docs/plugins.qmd
+            - docs/flow.qmd
   page-footer:
     left: "cadjoint"
     right:
