@@ -185,7 +185,13 @@ const KEY_LIGHT_INTENSITY = 1.5;
 /** Fraction of the distance to the camera that construction overlays are pulled forward. */
 const DEPTH_NUDGE = 0.004;
 const LINE_WIDTH_PX = 2.4;
-const HANDLE_RADIUS_PX = 6.5;
+/**
+ * The sheet keyline either side of a construction stroke (`fs_edge`). Mesh
+ * edges are written with none: they are the mesh's, not the skeleton's.
+ */
+const CASING_PX = 0.8;
+/** Up from 6.5 when handles gained their casing, so the body keeps its size. */
+const HANDLE_RADIUS_PX = 7.5;
 
 /**
  * The ground grid's metrics.
@@ -605,6 +611,8 @@ export class Renderer {
   set simulationActive(active: boolean) {
     if (active === this._simulationActive) return;
     this._simulationActive = active;
+    // The skeleton changes tone over a field (`packConstructionOverlay`).
+    this.uploadOverlay();
     this.invalidate();
   }
 
@@ -1183,6 +1191,7 @@ export class Renderer {
       this.profiles,
       this.selection,
       this.hover,
+      this._simulationActive,
     );
 
     // Transform controls have their own buffer and pass.
@@ -1484,7 +1493,7 @@ export class Renderer {
       [this.canvas.width, this.canvas.height, LINE_WIDTH_PX, HANDLE_RADIUS_PX],
       20,
     );
-    overlay.set([DEPTH_NUDGE, 0, 0, 0], 24);
+    overlay.set([DEPTH_NUDGE, CASING_PX, 0, 0], 24);
     device.queue.writeBuffer(this.overlayBuffer, 0, overlay);
 
     // Mesh edges sit exactly on the surface creases the construction
@@ -1641,6 +1650,20 @@ export class Renderer {
     const depth = this.seeThroughOverlays
       ? (pair: DepthPair) => pair.seen
       : (pair: DepthPair) => pair.tested;
+    // The skeleton is the exception to `seen`: through an x-rayed solid it is
+    // drawn twice, behind the part as a dashed, dimmed hidden line (`hidden`,
+    // below) and in front of it at full weight (`tested`), so the two never
+    // read as one weight.
+    const wantSkeletonEdges = Boolean(
+      this.display.showOverlays && this.display.showSketches && this.edgeCount && this.edgeBuffer && this.edgePipeline,
+    );
+    const wantHandles = Boolean(
+      this.display.showOverlays &&
+        this.display.showSketches &&
+        this.handleCount &&
+        this.handleBuffer &&
+        this.handlePipeline,
+    );
     const wantMeshWire = this.display.showMeshWireframe && this.meshWireCount > 0;
     const wantMeshSharp = this.display.showMeshEdges && this.meshSharpCount > 0;
     if (
@@ -1660,6 +1683,22 @@ export class Renderer {
     // the model. One switch turns the lot off for a presentation frame; the
     // mesh edges above belong to the mesh and keep their own.
     if (!this.display.showOverlays) return;
+    // Hidden lines first: they test against the scene's depth alone, before
+    // any overlay has written its own.
+    if (this.seeThroughOverlays) {
+      if (wantSkeletonEdges && this.edgePipeline!.hidden) {
+        pass.setPipeline(this.edgePipeline!.hidden);
+        pass.setBindGroup(0, this.overlayBindGroup);
+        pass.setVertexBuffer(0, this.edgeBuffer);
+        pass.draw(6, this.edgeCount);
+      }
+      if (wantHandles && this.handlePipeline!.hidden) {
+        pass.setPipeline(this.handlePipeline!.hidden);
+        pass.setBindGroup(0, this.overlayBindGroup);
+        pass.setVertexBuffer(0, this.handleBuffer);
+        pass.draw(6, this.handleCount);
+      }
+    }
     // Fill first, then its own outline: the wash does not write depth, so the
     // hairline lands on top of it rather than fighting it.
     if (this.faceFillVertices && this.faceFillBuffer && this.facePipeline) {
@@ -1674,19 +1713,14 @@ export class Renderer {
       pass.setVertexBuffer(0, this.faceOutlineBuffer);
       pass.draw(6, this.faceOutlineCount);
     }
-    if (this.display.showSketches && this.edgeCount && this.edgeBuffer && this.edgePipeline) {
-      pass.setPipeline(depth(this.edgePipeline!));
+    if (wantSkeletonEdges) {
+      pass.setPipeline(this.edgePipeline!.tested);
       pass.setBindGroup(0, this.overlayBindGroup);
       pass.setVertexBuffer(0, this.edgeBuffer);
       pass.draw(6, this.edgeCount);
     }
-    if (
-      this.display.showSketches &&
-      this.handleCount &&
-      this.handleBuffer &&
-      this.handlePipeline
-    ) {
-      pass.setPipeline(depth(this.handlePipeline!));
+    if (wantHandles) {
+      pass.setPipeline(this.handlePipeline!.tested);
       pass.setBindGroup(0, this.overlayBindGroup);
       pass.setVertexBuffer(0, this.handleBuffer);
       pass.draw(6, this.handleCount);

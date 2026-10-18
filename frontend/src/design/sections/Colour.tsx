@@ -35,6 +35,32 @@ const DATA_ROLES = [
   },
 ];
 
+/** A strip of grey part with a skeleton across it, for the C10 plates. */
+function SkeletonSwatch(props: { tone: string }) {
+  const cased = props.tone !== "ink-3";
+  return (
+    <svg viewBox="0 0 200 64" width="200" height="64" role="img" aria-label={`skeleton in ${props.tone}`}>
+      <rect x="0" y="12" width="70" height="40" fill={v("rule-strong")} />
+      <rect x="70" y="12" width="60" height="40" fill={v("rule")} />
+      <rect x="130" y="12" width="70" height="40" fill={v("ink-3")} />
+      {cased ? <line x1="8" y1="32" x2="192" y2="32" stroke={v("surface-float")} stroke-opacity="0.75" stroke-width="3.4" /> : null}
+      <line x1="8" y1="32" x2="192" y2="32" stroke={v(props.tone)} stroke-width="1.8" />
+      {[36, 100, 164].map((x) => (
+        <rect
+          x={x - 4}
+          y={28}
+          width="8"
+          height="8"
+          fill={v(props.tone)}
+          stroke={cased ? v("surface-float") : "none"}
+          stroke-opacity="0.75"
+          stroke-width="1.5"
+        />
+      ))}
+    </svg>
+  );
+}
+
 /** The viridis ends and middle, for the C7 plates. */
 const VIRIDIS = [
   [0, [0.267, 0.005, 0.329]],
@@ -166,8 +192,9 @@ export const colour: SectionDef = {
         id="C4"
         why="Selection has to read over any field value, and only the heaviest ink does. A constraint holds geometry still, and stillness has no hue."
       >
-        Selection is <code>ink</code>, hover <code>ink-2</code>, construction geometry <code>ink-3</code> (
-        <code>rule</code> when locked). Constraints are <code>ink</code>; a violated one is <code>danger</code>.
+        Selection is <code>ink</code>. Constraints are <code>ink</code>; a violated one is <code>danger</code>. The
+        skeleton is the one exception to this heading: it has a hue (C10), and drops back to <code>ink-3</code> /{" "}
+        <code>ink-2</code> / <code>rule-strong</code> only over a field (V2).
       </Rule>
 
       <h3>The accent (A3, A5)</h3>
@@ -239,9 +266,30 @@ export const colour: SectionDef = {
           </>
         }
       >
-        Chrome hue stays outside the viewport; inside it only data and direction are coloured. A ramp in a panel is a
-        legend at most 8px tall with both ends labelled. Hover and selection over a field are outlines, and no text sits
-        on a data-dependent backdrop.
+        Chrome hue stays outside the viewport; inside it only data, direction and the construction skeleton (C10) are
+        coloured. A ramp in a panel is a legend at most 8px tall with both ends labelled. Hover and selection over a
+        field are outlines, and no text sits on a data-dependent backdrop.
+      </Rule>
+      <Rule
+        id="C10"
+        why="The part is grey on grey paper; a grey skeleton over it was the same reading as the shading. Hue is the one channel the part does not use."
+        examples={
+          <>
+            <Plate kind="do" label="the skeleton in its own hue, cased in sheet" ground>
+              <SkeletonSwatch tone="construction" />
+            </Plate>
+            <Plate kind="dont" label="the skeleton in ink, over a grey part" ground>
+              <SkeletonSwatch tone="ink-3" />
+            </Plate>
+          </>
+        }
+      >
+        Sketch edges, axes, construction circles and held vertices are <code>construction</code> at rest,{" "}
+        <code>construction-strong</code> under the pointer, <code>construction-locked</code> when the source locks the
+        node, and <code>ink</code> once selected. Every stroke and handle has a <code>surface-float</code> casing so it
+        reads over a dark facet and a light one; where the part hides it, it is a dashed line at 45&nbsp;% with no
+        casing. Over a solved field the skeleton is the ink ladder (V2): its magenta sits beside magma's middle. Sketch
+        planes, face highlights and mesh edges are not the skeleton and keep their inks.
       </Rule>
 
       <h3>The editor</h3>

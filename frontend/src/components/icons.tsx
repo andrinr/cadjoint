@@ -292,6 +292,23 @@ export function TrashIcon(props: IconProps) {
   );
 }
 
+/** A profile through its held vertices: the construction skeleton. */
+export function SkeletonIcon(props: IconProps) {
+  const a: P = [3.5, 13.5];
+  const b: P = [3.5, 3.5];
+  const c: P = [13.5, 3.5];
+  const d: P = [13.5, 9.5];
+  return (
+    <svg {...base(props.size ?? BOX)}>
+      <path d={link([a, b], "grip", "grip") + link([b, c], "grip", "grip") + link([c, d], "grip", "grip")} />
+      <Grip x={a[0]} y={a[1]} />
+      <Grip x={b[0]} y={b[1]} />
+      <Grip x={c[0]} y={c[1]} />
+      <Grip x={d[0]} y={d[1]} />
+    </svg>
+  );
+}
+
 /** Converging lines: a perspective frustum. */
 export function PerspectiveIcon(props: IconProps) {
   return (

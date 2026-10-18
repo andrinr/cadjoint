@@ -5,7 +5,7 @@
  *
  * It is a specimen, not the renderer: geometry is a fixed front view of a fin
  * comb sketch, and every state the overlay table names (rest, hover,
- * selected, locked; free and held vertices) appears on it once.
+ * selected, locked, hidden; free and held vertices) appears on it once.
  */
 
 import { For, type JSX } from "solid-js";
@@ -33,6 +33,35 @@ const SELECTED_VERTEX = 8;
 const LOCKED_EDGE = 0;
 const SELECTED_EDGE = 7;
 const HOVER_EDGE = 12;
+/** A construction axis through the middle fin: hidden inside the part, seen above it. */
+const AXIS_SEEN: [Point, Point] = [[320, 78], [320, 110]];
+const AXIS_HIDDEN: [Point, Point] = [[320, 110], [320, 250]];
+
+/** The skeleton's state ladder (V1), or the ink one over a field (V2). */
+function edgeTone(i: number, field: boolean): string {
+  if (i === SELECTED_EDGE) return "ink";
+  if (i === HOVER_EDGE) return field ? "ink-2" : "construction-strong";
+  if (i === LOCKED_EDGE) return field ? "rule-strong" : "construction-locked";
+  return field ? "ink-3" : "construction";
+}
+
+/** A stroke cased in sheet, as `fs_edge` draws it. */
+function CasedLine(props: { a: Point; b: Point; tone: string; width: number }) {
+  return (
+    <g>
+      <line
+        x1={props.a[0]}
+        y1={props.a[1]}
+        x2={props.b[0]}
+        y2={props.b[1]}
+        stroke={v("surface-float")}
+        stroke-opacity="0.75"
+        stroke-width={props.width + 1.6}
+      />
+      <line x1={props.a[0]} y1={props.a[1]} x2={props.b[0]} y2={props.b[1]} stroke={v(props.tone)} stroke-width={props.width} />
+    </g>
+  );
+}
 
 /** World z = 0 and x = 0 on screen, where the graticule's axes run. */
 const ORIGIN: Point = [272, 250];
@@ -64,22 +93,26 @@ function Graticule(props: { width: number; height: number }) {
   return <g shape-rendering="crispEdges">{lines}</g>;
 }
 
-function Handle(props: { at: Point; held: boolean; selected: boolean; locked?: boolean }) {
+function Handle(props: { at: Point; held: boolean; selected: boolean; locked?: boolean; field?: boolean }) {
   const [x, y] = props.at;
-  if (props.selected) return <circle cx={x} cy={y} r="5.5" fill={v("ink")} />;
+  // Every shape sits in a sheet casing, so it reads over any shade of the part.
+  const casing = { stroke: v("surface-float"), "stroke-opacity": "0.75", "stroke-width": "1.5" };
+  if (props.selected) return <circle cx={x} cy={y} r="5.5" fill={v("ink")} {...casing} />;
   if (props.held) {
-    return (
-      <rect
-        x={x - 3.5}
-        y={y - 3.5}
-        width="7"
-        height="7"
-        fill={v(props.locked ? "rule" : "ink-3")}
-      />
-    );
+    const tone = props.field
+      ? props.locked
+        ? "rule-strong"
+        : "ink-3"
+      : props.locked
+        ? "construction-locked"
+        : "construction";
+    return <rect x={x - 3.5} y={y - 3.5} width="7" height="7" fill={v(tone)} {...casing} />;
   }
   return (
-    <circle cx={x} cy={y} r="4" fill={v("surface-float")} stroke={v("ink-2")} stroke-width="1.5" />
+    <g>
+      <circle cx={x} cy={y} r="5" fill={v("surface-float")} />
+      <circle cx={x} cy={y} r="3.4" fill={v("surface-float")} stroke={v("param")} stroke-width="1.6" />
+    </g>
   );
 }
 
@@ -210,7 +243,7 @@ export function ViewportSpecimen(props: { field?: boolean }) {
         </defs>
         <Graticule width={640} height={340} />
         <g transform="translate(-48 0)">
-        {/* The sketch plane: construction, so ink-3 at rest. */}
+        {/* The sketch plane: the ground a sketch is drawn on, so ink-3, not the skeleton's hue. */}
         <rect
           x="128"
           y="64"
@@ -236,25 +269,24 @@ export function ViewportSpecimen(props: { field?: boolean }) {
             <path d="M302,222L338,222L338,110L302,110Z" fill="none" stroke={v("ink")} stroke-width="2" />
           </g>
         ) : (
-          <path d={path} fill={v("ink")} fill-opacity="0.06" />
+          <path d={path} fill={v("ink")} fill-opacity="0.14" />
         )}
+        {/* Behind the part the skeleton is a hidden line: no casing, dashed, at 45 %. */}
+        <line
+          x1={AXIS_HIDDEN[0][0]}
+          y1={AXIS_HIDDEN[0][1]}
+          x2={AXIS_HIDDEN[1][0]}
+          y2={AXIS_HIDDEN[1][1]}
+          stroke={v(props.field ? "ink-3" : "construction")}
+          stroke-opacity="0.45"
+          stroke-width="1.5"
+          stroke-dasharray="5 3"
+        />
+        <CasedLine a={AXIS_SEEN[0]} b={AXIS_SEEN[1]} tone={props.field ? "ink-3" : "construction"} width={1.5} />
         <For each={edges}>
           {([a, b], index) => {
             const i = index();
-            const tone =
-              i === SELECTED_EDGE ? "ink" : i === HOVER_EDGE ? "ink-2" : i === LOCKED_EDGE ? "rule-strong" : "ink-3";
-            const width = i === SELECTED_EDGE ? 2 : 1.5;
-            return (
-              <line
-                x1={a[0]}
-                y1={a[1]}
-                x2={b[0]}
-                y2={b[1]}
-                stroke={v(tone)}
-                stroke-width={width}
-                stroke-dasharray={i === LOCKED_EDGE ? "4 3" : undefined}
-              />
-            );
+            return <CasedLine a={a} b={b} tone={edgeTone(i, Boolean(props.field))} width={i === SELECTED_EDGE ? 2 : 1.5} />;
           }}
         </For>
         <Dimension from={[196, 110]} to={[232, 110]} offset={14} text="0.30 ≠ 0.32" violated />
@@ -266,6 +298,7 @@ export function ViewportSpecimen(props: { field?: boolean }) {
               held={HELD.has(index())}
               selected={index() === SELECTED_VERTEX}
               locked={index() === LOCKED_VERTEX}
+              field={props.field}
             />
           )}
         </For>

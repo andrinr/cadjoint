@@ -23,7 +23,14 @@ import { normalTip, originMarkSize, type PlaneFrame } from "../planes";
 import { AXIS_COLORS, gizmoEdges, type AxisIndex } from "./gizmo";
 import type { Vec3 } from "./math";
 import { triangulate } from "./triangulate";
-import { CHROME, OVERLAY_TONES, VIEWPORT_STATES, hexToRgb, overlayRgba } from "../tokens";
+import {
+  CHROME,
+  FIELD_VIEWPORT_STATES,
+  OVERLAY_TONES,
+  VIEWPORT_STATES,
+  hexToRgb,
+  overlayRgba,
+} from "../tokens";
 
 /** Bytes per instance: position pair + rgba (+ an active flag for gizmos). */
 export const EDGE_STRIDE = 40;
@@ -36,9 +43,10 @@ export const FACE_STRIDE = 28;
 export type Rgba = readonly [number, number, number, number];
 
 /**
- * Construction-overlay ink, evaluated from `OVERLAY_TONES` in tokens.ts.
- * Achromatic inside the viewport (C7): state is the ink ladder (V1) — rest
- * `ink-3`, hover `ink-2`, selected `ink`, locked `rule`.
+ * Construction-overlay tones, evaluated from `OVERLAY_TONES` in tokens.ts.
+ * The skeleton is the construction hue (C10), and state is its ladder (V1):
+ * rest `construction`, hover `construction-strong`, selected `ink`, locked
+ * `construction-locked`.
  */
 export const COLORS: Record<string, Rgba> = Object.fromEntries(
   Object.keys(OVERLAY_TONES).map((name) => [name, overlayRgba(name)]),
@@ -46,7 +54,24 @@ export const COLORS: Record<string, Rgba> = Object.fromEntries(
 
 const INK = hexToRgb(CHROME.ink);
 
-/** A held vertex's square at rest: the rest step of the ink ladder. */
+const opaque = (token: keyof typeof CHROME): Rgba => [...hexToRgb(CHROME[token]), 1];
+
+/**
+ * The skeleton's tones while a solved field is on screen: the ink ladder of
+ * `FIELD_VIEWPORT_STATES`, so the field stays the only colour (V2).
+ */
+const FIELD_COLORS = {
+  edge: opaque(FIELD_VIEWPORT_STATES.rest),
+  edgeHover: opaque(FIELD_VIEWPORT_STATES.hover),
+  edgeSelected: opaque(FIELD_VIEWPORT_STATES.selected),
+  edgeLocked: opaque(FIELD_VIEWPORT_STATES.locked),
+  handleHover: opaque(FIELD_VIEWPORT_STATES.selected),
+  handleSelected: opaque(FIELD_VIEWPORT_STATES.selected),
+  handleLocked: opaque(FIELD_VIEWPORT_STATES.locked),
+  held: opaque(FIELD_VIEWPORT_STATES.rest),
+};
+
+/** A held vertex's square at rest: the construction hue, like its edges. */
 const HANDLE_HELD: Rgba = [...hexToRgb(CHROME[VIEWPORT_STATES.rest]), 1];
 
 /** A free vertex's ring: the free-parameter blue `free=True` takes in the editor. */
@@ -54,8 +79,9 @@ const HANDLE_FREE: Rgba = [...hexToRgb(CHROME.param), 1];
 
 /**
  * Handle shapes, the instance's last float (see `fs_handle`): free is a
- * hollow param-blue ring, held a filled ink square, selected a filled ink
- * circle. Shape and hue together survive a colour-blind reading.
+ * hollow param-blue ring, held a filled construction-hue square, selected a
+ * filled ink circle, each cased in sheet. Shape and hue together survive a
+ * colour-blind reading.
  */
 export const HANDLE_SHAPE = { free: 0, held: 1, selected: 2 } as const;
 
@@ -83,21 +109,34 @@ export function packConstructionOverlay(
   profiles: readonly ConstructionNode[],
   selection: Selection | null,
   hover: Selection | null,
+  overField = false,
 ): { edges: number[]; handles: number[] } {
   const edges: number[] = [];
   const handles: number[] = [];
+  const tones = overField
+    ? FIELD_COLORS
+    : {
+        edge: COLORS.edge,
+        edgeHover: COLORS.edgeHover,
+        edgeSelected: COLORS.edgeSelected,
+        edgeLocked: COLORS.edgeLocked,
+        handleHover: COLORS.handleHover,
+        handleSelected: COLORS.handleSelected,
+        handleLocked: COLORS.handleLocked,
+        held: HANDLE_HELD,
+      };
 
   for (const node of profiles) {
     const selected = selection?.nodeId === node.id;
     // Whole-object hover previews the pick before it is committed.
     const hovered = hover?.nodeId === node.id && hover.vertexIndex === null;
     const edgeColor = selected
-      ? COLORS.edgeSelected
+      ? tones.edgeSelected
       : hovered
-        ? COLORS.edgeHover
+        ? tones.edgeHover
         : node.editable
-          ? COLORS.edge
-          : COLORS.edgeLocked;
+          ? tones.edge
+          : tones.edgeLocked;
     for (const [start, end] of node.edges) {
       edges.push(start[0], start[1], start[2], end[0], end[1], end[2], ...edgeColor);
     }
@@ -113,14 +152,14 @@ export function packConstructionOverlay(
             : HANDLE_SHAPE.free;
       // A free handle keeps its hue on hover and gains weight via the emphasis flag.
       const handleColor = !node.editable
-        ? COLORS.handleLocked
+        ? tones.handleLocked
         : isSelected
-          ? COLORS.handleSelected
+          ? tones.handleSelected
           : !held
             ? HANDLE_FREE
             : isHovered
-              ? COLORS.handleHover
-              : HANDLE_HELD;
+              ? tones.handleHover
+              : tones.held;
       const position = node.vertices[index].world;
       handles.push(
         position[0],

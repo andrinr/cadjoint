@@ -270,14 +270,29 @@ describe("packConstructionOverlay shapes handles", () => {
     }
   });
 
-  it("draws a held handle in ink and a free one in param blue", () => {
+  it("draws a held handle in the construction hue and a free one in param blue", () => {
     const profile = node([
       { free: false, binding: null },
       { free: true, binding: null },
     ]);
     const { handles } = packConstructionOverlay([profile], null, null);
+    expect(handles.slice(3, 6)).toEqual(hexToRgb(CHROME.construction));
+    const [fr, fg, fb] = handles.slice(floats + 3, floats + 6);
+    expect([fr, fg, fb]).toEqual(hexToRgb(CHROME.param));
+  });
+
+  it("drops the construction hue over a solved field, keeping param for free", () => {
+    const profile = node([
+      { free: false, binding: null },
+      { free: true, binding: null },
+    ]);
+    const { edges, handles } = packConstructionOverlay([profile], null, null, true);
     const [hr, hg, hb] = handles.slice(3, 6);
     expect(Math.max(hr, hg, hb) - Math.min(hr, hg, hb)).toBeLessThan(0.04);
+    if (edges.length) {
+      const [er, eg, eb] = edges.slice(6, 9);
+      expect(Math.max(er, eg, eb) - Math.min(er, eg, eb)).toBeLessThan(0.04);
+    }
     const [fr, fg, fb] = handles.slice(floats + 3, floats + 6);
     expect([fr, fg, fb]).toEqual(hexToRgb(CHROME.param));
   });
