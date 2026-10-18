@@ -9,7 +9,9 @@
 import { numpy as np } from "@jax-js/jax";
 import type { Pts } from "./sdf";
 
-export const CHUNK = Number(globalThis.process?.env?.JAXJS_CHUNK ?? 1 << 14);
+// JAXJS_CHUNK overrides it under Node, for measuring.
+const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
+export const CHUNK = Number(env?.JAXJS_CHUNK ?? 1 << 14);
 
 /** Run `run` over (xs, ys, zs) in chunks, concatenating each of its outputs. */
 export function chunked(

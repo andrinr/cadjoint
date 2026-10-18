@@ -1,125 +1,128 @@
-# Spike: cadjoint's field in the browser on jax-js
+# cadjoint's field in the browser on jax-js
 
 Can a static page evaluate, differentiate, mesh and export a cadjoint scene
-with no server, without writing cadjoint's maths a second time?
+with no server, without writing cadjoint's maths a second time? Yes, for
+every shipped scene that loads, on Wasm and WebGPU.
 
-Measured 2026-10-16, Apple Silicon, jax-js 0.1.26: Node (Wasm) for the
-headless check, and the Claude desktop browser pane (Chromium 152) for the
-page.
+Measured 2026-10-18, Apple Silicon, jax-js 0.1.27: Node (Wasm) for the
+headless check, the Claude desktop browser pane (Chromium) for the page.
 
-## One source of truth for the maths
+## How it works
 
 ```
-cadjoint (Python, jnp)  --emit_kernels.py-->  StableHLO  -->  src/kernels.gen.ts (jax-js)
-cadjoint scene object   --export_scene.py-->  NAME.scene.json  (node type, params, children)
-src/runtime.ts          composes the generated kernels from the scene graph
-src/dc.ts               cadjoint's dual contouring, ported (extract_mesh, sharp=True)
+cadjoint (Python)  --python -m cadjoint.backends.jaxjs kernels-->  src/kernels.gen.ts
+cadjoint scene     --python -m cadjoint.backends.jaxjs scene---->  NAME.scene.json (cadjoint-scene v1)
+src/runtime.ts     wires the kernels from the scene graph (no formulas)
+src/dc.ts          cadjoint's dual contouring, ported (extract_mesh, sharp=True)
+src/chunk.ts       bounded-batch evaluation (jax-js's Wasm heap is 32-bit)
 ```
 
-- `emit_kernels.py` lowers each node type's per-point function from
-  cadjoint's own code -- `Box.sdf`, `Cylinder.sdf`, `ExtrudedPolygon.sdf`,
-  `Rotate._transform_point`, `Union.sdf`, ... -- to StableHLO and translates
-  it op by op into jax-js (15 kernels, ~1400 lines, never edited by hand).
-  It counts every SSA value's uses and emits jax-js's `.ref` ownership
-  mechanically.
-- `src/runtime.ts` is the only hand-written part of the field: four wiring
-  patterns (primitive, transform, field op, boolean fold), ~60 lines,
-  mirroring each node's `sdf(child_sdf, p, ...)`.
-- `export_scene.py` writes the scene graph plus Python references: values at
-  2000 points, `jax.grad` of their sum w.r.t. the first blend's smoothness
-  through cadjoint's functional form, and cadjoint's `extract_mesh` on a
-  lattice.
-- `check.mts` runs all four checks headless: `npx tsx check.mts`.
+The generator lives in the package, `cadjoint/backends/jaxjs/`:
 
-## Results (generated path, Wasm)
+- `kernels.py` traces each node type's own `sdf` with JAX, exports it to
+  StableHLO, and `_stablehlo.py` translates that op by op into jax-js.
+  Primitives become one kernel. Operations are traced with *recording*
+  children: the **query** kernel is the point a child is asked about
+  (skipped when it is `p`), the **combine** kernel is what the node makes
+  of the children's distances (skipped when it returns the child's value);
+  n-ary nodes fold it left. Patterns get a per-instance query (one kernel
+  for any count and skip mask) and a folded `min`. Profiles are emitted at
+  4/8/16/32/64 vertices and padded with their last vertex, which the polygon
+  distance treats exactly.
+- `scene.py`: `scene_graph(sdf)` writes the JSON contract; `graph_sdf(graph)`
+  evaluates a graph through the same `sdf`s in Python.
+- `tests/backends/test_jaxjs.py`: one scene using all 23 node types; its
+  graph evaluates bit-identically to the object, and the generated TS
+  matches Python within 2e-5 fused and per-node (needs `npm install` here).
 
-| | space-frame node | clevis bracket |
-| --- | --- | --- |
-| field vs cadjoint, 2000 points | 3.8e-6 | 3.8e-6 |
-| `grad` w.r.t. blend vs Python `jax.grad`, relative | 3.3e-7 | 3.9e-7 |
-| vertices / triangles vs `extract_mesh` | 121,960 / 243,936, exact | 45,556 / 91,140, exact |
-| bad edges (also after a position weld) | 0 | 0 |
-| volume, browser vs Python | 25,128.0 vs 25,128.0 mm^3 | 106,573.5 vs 106,588.8 mm^3 |
+## Coverage
 
-The clevis mesh has the same topology as Python's; 1.7 % of its vertices sit
-up to 0.22 mm apart (99 % within 0.05 mm). Traced cell by cell, none of it is
-the generated formulas:
+23 node types: sphere, box, round_box, cylinder, capsule, torus, plane,
+extruded_polygon (with draft and twist), revolved_polygon, lofted_polygon,
+translate, rotate, scale, twist, mirror, offset, shell, union, difference,
+intersection, xor, linear_pattern, polar_pattern. That is every concrete
+`cadjoint.sdf` node class. Not covered: profiles over 64 vertices, and
+plain Python callables as children (both raise `UnsupportedNode`).
 
-- cadjoint's `RoundBox` has a NaN gradient everywhere inside its inner box
-  (`norm` of a zero vector), which leaks through every boolean around it.
-  Python drops those normals and places the cutout-wall vertices by mass
-  point; jax-js has finite gradients and puts them on the wall (x = -54.000
-  vs Python's -53.984). Filed as andrinr/cadjoint#57.
-- On creases (a pin bore meeting a lug face) cadjoint's sharp booleans are a
-  smooth max with k floored at 1e-10, so which side's normal wins is decided
-  by float noise: XLA and jax-js pick differently, both valid.
-- At exact max/min ties jax-js 0.1.26 gives the gradient to the first
-  argument, JAX splits it 0.5 / 0.5 (ekzhang/jax-js#230). jax-js's JVP rule
-  now splits it like JAX (ekzhang/jax-js#231, merged after 0.1.26). The
-  composite workaround tried before that, `0.5 * (min(a, b) + min(b, a))`,
-  raised the clevis's Wasm compile from 163 ms to 66 s, then ran out of
-  memory. jit fusion renumbers buffer ids per op in operand order, so an op
-  reading (b, a) after one reading (a, b) gets a separate copy of each
-  operand. Shared subexpressions stop being shared, and the expression
-  doubles with every boolean in the chain (ekzhang/jax-js#233).
+## Results: every shipped scene, headless (Wasm)
 
-## Performance: fused scene kernel vs per-node kernels
+`npx tsx check.mts node clevis bracket cylinder_block duct_fairing duct_sink end_cap motor_shield`
 
-`src/runtime.ts` composes a scene two ways:
+Each scene's export lattice is the one a real export uses (`fit_bounds`, 96
+cells on the longest side); node and clevis keep the spike's lattices.
 
-- **fused** (`field`): `jit(vmap(scene))`, the whole scene one program.
-- **per-node** (`fieldPerNode`): `jit(vmap(kernel))` once per node *type*
-  (at most 15, shared by every node of that type), composed at batch level:
-  one dispatch per node.
+| scene | nodes | value err (rel) | grad err (rel) | vertices / triangles vs `extract_mesh` | vertex positions | sample + mesh, fused |
+| --- | --- | --- | --- | --- | --- | --- |
+| node | 30 | 8.7e-8 | 2.5e-7 | 121,960 / 243,936, equal | ≤ 1.2e-4 cells | 0.6 + 1.5 s |
+| clevis | 40 | 5.1e-9 | 3.9e-7 | 45,556 / 91,140, equal | 18 differ, ≤ 0.28 cells | 0.4 + 0.9 s |
+| bracket | 17 | 1.1e-7 | 8.5e-8 | 20,492 / 40,980, equal | ≤ 2.1e-5 cells | 0.1 + 0.4 s |
+| cylinder_block | 144 | 9.4e-8 | 4.0e-7 | 63,600 / 127,776, equal | ≤ 8.3e-5 cells | 5.2 + 18.8 s |
+| duct_fairing | 2 | 0 | (no blend) | 38,108 / 76,212, equal | exact | 0.0 + 0.2 s |
+| duct_sink | 9 | 2.7e-8 | 5.3e-7 | 30,826 / 61,648, equal | ≤ 2.8e-6 cells | 0.0 + 0.2 s |
+| end_cap | 51 | 1.8e-7 | 8.0e-8 | 31,932 / 63,860, equal | ≤ 9.0e-5 cells | 1.4 + 3.3 s |
+| motor_shield | 154 | 3.2e-7 | 4.1e-7 | 65,619 / 131,408, equal | 4 differ, ≤ 0.37 cells | 4.9 + 15.3 s |
 
-Clevis bracket (40 nodes), browser pane (Chromium 152), Apple Silicon:
+Bad edges equal Python's everywhere (0, and 3 on motor_shield, which
+Python's mesh has too). The gradient is `jax.grad` of the summed field at
+2000 points w.r.t. one blend smoothness, through the cadjoint object's own
+Parameter. `scenes/starter.py` does not load stand-alone (it needs a declared
+study), so it is not exported.
 
-| | Wasm fused | Wasm per-node | WebGPU fused | WebGPU per-node |
+The differing vertices are QEF solutions where the Hermite data differ by
+rounding: the clevis's at creases (cadjoint's sharp booleans floor k at
+1e-10, so which side's normal wins is float noise), motor_shield's at
+points where the jax-js vertex is no farther from the zero set than
+Python's (|f| 3.6e-4 vs 6.6e-2 cells for the worst). Not traced further.
+
+Per-node composition gives the same values within 1.2e-6 relative and the
+same gradients within 6.3e-7 on all eight; its meshes equal the fused ones
+except on the clevis, whose comparison lattice puts 10,909 points exactly on
+faces where the sign at zero is rounding.
+
+## Browser
+
+`npm run dev`, open http://localhost:5191/ (`?export=NAME[&webgpu][&pernode]`
+for one scene; `?split=NAME`, `?kernels` for timings). `?export` runs values,
+grad, the export lattice and dual contouring, and offers the STL.
+
+- **WebGPU works** since jax-js 0.1.27 (ekzhang/jax-js#234, the `maxArgs`
+  infinite loop). Every kernel compiles in 3-165 ms, `?export=end_cap&webgpu`
+  (fused) and `?export=motor_shield&webgpu&pernode` (154 nodes) match
+  Python: vertex, triangle and bad-edge counts equal, volume within 1e-7
+  and 1e-6 relative, gradient within 2.4e-7 and 8.3e-8. motor_shield's
+  export takes 4.1 s sampling + 12.0 s meshing there.
+- **WebGPU bug, `scale` only**: `Scale.sdf`'s `jnp.allclose` becomes a
+  boolean `all` over an `or` expression, and jax-js's WebGPU reduction emits
+  `acc = acc && a || b` (it strips the item's parentheses), which WGSL
+  rejects. Minimal repro: `jit((a, b, c) => np.all(np.logicalOr(np.less(a,
+  b), np.logicalAnd(np.less(b, c), np.less(a, c)))))` on WebGPU. Fix: keep
+  the parentheses in `src/backend/webgpu.ts`'s boolean min/max reduction
+  (WebGL does). Wasm is unaffected.
+- **Memory**: one fused call over 550k points of the 144-node cylinder block
+  exceeds jax-js's 4 GiB Wasm heap, so evaluation runs in 16k-point chunks.
+
+Timings (fused, compile + first call at 256 points; warm 1M points through
+`sample`). Taken with the browser pane in the background, so treat them as
+upper bounds; an earlier unchunked, foreground run of the clevis gave 153 ms
+/ 30 ms on WebGPU.
+
+| | clevis Wasm | clevis WebGPU | motor_shield Wasm | motor_shield WebGPU |
 | --- | --- | --- | --- | --- |
-| first call, 256 points (compile + run) | 190 ms | 91 ms | did not finish in 15+ min | did not finish in 1+ min |
-| second call, 256 points | 7 ms | 3 ms | | |
-| first call, 1 M points | 1528 ms | 367 ms | | |
-| warm, 1 M points | 394 ms | 209 ms | | |
+| fused, first 256 | 153 ms | 308 ms | 1192 ms | 2423 ms |
+| per-node, first 256 | 38 ms | 106 ms | 201 ms | 259 ms |
+| fused, warm 1M | 308 ms | 376 ms | 5.1 s | 3.1 s |
+| per-node, warm 1M | 493 ms | 567 ms | 7.6 s | 5.3 s |
 
-Per-kernel compile + run on Wasm (`?kernels`, 256 points): every node type
-takes 2-69 ms; the extruded polygons are the largest at ~60 ms.
-
-Per-node is the better default on Wasm too. Headless (Node, Wasm) it gives
-the same values within 1.1e-5 and the same blend gradient within 4.7e-7;
-its mesh is watertight, and differs from Python's only through 533 lattice
-signs where cadjoint's own value is within 2e-6 of zero: the comparison
-lattice was chosen to align with the clevis's faces, so 10,909 lattice
-points sit exactly on a face and the sign at zero is rounding. A real export
-fits its grid to the part with padding and almost never lands on a face.
-
-### WebGPU: an infinite loop in jax-js's jit, fixed upstream
-
-The WebGPU stall is not shader compilation, and not box/round_box. While it
-hangs, the page's renderer sits at 100 % CPU and the GPU process is idle;
-every stack sample is in jax-js's jit, in the `maxArgs` pass of
-`splitGraphDataflow`.
-
-A WebGPU kernel may bind at most `maxArgs` input buffers (7 on default
-limits: 8 storage buffers per stage, one for the output). When a fused op
-needs more, the pass marks the input with the most distinct dependencies as
-a kernel boundary and retries. It does not skip inputs it has already
-marked, so when the top pick is already marked, nothing changes and it
-loops forever. In extruded_polygon_4 an op reads three inputs with 1, 7 and
-7 dependencies (8 > 7), and the pass keeps re-picking the first.
-
-It hits extruded_polygon_4, _5 and _6, and the fused clevis, which contains
-them. Every other kernel, box and round_box included, compiles. WebGL
-(`maxArgs` 8) can hit the same loop; Wasm (64) does not.
-
-ekzhang/jax-js#234 (open) skips inputs already marked. With it,
-extruded_polygon_4/5/6 compile in 65-74 ms on headless WebGPU.
+Per-node compiles much less (one kernel per node type and role, shared);
+fused runs faster once compiled. 16k-point chunks with a synchronous
+readback each cost WebGPU most of its advantage; a larger chunk on WebGPU
+(its memory is not the Wasm heap) is the obvious next step.
 
 ## Files
 
-`emit_kernels.py`, `export_scene.py`, `check.mts`, `src/kernels.gen.ts`
-(generated), `src/runtime.ts`, `src/dc.ts`, `src/mesh.ts` (checks, STL),
-`src/main.ts` (the page; `?quick`, `?split[=node][&webgpu][&pernode]` and
-`?kernels[&webgpu]` time single steps), `src/sdf.ts` (the earlier hand-written node port, kept for
-comparison), `make_reference*.py` (the first, hand-port references).
-
-Run: `npm install && npm run dev`, open http://localhost:5191/.
+`check.mts` (headless checks), `eval.mts` (graph + points to values, for
+pytest), `export_scene.py` (graph + Python references for a scene file or a
+graph), `src/runtime.ts`, `src/dc.ts`, `src/chunk.ts`, `src/mesh.ts` (checks,
+STL), `src/main.ts` (the page), `src/kernels.gen.ts` (generated),
+`src/sdf.ts` and `make_reference*.py` (the first hand-written port, kept for
+comparison).
