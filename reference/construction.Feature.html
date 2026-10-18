@@ -3080,17 +3080,17 @@ ul.task-list li input[type="checkbox"] {
 
 <section id="cadjoint.construction.Feature" class="level1">
 <h1>construction.Feature</h1>
-<pre class="python"><code>construction.Feature(kind, faces, *, axis=None, solid=None)</code></pre>
+<pre class="python"><code>construction.Feature(kind, faces, *, axis=None, solid=None, profiles=())</code></pre>
 <p>The record a generator leaves on the profiles it consumed.</p>
 <p><code>extrude(profile, depth)</code> returns an SDF, and the SDF is the thing the renderer wants — but the <em>viewer</em> addresses geometry by the sketch that produced it. Registering the feature on its profile is what lets the construction payload list a sketch’s faces without the payload builder ever seeing the SDF tree.</p>
 <section id="parameters" class="level2 doc-section doc-section-parameters">
 <h2 class="doc-section doc-section-parameters anchored" data-anchor-id="parameters">Parameters</h2>
 <table class="caption-top table">
 <colgroup>
-<col style="width: 8%">
-<col style="width: 14%">
-<col style="width: 64%">
-<col style="width: 12%">
+<col style="width: 4%">
+<col style="width: 6%">
+<col style="width: 84%">
+<col style="width: 5%">
 </colgroup>
 <thead>
 <tr class="header">
@@ -3124,6 +3124,12 @@ ul.task-list li input[type="checkbox"] {
 <td></td>
 <td>The generated SDF, for callers that want to walk back to it.</td>
 <td><code>None</code></td>
+</tr>
+<tr class="odd">
+<td>profiles</td>
+<td>tuple</td>
+<td>Every profile the feature consumed, when there is more than the one it is registered on — a loft’s two ends. The feature is registered on the first; the rest are only reachable from here.</td>
+<td><code>()</code></td>
 </tr>
 </tbody>
 </table>

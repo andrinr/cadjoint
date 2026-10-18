@@ -8218,7 +8218,7 @@
     "href": "reference/construction.Feature.html",
     "title": "construction.Feature",
     "section": "",
-    "text": "construction.Feature(kind, faces, *, axis=None, solid=None)\nThe record a generator leaves on the profiles it consumed.\nextrude(profile, depth) returns an SDF, and the SDF is the thing the renderer wants — but the viewer addresses geometry by the sketch that produced it. Registering the feature on its profile is what lets the construction payload list a sketch’s faces without the payload builder ever seeing the SDF tree.\n\n\n\n\n\n\n\n\n\n\n\nName\nType\nDescription\nDefault\n\n\n\n\nkind\nstr\nextrude, revolve, or loft.\nrequired\n\n\nfaces\nFaceSet\nThe feature’s analytic faces.\nrequired\n\n\naxis\nAxis | None\nThe feature’s axis, for revolves.\nNone\n\n\nsolid\n\nThe generated SDF, for callers that want to walk back to it.\nNone",
+    "text": "construction.Feature(kind, faces, *, axis=None, solid=None, profiles=())\nThe record a generator leaves on the profiles it consumed.\nextrude(profile, depth) returns an SDF, and the SDF is the thing the renderer wants — but the viewer addresses geometry by the sketch that produced it. Registering the feature on its profile is what lets the construction payload list a sketch’s faces without the payload builder ever seeing the SDF tree.\n\n\n\n\n\n\n\n\n\n\n\nName\nType\nDescription\nDefault\n\n\n\n\nkind\nstr\nextrude, revolve, or loft.\nrequired\n\n\nfaces\nFaceSet\nThe feature’s analytic faces.\nrequired\n\n\naxis\nAxis | None\nThe feature’s axis, for revolves.\nNone\n\n\nsolid\n\nThe generated SDF, for callers that want to walk back to it.\nNone\n\n\nprofiles\ntuple\nEvery profile the feature consumed, when there is more than the one it is registered on — a loft’s two ends. The feature is registered on the first; the rest are only reachable from here.\n()",
     "crumbs": [
       "API reference",
       "Sketches and construction",
@@ -8231,7 +8231,7 @@
     "href": "reference/construction.Feature.html#parameters",
     "title": "construction.Feature",
     "section": "",
-    "text": "Name\nType\nDescription\nDefault\n\n\n\n\nkind\nstr\nextrude, revolve, or loft.\nrequired\n\n\nfaces\nFaceSet\nThe feature’s analytic faces.\nrequired\n\n\naxis\nAxis | None\nThe feature’s axis, for revolves.\nNone\n\n\nsolid\n\nThe generated SDF, for callers that want to walk back to it.\nNone",
+    "text": "Name\nType\nDescription\nDefault\n\n\n\n\nkind\nstr\nextrude, revolve, or loft.\nrequired\n\n\nfaces\nFaceSet\nThe feature’s analytic faces.\nrequired\n\n\naxis\nAxis | None\nThe feature’s axis, for revolves.\nNone\n\n\nsolid\n\nThe generated SDF, for callers that want to walk back to it.\nNone\n\n\nprofiles\ntuple\nEvery profile the feature consumed, when there is more than the one it is registered on — a loft’s two ends. The feature is registered on the first; the rest are only reachable from here.\n()",
     "crumbs": [
       "API reference",
       "Sketches and construction",
