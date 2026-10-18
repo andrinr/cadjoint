@@ -145,12 +145,40 @@ h2 {
 #quarto-sidebar .sidebar-item-section > .sidebar-item-container {
   margin-bottom: $cj-gap;
 }
-// The current page: semibold ink, no bar. The one vertical mark in the
-// panel is the outline's rail, and the current section's bar sits on it.
+// The current page: the accent block behind its name (the accent is only
+// ever a fill under type). The one vertical mark in the panel is the
+// outline's rail, and the current section's bar sits on it.
 #quarto-sidebar .sidebar-link.active {
   border-left-color: transparent;
-  color: $cj-ink !important;
+  background: $cj-accent;
+  color: $cj-ink-on-accent !important;
   font-weight: $cj-weight-semibold;
+}
+#quarto-sidebar .sidebar-item-container:has(> .sidebar-link.active) {
+  margin-right: $cj-gap;
+}
+// The standalone outline's head carries the same toggle as a section.
+#TOC .toc-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+#TOC .toc-head #toc-title {
+  margin: 0;
+  border: 0;
+}
+// Quarto rotates a section chevron only inside the sidebar; the outline's
+// toggle turns the same way, with the same transition.
+#TOC .sidebar-item-toggle i {
+  display: inline-block;
+  transition: transform 0.2s ease;
+}
+#TOC .sidebar-item-toggle[aria-expanded="true"] i {
+  transform: rotate(90deg);
+}
+#TOC .sidebar-item-toggle {
+  color: $cj-ink-3;
+  text-decoration: none;
 }
 
 // The page outline nested in the sidebar under the current page
