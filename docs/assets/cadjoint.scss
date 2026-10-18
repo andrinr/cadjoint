@@ -265,6 +265,26 @@ h2 {
   font-weight: $cj-weight-semibold;
   color: $cj-ink !important;
 }
+// quartodoc pages carry their title as the first body heading instead of
+// a title block; give it the title block's position so the title does not
+// drop when moving between a guide and a reference page.
+#title-block-header:not(:has(.quarto-title)) {
+  margin-block-end: 0;
+}
+main.content > header.quarto-title-block + section.level1 > h1:first-child {
+  margin-top: 0;
+}
+
+// Every page reserves the scrollbar's width, so a short page and a long
+// one put the content at the same x.
+html {
+  scrollbar-gutter: stable;
+}
+// The outline is moved into the sidebar after load (nav.html); hide it
+// until then so it does not flash in the margin.
+#TOC:not(.in-sidebar) {
+  visibility: hidden;
+}
 body.toc-in-sidebar #quarto-margin-sidebar {
   display: none;
 }

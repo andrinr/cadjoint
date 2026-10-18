@@ -20,6 +20,9 @@ website:
   title: cadjoint
   description: Differentiable CAD with JAX and SDFs
   favicon: docs/assets/logo.svg
+  # The sidebar shows where a page is; breadcrumbs above the title only
+  # pushed nested pages' titles down.
+  bread-crumbs: false
   search:
     location: navbar
     type: overlay
